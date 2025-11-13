@@ -1,13 +1,12 @@
-from os.path import abspath, dirname, join, pardir
 from pathlib import Path
 
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
 
 # Data directories and definitions
-ROOT_DIR = join(abspath(dirname(__file__)), pardir)
-PROCESSED_DATA_DIR = Path(join(ROOT_DIR, "Processed-Data"))
-FIGURE_DIR = join(ROOT_DIR, "figures")
+ROOT_DIR = Path(__file__).parent.parent
+PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"
+FIGURE_DIR = ROOT_DIR / "figures"
 
 
 """

@@ -75,8 +75,16 @@ ignore = [
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+# Stricter type checking suitable for scientific repositories
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+# Allow missing imports since many scientific packages lack type stubs
 ignore_missing_imports = true
+# Scientific code often uses dynamic types appropriately
+allow_any_generics = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
