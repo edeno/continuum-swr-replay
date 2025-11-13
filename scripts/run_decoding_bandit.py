@@ -23,7 +23,7 @@ from continuum_swr_replay.analysis.hippocampus.analysis_hpc_bandit import (
     get_data_over_time,
     load_results,
 )
-from continuum_swr_replay.data_loaders.load_data_bandit import (
+from continuum_swr_replay.data_loaders import (
     get_epoch_info,
     get_training_timepoints,
     load_data,

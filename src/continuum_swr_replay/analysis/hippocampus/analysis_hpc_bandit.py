@@ -17,7 +17,7 @@ from non_local_detector.model_checking.highest_posterior_density import (
 )
 from ripple_detection.core import gaussian_smooth, segment_boolean_series
 from scipy.stats import zscore
-from continuum_swr_replay.data_loaders.load_data_bandit import get_labels
+from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
