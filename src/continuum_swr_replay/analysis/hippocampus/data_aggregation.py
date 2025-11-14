@@ -1,7 +1,5 @@
 """Aggregation of analysis results over time."""
 
-from typing import Any
-
 import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
@@ -11,10 +9,15 @@ from continuum_swr_replay.data_loaders import get_labels
 
 from .event_detection import get_confident_times, get_overlap_times
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
+from .types import SessionData
+
+# Maximum speed threshold for filtering non-local events
+# Events with speeds above this are likely not genuine replay events
+MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 
 
 def get_data_over_time(
-    data: dict[str, Any],
+    data: SessionData,
     results: xr.Dataset,
     env: Environment,
     nwb_file_name: str,
@@ -30,7 +33,7 @@ def get_data_over_time(
 
     Parameters
     ----------
-    data : dict[str, Any]
+    data : SessionData
         Data dictionary from load_data() containing position, spikes, etc.
     results : xr.Dataset
         Decoding results
@@ -73,7 +76,9 @@ def get_data_over_time(
         data["position_info"].index.to_numpy(),
         non_local_threshold,
     )
-    non_local_times = non_local_times[non_local_times.max_speed < 4.0]
+    non_local_times = non_local_times[
+        non_local_times.max_speed < MAX_SPEED_THRESHOLD_CM_PER_SEC
+    ]
     non_local_labels = get_labels(non_local_times, results.time)
     SWR_labels = get_labels(data["ripple_times"], results.time)
     MUA_labels = get_labels(data["hse_times"][brain_area], results.time)

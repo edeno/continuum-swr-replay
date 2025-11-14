@@ -1,6 +1,6 @@
 """Analysis of decoded posterior distributions."""
 
-from typing import Any
+from typing import Literal
 
 import networkx as nx
 import numpy as np
@@ -16,6 +16,8 @@ from non_local_detector.model_checking.highest_posterior_density import (
     get_HPD_spatial_coverage,
 )
 from ripple_detection.core import gaussian_smooth
+
+from .types import SessionData
 
 
 def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
@@ -66,7 +68,17 @@ def get_map_speed(
     -------
     map_speed : np.ndarray
         Speed (cm/s) of the most likely decoded position over time
+
+    Raises
+    ------
+    ValueError
+        If sampling_frequency is not positive
     """
+    if sampling_frequency <= 0:
+        raise ValueError(
+            f"sampling_frequency must be positive, got {sampling_frequency}"
+        )
+
     dt = 1 / sampling_frequency
     posterior_array = np.asarray(posterior)
     map_position_ind = np.nanargmax(posterior_array, axis=1)
@@ -134,11 +146,11 @@ def get_map_speed(
 
 
 def get_posterior_stats(
-    data: dict[str, Any],
+    data: SessionData,
     env: Environment,
     results: xr.Dataset | None = None,
     sampling_frequency: int = 500,
-    orientation_variable: str = "head_orientation",
+    orientation_variable: Literal["head_orientation", "body_orientation"] = "head_orientation",
     posterior: xr.DataArray | None = None,
 ) -> tuple[
     xr.DataArray,
@@ -154,7 +166,7 @@ def get_posterior_stats(
 
     Parameters
     ----------
-    data : dict[str, Any]
+    data : SessionData
         Data dictionary containing position info, track graph, etc.
     env : Environment
         Environment configuration from detector

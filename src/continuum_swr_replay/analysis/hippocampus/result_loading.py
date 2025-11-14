@@ -1,4 +1,31 @@
-"""Loading and managing saved decoding results."""
+"""Loading and managing saved decoding results.
+
+This module provides functions for loading previously saved decoding results
+and detector models from disk.
+
+Examples
+--------
+Load decoding results with detector model:
+
+>>> from continuum_swr_replay.analysis.hippocampus import load_results
+>>> results, detector, env = load_results(
+...     nwb_file_name="chimi20200212_.nwb",
+...     epoch_name="02_r1",
+...     decoding_brain_area="HPC"
+... )
+>>> print(f"Loaded results with {len(results.time)} time points")
+>>> print(f"Track has {env.place_bin_size} cm bins")
+
+Load results only (without detector):
+
+>>> results, detector, env = load_results(
+...     "chimi20200212_.nwb",
+...     "02_r1",
+...     load_detector=False
+... )
+>>> # detector and env will be None
+>>> print(f"States: {list(results.states.values)}")
+"""
 
 
 import xarray as xr

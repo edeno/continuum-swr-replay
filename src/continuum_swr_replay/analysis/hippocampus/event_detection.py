@@ -1,4 +1,37 @@
-"""Detection and analysis of neural events (ripples, non-local states)."""
+"""Detection and analysis of neural events (ripples, non-local states).
+
+This module provides functions for detecting confident neural events from
+probability distributions and analyzing event overlap patterns.
+
+Examples
+--------
+Detect non-local events from decoding results:
+
+>>> from continuum_swr_replay.analysis.hippocampus import get_confident_times
+>>> # Combine non-local state probabilities
+>>> non_local_prob = (
+...     results.acausal_state_probabilities.sel(states="Non-Local Continuous") +
+...     results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+... )
+>>> # Detect confident events
+>>> non_local_times = get_confident_times(
+...     non_local_prob,
+...     speed=position_info.head_speed.to_numpy(),
+...     time=position_info.index.to_numpy(),
+...     prob_threshold=0.8,
+...     minimum_duration=0.015  # 15 ms minimum
+... )
+>>> print(f"Detected {len(non_local_times)} non-local events")
+
+Find events that overlap with ripples:
+
+>>> from continuum_swr_replay.analysis.hippocampus import get_overlap_times
+>>> overlap_events, no_overlap_events = get_overlap_times(
+...     non_local_times, ripple_times, results
+... )
+>>> print(f"Non-local events with ripples: {len(overlap_events)}")
+>>> print(f"Non-local events without ripples: {len(no_overlap_events)}")
+"""
 
 
 import numpy as np
@@ -57,9 +90,13 @@ def get_confident_times(
     else:
         max_speed = np.full(len(confident_times), np.nan)
 
+    # Create 1-based index for event numbering
     n_times = len(confident_times)
-    index_array: np.ndarray | list[int] = np.arange(n_times) + 1 if n_times > 0 else []
-    index = pd.Index(index_array, name="event_number")
+    if n_times > 0:
+        index = pd.RangeIndex(start=1, stop=n_times + 1, name="event_number")
+    else:
+        index = pd.Index([], name="event_number", dtype=int)
+
     return pd.DataFrame(
         {
             "start_time": confident_times[:, 0],
