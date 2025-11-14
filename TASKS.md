@@ -147,21 +147,21 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 3.1 Add Type Hints to task_variables.py (2 hours)
 
-- [ ] Open `src/continuum_swr_replay/data_loaders/task_variables.py`
-- [ ] Import NetworkX types: `import networkx as nx`
-- [ ] Add type hint to function at line 71
-- [ ] Add type hint to function at line 119
-- [ ] Add type hint to function at line 153
-- [ ] Add type hints to remaining 2 functions
-- [ ] Add `nx.Graph` type hints for graph parameters
-- [ ] Add `pd.DataFrame` type hints for DataFrame returns
-- [ ] Add `NDArray[np.float64]` for numpy arrays
-- [ ] Update all docstrings to match new type signatures
-- [ ] Save file
-- [ ] Run `uv run mypy src/continuum_swr_replay/data_loaders/task_variables.py`
-- [ ] Fix any mypy errors reported
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm tests pass
+- [x] Open `src/continuum_swr_replay/data_loaders/task_variables.py`
+- [x] Import NetworkX types: `import networkx as nx`
+- [x] Add type hint to function at line 71
+- [x] Add type hint to function at line 119
+- [x] Add type hint to function at line 153
+- [x] Add type hints to remaining 2 functions
+- [x] Add `nx.Graph` type hints for graph parameters
+- [x] Add `pd.DataFrame` type hints for DataFrame returns
+- [x] Add `NDArray[np.float64]` for numpy arrays
+- [x] Update all docstrings to match new type signatures
+- [x] Save file
+- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/task_variables.py`
+- [x] Fix any mypy errors reported
+- [x] Run `uv run pytest tests/`
+- [x] Confirm tests pass
 - [ ] Stage and commit: `git commit -m "Add type hints to task_variables.py"`
 
 #### 3.2 Fix Remaining Mypy Errors (1 hour)

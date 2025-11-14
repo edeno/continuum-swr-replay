@@ -101,6 +101,33 @@
 
 ---
 
+### 2025-11-14 - Milestone 3 - Task 3.1 COMPLETE ✅
+
+**Status**: Task 3.1 Complete - Add Type Hints to task_variables.py (30 min)
+
+**Completed Work**:
+1. ✅ Added NDArray import from numpy.typing
+2. ✅ Added type hints to `dist_to_goal_per_time()` function (line 71)
+   - Added: int, float, nx.Graph, dict[int, tuple[int, int]], and return type float
+3. ✅ Added type hints to `dist_to_goal()` function (line 119)
+   - Added: pd.DataFrame, pd.Series, nx.Graph, dict[int, tuple[int, int]], and return type NDArray[np.float64]
+4. ✅ Added type hints to `turn_direction()` function (line 153)
+   - Added: pd.Series, pd.DataFrame, nx.Graph, np.ndarray, and return type str
+5. ✅ Added type ignore comment for nx.shortest_path_length (mypy limitation)
+
+**Results**:
+- mypy passes with no errors on task_variables.py ✅
+- All 149 tests passing ✅
+- Docstrings already accurately described types (no updates needed) ✅
+
+**Notes**:
+- NetworkX was already imported (nx), no new import needed
+- 2 functions already had type hints (path_progress_for_run_segment, make_task_variables)
+- Added type ignore for nx.shortest_path_length return (returns Any in type stubs but actually returns float)
+- track_edges parameter typed as np.ndarray (array of edge tuples from nx.Graph.edges)
+
+---
+
 ## Blockers
 
 None currently.

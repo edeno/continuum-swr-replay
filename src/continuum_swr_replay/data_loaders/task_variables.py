@@ -3,6 +3,7 @@
 import networkx as nx
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
 
@@ -69,13 +70,13 @@ def path_progress_for_run_segment(
 
 
 def dist_to_goal_per_time(
-    track_segment_id,
-    projected_x_position,
-    projected_y_position,
-    goal_node_id,
-    track_graph,
-    track_segment_id_to_edge,
-):
+    track_segment_id: int,
+    projected_x_position: float,
+    projected_y_position: float,
+    goal_node_id: int,
+    track_graph: nx.Graph,
+    track_segment_id_to_edge: dict[int, tuple[int, int]],
+) -> float:
     """Compute distance to goal for a single time point.
 
     Parameters
@@ -108,7 +109,7 @@ def dist_to_goal_per_time(
     right_distance = np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2)
     nx.add_path(copy_graph, [node1, "cur_pos"], distance=left_distance)
     nx.add_path(copy_graph, ["cur_pos", node2], distance=right_distance)
-    return nx.shortest_path_length(
+    return nx.shortest_path_length(  # type: ignore[no-any-return]
         copy_graph,
         source="cur_pos",
         target=goal_node_id,
@@ -116,7 +117,12 @@ def dist_to_goal_per_time(
     )
 
 
-def dist_to_goal(position_info, trial, track_graph, track_segment_id_to_edge):
+def dist_to_goal(
+    position_info: pd.DataFrame,
+    trial: pd.Series,
+    track_graph: nx.Graph,
+    track_segment_id_to_edge: dict[int, tuple[int, int]],
+) -> NDArray[np.float64]:
     """Compute distance to goal for all time points in a trial.
 
     Parameters
@@ -150,7 +156,12 @@ def dist_to_goal(position_info, trial, track_graph, track_segment_id_to_edge):
     )
 
 
-def turn_direction(trial, position_info, track_graph, track_edges):
+def turn_direction(
+    trial: pd.Series,
+    position_info: pd.DataFrame,
+    track_graph: nx.Graph,
+    track_edges: np.ndarray,
+) -> str:
     """Determine turn direction sequence for a trial.
 
     Parameters
