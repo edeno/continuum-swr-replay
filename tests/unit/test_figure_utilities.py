@@ -240,6 +240,30 @@ class TestSaveFigure:
             assert (Path(tmpdir) / "test_figure.png").exists()
             plt.close(fig)
 
+    def test_dpi_is_always_int(self):
+        """Test that DPI is always cast to int, even if rcParams returns float.
+
+        This is the key test for FU-1.4: mpl.rcParams can return float values
+        (e.g., 450.0), but the dpi parameter should be int for type safety.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Set rcParams to a float value (common scenario)
+            original_dpi = mpl.rcParams["savefig.dpi"]
+            mpl.rcParams["savefig.dpi"] = 450.0  # Float value
+
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            output_path = Path(tmpdir) / "test_figure"
+            # This should work without type errors, even though rcParams has float
+            save_figure(str(output_path))
+
+            assert (Path(tmpdir) / "test_figure.pdf").exists()
+            plt.close(fig)
+
+            # Restore original
+            mpl.rcParams["savefig.dpi"] = original_dpi
+
 
 class TestLabelPanels:
     """Test panel labeling functionality."""

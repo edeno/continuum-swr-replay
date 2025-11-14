@@ -31,8 +31,9 @@
   - 3 warnings in `validate_figure_quality()`
   - **COMPLETED:** All 3 warnings now use stacklevel=2
 
-- [ ] **FU-1.4:** Cast DPI to int in `save_figure()` (line 441)
+- [x] **FU-1.4:** Cast DPI to int in `save_figure()` (line 441)
   - `dpi = int(mpl.rcParams.get("savefig.dpi", 300))`
+  - **COMPLETED:** DPI now cast to int for type safety (handles float from rcParams)
 
 - [ ] **FU-1.5:** Add format validation in `save_figure()`
   - Define `VALID_FORMATS` constant

@@ -438,7 +438,7 @@ def save_figure(
 
     # Get DPI from current settings if not specified
     if dpi is None:
-        dpi = mpl.rcParams.get("savefig.dpi", 300)
+        dpi = int(mpl.rcParams.get("savefig.dpi", 300))
 
     # Determine facecolor
     if facecolor is None:
