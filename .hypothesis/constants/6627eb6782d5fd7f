@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/bandit_task.py
+# hypothesis_version: 6.147.0
+
+['Kay', 'beam_breaks', 'electrode_group_info', 'interval_list_name', 'nwb_file_name', 'position_info', 'pump_events', 'spike_times', 'task_variables', 'track_graph', 'trials', 'well_visits']

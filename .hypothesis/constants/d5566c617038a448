@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/lfp.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.015, 2.0, 4.0, 1000, ' noPrePostTrialTimes', 'CA1', 'KEY', 'Kay', 'datajoint', 'default', 'filter_name', 'filter_sampling_rate', 'firing_rate', 'group_name', 'hdmf', 'hse_times', 'ignore', 'lfp_band', 'lfp_merge_id', 'merge_id', 'nwb_file_name', 'omit', 'pynwb', 'ripple_150_250', 'ripple_filtered_lfps', 'ripple_lfps', 'ripple_params', 'ripple_times', 'theta_5_11', 'theta_filtered_lfp', 'theta_phase', 'theta_power']

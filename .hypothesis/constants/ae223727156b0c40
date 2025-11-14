@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/.venv/bin/pytest
+# hypothesis_version: 6.147.0
+
+['-script.pyw', '.exe', '__main__']

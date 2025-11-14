@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/position.py
+# hypothesis_version: 6.147.0
+
+[' noPrePostTrialTimes', 'DLCPosV1', '_', 'datajoint', 'default', 'default_decoding', 'epoch', 'hdmf', 'head_', 'head_position_x', 'head_position_y', 'ignore', 'interval_list_name', 'linear', 'linear_edge_order', 'linear_edge_spacing', 'merge_id', 'nwb_file_name', 'patch_id', 'position_info', 'pynwb', 'source', 'time', 'track_graph', 'track_graph_name', 'track_segment_id', 'valid_times', 'video_frame_ind']

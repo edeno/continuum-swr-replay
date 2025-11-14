@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Eric Denovellis", email = "eric.denovellis@ucsf.edu" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     # Core scientific computing
     "numpy>=1.24.0",
@@ -25,8 +25,8 @@ dependencies = [
     "networkx>=3.0",
 
     # Neuroscience packages
-    "non_local_detector",
-    "spyglass-neuro",
+    "non_local_detector @ git+https://github.com/LorenFrankLab/non_local_detector.git",
+    "spyglass-neuro @ git+https://github.com/LorenFrankLab/spyglass.git",
     "kachery",                # database access
     "kachery-client",
     "kachery-cloud>=0.4.0",
@@ -48,6 +48,7 @@ dev = [
     "pytest>=7.0.0",
     "mypy>=1.0.0",
     "ruff>=0.0.241",
+    "hypothesis>=6.0.0",
 ]
 
 # GPU acceleration (optional)

@@ -152,7 +152,7 @@ def load_data(
 
     spike_data = get_spike_data(nwb_file_name)
     # Filter spike times by the start and end time of the position data
-    filter_spike_times(
+    spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
         spike_data["spike_times"],
         spike_data["spike_waveform_features"],
         position_data["position_info"].index,

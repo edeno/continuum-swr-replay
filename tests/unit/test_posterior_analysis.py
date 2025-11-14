@@ -1,0 +1,525 @@
+"""Tests for posterior analysis functions.
+
+This module tests the critical posterior statistics and speed calculations
+used for analyzing decoded neural replay events.
+"""
+
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+import pytest
+import xarray as xr
+
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    get_conditional_non_local_posterior,
+    get_map_speed,
+)
+
+
+class TestConditionalNonLocalPosterior:
+    """Test posterior conditioning on non-local state."""
+
+    def test_basic_normalization(self):
+        """Posterior should be normalized (sum to 1 over position)."""
+        time = np.arange(0, 1.0, 0.002)
+        position = np.arange(0, 100, 2)
+        n_time, n_pos = len(time), len(position)
+
+        # Create mock posterior with two non-local states
+        continuous_posterior = np.random.rand(n_time, n_pos)
+        fragmented_posterior = np.random.rand(n_time, n_pos)
+
+        acausal_posterior = xr.DataArray(
+            np.stack([continuous_posterior, fragmented_posterior]),
+            coords={
+                "state": ["Non-Local Continuous", "Non-Local Fragmented"],
+                "time": time,
+                "position": position,
+            },
+            dims=["state", "time", "position"],
+        )
+
+        results = xr.Dataset({"acausal_posterior": acausal_posterior})
+        conditional_posterior = get_conditional_non_local_posterior(results)
+
+        # Check normalization: each time point should sum to 1 over position
+        sums = conditional_posterior.sum("position")
+        np.testing.assert_allclose(sums, 1.0, rtol=1e-10)
+
+    def test_combines_both_states(self):
+        """Should sum continuous and fragmented non-local states."""
+        time = np.arange(0, 0.1, 0.002)
+        position = np.arange(0, 50, 5)
+
+        # Known values for easy checking
+        continuous_posterior = np.ones((len(time), len(position))) * 0.3
+        fragmented_posterior = np.ones((len(time), len(position))) * 0.7
+
+        acausal_posterior = xr.DataArray(
+            np.stack([continuous_posterior, fragmented_posterior]),
+            coords={
+                "state": ["Non-Local Continuous", "Non-Local Fragmented"],
+                "time": time,
+                "position": position,
+            },
+            dims=["state", "time", "position"],
+        )
+
+        results = xr.Dataset({"acausal_posterior": acausal_posterior})
+        conditional_posterior = get_conditional_non_local_posterior(results)
+
+        # Before normalization, sum should be 1.0 at each position
+        # After normalization, should sum to 1.0 over positions
+        assert conditional_posterior.sum("position").values == pytest.approx(
+            1.0, rel=1e-10
+        )
+
+    def test_handles_zero_posterior(self):
+        """Division by zero when posterior sums to zero."""
+        time = np.arange(0, 0.1, 0.002)
+        position = np.arange(0, 50, 5)
+
+        # All zeros - division by zero case
+        continuous_posterior = np.zeros((len(time), len(position)))
+        fragmented_posterior = np.zeros((len(time), len(position)))
+
+        acausal_posterior = xr.DataArray(
+            np.stack([continuous_posterior, fragmented_posterior]),
+            coords={
+                "state": ["Non-Local Continuous", "Non-Local Fragmented"],
+                "time": time,
+                "position": position,
+            },
+            dims=["state", "time", "position"],
+        )
+
+        results = xr.Dataset({"acausal_posterior": acausal_posterior})
+        conditional_posterior = get_conditional_non_local_posterior(results)
+
+        # Result should be NaN or Inf when dividing by zero
+        assert np.all(
+            np.isnan(conditional_posterior.values) | np.isinf(conditional_posterior.values)
+        ), "Division by zero should produce NaN or Inf"
+
+    def test_single_timepoint(self):
+        """Should work with single time point."""
+        time = np.array([0.0])
+        position = np.arange(0, 100, 2)
+
+        continuous_posterior = np.random.rand(1, len(position))
+        fragmented_posterior = np.random.rand(1, len(position))
+
+        acausal_posterior = xr.DataArray(
+            np.stack([continuous_posterior, fragmented_posterior]),
+            coords={
+                "state": ["Non-Local Continuous", "Non-Local Fragmented"],
+                "time": time,
+                "position": position,
+            },
+            dims=["state", "time", "position"],
+        )
+
+        results = xr.Dataset({"acausal_posterior": acausal_posterior})
+        conditional_posterior = get_conditional_non_local_posterior(results)
+
+        assert len(conditional_posterior.time) == 1
+        assert conditional_posterior.sum("position").values == pytest.approx(1.0, rel=1e-10)
+
+
+class TestMapSpeed:
+    """Test speed computation from decoded positions."""
+
+    def test_single_timepoint_returns_nan(self):
+        """With only one time point, speed should be NaN."""
+        # Create simple linear track graph
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # Single timepoint posterior (all probability at node 0)
+        posterior = np.array([[1.0, 0.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 1
+        assert np.isnan(speed[0]), "Single timepoint should return NaN"
+
+    def test_two_timepoints_basic_speed(self):
+        """With two time points, compute distance / dt."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=20.0)  # 20 cm apart
+
+        # Two timepoints: move from node 0 to node 1
+        posterior = np.array([[1.0, 0.0], [0.0, 1.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        sampling_frequency = 500.0  # Hz
+        dt = 1 / sampling_frequency  # 0.002 seconds
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,  # Minimal smoothing (can't use 0.0)
+        )
+
+        expected_speed = 20.0 / dt  # 20 cm / 0.002 s = 10000 cm/s
+        assert len(speed) == 2
+        # Both speeds should be approximately the same (repeated edge speed)
+        # Use relaxed tolerance due to smoothing
+        assert speed[0] == pytest.approx(expected_speed, rel=0.05)
+        assert speed[1] == pytest.approx(expected_speed, rel=0.05)
+
+    def test_stationary_animal_zero_speed(self):
+        """Animal staying at same position should have zero speed."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # Five timepoints, all at node 0 (stationary)
+        posterior = np.array([
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,
+        )
+
+        # Speed should be approximately zero (distance = 0)
+        np.testing.assert_allclose(speed, 0.0, atol=1e-6)
+
+    def test_linear_movement_speed(self):
+        """Test speed calculation with linear movement along track."""
+        # Create 5-node linear track
+        graph = nx.Graph()
+        edges = [(0, 1), (1, 2), (2, 3), (3, 4)]
+        for edge in edges:
+            graph.add_edge(*edge, distance=10.0)  # 10 cm per edge
+
+        # Move from node 0 to node 4 over 5 timepoints
+        posterior = np.eye(5)  # Diagonal: 0→1→2→3→4
+        place_bin_center_ind_to_node = np.arange(5)
+
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        # Expected: moving 10 cm every dt seconds
+        expected_speed = 10.0 / dt  # 5000 cm/s
+        assert len(speed) == 5
+        # All speeds should be approximately the same
+        # Use relaxed tolerance due to smoothing and edge effects
+        np.testing.assert_allclose(speed, expected_speed, rtol=0.15)
+
+    @pytest.mark.parametrize("invalid_freq", [0.0, -500.0, -1.0, -0.001])
+    def test_invalid_sampling_frequency_raises(self, invalid_freq):
+        """Zero or negative sampling frequency should raise ValueError."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        posterior = np.array([[1.0, 0.0], [0.0, 1.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        with pytest.raises(ValueError, match="sampling_frequency must be positive"):
+            get_map_speed(
+                posterior,
+                graph,
+                place_bin_center_ind_to_node,
+                sampling_frequency=invalid_freq,
+            )
+
+    def test_disconnected_graph_raises(self):
+        """Disconnected nodes should raise NetworkXNoPath error."""
+        # Create disconnected graph: 0-1 and 2-3 (no path between them)
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+        graph.add_edge(2, 3, distance=10.0)
+        # No edge connecting component {0,1} to component {2,3}
+
+        # Try to move from node 0 to node 2 (impossible)
+        posterior = np.array([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],  # Jump from 0 to 2
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1, 2, 3])
+
+        with pytest.raises(nx.NetworkXNoPath):
+            get_map_speed(
+                posterior,
+                graph,
+                place_bin_center_ind_to_node,
+                sampling_frequency=500.0,
+            )
+
+    def test_smoothing_reduces_noise(self):
+        """Gaussian smoothing should reduce speed fluctuations."""
+        # Create linear track
+        graph = nx.Graph()
+        for i in range(10):
+            graph.add_edge(i, i + 1, distance=10.0)
+
+        # Create noisy movement pattern
+        node_sequence = [0, 1, 0, 2, 1, 3, 2, 4, 3, 5, 4]
+        posterior = np.eye(11)[node_sequence]
+        place_bin_center_ind_to_node = np.arange(11)
+
+        # Compute speed with minimal smoothing
+        speed_no_smooth = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,  # Minimal smoothing
+        )
+
+        # Compute speed with heavier smoothing
+        speed_smooth = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.01,  # 10 ms smoothing
+        )
+
+        # Smoothed version should have lower variance
+        assert np.var(speed_smooth) < np.var(speed_no_smooth), \
+            "Smoothing should reduce variance"
+
+    def test_absolute_speed_always_positive(self):
+        """Speed should always be non-negative (uses np.abs)."""
+        # Create linear track
+        graph = nx.Graph()
+        graph.add_edges_from([(0, 1), (1, 2), (2, 3)])
+        nx.set_edge_attributes(graph, 10.0, "distance")
+
+        # Forward then backward movement: 0→1→2→3→2→1→0
+        node_sequence = [0, 1, 2, 3, 2, 1, 0]
+        posterior = np.eye(4)[node_sequence]
+        place_bin_center_ind_to_node = np.arange(4)
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,
+        )
+
+        # All speeds should be non-negative
+        assert np.all(speed >= 0), "Speed should always be non-negative"
+
+    def test_three_timepoints_central_difference(self):
+        """With 3+ time points, use central difference for middle points."""
+        graph = nx.Graph()
+        graph.add_edges_from([(0, 1), (1, 2), (2, 3)])
+        nx.set_edge_attributes(graph, 20.0, "distance")
+
+        # Three nodes: 0 → 1 → 2
+        posterior = np.array([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ])
+        place_bin_center_ind_to_node = np.arange(4)
+
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        # For 3 points, middle point uses central difference
+        # Distance from 0 to 2 is 40 cm (two edges), over 2*dt
+        expected_middle_speed = 40.0 / (2 * dt)
+        # Edge points use forward/backward difference: 20 cm / dt
+        expected_edge_speed = 20.0 / dt
+
+        assert len(speed) == 3
+        # Use relaxed tolerance due to smoothing
+        assert speed[0] == pytest.approx(expected_edge_speed, rel=0.05)
+        assert speed[1] == pytest.approx(expected_middle_speed, rel=0.05)
+        assert speed[2] == pytest.approx(expected_edge_speed, rel=0.05)
+
+    def test_xarray_input(self):
+        """Function should accept xarray DataArray as input."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # Create xarray DataArray
+        posterior = xr.DataArray(
+            np.array([[1.0, 0.0], [0.0, 1.0]]),
+            coords={"time": [0.0, 0.002], "position": [0, 1]},
+            dims=["time", "position"],
+        )
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        # Should work without error
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 2
+        assert np.all(np.isfinite(speed))
+
+    def test_high_sampling_frequency(self):
+        """Test with very high sampling frequency (small dt)."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        posterior = np.array([[1.0, 0.0], [0.0, 1.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        # Very high sampling rate
+        sampling_frequency = 10000.0  # 10 kHz
+        dt = 1 / sampling_frequency  # 0.0001 seconds
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        # At high sampling rates, smoothing has larger effect
+        # Just verify speed is computed and in reasonable range
+        expected_speed = 10.0 / dt  # 100000 cm/s theoretical
+        assert len(speed) == 2
+        assert np.all(np.isfinite(speed))
+        # Speed should be positive and within order of magnitude
+        assert np.all(speed > 0)
+        assert np.all(speed < expected_speed * 1.5), "Speed shouldn't exceed theoretical max"
+
+
+class TestEdgeCases:
+    """Test edge cases and boundary conditions."""
+
+    def test_nan_in_posterior(self):
+        """NaN in posterior should be handled by nanargmax."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # Posterior with NaN values
+        posterior = np.array([
+            [0.3, 0.7],
+            [np.nan, 1.0],
+            [0.5, 0.5],
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        # Should not crash; nanargmax ignores NaN
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 3
+        # Speed should be computed (nanargmax handles NaN)
+        assert np.all(np.isfinite(speed))
+
+    def test_uniform_posterior(self):
+        """Uniform posterior (no clear MAP) should pick first maximum."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # All positions equally likely
+        posterior = np.array([
+            [0.5, 0.5],
+            [0.5, 0.5],
+            [0.5, 0.5],
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        # Should not crash; argmax picks first occurrence
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 3
+        assert np.all(np.isfinite(speed))
+
+    def test_large_graph(self):
+        """Test with larger graph (100 nodes)."""
+        # Create 100-node linear track
+        graph = nx.Graph()
+        for i in range(99):
+            graph.add_edge(i, i + 1, distance=2.0)
+
+        # Move along first 10 nodes
+        posterior = np.zeros((10, 100))
+        for i in range(10):
+            posterior[i, i] = 1.0
+
+        place_bin_center_ind_to_node = np.arange(100)
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 10
+        assert np.all(np.isfinite(speed))
+
+    def test_weighted_graph_different_distances(self):
+        """Graph with varying edge distances."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=5.0)
+        graph.add_edge(1, 2, distance=15.0)
+        graph.add_edge(2, 3, distance=10.0)
+
+        # Move 0 → 1 → 2 → 3
+        posterior = np.eye(4)
+        place_bin_center_ind_to_node = np.arange(4)
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,
+        )
+
+        # Speeds should reflect different edge lengths
+        assert len(speed) == 4
+        assert np.all(np.isfinite(speed))
+        # Middle speeds should vary based on edge lengths
+        # Note: smoothing reduces differences, so check if any variation exists
+        assert np.std(speed) > 0, \
+            "Different edge lengths should produce variation in speeds"

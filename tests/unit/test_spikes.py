@@ -134,7 +134,7 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # Check temporal bounds
         assert spike_times["HPC"][0].min() >= 1.0
@@ -150,7 +150,7 @@ class TestSpikeFiltering:
         position_time = np.arange(0, 10, 0.1)
 
         # Should not raise
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
     def test_all_spikes_filtered_out(self):
         """If all spikes outside bounds, should return empty arrays."""
@@ -162,7 +162,7 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         assert len(spike_times["HPC"][0]) == 0
         assert len(spike_features["HPC"][0]) == 0
@@ -186,7 +186,7 @@ class TestSpikeFiltering:
         # Store original counts
         original_counts = [len(st) for st in spike_times["HPC"]]
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # All spikes should be preserved
         assert len(spike_times["HPC"][0]) == original_counts[0]
@@ -208,7 +208,7 @@ class TestSpikeFiltering:
             "HPC": [np.random.randn(5, 4)],
         }
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # Should have exactly 3 spikes: 1.0, 2.5, 5.0
         assert len(spike_times["HPC"][0]) == 3
@@ -239,7 +239,7 @@ class TestSpikeFiltering:
         # position_time goes from 1.0 to 4.9 (arange stops before 5.0)
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # Check HPC
         assert len(spike_times["HPC"][0]) == 2  # 1.5, 2.5
@@ -270,7 +270,7 @@ class TestSpikeFiltering:
         position_time = np.arange(1.0, 5.0, 0.1)
 
         # Should not raise KeyError
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # Both brain areas should be filtered
         assert len(spike_times["HPC"][0]) == 2  # 1.5, 2.5
@@ -286,7 +286,7 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
         # Should be in order
         filtered = spike_times["HPC"][0]

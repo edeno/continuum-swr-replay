@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/utils.py
+# hypothesis_version: 6.147.0
+
+['^[0-9]+_r[0-9]+$', '_', '_.nwb', 'all', 'animal', 'datajoint', 'date', 'end_time', 'epoch', 'epoch_tag', 'event_number', 'exposure', 'hdmf', 'ignore', 'interval_list_name', 'no_ripple', 'nwb_file_name', 'position_info', 'pynwb', 'records', 'ripple_times', 's', 'session_description', 'start_time', 'valid_times']

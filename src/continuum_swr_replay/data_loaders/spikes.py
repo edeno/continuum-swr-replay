@@ -357,8 +357,8 @@ def filter_spike_times(
     spike_times: dict[str, list[NDArray[np.float64]]],
     spike_waveform_features: dict[str, list[NDArray[np.float64]]],
     position_time: NDArray[np.float64],
-) -> None:
-    """Filter spike times to match position data time bounds (modifies in place).
+) -> tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]:
+    """Filter spike times to match position data time bounds.
 
     Parameters
     ----------
@@ -368,26 +368,38 @@ def filter_spike_times(
         Dictionary mapping brain area to list of feature arrays
     position_time : np.ndarray
         Position time array (defines time bounds)
+
+    Returns
+    -------
+    filtered_spike_times : dict
+        Dictionary mapping brain area to list of filtered spike time arrays
+    filtered_spike_waveform_features : dict
+        Dictionary mapping brain area to list of filtered feature arrays
     """
+    filtered_spike_times = {}
+    filtered_spike_waveform_features = {}
+
     for brain_area, brain_area_spike_times in spike_times.items():
-        filtered_spike_times = []
-        filtered_spike_waveform_features = []
+        brain_area_filtered_times = []
+        brain_area_filtered_features = []
         for sort_ind, sort_group_spike_times in enumerate(brain_area_spike_times):
 
             is_in_bounds = np.logical_and(
                 sort_group_spike_times >= position_time[0],
                 sort_group_spike_times <= position_time[-1],
             )
-            filtered_spike_times.append(sort_group_spike_times[is_in_bounds])
+            brain_area_filtered_times.append(sort_group_spike_times[is_in_bounds])
 
             try:
-                filtered_spike_waveform_features.append(
+                brain_area_filtered_features.append(
                     spike_waveform_features[brain_area][sort_ind][is_in_bounds]
                 )
             except KeyError:
                 pass
 
-        spike_times[brain_area] = filtered_spike_times
+        filtered_spike_times[brain_area] = brain_area_filtered_times
 
-        if filtered_spike_waveform_features:
-            spike_waveform_features[brain_area] = filtered_spike_waveform_features
+        if brain_area_filtered_features:
+            filtered_spike_waveform_features[brain_area] = brain_area_filtered_features
+
+    return filtered_spike_times, filtered_spike_waveform_features

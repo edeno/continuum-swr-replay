@@ -1,0 +1,4 @@
+# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/analysis/hippocampus/event_detection.py
+# hypothesis_version: 6.147.0
+
+[0.015, 0.8, 'duration', 'end_time', 'event_number', 'max_speed', 'start_time']
