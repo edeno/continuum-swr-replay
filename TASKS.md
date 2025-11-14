@@ -263,23 +263,25 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 4.3 Refactor filter_spike_times() to Functional Style (45 min)
 
-- [ ] Open `src/continuum_swr_replay/data_loaders/spikes.py`
-- [ ] Navigate to `filter_spike_times()` function (line ~356)
-- [ ] Change return type from `None` to `tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]`
-- [ ] Create new empty dicts: `filtered_times = {}` and `filtered_features = {}`
-- [ ] Change all in-place modifications to populate new dicts
-- [ ] Add return statement: `return filtered_times, filtered_features`
-- [ ] Update docstring to remove "modifies in place" and add Returns section
-- [ ] Save file
-- [ ] Find all call sites of `filter_spike_times()` in codebase
-- [ ] Update each call site to capture return values
-- [ ] Example: `spike_times, spike_waveform_features = filter_spike_times(...)`
-- [ ] Save all modified files
-- [ ] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_spike_times -v`
-- [ ] Confirm all tests still pass
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm all tests pass
-- [ ] Stage and commit: `git commit -m "Refactor filter_spike_times to return new objects"`
+- [x] Open `src/continuum_swr_replay/data_loaders/spikes.py`
+- [x] Navigate to `filter_spike_times()` function (line ~356)
+- [x] Change return type from `None` to `tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]`
+- [x] Create new empty dicts: `filtered_times = {}` and `filtered_features = {}`
+- [x] Change all in-place modifications to populate new dicts
+- [x] Add return statement: `return filtered_times, filtered_features`
+- [x] Update docstring to remove "modifies in place" and add Returns section
+- [x] Save file
+- [x] Find all call sites of `filter_spike_times()` in codebase
+- [x] Update call site in bandit_task.py to capture return values
+- [x] Update all 8 test cases in test_spikes.py
+- [x] Save all modified files
+- [x] Run `uv run pytest tests/unit/test_spikes.py::TestSpikeFiltering -v`
+- [x] Confirm all tests still pass (8/8 passed)
+- [x] Run `uv run pytest tests/`
+- [x] Confirm all tests pass (161/161 passed)
+- [x] Run `uv run mypy src/`
+- [x] Confirm no type errors
+- [x] Stage and commit: `git commit -m "refactor(M4): Refactor filter_spike_times to functional style"`
 
 #### 4.4 Refactor filter_ripple_lfp_time() to Functional Style (45 min)
 
