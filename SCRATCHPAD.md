@@ -1,9 +1,31 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-3.1 - Use `|` operator for dict merging
+**Current Task:** CB-3.2 - Fix SCREAMING_CASE for constants
 
 ## Session Notes
+
+### 2025-11-14: CB-3.2 - COMPLETED ✅
+
+**Task:** Rename `training_types` to `TRAINING_TYPES` in parameters.py (line 67)
+
+**Status:** COMPLETED - Simple rename, no side effects
+
+**Actions Taken:**
+1. ✅ Located constant at parameters.py:67
+2. ✅ Searched entire codebase for usages - found ZERO references
+3. ✅ Renamed `training_types` to `TRAINING_TYPES`
+4. ✅ Verified tests pass (36/36 integration + property tests)
+5. ✅ Verified ruff and mypy pass with no errors
+
+**Results:**
+- Constant now follows PEP 8 SCREAMING_CASE convention for module-level constants ✅
+- No code changes needed (constant was unused) ✅
+- All tests pass ✅
+
+**Time:** 5 minutes
+
+---
 
 ### 2025-11-14: CB-3.1 - BLOCKED (Mypy Type Inference Limitation)
 

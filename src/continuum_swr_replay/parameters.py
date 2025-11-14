@@ -64,7 +64,7 @@ DECODING_PARAMS: Final = DecodingParameters()
 
 PROBABILITY_THRESHOLDS = [0.50, 0.80, 0.95]
 
-training_types = [
+TRAINING_TYPES = [
     "all",
     "no_ripple",
 ]

@@ -109,8 +109,10 @@
   - Current syntax is actually the CORRECT approach for type-safe dict merging with TypedDicts
   - Removed unused `Any` import as cleanup
 
-- [ ] **CB-3.2:** Fix SCREAMING_CASE for constants in parameters.py (line 67)
+- [x] **CB-3.2:** Fix SCREAMING_CASE for constants in parameters.py (line 67)
   - Rename `training_types` to `TRAINING_TYPES`
+  - **COMPLETED:** Renamed constant to follow PEP 8 naming conventions
+  - No usages in codebase, simple rename with no side effects
 
 - [ ] **CB-3.3:** Optimize DataFrame construction in utils.py (line 114-116)
   - Use scalar broadcast instead of `np.zeros_like()`
