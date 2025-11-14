@@ -768,17 +768,4 @@ def validate_figure_quality() -> bool:
         )
         passed = False
 
-    # Check for layout warnings
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        try:
-            plt.tight_layout()
-        except Exception:
-            pass
-
-        if w:
-            for warning in w:
-                warnings.warn(f"Layout issue: {warning.message}", stacklevel=2)
-            passed = False
-
     return passed

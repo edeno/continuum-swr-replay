@@ -460,6 +460,62 @@ class TestSaveFigure:
             plt.close(fig)
 
 
+class TestValidateFigureQuality:
+    """Test figure quality validation functionality."""
+
+    def test_validation_does_not_modify_figure_layout(self):
+        """Test that validate_figure_quality() doesn't modify figure state.
+
+        This is the key test for FU-2.3: validation functions should be
+        read-only and not have side effects like calling tight_layout().
+        """
+        from continuum_swr_replay.figure_utilities import validate_figure_quality
+
+        fig, axes = plt.subplots(2, 2, constrained_layout=True, dpi=450)
+        for ax in axes.flatten():
+            ax.plot([0, 1], [0, 1])
+
+        # Get layout state before validation
+        # We'll check that the figure's layout engine state doesn't change
+        layout_engine_before = fig.get_layout_engine()
+
+        # Call validation
+        validate_figure_quality()
+
+        # Layout engine should be unchanged
+        layout_engine_after = fig.get_layout_engine()
+        assert type(layout_engine_before) == type(layout_engine_after)
+
+        plt.close(fig)
+
+    def test_validation_returns_true_for_good_figure(self):
+        """Test that validation returns True for properly configured figures."""
+        from continuum_swr_replay.figure_utilities import validate_figure_quality
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=450)
+        ax.plot([0, 1], [0, 1])
+
+        # Should pass validation
+        result = validate_figure_quality()
+        assert result is True
+
+        plt.close(fig)
+
+    def test_validation_warns_low_dpi(self):
+        """Test that validation warns about low DPI."""
+        from continuum_swr_replay.figure_utilities import validate_figure_quality
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=72)
+        ax.plot([0, 1], [0, 1])
+
+        # Should warn about low DPI
+        with pytest.warns(UserWarning, match="Low DPI"):
+            result = validate_figure_quality()
+            assert result is False
+
+        plt.close(fig)
+
+
 class TestLabelPanels:
     """Test panel labeling functionality."""
 

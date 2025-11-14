@@ -77,9 +77,10 @@
   - Raise `ValueError` with helpful hint if no axes found
   - **COMPLETED:** Added validation with helpful error message suggesting plt.subplots() or fig.add_subplot()
 
-- [ ] **FU-2.3:** Fix `validate_figure_quality()` modifying state (line 716)
+- [x] **FU-2.3:** Fix `validate_figure_quality()` modifying state (line 716)
   - Remove `plt.tight_layout()` call
   - Make validation read-only
+  - **COMPLETED:** Removed tight_layout() call and layout warning check, validation is now pure/read-only
 
 - [ ] **FU-2.4:** Improve error messages in `label_panels()` (line 656)
   - Add explicit length validation before zip
