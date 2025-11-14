@@ -285,25 +285,27 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 4.4 Refactor filter_ripple_lfp_time() to Functional Style (45 min)
 
-- [ ] Open `src/continuum_swr_replay/data_loaders/lfp.py`
-- [ ] Navigate to `filter_ripple_lfp_time()` function
-- [ ] Change return type from `None` to appropriate return type
-- [ ] Create new data structures instead of modifying in place
-- [ ] Add return statement
-- [ ] Update docstring to remove "modifies in place" and add Returns section
-- [ ] Save file
-- [ ] Find all call sites of `filter_ripple_lfp_time()` in codebase
-- [ ] Update each call site to capture return values
-- [ ] Save all modified files
-- [ ] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_ripple_lfp_time -v`
-- [ ] Confirm all tests still pass
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm all tests pass
-- [ ] Run `uv run mypy src/`
-- [ ] Confirm no new type errors
-- [ ] Stage and commit: `git commit -m "Refactor filter_ripple_lfp_time to return new objects"`
+- [x] Open `src/continuum_swr_replay/data_loaders/lfp.py`
+- [x] Navigate to `filter_ripple_lfp_time()` function (line 308)
+- [x] Change return type from `None` to `RippleData`
+- [x] Create new data structures instead of modifying in place
+- [x] Add return statement with all RippleData fields
+- [x] Update docstring to remove "modifies in place" and add Returns section
+- [x] Save file
+- [x] Find call site in bandit_task.py:162
+- [x] Update call site to capture return value
+- [x] Update all 7 test cases in test_lfp.py
+- [x] Rename test_modifies_in_place to test_returns_new_dict
+- [x] Save all modified files
+- [x] Run `uv run pytest tests/unit/test_lfp.py -v`
+- [x] Confirm all tests still pass (7/7 passed)
+- [x] Run `uv run pytest tests/`
+- [x] Confirm all tests pass (161/161 passed)
+- [x] Run `uv run mypy src/`
+- [x] Confirm no new type errors
+- [x] Stage and commit: `git commit -m "refactor(M4): Refactor filter_ripple_lfp_time to functional style"`
 
-**Milestone 4 Complete**: ⬜
+**Milestone 4 Complete**: ✅
 
 ---
 
@@ -505,7 +507,7 @@ Track your overall progress here:
 - [x] Milestone 1: Critical Blocking Issues (4/4 task groups) ✅
 - [x] Milestone 2: Type Hints - Data Loaders Part 1 (3/3 task groups) ✅
 - [x] Milestone 3: Type Hints - Data Loaders Part 2 (3/3 task groups) ✅
-- [ ] Milestone 4: Refactor to Functional Style (1/4 task groups) 🔄
+- [x] Milestone 4: Refactor to Functional Style (4/4 task groups) ✅
 - [ ] Milestone 5: Code Organization & Refactoring (0/3 task groups)
 
 ### Time Tracking
@@ -513,11 +515,11 @@ Track your overall progress here:
 - [x] Sprint 1: Critical Fixes - 1 hour (Milestone 1) ✅
 - [x] Sprint 2: Type Hints Part 1 - 2 hours actual (Milestone 2) ✅
 - [x] Sprint 3: Type Hints Part 2 - 1.5 hours actual (Milestone 3) ✅
-- [ ] Sprint 4: Refactoring with Tests - 3 hours (Milestone 4)
+- [x] Sprint 4: Refactoring with Tests - 1.5 hours actual (Milestone 4) ✅
 - [ ] Sprint 5: Code Organization - 7 hours (Milestone 5)
 
-**Total Progress**: 3/5 milestones completed (~4.5/18 hours)
-**Completion**: 60%
+**Total Progress**: 4/5 milestones completed (~6/18 hours)
+**Completion**: 80%
 
 ---
 
