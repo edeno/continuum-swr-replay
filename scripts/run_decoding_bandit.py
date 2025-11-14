@@ -1,14 +1,18 @@
 import logging
 import os
 import subprocess
-import sys
 import warnings
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import dask
 import numpy as np
 import pandas as pd
+from continuum_swr_replay.visualization.visualization import (
+    create_interactive_1D_decoding_figurl,
+)
 from dask.distributed import Client
 from dask_cuda import LocalCUDACluster
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
@@ -19,6 +23,7 @@ from non_local_detector.models.non_local_model import (
 from non_local_detector.models.non_local_model import (
     non_stationary_discrete_transition_type,
 )
+
 from continuum_swr_replay.analysis.hippocampus.analysis_hpc_bandit import (
     get_data_over_time,
     load_results,
@@ -29,11 +34,53 @@ from continuum_swr_replay.data_loaders import (
     load_data,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.visualization.visualization import (
-    create_interactive_1D_decoding_figurl,
-)
+
+if TYPE_CHECKING:
+    import networkx as nx
+    import xarray as xr
 
 warnings.filterwarnings("ignore")
+
+
+# Spatial binning parameters (in cm)
+PLACE_BIN_SIZE_1D = 2.0
+PLACE_BIN_SIZE_2D = 3.5
+
+# Decoding model parameters
+POSITION_STD = np.sqrt(12.5)  # ~3.5 cm spatial uncertainty
+WAVEFORM_STD = 24.0  # Waveform feature space standard deviation
+BLOCK_SIZE = 2**10  # GPU processing block size (1024)
+
+# Detector configuration by brain area
+DETECTOR_CLASSES = {
+    "HPC": (NonLocalClusterlessDetector, "clusterless"),
+    "mPFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+    "OFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+}
+
+
+@dataclass(frozen=True)
+class DecodingConfig:
+    """Configuration for neural decoding."""
+
+    position_std: float = POSITION_STD
+    block_size: int = BLOCK_SIZE
+    waveform_std: float = WAVEFORM_STD
+
+    def to_clusterless_params(self) -> dict[str, Any]:
+        """Get parameters for clusterless decoding (HPC)."""
+        return {
+            "position_std": self.position_std,
+            "waveform_std": self.waveform_std,
+            "block_size": self.block_size,
+        }
+
+    def to_sorted_spikes_params(self) -> dict[str, Any]:
+        """Get parameters for sorted spikes decoding (mPFC/OFC)."""
+        return {
+            "position_std": self.position_std,
+            "block_size": self.block_size,
+        }
 
 
 class SkipChecksumFilter(logging.Filter):
@@ -43,7 +90,7 @@ class SkipChecksumFilter(logging.Filter):
 
 def setup_logger(
     name_logfile: str,
-    path_logfile: str,
+    path_logfile: str | Path,
     *,
     level: int = logging.INFO,
     include_warnings: bool = True,
@@ -107,53 +154,128 @@ def setup_logger(
     return logger
 
 
-def results_exist(save_folder, epoch_identifier, overwrite, brain_area):
-    files_exist = [
-        (save_folder / f"{epoch_identifier}_{brain_area}_results.nc").exists(),
-        (save_folder / f"{epoch_identifier}_{brain_area}_detector.pkl").exists(),
+def results_exist(
+    save_folder: Path,
+    epoch_identifier: str,
+    overwrite: bool,
+    brain_area: str,
+) -> bool:
+    """Check if both results and detector files exist and we're not overwriting."""
+    if overwrite:
+        return False
+
+    required_files = [
+        save_folder / f"{epoch_identifier}_{brain_area}_results.nc",
+        save_folder / f"{epoch_identifier}_{brain_area}_detector.pkl",
     ]
-    if all(files_exist) and not overwrite:
-        return True
-    return False
+    return all(f.exists() for f in required_files)
+
+
+def create_detector(
+    brain_area: str,
+    env: Environment,
+    config: DecodingConfig,
+    discrete_transition_type: str,
+) -> NonLocalClusterlessDetector | NonLocalSortedSpikesDetector:
+    """Factory for creating the appropriate detector for a brain area.
+
+    Parameters
+    ----------
+    brain_area : str
+        Brain area name (must be 'HPC', 'mPFC', or 'OFC')
+    env : Environment
+        Environment configuration
+    config : DecodingConfig
+        Decoding parameters
+    discrete_transition_type : str
+        Type of transition model
+
+    Returns
+    -------
+    detector : NonLocalClusterlessDetector | NonLocalSortedSpikesDetector
+        Configured detector instance
+
+    Raises
+    ------
+    ValueError
+        If brain_area is not recognized
+    """
+    if brain_area not in DETECTOR_CLASSES:
+        valid_areas = list(DETECTOR_CLASSES.keys())
+        raise ValueError(
+            f"Invalid brain_area '{brain_area}'. Must be one of {valid_areas}"
+        )
+
+    detector_class, param_type = DETECTOR_CLASSES[brain_area]
+    params = getattr(config, f"to_{param_type}_params")()
+
+    param_key = f"{param_type}_algorithm_params"
+    return detector_class(
+        environments=env,
+        **{param_key: params},
+        discrete_transition_type=discrete_transition_type,
+    )
 
 
 def perform_decoding(
-    logger,
-    spike_times,
-    spike_waveform_features,
-    position_info,
-    linear_edge_order,
-    linear_edge_spacing,
-    track_graph,
-    is_training,
-    brain_area,
-    non_stationary=False,
-    is_1D=True,
-):
+    logger: logging.Logger,
+    spike_times: list,
+    spike_waveform_features: list | None,
+    position_info: pd.DataFrame,
+    linear_edge_order: list,
+    linear_edge_spacing: list,
+    track_graph: nx.Graph,
+    is_training: np.ndarray,
+    brain_area: str,
+    non_stationary: bool = False,
+    is_1D: bool = True,
+) -> tuple[
+    xr.Dataset, NonLocalClusterlessDetector | NonLocalSortedSpikesDetector, Environment
+]:
+    """Perform neural decoding for a given brain area.
+
+    Parameters
+    ----------
+    logger : logging.Logger
+    spike_times : list
+        List of spike time arrays per unit/tetrode
+    spike_waveform_features : Optional[list]
+        Waveform features (HPC only)
+    position_info : pd.DataFrame
+        Position and movement data
+    linear_edge_order : list
+        Order of track graph edges
+    linear_edge_spacing : list
+        Spacing of track graph edges
+    track_graph : networkx.Graph
+        Track graph structure
+    is_training : np.ndarray
+        Boolean mask for training timepoints
+    brain_area : str
+        Brain area (HPC, mPFC, or OFC)
+    non_stationary : bool
+        Use speed-dependent transitions
+    is_1D : bool
+        Use 1D spatial binning
+
+    Returns
+    -------
+    tuple
+        (results, detector, env)
+    """
     if is_1D:
         env = Environment(
-            place_bin_size=2.0,
+            place_bin_size=PLACE_BIN_SIZE_1D,
             track_graph=track_graph,
             edge_order=linear_edge_order,
             edge_spacing=linear_edge_spacing,
         )
     else:
         env = Environment(
-            place_bin_size=3.5,
+            place_bin_size=PLACE_BIN_SIZE_2D,
         )
 
-    position_std = np.sqrt(12.5)
-    block_size = int(2**10)
-
-    clusterless_decoding_parameters = {
-        "position_std": position_std,
-        "waveform_std": 24.0,
-        "block_size": block_size,
-    }
-    sorted_spikes_decoding_parameters = {
-        "position_std": position_std,
-        "block_size": block_size,
-    }
+    config = DecodingConfig()
 
     if non_stationary:
         discrete_transition_covariate_data = {
@@ -166,49 +288,40 @@ def perform_decoding(
 
     logger.info(f"Decoding {brain_area}...")
 
+    detector = create_detector(brain_area, env, config, discrete_transition_type)
+
+    # Prepare common parameters for all detectors
+    estimate_params = {
+        "position_time": position_info.index.to_numpy(),
+        "position": position_info[["head_position_x", "head_position_y"]].to_numpy(),
+        "spike_times": spike_times,
+        "time": position_info.index.to_numpy(),
+        "discrete_transition_covariate_data": discrete_transition_covariate_data,
+    }
+
+    # HPC-specific parameters: is_training and waveform features
     if brain_area == "HPC":
-        detector = NonLocalClusterlessDetector(
-            environments=env,
-            clusterless_algorithm_params=clusterless_decoding_parameters,
-            discrete_transition_type=discrete_transition_type,
-        )
-        results = detector.estimate_parameters(
-            position_time=position_info.index.to_numpy(),
-            position=position_info[["head_position_x", "head_position_y"]].to_numpy(),
-            spike_times=spike_times,
-            spike_waveform_features=spike_waveform_features,
-            time=position_info.index.to_numpy(),
-            is_training=is_training,
-            discrete_transition_covariate_data=discrete_transition_covariate_data,
-        )
-    else:
-        detector = NonLocalSortedSpikesDetector(
-            environments=env,
-            sorted_spikes_algorithm_params=sorted_spikes_decoding_parameters,
-            discrete_transition_type=discrete_transition_type,
-        )
-        results = detector.estimate_parameters(
-            position_time=position_info.index.to_numpy(),
-            position=position_info[["head_position_x", "head_position_y"]].to_numpy(),
-            spike_times=spike_times,
-            time=position_info.index.to_numpy(),
-            discrete_transition_covariate_data=discrete_transition_covariate_data,
-        )
+        estimate_params["is_training"] = is_training
+        if spike_waveform_features is not None:
+            estimate_params["spike_waveform_features"] = spike_waveform_features
+
+    results = detector.estimate_parameters(**estimate_params)
 
     return results, detector, env
 
 
 def save_results_and_model(
-    logger,
-    results,
-    detector,
-    env,
-    data_over_time,
-    save_folder,
-    epoch_identifier,
-    non_local_threshold,
-):
-    logger.info(f"Saving results...")
+    logger: logging.Logger,
+    results: xr.Dataset,
+    detector: NonLocalClusterlessDetector | NonLocalSortedSpikesDetector,
+    env: Environment,
+    data_over_time: pd.DataFrame,
+    save_folder: Path,
+    epoch_identifier: str,
+    non_local_threshold: float,
+) -> None:
+    """Save decoding results, detector model, environment, and derived data."""
+    logger.info("Saving results...")
     detector.save_results(
         results,
         save_folder / f"{epoch_identifier}_results.nc",
@@ -216,15 +329,45 @@ def save_results_and_model(
     detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
     env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
 
-    non_local_threshold = int(non_local_threshold * 100)
+    threshold_int = int(non_local_threshold * 100)
     data_over_time.to_pickle(
-        save_folder / f"{epoch_identifier}_{non_local_threshold}_data_over_time.pkl"
+        save_folder / f"{epoch_identifier}_{threshold_int}_data_over_time.pkl"
     )
 
 
 def organize_results(
-    data, results, env, nwb_file_name, epoch_name, brain_area, non_local_threshold=0.8
-):
+    data: dict,
+    results: xr.Dataset,
+    env: Environment,
+    nwb_file_name: str,
+    epoch_name: str,
+    brain_area: str,
+    non_local_threshold: float = 0.8,
+) -> tuple[pd.DataFrame, xr.DataArray]:
+    """Organize decoding results and compute derived measures.
+
+    Parameters
+    ----------
+    data : dict
+        Loaded session data
+    results : xarray.Dataset
+        Decoding results
+    env : Environment
+        Environment configuration
+    nwb_file_name : str
+        NWB file name
+    epoch_name : str
+        Epoch name
+    brain_area : str
+        Brain area
+    non_local_threshold : float
+        Threshold for non-local classification
+
+    Returns
+    -------
+    tuple[pd.DataFrame, Any]
+        (data_over_time, posterior)
+    """
     sampling_frequency = 1 / np.median(np.diff(results.time.values))
     data_over_time, posterior = get_data_over_time(
         data,
@@ -241,14 +384,15 @@ def organize_results(
 
 
 def generate_figurl(
-    logger,
-    data,
-    results,
-    data_over_time,
-    posterior,
-    epoch_identifier,
-    brain_area="HPC",
-):
+    logger: logging.Logger,
+    data: dict,
+    results: xr.Dataset,
+    data_over_time: pd.DataFrame,
+    posterior: xr.DataArray,
+    epoch_identifier: str,
+    brain_area: str = "HPC",
+) -> None:
+    """Generate interactive figurl visualization."""
     logger.info("Creating figurl...")
     url = create_interactive_1D_decoding_figurl(
         linear_position=data["position_info"]["linear_position"],
@@ -281,7 +425,7 @@ def run_decode(
     non_local_threshold: float = 0.8,
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
-):
+) -> None:
     # Remove extension from nwb_file_name
     epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     if ripple_detector_name != "Kay":
@@ -302,9 +446,9 @@ def run_decode(
         git_hash = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             stdout=subprocess.PIPE,
-            universal_newlines=True,
+            text=True,
         ).stdout
-        logger.info("Git Hash: {git_hash}".format(git_hash=git_hash.rstrip()))
+        logger.info(f"Git Hash: {git_hash.rstrip()}")
         logger.info(f"training type: {training_type}")
         logger.info(f"non_stationary: {non_stationary}")
         logger.info(f"non_local_threshold: {non_local_threshold}")
@@ -339,7 +483,9 @@ def run_decode(
             is_training = get_training_timepoints(data, training_type=training_type)
 
             # Get spike waveform features if available (HPC only)
-            spike_waveform_features = data["spike_waveform_features"].get(brain_area, None)
+            spike_waveform_features = data["spike_waveform_features"].get(
+                brain_area, None
+            )
 
             results, detector, env = perform_decoding(
                 logger,
@@ -391,7 +537,7 @@ def run_decode(
         logger.exception(e)
 
 
-def get_command_line_arguments():
+def get_command_line_arguments() -> Namespace:
     parser = ArgumentParser()
     parser.add_argument(
         "--cuda_visible_devices", type=str, default="0,1,2,3,4,5,6,7,8,9"
@@ -411,13 +557,13 @@ def get_command_line_arguments():
     return parser.parse_args()
 
 
-def _filter_epoch_info(epoch_info: pd.DataFrame, args: ArgumentParser) -> pd.DataFrame:
+def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
     """Filter the epoch_info DataFrame based on the command line arguments
 
     Parameters
     ----------
     epoch_info : pd.DataFrame
-    args : ArgumentParser
+    args : Namespace
 
     Returns
     -------
@@ -449,19 +595,20 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: ArgumentParser) -> pd.Dat
     return epoch_info
 
 
-def main():
+def main() -> None:
+    """Main entry point for batch decoding analysis."""
     args = get_command_line_arguments()
 
-    Path(args.local_scratch_dir).mkdir(exist_ok=True)
+    Path(args.local_scratch_dir).mkdir(exist_ok=True, parents=True)
 
     cluster = LocalCUDACluster(
         CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
         local_directory=args.local_scratch_dir,
     )
 
-    with Client(cluster) as client:
+    with Client(cluster):
         log_directory = Path.cwd() / "logs"
-        log_directory.mkdir(exist_ok=True)
+        log_directory.mkdir(exist_ok=True, parents=True)
 
         epoch_info = get_epoch_info()
         epoch_info = _filter_epoch_info(epoch_info, args)
@@ -488,4 +635,4 @@ def main():
 
 if __name__ == "__main__":
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
-    sys.exit(main())
+    main()
