@@ -320,16 +320,17 @@ This document provides a detailed task checklist for implementing the code revie
 
 ##### 5.1.1 Plan Extraction (30 min)
 
-- [ ] Open `src/continuum_swr_replay/visualization/figurl.py`
-- [ ] Navigate to `create_interactive_1D_decoding_figurl()` (line with function start)
-- [ ] Read through all 194 lines
-- [ ] Identify distinct view creation sections:
-  - [ ] Speed view (~lines ?)
-  - [ ] Head direction view (~lines ?)
-  - [ ] Ripple view (~lines ?)
-  - [ ] Posterior view (~lines ?)
-- [ ] Note parameters needed for each helper
-- [ ] Note return types for each helper
+- [x] Open `src/continuum_swr_replay/visualization/figurl.py`
+- [x] Navigate to `create_interactive_1D_decoding_figurl()` (line 98-397)
+- [x] Read through all 197 lines of function body
+- [x] Identify distinct view creation sections:
+  - [x] Behavioral views (speed + head direction) - lines 208-223
+  - [x] Neural activity views (MUA + SWR + Theta) - lines 225-332
+  - [x] State probability views (Non-local + Local) - lines 255-320
+  - [x] Quality metric views (Ahead-behind + HPD) - lines 334-354
+- [x] Note parameters needed for each helper
+- [x] Note return types for each helper
+- [x] Document extraction strategy in SCRATCHPAD.md
 
 ##### 5.1.2 Extract _create_speed_view() (45 min)
 

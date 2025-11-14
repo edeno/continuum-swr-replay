@@ -95,6 +95,313 @@ from continuum_swr_replay.parameters import COLORS
 from .interactive import create_playback_speed_dropdown, create_player
 
 
+def _create_speed_view(speed: pd.Series) -> vv.TimeseriesGraph:
+    """Create speed visualization timeseries graph.
+
+    Parameters
+    ----------
+    speed : pd.Series, shape (n_time,)
+        Speed of the animal in cm/s. Time-indexed.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Speed timeseries graph view.
+    """
+    return vv.TimeseriesGraph().add_line_series(
+        name="Speed [cm/s]",
+        t=np.asarray(speed.index),
+        y=np.asarray(speed, dtype=np.float32).squeeze(),
+        color="black",
+        width=1,
+    )
+
+
+def _create_head_direction_view(head_direction: pd.Series) -> vv.TimeseriesGraph:
+    """Create head direction visualization timeseries graph.
+
+    Parameters
+    ----------
+    head_direction : pd.Series, shape (n_time,)
+        Head direction of the animal in radians (-π to π). Time-indexed.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Head direction timeseries graph view with y-range [-π, π].
+    """
+    return vv.TimeseriesGraph(
+        y_range=[-np.pi, np.pi],
+    ).add_line_series(
+        name="Dir. [rad]",
+        t=np.asarray(head_direction.index),
+        y=np.asarray(head_direction, dtype=np.float32).squeeze(),
+        color="black",
+        width=1,
+    )
+
+
+def _create_mua_view(
+    MUA_times: pd.DataFrame,
+    MUA_zscore: pd.Series,
+) -> vv.TimeseriesGraph:
+    """Create multiunit activity (MUA) visualization timeseries graph.
+
+    Parameters
+    ----------
+    MUA_times : pd.DataFrame, shape (n_events, 2)
+        Multiunit activity event times with columns ['start_time', 'end_time']
+        in seconds.
+    MUA_zscore : pd.Series, shape (n_time,)
+        Z-scored multiunit activity firing rate. Time-indexed.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        MUA timeseries graph view with event intervals and z-score line.
+    """
+    multiunit_firing_rate_view = vv.TimeseriesGraph()
+    multiunit_firing_rate_view.add_interval_series(
+        name="MUA Events",
+        t_start=MUA_times.start_time.to_numpy(),
+        t_end=MUA_times.end_time.to_numpy(),
+        color=COLORS["MUA"],
+    )
+    multiunit_firing_rate_view.add_line_series(
+        name="MUA [std]",
+        t=np.asarray(MUA_zscore.index),
+        y=np.asarray(MUA_zscore, dtype=np.float32).squeeze(),
+        color="black",
+        width=1,
+    )
+    return multiunit_firing_rate_view
+
+
+def _create_swr_view(
+    SWR_times: pd.DataFrame,
+    SWR_zscore: pd.Series,
+) -> vv.TimeseriesGraph:
+    """Create sharp-wave ripple (SWR) visualization timeseries graph.
+
+    Parameters
+    ----------
+    SWR_times : pd.DataFrame, shape (n_events, 2)
+        Sharp-wave ripple event times with columns ['start_time', 'end_time']
+        in seconds.
+    SWR_zscore : pd.Series, shape (n_time,)
+        Z-scored ripple consensus trace. Time-indexed.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        SWR timeseries graph view with event intervals and z-score line.
+    """
+    ripple_zscore_view = vv.TimeseriesGraph()
+    ripple_zscore_view.add_interval_series(
+        name="SWR Events",
+        t_start=SWR_times.start_time.to_numpy(),
+        t_end=SWR_times.end_time.to_numpy(),
+        color=COLORS["SWR"],
+    )
+    ripple_zscore_view.add_line_series(
+        name="SWR [std]",
+        t=np.asarray(SWR_zscore.index),
+        y=np.asarray(SWR_zscore, dtype=np.float32).squeeze(),
+        color="black",
+        width=1,
+    )
+    return ripple_zscore_view
+
+
+def _create_theta_view(theta_filtered_lfp: pd.Series) -> vv.TimeseriesGraph:
+    """Create theta-filtered LFP visualization timeseries graph.
+
+    Parameters
+    ----------
+    theta_filtered_lfp : pd.Series, shape (n_time,)
+        LFP signal filtered in theta band (6-10 Hz). Time-indexed.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Theta LFP timeseries graph view.
+    """
+    theta_view = vv.TimeseriesGraph()
+    theta_view.add_line_series(
+        name="Theta Filtered LFP",
+        t=np.asarray(theta_filtered_lfp.index),
+        y=np.asarray(
+            theta_filtered_lfp,
+            dtype=np.float32,
+        ).squeeze(),
+        color="black",
+        width=1,
+    )
+    return theta_view
+
+
+def _create_non_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGraph:
+    """Create non-local state probability visualization timeseries graph.
+
+    Parameters
+    ----------
+    results : xr.Dataset
+        Decoding results containing acausal_state_probabilities with
+        states including "Non-Local Continuous" and "Non-Local Fragmented".
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Non-local probability timeseries graph view with event intervals
+        and probability lines for continuous and fragmented states.
+    """
+    non_local_times = get_confident_times(
+        results.sel(states="Non-Local Continuous").acausal_state_probabilities
+        + results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
+        minimum_duration=0.015,
+    )
+
+    non_local_probability_view = vv.TimeseriesGraph()
+    non_local_probability_view.add_interval_series(
+        name="Non-Local Events",
+        t_start=non_local_times.start_time.to_numpy(),
+        t_end=non_local_times.end_time.to_numpy(),
+        color=COLORS["Non-Local"],
+    )
+    non_local_probability_view.add_line_series(
+        name="Non-Local Continuous",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            results.sel(states="Non-Local Continuous").acausal_state_probabilities,
+            dtype=np.float32,
+        ).squeeze(),
+        color="black",
+        width=1,
+    )
+    non_local_probability_view.add_line_series(
+        name="Non-Local Fragmented",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
+            dtype=np.float32,
+        ).squeeze(),
+        color="#d62728",
+        width=1,
+    )
+    return non_local_probability_view
+
+
+def _create_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGraph:
+    """Create local state probability visualization timeseries graph.
+
+    Parameters
+    ----------
+    results : xr.Dataset
+        Decoding results containing acausal_state_probabilities with
+        states including "Local" and "No-Spike".
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Local probability timeseries graph view with event intervals
+        and probability lines for local and no-spike states.
+    """
+    local_times = get_confident_times(
+        results.sel(states="Local").acausal_state_probabilities,
+        minimum_duration=0.0,
+    )
+
+    local_probability_view = vv.TimeseriesGraph()
+    local_probability_view.add_interval_series(
+        name="Local Events",
+        t_start=local_times.start_time.to_numpy(),
+        t_end=local_times.end_time.to_numpy(),
+        color="#d3d3d3",
+    )
+    local_probability_view.add_line_series(
+        name="No-Spike",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            results.sel(states="No-Spike").acausal_state_probabilities,
+            dtype=np.float32,
+        ).squeeze(),
+        color="#ff7f0e",
+        width=1,
+    )
+    local_probability_view.add_line_series(
+        name="Local",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            results.sel(states="Local").acausal_state_probabilities,
+            dtype=np.float32,
+        ).squeeze(),
+        color="black",
+        width=1,
+    )
+    return local_probability_view
+
+
+def _create_ahead_behind_distance_view(
+    ahead_behind_distance: NDArray[np.floating],
+    results: xr.Dataset,
+) -> vv.TimeseriesGraph:
+    """Create ahead-behind distance metric visualization timeseries graph.
+
+    Parameters
+    ----------
+    ahead_behind_distance : np.ndarray, shape (n_time,)
+        Distance in cm between decoded position and actual position.
+        Positive indicates ahead, negative indicates behind.
+    results : xr.Dataset
+        Decoding results containing time coordinate.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        Ahead-behind distance timeseries graph view.
+    """
+    return vv.TimeseriesGraph().add_line_series(
+        name="Ahead-Behind Distance",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            ahead_behind_distance,
+            dtype=np.float32,
+        ).squeeze(),
+        color="black",
+        width=1,
+    )
+
+
+def _create_hpd_view(
+    hpd: NDArray[np.floating],
+    results: xr.Dataset,
+) -> vv.TimeseriesGraph:
+    """Create HPD (Highest Posterior Density) metric visualization timeseries graph.
+
+    Parameters
+    ----------
+    hpd : np.ndarray, shape (n_time,)
+        Highest Posterior Density interval width in cm.
+    results : xr.Dataset
+        Decoding results containing time coordinate.
+
+    Returns
+    -------
+    vv.TimeseriesGraph
+        HPD timeseries graph view.
+    """
+    return vv.TimeseriesGraph().add_line_series(
+        name="HPD",
+        t=np.asarray(results.time),
+        y=np.asarray(
+            hpd,
+            dtype=np.float32,
+        ).squeeze(),
+        color="black",
+        width=1,
+    )
+
+
 def create_interactive_1D_decoding_figurl(
     linear_position: pd.Series,
     speed: pd.Series,
@@ -205,153 +512,18 @@ def create_interactive_1D_decoding_figurl(
         linear_position=linear_position,
     )
 
-    speed_view = vv.TimeseriesGraph().add_line_series(
-        name="Speed [cm/s]",
-        t=np.asarray(speed.index),
-        y=np.asarray(speed, dtype=np.float32).squeeze(),
-        color="black",
-        width=1,
+    # Create all visualization views using helper functions
+    speed_view = _create_speed_view(speed)
+    head_direction_view = _create_head_direction_view(head_direction)
+    multiunit_firing_rate_view = _create_mua_view(MUA_times, MUA_zscore)
+    ripple_zscore_view = _create_swr_view(SWR_times, SWR_zscore)
+    non_local_probability_view = _create_non_local_probability_view(results)
+    local_probability_view = _create_local_probability_view(results)
+    theta_view = _create_theta_view(theta_filtered_lfp)
+    ahead_behind_distance_view = _create_ahead_behind_distance_view(
+        ahead_behind_distance, results
     )
-    head_direction_view = vv.TimeseriesGraph(
-        y_range=[-np.pi, np.pi],
-    ).add_line_series(
-        name="Dir. [rad]",
-        t=np.asarray(head_direction.index),
-        y=np.asarray(head_direction, dtype=np.float32).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    multiunit_firing_rate_view = vv.TimeseriesGraph()
-    multiunit_firing_rate_view.add_interval_series(
-        name="MUA Events",
-        t_start=MUA_times.start_time.to_numpy(),
-        t_end=MUA_times.end_time.to_numpy(),
-        color=COLORS["MUA"],
-    )
-    multiunit_firing_rate_view.add_line_series(
-        name="MUA [std]",
-        t=np.asarray(MUA_zscore.index),
-        y=np.asarray(MUA_zscore, dtype=np.float32).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    ripple_zscore_view = vv.TimeseriesGraph()
-    ripple_zscore_view.add_interval_series(
-        name="SWR Events",
-        t_start=SWR_times.start_time.to_numpy(),
-        t_end=SWR_times.end_time.to_numpy(),
-        color=COLORS["SWR"],
-    )
-    ripple_zscore_view.add_line_series(
-        name="SWR [std]",
-        t=np.asarray(SWR_zscore.index),
-        y=np.asarray(SWR_zscore, dtype=np.float32).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    non_local_times = get_confident_times(
-        results.sel(states="Non-Local Continuous").acausal_state_probabilities
-        + results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
-        minimum_duration=0.015,
-    )
-
-    non_local_probability_view = vv.TimeseriesGraph()
-    non_local_probability_view.add_interval_series(
-        name="Non-Local Events",
-        t_start=non_local_times.start_time.to_numpy(),
-        t_end=non_local_times.end_time.to_numpy(),
-        color=COLORS["Non-Local"],
-    )
-    non_local_probability_view.add_line_series(
-        name="Non-Local Continuous",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            results.sel(states="Non-Local Continuous").acausal_state_probabilities,
-            dtype=np.float32,
-        ).squeeze(),
-        color="black",
-        width=1,
-    )
-    non_local_probability_view.add_line_series(
-        name="Non-Local Fragmented",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
-            dtype=np.float32,
-        ).squeeze(),
-        color="#d62728",
-        width=1,
-    )
-
-    local_times = get_confident_times(
-        results.sel(states="Local").acausal_state_probabilities,
-        minimum_duration=0.0,
-    )
-
-    local_probability_view = vv.TimeseriesGraph()
-    local_probability_view.add_interval_series(
-        name="Local Events",
-        t_start=local_times.start_time.to_numpy(),
-        t_end=local_times.end_time.to_numpy(),
-        color="#d3d3d3",
-    )
-    local_probability_view.add_line_series(
-        name="No-Spike",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            results.sel(states="No-Spike").acausal_state_probabilities,
-            dtype=np.float32,
-        ).squeeze(),
-        color="#ff7f0e",
-        width=1,
-    )
-    local_probability_view.add_line_series(
-        name="Local",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            results.sel(states="Local").acausal_state_probabilities,
-            dtype=np.float32,
-        ).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    theta_view = vv.TimeseriesGraph()
-    theta_view.add_line_series(
-        name="Theta Filtered LFP",
-        t=np.asarray(theta_filtered_lfp.index),
-        y=np.asarray(
-            theta_filtered_lfp,
-            dtype=np.float32,
-        ).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    ahead_behind_distance_view = vv.TimeseriesGraph().add_line_series(
-        name="Ahead-Behind Distance",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            ahead_behind_distance,
-            dtype=np.float32,
-        ).squeeze(),
-        color="black",
-        width=1,
-    )
-
-    hpd_view = vv.TimeseriesGraph().add_line_series(
-        name="HPD",
-        t=np.asarray(results.time),
-        y=np.asarray(
-            hpd,
-            dtype=np.float32,
-        ).squeeze(),
-        color="black",
-        width=1,
-    )
+    hpd_view = _create_hpd_view(hpd, results)
 
     vertical_panel_content = [
         vv.LayoutItem(theta_view, stretch=1, title="Theta", collapsible=True),

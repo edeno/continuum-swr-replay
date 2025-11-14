@@ -375,3 +375,180 @@ None currently.
 ## Questions for User
 
 None currently.
+
+---
+
+### 2025-11-14 - Milestone 5 - Task 5.1.1 IN PROGRESS
+
+**Status**: Task 5.1.1 In Progress - Plan Extraction for figurl.py (30 min)
+
+**Analysis of `create_interactive_1D_decoding_figurl()`**:
+
+**Function Location**: [src/continuum_swr_replay/visualization/figurl.py:98-397](src/continuum_swr_replay/visualization/figurl.py#L98-L397)
+- Total function: 299 lines
+- Docstring: lines 98-199 (101 lines)
+- Function body: lines 200-397 (197 lines)
+
+**View Creation Sections Identified**:
+
+1. **Decode View** (lines 200-206) - 7 lines
+   - Computes conditional non-local posterior if not provided
+   - Creates decode view using external `create_1D_decode_view()`
+   - Parameters needed: `posterior`, `linear_position`, `results`
+   - Returns: Not extracted (already uses helper function)
+
+2. **Behavioral Views** (lines 208-223) - 16 lines
+   - **Speed view** (lines 208-214): TimeseriesGraph with speed data
+   - **Head direction view** (lines 215-223): TimeseriesGraph with y_range=[-π, π]
+   - Parameters needed: `speed`, `head_direction`
+   - Return type: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+3. **Multiunit Activity (MUA) View** (lines 225-238) - 14 lines
+   - Adds MUA event intervals (colored)
+   - Adds MUA z-score line series
+   - Parameters needed: `MUA_times`, `MUA_zscore`
+   - Return type: `vv.TimeseriesGraph`
+
+4. **Sharp-Wave Ripple (SWR) View** (lines 240-253) - 14 lines
+   - Adds SWR event intervals (colored)
+   - Adds SWR z-score line series
+   - Parameters needed: `SWR_times`, `SWR_zscore`
+   - Return type: `vv.TimeseriesGraph`
+
+5. **Non-Local Probability View** (lines 255-287) - 33 lines
+   - Computes confident non-local times
+   - Adds non-local event intervals
+   - Adds Non-Local Continuous line series
+   - Adds Non-Local Fragmented line series
+   - Parameters needed: `results` (xr.Dataset)
+   - Return type: `vv.TimeseriesGraph`
+
+6. **Local Probability View** (lines 289-320) - 32 lines
+   - Computes confident local times
+   - Adds local event intervals
+   - Adds No-Spike line series
+   - Adds Local line series
+   - Parameters needed: `results` (xr.Dataset)
+   - Return type: `vv.TimeseriesGraph`
+
+7. **Theta LFP View** (lines 322-332) - 11 lines
+   - Single line series for theta filtered LFP
+   - Parameters needed: `theta_filtered_lfp`
+   - Return type: `vv.TimeseriesGraph`
+
+8. **Quality Metric Views** (lines 334-354) - 21 lines
+   - **Ahead-behind distance view** (lines 334-343): Distance metric
+   - **HPD view** (lines 345-354): Highest Posterior Density
+   - Parameters needed: `ahead_behind_distance`, `hpd`, `results`
+   - Return type: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+9. **Layout Composition** (lines 356-397) - 42 lines
+   - Creates vertical_panel_content list
+   - Creates Box layout with all views
+   - Generates and validates URL
+   - NOT EXTRACTED (main function logic)
+
+**Extraction Strategy - Option A (Recommended)**:
+
+Extract 4 helper functions that group related visualizations:
+
+1. **`_create_behavioral_views()`** - 16 lines
+   - Speed + head direction views
+   - Parameters: `speed: pd.Series, head_direction: pd.Series`
+   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+2. **`_create_neural_activity_views()`** - 59 lines
+   - MUA view + SWR view + Theta view
+   - Parameters: `MUA_times, MUA_zscore, SWR_times, SWR_zscore, theta_filtered_lfp`
+   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+3. **`_create_state_probability_views()`** - 65 lines
+   - Non-local view + Local view
+   - Parameters: `results: xr.Dataset`
+   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+4. **`_create_quality_metric_views()`** - 21 lines
+   - Ahead-behind distance + HPD
+   - Parameters: `ahead_behind_distance, hpd, results: xr.Dataset`
+   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
+
+**Main function after extraction**: ~75 lines (down from 197)
+- Compute posterior if None (2 lines)
+- Create decode_view (4 lines)
+- Call 4 helper functions (8 lines)
+- Compose layout (42 lines)
+- Return URL with validation (3 lines)
+
+**Extraction Strategy - Option B (Alternative)**:
+
+Extract 7 individual helper functions (more granular):
+- Each view gets its own helper function
+- More testable but creates many small functions
+- Some functions would be very small (11-16 lines)
+
+**Recommendation**: Use Option A (4 grouped helpers) for better balance between:
+- Reducing main function complexity
+- Avoiding too many tiny helper functions
+- Grouping related visualizations logically
+- Maintaining readability
+
+**Decision**: User selected Option B - Extract individual helper functions for maximum granularity
+
+**Extraction Plan - Option B (9 Individual Helpers)**:
+1. `_create_speed_view()` - Speed timeseries
+2. `_create_head_direction_view()` - Head direction timeseries
+3. `_create_mua_view()` - Multiunit activity with events
+4. `_create_swr_view()` - Sharp-wave ripple with events
+5. `_create_non_local_probability_view()` - Non-local state probabilities
+6. `_create_local_probability_view()` - Local state probabilities
+7. `_create_theta_view()` - Theta filtered LFP
+8. `_create_ahead_behind_distance_view()` - Distance metric
+9. `_create_hpd_view()` - HPD metric
+
+**Next Steps**:
+1. ✅ Confirmed extraction strategy - Option B selected
+2. ✅ Extracted all 9 helper functions
+3. ✅ Updated main function to call each helper
+4. ✅ Verified mypy and ruff pass with no errors
+5. ⏭️ Running code-reviewer agent for final review
+
+---
+
+### 2025-11-14 - Milestone 5 - Task 5.1 COMPLETE ✅
+
+**Status**: Task 5.1 Complete - Extract Helper Functions in figurl.py (2 hours actual)
+
+**Completed Work**:
+1. ✅ Extracted 9 individual helper functions with full type hints and docstrings:
+   - `_create_speed_view()` - 19 lines
+   - `_create_head_direction_view()` - 23 lines
+   - `_create_mua_view()` - 27 lines
+   - `_create_swr_view()` - 25 lines
+   - `_create_theta_view()` - 23 lines
+   - `_create_non_local_probability_view()` - 49 lines
+   - `_create_local_probability_view()` - 48 lines
+   - `_create_ahead_behind_distance_view()` - 21 lines
+   - `_create_hpd_view()` - 19 lines
+
+2. ✅ Updated `create_interactive_1D_decoding_figurl()` to use all helpers
+3. ✅ Verified mypy passes with no errors
+4. ✅ Verified ruff passes with no errors
+
+**Results**:
+- Main function body: **197 lines → 63 lines** (68% reduction) ✅
+- Total function (with docstring): 299 lines → 165 lines ✅
+- Total file size: 695 lines → 866 lines (added helper functions)
+- All helper functions have:
+  - Full type hints for all parameters
+  - Comprehensive docstrings with Parameters and Returns sections
+  - Single responsibility (one view per function)
+- Main function now <150 lines (meets code review guideline) ✅
+
+**Benefits**:
+- Much more readable main function - just calls 9 helpers
+- Each helper is independently testable
+- Easier to understand and maintain
+- Follows single responsibility principle
+- Better code organization
+
+**Next**: Run code-reviewer agent to verify quality
