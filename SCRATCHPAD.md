@@ -128,6 +128,33 @@
 
 ---
 
+### 2025-11-14 - Milestone 3 - Task 3.2 COMPLETE ✅
+
+**Status**: Task 3.2 Complete - Fix Remaining Mypy Errors (25 min)
+
+**Completed Work**:
+1. ✅ Fixed utils.py:74 - Added type hints to nested function `_count_exposure(df: pd.DataFrame) -> pd.DataFrame`
+2. ✅ Fixed animation.py:452 - Added type hints to `_update_plot(time_ind: int) -> tuple`
+3. ✅ Fixed interactive.py:181 - Added type hints to `plot_func(n: int) -> hv.Curve`
+4. ✅ Fixed interactive.py:269 - Added type hints to `update_interval(event: object) -> None` with type ignore
+5. ✅ Fixed figurl.py:201 - Changed parameter type from `NDArray[np.floating] | None` to `NDArray[np.floating] | xr.DataArray | None`
+6. ✅ Fixed figurl.py:637 - Added type hints to `get_animal_position_dot(time_ind: int) -> hv.Overlay`
+7. ✅ Fixed figurl.py:659 - Added type hints to `get_posterior_quadmesh(time_ind: int) -> hv.QuadMesh`
+8. ✅ Fixed figurl.py:667 - Added type hints to `get_most_likely_decoded_position(time_ind: int) -> hv.Scatter`
+
+**Results**:
+- mypy passes with NO ERRORS on entire src/ directory (25 source files) ✅
+- All 149 tests passing ✅
+- Reduced from 8 mypy errors to 0 errors ✅
+
+**Notes**:
+- figurl.py type issue was due to `posterior` parameter accepting both NDArray and xr.DataArray
+- Used `hv.Overlay` type for overlay objects (created with `*` operator in HoloViews)
+- Used type ignore for Panel event handler where event type is not well-typed
+- Matplotlib animation callback typed with generic `tuple` return (specific artist types complex to specify)
+
+---
+
 ## Blockers
 
 None currently.

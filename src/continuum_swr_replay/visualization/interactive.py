@@ -178,7 +178,7 @@ def create_scrolling_line_plot(
     n_samples = int((window_lim[1] - window_lim[0]) * sampling_frequency)
     half_samples = n_samples // 2
 
-    def plot_func(n):
+    def plot_func(n: int) -> hv.Curve:
         start_idx = max(0, n - half_samples)
         end_idx = min(n_time, n + half_samples)
         window = np.asarray(data, dtype=float)[start_idx:end_idx].squeeze()
@@ -266,8 +266,8 @@ def create_playback_speed_dropdown(
     base_interval = 1000 / sampling_frequency  # ms/frame
 
     # Update the player's interval property based on the dropdown's value
-    def update_interval(event):
-        player.interval = int(event.new * base_interval)
+    def update_interval(event: object) -> None:
+        player.interval = int(event.new * base_interval)  # type: ignore[attr-defined]
 
     speed_dropdown.param.watch(update_interval, "value")
 

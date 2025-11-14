@@ -71,7 +71,7 @@ def get_epoch_info() -> pd.DataFrame:
     epoch_info["epoch"] = np.asarray(epoch, dtype=int)
     epoch_info["epoch_tag"] = epoch_tag
 
-    def _count_exposure(df):
+    def _count_exposure(df: pd.DataFrame) -> pd.DataFrame:
         df["exposure"] = np.arange(len(df)) + 1
         return df
 

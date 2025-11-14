@@ -166,26 +166,26 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 3.2 Fix Remaining Mypy Errors (1 hour)
 
-- [ ] Open `src/continuum_swr_replay/data_loaders/utils.py`
-- [ ] Navigate to line 74 (nested function `_count_exposure`)
-- [ ] Add type hints to nested function
-- [ ] Save and verify with mypy
-- [ ] Open `src/continuum_swr_replay/visualization/animation.py`
-- [ ] Navigate to line 452
-- [ ] Add missing type annotation
-- [ ] Save and verify with mypy
-- [ ] Open `src/continuum_swr_replay/visualization/interactive.py`
-- [ ] Navigate to line 181 and add type annotation
-- [ ] Navigate to line 269 and add type annotation
-- [ ] Save and verify with mypy
-- [ ] Open `src/continuum_swr_replay/visualization/figurl.py`
-- [ ] Navigate to line 201 and fix incompatible type assignment
-- [ ] Navigate to line 637 and add type annotation
-- [ ] Navigate to line 659 and add type annotation
-- [ ] Navigate to line 667 and add type annotation
-- [ ] Save and verify with mypy
-- [ ] Run `uv run mypy src/` (full codebase check)
-- [ ] Confirm <5 errors total
+- [x] Open `src/continuum_swr_replay/data_loaders/utils.py`
+- [x] Navigate to line 74 (nested function `_count_exposure`)
+- [x] Add type hints to nested function
+- [x] Save and verify with mypy
+- [x] Open `src/continuum_swr_replay/visualization/animation.py`
+- [x] Navigate to line 452
+- [x] Add missing type annotation
+- [x] Save and verify with mypy
+- [x] Open `src/continuum_swr_replay/visualization/interactive.py`
+- [x] Navigate to line 181 and add type annotation
+- [x] Navigate to line 269 and add type annotation
+- [x] Save and verify with mypy
+- [x] Open `src/continuum_swr_replay/visualization/figurl.py`
+- [x] Navigate to line 201 and fix incompatible type assignment
+- [x] Navigate to line 637 and add type annotation
+- [x] Navigate to line 659 and add type annotation
+- [x] Navigate to line 667 and add type annotation
+- [x] Save and verify with mypy
+- [x] Run `uv run mypy src/` (full codebase check)
+- [x] Confirm <5 errors total
 - [ ] Stage and commit: `git commit -m "Fix remaining mypy errors across visualization modules"`
 
 #### 3.3 Replace dict[str, Any] with TypedDict (1 hour)

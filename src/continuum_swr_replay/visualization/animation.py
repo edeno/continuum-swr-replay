@@ -449,7 +449,7 @@ def make_non_local_movie(
         window_time = window_ind / sampling_frequency
         window_factor = (window_size // 2) + window_ind
 
-        def _update_plot(time_ind):
+        def _update_plot(time_ind: int) -> tuple:
             start_ind = max(0, time_ind - 5)
             time_slice = slice(start_ind, time_ind)
 

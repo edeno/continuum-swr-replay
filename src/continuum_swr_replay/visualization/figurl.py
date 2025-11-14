@@ -107,7 +107,7 @@ def create_interactive_1D_decoding_figurl(
     ahead_behind_distance: NDArray[np.floating],
     hpd: NDArray[np.floating],
     theta_filtered_lfp: pd.Series,
-    posterior: NDArray[np.floating] | None = None,
+    posterior: NDArray[np.floating] | xr.DataArray | None = None,
     view_height: int = 800,
     label: str = "",
 ) -> str:
@@ -634,7 +634,7 @@ def create_2D_decoding_plot(
     if map_estimate is None:
         map_estimate = maximum_a_posteriori_estimate(posterior)
 
-    def get_animal_position_dot(time_ind):
+    def get_animal_position_dot(time_ind: int) -> hv.Overlay:
         head_point = hv.Scatter(
             position_info.iloc[[time_ind]],
             kdims=position_names[0],
@@ -656,7 +656,7 @@ def create_2D_decoding_plot(
 
         return head_point * head_direction_line
 
-    def get_posterior_quadmesh(time_ind):
+    def get_posterior_quadmesh(time_ind: int) -> hv.QuadMesh:
         posterior_slice = posterior.isel(time=time_ind)
         return hv.QuadMesh(
             posterior_slice,
@@ -664,7 +664,7 @@ def create_2D_decoding_plot(
             vdims=["probability"],
         ).opts(cmap=cmap, alpha=decode_opacity, width=width, height=height)
 
-    def get_most_likely_decoded_position(time_ind):
+    def get_most_likely_decoded_position(time_ind: int) -> hv.Scatter:
         return hv.Scatter(
             map_estimate[[time_ind]],
             kdims="x_position",
