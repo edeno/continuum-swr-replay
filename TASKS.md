@@ -213,32 +213,32 @@ This document provides a detailed task checklist for implementing the code revie
 ## Milestone 4: Refactor to Functional Style ⏱️ 3 hours
 
 **Goal**: Write tests first, then refactor in-place modifications to return new objects
-**Status**: ⬜ Not Started
+**Status**: 🔄 In Progress
 
 ### Tasks
 
 #### 4.1 Write Tests for filter_spike_times() (45 min)
 
-- [ ] Create or open `tests/unit/test_data_loaders.py`
-- [ ] Import `filter_spike_times` from `continuum_swr_replay.data_loaders.spikes`
-- [ ] Write test: `test_filter_spike_times_normal_operation()`
-  - [ ] Create sample spike_times dict with multiple brain areas
-  - [ ] Create sample spike_waveform_features dict
-  - [ ] Create sample position_time array
-  - [ ] Call filter_spike_times()
-  - [ ] Assert spikes outside time bounds are removed
-  - [ ] Assert spikes within bounds are kept
-- [ ] Write test: `test_filter_spike_times_empty_dict()`
-  - [ ] Test with empty input dicts
-- [ ] Write test: `test_filter_spike_times_all_filtered()`
-  - [ ] Test where all spikes are outside bounds
-- [ ] Write test: `test_filter_spike_times_none_filtered()`
-  - [ ] Test where all spikes are within bounds
-- [ ] Write test: `test_filter_spike_times_boundary_conditions()`
-  - [ ] Test spikes exactly at start/end times
-- [ ] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_spike_times -v`
-- [ ] Confirm all tests pass with current implementation
-- [ ] Stage and commit: `git commit -m "Add comprehensive tests for filter_spike_times"`
+- [x] Create or open `tests/unit/test_data_loaders.py`
+- [x] Import `filter_spike_times` from `continuum_swr_replay.data_loaders.spikes`
+- [x] Write test: `test_filter_spike_times_normal_operation()`
+  - [x] Create sample spike_times dict with multiple brain areas
+  - [x] Create sample spike_waveform_features dict
+  - [x] Create sample position_time array
+  - [x] Call filter_spike_times()
+  - [x] Assert spikes outside time bounds are removed
+  - [x] Assert spikes within bounds are kept
+- [x] Write test: `test_filter_spike_times_empty_dict()`
+  - [x] Test with empty input dicts
+- [x] Write test: `test_filter_spike_times_all_filtered()`
+  - [x] Test where all spikes are outside bounds
+- [x] Write test: `test_filter_spike_times_none_filtered()`
+  - [x] Test where all spikes are within bounds
+- [x] Write test: `test_filter_spike_times_boundary_conditions()`
+  - [x] Test spikes exactly at start/end times
+- [x] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_spike_times -v`
+- [x] Confirm all tests pass with current implementation
+- [x] Stage and commit: `git commit -m "Add comprehensive tests for filter_spike_times"`
 
 #### 4.2 Write Tests for filter_ripple_lfp_time() (45 min)
 
@@ -499,7 +499,7 @@ Track your overall progress here:
 - [x] Milestone 1: Critical Blocking Issues (4/4 task groups) ✅
 - [x] Milestone 2: Type Hints - Data Loaders Part 1 (3/3 task groups) ✅
 - [x] Milestone 3: Type Hints - Data Loaders Part 2 (3/3 task groups) ✅
-- [ ] Milestone 4: Refactor to Functional Style (0/4 task groups)
+- [ ] Milestone 4: Refactor to Functional Style (1/4 task groups) 🔄
 - [ ] Milestone 5: Code Organization & Refactoring (0/3 task groups)
 
 ### Time Tracking

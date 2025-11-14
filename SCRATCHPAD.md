@@ -209,6 +209,36 @@
 
 ---
 
+### 2025-11-14 - Milestone 4 - Task 4.1 COMPLETE ✅
+
+**Status**: Task 4.1 Complete - Write Tests for filter_spike_times (30 min)
+
+**Completed Work**:
+1. ✅ Reviewed existing test_spikes.py structure
+2. ✅ Added 5 new comprehensive test cases to TestSpikeFiltering class:
+   - `test_no_spikes_filtered_all_within_bounds` - Tests when all spikes preserved
+   - `test_boundary_conditions_exact_start_end` - Tests inclusive boundaries (>= and <=)
+   - `test_multiple_brain_areas` - Tests multiple brain areas (HPC + mPFC) simultaneously
+   - `test_brain_area_without_features` - Tests KeyError exception handling
+   - `test_preserves_spike_order_after_filtering` - Verifies temporal ordering maintained
+3. ✅ All 154 tests pass (149 existing + 5 new)
+4. ✅ Committed: 0711716 "test(M4): Add comprehensive tests for filter_spike_times"
+
+**Results**:
+- Total tests in TestSpikeFiltering: 8 (3 existing + 5 new) ✅
+- All tests pass with current in-place modification implementation ✅
+- Tests ready for refactoring to functional style ✅
+
+**Notes**:
+- Tests directory was previously untracked, so test_spikes.py is first test file in repo
+- Tests verify current behavior (in-place modification) before refactoring
+- Covered all edge cases: empty dicts, all filtered, none filtered, boundaries, multiple areas
+- Fixed one test issue with np.arange boundary (stops before upper limit)
+
+**Next**: Task 4.2 - Write tests for filter_ripple_lfp_time()
+
+---
+
 ## Blockers
 
 None currently.
