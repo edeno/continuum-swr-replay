@@ -26,9 +26,12 @@ get_training_timepoints : Select time points for decoder training
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from spyglass.common import PositionIntervalMap
+
+if TYPE_CHECKING:
+    from ..analysis.hippocampus.types import SessionData
 
 from .events import load_dios
 from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta
@@ -42,7 +45,7 @@ def load_data(
     nwb_file_name: str,
     epoch_name: str,
     ripple_detector_name: str = "Kay",
-) -> dict[str, Any]:
+) -> SessionData:
     """Load all data for a given session and epoch.
 
     This is the main entry point for loading data. It orchestrates loading
@@ -59,46 +62,18 @@ def load_data(
 
     Returns
     -------
-    dict
-        Dictionary containing all loaded and computed data:
+    SessionData
+        TypedDict containing all loaded and computed data. Includes:
+        - Position data: position_info, track_graph, linearization info
+        - Neural data: spike_times, spike_waveform_features
+        - LFP data: ripple and theta band signals and metrics
+        - Multiunit activity: hse_times, multiunit_firing_rate, multiunit_rate_zscore
+        - Task events: beam_breaks, pump_events, light_events
+        - Behavioral data: well_visits, trials, task_variables
+        - Metadata: electrode_group_info
 
-        Position data:
-        - position_info: pd.DataFrame with position, speed, direction, etc.
-        - track_graph: nx.Graph representation of the track
-        - linear_edge_order: list of edges for linearization
-        - linear_edge_spacing: list of edge spacings
-
-        Spike data:
-        - spike_times: dict[brain_area] -> list[np.ndarray]
-        - spike_waveform_features: dict[brain_area] -> list[np.ndarray]
-
-        LFP data:
-        - ripple_times: pd.DataFrame with ripple start/end times
-        - ripple_filtered_lfps: pd.DataFrame with ripple-band filtered LFP
-        - ripple_lfps: pd.DataFrame with raw ripple LFP
-        - ripple_consensus_trace: pd.Series with ripple consensus trace
-        - zscored_ripple_consensus_trace: pd.Series with z-scored trace
-        - theta_filtered_lfp: pd.DataFrame with theta-band filtered LFP
-        - theta_phase: pd.Series with theta phase
-        - theta_power: pd.Series with theta power
-
-        Multiunit data:
-        - hse_times: dict[brain_area] -> pd.DataFrame with HSE times
-        - multiunit_firing_rate: dict[brain_area] -> pd.DataFrame
-        - multiunit_rate_zscore: dict[brain_area] -> pd.DataFrame
-
-        Task events:
-        - beam_breaks: pd.DataFrame with poke events
-        - pump_events: pd.DataFrame with reward pump events
-        - light_events: pd.DataFrame with light events
-
-        Task structure:
-        - well_visits: pd.DataFrame with well visit intervals
-        - trials: pd.DataFrame with trial information
-        - task_variables: pd.DataFrame with derived task variables
-
-        Metadata:
-        - electrode_group_info: pd.DataFrame with electrode group information
+        See `continuum_swr_replay.analysis.hippocampus.types.SessionData` for
+        complete field documentation.
 
     See Also
     --------

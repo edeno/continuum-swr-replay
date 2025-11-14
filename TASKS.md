@@ -190,23 +190,23 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 3.3 Replace dict[str, Any] with TypedDict (1 hour)
 
-- [ ] Open `src/continuum_swr_replay/data_loaders/bandit_task.py`
-- [ ] Add import: `from ..analysis.hippocampus.types import SessionData`
-- [ ] Locate `load_data()` function signature
-- [ ] Change return type from `dict[str, Any]` to `SessionData`
-- [ ] Review function return statement
-- [ ] Verify all returned keys match SessionData TypedDict
-- [ ] Add any missing keys or fix mismatched types
-- [ ] Update function docstring Returns section
-- [ ] Save file
-- [ ] Run `uv run mypy src/continuum_swr_replay/data_loaders/bandit_task.py`
-- [ ] Fix any type errors
-- [ ] Test IDE autocomplete on `load_data()` return value
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm tests pass
+- [x] Open `src/continuum_swr_replay/data_loaders/bandit_task.py`
+- [x] Add import: `from ..analysis.hippocampus.types import SessionData`
+- [x] Locate `load_data()` function signature
+- [x] Change return type from `dict[str, Any]` to `SessionData`
+- [x] Review function return statement
+- [x] Verify all returned keys match SessionData TypedDict
+- [x] Add any missing keys or fix mismatched types
+- [x] Update function docstring Returns section
+- [x] Save file
+- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/bandit_task.py`
+- [x] Fix any type errors
+- [x] Test IDE autocomplete on `load_data()` return value
+- [x] Run `uv run pytest tests/`
+- [x] Confirm tests pass
 - [ ] Stage and commit: `git commit -m "Use SessionData TypedDict for load_data return type"`
 
-**Milestone 3 Complete**: ⬜
+**Milestone 3 Complete**: ✅
 
 ---
 
