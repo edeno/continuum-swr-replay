@@ -1,10 +1,28 @@
 """Trial and well visit construction from task events."""
 
+from typing import TypedDict
+
 import networkx as nx
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from .constants import WELL_PATCH_MAPPING
+
+
+class WellNodeData(TypedDict):
+    """Return type for get_start_end_node_id function.
+
+    Attributes
+    ----------
+    from_well : NDArray[np.int_]
+        Array of starting well node IDs
+    to_well : NDArray[np.int_]
+        Array of ending well node IDs
+    """
+
+    from_well: NDArray[np.int_]
+    to_well: NDArray[np.int_]
 
 
 def get_poke_in_poke_out_times(
@@ -71,7 +89,7 @@ def get_run_intervals(poke_times: pd.DataFrame) -> pd.DataFrame:
 
 def get_start_end_node_id(
     position_info: pd.DataFrame, track_graph: nx.Graph, times: pd.DataFrame
-) -> dict:
+) -> WellNodeData:
     """Determine start and end well nodes for each interval.
 
     Parameters
@@ -85,8 +103,8 @@ def get_start_end_node_id(
 
     Returns
     -------
-    dict
-        Dictionary with 'from_well' and 'to_well' arrays
+    WellNodeData
+        TypedDict with 'from_well' and 'to_well' node ID arrays
     """
     PROJECTED_COLS = ["projected_x_position", "projected_y_position"]
 
