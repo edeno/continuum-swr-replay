@@ -248,6 +248,9 @@ def set_figure_defaults(
     ...                        constrained_layout=True)
     >>> ax.plot(x, y, linewidth=4)  # Bold line for visibility
     """
+    # Reset to matplotlib defaults first to prevent stale settings
+    mpl.rcParams.update(mpl.rcParamsDefault)
+
     if context == "paper":
         # Try loading custom style file first
         style_path = Path(FIGURE_DIR) / "styles" / "paper.mplstyle"

@@ -87,9 +87,10 @@
   - Provide helpful error with label count and axes count
   - **COMPLETED:** Added explicit validation with helpful message showing both label and axes counts
 
-- [ ] **FU-2.5:** Reset matplotlib state in `set_figure_defaults()` (line 236+)
+- [x] **FU-2.5:** Reset matplotlib state in `set_figure_defaults()` (line 236+)
   - Call `mpl.rcParams.update(mpl.rcParamsDefault)` first
   - Prevents stale settings from previous context
+  - **COMPLETED:** Added mpl.rcParams.update(mpl.rcParamsDefault) at function start, ensures clean state
 
 ---
 

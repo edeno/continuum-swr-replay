@@ -147,6 +147,43 @@ class TestSetFigureDefaults:
         with pytest.raises(ValueError, match="Unknown context"):
             set_figure_defaults(context="invalid")
 
+    def test_resets_previous_settings(self):
+        """Test that set_figure_defaults resets stale settings.
+
+        This is the key test for FU-2.5: set_figure_defaults should reset
+        to matplotlib defaults before applying new settings, preventing
+        stale configuration from previous contexts.
+        """
+        # Set a custom value that shouldn't persist
+        original_linewidth = mpl.rcParams["lines.linewidth"]
+        mpl.rcParams["lines.linewidth"] = 99.0  # Unusual value
+
+        # Call set_figure_defaults - should reset to defaults first
+        set_figure_defaults(context="paper")
+
+        # Custom value should be gone, reset to a reasonable default
+        # Paper context sets specific linewidth (1.5), not the custom 99.0
+        assert mpl.rcParams["lines.linewidth"] != 99.0
+        assert mpl.rcParams["lines.linewidth"] <= 2.0  # Reasonable value
+
+        # Restore
+        mpl.rcParams["lines.linewidth"] = original_linewidth
+
+    def test_multiple_context_switches_clean(self):
+        """Test that switching contexts multiple times doesn't accumulate settings."""
+        # Switch between contexts
+        set_figure_defaults(context="presentation")
+        pres_dpi = mpl.rcParams["figure.dpi"]
+        assert pres_dpi == 150
+
+        set_figure_defaults(context="paper")
+        paper_dpi = mpl.rcParams["figure.dpi"]
+        assert paper_dpi == 450
+
+        # Switch back - should get same settings, not accumulated
+        set_figure_defaults(context="presentation")
+        assert mpl.rcParams["figure.dpi"] == pres_dpi
+
 
 class TestSaveFigure:
     """Test figure saving functionality."""
