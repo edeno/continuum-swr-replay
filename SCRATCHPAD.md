@@ -1,356 +1,55 @@
-# Scratchpad - Development Notes
+# Development Scratchpad
 
-**Date Started**: 2025-11-14
-**Current Milestone**: Milestone 2 - Type Hints - Data Loaders Part 1
+**Last Updated:** 2025-11-14
+**Current Task:** CB-3.1 - Use `|` operator for dict merging
 
----
+## Session Notes
 
-## Session Log
+### 2025-11-14: CB-3.1 - BLOCKED (Mypy Type Inference Limitation)
 
-### 2025-11-14 - Milestone 1 COMPLETE ✅
+**Task:** Replace `{**dict1, **dict2}` with `dict1 | dict2` in bandit_task.py (lines 181-192)
 
-**Status**: Milestone 1 Complete (1 hour)
+**Status:** BLOCKED - Discovered mypy limitation with `|` operator and TypedDict
 
-**Completed Tasks**:
-1. ✅ Task 1.1: Fixed import error in run_decoding_bandit.py (visualization.figurl)
-2. ✅ Task 1.2: Fixed syntax error in generate_figure03.py (commented magic command)
-3. ✅ Task 1.3: Fixed API typo edege_linewidth → edge_linewidth (3 occurrences)
-4. ✅ Task 1.4: Verified all changes (ruff, pytest, git diff, commit)
+**Investigation Summary:**
+1. ✅ Checked existing tests - 20 integration tests cover `load_data()` structure
+2. ✅ Ran baseline tests - all 20 tests pass with original code
+3. ✅ Implemented `|` operator refactor
+4. ✅ Tests still pass (runtime behavior identical)
+5. ❌ Mypy fails with `|` operator: "Incompatible return value type (got 'dict[str, object]', expected 'SessionData')"
+6. ✅ Verified old `{**dict}` syntax passes mypy without issues
 
-**Results**:
-- All 149 tests passing ✅
-- src/ clean (ruff) ✅
-- scripts/ has pre-existing linting issues (not blocking)
-- Commit: 2141d49 "fix(M1): critical blocking issues from code review"
+**Root Cause:**
+- The `|` operator for dict merging returns `dict[str, object]` type
+- This is incompatible with the `SessionData` TypedDict return type
+- The `{**dict}` unpacking syntax has BETTER type inference for TypedDict merging
+- This is a known mypy limitation, not a bug in our code
 
-**Notes**:
-- Import error was blocking script execution - now fixed
-- Syntax error in generate_figure03.py was preventing any use - now fixed
-- API typo fixed in all 3 locations (param def, docstring, usage)
-- No new errors introduced by changes
+**Mypy Behavior Comparison:**
+- Old syntax `{**position_data, **spike_data, ...}`: mypy correctly infers `SessionData` type ✅
+- New syntax `position_data | spike_data | ...`: mypy infers `dict[str, object]` ❌
 
----
+**Attempted Solutions:**
+- Used `cast("SessionData", ...)` - works but user rejected (code smell)
+- No other solutions available without sacrificing type safety
 
-### 2025-11-14 - Milestone 2 COMPLETE ✅
+**Decision Required:**
+1. Keep old `{**dict}` syntax (better mypy support for TypedDict) ← **RECOMMENDED**
+2. Mark CB-3.1 as NOT APPLICABLE (similar to CB-1.3)
 
-**Status**: Milestone 2 Complete - Type Hints for Data Loaders Part 1 (~2 hours)
-
-#### Task 2.1: Add Type Hints to lfp.py ✅
-
-**Completed Work**:
-1. ✅ Added TypedDict and NDArray imports
-2. ✅ Defined ThetaData TypedDict for get_theta() return value
-3. ✅ Defined RippleData TypedDict for get_ripple() return value
-4. ✅ Defined MultiunitData TypedDict for get_multiunit() return value
-5. ✅ Updated all 5 function signatures with precise type hints
-6. ✅ Enhanced docstrings to reference TypedDict types
-
-**Results**:
-- mypy passes with no errors on lfp.py ✅
-- Commit: 2236731 "feat(M2): Add comprehensive type hints to lfp.py"
-
-**TypedDicts Defined**:
-- `ThetaData`: theta_filtered_lfp, theta_phase, theta_power
-- `RippleData`: ripple_times, ripple_filtered_lfps, ripple_lfps, ripple_consensus_trace, zscored_ripple_consensus_trace
-- `MultiunitData`: hse_times, multiunit_firing_rate, multiunit_rate_zscore
-
-#### Task 2.2: Add Type Hints to events.py ✅
-
-**Completed Work**:
-1. ✅ Added TypedDict import
-2. ✅ Defined DIOEventData TypedDict for load_dios() return value
-3. ✅ Updated load_dios() signature with precise tuple and return types
-4. ✅ Added type ignore comments for pandas time-based slicing (mypy limitation)
-
-**Results**:
-- mypy passes with no errors on events.py ✅
-- Commit: a5663d3 "feat(M2): Add type hints to events.py"
-
-**TypedDict Defined**:
-- `DIOEventData`: beam_breaks, pump_events, light_events
-
-#### Task 2.3: Add Type Hints to trials.py ✅
-
-**Completed Work**:
-1. ✅ Added TypedDict and NDArray imports
-2. ✅ Defined WellNodeData TypedDict for get_start_end_node_id() return value
-3. ✅ Updated get_start_end_node_id() signature to use TypedDict
-4. ✅ Enhanced docstrings to reference TypedDict
-5. ✅ Verified nx.Graph types already present
-
-**Results**:
-- mypy passes with no errors on trials.py ✅
-- Commit: b1d0ac3 "feat(M2): Add type hints to trials.py"
-
-**TypedDict Defined**:
-- `WellNodeData`: from_well (node IDs), to_well (node IDs)
-
-#### Overall Milestone 2 Results:
-- All 149 tests passing ✅
-- mypy passes on all 3 files ✅
-- ruff checks pass ✅
-- 3 commits, 3 TypedDicts added for lfp.py, 1 for events.py, 1 for trials.py
-- Total: 5 new TypedDicts providing type safety for data loader returns
-
-**Key Improvements**:
-- Better IDE autocomplete for dictionary return values
-- Type checking catches missing/wrong dictionary keys at compile time
-- More precise numpy array types (NDArray[np.float64], NDArray[np.int_])
-- NetworkX graph types properly annotated
-- Clearer function signatures throughout data loaders
+**Recommendation:** Mark CB-3.1 as NOT APPLICABLE - The `{**dict}` syntax is actually the CORRECT and RECOMMENDED approach for TypedDict merging due to superior type inference in mypy. The `|` operator is great for general dict merging but has limitations with TypedDicts.
 
 ---
 
-### 2025-11-14 - Milestone 3 - Task 3.1 COMPLETE ✅
+## Completed Work
 
-**Status**: Task 3.1 Complete - Add Type Hints to task_variables.py (30 min)
+### Milestone 1: Critical Fixes ✅
+- FU-1.1 through FU-1.5: Figure utilities critical fixes
+- CB-1.1 through CB-1.2: Codebase critical fixes
+- CB-1.3: Marked NOT APPLICABLE (enumerate() is correct)
 
-**Completed Work**:
-1. ✅ Added NDArray import from numpy.typing
-2. ✅ Added type hints to `dist_to_goal_per_time()` function (line 71)
-   - Added: int, float, nx.Graph, dict[int, tuple[int, int]], and return type float
-3. ✅ Added type hints to `dist_to_goal()` function (line 119)
-   - Added: pd.DataFrame, pd.Series, nx.Graph, dict[int, tuple[int, int]], and return type NDArray[np.float64]
-4. ✅ Added type hints to `turn_direction()` function (line 153)
-   - Added: pd.Series, pd.DataFrame, nx.Graph, np.ndarray, and return type str
-5. ✅ Added type ignore comment for nx.shortest_path_length (mypy limitation)
-
-**Results**:
-- mypy passes with no errors on task_variables.py ✅
-- All 149 tests passing ✅
-- Docstrings already accurately described types (no updates needed) ✅
-
-**Notes**:
-- NetworkX was already imported (nx), no new import needed
-- 2 functions already had type hints (path_progress_for_run_segment, make_task_variables)
-- Added type ignore for nx.shortest_path_length return (returns Any in type stubs but actually returns float)
-- track_edges parameter typed as np.ndarray (array of edge tuples from nx.Graph.edges)
-
----
-
-### 2025-11-14 - Milestone 3 - Task 3.2 COMPLETE ✅
-
-**Status**: Task 3.2 Complete - Fix Remaining Mypy Errors (25 min)
-
-**Completed Work**:
-1. ✅ Fixed utils.py:74 - Added type hints to nested function `_count_exposure(df: pd.DataFrame) -> pd.DataFrame`
-2. ✅ Fixed animation.py:452 - Added type hints to `_update_plot(time_ind: int) -> tuple`
-3. ✅ Fixed interactive.py:181 - Added type hints to `plot_func(n: int) -> hv.Curve`
-4. ✅ Fixed interactive.py:269 - Added type hints to `update_interval(event: object) -> None` with type ignore
-5. ✅ Fixed figurl.py:201 - Changed parameter type from `NDArray[np.floating] | None` to `NDArray[np.floating] | xr.DataArray | None`
-6. ✅ Fixed figurl.py:637 - Added type hints to `get_animal_position_dot(time_ind: int) -> hv.Overlay`
-7. ✅ Fixed figurl.py:659 - Added type hints to `get_posterior_quadmesh(time_ind: int) -> hv.QuadMesh`
-8. ✅ Fixed figurl.py:667 - Added type hints to `get_most_likely_decoded_position(time_ind: int) -> hv.Scatter`
-
-**Results**:
-- mypy passes with NO ERRORS on entire src/ directory (25 source files) ✅
-- All 149 tests passing ✅
-- Reduced from 8 mypy errors to 0 errors ✅
-
-**Notes**:
-- figurl.py type issue was due to `posterior` parameter accepting both NDArray and xr.DataArray
-- Used `hv.Overlay` type for overlay objects (created with `*` operator in HoloViews)
-- Used type ignore for Panel event handler where event type is not well-typed
-- Matplotlib animation callback typed with generic `tuple` return (specific artist types complex to specify)
-
----
-
-### 2025-11-14 - Milestone 3 - Task 3.3 COMPLETE ✅
-
-**Status**: Task 3.3 Complete - Replace dict[str, Any] with SessionData TypedDict (15 min)
-
-**Completed Work**:
-1. ✅ Added TYPE_CHECKING import to avoid circular dependency
-2. ✅ Imported SessionData from `..analysis.hippocampus.types` (under TYPE_CHECKING)
-3. ✅ Changed `load_data()` return type from `dict[str, Any]` to `SessionData`
-4. ✅ Updated docstring Returns section to reference SessionData TypedDict
-5. ✅ Verified return statement matches SessionData structure
-6. ✅ Fixed circular import issue with TYPE_CHECKING guard
-
-**Results**:
-- mypy passes with no errors on entire codebase ✅
-- All 149 tests passing ✅
-- IDE autocomplete now works for load_data() return value ✅
-- No circular import issues ✅
-
-**Notes**:
-- Used `if TYPE_CHECKING:` guard to prevent circular import between data_loaders and analysis.hippocampus
-- SessionData TypedDict already existed with comprehensive documentation
-- Return statement uses dictionary unpacking from multiple sources (position_data, spike_data, ripple_data, etc.)
-- All returned keys match SessionData structure (total=False allows optional fields)
-
-**Key Improvement**:
-- Before: `data = load_data(...) → dict[str, Any]` (no autocomplete, no type checking)
-- After: `data = load_data(...) → SessionData` (full autocomplete, type-safe field access)
-
----
-
-### 2025-11-14 - Milestone 3 COMPLETE ✅
-
-**Status**: Milestone 3 Complete - Type Hints - Data Loaders Part 2 (1.5 hours total)
-
-**Summary of Milestone 3**:
-1. ✅ Task 3.1: Added type hints to task_variables.py (30 min)
-2. ✅ Task 3.2: Fixed remaining mypy errors across visualization modules (25 min)
-3. ✅ Task 3.3: Replaced dict[str, Any] with SessionData TypedDict (15 min)
-
-**Overall Results**:
-- mypy reports 0 errors across entire codebase (25 files) ✅
-- Type hint coverage >90% (estimated) ✅
-- load_data() returns typed SessionData ✅
-- All 149 tests passing ✅
-
-**Impact**:
-- Improved IDE autocomplete for all data loader functions
-- Type checking catches missing/wrong dictionary keys at compile time
-- More precise numpy array types (NDArray[np.float64])
-- NetworkX graph types properly annotated
-- Better maintainability and fewer runtime errors
-
----
-
-### 2025-11-14 - Milestone 4 - Task 4.1 COMPLETE ✅
-
-**Status**: Task 4.1 Complete - Write Tests for filter_spike_times (30 min)
-
-**Completed Work**:
-1. ✅ Reviewed existing test_spikes.py structure
-2. ✅ Added 5 new comprehensive test cases to TestSpikeFiltering class:
-   - `test_no_spikes_filtered_all_within_bounds` - Tests when all spikes preserved
-   - `test_boundary_conditions_exact_start_end` - Tests inclusive boundaries (>= and <=)
-   - `test_multiple_brain_areas` - Tests multiple brain areas (HPC + mPFC) simultaneously
-   - `test_brain_area_without_features` - Tests KeyError exception handling
-   - `test_preserves_spike_order_after_filtering` - Verifies temporal ordering maintained
-3. ✅ All 154 tests pass (149 existing + 5 new)
-4. ✅ Committed: 0711716 "test(M4): Add comprehensive tests for filter_spike_times"
-
-**Results**:
-- Total tests in TestSpikeFiltering: 8 (3 existing + 5 new) ✅
-- All tests pass with current in-place modification implementation ✅
-- Tests ready for refactoring to functional style ✅
-
-**Notes**:
-- Tests directory was previously untracked, so test_spikes.py is first test file in repo
-- Tests verify current behavior (in-place modification) before refactoring
-- Covered all edge cases: empty dicts, all filtered, none filtered, boundaries, multiple areas
-- Fixed one test issue with np.arange boundary (stops before upper limit)
-
-**Next**: Milestone 5 - Code Organization & Refactoring
-
----
-
-### 2025-11-14 - Milestone 4 COMPLETE ✅
-
-**Status**: Milestone 4 Complete - Refactor to Functional Style (1.5 hours total)
-
-**Summary of Milestone 4**:
-1. ✅ Task 4.1: Write Tests for filter_spike_times() (30 min)
-2. ✅ Task 4.2: Write Tests for filter_ripple_lfp_time() (5 min)
-3. ✅ Task 4.3: Refactor filter_spike_times() to functional style (30 min)
-4. ✅ Task 4.4: Refactor filter_ripple_lfp_time() to functional style (25 min)
-
-**Overall Results**:
-- All 161 tests passing ✅
-- Mypy reports 0 errors ✅
-- Both filtering functions now follow functional programming best practices ✅
-- No side effects on input parameters ✅
-- Clearer intent and safer to use ✅
-
-**Commits**:
-1. 0711716 - test(M4): Add comprehensive tests for filter_spike_times
-2. fc8b714 - test(M4): Add comprehensive tests for filter_ripple_lfp_time
-3. 5b49b1c - refactor(M4): Refactor filter_spike_times to functional style
-4. 37b0494 - refactor(M4): Refactor filter_ripple_lfp_time to functional style
-
----
-
-### 2025-11-14 - Milestone 4 - Task 4.4 COMPLETE ✅
-
-**Status**: Task 4.4 Complete - Refactor filter_ripple_lfp_time() to Functional Style (25 min)
-
-**Completed Work**:
-1. ✅ Refactored `filter_ripple_lfp_time()` in lfp.py to return new RippleData dict
-   - Changed return type from `None` to `RippleData`
-   - Created new dict with filtered DataFrames/Series
-   - Added comprehensive Returns section to docstring
-   - Preserved ripple_times field (not filtered by time bounds)
-2. ✅ Updated call site in bandit_task.py:162
-   - Captured return value: `ripple_data = filter_ripple_lfp_time(...)`
-3. ✅ Updated all 7 test cases in test_lfp.py
-   - Changed all calls to capture return values
-   - Renamed test_modifies_in_place to test_returns_new_dict
-   - Added assertions to verify original data unchanged
-4. ✅ Committed: 37b0494 "refactor(M4): Refactor filter_ripple_lfp_time to functional style"
-
-**Results**:
-- All 161 tests pass ✅
-- Mypy reports 0 errors ✅
-- Function now follows functional programming best practices ✅
-- Original input data remains unchanged ✅
-
-**Notes**:
-- Function now returns new RippleData dictionary instead of modifying input
-- Clearer intent and safer to use
-- Easier to test and reason about
-- Test renamed to accurately reflect functional style behavior
-
----
-
-### 2025-11-14 - Milestone 4 - Task 4.3 COMPLETE ✅
-
-**Status**: Task 4.3 Complete - Refactor filter_spike_times() to Functional Style (30 min)
-
-**Completed Work**:
-1. ✅ Refactored `filter_spike_times()` in spikes.py to return new dicts
-   - Changed return type from `None` to `tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]`
-   - Created new empty dicts instead of modifying inputs in place
-   - Added comprehensive Returns section to docstring
-2. ✅ Updated call site in bandit_task.py:155-159
-   - Captured return values: `spike_times, spike_features = filter_spike_times(...)`
-3. ✅ Updated all 8 test cases in test_spikes.py
-   - Changed from: `filter_spike_times(spike_times, spike_features, position_time)`
-   - Changed to: `spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)`
-4. ✅ Committed: 5b49b1c "refactor(M4): Refactor filter_spike_times to functional style"
-
-**Results**:
-- All 161 tests pass ✅
-- Mypy reports 0 errors ✅
-- Function now follows functional programming best practices ✅
-- No side effects on input parameters ✅
-
-**Notes**:
-- Function now returns new dictionaries instead of modifying inputs
-- Clearer intent and safer to use
-- Easier to test and reason about
-- Commit also picked up untracked test files and .hypothesis directory
-
----
-
-### 2025-11-14 - Milestone 4 - Task 4.2 COMPLETE ✅
-
-**Status**: Task 4.2 Complete - Write Tests for filter_ripple_lfp_time (5 min)
-
-**Completed Work**:
-1. ✅ Tests already existed in tests/unit/test_lfp.py (untracked file)
-2. ✅ Verified 7 comprehensive test cases all pass:
-   - `test_filter_to_position_bounds` - Normal operation
-   - `test_empty_dataframes` - Empty data handling
-   - `test_boundary_conditions_exact_start_end` - Inclusive boundaries
-   - `test_all_data_outside_bounds` - All data filtered
-   - `test_no_data_filtered_all_within_bounds` - No data filtered
-   - `test_preserves_data_structure` - Column/Series names preserved
-   - `test_modifies_in_place` - Current in-place modification behavior
-3. ✅ Committed: fc8b714 "test(M4): Add comprehensive tests for filter_ripple_lfp_time"
-
-**Results**:
-- Total tests: 7/7 pass ✅
-- Tests ready for refactoring to functional style ✅
-- More comprehensive than task specification required ✅
-
-**Notes**:
-- Tests were already written but not yet committed to git
-- Test coverage exceeds the 3 basic tests specified in TASKS.md
-- Tests verify current behavior (in-place modification) before refactoring
+### Milestone 2: UX Critical Fixes ✅
+- FU-2.1 through FU-2.5: All UX improvements completed
 
 ---
 
@@ -360,317 +59,19 @@ None currently.
 
 ---
 
-## Decisions Made
-
-1. **Left pre-existing linting issues in scripts/** - These are style issues (import sorting, unused imports) not blocking errors. Focus was on critical syntax/import errors per Milestone 1 scope.
-
-2. **Did not run auto-fix for ruff** - Would be out of scope for M1. Can address in future milestone if needed.
-
-3. **Used NDArray[np.float64] for numpy arrays** - More precise than generic np.ndarray, catches shape/dtype errors.
-
-4. **Created TypedDicts for complex return values** - Better than dict[str, Any], provides autocomplete and type safety.
-
----
-
-## Questions for User
-
-None currently.
-
----
-
-### 2025-11-14 - Milestone 5 - Task 5.1.1 IN PROGRESS
-
-**Status**: Task 5.1.1 In Progress - Plan Extraction for figurl.py (30 min)
-
-**Analysis of `create_interactive_1D_decoding_figurl()`**:
-
-**Function Location**: [src/continuum_swr_replay/visualization/figurl.py:98-397](src/continuum_swr_replay/visualization/figurl.py#L98-L397)
-- Total function: 299 lines
-- Docstring: lines 98-199 (101 lines)
-- Function body: lines 200-397 (197 lines)
-
-**View Creation Sections Identified**:
-
-1. **Decode View** (lines 200-206) - 7 lines
-   - Computes conditional non-local posterior if not provided
-   - Creates decode view using external `create_1D_decode_view()`
-   - Parameters needed: `posterior`, `linear_position`, `results`
-   - Returns: Not extracted (already uses helper function)
-
-2. **Behavioral Views** (lines 208-223) - 16 lines
-   - **Speed view** (lines 208-214): TimeseriesGraph with speed data
-   - **Head direction view** (lines 215-223): TimeseriesGraph with y_range=[-π, π]
-   - Parameters needed: `speed`, `head_direction`
-   - Return type: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-3. **Multiunit Activity (MUA) View** (lines 225-238) - 14 lines
-   - Adds MUA event intervals (colored)
-   - Adds MUA z-score line series
-   - Parameters needed: `MUA_times`, `MUA_zscore`
-   - Return type: `vv.TimeseriesGraph`
-
-4. **Sharp-Wave Ripple (SWR) View** (lines 240-253) - 14 lines
-   - Adds SWR event intervals (colored)
-   - Adds SWR z-score line series
-   - Parameters needed: `SWR_times`, `SWR_zscore`
-   - Return type: `vv.TimeseriesGraph`
-
-5. **Non-Local Probability View** (lines 255-287) - 33 lines
-   - Computes confident non-local times
-   - Adds non-local event intervals
-   - Adds Non-Local Continuous line series
-   - Adds Non-Local Fragmented line series
-   - Parameters needed: `results` (xr.Dataset)
-   - Return type: `vv.TimeseriesGraph`
-
-6. **Local Probability View** (lines 289-320) - 32 lines
-   - Computes confident local times
-   - Adds local event intervals
-   - Adds No-Spike line series
-   - Adds Local line series
-   - Parameters needed: `results` (xr.Dataset)
-   - Return type: `vv.TimeseriesGraph`
-
-7. **Theta LFP View** (lines 322-332) - 11 lines
-   - Single line series for theta filtered LFP
-   - Parameters needed: `theta_filtered_lfp`
-   - Return type: `vv.TimeseriesGraph`
-
-8. **Quality Metric Views** (lines 334-354) - 21 lines
-   - **Ahead-behind distance view** (lines 334-343): Distance metric
-   - **HPD view** (lines 345-354): Highest Posterior Density
-   - Parameters needed: `ahead_behind_distance`, `hpd`, `results`
-   - Return type: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-9. **Layout Composition** (lines 356-397) - 42 lines
-   - Creates vertical_panel_content list
-   - Creates Box layout with all views
-   - Generates and validates URL
-   - NOT EXTRACTED (main function logic)
-
-**Extraction Strategy - Option A (Recommended)**:
-
-Extract 4 helper functions that group related visualizations:
-
-1. **`_create_behavioral_views()`** - 16 lines
-   - Speed + head direction views
-   - Parameters: `speed: pd.Series, head_direction: pd.Series`
-   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-2. **`_create_neural_activity_views()`** - 59 lines
-   - MUA view + SWR view + Theta view
-   - Parameters: `MUA_times, MUA_zscore, SWR_times, SWR_zscore, theta_filtered_lfp`
-   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-3. **`_create_state_probability_views()`** - 65 lines
-   - Non-local view + Local view
-   - Parameters: `results: xr.Dataset`
-   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-4. **`_create_quality_metric_views()`** - 21 lines
-   - Ahead-behind distance + HPD
-   - Parameters: `ahead_behind_distance, hpd, results: xr.Dataset`
-   - Returns: `tuple[vv.TimeseriesGraph, vv.TimeseriesGraph]`
-
-**Main function after extraction**: ~75 lines (down from 197)
-- Compute posterior if None (2 lines)
-- Create decode_view (4 lines)
-- Call 4 helper functions (8 lines)
-- Compose layout (42 lines)
-- Return URL with validation (3 lines)
-
-**Extraction Strategy - Option B (Alternative)**:
-
-Extract 7 individual helper functions (more granular):
-- Each view gets its own helper function
-- More testable but creates many small functions
-- Some functions would be very small (11-16 lines)
-
-**Recommendation**: Use Option A (4 grouped helpers) for better balance between:
-- Reducing main function complexity
-- Avoiding too many tiny helper functions
-- Grouping related visualizations logically
-- Maintaining readability
-
-**Decision**: User selected Option B - Extract individual helper functions for maximum granularity
-
-**Extraction Plan - Option B (9 Individual Helpers)**:
-1. `_create_speed_view()` - Speed timeseries
-2. `_create_head_direction_view()` - Head direction timeseries
-3. `_create_mua_view()` - Multiunit activity with events
-4. `_create_swr_view()` - Sharp-wave ripple with events
-5. `_create_non_local_probability_view()` - Non-local state probabilities
-6. `_create_local_probability_view()` - Local state probabilities
-7. `_create_theta_view()` - Theta filtered LFP
-8. `_create_ahead_behind_distance_view()` - Distance metric
-9. `_create_hpd_view()` - HPD metric
-
-**Next Steps**:
-1. ✅ Confirmed extraction strategy - Option B selected
-2. ✅ Extracted all 9 helper functions
-3. ✅ Updated main function to call each helper
-4. ✅ Verified mypy and ruff pass with no errors
-5. ⏭️ Running code-reviewer agent for final review
-
----
-
-### 2025-11-14 - Milestone 5 - Task 5.1 COMPLETE ✅
-
-**Status**: Task 5.1 Complete - Extract Helper Functions in figurl.py (2 hours actual)
-
-**Completed Work**:
-1. ✅ Extracted 9 individual helper functions with full type hints and docstrings:
-   - `_create_speed_view()` - 19 lines
-   - `_create_head_direction_view()` - 23 lines
-   - `_create_mua_view()` - 27 lines
-   - `_create_swr_view()` - 25 lines
-   - `_create_theta_view()` - 23 lines
-   - `_create_non_local_probability_view()` - 49 lines
-   - `_create_local_probability_view()` - 48 lines
-   - `_create_ahead_behind_distance_view()` - 21 lines
-   - `_create_hpd_view()` - 19 lines
-
-2. ✅ Updated `create_interactive_1D_decoding_figurl()` to use all helpers
-3. ✅ Verified mypy passes with no errors
-4. ✅ Verified ruff passes with no errors
-
-**Results**:
-- Main function body: **197 lines → 63 lines** (68% reduction) ✅
-- Total function (with docstring): 299 lines → 165 lines ✅
-- Total file size: 695 lines → 866 lines (added helper functions)
-- All helper functions have:
-  - Full type hints for all parameters
-  - Comprehensive docstrings with Parameters and Returns sections
-  - Single responsibility (one view per function)
-- Main function now <150 lines (meets code review guideline) ✅
-
-**Benefits**:
-- Much more readable main function - just calls 9 helpers
-- Each helper is independently testable
-- Easier to understand and maintain
-- Follows single responsibility principle
-- Better code organization
-
-**Code Review Findings**:
-- ✅ Excellent function decomposition and organization
-- ✅ Complete type hints and comprehensive docstrings
-- ✅ Scientific correctness preserved
-- ❌ **Critical Issue Found**: Type inconsistency in main function signature
-  - `MUA_zscore` and `SWR_zscore` were typed as `pd.DataFrame`
-  - Should be `pd.Series` to match helper functions, docstrings, and SessionData TypedDict
-- ✅ **Fixed**: Changed both parameters from `pd.DataFrame` to `pd.Series`
-- ✅ Verified: mypy and ruff pass with no errors
-
-**Final Status**: Code review APPROVED after fix ✅
-
----
-
-### 2025-11-14 - Milestone 5 - Task 5.2 COMPLETE ✅
-
-**Status**: Task 5.2 Complete - Centralize MAX_SPEED_THRESHOLD Constant (15 min)
-
-**Completed Work**:
-1. ✅ Added `MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0` to parameters.py (line 8)
-2. ✅ Added descriptive comment explaining the purpose (filtering non-local events)
-3. ✅ Updated data_aggregation.py to import from parameters instead of local definition
-4. ✅ Removed local constant definition from data_aggregation.py
-5. ✅ Verified mypy passes on both files
-6. ✅ Verified ruff passes on both files
-7. ✅ Verified import works and constant accessible
-
-**Results**:
-- Constant now centralized in parameters.py ✅
-- Consistent with other project-wide constants (SAMPLING_FREQUENCY, COLORS, etc.) ✅
-- Single source of truth for speed threshold ✅
-- Easier to modify in future if needed ✅
-
-**Impact**: Better code organization, following DRY principle
-
----
-
-### 2025-11-14 - Milestone 5 - Task 5.3 COMPLETE ✅
-
-**Status**: Task 5.3 Complete - Convert Parameters to Dataclass (30 min)
-
-**Completed Work**:
-1. ✅ Added imports: `from dataclasses import dataclass` and `from typing import Final`
-2. ✅ Created `DecodingParameters` frozen dataclass with comprehensive docstring
-3. ✅ Added all 4 parameters with type hints and defaults:
-   - `place_bin_size: float = 2.0`
-   - `waveform_std: float = 24.0`
-   - `position_std: float = 6.0`
-   - `block_size: int = 4096`
-4. ✅ Created singleton instance: `DECODING_PARAMS: Final = DecodingParameters()`
-5. ✅ Replaced old dict (which was unused in codebase)
-6. ✅ Added detailed docstring explaining each parameter's purpose and scientific context
-7. ✅ Preserved geometric mean calculation notes in docstring
-
-**Results**:
-- Immutable configuration (frozen=True prevents accidental modification) ✅
-- Type-safe parameter access with IDE autocomplete ✅
-- Comprehensive documentation for each parameter ✅
-- All 161 tests pass ✅
-- mypy: no errors ✅
-- ruff: all checks passed ✅
-
-**Benefits**:
-- Cannot accidentally modify critical analysis parameters at runtime
-- Type checking for parameter access (catches typos at compile time)
-- Better IDE support with autocomplete
-- More professional and maintainable code
-- Comprehensive inline documentation
-
-**Notes**:
-- Old `decoding_parameters` dict was defined but never used in codebase
-- No references needed updating (dict was unused legacy code)
-- Dataclass provides superior type safety and documentation
-
----
-
-### 2025-11-14 - Milestone 5 COMPLETE ✅
-
-**Status**: Milestone 5 COMPLETE - Code Organization & Refactoring (2.5 hours total)
-
-**Final Code Review Results**:
-- **Assessment**: APPROVED ✅
-- **Score**: 5/5 (Perfect Score)
-- **Critical Issues**: 0
-- **Blocking Issues**: 0
-- **Tests Passing**: 161/161 ✅
-- **Mypy Errors**: 0 ✅
-- **Ruff Warnings**: 0 ✅
-
-**Summary of All Milestone 5 Tasks**:
-
-1. **Task 5.1**: Extracted 9 helper functions in figurl.py
-   - Main function reduced from 197 → 63 lines (68% reduction)
-   - All helpers <50 lines, single responsibility
-   - Fixed type inconsistency (DataFrame → Series)
-   - Time: 2 hours
-
-2. **Task 5.2**: Centralized MAX_SPEED_THRESHOLD constant
-   - Moved from data_aggregation.py to parameters.py
-   - Added documentation
-   - Time: 15 minutes
-
-3. **Task 5.3**: Converted parameters to immutable dataclass
-   - Created frozen DecodingParameters dataclass
-   - Comprehensive documentation with scientific context
-   - Singleton instance with Final annotation
-   - Time: 30 minutes
-
-**Key Achievements**:
-- Perfect type safety throughout all modules
-- Immutable configuration prevents accidental modification
-- Dramatic improvement in code organization (5/5 score)
-- Zero regressions, all tests pass
-- Publication-ready code quality
-
-**Code Review Highlights**:
-- "Exemplary refactoring work"
-- "Demonstrates deep understanding of Python best practices"
-- "Excellent foundation for future development"
-- All SOLID principles followed
-- No code smells remaining
-
-**Milestone 5 is production-ready** ✅
+## Decisions Log
+
+### CB-1.3: enumerate() with itertuples()
+**Decision:** NOT APPLICABLE - enumerate() is correct here
+**Rationale:** DataFrame index may be non-sequential, while labels must be sequential
+**Evidence:** Tests failed when using row.Index instead of enumerate counter
+
+### CB-3.1: Use | operator for dict merging
+**Decision:** NOT APPLICABLE - {**dict} is correct for TypedDict merging
+**Rationale:** The | operator has inferior type inference for TypedDict merging in mypy
+**Evidence:**
+  - `{**dict}` syntax: mypy correctly infers SessionData type
+  - `dict | dict` syntax: mypy infers dict[str, object], incompatible with SessionData
+  - Using cast() is a code smell and indicates wrong approach
+  - This is a documented mypy limitation, not a bug
+**Action Taken:** Removed unused `Any` import as cleanup

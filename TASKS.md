@@ -102,8 +102,12 @@
 
 ### Codebase Improvements
 
-- [ ] **CB-3.1:** Use `|` operator for dict merging in bandit_task.py (line 181-192)
+- [x] **CB-3.1:** Use `|` operator for dict merging in bandit_task.py (line 181-192)
   - Replace `{**dict1, **dict2}` with `dict1 | dict2`
+  - **NOT APPLICABLE:** `{**dict}` syntax has superior type inference for TypedDict merging in mypy
+  - The `|` operator returns `dict[str, object]` which is incompatible with `SessionData` TypedDict
+  - Current syntax is actually the CORRECT approach for type-safe dict merging with TypedDicts
+  - Removed unused `Any` import as cleanup
 
 - [ ] **CB-3.2:** Fix SCREAMING_CASE for constants in parameters.py (line 67)
   - Rename `training_types` to `TRAINING_TYPES`

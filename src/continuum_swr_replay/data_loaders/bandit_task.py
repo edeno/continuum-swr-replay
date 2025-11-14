@@ -26,7 +26,7 @@ get_training_timepoints : Select time points for decoder training
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from spyglass.common import PositionIntervalMap
 
