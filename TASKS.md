@@ -1,547 +1,373 @@
-# Implementation Tasks Checklist
+# Figure Utilities & Codebase Improvement Tasks
 
-**Date Created**: 2025-11-14
-**Based on**: PLAN.md and CODE_REVIEW.md
-**Total Estimated Time**: ~18 hours over 2 weeks
+**Status:** In Progress
+**Last Updated:** 2025-11-14
+**References:**
 
----
-
-## Overview
-
-This document provides a detailed task checklist for implementing the code review improvements. Check off tasks as you complete them to track progress.
-
-**Quick Stats**:
-
-- Total Milestones: 5
-- Total Tasks: ~60
-- Current Progress: 0/60 tasks completed (0%)
+- [IMPROVEMENTS.md](IMPROVEMENTS.md) - Full codebase review findings
+- [FIGURE_UTILITIES_REVIEW.md](FIGURE_UTILITIES_REVIEW.md) - Detailed figure utilities review
 
 ---
 
-## Milestone 1: Critical Blocking Issues ⏱️ 1 hour
+## Milestone 1: Critical Fixes (BLOCKING) 🔴
 
-**Goal**: Fix all import errors, syntax errors, and API typos
-**Status**: ⬜ Not Started
+**Priority:** IMMEDIATE
+**Estimated Time:** 2-4 hours
+**Goal:** Fix bugs that prevent safe usage and cause silent failures
 
-### Tasks
+### figure_utilities.py Critical Fixes
 
-#### 1.1 Fix Import Error in run_decoding_bandit.py (5 min)
+- [x] **FU-1.1:** Fix `facecolor` type hint in `save_figure()` (lines 387, 447)
+  - Accept `ColorType | None` instead of `str | None`
+  - Type error from `fig.get_facecolor()` returning tuple/array
+  - **COMPLETED:** Used matplotlib.typing.ColorType for proper type safety
 
-- [x] Open `scripts/run_decoding_bandit.py`
-- [x] Navigate to line 13
-- [x] Change `from continuum_swr_replay.visualization.visualization import` to `from continuum_swr_replay.visualization.figurl import`
-- [x] Save file
-- [x] Verify: Run `uv run python scripts/run_decoding_bandit.py --help`
-- [x] Confirm script runs without import error
+- [x] **FU-1.2:** Remove unused imports (lines 77, 87)
+  - Remove `import os`
+  - Remove `from matplotlib.figure import Figure`
+  - **COMPLETED:** Both imports removed, added ColorType import
 
-#### 1.2 Fix Syntax Error in generate_figure03.py (15 min)
+- [x] **FU-1.3:** Add `stacklevel=2` to all `warnings.warn()` calls (lines 701, 706, 722)
+  - 3 warnings in `validate_figure_quality()`
+  - **COMPLETED:** All 3 warnings now use stacklevel=2
 
-- [x] Open `scripts/generate_figure03.py`
-- [x] Inspect line 2 and identify syntax error
-- [x] Fix syntax error (complete incomplete code or fix invalid statement)
-- [x] Save file
-- [x] Verify: Run `uv run ruff check scripts/generate_figure03.py`
-- [x] Confirm no syntax errors reported
+- [ ] **FU-1.4:** Cast DPI to int in `save_figure()` (line 441)
+  - `dpi = int(mpl.rcParams.get("savefig.dpi", 300))`
 
-#### 1.3 Fix API Typo: edege_linewidth → edge_linewidth (20 min)
+- [ ] **FU-1.5:** Add format validation in `save_figure()`
+  - Define `VALID_FORMATS` constant
+  - Validate before saving, raise `ValueError` for invalid formats
 
-- [x] Open `src/continuum_swr_replay/visualization/plots.py`
-- [x] Navigate to line 908 (first occurrence in `plot_graph_as_1D`)
-- [x] Change parameter `edege_linewidth` to `edge_linewidth`
-- [x] Update docstring for this parameter
-- [x] Navigate to line 930 (second occurrence)
-- [x] Change parameter `edege_linewidth` to `edge_linewidth`
-- [x] Update docstring
-- [x] Navigate to line 970 (third occurrence)
-- [x] Change parameter `edege_linewidth` to `edge_linewidth`
-- [x] Update docstring
-- [x] Search codebase for any usage of `edege_linewidth` and update
-- [x] Save file
+### Codebase Critical Fixes
 
-#### 1.4 Verification & Commit (20 min)
+- [ ] **CB-1.1:** Fix unsafe `zip()` without `strict=True` in utils.py (lines 54-63, 68-69)
+  - Change `strict=False` to `strict=True`
 
-- [x] Run `uv run ruff check src/`
-- [x] Confirm no errors
-- [x] Run `uv run ruff check scripts/`
-- [x] Confirm no errors
-- [x] Run `uv run pytest tests/`
-- [x] Confirm all tests pass
-- [x] Review git diff to ensure only expected changes
-- [x] Stage changes: `git add scripts/run_decoding_bandit.py scripts/generate_figure03.py src/continuum_swr_replay/visualization/plots.py`
-- [x] Commit: `git commit -m "Fix critical blocking issues from code review"`
+- [ ] **CB-1.2:** Refactor filename parsing with regex in utils.py (lines 56-58)
+  - Create `parse_nwb_filename()` function
+  - Eliminate double `.replace()` call
 
-**Milestone 1 Complete**: ✅
+- [ ] **CB-1.3:** Remove redundant `enumerate()` with `itertuples()` in utils.py (line 118)
+  - Use `row.Index` instead of enumerate counter
 
 ---
 
-## Milestone 2: Type Hints - Data Loaders Part 1 ⏱️ 5 hours
+## Milestone 2: UX Critical Fixes (HIGH PRIORITY) 🟡
 
-**Goal**: Add type hints to lfp.py, events.py, and trials.py
-**Status**: ✅ Complete
+**Priority:** SAME DAY
+**Estimated Time:** 2-3 hours
+**Goal:** Remove workflow friction and prevent user confusion
 
-### Tasks
+- [ ] **FU-2.1:** Make `save_figure()` use `FIGURE_DIR` by default
+  - Add `base_dir: str | Path | None = None` parameter
+  - Default to `FIGURE_DIR` when None
+  - Create output path as `Path(base_dir) / figure_name`
 
-#### 2.1 Add Type Hints to lfp.py (2 hours)
+- [ ] **FU-2.2:** Validate figure exists before saving in `save_figure()`
+  - Check `fig.get_axes()` is not empty
+  - Raise `ValueError` with helpful hint if no axes found
 
-- [x] Open `src/continuum_swr_replay/data_loaders/lfp.py`
-- [x] Review all functions and identify missing type annotations
-- [x] Define TypedDict for `get_theta()` return value at top of file
-- [x] Define TypedDict for `get_ripple()` return value
-- [x] Define TypedDict for other function returns as needed
-- [x] Add type hints to `get_theta()` function signature
-- [x] Add type hints to `get_ripple()` function signature
-- [x] Add type hints to `get_ripple_consensus_trace()` function signature
-- [x] Add type hints to `filter_ripple_lfp_time()` function signature
-- [x] Add type hints to any other functions missing them
-- [x] Add `NDArray[np.float64]` for numpy arrays
-- [x] Add `pd.DataFrame` for pandas DataFrames
-- [x] Update all docstrings to match new type signatures
-- [x] Save file
-- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/lfp.py`
-- [x] Fix any mypy errors reported
-- [x] Run `uv run pytest tests/`
-- [x] Confirm tests pass
-- [x] Stage and commit: `git commit -m "Add type hints to lfp.py"`
+- [ ] **FU-2.3:** Fix `validate_figure_quality()` modifying state (line 716)
+  - Remove `plt.tight_layout()` call
+  - Make validation read-only
 
-#### 2.2 Add Type Hints to events.py (1 hour)
+- [ ] **FU-2.4:** Improve error messages in `label_panels()` (line 656)
+  - Add explicit length validation before zip
+  - Provide helpful error with label count and axes count
 
-- [x] Open `src/continuum_swr_replay/data_loaders/events.py`
-- [x] Review all functions and identify missing type annotations
-- [x] Consider defining dataclass for event structures
-- [x] Add type hints to all function parameters
-- [x] Add type hints to all function returns
-- [x] Add `pd.DataFrame` and `NDArray` annotations as appropriate
-- [x] Update all docstrings to match new type signatures
-- [x] Save file
-- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/events.py`
-- [x] Fix any mypy errors reported
-- [x] Run `uv run pytest tests/`
-- [x] Confirm tests pass
-- [x] Stage and commit: `git commit -m "Add type hints to events.py"`
-
-#### 2.3 Add Type Hints to trials.py (2 hours)
-
-- [x] Open `src/continuum_swr_replay/data_loaders/trials.py`
-- [x] Review all 5 functions missing type annotations
-- [x] Add type hints for pandas DataFrame returns
-- [x] Add type hints for all function parameters
-- [x] Add type hints for all local variables where helpful
-- [x] Update all docstrings to match new type signatures
-- [x] Save file
-- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/trials.py`
-- [x] Fix any mypy errors reported
-- [x] Run `uv run pytest tests/`
-- [x] Confirm tests pass
-- [x] Stage and commit: `git commit -m "Add type hints to trials.py"`
-
-**Milestone 2 Complete**: ✅
+- [ ] **FU-2.5:** Reset matplotlib state in `set_figure_defaults()` (line 236+)
+  - Call `mpl.rcParams.update(mpl.rcParamsDefault)` first
+  - Prevents stale settings from previous context
 
 ---
 
-## Milestone 3: Type Hints - Data Loaders Part 2 ⏱️ 4 hours
+## Milestone 3: Style & Quality (MEDIUM PRIORITY) 🟢
 
-**Goal**: Complete type coverage and fix all mypy errors
-**Status**: ⬜ Not Started
+**Priority:** THIS WEEK
+**Estimated Time:** 3-4 hours
+**Goal:** Improve code consistency and Python idioms
 
-### Tasks
+### Codebase Improvements
 
-#### 3.1 Add Type Hints to task_variables.py (2 hours)
+- [ ] **CB-3.1:** Use `|` operator for dict merging in bandit_task.py (line 181-192)
+  - Replace `{**dict1, **dict2}` with `dict1 | dict2`
 
-- [x] Open `src/continuum_swr_replay/data_loaders/task_variables.py`
-- [x] Import NetworkX types: `import networkx as nx`
-- [x] Add type hint to function at line 71
-- [x] Add type hint to function at line 119
-- [x] Add type hint to function at line 153
-- [x] Add type hints to remaining 2 functions
-- [x] Add `nx.Graph` type hints for graph parameters
-- [x] Add `pd.DataFrame` type hints for DataFrame returns
-- [x] Add `NDArray[np.float64]` for numpy arrays
-- [x] Update all docstrings to match new type signatures
-- [x] Save file
-- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/task_variables.py`
-- [x] Fix any mypy errors reported
-- [x] Run `uv run pytest tests/`
-- [x] Confirm tests pass
-- [x] Stage and commit: `git commit -m "Add type hints to task_variables.py"`
+- [ ] **CB-3.2:** Fix SCREAMING_CASE for constants in parameters.py (line 67)
+  - Rename `training_types` to `TRAINING_TYPES`
 
-#### 3.2 Fix Remaining Mypy Errors (1 hour)
+- [ ] **CB-3.3:** Optimize DataFrame construction in utils.py (line 114-116)
+  - Use scalar broadcast instead of `np.zeros_like()`
 
-- [x] Open `src/continuum_swr_replay/data_loaders/utils.py`
-- [x] Navigate to line 74 (nested function `_count_exposure`)
-- [x] Add type hints to nested function
-- [x] Save and verify with mypy
-- [x] Open `src/continuum_swr_replay/visualization/animation.py`
-- [x] Navigate to line 452
-- [x] Add missing type annotation
-- [x] Save and verify with mypy
-- [x] Open `src/continuum_swr_replay/visualization/interactive.py`
-- [x] Navigate to line 181 and add type annotation
-- [x] Navigate to line 269 and add type annotation
-- [x] Save and verify with mypy
-- [x] Open `src/continuum_swr_replay/visualization/figurl.py`
-- [x] Navigate to line 201 and fix incompatible type assignment
-- [x] Navigate to line 637 and add type annotation
-- [x] Navigate to line 659 and add type annotation
-- [x] Navigate to line 667 and add type annotation
-- [x] Save and verify with mypy
-- [x] Run `uv run mypy src/` (full codebase check)
-- [x] Confirm <5 errors total
-- [x] Stage and commit: `git commit -m "Fix remaining mypy errors across visualization modules"`
+### Figure Utilities Enhancements
 
-#### 3.3 Replace dict[str, Any] with TypedDict (1 hour)
+- [ ] **FU-3.1:** Add context-aware transparency default in `save_figure()`
+  - Auto-detect dark backgrounds
+  - Set `transparent=False` for dark, `True` for light
 
-- [x] Open `src/continuum_swr_replay/data_loaders/bandit_task.py`
-- [x] Add import: `from ..analysis.hippocampus.types import SessionData`
-- [x] Locate `load_data()` function signature
-- [x] Change return type from `dict[str, Any]` to `SessionData`
-- [x] Review function return statement
-- [x] Verify all returned keys match SessionData TypedDict
-- [x] Add any missing keys or fix mismatched types
-- [x] Update function docstring Returns section
-- [x] Save file
-- [x] Run `uv run mypy src/continuum_swr_replay/data_loaders/bandit_task.py`
-- [x] Fix any type errors
-- [x] Test IDE autocomplete on `load_data()` return value
-- [x] Run `uv run pytest tests/`
-- [x] Confirm tests pass
-- [x] Stage and commit: `git commit -m "Use SessionData TypedDict for load_data return type"`
+- [ ] **FU-3.2:** Implement font size validation in `validate_figure_quality()`
+  - Check axis labels meet minimum size
+  - Check tick labels meet minimum size
 
-**Milestone 3 Complete**: ✅
+- [ ] **FU-3.3:** Add source URLs to color palette comments (lines 125, 145)
+  - Verify WONG against Nature Methods article
+  - Verify OKABE_ITO against JFly source
 
 ---
 
-## Milestone 4: Refactor to Functional Style ⏱️ 3 hours
+## Milestone 4: Testing Infrastructure (HIGH PRIORITY) 🧪
 
-**Goal**: Write tests first, then refactor in-place modifications to return new objects
-**Status**: 🔄 In Progress
+**Priority:** THIS WEEK
+**Estimated Time:** 4-6 hours
+**Goal:** Establish comprehensive test coverage
 
-### Tasks
+- [ ] **TEST-4.1:** Create `tests/test_figure_utilities.py`
+  - Test constants (MM_TO_INCHES, GOLDEN_RATIO, column widths)
+  - Test `cm_to_inch()` conversion
+  - Test `figure_size_from_panels()` calculations
+  - Test color palette length and hex validity
+  - Test `label_panels()` with valid and invalid inputs
 
-#### 4.1 Write Tests for filter_spike_times() (45 min)
+- [ ] **TEST-4.2:** Add type checking validation
+  - Run `mypy src/continuum_swr_replay/figure_utilities.py`
+  - Ensure all type errors resolved
 
-- [x] Create or open `tests/unit/test_data_loaders.py`
-- [x] Import `filter_spike_times` from `continuum_swr_replay.data_loaders.spikes`
-- [x] Write test: `test_filter_spike_times_normal_operation()`
-  - [x] Create sample spike_times dict with multiple brain areas
-  - [x] Create sample spike_waveform_features dict
-  - [x] Create sample position_time array
-  - [x] Call filter_spike_times()
-  - [x] Assert spikes outside time bounds are removed
-  - [x] Assert spikes within bounds are kept
-- [x] Write test: `test_filter_spike_times_empty_dict()`
-  - [x] Test with empty input dicts
-- [x] Write test: `test_filter_spike_times_all_filtered()`
-  - [x] Test where all spikes are outside bounds
-- [x] Write test: `test_filter_spike_times_none_filtered()`
-  - [x] Test where all spikes are within bounds
-- [x] Write test: `test_filter_spike_times_boundary_conditions()`
-  - [x] Test spikes exactly at start/end times
-- [x] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_spike_times -v`
-- [x] Confirm all tests pass with current implementation
-- [x] Stage and commit: `git commit -m "Add comprehensive tests for filter_spike_times"`
+- [ ] **TEST-4.3:** Add linting validation
+  - Run `ruff check src/continuum_swr_replay/figure_utilities.py`
+  - Ensure all linting errors resolved
 
-#### 4.2 Write Tests for filter_ripple_lfp_time() (45 min)
-
-- [x] Open `tests/unit/test_lfp.py` (created comprehensive test file)
-- [x] Import `filter_ripple_lfp_time` from `continuum_swr_replay.data_loaders.lfp`
-- [x] Write test: `test_filter_to_position_bounds()` (normal operation)
-  - [x] Create sample ripple LFP data
-  - [x] Create sample position_time array
-  - [x] Call filter_ripple_lfp_time()
-  - [x] Assert times outside bounds are removed
-- [x] Write test: `test_empty_dataframes()` (empty data)
-  - [x] Test with empty input
-- [x] Write test: `test_boundary_conditions_exact_start_end()` (boundary conditions)
-  - [x] Test times exactly at boundaries
-- [x] Write test: `test_all_data_outside_bounds()` (all data filtered)
-- [x] Write test: `test_no_data_filtered_all_within_bounds()` (no data filtered)
-- [x] Write test: `test_preserves_data_structure()` (structure preservation)
-- [x] Write test: `test_modifies_in_place()` (current in-place behavior)
-- [x] Run `uv run pytest tests/unit/test_lfp.py -v`
-- [x] Confirm all tests pass with current implementation (7/7 passed)
-- [x] Stage and commit: `git commit -m "test(M4): Add comprehensive tests for filter_ripple_lfp_time"`
-
-#### 4.3 Refactor filter_spike_times() to Functional Style (45 min)
-
-- [x] Open `src/continuum_swr_replay/data_loaders/spikes.py`
-- [x] Navigate to `filter_spike_times()` function (line ~356)
-- [x] Change return type from `None` to `tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]`
-- [x] Create new empty dicts: `filtered_times = {}` and `filtered_features = {}`
-- [x] Change all in-place modifications to populate new dicts
-- [x] Add return statement: `return filtered_times, filtered_features`
-- [x] Update docstring to remove "modifies in place" and add Returns section
-- [x] Save file
-- [x] Find all call sites of `filter_spike_times()` in codebase
-- [x] Update call site in bandit_task.py to capture return values
-- [x] Update all 8 test cases in test_spikes.py
-- [x] Save all modified files
-- [x] Run `uv run pytest tests/unit/test_spikes.py::TestSpikeFiltering -v`
-- [x] Confirm all tests still pass (8/8 passed)
-- [x] Run `uv run pytest tests/`
-- [x] Confirm all tests pass (161/161 passed)
-- [x] Run `uv run mypy src/`
-- [x] Confirm no type errors
-- [x] Stage and commit: `git commit -m "refactor(M4): Refactor filter_spike_times to functional style"`
-
-#### 4.4 Refactor filter_ripple_lfp_time() to Functional Style (45 min)
-
-- [x] Open `src/continuum_swr_replay/data_loaders/lfp.py`
-- [x] Navigate to `filter_ripple_lfp_time()` function (line 308)
-- [x] Change return type from `None` to `RippleData`
-- [x] Create new data structures instead of modifying in place
-- [x] Add return statement with all RippleData fields
-- [x] Update docstring to remove "modifies in place" and add Returns section
-- [x] Save file
-- [x] Find call site in bandit_task.py:162
-- [x] Update call site to capture return value
-- [x] Update all 7 test cases in test_lfp.py
-- [x] Rename test_modifies_in_place to test_returns_new_dict
-- [x] Save all modified files
-- [x] Run `uv run pytest tests/unit/test_lfp.py -v`
-- [x] Confirm all tests still pass (7/7 passed)
-- [x] Run `uv run pytest tests/`
-- [x] Confirm all tests pass (161/161 passed)
-- [x] Run `uv run mypy src/`
-- [x] Confirm no new type errors
-- [x] Stage and commit: `git commit -m "refactor(M4): Refactor filter_ripple_lfp_time to functional style"`
-
-**Milestone 4 Complete**: ✅
+- [ ] **TEST-4.4:** Enable doctest for examples
+  - Add `--doctest-modules` to pytest config
+  - Or add `if __name__ == "__main__"` with `doctest.testmod()`
 
 ---
 
-## Milestone 5: Code Organization & Refactoring ⏱️ 2.5 hours actual (7 hours estimated)
+## Milestone 5: Type Safety & Enums (MEDIUM PRIORITY) 📝
 
-**Goal**: Extract long functions, centralize constants, use dataclasses
-**Status**: ✅ Complete
+**Priority:** WEEK 2
+**Estimated Time:** 2-3 hours
+**Goal:** Improve type safety and IDE support
 
-### Tasks
+- [ ] **CB-5.1:** Convert `training_types` to Enum in parameters.py
+  - Create `TrainingType(str, Enum)` class
+  - Update function signatures to use enum
 
-#### 5.1 Extract Helper Functions in figurl.py (4 hours)
+- [ ] **CB-5.2:** Create shared `types.py` module
+  - Move `SessionData` from analysis/hippocampus/types.py
+  - Create central location for all TypedDicts
+  - Update imports in bandit_task.py
 
-##### 5.1.1 Plan Extraction (30 min)
+- [ ] **CB-5.3:** Add TypedDict for detector params in run_decoding_bandit.py
+  - Create `ClusterlessParams` TypedDict
+  - Create `SortedSpikesParams` TypedDict
+  - Update return types
 
-- [x] Open `src/continuum_swr_replay/visualization/figurl.py`
-- [x] Navigate to `create_interactive_1D_decoding_figurl()` (line 98-397)
-- [x] Read through all 197 lines of function body
-- [x] Identify distinct view creation sections:
-  - [x] Behavioral views (speed + head direction) - lines 208-223
-  - [x] Neural activity views (MUA + SWR + Theta) - lines 225-332
-  - [x] State probability views (Non-local + Local) - lines 255-320
-  - [x] Quality metric views (Ahead-behind + HPD) - lines 334-354
-- [x] Note parameters needed for each helper
-- [x] Note return types for each helper
-- [x] Document extraction strategy in SCRATCHPAD.md
+- [ ] **CB-5.4:** Add missing type hints to helper functions
+  - Review all functions for complete type annotations
+  - Add return types to `_count_exposure()` and similar
 
-##### 5.1.2 Extract _create_speed_view() (45 min)
-
-- [ ] Create new function `_create_speed_view()` before main function
-- [ ] Add type hints for all parameters
-- [ ] Add return type: `-> pn.Column`
-- [ ] Add comprehensive docstring with Parameters and Returns
-- [ ] Move speed visualization code into this function
-- [ ] Test function works independently
-- [ ] Update main function to call `speed_view = _create_speed_view(...)`
-- [ ] Verify output unchanged
-
-##### 5.1.3 Extract _create_head_direction_view() (45 min)
-
-- [ ] Create new function `_create_head_direction_view()`
-- [ ] Add type hints for all parameters
-- [ ] Add return type: `-> pn.Column`
-- [ ] Add comprehensive docstring
-- [ ] Move head direction visualization code into this function
-- [ ] Update main function to call helper
-- [ ] Verify output unchanged
-
-##### 5.1.4 Extract _create_ripple_view() (45 min)
-
-- [ ] Create new function `_create_ripple_view()`
-- [ ] Add type hints for all parameters
-- [ ] Add return type: `-> pn.Column`
-- [ ] Add comprehensive docstring
-- [ ] Move ripple visualization code into this function
-- [ ] Update main function to call helper
-- [ ] Verify output unchanged
-
-##### 5.1.5 Extract _create_posterior_view() (45 min)
-
-- [ ] Create new function `_create_posterior_view()`
-- [ ] Add type hints for all parameters
-- [ ] Add return type: `-> pn.Column`
-- [ ] Add comprehensive docstring
-- [ ] Move posterior visualization code into this function
-- [ ] Update main function to call helper
-- [ ] Verify output unchanged
-
-##### 5.1.6 Verify and Commit (30 min)
-
-- [ ] Verify main function is now <100 lines
-- [ ] Run `uv run mypy src/continuum_swr_replay/visualization/figurl.py`
-- [ ] Fix any type errors
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm all tests pass
-- [ ] Check git diff to review changes
-- [ ] Stage and commit: `git commit -m "Extract view creation helpers in figurl.py"`
-
-#### 5.2 Centralize MAX_SPEED_THRESHOLD Constant (1 hour)
-
-- [ ] Open `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
-- [ ] Locate `MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0` (line ~8)
-- [ ] Copy the constant definition and its comment
-- [ ] Open `src/continuum_swr_replay/parameters.py`
-- [ ] Add constant in appropriate section with comment
-- [ ] Save `parameters.py`
-- [ ] Return to `data_aggregation.py`
-- [ ] Remove local constant definition
-- [ ] Add import: `from ...parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC`
-- [ ] Save file
-- [ ] Search codebase for other uses of this constant
-- [ ] Update any other files to import from `parameters.py`
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm tests pass
-- [ ] Run `uv run mypy src/`
-- [ ] Confirm no errors
-- [ ] Stage and commit: `git commit -m "Centralize MAX_SPEED_THRESHOLD constant in parameters.py"`
-
-#### 5.3 Convert Parameters to Dataclass (2 hours)
-
-##### 5.3.1 Create DecodingParameters Dataclass (45 min)
-
-- [ ] Open `src/continuum_swr_replay/parameters.py`
-- [ ] Add imports: `from dataclasses import dataclass` and `from typing import Final`
-- [ ] Locate `decoding_parameters` dict
-- [ ] Create `DecodingParameters` dataclass before the dict:
-
-  ```python
-  @dataclass(frozen=True)
-  class DecodingParameters:
-      """Parameters for neural decoding analysis."""
-      place_bin_size: float = 2.0
-      waveform_std: float = 24.0
-      position_std: float = 6.0
-      block_size: int = 4096
-  ```
-
-- [ ] Add comprehensive docstring with Attributes section
-- [ ] Create singleton instance: `DECODING_PARAMS: Final = DecodingParameters()`
-- [ ] Keep old dict for now (for backward compatibility during migration)
-- [ ] Save file
-- [ ] Run `uv run mypy src/continuum_swr_replay/parameters.py`
-- [ ] Fix any type errors
-
-##### 5.3.2 Update All References (1 hour)
-
-- [ ] Search codebase for `decoding_parameters['place_bin_size']`
-- [ ] Replace with `DECODING_PARAMS.place_bin_size`
-- [ ] Search codebase for `decoding_parameters['waveform_std']`
-- [ ] Replace with `DECODING_PARAMS.waveform_std`
-- [ ] Search codebase for `decoding_parameters['position_std']`
-- [ ] Replace with `DECODING_PARAMS.position_std`
-- [ ] Search codebase for `decoding_parameters['block_size']`
-- [ ] Replace with `DECODING_PARAMS.block_size`
-- [ ] Search for any remaining `decoding_parameters[` usage
-- [ ] Update all found instances
-- [ ] Save all modified files
-
-##### 5.3.3 Remove Old Dict and Verify (15 min)
-
-- [ ] Open `src/continuum_swr_replay/parameters.py`
-- [ ] Remove old `decoding_parameters = {...}` dict
-- [ ] Save file
-- [ ] Run `uv run mypy src/`
-- [ ] Confirm no type errors
-- [ ] Run `uv run pytest tests/`
-- [ ] Confirm all tests pass
-- [ ] Run `uv run ruff check src/`
-- [ ] Confirm no errors
-- [ ] Stage and commit: `git commit -m "Convert decoding parameters to immutable dataclass"`
-
-**Milestone 5 Complete**: ⬜
+- [ ] **CB-5.5:** Add `__all__` to public modules
+  - Define public API for each module
+  - Improves IDE autocomplete
 
 ---
 
-## Final Verification Checklist
+## Milestone 6: Documentation & Examples (MEDIUM PRIORITY) 📚
 
-Before marking the project as complete, verify all success criteria:
+**Priority:** WEEK 2-3
+**Estimated Time:** 2-3 hours
+**Goal:** Improve developer experience and learning curve
 
-### Phase 1 Success (Critical Fixes)
+- [ ] **FU-6.1:** Add `quick_figure()` helper function
+  - Single-panel figure with sensible defaults
+  - Reduces boilerplate for common case
 
-- [ ] All import statements work correctly
-- [ ] No syntax errors in any scripts
-- [ ] API typos fixed in plots.py
-- [ ] All tests passing
-- [ ] Scripts executable without errors
+- [ ] **FU-6.2:** Add `figure_context()` context manager
+  - Temporary style changes with automatic cleanup
+  - Prevents style leakage between figures
 
-### Phase 2 Success (Type Safety)
-
-- [ ] Mypy reports <5 errors across entire codebase
-- [ ] Type hint coverage >90% (estimated)
-- [ ] `load_data()` returns typed `SessionData`
-- [ ] Filtering functions return new objects (functional style)
-- [ ] All tests passing
-
-### Phase 3 Success (Refactoring)
-
-- [ ] No functions >150 lines
-- [ ] All constants centralized in `parameters.py`
-- [ ] Parameters use frozen dataclass
-- [ ] Code is well-organized and maintainable
-- [ ] All tests passing
-
-### Overall Success
-
-- [ ] **All tests passing** - Run `uv run pytest tests/`
-- [ ] **Clean mypy output** - Run `uv run mypy src/` (<5 errors)
-- [ ] **Clean ruff output** - Run `uv run ruff check src/` (no violations)
-- [ ] **No blocking issues remain**
-- [ ] **Code review grade improved** from 4/5 to 4.5/5
-- [ ] **Codebase is publication-ready**
+- [ ] **FU-6.3:** Return saved file paths from `save_figure()`
+  - Change return type to `list[Path]`
+  - Helps users verify what was saved
 
 ---
 
-## Progress Summary
+## Milestone 7: Performance Optimizations (LOW PRIORITY) ⚡
 
-Track your overall progress here:
+**Priority:** WEEK 3
+**Estimated Time:** 2-3 hours
+**Goal:** Improve execution speed for common operations
 
-### Milestones
+- [ ] **CB-7.1:** Vectorize event labeling with IntervalIndex in utils.py
+  - Replace explicit loop with pandas IntervalIndex
+  - Performance gain for large datasets
 
-- [x] Milestone 1: Critical Blocking Issues (4/4 task groups) ✅
-- [x] Milestone 2: Type Hints - Data Loaders Part 1 (3/3 task groups) ✅
-- [x] Milestone 3: Type Hints - Data Loaders Part 2 (3/3 task groups) ✅
-- [x] Milestone 4: Refactor to Functional Style (4/4 task groups) ✅
-- [ ] Milestone 5: Code Organization & Refactoring (0/3 task groups)
+- [ ] **CB-7.2:** Add `@cache` to `get_epoch_info()` in utils.py
+  - Expensive database query should be cached
+  - Use `functools.cache` (Python 3.9+)
 
-### Time Tracking
+- [ ] **CB-7.3:** Centralize script constants in parameters.py
+  - Move constants from run_decoding_bandit.py
+  - Eliminate duplication
 
-- [x] Sprint 1: Critical Fixes - 1 hour (Milestone 1) ✅
-- [x] Sprint 2: Type Hints Part 1 - 2 hours actual (Milestone 2) ✅
-- [x] Sprint 3: Type Hints Part 2 - 1.5 hours actual (Milestone 3) ✅
-- [x] Sprint 4: Refactoring with Tests - 1.5 hours actual (Milestone 4) ✅
-- [ ] Sprint 5: Code Organization - 7 hours (Milestone 5)
+---
 
-**Total Progress**: 4/5 milestones completed (~6/18 hours)
-**Completion**: 80%
+## Milestone 8: Code Quality & Cleanup (LOW PRIORITY) 🧹
+
+**Priority:** WEEK 3-4
+**Estimated Time:** 3-4 hours
+**Goal:** Polish and maintainability
+
+- [ ] **CB-8.1:** Remove obvious comments
+  - Review and improve comment quality
+  - Explain "why" not "what"
+
+- [ ] **CB-8.2:** Use `logging.config.dictConfig` in run_decoding_bandit.py
+  - Replace imperative logging setup
+  - Cleaner, more maintainable config
+
+- [ ] **CB-8.3:** Add validation to DecodingParameters dataclass
+  - Validate `block_size` is power of 2
+  - Validate positive values for stds
+
+- [ ] **CB-8.4:** Use more descriptive variable names
+  - Replace `frac` with `coincident_fraction`
+  - Improve readability throughout
+
+- [ ] **CB-8.5:** Ensure consistent `pathlib.Path` usage
+  - Review all file operations
+  - Use Path methods instead of string concatenation
+
+---
+
+## Milestone 9: Architecture Improvements (LONG-TERM) 🏗️
+
+**Priority:** FUTURE (1-2 weeks)
+**Estimated Time:** 5-10 hours
+**Goal:** Long-term maintainability and extensibility
+
+### Type System Reorganization
+
+- [ ] **ARCH-9.1:** Create comprehensive `types.py` module
+  - All TypedDicts in one place
+  - All Protocols defined
+  - Import from single source
+
+- [ ] **ARCH-9.2:** Define string keys as constants
+  - Create `SessionDataKeys` class
+  - Prevent typos with autocomplete
+
+### Constants Organization
+
+- [ ] **ARCH-9.3:** Organize constants into submodules
+  - `constants/files.py` for NWB_FILES
+  - `constants/spatial.py` for spatial mappings
+  - `constants/decoding.py` for decoding params
+
+### Configuration Management
+
+- [ ] **ARCH-9.4:** Consider Pydantic for configuration
+  - Type-safe settings with validation
+  - Environment variable support
+  - Better error messages
+
+### Development Tools
+
+- [ ] **ARCH-9.5:** Add pre-commit hooks
+  - Create `.pre-commit-config.yaml`
+  - Auto-run ruff, mypy, tests
+  - Prevent quality regressions
+
+- [ ] **ARCH-9.6:** Add CLI framework (click/typer)
+  - Better command-line interface for scripts
+  - Auto-generated help text
+  - Type-safe arguments
+
+---
+
+## Milestone 10: Advanced Testing (FUTURE) 🔬
+
+**Priority:** FUTURE
+**Estimated Time:** 4-6 hours
+**Goal:** Comprehensive test coverage with property-based testing
+
+- [ ] **TEST-10.1:** Expand property-based tests with Hypothesis
+  - Test spike filtering preserves order
+  - Test event labels don't overlap
+  - Test mathematical invariants
+
+- [ ] **TEST-10.2:** Add integration tests for data loading
+  - Test complete pipeline on sample data
+  - Verify data integrity end-to-end
+
+- [ ] **TEST-10.3:** Add neuroscience-specific test fixtures
+  - Sample spike times
+  - Sample position data
+  - Sample task events
+
+---
+
+## Progress Tracking
+
+### Overall Progress
+
+**Milestones Completed:** 0 / 10
+**Tasks Completed:** 0 / 61
+
+### Priority Breakdown
+
+| Priority | Milestones | Tasks | Status |
+|----------|------------|-------|--------|
+| 🔴 BLOCKING | M1 | 8 | Not Started |
+| 🟡 HIGH | M2, M4 | 11 | Not Started |
+| 🟢 MEDIUM | M3, M5, M6, M7 | 20 | Not Started |
+| 🧹 LOW | M8 | 5 | Not Started |
+| 🏗️ FUTURE | M9, M10 | 17 | Not Started |
+
+### Weekly Goals
+
+**Week 1 Target:** Complete M1 + M2 (19 tasks)
+**Week 2 Target:** Complete M3 + M4 + M5 (15 tasks)
+**Week 3 Target:** Complete M6 + M7 + M8 (12 tasks)
+**Week 4+:** M9 + M10 (15 tasks)
+
+---
+
+## Quick Reference
+
+### High-Impact Quick Wins (< 30 min each)
+
+- FU-1.2: Remove unused imports
+- FU-1.3: Add stacklevel to warnings
+- FU-1.4: Cast DPI to int
+- CB-1.1: Fix zip strict parameter
+- CB-3.1: Use | operator for dicts
+- CB-3.2: Fix constant naming
+
+### Must Complete Before Release
+
+- All M1 tasks (Critical Fixes)
+- All M2 tasks (UX Fixes)
+- TEST-4.1, TEST-4.2, TEST-4.3 (Core Testing)
+
+### Nice to Have for v1.0
+
+- M3, M5, M6 (Quality & Documentation)
+- TEST-4.4 (Doctest)
+
+### Future Enhancements
+
+- M9, M10 (Architecture & Advanced Testing)
 
 ---
 
 ## Notes
 
-- ✅ Check off tasks as you complete them
-- 📝 Add notes below any task if you encounter issues
-- ⏱️ Track actual time spent vs. estimates
-- 🔄 If a task takes >50% longer than estimated, reassess approach
-- 💾 Commit after each logical group of tasks
-- 🧪 Always run tests before committing
+- **Dependencies:** Some tasks depend on others (e.g., can't write tests until code works)
+- **Parallel Work:** Multiple milestones can be worked on simultaneously if different files
+- **Review Points:** After M1 and M2, run full test suite and linting
+- **Documentation:** Update IMPROVEMENTS.md and FIGURE_UTILITIES_REVIEW.md as tasks complete
 
 ---
 
-## Next Actions
-
-**Immediate Next Task**: Start Milestone 1, Task 1.1 (Fix import error in run_decoding_bandit.py)
-
-**Command to begin**: Open `scripts/run_decoding_bandit.py` and navigate to line 13.
-
----
-
-**Status**: Ready to Execute
-**Last Updated**: 2025-11-14
+**Last Status Check:** 2025-11-14
+**Next Review:** After M1 completion
