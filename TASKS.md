@@ -82,9 +82,10 @@
   - Make validation read-only
   - **COMPLETED:** Removed tight_layout() call and layout warning check, validation is now pure/read-only
 
-- [ ] **FU-2.4:** Improve error messages in `label_panels()` (line 656)
+- [x] **FU-2.4:** Improve error messages in `label_panels()` (line 656)
   - Add explicit length validation before zip
   - Provide helpful error with label count and axes count
+  - **COMPLETED:** Added explicit validation with helpful message showing both label and axes counts
 
 - [ ] **FU-2.5:** Reset matplotlib state in `set_figure_defaults()` (line 236+)
   - Call `mpl.rcParams.update(mpl.rcParamsDefault)` first

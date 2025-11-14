@@ -707,6 +707,13 @@ def label_panels(
 
         labels = list(string.ascii_lowercase[: len(axes)])
 
+    # Validate label and axes counts match
+    if len(labels) != len(axes):
+        raise ValueError(
+            f"Label count mismatch: got {len(labels)} labels for {len(axes)} axes. "
+            f"Provide exactly one label per axis."
+        )
+
     # Add label to each axis
     for ax, label in zip(axes, labels, strict=True):
         ax.text(

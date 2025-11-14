@@ -546,9 +546,21 @@ class TestLabelPanels:
         plt.close(fig)
 
     def test_label_count_mismatch_raises(self):
-        """Test that mismatched label count raises error."""
+        """Test that mismatched label count raises error with helpful message.
+
+        This is the key test for FU-2.4: label_panels should provide clear
+        error messages showing both the number of labels provided and the
+        number of axes, helping users quickly identify the mismatch.
+        """
         fig, axes = plt.subplots(1, 3)
-        with pytest.raises(ValueError):
-            # strict=True in zip should catch length mismatch
+        with pytest.raises(ValueError) as exc_info:
             label_panels(axes.flatten(), labels=["A", "B"])
+
+        error_msg = str(exc_info.value)
+        # Should mention both counts
+        assert "3" in error_msg  # 3 axes
+        assert "2" in error_msg  # 2 labels
+        # Should use clear language
+        assert "label" in error_msg.lower() or "axes" in error_msg.lower()
+
         plt.close(fig)
