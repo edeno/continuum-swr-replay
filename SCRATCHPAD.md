@@ -1,9 +1,45 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-3.2 - Fix SCREAMING_CASE for constants
+**Current Task:** CB-3.3 - Optimize DataFrame construction
 
 ## Session Notes
+
+### 2025-11-14: CB-3.3 - COMPLETED ✅
+
+**Task:** Optimize DataFrame construction in utils.py (line 159-161)
+
+**Status:** COMPLETED - Performance optimization with clearer intent
+
+**Actions Taken:**
+1. ✅ Located DataFrame construction in `get_labels()` function at utils.py:159-161
+2. ✅ Checked for existing tests - none found, but integration tests cover usage
+3. ✅ Replaced `np.zeros_like(time, dtype=int)` with scalar `0` and moved dtype to DataFrame
+4. ✅ Verified tests pass (36/36 integration + property tests)
+5. ✅ Verified ruff and mypy pass with no errors
+
+**Changes:**
+```python
+# Before (inefficient):
+event_labels = pd.DataFrame(
+    np.zeros_like(time, dtype=int), index=time, columns=["event_number"]
+)
+
+# After (optimized):
+event_labels = pd.DataFrame(
+    0, index=time, columns=["event_number"], dtype=int
+)
+```
+
+**Benefits:**
+- No intermediate numpy array creation ✅
+- Scalar broadcast more efficient ✅
+- Clearer intent (filling with constant value) ✅
+- Same functionality, better performance ✅
+
+**Time:** 5 minutes
+
+---
 
 ### 2025-11-14: CB-3.2 - COMPLETED ✅
 

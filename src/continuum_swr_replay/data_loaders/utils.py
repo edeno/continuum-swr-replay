@@ -157,7 +157,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
         Event labels (0 for no event, 1+ for event number)
     """
     event_labels = pd.DataFrame(
-        np.zeros_like(time, dtype=int), index=time, columns=["event_number"]
+        0, index=time, columns=["event_number"], dtype=int
     )
     # This means the label will be +1 because label count starts at 0
     for i, row in enumerate(times.itertuples()):

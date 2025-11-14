@@ -114,8 +114,10 @@
   - **COMPLETED:** Renamed constant to follow PEP 8 naming conventions
   - No usages in codebase, simple rename with no side effects
 
-- [ ] **CB-3.3:** Optimize DataFrame construction in utils.py (line 114-116)
+- [x] **CB-3.3:** Optimize DataFrame construction in utils.py (line 159-161)
   - Use scalar broadcast instead of `np.zeros_like()`
+  - **COMPLETED:** Replaced `np.zeros_like(time, dtype=int)` with scalar `0` and explicit `dtype=int`
+  - More efficient (no intermediate array creation) and clearer intent
 
 ### Figure Utilities Enhancements
 
