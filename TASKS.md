@@ -162,7 +162,7 @@ This document provides a detailed task checklist for implementing the code revie
 - [x] Fix any mypy errors reported
 - [x] Run `uv run pytest tests/`
 - [x] Confirm tests pass
-- [ ] Stage and commit: `git commit -m "Add type hints to task_variables.py"`
+- [x] Stage and commit: `git commit -m "Add type hints to task_variables.py"`
 
 #### 3.2 Fix Remaining Mypy Errors (1 hour)
 
