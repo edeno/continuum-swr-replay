@@ -305,24 +305,27 @@ def get_multiunit(
     }
 
 
-def filter_ripple_lfp_time(ripple_data: RippleData, position_time: NDArray[np.float64]) -> None:
-    """Filter ripple LFP data to match position time bounds (modifies in place).
+def filter_ripple_lfp_time(ripple_data: RippleData, position_time: NDArray[np.float64]) -> RippleData:
+    """Filter ripple LFP data to match position time bounds.
 
     Parameters
     ----------
     ripple_data : RippleData
-        Dictionary with ripple data (will be modified in place)
+        Dictionary with ripple data
     position_time : NDArray[np.float64]
         Position time array in seconds (defines time bounds)
+
+    Returns
+    -------
+    RippleData
+        New dictionary with filtered ripple data matching position time bounds
     """
     position_time_slice = slice(position_time[0], position_time[-1])
-    ripple_data["ripple_filtered_lfps"] = ripple_data["ripple_filtered_lfps"].loc[
-        position_time_slice
-    ]
-    ripple_data["ripple_lfps"] = ripple_data["ripple_lfps"].loc[position_time_slice]
-    ripple_data["ripple_consensus_trace"] = ripple_data["ripple_consensus_trace"].loc[
-        position_time_slice
-    ]
-    ripple_data["zscored_ripple_consensus_trace"] = ripple_data[
-        "zscored_ripple_consensus_trace"
-    ].loc[position_time_slice]
+
+    return {
+        "ripple_times": ripple_data["ripple_times"],  # Not filtered by time
+        "ripple_filtered_lfps": ripple_data["ripple_filtered_lfps"].loc[position_time_slice],
+        "ripple_lfps": ripple_data["ripple_lfps"].loc[position_time_slice],
+        "ripple_consensus_trace": ripple_data["ripple_consensus_trace"].loc[position_time_slice],
+        "zscored_ripple_consensus_trace": ripple_data["zscored_ripple_consensus_trace"].loc[position_time_slice],
+    }

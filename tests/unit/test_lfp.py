@@ -47,8 +47,8 @@ class TestRippleLFPFiltering:
         # Position time from 2.0 to 8.0 seconds
         position_time = np.arange(2.0, 8.0, 0.01)
 
-        # Apply filter (modifies in place)
-        filter_ripple_lfp_time(ripple_data, position_time)
+        # Apply filter (returns new dict)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Check that filtered data is within bounds
         assert ripple_data["ripple_filtered_lfps"].index.min() >= 2.0
@@ -96,7 +96,7 @@ class TestRippleLFPFiltering:
         position_time = np.arange(1.0, 5.0, 0.01)
 
         # Should not raise
-        filter_ripple_lfp_time(ripple_data, position_time)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Should still be empty
         assert len(ripple_data["ripple_filtered_lfps"]) == 0
@@ -136,7 +136,7 @@ class TestRippleLFPFiltering:
         # Position time from 2.0 to 4.0 (exact boundaries)
         position_time = np.array([2.0, 3.0, 4.0])
 
-        filter_ripple_lfp_time(ripple_data, position_time)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Should include boundary times (pandas slice is inclusive on both ends)
         assert len(ripple_data["ripple_filtered_lfps"]) == 3
@@ -183,7 +183,7 @@ class TestRippleLFPFiltering:
         # Position time from 5 to 10 seconds (completely outside ripple data)
         position_time = np.arange(5.0, 10.0, 0.01)
 
-        filter_ripple_lfp_time(ripple_data, position_time)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Should have empty filtered data
         assert len(ripple_data["ripple_filtered_lfps"]) == 0
@@ -224,7 +224,7 @@ class TestRippleLFPFiltering:
         # Position time encompasses all ripple data (1.0 to 5.0)
         position_time = np.arange(1.0, 5.0, 0.01)
 
-        filter_ripple_lfp_time(ripple_data, position_time)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # All data should be preserved
         assert len(ripple_data["ripple_filtered_lfps"]) == original_length
@@ -262,7 +262,7 @@ class TestRippleLFPFiltering:
 
         position_time = np.arange(2.0, 5.0, 0.01)
 
-        filter_ripple_lfp_time(ripple_data, position_time)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Check that column names are preserved
         assert list(ripple_data["ripple_filtered_lfps"].columns) == ["CA1_01", "CA1_02", "CA1_03"]
@@ -278,11 +278,11 @@ class TestRippleLFPFiltering:
         assert isinstance(ripple_data["ripple_consensus_trace"], pd.Series)
         assert isinstance(ripple_data["zscored_ripple_consensus_trace"], pd.Series)
 
-    def test_modifies_in_place(self):
-        """Function should modify the ripple_data dict in place."""
+    def test_returns_new_dict(self):
+        """Function should return new dict (functional style)."""
         time_index = pd.Index(np.arange(0.0, 10.0, 0.1), name="time")
 
-        ripple_data = {
+        original_ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}),
             "ripple_filtered_lfps": pd.DataFrame(
                 np.random.randn(len(time_index), 2),
@@ -304,15 +304,15 @@ class TestRippleLFPFiltering:
             ),
         }
 
-        # Store reference to original dict
-        original_dict = ripple_data
-        original_length = len(ripple_data["ripple_filtered_lfps"])
+        # Store original length
+        original_length = len(original_ripple_data["ripple_filtered_lfps"])
 
         position_time = np.arange(2.0, 5.0, 0.01)
 
-        # Function returns None and modifies in place
-        result = filter_ripple_lfp_time(ripple_data, position_time)
+        # Function returns new dict (functional style)
+        result = filter_ripple_lfp_time(original_ripple_data, position_time)
 
-        assert result is None, "Function should return None (modifies in place)"
-        assert ripple_data is original_dict, "Should be the same dict object"
-        assert len(ripple_data["ripple_filtered_lfps"]) < original_length, "Data should be filtered"
+        assert result is not None, "Function should return new dict"
+        assert result is not original_ripple_data, "Should be a new dict object"
+        assert len(result["ripple_filtered_lfps"]) < original_length, "Returned data should be filtered"
+        assert len(original_ripple_data["ripple_filtered_lfps"]) == original_length, "Original data should be unchanged"

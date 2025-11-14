@@ -159,7 +159,7 @@ def load_data(
     )
 
     ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
-    filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
+    ripple_data = filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
 
     dio_events = load_dios(
         nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
