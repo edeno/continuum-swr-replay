@@ -1,9 +1,11 @@
 """LFP, ripple, theta, and multiunit data loading."""
 
 import warnings
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from ripple_detection import (
     get_multiunit_population_firing_rate,
     multiunit_HSE_detector,
@@ -19,7 +21,67 @@ warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
 
 
-def get_theta(nwb_file_name: str, epoch_name: str) -> dict:
+class ThetaData(TypedDict):
+    """Return type for get_theta function.
+
+    Attributes
+    ----------
+    theta_filtered_lfp : pd.DataFrame
+        Theta-band filtered LFP data
+    theta_phase : pd.Series
+        Theta phase timeseries
+    theta_power : pd.Series
+        Theta power timeseries
+    """
+
+    theta_filtered_lfp: pd.DataFrame
+    theta_phase: pd.Series
+    theta_power: pd.Series
+
+
+class RippleData(TypedDict):
+    """Return type for get_ripple function.
+
+    Attributes
+    ----------
+    ripple_times : pd.DataFrame
+        DataFrame with ripple start/end times
+    ripple_filtered_lfps : pd.DataFrame
+        Ripple-band filtered LFP data
+    ripple_lfps : pd.DataFrame
+        Raw LFP data for ripple band
+    ripple_consensus_trace : pd.Series
+        Ripple consensus trace (combined signal across electrodes)
+    zscored_ripple_consensus_trace : pd.Series
+        Z-scored ripple consensus trace
+    """
+
+    ripple_times: pd.DataFrame
+    ripple_filtered_lfps: pd.DataFrame
+    ripple_lfps: pd.DataFrame
+    ripple_consensus_trace: pd.Series
+    zscored_ripple_consensus_trace: pd.Series
+
+
+class MultiunitData(TypedDict):
+    """Return type for get_multiunit function.
+
+    Attributes
+    ----------
+    hse_times : dict[str, pd.DataFrame]
+        High synchrony event times for each brain area
+    multiunit_firing_rate : dict[str, pd.DataFrame]
+        Population firing rates for each brain area
+    multiunit_rate_zscore : dict[str, pd.DataFrame]
+        Z-scored firing rates for each brain area
+    """
+
+    hse_times: dict[str, pd.DataFrame]
+    multiunit_firing_rate: dict[str, pd.DataFrame]
+    multiunit_rate_zscore: dict[str, pd.DataFrame]
+
+
+def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
     """Load theta-band LFP data.
 
     Parameters
@@ -31,8 +93,8 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> dict:
 
     Returns
     -------
-    dict
-        Dictionary containing:
+    ThetaData
+        TypedDict containing:
         - theta_filtered_lfp: pd.DataFrame with filtered LFP
         - theta_phase: pd.Series with theta phase
         - theta_power: pd.Series with theta power
@@ -61,7 +123,7 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> dict:
     }
 
 
-def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -> dict:
+def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -> RippleData:
     """Load ripple detection data.
 
     Parameters
@@ -75,8 +137,8 @@ def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -
 
     Returns
     -------
-    dict
-        Dictionary containing:
+    RippleData
+        TypedDict containing:
         - ripple_times: pd.DataFrame with ripple start/end times
         - ripple_filtered_lfps: pd.DataFrame with ripple-band filtered LFP
         - ripple_lfps: pd.DataFrame with raw ripple LFP
@@ -124,22 +186,24 @@ def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -
 
 
 def get_multiunit_HSE(
-    spike_times: dict, speed: np.ndarray, bin_time: np.ndarray
-) -> tuple:
+    spike_times: list[NDArray[np.float64]],
+    speed: NDArray[np.float64],
+    bin_time: NDArray[np.float64]
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute multiunit high synchrony events (HSE).
 
     Parameters
     ----------
-    spike_times : dict
-        Dictionary mapping brain area to list of spike time arrays
-    speed : np.ndarray
-        Speed of the animal
-    bin_time : np.ndarray
-        Time bins for spike counting
+    spike_times : list[NDArray[np.float64]]
+        List of spike time arrays for all units
+    speed : NDArray[np.float64]
+        Speed of the animal in cm/s
+    bin_time : NDArray[np.float64]
+        Time bins for spike counting in seconds
 
     Returns
     -------
-    tuple
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
         - hse_times: pd.DataFrame with HSE start/end times
         - multiunit_firing_rate: pd.DataFrame with population firing rate
         - multiunit_rate_zscore: pd.DataFrame with z-scored firing rate
@@ -197,20 +261,23 @@ def get_multiunit_HSE(
     return hse_times, multiunit_firing_rate, multiunit_rate_zscore
 
 
-def get_multiunit(spike_times: dict, position_info: pd.DataFrame) -> dict:
+def get_multiunit(
+    spike_times: dict[str, list[NDArray[np.float64]]],
+    position_info: pd.DataFrame
+) -> MultiunitData:
     """Get multiunit HSE data for all brain areas.
 
     Parameters
     ----------
-    spike_times : dict
+    spike_times : dict[str, list[NDArray[np.float64]]]
         Dictionary mapping brain area to list of spike time arrays
     position_info : pd.DataFrame
-        Position info with head_speed column
+        Position info with head_speed column and time index
 
     Returns
     -------
-    dict
-        Dictionary containing:
+    MultiunitData
+        TypedDict containing:
         - hse_times: dict mapping brain area to HSE times
         - multiunit_firing_rate: dict mapping brain area to firing rates
         - multiunit_rate_zscore: dict mapping brain area to z-scored rates
@@ -238,15 +305,15 @@ def get_multiunit(spike_times: dict, position_info: pd.DataFrame) -> dict:
     }
 
 
-def filter_ripple_lfp_time(ripple_data: dict, position_time: np.ndarray) -> None:
+def filter_ripple_lfp_time(ripple_data: RippleData, position_time: NDArray[np.float64]) -> None:
     """Filter ripple LFP data to match position time bounds (modifies in place).
 
     Parameters
     ----------
-    ripple_data : dict
-        Dictionary with ripple data
-    position_time : np.ndarray
-        Position time array (defines time bounds)
+    ripple_data : RippleData
+        Dictionary with ripple data (will be modified in place)
+    position_time : NDArray[np.float64]
+        Position time array in seconds (defines time bounds)
     """
     position_time_slice = slice(position_time[0], position_time[-1])
     ripple_data["ripple_filtered_lfps"] = ripple_data["ripple_filtered_lfps"].loc[
