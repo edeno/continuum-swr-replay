@@ -242,20 +242,24 @@ This document provides a detailed task checklist for implementing the code revie
 
 #### 4.2 Write Tests for filter_ripple_lfp_time() (45 min)
 
-- [ ] Open `tests/unit/test_data_loaders.py`
-- [ ] Import `filter_ripple_lfp_time` from `continuum_swr_replay.data_loaders.lfp`
-- [ ] Write test: `test_filter_ripple_lfp_time_normal_operation()`
-  - [ ] Create sample ripple LFP data
-  - [ ] Create sample position_time array
-  - [ ] Call filter_ripple_lfp_time()
-  - [ ] Assert times outside bounds are removed
-- [ ] Write test: `test_filter_ripple_lfp_time_empty_data()`
-  - [ ] Test with empty input
-- [ ] Write test: `test_filter_ripple_lfp_time_boundary_conditions()`
-  - [ ] Test times exactly at boundaries
-- [ ] Run `uv run pytest tests/unit/test_data_loaders.py::test_filter_ripple_lfp_time -v`
-- [ ] Confirm all tests pass with current implementation
-- [ ] Stage and commit: `git commit -m "Add tests for filter_ripple_lfp_time"`
+- [x] Open `tests/unit/test_lfp.py` (created comprehensive test file)
+- [x] Import `filter_ripple_lfp_time` from `continuum_swr_replay.data_loaders.lfp`
+- [x] Write test: `test_filter_to_position_bounds()` (normal operation)
+  - [x] Create sample ripple LFP data
+  - [x] Create sample position_time array
+  - [x] Call filter_ripple_lfp_time()
+  - [x] Assert times outside bounds are removed
+- [x] Write test: `test_empty_dataframes()` (empty data)
+  - [x] Test with empty input
+- [x] Write test: `test_boundary_conditions_exact_start_end()` (boundary conditions)
+  - [x] Test times exactly at boundaries
+- [x] Write test: `test_all_data_outside_bounds()` (all data filtered)
+- [x] Write test: `test_no_data_filtered_all_within_bounds()` (no data filtered)
+- [x] Write test: `test_preserves_data_structure()` (structure preservation)
+- [x] Write test: `test_modifies_in_place()` (current in-place behavior)
+- [x] Run `uv run pytest tests/unit/test_lfp.py -v`
+- [x] Confirm all tests pass with current implementation (7/7 passed)
+- [x] Stage and commit: `git commit -m "test(M4): Add comprehensive tests for filter_ripple_lfp_time"`
 
 #### 4.3 Refactor filter_spike_times() to Functional Style (45 min)
 
