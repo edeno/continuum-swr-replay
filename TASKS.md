@@ -72,9 +72,10 @@
   - Create output path as `Path(base_dir) / figure_name`
   - **COMPLETED:** Added base_dir parameter with FIGURE_DIR default, handles savefig.dpi='figure' case
 
-- [ ] **FU-2.2:** Validate figure exists before saving in `save_figure()`
+- [x] **FU-2.2:** Validate figure exists before saving in `save_figure()`
   - Check `fig.get_axes()` is not empty
   - Raise `ValueError` with helpful hint if no axes found
+  - **COMPLETED:** Added validation with helpful error message suggesting plt.subplots() or fig.add_subplot()
 
 - [ ] **FU-2.3:** Fix `validate_figure_quality()` modifying state (line 716)
   - Remove `plt.tight_layout()` call

@@ -413,6 +413,52 @@ class TestSaveFigure:
                 if original_figure_dir is not None:
                     figure_utilities.FIGURE_DIR = original_figure_dir
 
+    def test_empty_figure_raises_error(self):
+        """Test that saving a figure with no axes raises ValueError.
+
+        This is the key test for FU-2.2: save_figure should validate that
+        the figure actually has content (axes) before attempting to save,
+        preventing confusing empty figure files.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a figure but don't add any axes
+            fig = plt.figure()
+
+            # Should raise ValueError for empty figure
+            with pytest.raises(ValueError, match="no axes"):
+                save_figure("empty_figure", base_dir=tmpdir)
+
+            plt.close(fig)
+
+    def test_figure_with_axes_saves_successfully(self):
+        """Test that figures with axes save without error."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create figure with axes - should work fine
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            # Should not raise
+            save_figure("valid_figure", base_dir=tmpdir)
+
+            assert (Path(tmpdir) / "valid_figure.pdf").exists()
+            plt.close(fig)
+
+    def test_empty_figure_error_message_is_helpful(self):
+        """Test that empty figure error message provides helpful guidance."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig = plt.figure()
+
+            with pytest.raises(ValueError) as exc_info:
+                save_figure("empty_figure", base_dir=tmpdir)
+
+            error_msg = str(exc_info.value).lower()
+            # Should mention the problem and suggest a solution
+            assert "no axes" in error_msg or "empty" in error_msg
+            # Should suggest adding axes or subplots
+            assert "axes" in error_msg or "subplot" in error_msg
+
+            plt.close(fig)
+
 
 class TestLabelPanels:
     """Test panel labeling functionality."""

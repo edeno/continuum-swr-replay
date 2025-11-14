@@ -471,20 +471,26 @@ def save_figure(
             f"Valid formats are: {valid_list}"
         )
 
+    # Validate figure has content (axes)
+    fig = plt.gcf()
+    if not fig.get_axes():
+        raise ValueError(
+            "Cannot save empty figure with no axes. "
+            "Add content using fig.add_subplot() or plt.subplots() first."
+        )
+
     # Get DPI from current settings if not specified
     if dpi is None:
         dpi_setting = mpl.rcParams.get("savefig.dpi", 300)
         if dpi_setting == "figure":
             # Use the figure's DPI if savefig.dpi is set to 'figure'
-            fig = plt.gcf()
             dpi = int(fig.dpi)
         else:
             dpi = int(dpi_setting)
 
     # Determine facecolor
     if facecolor is None:
-        # Use figure's current facecolor
-        fig = plt.gcf()
+        # Use figure's current facecolor (fig already retrieved above)
         facecolor = fig.get_facecolor()
 
     # Determine base directory - use FIGURE_DIR if not specified
