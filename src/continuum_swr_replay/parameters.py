@@ -3,6 +3,10 @@ from pathlib import Path
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
 
+# Maximum speed threshold for filtering non-local events (cm/s)
+# Events with speeds above this are likely not genuine replay events
+MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
+
 # Data directories and definitions
 ROOT_DIR = Path(__file__).parent.parent
 PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"

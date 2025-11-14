@@ -562,3 +562,26 @@ Extract 7 individual helper functions (more granular):
 - ✅ Verified: mypy and ruff pass with no errors
 
 **Final Status**: Code review APPROVED after fix ✅
+
+---
+
+### 2025-11-14 - Milestone 5 - Task 5.2 COMPLETE ✅
+
+**Status**: Task 5.2 Complete - Centralize MAX_SPEED_THRESHOLD Constant (15 min)
+
+**Completed Work**:
+1. ✅ Added `MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0` to parameters.py (line 8)
+2. ✅ Added descriptive comment explaining the purpose (filtering non-local events)
+3. ✅ Updated data_aggregation.py to import from parameters instead of local definition
+4. ✅ Removed local constant definition from data_aggregation.py
+5. ✅ Verified mypy passes on both files
+6. ✅ Verified ruff passes on both files
+7. ✅ Verified import works and constant accessible
+
+**Results**:
+- Constant now centralized in parameters.py ✅
+- Consistent with other project-wide constants (SAMPLING_FREQUENCY, COLORS, etc.) ✅
+- Single source of truth for speed threshold ✅
+- Easier to modify in future if needed ✅
+
+**Impact**: Better code organization, following DRY principle
