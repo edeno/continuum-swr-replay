@@ -1,5 +1,6 @@
 """Utility functions for data loading."""
 
+import re
 import warnings
 from typing import Any
 
@@ -13,6 +14,51 @@ from .constants import NWB_FILES
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
+
+
+def parse_nwb_filename(filename: str) -> tuple[str, int]:
+    """Parse NWB filename to extract animal name and date.
+
+    Parameters
+    ----------
+    filename : str
+        NWB filename in format: {animal}{YYYYMMDD}_.nwb
+        Example: "chimi20200212_.nwb"
+
+    Returns
+    -------
+    tuple[str, int]
+        Animal name and date as (animal, date)
+        Example: ("chimi", 20200212)
+
+    Raises
+    ------
+    ValueError
+        If filename doesn't match expected format
+
+    Examples
+    --------
+    >>> parse_nwb_filename("chimi20200212_.nwb")
+    ('chimi', 20200212)
+
+    >>> parse_nwb_filename("peanut20201125_.nwb")
+    ('peanut', 20201125)
+    """
+    # Pattern: {animal_name}{8_digits}_.nwb
+    # Animal name is one or more letters, date is exactly 8 digits
+    pattern = r"^([a-zA-Z]+)(\d{8})_\.nwb$"
+    match = re.match(pattern, filename)
+
+    if not match:
+        raise ValueError(
+            f"Invalid NWB filename format: {filename}. "
+            f"Expected format: {{animal}}{{YYYYMMDD}}_.nwb"
+        )
+
+    animal = match.group(1)
+    date = int(match.group(2))
+
+    return animal, date
 
 
 def get_epoch_info() -> pd.DataFrame:
@@ -53,10 +99,7 @@ def get_epoch_info() -> pd.DataFrame:
 
     animal, date = zip(
         *[
-            (
-                file_name.replace("_.nwb", "")[:-8],
-                int(file_name.replace("_.nwb", "")[-8:]),
-            )
+            parse_nwb_filename(file_name)
             for file_name in epoch_info.index.get_level_values(
                 "nwb_file_name"
             ).to_numpy()

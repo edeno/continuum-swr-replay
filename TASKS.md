@@ -46,9 +46,10 @@
   - Change `strict=False` to `strict=True`
   - **COMPLETED:** Both zip() calls now use strict=True for safer unpacking
 
-- [ ] **CB-1.2:** Refactor filename parsing with regex in utils.py (lines 56-58)
+- [x] **CB-1.2:** Refactor filename parsing with regex in utils.py (lines 56-58)
   - Create `parse_nwb_filename()` function
   - Eliminate double `.replace()` call
+  - **COMPLETED:** Created parse_nwb_filename() with regex validation, eliminated redundant string operations
 
 - [ ] **CB-1.3:** Remove redundant `enumerate()` with `itertuples()` in utils.py (line 118)
   - Use `row.Index` instead of enumerate counter
