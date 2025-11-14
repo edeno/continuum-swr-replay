@@ -186,7 +186,7 @@ This document provides a detailed task checklist for implementing the code revie
 - [x] Save and verify with mypy
 - [x] Run `uv run mypy src/` (full codebase check)
 - [x] Confirm <5 errors total
-- [ ] Stage and commit: `git commit -m "Fix remaining mypy errors across visualization modules"`
+- [x] Stage and commit: `git commit -m "Fix remaining mypy errors across visualization modules"`
 
 #### 3.3 Replace dict[str, Any] with TypedDict (1 hour)
 
