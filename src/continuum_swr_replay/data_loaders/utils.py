@@ -60,13 +60,15 @@ def get_epoch_info() -> pd.DataFrame:
             for file_name in epoch_info.index.get_level_values(
                 "nwb_file_name"
             ).to_numpy()
-        ], strict=False
+        ],
+        strict=True,
     )
     epoch_info["animal"] = animal
     epoch_info["date"] = date
 
     epoch, epoch_tag = zip(
-        *epoch_info.index.get_level_values("interval_list_name").str.split("_"), strict=False
+        *epoch_info.index.get_level_values("interval_list_name").str.split("_"),
+        strict=True,
     )
     epoch_info["epoch"] = np.asarray(epoch, dtype=int)
     epoch_info["epoch_tag"] = epoch_tag

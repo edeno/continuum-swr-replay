@@ -42,8 +42,9 @@
 
 ### Codebase Critical Fixes
 
-- [ ] **CB-1.1:** Fix unsafe `zip()` without `strict=True` in utils.py (lines 54-63, 68-69)
+- [x] **CB-1.1:** Fix unsafe `zip()` without `strict=True` in utils.py (lines 54-63, 68-69)
   - Change `strict=False` to `strict=True`
+  - **COMPLETED:** Both zip() calls now use strict=True for safer unpacking
 
 - [ ] **CB-1.2:** Refactor filename parsing with regex in utils.py (lines 56-58)
   - Create `parse_nwb_filename()` function
