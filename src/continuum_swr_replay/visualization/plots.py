@@ -905,7 +905,7 @@ def plot_graph_as_1D(
     other_axis_start: float = 0,
     edge_colors: NDArray[np.floating] | None = None,
     reward_well_size: int = 10,
-    edege_linewidth: int = 2,
+    edge_linewidth: int = 2,
 ) -> None:
     """Plot track graph as 1D linearized representation.
 
@@ -927,7 +927,7 @@ def plot_graph_as_1D(
         Colors for each edge, by default None
     reward_well_size : int, optional
         Size of reward well markers, by default 10
-    edege_linewidth : int, optional
+    edge_linewidth : int, optional
         Line width for edges, by default 2
     """
     if ax is None:
@@ -967,7 +967,7 @@ def plot_graph_as_1D(
             color=edge_colors[edge_ind],
             clip_on=False,
             zorder=7,
-            linewidth=edege_linewidth,
+            linewidth=edge_linewidth,
         )
         if edge[0] in reward_well_nodes:
             ax.scatter(

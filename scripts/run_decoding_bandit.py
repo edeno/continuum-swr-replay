@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import dask
 import numpy as np
 import pandas as pd
-from continuum_swr_replay.visualization.visualization import (
+from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
 )
 from dask.distributed import Client
