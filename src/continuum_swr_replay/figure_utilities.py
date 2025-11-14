@@ -118,6 +118,22 @@ SLIDE_HEIGHT: float = 5.625  # inches (10 / 16 * 9)
 """Standard slide height for 16:9 presentations."""
 
 # ==============================================================================
+# File Format Constants
+# ==============================================================================
+
+VALID_FORMATS: frozenset[str] = frozenset(["pdf", "png", "svg", "eps", "jpg", "jpeg", "tif", "tiff"])
+"""Valid output formats for save_figure().
+
+Supported matplotlib backends for publication-quality outputs:
+- pdf: Vector format, preferred for papers (infinite resolution)
+- png: Raster format, good for presentations and web
+- svg: Vector format, editable in Illustrator/Inkscape
+- eps: Vector format, legacy LaTeX/PostScript
+- jpg/jpeg: Raster format, compressed (use for photos only)
+- tif/tiff: Raster format, uncompressed (large files)
+"""
+
+# ==============================================================================
 # Color Palettes (Colorblind-Friendly)
 # ==============================================================================
 
@@ -408,7 +424,7 @@ def save_figure(
         (450 for paper, 150 for presentations).
     formats : list of str, optional
         Output formats. Default is ["pdf", "png"].
-        Options: "pdf", "png", "svg", "eps", "jpg"
+        Valid options: "pdf", "png", "svg", "eps", "jpg", "jpeg", "tif", "tiff"
 
     Notes
     -----
@@ -435,6 +451,15 @@ def save_figure(
     """
     if formats is None:
         formats = ["pdf", "png"]
+
+    # Validate formats
+    invalid_formats = [fmt for fmt in formats if fmt not in VALID_FORMATS]
+    if invalid_formats:
+        valid_list = ", ".join(sorted(VALID_FORMATS))
+        raise ValueError(
+            f"Invalid format(s): {', '.join(invalid_formats)}. "
+            f"Valid formats are: {valid_list}"
+        )
 
     # Get DPI from current settings if not specified
     if dpi is None:

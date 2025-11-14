@@ -264,6 +264,64 @@ class TestSaveFigure:
             # Restore original
             mpl.rcParams["savefig.dpi"] = original_dpi
 
+    def test_invalid_format_raises_error(self):
+        """Test that invalid format raises ValueError.
+
+        This is the key test for FU-1.5: save_figure should validate
+        format strings before attempting to save, preventing cryptic
+        matplotlib errors.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            output_path = Path(tmpdir) / "test_figure"
+
+            # Invalid format should raise ValueError
+            with pytest.raises(ValueError, match="Invalid format"):
+                save_figure(str(output_path), formats=["invalid"])
+
+            with pytest.raises(ValueError, match="Invalid format"):
+                save_figure(str(output_path), formats=["pdf", "bad_format"])
+
+            plt.close(fig)
+
+    def test_valid_formats_accepted(self):
+        """Test that all valid matplotlib formats are accepted."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            output_path = Path(tmpdir) / "test_figure"
+
+            # Common valid formats should work
+            for fmt in ["pdf", "png", "svg", "eps", "jpg"]:
+                save_figure(str(output_path), formats=[fmt])
+                assert (Path(tmpdir) / f"test_figure.{fmt}").exists()
+                (Path(tmpdir) / f"test_figure.{fmt}").unlink()
+
+            plt.close(fig)
+
+    def test_format_error_message_is_helpful(self):
+        """Test that format validation error message lists valid formats."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            output_path = Path(tmpdir) / "test_figure"
+
+            # Error message should mention valid formats
+            with pytest.raises(ValueError) as exc_info:
+                save_figure(str(output_path), formats=["xyz"])
+
+            error_msg = str(exc_info.value)
+            # Should mention the invalid format
+            assert "xyz" in error_msg
+            # Should list valid formats (at least some of them)
+            assert "pdf" in error_msg.lower() or "png" in error_msg.lower()
+
+            plt.close(fig)
+
 
 class TestLabelPanels:
     """Test panel labeling functionality."""

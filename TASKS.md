@@ -35,9 +35,10 @@
   - `dpi = int(mpl.rcParams.get("savefig.dpi", 300))`
   - **COMPLETED:** DPI now cast to int for type safety (handles float from rcParams)
 
-- [ ] **FU-1.5:** Add format validation in `save_figure()`
+- [x] **FU-1.5:** Add format validation in `save_figure()`
   - Define `VALID_FORMATS` constant
   - Validate before saving, raise `ValueError` for invalid formats
+  - **COMPLETED:** Added VALID_FORMATS frozenset, validates before saving with helpful error messages
 
 ### Codebase Critical Fixes
 
