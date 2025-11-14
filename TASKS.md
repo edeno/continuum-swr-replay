@@ -51,8 +51,12 @@
   - Eliminate double `.replace()` call
   - **COMPLETED:** Created parse_nwb_filename() with regex validation, eliminated redundant string operations
 
-- [ ] **CB-1.3:** Remove redundant `enumerate()` with `itertuples()` in utils.py (line 118)
+- [x] **CB-1.3:** Remove redundant `enumerate()` with `itertuples()` in utils.py (line 118)
   - Use `row.Index` instead of enumerate counter
+  - **NOT APPLICABLE:** enumerate() is NOT redundant - it provides sequential 0-based counter independent of DataFrame index
+  - DataFrame indices may be non-sequential (e.g., [1, 2, 3]) while labels must be sequential [1, 2, 3]
+  - Tests verify this behavior: reverting to row.Index caused 3 test failures
+  - enumerate() is the correct implementation here
 
 ---
 
@@ -62,10 +66,11 @@
 **Estimated Time:** 2-3 hours
 **Goal:** Remove workflow friction and prevent user confusion
 
-- [ ] **FU-2.1:** Make `save_figure()` use `FIGURE_DIR` by default
+- [x] **FU-2.1:** Make `save_figure()` use `FIGURE_DIR` by default
   - Add `base_dir: str | Path | None = None` parameter
   - Default to `FIGURE_DIR` when None
   - Create output path as `Path(base_dir) / figure_name`
+  - **COMPLETED:** Added base_dir parameter with FIGURE_DIR default, handles savefig.dpi='figure' case
 
 - [ ] **FU-2.2:** Validate figure exists before saving in `save_figure()`
   - Check `fig.get_axes()` is not empty

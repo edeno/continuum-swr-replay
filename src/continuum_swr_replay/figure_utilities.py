@@ -399,6 +399,7 @@ def set_figure_defaults(
 def save_figure(
     figure_name: str,
     *,
+    base_dir: str | Path | None = None,
     facecolor: ColorType | None = None,
     transparent: bool = True,
     dpi: int | None = None,
@@ -412,7 +413,11 @@ def save_figure(
     Parameters
     ----------
     figure_name : str
-        Base filename (without extension). Can include directory path.
+        Base filename (without extension). Can include directory path relative
+        to base_dir.
+    base_dir : str, Path, or None, optional
+        Base directory for saving figures. If None, uses FIGURE_DIR from
+        parameters. Accepts both string paths and Path objects.
     facecolor : ColorType, optional
         Background color. If None, uses current figure facecolor.
         Accepts any matplotlib color: name, hex string, RGB(A) tuple, etc.
@@ -431,15 +436,20 @@ def save_figure(
     PDF uses vector graphics (infinite resolution) - preferred for papers.
     PNG uses raster graphics - useful for presentations and web.
 
-    File naming:
-    - figure_name="fig1" → fig1.pdf, fig1.png
-    - figure_name="figures/fig1" → figures/fig1.pdf, figures/fig1.png
+    File naming with base_dir:
+    - base_dir=None, figure_name="fig1" → FIGURE_DIR/fig1.pdf, FIGURE_DIR/fig1.png
+    - base_dir="/tmp", figure_name="fig1" → /tmp/fig1.pdf, /tmp/fig1.png
+    - base_dir=None, figure_name="subfolder/fig1" → FIGURE_DIR/subfolder/fig1.pdf
 
     Examples
     --------
-    Save with defaults:
+    Save to default FIGURE_DIR:
 
-    >>> save_figure("figure_1")  # Creates figure_1.pdf and figure_1.png
+    >>> save_figure("figure_1")  # Creates FIGURE_DIR/figure_1.pdf and .png
+
+    Save to custom directory:
+
+    >>> save_figure("figure_1", base_dir="/path/to/output")
 
     Dark background figure:
 
@@ -463,7 +473,13 @@ def save_figure(
 
     # Get DPI from current settings if not specified
     if dpi is None:
-        dpi = int(mpl.rcParams.get("savefig.dpi", 300))
+        dpi_setting = mpl.rcParams.get("savefig.dpi", 300)
+        if dpi_setting == "figure":
+            # Use the figure's DPI if savefig.dpi is set to 'figure'
+            fig = plt.gcf()
+            dpi = int(fig.dpi)
+        else:
+            dpi = int(dpi_setting)
 
     # Determine facecolor
     if facecolor is None:
@@ -471,14 +487,22 @@ def save_figure(
         fig = plt.gcf()
         facecolor = fig.get_facecolor()
 
+    # Determine base directory - use FIGURE_DIR if not specified
+    if base_dir is None:
+        base_directory = FIGURE_DIR
+    else:
+        base_directory = Path(base_dir)
+
+    # Construct full output path
+    output_path = base_directory / figure_name
+
     # Create directory if needed
-    output_path = Path(figure_name)
     if output_path.parent != Path("."):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save in each format
     for fmt in formats:
-        output_file = f"{figure_name}.{fmt}"
+        output_file = output_path.with_suffix(f".{fmt}")
         plt.savefig(
             output_file,
             format=fmt,

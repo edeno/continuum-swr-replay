@@ -157,8 +157,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-            save_figure(str(output_path))
+            save_figure("test_figure", base_dir=tmpdir)
 
             # Check both formats were created
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -172,8 +171,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-            save_figure(str(output_path), formats=["pdf", "svg"])
+            save_figure("test_figure", base_dir=tmpdir, formats=["pdf", "svg"])
 
             # Check only requested formats were created
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -197,8 +195,7 @@ class TestSaveFigure:
 
             # This should work without type errors
             # fig.get_facecolor() returns a tuple of floats (RGBA)
-            output_path = Path(tmpdir) / "test_figure"
-            save_figure(str(output_path), facecolor=None)
+            save_figure("test_figure", base_dir=tmpdir, facecolor=None)
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -209,8 +206,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-            save_figure(str(output_path), facecolor="#ffffff")
+            save_figure("test_figure", base_dir=tmpdir, facecolor="#ffffff")
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -221,9 +217,8 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
             # RGBA tuple should be accepted
-            save_figure(str(output_path), facecolor=(1.0, 1.0, 1.0, 1.0))
+            save_figure("test_figure", base_dir=tmpdir, facecolor=(1.0, 1.0, 1.0, 1.0))
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -234,8 +229,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-            save_figure(str(output_path), dpi=300)
+            save_figure("test_figure", base_dir=tmpdir, dpi=300)
 
             assert (Path(tmpdir) / "test_figure.png").exists()
             plt.close(fig)
@@ -254,9 +248,8 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
             # This should work without type errors, even though rcParams has float
-            save_figure(str(output_path))
+            save_figure("test_figure", base_dir=tmpdir)
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -275,14 +268,12 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-
             # Invalid format should raise ValueError
             with pytest.raises(ValueError, match="Invalid format"):
-                save_figure(str(output_path), formats=["invalid"])
+                save_figure("test_figure", base_dir=tmpdir, formats=["invalid"])
 
             with pytest.raises(ValueError, match="Invalid format"):
-                save_figure(str(output_path), formats=["pdf", "bad_format"])
+                save_figure("test_figure", base_dir=tmpdir, formats=["pdf", "bad_format"])
 
             plt.close(fig)
 
@@ -292,11 +283,9 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-
             # Common valid formats should work
             for fmt in ["pdf", "png", "svg", "eps", "jpg"]:
-                save_figure(str(output_path), formats=[fmt])
+                save_figure("test_figure", base_dir=tmpdir, formats=[fmt])
                 assert (Path(tmpdir) / f"test_figure.{fmt}").exists()
                 (Path(tmpdir) / f"test_figure.{fmt}").unlink()
 
@@ -308,11 +297,9 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            output_path = Path(tmpdir) / "test_figure"
-
             # Error message should mention valid formats
             with pytest.raises(ValueError) as exc_info:
-                save_figure(str(output_path), formats=["xyz"])
+                save_figure("test_figure", base_dir=tmpdir, formats=["xyz"])
 
             error_msg = str(exc_info.value)
             # Should mention the invalid format
@@ -321,6 +308,110 @@ class TestSaveFigure:
             assert "pdf" in error_msg.lower() or "png" in error_msg.lower()
 
             plt.close(fig)
+
+    def test_base_dir_none_uses_figure_dir(self):
+        """Test that base_dir=None saves to FIGURE_DIR by default.
+
+        This is the key test for FU-2.1: save_figure should default to
+        FIGURE_DIR when base_dir is not specified, making it easier to
+        save figures without specifying the full path every time.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Mock FIGURE_DIR to point to our temp directory
+            from continuum_swr_replay import figure_utilities
+            original_figure_dir = getattr(figure_utilities, "FIGURE_DIR", None)
+
+            # Set FIGURE_DIR to temp directory
+            figure_utilities.FIGURE_DIR = Path(tmpdir)
+
+            try:
+                fig, ax = plt.subplots()
+                ax.plot([0, 1], [0, 1])
+
+                # Save with base_dir=None (should use FIGURE_DIR)
+                save_figure("test_figure", base_dir=None)
+
+                # Check files were created in FIGURE_DIR
+                assert (Path(tmpdir) / "test_figure.pdf").exists()
+                assert (Path(tmpdir) / "test_figure.png").exists()
+
+                plt.close(fig)
+            finally:
+                # Restore original FIGURE_DIR
+                if original_figure_dir is not None:
+                    figure_utilities.FIGURE_DIR = original_figure_dir
+
+    def test_base_dir_string_accepted(self):
+        """Test that base_dir accepts string paths."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            # Save with string base_dir
+            save_figure("test_figure", base_dir=tmpdir)
+
+            # Check files were created in specified directory
+            assert (Path(tmpdir) / "test_figure.pdf").exists()
+            assert (Path(tmpdir) / "test_figure.png").exists()
+
+            plt.close(fig)
+
+    def test_base_dir_path_accepted(self):
+        """Test that base_dir accepts Path objects."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            # Save with Path base_dir
+            save_figure("test_figure", base_dir=Path(tmpdir))
+
+            # Check files were created in specified directory
+            assert (Path(tmpdir) / "test_figure.pdf").exists()
+            assert (Path(tmpdir) / "test_figure.png").exists()
+
+            plt.close(fig)
+
+    def test_figure_name_with_subdirectory_and_base_dir(self):
+        """Test that subdirectories in figure_name work with base_dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fig, ax = plt.subplots()
+            ax.plot([0, 1], [0, 1])
+
+            # Save with subdirectory in figure_name
+            save_figure("subfolder/test_figure", base_dir=tmpdir)
+
+            # Check files were created in base_dir/subfolder
+            assert (Path(tmpdir) / "subfolder" / "test_figure.pdf").exists()
+            assert (Path(tmpdir) / "subfolder" / "test_figure.png").exists()
+
+            plt.close(fig)
+
+    def test_figure_name_with_subdirectory_no_base_dir(self):
+        """Test that subdirectories in figure_name work when base_dir=None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Mock FIGURE_DIR to point to our temp directory
+            from continuum_swr_replay import figure_utilities
+            original_figure_dir = getattr(figure_utilities, "FIGURE_DIR", None)
+
+            # Set FIGURE_DIR to temp directory
+            figure_utilities.FIGURE_DIR = Path(tmpdir)
+
+            try:
+                fig, ax = plt.subplots()
+                ax.plot([0, 1], [0, 1])
+
+                # Save with subdirectory and base_dir=None
+                save_figure("subfolder/test_figure", base_dir=None)
+
+                # Check files were created in FIGURE_DIR/subfolder
+                assert (Path(tmpdir) / "subfolder" / "test_figure.pdf").exists()
+                assert (Path(tmpdir) / "subfolder" / "test_figure.png").exists()
+
+                plt.close(fig)
+            finally:
+                # Restore original FIGURE_DIR
+                if original_figure_dir is not None:
+                    figure_utilities.FIGURE_DIR = original_figure_dir
 
 
 class TestLabelPanels:
