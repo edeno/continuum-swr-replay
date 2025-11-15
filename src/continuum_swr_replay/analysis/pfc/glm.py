@@ -17,6 +17,20 @@ from continuum_swr_replay.data_loaders import load_data
 
 
 def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
+    """Bin spike times into time bins.
+
+    Parameters
+    ----------
+    spike_times : NDArray
+        Spike times in seconds
+    time : NDArray
+        Time bin edges in seconds
+
+    Returns
+    -------
+    NDArray
+        Spike counts per time bin (length matches time array)
+    """
     spike_times = spike_times[
         np.logical_and(spike_times >= time[0], spike_times <= time[-1])
     ]
@@ -27,6 +41,20 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
 
 
 def reindex_by(df: pd.Series | pd.DataFrame, index: pd.Index) -> pd.Series | pd.DataFrame:
+    """Reindex pandas object to new index using nearest neighbor.
+
+    Parameters
+    ----------
+    df : pd.Series | pd.DataFrame
+        Data to reindex
+    index : pd.Index
+        Target index to align to
+
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        Reindexed data with values from nearest time point
+    """
     return df.reindex(index, method="nearest")
 
 
@@ -65,6 +93,34 @@ def likelihood_ratio_test(
 def test_theta_modulation_v1(
     position_info: pd.DataFrame, theta_phase: pd.Series, neuron_spike_times: NDArray
 ) -> tuple[float, float, float, float]:
+    """Test theta phase modulation of neuron firing (original version).
+
+    NOTE: This is an older implementation kept for backward compatibility.
+    Consider using `test_theta_modulation()` instead, which uses pre-computed
+    spike counts and regularization for more robust parameter estimates.
+
+    Differences from newer version:
+    - Takes raw spike times instead of pre-computed counts
+    - Derives running state from position_info instead of is_immobile flag
+    - Does not use regularization for modulation estimation
+
+    Parameters
+    ----------
+    position_info : pd.DataFrame
+        Position data with head_speed column
+    theta_phase : pd.Series
+        Theta phase timeseries
+    neuron_spike_times : NDArray
+        Spike times in seconds
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        likelihood_ratio : Likelihood ratio statistic
+        p_val : P-value from chi-square test
+        modulation : Theta modulation strength
+        preferred_phase : Preferred theta phase in radians
+    """
     is_running = position_info.head_speed > 4.0
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
@@ -105,6 +161,24 @@ def test_theta_modulation_v1(
 
 
 def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
+    """Create event labels for time series data.
+
+    Assigns sequential integer labels (1, 2, 3, ...) to time points that fall
+    within event intervals. Time points outside any event are labeled 0.
+
+    Parameters
+    ----------
+    times : pd.DataFrame
+        Event times with 'start_time' and 'end_time' columns
+    time : pd.Index
+        Time index to label
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with 'event_number' column containing event labels
+        (0 for no event, 1+ for event number)
+    """
     event_labels = pd.DataFrame(
         np.zeros_like(time, dtype=int), index=time, columns=["event_number"]
     )
