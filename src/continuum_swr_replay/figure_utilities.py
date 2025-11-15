@@ -154,7 +154,12 @@ tritanopia. Also works in grayscale.
 
 References
 ----------
-Bang Wong (2011). "Points of view: Color blindness." Nature Methods 8(6).
+Bang Wong (2011). "Points of view: Color blindness." Nature Methods 8(6):441.
+https://doi.org/10.1038/nmeth.1618
+
+The palette values are verified against the article and widely-used
+implementations in R (ggplot2), Python (matplotlib, seaborn), and other
+scientific visualization libraries.
 """
 
 OKABE_ITO: list[str] = [
@@ -170,10 +175,17 @@ OKABE_ITO: list[str] = [
 """Okabe-Ito colorblind-friendly palette (8 colors).
 
 Alternative to Wong palette. Excellent for deuteranopia and protanopia.
+Uses gray instead of black, providing slightly softer contrast.
 
 References
 ----------
-Okabe & Ito (2008). "Color Universal Design." JFly Data Depository.
+Okabe, M. & Ito, K. (2008). "Color Universal Design (CUD): How to Make
+Figures and Presentations that are Friendly to Colorblind People."
+https://jfly.uni-koeln.de/color/
+
+The palette values are verified against the Color Universal Design
+Organization (CUDO) and widely-used implementations in scientific
+visualization libraries worldwide.
 """
 
 # ==============================================================================

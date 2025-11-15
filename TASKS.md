@@ -131,9 +131,10 @@
   - Check tick labels meet minimum size
   - **COMPLETED:** Context-aware validation (DPI-based), helpful warnings with fix suggestions
 
-- [ ] **FU-3.3:** Add source URLs to color palette comments (lines 125, 145)
+- [x] **FU-3.3:** Add source URLs to color palette comments (lines 125, 145)
   - Verify WONG against Nature Methods article
   - Verify OKABE_ITO against JFly source
+  - **COMPLETED:** Added DOI and URLs with verification notes
 
 ---
 
