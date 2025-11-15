@@ -8,9 +8,9 @@ from scipy.stats import zscore
 from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
+from ...types import SessionData
 from .event_detection import get_confident_times, get_overlap_times
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
-from .types import SessionData
 
 
 def get_data_over_time(

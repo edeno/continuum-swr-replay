@@ -1,4 +1,8 @@
-"""Type definitions for hippocampus analysis."""
+"""Central type definitions for the continuum-swr-replay project.
+
+This module provides shared TypedDicts and type aliases used across
+data loading, analysis, and visualization modules.
+"""
 
 from typing import TypedDict
 

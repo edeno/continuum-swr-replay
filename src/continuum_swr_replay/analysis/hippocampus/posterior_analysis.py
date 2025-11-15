@@ -17,7 +17,7 @@ from non_local_detector.model_checking.highest_posterior_density import (
 )
 from ripple_detection.core import gaussian_smooth
 
-from .types import SessionData
+from ...types import SessionData
 
 
 def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:

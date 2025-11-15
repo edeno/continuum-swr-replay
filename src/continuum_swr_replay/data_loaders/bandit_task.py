@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING
 from spyglass.common import PositionIntervalMap
 
 if TYPE_CHECKING:
-    from ..analysis.hippocampus.types import SessionData
+    from ..types import SessionData
 
 from .events import load_dios
 from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta

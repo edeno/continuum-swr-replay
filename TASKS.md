@@ -185,10 +185,15 @@
   - Updated get_training_timepoints() to accept both enum and string
   - All 20 integration tests pass ✅
 
-- [ ] **CB-5.2:** Create shared `types.py` module
+- [x] **CB-5.2:** Create shared `types.py` module
   - Move `SessionData` from analysis/hippocampus/types.py
   - Create central location for all TypedDicts
   - Update imports in bandit_task.py
+  - **COMPLETED:** Created src/continuum_swr_replay/types.py with SessionData TypedDict
+  - Removed old analysis/hippocampus/types.py file
+  - Updated imports in bandit_task.py, data_aggregation.py, posterior_analysis.py
+  - Fixed __init__.py imports to use new module structure
+  - All 20 integration tests + 43 unit tests pass ✅
 
 - [ ] **CB-5.3:** Add TypedDict for detector params in run_decoding_bandit.py
   - Create `ClusterlessParams` TypedDict
