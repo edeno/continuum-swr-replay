@@ -223,9 +223,12 @@
   - Fixed min() key parameter type issue with lambda
   - Added explicit dict type annotations for neuron_stats
 
-- [ ] **CB-5.5:** Add `__all__` to public modules
+- [x] **CB-5.5:** Add `__all__` to public modules
   - Define public API for each module
   - Improves IDE autocomplete
+  - **COMPLETED:** Added `__all__` to types.py (3 exports), figure_utilities.py (37+ exports), parameters.py (11 exports)
+  - Verified imports work correctly with star imports
+  - Mypy and ruff checks pass ✅
 
 ---
 

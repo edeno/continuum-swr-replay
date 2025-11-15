@@ -105,3 +105,21 @@ COLORS = {
     "Local": "#add8e6",  # Soft Blue for Local
     "No-Spike": "#b0b0b0",  # Light Beige for No-Spike
 }
+
+__all__ = [
+    # Sampling and thresholds
+    "SAMPLING_FREQUENCY",
+    "MAX_SPEED_THRESHOLD_CM_PER_SEC",
+    "PROBABILITY_THRESHOLDS",
+    # Directories
+    "ROOT_DIR",
+    "PROCESSED_DATA_DIR",
+    "FIGURE_DIR",
+    # Decoding parameters
+    "DecodingParameters",
+    "DECODING_PARAMS",
+    # Enums
+    "TrainingType",
+    # Color schemes
+    "COLORS",
+]

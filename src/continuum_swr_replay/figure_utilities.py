@@ -866,3 +866,46 @@ def validate_figure_quality() -> bool:
                 passed = False
 
     return passed
+
+
+# ==============================================================================
+# Public API
+# ==============================================================================
+
+__all__ = [
+    # Constants - Dimensions
+    "MM_TO_INCHES",
+    "ONE_COLUMN",
+    "ONE_AND_HALF_COLUMN",
+    "TWO_COLUMN",
+    "PAGE_HEIGHT",
+    "GOLDEN_RATIO",
+    "SLIDE_WIDTH",
+    "SLIDE_HEIGHT",
+    # Constants - Formats
+    "VALID_FORMATS",
+    # Constants - Color Palettes
+    "WONG",
+    "OKABE_ITO",
+    # Constants - Font Sizes (Paper)
+    "PAPER_FONT_MIN",
+    "PAPER_AXIS_LABEL",
+    "PAPER_TICK_LABEL",
+    "PAPER_PANEL_LABEL",
+    "PAPER_LEGEND",
+    # Constants - Font Sizes (Presentation)
+    "PRES_BODY",
+    "PRES_TITLE",
+    "PRES_AXIS_LABEL",
+    "PRES_TICK_LABEL",
+    "PRES_LEGEND",
+    # Functions - Configuration
+    "set_figure_defaults",
+    # Functions - Saving
+    "save_figure",
+    # Functions - Utilities
+    "cm_to_inch",
+    "figure_size_from_panels",
+    "label_panels",
+    "validate_figure_quality",
+]
