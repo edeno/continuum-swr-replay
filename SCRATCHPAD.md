@@ -1,7 +1,101 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-7.2 - Add @cache to get_epoch_info() (COMPLETED)
+**Current Task:** CB-7.3 - Centralize script constants in parameters.py
+
+## Session Notes
+
+### 2025-11-14: CB-7.3 - COMPLETED ✅
+
+**Task:** Move constants from `run_decoding_bandit.py` to `parameters.py`
+
+**Status:** COMPLETED - Constants centralized and duplication eliminated
+
+**Actions Taken:**
+
+1. ✅ Added import `numpy as np` to parameters.py
+2. ✅ Added module-level constants to parameters.py (with `Final` type):
+   - `PLACE_BIN_SIZE_1D: Final[float] = 2.0`
+   - `PLACE_BIN_SIZE_2D: Final[float] = 3.5`
+   - `POSITION_STD: Final[float] = float(np.sqrt(12.5))` # ~3.536 cm
+   - `WAVEFORM_STD: Final[float] = 24.0`
+   - `BLOCK_SIZE: Final[int] = 2**10` # 1024
+   - `DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]]` (class names as strings)
+3. ✅ Updated `DecodingParameters` dataclass to use module constants
+   - Changed defaults from hardcoded values to constant references
+   - Fixed incorrect values: position_std (6.0 → 3.536), block_size (4096 → 1024)
+   - Updated docstring to document correct values
+4. ✅ Updated __all__ in parameters.py to export new constants
+5. ✅ Updated run_decoding_bandit.py to import constants from parameters.py
+6. ✅ Removed duplicate constant definitions from script
+7. ✅ Kept `DETECTOR_CLASSES` in script (maps to actual detector class objects)
+8. ✅ All 223 tests pass (mypy and ruff clean)
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/parameters.py` (added constants, updated dataclass)
+- Updated: `scripts/run_decoding_bandit.py` (imports from parameters, removed duplicates)
+- Updated: `TASKS.md` (marked CB-7.3 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Implementation:**
+
+```python
+# parameters.py - New constants added
+import numpy as np
+
+PLACE_BIN_SIZE_1D: Final[float] = 2.0
+PLACE_BIN_SIZE_2D: Final[float] = 3.5
+POSITION_STD: Final[float] = float(np.sqrt(12.5))  # ~3.536 cm
+WAVEFORM_STD: Final[float] = 24.0
+BLOCK_SIZE: Final[int] = 2**10  # 1024
+DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
+    "HPC": ("NonLocalClusterlessDetector", "clusterless"),
+    "mPFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+    "OFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+}
+
+@dataclass(frozen=True)
+class DecodingParameters:
+    place_bin_size: float = PLACE_BIN_SIZE_1D
+    waveform_std: float = WAVEFORM_STD
+    position_std: float = POSITION_STD  # Fixed: 6.0 → 3.536
+    block_size: int = BLOCK_SIZE        # Fixed: 4096 → 1024
+
+# run_decoding_bandit.py - Imports from parameters
+from continuum_swr_replay.parameters import (
+    BLOCK_SIZE,
+    PLACE_BIN_SIZE_1D,
+    PLACE_BIN_SIZE_2D,
+    POSITION_STD,
+    PROCESSED_DATA_DIR,
+    WAVEFORM_STD,
+)
+```
+
+**Key Design Decisions:**
+- User confirmed "no need for backward compatibility" → safe to fix DecodingParameters values
+- Module-level constants use `Final` type for immutability
+- DETECTOR_CONFIG in parameters.py stores class names as strings (lightweight)
+- DETECTOR_CLASSES in script maps to actual detector class objects (imported locally)
+- DecodingParameters now references module constants (single source of truth)
+
+**Critical Bug Fix:**
+Discovered and fixed incorrect default values in `DecodingParameters`:
+- `position_std`: Was 6.0, should be sqrt(12.5) ≈ 3.536
+- `block_size`: Was 4096, should be 1024 (2^10)
+
+These values were **never used** (dataclass not referenced in codebase), but now they match the actual analysis parameters.
+
+**Benefits:**
+- Single source of truth for decoding constants ✅
+- No duplication between parameters.py and scripts ✅
+- DecodingParameters now has correct values ✅
+- Type-safe with Final annotations ✅
+- All tests pass ✅
+
+**Time:** 25 minutes
+
+---
 
 ## Session Notes
 

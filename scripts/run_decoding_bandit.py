@@ -27,7 +27,14 @@ from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import (
+    BLOCK_SIZE,
+    PLACE_BIN_SIZE_1D,
+    PLACE_BIN_SIZE_2D,
+    POSITION_STD,
+    PROCESSED_DATA_DIR,
+    WAVEFORM_STD,
+)
 from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
@@ -41,17 +48,7 @@ if TYPE_CHECKING:
 
 warnings.filterwarnings("ignore")
 
-
-# Spatial binning parameters (in cm)
-PLACE_BIN_SIZE_1D = 2.0
-PLACE_BIN_SIZE_2D = 3.5
-
-# Decoding model parameters
-POSITION_STD = np.sqrt(12.5)  # ~3.5 cm spatial uncertainty
-WAVEFORM_STD = 24.0  # Waveform feature space standard deviation
-BLOCK_SIZE = 2**10  # GPU processing block size (1024)
-
-# Detector configuration by brain area
+# Detector configuration by brain area (maps to actual detector classes)
 DETECTOR_CLASSES = {
     "HPC": (NonLocalClusterlessDetector, "clusterless"),
     "mPFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),

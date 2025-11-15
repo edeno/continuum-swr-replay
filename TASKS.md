@@ -271,9 +271,14 @@
   - Validated through integration tests (all 223 pass)
   - **COMPLETED:** 2025-11-14
 
-- [ ] **CB-7.3:** Centralize script constants in parameters.py
+- [x] **CB-7.3:** Centralize script constants in parameters.py
   - Move constants from run_decoding_bandit.py
   - Eliminate duplication
+  - Added PLACE_BIN_SIZE_1D, PLACE_BIN_SIZE_2D, POSITION_STD, WAVEFORM_STD, BLOCK_SIZE, DETECTOR_CONFIG
+  - Updated DecodingParameters to use module-level constants (values corrected to match script)
+  - Updated run_decoding_bandit.py to import from parameters.py
+  - All 223 tests pass ✅
+  - **COMPLETED:** 2025-11-14
 
 ---
 

@@ -3,6 +3,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Final
 
+import numpy as np
+
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
 
@@ -14,6 +16,24 @@ MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 ROOT_DIR = Path(__file__).parent.parent
 PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"
 FIGURE_DIR = ROOT_DIR / "figures"
+
+# Spatial binning parameters (in cm)
+PLACE_BIN_SIZE_1D: Final[float] = 2.0
+PLACE_BIN_SIZE_2D: Final[float] = 3.5
+
+# Decoding model parameters
+POSITION_STD: Final[float] = float(np.sqrt(12.5))  # ~3.536 cm spatial uncertainty
+WAVEFORM_STD: Final[float] = 24.0  # Waveform feature space standard deviation (µV)
+BLOCK_SIZE: Final[int] = 2**10  # GPU processing block size (1024)
+
+# Detector configuration by brain area
+# Maps brain area to (detector_class_name, detector_type_string)
+# Actual detector classes must be imported from non_local_detector in analysis scripts
+DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
+    "HPC": ("NonLocalClusterlessDetector", "clusterless"),
+    "mPFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+    "OFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+}
 
 
 @dataclass(frozen=True)
@@ -32,12 +52,11 @@ class DecodingParameters:
         to the posterior. Default is 24.0 µV.
     position_std : float
         Standard deviation for position likelihood in cm. Derived from
-        place_bin_size (sqrt(place_bin_size^2 / 12)) for uniform bins.
-        Default is 6.0 cm (~sqrt(12.5)).
+        sqrt(12.5) ≈ 3.536 cm, which corresponds to uniform spatial uncertainty.
     block_size : int
         Block size for GPU memory management during decoding. Controls
         how many time bins are processed simultaneously. Must be a power
-        of 2 for optimal GPU performance. Default is 4096 (2^12).
+        of 2 for optimal GPU performance. Default is 1024 (2^10).
 
     Notes
     -----
@@ -54,10 +73,10 @@ class DecodingParameters:
     of these critical analysis parameters.
     """
 
-    place_bin_size: float = 2.0
-    waveform_std: float = 24.0
-    position_std: float = 6.0
-    block_size: int = 4096
+    place_bin_size: float = PLACE_BIN_SIZE_1D
+    waveform_std: float = WAVEFORM_STD
+    position_std: float = POSITION_STD
+    block_size: int = BLOCK_SIZE
 
 
 # Singleton instance of decoding parameters
@@ -115,7 +134,15 @@ __all__ = [
     "ROOT_DIR",
     "PROCESSED_DATA_DIR",
     "FIGURE_DIR",
-    # Decoding parameters
+    # Spatial binning parameters
+    "PLACE_BIN_SIZE_1D",
+    "PLACE_BIN_SIZE_2D",
+    # Decoding model parameters
+    "POSITION_STD",
+    "WAVEFORM_STD",
+    "BLOCK_SIZE",
+    "DETECTOR_CONFIG",
+    # Decoding parameters (dataclass)
     "DecodingParameters",
     "DECODING_PARAMS",
     # Enums
