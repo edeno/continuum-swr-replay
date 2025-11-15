@@ -1,5 +1,7 @@
 """Utility functions for data loading."""
 
+from __future__ import annotations
+
 import re
 import warnings
 from typing import TYPE_CHECKING
