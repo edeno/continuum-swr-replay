@@ -144,12 +144,16 @@
 **Estimated Time:** 4-6 hours
 **Goal:** Establish comprehensive test coverage
 
-- [ ] **TEST-4.1:** Create `tests/test_figure_utilities.py`
+- [x] **TEST-4.1:** Create `tests/test_figure_utilities.py`
   - Test constants (MM_TO_INCHES, GOLDEN_RATIO, column widths)
   - Test `cm_to_inch()` conversion
   - Test `figure_size_from_panels()` calculations
   - Test color palette length and hex validity
   - Test `label_panels()` with valid and invalid inputs
+  - **COMPLETED:** Comprehensive test suite with 54 tests covering all functionality
+  - Tests include: constants, color palettes, conversions, sizing, context switching,
+    save_figure (transparency, formats, validation), validate_figure_quality (DPI,
+    layout, font sizes), and label_panels (error handling)
 
 - [ ] **TEST-4.2:** Add type checking validation
   - Run `mypy src/continuum_swr_replay/figure_utilities.py`
