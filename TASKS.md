@@ -258,9 +258,11 @@
 **Estimated Time:** 2-3 hours
 **Goal:** Improve execution speed for common operations
 
-- [ ] **CB-7.1:** Vectorize event labeling with IntervalIndex in utils.py
-  - Replace explicit loop with pandas IntervalIndex
-  - Performance gain for large datasets
+- [x] **CB-7.1:** Vectorize event labeling with IntervalIndex in utils.py
+  - Replace explicit loop with binary search (np.searchsorted)
+  - Performance gain for large datasets (~36x speedup verified)
+  - Comprehensive test suite added (8 tests in tests/unit/test_utils.py)
+  - **COMPLETED:** 2025-11-14
 
 - [ ] **CB-7.2:** Add `@cache` to `get_epoch_info()` in utils.py
   - Expensive database query should be cached

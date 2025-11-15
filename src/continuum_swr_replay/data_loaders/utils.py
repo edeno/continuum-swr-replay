@@ -150,6 +150,10 @@ def get_epoch_info() -> pd.DataFrame:
 def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     """Create event labels for each time point.
 
+    Uses vectorized binary search (np.searchsorted) for efficient labeling
+    of large datasets. Complexity is O(n_events * log(n_times)) instead of
+    O(n_events * n_times) with explicit boolean masking.
+
     Parameters
     ----------
     times : pd.DataFrame
@@ -161,13 +165,30 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     -------
     pd.DataFrame
         Event labels (0 for no event, 1+ for event number)
+
+    Notes
+    -----
+    Time points within [start_time, end_time] (inclusive) are labeled with
+    sequential integers starting from 1. Time points outside all events are
+    labeled 0.
     """
     event_labels = pd.DataFrame(
         0, index=time, columns=["event_number"], dtype=int
     )
-    # This means the label will be +1 because label count starts at 0
-    for i, row in enumerate(times.itertuples()):
-        event_labels.loc[row.start_time : row.end_time, :] = i + 1
+
+    # Convert time index to numpy array for searchsorted
+    time_array = time.to_numpy()
+
+    # Vectorized labeling using binary search
+    for i, (start, end) in enumerate(
+        zip(times["start_time"], times["end_time"], strict=True), start=1
+    ):
+        # Find indices of time points within [start, end]
+        start_idx = np.searchsorted(time_array, start, side="left")
+        end_idx = np.searchsorted(time_array, end, side="right")
+
+        # Assign label to these indices (iloc for integer-based indexing)
+        event_labels.iloc[start_idx:end_idx, 0] = i
 
     return event_labels
 
