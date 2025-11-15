@@ -1,0 +1,51 @@
+# Matplotlib style for Nature publications
+
+# Font settings
+font.family: Arial
+pdf.fonttype: 42 # Embeds TrueType fonts, making text editable in vector files
+ps.fonttype: 42
+
+# Text and color
+text.color: black
+axes.labelcolor: black
+
+# Figure settings
+figure.facecolor: white
+savefig.dpi: 450
+savefig.format: pdf
+savefig.transparent: False
+
+# Axes settings
+axes.edgecolor: black
+axes.linewidth: 0.8
+axes.labelsize: 7
+axes.labelpad: 4
+axes.titlesize: 7
+axes.grid: False
+axes.spines.top: True
+axes.spines.right: True
+axes.formatter.use_mathtext: True
+
+# Tick settings
+xtick.labelsize: 5
+ytick.labelsize: 5
+xtick.color: black
+ytick.color: black
+xtick.direction: out
+ytick.direction: out
+xtick.major.size: 3
+ytick.major.width: 0.8
+ytick.major.size: 3
+
+# Line and marker settings
+lines.linewidth: 1.5
+lines.markersize: 4
+
+# Legend settings
+legend.frameon: False
+legend.fontsize: 5
+legend.loc: best
+
+# Image settings
+image.cmap: viridis
+image.interpolation: none

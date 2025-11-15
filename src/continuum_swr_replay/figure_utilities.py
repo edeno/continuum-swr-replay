@@ -404,7 +404,7 @@ def save_figure(
     *,
     base_dir: str | Path | None = None,
     facecolor: ColorType | None = None,
-    transparent: bool = True,
+    transparent: bool | None = None,
     dpi: int | None = None,
     formats: list[str] | None = None,
 ) -> None:
@@ -425,8 +425,11 @@ def save_figure(
         Background color. If None, uses current figure facecolor.
         Accepts any matplotlib color: name, hex string, RGB(A) tuple, etc.
         Use "#1a1a1a" for dark backgrounds.
-    transparent : bool, default=True
-        Whether to use transparent background (recommended for papers).
+    transparent : bool or None, optional
+        Whether to use transparent background. If None (default), automatically
+        detects based on facecolor: transparent=False for dark backgrounds,
+        transparent=True for light backgrounds. This prevents dark backgrounds
+        from disappearing when placed on dark slides/backgrounds.
     dpi : int, optional
         DPI for raster formats. If None, uses context default
         (450 for paper, 150 for presentations).
@@ -454,7 +457,11 @@ def save_figure(
 
     >>> save_figure("figure_1", base_dir="/path/to/output")
 
-    Dark background figure:
+    Dark background figure (auto-detects transparency):
+
+    >>> save_figure("dark_fig", facecolor="#1a1a1a")  # Auto: transparent=False
+
+    Explicitly control transparency:
 
     >>> save_figure("dark_fig", facecolor="#1a1a1a", transparent=False)
 
@@ -495,6 +502,17 @@ def save_figure(
     if facecolor is None:
         # Use figure's current facecolor (fig already retrieved above)
         facecolor = fig.get_facecolor()
+
+    # Auto-detect transparency based on background color if not specified
+    if transparent is None:
+        # Convert facecolor to RGBA tuple for luminance calculation
+        rgba = mpl.colors.to_rgba(facecolor)
+        # Calculate luminance using weighted average (ITU-R BT.601)
+        # https://en.wikipedia.org/wiki/Relative_luminance
+        luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+        # Dark backgrounds (luminance < 0.5) should not be transparent
+        # to prevent them from disappearing on dark slides/backgrounds
+        transparent = luminance >= 0.5
 
     # Determine base directory - use FIGURE_DIR if not specified
     if base_dir is None:

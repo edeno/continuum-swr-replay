@@ -496,6 +496,71 @@ class TestSaveFigure:
 
             plt.close(fig)
 
+    def test_transparent_auto_detects_dark_background(self):
+        """Test that transparent=None auto-detects dark backgrounds.
+
+        This is a key test for FU-3.1: save_figure should automatically
+        set transparent=False for dark backgrounds and transparent=True
+        for light backgrounds when transparent=None.
+        """
+        import matplotlib.colors as mcolors
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create figure with dark background
+            fig, ax = plt.subplots()
+            fig.set_facecolor("#1a1a1a")  # Dark gray
+            ax.plot([0, 1], [0, 1])
+
+            # Save with transparent=None (auto-detect)
+            # This should detect dark background and set transparent=False
+            save_figure("dark_figure", base_dir=tmpdir, transparent=None)
+
+            assert (Path(tmpdir) / "dark_figure.pdf").exists()
+            plt.close(fig)
+
+    def test_transparent_auto_detects_light_background(self):
+        """Test that transparent=None auto-detects light backgrounds."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create figure with light background
+            fig, ax = plt.subplots()
+            fig.set_facecolor("white")  # Light background
+            ax.plot([0, 1], [0, 1])
+
+            # Save with transparent=None (auto-detect)
+            # This should detect light background and set transparent=True
+            save_figure("light_figure", base_dir=tmpdir, transparent=None)
+
+            assert (Path(tmpdir) / "light_figure.pdf").exists()
+            plt.close(fig)
+
+    def test_transparent_explicit_true_honored(self):
+        """Test that explicit transparent=True is honored regardless of background."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create figure with dark background
+            fig, ax = plt.subplots()
+            fig.set_facecolor("#1a1a1a")  # Dark gray
+            ax.plot([0, 1], [0, 1])
+
+            # Explicit transparent=True should be honored even on dark background
+            save_figure("dark_transparent", base_dir=tmpdir, transparent=True)
+
+            assert (Path(tmpdir) / "dark_transparent.pdf").exists()
+            plt.close(fig)
+
+    def test_transparent_explicit_false_honored(self):
+        """Test that explicit transparent=False is honored regardless of background."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create figure with light background
+            fig, ax = plt.subplots()
+            fig.set_facecolor("white")  # Light background
+            ax.plot([0, 1], [0, 1])
+
+            # Explicit transparent=False should be honored even on light background
+            save_figure("light_opaque", base_dir=tmpdir, transparent=False)
+
+            assert (Path(tmpdir) / "light_opaque.pdf").exists()
+            plt.close(fig)
+
 
 class TestValidateFigureQuality:
     """Test figure quality validation functionality."""

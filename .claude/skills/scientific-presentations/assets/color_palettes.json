@@ -1,0 +1,379 @@
+{
+  "palettes": {
+    "wong": {
+      "name": "Wong Palette",
+      "description": "8-color colorblind-friendly palette optimized for scientific visualization",
+      "reference": "Bang Wong (2011) Nature Methods",
+      "colors": [
+        {
+          "hex": "#000000",
+          "rgb": [0, 0, 0],
+          "name": "Black",
+          "usage": "Primary text, emphasis lines"
+        },
+        {
+          "hex": "#E69F00",
+          "rgb": [230, 159, 0],
+          "name": "Orange",
+          "usage": "Primary data color"
+        },
+        {
+          "hex": "#56B4E9",
+          "rgb": [86, 180, 233],
+          "name": "Sky Blue",
+          "usage": "Secondary data color"
+        },
+        {
+          "hex": "#009E73",
+          "rgb": [0, 158, 115],
+          "name": "Bluish Green",
+          "usage": "Tertiary data color"
+        },
+        {
+          "hex": "#F0E442",
+          "rgb": [240, 228, 66],
+          "name": "Yellow",
+          "usage": "Highlighting, attention"
+        },
+        {
+          "hex": "#0072B2",
+          "rgb": [0, 114, 178],
+          "name": "Blue",
+          "usage": "Cool data color"
+        },
+        {
+          "hex": "#D55E00",
+          "rgb": [213, 94, 0],
+          "name": "Vermillion",
+          "usage": "Warm emphasis, warnings"
+        },
+        {
+          "hex": "#CC79A7",
+          "rgb": [204, 121, 167],
+          "name": "Reddish Purple",
+          "usage": "Alternative accent"
+        }
+      ],
+      "recommended_usage": "Primary palette for most scientific presentations. Use first 3-4 colors for data comparisons."
+    },
+    "okabe_ito": {
+      "name": "Okabe-Ito Palette",
+      "description": "Alternative colorblind-friendly palette with excellent distinguishability",
+      "reference": "Okabe and Ito (2008)",
+      "colors": [
+        {
+          "hex": "#E69F00",
+          "rgb": [230, 159, 0],
+          "name": "Orange"
+        },
+        {
+          "hex": "#56B4E9",
+          "rgb": [86, 180, 233],
+          "name": "Sky Blue"
+        },
+        {
+          "hex": "#009E73",
+          "rgb": [0, 158, 115],
+          "name": "Bluish Green"
+        },
+        {
+          "hex": "#F0E442",
+          "rgb": [240, 228, 66],
+          "name": "Yellow"
+        },
+        {
+          "hex": "#0072B2",
+          "rgb": [0, 114, 178],
+          "name": "Blue"
+        },
+        {
+          "hex": "#D55E00",
+          "rgb": [213, 94, 0],
+          "name": "Vermillion"
+        },
+        {
+          "hex": "#CC79A7",
+          "rgb": [204, 121, 167],
+          "name": "Reddish Purple"
+        },
+        {
+          "hex": "#000000",
+          "rgb": [0, 0, 0],
+          "name": "Black"
+        }
+      ],
+      "recommended_usage": "Alternative to Wong when different color ordering is desired. Black at end for backgrounds."
+    },
+    "tol_bright": {
+      "name": "Tol Bright Palette",
+      "description": "High contrast palette ideal for presentations in dark rooms",
+      "reference": "Paul Tol's color schemes",
+      "colors": [
+        {
+          "hex": "#4477AA",
+          "rgb": [68, 119, 170],
+          "name": "Blue"
+        },
+        {
+          "hex": "#EE6677",
+          "rgb": [238, 102, 119],
+          "name": "Red"
+        },
+        {
+          "hex": "#228833",
+          "rgb": [34, 136, 51],
+          "name": "Green"
+        },
+        {
+          "hex": "#CCBB44",
+          "rgb": [204, 187, 68],
+          "name": "Yellow"
+        },
+        {
+          "hex": "#66CCEE",
+          "rgb": [102, 204, 238],
+          "name": "Cyan"
+        },
+        {
+          "hex": "#AA3377",
+          "rgb": [170, 51, 119],
+          "name": "Purple"
+        },
+        {
+          "hex": "#BBBBBB",
+          "rgb": [187, 187, 187],
+          "name": "Grey"
+        }
+      ],
+      "recommended_usage": "High contrast for emphasis or dark room presentations. Very saturated colors."
+    },
+    "tol_muted": {
+      "name": "Tol Muted Palette",
+      "description": "Subtle palette for presentations requiring softer colors",
+      "reference": "Paul Tol's color schemes",
+      "colors": [
+        {
+          "hex": "#332288",
+          "rgb": [51, 34, 136],
+          "name": "Indigo"
+        },
+        {
+          "hex": "#88CCEE",
+          "rgb": [136, 204, 238],
+          "name": "Cyan"
+        },
+        {
+          "hex": "#44AA99",
+          "rgb": [68, 170, 153],
+          "name": "Teal"
+        },
+        {
+          "hex": "#117733",
+          "rgb": [17, 119, 51],
+          "name": "Green"
+        },
+        {
+          "hex": "#999933",
+          "rgb": [153, 153, 51],
+          "name": "Olive"
+        },
+        {
+          "hex": "#DDCC77",
+          "rgb": [221, 204, 119],
+          "name": "Sand"
+        },
+        {
+          "hex": "#CC6677",
+          "rgb": [204, 102, 119],
+          "name": "Rose"
+        },
+        {
+          "hex": "#882255",
+          "rgb": [136, 34, 85],
+          "name": "Wine"
+        },
+        {
+          "hex": "#AA4499",
+          "rgb": [170, 68, 153],
+          "name": "Purple"
+        }
+      ],
+      "recommended_usage": "Use sparingly. More colors available but less saturated. Better for papers than presentations."
+    },
+    "ibm_colorblind": {
+      "name": "IBM Design Colorblind Safe",
+      "description": "Modern palette from IBM Design Language",
+      "reference": "IBM Design Language",
+      "colors": [
+        {
+          "hex": "#648FFF",
+          "rgb": [100, 143, 255],
+          "name": "Blue"
+        },
+        {
+          "hex": "#785EF0",
+          "rgb": [120, 94, 240],
+          "name": "Purple"
+        },
+        {
+          "hex": "#DC267F",
+          "rgb": [220, 38, 127],
+          "name": "Magenta"
+        },
+        {
+          "hex": "#FE6100",
+          "rgb": [254, 97, 0],
+          "name": "Orange"
+        },
+        {
+          "hex": "#FFB000",
+          "rgb": [255, 176, 0],
+          "name": "Yellow"
+        }
+      ],
+      "recommended_usage": "Modern, vibrant colors. Good for tech/corporate presentations."
+    }
+  },
+  "semantic_colors": {
+    "success": {
+      "color": "#009E73",
+      "name": "Bluish Green from Wong",
+      "usage": "Positive results, success indicators"
+    },
+    "warning": {
+      "color": "#F0E442",
+      "name": "Yellow from Wong",
+      "usage": "Cautions, attention needed"
+    },
+    "error": {
+      "color": "#D55E00",
+      "name": "Vermillion from Wong",
+      "usage": "Errors, critical issues, negative results"
+    },
+    "info": {
+      "color": "#56B4E9",
+      "name": "Sky Blue from Wong",
+      "usage": "Information, neutral highlights"
+    }
+  },
+  "background_colors": {
+    "light": {
+      "primary": {
+        "hex": "#FFFFFF",
+        "rgb": [255, 255, 255],
+        "name": "Pure White",
+        "usage": "Default light background"
+      },
+      "alternative": {
+        "hex": "#F5F5F5",
+        "rgb": [245, 245, 245],
+        "name": "Off-White",
+        "usage": "Slightly softer alternative"
+      }
+    },
+    "dark": {
+      "primary": {
+        "hex": "#1A1A1A",
+        "rgb": [26, 26, 26],
+        "name": "Dark Gray",
+        "usage": "Default dark background for presentations"
+      },
+      "alternative": {
+        "hex": "#2D2D2D",
+        "rgb": [45, 45, 45],
+        "name": "Medium Dark Gray",
+        "usage": "Slightly lighter dark background"
+      }
+    }
+  },
+  "text_colors": {
+    "on_light": {
+      "primary": {
+        "hex": "#000000",
+        "rgb": [0, 0, 0],
+        "name": "Black",
+        "contrast_ratio": "21:1 with white"
+      },
+      "secondary": {
+        "hex": "#333333",
+        "rgb": [51, 51, 51],
+        "name": "Dark Gray",
+        "contrast_ratio": "12.6:1 with white"
+      }
+    },
+    "on_dark": {
+      "primary": {
+        "hex": "#FFFFFF",
+        "rgb": [255, 255, 255],
+        "name": "White",
+        "contrast_ratio": "21:1 with black"
+      },
+      "secondary": {
+        "hex": "#CCCCCC",
+        "rgb": [204, 204, 204],
+        "name": "Light Gray",
+        "contrast_ratio": "11.2:1 with #1a1a1a"
+      }
+    }
+  },
+  "usage_guidelines": {
+    "max_colors_per_slide": 3,
+    "recommended_primary": "wong",
+    "for_emphasis": ["#E69F00", "#D55E00", "#F0E442"],
+    "for_comparison": ["#E69F00", "#56B4E9", "#009E73"],
+    "avoid_combinations": [
+      {
+        "colors": ["#009E73", "#D55E00"],
+        "reason": "Red-green combination problematic for colorblind viewers"
+      },
+      {
+        "colors": ["#F0E442", "#FFFFFF"],
+        "reason": "Insufficient contrast on light backgrounds"
+      }
+    ],
+    "testing": {
+      "tools": [
+        "ColorOracle (free colorblind simulator)",
+        "Coblis (web-based colorblind simulator)",
+        "WebAIM Contrast Checker (WCAG compliance)"
+      ],
+      "process": "Always test palette with colorblind simulator before finalizing presentation"
+    }
+  },
+  "wcag_compliance": {
+    "normal_text": {
+      "min_ratio": 4.5,
+      "description": "For text <18pt or <14pt bold"
+    },
+    "large_text": {
+      "min_ratio": 3.0,
+      "description": "For text ≥18pt or ≥14pt bold"
+    },
+    "compliant_combinations": [
+      {
+        "foreground": "#000000",
+        "background": "#FFFFFF",
+        "ratio": 21.0,
+        "level": "AAA"
+      },
+      {
+        "foreground": "#E69F00",
+        "background": "#000000",
+        "ratio": 7.5,
+        "level": "AAA"
+      },
+      {
+        "foreground": "#56B4E9",
+        "background": "#000000",
+        "ratio": 8.2,
+        "level": "AAA"
+      },
+      {
+        "foreground": "#FFFFFF",
+        "background": "#0072B2",
+        "ratio": 5.1,
+        "level": "AA (large text AAA)"
+      }
+    ]
+  }
+}

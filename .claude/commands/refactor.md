@@ -1,4 +1,4 @@
-I'm working on the continuum-swr-replay project.
+I'm working on the continuum-swr-replay project, a paper analyzing how hippocampal replay and sharp wave ripples relate.
 
 Start now by reading the files and telling me which task you'll work on first.
 
@@ -8,9 +8,10 @@ Your workflow MUST be:
         CLAUDE.md (implementation guide)
         SCRATCHPAD.md (notes and current status)
         TASKS.md (current tasks)
-        PLAN.md (overall project plan for specific context)
+        IMPROVEMENTS.md (potential improvements)
+        FIGURE_UTILITIES_REVIEW.md (figure utilities review)
 
-    Find the FIRST unchecked [ ] task in PLAN.md
+    Find the FIRST unchecked [ ] task in TASKS.md
 
     For EVERY feature, follow TDD:
       a. Create the TEST file first  (or identify/modify existing tests)

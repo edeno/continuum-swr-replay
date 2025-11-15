@@ -1,12 +1,8 @@
 # %%
 # %config InlineBackend.figure_format = 'retina'
-import warnings
-import os
-
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
-
 import logging
 import os
+import warnings
 from pathlib import Path
 
 import matplotlib
@@ -14,9 +10,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import xarray as xr
+from scipy.ndimage import label
+from scipy.stats import sem
 
-import src.figure_utilities as figure_utilities
-from src.parameters import COLORS, PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.parameters import (
+    COLORS,
+    PROCESSED_DATA_DIR,
+    SAMPLING_FREQUENCY,
+)
+
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -87,12 +92,11 @@ def get_event_types(data_over_time: dict):
         "mua_events_no_non_local": mua_events_no_non_local,
     }
 
+
 # %%
 data_over_time = load_data_over_time()
 event_types = get_event_types(data_over_time)
 
-# %%
-event_types.keys()
 
 # %%
 def get_duration(df: pd.DataFrame, event_name="non_local_event") -> pd.Series:
@@ -171,7 +175,8 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
         else "lightgrey"
     )
     ax.hist(
-        event_types[event_type]["linear_position"] / event_types[event_type]["max_linear_position"],
+        event_types[event_type]["linear_position"]
+        / event_types[event_type]["max_linear_position"],
         bins=np.arange(0, 1, 0.01),
         color=color,
         alpha=0.7,
@@ -324,7 +329,9 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharex=True, sharey=True)
-for event_type, ax in zip(("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes):
+for event_type, ax in zip(
+    ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes, strict=True
+):
 
     color = (
         COLORS["Non-Local"]
@@ -346,9 +353,6 @@ for event_type, ax in zip(("non_local_immobile", "non_local_immobile_no_overlap_
     ax.set_xlabel("Normalized Animal Position")
     ax.set_ylabel("Normalized Replay Position")
     ax.set_title(event_type)
-
-# %%
-event_types["non_local_immobile_no_overlap_SWR"].columns
 
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -398,9 +402,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("HPD")
     ax.set_ylabel("Density")
 
-# %%
-event_types["non_local_immobile_no_overlap_SWR"].groupby(
-    ["animal", "day", "epoch", "non_local_event"]).mean()
 
 # %%
 def get_event_start_end(df: pd.DataFrame, event_name="non_local_event") -> pd.DataFrame:
@@ -414,11 +415,11 @@ def get_event_start_end(df: pd.DataFrame, event_name="non_local_event") -> pd.Da
     return event_times
 
 
-non_local_start_end_time = get_event_start_end(event_types["non_local_immobile"], event_name="non_local_event")
-non_local_start_end_time
+non_local_start_end_time = get_event_start_end(
+    event_types["non_local_immobile"], event_name="non_local_event"
+)
 
 # %%
-import xarray as xr
 
 
 def _get_signal_windows(
@@ -550,9 +551,6 @@ signal_windows = xr.concat(
 )
 
 # %%
-signal_windows
-
-# %%
 non_local_start_end_time = get_event_start_end(
     event_types["non_local_immobile_no_overlap_SWR"], event_name="non_local_event"
 )
@@ -574,9 +572,6 @@ signal_windows = xr.concat(
     ],
     dim="event",
 )
-
-# %%
-event_types.keys()
 
 # %%
 non_local_start_end_time = get_event_start_end(
@@ -602,10 +597,6 @@ signal_windows_overlap = xr.concat(
 )
 
 # %%
-signal_windows_overlap.mean(dim="event").T
-
-# %%
-from scipy.stats import sem
 
 fig, axes = plt.subplots(
     nrows=4,
@@ -616,19 +607,21 @@ fig, axes = plt.subplots(
     constrained_layout=True,
 )
 
-no_overlap_mean = signal_windows.mean(dim="event")
-overlap_mean = signal_windows_overlap.mean(dim="event")
-no_overlap_sem = sem(signal_windows, axis=0, nan_policy="omit")
-overlap_sem = sem(signal_windows_overlap, axis=0, nan_policy="omit")
+no_overlap_mean_all = signal_windows.mean(dim="event")
+overlap_mean_all = signal_windows_overlap.mean(dim="event")
+no_overlap_sem_all = sem(signal_windows, axis=0, nan_policy="omit")
+overlap_sem_all = sem(signal_windows_overlap, axis=0, nan_policy="omit")
 
 for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     axes.flatten(),
     zip(
-        no_overlap_mean.T,
-        overlap_mean.T,
-        no_overlap_sem.T,
-        overlap_sem.T,
+        no_overlap_mean_all.T,
+        overlap_mean_all.T,
+        no_overlap_sem_all.T,
+        overlap_sem_all.T,
+        strict=True,
     ),
+    strict=True,
 ):
 
     # Add shaded error bars
@@ -756,7 +749,6 @@ signal_windows_overlap = xr.concat(
 )
 
 # %%
-from scipy.stats import sem
 
 fig, axes = plt.subplots(
     nrows=4,
@@ -767,19 +759,21 @@ fig, axes = plt.subplots(
     constrained_layout=True,
 )
 
-no_overlap_mean = signal_windows.mean(dim="event")
-overlap_mean = signal_windows_overlap.mean(dim="event")
-no_overlap_sem = sem(signal_windows, axis=0, nan_policy="omit")
-overlap_sem = sem(signal_windows_overlap, axis=0, nan_policy="omit")
+no_overlap_mean_all2 = signal_windows.mean(dim="event")
+overlap_mean_all2 = signal_windows_overlap.mean(dim="event")
+no_overlap_sem_all2 = sem(signal_windows, axis=0, nan_policy="omit")
+overlap_sem_all2 = sem(signal_windows_overlap, axis=0, nan_policy="omit")
 
 for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     axes.flatten(),
     zip(
-        no_overlap_mean.T,
-        overlap_mean.T,
-        no_overlap_sem.T,
-        overlap_sem.T,
+        no_overlap_mean_all2.T,
+        overlap_mean_all2.T,
+        no_overlap_sem_all2.T,
+        overlap_sem_all2.T,
+        strict=True,
     ),
+    strict=True,
 ):
 
     # Add shaded error bars
@@ -859,6 +853,158 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     ax.legend()
 
 plt.xlim((-1.0, 1.0))
+
+
+bins = int(np.median(data_over_time["max_linear_position"].unique() / 2))
+density, bins, _ = plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] > 0
+        ),
+        "map_estimate",
+    ]
+    / data_over_time.loc[data_over_time["non_local_event"] > 0, "max_linear_position"],
+    bins=bins,
+    density=True,
+    alpha=0.8,
+    color=COLORS["SWR"],
+    edgecolor=COLORS["SWR"],
+    label="SWR",
+)
+plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] == 0
+        ),
+        "map_estimate",
+    ]
+    / data_over_time.loc[data_over_time["non_local_event"] > 0, "max_linear_position"],
+    bins=bins,
+    density=True,
+    alpha=0.8,
+    color=COLORS["Non-Local"],
+    edgecolor=COLORS["Non-Local"],
+    label="No SWR",
+)
+plt.legend()
+
+
+bin_labels, n_labels = label(density)
+
+well_labels = [2, 3, 5, 6, 8, 9]
+edge_colors = np.array(matplotlib.colormaps.get_cmap("tab10").colors)
+track_line_y = -0.3
+
+for i in range(1, n_labels + 1):
+    bin_ind = np.nonzero(bin_labels == i)[0]
+    plt.plot(
+        (bins[bin_ind[0]], bins[bin_ind[-1] + 1]),
+        (track_line_y, track_line_y),
+        zorder=10,
+        clip_on=False,
+        color=edge_colors[i - 1],
+        linewidth=3,
+    )
+
+    if i in well_labels:
+        plt.scatter(
+            bins[bin_ind[-1]],
+            track_line_y,
+            zorder=11,
+            clip_on=False,
+            color=edge_colors[i - 1],
+            s=30,
+        )
+
+plt.xlim((0, 1))
+plt.yticks([0, 13])
+plt.ylim((0, 13))
+plt.ylabel("Density")
+# Hide x-axis and x line
+sns.despine(offset=5)
+plt.gca().get_xaxis().set_ticks([])
+plt.gca().spines["bottom"].set_visible(False)
+plt.xlabel("Linear position", labelpad=10)
+
+
+plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time.head_speed < 4.0, data_over_time["Local_prob"] > 0.8
+        ),
+        "SWR_zscore",
+    ],
+    bins=np.arange(-5, 11),
+    alpha=0.8,
+    density=True,
+    label="Local",
+    color=COLORS["Local"],
+)
+plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time.head_speed < 4.0, data_over_time["Non-Local_prob"] > 0.8
+        ),
+        "SWR_zscore",
+    ],
+    bins=np.arange(-5, 11),
+    alpha=0.8,
+    density=True,
+    label="Non-Local",
+    color=COLORS["Non-Local"],
+)
+plt.legend()
+plt.ylabel("Density")
+plt.xlabel("SWR z-score")
+sns.despine()
+
+
+plt.hist2d(
+    data_over_time.loc[data_over_time.head_speed < 4.0]["SWR_zscore"],
+    data_over_time.loc[data_over_time.head_speed < 4.0]["Non-Local_prob"],
+    bins=(np.arange(-5, 11), np.arange(0, 1.1, 0.1)),
+    vmin=0.0,
+    vmax=0.1,
+    density=True,
+)
+plt.xlabel("SWR Z-score")
+plt.ylabel("Non-Local Probability")
+plt.colorbar(label="Density")
+
+
+bins = np.arange(0, 3, 0.1)
+plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] > 0
+        ),
+        "map_speed",
+    ]
+    / 1000,
+    bins=bins,
+    density=True,
+    alpha=0.8,
+    color=COLORS["SWR"],
+    label="SWR",
+)
+plt.hist(
+    data_over_time.loc[
+        np.logical_and(
+            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] == 0
+        ),
+        "map_speed",
+    ]
+    / 1000,
+    bins=bins,
+    density=True,
+    alpha=0.8,
+    color=COLORS["Non-Local"],
+    label="No SWR",
+)
+plt.legend()
+plt.xlabel("Replay Speed (m/s)")
+plt.ylabel("Density")
+sns.despine(offset=5)
 
 # %%
 # what are the spike amplitudes during these events

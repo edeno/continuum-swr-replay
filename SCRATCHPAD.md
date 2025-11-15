@@ -1,9 +1,61 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-3.3 - Optimize DataFrame construction
+**Current Task:** FU-3.1 - Add context-aware transparency (COMPLETED)
 
 ## Session Notes
+
+### 2025-11-14: FU-3.1 - COMPLETED ✅
+
+**Task:** Add context-aware transparency default in `save_figure()`
+
+**Status:** COMPLETED - Intelligent auto-detection with scientific rigor
+
+**Actions Taken:**
+1. ✅ Added tests first (TDD): 4 comprehensive tests covering all scenarios
+2. ✅ Modified parameter signature: `transparent: bool | None = None`
+3. ✅ Implemented ITU-R BT.601 luminance calculation with 0.5 threshold
+4. ✅ Updated docstrings with examples and rationale
+5. ✅ All 49 tests pass (including 4 new ones)
+6. ✅ Ruff: All checks passed
+7. ✅ Mypy: No issues found
+8. ✅ Code review: APPROVED with high praise
+
+**Implementation:**
+```python
+# Auto-detect transparency based on background color
+rgba = mpl.colors.to_rgba(facecolor)
+luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]  # ITU-R BT.601
+transparent = luminance >= 0.5  # Dark (<0.5) → opaque, Light (≥0.5) → transparent
+```
+
+**Key Design Decisions:**
+- Used ITU-R BT.601 standard for perceptual brightness (scientifically correct)
+- Threshold at 0.5 luminance (sensible gray scale midpoint)
+- Explicit values override auto-detection (principle of least surprise)
+- Alpha channel ignored in luminance calculation (correct RGB-only behavior)
+
+**Tests Added:**
+- `test_transparent_auto_detects_dark_background`: Verifies #1a1a1a → transparent=False
+- `test_transparent_auto_detects_light_background`: Verifies white → transparent=True
+- `test_transparent_explicit_true_honored`: Override on dark background
+- `test_transparent_explicit_false_honored`: Override on light background
+
+**Code Review Notes:**
+- Reviewer: scientific-code-reviewer
+- Rating: APPROVE
+- Strengths: Scientific correctness, clean API, comprehensive tests, clear docs
+- Suggested improvements (optional): Verify actual transparency in tests (not just file existence)
+
+**Time:** 30 minutes
+
+**Benefits:**
+- Dark presentation backgrounds no longer disappear on dark slides ✅
+- Light paper figures remain transparent as expected ✅
+- Users can override when needed ✅
+- Scientific standard for luminance calculation ✅
+
+---
 
 ### 2025-11-14: CB-3.3 - COMPLETED ✅
 

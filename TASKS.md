@@ -121,9 +121,10 @@
 
 ### Figure Utilities Enhancements
 
-- [ ] **FU-3.1:** Add context-aware transparency default in `save_figure()`
+- [x] **FU-3.1:** Add context-aware transparency default in `save_figure()`
   - Auto-detect dark backgrounds
   - Set `transparent=False` for dark, `True` for light
+  - **COMPLETED:** Uses ITU-R BT.601 luminance formula with 0.5 threshold
 
 - [ ] **FU-3.2:** Implement font size validation in `validate_figure_quality()`
   - Check axis labels meet minimum size

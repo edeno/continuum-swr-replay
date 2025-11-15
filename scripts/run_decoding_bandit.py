@@ -10,9 +10,6 @@ from typing import TYPE_CHECKING, Any
 import dask
 import numpy as np
 import pandas as pd
-from continuum_swr_replay.visualization.figurl import (
-    create_interactive_1D_decoding_figurl,
-)
 from dask.distributed import Client
 from dask_cuda import LocalCUDACluster
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
@@ -34,6 +31,9 @@ from continuum_swr_replay.data_loaders import (
     load_data,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.visualization.figurl import (
+    create_interactive_1D_decoding_figurl,
+)
 
 if TYPE_CHECKING:
     import networkx as nx

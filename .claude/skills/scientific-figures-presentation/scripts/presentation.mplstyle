@@ -1,0 +1,58 @@
+# Matplotlib style for scientific presentations
+
+# Font settings
+font.family: Arial
+font.size: 20  # Much larger base font for presentations
+pdf.fonttype: 42  # Embeds TrueType fonts
+ps.fonttype: 42
+
+# Text and color
+text.color: black
+axes.labelcolor: black
+
+# Figure settings
+figure.facecolor: white
+figure.dpi: 150  # Screen resolution
+savefig.dpi: 150
+savefig.format: png  # PNG better for slides
+savefig.transparent: False
+
+# Axes settings
+axes.edgecolor: black
+axes.linewidth: 2  # Bolder axes
+axes.labelsize: 24  # Large labels
+axes.labelpad: 10  # More padding
+axes.titlesize: 32  # Large titles
+axes.titlepad: 20
+axes.grid: False
+axes.spines.top: False  # Cleaner look
+axes.spines.right: False
+axes.formatter.use_mathtext: True
+
+# Color cycle (Wong palette for colorblind accessibility)
+axes.prop_cycle: cycler('color', ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'])
+
+# Tick settings
+xtick.labelsize: 18  # Large tick labels
+ytick.labelsize: 18
+xtick.color: black
+ytick.color: black
+xtick.direction: out
+ytick.direction: out
+xtick.major.size: 8  # Larger ticks
+xtick.major.width: 2
+ytick.major.size: 8
+ytick.major.width: 2
+
+# Line and marker settings
+lines.linewidth: 3  # Much thicker lines
+lines.markersize: 10  # Larger markers
+
+# Legend settings
+legend.frameon: False
+legend.fontsize: 20  # Large legend
+legend.loc: best
+
+# Image settings
+image.cmap: viridis
+image.interpolation: none

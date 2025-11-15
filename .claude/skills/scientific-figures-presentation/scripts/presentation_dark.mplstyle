@@ -1,0 +1,67 @@
+# Matplotlib style for scientific presentations with dark backgrounds
+
+# Font settings
+font.family: Arial
+font.size: 20
+pdf.fonttype: 42
+ps.fonttype: 42
+
+# Text and color - WHITE for dark backgrounds
+text.color: white
+axes.labelcolor: white
+
+# Figure settings - DARK backgrounds
+figure.facecolor: #1a1a1a
+figure.dpi: 150
+savefig.dpi: 150
+savefig.format: png
+savefig.transparent: False
+savefig.facecolor: #1a1a1a  # Dark background in saved file
+
+# Axes settings
+axes.facecolor: #1a1a1a  # Dark plot background
+axes.edgecolor: white  # White axes
+axes.linewidth: 2
+axes.labelsize: 24
+axes.labelpad: 10
+axes.titlesize: 32
+axes.titlepad: 20
+axes.grid: False
+axes.spines.top: False
+axes.spines.right: False
+axes.formatter.use_mathtext: True
+
+# Color cycle - bright colors that work on dark backgrounds
+axes.prop_cycle: cycler('color', ['#E69F00', '#56B4E9', '#F0E442', '#009E73', '#0072B2', '#CC79A7', '#D55E00', '#FFFFFF'])
+
+# Tick settings - WHITE
+xtick.labelsize: 18
+ytick.labelsize: 18
+xtick.color: white
+ytick.color: white
+xtick.direction: out
+ytick.direction: out
+xtick.major.size: 8
+xtick.major.width: 2
+ytick.major.size: 8
+ytick.major.width: 2
+
+# Line and marker settings
+lines.linewidth: 3
+lines.markersize: 10
+
+# Legend settings
+legend.frameon: False
+legend.fontsize: 20
+legend.loc: best
+legend.facecolor: #1a1a1a
+legend.edgecolor: white
+
+# Image settings
+image.cmap: viridis
+image.interpolation: none
+
+# Grid settings (if enabled)
+grid.color: white
+grid.alpha: 0.3
+grid.linewidth: 1
