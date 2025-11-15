@@ -126,9 +126,10 @@
   - Set `transparent=False` for dark, `True` for light
   - **COMPLETED:** Uses ITU-R BT.601 luminance formula with 0.5 threshold
 
-- [ ] **FU-3.2:** Implement font size validation in `validate_figure_quality()`
+- [x] **FU-3.2:** Implement font size validation in `validate_figure_quality()`
   - Check axis labels meet minimum size
   - Check tick labels meet minimum size
+  - **COMPLETED:** Context-aware validation (DPI-based), helpful warnings with fix suggestions
 
 - [ ] **FU-3.3:** Add source URLs to color palette comments (lines 125, 145)
   - Verify WONG against Nature Methods article

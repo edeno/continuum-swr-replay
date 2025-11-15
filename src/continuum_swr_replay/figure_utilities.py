@@ -788,12 +788,69 @@ def validate_figure_quality() -> bool:
         passed = False
 
     # Check constrained_layout
-    if not mpl.rcParams.get("figure.constrained_layout.use", False):
+    layout_engine = fig.get_layout_engine()
+    if layout_engine is None or not hasattr(layout_engine, "execute"):
         warnings.warn(
             "constrained_layout not enabled. "
             "Use constrained_layout=True to prevent overlaps.",
             stacklevel=2,
         )
         passed = False
+
+    # Determine context based on DPI
+    is_paper = fig.dpi >= 300
+    min_axis_label = PAPER_AXIS_LABEL if is_paper else PRES_AXIS_LABEL
+    min_tick_label = PAPER_TICK_LABEL if is_paper else PRES_TICK_LABEL
+    context_name = "paper" if is_paper else "presentation"
+
+    # Check font sizes for all axes
+    for ax in fig.get_axes():
+        # Check X-axis label
+        if ax.xaxis.label.get_text():  # Only check if label is set
+            xlabel_size = float(ax.xaxis.label.get_fontsize())
+            if xlabel_size < min_axis_label:
+                warnings.warn(
+                    f"X-axis label too small ({xlabel_size}pt < {min_axis_label}pt "
+                    f"minimum for {context_name}). Use ax.set_xlabel(..., fontsize={min_axis_label}).",
+                    stacklevel=2,
+                )
+                passed = False
+
+        # Check Y-axis label
+        if ax.yaxis.label.get_text():  # Only check if label is set
+            ylabel_size = float(ax.yaxis.label.get_fontsize())
+            if ylabel_size < min_axis_label:
+                warnings.warn(
+                    f"Y-axis label too small ({ylabel_size}pt < {min_axis_label}pt "
+                    f"minimum for {context_name}). Use ax.set_ylabel(..., fontsize={min_axis_label}).",
+                    stacklevel=2,
+                )
+                passed = False
+
+        # Check X-axis tick labels
+        x_tick_labels = ax.xaxis.get_ticklabels()
+        if x_tick_labels:  # Only check if there are tick labels
+            # Get the fontsize from the first tick label
+            x_tick_size = float(x_tick_labels[0].get_fontsize())
+            if x_tick_size < min_tick_label:
+                warnings.warn(
+                    f"X-axis tick labels too small ({x_tick_size}pt < {min_tick_label}pt "
+                    f"minimum for {context_name}). Use ax.tick_params(axis='x', labelsize={min_tick_label}).",
+                    stacklevel=2,
+                )
+                passed = False
+
+        # Check Y-axis tick labels
+        y_tick_labels = ax.yaxis.get_ticklabels()
+        if y_tick_labels:  # Only check if there are tick labels
+            # Get the fontsize from the first tick label
+            y_tick_size = float(y_tick_labels[0].get_fontsize())
+            if y_tick_size < min_tick_label:
+                warnings.warn(
+                    f"Y-axis tick labels too small ({y_tick_size}pt < {min_tick_label}pt "
+                    f"minimum for {context_name}). Use ax.tick_params(axis='y', labelsize={min_tick_label}).",
+                    stacklevel=2,
+                )
+                passed = False
 
     return passed

@@ -1,9 +1,73 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** FU-3.1 - Add context-aware transparency (COMPLETED)
+**Current Task:** FU-3.2 - Implement font size validation (COMPLETED)
 
 ## Session Notes
+
+### 2025-11-14: FU-3.2 - COMPLETED ✅
+
+**Task:** Implement font size validation in `validate_figure_quality()`
+
+**Status:** COMPLETED - Context-aware validation with excellent UX
+
+**Actions Taken:**
+1. ✅ Added tests first (TDD): 5 comprehensive tests covering all scenarios
+2. ✅ Implemented context detection (DPI >= 300 = paper, < 300 = presentation)
+3. ✅ Added validation for 4 label types (x-axis, y-axis, x-ticks, y-ticks)
+4. ✅ Fixed constrained_layout check to use `fig.get_layout_engine()`
+5. ✅ Added `float()` casts for type safety (get_fontsize() returns float | str)
+6. ✅ All 54 tests pass (8 validation tests total)
+7. ✅ Ruff: All checks passed
+8. ✅ Mypy: No issues found
+9. ✅ Code review: APPROVED
+
+**Implementation:**
+```python
+# Auto-detect context from DPI
+is_paper = fig.dpi >= 300
+min_axis_label = PAPER_AXIS_LABEL if is_paper else PRES_AXIS_LABEL
+min_tick_label = PAPER_TICK_LABEL if is_paper else PRES_TICK_LABEL
+
+# Validate each axis in figure
+for ax in fig.get_axes():
+    if ax.xaxis.label.get_text():  # Only if label exists
+        xlabel_size = float(ax.xaxis.label.get_fontsize())
+        if xlabel_size < min_axis_label:
+            warnings.warn(f"X-axis label too small ({xlabel_size}pt < {min_axis_label}pt "
+                         f"minimum for {context_name})...")
+```
+
+**Key Design Decisions:**
+- DPI threshold of 300 separates print (paper) from screen (presentation)
+- Only validates labels that actually exist (checks `get_text()` first)
+- Uses first tick label as representative (all have same size in matplotlib)
+- Provides exact fix suggestions in warning messages
+- Context-aware minimums: Paper (7pt axis, 6pt tick), Presentation (24pt axis, 18pt tick)
+
+**Tests Added:**
+- `test_validation_warns_small_axis_labels_paper`: Paper context axis validation
+- `test_validation_warns_small_tick_labels_paper`: Paper context tick validation
+- `test_validation_warns_small_axis_labels_presentation`: Presentation context axis validation
+- `test_validation_passes_with_proper_font_sizes_paper`: Paper passing case
+- `test_validation_passes_with_proper_font_sizes_presentation`: Presentation passing case
+
+**Code Review Notes:**
+- Reviewer: scientific-code-reviewer
+- Rating: APPROVE
+- Strengths: Scientific accuracy, excellent UX (warning messages), robust edge handling
+- Font minimums match Nature/Science standards (7pt min for papers)
+- DPI threshold (300) correctly separates print from screen
+
+**Time:** 30 minutes
+
+**Benefits:**
+- Researchers get early warnings about fonts too small for publication ✅
+- Context-aware (paper vs presentation) minimums ✅
+- Helpful error messages with exact fix suggestions ✅
+- Prevents rejection due to font size issues ✅
+
+---
 
 ### 2025-11-14: FU-3.1 - COMPLETED ✅
 

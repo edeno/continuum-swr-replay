@@ -617,6 +617,109 @@ class TestValidateFigureQuality:
 
         plt.close(fig)
 
+    def test_validation_warns_small_axis_labels_paper(self):
+        """Test that validation warns about small axis labels in paper context.
+
+        This is a key test for FU-3.2: validate_figure_quality should check
+        that axis labels meet minimum font size requirements for the context.
+        """
+        from continuum_swr_replay.figure_utilities import (
+            PAPER_AXIS_LABEL,
+            validate_figure_quality,
+        )
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=450)  # Paper DPI
+        ax.plot([0, 1], [0, 1])
+        ax.set_xlabel("X Label", fontsize=PAPER_AXIS_LABEL - 1)  # Too small
+        ax.set_ylabel("Y Label", fontsize=PAPER_AXIS_LABEL)  # OK
+
+        # Should warn about small X-axis label
+        with pytest.warns(UserWarning, match="axis label.*small"):
+            result = validate_figure_quality()
+            assert result is False
+
+        plt.close(fig)
+
+    def test_validation_warns_small_tick_labels_paper(self):
+        """Test that validation warns about small tick labels in paper context."""
+        from continuum_swr_replay.figure_utilities import (
+            PAPER_TICK_LABEL,
+            validate_figure_quality,
+        )
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=450)  # Paper DPI
+        ax.plot([0, 1], [0, 1])
+        ax.set_xlabel("X Label")
+        ax.set_ylabel("Y Label")
+        ax.tick_params(axis="x", labelsize=PAPER_TICK_LABEL - 1)  # Too small
+        ax.tick_params(axis="y", labelsize=PAPER_TICK_LABEL)  # OK
+
+        # Should warn about small X tick labels
+        with pytest.warns(UserWarning, match="tick label.*small"):
+            result = validate_figure_quality()
+            assert result is False
+
+        plt.close(fig)
+
+    def test_validation_warns_small_axis_labels_presentation(self):
+        """Test that validation warns about small axis labels in presentation context."""
+        from continuum_swr_replay.figure_utilities import (
+            PRES_AXIS_LABEL,
+            validate_figure_quality,
+        )
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=150)  # Presentation DPI
+        ax.plot([0, 1], [0, 1])
+        ax.set_xlabel("X Label", fontsize=PRES_AXIS_LABEL - 1)  # Too small
+        ax.set_ylabel("Y Label", fontsize=PRES_AXIS_LABEL)  # OK
+
+        # Should warn about small X-axis label
+        with pytest.warns(UserWarning, match="axis label.*small"):
+            result = validate_figure_quality()
+            assert result is False
+
+        plt.close(fig)
+
+    def test_validation_passes_with_proper_font_sizes_paper(self):
+        """Test that validation passes when all font sizes meet requirements."""
+        from continuum_swr_replay.figure_utilities import (
+            PAPER_AXIS_LABEL,
+            PAPER_TICK_LABEL,
+            validate_figure_quality,
+        )
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=450)  # Paper DPI
+        ax.plot([0, 1], [0, 1])
+        ax.set_xlabel("X Label", fontsize=PAPER_AXIS_LABEL)
+        ax.set_ylabel("Y Label", fontsize=PAPER_AXIS_LABEL)
+        ax.tick_params(axis="both", labelsize=PAPER_TICK_LABEL)
+
+        # Should pass all validations
+        result = validate_figure_quality()
+        assert result is True
+
+        plt.close(fig)
+
+    def test_validation_passes_with_proper_font_sizes_presentation(self):
+        """Test that validation passes for presentation context with proper sizes."""
+        from continuum_swr_replay.figure_utilities import (
+            PRES_AXIS_LABEL,
+            PRES_TICK_LABEL,
+            validate_figure_quality,
+        )
+
+        fig, ax = plt.subplots(constrained_layout=True, dpi=150)  # Presentation DPI
+        ax.plot([0, 1], [0, 1])
+        ax.set_xlabel("X Label", fontsize=PRES_AXIS_LABEL)
+        ax.set_ylabel("Y Label", fontsize=PRES_AXIS_LABEL)
+        ax.tick_params(axis="both", labelsize=PRES_TICK_LABEL)
+
+        # Should pass all validations
+        result = validate_figure_quality()
+        assert result is True
+
+        plt.close(fig)
+
 
 class TestLabelPanels:
     """Test panel labeling functionality."""
