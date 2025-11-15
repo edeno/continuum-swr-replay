@@ -207,9 +207,21 @@
   - All 20 integration tests pass ✅
   - Mypy and ruff clean ✅
 
-- [ ] **CB-5.4:** Add missing type hints to helper functions
+- [x] **CB-5.4:** Add missing type hints to helper functions
   - Review all functions for complete type annotations
   - Add return types to `_count_exposure()` and similar
+  - **COMPLETED:** Added comprehensive type hints to src/continuum_swr_replay/analysis/pfc/glm.py
+  - Added type hints to 16 functions (get_spikecount_per_time_bin, reindex_by, test_theta_modulation_v1,
+    get_labels, _lr_test, test_theta_modulation, create_lagged_signal, create_conv_basis,
+    _make_conv_spline_basis, _make_design_matrices, _fit_immobility_models, get_frac_null_deviance,
+    get_frac_explained_deviance, process_neuron, run_session)
+  - Fixed duplicate function name: test_theta_modulation → test_theta_modulation_v1 (original), test_theta_modulation (new)
+  - Fixed all mypy type errors (19 → 0) ✅
+  - Fixed ruff linting issues (import sorting) ✅
+  - Replaced mutable default arguments with None pattern
+  - Added strict=True to zip() call
+  - Fixed min() key parameter type issue with lambda
+  - Added explicit dict type annotations for neuron_stats
 
 - [ ] **CB-5.5:** Add `__all__` to public modules
   - Define public API for each module

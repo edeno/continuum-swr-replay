@@ -1,9 +1,79 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-5.3 - Add TypedDict for detector params (COMPLETED)
+**Current Task:** CB-5.4 - Add missing type hints to helper functions (COMPLETED)
 
 ## Session Notes
+
+### 2025-11-14: CB-5.4 - COMPLETED ✅
+
+**Task:** Add missing type hints to helper functions
+
+**Status:** COMPLETED - Comprehensive type coverage in PFC GLM analysis module
+
+**Actions Taken:**
+1. ✅ Investigated _count_exposure() - found in data_loaders (already type-safe)
+2. ✅ Discovered analysis/pfc/glm.py with 19 mypy errors (missing type hints)
+3. ✅ Added type hints to 16 functions in glm.py:
+   - get_spikecount_per_time_bin, reindex_by, test_theta_modulation_v1
+   - get_labels, _lr_test, test_theta_modulation
+   - create_lagged_signal, create_conv_basis, _make_conv_spline_basis
+   - _make_design_matrices, _fit_immobility_models
+   - get_frac_null_deviance, get_frac_explained_deviance
+   - process_neuron, run_session
+4. ✅ Fixed duplicate function name: test_theta_modulation → test_theta_modulation_v1 (original)
+5. ✅ Added imports: `from typing import Any` and `from numpy.typing import NDArray`
+6. ✅ Replaced mutable default arguments with None pattern
+7. ✅ Added strict=True to zip() call for safer unpacking
+8. ✅ Fixed min() key parameter: changed dict.get to lambda for type inference
+9. ✅ Fixed float() return type issues in deviance calculations
+10. ✅ Added explicit dict type annotations for neuron_stats
+11. ✅ Fixed import sorting (ruff auto-fix)
+12. ✅ All mypy errors resolved (19 → 0)
+13. ✅ All ruff checks passed
+14. ✅ Integration tests continue to pass
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/analysis/pfc/glm.py` (comprehensive type hints)
+- Updated: `TASKS.md` (marked CB-5.4 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Key Type Fixes:**
+```python
+# Function signatures with type hints
+def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray: ...
+def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray: ...
+def get_frac_null_deviance(full_model: Any, reduced_model: Any, constant_model: Any) -> float: ...
+
+# Fixed mutable default argument
+# Before: def create_lagged_signal(signal, lags=np.arange(-100, 100, 1))
+# After: def create_lagged_signal(signal, lags: NDArray | None = None)
+
+# Fixed min() key for type inference
+# Before: min(aics, key=aics.get)
+# After: min(aics, key=lambda k: aics[k])
+
+# Fixed zip unpacking with strict=True
+neuron_stats_list, SWR_modulation_list, no_SWR_modulation_list = zip(*result, strict=True)
+```
+
+**Mypy Errors Fixed:**
+1. Return type incompatibility in get_frac_null_deviance/get_frac_explained_deviance
+2. Min() key parameter type issue in process_neuron
+3. Zip assignment incompatibility in run_session
+4. Name redefinition in except block
+5. 15 missing type annotations across helper functions
+
+**Benefits:**
+- Complete type coverage in PFC GLM analysis module ✅
+- Mypy can now catch type errors at development time ✅
+- Better IDE autocomplete and documentation ✅
+- Safer code with strict=True on zip() ✅
+- No mutable default argument bugs ✅
+
+**Time:** 30 minutes
+
+---
 
 ### 2025-11-14: CB-5.3 - COMPLETED ✅
 

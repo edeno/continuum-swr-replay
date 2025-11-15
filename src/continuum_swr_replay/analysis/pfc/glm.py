@@ -1,8 +1,11 @@
+from typing import Any
+
 import dask
 import numpy as np
 import pandas as pd
 import scipy
 import statsmodels.api as sm
+from numpy.typing import NDArray
 from patsy import dmatrix
 
 from continuum_swr_replay.analysis.hippocampus import (
@@ -13,7 +16,7 @@ from continuum_swr_replay.analysis.hippocampus import (
 from continuum_swr_replay.data_loaders import load_data
 
 
-def get_spikecount_per_time_bin(spike_times, time):
+def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times = spike_times[
         np.logical_and(spike_times >= time[0], spike_times <= time[-1])
     ]
@@ -23,7 +26,7 @@ def get_spikecount_per_time_bin(spike_times, time):
     )
 
 
-def reindex_by(df, index):
+def reindex_by(df: pd.Series | pd.DataFrame, index: pd.Index) -> pd.Series | pd.DataFrame:
     return df.reindex(index, method="nearest")
 
 
@@ -59,7 +62,9 @@ def likelihood_ratio_test(
     return likelihood_ratio, p_value
 
 
-def test_theta_modulation(position_info, theta_phase, neuron_spike_times):
+def test_theta_modulation_v1(
+    position_info: pd.DataFrame, theta_phase: pd.Series, neuron_spike_times: NDArray
+) -> tuple[float, float, float, float]:
     is_running = position_info.head_speed > 4.0
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
@@ -99,7 +104,7 @@ def test_theta_modulation(position_info, theta_phase, neuron_spike_times):
     return likelihood_ratio, p_val, modulation, preferred_phase
 
 
-def get_labels(times, time):
+def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     event_labels = pd.DataFrame(
         np.zeros_like(time, dtype=int), index=time, columns=["event_number"]
     )
@@ -110,7 +115,7 @@ def get_labels(times, time):
     return event_labels
 
 
-def _lr_test(full_model, restricted_model):
+def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
     return likelihood_ratio_test(
         full_model.deviance,
         restricted_model.deviance,
@@ -119,7 +124,9 @@ def _lr_test(full_model, restricted_model):
     )
 
 
-def test_theta_modulation(theta_phase, is_immobile, neuron_spike_count):
+def test_theta_modulation(
+    theta_phase: pd.Series, is_immobile: pd.Series, neuron_spike_count: NDArray
+) -> tuple[float, float, float, float]:
     is_running = ~is_immobile
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
@@ -157,14 +164,18 @@ def test_theta_modulation(theta_phase, is_immobile, neuron_spike_count):
     return likelihood_ratio, p_val, modulation, preferred_phase
 
 
-def create_lagged_signal(signal, lags=np.arange(-100, 100, 1)):
+def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
+    if lags is None:
+        lags = np.arange(-100, 100, 1)
     signal_df = pd.DataFrame(signal)
     return np.concatenate(
         [signal_df.shift(lag, fill_value=0).to_numpy() for lag in lags], axis=1
     )
 
 
-def create_conv_basis(count, lags, knots, sampling_frequency):
+def create_conv_basis(
+    count: NDArray, lags: NDArray, knots: NDArray, sampling_frequency: float
+) -> tuple[NDArray, NDArray, NDArray]:
     lag_time = lags / sampling_frequency
     spline_basis = np.asarray(
         dmatrix(
@@ -178,15 +189,17 @@ def create_conv_basis(count, lags, knots, sampling_frequency):
 
 
 def _make_conv_spline_basis(
-    times,
-    position_info,
-    sampling_frequency=500,
-    lags=np.arange(-100, 101, 1),
-):
+    times: dict[str, pd.DataFrame],
+    position_info: pd.DataFrame,
+    sampling_frequency: float = 500,
+    lags: NDArray | None = None,
+) -> tuple[dict[str, NDArray], NDArray, NDArray]:
+    if lags is None:
+        lags = np.arange(-100, 101, 1)
     knots = np.arange(
         lags[0] / sampling_frequency, lags[-1] / sampling_frequency, 0.100
     )[1:]
-    conv_spline_basis = {}
+    conv_spline_basis: dict[str, NDArray] = {}
     for times_name, times_df in times.items():
         is_time = get_spikecount_per_time_bin(
             times_df.start_time, position_info.index.to_numpy()
@@ -199,11 +212,11 @@ def _make_conv_spline_basis(
 
 
 def _make_design_matrices(
-    times,
-    position_info,
-    sampling_frequency=500,
-    lags=np.arange(-100, 101, 1),
-):
+    times: dict[str, pd.DataFrame],
+    position_info: pd.DataFrame,
+    sampling_frequency: float = 500,
+    lags: NDArray | None = None,
+) -> tuple[dict[str, NDArray], NDArray, NDArray]:
     constant_design_matrix = np.ones((len(position_info), 1))
 
     conv_spline_basis, spline_basis, lag_time = _make_conv_spline_basis(
@@ -273,7 +286,9 @@ def _make_design_matrices(
     return design_matrices, spline_basis, lag_time
 
 
-def _fit_immobility_models(is_immobile, design_matrices, neuron_spike_count):
+def _fit_immobility_models(
+    is_immobile: pd.Series, design_matrices: dict[str, NDArray], neuron_spike_count: NDArray
+) -> tuple[dict[str, Any], dict[str, Any]]:
     glm_models = {
         model_name: sm.GLM(
             neuron_spike_count[is_immobile],
@@ -287,29 +302,30 @@ def _fit_immobility_models(is_immobile, design_matrices, neuron_spike_count):
     return glm_results, glm_models
 
 
-def get_frac_null_deviance(full_model, reduced_model, constant_model):
-    return (reduced_model.deviance - full_model.deviance) / constant_model.deviance
+def get_frac_null_deviance(full_model: Any, reduced_model: Any, constant_model: Any) -> float:
+    return float((reduced_model.deviance - full_model.deviance) / constant_model.deviance)
 
 
-def get_frac_explained_deviance(full_model, reduced_model, constant_model):
-    return (reduced_model.deviance - full_model.deviance) / (
-        constant_model.deviance - full_model.deviance
+def get_frac_explained_deviance(full_model: Any, reduced_model: Any, constant_model: Any) -> float:
+    return float(
+        (reduced_model.deviance - full_model.deviance)
+        / (constant_model.deviance - full_model.deviance)
     )
 
 
 def process_neuron(
-    neuron_spike_times,
-    is_immobile,
-    theta_phase,
-    time,
-    immobility_design_matrices,
-    spline_basis,
-    lag_time,
-):
+    neuron_spike_times: NDArray,
+    is_immobile: pd.Series,
+    theta_phase: pd.Series,
+    time: NDArray,
+    immobility_design_matrices: dict[str, NDArray],
+    spline_basis: NDArray,
+    lag_time: NDArray,
+) -> tuple[dict[str, Any], NDArray, NDArray]:
     try:
         neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
         sampling_frequency = 1 / np.median(np.diff(time))
-        neuron_stats = {}
+        neuron_stats: dict[str, Any] = {}
 
         # Get run theta statistics
         (
@@ -368,7 +384,7 @@ def process_neuron(
                 "non_local",
             ]
         }
-        neuron_stats["min_aic_model"] = min(aics, key=aics.get)
+        neuron_stats["min_aic_model"] = min(aics, key=lambda k: aics[k])
 
         ## Modulation
         # Non-overlapping events controlling for SWR
@@ -401,14 +417,14 @@ def process_neuron(
 
 
 def run_session(
-    nwb_file_name,
-    epoch_name,
-    brain_area="mPFC",
-    sampling_frequency=500,
-    immobility_threshold=4.0,
-    non_local_threshold=0.8,
-    run_parallel=True,
-):
+    nwb_file_name: str,
+    epoch_name: str,
+    brain_area: str = "mPFC",
+    sampling_frequency: float = 500,
+    immobility_threshold: float = 4.0,
+    non_local_threshold: float = 0.8,
+    run_parallel: bool = True,
+) -> tuple[pd.DataFrame, NDArray, NDArray]:
     results, _, _ = load_results(nwb_file_name, epoch_name, decoding_brain_area="HPC")
     data = load_data(nwb_file_name, epoch_name)
 
@@ -474,10 +490,10 @@ def run_session(
             for neuron_spike_times in data["spike_times"][brain_area]
         ]
 
-    neuron_stats, SWR_modulation, no_SWR_modulation = zip(*result)
-    neuron_stats = pd.DataFrame(neuron_stats)
-    SWR_modulation = np.stack(SWR_modulation, axis=1)
-    no_SWR_modulation = np.stack(no_SWR_modulation, axis=1)
+    neuron_stats_list, SWR_modulation_list, no_SWR_modulation_list = zip(*result, strict=True)
+    neuron_stats = pd.DataFrame(list(neuron_stats_list))
+    SWR_modulation = np.stack(SWR_modulation_list, axis=1)
+    no_SWR_modulation = np.stack(no_SWR_modulation_list, axis=1)
 
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
