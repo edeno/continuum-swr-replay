@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Final
 
@@ -64,10 +65,38 @@ DECODING_PARAMS: Final = DecodingParameters()
 
 PROBABILITY_THRESHOLDS = [0.50, 0.80, 0.95]
 
-TRAINING_TYPES = [
-    "all",
-    "no_ripple",
-]
+
+class TrainingType(str, Enum):
+    """Types of training data selection for decoder.
+
+    Attributes
+    ----------
+    ALL : str
+        Use all time points for training (no exclusions)
+    NO_RIPPLE : str
+        Exclude ripple times from training data
+
+    Notes
+    -----
+    Inherits from str to allow direct string comparisons and JSON serialization.
+    Use .value to get the underlying string value.
+
+    Examples
+    --------
+    >>> TrainingType.ALL
+    <TrainingType.ALL: 'all'>
+    >>> TrainingType.ALL.value
+    'all'
+    >>> TrainingType.ALL == "all"
+    True
+    """
+
+    ALL = "all"
+    NO_RIPPLE = "no_ripple"
+
+    def __str__(self) -> str:
+        """Return string value for easy formatting."""
+        return self.value
 
 COLORS = {
     "SWR": "#d95f02",

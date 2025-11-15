@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from spyglass.common import IntervalList, PositionIntervalMap, Session
 
+from ..parameters import TrainingType
 from .constants import NWB_FILES
 
 # Ignore warnings
@@ -167,7 +168,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
 
 
 def get_training_timepoints(
-    data: dict[str, Any], training_type: str = "no_ripple"
+    data: dict[str, Any], training_type: str | TrainingType = TrainingType.NO_RIPPLE
 ) -> np.ndarray:
     """Get boolean mask of time points to use for training.
 
@@ -175,21 +176,39 @@ def get_training_timepoints(
     ----------
     data : dict
         Data dictionary with position_info and ripple_times
-    training_type : str, optional
-        Type of training data selection:
-        - "all": use all time points
-        - "no_ripple": exclude ripple times
+    training_type : str or TrainingType, optional
+        Type of training data selection. Default is TrainingType.NO_RIPPLE.
+        Accepts either TrainingType enum or equivalent string:
+        - TrainingType.ALL or "all": use all time points
+        - TrainingType.NO_RIPPLE or "no_ripple": exclude ripple times
 
     Returns
     -------
     np.ndarray
         Boolean mask of time points to use for training
+
+    Examples
+    --------
+    >>> # Using enum (type-safe, recommended)
+    >>> mask = get_training_timepoints(data, TrainingType.ALL)
+    >>> # Using string (backward compatible)
+    >>> mask = get_training_timepoints(data, "all")
     """
-    if training_type == "all":
+    # Convert string to enum if needed (backward compatibility)
+    if isinstance(training_type, str):
+        try:
+            training_type = TrainingType(training_type)
+        except ValueError:
+            raise ValueError(
+                f"Unknown training_type: {training_type}. "
+                f"Must be TrainingType.ALL, TrainingType.NO_RIPPLE, 'all', or 'no_ripple'."
+            ) from None
+
+    if training_type == TrainingType.ALL:
         n_time = len(data["position_info"].index)
         return np.ones((n_time,), dtype=bool)
 
-    elif training_type == "no_ripple":
+    elif training_type == TrainingType.NO_RIPPLE:
         ripple_labels = get_labels(
             data["ripple_times"], data["position_info"].index.to_numpy()
         )
@@ -199,5 +218,6 @@ def get_training_timepoints(
         return not_ripple
     else:
         raise ValueError(
-            f"Unknown training_type: {training_type}. Must be 'all' or 'no_ripple'."
+            f"Unknown training_type: {training_type}. "
+            f"Must be TrainingType.ALL or TrainingType.NO_RIPPLE."
         )

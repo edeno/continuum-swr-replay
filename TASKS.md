@@ -177,9 +177,13 @@
 **Estimated Time:** 2-3 hours
 **Goal:** Improve type safety and IDE support
 
-- [ ] **CB-5.1:** Convert `training_types` to Enum in parameters.py
+- [x] **CB-5.1:** Convert `TRAINING_TYPES` to Enum in parameters.py
   - Create `TrainingType(str, Enum)` class
   - Update function signatures to use enum
+  - **COMPLETED:** Type-safe enum with backward compatibility for strings
+  - Created TrainingType enum with ALL and NO_RIPPLE values
+  - Updated get_training_timepoints() to accept both enum and string
+  - All 20 integration tests pass ✅
 
 - [ ] **CB-5.2:** Create shared `types.py` module
   - Move `SessionData` from analysis/hippocampus/types.py

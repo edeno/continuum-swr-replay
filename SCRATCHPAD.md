@@ -1,9 +1,65 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** TEST-4.1 - Mark as complete (COMPLETED)
+**Current Task:** CB-5.1 - Convert TRAINING_TYPES to Enum (COMPLETED)
 
 ## Session Notes
+
+### 2025-11-14: CB-5.1 - COMPLETED ✅
+
+**Task:** Convert `TRAINING_TYPES` to Enum in parameters.py
+
+**Status:** COMPLETED - Type-safe enum with backward compatibility
+
+**Actions Taken:**
+1. ✅ Added `from enum import Enum` to parameters.py
+2. ✅ Created `TrainingType(str, Enum)` with ALL and NO_RIPPLE values
+3. ✅ Comprehensive docstring with examples
+4. ✅ Updated `get_training_timepoints()` signature to accept `str | TrainingType`
+5. ✅ Added string-to-enum conversion for backward compatibility
+6. ✅ Updated error messages to mention both enum and string options
+7. ✅ All 20 integration tests pass
+8. ✅ Mypy: Success (no issues)
+9. ✅ Ruff: All checks passed
+
+**Implementation:**
+```python
+class TrainingType(str, Enum):
+    """Types of training data selection for decoder."""
+    ALL = "all"
+    NO_RIPPLE = "no_ripple"
+
+    def __str__(self) -> str:
+        return self.value
+
+# Updated function signature
+def get_training_timepoints(
+    data: dict[str, Any],
+    training_type: str | TrainingType = TrainingType.NO_RIPPLE
+) -> np.ndarray:
+    # Convert string to enum if needed (backward compatibility)
+    if isinstance(training_type, str):
+        training_type = TrainingType(training_type)
+    ...
+```
+
+**Key Design Decisions:**
+- Inherits from `str` for JSON serialization and direct string comparisons
+- Default changed from string `"no_ripple"` to enum `TrainingType.NO_RIPPLE`
+- Accepts both enum and string for backward compatibility
+- Explicit `__str__()` method for clean string formatting
+- Comprehensive examples in docstring
+
+**Benefits:**
+- Type safety: IDE autocomplete and type checking ✅
+- Prevents typos: invalid values caught at call time ✅
+- Backward compatible: existing code with strings still works ✅
+- Better documentation: enum values self-documenting ✅
+- JSON serializable: str inheritance enables easy serialization ✅
+
+**Time:** 20 minutes
+
+---
 
 ### 2025-11-14: TEST-4.1 - MARKED COMPLETE ✅
 
