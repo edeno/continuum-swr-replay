@@ -5,7 +5,7 @@ import warnings
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import dask
 import numpy as np
@@ -21,16 +21,14 @@ from non_local_detector.models.non_local_model import (
     non_stationary_discrete_transition_type,
 )
 
-from continuum_swr_replay.analysis.hippocampus.analysis_hpc_bandit import (
-    get_data_over_time,
-    load_results,
-)
+from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
 from continuum_swr_replay.data_loaders import (
     get_epoch_info,
     get_training_timepoints,
     load_data,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
 )
@@ -38,6 +36,8 @@ from continuum_swr_replay.visualization.figurl import (
 if TYPE_CHECKING:
     import networkx as nx
     import xarray as xr
+
+    from continuum_swr_replay.types import SessionData
 
 warnings.filterwarnings("ignore")
 
@@ -67,7 +67,7 @@ class DecodingConfig:
     block_size: int = BLOCK_SIZE
     waveform_std: float = WAVEFORM_STD
 
-    def to_clusterless_params(self) -> dict[str, Any]:
+    def to_clusterless_params(self) -> ClusterlessParams:
         """Get parameters for clusterless decoding (HPC)."""
         return {
             "position_std": self.position_std,
@@ -75,7 +75,7 @@ class DecodingConfig:
             "block_size": self.block_size,
         }
 
-    def to_sorted_spikes_params(self) -> dict[str, Any]:
+    def to_sorted_spikes_params(self) -> SortedSpikesParams:
         """Get parameters for sorted spikes decoding (mPFC/OFC)."""
         return {
             "position_std": self.position_std,
@@ -336,7 +336,7 @@ def save_results_and_model(
 
 
 def organize_results(
-    data: dict,
+    data: SessionData,
     results: xr.Dataset,
     env: Environment,
     nwb_file_name: str,
@@ -385,7 +385,7 @@ def organize_results(
 
 def generate_figurl(
     logger: logging.Logger,
-    data: dict,
+    data: SessionData,
     results: xr.Dataset,
     data_over_time: pd.DataFrame,
     posterior: xr.DataArray,

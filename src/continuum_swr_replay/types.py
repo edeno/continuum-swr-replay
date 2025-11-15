@@ -124,3 +124,44 @@ class SessionData(TypedDict, total=False):
 
     # Metadata
     electrode_group_info: pd.DataFrame
+
+
+class ClusterlessParams(TypedDict):
+    """Parameters for clusterless decoder (used for HPC).
+
+    Attributes
+    ----------
+    position_std : float
+        Standard deviation for position likelihood in cm. Controls spatial
+        uncertainty in the decoding model.
+    waveform_std : float
+        Standard deviation for waveform feature likelihood in µV. Controls
+        how tightly spikes must match waveform features to contribute to
+        the posterior probability.
+    block_size : int
+        Block size for GPU memory management during decoding. Controls how
+        many time bins are processed simultaneously. Should be a power of 2
+        for optimal GPU performance.
+    """
+
+    position_std: float
+    waveform_std: float
+    block_size: int
+
+
+class SortedSpikesParams(TypedDict):
+    """Parameters for sorted spikes decoder (used for mPFC/OFC).
+
+    Attributes
+    ----------
+    position_std : float
+        Standard deviation for position likelihood in cm. Controls spatial
+        uncertainty in the decoding model.
+    block_size : int
+        Block size for GPU memory management during decoding. Controls how
+        many time bins are processed simultaneously. Should be a power of 2
+        for optimal GPU performance.
+    """
+
+    position_std: float
+    block_size: int

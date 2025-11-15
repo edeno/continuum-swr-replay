@@ -1,9 +1,53 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-14
-**Current Task:** CB-5.2 - Create shared types.py module (COMPLETED)
+**Current Task:** CB-5.3 - Add TypedDict for detector params (COMPLETED)
 
 ## Session Notes
+
+### 2025-11-14: CB-5.3 - COMPLETED ✅
+
+**Task:** Add TypedDict for detector params in run_decoding_bandit.py
+
+**Status:** COMPLETED - Type-safe detector parameters with consistent SessionData usage
+
+**Actions Taken:**
+1. ✅ Created `ClusterlessParams` TypedDict in types.py (position_std, waveform_std, block_size)
+2. ✅ Created `SortedSpikesParams` TypedDict in types.py (position_std, block_size)
+3. ✅ Updated `to_clusterless_params()` return type from `dict[str, Any]` to `ClusterlessParams`
+4. ✅ Updated `to_sorted_spikes_params()` return type from `dict[str, Any]` to `SortedSpikesParams`
+5. ✅ Updated `organize_results()` parameter type from `dict` to `SessionData`
+6. ✅ Updated `generate_figurl()` parameter type from `dict` to `SessionData`
+7. ✅ Updated `get_training_timepoints()` parameter type from `dict[str, Any]` to `SessionData`
+8. ✅ Fixed import in run_decoding_bandit.py from deleted `analysis_hpc_bandit` module
+9. ✅ Added SessionData import in TYPE_CHECKING blocks where needed
+10. ✅ Removed unused `Any` imports (ruff auto-fix)
+11. ✅ All 20 integration tests pass
+12. ✅ Mypy: Success (no issues)
+13. ✅ Ruff: All checks passed
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/types.py` (added ClusterlessParams and SortedSpikesParams)
+- Updated: `scripts/run_decoding_bandit.py` (return types, parameter types, imports)
+- Updated: `src/continuum_swr_replay/data_loaders/utils.py` (get_training_timepoints parameter type)
+
+**Key Design Decisions:**
+- ClusterlessParams includes `waveform_std` for HPC waveform feature decoding
+- SortedSpikesParams excludes `waveform_std` (not needed for sorted spike decoding)
+- Both TypedDicts document GPU block_size parameter requirements
+- Consistent use of SessionData across all functions that operate on loaded data
+- TYPE_CHECKING imports to avoid circular dependencies
+
+**Benefits:**
+- Type-safe parameter passing to detector constructors ✅
+- IDE autocomplete for parameter dictionaries ✅
+- Clear distinction between HPC and mPFC/OFC decoder parameters ✅
+- Mypy catches incorrect parameter usage at dev time ✅
+- Better documentation through typed interfaces ✅
+
+**Time:** 20 minutes
+
+---
 
 ### 2025-11-14: CB-5.2 - COMPLETED ✅
 

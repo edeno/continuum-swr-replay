@@ -2,11 +2,14 @@
 
 import re
 import warnings
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from spyglass.common import IntervalList, PositionIntervalMap, Session
+
+if TYPE_CHECKING:
+    from ..types import SessionData
 
 from ..parameters import TrainingType
 from .constants import NWB_FILES
@@ -168,7 +171,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
 
 
 def get_training_timepoints(
-    data: dict[str, Any], training_type: str | TrainingType = TrainingType.NO_RIPPLE
+    data: SessionData, training_type: str | TrainingType = TrainingType.NO_RIPPLE
 ) -> np.ndarray:
     """Get boolean mask of time points to use for training.
 

@@ -192,13 +192,20 @@
   - **COMPLETED:** Created src/continuum_swr_replay/types.py with SessionData TypedDict
   - Removed old analysis/hippocampus/types.py file
   - Updated imports in bandit_task.py, data_aggregation.py, posterior_analysis.py
-  - Fixed __init__.py imports to use new module structure
+  - Fixed **init**.py imports to use new module structure
   - All 20 integration tests + 43 unit tests pass ✅
 
-- [ ] **CB-5.3:** Add TypedDict for detector params in run_decoding_bandit.py
+- [x] **CB-5.3:** Add TypedDict for detector params in run_decoding_bandit.py
   - Create `ClusterlessParams` TypedDict
   - Create `SortedSpikesParams` TypedDict
   - Update return types
+  - **COMPLETED:** Added ClusterlessParams and SortedSpikesParams to types.py
+  - Updated to_clusterless_params() and to_sorted_spikes_params() return types
+  - Updated organize_results() and generate_figurl() to use SessionData
+  - Updated get_training_timepoints() to accept SessionData
+  - Fixed import from deleted analysis_hpc_bandit module
+  - All 20 integration tests pass ✅
+  - Mypy and ruff clean ✅
 
 - [ ] **CB-5.4:** Add missing type hints to helper functions
   - Review all functions for complete type annotations
@@ -301,13 +308,6 @@
   - `constants/files.py` for NWB_FILES
   - `constants/spatial.py` for spatial mappings
   - `constants/decoding.py` for decoding params
-
-### Configuration Management
-
-- [ ] **ARCH-9.4:** Consider Pydantic for configuration
-  - Type-safe settings with validation
-  - Environment variable support
-  - Better error messages
 
 ### Development Tools
 
