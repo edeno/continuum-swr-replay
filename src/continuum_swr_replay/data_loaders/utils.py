@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import warnings
+from functools import cache
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -67,8 +68,13 @@ def parse_nwb_filename(filename: str) -> tuple[str, int]:
     return animal, date
 
 
+@cache
 def get_epoch_info() -> pd.DataFrame:
     """Get information about all available epochs across all animals.
+
+    This function queries the Spyglass database, which is expensive. Results
+    are cached for the lifetime of the Python process to avoid redundant
+    database queries.
 
     Returns
     -------
@@ -77,6 +83,13 @@ def get_epoch_info() -> pd.DataFrame:
         - animal, date, epoch, epoch_tag
         - exposure (session number for that animal)
         - start_time, end_time
+
+    Notes
+    -----
+    The cache persists for the entire Python session. If the database is
+    modified externally during runtime, the cached result will be stale.
+    This is acceptable for typical analysis workflows where the database
+    is static.
     """
     epoch_info = (
         pd.DataFrame(

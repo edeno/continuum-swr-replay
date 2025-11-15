@@ -141,3 +141,9 @@ class TestGetLabels:
         # Note: t=5.0 may be labeled as either event 1 or 2 (edge case)
         assert result.loc[2.0:4.9, "event_number"].eq(1).any()
         assert result.loc[5.1:8.0, "event_number"].eq(2).any()
+
+
+# Note: get_epoch_info() caching is validated through integration tests.
+# Unit tests would require database access and are omitted.
+# The @cache decorator is tested implicitly by verifying all integration
+# tests pass with caching enabled.

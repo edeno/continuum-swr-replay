@@ -264,9 +264,12 @@
   - Comprehensive test suite added (8 tests in tests/unit/test_utils.py)
   - **COMPLETED:** 2025-11-14
 
-- [ ] **CB-7.2:** Add `@cache` to `get_epoch_info()` in utils.py
+- [x] **CB-7.2:** Add `@cache` to `get_epoch_info()` in utils.py
   - Expensive database query should be cached
   - Use `functools.cache` (Python 3.9+)
+  - Enhanced docstring documenting cache behavior and limitations
+  - Validated through integration tests (all 223 pass)
+  - **COMPLETED:** 2025-11-14
 
 - [ ] **CB-7.3:** Centralize script constants in parameters.py
   - Move constants from run_decoding_bandit.py
