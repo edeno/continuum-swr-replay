@@ -316,17 +316,23 @@
 - [x] **CB-8.4:** Use more descriptive variable names
   - Replace `frac` with `coincident_fraction`
   - Improve readability throughout
-  - **COMPLETED:** Renamed unclear variables to improve code readability
+  - **COMPLETED:** Renamed 8 unclear variables to improve code readability
   - spikes.py (detect_coincident_spikes):
     - `frac` → `coincident_fraction` (more descriptive of what it measures)
     - Filtered `frac` → `artifact_labels` (clearer that these are artifact labels)
+    - `df` → `spike_events` (generic DataFrame → descriptive purpose)
     - Improved formatting with method chaining on separate lines
   - spikes.py (get_electrode_group_info):
     - `cur` → `group_info` (clearer that it's electrode group information)
     - `nwbf` → `nwb_file` (clearer that it's a file object, not filename)
   - utils.py (get_epoch_info):
     - `nwbf` → `nwb_file_name` (clearer that it's a filename string, not file object)
-  - All 25 tests pass (test_spikes.py, test_utils.py), mypy and ruff clean ✅
+  - events.py (get_event_time):
+    - `start_ind` → `start_indices` (abbreviated → PEP 8 compliant)
+    - `end_ind` → `end_indices` (abbreviated → PEP 8 compliant)
+  - bandit_task.py (load_data):
+    - `pos_name` → `position_interval_name` (matches database column name)
+  - All 42 tests pass (test_spikes.py, test_utils.py), mypy and ruff clean ✅
 
 - [ ] **CB-8.5:** Ensure consistent `pathlib.Path` usage
   - Review all file operations

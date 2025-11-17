@@ -111,6 +111,32 @@ for nwb_file_name in NWB_FILES  # Clearly a filename string
 
 **Time:** 20 minutes
 
+**Follow-up Improvements (additional variable renames):**
+
+After reviewing for flake8/PEP 8 naming violations, found and fixed 3 more issues:
+
+1. **spikes.py (detect_coincident_spikes):**
+   - `df` → `spike_events` (generic DataFrame → descriptive purpose)
+   - More semantic: clearly indicates it's a table of spike events
+
+2. **events.py (get_event_time):**
+   - `start_ind` → `start_indices` (abbreviated → full word)
+   - `end_ind` → `end_indices` (abbreviated → full word)
+   - Follows PEP 8 recommendation to spell out words
+
+3. **bandit_task.py (load_data):**
+   - `pos_name` → `position_interval_name` (abbreviated → full name)
+   - Matches database column name, no ambiguity
+
+All 17 spike tests pass, ruff and mypy clean ✅
+
+**Benefits of follow-up:**
+- Eliminated generic `df` - now self-documenting as `spike_events`
+- No abbreviated suffixes (`_ind` → `_indices`) - PEP 8 compliant
+- Full variable names match their semantic purpose
+
+**Total improvements:** 8 variable renames across 3 files
+
 **Next Steps:**
 - Ready for commit
 - Consider: CB-8.5 (pathlib.Path consistency)

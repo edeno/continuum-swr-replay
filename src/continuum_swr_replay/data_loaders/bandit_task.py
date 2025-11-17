@@ -144,11 +144,11 @@ def load_data(
     """
     electrode_group_info = get_electrode_group_info(nwb_file_name)
 
-    pos_name = (
+    position_interval_name = (
         PositionIntervalMap
         & {"nwb_file_name": nwb_file_name, "interval_list_name": epoch_name}
     ).fetch1("position_interval_name")
-    position_data = get_position_info(nwb_file_name, epoch_name, pos_name)
+    position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
 
     spike_data = get_spike_data(nwb_file_name)
     # Filter spike times by the start and end time of the position data

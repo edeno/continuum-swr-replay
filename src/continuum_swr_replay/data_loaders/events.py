@@ -48,16 +48,16 @@ def convert_dio_events_to_start_stop_times(
     pd.DataFrame
         DataFrame with start_time, end_time, event_name, and event_number columns
     """
-    start_ind = event.astype(bool).to_numpy().nonzero()[0]
-    end_ind = start_ind + 1
-    end_ind[end_ind >= len(event)] = len(event) - 1
+    start_indices = event.astype(bool).to_numpy().nonzero()[0]
+    end_indices = start_indices + 1
+    end_indices[end_indices >= len(event)] = len(event) - 1
 
     event_times = pd.DataFrame(
         {
-            "start_time": event.iloc[start_ind].index,
-            "end_time": event.iloc[end_ind].index,
+            "start_time": event.iloc[start_indices].index,
+            "end_time": event.iloc[end_indices].index,
             "event_name": event_name,
-            "event_number": np.arange(len(start_ind)) + 1,
+            "event_number": np.arange(len(start_indices)) + 1,
         },
     )
     return event_times.set_index(["event_name", "event_number"])

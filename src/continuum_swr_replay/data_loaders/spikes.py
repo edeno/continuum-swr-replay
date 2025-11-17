@@ -116,7 +116,7 @@ def detect_coincident_spikes(
     is_close = np.concatenate([[False], is_close])
     labels, _ = label(is_close)
 
-    df = pd.DataFrame(
+    spike_events = pd.DataFrame(
         {
             "labels": labels,
             "sort_group_id": sort_group_id,
@@ -127,7 +127,7 @@ def detect_coincident_spikes(
     # Calculate coincident fraction to identify artifacts
     n_sort_groups = len(spike_times)
     coincident_fraction = (
-        df.loc[df.labels > 0]
+        spike_events.loc[spike_events.labels > 0]
         .groupby("labels")
         .sort_group_id.nunique()
         / n_sort_groups
@@ -136,13 +136,13 @@ def detect_coincident_spikes(
         coincident_fraction > max_coincident_fraction
     ]
 
-    df = df.loc[~df.labels.isin(artifact_labels.index)]
+    spike_events = spike_events.loc[~spike_events.labels.isin(artifact_labels.index)]
 
     filtered_spike_times = (
-        df.groupby("sort_group_id").spike_times.apply(np.array).tolist()
+        spike_events.groupby("sort_group_id").spike_times.apply(np.array).tolist()
     )
     filtered_time_bin_ind = (
-        df.groupby("sort_group_id").time_bin_ind.apply(np.array).tolist()
+        spike_events.groupby("sort_group_id").time_bin_ind.apply(np.array).tolist()
     )
 
     return filtered_spike_times, filtered_time_bin_ind
