@@ -1,9 +1,147 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-17
-**Current Task:** CB-8.2 - Use logging.config.dictConfig
+**Current Task:** CB-8.3 - Add validation to DecodingParameters
 
 ## Session Notes
+
+### 2025-11-17: CB-8.3 - COMPLETED ✅
+
+**Task:** Add validation to DecodingParameters dataclass in parameters.py
+
+**Status:** COMPLETED - Comprehensive input validation with TDD
+
+**Actions Taken:**
+1. ✅ Read DecodingParameters dataclass structure (parameters.py:39-80)
+   - Fields: place_bin_size, waveform_std, position_std, block_size
+   - All frozen (immutable) dataclass
+2. ✅ Created comprehensive test suite FIRST (TDD Red phase)
+   - Created tests/unit/test_parameters.py with 11 tests
+   - Tests for valid inputs: defaults, powers of 2, custom parameters
+   - Tests for invalid inputs: non-power-of-2, negative, zero values
+   - Initial run: 8 failures, 3 passes (expected - no validation yet)
+3. ✅ Implemented `__post_init__` validation (TDD Green phase)
+   - block_size: Validate power of 2 using bitwise check `n & (n-1) == 0`
+   - position_std: Validate > 0
+   - waveform_std: Validate > 0
+   - place_bin_size: Validate > 0
+   - Clear error messages include actual invalid value
+4. ✅ All tests pass (11/11) ✅
+5. ✅ Fixed mypy errors: Added `-> None` return type to all test methods
+6. ✅ Ruff: All checks passed ✅
+7. ✅ Mypy: Success (no issues found) ✅
+8. ✅ Updated TASKS.md with completion notes
+9. ✅ Updated SCRATCHPAD.md (this file)
+
+**Files Modified:**
+- Created: `tests/unit/test_parameters.py` (11 comprehensive validation tests)
+- Updated: `src/continuum_swr_replay/parameters.py` (added __post_init__ validation, updated docstrings)
+- Updated: `TASKS.md` (marked CB-8.3 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Design Decisions:**
+
+1. **Power of 2 validation:** Used bitwise check `n & (n-1) == 0`
+   - Efficient and standard algorithm
+   - Works because powers of 2 have exactly one bit set
+   - Examples: 8 = 0b1000, 8-1 = 0b0111, 8 & 7 = 0
+   - Non-power: 10 = 0b1010, 10-1 = 0b1001, 10 & 9 = 0b1000 ≠ 0
+
+2. **Error messages:** Include actual value for debugging
+   - `ValueError: block_size must be power of 2, got 1023`
+   - `ValueError: position_std must be positive, got -1.0`
+
+3. **Docstring updates:** Added constraint documentation
+   - "Must be positive" added to each field description
+   - Added "Raises" section documenting ValueError conditions
+
+**Before & After:**
+
+```python
+# BEFORE: No validation
+@dataclass(frozen=True)
+class DecodingParameters:
+    """Parameters for neural decoding analysis."""
+
+    place_bin_size: float = PLACE_BIN_SIZE_1D
+    waveform_std: float = WAVEFORM_STD
+    position_std: float = POSITION_STD
+    block_size: int = BLOCK_SIZE
+    # No validation - accepts any values!
+
+# AFTER: Comprehensive validation
+@dataclass(frozen=True)
+class DecodingParameters:
+    """Parameters for neural decoding analysis.
+
+    ...docstring with "Must be positive" constraints...
+
+    Raises
+    ------
+    ValueError
+        If block_size is not a power of 2, or if any standard deviation
+        or bin size parameter is not positive.
+    """
+
+    place_bin_size: float = PLACE_BIN_SIZE_1D
+    waveform_std: float = WAVEFORM_STD
+    position_std: float = POSITION_STD
+    block_size: int = BLOCK_SIZE
+
+    def __post_init__(self) -> None:
+        """Validate parameter values after initialization."""
+        # Validate block_size is a power of 2
+        if self.block_size <= 0 or (self.block_size & (self.block_size - 1)) != 0:
+            raise ValueError(
+                f"block_size must be power of 2, got {self.block_size}"
+            )
+
+        # Validate positive values
+        if self.position_std <= 0:
+            raise ValueError(
+                f"position_std must be positive, got {self.position_std}"
+            )
+
+        if self.waveform_std <= 0:
+            raise ValueError(
+                f"waveform_std must be positive, got {self.waveform_std}"
+            )
+
+        if self.place_bin_size <= 0:
+            raise ValueError(
+                f"place_bin_size must be positive, got {self.place_bin_size}"
+            )
+```
+
+**Test Coverage:**
+
+```python
+# tests/unit/test_parameters.py - 11 tests
+class TestDecodingParametersValidation:
+    def test_default_parameters_are_valid(self) -> None: ...
+    def test_valid_block_size_powers_of_two(self) -> None: ...
+    def test_invalid_block_size_not_power_of_two(self) -> None: ...
+    def test_invalid_block_size_negative(self) -> None: ...
+    def test_invalid_position_std_zero(self) -> None: ...
+    def test_invalid_position_std_negative(self) -> None: ...
+    def test_invalid_waveform_std_zero(self) -> None: ...
+    def test_invalid_waveform_std_negative(self) -> None: ...
+    def test_invalid_place_bin_size_zero(self) -> None: ...
+    def test_invalid_place_bin_size_negative(self) -> None: ...
+    def test_valid_custom_parameters(self) -> None: ...
+```
+
+**Benefits:**
+- ✅ Prevents invalid decoder configurations early (fail fast)
+- ✅ Clear error messages help users understand constraints
+- ✅ Type-safe with mypy validation
+- ✅ Comprehensive test coverage ensures correctness
+- ✅ Immutable dataclass prevents accidental modification
+- ✅ Self-documenting through docstrings and tests
+
+**Next Steps:**
+- Ready for commit
+- Consider: CB-8.4 (descriptive variable names) or CB-8.5 (pathlib.Path consistency)
 
 ### 2025-11-17: CB-8.2 - COMPLETED ✅
 

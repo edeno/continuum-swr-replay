@@ -45,14 +45,15 @@ class DecodingParameters:
     place_bin_size : float
         Spatial bin size in cm for position discretization. Smaller bins
         provide higher spatial resolution but require more computation.
-        Default is 2.0 cm for 1D decoding.
+        Default is 2.0 cm for 1D decoding. Must be positive.
     waveform_std : float
         Standard deviation for waveform feature likelihood in µV. Controls
         how tightly spikes must match the waveform features to contribute
-        to the posterior. Default is 24.0 µV.
+        to the posterior. Default is 24.0 µV. Must be positive.
     position_std : float
         Standard deviation for position likelihood in cm. Derived from
         sqrt(12.5) ≈ 3.536 cm, which corresponds to uniform spatial uncertainty.
+        Must be positive.
     block_size : int
         Block size for GPU memory management during decoding. Controls
         how many time bins are processed simultaneously. Must be a power
@@ -71,12 +72,50 @@ class DecodingParameters:
 
     The dataclass is frozen (immutable) to prevent accidental modification
     of these critical analysis parameters.
+
+    Raises
+    ------
+    ValueError
+        If block_size is not a power of 2, or if any standard deviation
+        or bin size parameter is not positive.
     """
 
     place_bin_size: float = PLACE_BIN_SIZE_1D
     waveform_std: float = WAVEFORM_STD
     position_std: float = POSITION_STD
     block_size: int = BLOCK_SIZE
+
+    def __post_init__(self) -> None:
+        """Validate parameter values after initialization.
+
+        Raises
+        ------
+        ValueError
+            If block_size is not a power of 2, or if any parameter
+            that should be positive is not.
+        """
+        # Validate block_size is a power of 2
+        # Powers of 2 have exactly one bit set, so n & (n-1) == 0
+        if self.block_size <= 0 or (self.block_size & (self.block_size - 1)) != 0:
+            raise ValueError(
+                f"block_size must be power of 2, got {self.block_size}"
+            )
+
+        # Validate positive values
+        if self.position_std <= 0:
+            raise ValueError(
+                f"position_std must be positive, got {self.position_std}"
+            )
+
+        if self.waveform_std <= 0:
+            raise ValueError(
+                f"waveform_std must be positive, got {self.waveform_std}"
+            )
+
+        if self.place_bin_size <= 0:
+            raise ValueError(
+                f"place_bin_size must be positive, got {self.place_bin_size}"
+            )
 
 
 # Singleton instance of decoding parameters

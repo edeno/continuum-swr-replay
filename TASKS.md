@@ -301,9 +301,17 @@
   - Cleaner, more maintainable configuration structure
   - Same functionality: file + console handlers with SkipChecksumFilter
 
-- [ ] **CB-8.3:** Add validation to DecodingParameters dataclass
+- [x] **CB-8.3:** Add validation to DecodingParameters dataclass
   - Validate `block_size` is power of 2
   - Validate positive values for stds
+  - **COMPLETED:** Added `__post_init__` validation to DecodingParameters
+  - Validates block_size is power of 2 using bitwise check: `n & (n-1) == 0`
+  - Validates position_std, waveform_std, place_bin_size are all positive
+  - Clear error messages with actual values for debugging
+  - Updated docstrings with "Must be positive" constraints
+  - Added Raises section documenting ValueError conditions
+  - Comprehensive test suite: 11 tests in tests/unit/test_parameters.py
+  - All tests pass, mypy and ruff clean ✅
 
 - [ ] **CB-8.4:** Use more descriptive variable names
   - Replace `frac` with `coincident_fraction`
