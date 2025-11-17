@@ -374,6 +374,21 @@
   - Prevents typos with compile-time constant references
   - All 37 spike/data loading tests pass, mypy and ruff clean ✅
 
+- [x] **ARCH-9.2b:** Implement selective data loading ✅
+  - Created `DataLoadingPreset` class with 4 predefined presets (MINIMAL, NEURAL, BEHAVIORAL, DECODING)
+  - Added `include` parameter to `load_data()` for selective loading
+  - Backward compatible: `include=None` loads all data (default behavior)
+  - Performance: Only loads/queries requested data from database
+  - Type-safe: Uses SessionDataKeys constants for `should_load()` checks
+  - Flexible: Presets can be extended with `|` operator for custom combinations
+  - Comprehensive tests: Added 5 tests for selective loading presets
+  - All 25 integration tests pass, mypy and ruff clean ✅
+  - Enables efficient workflows:
+    * Basic decoding: `load_data(..., include=DataLoadingPreset.MINIMAL)`
+    * Behavioral analysis: `load_data(..., include=DataLoadingPreset.BEHAVIORAL)`
+    * Full decoding pipeline: `load_data(..., include=DataLoadingPreset.DECODING)`
+    * Custom: `load_data(..., include={SDK.POSITION_INFO, SDK.SPIKE_TIMES, SDK.RIPPLE_TIMES})`
+
 ### Constants Organization
 
 - [ ] **ARCH-9.3:** Organize constants into submodules

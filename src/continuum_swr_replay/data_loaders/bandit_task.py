@@ -45,11 +45,15 @@ def load_data(
     nwb_file_name: str,
     epoch_name: str,
     ripple_detector_name: str = "Kay",
+    include: frozenset[str] | None = None,
 ) -> SessionData:
-    """Load all data for a given session and epoch.
+    """Load data for a given session and epoch with selective loading.
 
     This is the main entry point for loading data. It orchestrates loading
     of position, spikes, LFP, task events, and computes derived task variables.
+
+    Selective loading allows you to load only the data needed for specific
+    analyses, improving performance and reducing memory usage.
 
     Parameters
     ----------
@@ -59,6 +63,11 @@ def load_data(
         Epoch name (e.g., "02_r1")
     ripple_detector_name : str, optional
         Ripple detector name (currently only "Kay" is supported)
+    include : frozenset[str] | None, optional
+        Set of SessionDataKeys to load. If None (default), loads all data.
+        Use DataLoadingPreset for common configurations or create custom sets.
+        Position data (position_info, track_graph) is always loaded as it
+        defines time bounds for other data types
 
     Returns
     -------
@@ -84,11 +93,33 @@ def load_data(
 
     Examples
     --------
-    Load data for a single session:
+    Load all data (backward compatible):
 
     >>> data = load_data("chimi20200212_.nwb", "02_r1")
     >>> data.keys()
     dict_keys(['position_info', 'track_graph', 'spike_times', ...])
+
+    Load minimal data for basic decoding:
+
+    >>> from continuum_swr_replay.types import DataLoadingPreset
+    >>> data = load_data("chimi20200212_.nwb", "02_r1",
+    ...                  include=DataLoadingPreset.MINIMAL)
+    >>> data.keys()
+    dict_keys(['position_info', 'track_graph', 'linear_edge_order',
+               'linear_edge_spacing', 'spike_times', 'spike_waveform_features'])
+
+    Load custom subset of data:
+
+    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> data = load_data(
+    ...     "chimi20200212_.nwb", "02_r1",
+    ...     include={SDK.POSITION_INFO, SDK.SPIKE_TIMES, SDK.RIPPLE_TIMES, SDK.TRIALS}
+    ... )
+
+    Extend a preset with additional keys:
+
+    >>> custom = DataLoadingPreset.NEURAL | {SDK.TRIALS, SDK.TASK_VARIABLES}
+    >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
 
     Access position data:
 
@@ -142,51 +173,110 @@ def load_data(
     1   1237.891   1238.012   0.121
     2   1242.456   1242.598   0.142
     """
-    electrode_group_info = get_electrode_group_info(nwb_file_name)
+    from ..types import SessionDataKeys as SDK
 
+    # Helper to check if we should load this key
+    def should_load(key: str) -> bool:
+        return include is None or key in include
+
+    # Always load position data (required for time bounds)
     position_interval_name = (
         PositionIntervalMap
         & {"nwb_file_name": nwb_file_name, "interval_list_name": epoch_name}
     ).fetch1("position_interval_name")
     position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
 
-    spike_data = get_spike_data(nwb_file_name)
-    # Filter spike times by the start and end time of the position data
-    spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
-        spike_data["spike_times"],
-        spike_data["spike_waveform_features"],
-        position_data["position_info"].index,
-    )
-
-    ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
-    ripple_data = filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
-
-    dio_events = load_dios(
-        nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
-    )
-    well_visits = make_well_visits_df(
-        dio_events["beam_breaks"],
-        dio_events["pump_events"],
-        position_data["position_info"],
-        track_graph=position_data["track_graph"],
-    )
-    trials_df = make_trials_df_from_well_visits(well_visits)
-
-    task_variables_df = make_task_variables(
-        position_info=position_data["position_info"],
-        trials_df=trials_df,
-        track_graph=position_data["track_graph"],
-    )
-
-    return {
-        **position_data,
-        **spike_data,
-        **ripple_data,
-        **get_theta(nwb_file_name, epoch_name),
-        **get_multiunit(spike_data["spike_times"], position_data["position_info"]),
-        **dio_events,
-        "electrode_group_info": electrode_group_info,
-        "well_visits": well_visits,
-        "trials": trials_df,
-        "task_variables": task_variables_df,
+    # Initialize result with position data (always included)
+    result: dict = {
+        "position_info": position_data["position_info"],
+        "track_graph": position_data["track_graph"],
+        "linear_edge_order": position_data["linear_edge_order"],
+        "linear_edge_spacing": position_data["linear_edge_spacing"],
     }
+
+    # Conditionally load spike data
+    if should_load(SDK.SPIKE_TIMES) or should_load(SDK.SPIKE_WAVEFORM_FEATURES):
+        spike_data = get_spike_data(nwb_file_name)
+        spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
+            spike_data["spike_times"],
+            spike_data["spike_waveform_features"],
+            position_data["position_info"].index,
+        )
+        if should_load(SDK.SPIKE_TIMES):
+            result["spike_times"] = spike_data["spike_times"]
+        if should_load(SDK.SPIKE_WAVEFORM_FEATURES):
+            result["spike_waveform_features"] = spike_data["spike_waveform_features"]
+
+    # Conditionally load ripple data
+    if any(should_load(key) for key in [
+        SDK.RIPPLE_TIMES, SDK.RIPPLE_FILTERED_LFPS, SDK.RIPPLE_LFPS,
+        SDK.RIPPLE_CONSENSUS_TRACE, SDK.ZSCORED_RIPPLE_CONSENSUS_TRACE
+    ]):
+        ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
+        ripple_data = filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
+        for key, value in ripple_data.items():
+            if should_load(key):
+                result[key] = value
+
+    # Conditionally load theta data
+    if any(should_load(key) for key in [SDK.THETA_FILTERED_LFP, SDK.THETA_PHASE, SDK.THETA_POWER]):
+        theta_data = get_theta(nwb_file_name, epoch_name)
+        for key, value in theta_data.items():
+            if should_load(key):
+                result[key] = value
+
+    # Conditionally load multiunit data
+    if any(should_load(key) for key in [SDK.HSE_TIMES, SDK.MULTIUNIT_FIRING_RATE, SDK.MULTIUNIT_RATE_ZSCORE]):
+        # Only load if we have spike data
+        if "spike_times" in result:
+            multiunit_data = get_multiunit(result["spike_times"], position_data["position_info"])
+            for key, value in multiunit_data.items():
+                if should_load(key):
+                    result[key] = value
+
+    # Conditionally load DIO events and behavioral data
+    if any(should_load(key) for key in [
+        SDK.BEAM_BREAKS, SDK.PUMP_EVENTS, SDK.LIGHT_EVENTS,
+        SDK.WELL_VISITS, SDK.TRIALS, SDK.TASK_VARIABLES
+    ]):
+        dio_events = load_dios(
+            nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
+        )
+
+        # Add DIO events to result if requested
+        for key, value in dio_events.items():
+            if should_load(key):
+                result[key] = value
+
+        # Conditionally load well visits and trials
+        if should_load(SDK.WELL_VISITS) or should_load(SDK.TRIALS) or should_load(SDK.TASK_VARIABLES):
+            well_visits = make_well_visits_df(
+                dio_events["beam_breaks"],
+                dio_events["pump_events"],
+                position_data["position_info"],
+                track_graph=position_data["track_graph"],
+            )
+
+            if should_load(SDK.WELL_VISITS):
+                result["well_visits"] = well_visits
+
+            if should_load(SDK.TRIALS) or should_load(SDK.TASK_VARIABLES):
+                trials_df = make_trials_df_from_well_visits(well_visits)
+
+                if should_load(SDK.TRIALS):
+                    result["trials"] = trials_df
+
+                if should_load(SDK.TASK_VARIABLES):
+                    task_variables_df = make_task_variables(
+                        position_info=position_data["position_info"],
+                        trials_df=trials_df,
+                        track_graph=position_data["track_graph"],
+                    )
+                    result["task_variables"] = task_variables_df
+
+    # Conditionally load electrode group info
+    if should_load(SDK.ELECTRODE_GROUP_INFO):
+        electrode_group_info = get_electrode_group_info(nwb_file_name)
+        result["electrode_group_info"] = electrode_group_info
+
+    return result  # type: ignore[return-value]

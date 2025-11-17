@@ -188,6 +188,74 @@ class SessionDataKeys:
     ELECTRODE_GROUP_INFO = "electrode_group_info"
 
 
+class DataLoadingPreset:
+    """Predefined data loading presets for common analysis workflows.
+
+    Use these presets with load_data(include=...) to load only the data
+    needed for specific analyses, improving performance and memory usage.
+
+    Each preset is a frozenset of SessionDataKeys constants.
+
+    Examples
+    --------
+    >>> from continuum_swr_replay.data_loaders.bandit_task import load_data
+    >>> from continuum_swr_replay.types import DataLoadingPreset
+    >>>
+    >>> # Load minimal data for basic decoding
+    >>> data = load_data("chimi20200212_.nwb", "02_r1",
+    ...                  include=DataLoadingPreset.MINIMAL)
+    >>>
+    >>> # Extend a preset with custom keys
+    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> custom = DataLoadingPreset.NEURAL | {SDK.TRIALS, SDK.TASK_VARIABLES}
+    >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
+    """
+
+    # Minimal - just position and spikes for basic decoding
+    MINIMAL: frozenset[str] = frozenset({
+        SessionDataKeys.POSITION_INFO,
+        SessionDataKeys.TRACK_GRAPH,
+        SessionDataKeys.LINEAR_EDGE_ORDER,
+        SessionDataKeys.LINEAR_EDGE_SPACING,
+        SessionDataKeys.SPIKE_TIMES,
+        SessionDataKeys.SPIKE_WAVEFORM_FEATURES,
+    })
+
+    # Neural - all neural data (spikes + LFP + multiunit)
+    NEURAL: frozenset[str] = MINIMAL | frozenset({
+        SessionDataKeys.RIPPLE_TIMES,
+        SessionDataKeys.RIPPLE_FILTERED_LFPS,
+        SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
+        SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
+        SessionDataKeys.THETA_FILTERED_LFP,
+        SessionDataKeys.THETA_PHASE,
+        SessionDataKeys.THETA_POWER,
+        SessionDataKeys.MULTIUNIT_FIRING_RATE,
+        SessionDataKeys.HSE_TIMES,
+    })
+
+    # Behavioral - position + task events + trials (no neural data)
+    BEHAVIORAL: frozenset[str] = frozenset({
+        SessionDataKeys.POSITION_INFO,
+        SessionDataKeys.TRACK_GRAPH,
+        SessionDataKeys.LINEAR_EDGE_ORDER,
+        SessionDataKeys.LINEAR_EDGE_SPACING,
+        SessionDataKeys.TRIALS,
+        SessionDataKeys.TASK_VARIABLES,
+        SessionDataKeys.WELL_VISITS,
+        SessionDataKeys.BEAM_BREAKS,
+        SessionDataKeys.PUMP_EVENTS,
+        SessionDataKeys.LIGHT_EVENTS,
+    })
+
+    # Decoding - everything needed for decoding analysis
+    DECODING: frozenset[str] = NEURAL | frozenset({
+        SessionDataKeys.TRIALS,
+        SessionDataKeys.TASK_VARIABLES,
+        SessionDataKeys.ELECTRODE_GROUP_INFO,
+    })
+
+
 class ClusterlessParams(TypedDict):
     """Parameters for clusterless decoder (used for HPC).
 
@@ -368,6 +436,7 @@ __all__ = [
     # Main data structures
     "SessionData",
     "SessionDataKeys",
+    "DataLoadingPreset",
     # Decoding parameters
     "ClusterlessParams",
     "SortedSpikesParams",
