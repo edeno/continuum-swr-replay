@@ -334,9 +334,16 @@
     - `pos_name` → `position_interval_name` (matches database column name)
   - All 42 tests pass (test_spikes.py, test_utils.py), mypy and ruff clean ✅
 
-- [ ] **CB-8.5:** Ensure consistent `pathlib.Path` usage
-  - Review all file operations
-  - Use Path methods instead of string concatenation
+- [x] **CB-8.5:** Ensure consistent `pathlib.Path` usage ✅
+  - Reviewed all file operations across src/ and scripts/
+  - Found codebase already uses pathlib.Path consistently
+  - Fixed 3 instances of redundant `Path()` wrapping of directory constants:
+    - `Path(PROCESSED_DATA_DIR)` → `PROCESSED_DATA_DIR` (already a Path)
+    - `Path(FIGURE_DIR)` → `FIGURE_DIR` (already a Path)
+  - Removed unused `from pathlib import Path` imports in scripts
+  - No `os.path` usage found (except `os.environ` for environment variables, which is correct)
+  - All file operations use Path `/` operator and Path methods (.exists(), .mkdir(), .glob())
+  - All 54 figure utility tests pass, mypy and ruff clean ✅
 
 ---
 

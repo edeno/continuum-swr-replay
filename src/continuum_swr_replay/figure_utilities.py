@@ -265,7 +265,7 @@ def set_figure_defaults(
 
     if context == "paper":
         # Try loading custom style file first
-        style_path = Path(FIGURE_DIR) / "styles" / "paper.mplstyle"
+        style_path = FIGURE_DIR / "styles" / "paper.mplstyle"
         if style_path.exists():
             mpl.style.use(str(style_path))
         else:

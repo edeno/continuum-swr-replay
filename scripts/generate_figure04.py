@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -286,7 +284,7 @@ model_list = [
 plot_AICs(glm_results, model_list=model_list)
 
 
-data_path = Path(PROCESSED_DATA_DIR).glob("*_mPFC_modulation.pkl")
+data_path = PROCESSED_DATA_DIR.glob("*_mPFC_modulation.pkl")
 df = pd.concat([pd.read_pickle(p) for p in data_path])
 df["animal"] = df["nwb_file_name"].str[:-13]
 df

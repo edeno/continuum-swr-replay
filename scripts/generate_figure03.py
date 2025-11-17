@@ -3,7 +3,6 @@
 import logging
 import os
 import warnings
-from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -34,7 +33,7 @@ warnings.filterwarnings("ignore")
 
 def load_data_over_time():
     # Load all relevant data files
-    data_path = Path(PROCESSED_DATA_DIR).glob("*_HPC_80_data_over_time.pkl")
+    data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
 
     data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
     data_over_time["Non-Local_prob"] = (

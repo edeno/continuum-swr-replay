@@ -1,9 +1,72 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-17
-**Current Task:** CB-8.4 - Use more descriptive variable names
+**Current Task:** CB-8.5 - Ensure consistent pathlib.Path usage
 
 ## Session Notes
+
+### 2025-11-17: CB-8.5 - COMPLETED ✅
+
+**Task:** Ensure consistent `pathlib.Path` usage across the codebase
+
+**Status:** COMPLETED - Found codebase already uses pathlib.Path consistently, removed redundant wrapping
+
+**Actions Taken:**
+1. ✅ Searched for `os.path` usage (join, exists, dirname, basename, etc.)
+   - Found NO usage in src/ or scripts/ ✅
+   - Only `os.environ` usage (correct for environment variables)
+2. ✅ Searched for string path concatenation patterns
+   - Found NO string concatenation with paths ✅
+3. ✅ Reviewed all Path usage patterns
+   - All file operations use Path `/` operator ✅
+   - All use Path methods (.exists(), .mkdir(), .glob()) ✅
+4. ✅ Identified 3 instances of redundant `Path()` wrapping:
+   - `scripts/generate_figure03.py:37`: `Path(PROCESSED_DATA_DIR).glob(...)` → `PROCESSED_DATA_DIR.glob(...)`
+   - `scripts/generate_figure04.py:289`: `Path(PROCESSED_DATA_DIR).glob(...)` → `PROCESSED_DATA_DIR.glob(...)`
+   - `src/continuum_swr_replay/figure_utilities.py:268`: `Path(FIGURE_DIR) / ...` → `FIGURE_DIR / ...`
+5. ✅ Removed unused `from pathlib import Path` imports from scripts
+6. ✅ All 54 figure utility tests pass ✅
+7. ✅ Mypy: Success (no issues found in 26 source files) ✅
+8. ✅ Ruff: Clean (only pre-existing issues in figure generation scripts) ✅
+9. ✅ Updated TASKS.md with completion notes
+10. ✅ Updated SCRATCHPAD.md (this file)
+
+**Files Modified:**
+- Updated: `scripts/generate_figure03.py` (removed redundant Path(), removed unused import)
+- Updated: `scripts/generate_figure04.py` (removed redundant Path(), removed unused import)
+- Updated: `src/continuum_swr_replay/figure_utilities.py` (removed redundant Path())
+- Updated: `TASKS.md` (marked CB-8.5 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Before & After:**
+
+```python
+# BEFORE: Redundant Path() wrapping in generate_figure03.py
+from pathlib import Path
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+data_path = Path(PROCESSED_DATA_DIR).glob("*_HPC_80_data_over_time.pkl")
+
+# AFTER: Direct usage (PROCESSED_DATA_DIR is already a Path from parameters.py)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
+```
+
+**Key Findings:**
+- Codebase already follows pathlib.Path best practices consistently
+- `parameters.py` correctly defines directory constants as Path objects:
+  - `ROOT_DIR = Path(__file__).parent.parent`
+  - `PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"`
+  - `FIGURE_DIR = ROOT_DIR / "figures"`
+- All file I/O uses Path methods
+- No legacy `os.path` usage found
+- Only issue was redundant Path() wrapping of already-Path constants
+
+**Next Steps:**
+- Ready for commit
+
+---
 
 ### 2025-11-17: CB-8.4 - COMPLETED ✅
 
