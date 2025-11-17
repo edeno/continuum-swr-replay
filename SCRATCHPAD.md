@@ -139,6 +139,25 @@ def setup_logger(...) -> logging.Logger:
 
 **Time:** 25 minutes
 
+**Follow-up Improvement:**
+Added informative log format with level and logger name:
+```python
+"format": "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s"
+```
+
+Output now shows:
+```
+17-Nov-25 11:01:59 - decoding_chimi20200212_02_r1_HPC - INFO     - Starting analysis
+17-Nov-25 11:01:59 - decoding_chimi20200212_02_r1_HPC - WARNING  - GPU memory high
+17-Nov-25 11:01:59 - decoding_chimi20200212_02_r1_HPC - ERROR    - Failed to load
+```
+
+Benefits:
+- Easy to distinguish INFO/WARNING/ERROR at a glance
+- Logger name helps identify which session/animal/epoch
+- Left-aligned level names (%-8s) for visual consistency
+- Easy to grep: `grep ERROR logfile.log`
+
 ---
 
 ## Session Notes

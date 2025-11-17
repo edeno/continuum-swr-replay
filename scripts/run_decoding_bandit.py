@@ -127,7 +127,7 @@ def setup_logger(
         },
         "formatters": {
             "standard": {
-                "format": "%(asctime)s %(message)s",
+                "format": "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
                 "datefmt": "%d-%b-%y %H:%M:%S",
             },
         },
