@@ -93,13 +93,10 @@ def detect_coincident_spikes(
         - filtered_spike_times: list of arrays with coincident spikes removed
         - filtered_time_bin_ind: list of arrays with indices of kept spikes
     """
-    # Handle empty spike times
     if not spike_times or all(len(st) == 0 for st in spike_times):
         return [], []
 
-    # Concatenate all spike times
     concat_spike_times = np.concatenate(spike_times)
-    # Create group IDs for each spike time
     sort_group_id = np.concatenate(
         [
             np.ones(len(spike_time), dtype=int) * i
@@ -110,18 +107,15 @@ def detect_coincident_spikes(
         [np.arange(len(spike_time), dtype=int) for spike_time in spike_times]
     )
 
-    # Sort spike times and group IDs based on the spike times
     sort_ind = np.argsort(concat_spike_times)
     sorted_spike_times = concat_spike_times[sort_ind]
     sort_group_id = sort_group_id[sort_ind]
     time_bin_ind = time_bin_ind[sort_ind]
 
-    # Find differences and label close spikes
     is_close = np.diff(sorted_spike_times) < spike_closeness_threshold
     is_close = np.concatenate([[False], is_close])
     labels, _ = label(is_close)
 
-    # Create a DataFrame for further analysis
     df = pd.DataFrame(
         {
             "labels": labels,
@@ -130,7 +124,7 @@ def detect_coincident_spikes(
             "spike_times": sorted_spike_times,
         },
     )
-    # Calculate the fraction of each group and the median spike times
+    # Calculate coincident fraction to identify artifacts
     n_sort_groups = len(spike_times)
     frac = (
         df.loc[df.labels > 0].groupby("labels").sort_group_id.nunique() / n_sort_groups
@@ -279,12 +273,9 @@ def get_pfc_spike_times(nwb_file_name: str, brain_area: str) -> list[NDArray[np.
         "sorter": "mountainsort4",
     }
 
-    # Get the latest curation_id
     max_curation_id = (CuratedSpikeSorting & restriction).fetch("curation_id").max()
     restriction.update({"curation_id": max_curation_id})
-    # "ampl_2000_z_30_prop_075_1ms" for artifact_params_name
 
-    # Find brain area
     curated_spikes_info = pd.DataFrame(
         (CuratedSpikeSorting & restriction) * SortGroup.SortGroupElectrode
     )

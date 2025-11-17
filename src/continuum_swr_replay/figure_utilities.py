@@ -484,7 +484,6 @@ def save_figure(
     if formats is None:
         formats = ["pdf", "png"]
 
-    # Validate formats
     invalid_formats = [fmt for fmt in formats if fmt not in VALID_FORMATS]
     if invalid_formats:
         valid_list = ", ".join(sorted(VALID_FORMATS))
@@ -493,7 +492,6 @@ def save_figure(
             f"Valid formats are: {valid_list}"
         )
 
-    # Validate figure has content (axes)
     fig = plt.gcf()
     if not fig.get_axes():
         raise ValueError(
@@ -501,45 +499,34 @@ def save_figure(
             "Add content using fig.add_subplot() or plt.subplots() first."
         )
 
-    # Get DPI from current settings if not specified
     if dpi is None:
         dpi_setting = mpl.rcParams.get("savefig.dpi", 300)
         if dpi_setting == "figure":
-            # Use the figure's DPI if savefig.dpi is set to 'figure'
             dpi = int(fig.dpi)
         else:
             dpi = int(dpi_setting)
 
-    # Determine facecolor
     if facecolor is None:
-        # Use figure's current facecolor (fig already retrieved above)
         facecolor = fig.get_facecolor()
 
-    # Auto-detect transparency based on background color if not specified
     if transparent is None:
-        # Convert facecolor to RGBA tuple for luminance calculation
         rgba = mpl.colors.to_rgba(facecolor)
-        # Calculate luminance using weighted average (ITU-R BT.601)
+        # Calculate luminance using ITU-R BT.601 weighted average
         # https://en.wikipedia.org/wiki/Relative_luminance
         luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
-        # Dark backgrounds (luminance < 0.5) should not be transparent
-        # to prevent them from disappearing on dark slides/backgrounds
+        # Dark backgrounds should not be transparent to prevent disappearing on dark slides
         transparent = luminance >= 0.5
 
-    # Determine base directory - use FIGURE_DIR if not specified
     if base_dir is None:
         base_directory = FIGURE_DIR
     else:
         base_directory = Path(base_dir)
 
-    # Construct full output path
     output_path = base_directory / figure_name
 
-    # Create directory if needed
     if output_path.parent != Path("."):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Save in each format
     for fmt in formats:
         output_file = output_path.with_suffix(f".{fmt}")
         plt.savefig(
@@ -643,7 +630,6 @@ def figure_size_from_panels(
     if panel_height_cm is None:
         panel_height_cm = panel_width_cm * GOLDEN_RATIO
 
-    # Calculate total width
     total_width_cm = (
         left_margin_cm
         + (ncols * panel_width_cm)
@@ -651,7 +637,6 @@ def figure_size_from_panels(
         + right_margin_cm
     )
 
-    # Calculate total height
     total_height_cm = (
         bottom_margin_cm
         + (nrows * panel_height_cm)
@@ -659,7 +644,6 @@ def figure_size_from_panels(
         + top_margin_cm
     )
 
-    # Convert to inches
     width_inches = cm_to_inch(total_width_cm)
     height_inches = cm_to_inch(total_height_cm)
 
@@ -730,24 +714,20 @@ def label_panels(
 
     >>> label_panels(axes.flatten(), labels=['A1', 'A2', 'B1', 'B2'])
     """
-    # Flatten if ndarray
     if isinstance(axes, np.ndarray):
         axes = axes.flatten()
 
-    # Generate default labels if not provided
     if labels is None:
         import string
 
         labels = list(string.ascii_lowercase[: len(axes)])
 
-    # Validate label and axes counts match
     if len(labels) != len(axes):
         raise ValueError(
             f"Label count mismatch: got {len(labels)} labels for {len(axes)} axes. "
             f"Provide exactly one label per axis."
         )
 
-    # Add label to each axis
     for ax, label in zip(axes, labels, strict=True):
         ax.text(
             xpos,
@@ -791,7 +771,6 @@ def validate_figure_quality() -> bool:
     fig = plt.gcf()
     passed = True
 
-    # Check DPI
     if fig.dpi < 150:
         warnings.warn(
             f"Low DPI ({fig.dpi}). Use 450 for papers, 150 for presentations.",
@@ -799,7 +778,6 @@ def validate_figure_quality() -> bool:
         )
         passed = False
 
-    # Check constrained_layout
     layout_engine = fig.get_layout_engine()
     if layout_engine is None or not hasattr(layout_engine, "execute"):
         warnings.warn(
@@ -809,16 +787,13 @@ def validate_figure_quality() -> bool:
         )
         passed = False
 
-    # Determine context based on DPI
     is_paper = fig.dpi >= 300
     min_axis_label = PAPER_AXIS_LABEL if is_paper else PRES_AXIS_LABEL
     min_tick_label = PAPER_TICK_LABEL if is_paper else PRES_TICK_LABEL
     context_name = "paper" if is_paper else "presentation"
 
-    # Check font sizes for all axes
     for ax in fig.get_axes():
-        # Check X-axis label
-        if ax.xaxis.label.get_text():  # Only check if label is set
+        if ax.xaxis.label.get_text():
             xlabel_size = float(ax.xaxis.label.get_fontsize())
             if xlabel_size < min_axis_label:
                 warnings.warn(
@@ -828,8 +803,7 @@ def validate_figure_quality() -> bool:
                 )
                 passed = False
 
-        # Check Y-axis label
-        if ax.yaxis.label.get_text():  # Only check if label is set
+        if ax.yaxis.label.get_text():
             ylabel_size = float(ax.yaxis.label.get_fontsize())
             if ylabel_size < min_axis_label:
                 warnings.warn(
@@ -839,10 +813,8 @@ def validate_figure_quality() -> bool:
                 )
                 passed = False
 
-        # Check X-axis tick labels
         x_tick_labels = ax.xaxis.get_ticklabels()
-        if x_tick_labels:  # Only check if there are tick labels
-            # Get the fontsize from the first tick label
+        if x_tick_labels:
             x_tick_size = float(x_tick_labels[0].get_fontsize())
             if x_tick_size < min_tick_label:
                 warnings.warn(
@@ -852,10 +824,8 @@ def validate_figure_quality() -> bool:
                 )
                 passed = False
 
-        # Check Y-axis tick labels
         y_tick_labels = ax.yaxis.get_ticklabels()
-        if y_tick_labels:  # Only check if there are tick labels
-            # Get the fontsize from the first tick label
+        if y_tick_labels:
             y_tick_size = float(y_tick_labels[0].get_fontsize())
             if y_tick_size < min_tick_label:
                 warnings.warn(

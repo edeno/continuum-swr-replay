@@ -212,8 +212,8 @@
   - Add return types to `_count_exposure()` and similar
   - **COMPLETED:** Added comprehensive type hints to src/continuum_swr_replay/analysis/pfc/glm.py
   - Added type hints to 16 functions (get_spikecount_per_time_bin, reindex_by, test_theta_modulation_v1,
-    get_labels, _lr_test, test_theta_modulation, create_lagged_signal, create_conv_basis,
-    _make_conv_spline_basis, _make_design_matrices, _fit_immobility_models, get_frac_null_deviance,
+    get_labels,_lr_test, test_theta_modulation, create_lagged_signal, create_conv_basis,
+    _make_conv_spline_basis,_make_design_matrices, _fit_immobility_models, get_frac_null_deviance,
     get_frac_explained_deviance, process_neuron, run_session)
   - Fixed duplicate function name: test_theta_modulation → test_theta_modulation_v1 (original), test_theta_modulation (new)
   - Fixed all mypy type errors (19 → 0) ✅
@@ -288,9 +288,11 @@
 **Estimated Time:** 3-4 hours
 **Goal:** Polish and maintainability
 
-- [ ] **CB-8.1:** Remove obvious comments
+- [x] **CB-8.1:** Remove obvious comments
   - Review and improve comment quality
   - Explain "why" not "what"
+  - **COMPLETED:** Removed ~30 obvious comments from spikes.py, figure_utilities.py, utils.py
+  - Comments now explain rationale, not implementation details
 
 - [ ] **CB-8.2:** Use `logging.config.dictConfig` in run_decoding_bandit.py
   - Replace imperative logging setup
@@ -341,11 +343,6 @@
   - Auto-run ruff, mypy, tests
   - Prevent quality regressions
 
-- [ ] **ARCH-9.6:** Add CLI framework (click/typer)
-  - Better command-line interface for scripts
-  - Auto-generated help text
-  - Type-safe arguments
-
 ---
 
 ## Milestone 10: Advanced Testing (FUTURE) 🔬
@@ -362,11 +359,6 @@
 - [ ] **TEST-10.2:** Add integration tests for data loading
   - Test complete pipeline on sample data
   - Verify data integrity end-to-end
-
-- [ ] **TEST-10.3:** Add neuroscience-specific test fixtures
-  - Sample spike times
-  - Sample position data
-  - Sample task events
 
 ---
 

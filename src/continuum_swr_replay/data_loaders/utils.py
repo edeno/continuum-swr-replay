@@ -189,18 +189,16 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
         0, index=time, columns=["event_number"], dtype=int
     )
 
-    # Convert time index to numpy array for searchsorted
     time_array = time.to_numpy()
 
-    # Vectorized labeling using binary search
+    # Vectorized labeling using binary search (O(n_events * log(n_times)))
     for i, (start, end) in enumerate(
         zip(times["start_time"], times["end_time"], strict=True), start=1
     ):
-        # Find indices of time points within [start, end]
         start_idx = np.searchsorted(time_array, start, side="left")
         end_idx = np.searchsorted(time_array, end, side="right")
 
-        # Assign label to these indices (iloc for integer-based indexing)
+        # Use iloc for integer-based indexing (loc would be label-based)
         event_labels.iloc[start_idx:end_idx, 0] = i
 
     return event_labels

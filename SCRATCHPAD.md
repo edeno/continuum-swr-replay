@@ -1,7 +1,140 @@
 # Development Scratchpad
 
-**Last Updated:** 2025-11-14
-**Current Task:** CB-7.3 - Centralize script constants in parameters.py
+**Last Updated:** 2025-11-17
+**Current Task:** CB-8.1 - Remove obvious comments
+
+## Session Notes
+
+### 2025-11-17: CB-8.1 - COMPLETED ✅
+
+**Task:** Remove obvious comments that restate code, keep only comments explaining "why"
+
+**Status:** COMPLETED - Comment quality improved throughout codebase
+
+**Actions Taken:**
+1. ✅ Searched codebase for obvious comments
+2. ✅ Removed ~9 obvious comments from spikes.py
+   - Lines 96-133: Removed obvious comments like "Concatenate all spike times", "Sort spike times", etc.
+   - Line 133: Fixed inaccurate comment ("median spike times" when no median calculated)
+   - Lines 282-287: Removed obvious comments and stale artifact_params_name note
+   - Kept good comment: "Calculate coincident fraction to identify artifacts"
+3. ✅ Removed ~25 obvious comments from figure_utilities.py
+   - save_figure function: Removed obvious validation/setup comments
+   - Kept good comments: ITU-R BT.601 luminance formula, dark background transparency rationale
+   - figure_size_from_panels: Removed obvious "Calculate total width/height", "Convert to inches"
+   - label_panels: Removed obvious "Flatten if ndarray", "Generate default labels", etc.
+   - validate_figure_quality: Removed obvious "Check DPI", "Check X-axis label", etc.
+4. ✅ Improved 3 comments in utils.py
+   - Line 192: Removed "Convert time index to numpy array for searchsorted"
+   - Line 195: Improved "Vectorized labeling using binary search" to include complexity
+   - Line 199: Removed "Find indices of time points within [start, end]"
+   - Line 203: Improved to explain *why* we use iloc vs loc
+5. ✅ Reviewed bandit_task.py
+   - Line 154 comment kept: Provides workflow context (not just restating code)
+6. ✅ Ruff: All checks passed on modified files ✅
+7. ✅ Mypy: Success (no issues in 3 source files) ✅
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/data_loaders/spikes.py` (removed 9 comments)
+- Updated: `src/continuum_swr_replay/figure_utilities.py` (removed 25 comments)
+- Updated: `src/continuum_swr_replay/data_loaders/utils.py` (improved 3 comments)
+- Updated: `TASKS.md` (marked CB-8.1 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Key Improvements:**
+```python
+# BEFORE: Obvious comments restating code
+# Concatenate all spike times
+concat_spike_times = np.concatenate(spike_times)
+# Sort spike times and group IDs based on the spike times
+sort_ind = np.argsort(concat_spike_times)
+
+# AFTER: Clean code, self-documenting
+concat_spike_times = np.concatenate(spike_times)
+sort_ind = np.argsort(concat_spike_times)
+
+# BEFORE: Obvious comment
+# Vectorized labeling using binary search
+for i, (start, end) in enumerate(...):
+
+# AFTER: Explains optimization strategy
+# Vectorized labeling using binary search (O(n_events * log(n_times)))
+for i, (start, end) in enumerate(...):
+
+# BEFORE: Obvious comment
+# Assign label to these indices (iloc for integer-based indexing)
+event_labels.iloc[start_idx:end_idx, 0] = i
+
+# AFTER: Explains *why* we use iloc
+# Use iloc for integer-based indexing (loc would be label-based)
+event_labels.iloc[start_idx:end_idx, 0] = i
+```
+
+**Comments Removed:**
+1. **spikes.py (9 comments):**
+   - "Handle empty spike times"
+   - "Concatenate all spike times"
+   - "Create group IDs for each spike time"
+   - "Sort spike times and group IDs based on the spike times"
+   - "Find differences and label close spikes"
+   - "Create a DataFrame for further analysis"
+   - "Calculate the fraction of each group and the median spike times" (also inaccurate)
+   - "Get the latest curation_id"
+   - "Find brain area"
+   - Stale comment: "# 'ampl_2000_z_30_prop_075_1ms' for artifact_params_name"
+
+2. **figure_utilities.py (25 comments):**
+   - "Validate formats"
+   - "Validate figure has content (axes)"
+   - "Get DPI from current settings if not specified"
+   - "Use the figure's DPI if savefig.dpi is set to 'figure'"
+   - "Determine facecolor"
+   - "Use figure's current facecolor (fig already retrieved above)"
+   - "Auto-detect transparency based on background color if not specified"
+   - "Convert facecolor to RGBA tuple for luminance calculation"
+   - "Determine base directory - use FIGURE_DIR if not specified"
+   - "Construct full output path"
+   - "Create directory if needed"
+   - "Save in each format"
+   - "Calculate total width"
+   - "Calculate total height"
+   - "Convert to inches"
+   - "Flatten if ndarray"
+   - "Generate default labels if not provided"
+   - "Validate label and axes counts match"
+   - "Add label to each axis"
+   - "Check DPI"
+   - "Check constrained_layout"
+   - "Determine context based on DPI"
+   - "Check font sizes for all axes"
+   - "Check X-axis label", "Check Y-axis label"
+   - "Check X-axis tick labels", "Check Y-axis tick labels"
+   - "Get the fontsize from the first tick label" (2 instances)
+
+3. **utils.py (2 removed, 2 improved):**
+   - Removed: "Convert time index to numpy array for searchsorted"
+   - Improved: Added complexity notation to binary search comment
+   - Removed: "Find indices of time points within [start, end]"
+   - Improved: Explained iloc vs loc choice
+
+**Comments Kept (Good Examples):**
+- spikes.py: "Calculate coincident fraction to identify artifacts" (explains why)
+- figure_utilities.py: "Calculate luminance using ITU-R BT.601 weighted average" (scientific reference)
+- figure_utilities.py: "Dark backgrounds should not be transparent to prevent disappearing on dark slides" (explains rationale)
+- utils.py: "Vectorized labeling using binary search (O(n_events * log(n_times)))" (explains optimization)
+- utils.py: "Use iloc for integer-based indexing (loc would be label-based)" (explains choice)
+- bandit_task.py: "Filter spike times by the start and end time of the position data" (workflow context)
+
+**Time:** 30 minutes
+
+**Benefits:**
+- Cleaner, more readable code ✅
+- Comments now explain rationale, not implementation ✅
+- Easier to maintain (less noise) ✅
+- Follows best practices (comment "why", not "what") ✅
+- All code still passes ruff and mypy ✅
+
+---
 
 ## Session Notes
 
