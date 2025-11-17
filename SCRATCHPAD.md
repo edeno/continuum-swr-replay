@@ -1,7 +1,7 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-17
-**Current Task:** ARCH-9.1 - Create comprehensive types.py module
+**Current Task:** ARCH-9.2 - Define string keys as constants (COMPLETED)
 
 ## Session Notes
 
@@ -136,7 +136,147 @@ from ..types import DIOEventData
 
 **Next Steps:**
 - Ready for commit
-- Consider: ARCH-9.2 (Define string keys as constants)
+- ARCH-9.2 (Define string keys as constants) - COMPLETED ✅
+
+---
+
+### 2025-11-17: ARCH-9.2 - COMPLETED ✅
+
+**Task:** Define string keys as constants to prevent typos and enable autocomplete
+
+**Status:** COMPLETED - Created SessionDataKeys class with 24 string constants
+
+**Actions Taken:**
+1. ✅ Reviewed SessionData TypedDict structure in types.py
+   - Identified all 24 keys organized in 6 categories
+2. ✅ Created SessionDataKeys class in types.py (after SessionData definition)
+   - 24 class-level string constants matching SessionData keys
+   - Organized in same categories as SessionData TypedDict
+   - Added comprehensive docstring with usage examples
+3. ✅ Added SessionDataKeys to __all__ export list
+4. ✅ Ran type checking and linting
+   - Mypy: Success (no issues) ✅
+   - Ruff: All checks passed ✅
+5. ✅ Ran tests
+   - All 37 spike/data loading tests pass ✅
+6. ✅ Updated TASKS.md with completion notes
+7. ✅ Updated SCRATCHPAD.md (this file)
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/types.py` (+55 lines: SessionDataKeys class, __all__ update)
+- Updated: `TASKS.md` (marked ARCH-9.2 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Implementation Details:**
+
+```python
+class SessionDataKeys:
+    """String constants for SessionData dictionary keys.
+
+    Use these constants instead of string literals to prevent typos
+    and enable IDE autocomplete when accessing SessionData dictionaries.
+
+    Example
+    -------
+    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> data = load_data(...)
+    >>> position_info = data[SDK.POSITION_INFO]  # Instead of data["position_info"]
+    >>> spike_times = data[SDK.SPIKE_TIMES]      # Instead of data["spike_times"]
+    """
+
+    # Position and tracking (4 keys)
+    POSITION_INFO = "position_info"
+    TRACK_GRAPH = "track_graph"
+    LINEAR_EDGE_ORDER = "linear_edge_order"
+    LINEAR_EDGE_SPACING = "linear_edge_spacing"
+
+    # Neural data - spike times and waveforms (2 keys)
+    SPIKE_TIMES = "spike_times"
+    SPIKE_WAVEFORM_FEATURES = "spike_waveform_features"
+
+    # LFP data - ripple band (5 keys)
+    RIPPLE_TIMES = "ripple_times"
+    RIPPLE_FILTERED_LFPS = "ripple_filtered_lfps"
+    RIPPLE_LFPS = "ripple_lfps"
+    RIPPLE_CONSENSUS_TRACE = "ripple_consensus_trace"
+    ZSCORED_RIPPLE_CONSENSUS_TRACE = "zscored_ripple_consensus_trace"
+
+    # LFP data - theta band (3 keys)
+    THETA_FILTERED_LFP = "theta_filtered_lfp"
+    THETA_PHASE = "theta_phase"
+    THETA_POWER = "theta_power"
+
+    # Multi-unit activity (3 keys)
+    HSE_TIMES = "hse_times"
+    MULTIUNIT_FIRING_RATE = "multiunit_firing_rate"
+    MULTIUNIT_RATE_ZSCORE = "multiunit_rate_zscore"
+
+    # Task events from DIO (3 keys)
+    BEAM_BREAKS = "beam_breaks"
+    PUMP_EVENTS = "pump_events"
+    LIGHT_EVENTS = "light_events"
+
+    # Behavioral data (3 keys)
+    WELL_VISITS = "well_visits"
+    TRIALS = "trials"
+    TASK_VARIABLES = "task_variables"
+
+    # Metadata (1 key)
+    ELECTRODE_GROUP_INFO = "electrode_group_info"
+```
+
+**Benefits:**
+
+1. **Type Safety** ✅
+   - Compile-time constant references instead of runtime string literals
+   - IDEs can catch typos immediately
+   - Refactoring tools can rename all references
+
+2. **IDE Autocomplete** ✅
+   - Type `SDK.` and see all 24 available keys
+   - No need to remember exact key names
+   - Reduced cognitive load for developers
+
+3. **Self-Documenting** ✅
+   - Organization mirrors SessionData structure
+   - Clear categories (Position, Neural, LFP, Task, Behavioral, Metadata)
+   - Usage examples in docstring
+
+4. **Import Flexibility** ✅
+   - Can import as alias: `from continuum_swr_replay.types import SessionDataKeys as SDK`
+   - Can import specific keys: `from continuum_swr_replay.types import SessionDataKeys`
+   - Available via `__all__` for star imports
+
+**Usage Pattern:**
+
+```python
+# OLD WAY (error-prone)
+data = load_data(...)
+position_info = data["position_info"]  # Typo risk: "postion_info", "position_infos", etc.
+spike_times = data["spike_times"]
+
+# NEW WAY (type-safe)
+from continuum_swr_replay.types import SessionDataKeys as SDK
+
+data = load_data(...)
+position_info = data[SDK.POSITION_INFO]  # IDE autocomplete, typo-proof
+spike_times = data[SDK.SPIKE_TIMES]
+```
+
+**Key Constants Organized by Category:**
+- Position and tracking: 4 keys
+- Neural data: 2 keys
+- LFP ripple band: 5 keys
+- LFP theta band: 3 keys
+- Multi-unit activity: 3 keys
+- Task events: 3 keys
+- Behavioral data: 3 keys
+- Metadata: 1 key
+- **Total: 24 string constants** matching all SessionData keys
+
+**Next Steps:**
+- Ready for commit
+- Consider: ARCH-9.3 (Organize constants into submodules)
 
 ---
 

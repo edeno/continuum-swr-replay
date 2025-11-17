@@ -133,6 +133,61 @@ class SessionData(TypedDict, total=False):
     electrode_group_info: pd.DataFrame
 
 
+class SessionDataKeys:
+    """String constants for SessionData dictionary keys.
+
+    Use these constants instead of string literals to prevent typos
+    and enable IDE autocomplete when accessing SessionData dictionaries.
+
+    Example
+    -------
+    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> data = load_data(...)
+    >>> position_info = data[SDK.POSITION_INFO]  # Instead of data["position_info"]
+    >>> spike_times = data[SDK.SPIKE_TIMES]      # Instead of data["spike_times"]
+    """
+
+    # Position and tracking
+    POSITION_INFO = "position_info"
+    TRACK_GRAPH = "track_graph"
+    LINEAR_EDGE_ORDER = "linear_edge_order"
+    LINEAR_EDGE_SPACING = "linear_edge_spacing"
+
+    # Neural data - spike times and waveforms
+    SPIKE_TIMES = "spike_times"
+    SPIKE_WAVEFORM_FEATURES = "spike_waveform_features"
+
+    # LFP data - ripple band
+    RIPPLE_TIMES = "ripple_times"
+    RIPPLE_FILTERED_LFPS = "ripple_filtered_lfps"
+    RIPPLE_LFPS = "ripple_lfps"
+    RIPPLE_CONSENSUS_TRACE = "ripple_consensus_trace"
+    ZSCORED_RIPPLE_CONSENSUS_TRACE = "zscored_ripple_consensus_trace"
+
+    # LFP data - theta band
+    THETA_FILTERED_LFP = "theta_filtered_lfp"
+    THETA_PHASE = "theta_phase"
+    THETA_POWER = "theta_power"
+
+    # Multi-unit activity
+    HSE_TIMES = "hse_times"
+    MULTIUNIT_FIRING_RATE = "multiunit_firing_rate"
+    MULTIUNIT_RATE_ZSCORE = "multiunit_rate_zscore"
+
+    # Task events from DIO
+    BEAM_BREAKS = "beam_breaks"
+    PUMP_EVENTS = "pump_events"
+    LIGHT_EVENTS = "light_events"
+
+    # Behavioral data
+    WELL_VISITS = "well_visits"
+    TRIALS = "trials"
+    TASK_VARIABLES = "task_variables"
+
+    # Metadata
+    ELECTRODE_GROUP_INFO = "electrode_group_info"
+
+
 class ClusterlessParams(TypedDict):
     """Parameters for clusterless decoder (used for HPC).
 
@@ -312,6 +367,7 @@ class WellNodeData(TypedDict):
 __all__ = [
     # Main data structures
     "SessionData",
+    "SessionDataKeys",
     # Decoding parameters
     "ClusterlessParams",
     "SortedSpikesParams",
