@@ -97,10 +97,10 @@ def get_epoch_info() -> pd.DataFrame:
                 Session
                 & [
                     {
-                        "nwb_file_name": nwbf,
+                        "nwb_file_name": nwb_file_name,
                         "session_description": "Spatial bandit task (regular)",
                     }
-                    for nwbf in NWB_FILES
+                    for nwb_file_name in NWB_FILES
                 ]
             )
             * PositionIntervalMap

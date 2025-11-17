@@ -126,12 +126,17 @@ def detect_coincident_spikes(
     )
     # Calculate coincident fraction to identify artifacts
     n_sort_groups = len(spike_times)
-    frac = (
-        df.loc[df.labels > 0].groupby("labels").sort_group_id.nunique() / n_sort_groups
+    coincident_fraction = (
+        df.loc[df.labels > 0]
+        .groupby("labels")
+        .sort_group_id.nunique()
+        / n_sort_groups
     )
-    frac = frac[frac > max_coincident_fraction]
+    artifact_labels = coincident_fraction[
+        coincident_fraction > max_coincident_fraction
+    ]
 
-    df = df.loc[~df.labels.isin(frac.index)]
+    df = df.loc[~df.labels.isin(artifact_labels.index)]
 
     filtered_spike_times = (
         df.groupby("sort_group_id").spike_times.apply(np.array).tolist()
@@ -157,15 +162,15 @@ def get_electrode_group_info(nwb_file_name: str) -> pd.DataFrame:
         Electrode group information with targeted location labels
     """
     nwb_file_abspath = Nwbfile.get_abs_path(nwb_file_name)
-    nwbf = get_nwb_file(nwb_file_abspath)
+    nwb_file = get_nwb_file(nwb_file_abspath)
     electrode_group_df = []
-    for electrode_group in nwbf.electrode_groups.values():
-        cur = {
+    for electrode_group in nwb_file.electrode_groups.values():
+        group_info = {
             "electrode_group_name": electrode_group.name,
             "description": electrode_group.description,
         }
-        cur.update(electrode_group.fields)
-        electrode_group_df.append(cur)
+        group_info.update(electrode_group.fields)
+        electrode_group_df.append(group_info)
 
     electrode_group_df = (
         pd.DataFrame(electrode_group_df)
