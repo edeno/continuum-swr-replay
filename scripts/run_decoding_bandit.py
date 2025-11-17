@@ -1,11 +1,12 @@
 import logging
+import logging.config
 import os
 import subprocess
 import warnings
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import dask
 import numpy as np
@@ -93,7 +94,7 @@ def setup_logger(
     include_warnings: bool = True,
 ) -> logging.Logger:
     """
-    Sets up a logger that logs to console and a file using the original format.
+    Sets up a logger that logs to console and a file using declarative configuration.
 
     Parameters
     ----------
@@ -111,44 +112,59 @@ def setup_logger(
     logging.Logger
         Configured logger.
     """
-    logger = logging.getLogger(name_logfile)
-    logger.setLevel(level)
-    logger.propagate = False  # avoid double-logging via root
+    log_path = Path(path_logfile)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Only configure once to prevent duplicate handlers
-    if not logger.handlers:
-        # Ensure the directory exists
-        log_path = Path(path_logfile)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+    level_name = logging.getLevelName(level)
 
-        formatter = logging.Formatter(
-            "%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
-        )
+    config: dict[str, Any] = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "skip_checksum": {
+                "()": SkipChecksumFilter,
+            },
+        },
+        "formatters": {
+            "standard": {
+                "format": "%(asctime)s %(message)s",
+                "datefmt": "%d-%b-%y %H:%M:%S",
+            },
+        },
+        "handlers": {
+            "file": {
+                "class": "logging.FileHandler",
+                "filename": str(log_path),
+                "mode": "w",
+                "encoding": "utf-8",
+                "formatter": "standard",
+                "filters": ["skip_checksum"],
+            },
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "standard",
+                "filters": ["skip_checksum"],
+            },
+        },
+        "loggers": {
+            name_logfile: {
+                "handlers": ["file", "console"],
+                "level": level_name,
+                "propagate": False,
+            },
+        },
+    }
 
-        # File handler (overwrite each run, like your original "w")
-        file_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
-        file_handler.setFormatter(formatter)
-        file_handler.addFilter(SkipChecksumFilter())
-        logger.addHandler(file_handler)
+    if include_warnings:
+        logging.captureWarnings(True)
+        config["loggers"]["py.warnings"] = {
+            "handlers": ["console"],
+            "level": level_name,
+            "propagate": False,
+        }
 
-        # Console handler
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-        stream_handler.addFilter(SkipChecksumFilter())
-        logger.addHandler(stream_handler)
-
-        if include_warnings:
-            # Route warnings through logging so they respect filters/format
-            logging.captureWarnings(True)
-            warnings_logger = logging.getLogger("py.warnings")
-            warnings_logger.setLevel(level)
-            # avoid duplicating handlers on 'py.warnings'
-            if not warnings_logger.handlers:
-                wh = logging.StreamHandler()
-                wh.setFormatter(formatter)
-                warnings_logger.addHandler(wh)
-
-    return logger
+    logging.config.dictConfig(config)
+    return logging.getLogger(name_logfile)
 
 
 def results_exist(

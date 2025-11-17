@@ -1,7 +1,145 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-17
-**Current Task:** CB-8.1 - Remove obvious comments
+**Current Task:** CB-8.2 - Use logging.config.dictConfig
+
+## Session Notes
+
+### 2025-11-17: CB-8.2 - COMPLETED ✅
+
+**Task:** Refactor logging setup to use `logging.config.dictConfig` instead of imperative code
+
+**Status:** COMPLETED - Cleaner, more maintainable logging configuration
+
+**Actions Taken:**
+1. ✅ Read current imperative logging setup in run_decoding_bandit.py (lines 88-151)
+2. ✅ Refactored setup_logger() to use logging.config.dictConfig
+   - Created declarative config dictionary with filters, formatters, handlers, loggers
+   - Maintained all functionality: file handler, console handler, SkipChecksumFilter
+   - Kept include_warnings support for py.warnings logger
+   - Config supports dynamic log path and custom logger name
+3. ✅ Added `import logging.config` to imports
+4. ✅ Added `Any` import for type annotation
+5. ✅ Added type annotation `config: dict[str, Any]` to fix mypy error
+6. ✅ Ruff: All checks passed ✅
+7. ✅ Mypy: Success (no issues found) ✅
+
+**Files Modified:**
+- Updated: `scripts/run_decoding_bandit.py` (setup_logger function, imports)
+- Updated: `TASKS.md` (marked CB-8.2 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Before & After:**
+
+```python
+# BEFORE: Imperative logging setup (65 lines)
+def setup_logger(...) -> logging.Logger:
+    logger = logging.getLogger(name_logfile)
+    logger.setLevel(level)
+    logger.propagate = False
+
+    if not logger.handlers:
+        log_path = Path(path_logfile)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        formatter = logging.Formatter(
+            "%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+        )
+
+        file_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        file_handler.addFilter(SkipChecksumFilter())
+        logger.addHandler(file_handler)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        stream_handler.addFilter(SkipChecksumFilter())
+        logger.addHandler(stream_handler)
+
+        if include_warnings:
+            logging.captureWarnings(True)
+            warnings_logger = logging.getLogger("py.warnings")
+            warnings_logger.setLevel(level)
+            if not warnings_logger.handlers:
+                wh = logging.StreamHandler()
+                wh.setFormatter(formatter)
+                warnings_logger.addHandler(wh)
+
+    return logger
+
+# AFTER: Declarative dictConfig (53 lines, cleaner structure)
+def setup_logger(...) -> logging.Logger:
+    log_path = Path(path_logfile)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    level_name = logging.getLevelName(level)
+
+    config: dict[str, Any] = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "skip_checksum": {"()": SkipChecksumFilter},
+        },
+        "formatters": {
+            "standard": {
+                "format": "%(asctime)s %(message)s",
+                "datefmt": "%d-%b-%y %H:%M:%S",
+            },
+        },
+        "handlers": {
+            "file": {
+                "class": "logging.FileHandler",
+                "filename": str(log_path),
+                "mode": "w",
+                "encoding": "utf-8",
+                "formatter": "standard",
+                "filters": ["skip_checksum"],
+            },
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "standard",
+                "filters": ["skip_checksum"],
+            },
+        },
+        "loggers": {
+            name_logfile: {
+                "handlers": ["file", "console"],
+                "level": level_name,
+                "propagate": False,
+            },
+        },
+    }
+
+    if include_warnings:
+        logging.captureWarnings(True)
+        config["loggers"]["py.warnings"] = {
+            "handlers": ["console"],
+            "level": level_name,
+            "propagate": False,
+        }
+
+    logging.config.dictConfig(config)
+    return logging.getLogger(name_logfile)
+```
+
+**Key Design Decisions:**
+- Used declarative dict config instead of imperative handler creation
+- Maintained all original functionality (no behavioral changes)
+- Config structure follows logging.config.dictConfig specification
+- SkipChecksumFilter specified with `"()": SkipChecksumFilter` for custom filter class
+- Dynamic values (log_path, level, name_logfile) still set programmatically as needed
+- Type annotation `dict[str, Any]` resolves mypy indexed assignment error
+
+**Benefits:**
+- **Cleaner structure:** Configuration is self-documenting and easier to understand ✅
+- **More maintainable:** Easier to modify logging config without touching handler creation logic ✅
+- **Standard Python pattern:** Uses built-in logging.config.dictConfig (PEP 391) ✅
+- **Same functionality:** All original features preserved (file + console, filters, warnings) ✅
+- **Better separation:** Config structure separated from setup logic ✅
+
+**Time:** 25 minutes
+
+---
 
 ## Session Notes
 

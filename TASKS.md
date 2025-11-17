@@ -294,9 +294,12 @@
   - **COMPLETED:** Removed ~30 obvious comments from spikes.py, figure_utilities.py, utils.py
   - Comments now explain rationale, not implementation details
 
-- [ ] **CB-8.2:** Use `logging.config.dictConfig` in run_decoding_bandit.py
+- [x] **CB-8.2:** Use `logging.config.dictConfig` in run_decoding_bandit.py
   - Replace imperative logging setup
   - Cleaner, more maintainable config
+  - **COMPLETED:** Refactored setup_logger() to use declarative dictConfig
+  - Cleaner, more maintainable configuration structure
+  - Same functionality: file + console handlers with SkipChecksumFilter
 
 - [ ] **CB-8.3:** Add validation to DecodingParameters dataclass
   - Validate `block_size` is power of 2
