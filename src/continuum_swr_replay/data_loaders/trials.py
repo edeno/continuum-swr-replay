@@ -1,28 +1,11 @@
 """Trial and well visit construction from task events."""
 
-from typing import TypedDict
-
 import networkx as nx
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 
+from ..types import WellNodeData
 from .constants import WELL_PATCH_MAPPING
-
-
-class WellNodeData(TypedDict):
-    """Return type for get_start_end_node_id function.
-
-    Attributes
-    ----------
-    from_well : NDArray[np.int_]
-        Array of starting well node IDs
-    to_well : NDArray[np.int_]
-        Array of ending well node IDs
-    """
-
-    from_well: NDArray[np.int_]
-    to_well: NDArray[np.int_]
 
 
 def get_poke_in_poke_out_times(

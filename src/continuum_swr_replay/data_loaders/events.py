@@ -1,34 +1,17 @@
 """DIO event data loading."""
 
 import warnings
-from typing import TypedDict
 
 import numpy as np
 import pandas as pd
 from spyglass.common import DIOEvents
 
+from ..types import DIOEventData
+
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
-
-
-class DIOEventData(TypedDict):
-    """Return type for load_dios function.
-
-    Attributes
-    ----------
-    beam_breaks : pd.DataFrame
-        DataFrame with beam break events (poke-in/poke-out)
-    pump_events : pd.DataFrame
-        DataFrame with reward pump events
-    light_events : pd.DataFrame
-        DataFrame with light on/off events
-    """
-
-    beam_breaks: pd.DataFrame
-    pump_events: pd.DataFrame
-    light_events: pd.DataFrame
 
 
 def convert_dio_events_to_start_stop_times(

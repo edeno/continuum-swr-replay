@@ -2,6 +2,12 @@
 
 This module provides shared TypedDicts and type aliases used across
 data loading, analysis, and visualization modules.
+
+All TypedDicts are consolidated here for:
+- Single source of truth for type definitions
+- Easier discovery and maintenance
+- Consistent type annotations across modules
+- Better IDE autocomplete support
 """
 
 from typing import TypedDict
@@ -9,6 +15,7 @@ from typing import TypedDict
 import networkx as nx
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 
 class SessionData(TypedDict, total=False):
@@ -167,8 +174,153 @@ class SortedSpikesParams(TypedDict):
     block_size: int
 
 
+# Data loader return types
+# =========================
+
+
+class PositionInfoDict(TypedDict):
+    """Return type for get_position_info() in data_loaders.position.
+
+    Attributes
+    ----------
+    position_info : pd.DataFrame
+        Time-indexed DataFrame with position tracking data
+    linear_edge_order : list[tuple[int, int]]
+        List of edges for linearization in order
+    linear_edge_spacing : list[float]
+        List of edge spacings for linearization
+    track_graph : nx.Graph
+        NetworkX graph representing track topology
+    """
+
+    position_info: pd.DataFrame
+    linear_edge_order: list[tuple[int, int]]
+    linear_edge_spacing: list[float]
+    track_graph: nx.Graph
+
+
+class SpikeDataDict(TypedDict):
+    """Return type for get_spike_data() in data_loaders.spikes.
+
+    Attributes
+    ----------
+    spike_times : dict[str, list[NDArray[np.float64]]]
+        Spike times organized by brain area (e.g., "HPC", "mPFC", "OFC").
+        Each area contains a list of arrays, one per sort group/unit.
+    spike_waveform_features : dict[str, list[NDArray[np.float64]]]
+        Waveform features for clusterless decoding (primarily HPC).
+        Shape: (n_spikes, n_features) per sort group.
+    """
+
+    spike_times: dict[str, list[NDArray[np.float64]]]
+    spike_waveform_features: dict[str, list[NDArray[np.float64]]]
+
+
+class DIOEventData(TypedDict):
+    """Return type for load_dios() in data_loaders.events.
+
+    Attributes
+    ----------
+    beam_breaks : pd.DataFrame
+        DataFrame with beam break events (poke-in/poke-out)
+    pump_events : pd.DataFrame
+        DataFrame with reward pump events
+    light_events : pd.DataFrame
+        DataFrame with light on/off events
+    """
+
+    beam_breaks: pd.DataFrame
+    pump_events: pd.DataFrame
+    light_events: pd.DataFrame
+
+
+class ThetaData(TypedDict):
+    """Return type for get_theta() in data_loaders.lfp.
+
+    Attributes
+    ----------
+    theta_filtered_lfp : pd.DataFrame
+        Theta-band filtered LFP data
+    theta_phase : pd.Series
+        Theta phase timeseries
+    theta_power : pd.Series
+        Theta power timeseries
+    """
+
+    theta_filtered_lfp: pd.DataFrame
+    theta_phase: pd.Series
+    theta_power: pd.Series
+
+
+class RippleData(TypedDict):
+    """Return type for get_ripple() in data_loaders.lfp.
+
+    Attributes
+    ----------
+    ripple_times : pd.DataFrame
+        DataFrame with ripple start/end times
+    ripple_filtered_lfps : pd.DataFrame
+        Ripple-band filtered LFP data
+    ripple_lfps : pd.DataFrame
+        Raw LFP data for ripple band
+    ripple_consensus_trace : pd.Series
+        Ripple consensus trace (combined signal across electrodes)
+    zscored_ripple_consensus_trace : pd.Series
+        Z-scored ripple consensus trace
+    """
+
+    ripple_times: pd.DataFrame
+    ripple_filtered_lfps: pd.DataFrame
+    ripple_lfps: pd.DataFrame
+    ripple_consensus_trace: pd.Series
+    zscored_ripple_consensus_trace: pd.Series
+
+
+class MultiunitData(TypedDict):
+    """Return type for get_multiunit() in data_loaders.lfp.
+
+    Attributes
+    ----------
+    hse_times : dict[str, pd.DataFrame]
+        High synchrony event times for each brain area
+    multiunit_firing_rate : dict[str, pd.DataFrame]
+        Population firing rates for each brain area
+    multiunit_rate_zscore : dict[str, pd.DataFrame]
+        Z-scored firing rates for each brain area
+    """
+
+    hse_times: dict[str, pd.DataFrame]
+    multiunit_firing_rate: dict[str, pd.DataFrame]
+    multiunit_rate_zscore: dict[str, pd.DataFrame]
+
+
+class WellNodeData(TypedDict):
+    """Return type for get_start_end_node_id() in data_loaders.trials.
+
+    Attributes
+    ----------
+    from_well : NDArray[np.int_]
+        Array of starting well node IDs
+    to_well : NDArray[np.int_]
+        Array of ending well node IDs
+    """
+
+    from_well: NDArray[np.int_]
+    to_well: NDArray[np.int_]
+
+
 __all__ = [
+    # Main data structures
     "SessionData",
+    # Decoding parameters
     "ClusterlessParams",
     "SortedSpikesParams",
+    # Data loader return types
+    "PositionInfoDict",
+    "SpikeDataDict",
+    "DIOEventData",
+    "ThetaData",
+    "RippleData",
+    "MultiunitData",
+    "WellNodeData",
 ]

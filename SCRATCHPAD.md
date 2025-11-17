@@ -1,9 +1,144 @@
 # Development Scratchpad
 
 **Last Updated:** 2025-11-17
-**Current Task:** CB-8.5 - Ensure consistent pathlib.Path usage
+**Current Task:** ARCH-9.1 - Create comprehensive types.py module
 
 ## Session Notes
+
+### 2025-11-17: ARCH-9.1 - COMPLETED ✅
+
+**Task:** Create comprehensive `types.py` module with all TypedDicts in one place
+
+**Status:** COMPLETED - Consolidated all TypedDicts into central types.py
+
+**Actions Taken:**
+1. ✅ Searched for all TypedDict definitions across codebase
+   - Found 7 TypedDicts scattered across data_loaders modules
+   - No Protocol definitions found in codebase
+2. ✅ Reviewed existing types.py structure
+   - Already contained SessionData, ClusterlessParams, SortedSpikesParams
+3. ✅ Added 7 data loader TypedDicts to types.py:
+   - `PositionInfoDict` (from position.py)
+   - `SpikeDataDict` (from spikes.py)
+   - `DIOEventData` (from events.py)
+   - `ThetaData` (from lfp.py)
+   - `RippleData` (from lfp.py)
+   - `MultiunitData` (from lfp.py)
+   - `WellNodeData` (from trials.py)
+4. ✅ Updated docstring with consolidation benefits
+5. ✅ Added `from numpy.typing import NDArray` import
+6. ✅ Organized TypedDicts with section header "Data loader return types"
+7. ✅ Updated `__all__` with all 10 TypedDicts
+8. ✅ Updated imports in 5 data_loaders modules:
+   - spikes.py: Import SpikeDataDict from ..types
+   - events.py: Import DIOEventData from ..types
+   - position.py: Import PositionInfoDict from ..types
+   - trials.py: Import WellNodeData from ..types (removed unused NDArray)
+   - lfp.py: Import ThetaData, RippleData, MultiunitData from ..types
+9. ✅ Removed all local TypedDict class definitions
+10. ✅ Removed unused `from typing import TypedDict` imports
+11. ✅ All 25 data loader tests pass ✅
+12. ✅ Mypy: Success (no issues in 10 source files) ✅
+13. ✅ Ruff: All checks passed ✅
+14. ✅ Updated TASKS.md with completion notes
+15. ✅ Updated SCRATCHPAD.md (this file)
+
+**Files Modified:**
+- Updated: `src/continuum_swr_replay/types.py` (+157 lines: 7 TypedDicts, docstring, imports, __all__)
+- Updated: `src/continuum_swr_replay/data_loaders/spikes.py` (removed SpikeDataDict, updated import)
+- Updated: `src/continuum_swr_replay/data_loaders/events.py` (removed DIOEventData, updated import)
+- Updated: `src/continuum_swr_replay/data_loaders/position.py` (removed PositionInfoDict, updated import)
+- Updated: `src/continuum_swr_replay/data_loaders/trials.py` (removed WellNodeData, updated import, removed unused NDArray)
+- Updated: `src/continuum_swr_replay/data_loaders/lfp.py` (removed 3 TypedDicts, updated import)
+- Updated: `TASKS.md` (marked ARCH-9.1 complete)
+- Updated: `SCRATCHPAD.md` (this file)
+
+**Before & After:**
+
+```python
+# BEFORE: TypedDicts scattered across modules
+# src/continuum_swr_replay/data_loaders/spikes.py
+from typing import TypedDict
+
+class SpikeDataDict(TypedDict):
+    spike_times: dict[str, list[NDArray[np.float64]]]
+    spike_waveform_features: dict[str, list[NDArray[np.float64]]]
+
+# src/continuum_swr_replay/data_loaders/events.py
+from typing import TypedDict
+
+class DIOEventData(TypedDict):
+    beam_breaks: pd.DataFrame
+    pump_events: pd.DataFrame
+    light_events: pd.DataFrame
+
+# ... and 5 more scattered across position.py, trials.py, lfp.py
+
+# AFTER: All TypedDicts in types.py
+# src/continuum_swr_replay/types.py
+class SpikeDataDict(TypedDict):
+    """Return type for get_spike_data() in data_loaders.spikes."""
+    spike_times: dict[str, list[NDArray[np.float64]]]
+    spike_waveform_features: dict[str, list[NDArray[np.float64]]]
+
+class DIOEventData(TypedDict):
+    """Return type for load_dios() in data_loaders.events."""
+    beam_breaks: pd.DataFrame
+    pump_events: pd.DataFrame
+    light_events: pd.DataFrame
+
+# ... all 10 TypedDicts in one place
+
+# src/continuum_swr_replay/data_loaders/spikes.py
+from ..types import SpikeDataDict
+
+# src/continuum_swr_replay/data_loaders/events.py
+from ..types import DIOEventData
+```
+
+**Benefits:**
+
+1. **Single source of truth** ✅
+   - All TypedDicts defined in one module
+   - Easy to find and review all type definitions
+   - No duplication or inconsistency
+
+2. **Better IDE support** ✅
+   - Autocomplete shows all available types from one import
+   - Jump-to-definition goes to central location
+   - Easier to discover what types are available
+
+3. **Improved maintainability** ✅
+   - Changes to types happen in one place
+   - Clear separation of concerns (types vs implementation)
+   - Easier to add new TypedDicts consistently
+
+4. **Better documentation** ✅
+   - Each TypedDict includes which function returns it
+   - Organized by category (main data, decoding params, loader returns)
+   - Clear docstrings for all types
+
+5. **Type safety** ✅
+   - All imports verified by mypy
+   - NDArray properly typed for numpy arrays
+   - Consistent type annotations across modules
+
+**Key Consolidation:**
+
+- **10 TypedDicts** total in types.py:
+  - 3 existing: SessionData, ClusterlessParams, SortedSpikesParams
+  - 7 newly consolidated: SpikeDataDict, DIOEventData, PositionInfoDict, ThetaData, RippleData, MultiunitData, WellNodeData
+
+- **5 modules** updated to import from types.py:
+  - spikes.py, events.py, position.py, trials.py, lfp.py
+
+- **No Protocols** found in codebase (future opportunity)
+
+**Next Steps:**
+- Ready for commit
+- Consider: ARCH-9.2 (Define string keys as constants)
+
+---
 
 ### 2025-11-17: CB-8.5 - COMPLETED ✅
 

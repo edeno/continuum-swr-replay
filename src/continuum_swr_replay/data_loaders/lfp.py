@@ -1,7 +1,6 @@
 """LFP, ripple, theta, and multiunit data loading."""
 
 import warnings
-from typing import TypedDict
 
 import numpy as np
 import pandas as pd
@@ -15,70 +14,12 @@ from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
 from spyglass.lfp.lfp_merge import LFPOutput
 from spyglass.ripple.v1 import RippleTimesV1
 
+from ..types import MultiunitData, RippleData, ThetaData
+
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
-
-
-class ThetaData(TypedDict):
-    """Return type for get_theta function.
-
-    Attributes
-    ----------
-    theta_filtered_lfp : pd.DataFrame
-        Theta-band filtered LFP data
-    theta_phase : pd.Series
-        Theta phase timeseries
-    theta_power : pd.Series
-        Theta power timeseries
-    """
-
-    theta_filtered_lfp: pd.DataFrame
-    theta_phase: pd.Series
-    theta_power: pd.Series
-
-
-class RippleData(TypedDict):
-    """Return type for get_ripple function.
-
-    Attributes
-    ----------
-    ripple_times : pd.DataFrame
-        DataFrame with ripple start/end times
-    ripple_filtered_lfps : pd.DataFrame
-        Ripple-band filtered LFP data
-    ripple_lfps : pd.DataFrame
-        Raw LFP data for ripple band
-    ripple_consensus_trace : pd.Series
-        Ripple consensus trace (combined signal across electrodes)
-    zscored_ripple_consensus_trace : pd.Series
-        Z-scored ripple consensus trace
-    """
-
-    ripple_times: pd.DataFrame
-    ripple_filtered_lfps: pd.DataFrame
-    ripple_lfps: pd.DataFrame
-    ripple_consensus_trace: pd.Series
-    zscored_ripple_consensus_trace: pd.Series
-
-
-class MultiunitData(TypedDict):
-    """Return type for get_multiunit function.
-
-    Attributes
-    ----------
-    hse_times : dict[str, pd.DataFrame]
-        High synchrony event times for each brain area
-    multiunit_firing_rate : dict[str, pd.DataFrame]
-        Population firing rates for each brain area
-    multiunit_rate_zscore : dict[str, pd.DataFrame]
-        Z-scored firing rates for each brain area
-    """
-
-    hse_times: dict[str, pd.DataFrame]
-    multiunit_firing_rate: dict[str, pd.DataFrame]
-    multiunit_rate_zscore: dict[str, pd.DataFrame]
 
 
 def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:

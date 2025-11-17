@@ -45,7 +45,6 @@ from __future__ import annotations
 
 import itertools
 import warnings
-from typing import TypedDict
 
 import numpy as np
 import pandas as pd
@@ -56,17 +55,12 @@ from spyglass.decoding.v0.clusterless import UnitMarks
 from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
 from spyglass.utils.nwb_helper_fn import get_nwb_file
 
+from ..types import SpikeDataDict
+
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
-
-
-class SpikeDataDict(TypedDict):
-    """Type definition for spike data dictionary returned by get_spike_data."""
-
-    spike_times: dict[str, list[NDArray[np.float64]]]
-    spike_waveform_features: dict[str, list[NDArray[np.float64]]]
 
 
 def detect_coincident_spikes(

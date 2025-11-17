@@ -355,10 +355,15 @@
 
 ### Type System Reorganization
 
-- [ ] **ARCH-9.1:** Create comprehensive `types.py` module
-  - All TypedDicts in one place
-  - All Protocols defined
-  - Import from single source
+- [x] **ARCH-9.1:** Create comprehensive `types.py` module ✅
+  - Consolidated 7 TypedDicts from data_loaders into types.py:
+    - `SpikeDataDict`, `DIOEventData`, `PositionInfoDict`, `WellNodeData`
+    - `ThetaData`, `RippleData`, `MultiunitData`
+  - All TypedDicts now imported from single source (`continuum_swr_replay.types`)
+  - Updated imports in 5 data_loaders modules (spikes, events, position, trials, lfp)
+  - Added NDArray import for proper type annotations
+  - No Protocols currently in codebase
+  - All 25 data loader tests pass, mypy and ruff clean ✅
 
 - [ ] **ARCH-9.2:** Define string keys as constants
   - Create `SessionDataKeys` class

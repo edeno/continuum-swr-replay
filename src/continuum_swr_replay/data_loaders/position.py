@@ -26,7 +26,6 @@ trials : Trial construction that depends on position data
 from __future__ import annotations
 
 import warnings
-from typing import TypedDict
 
 import networkx as nx
 import numpy as np
@@ -39,21 +38,13 @@ from spyglass.linearization.v0.main import IntervalLinearizedPosition, TrackGrap
 from spyglass.position import PositionOutput
 from track_linearization import get_linearized_position
 
+from ..types import PositionInfoDict
 from .constants import TRACK_SEGMENT_TO_PATCH
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
-
-
-class PositionInfoDict(TypedDict):
-    """Type definition for position data dictionary returned by get_position_info."""
-
-    position_info: pd.DataFrame
-    linear_edge_order: list[tuple[int, int]]
-    linear_edge_spacing: list[float]
-    track_graph: nx.Graph
 
 
 def get_interpolated_position_info(
