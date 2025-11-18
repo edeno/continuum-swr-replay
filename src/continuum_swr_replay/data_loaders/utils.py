@@ -1,4 +1,58 @@
-"""Utility functions for data loading."""
+"""Utility functions for data loading.
+
+This module provides helper functions for data loading, session management, and
+time-based data filtering. These utilities support the main data loading pipeline
+by handling NWB file parsing, epoch discovery, event labeling, and training data
+selection for decoding models.
+
+Main Functions
+--------------
+get_epoch_info
+    Queries Spyglass database for all available epochs across animals. Results are
+    cached for efficiency. This is the primary entry point for discovering available
+    data sessions.
+get_training_timepoints
+    Creates boolean masks to select time points for decoder training, with options
+    to exclude ripple times or use all data.
+get_labels
+    Efficiently labels time points with event IDs using vectorized binary search.
+parse_nwb_filename
+    Extracts animal name and date from NWB filenames.
+
+Features
+--------
+- Cached database queries: get_epoch_info uses @cache to avoid redundant queries
+- Efficient time labeling: get_labels uses np.searchsorted for O(n log n) complexity
+- Type-safe training selection: Supports both TrainingType enum and string inputs
+- Robust parsing: Validates NWB filename format with regex
+
+Notes
+-----
+- All database queries use Spyglass DataJoint tables (Session, IntervalList, etc.)
+- Warning filters suppress verbose pynwb/hdmf/datajoint logging
+- Cached results persist for the entire Python session
+- Time indices are always in seconds
+
+See Also
+--------
+continuum_swr_replay.data_loaders.bandit_task : Main data loading orchestration
+continuum_swr_replay.data_loaders.constants : NWB_FILES list and task constants
+continuum_swr_replay.parameters : TrainingType enum definition
+continuum_swr_replay.types : SessionData TypedDict
+
+Examples
+--------
+>>> # Get all available epochs
+>>> epoch_info = get_epoch_info()
+>>> epoch_info[["animal", "date", "epoch"]].head()
+
+>>> # Parse filename
+>>> animal, date = parse_nwb_filename("chimi20200212_.nwb")
+
+>>> # Get training mask excluding ripples
+>>> from continuum_swr_replay.parameters import TrainingType
+>>> mask = get_training_timepoints(data, TrainingType.NO_RIPPLE)
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,52 @@
-"""LFP, ripple, theta, and multiunit data loading."""
+"""LFP, ripple, theta, and multiunit data loading.
+
+This module provides functions for loading local field potential (LFP) data from
+Spyglass/NWB files, including theta oscillations, ripple events, and multiunit
+activity. All data is extracted from the Spyglass DataJoint pipeline and returned
+as time-indexed pandas DataFrames or TypedDicts.
+
+Main Functions
+--------------
+get_theta
+    Load theta-band (5-11 Hz) filtered LFP with phase and power estimates.
+get_ripple
+    Load ripple-band (150-250 Hz) filtered LFP and detected ripple events.
+get_multiunit
+    Compute multiunit high-synchrony events (HSE) from spike times across brain areas.
+
+Helper Functions
+----------------
+get_multiunit_HSE
+    Compute HSE detection for a single brain area's spike data.
+filter_ripple_lfp_time
+    Filter ripple data to match position time bounds.
+
+Data Sources
+------------
+The module queries the following Spyglass DataJoint tables:
+- LFPBandV1: Band-pass filtered LFP data
+- LFPOutput: Raw LFP traces
+- RippleTimesV1: Detected ripple events using Kay detector
+
+Notes
+-----
+- All time indices are in seconds
+- Theta phase is computed from the first reference electrode
+- Ripple consensus trace combines multiple electrodes for robust detection
+- HSE detection uses the ripple_detection package with default thresholds
+- Z-scored traces handle constant values to avoid division by zero
+
+See Also
+--------
+continuum_swr_replay.types : ThetaData, RippleData, MultiunitData TypedDicts
+continuum_swr_replay.data_loaders.spikes : Spike data loading
+
+Examples
+--------
+>>> theta_data = get_theta("chimi20200212_.nwb", "02_r1")
+>>> ripple_data = get_ripple("chimi20200212_.nwb", "02_r1", "Kay")
+>>> multiunit_data = get_multiunit(spike_times, position_info)
+"""
 
 import warnings
 

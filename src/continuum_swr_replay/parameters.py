@@ -1,3 +1,66 @@
+"""Global parameters and configuration for neural decoding analysis.
+
+This module provides centralized configuration for the continuum-swr-replay
+project, including spatial binning parameters, decoding model parameters,
+file paths, and analysis constants.
+
+Constants
+---------
+SAMPLING_FREQUENCY : int
+    Decoding sampling frequency (500 Hz). All temporal analyses use this rate.
+MAX_SPEED_THRESHOLD_CM_PER_SEC : float
+    Maximum speed threshold (4.0 cm/s) for filtering non-local events. Events
+    with speeds above this are likely not genuine replay events.
+ROOT_DIR : Path
+    Root directory of the project (parent of src/).
+PROCESSED_DATA_DIR : Path
+    Directory for saving analysis results and processed data.
+FIGURE_DIR : Path
+    Directory for saving generated figures.
+PLACE_BIN_SIZE_1D : float
+    Spatial bin size for 1D decoding (2.0 cm).
+PLACE_BIN_SIZE_2D : float
+    Spatial bin size for 2D decoding (3.5 cm).
+POSITION_STD : float
+    Spatial uncertainty standard deviation (~3.536 cm, derived from sqrt(12.5)).
+WAVEFORM_STD : float
+    Waveform feature space standard deviation (24.0 µV) for clusterless decoding.
+BLOCK_SIZE : int
+    GPU processing block size (1024) for memory management.
+DETECTOR_CONFIG : dict
+    Maps brain area names to detector class names and types.
+DECODING_PARAMS : DecodingParameters
+    Singleton instance with default decoding parameters.
+PROBABILITY_THRESHOLDS : list
+    Probability thresholds for posterior analysis [0.50, 0.80, 0.95].
+COLORS : dict
+    Color scheme for plotting different event types.
+
+Classes
+-------
+DecodingParameters
+    Dataclass containing validated decoding parameters.
+TrainingType
+    Enum for training data selection strategies (ALL or NO_RIPPLE).
+
+Notes
+-----
+All constants use type hints with Final[] to indicate they should not be
+modified. The DecodingParameters dataclass is frozen for immutability.
+
+See Also
+--------
+continuum_swr_replay.types : TypedDict definitions for data structures
+continuum_swr_replay.data_loaders.constants : Task-specific constants
+
+Examples
+--------
+>>> from continuum_swr_replay.parameters import DECODING_PARAMS, TrainingType
+>>> DECODING_PARAMS.place_bin_size
+2.0
+>>> TrainingType.NO_RIPPLE.value
+'no_ripple'
+"""
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path

@@ -1,4 +1,69 @@
-"""Task-specific derived variables computation."""
+"""Task-specific derived variables computation.
+
+This module computes task-relevant behavioral variables for the spatial bandit task,
+including trial timing, spatial progress, distance to goals, and turn sequences.
+These variables are essential for analyzing neural activity in relation to behavior
+and task structure.
+
+Main Functions
+--------------
+make_task_variables
+    Computes all task-specific derived variables for the entire session. This is the
+    primary entry point that orchestrates all variable computations and returns a
+    comprehensive DataFrame indexed by time.
+
+Helper Functions
+----------------
+path_progress_for_run_segment
+    Computes normalized progress (0-1) along a trial path using the track graph.
+dist_to_goal
+    Computes distance to goal well for all time points in a trial.
+dist_to_goal_per_time
+    Computes distance to goal for a single time point.
+turn_direction
+    Determines the sequence of left/right turns taken during a trial.
+
+Computed Variables
+------------------
+The make_task_variables function computes:
+
+Spatial variables:
+    - path_progress: Normalized (0-1) progress along current trial path
+    - dist_to_goal: Distance to goal well in graph distance units
+    - start_node_id: Starting well ID for current trial
+    - goal_node_id: Goal well ID for current trial
+
+Temporal variables:
+    - trial_number: Current trial index
+    - time_to_goal: Time elapsed since trial start (seconds)
+
+Behavioral variables:
+    - turn_direction: Sequence of turns (e.g., "left-right-left")
+    - is_no_reward_{N}: Reward omission indicators (N trials back, e.g., is_no_reward_1)
+    - is_patch_change{N}: Patch change indicators (N trials relative, e.g., is_patch_change-1)
+
+Notes
+-----
+- All variables are time-aligned and indexed by seconds
+- Path progress and distance calculations use NetworkX graph shortest paths
+- Turn directions are computed from track geometry using cross products
+- Division by zero is handled when start/end nodes are the same
+- Omission and patch change indicators support configurable trial shifts
+
+See Also
+--------
+continuum_swr_replay.data_loaders.trials : Trial construction from task events
+continuum_swr_replay.data_loaders.constants : Track graph structure and mappings
+continuum_swr_replay.types : TaskVariables TypedDict
+
+Examples
+--------
+>>> task_vars = make_task_variables(
+...     position_info, trials_df, track_graph,
+...     sampling_frequency=500.0
+... )
+>>> task_vars[["path_progress", "dist_to_goal", "turn_direction"]].head()
+"""
 
 import networkx as nx
 import numpy as np
@@ -252,8 +317,8 @@ def make_task_variables(
         - dist_to_goal
         - path_progress
         - turn_direction
-        - is_no_reward_N (for each shift in omission_shifts)
-        - is_patch_changeN (for each shift in patch_change_shifts)
+        - is_no_reward_{N} (for each N in omission_shifts, e.g., is_no_reward_1)
+        - is_patch_change{N} (for each N in patch_change_shifts, e.g., is_patch_change-1)
     """
     if omission_shifts is None:
         omission_shifts = list(range(1, 6))

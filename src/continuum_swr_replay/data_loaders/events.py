@@ -1,4 +1,68 @@
-"""DIO event data loading."""
+"""DIO event data loading.
+
+This module loads digital I/O (DIO) event data from Spyglass/NWB files. DIO events
+capture hardware-triggered signals from the behavioral apparatus, including beam
+breaks (well visits), reward pump activations, and environmental lights.
+
+These events are essential for constructing the task structure: identifying when the
+animal visits wells, receives rewards, and transitions between behavioral states.
+
+Main Functions
+--------------
+load_dios
+    Primary entry point that loads all DIO event types (beam breaks, pump events,
+    light events) for a given session and time range. Returns organized event data
+    as a TypedDict.
+
+Helper Functions
+----------------
+convert_dio_events_to_start_stop_times
+    Converts raw DIO binary signals to discrete events with start/end times.
+    Handles edge cases where events occur at data boundaries.
+
+Event Types
+-----------
+Beam Breaks (Poke events):
+    Triggered when animal's nose breaks infrared beams at well locations. Used to
+    identify well visits and construct trial structure. Event names match pattern
+    "Poke%".
+
+Pump Events:
+    Triggered when reward pump activates to deliver liquid reward. Used to identify
+    rewarded trials. Event names match pattern "Pump%".
+
+Light Events:
+    Environmental lighting changes during the task. Event names match pattern
+    "Light%".
+
+Data Structure
+--------------
+All events are returned as pandas DataFrames with:
+    - start_time: Event onset time (seconds)
+    - end_time: Event offset time (seconds)
+    - event_name: String identifier for the event type
+    - event_number: Sequential numbering within each event type
+    - Multi-index: (event_name, event_number)
+
+Notes
+-----
+- All times are in seconds
+- Events are filtered to valid_times range (typically epoch boundaries)
+- DIO data is binary (0/1) and converted to discrete intervals
+- Queries use Spyglass DIOEvents table with SQL-like LIKE pattern matching
+- Edge case: if event starts at last time point, end_time is clamped to last index
+
+See Also
+--------
+continuum_swr_replay.data_loaders.trials : Trial construction from DIO events
+continuum_swr_replay.types : DIOEventData TypedDict
+
+Examples
+--------
+>>> dio_data = load_dios("chimi20200212_.nwb", (100.0, 1000.0))
+>>> beam_breaks = dio_data["beam_breaks"]
+>>> pump_events = dio_data["pump_events"]
+"""
 
 import warnings
 

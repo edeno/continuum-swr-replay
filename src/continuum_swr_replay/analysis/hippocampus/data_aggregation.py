@@ -1,4 +1,104 @@
-"""Aggregation of analysis results over time."""
+"""Aggregation of analysis results over time.
+
+This module aggregates decoding results, posterior statistics, event detections, and
+behavioral data into comprehensive time-indexed DataFrames ready for visualization
+and statistical analysis. It serves as the bridge between raw decoding output and
+downstream analyses.
+
+The main function, get_data_over_time, combines:
+- Decoding state probabilities (local, non-local)
+- Posterior statistics (mean position, variance, HPD coverage)
+- Spatial variables (ahead/behind distance, MAP speed)
+- Event labels (ripples, confident events, movement)
+- Behavioral data (position, speed, task variables)
+
+Main Function
+-------------
+get_data_over_time
+    Primary aggregation function that combines all analysis components into a single
+    time-aligned DataFrame. Returns both the aggregated DataFrame and the conditional
+    non-local posterior distribution.
+
+Aggregated Data
+---------------
+The output DataFrame contains time-indexed columns for:
+
+Event labels (integer event numbers):
+    - non_local_event: Non-local event number (0 if not in event)
+    - SWR_event: Sharp-wave ripple event number
+    - MUA_event: Multiunit activity high-synchrony event number
+
+State probabilities (0-1):
+    - Local_prob: Probability of local state
+    - No-Spike_prob: Probability of no-spike state
+    - Non-Local_Continuous_prob: Probability of continuous non-local state
+    - Non-Local_Fragmented_prob: Probability of fragmented non-local state
+
+Spatial statistics:
+    - map_estimate: Maximum a posteriori position estimate (cm)
+    - map_speed: Speed of MAP position estimate (cm/s)
+    - ahead_behind_distance: Signed distance from actual to decoded position (cm)
+    - hpd: Highest posterior density threshold value
+    - max_coverage: Maximum HPD spatial coverage
+    - max_distance: Maximum distance in posterior
+    - max_linear_position: Maximum linear position
+
+Neural signals (z-scored or phase):
+    - theta_phase: Theta oscillation phase (radians)
+    - theta_power_zscore: Z-scored theta power
+    - SWR_zscore: Z-scored ripple consensus trace
+    - MUA_zscore: Z-scored multiunit firing rate
+
+Event counts (session-level):
+    - n_non_local, n_SWR, n_MUA: Total event counts
+    - n_non_local_SWR, n_non_local_no_SWR: Non-local overlaps with/without SWR
+    - n_non_local_MUA, n_non_local_no_MUA: Non-local overlaps with/without MUA
+    - n_SWR_MUA, n_SWR_no_MUA: SWR overlaps with/without MUA
+
+Session metadata:
+    - animal: Animal name (str)
+    - day: Recording date (int, YYYYMMDD)
+    - epoch: Epoch name (str)
+    - nwb_file_name: NWB file name (str)
+
+Position and behavioral data:
+    - All columns from position_info DataFrame (position, speed, track segment, etc.)
+
+Filtering and Processing
+-------------------------
+- Events exceeding max speed threshold are filtered out
+- Missing values are forward-filled to maintain continuity
+- Z-scoring is applied to relevant continuous variables
+- Event overlap detection uses interval-based logic
+- All data is aligned to the same temporal resolution (default 500 Hz)
+
+Notes
+-----
+- All data is time-indexed in seconds
+- Non-local threshold typically set to 0.8 for classification
+- Ahead/behind distance uses graph shortest path (can be negative)
+- MAP speed is smoothed before computation to reduce noise
+- Missing behavioral data is handled gracefully with forward-fill
+
+See Also
+--------
+continuum_swr_replay.analysis.hippocampus.posterior_analysis : Posterior statistics
+continuum_swr_replay.analysis.hippocampus.event_detection : Event detection functions
+continuum_swr_replay.data_loaders.bandit_task : Session data loading
+
+Examples
+--------
+>>> from continuum_swr_replay.analysis.hippocampus import load_results, get_data_over_time
+>>> results, detector, env = load_results("chimi20200212_02_r1_HPC")
+>>> data_df, posterior = get_data_over_time(
+...     data, results, env, "chimi20200212_.nwb", "02_r1",
+...     non_local_threshold=0.80
+... )
+>>> # Access aggregated data
+>>> data_df[["non_local_event", "ahead_behind_distance", "map_speed"]].head()
+>>> # Access state probabilities
+>>> data_df[["Local_prob", "Non-Local_Continuous_prob"]].head()
+"""
 
 import pandas as pd
 import xarray as xr

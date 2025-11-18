@@ -1,3 +1,112 @@
+"""Main script for running continuum neural decoding on spatial bandit task data.
+
+This script performs continuum (non-local) decoding of neural activity to identify
+hippocampal replay events during sharp-wave ripples (SWR). It processes sessions
+from the spatial bandit task, fitting non-local detectors to distinguish when neural
+activity represents the animal's current location versus distant locations (replay).
+
+The script supports:
+- Multi-session batch processing across animals
+- GPU-accelerated parallel decoding with Dask CUDA
+- Both clusterless (HPC) and sorted spikes (mPFC/OFC) decoding
+- Stationary and non-stationary state transition models
+- Interactive figurl visualization generation
+- Comprehensive logging and reproducibility tracking
+
+Usage
+-----
+Command-line interface with various options:
+
+# Decode all sessions for an animal
+python run_decoding_bandit.py --animal chimi --brain_area HPC
+
+# Decode specific session
+python run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
+
+# With non-stationary model and interactive visualization
+python run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+
+# Overwrite existing results
+python run_decoding_bandit.py --animal chimi --overwrite
+
+# Use specific GPUs
+python run_decoding_bandit.py --animal chimi --cuda_visible_devices "0,1,2,3"
+
+Workflow
+--------
+1. Parse command-line arguments to determine which sessions to process
+2. Set up GPU cluster (LocalCUDACluster) for parallel processing
+3. For each session:
+   a. Load data (position, spikes, LFP, task events)
+   b. Create environment (place bins, track graph)
+   c. Prepare training data (exclude ripples or use all data)
+   d. Fit detector model (NonLocalClusterlessDetector or NonLocalSortedSpikesDetector)
+   e. Run decoding to get posterior distributions
+   f. Compute derived measures (ahead/behind distance, HPD regions)
+   g. Save results (NetCDF), models (pickle), and logs
+   h. Optionally create interactive figurl visualization
+4. Process multiple sessions in parallel using Dask delayed
+
+Output Files
+------------
+Saved to PROCESSED_DATA_DIR (defined in parameters.py):
+
+{epoch_identifier}_results.nc
+    Decoding results as xarray Dataset (posterior distributions, state probabilities)
+{epoch_identifier}_detector.pkl
+    Fitted detector model (can be reloaded for analysis)
+{epoch_identifier}_environment.pkl
+    Environment configuration (place bins, track graph)
+{epoch_identifier}_{threshold}_data_over_time.pkl
+    Aggregated time-series data (decoding + behavioral variables)
+
+Logs written to logs/{epoch_identifier}.log with git hash for reproducibility.
+
+Configuration
+-------------
+- Detector class: Automatically selected based on brain_area (HPC uses clusterless,
+  mPFC/OFC use sorted spikes)
+- Place bin size: 2.0 cm for 1D, 3.5 cm for 2D
+- Position uncertainty: sqrt(12.5) ≈ 3.536 cm
+- Waveform uncertainty: 24.0 µV (clusterless only)
+- GPU block size: 1024 for memory management
+- Non-local threshold: 0.8 for event classification
+- Training type: "no_ripple" (exclude ripples) or "all" (use all data)
+
+GPU and Parallelism
+-------------------
+- Uses Dask CUDA for GPU cluster management
+- XLA_PYTHON_CLIENT_MEM_FRACTION set to 0.99 for GPU memory
+- Multiple sessions processed in parallel via dask.compute()
+- Each session's decoding uses GPU acceleration (JAX)
+
+Notes
+-----
+- All time units are in seconds
+- Epoch identifiers: {animal}{date}_{epoch}_{brain_area} (e.g., "chimi20200212_02_r1_HPC")
+- Results are skipped if files exist unless --overwrite is specified
+- Empty spike data is handled gracefully (session skipped with warning)
+- Git commit hash is logged for reproducibility
+
+See Also
+--------
+continuum_swr_replay.data_loaders.bandit_task : Data loading
+continuum_swr_replay.analysis.hippocampus : Result analysis and aggregation
+non_local_detector : Core decoding algorithms
+
+Examples
+--------
+# Decode all HPC data for one animal
+python run_decoding_bandit.py --animal chimi --brain_area HPC
+
+# Decode single session with figurl
+python run_decoding_bandit.py --animal peanut --date 20201125 --epoch 02_r1 \\
+    --brain_area HPC --create_figurl
+
+# Non-stationary model with custom GPUs
+python run_decoding_bandit.py --animal wilbur --non_stationary \\
+    --cuda_visible_devices "2,3"
+"""
 import logging
 import logging.config
 import os

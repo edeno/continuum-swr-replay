@@ -1,4 +1,61 @@
-"""Analysis of decoded posterior distributions."""
+"""Analysis of decoded posterior distributions.
+
+This module provides functions for analyzing the posterior probability distributions
+output by the continuum non-local detector. It computes summary statistics, extracts
+maximum a posteriori (MAP) estimates, calculates trajectory speeds, and identifies
+highest posterior density (HPD) regions.
+
+These analyses are essential for characterizing hippocampal replay events: determining
+what position is being represented, how fast the representation moves through space,
+and how confident/localized the decoding is.
+
+Main Functions
+--------------
+get_conditional_non_local_posterior
+    Extract and normalize posterior probability conditioned on being in the non-local
+    state (combining continuous and fragmented non-local states). This isolates the
+    spatial representation during replay.
+get_map_speed
+    Compute the speed of the decoded position over time using the maximum a posteriori
+    (MAP) estimate. Useful for distinguishing stationary replay from trajectory sweeps.
+get_posterior_stats
+    Calculate comprehensive summary statistics from posterior distributions including
+    mean position, variance, highest posterior density coverage, and ahead/behind
+    distance relative to actual position.
+
+Analysis Capabilities
+---------------------
+- Posterior conditioning: Separate non-local (replay) from local representations
+- Trajectory extraction: Identify decoded position sequences and their dynamics
+- Speed computation: Quantify how fast decoded position changes (cm/s)
+- HPD analysis: Determine spatial extent of confident decoding regions
+- Ahead/behind distance: Compute signed distance between decoded and actual position
+  along the track graph to identify forward vs. backward replay
+
+Notes
+-----
+- All analyses use xarray Datasets for labeled multi-dimensional data
+- MAP estimates are smoothed with Gaussian filter before differentiation
+- HPD regions are computed at specified coverage levels (e.g., 95%)
+- Ahead/behind distance uses shortest path on track graph (can be negative for
+  backward replay)
+- Position coordinates can be 1D (linear track) or 2D (open field)
+
+See Also
+--------
+non_local_detector.analysis : Core decoding analysis functions
+non_local_detector.model_checking.highest_posterior_density : HPD computation
+continuum_swr_replay.analysis.hippocampus.data_aggregation : Time-series aggregation
+
+Examples
+--------
+>>> # Get non-local posterior
+>>> nl_posterior = get_conditional_non_local_posterior(results)
+>>> # Compute MAP speed
+>>> speed = get_map_speed(nl_posterior, track_graph, bin_centers, sampling_frequency=500)
+>>> # Get comprehensive statistics
+>>> stats = get_posterior_stats(results, position_info, detector, env)
+"""
 
 from typing import Literal
 
