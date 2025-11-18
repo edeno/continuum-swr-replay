@@ -139,6 +139,7 @@ from continuum_swr_replay.data_loaders import (
 )
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
+    DETECTOR_CONFIG,
     PLACE_BIN_SIZE_1D,
     PLACE_BIN_SIZE_2D,
     POSITION_STD,
@@ -159,10 +160,14 @@ if TYPE_CHECKING:
 warnings.filterwarnings("ignore")
 
 # Detector configuration by brain area (maps to actual detector classes)
+# Import configuration from parameters.py and map string names to actual classes
 DETECTOR_CLASSES = {
-    "HPC": (NonLocalClusterlessDetector, "clusterless"),
-    "mPFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
-    "OFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+    brain_area: (
+        NonLocalClusterlessDetector if config[0] == "NonLocalClusterlessDetector"
+        else NonLocalSortedSpikesDetector,
+        config[1]
+    )
+    for brain_area, config in DETECTOR_CONFIG.items()
 }
 
 
