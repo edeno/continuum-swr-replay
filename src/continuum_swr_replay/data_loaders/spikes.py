@@ -206,38 +206,31 @@ def get_hpc_marks(
         - spike_times: list of arrays with spike times per tetrode
         - spike_waveform_features: list of arrays with waveform features
     """
-    try:
-        restriction = {
-            "nwb_file_name": nwb_file_name,
-            "curation_id": 0,
-            "sort_interval_name": "runs_noPrePostTrialTimes raw data valid times",
-            "preproc_params_name": "franklab_tetrode_hippocampus",
-            "team_name": "ac_em_xs",
-            "sorter": "clusterless_thresholder",
-            "sorter_params_name": "clusterless_fixed",
-            "mark_param_name": "default",
-        }
-        marks = (UnitMarks & restriction).fetch_dataframe()
-        marks = [(mark.index.to_numpy(), mark.to_numpy()) for mark in marks]
-        spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=False)
-        spike_times = list(spike_times_tuple)
-        spike_waveform_features = list(spike_waveform_features_tuple)
-    except ValueError:
-        restriction = {
-            "nwb_file_name": nwb_file_name,
-            "curation_id": 0,
-            "sort_interval_name": "runs_noPrePostTrialTimes raw data valid times",
-            "preproc_params_name": "franklab_tetrode_hippocampus",
-            "team_name": "ac_em_xs",
-            "sorter": "clusterless_thresholder",
-            "sorter_params_name": "default_clusterless",
-            "mark_param_name": "default",
-        }
-        marks = (UnitMarks & restriction).fetch_dataframe()
-        marks = [(mark.index.to_numpy(), mark.to_numpy()) for mark in marks]
-        spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=False)
-        spike_times = list(spike_times_tuple)
-        spike_waveform_features = list(spike_waveform_features_tuple)
+    # Base restriction shared by both parameter options
+    restriction_base = {
+        "nwb_file_name": nwb_file_name,
+        "curation_id": 0,
+        "sort_interval_name": "runs_noPrePostTrialTimes raw data valid times",
+        "preproc_params_name": "franklab_tetrode_hippocampus",
+        "team_name": "ac_em_xs",
+        "sorter": "clusterless_thresholder",
+        "mark_param_name": "default",
+    }
+
+    # Check which parameter name exists (cheap query)
+    restriction_fixed = {**restriction_base, "sorter_params_name": "clusterless_fixed"}
+    if len(UnitMarks & restriction_fixed) > 0:
+        restriction = restriction_fixed
+    else:
+        # Fall back to alternative parameter name
+        restriction = {**restriction_base, "sorter_params_name": "default_clusterless"}
+
+    # Fetch data once with the correct parameter
+    marks = (UnitMarks & restriction).fetch_dataframe()
+    marks = [(mark.index.to_numpy(), mark.to_numpy()) for mark in marks]
+    spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=False)
+    spike_times = list(spike_times_tuple)
+    spike_waveform_features = list(spike_waveform_features_tuple)
 
     spike_times, filtered_time_bin_ind = detect_coincident_spikes(spike_times)
     spike_waveform_features = [
