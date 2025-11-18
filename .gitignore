@@ -180,3 +180,6 @@ cython_debug/
 
 # datajoint
 dj_local_conf.json
+
+
+test_outputs/

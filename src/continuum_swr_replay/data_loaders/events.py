@@ -110,6 +110,50 @@ def convert_dio_events_to_start_stop_times(
     return event_times.set_index(["event_name", "event_number"])
 
 
+def _load_dio_event_type(
+    nwb_file_name: str, pattern: str, valid_times: tuple[float, float]
+) -> pd.DataFrame:
+    """Load and process a specific type of DIO event.
+
+    Helper function to eliminate code duplication when loading different
+    DIO event types (beam breaks, pump events, light events).
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name
+    pattern : str
+        SQL LIKE pattern for event names (e.g., "Poke%", "Pump%", "Light%")
+    valid_times : tuple[float, float]
+        (start_time, end_time) tuple defining valid time range in seconds
+
+    Returns
+    -------
+    pd.DataFrame
+        Processed DIO events with start/end times and event numbers
+
+    See Also
+    --------
+    load_dios : Main function that uses this helper for all event types
+    convert_dio_events_to_start_stop_times : Converts raw events to intervals
+    """
+    events = {
+        nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
+        .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
+        .loc[valid_times[0] : valid_times[1]]  # type: ignore[misc]
+        for nwb_file in (
+            DIOEvents & {"nwb_file_name": nwb_file_name} & f'dio_event_name LIKE "{pattern}"'
+        ).fetch_nwb()
+    }
+    return pd.concat(
+        [
+            convert_dio_events_to_start_stop_times(event, event_name)
+            for event_name, event in events.items()
+        ],
+        axis=0,
+    )
+
+
 def load_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> DIOEventData:
     """Load DIO events (beam breaks, pump events, lights).
 
@@ -128,55 +172,9 @@ def load_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> DIOEventD
         - pump_events: pd.DataFrame with reward pump events
         - light_events: pd.DataFrame with light events
     """
-    beam_breaks = {
-        nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
-        .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
-        .loc[valid_times[0] : valid_times[1]]  # type: ignore[misc]
-        for nwb_file in (
-            DIOEvents & {"nwb_file_name": nwb_file_name} & 'dio_event_name LIKE "Poke%"'
-        ).fetch_nwb()
-    }
-    beam_breaks = pd.concat(
-        [
-            convert_dio_events_to_start_stop_times(event, event_name)
-            for event_name, event in beam_breaks.items()
-        ],
-        axis=0,
-    )
-
-    pump_events = {
-        nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
-        .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
-        .loc[valid_times[0] : valid_times[1]]  # type: ignore[misc]
-        for nwb_file in (
-            DIOEvents & {"nwb_file_name": nwb_file_name} & 'dio_event_name LIKE "Pump%"'
-        ).fetch_nwb()
-    }
-    pump_events = pd.concat(
-        [
-            convert_dio_events_to_start_stop_times(event, event_name)
-            for event_name, event in pump_events.items()
-        ],
-        axis=0,
-    )
-
-    light_events = {
-        nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
-        .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
-        .loc[valid_times[0] : valid_times[1]]  # type: ignore[misc]
-        for nwb_file in (
-            DIOEvents
-            & {"nwb_file_name": nwb_file_name}
-            & 'dio_event_name LIKE "Light%"'
-        ).fetch_nwb()
-    }
-    light_events = pd.concat(
-        [
-            convert_dio_events_to_start_stop_times(event, event_name)
-            for event_name, event in light_events.items()
-        ],
-        axis=0,
-    )
+    beam_breaks = _load_dio_event_type(nwb_file_name, "Poke%", valid_times)
+    pump_events = _load_dio_event_type(nwb_file_name, "Pump%", valid_times)
+    light_events = _load_dio_event_type(nwb_file_name, "Light%", valid_times)
 
     return {
         "beam_breaks": beam_breaks,
