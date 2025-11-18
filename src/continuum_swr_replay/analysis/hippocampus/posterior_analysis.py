@@ -255,7 +255,7 @@ def get_posterior_stats(
     posterior : xr.DataArray
         Posterior distribution (returned for reuse)
     """
-    SMOOTH_SIGMA = 0.0025
+    smooth_sigma = 0.0025
 
     if posterior is None:
         if results is None:
@@ -286,7 +286,7 @@ def get_posterior_stats(
         env.track_graph_with_bin_centers_edges_,
         np.asarray(env.place_bin_centers_nodes_df_.node_id),
         sampling_frequency,
-        SMOOTH_SIGMA,
+        smooth_sigma,
     )
     hpd = get_HPD_spatial_coverage(
         posterior, get_highest_posterior_threshold(posterior, coverage=0.95)

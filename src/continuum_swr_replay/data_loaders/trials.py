@@ -158,14 +158,14 @@ def get_start_end_node_id(
     WellNodeData
         TypedDict with 'from_well' and 'to_well' node ID arrays
     """
-    PROJECTED_COLS = ["projected_x_position", "projected_y_position"]
+    projected_cols = ["projected_x_position", "projected_y_position"]
 
     start_time_pos = position_info.iloc[
         position_info.index.searchsorted(times.start_time.values, side="right")
-    ][PROJECTED_COLS].to_numpy()
+    ][projected_cols].to_numpy()
     end_time_pos = position_info.iloc[
         position_info.index.searchsorted(times.end_time.values, side="right")
-    ][PROJECTED_COLS].to_numpy()
+    ][projected_cols].to_numpy()
 
     node_attrs = nx.get_node_attributes(track_graph, "pos")
     node_pos = np.array(list(node_attrs.values()))

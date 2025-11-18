@@ -141,10 +141,10 @@ class SessionDataKeys:
 
     Example
     -------
-    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> from continuum_swr_replay.types import SessionDataKeys
     >>> data = load_data(...)
-    >>> position_info = data[SDK.POSITION_INFO]  # Instead of data["position_info"]
-    >>> spike_times = data[SDK.SPIKE_TIMES]      # Instead of data["spike_times"]
+    >>> position_info = data[SessionDataKeys.POSITION_INFO]  # Instead of data["position_info"]
+    >>> spike_times = data[SessionDataKeys.SPIKE_TIMES]      # Instead of data["spike_times"]
     """
 
     # Position and tracking
@@ -206,8 +206,8 @@ class DataLoadingPreset:
     ...                  include=DataLoadingPreset.MINIMAL)
     >>>
     >>> # Extend a preset with custom keys
-    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
-    >>> custom = DataLoadingPreset.NEURAL | {SDK.TRIALS, SDK.TASK_VARIABLES}
+    >>> from continuum_swr_replay.types import SessionDataKeys
+    >>> custom = DataLoadingPreset.NEURAL | {SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES}
     >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
     """
 

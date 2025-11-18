@@ -350,7 +350,7 @@ def perform_decoding(
     is_training: np.ndarray,
     brain_area: str,
     non_stationary: bool = False,
-    is_1D: bool = True,
+    is_1d: bool = True,
 ) -> tuple[
     xr.Dataset, NonLocalClusterlessDetector | NonLocalSortedSpikesDetector, Environment
 ]:
@@ -377,7 +377,7 @@ def perform_decoding(
         Brain area (HPC, mPFC, or OFC)
     non_stationary : bool
         Use speed-dependent transitions
-    is_1D : bool
+    is_1d : bool
         Use 1D spatial binning
 
     Returns
@@ -385,7 +385,7 @@ def perform_decoding(
     tuple
         (results, detector, env)
     """
-    if is_1D:
+    if is_1d:
         env = Environment(
             place_bin_size=PLACE_BIN_SIZE_1D,
             track_graph=track_graph,

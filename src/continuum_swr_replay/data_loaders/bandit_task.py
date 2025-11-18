@@ -110,15 +110,15 @@ def load_data(
 
     Load custom subset of data:
 
-    >>> from continuum_swr_replay.types import SessionDataKeys as SDK
+    >>> from continuum_swr_replay.types import SessionDataKeys
     >>> data = load_data(
     ...     "chimi20200212_.nwb", "02_r1",
-    ...     include={SDK.POSITION_INFO, SDK.SPIKE_TIMES, SDK.RIPPLE_TIMES, SDK.TRIALS}
+    ...     include={SessionDataKeys.POSITION_INFO, SessionDataKeys.SPIKE_TIMES, SessionDataKeys.RIPPLE_TIMES, SessionDataKeys.TRIALS}
     ... )
 
     Extend a preset with additional keys:
 
-    >>> custom = DataLoadingPreset.NEURAL | {SDK.TRIALS, SDK.TASK_VARIABLES}
+    >>> custom = DataLoadingPreset.NEURAL | {SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES}
     >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
 
     Access position data:
@@ -173,7 +173,7 @@ def load_data(
     1   1237.891   1238.012   0.121
     2   1242.456   1242.598   0.142
     """
-    from ..types import SessionDataKeys as SDK
+    from ..types import SessionDataKeys
 
     # Helper to check if we should load this key
     def should_load(key: str) -> bool:
@@ -195,22 +195,22 @@ def load_data(
     }
 
     # Conditionally load spike data
-    if should_load(SDK.SPIKE_TIMES) or should_load(SDK.SPIKE_WAVEFORM_FEATURES):
+    if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
         spike_data = get_spike_data(nwb_file_name)
         spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
             spike_data["spike_times"],
             spike_data["spike_waveform_features"],
             position_data["position_info"].index,
         )
-        if should_load(SDK.SPIKE_TIMES):
+        if should_load(SessionDataKeys.SPIKE_TIMES):
             result["spike_times"] = spike_data["spike_times"]
-        if should_load(SDK.SPIKE_WAVEFORM_FEATURES):
+        if should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
             result["spike_waveform_features"] = spike_data["spike_waveform_features"]
 
     # Conditionally load ripple data
     if any(should_load(key) for key in [
-        SDK.RIPPLE_TIMES, SDK.RIPPLE_FILTERED_LFPS, SDK.RIPPLE_LFPS,
-        SDK.RIPPLE_CONSENSUS_TRACE, SDK.ZSCORED_RIPPLE_CONSENSUS_TRACE
+        SessionDataKeys.RIPPLE_TIMES, SessionDataKeys.RIPPLE_FILTERED_LFPS, SessionDataKeys.RIPPLE_LFPS,
+        SessionDataKeys.RIPPLE_CONSENSUS_TRACE, SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE
     ]):
         ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
         ripple_data = filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
@@ -219,14 +219,14 @@ def load_data(
                 result[key] = value
 
     # Conditionally load theta data
-    if any(should_load(key) for key in [SDK.THETA_FILTERED_LFP, SDK.THETA_PHASE, SDK.THETA_POWER]):
+    if any(should_load(key) for key in [SessionDataKeys.THETA_FILTERED_LFP, SessionDataKeys.THETA_PHASE, SessionDataKeys.THETA_POWER]):
         theta_data = get_theta(nwb_file_name, epoch_name)
         for key, value in theta_data.items():
             if should_load(key):
                 result[key] = value
 
     # Conditionally load multiunit data
-    if any(should_load(key) for key in [SDK.HSE_TIMES, SDK.MULTIUNIT_FIRING_RATE, SDK.MULTIUNIT_RATE_ZSCORE]):
+    if any(should_load(key) for key in [SessionDataKeys.HSE_TIMES, SessionDataKeys.MULTIUNIT_FIRING_RATE, SessionDataKeys.MULTIUNIT_RATE_ZSCORE]):
         # Only load if we have spike data
         if "spike_times" in result:
             multiunit_data = get_multiunit(result["spike_times"], position_data["position_info"])
@@ -236,8 +236,8 @@ def load_data(
 
     # Conditionally load DIO events and behavioral data
     if any(should_load(key) for key in [
-        SDK.BEAM_BREAKS, SDK.PUMP_EVENTS, SDK.LIGHT_EVENTS,
-        SDK.WELL_VISITS, SDK.TRIALS, SDK.TASK_VARIABLES
+        SessionDataKeys.BEAM_BREAKS, SessionDataKeys.PUMP_EVENTS, SessionDataKeys.LIGHT_EVENTS,
+        SessionDataKeys.WELL_VISITS, SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES
     ]):
         dio_events = load_dios(
             nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
@@ -249,7 +249,7 @@ def load_data(
                 result[key] = value
 
         # Conditionally load well visits and trials
-        if should_load(SDK.WELL_VISITS) or should_load(SDK.TRIALS) or should_load(SDK.TASK_VARIABLES):
+        if should_load(SessionDataKeys.WELL_VISITS) or should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
             well_visits = make_well_visits_df(
                 dio_events["beam_breaks"],
                 dio_events["pump_events"],
@@ -257,16 +257,16 @@ def load_data(
                 track_graph=position_data["track_graph"],
             )
 
-            if should_load(SDK.WELL_VISITS):
+            if should_load(SessionDataKeys.WELL_VISITS):
                 result["well_visits"] = well_visits
 
-            if should_load(SDK.TRIALS) or should_load(SDK.TASK_VARIABLES):
+            if should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
                 trials_df = make_trials_df_from_well_visits(well_visits)
 
-                if should_load(SDK.TRIALS):
+                if should_load(SessionDataKeys.TRIALS):
                     result["trials"] = trials_df
 
-                if should_load(SDK.TASK_VARIABLES):
+                if should_load(SessionDataKeys.TASK_VARIABLES):
                     task_variables_df = make_task_variables(
                         position_info=position_data["position_info"],
                         trials_df=trials_df,
@@ -275,7 +275,7 @@ def load_data(
                     result["task_variables"] = task_variables_df
 
     # Conditionally load electrode group info
-    if should_load(SDK.ELECTRODE_GROUP_INFO):
+    if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
         electrode_group_info = get_electrode_group_info(nwb_file_name)
         result["electrode_group_info"] = electrode_group_info
 
