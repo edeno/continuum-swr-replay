@@ -247,10 +247,23 @@ def make_well_visits_df(
         pd.concat((poke_times, run_times)).sort_values("start_time").reset_index()
     )
     well_visits["is_run"] = well_visits["from_well"] != well_visits["to_well"]
-    well_visits["is_reward"] = [
-        pump_events.start_time.between(row.start_time, row.end_time).any()
-        for row in well_visits.itertuples()
-    ]
+
+    # Vectorized reward detection: O(n_visits + n_pumps) instead of O(n_visits × n_pumps)
+    # Check which well visits contain pump events using binary search
+    pump_times_arr = pump_events["start_time"].values
+    visit_starts = well_visits["start_time"].values
+    visit_ends = well_visits["end_time"].values
+
+    # Initialize is_reward as False
+    is_reward = np.zeros(len(well_visits), dtype=bool)
+
+    # For each pump event, find which visit(s) it belongs to
+    for pump_time in pump_times_arr:
+        # Find visits where start_time <= pump_time <= end_time
+        is_in_visit = (visit_starts <= pump_time) & (pump_time <= visit_ends)
+        is_reward |= is_in_visit
+
+    well_visits["is_reward"] = is_reward
     well_visits["is_reward"] = (
         well_visits["is_run"] & well_visits["is_reward"].shift(-1)
     ) | well_visits["is_reward"]
