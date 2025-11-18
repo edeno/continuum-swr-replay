@@ -1,4 +1,73 @@
-"""Trial and well visit construction from task events."""
+"""Trial and well visit construction from task events.
+
+This module constructs structured trial and well visit DataFrames from raw task events
+(beam breaks, pump activations) and position data. It implements the logic for
+segmenting continuous behavior into discrete trials and identifying key behavioral
+events like well visits, runs, rewards, and patch changes.
+
+Main Functions
+--------------
+make_well_visits_df
+    Primary entry point that constructs the complete well visits DataFrame from
+    beam breaks, pump events, position data, and track graph. Combines poke and
+    run intervals into a unified behavioral segmentation.
+make_trials_df_from_well_visits
+    Aggregates well visits into trials by grouping consecutive well visit events
+    and computing trial-level summaries (reward status, timing, etc.).
+
+Helper Functions
+----------------
+get_poke_in_poke_out_times
+    Merges consecutive beam break events into poke in/out intervals using a
+    maximum inter-event interval threshold.
+get_run_intervals
+    Extracts movement intervals between consecutive pokes.
+get_start_end_node_id
+    Determines which wells (graph nodes) the animal is at for each interval
+    by finding the nearest node to the projected position.
+
+Data Structure
+--------------
+Well Visits DataFrame contains:
+    - start_time, end_time, duration: Interval timing
+    - from_well, to_well: Start and end well node IDs (0-5)
+    - from_patch, to_patch: Start and end patch IDs (1-3)
+    - is_run: True if movement interval (from_well != to_well)
+    - is_reward: True if reward was delivered during this interval
+    - is_patch_change: True if movement crossed patch boundaries
+    - trial_number: Trial index assignment
+
+Trials DataFrame contains:
+    - start_time, end_time, duration: Trial timing (sum of visit durations)
+    - goal_arrival_time: Time when animal reached goal well
+    - from_well, to_well: Starting and ending well IDs
+    - from_patch, to_patch: Starting and ending patch IDs
+    - is_reward: True if trial resulted in reward
+    - is_patch_change: True if trial crossed patch boundaries
+
+Notes
+-----
+- Pokes are merged if inter-event interval is below threshold (default 1.0 sec)
+- Rewards are associated with runs, not poke intervals
+- Trial numbers are forward/backward filled to assign pokes to trials
+- Boundary events are added at session start/end for completeness
+- Position data must have projected_x_position and projected_y_position columns
+- Node positions come from track_graph.nodes[node_id]['pos']
+
+See Also
+--------
+continuum_swr_replay.data_loaders.events : DIO event loading
+continuum_swr_replay.data_loaders.constants : WELL_PATCH_MAPPING
+continuum_swr_replay.types : WellNodeData TypedDict
+
+Examples
+--------
+>>> well_visits = make_well_visits_df(
+...     beam_breaks, pump_events, position_info, track_graph
+... )
+>>> trials = make_trials_df_from_well_visits(well_visits)
+>>> trials[["from_well", "to_well", "is_reward"]].head()
+"""
 
 import networkx as nx
 import numpy as np
