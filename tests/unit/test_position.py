@@ -148,31 +148,6 @@ class TestGetInterpolatedPositionInfo:
         assert 'linear_position' in result.columns
         assert 'custom_x' in result.columns
 
-    @pytest.mark.skip(reason="Empty time arrays not supported by track_linearization")
-    def test_empty_time_array(self):
-        """Should handle empty time array gracefully."""
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0],
-            'head_position_y': [0.0],
-        }, index=[0.0])
-
-        # Create track graph using recommended function
-        track_graph = make_track_graph(
-            node_positions=[(0, 0), (10, 0), (20, 0)],
-            edges=[(0, 1), (1, 2)]
-        )
-
-        # Empty time array
-        result = get_interpolated_position_info(
-            position_info,
-            time=np.array([]),
-            track_graph=track_graph,
-            edge_order=[(0, 1), (1, 2)],
-            edge_spacing=[10.0],  # One spacing between two edges
-        )
-
-        assert len(result) == 0
-
     def test_single_time_point(self):
         """Should handle single time point."""
         position_info = pd.DataFrame({

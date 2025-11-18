@@ -94,6 +94,10 @@ def get_poke_in_poke_out_times(
     pd.DataFrame
         Merged poke events with start_time, end_time, and duration
     """
+    # Handle empty DataFrame
+    if len(beam_breaks) == 0:
+        return pd.DataFrame(columns=["start_time", "end_time", "duration"])
+
     merged_events = []
     for _, df in beam_breaks.groupby("event_name"):
         interevent_interval = (df.start_time.shift(-1) - df.end_time).fillna(0)
@@ -160,12 +164,23 @@ def get_start_end_node_id(
     """
     projected_cols = ["projected_x_position", "projected_y_position"]
 
-    start_time_pos = position_info.iloc[
-        position_info.index.searchsorted(times.start_time.values, side="right")
-    ][projected_cols].to_numpy()
-    end_time_pos = position_info.iloc[
-        position_info.index.searchsorted(times.end_time.values, side="right")
-    ][projected_cols].to_numpy()
+    # Use searchsorted to find indices, but clamp to valid range
+    # searchsorted with side="right" can return len(position_info) for values
+    # past the end of the index, so we clamp to the last valid index
+    max_idx = len(position_info) - 1
+    start_indices = np.clip(
+        position_info.index.searchsorted(times.start_time.values, side="right"),
+        0,
+        max_idx,
+    )
+    end_indices = np.clip(
+        position_info.index.searchsorted(times.end_time.values, side="right"),
+        0,
+        max_idx,
+    )
+
+    start_time_pos = position_info.iloc[start_indices][projected_cols].to_numpy()
+    end_time_pos = position_info.iloc[end_indices][projected_cols].to_numpy()
 
     node_attrs = nx.get_node_attributes(track_graph, "pos")
     node_pos = np.array(list(node_attrs.values()))

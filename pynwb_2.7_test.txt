@@ -1,0 +1,95 @@
+Uninstalled 2 packages in 1.25s
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 2 packages in 3.78s
+/cumulus/edeno/continuum-swr-replay/.venv/lib/python3.11/site-packages/datajoint/plugin.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+[2025-11-18 07:44:15,396][INFO]: DataJoint 0.14.6 connected to edeno@lmf-db.cin.ucsf.edu:3306
+[07:44:29][WARNING] Spyglass: No module named 'replay_trajectory_classification'
+[07:44:29][WARNING] Spyglass: No module named 'replay_trajectory_classification'
+[07:44:29][WARNING] Spyglass: No module named 'replay_trajectory_classification'
+[07:44:29][WARNING] Spyglass: No module named 'replay_trajectory_classification'
+[2025-11-18 07:49:15,556][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,558][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,559][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,561][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,562][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,564][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,574][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,582][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,590][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,598][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,606][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:15,614][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,602][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,603][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,604][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,606][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,607][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,609][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,618][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,626][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,635][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,643][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,651][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,659][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,746][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,749][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,752][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,754][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,757][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,760][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,774][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,787][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,800][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,814][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,828][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+[2025-11-18 07:49:28,841][WARNING]: Skipped checksum for file with hash: 6fc32264-8cc8-495b-db57-fc2e00fa1af4, and path: /stelmo/nwb/raw/senor20201028_.nwb
+/cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/task_variables.py:436: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  .fillna(False)
+/cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/task_variables.py:445: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  .fillna(False)
+================================================================================
+REFACTORING VERIFICATION TEST
+================================================================================
+NWB File: senor20201028_.nwb
+Epoch: 08_r4
+
+Loading baseline data...
+✓ Baseline load time: 330.103s
+
+Loading data with refactored code...
+✓ New load time: 303.283s
+
+Performance Comparison:
+  Baseline: 330.103s
+  New:      303.283s
+  Speedup:  1.09x
+  Saved:    26.820s (8.1%)
+
+Comparing outputs...
+  ✓ position_info: Exact match
+  ✓ well_visits: Exact match
+  ✓ trials: Exact match
+  ✓ task_variables: Exact match
+  ✓ spike_times: Exact match
+  ✓ spike_waveform_features: Exact match
+  ✓ beam_breaks: Exact match
+  ✓ pump_events: Exact match
+  ✓ light_events: Exact match
+
+================================================================================
+✓ VERIFICATION PASSED - All outputs match!
+================================================================================
+
+Refactoring successful:
+  - Correctness: ✓ Verified
+  - Performance: 1.09x speedup (26.820s saved)
+Exception ignored in: <function HDMFIO.__del__ at 0x7f8839fbc220>
+Traceback (most recent call last):
+  File "/cumulus/edeno/continuum-swr-replay/.venv/lib/python3.11/site-packages/hdmf/backends/io.py", line 206, in __del__
+  File "/cumulus/edeno/continuum-swr-replay/.venv/lib/python3.11/site-packages/hdmf/backends/hdf5/h5tools.py", line 746, in close
+  File "/cumulus/edeno/continuum-swr-replay/.venv/lib/python3.11/site-packages/hdmf/backends/hdf5/h5tools.py", line 768, in close_linked_files
+  File "/cumulus/edeno/continuum-swr-replay/.venv/lib/python3.11/site-packages/h5py/_hl/base.py", line 284, in file
+ImportError: sys.meta_path is None, Python is likely shutting down

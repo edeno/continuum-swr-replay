@@ -124,7 +124,6 @@ class TestGetPokeInPokeOutTimes:
         expected_duration = 3.0 - 1.0  # 2.0 seconds
         assert result.iloc[0]['duration'] == pytest.approx(expected_duration)
 
-    @pytest.mark.skip(reason="Empty DataFrame groupby edge case - not critical for production")
     def test_empty_beam_breaks(self):
         """Should handle empty beam breaks DataFrame."""
         beam_breaks = pd.DataFrame({
@@ -273,7 +272,6 @@ class TestGetStartEndNodeID:
         assert result['from_well'][0] == 1
         assert result['to_well'][0] == 1
 
-    @pytest.mark.skip(reason="Boundary indexing edge case - complex to handle correctly")
     def test_different_start_and_end_nodes(self, simple_linear_track):
         """Should handle movement from one node to another."""
         # Set up node positions
