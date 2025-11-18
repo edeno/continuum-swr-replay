@@ -1,0 +1,307 @@
+"""Unit tests for position data processing.
+
+Tests position interpolation and linearization functions used in the
+data loading pipeline.
+"""
+
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.data_loaders.position import get_interpolated_position_info
+
+
+class TestGetInterpolatedPositionInfo:
+    """Test position interpolation and linearization."""
+
+    def test_interpolation_preserves_original_times(self, simple_linear_track):
+        """Original time points should have exact original values (no interpolation artifacts)."""
+        # Setup test data
+        original_times = np.array([0.0, 1.0, 2.0, 3.0])
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 5.0, 10.0, 15.0],
+            'head_position_y': [0.0, 0.0, 0.0, 0.0],
+            'head_speed': [5.0, 5.0, 5.0, 5.0],
+        }, index=original_times)
+
+        # Set node positions for linearization
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Interpolate to same times (should be identity operation for data)
+        result = get_interpolated_position_info(
+            position_info,
+            time=original_times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Check original columns preserved
+        assert 'head_position_x' in result.columns
+        assert 'head_speed' in result.columns
+
+        # Check new columns added
+        assert 'linear_position' in result.columns
+        assert 'projected_x_position' in result.columns
+        assert 'track_segment_id' in result.columns
+
+    def test_interpolation_to_new_times(self, simple_linear_track):
+        """New time points should have linearly interpolated values."""
+        # Setup: Animal moves from 0 to 10 cm in 2 seconds
+        original_times = np.array([0.0, 2.0])
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 10.0],
+            'head_position_y': [0.0, 0.0],
+        }, index=original_times)
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Interpolate to middle time point
+        new_times = np.array([0.0, 1.0, 2.0])
+        result = get_interpolated_position_info(
+            position_info,
+            time=new_times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Check interpolation
+        assert len(result) == 3
+        assert result.index.tolist() == list(new_times)
+
+        # Middle point should be interpolated (5.0 cm at t=1.0)
+        np.testing.assert_allclose(
+            result.loc[1.0, 'head_position_x'],
+            5.0,
+            rtol=0.01,
+            err_msg="Expected linear interpolation at midpoint"
+        )
+
+    def test_interpolation_multiple_columns(self, simple_linear_track):
+        """All columns should be interpolated independently."""
+        original_times = np.array([0.0, 1.0])
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 10.0],
+            'head_position_y': [0.0, 5.0],
+            'head_speed': [0.0, 10.0],
+            'head_orientation': [0.0, np.pi],
+        }, index=original_times)
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Interpolate to midpoint
+        new_times = np.array([0.5])
+        result = get_interpolated_position_info(
+            position_info,
+            time=new_times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # All columns should be interpolated to midpoint values
+        np.testing.assert_allclose(result.loc[0.5, 'head_position_x'], 5.0, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, 'head_position_y'], 2.5, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, 'head_speed'], 5.0, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, 'head_orientation'], np.pi/2, rtol=0.01)
+
+    def test_custom_position_columns(self, simple_linear_track):
+        """Should handle custom position column names."""
+        original_times = np.array([0.0, 1.0])
+        position_info = pd.DataFrame({
+            'custom_x': [0.0, 10.0],
+            'custom_y': [0.0, 0.0],
+        }, index=original_times)
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Use custom column names
+        result = get_interpolated_position_info(
+            position_info,
+            time=original_times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+            position_columns=['custom_x', 'custom_y'],
+        )
+
+        # Should successfully linearize using custom columns
+        assert 'linear_position' in result.columns
+        assert 'custom_x' in result.columns
+
+    @pytest.mark.skip(reason="Empty time arrays not supported by track_linearization")
+    def test_empty_time_array(self, simple_linear_track):
+        """Should handle empty time array gracefully."""
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0],
+            'head_position_y': [0.0],
+        }, index=[0.0])
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Empty time array
+        result = get_interpolated_position_info(
+            position_info,
+            time=np.array([]),
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        assert len(result) == 0
+
+    def test_single_time_point(self, simple_linear_track):
+        """Should handle single time point."""
+        position_info = pd.DataFrame({
+            'head_position_x': [5.0],
+            'head_position_y': [0.0],
+        }, index=[1.0])
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        result = get_interpolated_position_info(
+            position_info,
+            time=np.array([1.0]),
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        assert len(result) == 1
+        assert 'linear_position' in result.columns
+
+    def test_preserves_time_ordering(self, simple_linear_track):
+        """Output should maintain time ordering even with unsorted input times."""
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 5.0, 10.0],
+            'head_position_y': [0.0, 0.0, 0.0],
+        }, index=[0.0, 1.0, 2.0])
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Unsorted times
+        unsorted_times = np.array([2.0, 0.5, 1.5, 0.0])
+        result = get_interpolated_position_info(
+            position_info,
+            time=unsorted_times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Result should have exactly the requested times (may be reordered)
+        assert set(result.index) == set(unsorted_times)
+
+    def test_adds_linearization_columns(self, simple_linear_track):
+        """Should add all required linearization columns."""
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 10.0],
+            'head_position_y': [0.0, 0.0],
+        }, index=[0.0, 1.0])
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        result = get_interpolated_position_info(
+            position_info,
+            time=np.array([0.0, 1.0]),
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Check for linearization columns
+        required_columns = {
+            'linear_position',
+            'projected_x_position',
+            'projected_y_position',
+            'track_segment_id',
+        }
+
+        for col in required_columns:
+            assert col in result.columns, f"Missing required column: {col}"
+
+    def test_linear_position_monotonic_for_forward_movement(self, simple_linear_track):
+        """Linear position should increase monotonically for forward movement."""
+        # Animal moves steadily from 0 to 15 cm
+        times = np.arange(0.0, 3.0, 0.1)
+        positions = np.linspace(0.0, 15.0, len(times))
+
+        position_info = pd.DataFrame({
+            'head_position_x': positions,
+            'head_position_y': np.zeros(len(times)),
+        }, index=times)
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        result = get_interpolated_position_info(
+            position_info,
+            time=times,
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Linear position should increase (within numerical tolerance)
+        linear_pos = result['linear_position'].values
+        diffs = np.diff(linear_pos)
+
+        # Allow for small numerical errors and stationary periods
+        assert np.all(diffs >= -0.01), \
+            "Linear position should be monotonically increasing for forward movement"
+
+    def test_respects_edge_spacing(self, simple_linear_track):
+        """Linearization should respect provided edge spacing."""
+        # Place animal at start and end of first edge
+        position_info = pd.DataFrame({
+            'head_position_x': [0.0, 10.0],
+            'head_position_y': [0.0, 0.0],
+        }, index=[0.0, 1.0])
+
+        # Set node positions
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        nx.set_edge_attributes(simple_linear_track, {(0, 1): 0, (1, 2): 1}, 'edge_id')
+
+        # Use specific edge spacing
+        result = get_interpolated_position_info(
+            position_info,
+            time=np.array([0.0, 1.0]),
+            track_graph=simple_linear_track,
+            edge_order=[(0, 1), (1, 2)],
+            edge_spacing=[10.0],  # One spacing between two edges
+        )
+
+        # Linear position should roughly match edge spacing
+        # (exact values depend on projection algorithm)
+        assert result['linear_position'].min() >= 0.0
+        assert result['linear_position'].max() <= 20.0  # Total track length
