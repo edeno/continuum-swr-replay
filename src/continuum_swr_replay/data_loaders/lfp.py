@@ -64,7 +64,9 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
     }
 
 
-def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -> RippleData:
+def get_ripple(
+    nwb_file_name: str, epoch_name: str, ripple_detector_name: str
+) -> RippleData:
     """Load ripple detection data.
 
     Parameters
@@ -116,6 +118,11 @@ def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -
         ripple_filtered_lfp, sampling_frequency=ripple_key["filter_sampling_rate"]
     )
     zscored_ripple_consensus_trace = zscore(ripple_consensus_trace, nan_policy="omit")
+    zscored_ripple_consensus_trace = pd.Series(
+        zscored_ripple_consensus_trace.squeeze(),
+        index=ripple_consensus_trace.index,
+        name="zscored_ripple_consensus_trace",
+    )
 
     return {
         "ripple_times": ripple_times,
@@ -129,7 +136,7 @@ def get_ripple(nwb_file_name: str, epoch_name: str, ripple_detector_name: str) -
 def get_multiunit_HSE(
     spike_times: list[NDArray[np.float64]],
     speed: NDArray[np.float64],
-    bin_time: NDArray[np.float64]
+    bin_time: NDArray[np.float64],
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute multiunit high synchrony events (HSE).
 
@@ -182,7 +189,7 @@ def get_multiunit_HSE(
         multiunit_rate_zscore = pd.DataFrame(
             np.zeros_like(multiunit_firing_rate),
             index=bin_time,
-            columns=["firing_rate"]
+            columns=["firing_rate"],
         )
     else:
         multiunit_rate_zscore = (multiunit_firing_rate - mean) / std
@@ -203,8 +210,7 @@ def get_multiunit_HSE(
 
 
 def get_multiunit(
-    spike_times: dict[str, list[NDArray[np.float64]]],
-    position_info: pd.DataFrame
+    spike_times: dict[str, list[NDArray[np.float64]]], position_info: pd.DataFrame
 ) -> MultiunitData:
     """Get multiunit HSE data for all brain areas.
 
@@ -246,7 +252,9 @@ def get_multiunit(
     }
 
 
-def filter_ripple_lfp_time(ripple_data: RippleData, position_time: NDArray[np.float64]) -> RippleData:
+def filter_ripple_lfp_time(
+    ripple_data: RippleData, position_time: NDArray[np.float64]
+) -> RippleData:
     """Filter ripple LFP data to match position time bounds.
 
     Parameters
@@ -265,8 +273,14 @@ def filter_ripple_lfp_time(ripple_data: RippleData, position_time: NDArray[np.fl
 
     return {
         "ripple_times": ripple_data["ripple_times"],  # Not filtered by time
-        "ripple_filtered_lfps": ripple_data["ripple_filtered_lfps"].loc[position_time_slice],
+        "ripple_filtered_lfps": ripple_data["ripple_filtered_lfps"].loc[
+            position_time_slice
+        ],
         "ripple_lfps": ripple_data["ripple_lfps"].loc[position_time_slice],
-        "ripple_consensus_trace": ripple_data["ripple_consensus_trace"].loc[position_time_slice],
-        "zscored_ripple_consensus_trace": ripple_data["zscored_ripple_consensus_trace"].loc[position_time_slice],
+        "ripple_consensus_trace": ripple_data["ripple_consensus_trace"].loc[
+            position_time_slice
+        ],
+        "zscored_ripple_consensus_trace": ripple_data[
+            "zscored_ripple_consensus_trace"
+        ].loc[position_time_slice],
     }
