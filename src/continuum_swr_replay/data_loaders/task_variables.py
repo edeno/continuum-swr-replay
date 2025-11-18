@@ -134,6 +134,66 @@ def path_progress_for_run_segment(
     return np.asarray(dist / max_dist)
 
 
+def _precompute_segment_distances_to_goal(
+    goal_node_id: int,
+    track_graph: nx.Graph,
+    track_segment_id_to_edge: dict[int, tuple[int, int]],
+) -> dict[int, tuple[float, float, float]]:
+    """Precompute distances from each segment endpoint to goal.
+
+    For each track segment, computes:
+    - Distance from node1 to goal (via shortest path)
+    - Distance from node2 to goal (via shortest path)
+    - Length of the segment edge
+
+    This allows fast interpolation of distance to goal for any point
+    on the segment without recomputing shortest paths.
+
+    Parameters
+    ----------
+    goal_node_id : int
+        Goal well node ID
+    track_graph : nx.Graph
+        Track graph
+    track_segment_id_to_edge : dict
+        Mapping from segment ID to edge tuple (node1, node2)
+
+    Returns
+    -------
+    dict[int, tuple[float, float, float]]
+        Mapping from segment_id to (dist_node1_to_goal, dist_node2_to_goal, edge_length)
+    """
+    segment_distances = {}
+
+    for segment_id, (node1, node2) in track_segment_id_to_edge.items():
+        # Compute shortest path distances from each endpoint to goal
+        try:
+            dist_node1_to_goal = nx.shortest_path_length(
+                track_graph, source=node1, target=goal_node_id, weight="distance"
+            )
+        except nx.NetworkXNoPath:
+            # If no path exists, use infinity
+            dist_node1_to_goal = float("inf")
+
+        try:
+            dist_node2_to_goal = nx.shortest_path_length(
+                track_graph, source=node2, target=goal_node_id, weight="distance"
+            )
+        except nx.NetworkXNoPath:
+            dist_node2_to_goal = float("inf")
+
+        # Get edge length
+        edge_length = track_graph.edges[(node1, node2)]["distance"]
+
+        segment_distances[segment_id] = (
+            dist_node1_to_goal,
+            dist_node2_to_goal,
+            edge_length,
+        )
+
+    return segment_distances
+
+
 def dist_to_goal_per_time(
     track_segment_id: int,
     projected_x_position: float,
@@ -143,6 +203,9 @@ def dist_to_goal_per_time(
     track_segment_id_to_edge: dict[int, tuple[int, int]],
 ) -> float:
     """Compute distance to goal for a single time point.
+
+    DEPRECATED: This function is kept for backward compatibility but is
+    inefficient. Use the vectorized dist_to_goal() instead.
 
     Parameters
     ----------
@@ -190,6 +253,10 @@ def dist_to_goal(
 ) -> NDArray[np.float64]:
     """Compute distance to goal for all time points in a trial.
 
+    Optimized implementation that precomputes distances from segment endpoints
+    to goal, then interpolates for each timepoint. This avoids creating
+    557K graph copies and shortest path computations.
+
     Parameters
     ----------
     position_info : pd.DataFrame
@@ -206,19 +273,38 @@ def dist_to_goal(
     np.ndarray
         Distance to goal for each time point
     """
-    return np.array(
-        [
-            dist_to_goal_per_time(
-                row.track_segment_id,
-                row.projected_x_position,
-                row.projected_y_position,
-                trial.to_well,
-                track_graph,
-                track_segment_id_to_edge,
-            )
-            for row in position_info.itertuples()
-        ]
+    # Precompute distances from each segment endpoint to goal (once per trial)
+    segment_distances = _precompute_segment_distances_to_goal(
+        trial.to_well, track_graph, track_segment_id_to_edge
     )
+
+    # Vectorized computation for all timepoints
+    distances = np.zeros(len(position_info))
+
+    for idx, row in enumerate(position_info.itertuples()):
+        segment_id = row.track_segment_id
+        dist_node1_to_goal, dist_node2_to_goal, edge_length = segment_distances[
+            segment_id
+        ]
+
+        # Get segment endpoints
+        node1, node2 = track_segment_id_to_edge[segment_id]
+        node1_pos = np.array(track_graph.nodes[node1]["pos"])
+        projected_pos = np.array([row.projected_x_position, row.projected_y_position])
+
+        # Distance from current position to node1 (along the segment)
+        dist_from_node1 = np.linalg.norm(projected_pos - node1_pos)
+
+        # Two possible paths to goal:
+        # 1. Go back to node1, then to goal: dist_from_node1 + dist_node1_to_goal
+        # 2. Go forward to node2, then to goal: (edge_length - dist_from_node1) + dist_node2_to_goal
+        dist_via_node1 = dist_from_node1 + dist_node1_to_goal
+        dist_via_node2 = (edge_length - dist_from_node1) + dist_node2_to_goal
+
+        # Take the shorter path
+        distances[idx] = min(dist_via_node1, dist_via_node2)
+
+    return distances
 
 
 def turn_direction(
