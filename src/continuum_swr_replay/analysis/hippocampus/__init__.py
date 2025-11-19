@@ -29,6 +29,16 @@ get_overlap_times
     Find temporal overlap between different event types (e.g., ripples and confident
     decoding) using interval logic.
 
+Event Analysis
+--------------
+get_immobile_events
+    Filter events to only include those during low-speed periods, ensuring the
+    animal is immobile (relevant for replay analysis).
+get_event_start_end_times
+    Convert event labels to start/end time intervals with durations.
+get_event_durations_ms
+    Convert event durations from seconds to milliseconds for reporting.
+
 Posterior Analysis
 ------------------
 get_conditional_non_local_posterior
@@ -62,6 +72,11 @@ Examples
 """
 
 from .data_aggregation import get_data_over_time
+from .event_analysis import (
+    get_event_durations_ms,
+    get_event_start_end_times,
+    get_immobile_events,
+)
 from .event_detection import get_confident_times, get_overlap_times
 from .posterior_analysis import (
     get_conditional_non_local_posterior,
@@ -74,6 +89,9 @@ __all__ = [
     "load_results",
     "get_confident_times",
     "get_overlap_times",
+    "get_immobile_events",
+    "get_event_start_end_times",
+    "get_event_durations_ms",
     "get_conditional_non_local_posterior",
     "get_map_speed",
     "get_posterior_stats",

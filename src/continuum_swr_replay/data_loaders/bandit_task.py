@@ -32,6 +32,10 @@ from typing import TYPE_CHECKING, cast
 
 from spyglass.common import PositionIntervalMap
 
+# Suppress Spyglass warnings
+logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
+logging.getLogger("spyglass").setLevel(logging.ERROR)
+
 if TYPE_CHECKING:
     from ..types import SessionData
 
