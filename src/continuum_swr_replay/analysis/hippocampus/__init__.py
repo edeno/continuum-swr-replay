@@ -39,6 +39,12 @@ get_event_start_end_times
 get_event_durations_ms
     Convert event durations from seconds to milliseconds for reporting.
 
+Event-Triggered Analysis
+-------------------------
+get_signal_windows
+    Extract signal windows around event times for peri-event time histogram (PETH)
+    analysis. Returns xarray DataArray with dimensions (event, time, signal).
+
 Posterior Analysis
 ------------------
 get_conditional_non_local_posterior
@@ -84,6 +90,7 @@ from .posterior_analysis import (
     get_posterior_stats,
 )
 from .result_loading import load_results
+from .triggered_analysis import get_signal_windows
 
 __all__ = [
     "load_results",
@@ -92,6 +99,7 @@ __all__ = [
     "get_immobile_events",
     "get_event_start_end_times",
     "get_event_durations_ms",
+    "get_signal_windows",
     "get_conditional_non_local_posterior",
     "get_map_speed",
     "get_posterior_stats",

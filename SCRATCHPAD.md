@@ -87,16 +87,120 @@ Based on code review, fixed:
 
 ### Next Steps
 
-Move to **Milestone 2: Event-Triggered Analysis Module**
-- Create `triggered_analysis.py` with `get_signal_windows()`
-- Extract signal windows around events for peri-event analysis
-- More complex implementation (xarray, bounds checking, etc.)
+Move to **Milestone 3: Analysis Constants Module**
+- Create `constants.py` with shared analysis parameters
+- Much simpler module (just constant definitions)
+
+---
+
+## Milestone 2: Event-Triggered Analysis Module ✅ COMPLETE
+
+**Started:** 2025-11-19
+**Completed:** 2025-11-19
+**Status:** All tasks complete, code reviewed, tests passing
+
+### Implementation Summary
+
+Created `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py` with one function:
+
+**`get_signal_windows()`** - Extracts signal windows around events for peri-event time histogram (PETH) analysis:
+- Takes time-series data and event times
+- Returns xarray DataArray with dimensions (event, time, signal)
+- Handles multiple sessions with proper grouping
+- Supports both integer event IDs and MultiIndex coordinates
+- Robust handling of boundary conditions
+
+### Test Coverage
+
+Created comprehensive test suite with **14 tests** covering:
+- Normal window extraction
+- Events near data boundaries (partial windows)
+- Events outside data range (full NaN windows)
+- Empty events (proper structure returned)
+- Parameter validation (sampling_frequency, window_sec)
+- Missing columns detection
+- MultiIndex support for event tracking
+- Multiple sessions
+- Different time columns (start_time vs end_time)
+- Window size calculations
+
+**Test Results:** 14/14 passing (100%)
+
+### Code Quality
+
+**Ruff:** ✅ All checks passed
+**Mypy:** ✅ No type errors
+**Code Review:** ✅ Applied scientific-code-reviewer agent
+
+### Fixes Applied
+
+Based on code review, fixed:
+1. **Type annotation** - Added proper Union type for event_id_list
+2. **Boundary validation** - Added explicit check for events within extractable range
+3. **Index consistency** - Used pd.RangeIndex instead of range() for consistency with codebase
+4. **Documentation** - Improved docstring about empty data behavior
+5. **Temporal validation** - Enhanced bounds checking to catch events far outside data range
+
+### Key Implementation Details
+
+1. **Window Extraction Algorithm**
+   - Uses `np.searchsorted()` to find closest index for each event
+   - Creates window indices as offsets from center: `center_idxs[:, None] + offsets[None, :]`
+   - Pre-allocates with NaN, fills only valid indices
+   - Handles non-uniform sampling gracefully
+
+2. **Boundary Handling**
+   - Explicit check: events must be within `[time_min + half_window, time_max - half_window]`
+   - Temporal validation: if event is more than half_window away from nearest data point, mask all
+   - Prevents silent errors from `searchsorted` + `clip` combination
+
+3. **xarray Structure**
+   - Dimensions: ("event", "time", "signal")
+   - Time coordinate: centered at 0 (negative = before, positive = after)
+   - Event coordinate: MultiIndex (animal, day, epoch, event_id) or simple integers
+   - Enables clean selection: `.sel(signal="theta_power")`
+
+4. **Multiple Session Support**
+   - Groups data by (animal, day, epoch)
+   - Processes each session independently
+   - Concatenates all windows at the end
+   - Logs empty sessions at debug level
+
+### Files Modified
+
+- ✅ Created: `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
+- ✅ Created: `tests/analysis/hippocampus/test_triggered_analysis.py`
+- ✅ Updated: `src/continuum_swr_replay/analysis/hippocampus/__init__.py`
+
+### Key Decisions
+
+1. **Type annotation for mixed list:** Used `list[tuple[Any, Any, Any, Any] | int]` for flexibility with different data types
+
+2. **Boundary validation strategy:** Two-level approach:
+   - Extractable range check (accounting for full window size)
+   - Temporal distance check (catch edge cases with non-uniform sampling)
+
+3. **Empty array handling:** Return proper xarray structure even when no events found (enables consistent downstream processing)
+
+4. **Event indexing:** Use pd.RangeIndex for integer IDs (consistency with `event_detection.py`) and pd.MultiIndex for event_id_col (enables tracking across sessions)
+
+### Performance Notes
+
+- **Time Complexity:** O(S × E × W × C) where S=sessions, E=events, W=window_length, C=signals
+- **Memory:** Pre-allocates full window array, ~8 bytes per sample
+- **Typical use:** 1000 events × 101 samples × 3 signals = ~2.4 MB (acceptable)
+- **Vectorization:** Window index creation and masking are vectorized
+- **No optimization needed** unless processing >100k events
+
+### Next Steps
+
+Move to **Milestone 3: Analysis Constants Module**
 
 ---
 
 ## Current Blockers
 
-None - ready to proceed to Milestone 2
+None - ready to proceed to Milestone 3
 
 ---
 
