@@ -194,13 +194,101 @@ Based on code review, fixed:
 
 ### Next Steps
 
-Move to **Milestone 3: Analysis Constants Module**
+Move to **Milestone 4: Baseline Figure Generation**
+
+---
+
+## Milestone 3: Analysis Constants Module ✅ COMPLETE
+
+**Started:** 2025-11-19
+**Completed:** 2025-11-19
+**Status:** All tasks complete, tests passing, code quality verified
+
+### Implementation Summary
+
+Created `src/continuum_swr_replay/analysis/constants.py` with shared analysis constants:
+
+1. **Event Detection Thresholds**
+   - `DEFAULT_NON_LOCAL_THRESHOLD = 0.8` - Probability threshold for non-local events
+   - `DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0` - Speed threshold for immobility
+   - `DEFAULT_SAMPLING_FREQUENCY_HZ = 500.0` - Default sampling frequency
+
+2. **Histogram Bin Definitions**
+   - `BINS_DURATION_MS` - Event durations (0-250 ms, step 10)
+   - `BINS_PROBABILITY` - Probabilities (0-1.0, step 0.05)
+   - `BINS_DISTANCE_CM` - Distances (0-230 cm, step 2)
+   - `BINS_HPD_CM` - HPD values (0-250 cm, step 10)
+   - `BINS_SPEED_CM_PER_SEC` - Speeds (0-20 cm/s, step 0.5)
+
+3. **Event-Triggered Analysis**
+   - `DEFAULT_WINDOW_EVENT_TRIGGERED_SEC = 0.25` - Default PETH window
+
+### Test Coverage
+
+Created comprehensive test suite with **11 tests** covering:
+- Import verification for all constants
+- Type checking (float for thresholds, np.ndarray for bins)
+- Value verification for each constant
+- Bin structure validation (start, end, spacing)
+- Ensuring bins are numpy arrays (not lists)
+
+**Test Results:** 11/11 passing (100%)
+
+### Code Quality
+
+**Ruff:** ✅ All checks passed
+**Mypy:** ✅ No type errors
+
+### Files Modified
+
+- ✅ Created: `src/continuum_swr_replay/analysis/constants.py`
+- ✅ Created: `src/continuum_swr_replay/analysis/__init__.py`
+- ✅ Created: `tests/analysis/test_constants.py`
+
+### Key Decisions
+
+1. **Module location:** Placed at `analysis/` level (not `analysis/hippocampus/`)
+   - Constants are shared across multiple analysis modules
+   - Follows pattern in PLAN.md
+
+2. **Module-level constants vs dataclass:** Used module-level constants
+   - Matches existing pattern in `parameters.py`
+   - Simpler imports: `from continuum_swr_replay.analysis.constants import BINS_DURATION_MS`
+   - No need for configuration instantiation
+
+3. **Documentation style:** Added inline docstrings for each constant
+   - Helps with IDE autocomplete
+   - Clear units and purpose
+
+4. **Numpy arrays vs lists:** All bins are `np.ndarray`
+   - More efficient for numerical operations
+   - Consistent with scientific computing best practices
+   - Enables vectorized operations
+
+### Design Notes
+
+This is the **simplest module** so far:
+- No complex logic, just constant definitions
+- No edge cases to handle
+- No scientific validation needed
+- Quick to implement (~15 minutes including tests)
+
+**Testing approach:** Verify imports, types, and values
+- Simple but complete coverage
+- Ensures constants don't accidentally change
+- Validates bin structures (start, end, spacing)
+
+### Next Steps
+
+Move to **Milestone 4: Baseline Figure Generation**
+- Generate baseline figures for regression testing
+- Create reference outputs before refactoring scripts
 
 ---
 
 ## Current Blockers
 
-None - ready to proceed to Milestone 3
+None - ready to proceed to Milestone 4
 
 ---
 

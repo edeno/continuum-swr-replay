@@ -101,33 +101,35 @@ This file tracks the implementation of PLAN.md. Each task should be marked compl
 
 ---
 
-## Milestone 3: Analysis Constants (Week 2)
+## Milestone 3: Analysis Constants (Week 2) ✅ COMPLETE
 
 **Goal:** Create `src/continuum_swr_replay/analysis/constants.py` with shared constants.
 
+**Completed:** 2025-11-19
+
 ### Implementation
 
-- [ ] Create `src/continuum_swr_replay/analysis/constants.py`
-- [ ] Add event detection thresholds:
-  - [ ] `DEFAULT_NON_LOCAL_THRESHOLD = 0.8`
-  - [ ] `DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0`
-  - [ ] `DEFAULT_SAMPLING_FREQUENCY_HZ = 500.0`
-- [ ] Add histogram bin definitions:
-  - [ ] `BINS_DURATION_MS`
-  - [ ] `BINS_PROBABILITY`
-  - [ ] `BINS_DISTANCE_CM`
-  - [ ] `BINS_HPD_CM`
-  - [ ] `BINS_SPEED_CM_PER_SEC`
-- [ ] Add event-triggered analysis constants:
-  - [ ] `DEFAULT_WINDOW_EVENT_TRIGGERED_SEC = 0.25`
-- [ ] Add module docstring referencing `parameters.py` pattern
+- [x] Create `src/continuum_swr_replay/analysis/constants.py`
+- [x] Add event detection thresholds:
+  - [x] `DEFAULT_NON_LOCAL_THRESHOLD = 0.8`
+  - [x] `DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0`
+  - [x] `DEFAULT_SAMPLING_FREQUENCY_HZ = 500.0`
+- [x] Add histogram bin definitions:
+  - [x] `BINS_DURATION_MS`
+  - [x] `BINS_PROBABILITY`
+  - [x] `BINS_DISTANCE_CM`
+  - [x] `BINS_HPD_CM`
+  - [x] `BINS_SPEED_CM_PER_SEC`
+- [x] Add event-triggered analysis constants:
+  - [x] `DEFAULT_WINDOW_EVENT_TRIGGERED_SEC = 0.25`
+- [x] Add module docstring referencing `parameters.py` pattern
 
 ### Testing
 
-- [ ] Test constants are importable: `from continuum_swr_replay.analysis.constants import BINS_DURATION_MS`
-- [ ] Verify constants have expected types and values
+- [x] Test constants are importable: `from continuum_swr_replay.analysis.constants import BINS_DURATION_MS`
+- [x] Verify constants have expected types and values
 
-**Acceptance Criteria:** Constants module created, all constants defined, importable from analysis subpackage.
+**Acceptance Criteria:** ✅ Constants module created, all constants defined, importable from analysis subpackage.
 
 ---
 
@@ -379,7 +381,7 @@ Track overall progress here:
 
 - [x] Milestone 1: Event Analysis Module ✅ (2025-11-19)
 - [x] Milestone 2: Event-Triggered Analysis Module ✅ (2025-11-19)
-- [ ] Milestone 3: Analysis Constants
+- [x] Milestone 3: Analysis Constants ✅ (2025-11-19)
 - [ ] Milestone 4: Baseline Figure Generation
 - [ ] Milestone 5: Refactor generate_figure03.py
 - [ ] Milestone 6: Refactor generate_figure02.py
@@ -390,7 +392,7 @@ Track overall progress here:
 - [ ] Milestone 11: Final Verification
 
 **Target Completion:** Week 6
-**Current Status:** Milestones 1-2 complete (2/11)
+**Current Status:** Milestones 1-3 complete (3/11)
 
 ---
 
