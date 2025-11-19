@@ -65,6 +65,9 @@ Examples
 >>> task_vars[["path_progress", "dist_to_goal", "turn_direction"]].head()
 """
 
+from concurrent.futures import ProcessPoolExecutor
+from typing import Any
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -368,6 +371,86 @@ def turn_direction(
     return "-".join(trial_turns)
 
 
+def _process_single_trial(
+    trial_data: tuple[dict, pd.DataFrame, nx.Graph, np.ndarray, dict, np.ndarray, np.ndarray, float]
+) -> dict:
+    """Process a single trial in parallel.
+
+    Parameters
+    ----------
+    trial_data : tuple
+        Contains (trial_dict, position_info, track_graph, track_edges, track_segment_id_to_edge,
+                  is_prev_reward_omission_row, is_patch_change_row, sampling_frequency)
+
+    Returns
+    -------
+    dict
+        Dictionary containing trial results with time indices
+    """
+    (
+        trial_dict,
+        position_info,
+        track_graph,
+        track_edges,
+        track_segment_id_to_edge,
+        is_prev_reward_omission_row,
+        is_patch_change_row,
+        sampling_frequency,
+    ) = trial_data
+
+    # Create a simple trial object with necessary attributes
+    class TrialData:
+        def __init__(self, d):
+            for k, v in d.items():
+                setattr(self, k, v)
+
+    trial = TrialData(trial_dict)
+
+    time = position_info.index.to_numpy()
+    is_in_trial = (time >= trial.start_time) & (time < trial.end_time)
+    from_start_time_to_goal = (time >= trial.start_time) & (time < trial.goal_arrival_time)
+    from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (time < trial.end_time)
+
+    # Get trial position data
+    trial_position = position_info.loc[is_in_trial]
+
+    # Compute all variables for this trial
+    trial_turn_direction = turn_direction(trial, trial_position, track_graph, track_edges)
+
+    start_to_goal_position = position_info.loc[from_start_time_to_goal]
+    trial_path_progress = path_progress_for_run_segment(
+        start_to_goal_position, track_graph, trial.from_well, trial.to_well
+    )
+
+    trial_dist_to_goal = dist_to_goal(
+        trial_position, trial, track_graph, track_segment_id_to_edge
+    )
+
+    trial_time_to_goal_start = np.arange(np.sum(from_start_time_to_goal)) / sampling_frequency
+
+    return {
+        "trial_index": trial.Index,
+        "time_indices": {
+            "is_in_trial": np.where(is_in_trial)[0],
+            "from_start_time_to_goal": np.where(from_start_time_to_goal)[0],
+            "from_goal_to_next_movement": np.where(from_goal_to_next_movement)[0],
+        },
+        "values": {
+            "trial_number": trial.Index,
+            "from_well": trial.from_well,
+            "to_well": trial.to_well,
+            "turn_direction": trial_turn_direction,
+            "path_progress": trial_path_progress,
+            "dist_to_goal": trial_dist_to_goal,
+            "time_to_goal_start": trial_time_to_goal_start,
+        },
+        "omission_patch": {
+            "is_prev_reward_omission": is_prev_reward_omission_row,
+            "is_patch_change": is_patch_change_row,
+        },
+    }
+
+
 def make_task_variables(
     position_info: pd.DataFrame,
     trials_df: pd.DataFrame,
@@ -375,6 +458,7 @@ def make_task_variables(
     sampling_frequency: float = 500.0,
     omission_shifts: list[int] | None = None,
     patch_change_shifts: list[int] | None = None,
+    parallel: bool = False,
 ) -> pd.DataFrame:
     """Compute all task-specific derived variables.
 
@@ -392,6 +476,10 @@ def make_task_variables(
         Trial shifts for reward omission indicators
     patch_change_shifts : list[int], optional
         Trial shifts for patch change indicators
+    parallel : bool, optional
+        Whether to use parallel processing across trials. Default True.
+        Uses ProcessPoolExecutor to process trials concurrently, which can
+        significantly reduce computation time for sessions with many trials.
 
     Returns
     -------
@@ -451,44 +539,94 @@ def make_task_variables(
     n_shifts = len(patch_change_shifts)
     is_patch_change_pos = np.full((n_time, n_shifts), False)
 
-    for trial in trials_df.itertuples():
-        is_in_trial = (time >= trial.start_time) & (time < trial.end_time)
-        from_start_time_to_goal = (time >= trial.start_time) & (
-            time < trial.goal_arrival_time
-        )
-        from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (
-            time < trial.end_time
-        )
-        trial_number[is_in_trial] = trial.Index
+    if parallel:
+        # Parallel processing across trials
+        # Convert trials to dicts for pickling
+        trial_data_list = []
+        for trial in trials_df.itertuples():
+            trial_dict = trial._asdict()
+            trial_data_list.append(
+                (
+                    trial_dict,
+                    position_info,
+                    track_graph,
+                    track_edges,
+                    track_segment_id_to_edge,
+                    is_prev_reward_omission.loc[trial.Index].to_numpy(),
+                    is_patch_change.loc[trial.Index].to_numpy(),
+                    sampling_frequency,
+                )
+            )
 
-        time_to_goal[from_start_time_to_goal] = (
-            np.arange(np.sum(from_start_time_to_goal)) / sampling_frequency
-        )
-        time_to_goal[from_goal_to_next_movement] = 0.0
+        with ProcessPoolExecutor() as executor:
+            trial_results = list(executor.map(_process_single_trial, trial_data_list))
 
-        start_node_id[is_in_trial] = trial.from_well
-        goal_node_id[is_in_trial] = trial.to_well
-        turn_direction_arr[is_in_trial] = turn_direction(
-            trial, position_info.loc[is_in_trial], track_graph, track_edges
-        )
-        path_progress[from_start_time_to_goal] = path_progress_for_run_segment(
-            position_info.loc[from_start_time_to_goal],
-            track_graph,
-            trial.from_well,
-            trial.to_well,
-        )
-        path_progress[from_goal_to_next_movement] = 0.0
+        # Combine results from all trials
+        for result in trial_results:
+            indices = result["time_indices"]
+            values = result["values"]
 
-        dist_to_goal_arr[is_in_trial] = dist_to_goal(
-            position_info.loc[is_in_trial],
-            trial,
-            track_graph,
-            track_segment_id_to_edge,
-        )
-        is_prev_reward_omission_pos[is_in_trial] = is_prev_reward_omission.loc[
-            trial.Index
-        ].to_numpy()
-        is_patch_change_pos[is_in_trial] = is_patch_change.loc[trial.Index].to_numpy()
+            # Assign values to output arrays
+            trial_number[indices["is_in_trial"]] = values["trial_number"]
+            start_node_id[indices["is_in_trial"]] = values["from_well"]
+            goal_node_id[indices["is_in_trial"]] = values["to_well"]
+            turn_direction_arr[indices["is_in_trial"]] = values["turn_direction"]
+
+            time_to_goal[indices["from_start_time_to_goal"]] = values["time_to_goal_start"]
+            time_to_goal[indices["from_goal_to_next_movement"]] = 0.0
+
+            path_progress[indices["from_start_time_to_goal"]] = values["path_progress"]
+            path_progress[indices["from_goal_to_next_movement"]] = 0.0
+
+            dist_to_goal_arr[indices["is_in_trial"]] = values["dist_to_goal"]
+
+            is_prev_reward_omission_pos[indices["is_in_trial"]] = result["omission_patch"][
+                "is_prev_reward_omission"
+            ]
+            is_patch_change_pos[indices["is_in_trial"]] = result["omission_patch"][
+                "is_patch_change"
+            ]
+
+    else:
+        # Sequential processing (original implementation)
+        for trial in trials_df.itertuples():
+            is_in_trial = (time >= trial.start_time) & (time < trial.end_time)
+            from_start_time_to_goal = (time >= trial.start_time) & (
+                time < trial.goal_arrival_time
+            )
+            from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (
+                time < trial.end_time
+            )
+            trial_number[is_in_trial] = trial.Index
+
+            time_to_goal[from_start_time_to_goal] = (
+                np.arange(np.sum(from_start_time_to_goal)) / sampling_frequency
+            )
+            time_to_goal[from_goal_to_next_movement] = 0.0
+
+            start_node_id[is_in_trial] = trial.from_well
+            goal_node_id[is_in_trial] = trial.to_well
+            turn_direction_arr[is_in_trial] = turn_direction(
+                trial, position_info.loc[is_in_trial], track_graph, track_edges
+            )
+            path_progress[from_start_time_to_goal] = path_progress_for_run_segment(
+                position_info.loc[from_start_time_to_goal],
+                track_graph,
+                trial.from_well,
+                trial.to_well,
+            )
+            path_progress[from_goal_to_next_movement] = 0.0
+
+            dist_to_goal_arr[is_in_trial] = dist_to_goal(
+                position_info.loc[is_in_trial],
+                trial,
+                track_graph,
+                track_segment_id_to_edge,
+            )
+            is_prev_reward_omission_pos[is_in_trial] = is_prev_reward_omission.loc[
+                trial.Index
+            ].to_numpy()
+            is_patch_change_pos[is_in_trial] = is_patch_change.loc[trial.Index].to_numpy()
 
     return pd.DataFrame(
         {

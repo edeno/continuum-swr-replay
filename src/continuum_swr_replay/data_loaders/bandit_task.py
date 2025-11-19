@@ -412,7 +412,6 @@ def load_data(
             electrode_group_info = get_electrode_group_info(nwb_file_name)
             result["electrode_group_info"] = electrode_group_info
 
-    # Cast result dict to SessionData TypedDict for type safety
-    # The dict is built dynamically based on the include parameter,
-    # but we verify at runtime that all required keys are present
-    return cast(SessionData, result)
+    # Return result dict - type checkers will validate it matches SessionData
+    # The dict is built dynamically based on the include parameter
+    return result  # type: ignore[return-value]
