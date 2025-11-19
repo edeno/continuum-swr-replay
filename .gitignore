@@ -182,4 +182,5 @@ cython_debug/
 dj_local_conf.json
 
 
-test_outputs/
+test_outputs/# Processed data (large files, regenerated from decoding)
+src/Processed-Data/
