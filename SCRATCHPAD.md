@@ -286,40 +286,78 @@ This is the **simplest module** so far:
 
 ---
 
-## Milestone 4: Baseline Figure Generation ⏸️ DEFERRED
+## Milestone 4: Baseline Figure Generation ⚠️ PARTIAL
 
-**Status:** Deferred until after decoding re-run
-**Decision Date:** 2025-11-19
+**Status:** Partially complete with known limitations
+**Started:** 2025-11-19
+**Completed:** 2025-11-19
 
-### Rationale
+### Results Summary
 
-**Data situation:**
-- Old processed data: `/cumulus/edeno/non_local_paper/Processed-Data` (256 GB total)
-- Figure 02-03 need: `*_HPC_80_data_over_time.pkl` (182 files, 16 GB)
-- Figure 04 needs: `*_mPFC_modulation.pkl` (0 files - missing ❌)
+**Figure02:** ✅ Complete (22/22 PDFs, 817 KB)
+**Figure03:** ⚠️ Partial (13/16 PDFs, crashed due to data quality issue)
+**Figure04:** ❌ Not generated (missing mPFC modulation files)
 
-**Why defer:**
-1. **Will re-run decoding** - New data will go to different location
-2. **Avoid mixing data** - Don't want old + new data mixed
-3. **Missing files** - Can't generate complete baselines anyway
-4. **Wasteful copy** - 16 GB that will be replaced soon
+### Implementation
 
-### Alternative Approach
+1. **Data Copy:**
+   - Copied 16 GB (182 files) from `/cumulus/edeno/non_local_paper/Processed-Data`
+   - Destination: `src/Processed-Data/`
+   - Files: `*_HPC_80_data_over_time.pkl`
 
-**Instead of formal baselines:**
-- ✅ Make small, incremental commits (easy to review/revert)
-- ✅ Visual inspection during refactoring (run scripts to check output)
-- ✅ Comprehensive unit tests for extracted utilities (already done for M1-M3)
-- ✅ Proactive use of code review agents
-- ✅ Generate baselines from fresh data after re-running decoding
+2. **Baseline Scripts Created:**
+   - `scripts/generate_figure02_baseline.py` - Modified to save PDFs instead of plt.show()
+   - `scripts/generate_figure03_baseline.py` - Modified to save PDFs instead of plt.show()
 
-### When to Resume
+3. **Generation Process:**
+   - Figure02: Completed successfully in ~45 minutes, all 22 panels generated
+   - Figure03: Ran for ~5 minutes, generated 13/16 panels before crash
 
-After decoding is re-run with new data in proper location:
-1. Run all figure scripts
-2. Save outputs to `tests/baselines/`
-3. Document process in `tests/baselines/README.md`
-4. Use for regression testing going forward
+### Figure03 Crash Analysis
+
+**Error:** `TypeError: agg function failed [how->mean,dtype->object]`
+
+**Root Cause:**
+- Corrupted data column in old processed files
+- String column containing concatenated NWB filenames: `'chimi20200213_.nwbchimi20200213_.nwb...'`
+- Script attempted numeric aggregation (`.mean()`) on this string column
+- Occurred at panel 14 (line 415 of baseline script)
+
+**Conclusion:**
+- This is a **data quality issue** in the old processed files, not a script bug
+- The original scripts likely have the same issue with this dataset
+- Will be resolved when decoding is re-run with fresh data
+
+### Files Created
+
+- ✅ `tests/baselines/README.md` - Documentation of baseline generation process
+- ✅ `tests/baselines/figure02/figure02_panel_01.pdf` through `_22.pdf`
+- ✅ `tests/baselines/figure03/figure03_panel_01.pdf` through `_13.pdf`
+- ✅ `tests/baselines/figure02.log` - Full generation log for figure02
+- ✅ `tests/baselines/figure03.log` - Full generation log for figure03 (includes error)
+- ✅ `scripts/generate_figure02_baseline.py` - Temporary baseline script
+- ✅ `scripts/generate_figure03_baseline.py` - Temporary baseline script
+
+### Limitations and Next Steps
+
+**Known Limitations:**
+1. Figure03 incomplete (13/16 panels) due to data corruption
+2. Figure04 cannot be generated (missing input files)
+3. Old data will be replaced when decoding re-runs
+4. Baseline scripts are temporary and should be removed later
+
+**Usage During Refactoring:**
+- Use for visual spot-checking only
+- Do NOT treat as authoritative reference
+- Compare panel structure and count, not pixel-perfect output
+- Accept incomplete figure03 (missing panels 14-16)
+
+**When to Regenerate:**
+After decoding is re-run with fresh data:
+1. Run original figure scripts (not baseline versions)
+2. Save complete outputs to `tests/baselines/`
+3. Remove temporary baseline scripts
+4. Update README with new generation date
 
 ---
 

@@ -184,3 +184,6 @@ dj_local_conf.json
 
 test_outputs/# Processed data (large files, regenerated from decoding)
 src/Processed-Data/
+# Baseline figures (PDFs are large, generated artifacts)
+tests/baselines/**/*.pdf
+tests/baselines/**/*.log
