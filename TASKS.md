@@ -133,18 +133,33 @@ This file tracks the implementation of PLAN.md. Each task should be marked compl
 
 ---
 
-## Milestone 4: Baseline Figure Generation (Week 2)
+## Milestone 4: Baseline Figure Generation (Week 2) ⏸️ DEFERRED
 
 **Goal:** Generate baseline figures from current scripts for regression testing.
 
-### Baseline Creation
+**Status:** Deferred until after decoding re-run
+
+**Rationale:**
+- Old data is in `/cumulus/edeno/non_local_paper/Processed-Data` (256 GB)
+- Decoding will be re-run to new location
+- Figure 04 requires missing mPFC modulation files
+- Copying 16 GB for partial baselines is wasteful
+- **Alternative approach:** Incremental refactoring with visual inspection + code review
+
+**Deferred Tasks:**
 
 - [ ] Run `python scripts/generate_figure02.py` and save outputs to `tests/baselines/figure02/`
 - [ ] Run `python scripts/generate_figure03.py` and save outputs to `tests/baselines/figure03/`
 - [ ] Run `python scripts/generate_figure04.py` and save outputs to `tests/baselines/figure04/`
 - [ ] Document baseline generation process in `tests/baselines/README.md`
 
-**Acceptance Criteria:** Baseline figures generated and saved for comparison during refactoring.
+**When to resume:** After decoding is re-run and new data is in `Processed-Data/`
+
+**Mitigation during refactoring:**
+- Make small, incremental commits
+- Run scripts during development for visual inspection
+- Use scientific-code-reviewer agent proactively
+- Rely on comprehensive unit tests for extracted utilities
 
 ---
 

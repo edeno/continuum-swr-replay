@@ -280,15 +280,52 @@ This is the **simplest module** so far:
 
 ### Next Steps
 
-Move to **Milestone 4: Baseline Figure Generation**
-- Generate baseline figures for regression testing
-- Create reference outputs before refactoring scripts
+**Milestone 4 DEFERRED** - Skip to Milestone 5: Refactor generate_figure03.py
+- Cannot generate baselines (missing data + will re-run decoding)
+- Use incremental commits + visual inspection instead
+
+---
+
+## Milestone 4: Baseline Figure Generation ⏸️ DEFERRED
+
+**Status:** Deferred until after decoding re-run
+**Decision Date:** 2025-11-19
+
+### Rationale
+
+**Data situation:**
+- Old processed data: `/cumulus/edeno/non_local_paper/Processed-Data` (256 GB total)
+- Figure 02-03 need: `*_HPC_80_data_over_time.pkl` (182 files, 16 GB)
+- Figure 04 needs: `*_mPFC_modulation.pkl` (0 files - missing ❌)
+
+**Why defer:**
+1. **Will re-run decoding** - New data will go to different location
+2. **Avoid mixing data** - Don't want old + new data mixed
+3. **Missing files** - Can't generate complete baselines anyway
+4. **Wasteful copy** - 16 GB that will be replaced soon
+
+### Alternative Approach
+
+**Instead of formal baselines:**
+- ✅ Make small, incremental commits (easy to review/revert)
+- ✅ Visual inspection during refactoring (run scripts to check output)
+- ✅ Comprehensive unit tests for extracted utilities (already done for M1-M3)
+- ✅ Proactive use of code review agents
+- ✅ Generate baselines from fresh data after re-running decoding
+
+### When to Resume
+
+After decoding is re-run with new data in proper location:
+1. Run all figure scripts
+2. Save outputs to `tests/baselines/`
+3. Document process in `tests/baselines/README.md`
+4. Use for regression testing going forward
 
 ---
 
 ## Current Blockers
 
-None - ready to proceed to Milestone 4
+None - proceeding to Milestone 5
 
 ---
 
