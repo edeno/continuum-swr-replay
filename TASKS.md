@@ -140,6 +140,7 @@ This file tracks the implementation of PLAN.md. Each task should be marked compl
 **Status:** Deferred until after decoding re-run
 
 **Rationale:**
+
 - Old data is in `/cumulus/edeno/non_local_paper/Processed-Data` (256 GB)
 - Decoding will be re-run to new location
 - Figure 04 requires missing mPFC modulation files
@@ -156,6 +157,7 @@ This file tracks the implementation of PLAN.md. Each task should be marked compl
 **When to resume:** After decoding is re-run and new data is in `Processed-Data/`
 
 **Mitigation during refactoring:**
+
 - Make small, incremental commits
 - Run scripts during development for visual inspection
 - Use scientific-code-reviewer agent proactively

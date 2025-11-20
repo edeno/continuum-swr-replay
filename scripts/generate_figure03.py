@@ -1,19 +1,47 @@
+#!/usr/bin/env python
+"""Generate Figure 3: Non-local event characteristics and physiological correlates.
+
+This script generates panels showing:
+- Event duration distributions
+- Spatial properties (distance, HPD)
+- Decoded position metrics
+- Event-triggered averages of physiological signals (theta, SWR, MUA)
+
+Usage:
+    python scripts/generate_figure03.py
+    python scripts/generate_figure03.py --output-dir paper/figures --format pdf
+"""
+
 # %%
 # %config InlineBackend.figure_format = 'retina'
+import argparse
 import logging
 import os
 import warnings
+from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import xarray as xr
 from scipy.ndimage import label
 from scipy.stats import sem
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import (
+    BINS_DISTANCE_CM,
+    BINS_DURATION_MS,
+    BINS_HPD_CM,
+    BINS_SPEED_CM_PER_SEC,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+from continuum_swr_replay.analysis.hippocampus import (
+    get_event_durations_ms,
+    get_event_start_end_times,
+    get_immobile_events,
+    get_signal_windows,
+)
 from continuum_swr_replay.parameters import (
     COLORS,
     PROCESSED_DATA_DIR,
@@ -27,13 +55,52 @@ logging.basicConfig(
 )
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory to save output figures (default: current directory)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["pdf", "png", "svg"],
+        default="pdf",
+        help="Output file format (default: pdf)",
+    )
+    parser.add_argument(
+        "--dpi", type=int, default=300, help="DPI for raster formats (default: 300)"
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=None,
+        help="Override PROCESSED_DATA_DIR for loading data",
+    )
+    return parser.parse_args()
+
+
+# Parse arguments (but don't require them for notebook use)
+try:
+    args = parse_args()
+    if args.output_dir:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+except SystemExit:
+    # Allow script to run in notebook mode without arguments
+    args = argparse.Namespace(output_dir=None, format="pdf", dpi=300, data_dir=None)
+
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
 
 def load_data_over_time():
     # Load all relevant data files
-    data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
+    data_dir = args.data_dir if args.data_dir else PROCESSED_DATA_DIR
+    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
 
     data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
     data_over_time["Non-Local_prob"] = (
@@ -46,10 +113,12 @@ def load_data_over_time():
 
 
 def get_event_types(data_over_time: dict):
-    non_local_immobile = (
-        data_over_time.loc[(data_over_time["non_local_event"] > 0)]
-        .groupby(["animal", "day", "epoch", "non_local_event"])
-        .filter(lambda g: (g.head_speed.iloc[0] < 4.0) & (g.head_speed.iloc[-1] < 4.0))
+    non_local_immobile = get_immobile_events(
+        data_over_time,
+        event_col="non_local_event",
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        method="endpoints",
     )
 
     swr_events = data_over_time.loc[(data_over_time["SWR_event"] > 0)]
@@ -98,16 +167,13 @@ event_types = get_event_types(data_over_time)
 
 
 # %%
-def get_duration(df: pd.DataFrame, event_name="non_local_event") -> pd.Series:
-    duration = (
-        df.groupby(["animal", "day", "epoch", event_name]).size() / SAMPLING_FREQUENCY
-    )
-    return duration * 1000.0  # Convert to milliseconds
-
+# Use get_event_durations_ms() from library instead of local function
 
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    duration = get_duration(event_types[event_type], event_name="non_local_event")
+    duration = get_event_durations_ms(
+        event_types[event_type], event_col="non_local_event"
+    )
 
     color = (
         COLORS["Non-Local"]
@@ -116,7 +182,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     )
     ax.hist(
         duration,
-        bins=np.arange(0, 250, 10),
+        bins=BINS_DURATION_MS,
         color=color,
         alpha=0.7,
         edgecolor="none",
@@ -128,7 +194,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -147,7 +212,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -155,7 +219,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     )
     ax.hist(
         np.abs(event_types[event_type]["ahead_behind_distance"]),
-        bins=np.arange(0, 230, 2),
+        bins=BINS_DISTANCE_CM,
         color=color,
         alpha=0.7,
         edgecolor="none",
@@ -167,7 +231,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -188,7 +251,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -196,7 +258,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     )
     ax.hist(
         event_types[event_type]["map_speed"] / 100.0,
-        bins=np.arange(0, 20, 0.5),
+        bins=BINS_SPEED_CM_PER_SEC,
         color=color,
         alpha=0.7,
         edgecolor="none",
@@ -208,7 +270,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -229,7 +290,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -249,7 +309,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -269,7 +328,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -289,7 +347,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -309,7 +366,6 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -331,7 +387,6 @@ fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharex=True, sharey=True)
 for event_type, ax in zip(
     ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes, strict=True
 ):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -356,7 +411,6 @@ for event_type, ax in zip(
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -392,7 +446,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     )
     ax.hist(
         mean_event["hpd"],
-        bins=np.arange(0, 250, 10),
+        bins=BINS_HPD_CM,
         color=color,
         alpha=0.7,
         edgecolor="none",
@@ -403,115 +457,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
 
 
 # %%
-def get_event_start_end(df: pd.DataFrame, event_name="non_local_event") -> pd.DataFrame:
-    event_times = (
-        df.reset_index()
-        .groupby(["animal", "day", "epoch", event_name])["index"]
-        .agg(["min", "max"])
-        .rename(columns={"min": "start_time", "max": "end_time"})
-        .reset_index()
-    )
-    return event_times
-
-
-non_local_start_end_time = get_event_start_end(
-    event_types["non_local_immobile"], event_name="non_local_event"
+non_local_start_end_time = get_event_start_end_times(
+    event_types["non_local_immobile"], event_col="non_local_event"
 )
 
 # %%
-
-
-def _get_signal_windows(
-    group: pd.DataFrame,
-    start_end_time: pd.DataFrame,
-    animal_day_epoch: tuple[str, int, str],
-    time_type: str,
-    signal_types: list[str],
-    total_window_len_seconds=2.0,
-    event_column: str | None = None,
-) -> xr.DataArray:
-    """Extract signal windows around event times.
-
-    Parameters
-    ----------
-    group : pd.DataFrame
-        DataFrame containing the signal data for a specific animal, day, and epoch.
-    start_end_time : pd.DataFrame
-        DataFrame containing the start and end times of events.
-    animal : str
-        Animal identifier.
-    day : int
-        Day identifier.
-    epoch : str
-        Epoch identifier.
-    time_type : str
-        Column name in start_end_time to use for event times ('start_time' or 'end_time').
-    signal_type : str
-        Column name in group to extract signal from.
-    total_window_len_seconds : float, optional
-        Total length of the window in seconds (default is 2.0 seconds).
-
-    Returns
-    -------
-    np.ndarray, shape (n_events, window_length)
-        signal windows.
-
-    """
-    animal, day, epoch = animal_day_epoch
-    cur_event_times = start_end_time.loc[
-        (start_end_time.animal == animal)
-        & (start_end_time.day == day)
-        & (start_end_time.epoch == epoch)
-    ]
-    event_times = cur_event_times[time_type].to_numpy()
-    n_signals = len(signal_types)
-
-    if len(event_times) == 0:
-        return np.empty(
-            (
-                0,
-                int(round(total_window_len_seconds * SAMPLING_FREQUENCY)) + 1,
-                n_signals,
-            )
-        )
-
-    window = total_window_len_seconds / 2.0  # Half window on each side
-    dt = 1 / SAMPLING_FREQUENCY
-    half_window_samples = int(round(window / dt))
-    window_len = 2 * half_window_samples + 1
-    offsets = np.arange(-half_window_samples, half_window_samples + 1)
-    windows = np.full((len(event_times), window_len, n_signals), np.nan)
-    center_idxs = group.index.searchsorted(event_times)
-    all_window_idxs = center_idxs[:, None] + offsets[None, :]
-    mask = (all_window_idxs >= 0) & (all_window_idxs < len(group))
-    windows = np.full((len(event_times), window_len, n_signals), np.nan)
-    valid_rows, valid_cols = np.where(mask)
-    valid_ind = all_window_idxs[mask]
-
-    for i, signal_type in enumerate(signal_types):
-        windows[valid_rows, valid_cols, i] = group[signal_type].to_numpy()[valid_ind]
-
-    time_axis = np.arange(-half_window_samples, half_window_samples + 1) * dt
-    if event_column is not None:
-        event_ids = pd.MultiIndex.from_frame(
-            cur_event_times.loc[:, ["animal", "day", "epoch", event_column]]
-        )
-    else:
-        event_ids = np.arange(len(event_times))
-    da = xr.DataArray(
-        windows,
-        dims=("event", "time", "signal"),
-        coords={
-            "event": event_ids,
-            "time": time_axis,
-            "signal": signal_types,
-        },
-        attrs={
-            "event_type": event_column,
-        },
-    )
-    return da
-
 
 signal_types = [
     "Non-Local_prob",
@@ -521,78 +471,44 @@ signal_types = [
     "head_speed",
 ]
 
-# _get_signal_windows(
-#     group=group,
-#     start_end_time=non_local_start_end_time,
-#     animal_day_epoch=(animal, day, epoch),
-#     time_type="start_time",
-#     signal_types=signal_types,
-#     total_window_len_seconds=2.0,
-#     event_column="non_local_event",
-# )
-
-signal_windows = xr.concat(
-    [
-        _get_signal_windows(
-            group=group,
-            start_end_time=non_local_start_end_time,
-            animal_day_epoch=(animal, day, epoch),
-            time_type="start_time",
-            signal_types=signal_types,
-            total_window_len_seconds=2.0,
-            event_column="non_local_event",
-        )
-        for (animal, day, epoch), group in data_over_time.groupby(
-            ["animal", "day", "epoch"]
-        )
-    ],
-    dim="event",
+signal_windows = get_signal_windows(
+    data=data_over_time,
+    event_times=non_local_start_end_time,
+    signal_cols=signal_types,
+    time_col="start_time",
+    window_sec=2.0,
+    sampling_frequency=SAMPLING_FREQUENCY,
+    event_id_col="non_local_event",
 )
 
 # %%
-non_local_start_end_time = get_event_start_end(
-    event_types["non_local_immobile_no_overlap_SWR"], event_name="non_local_event"
+non_local_start_end_time = get_event_start_end_times(
+    event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
 )
 
-signal_windows = xr.concat(
-    [
-        _get_signal_windows(
-            group=group,
-            start_end_time=non_local_start_end_time,
-            animal_day_epoch=(animal, day, epoch),
-            time_type="start_time",
-            signal_types=signal_types,
-            total_window_len_seconds=2.0,
-            event_column="non_local_event",
-        )
-        for (animal, day, epoch), group in data_over_time.groupby(
-            ["animal", "day", "epoch"]
-        )
-    ],
-    dim="event",
+signal_windows = get_signal_windows(
+    data=data_over_time,
+    event_times=non_local_start_end_time,
+    signal_cols=signal_types,
+    time_col="start_time",
+    window_sec=2.0,
+    sampling_frequency=SAMPLING_FREQUENCY,
+    event_id_col="non_local_event",
 )
 
 # %%
-non_local_start_end_time = get_event_start_end(
-    event_types["non_local_immobile_overlap_swr"], event_name="non_local_event"
+non_local_start_end_time = get_event_start_end_times(
+    event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
 )
 
-signal_windows_overlap = xr.concat(
-    [
-        _get_signal_windows(
-            group=group,
-            start_end_time=non_local_start_end_time,
-            animal_day_epoch=(animal, day, epoch),
-            time_type="start_time",
-            signal_types=signal_types,
-            total_window_len_seconds=2.0,
-            event_column="non_local_event",
-        )
-        for (animal, day, epoch), group in data_over_time.groupby(
-            ["animal", "day", "epoch"]
-        )
-    ],
-    dim="event",
+signal_windows_overlap = get_signal_windows(
+    data=data_over_time,
+    event_times=non_local_start_end_time,
+    signal_cols=signal_types,
+    time_col="start_time",
+    window_sec=2.0,
+    sampling_frequency=SAMPLING_FREQUENCY,
+    event_id_col="non_local_event",
 )
 
 # %%
@@ -622,7 +538,6 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     ),
     strict=True,
 ):
-
     # Add shaded error bars
     ax.fill_between(
         no_overlap_mean["time"],
@@ -702,49 +617,33 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
 plt.xlim((-1.0, 1.0))
 
 # %%
-non_local_start_end_time = get_event_start_end(
-    event_types["non_local_immobile_no_overlap_SWR"], event_name="non_local_event"
+non_local_start_end_time = get_event_start_end_times(
+    event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
 )
 
-signal_windows = xr.concat(
-    [
-        _get_signal_windows(
-            group=group,
-            start_end_time=non_local_start_end_time,
-            animal_day_epoch=(animal, day, epoch),
-            time_type="end_time",
-            signal_types=signal_types,
-            total_window_len_seconds=2.0,
-            event_column="non_local_event",
-        )
-        for (animal, day, epoch), group in data_over_time.groupby(
-            ["animal", "day", "epoch"]
-        )
-    ],
-    dim="event",
+signal_windows = get_signal_windows(
+    data=data_over_time,
+    event_times=non_local_start_end_time,
+    signal_cols=signal_types,
+    time_col="end_time",
+    window_sec=2.0,
+    sampling_frequency=SAMPLING_FREQUENCY,
+    event_id_col="non_local_event",
 )
 
 # %%
-non_local_start_end_time = get_event_start_end(
-    event_types["non_local_immobile_overlap_swr"], event_name="non_local_event"
+non_local_start_end_time = get_event_start_end_times(
+    event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
 )
 
-signal_windows_overlap = xr.concat(
-    [
-        _get_signal_windows(
-            group=group,
-            start_end_time=non_local_start_end_time,
-            animal_day_epoch=(animal, day, epoch),
-            time_type="end_time",
-            signal_types=signal_types,
-            total_window_len_seconds=2.0,
-            event_column="non_local_event",
-        )
-        for (animal, day, epoch), group in data_over_time.groupby(
-            ["animal", "day", "epoch"]
-        )
-    ],
-    dim="event",
+signal_windows_overlap = get_signal_windows(
+    data=data_over_time,
+    event_times=non_local_start_end_time,
+    signal_cols=signal_types,
+    time_col="end_time",
+    window_sec=2.0,
+    sampling_frequency=SAMPLING_FREQUENCY,
+    event_id_col="non_local_event",
 )
 
 # %%
@@ -774,7 +673,6 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     ),
     strict=True,
 ):
-
     # Add shaded error bars
     ax.fill_between(
         no_overlap_mean["time"],
