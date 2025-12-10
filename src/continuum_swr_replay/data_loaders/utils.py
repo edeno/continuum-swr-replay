@@ -303,7 +303,7 @@ def get_training_timepoints(
 
     elif training_type == TrainingType.NO_RIPPLE:
         ripple_labels = get_labels(
-            data["ripple_times"], data["position_info"].index.to_numpy()
+            data["ripple_times"], data["position_info"].index
         )
         is_ripple = ripple_labels > 0
         not_ripple = ~np.asarray(is_ripple).squeeze()
