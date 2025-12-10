@@ -27,9 +27,11 @@ get_training_timepoints : Select time points for decoder training
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import TYPE_CHECKING, cast
+from collections.abc import Callable
+from concurrent.futures import Future, ProcessPoolExecutor
+from typing import TYPE_CHECKING, Any
 
+import pandas as pd
 from spyglass.common import PositionIntervalMap
 
 # Suppress Spyglass warnings
@@ -37,7 +39,14 @@ logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
 logging.getLogger("spyglass").setLevel(logging.ERROR)
 
 if TYPE_CHECKING:
-    from ..types import SessionData
+    from ..types import (
+        DIOEventData,
+        PositionInfoDict,
+        RippleData,
+        SessionData,
+        SpikeDataDict,
+        ThetaData,
+    )
 
 from .events import load_dios
 from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta
@@ -47,6 +56,125 @@ from .task_variables import make_task_variables
 from .trials import make_trials_df_from_well_visits, make_well_visits_df
 
 logger = logging.getLogger(__name__)
+
+
+def _process_spike_data(
+    spike_data: SpikeDataDict,
+    position_index: pd.Index,
+    should_load: Callable[[str], bool],
+    result: dict[str, Any],
+) -> None:
+    """Process raw spike data and add to result dict.
+
+    Filters spike times to position bounds and adds requested keys to result.
+    """
+    from ..types import SessionDataKeys
+
+    spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
+        spike_data["spike_times"],
+        spike_data["spike_waveform_features"],
+        position_index,
+    )
+    if should_load(SessionDataKeys.SPIKE_TIMES):
+        result["spike_times"] = spike_data["spike_times"]
+    if should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
+        result["spike_waveform_features"] = spike_data["spike_waveform_features"]
+
+
+def _process_ripple_data(
+    ripple_data: RippleData,
+    position_index: pd.Index,
+    should_load: Callable[[str], bool],
+    result: dict[str, Any],
+) -> None:
+    """Process raw ripple data and add to result dict."""
+    filtered_ripple = filter_ripple_lfp_time(ripple_data, position_index)
+    for key, value in filtered_ripple.items():
+        if should_load(key):
+            result[key] = value
+
+
+def _process_theta_data(
+    theta_data: ThetaData,
+    should_load: Callable[[str], bool],
+    result: dict[str, Any],
+) -> None:
+    """Process theta data and add requested keys to result dict."""
+    for key, value in theta_data.items():
+        if should_load(key):
+            result[key] = value
+
+
+def _process_multiunit_data(
+    spike_times: dict[str, Any],
+    position_info: pd.DataFrame,
+    should_load: Callable[[str], bool],
+    result: dict[str, Any],
+) -> None:
+    """Process multiunit data and add requested keys to result dict."""
+    from ..types import SessionDataKeys
+
+    if not any(
+        should_load(key)
+        for key in [
+            SessionDataKeys.HSE_TIMES,
+            SessionDataKeys.MULTIUNIT_FIRING_RATE,
+            SessionDataKeys.MULTIUNIT_RATE_ZSCORE,
+        ]
+    ):
+        return
+
+    multiunit_data = get_multiunit(spike_times, position_info)
+    for key, value in multiunit_data.items():
+        if should_load(key):
+            result[key] = value
+
+
+def _process_behavioral_data(
+    dio_events: DIOEventData,
+    position_data: PositionInfoDict,
+    should_load: Callable[[str], bool],
+    result: dict[str, Any],
+) -> None:
+    """Process DIO events and compute behavioral data (well visits, trials, task variables)."""
+    from ..types import SessionDataKeys
+
+    # Add DIO events to result if requested
+    for key, value in dio_events.items():
+        if should_load(key):
+            result[key] = value
+
+    # Sequential: well visits, trials, task variables (depend on each other)
+    if not (
+        should_load(SessionDataKeys.WELL_VISITS)
+        or should_load(SessionDataKeys.TRIALS)
+        or should_load(SessionDataKeys.TASK_VARIABLES)
+    ):
+        return
+
+    well_visits = make_well_visits_df(
+        dio_events["beam_breaks"],
+        dio_events["pump_events"],
+        position_data["position_info"],
+        track_graph=position_data["track_graph"],
+    )
+
+    if should_load(SessionDataKeys.WELL_VISITS):
+        result["well_visits"] = well_visits
+
+    if should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
+        trials_df = make_trials_df_from_well_visits(well_visits)
+
+        if should_load(SessionDataKeys.TRIALS):
+            result["trials"] = trials_df
+
+        if should_load(SessionDataKeys.TASK_VARIABLES):
+            task_variables_df = make_task_variables(
+                position_info=position_data["position_info"],
+                trials_df=trials_df,
+                track_graph=position_data["track_graph"],
+            )
+            result["task_variables"] = task_variables_df
 
 
 def load_data(
@@ -215,37 +343,67 @@ def load_data(
         logger.debug("Using parallel loading for independent data components")
 
         # Define loading tasks for independent components
-        futures = {}
+        futures: dict[str, Future[Any]] = {}
 
         with ProcessPoolExecutor(max_workers=4) as executor:
             # Submit spike loading task
-            if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
+            if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
+                SessionDataKeys.SPIKE_WAVEFORM_FEATURES
+            ):
                 futures["spike"] = executor.submit(get_spike_data, nwb_file_name)
 
             # Submit ripple loading task
-            if any(should_load(key) for key in [
-                SessionDataKeys.RIPPLE_TIMES, SessionDataKeys.RIPPLE_FILTERED_LFPS, SessionDataKeys.RIPPLE_LFPS,
-                SessionDataKeys.RIPPLE_CONSENSUS_TRACE, SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE
-            ]):
-                futures["ripple"] = executor.submit(get_ripple, nwb_file_name, epoch_name, ripple_detector_name)
+            if any(
+                should_load(key)
+                for key in [
+                    SessionDataKeys.RIPPLE_TIMES,
+                    SessionDataKeys.RIPPLE_FILTERED_LFPS,
+                    SessionDataKeys.RIPPLE_LFPS,
+                    SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
+                    SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
+                ]
+            ):
+                futures["ripple"] = executor.submit(
+                    get_ripple, nwb_file_name, epoch_name, ripple_detector_name
+                )
 
             # Submit theta loading task
-            if any(should_load(key) for key in [SessionDataKeys.THETA_FILTERED_LFP, SessionDataKeys.THETA_PHASE, SessionDataKeys.THETA_POWER]):
+            if any(
+                should_load(key)
+                for key in [
+                    SessionDataKeys.THETA_FILTERED_LFP,
+                    SessionDataKeys.THETA_PHASE,
+                    SessionDataKeys.THETA_POWER,
+                ]
+            ):
                 futures["theta"] = executor.submit(get_theta, nwb_file_name, epoch_name)
 
             # Submit DIO loading task
-            if any(should_load(key) for key in [
-                SessionDataKeys.BEAM_BREAKS, SessionDataKeys.PUMP_EVENTS, SessionDataKeys.LIGHT_EVENTS,
-                SessionDataKeys.WELL_VISITS, SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES
-            ]):
-                futures["dio"] = executor.submit(load_dios, nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]])
+            if any(
+                should_load(key)
+                for key in [
+                    SessionDataKeys.BEAM_BREAKS,
+                    SessionDataKeys.PUMP_EVENTS,
+                    SessionDataKeys.LIGHT_EVENTS,
+                    SessionDataKeys.WELL_VISITS,
+                    SessionDataKeys.TRIALS,
+                    SessionDataKeys.TASK_VARIABLES,
+                ]
+            ):
+                futures["dio"] = executor.submit(
+                    load_dios,
+                    nwb_file_name,
+                    position_data["position_info"].index.to_numpy()[[0, -1]],
+                )
 
             # Submit electrode group info loading task
             if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
-                futures["electrode"] = executor.submit(get_electrode_group_info, nwb_file_name)
+                futures["electrode"] = executor.submit(
+                    get_electrode_group_info, nwb_file_name
+                )
 
             # Wait for all futures to complete and collect results
-            raw_data = {}
+            raw_data: dict[str, Any] = {}
             for name, future in futures.items():
                 try:
                     raw_data[name] = future.result(timeout=600)  # 10 minute timeout
@@ -254,167 +412,98 @@ def load_data(
                     logger.error(f"Error loading {name} data: {e}")
                     raise
 
-        # Process spike data (depends on raw spike data)
+        # Process raw data using helper functions
         if "spike" in raw_data:
-            spike_data = raw_data["spike"]
-            spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
-                spike_data["spike_times"],
-                spike_data["spike_waveform_features"],
-                position_data["position_info"].index,
+            _process_spike_data(
+                raw_data["spike"], position_data["position_info"].index, should_load, result
             )
-            if should_load(SessionDataKeys.SPIKE_TIMES):
-                result["spike_times"] = spike_data["spike_times"]
-            if should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
-                result["spike_waveform_features"] = spike_data["spike_waveform_features"]
 
-        # Process ripple data (depends on raw ripple data)
         if "ripple" in raw_data:
-            ripple_data = filter_ripple_lfp_time(raw_data["ripple"], position_data["position_info"].index)
-            for key, value in ripple_data.items():
-                if should_load(key):
-                    result[key] = value
+            _process_ripple_data(
+                raw_data["ripple"], position_data["position_info"].index, should_load, result
+            )
 
-        # Process theta data
         if "theta" in raw_data:
-            for key, value in raw_data["theta"].items():
-                if should_load(key):
-                    result[key] = value
+            _process_theta_data(raw_data["theta"], should_load, result)
 
-        # Process DIO events and behavioral data (sequential after DIO loading)
         if "dio" in raw_data:
-            dio_events = raw_data["dio"]
+            _process_behavioral_data(raw_data["dio"], position_data, should_load, result)
 
-            # Add DIO events to result if requested
-            for key, value in dio_events.items():
-                if should_load(key):
-                    result[key] = value
+        if "spike_times" in result:
+            _process_multiunit_data(
+                result["spike_times"], position_data["position_info"], should_load, result
+            )
 
-            # Sequential: well visits, trials, task variables (depend on each other)
-            if should_load(SessionDataKeys.WELL_VISITS) or should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
-                well_visits = make_well_visits_df(
-                    dio_events["beam_breaks"],
-                    dio_events["pump_events"],
-                    position_data["position_info"],
-                    track_graph=position_data["track_graph"],
-                )
-
-                if should_load(SessionDataKeys.WELL_VISITS):
-                    result["well_visits"] = well_visits
-
-                if should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
-                    trials_df = make_trials_df_from_well_visits(well_visits)
-
-                    if should_load(SessionDataKeys.TRIALS):
-                        result["trials"] = trials_df
-
-                    if should_load(SessionDataKeys.TASK_VARIABLES):
-                        task_variables_df = make_task_variables(
-                            position_info=position_data["position_info"],
-                            trials_df=trials_df,
-                            track_graph=position_data["track_graph"],
-                        )
-                        result["task_variables"] = task_variables_df
-
-        # Process multiunit data (depends on spike_times being in result)
-        if any(should_load(key) for key in [SessionDataKeys.HSE_TIMES, SessionDataKeys.MULTIUNIT_FIRING_RATE, SessionDataKeys.MULTIUNIT_RATE_ZSCORE]):
-            if "spike_times" in result:
-                multiunit_data = get_multiunit(result["spike_times"], position_data["position_info"])
-                for key, value in multiunit_data.items():
-                    if should_load(key):
-                        result[key] = value
-
-        # Process electrode group info
         if "electrode" in raw_data:
             result["electrode_group_info"] = raw_data["electrode"]
 
     else:
-        # Sequential loading (original implementation)
+        # Sequential loading (for debugging or when parallel is disabled)
         logger.debug("Using sequential loading")
 
-        # Conditionally load spike data
-        if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
+        # Load and process spike data
+        if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
+            SessionDataKeys.SPIKE_WAVEFORM_FEATURES
+        ):
             spike_data = get_spike_data(nwb_file_name)
-            spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
-                spike_data["spike_times"],
-            spike_data["spike_waveform_features"],
-            position_data["position_info"].index,
-        )
-            if should_load(SessionDataKeys.SPIKE_TIMES):
-                result["spike_times"] = spike_data["spike_times"]
-            if should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES):
-                result["spike_waveform_features"] = spike_data["spike_waveform_features"]
+            _process_spike_data(
+                spike_data, position_data["position_info"].index, should_load, result
+            )
 
-        # Conditionally load ripple data
-        if any(should_load(key) for key in [
-            SessionDataKeys.RIPPLE_TIMES, SessionDataKeys.RIPPLE_FILTERED_LFPS, SessionDataKeys.RIPPLE_LFPS,
-            SessionDataKeys.RIPPLE_CONSENSUS_TRACE, SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE
-        ]):
+        # Load and process ripple data
+        if any(
+            should_load(key)
+            for key in [
+                SessionDataKeys.RIPPLE_TIMES,
+                SessionDataKeys.RIPPLE_FILTERED_LFPS,
+                SessionDataKeys.RIPPLE_LFPS,
+                SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
+                SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
+            ]
+        ):
             ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
-            ripple_data = filter_ripple_lfp_time(ripple_data, position_data["position_info"].index)
-            for key, value in ripple_data.items():
-                if should_load(key):
-                    result[key] = value
+            _process_ripple_data(
+                ripple_data, position_data["position_info"].index, should_load, result
+            )
 
-        # Conditionally load theta data
-        if any(should_load(key) for key in [SessionDataKeys.THETA_FILTERED_LFP, SessionDataKeys.THETA_PHASE, SessionDataKeys.THETA_POWER]):
+        # Load and process theta data
+        if any(
+            should_load(key)
+            for key in [
+                SessionDataKeys.THETA_FILTERED_LFP,
+                SessionDataKeys.THETA_PHASE,
+                SessionDataKeys.THETA_POWER,
+            ]
+        ):
             theta_data = get_theta(nwb_file_name, epoch_name)
-            for key, value in theta_data.items():
-                if should_load(key):
-                    result[key] = value
+            _process_theta_data(theta_data, should_load, result)
 
-        # Conditionally load multiunit data
-        if any(should_load(key) for key in [SessionDataKeys.HSE_TIMES, SessionDataKeys.MULTIUNIT_FIRING_RATE, SessionDataKeys.MULTIUNIT_RATE_ZSCORE]):
-            # Only load if we have spike data
-            if "spike_times" in result:
-                multiunit_data = get_multiunit(result["spike_times"], position_data["position_info"])
-                for key, value in multiunit_data.items():
-                    if should_load(key):
-                        result[key] = value
-
-        # Conditionally load DIO events and behavioral data
-        if any(should_load(key) for key in [
-            SessionDataKeys.BEAM_BREAKS, SessionDataKeys.PUMP_EVENTS, SessionDataKeys.LIGHT_EVENTS,
-            SessionDataKeys.WELL_VISITS, SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES
-        ]):
+        # Load and process DIO events and behavioral data
+        if any(
+            should_load(key)
+            for key in [
+                SessionDataKeys.BEAM_BREAKS,
+                SessionDataKeys.PUMP_EVENTS,
+                SessionDataKeys.LIGHT_EVENTS,
+                SessionDataKeys.WELL_VISITS,
+                SessionDataKeys.TRIALS,
+                SessionDataKeys.TASK_VARIABLES,
+            ]
+        ):
             dio_events = load_dios(
                 nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
             )
+            _process_behavioral_data(dio_events, position_data, should_load, result)
 
-            # Add DIO events to result if requested
-            for key, value in dio_events.items():
-                if should_load(key):
-                    result[key] = value
+        # Process multiunit data (depends on spike_times being loaded)
+        if "spike_times" in result:
+            _process_multiunit_data(
+                result["spike_times"], position_data["position_info"], should_load, result
+            )
 
-            # Conditionally load well visits and trials
-            if should_load(SessionDataKeys.WELL_VISITS) or should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
-                well_visits = make_well_visits_df(
-                    dio_events["beam_breaks"],
-                    dio_events["pump_events"],
-                    position_data["position_info"],
-                    track_graph=position_data["track_graph"],
-                )
-
-                if should_load(SessionDataKeys.WELL_VISITS):
-                    result["well_visits"] = well_visits
-
-                if should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
-                    trials_df = make_trials_df_from_well_visits(well_visits)
-
-                    if should_load(SessionDataKeys.TRIALS):
-                        result["trials"] = trials_df
-
-                    if should_load(SessionDataKeys.TASK_VARIABLES):
-                        task_variables_df = make_task_variables(
-                            position_info=position_data["position_info"],
-                            trials_df=trials_df,
-                            track_graph=position_data["track_graph"],
-                        )
-                        result["task_variables"] = task_variables_df
-
-        # Conditionally load electrode group info
+        # Load electrode group info
         if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
-            electrode_group_info = get_electrode_group_info(nwb_file_name)
-            result["electrode_group_info"] = electrode_group_info
+            result["electrode_group_info"] = get_electrode_group_info(nwb_file_name)
 
     # Return result dict - type checkers will validate it matches SessionData
     # The dict is built dynamically based on the include parameter

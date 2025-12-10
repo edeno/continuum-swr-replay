@@ -5,7 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.utils import get_labels
+import pytest
+
+from continuum_swr_replay.data_loaders.utils import get_labels, parse_nwb_filename
 
 
 class TestGetLabels:
@@ -141,6 +143,60 @@ class TestGetLabels:
         # Note: t=5.0 may be labeled as either event 1 or 2 (edge case)
         assert result.loc[2.0:4.9, "event_number"].eq(1).any()
         assert result.loc[5.1:8.0, "event_number"].eq(2).any()
+
+
+class TestParseNwbFilename:
+    """Tests for NWB filename parsing."""
+
+    def test_letters_only_animal_name(self):
+        """Test parsing filename with letters-only animal name."""
+        animal, date = parse_nwb_filename("chimi20200212_.nwb")
+        assert animal == "chimi"
+        assert date == 20200212
+
+    def test_another_letters_only_animal(self):
+        """Test parsing another letters-only animal name."""
+        animal, date = parse_nwb_filename("peanut20201125_.nwb")
+        assert animal == "peanut"
+        assert date == 20201125
+
+    def test_alphanumeric_animal_name(self):
+        """Test parsing filename with alphanumeric animal name (e.g., j16)."""
+        animal, date = parse_nwb_filename("j1620210706_.nwb")
+        assert animal == "j16"
+        assert date == 20210706
+
+    def test_short_animal_name(self):
+        """Test parsing filename with short animal name."""
+        animal, date = parse_nwb_filename("wilbur20210315_.nwb")
+        assert animal == "wilbur"
+        assert date == 20210315
+
+    def test_senor_animal_name(self):
+        """Test parsing senor animal name."""
+        animal, date = parse_nwb_filename("senor20201015_.nwb")
+        assert animal == "senor"
+        assert date == 20201015
+
+    def test_invalid_format_missing_underscore(self):
+        """Test that missing underscore raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            parse_nwb_filename("chimi20200212.nwb")
+
+    def test_invalid_format_wrong_extension(self):
+        """Test that wrong extension raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            parse_nwb_filename("chimi20200212_.txt")
+
+    def test_invalid_format_short_date(self):
+        """Test that date with fewer than 8 digits raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            parse_nwb_filename("chimi2020021_.nwb")
+
+    def test_invalid_format_no_animal(self):
+        """Test that filename with no animal name raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            parse_nwb_filename("20200212_.nwb")
 
 
 # Note: get_epoch_info() caching is validated through integration tests.

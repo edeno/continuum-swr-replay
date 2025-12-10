@@ -104,10 +104,14 @@ def parse_nwb_filename(filename: str) -> tuple[str, int]:
 
     >>> parse_nwb_filename("peanut20201125_.nwb")
     ('peanut', 20201125)
+
+    >>> parse_nwb_filename("j1620210706_.nwb")
+    ('j16', 20210706)
     """
     # Pattern: {animal_name}{8_digits}_.nwb
-    # Animal name is one or more letters, date is exactly 8 digits
-    pattern = r"^([a-zA-Z]+)(\d{8})_\.nwb$"
+    # Animal name is one or more alphanumeric chars (non-greedy), date is exactly 8 digits
+    # The date is always YYYYMMDD format, so we match the last 8 digits before _.nwb
+    pattern = r"^([a-zA-Z0-9]+?)(\d{8})_\.nwb$"
     match = re.match(pattern, filename)
 
     if not match:
@@ -239,9 +243,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     sequential integers starting from 1. Time points outside all events are
     labeled 0.
     """
-    event_labels = pd.DataFrame(
-        0, index=time, columns=["event_number"], dtype=int
-    )
+    event_labels = pd.DataFrame(0, index=time, columns=["event_number"], dtype=int)
 
     time_array = time.to_numpy()
 

@@ -25,6 +25,7 @@ trials : Trial construction that depends on position data
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 import networkx as nx
@@ -40,6 +41,8 @@ from track_linearization import get_linearized_position
 
 from ..types import PositionInfoDict
 from .constants import TRACK_SEGMENT_TO_PATCH
+
+logger = logging.getLogger(__name__)
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
@@ -130,7 +133,9 @@ def get_interpolated_position_info(
     )
 
 
-def get_position_info(nwb_file_name: str, epoch_name: str, pos_name: str) -> PositionInfoDict:
+def get_position_info(
+    nwb_file_name: str, epoch_name: str, pos_name: str
+) -> PositionInfoDict:
     """Load position data for a given session and epoch.
 
     Loads raw position tracking data from Spyglass database, performs quality
@@ -257,8 +262,10 @@ def get_position_info(nwb_file_name: str, epoch_name: str, pos_name: str) -> Pos
         position_info = position_info.loc[
             valid_interval_times[0][0] : valid_interval_times[-1][1]
         ]
-    except DataJointError:
-        pass
+    except DataJointError as e:
+        logger.debug(
+            "No noPrePostTrialTimes interval for %s %s: %s", nwb_file_name, epoch_name, e
+        )
 
     position_info = get_interpolated_position_info(
         position_info,

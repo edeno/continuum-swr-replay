@@ -10,6 +10,7 @@ All TypedDicts are consolidated here for:
 - Better IDE autocomplete support
 """
 
+from enum import StrEnum
 from typing import TypedDict
 
 import networkx as nx
@@ -133,18 +134,35 @@ class SessionData(TypedDict, total=False):
     electrode_group_info: pd.DataFrame
 
 
-class SessionDataKeys:
+class SessionDataKeys(StrEnum):
     """String constants for SessionData dictionary keys.
 
-    Use these constants instead of string literals to prevent typos
+    Use these enum members instead of string literals to prevent typos
     and enable IDE autocomplete when accessing SessionData dictionaries.
 
-    Example
-    -------
+    Notes
+    -----
+    This enum inherits from StrEnum (Python 3.11+), which provides:
+    - Direct string comparison: SessionDataKeys.POSITION_INFO == "position_info"
+    - Iteration: list(SessionDataKeys) to get all keys
+    - Membership testing: "position_info" in SessionDataKeys
+    - Automatic string coercion in contexts expecting strings
+
+    Examples
+    --------
     >>> from continuum_swr_replay.types import SessionDataKeys
     >>> data = load_data(...)
     >>> position_info = data[SessionDataKeys.POSITION_INFO]  # Instead of data["position_info"]
     >>> spike_times = data[SessionDataKeys.SPIKE_TIMES]      # Instead of data["spike_times"]
+    >>>
+    >>> # Iterate over all available keys
+    >>> for key in SessionDataKeys:
+    ...     if key in data:
+    ...         print(f"Found {key}")
+    >>>
+    >>> # Check membership
+    >>> if "position_info" in SessionDataKeys:
+    ...     print("Valid key")
     """
 
     # Position and tracking
@@ -212,48 +230,56 @@ class DataLoadingPreset:
     """
 
     # Minimal - just position and spikes for basic decoding
-    MINIMAL: frozenset[str] = frozenset({
-        SessionDataKeys.POSITION_INFO,
-        SessionDataKeys.TRACK_GRAPH,
-        SessionDataKeys.LINEAR_EDGE_ORDER,
-        SessionDataKeys.LINEAR_EDGE_SPACING,
-        SessionDataKeys.SPIKE_TIMES,
-        SessionDataKeys.SPIKE_WAVEFORM_FEATURES,
-    })
+    MINIMAL: frozenset[str] = frozenset(
+        {
+            SessionDataKeys.POSITION_INFO,
+            SessionDataKeys.TRACK_GRAPH,
+            SessionDataKeys.LINEAR_EDGE_ORDER,
+            SessionDataKeys.LINEAR_EDGE_SPACING,
+            SessionDataKeys.SPIKE_TIMES,
+            SessionDataKeys.SPIKE_WAVEFORM_FEATURES,
+        }
+    )
 
     # Neural - all neural data (spikes + LFP + multiunit)
-    NEURAL: frozenset[str] = MINIMAL | frozenset({
-        SessionDataKeys.RIPPLE_TIMES,
-        SessionDataKeys.RIPPLE_FILTERED_LFPS,
-        SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
-        SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
-        SessionDataKeys.THETA_FILTERED_LFP,
-        SessionDataKeys.THETA_PHASE,
-        SessionDataKeys.THETA_POWER,
-        SessionDataKeys.MULTIUNIT_FIRING_RATE,
-        SessionDataKeys.HSE_TIMES,
-    })
+    NEURAL: frozenset[str] = MINIMAL | frozenset(
+        {
+            SessionDataKeys.RIPPLE_TIMES,
+            SessionDataKeys.RIPPLE_FILTERED_LFPS,
+            SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
+            SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
+            SessionDataKeys.THETA_FILTERED_LFP,
+            SessionDataKeys.THETA_PHASE,
+            SessionDataKeys.THETA_POWER,
+            SessionDataKeys.MULTIUNIT_FIRING_RATE,
+            SessionDataKeys.HSE_TIMES,
+        }
+    )
 
     # Behavioral - position + task events + trials (no neural data)
-    BEHAVIORAL: frozenset[str] = frozenset({
-        SessionDataKeys.POSITION_INFO,
-        SessionDataKeys.TRACK_GRAPH,
-        SessionDataKeys.LINEAR_EDGE_ORDER,
-        SessionDataKeys.LINEAR_EDGE_SPACING,
-        SessionDataKeys.TRIALS,
-        SessionDataKeys.TASK_VARIABLES,
-        SessionDataKeys.WELL_VISITS,
-        SessionDataKeys.BEAM_BREAKS,
-        SessionDataKeys.PUMP_EVENTS,
-        SessionDataKeys.LIGHT_EVENTS,
-    })
+    BEHAVIORAL: frozenset[str] = frozenset(
+        {
+            SessionDataKeys.POSITION_INFO,
+            SessionDataKeys.TRACK_GRAPH,
+            SessionDataKeys.LINEAR_EDGE_ORDER,
+            SessionDataKeys.LINEAR_EDGE_SPACING,
+            SessionDataKeys.TRIALS,
+            SessionDataKeys.TASK_VARIABLES,
+            SessionDataKeys.WELL_VISITS,
+            SessionDataKeys.BEAM_BREAKS,
+            SessionDataKeys.PUMP_EVENTS,
+            SessionDataKeys.LIGHT_EVENTS,
+        }
+    )
 
     # Decoding - everything needed for decoding analysis
-    DECODING: frozenset[str] = NEURAL | frozenset({
-        SessionDataKeys.TRIALS,
-        SessionDataKeys.TASK_VARIABLES,
-        SessionDataKeys.ELECTRODE_GROUP_INFO,
-    })
+    DECODING: frozenset[str] = NEURAL | frozenset(
+        {
+            SessionDataKeys.TRIALS,
+            SessionDataKeys.TASK_VARIABLES,
+            SessionDataKeys.ELECTRODE_GROUP_INFO,
+        }
+    )
 
 
 class ClusterlessParams(TypedDict):

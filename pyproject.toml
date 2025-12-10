@@ -39,6 +39,7 @@ dependencies = [
     # High-performance computing
     "dask>=2023.1.0",
     "dask[distributed]",
+    "pyarrow>=14.0.0",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,7 @@ dev = [
 ]
 
 # GPU acceleration (optional)
-gpu = ["dask-cuda"]
+gpu = ["dask-cuda>=24.12.0"]
 
 [tool.ruff]
 line-length = 88
@@ -72,8 +73,13 @@ ignore = [
     "E501",  # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Allow imports after TYPE_CHECKING blocks (standard pattern to avoid circular imports)
+# Also allow "unused" imports in TYPE_CHECKING blocks - they're used by type checkers
+"src/continuum_swr_replay/data_loaders/bandit_task.py" = ["E402", "F401"]
+
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 # Stricter type checking suitable for scientific repositories

@@ -138,7 +138,19 @@ def get_map_speed(
 
     dt = 1 / sampling_frequency
     posterior_array = np.asarray(posterior)
-    map_position_ind = np.nanargmax(posterior_array, axis=1)
+
+    # Handle all-NaN rows gracefully (np.nanargmax returns 0 with warning)
+    has_valid_data = ~np.all(np.isnan(posterior_array), axis=1)
+    if not np.any(has_valid_data):
+        # All timepoints have NaN posteriors
+        return np.full(len(posterior_array), np.nan)
+
+    # Compute argmax, using 0 as placeholder for invalid rows
+    map_position_ind = np.zeros(len(posterior_array), dtype=int)
+    map_position_ind[has_valid_data] = np.nanargmax(
+        posterior_array[has_valid_data], axis=1
+    )
+
     node_ids = place_bin_center_ind_to_node[map_position_ind]
     n_time = len(node_ids)
 
@@ -198,8 +210,13 @@ def get_map_speed(
             )
             / dt,
         )
-    # Type ignore: gaussian_smooth returns Any but result is ndarray
-    return gaussian_smooth(np.abs(speed), smooth_sigma, sampling_frequency)  # type: ignore[no-any-return]
+    # Apply Gaussian smoothing
+    smoothed_speed: np.ndarray = gaussian_smooth(np.abs(speed), smooth_sigma, sampling_frequency)
+
+    # Set speed to NaN for timepoints with invalid posteriors
+    smoothed_speed[~has_valid_data] = np.nan
+
+    return smoothed_speed
 
 
 def get_posterior_stats(
@@ -207,7 +224,9 @@ def get_posterior_stats(
     env: Environment,
     results: xr.Dataset | None = None,
     sampling_frequency: int = 500,
-    orientation_variable: Literal["head_orientation", "body_orientation"] = "head_orientation",
+    orientation_variable: Literal[
+        "head_orientation", "body_orientation"
+    ] = "head_orientation",
     posterior: xr.DataArray | None = None,
 ) -> tuple[
     xr.DataArray,

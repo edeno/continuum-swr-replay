@@ -61,6 +61,7 @@ Examples
 >>> TrainingType.NO_RIPPLE.value
 'no_ripple'
 """
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -78,7 +79,7 @@ MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 # Data directories and definitions
 ROOT_DIR = Path(__file__).parent.parent
 PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"
-FIGURE_DIR = ROOT_DIR / "figures"
+FIGURE_DIR = ROOT_DIR / "paper" / "figures"
 
 # Spatial binning parameters (in cm)
 PLACE_BIN_SIZE_1D: Final[float] = 2.0
@@ -160,20 +161,14 @@ class DecodingParameters:
         # Validate block_size is a power of 2
         # Powers of 2 have exactly one bit set, so n & (n-1) == 0
         if self.block_size <= 0 or (self.block_size & (self.block_size - 1)) != 0:
-            raise ValueError(
-                f"block_size must be power of 2, got {self.block_size}"
-            )
+            raise ValueError(f"block_size must be power of 2, got {self.block_size}")
 
         # Validate positive values
         if self.position_std <= 0:
-            raise ValueError(
-                f"position_std must be positive, got {self.position_std}"
-            )
+            raise ValueError(f"position_std must be positive, got {self.position_std}")
 
         if self.waveform_std <= 0:
-            raise ValueError(
-                f"waveform_std must be positive, got {self.waveform_std}"
-            )
+            raise ValueError(f"waveform_std must be positive, got {self.waveform_std}")
 
         if self.place_bin_size <= 0:
             raise ValueError(
@@ -218,6 +213,7 @@ class TrainingType(str, Enum):
     def __str__(self) -> str:
         """Return string value for easy formatting."""
         return self.value
+
 
 COLORS = {
     "SWR": "#d95f02",

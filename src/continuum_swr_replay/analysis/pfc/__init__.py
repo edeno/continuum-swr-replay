@@ -48,6 +48,7 @@ Examples
 >>> # Fit GLM for a single neuron
 >>> results = process_neuron(spike_times, design_matrix, time_bins)
 """
+
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models,
     _make_design_matrices,

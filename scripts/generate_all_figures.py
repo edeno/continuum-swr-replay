@@ -154,9 +154,13 @@ def main() -> None:
 
     # Determine which figures to generate
     if args.only:
-        figures_to_generate = {k: v for k, v in FIGURE_SCRIPTS.items() if k in args.only}
+        figures_to_generate = {
+            k: v for k, v in FIGURE_SCRIPTS.items() if k in args.only
+        }
     else:
-        figures_to_generate = {k: v for k, v in FIGURE_SCRIPTS.items() if k not in args.skip}
+        figures_to_generate = {
+            k: v for k, v in FIGURE_SCRIPTS.items() if k not in args.skip
+        }
 
     # Validate figure names
     invalid_names = set(args.skip + args.only) - set(FIGURE_SCRIPTS.keys())
@@ -166,9 +170,9 @@ def main() -> None:
         sys.exit(1)
 
     # Print summary
-    logging.info("="*60)
+    logging.info("=" * 60)
     logging.info("Generating Manuscript Figures")
-    logging.info("="*60)
+    logging.info("=" * 60)
     logging.info(f"Output directory: {args.output_dir}")
     logging.info(f"Format: {args.format} (DPI: {args.dpi})")
     if args.data_dir:
@@ -176,7 +180,7 @@ def main() -> None:
     logging.info(f"Figures to generate: {', '.join(figures_to_generate.keys())}")
     if args.skip:
         logging.info(f"Skipping: {', '.join(args.skip)}")
-    logging.info("="*60)
+    logging.info("=" * 60)
 
     # Run each figure script
     results = {}
@@ -191,9 +195,9 @@ def main() -> None:
     total_elapsed = time.time() - total_start
 
     # Print summary
-    logging.info("="*60)
+    logging.info("=" * 60)
     logging.info("Summary")
-    logging.info("="*60)
+    logging.info("=" * 60)
 
     successful = [name for name, res in results.items() if res["success"]]
     failed = [name for name, res in results.items() if not res["success"]]
@@ -204,8 +208,10 @@ def main() -> None:
     for name in failed:
         logging.error(f" {name:12s} {results[name]['time']:6.1f}s")
 
-    logging.info("-"*60)
-    logging.info(f"Total: {len(successful)}/{len(results)} succeeded in {total_elapsed:.1f}s")
+    logging.info("-" * 60)
+    logging.info(
+        f"Total: {len(successful)}/{len(results)} succeeded in {total_elapsed:.1f}s"
+    )
 
     if failed:
         logging.error(f"Failed: {', '.join(failed)}")

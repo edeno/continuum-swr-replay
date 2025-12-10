@@ -33,7 +33,6 @@ Find events that overlap with ripples:
 >>> print(f"Non-local events without ripples: {len(no_overlap_events)}")
 """
 
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -79,12 +78,24 @@ def get_confident_times(
     if len(confident_times) == 0:
         confident_times = np.full((0, 2), np.nan)
 
-    # Calculate max speed for each confident time interval
-    if speed is not None and time is not None:
+    # Calculate max speed for each confident time interval (vectorized index computation)
+    if speed is not None and time is not None and len(confident_times) > 0:
+        # Get bin indices for all intervals at once using searchsorted (vectorized)
+        start_indices = np.searchsorted(time, confident_times[:, 0], side="left")
+        end_indices = np.searchsorted(time, confident_times[:, 1], side="right")
+
+        # Clip indices to valid range (vectorized)
+        n_speed = len(speed)
+        start_indices = np.clip(start_indices, 0, n_speed)
+        end_indices = np.clip(end_indices, 0, n_speed)
+
+        # Compute max speed per interval
+        # Note: grouped max over non-contiguous intervals requires iteration,
+        # but index computation above is fully vectorized
         max_speed = np.array(
             [
-                np.nanmax(speed[slice(*np.digitize(time_range, time[1:-1]))])
-                for time_range in confident_times
+                np.nanmax(speed[start:end]) if start < end else np.nan
+                for start, end in zip(start_indices, end_indices, strict=True)
             ]
         )
     else:

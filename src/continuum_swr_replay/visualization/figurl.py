@@ -86,7 +86,7 @@ from non_local_detector.visualization.figurl_1D import create_1D_decode_view
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.analysis_hpc_bandit import (
+from continuum_swr_replay.analysis.hippocampus import (
     get_conditional_non_local_posterior,
     get_confident_times,
 )
@@ -565,7 +565,9 @@ def create_interactive_1D_decoding_figurl(
 
     url = view.url(label=label)
     if not isinstance(url, str):
-        raise TypeError(f"Expected string URL from view.url(), got {type(url).__name__}")
+        raise TypeError(
+            f"Expected string URL from view.url(), got {type(url).__name__}"
+        )
     return url
 
 
@@ -706,7 +708,9 @@ def create_multiregion_figurl(
 
     url = view.url(label=label)
     if not isinstance(url, str):
-        raise TypeError(f"Expected string URL from view.url(), got {type(url).__name__}")
+        raise TypeError(
+            f"Expected string URL from view.url(), got {type(url).__name__}"
+        )
     return url
 
 

@@ -176,6 +176,13 @@ from .figurl import (
     create_multiregion_figurl,
 )
 
+# Static plots
+from .glm_plots import (
+    plot_AICs,
+    plot_hist_relative_to_event,
+    plot_raster_relative_to_event,
+)
+
 # Interactive components
 from .interactive import (
     create_playback_speed_dropdown,
@@ -183,8 +190,6 @@ from .interactive import (
     create_scrolling_line_plot,
     create_visualization,
 )
-
-# Static plots
 from .plots import (
     plot_acausal_probabilities,
     plot_conditional_non_local_posterior,
@@ -220,6 +225,10 @@ __all__ = [
     "plot_head_direction",
     "plot_detector",
     "plot_graph_as_1D",
+    # GLM plots
+    "plot_raster_relative_to_event",
+    "plot_hist_relative_to_event",
+    "plot_AICs",
     # Interactive components
     "create_scrolling_line_plot",
     "create_player",

@@ -9,20 +9,90 @@ algorithm on synthetic data. It creates diagnostic plots showing:
 
 Usage:
     python scripts/generate_figure01.py
-    python scripts/generate_figure01.py --output-dir paper/figures --format pdf
+    python scripts/generate_figure01.py --output-dir paper/figures/figure01
+    python scripts/generate_figure01.py --format pdf  # PDF only
 """
 
 import argparse
+import warnings
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+from matplotlib.axes import Axes
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 from non_local_detector.visualization import plot_non_local_model
 
+import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.figure_utilities import (
+    PANEL_SINGLE_TALL,
+    PANEL_WIDE,
+    TWO_COLUMN,
+    get_figure_size,
+    save_figure,
+)
 
-def generate_simulation_panels(n_neurons: int = 30) -> tuple:
+figure_utilities.set_figure_defaults(context="paper")
+warnings.filterwarnings("ignore")
+
+
+@dataclass
+class SimulationOutput:
+    """Container for simulation results and visualizations.
+
+    Attributes
+    ----------
+    diagnostic_fig : plt.Figure
+        Figure with position, speed, and spike raster panels
+    detector : NonLocalSortedSpikesDetector
+        Fitted detector model
+    results : dict
+        Decoding results from detector.predict()
+    time : np.ndarray
+        Time points (seconds)
+    position : np.ndarray
+        Position values (cm)
+    spike_times : list
+        List of spike time arrays per neuron
+    speed : np.ndarray
+        Speed values (cm/s)
+    is_event : np.ndarray
+        Boolean mask for event periods
+    """
+
+    diagnostic_fig: plt.Figure
+    detector: NonLocalSortedSpikesDetector
+    results: dict
+    time: np.ndarray
+    position: np.ndarray
+    spike_times: list
+    speed: np.ndarray
+    is_event: np.ndarray
+
+
+def add_event_shading(
+    ax: Axes, time: np.ndarray, is_event: np.ndarray, max_height: float
+) -> None:
+    """Add shaded regions for event periods to an axis.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axis to add shading to
+    time : np.ndarray
+        Time points
+    is_event : np.ndarray
+        Boolean mask for event periods
+    max_height : float
+        Maximum height of shading region
+    """
+    ax.fill_between(time, is_event * max_height, alpha=0.2, label="Event Periods")
+
+
+def generate_simulation_panels(n_neurons: int = 30) -> SimulationOutput:
     """Generate simulated data and create diagnostic panels.
 
     Parameters
@@ -32,8 +102,8 @@ def generate_simulation_panels(n_neurons: int = 30) -> tuple:
 
     Returns
     -------
-    tuple
-        (fig, detector, results) - matplotlib figure and model objects
+    SimulationOutput
+        Container with all simulation data and results
     """
     # Generate simulated data
     (
@@ -47,30 +117,34 @@ def generate_simulation_panels(n_neurons: int = 30) -> tuple:
         place_fields,
     ) = make_simulated_data(n_neurons=n_neurons)
 
-    # Create diagnostic panels
-    fig, axes = plt.subplots(3, 1, figsize=(6, 4), sharex=True, constrained_layout=True)
+    # Create diagnostic panels (3 stacked panels, single column width)
+    fig, axes = plt.subplots(
+        3, 1, figsize=get_figure_size(3, 1), sharex=True, constrained_layout=True
+    )
+
+    # Position panel
     axes[0].plot(time, position, label="Position")
     axes[0].set_ylabel("Position (cm)")
-    axes[0].fill_between(
-        time, is_event * np.max(position), alpha=0.2, label="Event Periods"
-    )
+    add_event_shading(axes[0], time, is_event, np.max(position))
     axes[0].legend()
 
+    # Speed panel
     axes[1].plot(time, speed, label="Speed", color="orange")
     axes[1].set_ylabel("Speed (cm/s)")
-    axes[1].fill_between(
-        time, is_event * np.max(speed), alpha=0.2, label="Event Periods"
-    )
+    add_event_shading(axes[1], time, is_event, np.max(speed))
 
+    # Spike raster panel
     axes[2].eventplot(spike_times, lineoffsets=1, linelengths=0.5, color="black")
     axes[2].set_ylabel("Spike Times")
     axes[2].set_xlabel("Time (s)")
     axes[2].set_yticks([])
     axes[2].set_title("Spike Raster Plot")
-    axes[2].fill_between(
-        time, is_event * len(spike_times), alpha=0.2, label="Event Periods"
-    )
+    add_event_shading(axes[2], time, is_event, len(spike_times))
     axes[2].set_xlim(0, time[-1])
+
+    # Apply consistent styling
+    for ax in axes:
+        sns.despine(ax=ax)
 
     # Fit detector
     detector = NonLocalSortedSpikesDetector(
@@ -90,7 +164,16 @@ def generate_simulation_panels(n_neurons: int = 30) -> tuple:
         save_log_likelihood_to_results=True,
     )
 
-    return fig, detector, results, time, position, spike_times, speed
+    return SimulationOutput(
+        diagnostic_fig=fig,
+        detector=detector,
+        results=results,
+        time=time,
+        position=position,
+        spike_times=spike_times,
+        speed=speed,
+        is_event=is_event,
+    )
 
 
 def main() -> None:
@@ -101,15 +184,15 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("paper/figures"),
-        help="Output directory for figures (default: paper/figures)",
+        default=Path("paper/figures/figure01"),
+        help="Output directory for figures (default: paper/figures/figure01)",
     )
     parser.add_argument(
         "--format",
         type=str,
         choices=["pdf", "png", "svg"],
-        default="pdf",
-        help="Output format (default: pdf)",
+        default=None,
+        help="Output format (default: both pdf and png)",
     )
     parser.add_argument(
         "--dpi",
@@ -131,51 +214,70 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Validate inputs
+    if args.n_neurons < 1:
+        parser.error("--n-neurons must be positive")
+
     # Create output directory if needed
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate simulation
     print(f"Generating simulation with {args.n_neurons} neurons...")
-    fig, detector, results, time, position, spike_times, speed = (
-        generate_simulation_panels(n_neurons=args.n_neurons)
-    )
+    sim = generate_simulation_panels(n_neurons=args.n_neurons)
 
     # Save diagnostic panels
-    output_file = args.output_dir / f"figure01_simulation.{args.format}"
-    fig.savefig(output_file, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved: {output_file}")
+    plt.figure(sim.diagnostic_fig.number)
+    save_figure(
+        "figure01_simulation",
+        base_dir=args.output_dir,
+        dpi=args.dpi,
+        formats=[args.format] if args.format else None,
+    )
 
-    # Generate detector diagnostic plots
+    # Generate and save detector diagnostic plots
     print("Generating detector diagnostics...")
-    fig2 = detector.plot_initial_conditions()
-    output_file2 = args.output_dir / f"figure01_initial_conditions.{args.format}"
-    fig2.savefig(output_file2, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved: {output_file2}")
 
-    fig3 = detector.plot_discrete_state_transition()
-    output_file3 = args.output_dir / f"figure01_discrete_transition.{args.format}"
-    fig3.savefig(output_file3, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved: {output_file3}")
+    sim.detector.plot_initial_conditions()
+    save_figure(
+        "figure01_initial_conditions",
+        base_dir=args.output_dir,
+        dpi=args.dpi,
+        formats=[args.format] if args.format else None,
+    )
 
-    fig4 = detector.plot_continuous_state_transition()
-    output_file4 = args.output_dir / f"figure01_continuous_transition.{args.format}"
-    fig4.savefig(output_file4, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved: {output_file4}")
+    sim.detector.plot_discrete_state_transition()
+    save_figure(
+        "figure01_discrete_transition",
+        base_dir=args.output_dir,
+        dpi=args.dpi,
+        formats=[args.format] if args.format else None,
+    )
+
+    sim.detector.plot_continuous_state_transition()
+    save_figure(
+        "figure01_continuous_transition",
+        base_dir=args.output_dir,
+        dpi=args.dpi,
+        formats=[args.format] if args.format else None,
+    )
 
     # Generate full model visualization
     print("Generating full model visualization...")
-    fig5 = plot_non_local_model(
-        time,
-        position,
-        spike_times,
-        speed,
-        detector,
-        results,
+    plot_non_local_model(
+        sim.time,
+        sim.position,
+        sim.spike_times,
+        sim.speed,
+        sim.detector,
+        sim.results,
         figsize=(20, 10),
     )
-    output_file5 = args.output_dir / f"figure01_full_model.{args.format}"
-    fig5.savefig(output_file5, dpi=args.dpi, bbox_inches="tight")
-    print(f"Saved: {output_file5}")
+    save_figure(
+        "figure01_full_model",
+        base_dir=args.output_dir,
+        dpi=args.dpi,
+        formats=[args.format] if args.format else None,
+    )
 
     if args.show_plots:
         plt.show()

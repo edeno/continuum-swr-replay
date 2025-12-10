@@ -17,8 +17,7 @@ import seaborn as sns
 from scipy.ndimage import label
 
 import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.parameters import COLORS
-
+from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 
 # Output directory for baseline figures
 OUTPUT_DIR = Path("tests/baselines/figure02")
@@ -33,11 +32,7 @@ figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
 # %%
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-
-data_path = PROCESSED_DATA_DIR.glob(
-    "*_HPC_80_data_over_time.pkl"
-)
+data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
 
 data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
 data_over_time["Non-Local_prob"] = (
@@ -50,44 +45,38 @@ data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])
 # Need non-local events during immobility, swr events, mua events
 # Need to know if overlaps with SWR or MUA events
 #
-non_local_immobile = data_over_time.loc[(data_over_time["non_local_event"] > 0)].groupby(
-    ["animal", "day", "epoch", "non_local_event"]
-).filter(
-    lambda g: (g.head_speed.iloc[0] < 4.0) & (g.head_speed.iloc[-1] < 4.0)
+non_local_immobile = (
+    data_over_time.loc[(data_over_time["non_local_event"] > 0)]
+    .groupby(["animal", "day", "epoch", "non_local_event"])
+    .filter(lambda g: (g.head_speed.iloc[0] < 4.0) & (g.head_speed.iloc[-1] < 4.0))
 )
 
 swr_events = data_over_time.loc[(data_over_time["SWR_event"] > 0)]
 mua_events = data_over_time.loc[(data_over_time["MUA_event"] > 0)]
 
 
-non_local_immobile_overlap_swr = non_local_immobile.groupby(["animal", "day", "epoch", "non_local_event"]).filter(
-    lambda g: (g["SWR_event"] > 0).any()
-)
-non_local_immobile_overlap_mua = non_local_immobile.groupby(["animal", "day", "epoch", "non_local_event"]).filter(
-    lambda g: (g["MUA_event"] > 0).any()
-)
+non_local_immobile_overlap_swr = non_local_immobile.groupby(
+    ["animal", "day", "epoch", "non_local_event"]
+).filter(lambda g: (g["SWR_event"] > 0).any())
+non_local_immobile_overlap_mua = non_local_immobile.groupby(
+    ["animal", "day", "epoch", "non_local_event"]
+).filter(lambda g: (g["MUA_event"] > 0).any())
 
 non_local_immobile_no_overlap = non_local_immobile.groupby(
     ["animal", "day", "epoch", "non_local_event"]
-).filter(
-    lambda g: (g["SWR_event"] == 0).all() & (g["MUA_event"] == 0).all()
-)
+).filter(lambda g: (g["SWR_event"] == 0).all() & (g["MUA_event"] == 0).all())
 non_local_immobile_no_overlap_SWR = non_local_immobile.groupby(
     ["animal", "day", "epoch", "non_local_event"]
-).filter(
-    lambda g: (g["SWR_event"] == 0).all()
-)
+).filter(lambda g: (g["SWR_event"] == 0).all())
 non_local_immobile_no_overlap_MUA = non_local_immobile.groupby(
     ["animal", "day", "epoch", "non_local_event"]
-).filter(
-    lambda g: (g["MUA_event"] == 0).all()
-)
-swr_events_no_non_local = swr_events.groupby(["animal", "day", "epoch", "SWR_event"]).filter(
-    lambda g: (g["non_local_event"] == 0).all()
-)
-mua_events_no_non_local = mua_events.groupby(["animal", "day", "epoch", "MUA_event"]).filter(
-    lambda g: (g["non_local_event"] == 0).all()
-)
+).filter(lambda g: (g["MUA_event"] == 0).all())
+swr_events_no_non_local = swr_events.groupby(
+    ["animal", "day", "epoch", "SWR_event"]
+).filter(lambda g: (g["non_local_event"] == 0).all())
+mua_events_no_non_local = mua_events.groupby(
+    ["animal", "day", "epoch", "MUA_event"]
+).filter(lambda g: (g["non_local_event"] == 0).all())
 
 # %%
 # animal                                    j16
@@ -95,9 +84,12 @@ mua_events_no_non_local = mua_events.groupby(["animal", "day", "epoch", "MUA_eve
 # epoch                                   04_r2
 # MUA_event                                  1
 
-(non_local_immobile_no_overlap_MUA.groupby(
-    ["animal", "day", "epoch", "non_local_event"]
-).MUA_event.mean() > 0).any()
+(
+    non_local_immobile_no_overlap_MUA.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).MUA_event.mean()
+    > 0
+).any()
 
 # %%
 len(non_local_immobile)
@@ -844,6 +836,7 @@ plt.tight_layout()
 plt.savefig(OUTPUT_DIR / "figure02_panel_12.pdf", bbox_inches="tight", dpi=300)
 plt.close()
 
+
 # %%
 def get_event_times(group: pd.DataFrame, event_col: str, mode: str = "start") -> Any:
     """
@@ -977,10 +970,17 @@ def plot_event_triggered(
     )
     plt.subplots_adjust(hspace=0.15)
     plt.savefig(OUTPUT_DIR / "figure02_panel_13.pdf", bbox_inches="tight", dpi=300)
+
+
 plt.close()
 
 
-def low_speed_filter(group: pd.DataFrame, _event_col: str, event_times: np.ndarray, threshold: float = 4.0) -> np.ndarray:
+def low_speed_filter(
+    group: pd.DataFrame,
+    _event_col: str,
+    event_times: np.ndarray,
+    threshold: float = 4.0,
+) -> np.ndarray:
     # Get windows around each event, check speed at start/end
     mask = []
     speed = group["head_speed"]
@@ -992,7 +992,11 @@ def low_speed_filter(group: pd.DataFrame, _event_col: str, event_times: np.ndarr
 
 
 def label_events_by_group(
-    df: pd.DataFrame, prob_col: str, out_col: str, threshold: float = 0.8, group_cols: list[str] | None = None
+    df: pd.DataFrame,
+    prob_col: str,
+    out_col: str,
+    threshold: float = 0.8,
+    group_cols: list[str] | None = None,
 ) -> None:
     """
     Labels contiguous above-threshold events in prob_col for each group,
@@ -1221,9 +1225,7 @@ ax.text(0.27, 0.5, f"{counts['SWR only']:.1f}%", ha="center")
 ax.text(0.73, 0.5, f"{counts['MUA only']:.1f}%", ha="center")
 ax.text(0.5, 0.8, f"{counts['Non-local only']:.1f}%", ha="center")
 
-ax.text(
-    0.5, 0.55, f"{counts['All three']:.1f}%", ha="center"
-)  # center overlap
+ax.text(0.5, 0.55, f"{counts['All three']:.1f}%", ha="center")  # center overlap
 
 ax.text(0.5, 0.4, f"{counts['SWR ∩ MUA']:.1f}%", ha="center")
 ax.text(0.35, 0.65, f"{counts['SWR ∩ Non-local']:.1f}%", ha="center")
@@ -1307,7 +1309,10 @@ ax.text(0.73, 0.5, f"{event_counts['MUA only']}", ha="center")
 ax.text(0.5, 0.8, f"{event_counts['Non-local only']}", ha="center")
 
 ax.text(
-    0.5, 0.55, f"{event_counts['All three']}", ha="center",
+    0.5,
+    0.55,
+    f"{event_counts['All three']}",
+    ha="center",
 )  # center overlap
 
 ax.text(0.5, 0.4, f"{event_counts['SWR ∩ MUA']}", ha="center")
@@ -1438,18 +1443,14 @@ data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(
     ["animal", "day", "epoch", "SWR_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "SWR_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 data_over_time.loc[data_over_time["MUA_event"] > 0].groupby(
     ["animal", "day", "epoch", "MUA_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "MUA_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 (immobile_non_local_events.map_speed / 1000).hist(
@@ -1491,12 +1492,56 @@ fig, axes = plt.subplots(
 
 # Data for each subplot
 plot_data = [
-    (immobile_non_local_events["Non-Local_Continuous_prob"], COLORS["Non-Local"], axes[0, 0], row_titles[0], col_titles[0]),
-    (data_over_time.loc[data_over_time["SWR_event"] > 0, "Non-Local_Continuous_prob"], COLORS["SWR"], axes[1, 0], row_titles[1], None),
-    (data_over_time.loc[data_over_time["MUA_event"] > 0, "Non-Local_Continuous_prob"], COLORS["MUA"], axes[2, 0], row_titles[2], None),
-    (immobile_non_local_events["Non-Local_Fragmented_prob"], COLORS["Non-Local"], axes[0, 1], None, col_titles[1]),
-    (data_over_time.loc[data_over_time["SWR_event"] > 0, "Non-Local_Fragmented_prob"], COLORS["SWR"], axes[1, 1], None, None),
-    (data_over_time.loc[data_over_time["MUA_event"] > 0, "Non-Local_Fragmented_prob"], COLORS["MUA"], axes[2, 1], None, None),
+    (
+        immobile_non_local_events["Non-Local_Continuous_prob"],
+        COLORS["Non-Local"],
+        axes[0, 0],
+        row_titles[0],
+        col_titles[0],
+    ),
+    (
+        data_over_time.loc[
+            data_over_time["SWR_event"] > 0, "Non-Local_Continuous_prob"
+        ],
+        COLORS["SWR"],
+        axes[1, 0],
+        row_titles[1],
+        None,
+    ),
+    (
+        data_over_time.loc[
+            data_over_time["MUA_event"] > 0, "Non-Local_Continuous_prob"
+        ],
+        COLORS["MUA"],
+        axes[2, 0],
+        row_titles[2],
+        None,
+    ),
+    (
+        immobile_non_local_events["Non-Local_Fragmented_prob"],
+        COLORS["Non-Local"],
+        axes[0, 1],
+        None,
+        col_titles[1],
+    ),
+    (
+        data_over_time.loc[
+            data_over_time["SWR_event"] > 0, "Non-Local_Fragmented_prob"
+        ],
+        COLORS["SWR"],
+        axes[1, 1],
+        None,
+        None,
+    ),
+    (
+        data_over_time.loc[
+            data_over_time["MUA_event"] > 0, "Non-Local_Fragmented_prob"
+        ],
+        COLORS["MUA"],
+        axes[2, 1],
+        None,
+        None,
+    ),
 ]
 
 for data, color, ax, row_title, col_title in plot_data:
@@ -1531,10 +1576,16 @@ plt.close()
 
 
 # %%
-non_local_events_in_SWR = data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(["animal", "day", "epoch", "SWR_event"]).apply(
-    lambda g: pd.unique(g.loc[g["non_local_event"] > 0].non_local_event))
-swr_start_time = data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(["animal", "day", "epoch", "SWR_event"]).apply(
-    lambda g: g.index[0])
+non_local_events_in_SWR = (
+    data_over_time.loc[data_over_time["SWR_event"] > 0]
+    .groupby(["animal", "day", "epoch", "SWR_event"])
+    .apply(lambda g: pd.unique(g.loc[g["non_local_event"] > 0].non_local_event))
+)
+swr_start_time = (
+    data_over_time.loc[data_over_time["SWR_event"] > 0]
+    .groupby(["animal", "day", "epoch", "SWR_event"])
+    .apply(lambda g: g.index[0])
+)
 swr_non_local_overlap = (
     data_over_time.loc[data_over_time["SWR_event"] > 0]
     .groupby(["animal", "day", "epoch", "SWR_event"])
@@ -1569,11 +1620,7 @@ non_local_events_in_SWR = (
     .set_index(["animal", "day", "epoch", "SWR_event"])
     .join(swr_start_time)
     .reset_index()
-    .assign(
-        time_diff=lambda df: (
-            df["non_local_start_time"] - df["swr_start_time"]
-        )
-    )
+    .assign(time_diff=lambda df: (df["non_local_start_time"] - df["swr_start_time"]))
 )
 
 # %%
@@ -1665,9 +1712,7 @@ ax.axvline(0, color="k", linestyle="--", lw=1, label="SWR Start")
 sns.despine(ax=ax, top=True, right=True, left=True, bottom=False)
 ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.3)
 ax.set_axisbelow(True)
-ax.set_xlabel(
-    "Time Difference (ms)\n(Non-local event start minus SWR start)"
-)
+ax.set_xlabel("Time Difference (ms)\n(Non-local event start minus SWR start)")
 ax.set_ylabel("Density")
 ax.set_title("Timing of Non-local Events Relative to SWR Start", pad=10)
 ax.set_xlim(-100, 100)
@@ -1675,7 +1720,10 @@ ax.tick_params(axis="both", which="both", length=3, direction="out")
 
 # Annotate regions
 ax.text(
-    40, ax.get_ylim()[1] * 0.9, "Non-local event starts later", ha="right",
+    40,
+    ax.get_ylim()[1] * 0.9,
+    "Non-local event starts later",
+    ha="right",
 )
 ax.text(
     -40,
@@ -1906,7 +1954,10 @@ ax.tick_params(axis="both", which="both", length=3, direction="out")
 
 # Annotate regions
 ax.text(
-    40, ax.get_ylim()[1] * 0.9, "Non-local event starts later", ha="right",
+    40,
+    ax.get_ylim()[1] * 0.9,
+    "Non-local event starts later",
+    ha="right",
 )
 ax.text(
     -40,

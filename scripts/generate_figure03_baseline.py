@@ -3,6 +3,7 @@
 import logging
 import os
 import warnings
+from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -14,12 +15,12 @@ from scipy.ndimage import label
 from scipy.stats import sem
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.parameters import (
     COLORS,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
-from pathlib import Path
 
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
 
@@ -129,12 +130,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Event Duration (ms)")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_01.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_01", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -150,12 +150,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("HPD")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_02.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_02", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -172,12 +171,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Distance from Animal (cm)")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_03.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_03", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -195,12 +193,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Normalized Animal Position")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_04.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_04", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -217,12 +214,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Replay Speed")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_05.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_05", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -240,12 +236,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Normalized Replay Position")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_06.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_06", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -262,12 +257,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Non-Local Cont. Prob.")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_07.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_07", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -284,12 +278,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Non-Local Frag. Prob.")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_08.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_08", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -306,12 +299,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Local Prob.")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_09.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_09", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -328,12 +320,11 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("No-Spike Prob.")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_10.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_10", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -350,14 +341,13 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Local Prob.")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_11.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_11", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharex=True, sharey=True)
 for event_type, ax in zip(
     ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes, strict=True
 ):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -379,12 +369,11 @@ for event_type, ax in zip(
     ax.set_ylabel("Normalized Replay Position")
     ax.set_title(event_type)
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_12.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_12", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
 for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-
     color = (
         COLORS["Non-Local"]
         if event_type == "non_local_immobile_no_overlap_SWR"
@@ -401,7 +390,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("HPD proportion of track covered")
     ax.set_ylabel("Density")
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_13.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_13", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 
@@ -432,8 +421,10 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_ylabel("Density")
 
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_14.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_14", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
+
+
 # %%
 def get_event_start_end(df: pd.DataFrame, event_name="non_local_event") -> pd.DataFrame:
     event_times = (
@@ -654,7 +645,6 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     ),
     strict=True,
 ):
-
     # Add shaded error bars
     ax.fill_between(
         no_overlap_mean["time"],
@@ -733,7 +723,7 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
 
 plt.xlim((-1.0, 1.0))
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_15.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_15", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 non_local_start_end_time = get_event_start_end(
@@ -808,7 +798,6 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
     ),
     strict=True,
 ):
-
     # Add shaded error bars
     ax.fill_between(
         no_overlap_mean["time"],
@@ -1039,7 +1028,7 @@ plt.xlabel("Replay Speed (m/s)")
 plt.ylabel("Density")
 sns.despine(offset=5)
 
-plt.savefig(OUTPUT_DIR / "figure03_panel_16.pdf", bbox_inches="tight", dpi=300)
+save_figure("figure03_panel_16", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 # what are the spike amplitudes during these events

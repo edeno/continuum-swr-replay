@@ -118,10 +118,176 @@ SLIDE_HEIGHT: float = 5.625  # inches (10 / 16 * 9)
 """Standard slide height for 16:9 presentations."""
 
 # ==============================================================================
+# Standard Panel Sizes (Nature Journal Requirements)
+# ==============================================================================
+# Nature requires figures to fit within specific column widths.
+# These pre-defined sizes ensure consistent, publication-ready figures.
+
+# Single panel sizes (width, height) in inches
+PANEL_SINGLE: tuple[float, float] = (ONE_COLUMN, ONE_COLUMN * GOLDEN_RATIO)
+"""Single panel for one-column figures (3.5" × 2.16").
+
+Use for simple plots: single histogram, line plot, scatter plot.
+"""
+
+PANEL_SINGLE_SQUARE: tuple[float, float] = (ONE_COLUMN, ONE_COLUMN)
+"""Square single panel (3.5" × 3.5").
+
+Use for: heatmaps, 2D histograms, correlation matrices.
+"""
+
+PANEL_SINGLE_TALL: tuple[float, float] = (ONE_COLUMN, ONE_COLUMN * 1.2)
+"""Tall single panel (3.5" × 4.2").
+
+Use for: stacked subplots, multi-row comparisons.
+"""
+
+PANEL_WIDE: tuple[float, float] = (TWO_COLUMN, TWO_COLUMN * GOLDEN_RATIO * 0.5)
+"""Wide panel spanning full page (7.0" × 2.16").
+
+Use for: time series, triggered averages, rasters.
+"""
+
+PANEL_HALF: tuple[float, float] = (ONE_COLUMN * 0.5, ONE_COLUMN * 0.5 * GOLDEN_RATIO)
+"""Half-width panel for dense multi-panel figures (1.75" × 1.08").
+
+Use for: small multiples, grid layouts with many panels.
+"""
+
+# Multi-panel figure sizes
+FIGURE_TWO_PANEL_HORIZONTAL: tuple[float, float] = (
+    TWO_COLUMN,
+    ONE_COLUMN * GOLDEN_RATIO,
+)
+"""Two panels side-by-side (7.0" × 2.16").
+
+Use for: paired comparisons, before/after, two conditions.
+"""
+
+FIGURE_TWO_PANEL_VERTICAL: tuple[float, float] = (
+    ONE_COLUMN,
+    ONE_COLUMN * GOLDEN_RATIO * 2,
+)
+"""Two panels stacked vertically (3.5" × 4.33").
+
+Use for: related metrics shown together, cause/effect.
+"""
+
+FIGURE_THREE_PANEL_HORIZONTAL: tuple[float, float] = (
+    TWO_COLUMN,
+    TWO_COLUMN / 3 * GOLDEN_RATIO,
+)
+"""Three panels in a row (7.0" × 1.44").
+
+Use for: three conditions, three time points, three groups.
+"""
+
+FIGURE_FOUR_PANEL_GRID: tuple[float, float] = (
+    TWO_COLUMN,
+    TWO_COLUMN * GOLDEN_RATIO,
+)
+"""2×2 grid of panels (7.0" × 4.33").
+
+Use for: comparing 4 conditions/groups, factorial designs.
+"""
+
+FIGURE_SIX_PANEL_GRID: tuple[float, float] = (
+    TWO_COLUMN,
+    TWO_COLUMN,
+)
+"""2×3 or 3×2 grid of panels (7.0" × 7.0").
+
+Use for: comparing 6 conditions, multi-animal comparisons.
+"""
+
+
+def get_figure_size(
+    nrows: int = 1,
+    ncols: int = 1,
+    *,
+    base_width: float | None = None,
+    aspect_ratio: float | None = None,
+    max_height: float | None = None,
+) -> tuple[float, float]:
+    """Calculate optimal figure size for a grid of panels.
+
+    Automatically selects appropriate width based on number of columns
+    and constrains height to page limits.
+
+    Parameters
+    ----------
+    nrows : int
+        Number of rows of panels
+    ncols : int
+        Number of columns of panels
+    base_width : float, optional
+        Base width in inches. If None, automatically selects:
+        - 1 column: ONE_COLUMN (3.5")
+        - 2 columns: ONE_AND_HALF_COLUMN (5.5")
+        - 3+ columns: TWO_COLUMN (7.0")
+    aspect_ratio : float, optional
+        Height/width ratio per panel. Default is GOLDEN_RATIO (~0.618).
+    max_height : float, optional
+        Maximum figure height. Default is PAGE_HEIGHT (~9.7").
+
+    Returns
+    -------
+    tuple[float, float]
+        Figure size (width, height) in inches
+
+    Examples
+    --------
+    >>> get_figure_size(1, 1)  # Single panel
+    (3.50, 2.16)
+
+    >>> get_figure_size(2, 2)  # 2x2 grid
+    (5.51, 3.40)
+
+    >>> get_figure_size(4, 1)  # 4 stacked panels
+    (3.50, 8.66)
+
+    >>> get_figure_size(1, 5)  # 5 panels in a row
+    (7.01, 0.87)
+    """
+    if aspect_ratio is None:
+        aspect_ratio = GOLDEN_RATIO
+
+    if max_height is None:
+        max_height = PAGE_HEIGHT
+
+    # Auto-select width based on columns
+    if base_width is None:
+        if ncols == 1:
+            base_width = ONE_COLUMN
+        elif ncols == 2:
+            base_width = ONE_AND_HALF_COLUMN
+        else:
+            base_width = TWO_COLUMN
+
+    # Calculate panel dimensions
+    panel_width = base_width / ncols
+    panel_height = panel_width * aspect_ratio
+
+    # Calculate total figure size
+    width = base_width
+    height = panel_height * nrows
+
+    # Constrain to maximum height
+    if height > max_height:
+        scale = max_height / height
+        height = max_height
+        # Note: we don't scale width to maintain column fit
+
+    return (width, height)
+
+
+# ==============================================================================
 # File Format Constants
 # ==============================================================================
 
-VALID_FORMATS: frozenset[str] = frozenset(["pdf", "png", "svg", "eps", "jpg", "jpeg", "tif", "tiff"])
+VALID_FORMATS: frozenset[str] = frozenset(
+    ["pdf", "png", "svg", "eps", "jpg", "jpeg", "tif", "tiff"]
+)
 """Valid output formats for save_figure().
 
 Supported matplotlib backends for publication-quality outputs:
@@ -852,6 +1018,17 @@ __all__ = [
     "GOLDEN_RATIO",
     "SLIDE_WIDTH",
     "SLIDE_HEIGHT",
+    # Constants - Panel Sizes (Nature Journal)
+    "PANEL_SINGLE",
+    "PANEL_SINGLE_SQUARE",
+    "PANEL_SINGLE_TALL",
+    "PANEL_WIDE",
+    "PANEL_HALF",
+    "FIGURE_TWO_PANEL_HORIZONTAL",
+    "FIGURE_TWO_PANEL_VERTICAL",
+    "FIGURE_THREE_PANEL_HORIZONTAL",
+    "FIGURE_FOUR_PANEL_GRID",
+    "FIGURE_SIX_PANEL_GRID",
     # Constants - Formats
     "VALID_FORMATS",
     # Constants - Color Palettes
@@ -876,6 +1053,7 @@ __all__ = [
     # Functions - Utilities
     "cm_to_inch",
     "figure_size_from_panels",
+    "get_figure_size",
     "label_panels",
     "validate_figure_quality",
 ]

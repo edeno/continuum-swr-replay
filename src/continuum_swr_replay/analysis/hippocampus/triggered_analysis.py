@@ -83,7 +83,9 @@ def get_signal_windows(
     """
     # Validate inputs
     if sampling_frequency <= 0:
-        raise ValueError(f"sampling_frequency must be positive, got {sampling_frequency}")
+        raise ValueError(
+            f"sampling_frequency must be positive, got {sampling_frequency}"
+        )
     if window_sec <= 0:
         raise ValueError(f"window_sec must be positive, got {window_sec}")
 
@@ -107,7 +109,9 @@ def get_signal_windows(
     offsets = np.arange(-half_window_samples, half_window_samples + 1)
 
     all_windows = []
-    event_id_list: list[tuple[Any, Any, Any, Any] | int] = []  # Mixed type for flexibility
+    event_id_list: list[
+        tuple[Any, Any, Any, Any] | int
+    ] = []  # Mixed type for flexibility
 
     for (animal, day, epoch), group in data.groupby(["animal", "day", "epoch"]):
         # Get events for this session

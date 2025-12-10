@@ -66,13 +66,25 @@ Examples
 """
 
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any
+from types import SimpleNamespace
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
+
+# Minimum meaningful distance for path progress calculation (in cm).
+# Distances below this threshold are treated as zero to avoid division
+# by near-zero values. Set to 1e-10 cm (sub-picometer), which is far below
+# any physically meaningful spatial resolution in behavioral tracking.
+PATH_PROGRESS_EPSILON: float = 1e-10
+
+# Default trial shifts for task variable indicators
+# Omission shifts: look back N trials to check for reward omissions
+DEFAULT_OMISSION_SHIFTS: tuple[int, ...] = tuple(range(1, 6))  # (1, 2, 3, 4, 5)
+# Patch change shifts: look N trials relative to current (-5 to +5)
+DEFAULT_PATCH_CHANGE_SHIFTS: tuple[int, ...] = tuple(range(-5, 6))  # (-5, -4, ..., 4, 5)
 
 
 def path_progress_for_run_segment(
@@ -100,17 +112,17 @@ def path_progress_for_run_segment(
         Path progress values (0 to 1) for each time point
     """
     path = nx.shortest_path(track_graph, source=start_node, target=end_node)
-    path_edges = list(zip(path[:-1], path[1:], strict=False))
+    path_edges = list(zip(path[:-1], path[1:], strict=True))
     path_edge_ids = [track_graph.edges[edge]["edge_id"] for edge in path_edges]
 
     dist = np.full(pos_info.shape[0], np.nan)
     time = pos_info.index
-    add = 0.0
+    add: float = 0.0
 
     if len(path_edges) == 0:
         return np.zeros(pos_info.shape[0])
 
-    for (start_node, end_node), edge_id in zip(path_edges, path_edge_ids, strict=False):
+    for (start_node, end_node), edge_id in zip(path_edges, path_edge_ids, strict=True):
         is_edge = pos_info.track_segment_id == edge_id
         proj_pos = pos_info.loc[
             is_edge, ["projected_x_position", "projected_y_position"]
@@ -118,9 +130,11 @@ def path_progress_for_run_segment(
         start_node_pos = np.array(track_graph.nodes[start_node]["pos"])[None, :]
         dist[is_edge] = np.linalg.norm(proj_pos - start_node_pos, axis=1)
         dist[is_edge] += add
-        add += np.linalg.norm(
-            np.array(track_graph.nodes[start_node]["pos"])
-            - np.array(track_graph.nodes[end_node]["pos"])
+        add += float(
+            np.linalg.norm(
+                np.array(track_graph.nodes[start_node]["pos"])
+                - np.array(track_graph.nodes[end_node]["pos"])
+            )
         )
 
     is_nan = np.isnan(dist)
@@ -132,7 +146,8 @@ def path_progress_for_run_segment(
 
     # Avoid division by zero if start and end nodes are the same
     max_dist = dist.max()
-    if max_dist == 0 or np.isnan(max_dist):
+    # Handle both zero and very small values for numerical stability
+    if max_dist <= PATH_PROGRESS_EPSILON or np.isnan(max_dist):
         return np.zeros(pos_info.shape[0])
     return np.asarray(dist / max_dist)
 
@@ -281,7 +296,8 @@ def dist_to_goal(
         trial.to_well, track_graph, track_segment_id_to_edge
     )
 
-    # Vectorized computation for all timepoints
+    # Compute distance for each timepoint using precomputed segment distances
+    # (Loop is necessary because each point requires segment-specific interpolation)
     distances = np.zeros(len(position_info))
 
     for idx, row in enumerate(position_info.itertuples()):
@@ -297,6 +313,9 @@ def dist_to_goal(
 
         # Distance from current position to node1 (along the segment)
         dist_from_node1 = np.linalg.norm(projected_pos - node1_pos)
+
+        # Clamp to edge bounds for numerical stability
+        dist_from_node1 = np.clip(dist_from_node1, 0.0, edge_length)
 
         # Two possible paths to goal:
         # 1. Go back to node1, then to goal: dist_from_node1 + dist_node1_to_goal
@@ -354,7 +373,9 @@ def turn_direction(
     if trial_nodes[0][0] != trial.from_well:
         trial_nodes = trial_nodes[::-1]
 
-    for ind, (edge1, edge2) in enumerate(zip(trial_nodes[:-1], trial_nodes[1:], strict=False)):
+    for ind, (edge1, edge2) in enumerate(
+        zip(trial_nodes[:-1], trial_nodes[1:], strict=True)
+    ):
         if edge1[-1] != edge2[0]:
             trial_nodes[ind + 1] = trial_nodes[ind + 1][::-1]
 
@@ -372,7 +393,9 @@ def turn_direction(
 
 
 def _process_single_trial(
-    trial_data: tuple[dict, pd.DataFrame, nx.Graph, np.ndarray, dict, np.ndarray, np.ndarray, float]
+    trial_data: tuple[
+        dict, pd.DataFrame, nx.Graph, np.ndarray, dict, np.ndarray, np.ndarray, float
+    ],
 ) -> dict:
     """Process a single trial in parallel.
 
@@ -399,23 +422,26 @@ def _process_single_trial(
     ) = trial_data
 
     # Create a simple trial object with necessary attributes
-    class TrialData:
-        def __init__(self, d):
-            for k, v in d.items():
-                setattr(self, k, v)
-
-    trial = TrialData(trial_dict)
+    # Uses SimpleNamespace for clean dict-to-object conversion
+    # Expected attributes: Index, start_time, end_time, goal_arrival_time, from_well, to_well
+    trial = SimpleNamespace(**trial_dict)
 
     time = position_info.index.to_numpy()
     is_in_trial = (time >= trial.start_time) & (time < trial.end_time)
-    from_start_time_to_goal = (time >= trial.start_time) & (time < trial.goal_arrival_time)
-    from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (time < trial.end_time)
+    from_start_time_to_goal = (time >= trial.start_time) & (
+        time < trial.goal_arrival_time
+    )
+    from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (
+        time < trial.end_time
+    )
 
     # Get trial position data
     trial_position = position_info.loc[is_in_trial]
 
     # Compute all variables for this trial
-    trial_turn_direction = turn_direction(trial, trial_position, track_graph, track_edges)
+    trial_turn_direction = turn_direction(
+        trial, trial_position, track_graph, track_edges
+    )
 
     start_to_goal_position = position_info.loc[from_start_time_to_goal]
     trial_path_progress = path_progress_for_run_segment(
@@ -426,7 +452,9 @@ def _process_single_trial(
         trial_position, trial, track_graph, track_segment_id_to_edge
     )
 
-    trial_time_to_goal_start = np.arange(np.sum(from_start_time_to_goal)) / sampling_frequency
+    trial_time_to_goal_start = (
+        np.arange(np.sum(from_start_time_to_goal)) / sampling_frequency
+    )
 
     return {
         "trial_index": trial.Index,
@@ -495,9 +523,9 @@ def make_task_variables(
         - is_patch_change{N} (for each N in patch_change_shifts, e.g., is_patch_change-1)
     """
     if omission_shifts is None:
-        omission_shifts = list(range(1, 6))
+        omission_shifts = list(DEFAULT_OMISSION_SHIFTS)
     if patch_change_shifts is None:
-        patch_change_shifts = list(range(-5, 6))
+        patch_change_shifts = list(DEFAULT_PATCH_CHANGE_SHIFTS)
 
     time = position_info.index
     n_time = len(time)
@@ -572,7 +600,9 @@ def make_task_variables(
             goal_node_id[indices["is_in_trial"]] = values["to_well"]
             turn_direction_arr[indices["is_in_trial"]] = values["turn_direction"]
 
-            time_to_goal[indices["from_start_time_to_goal"]] = values["time_to_goal_start"]
+            time_to_goal[indices["from_start_time_to_goal"]] = values[
+                "time_to_goal_start"
+            ]
             time_to_goal[indices["from_goal_to_next_movement"]] = 0.0
 
             path_progress[indices["from_start_time_to_goal"]] = values["path_progress"]
@@ -580,9 +610,9 @@ def make_task_variables(
 
             dist_to_goal_arr[indices["is_in_trial"]] = values["dist_to_goal"]
 
-            is_prev_reward_omission_pos[indices["is_in_trial"]] = result["omission_patch"][
-                "is_prev_reward_omission"
-            ]
+            is_prev_reward_omission_pos[indices["is_in_trial"]] = result[
+                "omission_patch"
+            ]["is_prev_reward_omission"]
             is_patch_change_pos[indices["is_in_trial"]] = result["omission_patch"][
                 "is_patch_change"
             ]
@@ -626,7 +656,9 @@ def make_task_variables(
             is_prev_reward_omission_pos[is_in_trial] = is_prev_reward_omission.loc[
                 trial.Index
             ].to_numpy()
-            is_patch_change_pos[is_in_trial] = is_patch_change.loc[trial.Index].to_numpy()
+            is_patch_change_pos[is_in_trial] = is_patch_change.loc[
+                trial.Index
+            ].to_numpy()
 
     return pd.DataFrame(
         {
@@ -640,13 +672,13 @@ def make_task_variables(
             **{
                 f"is_no_reward_{shift}": is_reward_omission
                 for is_reward_omission, shift in zip(
-                    is_prev_reward_omission_pos.T, omission_shifts, strict=False
+                    is_prev_reward_omission_pos.T, omission_shifts, strict=True
                 )
             },
             **{
                 f"is_patch_change{shift}": is_patch_change
                 for is_patch_change, shift in zip(
-                    is_patch_change_pos.T, patch_change_shifts, strict=False
+                    is_patch_change_pos.T, patch_change_shifts, strict=True
                 )
             },
         },

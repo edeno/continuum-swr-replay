@@ -5,27 +5,23 @@ This script generates panels showing:
 - Event duration distributions
 - Spatial properties (distance, HPD)
 - Decoded position metrics
-- Event-triggered averages of physiological signals (theta, SWR, MUA)
+- Event-triggered averages of physiological signals
 
 Usage:
     python scripts/generate_figure03.py
-    python scripts/generate_figure03.py --output-dir paper/figures --format pdf
+    python scripts/generate_figure03.py --output-dir paper/figures/figure03
+    python scripts/generate_figure03.py --format png  # PNG only
 """
 
-# %%
-# %config InlineBackend.figure_format = 'retina'
 import argparse
 import logging
-import os
 import warnings
 from pathlib import Path
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.ndimage import label
 from scipy.stats import sem
 
 import continuum_swr_replay.figure_utilities as figure_utilities
@@ -33,7 +29,6 @@ from continuum_swr_replay.analysis.constants import (
     BINS_DISTANCE_CM,
     BINS_DURATION_MS,
     BINS_HPD_CM,
-    BINS_SPEED_CM_PER_SEC,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.hippocampus import (
@@ -42,66 +37,40 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_immobile_events,
     get_signal_windows,
 )
+from continuum_swr_replay.figure_utilities import (
+    FIGURE_TWO_PANEL_HORIZONTAL,
+    PANEL_SINGLE,
+    get_figure_size,
+    save_figure,
+)
 from continuum_swr_replay.parameters import (
     COLORS,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
 
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
 )
-
-
-def parse_args():
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Directory to save output figures (default: current directory)",
-    )
-    parser.add_argument(
-        "--format",
-        choices=["pdf", "png", "svg"],
-        default="pdf",
-        help="Output file format (default: pdf)",
-    )
-    parser.add_argument(
-        "--dpi", type=int, default=300, help="DPI for raster formats (default: 300)"
-    )
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=None,
-        help="Override PROCESSED_DATA_DIR for loading data",
-    )
-    return parser.parse_args()
-
-
-# Parse arguments (but don't require them for notebook use)
-try:
-    args = parse_args()
-    if args.output_dir:
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-except SystemExit:
-    # Allow script to run in notebook mode without arguments
-    args = argparse.Namespace(output_dir=None, format="pdf", dpi=300, data_dir=None)
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
 
-def load_data_over_time():
-    # Load all relevant data files
-    data_dir = args.data_dir if args.data_dir else PROCESSED_DATA_DIR
-    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
+def load_data_over_time(data_dir: Path) -> pd.DataFrame:
+    """Load and prepare processed data.
 
+    Parameters
+    ----------
+    data_dir : Path
+        Directory containing processed data files
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated data with derived columns
+    """
+    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
     data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]
@@ -112,7 +81,19 @@ def load_data_over_time():
     return data_over_time
 
 
-def get_event_types(data_over_time: dict):
+def get_event_types(data_over_time: pd.DataFrame) -> dict:
+    """Extract different event type subsets from the data.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Full dataset with event labels
+
+    Returns
+    -------
+    dict
+        Dictionary mapping event type names to filtered DataFrames
+    """
     non_local_immobile = get_immobile_events(
         data_over_time,
         event_col="non_local_event",
@@ -161,755 +142,726 @@ def get_event_types(data_over_time: dict):
     }
 
 
-# %%
-data_over_time = load_data_over_time()
-event_types = get_event_types(data_over_time)
+def plot_event_duration_distribution(
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot event duration distribution comparing all vs no-SWR overlap.
 
+    Parameters
+    ----------
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
+        event_times = get_event_start_end_times(
+            event_types[event_type], event_col="non_local_event"
+        )
+        duration = get_event_durations_ms(event_times)
 
-# %%
-# Use get_event_durations_ms() from library instead of local function
+        color = (
+            COLORS["Non-Local"]
+            if event_type == "non_local_immobile_no_overlap_SWR"
+            else "lightgrey"
+        )
+        label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
+        ax.hist(
+            duration,
+            bins=BINS_DURATION_MS,
+            color=color,
+            alpha=0.7,
+            edgecolor="none",
+            density=True,
+            label=label,
+        )
 
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    duration = get_event_durations_ms(
-        event_types[event_type], event_col="non_local_event"
-    )
-
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        duration,
-        bins=BINS_DURATION_MS,
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
     ax.set_xlabel("Event Duration (ms)")
     ax.set_ylabel("Density")
+    ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["hpd"],
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("HPD")
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_hpd_distribution(
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot HPD (highest posterior density) distribution.
+
+    Parameters
+    ----------
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
+        color = (
+            COLORS["Non-Local"]
+            if event_type == "non_local_immobile_no_overlap_SWR"
+            else "lightgrey"
+        )
+        label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
+        ax.hist(
+            event_types[event_type]["hpd"],
+            bins=BINS_HPD_CM,
+            color=color,
+            alpha=0.7,
+            edgecolor="none",
+            density=True,
+            label=label,
+        )
+
+    ax.set_xlabel("HPD (cm)")
     ax.set_ylabel("Density")
+    ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        np.abs(event_types[event_type]["ahead_behind_distance"]),
-        bins=BINS_DISTANCE_CM,
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_distance_distribution(
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot distance from animal distribution.
+
+    Parameters
+    ----------
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
+        color = (
+            COLORS["Non-Local"]
+            if event_type == "non_local_immobile_no_overlap_SWR"
+            else "lightgrey"
+        )
+        label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
+        ax.hist(
+            np.abs(event_types[event_type]["ahead_behind_distance"]),
+            bins=BINS_DISTANCE_CM,
+            color=color,
+            alpha=0.7,
+            edgecolor="none",
+            density=True,
+            label=label,
+        )
+
     ax.set_xlabel("Distance from Animal (cm)")
     ax.set_ylabel("Density")
+    ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["linear_position"]
-        / event_types[event_type]["max_linear_position"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("Normalized Animal Position")
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_mean_hpd_per_event(
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot mean HPD per event distribution.
+
+    Parameters
+    ----------
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
+        mean_event = (
+            event_types[event_type]
+            .groupby(["animal", "day", "epoch", "non_local_event"])
+            .mean(numeric_only=True)
+        )
+
+        color = (
+            COLORS["Non-Local"]
+            if event_type == "non_local_immobile_no_overlap_SWR"
+            else "lightgrey"
+        )
+        label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
+        ax.hist(
+            mean_event["hpd"],
+            bins=BINS_HPD_CM,
+            color=color,
+            alpha=0.7,
+            edgecolor="none",
+            density=True,
+            label=label,
+        )
+
+    ax.set_xlabel("Mean HPD per Event (cm)")
     ax.set_ylabel("Density")
+    ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_position_animal_vs_replay(
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot 2D histogram of animal position vs replay position.
+
+    Parameters
+    ----------
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, axes = plt.subplots(1, 2, figsize=FIGURE_TWO_PANEL_HORIZONTAL, sharex=True, sharey=True)
+
+    for event_type, ax in zip(
+        ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes
+    ):
+        title = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
+        data = event_types[event_type]
+        ax.hist2d(
+            data["linear_position"] / data["max_linear_position"],
+            data["map_estimate"] / data["max_linear_position"],
+            bins=(np.arange(0, 1.01, 0.02), np.arange(0, 1.01, 0.02)),
+            density=True,
+            vmin=0.0,
+            vmax=40.0,
+            cmap="viridis",
+        )
+        ax.set_xlabel("Normalized Animal Position")
+        ax.set_ylabel("Normalized Replay Position")
+        ax.set_title(title)
+        ax.plot([0, 1], [0, 1], "w--", alpha=0.5, linewidth=1)
+
+    plt.tight_layout()
+
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_triggered_averages(
+    data_over_time: pd.DataFrame,
+    event_types: dict,
+    output_dir: Path,
+    figure_name: str,
+    time_col: str = "start_time",
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot event-triggered averages of physiological signals.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Full dataset
+    event_types : dict
+        Dictionary of event type DataFrames
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    time_col : str
+        Column to use for alignment ('start_time' or 'end_time')
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    signal_types = [
+        "Non-Local_prob",
+        "theta_power_zscore",
+        "MUA_zscore",
+        "SWR_zscore",
+    ]
+
+    # Get signal windows for no-overlap events
+    non_local_start_end_time = get_event_start_end_times(
+        event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
+    )
+    signal_windows = get_signal_windows(
+        data=data_over_time,
+        event_times=non_local_start_end_time,
+        signal_cols=signal_types,
+        time_col=time_col,
+        window_sec=2.0,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        event_id_col="non_local_event",
+    )
+
+    # Get signal windows for overlap events
+    non_local_start_end_time_overlap = get_event_start_end_times(
+        event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
+    )
+    signal_windows_overlap = get_signal_windows(
+        data=data_over_time,
+        event_times=non_local_start_end_time_overlap,
+        signal_cols=signal_types,
+        time_col=time_col,
+        window_sec=2.0,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        event_id_col="non_local_event",
+    )
+
+    n_signals = len(signal_types)
+    fig, axes = plt.subplots(
+        nrows=n_signals,
+        ncols=1,
+        figsize=get_figure_size(n_signals, 1),
+        sharex=True,
+        constrained_layout=True,
+    )
+
+    no_overlap_mean_all = signal_windows.mean(dim="event")
+    overlap_mean_all = signal_windows_overlap.mean(dim="event")
+
+    for i, (ax, signal_type) in enumerate(zip(axes.flatten(), signal_types)):
+        no_overlap_mean = no_overlap_mean_all.sel(signal=signal_type)
+        overlap_mean = overlap_mean_all.sel(signal=signal_type)
+
+        # Compute SEM for this specific signal
+        no_overlap_data = signal_windows.sel(signal=signal_type)
+        overlap_data = signal_windows_overlap.sel(signal=signal_type)
+        no_overlap_sem = sem(no_overlap_data.values, axis=0, nan_policy="omit")
+        overlap_sem = sem(overlap_data.values, axis=0, nan_policy="omit")
+
+        time = no_overlap_mean["time"].values
+
+        # Add shaded error bars
+        ax.fill_between(
+            time,
+            no_overlap_mean.values - no_overlap_sem,
+            no_overlap_mean.values + no_overlap_sem,
+            color="C0",
+            alpha=0.3,
+        )
+        ax.fill_between(
+            time,
+            overlap_mean.values - overlap_sem,
+            overlap_mean.values + overlap_sem,
+            color="C1",
+            alpha=0.3,
+        )
+
+        ax.plot(time, no_overlap_mean.values, label="No SWR Overlap", color="C0")
+        ax.plot(time, overlap_mean.values, label="SWR Overlap", color="C1")
+
+        # Set ylabel based on signal type
+        if signal_type.endswith("_zscore"):
+            name = signal_type.replace("_zscore", "").replace("_", " ").title()
+            if name == "Theta Power":
+                name = "Theta"
+            ax.set_ylabel(f"{name}\nZ-score")
+            ax.axhline(2.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
+        elif signal_type == "Non-Local_prob":
+            ax.set_ylabel("Non-Local\nProb.")
+            ax.axhline(
+                0.8, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75
+            )
+            ax.set_ylim(0.0, 1.0)
+
+        ax.axvline(0.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
+        ax.axhline(0.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
+
+        if i == 0:
+            ax.legend(loc="upper right", fontsize=8)
+
+    axes[-1].set_xlabel("Time from Event (s)")
+    axes[-1].set_xlim(-1.0, 1.0)
+
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
+
+
+def plot_replay_position_by_swr(
+    data_over_time: pd.DataFrame,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot replay position distribution by SWR overlap status.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Full dataset
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+
+    # Use nanmedian to handle potential NaN values
+    unique_positions = data_over_time["max_linear_position"].unique()
+    bins = int(np.nanmedian(unique_positions[~np.isnan(unique_positions)]) / 2)
+
+    # SWR overlap
+    swr_mask = (data_over_time["non_local_event"] > 0) & (
+        data_over_time["SWR_event"] > 0
     )
     ax.hist(
-        event_types[event_type]["map_speed"] / 100.0,
-        bins=BINS_SPEED_CM_PER_SEC,
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
+        data_over_time.loc[swr_mask, "map_estimate"]
+        / data_over_time.loc[swr_mask, "max_linear_position"],
+        bins=bins,
         density=True,
+        alpha=0.7,
+        color=COLORS["SWR"],
+        label="With SWR",
     )
-    ax.set_xlabel("Replay Speed")
-    ax.set_ylabel("Density")
 
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
+    # No SWR overlap
+    no_swr_mask = (data_over_time["non_local_event"] > 0) & (
+        data_over_time["SWR_event"] == 0
     )
     ax.hist(
-        event_types[event_type]["map_estimate"]
-        / event_types[event_type]["max_linear_position"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
+        data_over_time.loc[no_swr_mask, "map_estimate"]
+        / data_over_time.loc[no_swr_mask, "max_linear_position"],
+        bins=bins,
         density=True,
+        alpha=0.7,
+        color=COLORS["Non-Local"],
+        label="Without SWR",
     )
+
     ax.set_xlabel("Normalized Replay Position")
     ax.set_ylabel("Density")
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["Non-Local_Continuous_prob"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("Non-Local Cont. Prob.")
-    ax.set_ylabel("Density")
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["Non-Local_Fragmented_prob"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("Non-Local Frag. Prob.")
-    ax.set_ylabel("Density")
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["Local_prob"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("Local Prob.")
-    ax.set_ylabel("Density")
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["No-Spike_prob"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("No-Spike Prob.")
-    ax.set_ylabel("Density")
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["Local_prob"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("Local Prob.")
-    ax.set_ylabel("Density")
-
-# %%
-fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharex=True, sharey=True)
-for event_type, ax in zip(
-    ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes, strict=True
-):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist2d(
-        event_types[event_type]["linear_position"]
-        / event_types[event_type]["max_linear_position"],
-        event_types[event_type]["map_estimate"]
-        / event_types[event_type]["max_linear_position"],
-        bins=(np.arange(0, 1, 0.01), np.arange(0, 1, 0.01)),
-        color=color,
-        edgecolor="none",
-        density=True,
-        vmin=0.0,
-        vmax=40.0,
-    )
-    ax.set_xlabel("Normalized Animal Position")
-    ax.set_ylabel("Normalized Replay Position")
-    ax.set_title(event_type)
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        event_types[event_type]["hpd"] / event_types[event_type]["max_coverage"],
-        bins=np.arange(0, 1, 0.01),
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("HPD proportion of track covered")
-    ax.set_ylabel("Density")
-
-# %%
-
-
-# %%
-fig, ax = plt.subplots(figsize=(4, 3))
-for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
-    mean_event = (
-        event_types[event_type]
-        .groupby(["animal", "day", "epoch", "non_local_event"])
-        .mean()
-    )
-
-    color = (
-        COLORS["Non-Local"]
-        if event_type == "non_local_immobile_no_overlap_SWR"
-        else "lightgrey"
-    )
-    ax.hist(
-        mean_event["hpd"],
-        bins=BINS_HPD_CM,
-        color=color,
-        alpha=0.7,
-        edgecolor="none",
-        density=True,
-    )
-    ax.set_xlabel("HPD")
-    ax.set_ylabel("Density")
-
-
-# %%
-non_local_start_end_time = get_event_start_end_times(
-    event_types["non_local_immobile"], event_col="non_local_event"
-)
-
-# %%
-
-signal_types = [
-    "Non-Local_prob",
-    "theta_power_zscore",
-    "MUA_zscore",
-    "SWR_zscore",
-    "head_speed",
-]
-
-signal_windows = get_signal_windows(
-    data=data_over_time,
-    event_times=non_local_start_end_time,
-    signal_cols=signal_types,
-    time_col="start_time",
-    window_sec=2.0,
-    sampling_frequency=SAMPLING_FREQUENCY,
-    event_id_col="non_local_event",
-)
-
-# %%
-non_local_start_end_time = get_event_start_end_times(
-    event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
-)
-
-signal_windows = get_signal_windows(
-    data=data_over_time,
-    event_times=non_local_start_end_time,
-    signal_cols=signal_types,
-    time_col="start_time",
-    window_sec=2.0,
-    sampling_frequency=SAMPLING_FREQUENCY,
-    event_id_col="non_local_event",
-)
-
-# %%
-non_local_start_end_time = get_event_start_end_times(
-    event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
-)
-
-signal_windows_overlap = get_signal_windows(
-    data=data_over_time,
-    event_times=non_local_start_end_time,
-    signal_cols=signal_types,
-    time_col="start_time",
-    window_sec=2.0,
-    sampling_frequency=SAMPLING_FREQUENCY,
-    event_id_col="non_local_event",
-)
-
-# %%
-
-fig, axes = plt.subplots(
-    nrows=4,
-    ncols=1,
-    figsize=(6, 4),
-    sharex=True,
-    sharey=False,
-    constrained_layout=True,
-)
-
-no_overlap_mean_all = signal_windows.mean(dim="event")
-overlap_mean_all = signal_windows_overlap.mean(dim="event")
-no_overlap_sem_all = sem(signal_windows, axis=0, nan_policy="omit")
-overlap_sem_all = sem(signal_windows_overlap, axis=0, nan_policy="omit")
-
-for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
-    axes.flatten(),
-    zip(
-        no_overlap_mean_all.T,
-        overlap_mean_all.T,
-        no_overlap_sem_all.T,
-        overlap_sem_all.T,
-        strict=True,
-    ),
-    strict=True,
-):
-    # Add shaded error bars
-    ax.fill_between(
-        no_overlap_mean["time"],
-        no_overlap_mean - no_overlap_sem,
-        no_overlap_mean + no_overlap_sem,
-        color="C0",
-        alpha=0.7,
-    )
-    ax.fill_between(
-        overlap_mean["time"],
-        overlap_mean - overlap_sem,
-        overlap_mean + overlap_sem,
-        color="C1",
-        alpha=0.7,
-    )
-
-    ax.plot(no_overlap_mean["time"], no_overlap_mean, label="No Overlap")
-    ax.plot(overlap_mean["time"], overlap_mean, label="Overlap")
-
-    if str(no_overlap_mean["signal"].values).split("_")[-1] == "zscore":
-        name = str(no_overlap_mean["signal"].values).split("_")[0]
-        if name == "theta":
-            name = "Theta"
-        ax.set_ylabel(f"{name}\nZ-score")
-        ax.set_ylim(-2.5, 4.0)
-        ax.axhline(
-            2.0,
-            color="lightgrey",
-            linestyle="--",
-            label="Z-score Threshold",
-            alpha=0.5,
-            zorder=-1,
-            linewidth=0.75,
-        )
-    if no_overlap_mean["signal"].values == "head_speed":
-        ax.set_ylabel("Head Speed\n(cm/s)")
-        ax.axhline(
-            4.0,
-            color="lightgrey",
-            linestyle="--",
-            label="Immobile Threshold",
-            alpha=0.5,
-            zorder=-1,
-        )
-    if no_overlap_mean["signal"].values == "Non-Local_prob":
-        ax.set_ylabel("Non-Local\nProb.")
-        ax.axhline(
-            0.8,
-            color="lightgrey",
-            linestyle="--",
-            label="Prob. Threshold",
-            alpha=0.5,
-            zorder=-1,
-            linewidth=0.75,
-        )
-        ax.set_ylim(0.0, 1.0)
-    if ax is axes[-1]:
-        ax.set_xlabel("Time (s)")
-    ax.axvline(
-        0.0,
-        color="lightgrey",
-        linestyle="--",
-        alpha=0.5,
-        zorder=-1,
-        linewidth=0.75,
-    )
-    ax.axhline(
-        0.0,
-        color="lightgrey",
-        linestyle="--",
-        alpha=0.5,
-        zorder=-1,
-        linewidth=0.75,
-    )
+    ax.set_xlim(0, 1)
     ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-plt.xlim((-1.0, 1.0))
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
 
-# %%
-non_local_start_end_time = get_event_start_end_times(
-    event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
-)
 
-signal_windows = get_signal_windows(
-    data=data_over_time,
-    event_times=non_local_start_end_time,
-    signal_cols=signal_types,
-    time_col="end_time",
-    window_sec=2.0,
-    sampling_frequency=SAMPLING_FREQUENCY,
-    event_id_col="non_local_event",
-)
+def plot_swr_zscore_by_state(
+    data_over_time: pd.DataFrame,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot SWR z-score distribution by local/non-local state.
 
-# %%
-non_local_start_end_time = get_event_start_end_times(
-    event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
-)
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Full dataset
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-signal_windows_overlap = get_signal_windows(
-    data=data_over_time,
-    event_times=non_local_start_end_time,
-    signal_cols=signal_types,
-    time_col="end_time",
-    window_sec=2.0,
-    sampling_frequency=SAMPLING_FREQUENCY,
-    event_id_col="non_local_event",
-)
+    is_immobile = data_over_time.head_speed < 4.0
 
-# %%
-
-fig, axes = plt.subplots(
-    nrows=4,
-    ncols=1,
-    figsize=(6, 4),
-    sharex=True,
-    sharey=False,
-    constrained_layout=True,
-)
-
-no_overlap_mean_all2 = signal_windows.mean(dim="event")
-overlap_mean_all2 = signal_windows_overlap.mean(dim="event")
-no_overlap_sem_all2 = sem(signal_windows, axis=0, nan_policy="omit")
-overlap_sem_all2 = sem(signal_windows_overlap, axis=0, nan_policy="omit")
-
-for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
-    axes.flatten(),
-    zip(
-        no_overlap_mean_all2.T,
-        overlap_mean_all2.T,
-        no_overlap_sem_all2.T,
-        overlap_sem_all2.T,
-        strict=True,
-    ),
-    strict=True,
-):
-    # Add shaded error bars
-    ax.fill_between(
-        no_overlap_mean["time"],
-        no_overlap_mean - no_overlap_sem,
-        no_overlap_mean + no_overlap_sem,
-        color="C0",
+    # Local state
+    local_mask = is_immobile & (data_over_time["Local_prob"] > 0.8)
+    ax.hist(
+        data_over_time.loc[local_mask, "SWR_zscore"],
+        bins=np.arange(-5, 11),
         alpha=0.7,
+        density=True,
+        label="Local",
+        color=COLORS["Local"],
     )
-    ax.fill_between(
-        overlap_mean["time"],
-        overlap_mean - overlap_sem,
-        overlap_mean + overlap_sem,
-        color="C1",
+
+    # Non-local state
+    nonlocal_mask = is_immobile & (data_over_time["Non-Local_prob"] > 0.8)
+    ax.hist(
+        data_over_time.loc[nonlocal_mask, "SWR_zscore"],
+        bins=np.arange(-5, 11),
         alpha=0.7,
+        density=True,
+        label="Non-Local",
+        color=COLORS["Non-Local"],
     )
 
-    ax.plot(no_overlap_mean["time"], no_overlap_mean, label="No Overlap")
-    ax.plot(overlap_mean["time"], overlap_mean, label="Overlap")
-
-    if str(no_overlap_mean["signal"].values).split("_")[-1] == "zscore":
-        name = str(no_overlap_mean["signal"].values).split("_")[0]
-        if name == "theta":
-            name = "Theta"
-        ax.set_ylabel(f"{name}\nZ-score")
-        ax.set_ylim(-2.5, 4.0)
-        ax.axhline(
-            2.0,
-            color="lightgrey",
-            linestyle="--",
-            label="Z-score Threshold",
-            alpha=0.5,
-            zorder=-1,
-            linewidth=0.75,
-        )
-    if no_overlap_mean["signal"].values == "head_speed":
-        ax.set_ylabel("Head Speed\n(cm/s)")
-        ax.axhline(
-            4.0,
-            color="lightgrey",
-            linestyle="--",
-            label="Immobile Threshold",
-            alpha=0.5,
-            zorder=-1,
-        )
-    if no_overlap_mean["signal"].values == "Non-Local_prob":
-        ax.set_ylabel("Non-Local\nProb.")
-        ax.axhline(
-            0.8,
-            color="lightgrey",
-            linestyle="--",
-            label="Prob. Threshold",
-            alpha=0.5,
-            zorder=-1,
-            linewidth=0.75,
-        )
-        ax.set_ylim(0.0, 1.0)
-    if ax is axes[-1]:
-        ax.set_xlabel("Time (s)")
-    ax.axvline(
-        0.0,
-        color="lightgrey",
-        linestyle="--",
-        alpha=0.5,
-        zorder=-1,
-        linewidth=0.75,
-    )
-    ax.axhline(
-        0.0,
-        color="lightgrey",
-        linestyle="--",
-        alpha=0.5,
-        zorder=-1,
-        linewidth=0.75,
-    )
+    ax.set_xlabel("SWR Z-score")
+    ax.set_ylabel("Density")
     ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-plt.xlim((-1.0, 1.0))
-
-
-bins = int(np.median(data_over_time["max_linear_position"].unique() / 2))
-density, bins, _ = plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] > 0
-        ),
-        "map_estimate",
-    ]
-    / data_over_time.loc[data_over_time["non_local_event"] > 0, "max_linear_position"],
-    bins=bins,
-    density=True,
-    alpha=0.8,
-    color=COLORS["SWR"],
-    edgecolor=COLORS["SWR"],
-    label="SWR",
-)
-plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] == 0
-        ),
-        "map_estimate",
-    ]
-    / data_over_time.loc[data_over_time["non_local_event"] > 0, "max_linear_position"],
-    bins=bins,
-    density=True,
-    alpha=0.8,
-    color=COLORS["Non-Local"],
-    edgecolor=COLORS["Non-Local"],
-    label="No SWR",
-)
-plt.legend()
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
 
 
-bin_labels, n_labels = label(density)
+def plot_replay_speed_by_swr(
+    data_over_time: pd.DataFrame,
+    output_dir: Path,
+    figure_name: str,
+    formats: list[str] | None = None,
+    dpi: int = 300,
+) -> None:
+    """Plot replay speed distribution by SWR overlap status.
 
-well_labels = [2, 3, 5, 6, 8, 9]
-edge_colors = np.array(matplotlib.colormaps.get_cmap("tab10").colors)
-track_line_y = -0.3
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Full dataset
+    output_dir : Path
+        Output directory
+    figure_name : str
+        Base name for the figure
+    formats : list of str, optional
+        Output formats
+    dpi : int
+        DPI for raster formats
+    """
+    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-for i in range(1, n_labels + 1):
-    bin_ind = np.nonzero(bin_labels == i)[0]
-    plt.plot(
-        (bins[bin_ind[0]], bins[bin_ind[-1] + 1]),
-        (track_line_y, track_line_y),
-        zorder=10,
-        clip_on=False,
-        color=edge_colors[i - 1],
-        linewidth=3,
+    bins = np.arange(0, 3, 0.1)
+
+    # SWR overlap
+    swr_mask = (data_over_time["non_local_event"] > 0) & (
+        data_over_time["SWR_event"] > 0
+    )
+    ax.hist(
+        data_over_time.loc[swr_mask, "map_speed"] / 1000,
+        bins=bins,
+        density=True,
+        alpha=0.7,
+        color=COLORS["SWR"],
+        label="With SWR",
     )
 
-    if i in well_labels:
-        plt.scatter(
-            bins[bin_ind[-1]],
-            track_line_y,
-            zorder=11,
-            clip_on=False,
-            color=edge_colors[i - 1],
-            s=30,
-        )
+    # No SWR overlap
+    no_swr_mask = (data_over_time["non_local_event"] > 0) & (
+        data_over_time["SWR_event"] == 0
+    )
+    ax.hist(
+        data_over_time.loc[no_swr_mask, "map_speed"] / 1000,
+        bins=bins,
+        density=True,
+        alpha=0.7,
+        color=COLORS["Non-Local"],
+        label="Without SWR",
+    )
 
-plt.xlim((0, 1))
-plt.yticks([0, 13])
-plt.ylim((0, 13))
-plt.ylabel("Density")
-# Hide x-axis and x line
-sns.despine(offset=5)
-plt.gca().get_xaxis().set_ticks([])
-plt.gca().spines["bottom"].set_visible(False)
-plt.xlabel("Linear position", labelpad=10)
+    ax.set_xlabel("Replay Speed (m/s)")
+    ax.set_ylabel("Density")
+    ax.legend()
+    sns.despine(ax=ax)
+    plt.tight_layout()
 
-
-plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time.head_speed < 4.0, data_over_time["Local_prob"] > 0.8
-        ),
-        "SWR_zscore",
-    ],
-    bins=np.arange(-5, 11),
-    alpha=0.8,
-    density=True,
-    label="Local",
-    color=COLORS["Local"],
-)
-plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time.head_speed < 4.0, data_over_time["Non-Local_prob"] > 0.8
-        ),
-        "SWR_zscore",
-    ],
-    bins=np.arange(-5, 11),
-    alpha=0.8,
-    density=True,
-    label="Non-Local",
-    color=COLORS["Non-Local"],
-)
-plt.legend()
-plt.ylabel("Density")
-plt.xlabel("SWR z-score")
-sns.despine()
+    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    plt.close(fig)
+    logging.info(f"Saved: {figure_name}")
 
 
-plt.hist2d(
-    data_over_time.loc[data_over_time.head_speed < 4.0]["SWR_zscore"],
-    data_over_time.loc[data_over_time.head_speed < 4.0]["Non-Local_prob"],
-    bins=(np.arange(-5, 11), np.arange(0, 1.1, 0.1)),
-    vmin=0.0,
-    vmax=0.1,
-    density=True,
-)
-plt.xlabel("SWR Z-score")
-plt.ylabel("Non-Local Probability")
-plt.colorbar(label="Density")
+def main() -> None:
+    """Main entry point for figure generation."""
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("paper/figures/figure03"),
+        help="Output directory for figures (default: paper/figures/figure03)",
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["pdf", "png", "svg"],
+        default=None,
+        help="Output format (default: both pdf and png)",
+    )
+    parser.add_argument(
+        "--dpi",
+        type=int,
+        default=300,
+        help="DPI for raster formats (default: 300)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=PROCESSED_DATA_DIR,
+        help=f"Directory containing processed data (default: {PROCESSED_DATA_DIR})",
+    )
+
+    args = parser.parse_args()
+
+    # Create output directory
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load data
+    logging.info("Loading data...")
+    data_over_time = load_data_over_time(args.data_dir)
+    event_types = get_event_types(data_over_time)
+
+    # Generate figures
+    logging.info("Generating figures...")
+    formats = [args.format] if args.format else None
+
+    plot_event_duration_distribution(
+        event_types,
+        args.output_dir,
+        "fig03_event_duration",
+        formats,
+        args.dpi,
+    )
+
+    plot_hpd_distribution(
+        event_types,
+        args.output_dir,
+        "fig03_hpd_distribution",
+        formats,
+        args.dpi,
+    )
+
+    plot_distance_distribution(
+        event_types,
+        args.output_dir,
+        "fig03_distance_from_animal",
+        formats,
+        args.dpi,
+    )
+
+    plot_mean_hpd_per_event(
+        event_types,
+        args.output_dir,
+        "fig03_mean_hpd_per_event",
+        formats,
+        args.dpi,
+    )
+
+    plot_position_animal_vs_replay(
+        event_types,
+        args.output_dir,
+        "fig03_position_animal_vs_replay",
+        formats,
+        args.dpi,
+    )
+
+    plot_triggered_averages(
+        data_over_time,
+        event_types,
+        args.output_dir,
+        "fig03_triggered_averages_start",
+        time_col="start_time",
+        formats=formats,
+        dpi=args.dpi,
+    )
+
+    plot_triggered_averages(
+        data_over_time,
+        event_types,
+        args.output_dir,
+        "fig03_triggered_averages_end",
+        time_col="end_time",
+        formats=formats,
+        dpi=args.dpi,
+    )
+
+    plot_replay_position_by_swr(
+        data_over_time,
+        args.output_dir,
+        "fig03_replay_position_by_swr",
+        formats,
+        args.dpi,
+    )
+
+    plot_swr_zscore_by_state(
+        data_over_time,
+        args.output_dir,
+        "fig03_swr_zscore_by_state",
+        formats,
+        args.dpi,
+    )
+
+    plot_replay_speed_by_swr(
+        data_over_time,
+        args.output_dir,
+        "fig03_replay_speed_by_swr",
+        formats,
+        args.dpi,
+    )
+
+    logging.info("Done!")
 
 
-bins = np.arange(0, 3, 0.1)
-plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] > 0
-        ),
-        "map_speed",
-    ]
-    / 1000,
-    bins=bins,
-    density=True,
-    alpha=0.8,
-    color=COLORS["SWR"],
-    label="SWR",
-)
-plt.hist(
-    data_over_time.loc[
-        np.logical_and(
-            data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] == 0
-        ),
-        "map_speed",
-    ]
-    / 1000,
-    bins=bins,
-    density=True,
-    alpha=0.8,
-    color=COLORS["Non-Local"],
-    label="No SWR",
-)
-plt.legend()
-plt.xlabel("Replay Speed (m/s)")
-plt.ylabel("Density")
-sns.despine(offset=5)
-
-# %%
-# what are the spike amplitudes during these events
-# how many neurons are spiking (What percentage of cells are spiking)
-# what is the spike rate (MUA?)
-# how synchronous are the spikes (all at the same time?)
-# angular velocity of head
-# interspike interval?
-# speed of replay
-# position of replay
-# hpd of replay
+if __name__ == "__main__":
+    main()

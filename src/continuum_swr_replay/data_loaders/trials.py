@@ -291,12 +291,7 @@ def make_well_visits_df(
     trial_number = np.full((len(well_visits),), np.nan)
     trial_number[well_visits.is_run] = np.arange(1, well_visits.is_run.sum() + 1)
     trial_number = (
-        pd.DataFrame(trial_number)
-        .ffill()
-        .bfill()
-        .astype(int)
-        .to_numpy()
-        .squeeze()
+        pd.DataFrame(trial_number).ffill().bfill().astype(int).to_numpy().squeeze()
     )
     well_visits["trial_number"] = trial_number
 

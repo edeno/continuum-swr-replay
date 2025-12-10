@@ -44,6 +44,7 @@ position : Position data that defines time bounds for spike filtering
 from __future__ import annotations
 
 import itertools
+import logging
 import warnings
 
 import numpy as np
@@ -56,6 +57,8 @@ from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
 from spyglass.utils.nwb_helper_fn import get_nwb_file
 
 from ..types import SpikeDataDict
+
+logger = logging.getLogger(__name__)
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
@@ -70,22 +73,34 @@ def detect_coincident_spikes(
 ) -> tuple[list[NDArray[np.float64]], list[NDArray[np.int_]]]:
     """Detect and remove coincident spikes across tetrodes.
 
-    Coincident spikes (within 40μs across >33% of tetrodes) are likely artifacts.
+    Coincident spikes (within threshold across >fraction of tetrodes) are likely
+    electrical artifacts rather than biological neural activity.
 
     Parameters
     ----------
-    spike_times : list
-        List of arrays, each containing spike times for one tetrode
+    spike_times : list[NDArray[np.float64]]
+        List of arrays, each containing spike times (seconds) for one tetrode.
     spike_closeness_threshold : float, optional
-        Time threshold for considering spikes coincident (seconds)
+        Time threshold for considering spikes coincident (seconds). Default 40μs
+        (0.00004s) based on neural propagation delays being ~1-10 ms; spikes
+        within 40μs across multiple channels indicate electrical artifact.
     max_coincident_fraction : float, optional
-        Fraction of tetrodes that must fire together to be considered artifact
+        Fraction of tetrodes that must fire together to be considered artifact.
+        Default 0.33 (33%) based on real neural synchrony rarely exceeding 20%
+        of channels simultaneously.
 
     Returns
     -------
-    tuple
-        - filtered_spike_times: list of arrays with coincident spikes removed
-        - filtered_time_bin_ind: list of arrays with indices of kept spikes
+    tuple[list[NDArray[np.float64]], list[NDArray[np.int_]]]
+        - filtered_spike_times: list of arrays with coincident spikes removed.
+          Returns empty list if input is empty or contains only empty arrays.
+        - filtered_time_bin_ind: list of arrays with indices of kept spikes.
+          Returns empty list if input is empty or contains only empty arrays.
+
+    Notes
+    -----
+    Returns empty lists ([], []) when input is empty or all arrays are empty.
+    Downstream code should check for empty results before further processing.
     """
     if not spike_times or all(len(st) == 0 for st in spike_times):
         return [], []
@@ -126,9 +141,7 @@ def detect_coincident_spikes(
         .sort_group_id.nunique()
         / n_sort_groups
     )
-    artifact_labels = coincident_fraction[
-        coincident_fraction > max_coincident_fraction
-    ]
+    artifact_labels = coincident_fraction[coincident_fraction > max_coincident_fraction]
 
     spike_events = spike_events.loc[~spike_events.labels.isin(artifact_labels.index)]
 
@@ -228,20 +241,31 @@ def get_hpc_marks(
     # Fetch data once with the correct parameter
     marks = (UnitMarks & restriction).fetch_dataframe()
     marks = [(mark.index.to_numpy(), mark.to_numpy()) for mark in marks]
-    spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=False)
+    # Unpack list of (spike_times, waveform_features) tuples into separate tuples
+    spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=True)
     spike_times = list(spike_times_tuple)
     spike_waveform_features = list(spike_waveform_features_tuple)
 
     spike_times, filtered_time_bin_ind = detect_coincident_spikes(spike_times)
+    # Note: strict=False is required here because detect_coincident_spikes may return
+    # fewer sort groups than the original if all spikes from a group were removed as
+    # artifacts. The groupby in detect_coincident_spikes only returns groups with
+    # remaining spikes. This causes filtered_time_bin_ind to have fewer entries than
+    # spike_waveform_features when some sort groups lose all spikes.
+    # TODO: Consider refactoring detect_coincident_spikes to preserve sort group indices.
     spike_waveform_features = [
         features[ind]
-        for ind, features in zip(filtered_time_bin_ind, spike_waveform_features, strict=False)
+        for ind, features in zip(
+            filtered_time_bin_ind, spike_waveform_features, strict=False
+        )
     ]
 
     return spike_times, spike_waveform_features
 
 
-def get_pfc_spike_times(nwb_file_name: str, brain_area: str) -> list[NDArray[np.float64]]:
+def get_pfc_spike_times(
+    nwb_file_name: str, brain_area: str
+) -> list[NDArray[np.float64]]:
     """Get prefrontal cortex sorted spike times.
 
     Parameters
@@ -319,16 +343,16 @@ def get_spike_data(nwb_file_name: str) -> SpikeDataDict:
         spike_times["HPC"], spike_waveform_features["HPC"] = get_hpc_marks(
             nwb_file_name
         )
-    except ValueError:
-        pass
+    except ValueError as e:
+        logger.debug("No HPC data available for %s: %s", nwb_file_name, e)
 
     for brain_area in ["mPFC", "OFC"]:
         try:
             spike_times[brain_area] = get_pfc_spike_times(nwb_file_name, brain_area)
             if len(spike_times[brain_area]) < 1:
                 del spike_times[brain_area]
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.debug("No %s data available for %s: %s", brain_area, nwb_file_name, e)
 
     return {
         "spike_times": spike_times,
@@ -366,7 +390,6 @@ def filter_spike_times(
         brain_area_filtered_times = []
         brain_area_filtered_features = []
         for sort_ind, sort_group_spike_times in enumerate(brain_area_spike_times):
-
             is_in_bounds = np.logical_and(
                 sort_group_spike_times >= position_time[0],
                 sort_group_spike_times <= position_time[-1],
@@ -378,6 +401,7 @@ def filter_spike_times(
                     spike_waveform_features[brain_area][sort_ind][is_in_bounds]
                 )
             except KeyError:
+                # Expected: mPFC/OFC use sorted spikes without waveform features
                 pass
 
         filtered_spike_times[brain_area] = brain_area_filtered_times

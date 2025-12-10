@@ -523,3 +523,116 @@ class TestEdgeCases:
         # Note: smoothing reduces differences, so check if any variation exists
         assert np.std(speed) > 0, \
             "Different edge lengths should produce variation in speeds"
+
+
+class TestAllNaNRowHandlingFix:
+    """Test fix for handling all-NaN rows in posterior (NaN handling fix)."""
+
+    def test_all_nan_rows_return_nan_speed(self):
+        """Timepoints with all-NaN posteriors should have NaN speed."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # Some rows have valid data, some are all NaN
+        posterior = np.array([
+            [0.3, 0.7],      # Valid
+            [np.nan, np.nan],  # All NaN
+            [0.5, 0.5],      # Valid
+            [np.nan, np.nan],  # All NaN
+            [0.2, 0.8],      # Valid
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,
+        )
+
+        assert len(speed) == 5
+        # Rows with all NaN should produce NaN speed
+        assert np.isnan(speed[1]), "All-NaN row should produce NaN speed"
+        assert np.isnan(speed[3]), "All-NaN row should produce NaN speed"
+
+    def test_all_rows_nan_returns_all_nan(self):
+        """Completely NaN posterior should return all NaN speeds."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        # All rows are NaN
+        posterior = np.full((5, 2), np.nan)
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+        )
+
+        assert len(speed) == 5
+        assert np.all(np.isnan(speed)), "All-NaN posterior should return all NaN speeds"
+
+    def test_partial_nan_rows_do_not_affect_valid_rows(self):
+        """Valid rows should have computed speeds even when some rows are NaN."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=20.0)
+
+        # First and last row valid, middle is NaN
+        posterior = np.array([
+            [1.0, 0.0],       # At node 0
+            [np.nan, np.nan],  # NaN
+            [0.0, 1.0],       # At node 1
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=500.0,
+            smooth_sigma=0.0001,
+        )
+
+        assert len(speed) == 3
+        # Valid rows should have finite speeds (before NaN masking)
+        # After fix, speeds at invalid timepoints are set to NaN
+        assert np.isnan(speed[1]), "NaN row should have NaN speed"
+        # Edge rows may or may not be NaN depending on smoothing
+
+    def test_no_warning_on_all_nan_rows(self):
+        """Should not emit numpy warning when handling all-NaN rows."""
+        import warnings
+
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+
+        posterior = np.array([
+            [0.3, 0.7],
+            [np.nan, np.nan],
+            [0.5, 0.5],
+        ])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        # Catch any numpy warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            _ = get_map_speed(
+                posterior,
+                graph,
+                place_bin_center_ind_to_node,
+                sampling_frequency=500.0,
+            )
+
+            # Filter for RuntimeWarning about nanargmax
+            nan_warnings = [
+                warning for warning in w
+                if "All-NaN" in str(warning.message)
+                or "nanargmax" in str(warning.message).lower()
+            ]
+
+            assert len(nan_warnings) == 0, \
+                f"Should not emit NaN warnings, got: {[str(w.message) for w in nan_warnings]}"

@@ -363,7 +363,8 @@ def make_non_local_movie(
             [], [], "green", linewidth=3, animated=True
         )
 
-        mesh = posterior.isel(time=0).plot(
+        # xarray's plot() method has complex dynamic dispatch that mypy can't resolve
+        mesh = posterior.isel(time=0).plot(  # type: ignore[call-arg]
             x="x_position",
             y="y_position",
             vmin=0.0,

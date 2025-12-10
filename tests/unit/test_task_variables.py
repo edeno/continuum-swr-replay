@@ -6,10 +6,8 @@ analyzing spatial navigation behavior in the bandit task.
 
 from __future__ import annotations
 
-import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
 
 from continuum_swr_replay.data_loaders.task_variables import (
     dist_to_goal_per_time,
@@ -452,3 +450,83 @@ class TestEdgeCases:
         assert len(progress) == 2
         assert np.all(progress >= 0.0)
         assert np.all(progress <= 1.0)
+
+
+class TestNumericalStabilityFixes:
+    """Test fixes for numerical stability issues."""
+
+    def test_path_progress_epsilon_check_very_small_max_dist(self, simple_linear_track):
+        """Very small max_dist (< 1e-10) should return zeros to avoid division issues.
+
+        This tests the fix: if max_dist <= 1e-10, return zeros.
+        """
+        time = np.arange(0, 0.1, 0.002)
+
+        # Create position data at essentially the same point
+        pos_info = pd.DataFrame({
+            'projected_x_position': np.full(len(time), 0.0),
+            'projected_y_position': np.full(len(time), 0.0),
+            'track_segment_id': np.zeros(len(time), dtype=int),
+        }, index=time)
+
+        for node, pos in [(0, (0, 0)), (1, (1e-12, 0)), (2, (2e-12, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+
+        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
+        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+
+        # Same start and end node produces very small max_dist
+        progress = path_progress_for_run_segment(
+            pos_info,
+            simple_linear_track,
+            start_node=0,
+            end_node=0,
+        )
+
+        # Should return all zeros (no NaN or Inf from division)
+        assert progress.shape == (len(time),)
+        np.testing.assert_array_equal(progress, np.zeros(len(time)))
+        assert not np.any(np.isnan(progress)), "Should not have NaN values"
+        assert not np.any(np.isinf(progress)), "Should not have Inf values"
+
+    def test_dist_to_goal_clamps_dist_from_node1(self, simple_linear_track):
+        """Distance from node1 should be clamped to [0, edge_length].
+
+        This tests the fix: np.clip(dist_from_node1, 0.0, edge_length).
+        """
+        from continuum_swr_replay.data_loaders.task_variables import dist_to_goal
+
+        time = np.arange(0, 0.1, 0.002)
+
+        # Position slightly outside the segment bounds
+        pos_info = pd.DataFrame({
+            'projected_x_position': np.full(len(time), -0.001),  # Slightly negative
+            'projected_y_position': np.zeros(len(time)),
+            'track_segment_id': np.zeros(len(time), dtype=int),
+        }, index=time)
+
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+
+        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
+        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+
+        track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
+
+        # Create a mock trial Series with to_well as the goal
+        trial = pd.Series({
+            'to_well': 2,
+            'start_time': 0.0,
+            'end_time': 0.1,
+        })
+
+        distances = dist_to_goal(
+            pos_info,
+            trial=trial,
+            track_graph=simple_linear_track,
+            track_segment_id_to_edge=track_segment_id_to_edge,
+        )
+
+        # All distances should be non-negative (no negative from unstable subtraction)
+        assert np.all(distances >= 0.0), "Distances should be non-negative"
+        assert not np.any(np.isnan(distances)), "Should not have NaN values"

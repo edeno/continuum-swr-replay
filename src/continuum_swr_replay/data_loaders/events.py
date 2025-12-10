@@ -142,7 +142,9 @@ def _load_dio_event_type(
         .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
         .loc[valid_times[0] : valid_times[1]]  # type: ignore[misc]
         for nwb_file in (
-            DIOEvents & {"nwb_file_name": nwb_file_name} & f'dio_event_name LIKE "{pattern}"'
+            DIOEvents
+            & {"nwb_file_name": nwb_file_name}
+            & f'dio_event_name LIKE "{pattern}"'
         ).fetch_nwb()
     }
     return pd.concat(

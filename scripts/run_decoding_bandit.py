@@ -107,6 +107,7 @@ python run_decoding_bandit.py --animal peanut --date 20201125 --epoch 02_r1 \\
 python run_decoding_bandit.py --animal wilbur --non_stationary \\
     --cuda_visible_devices "2,3"
 """
+
 import logging
 import logging.config
 import os
@@ -118,18 +119,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import dask
+import networkx as nx
 import numpy as np
 import pandas as pd
+import xarray as xr
 from dask.distributed import Client
 from dask_cuda import LocalCUDACluster
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
+from non_local_detector.discrete_state_transitions import (
+    DiscreteNonStationaryDiagonal,
+    DiscreteStationaryDiagonal,
+)
 from non_local_detector.environment import Environment
-from non_local_detector.models.non_local_model import (
-    discrete_transition_type as stationary_discrete_transition_type,
-)
-from non_local_detector.models.non_local_model import (
-    non_stationary_discrete_transition_type,
-)
 
 from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
 from continuum_swr_replay.data_loaders import (
@@ -146,16 +147,14 @@ from continuum_swr_replay.parameters import (
     PROCESSED_DATA_DIR,
     WAVEFORM_STD,
 )
-from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
+from continuum_swr_replay.types import (
+    ClusterlessParams,
+    SessionData,
+    SortedSpikesParams,
+)
 from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
 )
-
-if TYPE_CHECKING:
-    import networkx as nx
-    import xarray as xr
-
-    from continuum_swr_replay.types import SessionData
 
 warnings.filterwarnings("ignore")
 
@@ -163,9 +162,12 @@ warnings.filterwarnings("ignore")
 # Import configuration from parameters.py and map string names to actual classes
 DETECTOR_CLASSES = {
     brain_area: (
-        NonLocalClusterlessDetector if config[0] == "NonLocalClusterlessDetector"
-        else NonLocalSortedSpikesDetector,
-        config[1]
+        (
+            NonLocalClusterlessDetector
+            if config[0] == "NonLocalClusterlessDetector"
+            else NonLocalSortedSpikesDetector
+        ),
+        config[1],
     )
     for brain_area, config in DETECTOR_CONFIG.items()
 }
@@ -408,10 +410,10 @@ def perform_decoding(
         discrete_transition_covariate_data = {
             "speed": position_info["head_speed"].interpolate().to_numpy()
         }
-        discrete_transition_type = non_stationary_discrete_transition_type
+        discrete_transition_type = DiscreteNonStationaryDiagonal
     else:
         discrete_transition_covariate_data = None
-        discrete_transition_type = stationary_discrete_transition_type
+        discrete_transition_type = DiscreteStationaryDiagonal
 
     logger.info(f"Decoding {brain_area}...")
 
@@ -495,7 +497,29 @@ def organize_results(
     tuple[pd.DataFrame, Any]
         (data_over_time, posterior)
     """
-    sampling_frequency = 1 / np.median(np.diff(results.time.values))
+    # Compute sampling frequency with validation
+    time_diffs = np.diff(results.time.values)
+    if len(time_diffs) == 0:
+        raise ValueError(
+            "Time array must have at least 2 elements to compute sampling frequency"
+        )
+    if np.any(time_diffs <= 0):
+        n_bad = np.sum(time_diffs <= 0)
+        bad_indices = np.where(time_diffs <= 0)[0][:5]  # First 5 problematic indices
+        bad_values = time_diffs[bad_indices]
+        raise ValueError(
+            f"Time array must be strictly increasing with positive differences. "
+            f"Found {n_bad}/{len(time_diffs)} non-positive differences. "
+            f"First problematic indices: {bad_indices.tolist()}, values: {bad_values.tolist()}"
+        )
+
+    median_dt = np.median(time_diffs)
+    if median_dt <= 1e-10:
+        raise ValueError(
+            f"Median time difference too small ({median_dt}), cannot compute sampling frequency"
+        )
+
+    sampling_frequency = 1 / median_dt
     data_over_time, posterior = get_data_over_time(
         data,
         results,
@@ -582,10 +606,13 @@ def run_decode(
         logger.info(f"ripple_detector_name: {ripple_detector_name}")
         logger.info(f"brain_area: {brain_area}")
         logger.info("Loading data...")
+        # parallel=False because this runs in a Dask worker (daemon process)
+        # which cannot spawn child processes
         data = load_data(
             nwb_file_name,
             epoch_name,
             ripple_detector_name=ripple_detector_name,
+            parallel=False,
         )
 
         if not data["spike_times"]:

@@ -1,3 +1,4 @@
+import warnings
 from typing import Any
 
 import dask
@@ -40,22 +41,40 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     )
 
 
-def reindex_by(df: pd.Series | pd.DataFrame, index: pd.Index) -> pd.Series | pd.DataFrame:
+def reindex_by(
+    df: pd.Series | pd.DataFrame,
+    index: pd.Index,
+    tolerance: float | None = None,
+) -> pd.Series | pd.DataFrame:
     """Reindex pandas object to new index using nearest neighbor.
 
     Parameters
     ----------
     df : pd.Series | pd.DataFrame
-        Data to reindex
+        Data to reindex.
     index : pd.Index
-        Target index to align to
+        Target index to align to.
+    tolerance : float | None, optional
+        Maximum distance for nearest neighbor match (in index units, typically
+        seconds for time indices). If None, uses unlimited matching which may
+        match to distant points. Recommended to set this to the sampling period
+        (e.g., 0.002 seconds for 500 Hz data) to prevent spurious matches.
 
     Returns
     -------
     pd.Series | pd.DataFrame
-        Reindexed data with values from nearest time point
+        Reindexed data with values from nearest time point within tolerance.
+        Values outside tolerance will be NaN.
     """
-    return df.reindex(index, method="nearest")
+    if tolerance is None:
+        warnings.warn(
+            "reindex_by called with tolerance=None; nearest neighbor matching will "
+            "match to arbitrarily distant points. Consider setting tolerance to the "
+            "sampling period (e.g., 0.002 for 500 Hz data) to prevent spurious matches.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return df.reindex(index, method="nearest", tolerance=tolerance)
 
 
 def likelihood_ratio_test(
@@ -361,7 +380,9 @@ def _make_design_matrices(
 
 
 def _fit_immobility_models(
-    is_immobile: pd.Series, design_matrices: dict[str, NDArray], neuron_spike_count: NDArray
+    is_immobile: pd.Series,
+    design_matrices: dict[str, NDArray],
+    neuron_spike_count: NDArray,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     glm_models = {
         model_name: sm.GLM(
@@ -376,11 +397,17 @@ def _fit_immobility_models(
     return glm_results, glm_models
 
 
-def get_frac_null_deviance(full_model: Any, reduced_model: Any, constant_model: Any) -> float:
-    return float((reduced_model.deviance - full_model.deviance) / constant_model.deviance)
+def get_frac_null_deviance(
+    full_model: Any, reduced_model: Any, constant_model: Any
+) -> float:
+    return float(
+        (reduced_model.deviance - full_model.deviance) / constant_model.deviance
+    )
 
 
-def get_frac_explained_deviance(full_model: Any, reduced_model: Any, constant_model: Any) -> float:
+def get_frac_explained_deviance(
+    full_model: Any, reduced_model: Any, constant_model: Any
+) -> float:
     return float(
         (reduced_model.deviance - full_model.deviance)
         / (constant_model.deviance - full_model.deviance)
@@ -564,7 +591,9 @@ def run_session(
             for neuron_spike_times in data["spike_times"][brain_area]
         ]
 
-    neuron_stats_list, SWR_modulation_list, no_SWR_modulation_list = zip(*result, strict=True)
+    neuron_stats_list, SWR_modulation_list, no_SWR_modulation_list = zip(
+        *result, strict=True
+    )
     neuron_stats = pd.DataFrame(list(neuron_stats_list))
     SWR_modulation = np.stack(SWR_modulation_list, axis=1)
     no_SWR_modulation = np.stack(no_SWR_modulation_list, axis=1)

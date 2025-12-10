@@ -27,7 +27,6 @@ Load results only (without detector):
 >>> print(f"States: {list(results.states.values)}")
 """
 
-
 import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment

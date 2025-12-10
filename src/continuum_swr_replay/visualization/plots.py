@@ -184,7 +184,7 @@ def plot_peri_event_probability(
     max_swr_zscores: list[float] = []
     max_mua_zscores: list[float] = []
 
-    for start_time, end_time in zip(start_times, end_times, strict=False):
+    for start_time, end_time in zip(start_times, end_times, strict=True):
         time_slice = slice(
             start_time + relative_time_range[0], start_time + relative_time_range[1]
         )
@@ -257,21 +257,27 @@ def plot_peri_event_probability(
     t, n = np.meshgrid(relative_time, np.arange(n_events))
 
     # Non-local probability
-    h = axes[0].pcolormesh(t, n, event_probs_sorted.T, vmin=0.0, vmax=1.0, cmap="cividis")
+    h = axes[0].pcolormesh(
+        t, n, event_probs_sorted.T, vmin=0.0, vmax=1.0, cmap="cividis"
+    )
     axes[0].axvline(0, color=COLORS["clusterless"], linestyle="--")
     axes[0].set_ylabel("Event number")
     axes[0].set_title("Non-Local Event Probability")
     plt.colorbar(h, ax=axes[0])
 
     # SWR z-score
-    h = axes[1].pcolormesh(t, n, event_swr_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r")
+    h = axes[1].pcolormesh(
+        t, n, event_swr_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r"
+    )
     axes[1].axvline(0, color=COLORS["clusterless"], linestyle="--")
     axes[1].set_ylabel("Event number")
     axes[1].set_title("SWR z-score")
     plt.colorbar(h, ax=axes[1])
 
     # MUA z-score
-    h = axes[2].pcolormesh(t, n, event_mua_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r")
+    h = axes[2].pcolormesh(
+        t, n, event_mua_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r"
+    )
     axes[2].axvline(0, color=COLORS["clusterless"], linestyle="--")
     axes[2].set_ylabel("Event number")
     axes[2].set_title("MUA z-score")
@@ -941,7 +947,7 @@ def plot_graph_as_1D(
     if edge_colors is None:
         # Get tab10 colormap colors - use getattr since .colors not in type stubs
         cmap = matplotlib.colormaps.get_cmap("tab10")
-        colors = getattr(cmap, 'colors', None)
+        colors = getattr(cmap, "colors", None)
         if colors is not None:
             edge_colors = np.array(colors)
         else:
