@@ -90,13 +90,28 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
     Returns
     -------
     conditional_posterior : xr.DataArray
-        Normalized posterior conditioned on non-local state
+        Normalized posterior conditioned on non-local state.
+        Time points with negligible non-local probability are forward-filled
+        from the nearest valid time point.
     """
     acausal_posterior = results.acausal_posterior.sel(state="Non-Local Continuous")
     acausal_posterior += results.acausal_posterior.sel(state="Non-Local Fragmented")
 
+    non_local_prob = acausal_posterior.sum("position")
+
+    # Compute conditional posterior, avoiding division by zero
+    conditional_posterior = xr.where(
+        non_local_prob > 1e-10,
+        acausal_posterior / non_local_prob,
+        np.nan,
+    )
+
+    # Forward fill any all-NaN time points (e.g., first time point before spikes)
+    # then backward fill any remaining (e.g., if first points are NaN)
+    conditional_posterior = conditional_posterior.ffill("time").bfill("time")
+
     # Type ignore: xarray operations return Any but result is DataArray
-    return acausal_posterior / acausal_posterior.sum("position")  # type: ignore[no-any-return]
+    return conditional_posterior  # type: ignore[no-any-return]
 
 
 def get_map_speed(
