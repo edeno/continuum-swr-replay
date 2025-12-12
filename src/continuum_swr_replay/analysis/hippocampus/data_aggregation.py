@@ -232,9 +232,12 @@ def get_data_over_time(
             "theta_phase": data["theta_phase"]
             .reindex(results.time, method="nearest")
             .squeeze(),
-            "theta_power_zscore": zscore(data["theta_power"].squeeze())
-            .reindex(results.time, method="nearest")
-            .squeeze(),
+            "theta_power_zscore": zscore(
+                data["theta_power"]
+                .squeeze()
+                .reindex(results.time, method="nearest")
+                .squeeze()
+            ),
             "SWR_zscore": data["zscored_ripple_consensus_trace"]
             .reindex(results.time, method="nearest")
             .squeeze(),
