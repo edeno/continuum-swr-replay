@@ -116,7 +116,7 @@ import warnings
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import dask
 import networkx as nx
@@ -126,10 +126,7 @@ import xarray as xr
 from dask.distributed import Client
 from dask_cuda import LocalCUDACluster
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
-from non_local_detector.discrete_state_transitions import (
-    DiscreteNonStationaryDiagonal,
-    DiscreteStationaryDiagonal,
-)
+from non_local_detector.discrete_state_transitions import DiscreteNonStationaryDiagonal
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
@@ -407,19 +404,29 @@ def perform_decoding(
     config = DecodingConfig()
 
     if non_stationary:
+        # Speed is derived from position, so no NaNs after position filtering
         discrete_transition_covariate_data = {
-            "speed": position_info["head_speed"].interpolate().to_numpy()
+            "speed": position_info["head_speed"].to_numpy()
         }
-        discrete_transition_type = DiscreteNonStationaryDiagonal
+        # Non-stationary: transition probabilities depend on speed
+        # Uses 4 states: Local, No-Spike, Non-Local Continuous, Non-Local Fragmented
+        # Diagonal values match the stationary defaults
+        diagonal_values = np.array([0.99, 0.98, 0.98, 0.98])
+        # Formula uses default b-spline basis for smooth speed dependence
+        discrete_transition_type = DiscreteNonStationaryDiagonal(
+            diagonal_values=diagonal_values,
+        )  # Uses default formula: 1 + bs(speed, knots=[1.0, 4.0, 16.0, 32.0, 64.0])
     else:
+        # Use default stationary transition matrix (None triggers sensible defaults)
         discrete_transition_covariate_data = None
-        discrete_transition_type = DiscreteStationaryDiagonal
+        discrete_transition_type = None
 
     logger.info(f"Decoding {brain_area}...")
 
     detector = create_detector(brain_area, env, config, discrete_transition_type)
 
     # Prepare common parameters for all detectors
+    # position_info has already been filtered to remove NaN values upstream
     estimate_params = {
         "position_time": position_info.index.to_numpy(),
         "position": position_info[["head_position_x", "head_position_y"]].to_numpy(),
@@ -634,7 +641,23 @@ def run_decode(
             logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
             results, detector, env = load_results(nwb_file_name, epoch_name, brain_area)
         else:
-            is_training = get_training_timepoints(data, training_type=training_type)
+            # Filter position_info to remove NaN position values (typically at start/end)
+            # NaN positions occur when tracking is lost and cannot be used for training
+            position_info = data["position_info"].dropna(
+                subset=["head_position_x", "head_position_y"]
+            )
+            n_dropped = len(data["position_info"]) - len(position_info)
+            if n_dropped > 0:
+                logger.info(
+                    f"Dropped {n_dropped} time points with NaN position "
+                    f"({100 * n_dropped / len(data['position_info']):.1f}%)"
+                )
+
+            # Create data dict with filtered position_info for get_training_timepoints
+            data_filtered = {**data, "position_info": position_info}
+            is_training = get_training_timepoints(
+                data_filtered, training_type=training_type
+            )
 
             # Get spike waveform features if available (HPC only)
             spike_waveform_features = data["spike_waveform_features"].get(
@@ -645,7 +668,7 @@ def run_decode(
                 logger,
                 data["spike_times"][brain_area],
                 spike_waveform_features,
-                data["position_info"],
+                position_info,  # Use filtered position_info
                 data["linear_edge_order"],
                 data["linear_edge_spacing"],
                 data["track_graph"],
