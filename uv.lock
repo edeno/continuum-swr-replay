@@ -2126,8 +2126,8 @@ wheels = [
 
 [[package]]
 name = "non-local-detector"
-version = "0.6.10.dev209+g58ae32af7"
-source = { git = "https://github.com/LorenFrankLab/non_local_detector.git#58ae32af7e6d609cdda6febbe86e4c2c541bb707" }
+version = "0.6.10.dev212+ge97efc759"
+source = { git = "https://github.com/LorenFrankLab/non_local_detector.git#e97efc759da9821b26a4fed931e63a677c692a23" }
 dependencies = [
     { name = "jax" },
     { name = "matplotlib" },
