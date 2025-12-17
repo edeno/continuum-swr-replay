@@ -330,6 +330,19 @@ def load_data(
     ).fetch1("position_interval_name")
     position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
 
+    # Drop time points with NaN positions (typically at start/end when tracking unavailable)
+    # This ensures all time-indexed data will be aligned to valid position times
+    n_before = len(position_data["position_info"])
+    position_data["position_info"] = position_data["position_info"].dropna(
+        subset=["head_position_x", "head_position_y"]
+    )
+    n_dropped = n_before - len(position_data["position_info"])
+    if n_dropped > 0:
+        logger.info(
+            f"Dropped {n_dropped} time points with NaN position "
+            f"({100 * n_dropped / n_before:.1f}%)"
+        )
+
     # Initialize result with position data (always included)
     result: dict = {
         "position_info": position_data["position_info"],

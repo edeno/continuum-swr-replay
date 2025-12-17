@@ -641,23 +641,8 @@ def run_decode(
             logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
             results, detector, env = load_results(nwb_file_name, epoch_name, brain_area)
         else:
-            # Filter position_info to remove NaN position values (typically at start/end)
-            # NaN positions occur when tracking is lost and cannot be used for training
-            position_info = data["position_info"].dropna(
-                subset=["head_position_x", "head_position_y"]
-            )
-            n_dropped = len(data["position_info"]) - len(position_info)
-            if n_dropped > 0:
-                logger.info(
-                    f"Dropped {n_dropped} time points with NaN position "
-                    f"({100 * n_dropped / len(data['position_info']):.1f}%)"
-                )
-
-            # Create data dict with filtered position_info for get_training_timepoints
-            data_filtered = {**data, "position_info": position_info}
-            is_training = get_training_timepoints(
-                data_filtered, training_type=training_type
-            )
+            # NaN positions are already filtered in load_data()
+            is_training = get_training_timepoints(data, training_type=training_type)
 
             # Get spike waveform features if available (HPC only)
             spike_waveform_features = data["spike_waveform_features"].get(
@@ -668,7 +653,7 @@ def run_decode(
                 logger,
                 data["spike_times"][brain_area],
                 spike_waveform_features,
-                position_info,  # Use filtered position_info
+                data["position_info"],
                 data["linear_edge_order"],
                 data["linear_edge_spacing"],
                 data["track_graph"],

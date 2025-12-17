@@ -77,7 +77,8 @@ SAMPLING_FREQUENCY = 500
 MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 
 # Data directories and definitions
-ROOT_DIR = Path(__file__).parent.parent
+# ROOT_DIR is the project root (continuum-swr-replay/), not src/
+ROOT_DIR = Path(__file__).parent.parent.parent
 PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"
 FIGURE_DIR = ROOT_DIR / "paper" / "figures"
 
