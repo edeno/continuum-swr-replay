@@ -7,7 +7,7 @@ activity represents the animal's current location versus distant locations (repl
 
 The script supports:
 - Multi-session batch processing across animals
-- GPU-accelerated parallel decoding with Dask CUDA
+- GPU-accelerated parallel decoding with Dask CUDA (optional, falls back to CPU)
 - Both clusterless (HPC) and sorted spikes (mPFC/OFC) decoding
 - Stationary and non-stationary state transition models
 - Interactive figurl visualization generation
@@ -75,10 +75,11 @@ Configuration
 
 GPU and Parallelism
 -------------------
-- Uses Dask CUDA for GPU cluster management
+- Uses Dask CUDA for GPU cluster management if available (install with `uv sync --extra gpu`)
+- Falls back to CPU-based LocalCluster if dask-cuda is not installed
 - XLA_PYTHON_CLIENT_MEM_FRACTION set to 0.99 for GPU memory
 - Multiple sessions processed in parallel via dask.compute()
-- Each session's decoding uses GPU acceleration (JAX)
+- Each session's decoding uses GPU acceleration (JAX) when available
 
 Notes
 -----
@@ -123,8 +124,14 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import xarray as xr
-from dask.distributed import Client
-from dask_cuda import LocalCUDACluster
+from dask.distributed import Client, LocalCluster
+
+try:
+    from dask_cuda import LocalCUDACluster
+
+    HAS_CUDA = True
+except ImportError:
+    HAS_CUDA = False
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
 from non_local_detector.discrete_state_transitions import DiscreteNonStationaryDiagonal
 from non_local_detector.environment import Environment
@@ -458,9 +465,10 @@ def save_results_and_model(
 ) -> None:
     """Save decoding results, detector model, environment, and derived data."""
     logger.info("Saving results...")
-    detector.save_results(
-        results,
+    # Use netcdf4 engine to support files >2GB (scipy engine limited to int32)
+    results.reset_index("state_bins").to_netcdf(
         save_folder / f"{epoch_identifier}_results.nc",
+        engine="netcdf4",
     )
     detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
     env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
@@ -763,10 +771,13 @@ def main() -> None:
 
     Path(args.local_scratch_dir).mkdir(exist_ok=True, parents=True)
 
-    cluster = LocalCUDACluster(
-        CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
-        local_directory=args.local_scratch_dir,
-    )
+    if HAS_CUDA:
+        cluster = LocalCUDACluster(
+            CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
+            local_directory=args.local_scratch_dir,
+        )
+    else:
+        cluster = LocalCluster(local_directory=args.local_scratch_dir)
 
     with Client(cluster):
         log_directory = Path.cwd() / "logs"
