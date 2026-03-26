@@ -367,6 +367,10 @@ def filter_spike_times(
 ) -> tuple[dict[str, list[NDArray[np.float64]]], dict[str, list[NDArray[np.float64]]]]:
     """Filter spike times to match position data time bounds.
 
+    Restricts spikes to the position time range and drops tetrodes/units
+    that have zero spikes after filtering (empty arrays cause downstream
+    errors in the non_local_detector encoding model).
+
     Parameters
     ----------
     spike_times : dict
@@ -379,9 +383,11 @@ def filter_spike_times(
     Returns
     -------
     filtered_spike_times : dict
-        Dictionary mapping brain area to list of filtered spike time arrays
+        Dictionary mapping brain area to list of filtered spike time arrays.
+        Tetrodes/units with zero spikes after filtering are excluded.
     filtered_spike_waveform_features : dict
-        Dictionary mapping brain area to list of filtered feature arrays
+        Dictionary mapping brain area to list of filtered feature arrays.
+        Entries correspond 1:1 with filtered_spike_times.
     """
     filtered_spike_times = {}
     filtered_spike_waveform_features = {}
@@ -389,20 +395,35 @@ def filter_spike_times(
     for brain_area, brain_area_spike_times in spike_times.items():
         brain_area_filtered_times = []
         brain_area_filtered_features = []
+        has_features = brain_area in spike_waveform_features
+        n_dropped = 0
+
         for sort_ind, sort_group_spike_times in enumerate(brain_area_spike_times):
             is_in_bounds = np.logical_and(
                 sort_group_spike_times >= position_time[0],
                 sort_group_spike_times <= position_time[-1],
             )
-            brain_area_filtered_times.append(sort_group_spike_times[is_in_bounds])
+            filtered = sort_group_spike_times[is_in_bounds]
 
-            try:
+            # Drop tetrodes/units with no spikes in the time range
+            if len(filtered) == 0:
+                n_dropped += 1
+                continue
+
+            brain_area_filtered_times.append(filtered)
+
+            if has_features:
                 brain_area_filtered_features.append(
                     spike_waveform_features[brain_area][sort_ind][is_in_bounds]
                 )
-            except KeyError:
-                # Expected: mPFC/OFC use sorted spikes without waveform features
-                pass
+
+        if n_dropped > 0:
+            logger.info(
+                "Dropped %d/%d %s tetrodes/units with no spikes in time range",
+                n_dropped,
+                len(brain_area_spike_times),
+                brain_area,
+            )
 
         filtered_spike_times[brain_area] = brain_area_filtered_times
 

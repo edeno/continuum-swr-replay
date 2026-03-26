@@ -153,7 +153,7 @@ class TestSpikeFiltering:
         spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
     def test_all_spikes_filtered_out(self):
-        """If all spikes outside bounds, should return empty arrays."""
+        """If all spikes outside bounds, tetrode should be dropped."""
         spike_times = {
             "HPC": [np.array([0.1, 0.2, 0.3])],  # All before position starts
         }
@@ -164,8 +164,35 @@ class TestSpikeFiltering:
 
         spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
-        assert len(spike_times["HPC"][0]) == 0
-        assert len(spike_features["HPC"][0]) == 0
+        # Tetrode with zero spikes is dropped entirely
+        assert len(spike_times["HPC"]) == 0
+        assert "HPC" not in spike_features
+
+    def test_empty_tetrodes_dropped_nonempty_kept(self):
+        """Tetrodes with no spikes after filtering are dropped; others kept."""
+        spike_times = {
+            "HPC": [
+                np.array([0.1, 0.2]),       # All outside — should be dropped
+                np.array([1.5, 2.5, 3.5]),  # All inside — should be kept
+                np.array([0.3]),             # Outside — should be dropped
+            ],
+        }
+        spike_features = {
+            "HPC": [
+                np.random.randn(2, 4),
+                np.random.randn(3, 4),
+                np.random.randn(1, 4),
+            ],
+        }
+        position_time = np.arange(1.0, 5.0, 0.1)
+
+        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+
+        # Only the second tetrode survives
+        assert len(spike_times["HPC"]) == 1
+        assert len(spike_features["HPC"]) == 1
+        np.testing.assert_array_equal(spike_times["HPC"][0], np.array([1.5, 2.5, 3.5]))
+        assert spike_features["HPC"][0].shape[0] == 3
 
     def test_no_spikes_filtered_all_within_bounds(self):
         """If all spikes within bounds, all should be preserved."""
