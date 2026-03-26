@@ -102,7 +102,9 @@ def get_poke_in_poke_out_times(
     for _, df in beam_breaks.groupby("event_name"):
         interevent_interval = (df.start_time.shift(-1) - df.end_time).fillna(0)
         labels = (
-            (interevent_interval > max_inter_event_interval).shift(1).fillna(0).cumsum()
+            (interevent_interval > max_inter_event_interval)
+            .shift(1, fill_value=False)
+            .cumsum()
         )
         new_events = df.groupby(labels).agg({"start_time": "first", "end_time": "last"})
         merged_events.append(new_events)
