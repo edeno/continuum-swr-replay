@@ -210,16 +210,17 @@ def get_multiunit_HSE(
         [
             np.bincount(
                 np.digitize(
-                    spike_times[
+                    unit_spike_times[
                         np.logical_and(
-                            spike_times >= start_time, spike_times <= end_time
+                            unit_spike_times >= start_time,
+                            unit_spike_times <= end_time,
                         )
                     ],
                     bin_time[1:-1],
                 ),
                 minlength=bin_time.shape[0],
             )
-            for spike_times in spike_times
+            for unit_spike_times in spike_times
         ],
         axis=1,
     )
