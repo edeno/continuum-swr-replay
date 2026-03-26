@@ -21,15 +21,26 @@ Notes
 
 import numpy as np
 
+from continuum_swr_replay.parameters import (
+    MAX_SPEED_THRESHOLD_CM_PER_SEC,
+    SAMPLING_FREQUENCY,
+)
+
 # Event detection thresholds
 DEFAULT_NON_LOCAL_THRESHOLD = 0.8
 """Default probability threshold for classifying non-local events (0-1)."""
 
-DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0
-"""Default speed threshold for classifying immobile periods (cm/s)."""
+DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC: float = float(MAX_SPEED_THRESHOLD_CM_PER_SEC)
+"""Default speed threshold for classifying immobile periods (cm/s).
 
-DEFAULT_SAMPLING_FREQUENCY_HZ = 500.0
-"""Default sampling frequency for neural data (Hz)."""
+Derived from :data:`continuum_swr_replay.parameters.MAX_SPEED_THRESHOLD_CM_PER_SEC`.
+"""
+
+DEFAULT_SAMPLING_FREQUENCY_HZ: float = float(SAMPLING_FREQUENCY)
+"""Default sampling frequency for neural data (Hz).
+
+Derived from :data:`continuum_swr_replay.parameters.SAMPLING_FREQUENCY`.
+"""
 
 # Histogram bin definitions
 # These are shared across multiple figure generation scripts to ensure consistency
