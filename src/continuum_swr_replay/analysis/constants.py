@@ -36,6 +36,8 @@ DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC: float = float(MAX_SPEED_THRESHOLD_CM_PE
 Derived from :data:`continuum_swr_replay.parameters.MAX_SPEED_THRESHOLD_CM_PER_SEC`.
 """
 
+# SAMPLING_FREQUENCY is int in parameters.py; cast to float for use in
+# arithmetic that expects float division (e.g., duration / sampling_frequency).
 DEFAULT_SAMPLING_FREQUENCY_HZ: float = float(SAMPLING_FREQUENCY)
 """Default sampling frequency for neural data (Hz).
 
@@ -62,8 +64,8 @@ BINS_SPEED_CM_PER_SEC = np.arange(0, 20, 0.5)
 
 # Event-triggered analysis
 DEFAULT_WINDOW_EVENT_TRIGGERED_SEC = 0.25
-"""Default window duration for event-triggered analysis (seconds).
+"""Total window duration for event-triggered analysis (seconds).
 
-This defines the total window duration centered on event times.
-For example, 0.25 seconds means ±0.125 seconds around the event.
+The window is centered on the event time, so a value of 0.25 spans
+from -0.125 s to +0.125 s relative to the event.
 """
