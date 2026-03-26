@@ -386,8 +386,10 @@ def turn_direction(
             for (node1, node2) in trial_nodes
         ]
     )
-    # 2D cross product (scalar): a[0]*b[1] - a[1]*b[0]
-    # Avoids NumPy 2.0 deprecation of np.cross with 2D vectors
+    # 2D scalar cross product: positive means counterclockwise (left) turn.
+    # Assumes track graph node "pos" coordinates use a standard right-hand
+    # system (x increases rightward, y increases upward), as provided by
+    # Spyglass position tracking.
     v1, v2 = vectors[:-1], vectors[1:]
     cross = v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0]
     trial_turns = np.where(cross > 0, "left", "right")
