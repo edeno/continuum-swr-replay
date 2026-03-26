@@ -291,15 +291,14 @@ def results_exist(
     save_folder: Path,
     epoch_identifier: str,
     overwrite: bool,
-    brain_area: str,
 ) -> bool:
     """Check if both results and detector files exist and we're not overwriting."""
     if overwrite:
         return False
 
     required_files = [
-        save_folder / f"{epoch_identifier}_{brain_area}_results.nc",
-        save_folder / f"{epoch_identifier}_{brain_area}_detector.pkl",
+        save_folder / f"{epoch_identifier}_results.nc",
+        save_folder / f"{epoch_identifier}_detector.pkl",
     ]
     return all(f.exists() for f in required_files)
 
@@ -644,7 +643,6 @@ def run_decode(
             save_folder,
             epoch_identifier,
             overwrite,
-            brain_area,
         ):
             logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
             results, detector, env = load_results(nwb_file_name, epoch_name, brain_area)
