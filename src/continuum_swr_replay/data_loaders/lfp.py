@@ -320,8 +320,14 @@ def filter_ripple_lfp_time(
     """
     position_time_slice = slice(position_time[0], position_time[-1])
 
+    ripple_times = ripple_data["ripple_times"]
+    ripple_times = ripple_times[
+        (ripple_times["start_time"] >= position_time[0])
+        & (ripple_times["end_time"] <= position_time[-1])
+    ]
+
     return {
-        "ripple_times": ripple_data["ripple_times"],  # Not filtered by time
+        "ripple_times": ripple_times,
         "ripple_filtered_lfps": ripple_data["ripple_filtered_lfps"].loc[
             position_time_slice
         ],
