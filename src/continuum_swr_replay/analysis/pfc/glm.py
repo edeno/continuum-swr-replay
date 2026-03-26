@@ -539,7 +539,9 @@ def run_session(
         data["position_info"].index.to_numpy(),
         non_local_threshold,
     )
-    non_local_times = non_local_times[non_local_times.max_speed < 4.0]
+    non_local_times = non_local_times[
+        non_local_times.max_speed < immobility_threshold
+    ]
 
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
         non_local_times, data["ripple_times"], results

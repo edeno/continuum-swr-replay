@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     _make_design_matrices,
     get_spikecount_per_time_bin,
     process_neuron,
+    run_session,
 )
 
 __all__ = [
@@ -61,4 +62,5 @@ __all__ = [
     "get_spikecount_per_time_bin",
     "process_neuron",
     "_fit_immobility_models",
+    "run_session",
 ]
