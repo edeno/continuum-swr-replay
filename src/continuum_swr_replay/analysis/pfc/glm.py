@@ -179,35 +179,6 @@ def test_theta_modulation_v1(
     return likelihood_ratio, p_val, modulation, preferred_phase
 
 
-def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
-    """Create event labels for time series data.
-
-    Assigns sequential integer labels (1, 2, 3, ...) to time points that fall
-    within event intervals. Time points outside any event are labeled 0.
-
-    Parameters
-    ----------
-    times : pd.DataFrame
-        Event times with 'start_time' and 'end_time' columns
-    time : pd.Index
-        Time index to label
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with 'event_number' column containing event labels
-        (0 for no event, 1+ for event number)
-    """
-    event_labels = pd.DataFrame(
-        np.zeros_like(time, dtype=int), index=time, columns=["event_number"]
-    )
-    # This means the label will be +1 because label count starts at 0
-    for i, row in enumerate(times.itertuples()):
-        event_labels.loc[row.start_time : row.end_time] = i + 1
-
-    return event_labels
-
-
 def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
     return likelihood_ratio_test(
         full_model.deviance,
