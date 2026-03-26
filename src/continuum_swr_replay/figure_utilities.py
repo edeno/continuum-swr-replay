@@ -274,9 +274,7 @@ def get_figure_size(
 
     # Constrain to maximum height
     if height > max_height:
-        scale = max_height / height
         height = max_height
-        # Note: we don't scale width to maintain column fit
 
     return (width, height)
 
