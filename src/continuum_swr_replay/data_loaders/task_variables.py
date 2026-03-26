@@ -149,7 +149,7 @@ def path_progress_for_run_segment(
     # Handle both zero and very small values for numerical stability
     if max_dist <= PATH_PROGRESS_EPSILON or np.isnan(max_dist):
         return np.zeros(pos_info.shape[0])
-    return np.asarray(dist / max_dist)
+    return np.clip(dist / max_dist, 0.0, 1.0)
 
 
 def _precompute_segment_distances_to_goal(
@@ -509,7 +509,7 @@ def make_task_variables(
     patch_change_shifts : list[int], optional
         Trial shifts for patch change indicators
     parallel : bool, optional
-        Whether to use parallel processing across trials. Default True.
+        Whether to use parallel processing across trials. Default False.
         Uses ProcessPoolExecutor to process trials concurrently, which can
         significantly reduce computation time for sessions with many trials.
 
