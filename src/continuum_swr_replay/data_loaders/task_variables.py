@@ -386,9 +386,11 @@ def turn_direction(
             for (node1, node2) in trial_nodes
         ]
     )
-    trial_turns = np.where(
-        np.cross(vectors[:-1], vectors[1:], axis=1) > 0, "left", "right"
-    )
+    # 2D cross product (scalar): a[0]*b[1] - a[1]*b[0]
+    # Avoids NumPy 2.0 deprecation of np.cross with 2D vectors
+    v1, v2 = vectors[:-1], vectors[1:]
+    cross = v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0]
+    trial_turns = np.where(cross > 0, "left", "right")
     return "-".join(trial_turns)
 
 
