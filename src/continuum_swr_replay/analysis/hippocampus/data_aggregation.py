@@ -106,6 +106,7 @@ from non_local_detector.environment import Environment
 from scipy.stats import zscore
 
 from continuum_swr_replay.data_loaders import get_labels
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
 from ...types import SessionData
@@ -202,8 +203,7 @@ def get_data_over_time(
     ) = get_posterior_stats(
         data, env, sampling_frequency=sampling_frequency, posterior=posterior
     )
-    animal = nwb_file_name.replace("_.nwb", "")[:-8]
-    date = int(nwb_file_name.replace("_.nwb", "")[-8:])
+    animal, date = parse_nwb_filename(nwb_file_name)
 
     data_over_time = pd.DataFrame(
         {
