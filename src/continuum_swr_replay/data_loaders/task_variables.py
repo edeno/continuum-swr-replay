@@ -149,7 +149,7 @@ def path_progress_for_run_segment(
     # Handle both zero and very small values for numerical stability
     if max_dist <= PATH_PROGRESS_EPSILON or np.isnan(max_dist):
         return np.zeros(pos_info.shape[0])
-    return np.clip(dist / max_dist, 0.0, 1.0)
+    return np.asarray(np.clip(dist / max_dist, 0.0, 1.0))
 
 
 def _precompute_segment_distances_to_goal(
@@ -365,6 +365,9 @@ def turn_direction(
     trial_segment_ids = trial_segment_ids[
         ~np.isin(trial_segment_ids, is_bad.index[is_bad])
     ]
+
+    if len(trial_segment_ids) == 0:
+        return ""
 
     # Ensure that the trial is in the correct traversal direction
     # track_segment_id does not contain node order information

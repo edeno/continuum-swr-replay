@@ -489,8 +489,9 @@ class TestTurnDirection:
 
         direction = turn_direction(trial, pos_info, simple_linear_track, track_edges)
 
-        # Straight path has one turn direction (left or right)
-        assert isinstance(direction, str)
+        # Collinear segments have zero cross product, classified as "right"
+        # by the np.where(cross > 0, "left", "right") convention
+        assert direction == "right"
 
 
 class TestEdgeCases:
