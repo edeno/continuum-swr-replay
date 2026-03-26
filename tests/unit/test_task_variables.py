@@ -6,6 +6,7 @@ analyzing spatial navigation behavior in the bandit task.
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 
@@ -361,6 +362,103 @@ class TestTurnDirection:
         assert isinstance(direction, str)
         # Should contain turn directions
         assert all(turn in ['left', 'right'] for turn in direction.split('-') if turn)
+
+    def test_known_left_turn_geometry(self):
+        """A 90-degree counterclockwise turn (y-up) should be 'left'.
+
+        Geometry (y-up coordinate system):
+            node 1 at (0, 10)
+                |
+            node 0 at (0, 0) --- node 2 at (10, 0)
+
+        Path: node 2 -> node 0 -> node 1
+        Vector 1: (0,0) - (10,0) = (-10, 0)  [going left]
+        Vector 2: (0,10) - (0,0) = (0, 10)   [going up]
+        Cross product: (-10)(10) - (0)(0) = -100 < 0 => "right"
+
+        But path 0 -> 2 -> ... would give different vectors. Let's use
+        a clear L-shaped path: 0 -> 1 -> 2 where going east then north.
+        Vector 1: (10,0) - (0,0) = (10, 0)
+        Vector 2: (10,10) - (10,0) = (0, 10)
+        Cross product: (10)(10) - (0)(0) = 100 > 0 => "left"
+        """
+        graph = nx.Graph()
+        graph.add_edges_from([(0, 1), (1, 2)])
+        nx.set_edge_attributes(graph, {(0, 1): 10.0, (1, 2): 10.0}, "distance")
+        graph.nodes[0]['pos'] = (0, 0)
+        graph.nodes[1]['pos'] = (10, 0)
+        graph.nodes[2]['pos'] = (10, 10)
+
+        time = np.arange(0, 1.0, 0.002)
+        n = len(time)
+        pos_info = pd.DataFrame({
+            'track_segment_id': np.concatenate([
+                np.zeros(n // 2, dtype=int),
+                np.ones(n // 2, dtype=int),
+            ]),
+            'projected_x_position': np.concatenate([
+                np.linspace(0, 10, n // 2),
+                np.full(n - n // 2, 10.0),
+            ]),
+            'projected_y_position': np.concatenate([
+                np.zeros(n // 2),
+                np.linspace(0, 10, n - n // 2),
+            ]),
+        }, index=time)
+
+        trial = pd.Series({
+            'start_time': 0.0,
+            'end_time': 1.0,
+            'from_well': 0,
+            'to_well': 2,
+        })
+        track_edges = np.array([(0, 1), (1, 2)])
+
+        direction = turn_direction(trial, pos_info, graph, track_edges)
+        assert direction == "left"
+
+    def test_known_right_turn_geometry(self):
+        """A 90-degree clockwise turn (y-up) should be 'right'.
+
+        Path: 0 -> 1 -> 2 going east then south.
+        Vector 1: (10,0) - (0,0) = (10, 0)
+        Vector 2: (10,-10) - (10,0) = (0, -10)
+        Cross product: (10)(-10) - (0)(0) = -100 < 0 => "right"
+        """
+        graph = nx.Graph()
+        graph.add_edges_from([(0, 1), (1, 2)])
+        nx.set_edge_attributes(graph, {(0, 1): 10.0, (1, 2): 10.0}, "distance")
+        graph.nodes[0]['pos'] = (0, 0)
+        graph.nodes[1]['pos'] = (10, 0)
+        graph.nodes[2]['pos'] = (10, -10)
+
+        time = np.arange(0, 1.0, 0.002)
+        n = len(time)
+        pos_info = pd.DataFrame({
+            'track_segment_id': np.concatenate([
+                np.zeros(n // 2, dtype=int),
+                np.ones(n // 2, dtype=int),
+            ]),
+            'projected_x_position': np.concatenate([
+                np.linspace(0, 10, n // 2),
+                np.full(n - n // 2, 10.0),
+            ]),
+            'projected_y_position': np.concatenate([
+                np.zeros(n // 2),
+                np.linspace(0, -10, n - n // 2),
+            ]),
+        }, index=time)
+
+        trial = pd.Series({
+            'start_time': 0.0,
+            'end_time': 1.0,
+            'from_well': 0,
+            'to_well': 2,
+        })
+        track_edges = np.array([(0, 1), (1, 2)])
+
+        direction = turn_direction(trial, pos_info, graph, track_edges)
+        assert direction == "right"
 
     def test_straight_path_no_turns(self, simple_linear_track):
         """Straight path should have no turns."""
