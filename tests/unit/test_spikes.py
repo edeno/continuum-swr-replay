@@ -432,34 +432,65 @@ class TestSpikeFiltering:
 
 
 class TestSpikeDataIntegrity:
-    """Test data integrity properties of spike processing."""
+    """Test data integrity properties after spike processing."""
 
-    def test_spike_times_always_sorted(self):
-        """Spike times should always be in ascending order."""
-        # Create unsorted spikes (shouldn't happen, but test robustness)
-        spike_times = [np.array([3.0, 1.0, 2.0, 5.0, 4.0])]
+    def test_spike_times_sorted_after_coincident_detection(self):
+        """Spike times should remain sorted after coincident spike removal."""
+        spike_times = [
+            np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            np.array([1.5, 2.5, 3.5, 4.5]),
+            np.array([1.0000001, 2.0000001, 3.0000001]),  # near-coincident with tetrode 0
+        ]
 
-        # Process (sort if needed)
-        spike_times_sorted = [np.sort(st) for st in spike_times]
+        filtered_times, _ = detect_coincident_spikes(spike_times)
 
-        assert np.all(np.diff(spike_times_sorted[0]) > 0)
+        for i, st in enumerate(filtered_times):
+            if len(st) > 1:
+                assert np.all(np.diff(st) > 0), (
+                    f"Sort group {i} spike times not sorted after filtering"
+                )
 
-    def test_no_duplicate_spikes(self):
-        """Spike detection should not produce duplicate timestamps."""
-        spike_times = [np.array([1.0, 1.0, 2.0, 3.0, 3.0])]
+    def test_no_duplicate_spikes_after_coincident_detection(self):
+        """Coincident spike removal should not introduce duplicate timestamps."""
+        spike_times = [
+            np.array([1.0, 2.0, 3.0, 4.0]),
+            np.array([1.5, 2.5, 3.5]),
+        ]
 
-        # Remove duplicates
-        spike_times_unique = [np.unique(st) for st in spike_times]
+        filtered_times, _ = detect_coincident_spikes(spike_times)
 
-        assert len(spike_times_unique[0]) == 3  # 1.0, 2.0, 3.0
+        for i, st in enumerate(filtered_times):
+            if len(st) > 1:
+                assert len(st) == len(np.unique(st)), (
+                    f"Sort group {i} has duplicate spike times after filtering"
+                )
 
-    def test_spike_features_match_spike_count(self):
-        """Number of feature vectors must equal number of spikes."""
-        n_spikes = 100
+    def test_features_match_spike_count_after_filtering(self):
+        """After filter_spike_times, feature count must equal spike count per group."""
         n_features = 4
+        spike_times = {
+            "HPC": [
+                np.array([0.5, 1.0, 2.0, 3.0, 5.5]),
+                np.array([1.5, 2.5]),
+            ],
+        }
+        spike_features = {
+            "HPC": [
+                np.random.randn(5, n_features),
+                np.random.randn(2, n_features),
+            ],
+        }
+        position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times = [np.linspace(0, 10, n_spikes)]
-        spike_features = [np.random.randn(n_spikes, n_features)]
+        filtered_times, filtered_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
-        assert spike_features[0].shape[0] == len(spike_times[0])
-        assert spike_features[0].shape[1] == n_features
+        for brain_area in filtered_times:
+            for i, (times, feats) in enumerate(
+                zip(filtered_times[brain_area], filtered_features[brain_area])
+            ):
+                assert feats.shape[0] == len(times), (
+                    f"{brain_area} sort group {i}: {feats.shape[0]} features != {len(times)} spikes"
+                )
+                assert feats.shape[1] == n_features

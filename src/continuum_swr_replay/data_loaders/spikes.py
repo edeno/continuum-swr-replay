@@ -70,7 +70,7 @@ def detect_coincident_spikes(
     spike_times: list[NDArray[np.float64]],
     spike_closeness_threshold: float = 0.00004,
     max_coincident_fraction: float = 0.33,
-) -> tuple[list[NDArray[np.float64]], list[NDArray[np.int_]]]:
+) -> tuple[list[NDArray[np.float64]], list[NDArray[np.intp]]]:
     """Detect and remove coincident spikes across tetrodes.
 
     Coincident spikes (within threshold across >fraction of tetrodes) are likely
@@ -91,7 +91,7 @@ def detect_coincident_spikes(
 
     Returns
     -------
-    tuple[list[NDArray[np.float64]], list[NDArray[np.int_]]]
+    tuple[list[NDArray[np.float64]], list[NDArray[np.intp]]]
         - filtered_spike_times: list of arrays with coincident spikes removed,
           one per input sort group (preserves 1:1 alignment with input).
           Sort groups that lose all spikes get empty arrays.
@@ -167,7 +167,7 @@ def detect_coincident_spikes(
         for i in range(n_sort_groups)
     ]
     filtered_time_bin_ind = [
-        grouped_time_bin_ind[i] if i in grouped_time_bin_ind.index else np.array([], dtype=np.int_)
+        grouped_time_bin_ind[i] if i in grouped_time_bin_ind.index else np.array([], dtype=np.intp)
         for i in range(n_sort_groups)
     ]
 
@@ -259,6 +259,11 @@ def get_hpc_marks(
 
     # Fetch data once with the correct parameter
     marks = (UnitMarks & restriction).fetch_dataframe()
+    if len(marks) == 0:
+        raise ValueError(
+            f"No UnitMarks found for {nwb_file_name!r} with either "
+            "'clusterless_fixed' or 'default_clusterless' sorter_params_name"
+        )
     marks = [(mark.index.to_numpy(), mark.to_numpy()) for mark in marks]
     # Unpack list of (spike_times, waveform_features) tuples into separate tuples
     spike_times_tuple, spike_waveform_features_tuple = zip(*marks, strict=True)
@@ -302,7 +307,13 @@ def get_pfc_spike_times(
         "sorter": "mountainsort4",
     }
 
-    max_curation_id = (CuratedSpikeSorting & restriction).fetch("curation_id").max()
+    curation_ids = (CuratedSpikeSorting & restriction).fetch("curation_id")
+    if len(curation_ids) == 0:
+        raise ValueError(
+            f"No CuratedSpikeSorting rows found for {nwb_file_name!r} "
+            f"with brain_area={brain_area!r}"
+        )
+    max_curation_id = curation_ids.max()
     restriction.update({"curation_id": max_curation_id})
 
     curated_spikes_info = pd.DataFrame(
