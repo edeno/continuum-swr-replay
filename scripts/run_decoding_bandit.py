@@ -465,10 +465,10 @@ def save_results_and_model(
 ) -> None:
     """Save decoding results, detector model, environment, and derived data."""
     logger.info("Saving results...")
-    # Use netcdf4 engine to support files >2GB (scipy engine limited to int32)
+    # Use h5netcdf engine to avoid netCDF4 C-library HDF errors with large files
     results.reset_index("state_bins").to_netcdf(
         save_folder / f"{epoch_identifier}_results.nc",
-        engine="netcdf4",
+        engine="h5netcdf",
     )
     detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
     env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
