@@ -92,9 +92,12 @@ def detect_coincident_spikes(
     Returns
     -------
     tuple[list[NDArray[np.float64]], list[NDArray[np.int_]]]
-        - filtered_spike_times: list of arrays with coincident spikes removed.
+        - filtered_spike_times: list of arrays with coincident spikes removed,
+          one per input sort group (preserves 1:1 alignment with input).
+          Sort groups that lose all spikes get empty arrays.
           Returns empty list if input is empty or contains only empty arrays.
-        - filtered_time_bin_ind: list of arrays with indices of kept spikes.
+        - filtered_time_bin_ind: list of arrays with indices of kept spikes,
+          one per input sort group (preserves 1:1 alignment with input).
           Returns empty list if input is empty or contains only empty arrays.
 
     Notes
@@ -143,14 +146,30 @@ def detect_coincident_spikes(
     )
     artifact_labels = coincident_fraction[coincident_fraction > max_coincident_fraction]
 
-    spike_events = spike_events.loc[~spike_events.labels.isin(artifact_labels.index)]
+    # Build mask of spikes belonging to artifact groups.
+    # scipy.ndimage.label assigns label=0 to the first spike in each cluster
+    # (because np.diff only looks backward), so we must also remove the spike
+    # immediately preceding each artifact-labeled run.
+    is_artifact = spike_events.labels.isin(artifact_labels.index)
+    # Shift forward to also flag the preceding (label=0) spike that starts each cluster
+    is_artifact = is_artifact | is_artifact.shift(-1, fill_value=False)
+    spike_events = spike_events.loc[~is_artifact]
 
-    filtered_spike_times = (
-        spike_events.groupby("sort_group_id").spike_times.apply(np.array).tolist()
-    )
-    filtered_time_bin_ind = (
-        spike_events.groupby("sort_group_id").time_bin_ind.apply(np.array).tolist()
-    )
+    grouped = spike_events.groupby("sort_group_id")
+    grouped_spike_times = grouped.spike_times.apply(np.array)
+    grouped_time_bin_ind = grouped.time_bin_ind.apply(np.array)
+
+    # Preserve all original sort group indices so the output aligns 1:1 with the input.
+    # Sort groups that lost all spikes get empty arrays.
+    n_sort_groups = len(spike_times)
+    filtered_spike_times = [
+        grouped_spike_times[i] if i in grouped_spike_times.index else np.array([], dtype=np.float64)
+        for i in range(n_sort_groups)
+    ]
+    filtered_time_bin_ind = [
+        grouped_time_bin_ind[i] if i in grouped_time_bin_ind.index else np.array([], dtype=np.int_)
+        for i in range(n_sort_groups)
+    ]
 
     return filtered_spike_times, filtered_time_bin_ind
 
@@ -247,16 +266,10 @@ def get_hpc_marks(
     spike_waveform_features = list(spike_waveform_features_tuple)
 
     spike_times, filtered_time_bin_ind = detect_coincident_spikes(spike_times)
-    # Note: strict=False is required here because detect_coincident_spikes may return
-    # fewer sort groups than the original if all spikes from a group were removed as
-    # artifacts. The groupby in detect_coincident_spikes only returns groups with
-    # remaining spikes. This causes filtered_time_bin_ind to have fewer entries than
-    # spike_waveform_features when some sort groups lose all spikes.
-    # TODO: Consider refactoring detect_coincident_spikes to preserve sort group indices.
     spike_waveform_features = [
         features[ind]
         for ind, features in zip(
-            filtered_time_bin_ind, spike_waveform_features, strict=False
+            filtered_time_bin_ind, spike_waveform_features, strict=True
         )
     ]
 

@@ -101,6 +101,116 @@ class TestCoincidentSpikeDetection:
         total_filtered = sum(len(st) for st in filtered_times)
         assert total_filtered >= total_original * 0.9
 
+    def test_output_length_matches_input_length(self):
+        """Output lists must have same length as input, even when groups lose all spikes.
+
+        This ensures 1:1 alignment between sort group indices in the output and
+        the original waveform features, preventing misalignment bugs.
+        """
+        # 4 tetrodes: tetrode 1 only has coincident spikes that will be removed
+        spike_times = [
+            np.array([1.0, 2.0, 5.0]),
+            np.array([1.00001, 5.00001]),       # Only coincident spikes
+            np.array([1.00002, 3.0, 5.00002]),
+            np.array([6.0, 7.0, 8.0]),
+        ]
+        filtered_times, filtered_indices = detect_coincident_spikes(spike_times)
+
+        assert len(filtered_times) == len(spike_times), \
+            f"Expected {len(spike_times)} groups, got {len(filtered_times)}"
+        assert len(filtered_indices) == len(spike_times), \
+            f"Expected {len(spike_times)} groups, got {len(filtered_indices)}"
+
+    def test_empty_groups_get_empty_arrays(self):
+        """Sort groups that lose all spikes should get empty arrays, not be omitted."""
+        # Create a scenario where tetrode 1 has only coincident spikes.
+        # All 4 tetrodes fire within 40μs at t≈1.0 — all spikes in that cluster
+        # should be removed, including the first one in sorted order.
+        spike_times = [
+            np.array([1.00000, 3.0, 4.0]),
+            np.array([1.00001]),                 # Only coincident — should become empty
+            np.array([1.00002, 5.0, 6.0]),
+            np.array([1.00003, 7.0, 8.0]),
+        ]
+        filtered_times, filtered_indices = detect_coincident_spikes(spike_times)
+
+        # All 4 groups must be present
+        assert len(filtered_times) == 4
+        assert len(filtered_indices) == 4
+
+        # Tetrode 1 should have an empty array (its only spike was coincident)
+        assert len(filtered_times[1]) == 0
+        assert len(filtered_indices[1]) == 0
+        assert filtered_times[1].dtype == np.float64
+        assert filtered_indices[1].dtype == np.int_
+
+        # The coincident spike at t=1.00000 from tetrode 0 should also be removed
+        assert 1.00000 not in filtered_times[0], \
+            "First spike in artifact cluster should also be removed"
+        # But non-coincident spikes on tetrode 0 should survive
+        assert 3.0 in filtered_times[0]
+        assert 4.0 in filtered_times[0]
+
+    def test_waveform_feature_alignment_after_filtering(self):
+        """Simulate get_hpc_marks: filtered_time_bin_ind must correctly index features."""
+        # 4 tetrodes, with tetrode 1 losing all spikes to coincidence
+        spike_times = [
+            np.array([1.0, 2.0, 5.0]),
+            np.array([1.00001, 5.00001]),        # Only coincident spikes
+            np.array([1.00002, 3.0, 5.00002]),
+            np.array([6.0, 7.0, 8.0]),
+        ]
+        # Simulate waveform features with distinct values per tetrode
+        waveform_features = [
+            np.arange(len(st) * 4).reshape(-1, 4).astype(float) + i * 100
+            for i, st in enumerate(spike_times)
+        ]
+
+        filtered_times, filtered_indices = detect_coincident_spikes(spike_times)
+
+        # Apply indices to features (same logic as get_hpc_marks)
+        filtered_features = [
+            features[ind]
+            for ind, features in zip(filtered_indices, waveform_features, strict=True)
+        ]
+
+        # Verify alignment: each filtered feature set matches its spike times
+        for i in range(len(spike_times)):
+            assert len(filtered_features[i]) == len(filtered_times[i]), \
+                f"Tetrode {i}: {len(filtered_features[i])} features vs {len(filtered_times[i])} spikes"
+
+        # Verify tetrode 3's features come from tetrode 3 (not shifted from tetrode 2)
+        # Tetrode 3 had no coincident spikes, so all should be preserved
+        assert len(filtered_features[3]) == 3
+        assert filtered_features[3][0, 0] >= 300  # From tetrode 3's offset
+
+    def test_first_spike_in_artifact_cluster_also_removed(self):
+        """The first spike in a coincident cluster must be removed, not just followers.
+
+        Regression test: np.diff only looks backward, so the first spike in a
+        cluster gets label=0 and was previously exempt from removal.
+        """
+        # 4 tetrodes all fire within 30μs — clear artifact
+        spike_times = [
+            np.array([1.00000, 5.0]),  # t=1.0 is first in sorted order
+            np.array([1.00001, 6.0]),
+            np.array([1.00002, 7.0]),
+            np.array([1.00003, 8.0]),
+        ]
+        filtered_times, _ = detect_coincident_spikes(spike_times)
+
+        # ALL 4 artifact spikes around t=1.0 should be removed
+        all_filtered = np.concatenate(filtered_times)
+        artifact_survivors = all_filtered[(all_filtered >= 0.999) & (all_filtered <= 1.001)]
+        assert len(artifact_survivors) == 0, \
+            f"All artifact spikes should be removed, but {len(artifact_survivors)} survived: {artifact_survivors}"
+
+        # Non-coincident spikes should be preserved
+        assert np.any(np.abs(all_filtered - 5.0) < 0.01)
+        assert np.any(np.abs(all_filtered - 6.0) < 0.01)
+        assert np.any(np.abs(all_filtered - 7.0) < 0.01)
+        assert np.any(np.abs(all_filtered - 8.0) < 0.01)
+
     def test_preserves_spike_order(self):
         """Filtered spikes should remain in temporal order."""
         spike_times = [
