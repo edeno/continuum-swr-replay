@@ -263,7 +263,12 @@ def _make_conv_spline_basis(
     knots = np.arange(
         lags[0] / sampling_frequency, lags[-1] / sampling_frequency, 0.100
     )[1:]
+    if not times:
+        raise ValueError("times dict must be non-empty")
+
     conv_spline_basis: dict[str, NDArray] = {}
+    spline_basis: NDArray | None = None
+    lag_time: NDArray | None = None
     for times_name, times_df in times.items():
         is_time = get_spikecount_per_time_bin(
             times_df.start_time, position_info.index.to_numpy()
