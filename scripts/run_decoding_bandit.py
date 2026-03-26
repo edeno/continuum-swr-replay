@@ -299,6 +299,7 @@ def results_exist(
     required_files = [
         save_folder / f"{epoch_identifier}_results.nc",
         save_folder / f"{epoch_identifier}_detector.pkl",
+        save_folder / f"{epoch_identifier}_environment.pkl",
     ]
     return all(f.exists() for f in required_files)
 
