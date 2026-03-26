@@ -94,8 +94,10 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
         Time points with negligible non-local probability are forward-filled
         from the nearest valid time point.
     """
-    acausal_posterior = results.acausal_posterior.sel(state="Non-Local Continuous")
-    acausal_posterior += results.acausal_posterior.sel(state="Non-Local Fragmented")
+    acausal_posterior = (
+        results.acausal_posterior.sel(state="Non-Local Continuous")
+        + results.acausal_posterior.sel(state="Non-Local Fragmented")
+    )
 
     non_local_prob = acausal_posterior.sum("position")
 
@@ -214,9 +216,8 @@ def get_map_speed(
             )
             / dt,
         )
-        speed = np.insert(
+        speed = np.append(
             speed,
-            -1,
             nx.shortest_path_length(
                 track_graph_with_bin_centers_edges,
                 source=node_ids[-2],

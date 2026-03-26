@@ -127,6 +127,32 @@ class TestConditionalNonLocalPosterior:
         assert conditional_posterior.sum("position").values == pytest.approx(1.0, rel=1e-10)
 
 
+    def test_idempotent_does_not_mutate_results(self):
+        """Calling twice on the same results should return identical output."""
+        time = np.arange(0, 0.1, 0.002)
+        position = np.arange(0, 50, 5)
+
+        continuous_posterior = np.random.rand(len(time), len(position))
+        fragmented_posterior = np.random.rand(len(time), len(position))
+
+        acausal_posterior = xr.DataArray(
+            np.stack([continuous_posterior, fragmented_posterior]),
+            coords={
+                "state": ["Non-Local Continuous", "Non-Local Fragmented"],
+                "time": time,
+                "position": position,
+            },
+            dims=["state", "time", "position"],
+        )
+
+        results = xr.Dataset({"acausal_posterior": acausal_posterior})
+
+        first_call = get_conditional_non_local_posterior(results)
+        second_call = get_conditional_non_local_posterior(results)
+
+        xr.testing.assert_identical(first_call, second_call)
+
+
 class TestMapSpeed:
     """Test speed computation from decoded positions."""
 
@@ -366,6 +392,36 @@ class TestMapSpeed:
         assert speed[0] == pytest.approx(expected_edge_speed, rel=0.05)
         assert speed[1] == pytest.approx(expected_middle_speed, rel=0.05)
         assert speed[2] == pytest.approx(expected_edge_speed, rel=0.05)
+
+    def test_nonuniform_edges_last_speed_correct(self):
+        """With non-uniform edges, last timepoint should use backward difference."""
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+        graph.add_edge(1, 2, distance=10.0)
+        graph.add_edge(2, 3, distance=40.0)
+
+        # Move 0 → 1 → 2 → 3
+        posterior = np.eye(4)
+        place_bin_center_ind_to_node = np.arange(4)
+
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        # Last timepoint: backward difference = dist(2,3)/dt = 40/0.002 = 20000
+        expected_last = 40.0 / dt
+        # Second-to-last: central difference = dist(1,3)/(2*dt) = 50/0.004 = 12500
+        expected_second_last = 50.0 / (2 * dt)
+
+        assert speed[2] == pytest.approx(expected_second_last, rel=0.05)
+        assert speed[3] == pytest.approx(expected_last, rel=0.05)
 
     def test_xarray_input(self):
         """Function should accept xarray DataArray as input."""
