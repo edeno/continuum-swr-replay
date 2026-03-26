@@ -118,7 +118,7 @@ class SessionData(TypedDict, total=False):
     # Multi-unit activity
     hse_times: dict[str, pd.DataFrame]
     multiunit_firing_rate: dict[str, pd.DataFrame]
-    multiunit_rate_zscore: dict[str, pd.Series]
+    multiunit_rate_zscore: dict[str, pd.DataFrame]
 
     # Task events from DIO
     beam_breaks: pd.DataFrame
