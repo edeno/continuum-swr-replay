@@ -459,9 +459,17 @@ def process_neuron(
     - ``non_local_SWR + non_local_no_SWR``: both replay types with
       separate regressors
 
-    Likelihood ratio tests compare nested model pairs within and across
-    decompositions. AIC model selection is performed separately for each
-    decomposition (only comparable models compete).
+    Likelihood ratio tests compare nested model pairs:
+
+    - vs ``constant``: does each event type modulate firing?
+    - Within SWR-controlled: does non-SWR replay add beyond SWR
+      (``SWR + non_local_no_SWR vs. SWR``) and vice versa? Does the
+      SWR-controlled split improve on unified replay (``vs. non_local``)?
+    - Within replay-split: does each replay type add beyond the other?
+      Does splitting improve on unified replay (``vs. non_local``)?
+
+    AIC model selection is performed separately for each decomposition
+    (only comparable models compete).
 
     Parameters
     ----------
@@ -538,16 +546,21 @@ def process_neuron(
         # SWR-controlled decomposition: does replay add to SWR response?
         # Replay-split decomposition: do SWR-replay and non-SWR-replay differ?
         test_cases = [
+            # Individual event types vs baseline
             ("SWR", "constant"),
+            ("non_local", "constant"),
             ("non_local_no_SWR", "constant"),
             ("non_local_SWR", "constant"),
+            # SWR-controlled: does separating SWR and replay help?
+            ("SWR + non_local_no_SWR", "constant"),
             ("SWR + non_local_no_SWR", "SWR"),
             ("SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("SWR + non_local_no_SWR", "constant"),
-            ("non_local", "constant"),
+            ("SWR + non_local_no_SWR", "non_local"),
+            # Replay-split: does splitting replay by SWR status help?
+            ("non_local_SWR + non_local_no_SWR", "constant"),
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("non_local_SWR + non_local_no_SWR", "constant"),
+            ("non_local_SWR + non_local_no_SWR", "non_local"),
         ]
 
         for model1, model2 in test_cases:
@@ -560,8 +573,10 @@ def process_neuron(
         deviance_cases = [
             ("SWR + non_local_no_SWR", "SWR"),
             ("SWR + non_local_no_SWR", "non_local_no_SWR"),
+            ("SWR + non_local_no_SWR", "non_local"),
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
+            ("non_local_SWR + non_local_no_SWR", "non_local"),
         ]
         for model1, model2 in deviance_cases:
             test_name = f"{model1} vs. {model2}"
