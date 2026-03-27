@@ -361,20 +361,15 @@ def main() -> None:
     Path(args.log_directory).mkdir(exist_ok=True, parents=True)
     PROCESSED_DATA_DIR.mkdir(exist_ok=True, parents=True)
 
-    cluster = LocalCluster(
-        local_directory=args.local_scratch_dir,
-        n_workers=args.n_workers,
-    )
+    epoch_info = get_epoch_info()
+    epoch_info = _filter_epoch_info(epoch_info, args)
+    epoch_info = _filter_to_sorted_sessions(epoch_info)
 
-    with Client(cluster):
-        epoch_info = get_epoch_info()
-        epoch_info = _filter_epoch_info(epoch_info, args)
-        epoch_info = _filter_to_sorted_sessions(epoch_info)
+    print(f"Processing {len(epoch_info)} sessions for {args.brain_area}...")
 
-        print(f"Processing {len(epoch_info)} sessions for {args.brain_area}...")
-
-        results = [
-            dask.delayed(run_analysis)(
+    if args.n_workers <= 1 or len(epoch_info) <= 1:
+        for epoch in epoch_info.itertuples():
+            run_analysis(
                 nwb_file_name=epoch.Index[0],
                 epoch_name=epoch.Index[1],
                 brain_area=args.brain_area,
@@ -383,10 +378,27 @@ def main() -> None:
                 log_directory=args.log_directory,
                 overwrite=args.overwrite,
             )
-            for epoch in epoch_info.itertuples()
-        ]
+    else:
+        cluster = LocalCluster(
+            local_directory=args.local_scratch_dir,
+            n_workers=args.n_workers,
+        )
 
-        dask.compute(*results)
+        with Client(cluster):
+            results = [
+                dask.delayed(run_analysis)(
+                    nwb_file_name=epoch.Index[0],
+                    epoch_name=epoch.Index[1],
+                    brain_area=args.brain_area,
+                    sampling_frequency=SAMPLING_FREQUENCY,
+                    immobility_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
+                    log_directory=args.log_directory,
+                    overwrite=args.overwrite,
+                )
+                for epoch in epoch_info.itertuples()
+            ]
+
+            dask.compute(*results)
 
 
 if __name__ == "__main__":
