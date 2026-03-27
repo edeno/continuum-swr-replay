@@ -466,12 +466,18 @@ def process_neuron(
         )
 
         ## Likelihood ratio tests
+        # SWR-controlled decomposition: does replay add to SWR response?
+        # Replay-split decomposition: do SWR-replay and non-SWR-replay differ?
         test_cases = [
             ("SWR", "constant"),
             ("non_local_no_SWR", "constant"),
+            ("non_local_SWR", "constant"),
             ("SWR + non_local_no_SWR", "SWR"),
             ("SWR + non_local_no_SWR", "constant"),
             ("non_local", "constant"),
+            ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
+            ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
+            ("non_local_SWR + non_local_no_SWR", "constant"),
         ]
 
         for model1, model2 in test_cases:
@@ -481,10 +487,12 @@ def process_neuron(
             )
 
         ## Fractional deviance
-        test_cases = [
+        deviance_cases = [
             ("SWR + non_local_no_SWR", "SWR"),
+            ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
+            ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
         ]
-        for model1, model2 in test_cases:
+        for model1, model2 in deviance_cases:
             test_name = f"{model1} vs. {model2}"
             neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
                 results[model1], results[model2], results["constant"]
@@ -505,6 +513,9 @@ def process_neuron(
                 "SWR",
                 "SWR + non_local_no_SWR",
                 "non_local",
+                "non_local_SWR",
+                "non_local_no_SWR",
+                "non_local_SWR + non_local_no_SWR",
             ]
         }
         neuron_stats["min_aic_model"] = min(aics, key=lambda k: aics[k])
