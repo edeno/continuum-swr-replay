@@ -503,22 +503,32 @@ def process_neuron(
                 )
             )
 
-        ## AIC
-        aics = {
-            model_name: result.aic
-            for model_name, result in results.items()
-            if model_name
-            in [
+        ## AIC — SWR-controlled: what best explains immobility firing?
+        swr_controlled_aics = {
+            model_name: results[model_name].aic
+            for model_name in [
                 "constant",
                 "SWR",
-                "SWR + non_local_no_SWR",
                 "non_local",
-                "non_local_SWR",
-                "non_local_no_SWR",
+                "SWR + non_local_no_SWR",
+            ]
+        }
+        neuron_stats["min_aic_model"] = min(
+            swr_controlled_aics, key=swr_controlled_aics.get
+        )
+
+        ## AIC — Replay-split: is replay one process or two?
+        replay_split_aics = {
+            model_name: results[model_name].aic
+            for model_name in [
+                "constant",
+                "non_local",
                 "non_local_SWR + non_local_no_SWR",
             ]
         }
-        neuron_stats["min_aic_model"] = min(aics, key=lambda k: aics[k])
+        neuron_stats["min_aic_model_replay_split"] = min(
+            replay_split_aics, key=replay_split_aics.get
+        )
 
         ## Modulation
         # Non-overlapping events controlling for SWR
