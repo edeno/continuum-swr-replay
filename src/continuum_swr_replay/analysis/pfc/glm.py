@@ -436,6 +436,75 @@ def process_neuron(
     spline_basis: NDArray,
     lag_time: NDArray,
 ) -> tuple[dict[str, Any], NDArray, NDArray]:
+    """Fit GLM models for a single neuron and compute modulation statistics.
+
+    Fits 7 Poisson GLM models during immobility to test how the neuron's
+    firing rate relates to SWR and non-local (replay) events. Models are
+    organized into two decomposition strategies:
+
+    **SWR-controlled decomposition** — separates the generic ripple response
+    from replay-specific modulation:
+
+    - ``constant``: intercept only (baseline)
+    - ``SWR``: all detected ripples
+    - ``non_local``: all replay events regardless of SWR overlap
+    - ``SWR + non_local_no_SWR``: ripples + non-SWR replay (key model;
+      isolates replay-specific effects after controlling for SWR)
+
+    **Replay-split decomposition** — tests whether SWR-coincident and
+    non-SWR replay drive different responses:
+
+    - ``non_local_SWR``: replay events that co-occur with a ripple
+    - ``non_local_no_SWR``: replay events without a ripple
+    - ``non_local_SWR + non_local_no_SWR``: both replay types with
+      separate regressors
+
+    Likelihood ratio tests compare nested model pairs within and across
+    decompositions. AIC model selection is performed separately for each
+    decomposition (only comparable models compete).
+
+    Parameters
+    ----------
+    neuron_spike_times : NDArray
+        Spike times in seconds.
+    is_immobile : pd.Series
+        Boolean series indicating immobility at each time bin.
+    theta_phase : pd.Series
+        Theta phase timeseries (radians).
+    time : NDArray
+        Time bin centers in seconds (from position_info index).
+    immobility_design_matrices : dict[str, NDArray]
+        Pre-computed design matrices keyed by model name.
+    spline_basis : NDArray
+        Spline basis functions for reconstructing peri-event modulation.
+        Shape (n_lag_times, n_basis_functions).
+    lag_time : NDArray
+        Lag times in seconds corresponding to spline_basis rows.
+
+    Returns
+    -------
+    neuron_stats : dict[str, Any]
+        Per-neuron statistics including:
+
+        - ``run_avg_firing_rate``, ``immobility_avg_firing_rate``: Hz
+        - ``theta_mod``, ``theta_preferred_phase``: theta modulation during running
+        - ``{model} vs. {baseline}: lr, pval``: likelihood ratio tests
+        - ``{model} vs. {baseline}: frac_null_dev, frac_explained_dev``:
+          fractional deviance measures
+        - ``min_aic_model``: best SWR-controlled model by AIC
+        - ``min_aic_model_replay_split``: best replay-split model by AIC
+        - ``SWR_max_mod``, ``non_local_no_SWR_max_mod``: peak modulation amplitudes
+        - ``SWR_max_mod_time``, ``non_local_no_SWR_max_mod_time``: peak lag times (s)
+
+        Empty dict with only firing rates if GLM fitting fails.
+
+    SWR_modulation : NDArray
+        Spline-reconstructed SWR peri-event modulation. Shape (n_lag_times,).
+        NaN if fitting failed.
+    no_SWR_modulation : NDArray
+        Spline-reconstructed non-SWR replay peri-event modulation.
+        Shape (n_lag_times,). NaN if fitting failed.
+    """
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
     sampling_frequency = 1 / np.median(np.diff(time))
 
