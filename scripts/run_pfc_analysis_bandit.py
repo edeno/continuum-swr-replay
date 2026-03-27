@@ -148,6 +148,8 @@ def results_exist(
         save_base.with_suffix(".pkl"),
         save_base.with_suffix(".SWR_modulation.npy"),
         save_base.with_suffix(".no_SWR_modulation.npy"),
+        save_base.with_suffix(".non_local_SWR_modulation.npy"),
+        save_base.with_suffix(".non_local_no_SWR_modulation.npy"),
     ]
     return all(f.exists() for f in required_files)
 
@@ -209,7 +211,13 @@ def run_analysis(
 
     try:
         logger.info(f"Processing {epoch_identifier}...")
-        neuron_stats, SWR_modulation, no_SWR_modulation = run_session(
+        (
+            neuron_stats,
+            SWR_modulation,
+            no_SWR_modulation,
+            non_local_SWR_modulation,
+            non_local_no_SWR_modulation,
+        ) = run_session(
             nwb_file_name,
             epoch_name,
             brain_area=brain_area,
@@ -228,6 +236,14 @@ def run_analysis(
         np.save(
             save_file.with_suffix(".no_SWR_modulation.npy"),
             no_SWR_modulation,
+        )
+        np.save(
+            save_file.with_suffix(".non_local_SWR_modulation.npy"),
+            non_local_SWR_modulation,
+        )
+        np.save(
+            save_file.with_suffix(".non_local_no_SWR_modulation.npy"),
+            non_local_no_SWR_modulation,
         )
 
         logger.info(f"Saved results to {save_file}")

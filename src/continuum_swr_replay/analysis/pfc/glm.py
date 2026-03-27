@@ -459,17 +459,38 @@ def process_neuron(
     - ``non_local_SWR + non_local_no_SWR``: both replay types with
       separate regressors
 
-    Likelihood ratio tests compare nested model pairs:
+    The analysis addresses a sequence of scientific questions:
 
-    - vs ``constant``: does each event type modulate firing?
-    - Within SWR-controlled: does non-SWR replay add beyond SWR
-      (``SWR + non_local_no_SWR vs. SWR``) and vice versa? Does the
-      SWR-controlled split improve on unified replay (``vs. non_local``)?
-    - Within replay-split: does each replay type add beyond the other?
-      Does splitting improve on unified replay (``vs. non_local``)?
+    **Q1. Do PFC neurons respond to hippocampal events during immobility?**
+    ``SWR vs constant``, ``non_local vs constant``
 
-    AIC model selection is performed separately for each decomposition
-    (only comparable models compete).
+    **Q2. Are non-local events and SWRs redundant or independent?**
+    ``SWR + non_local_no_SWR vs SWR`` (replay adds beyond ripples),
+    ``SWR + non_local_no_SWR vs non_local_no_SWR`` (ripples add beyond
+    replay). AIC: ``min_aic_model``.
+
+    **Q3. Do PFC neurons respond to non-local events lacking a detected SWR?**
+    ``non_local_no_SWR vs constant``. Modulation: ``no_SWR_modulation``.
+
+    **Q4. Is the non-SWR replay response robust to sub-threshold ripple
+    confounds?**
+    Compare ``no_SWR_modulation`` (controlling for all SWRs) vs
+    ``non_local_no_SWR_modulation`` (controlling for replay-coincident
+    SWRs only). ``non_local_SWR + non_local_no_SWR vs non_local_SWR``.
+
+    **Q5. Do SWR-coincident and non-SWR replay drive different responses?**
+    ``non_local_SWR + non_local_no_SWR vs non_local`` (does splitting
+    improve fit?). AIC: ``min_aic_model_replay_split``. Compare
+    ``non_local_SWR_modulation`` vs ``non_local_no_SWR_modulation`` shapes.
+
+    **Q6. What is the relationship to theta modulation during running?**
+    ``theta_mod``, ``theta_preferred_phase``, firing rates.
+
+    Every likelihood ratio test has a paired effect size (``frac_null_dev``,
+    ``frac_explained_dev``). AIC model selection is performed separately
+    for each decomposition (only comparable models compete). Multiple
+    comparison correction (e.g., FDR per test type across neurons) and
+    population-level analyses are deferred to downstream figure code.
 
     Parameters
     ----------
@@ -580,16 +601,12 @@ def process_neuron(
                 _lr_test(results[model1], results[model2])
             )
 
-        ## Fractional deviance
-        deviance_cases = [
-            ("SWR + non_local_no_SWR", "SWR"),
-            ("SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("SWR + non_local_no_SWR", "non_local"),
-            ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
-            ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("non_local_SWR + non_local_no_SWR", "non_local"),
-        ]
-        for model1, model2 in deviance_cases:
+        ## Effect sizes: fractional deviance for every LR test
+        # frac_null_dev: (reduced - full) / constant deviance
+        #   = fraction of total deviance uniquely explained by added regressors
+        # frac_explained_dev: (reduced - full) / (constant - full)
+        #   = fraction of full model's explained deviance due to added regressors
+        for model1, model2 in test_cases:
             test_name = f"{model1} vs. {model2}"
             neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
                 results[model1], results[model2], results["constant"]
