@@ -190,14 +190,49 @@ def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
 
 
 def test_theta_modulation(
-    theta_phase: pd.Series, is_immobile: pd.Series, neuron_spike_count: NDArray
+    theta_phase: pd.Series,
+    is_immobile: pd.Series,
+    neuron_spike_count: NDArray,
+    sampling_frequency: float = 500.0,
 ) -> tuple[float, float, float, float]:
+    """Test theta phase modulation of neuron firing during running.
+
+    Uses an unregularized GLM for the likelihood ratio test (correct for
+    hypothesis testing), then a ridge-regularized fit (alpha=1e-20, L1_wt=0)
+    for extracting modulation amplitude and preferred phase to avoid
+    overfitting.
+
+    Parameters
+    ----------
+    theta_phase : pd.Series
+        Theta phase timeseries (radians).
+    is_immobile : pd.Series
+        Boolean series indicating immobility at each time bin.
+    neuron_spike_count : NDArray
+        Binned spike counts aligned to is_immobile.index.
+    sampling_frequency : float
+        Sampling frequency in Hz, used to set reindex tolerance.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        likelihood_ratio : Likelihood ratio statistic (theta vs constant).
+        p_val : P-value from chi-square test.
+        modulation : Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
+        preferred_phase : Preferred theta phase in radians.
+    """
     is_running = ~is_immobile
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
     design_matrix = dmatrix(
         formula,
-        {"theta_phase": reindex_by(theta_phase, is_immobile.index)},
+        {
+            "theta_phase": reindex_by(
+                theta_phase,
+                is_immobile.index,
+                tolerance=1.0 / sampling_frequency,
+            )
+        },
         return_type="dataframe",
     )
 
@@ -261,8 +296,9 @@ def _make_conv_spline_basis(
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
     if lags is None:
         lags = np.arange(-100, 101, 1)
+    # 50ms knot spacing resolves sharp peri-SWR responses (~50ms peaks)
     knots = np.arange(
-        lags[0] / sampling_frequency, lags[-1] / sampling_frequency, 0.100
+        lags[0] / sampling_frequency, lags[-1] / sampling_frequency, 0.050
     )[1:]
     if not times:
         raise ValueError("times dict must be non-empty")
@@ -400,9 +436,10 @@ def process_neuron(
     spline_basis: NDArray,
     lag_time: NDArray,
 ) -> tuple[dict[str, Any], NDArray, NDArray]:
+    neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
+    sampling_frequency = 1 / np.median(np.diff(time))
+
     try:
-        neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
-        sampling_frequency = 1 / np.median(np.diff(time))
         neuron_stats: dict[str, Any] = {}
 
         # Get run theta statistics
@@ -411,7 +448,10 @@ def process_neuron(
             neuron_stats["theta vs. constant: pval"],
             neuron_stats["theta_mod"],
             neuron_stats["theta_preferred_phase"],
-        ) = test_theta_modulation(theta_phase, is_immobile, neuron_spike_count)
+        ) = test_theta_modulation(
+            theta_phase, is_immobile, neuron_spike_count,
+            sampling_frequency=sampling_frequency,
+        )
         neuron_stats["run_avg_firing_rate"] = (
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
         )
@@ -440,7 +480,7 @@ def process_neuron(
                 _lr_test(results[model1], results[model2])
             )
 
-        ## Fractional null deviance
+        ## Fractional deviance
         test_cases = [
             ("SWR + non_local_no_SWR", "SWR"),
         ]
@@ -448,6 +488,11 @@ def process_neuron(
             test_name = f"{model1} vs. {model2}"
             neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
                 results[model1], results[model2], results["constant"]
+            )
+            neuron_stats[f"{test_name}: frac_explained_dev"] = (
+                get_frac_explained_deviance(
+                    results[model1], results[model2], results["constant"]
+                )
             )
 
         ## AIC
@@ -480,7 +525,12 @@ def process_neuron(
         no_SWR_max_mod_ind = np.argmax(np.abs(no_SWR_modulation))
         neuron_stats["non_local_no_SWR_max_mod"] = no_SWR_modulation[no_SWR_max_mod_ind]
         neuron_stats["non_local_no_SWR_max_mod_time"] = lag_time[no_SWR_max_mod_ind]
-    except ValueError:
+    except (ValueError, np.linalg.LinAlgError):
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "GLM fitting failed for neuron; falling back to firing rates only",
+            exc_info=True,
+        )
         neuron_stats = {}
         neuron_stats["run_avg_firing_rate"] = (
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
@@ -503,12 +553,47 @@ def run_session(
     non_local_threshold: float = 0.8,
     run_parallel: bool = True,
 ) -> tuple[pd.DataFrame, NDArray, NDArray]:
+    """Run PFC GLM analysis for all neurons in a single session.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name (e.g., "wilbur20210329_.nwb").
+    epoch_name : str
+        Epoch name (e.g., "02_r1").
+    brain_area : str
+        Brain area to analyze ("mPFC" or "OFC").
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    immobility_threshold : float
+        Speed threshold for immobility classification (cm/s).
+    non_local_threshold : float
+        Probability threshold for classifying non-local events.
+    run_parallel : bool
+        Whether to use Dask for parallel neuron processing.
+
+    Returns
+    -------
+    neuron_stats : pd.DataFrame
+        Per-neuron statistics. Shape (n_neurons, n_stats). Includes GLM
+        comparison results, theta modulation, firing rates, and AIC model
+        selection.
+    SWR_modulation : NDArray
+        SWR modulation time courses. Shape (n_lag_times, n_neurons).
+        Each column is the spline-reconstructed peri-event modulation
+        for one neuron. NaN columns indicate failed GLM fits.
+    no_SWR_modulation : NDArray
+        Non-local (no SWR) modulation time courses.
+        Shape (n_lag_times, n_neurons). Same layout as SWR_modulation.
+    """
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     )
 
     logger.info("Loading HPC decoding results...")
-    results, _, _ = load_results(nwb_file_name, epoch_name, decoding_brain_area="HPC")
+    results, _, _ = load_results(
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False,
+    )
 
     logger.info("Loading session data...")
     data = load_data(nwb_file_name, epoch_name, parallel=False)
@@ -556,6 +641,10 @@ def run_session(
         sampling_frequency=sampling_frequency,
         lags=np.arange(-100, 101, 1),
     )
+
+    if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
+        logger.warning("No %s neurons found for this session", brain_area)
+        return pd.DataFrame(), np.empty((0, 0)), np.empty((0, 0))
 
     n_neurons = len(data["spike_times"][brain_area])
     logger.info(

@@ -54,7 +54,11 @@ from continuum_swr_replay.parameters import (
     SAMPLING_FREQUENCY,
 )
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", message=".*Skipped checksum.*")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="datajoint")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="hdmf")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 
 
 class SkipChecksumFilter(logging.Filter):
@@ -297,8 +301,10 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFram
         is_epoch = np.logical_and(epoch_info.date == args.date, is_epoch)
 
     if args.epoch is not None:
-        epoch = int(args.epoch.split("_")[0])
-        is_epoch = np.logical_and(epoch_info.epoch == epoch, is_epoch)
+        is_epoch = np.logical_and(
+            epoch_info.index.get_level_values("interval_list_name") == args.epoch,
+            is_epoch,
+        )
 
     epoch_info = epoch_info.loc[is_epoch, :]
 
