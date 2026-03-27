@@ -1,3 +1,4 @@
+import logging
 import warnings
 from typing import Any
 
@@ -502,9 +503,17 @@ def run_session(
     non_local_threshold: float = 0.8,
     run_parallel: bool = True,
 ) -> tuple[pd.DataFrame, NDArray, NDArray]:
-    results, _, _ = load_results(nwb_file_name, epoch_name, decoding_brain_area="HPC")
-    data = load_data(nwb_file_name, epoch_name)
+    logger = logging.getLogger(
+        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    )
 
+    logger.info("Loading HPC decoding results...")
+    results, _, _ = load_results(nwb_file_name, epoch_name, decoding_brain_area="HPC")
+
+    logger.info("Loading session data...")
+    data = load_data(nwb_file_name, epoch_name, parallel=False)
+
+    logger.info("Identifying non-local events...")
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
@@ -522,6 +531,13 @@ def run_session(
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
         non_local_times, data["ripple_times"], results
     )
+    logger.info(
+        "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",
+        len(non_local_times),
+        len(non_local_SWR_times),
+        len(non_local_no_SWR_times),
+        len(data["ripple_times"]),
+    )
 
     event_times = {
         "non_local_no_SWR": non_local_no_SWR_times,
@@ -533,11 +549,20 @@ def run_session(
     time = data["position_info"].index.to_numpy()
     is_immobile = data["position_info"].head_speed <= immobility_threshold
 
+    logger.info("Building design matrices...")
     immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
         event_times,
         data["position_info"],
         sampling_frequency=sampling_frequency,
         lags=np.arange(-100, 101, 1),
+    )
+
+    n_neurons = len(data["spike_times"][brain_area])
+    logger.info(
+        "Fitting GLMs for %d %s neurons (parallel=%s)...",
+        n_neurons,
+        brain_area,
+        run_parallel,
     )
 
     if run_parallel:
@@ -556,18 +581,20 @@ def run_session(
 
         result = dask.compute(*tasks)
     else:
-        result = [
-            process_neuron(
-                neuron_spike_times,
-                is_immobile,
-                data["theta_phase"],
-                time,
-                immobility_design_matrices,
-                spline_basis,
-                lag_time,
+        result = []
+        for i, neuron_spike_times in enumerate(data["spike_times"][brain_area]):
+            logger.info("  Neuron %d/%d...", i + 1, n_neurons)
+            result.append(
+                process_neuron(
+                    neuron_spike_times,
+                    is_immobile,
+                    data["theta_phase"],
+                    time,
+                    immobility_design_matrices,
+                    spline_basis,
+                    lag_time,
+                )
             )
-            for neuron_spike_times in data["spike_times"][brain_area]
-        ]
 
     neuron_stats_list, SWR_modulation_list, no_SWR_modulation_list = zip(
         *result, strict=True
@@ -579,5 +606,7 @@ def run_session(
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
     neuron_stats["brain_area"] = brain_area
+
+    logger.info("Session complete: %d neurons analyzed", len(neuron_stats))
 
     return neuron_stats, SWR_modulation, no_SWR_modulation

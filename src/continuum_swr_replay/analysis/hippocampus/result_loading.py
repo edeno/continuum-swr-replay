@@ -65,7 +65,8 @@ def load_results(
     epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
 
     results = xr.open_dataset(
-        PROCESSED_DATA_DIR / f"{epoch_identifier}_{decoding_brain_area}_results.nc"
+        PROCESSED_DATA_DIR / f"{epoch_identifier}_{decoding_brain_area}_results.nc",
+        engine="h5netcdf",
     )
     state_bin_coord_names = list(results["state_bins"].coords)
     results = results.set_index(state_bins=state_bin_coord_names)
