@@ -473,6 +473,7 @@ def process_neuron(
             ("non_local_no_SWR", "constant"),
             ("non_local_SWR", "constant"),
             ("SWR + non_local_no_SWR", "SWR"),
+            ("SWR + non_local_no_SWR", "non_local_no_SWR"),
             ("SWR + non_local_no_SWR", "constant"),
             ("non_local", "constant"),
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
@@ -489,6 +490,7 @@ def process_neuron(
         ## Fractional deviance
         deviance_cases = [
             ("SWR + non_local_no_SWR", "SWR"),
+            ("SWR + non_local_no_SWR", "non_local_no_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
         ]
