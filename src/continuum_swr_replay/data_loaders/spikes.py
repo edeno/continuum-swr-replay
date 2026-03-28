@@ -161,7 +161,6 @@ def detect_coincident_spikes(
 
     # Preserve all original sort group indices so the output aligns 1:1 with the input.
     # Sort groups that lost all spikes get empty arrays.
-    n_sort_groups = len(spike_times)
     filtered_spike_times = [
         grouped_spike_times[i] if i in grouped_spike_times.index else np.array([], dtype=np.float64)
         for i in range(n_sort_groups)
