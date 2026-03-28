@@ -356,11 +356,15 @@ def turn_direction(
     trial_segment_ids = position_info.loc[
         trial.start_time : trial.end_time
     ].track_segment_id.unique()  # pandas unique is not sorted
+    # Require at least 100 ms of occupancy per segment to filter transient noise.
+    # At 500 Hz this is 50 samples.
+    sampling_frequency = 1.0 / np.median(np.diff(position_info.index.to_numpy()))
+    min_segment_samples = int(0.1 * sampling_frequency)
     is_bad = (
         position_info.loc[trial.start_time : trial.end_time]
         .groupby("track_segment_id")
         .size()
-        < 50
+        < min_segment_samples
     )
     trial_segment_ids = trial_segment_ids[
         ~np.isin(trial_segment_ids, is_bad.index[is_bad])
