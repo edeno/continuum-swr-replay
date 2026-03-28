@@ -162,6 +162,19 @@ def get_data_over_time(
     posterior : xr.DataArray
         Conditional non-local posterior distribution
     """
+    # Validate required data keys
+    required_keys = [
+        "position_info", "ripple_times", "hse_times",
+        "theta_phase", "theta_power",
+        "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+    ]
+    missing_keys = [k for k in required_keys if k not in data]
+    if missing_keys:
+        raise KeyError(
+            f"Missing required data keys: {missing_keys}. "
+            f"Ensure load_data() was called with DataLoadingPreset.DECODING or equivalent."
+        )
+
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
