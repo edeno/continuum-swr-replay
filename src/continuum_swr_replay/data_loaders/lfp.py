@@ -62,6 +62,7 @@ from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
 from spyglass.lfp.lfp_merge import LFPOutput
 from spyglass.ripple.v1 import RippleTimesV1
 
+from ..parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 from ..types import MultiunitData, RippleData, ThetaData
 
 # Ignore warnings
@@ -94,15 +95,16 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
         "filter_sampling_rate": 1000,
         "target_interval_list_name": epoch_name + " noPrePostTrialTimes",
     }
-    theta_filtered_lfp = (LFPBandV1 & theta_lfp_key).fetch1_dataframe()
+    theta_table = LFPBandV1 & theta_lfp_key
+    theta_filtered_lfp = theta_table.fetch1_dataframe()
     # Pick the first reference electrode
     electrode_list = [
-        (LFPBandV1 & theta_lfp_key).fetch_nwb()[0]["lfp_band"].electrodes.data[0]
+        theta_table.fetch_nwb()[0]["lfp_band"].electrodes.data[0]
     ]
-    theta_phase = (LFPBandV1 & theta_lfp_key).compute_signal_phase(
+    theta_phase = theta_table.compute_signal_phase(
         electrode_list=electrode_list
     )
-    theta_power = (LFPBandV1 & theta_lfp_key).compute_signal_power(
+    theta_power = theta_table.compute_signal_power(
         electrode_list=electrode_list
     )
     return {
@@ -248,10 +250,10 @@ def get_multiunit_HSE(
         multiunit_spikes,
         speed,
         sampling_frequency,
-        speed_threshold=4.0,
+        speed_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
         minimum_duration=0.015,
         zscore_threshold=2.0,
-        close_event_threshold=0.000,
+        close_event_threshold=0.0,
         use_speed_threshold_for_zscore=False,
     )
 
