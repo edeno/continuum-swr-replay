@@ -63,8 +63,73 @@ class TestRippleLFPFiltering:
         assert ripple_data["zscored_ripple_consensus_trace"].index.min() >= 2.0
         assert ripple_data["zscored_ripple_consensus_trace"].index.max() <= 8.0
 
-        # Check that ripple_times is NOT modified (not in the filtered fields)
-        assert len(ripple_data["ripple_times"]) == 2
+        # Check that ripple_times IS filtered: [1.0, 1.5] is before position
+        # start (2.0), so only the [3.0, 3.5] event should remain
+        assert len(ripple_data["ripple_times"]) == 1
+        assert ripple_data["ripple_times"].iloc[0]["start_time"] == 3.0
+        assert ripple_data["ripple_times"].iloc[0]["end_time"] == 3.5
+
+    def test_ripple_straddling_start_boundary_is_dropped(self):
+        """A ripple starting before position time should be dropped entirely."""
+        time_index = pd.Index(np.arange(0.0, 10.0, 0.001), name="time")
+
+        ripple_data = {
+            "ripple_times": pd.DataFrame({
+                "start_time": [1.5, 3.0],
+                "end_time": [2.5, 3.5],
+            }),
+            "ripple_filtered_lfps": pd.DataFrame(
+                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+            ),
+            "ripple_lfps": pd.DataFrame(
+                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+            ),
+            "ripple_consensus_trace": pd.Series(
+                np.zeros(len(time_index)), index=time_index, name="c",
+            ),
+            "zscored_ripple_consensus_trace": pd.Series(
+                np.zeros(len(time_index)), index=time_index, name="zc",
+            ),
+        }
+
+        # Position starts at 2.0 — the [1.5, 2.5] ripple straddles the boundary
+        position_time = np.arange(2.0, 8.0, 0.01)
+        result = filter_ripple_lfp_time(ripple_data, position_time)
+
+        # Only the fully-contained [3.0, 3.5] ripple should survive
+        assert len(result["ripple_times"]) == 1
+        assert result["ripple_times"].iloc[0]["start_time"] == 3.0
+
+    def test_ripple_straddling_end_boundary_is_dropped(self):
+        """A ripple ending after position time should be dropped entirely."""
+        time_index = pd.Index(np.arange(0.0, 10.0, 0.001), name="time")
+
+        ripple_data = {
+            "ripple_times": pd.DataFrame({
+                "start_time": [3.0, 7.5],
+                "end_time": [3.5, 8.5],
+            }),
+            "ripple_filtered_lfps": pd.DataFrame(
+                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+            ),
+            "ripple_lfps": pd.DataFrame(
+                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+            ),
+            "ripple_consensus_trace": pd.Series(
+                np.zeros(len(time_index)), index=time_index, name="c",
+            ),
+            "zscored_ripple_consensus_trace": pd.Series(
+                np.zeros(len(time_index)), index=time_index, name="zc",
+            ),
+        }
+
+        # Position ends at 8.0 — the [7.5, 8.5] ripple straddles the boundary
+        position_time = np.arange(2.0, 8.0, 0.01)
+        result = filter_ripple_lfp_time(ripple_data, position_time)
+
+        # Only the fully-contained [3.0, 3.5] ripple should survive
+        assert len(result["ripple_times"]) == 1
+        assert result["ripple_times"].iloc[0]["start_time"] == 3.0
 
     def test_empty_dataframes(self):
         """Empty ripple data should not crash."""
