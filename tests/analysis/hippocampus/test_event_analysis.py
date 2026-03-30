@@ -91,7 +91,7 @@ class TestGetImmobileEvents:
             mock_event_data, event_col="event", speed_threshold=4.0, method="mean"
         )
 
-        # Event 1: mean ≈ 4.78 (fail) -> excluded
+        # Event 1: mean ≈ 4.67 (fail) -> excluded
         # Event 2: mean = 2.4 (pass) -> included
         # Event 3: mean = 5.0 (fail) -> excluded
 

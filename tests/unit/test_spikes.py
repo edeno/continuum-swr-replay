@@ -99,7 +99,7 @@ class TestCoincidentSpikeDetection:
         # All spikes well-separated, should keep most or all
         total_original = sum(len(st) for st in spike_times)
         total_filtered = sum(len(st) for st in filtered_times)
-        assert total_filtered >= total_original * 0.9
+        assert total_filtered == total_original
 
     def test_output_length_matches_input_length(self):
         """Output lists must have same length as input, even when groups lose all spikes.
@@ -238,8 +238,8 @@ class TestSpikeFiltering:
         }
         spike_features = {
             "HPC": [
-                np.random.randn(5, 4),  # 5 spikes, 4 features
-                np.random.randn(3, 4),
+                np.random.RandomState(42).randn(5, 4),  # 5 spikes, 4 features
+                np.random.RandomState(42).randn(3, 4),
             ]
         }
         position_time = np.arange(1.0, 5.0, 0.1)
@@ -268,7 +268,7 @@ class TestSpikeFiltering:
             "HPC": [np.array([0.1, 0.2, 0.3])],  # All before position starts
         }
         spike_features = {
-            "HPC": [np.random.randn(3, 4)],
+            "HPC": [np.random.RandomState(42).randn(3, 4)],
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
@@ -289,9 +289,9 @@ class TestSpikeFiltering:
         }
         spike_features = {
             "HPC": [
-                np.random.randn(2, 4),
-                np.random.randn(3, 4),
-                np.random.randn(1, 4),
+                np.random.RandomState(42).randn(2, 4),
+                np.random.RandomState(42).randn(3, 4),
+                np.random.RandomState(42).randn(1, 4),
             ],
         }
         position_time = np.arange(1.0, 5.0, 0.1)
@@ -314,8 +314,8 @@ class TestSpikeFiltering:
         }
         spike_features = {
             "HPC": [
-                np.random.randn(5, 4),
-                np.random.randn(3, 4),
+                np.random.RandomState(42).randn(5, 4),
+                np.random.RandomState(42).randn(3, 4),
             ]
         }
         position_time = np.arange(1.0, 5.0, 0.1)
@@ -342,7 +342,7 @@ class TestSpikeFiltering:
             ]
         }
         spike_features = {
-            "HPC": [np.random.randn(5, 4)],
+            "HPC": [np.random.RandomState(42).randn(5, 4)],
         }
 
         spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
@@ -366,11 +366,11 @@ class TestSpikeFiltering:
         }
         spike_features = {
             "HPC": [
-                np.random.randn(4, 4),
-                np.random.randn(3, 4),
+                np.random.RandomState(42).randn(4, 4),
+                np.random.RandomState(42).randn(3, 4),
             ],
             "mPFC": [
-                np.random.randn(4, 4),
+                np.random.RandomState(42).randn(4, 4),
             ],
         }
         # position_time goes from 1.0 to 4.9 (arange stops before 5.0)
@@ -401,7 +401,7 @@ class TestSpikeFiltering:
             "mPFC": [np.array([1.0, 2.0, 3.0])],
         }
         spike_features = {
-            "HPC": [np.random.randn(4, 4)],
+            "HPC": [np.random.RandomState(42).randn(4, 4)],
             # mPFC features missing (KeyError should be caught)
         }
         position_time = np.arange(1.0, 5.0, 0.1)
@@ -419,7 +419,7 @@ class TestSpikeFiltering:
             "HPC": [np.array([0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 5.5])],
         }
         spike_features = {
-            "HPC": [np.random.randn(7, 4)],
+            "HPC": [np.random.RandomState(42).randn(7, 4)],
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
@@ -476,8 +476,8 @@ class TestSpikeDataIntegrity:
         }
         spike_features = {
             "HPC": [
-                np.random.randn(5, n_features),
-                np.random.randn(2, n_features),
+                np.random.RandomState(42).randn(5, n_features),
+                np.random.RandomState(42).randn(2, n_features),
             ],
         }
         position_time = np.arange(1.0, 5.0, 0.1)

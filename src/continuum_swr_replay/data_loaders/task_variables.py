@@ -71,6 +71,10 @@ from types import SimpleNamespace
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+# Opt in to future pandas behavior: fillna on object dtype will no longer
+# silently downcast. This suppresses the FutureWarning.
+pd.set_option("future.no_silent_downcasting", True)
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
@@ -560,6 +564,7 @@ def make_task_variables(
         [
             (~trials_df.is_reward)
             .shift(shift)
+            .infer_objects(copy=False)
             .fillna(False)
             .rename(f"is_no_reward_{shift}")
             for shift in omission_shifts
@@ -569,6 +574,7 @@ def make_task_variables(
     is_patch_change = pd.concat(
         [
             trials_df.is_patch_change.shift(shift)
+            .infer_objects(copy=False)
             .fillna(False)
             .rename(f"is_patch_change_{shift}")
             for shift in patch_change_shifts

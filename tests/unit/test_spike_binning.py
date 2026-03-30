@@ -59,8 +59,8 @@ class TestGetSpikecountPerTimeBin:
 
         # np.digitize with time[1:-1] = [1.0, 2.0]:
         # spike at 1.0 gets index 1 (since digitize uses right=False by default)
-        total = counts.sum()
-        assert total == 1, "Spike should be counted exactly once"
+        assert counts.sum() == 1, "Spike should be counted exactly once"
+        assert counts[1] == 1, "Spike at edge 1.0 should land in bin index 1"
 
     def test_spikes_outside_range_are_excluded(self):
         """Spikes before start or after end of time should be excluded."""

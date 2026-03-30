@@ -141,8 +141,8 @@ class TestGetLabels:
 
         # Both events should be labeled
         # Note: t=5.0 may be labeled as either event 1 or 2 (edge case)
-        assert result.loc[2.0:4.9, "event_number"].eq(1).any()
-        assert result.loc[5.1:8.0, "event_number"].eq(2).any()
+        assert result.loc[2.0:4.9, "event_number"].eq(1).all()
+        assert result.loc[5.1:8.0, "event_number"].eq(2).all()
 
 
 class TestParseNwbFilename:

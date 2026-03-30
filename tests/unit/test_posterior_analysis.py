@@ -27,8 +27,9 @@ class TestConditionalNonLocalPosterior:
         n_time, n_pos = len(time), len(position)
 
         # Create mock posterior with two non-local states
-        continuous_posterior = np.random.rand(n_time, n_pos)
-        fragmented_posterior = np.random.rand(n_time, n_pos)
+        rng = np.random.default_rng(42)
+        continuous_posterior = rng.random((n_time, n_pos))
+        fragmented_posterior = rng.random((n_time, n_pos))
 
         acausal_posterior = xr.DataArray(
             np.stack([continuous_posterior, fragmented_posterior]),
@@ -69,10 +70,9 @@ class TestConditionalNonLocalPosterior:
         results = xr.Dataset({"acausal_posterior": acausal_posterior})
         conditional_posterior = get_conditional_non_local_posterior(results)
 
-        # Before normalization, sum should be 1.0 at each position
-        # After normalization, should sum to 1.0 over positions
-        assert conditional_posterior.sum("position").values == pytest.approx(
-            1.0, rel=1e-10
+        # After normalization, should sum to 1.0 over positions at each time
+        np.testing.assert_allclose(
+            conditional_posterior.sum("position").values, 1.0, rtol=1e-10
         )
 
     def test_handles_zero_posterior(self):
@@ -107,8 +107,9 @@ class TestConditionalNonLocalPosterior:
         time = np.array([0.0])
         position = np.arange(0, 100, 2)
 
-        continuous_posterior = np.random.rand(1, len(position))
-        fragmented_posterior = np.random.rand(1, len(position))
+        rng = np.random.default_rng(43)
+        continuous_posterior = rng.random((1, len(position)))
+        fragmented_posterior = rng.random((1, len(position)))
 
         acausal_posterior = xr.DataArray(
             np.stack([continuous_posterior, fragmented_posterior]),
@@ -124,7 +125,9 @@ class TestConditionalNonLocalPosterior:
         conditional_posterior = get_conditional_non_local_posterior(results)
 
         assert len(conditional_posterior.time) == 1
-        assert conditional_posterior.sum("position").values == pytest.approx(1.0, rel=1e-10)
+        np.testing.assert_allclose(
+            conditional_posterior.sum("position").values, 1.0, rtol=1e-10
+        )
 
 
     def test_idempotent_does_not_mutate_results(self):
@@ -132,8 +135,9 @@ class TestConditionalNonLocalPosterior:
         time = np.arange(0, 0.1, 0.002)
         position = np.arange(0, 50, 5)
 
-        continuous_posterior = np.random.rand(len(time), len(position))
-        fragmented_posterior = np.random.rand(len(time), len(position))
+        rng = np.random.default_rng(44)
+        continuous_posterior = rng.random((len(time), len(position)))
+        fragmented_posterior = rng.random((len(time), len(position)))
 
         acausal_posterior = xr.DataArray(
             np.stack([continuous_posterior, fragmented_posterior]),

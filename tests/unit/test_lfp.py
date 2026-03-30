@@ -23,22 +23,22 @@ class TestRippleLFPFiltering:
         ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [1.0, 3.0], "end_time": [1.5, 3.5]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 4),
+                np.random.RandomState(42).randn(len(time_index), 4),
                 index=time_index,
                 columns=["electrode1", "electrode2", "electrode3", "electrode4"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 4),
+                np.random.RandomState(42).randn(len(time_index), 4),
                 index=time_index,
                 columns=["electrode1", "electrode2", "electrode3", "electrode4"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="consensus_trace",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="zscored_consensus_trace",
             ),
@@ -177,22 +177,22 @@ class TestRippleLFPFiltering:
         ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [2.0], "end_time": [3.0]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["electrode1", "electrode2"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["electrode1", "electrode2"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="consensus_trace",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="zscored_consensus_trace",
             ),
@@ -224,22 +224,22 @@ class TestRippleLFPFiltering:
         ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [0.2], "end_time": [0.5]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["electrode1", "electrode2"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["electrode1", "electrode2"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="consensus_trace",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="zscored_consensus_trace",
             ),
@@ -265,22 +265,22 @@ class TestRippleLFPFiltering:
         ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [2.5], "end_time": [3.5]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(original_length, 3),
+                np.random.RandomState(42).randn(original_length, 3),
                 index=time_index,
                 columns=["electrode1", "electrode2", "electrode3"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(original_length, 3),
+                np.random.RandomState(42).randn(original_length, 3),
                 index=time_index,
                 columns=["electrode1", "electrode2", "electrode3"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(original_length),
+                np.random.RandomState(42).randn(original_length),
                 index=time_index,
                 name="consensus_trace",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(original_length),
+                np.random.RandomState(42).randn(original_length),
                 index=time_index,
                 name="zscored_consensus_trace",
             ),
@@ -304,22 +304,22 @@ class TestRippleLFPFiltering:
         ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 3),
+                np.random.RandomState(42).randn(len(time_index), 3),
                 index=time_index,
                 columns=["CA1_01", "CA1_02", "CA1_03"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 3),
+                np.random.RandomState(42).randn(len(time_index), 3),
                 index=time_index,
                 columns=["CA1_01", "CA1_02", "CA1_03"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="consensus",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
                 name="zscored",
             ),
@@ -350,21 +350,21 @@ class TestRippleLFPFiltering:
         original_ripple_data = {
             "ripple_times": pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["e1", "e2"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.random.randn(len(time_index), 2),
+                np.random.RandomState(42).randn(len(time_index), 2),
                 index=time_index,
                 columns=["e1", "e2"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.random.randn(len(time_index)),
+                np.random.RandomState(42).randn(len(time_index)),
                 index=time_index,
             ),
         }

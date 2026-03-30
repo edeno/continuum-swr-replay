@@ -246,12 +246,15 @@ class TestGetDataOverTimeValidation:
                 "02_r1",
             )
 
-    def test_all_required_keys_present_does_not_raise(
+    def test_all_required_keys_present_does_not_raise_validation(
         self, mock_session_data_for_aggregation, mock_results, mock_environment
     ):
-        """Complete data dict should not raise on validation."""
-        # This may fail downstream in get_posterior_stats due to mock env,
-        # but should NOT fail on key validation
+        """Complete data dict should pass the key validation check.
+
+        Tests only the validation logic, not the full aggregation pipeline.
+        Downstream failures from mock environment are expected and acceptable,
+        but the specific "Missing required data keys" error should not occur.
+        """
         try:
             get_data_over_time(
                 mock_session_data_for_aggregation,
@@ -263,7 +266,7 @@ class TestGetDataOverTimeValidation:
         except KeyError as e:
             if "Missing required data keys" in str(e):
                 pytest.fail(f"Validation raised KeyError unexpectedly: {e}")
-            # Other KeyErrors from downstream code are acceptable in this test
-        except Exception:
-            # Non-KeyError exceptions from downstream processing are OK
+            # Other KeyErrors from downstream code (e.g., mock env) are acceptable
+        except (TypeError, AttributeError, ValueError):
+            # Expected failures from mock environment in downstream processing
             pass

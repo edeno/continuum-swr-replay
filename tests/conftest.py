@@ -275,10 +275,11 @@ def mock_ripple_lfp() -> pd.DataFrame:
     n_points = len(time)
 
     # Simulate ripple oscillations (150-250 Hz)
+    rng = np.random.default_rng(42)
     lfp_data = {}
     for electrode in range(4):
         # Base noise + ripple events
-        signal = np.random.randn(n_points) * 0.1
+        signal = rng.standard_normal(n_points) * 0.1
 
         # Add ripple at t=1.0 and t=3.5
         ripple_freq = 200  # Hz

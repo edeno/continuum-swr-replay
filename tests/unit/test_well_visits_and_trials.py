@@ -179,9 +179,9 @@ class TestMakeWellVisitsDf:
         )
 
         run_trials = result.loc[result["is_run"], "trial_number"].values
-        if len(run_trials) > 0:
-            expected = np.arange(1, len(run_trials) + 1)
-            np.testing.assert_array_equal(run_trials, expected)
+        assert len(run_trials) > 0, "Fixture should produce at least one run"
+        expected = np.arange(1, len(run_trials) + 1)
+        np.testing.assert_array_equal(run_trials, expected)
 
     def test_reward_associated_with_correct_visit(
         self, beam_breaks, pump_events, position_info, track_graph
@@ -309,9 +309,11 @@ class TestMakeTrialsDfFromWellVisits:
         trials = make_trials_df_from_well_visits(well_visits)
 
         n_runs = well_visits["is_run"].sum()
-        # Each run defines a trial, but some poke-only groups get merged
-        # At minimum, we should have <= n_runs trials
-        assert len(trials) <= n_runs or n_runs == 0
+        # Each run defines a trial; trial count should not exceed run count
+        if n_runs > 0:
+            assert 1 <= len(trials) <= n_runs
+        else:
+            assert len(trials) == 0
 
     def test_has_required_columns(
         self, beam_breaks, pump_events, position_info, track_graph
