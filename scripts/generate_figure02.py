@@ -331,7 +331,7 @@ for i, (signal, title) in enumerate(zip(signals, titles, strict=True)):
     if all_windows:
         all_windows_matrix = np.vstack(all_windows)
         mean_y = np.nanmean(all_windows_matrix, axis=0)
-        sem_y = np.nanstd(all_windows_matrix, axis=0) / np.sqrt(
+        sem_y = np.nanstd(all_windows_matrix, ddof=1, axis=0) / np.sqrt(
             np.sum(~np.isnan(all_windows_matrix), axis=0)
         )
         x = offsets * dt * 1000
@@ -418,7 +418,7 @@ for i, (signal, title) in enumerate(zip(signals, titles, strict=True)):
     if all_windows:
         all_windows_matrix = np.vstack(all_windows)
         mean_y = np.nanmean(all_windows_matrix, axis=0)
-        sem_y = np.nanstd(all_windows_matrix, axis=0) / np.sqrt(
+        sem_y = np.nanstd(all_windows_matrix, ddof=1, axis=0) / np.sqrt(
             np.sum(~np.isnan(all_windows_matrix), axis=0)
         )
         x = offsets * dt * 1000

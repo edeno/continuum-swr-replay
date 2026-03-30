@@ -126,7 +126,7 @@ def plot_triggered_average_mean(
 
         # Compute mean and SEM
         mean_y = np.nanmean(signal_data, axis=0)
-        sem_y = np.nanstd(signal_data, axis=0) / np.sqrt(
+        sem_y = np.nanstd(signal_data, ddof=1, axis=0) / np.sqrt(
             np.sum(~np.isnan(signal_data), axis=0)
         )
 
