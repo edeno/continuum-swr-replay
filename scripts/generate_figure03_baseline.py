@@ -204,8 +204,8 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
         else "lightgrey"
     )
     ax.hist(
-        event_types[event_type]["map_speed"] / 100.0,
-        bins=np.arange(0, 20, 0.5),
+        event_types[event_type]["map_speed"],
+        bins=np.arange(0, 2000, 50),
         color=color,
         alpha=0.7,
         edgecolor="none",
@@ -994,15 +994,14 @@ plt.ylabel("Non-Local Probability")
 plt.colorbar(label="Density")
 
 
-bins = np.arange(0, 3, 0.1)
+bins = np.arange(0, 3000, 100)
 plt.hist(
     data_over_time.loc[
         np.logical_and(
             data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] > 0
         ),
         "map_speed",
-    ]
-    / 1000,
+    ],
     bins=bins,
     density=True,
     alpha=0.8,
@@ -1015,8 +1014,7 @@ plt.hist(
             data_over_time["non_local_event"] > 0, data_over_time["SWR_event"] == 0
         ),
         "map_speed",
-    ]
-    / 1000,
+    ],
     bins=bins,
     density=True,
     alpha=0.8,
@@ -1024,7 +1022,7 @@ plt.hist(
     label="No SWR",
 )
 plt.legend()
-plt.xlabel("Replay Speed (m/s)")
+plt.xlabel("Replay Speed (cm/s)")
 plt.ylabel("Density")
 sns.despine(offset=5)
 

@@ -692,14 +692,14 @@ def plot_replay_speed_by_swr(
     """
     fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    bins = np.arange(0, 3, 0.1)
+    bins = np.arange(0, 3000, 100)
 
     # SWR overlap
     swr_mask = (data_over_time["non_local_event"] > 0) & (
         data_over_time["SWR_event"] > 0
     )
     ax.hist(
-        data_over_time.loc[swr_mask, "map_speed"] / 1000,
+        data_over_time.loc[swr_mask, "map_speed"],
         bins=bins,
         density=True,
         alpha=0.7,
@@ -712,7 +712,7 @@ def plot_replay_speed_by_swr(
         data_over_time["SWR_event"] == 0
     )
     ax.hist(
-        data_over_time.loc[no_swr_mask, "map_speed"] / 1000,
+        data_over_time.loc[no_swr_mask, "map_speed"],
         bins=bins,
         density=True,
         alpha=0.7,
@@ -720,7 +720,7 @@ def plot_replay_speed_by_swr(
         label="Without SWR",
     )
 
-    ax.set_xlabel("Replay Speed (m/s)")
+    ax.set_xlabel("Replay Speed (cm/s)")
     ax.set_ylabel("Density")
     ax.legend()
     sns.despine(ax=ax)

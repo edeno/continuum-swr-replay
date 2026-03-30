@@ -1436,8 +1436,8 @@ data_over_time.loc[data_over_time["MUA_event"] > 0].groupby(
 ].mean().mean()
 
 # %%
-(immobile_non_local_events.map_speed / 1000).hist(
-    bins=np.arange(0, 30, 1),
+immobile_non_local_events.map_speed.hist(
+    bins=np.arange(0, 30000, 1000),
     color=COLORS["Non-Local"],
     alpha=0.7,
     edgecolor="none",
@@ -1449,9 +1449,8 @@ data_over_time.loc[data_over_time["MUA_event"] > 0].groupby(
     immobile_non_local_events.groupby(
         ["animal", "day", "epoch", "non_local_event"]
     ).map_speed.median()
-    / 1000
 ).hist(
-    bins=np.arange(0, 30, 1),
+    bins=np.arange(0, 30000, 1000),
     color=COLORS["Non-Local"],
     alpha=0.7,
     edgecolor="none",
