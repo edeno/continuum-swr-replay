@@ -17,6 +17,8 @@ from continuum_swr_replay.analysis.hippocampus import (
 )
 from continuum_swr_replay.data_loaders import load_data
 
+logger = logging.getLogger(__name__)
+
 
 def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     """Bin spike times into time bins.
@@ -698,7 +700,6 @@ def process_neuron(
         )
 
     except (ValueError, np.linalg.LinAlgError):
-        logger = logging.getLogger(__name__)
         logger.warning(
             "GLM fitting failed for neuron; falling back to firing rates only",
             exc_info=True,

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.task_variables import (
-    dist_to_goal_per_time,
+    dist_to_goal,
     path_progress_for_run_segment,
     turn_direction,
 )
@@ -255,39 +255,26 @@ class TestDistToGoal:
             1: (1, 2),
         }
 
-        # At start of track (x=0), distance to goal (node 2) should be ~20
-        dist_start = dist_to_goal_per_time(
-            track_segment_id=0,
-            projected_x_position=0.0,
-            projected_y_position=0.0,
-            goal_node_id=2,
+        # Three positions: start (x=0), middle (x=10), goal (x=20)
+        time = np.array([0.0, 0.002, 0.004])
+        pos_info = pd.DataFrame({
+            'projected_x_position': [0.0, 10.0, 20.0],
+            'projected_y_position': [0.0, 0.0, 0.0],
+            'track_segment_id': [0, 1, 1],
+        }, index=time)
+
+        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': 0.006})
+
+        distances = dist_to_goal(
+            pos_info,
+            trial=trial,
             track_graph=simple_linear_track,
             track_segment_id_to_edge=track_segment_id_to_edge,
         )
 
-        # At middle (x=10), distance should be ~10
-        dist_middle = dist_to_goal_per_time(
-            track_segment_id=1,
-            projected_x_position=10.0,
-            projected_y_position=0.0,
-            goal_node_id=2,
-            track_graph=simple_linear_track,
-            track_segment_id_to_edge=track_segment_id_to_edge,
-        )
-
-        # At goal (x=20), distance should be ~0
-        dist_goal = dist_to_goal_per_time(
-            track_segment_id=1,
-            projected_x_position=20.0,
-            projected_y_position=0.0,
-            goal_node_id=2,
-            track_graph=simple_linear_track,
-            track_segment_id_to_edge=track_segment_id_to_edge,
-        )
-
-        # Distances should decrease
-        assert dist_start > dist_middle > dist_goal
-        assert dist_goal < 1.0, "Should be very close to goal"
+        # Distances should decrease: start (~20) > middle (~10) > goal (~0)
+        assert distances[0] > distances[1] > distances[2]
+        assert distances[2] < 1.0, "Should be very close to goal"
 
     def test_distance_always_non_negative(self, simple_linear_track):
         """Distance must always be non-negative."""
@@ -299,18 +286,24 @@ class TestDistToGoal:
 
         track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
 
-        # Test multiple positions
-        for x_pos in [0, 5, 10, 15, 20]:
-            dist = dist_to_goal_per_time(
-                track_segment_id=0 if x_pos < 10 else 1,
-                projected_x_position=float(x_pos),
-                projected_y_position=0.0,
-                goal_node_id=2,
-                track_graph=simple_linear_track,
-                track_segment_id_to_edge=track_segment_id_to_edge,
-            )
+        x_positions = [0.0, 5.0, 10.0, 15.0, 20.0]
+        time = np.arange(len(x_positions)) * 0.002
+        pos_info = pd.DataFrame({
+            'projected_x_position': x_positions,
+            'projected_y_position': [0.0] * len(x_positions),
+            'track_segment_id': [0 if x < 10 else 1 for x in x_positions],
+        }, index=time)
 
-            assert dist >= 0.0, f"Distance must be non-negative, got {dist}"
+        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': 0.01})
+
+        distances = dist_to_goal(
+            pos_info,
+            trial=trial,
+            track_graph=simple_linear_track,
+            track_segment_id_to_edge=track_segment_id_to_edge,
+        )
+
+        assert np.all(distances >= 0.0), f"All distances must be non-negative, got {distances}"
 
 
 class TestTurnDirection:
@@ -629,3 +622,57 @@ class TestNumericalStabilityFixes:
         # All distances should be non-negative (no negative from unstable subtraction)
         assert np.all(distances >= 0.0), "Distances should be non-negative"
         assert not np.any(np.isnan(distances)), "Should not have NaN values"
+
+    def test_dist_to_goal_matches_pointwise_calculation(self, simple_linear_track):
+        """Vectorized dist_to_goal must match manual point-by-point computation.
+
+        Verifies equivalence with the old per-row algorithm by computing
+        min(dist_to_node1 + d(node1, goal), dist_to_node2 + d(node2, goal))
+        for each point independently.
+        """
+        from continuum_swr_replay.data_loaders.task_variables import (
+            _precompute_segment_distances_to_goal,
+            dist_to_goal,
+        )
+
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]['pos'] = pos
+        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
+        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+
+        track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
+
+        # Many positions across both segments
+        x_positions = np.linspace(0, 20, 200)
+        segment_ids = np.where(x_positions < 10, 0, 1).astype(int)
+        time = np.arange(len(x_positions)) * 0.002
+        pos_info = pd.DataFrame({
+            'projected_x_position': x_positions,
+            'projected_y_position': np.zeros(len(x_positions)),
+            'track_segment_id': segment_ids,
+        }, index=time)
+
+        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': time[-1] + 0.002})
+
+        # Vectorized result
+        vectorized = dist_to_goal(
+            pos_info, trial=trial,
+            track_graph=simple_linear_track,
+            track_segment_id_to_edge=track_segment_id_to_edge,
+        )
+
+        # Manual point-by-point result (old algorithm logic)
+        seg_dists = _precompute_segment_distances_to_goal(
+            2, simple_linear_track, track_segment_id_to_edge
+        )
+        expected = np.empty(len(x_positions))
+        for i in range(len(x_positions)):
+            seg_id = segment_ids[i]
+            d1, d2, el = seg_dists[seg_id]
+            node1, _ = track_segment_id_to_edge[seg_id]
+            node1_pos = np.array(simple_linear_track.nodes[node1]['pos'])
+            proj = np.array([x_positions[i], 0.0])
+            dfn1 = np.clip(np.linalg.norm(proj - node1_pos), 0.0, el)
+            expected[i] = min(dfn1 + d1, (el - dfn1) + d2)
+
+        np.testing.assert_allclose(vectorized, expected, atol=1e-12)

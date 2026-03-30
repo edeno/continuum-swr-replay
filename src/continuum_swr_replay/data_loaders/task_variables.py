@@ -18,8 +18,6 @@ path_progress_for_run_segment
     Computes normalized progress (0-1) along a trial path using the track graph.
 dist_to_goal
     Computes distance to goal well for all time points in a trial.
-dist_to_goal_per_time
-    Computes distance to goal for a single time point.
 turn_direction
     Determines the sequence of left/right turns taken during a trial.
 
@@ -216,57 +214,6 @@ def _precompute_segment_distances_to_goal(
     return segment_distances
 
 
-def dist_to_goal_per_time(
-    track_segment_id: int,
-    projected_x_position: float,
-    projected_y_position: float,
-    goal_node_id: int,
-    track_graph: nx.Graph,
-    track_segment_id_to_edge: dict[int, tuple[int, int]],
-) -> float:
-    """Compute distance to goal for a single time point.
-
-    DEPRECATED: This function is kept for backward compatibility but is
-    inefficient. Use the vectorized dist_to_goal() instead.
-
-    Parameters
-    ----------
-    track_segment_id : int
-        Current track segment ID
-    projected_x_position : float
-        Current x position
-    projected_y_position : float
-        Current y position
-    goal_node_id : int
-        Goal well node ID
-    track_graph : nx.Graph
-        Track graph
-    track_segment_id_to_edge : dict
-        Mapping from segment ID to edge tuple
-
-    Returns
-    -------
-    float
-        Distance to goal in graph distance units
-    """
-    node1, node2 = track_segment_id_to_edge[track_segment_id]
-    copy_graph = track_graph.copy()
-    copy_graph.add_node("cur_pos", pos=(projected_x_position, projected_y_position))
-    x1, y1 = copy_graph.nodes[node1]["pos"]
-    x2, y2 = copy_graph.nodes[node2]["pos"]
-    x3, y3 = copy_graph.nodes["cur_pos"]["pos"]
-    left_distance = np.sqrt((x3 - x1) ** 2 + (y3 - y1) ** 2)
-    right_distance = np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2)
-    nx.add_path(copy_graph, [node1, "cur_pos"], distance=left_distance)
-    nx.add_path(copy_graph, ["cur_pos", node2], distance=right_distance)
-    return nx.shortest_path_length(  # type: ignore[no-any-return]
-        copy_graph,
-        source="cur_pos",
-        target=goal_node_id,
-        weight="distance",
-    )
-
-
 def dist_to_goal(
     position_info: pd.DataFrame,
     trial: pd.Series,
@@ -275,9 +222,9 @@ def dist_to_goal(
 ) -> NDArray[np.float64]:
     """Compute distance to goal for all time points in a trial.
 
-    Optimized implementation that precomputes distances from segment endpoints
-    to goal, then interpolates for each timepoint. This avoids creating
-    557K graph copies and shortest path computations.
+    Vectorized implementation that precomputes distances from segment endpoints
+    to goal, then computes all timepoint distances using array operations.
+    This avoids per-row Python loops and graph copies.
 
     Parameters
     ----------
@@ -295,42 +242,53 @@ def dist_to_goal(
     np.ndarray
         Distance to goal for each time point
     """
+    n = len(position_info)
+    if n == 0:
+        return np.array([], dtype=np.float64)
+
     # Precompute distances from each segment endpoint to goal (once per trial)
     segment_distances = _precompute_segment_distances_to_goal(
         trial.to_well, track_graph, track_segment_id_to_edge
     )
 
-    # Compute distance for each timepoint using precomputed segment distances
-    # (Loop is necessary because each point requires segment-specific interpolation)
-    distances = np.zeros(len(position_info))
+    # Build lookup arrays indexed by segment_id for vectorized access
+    segment_ids = position_info.track_segment_id.to_numpy()
+    unique_segments = np.unique(segment_ids)
 
-    for idx, row in enumerate(position_info.itertuples()):
-        segment_id = row.track_segment_id
-        dist_node1_to_goal, dist_node2_to_goal, edge_length = segment_distances[
-            segment_id
-        ]
+    # Precompute node1 positions, distances, and edge lengths per segment
+    seg_node1_x = np.empty(n)
+    seg_node1_y = np.empty(n)
+    seg_dist_node1_to_goal = np.empty(n)
+    seg_dist_node2_to_goal = np.empty(n)
+    seg_edge_length = np.empty(n)
 
-        # Get segment endpoints
-        node1, node2 = track_segment_id_to_edge[segment_id]
-        node1_pos = np.array(track_graph.nodes[node1]["pos"])
-        projected_pos = np.array([row.projected_x_position, row.projected_y_position])
+    for seg_id in unique_segments:
+        mask = segment_ids == seg_id
+        node1, _node2 = track_segment_id_to_edge[seg_id]
+        node1_pos = track_graph.nodes[node1]["pos"]
+        d1, d2, el = segment_distances[seg_id]
 
-        # Distance from current position to node1 (along the segment)
-        dist_from_node1 = np.linalg.norm(projected_pos - node1_pos)
+        seg_node1_x[mask] = node1_pos[0]
+        seg_node1_y[mask] = node1_pos[1]
+        seg_dist_node1_to_goal[mask] = d1
+        seg_dist_node2_to_goal[mask] = d2
+        seg_edge_length[mask] = el
 
-        # Clamp to edge bounds for numerical stability
-        dist_from_node1 = np.clip(dist_from_node1, 0.0, edge_length)
+    # Vectorized distance from each position to its segment's node1
+    proj_x = position_info.projected_x_position.to_numpy()
+    proj_y = position_info.projected_y_position.to_numpy()
+    dx = proj_x - seg_node1_x
+    dy = proj_y - seg_node1_y
+    dist_from_node1 = np.sqrt(dx * dx + dy * dy)
 
-        # Two possible paths to goal:
-        # 1. Go back to node1, then to goal: dist_from_node1 + dist_node1_to_goal
-        # 2. Go forward to node2, then to goal: (edge_length - dist_from_node1) + dist_node2_to_goal
-        dist_via_node1 = dist_from_node1 + dist_node1_to_goal
-        dist_via_node2 = (edge_length - dist_from_node1) + dist_node2_to_goal
+    # Clamp to edge bounds for numerical stability
+    np.clip(dist_from_node1, 0.0, seg_edge_length, out=dist_from_node1)
 
-        # Take the shorter path
-        distances[idx] = min(dist_via_node1, dist_via_node2)
+    # Two possible paths to goal — take the shorter one
+    dist_via_node1 = dist_from_node1 + seg_dist_node1_to_goal
+    dist_via_node2 = (seg_edge_length - dist_from_node1) + seg_dist_node2_to_goal
 
-    return distances
+    return np.minimum(dist_via_node1, dist_via_node2)
 
 
 def turn_direction(

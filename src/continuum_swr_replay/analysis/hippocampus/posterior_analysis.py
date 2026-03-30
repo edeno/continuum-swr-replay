@@ -125,6 +125,11 @@ def get_map_speed(
 ) -> np.ndarray:
     """Compute speed of the most likely decoded position.
 
+    Uses forward differences of graph shortest-path distance between
+    successive MAP positions. This correctly measures speed even when
+    the decoded trajectory reverses direction, unlike central differences
+    which underestimate speed at reversal points.
+
     Parameters
     ----------
     posterior : xr.DataArray | np.ndarray
@@ -173,63 +178,54 @@ def get_map_speed(
 
     if n_time == 1:
         return np.asarray([np.nan])
-    elif n_time == 2:
-        speed = (
-            np.array(
-                [
-                    nx.shortest_path_length(
-                        track_graph_with_bin_centers_edges,
-                        source=node_ids[0],
-                        target=node_ids[1],
-                        weight="distance",
-                    ),
-                    nx.shortest_path_length(
-                        track_graph_with_bin_centers_edges,
-                        source=node_ids[-2],
-                        target=node_ids[-1],
-                        weight="distance",
-                    ),
-                ]
-            )
-            / dt
+
+    # Precompute all-pairs shortest path distances
+    shortest_path_lengths = dict(
+        nx.shortest_path_length(
+            track_graph_with_bin_centers_edges, weight="distance"
         )
-    else:
-        shortest_path_lengths = dict(
-            nx.shortest_path_length(
-                track_graph_with_bin_centers_edges, weight="distance"
-            )
-        )
-        speed = np.array(
+    )
+
+    # Forward differences: speed[t] = dist(node[t], node[t+1]) / dt
+    # This correctly captures speed at reversal points, unlike central
+    # differences which compute dist(node[t-1], node[t+1]) and
+    # underestimate when the trajectory changes direction.
+    try:
+        step_distances = np.array(
             [
                 shortest_path_lengths[node1][node2]
-                for node1, node2 in zip(node_ids[:-2], node_ids[2:], strict=True)
+                for node1, node2 in zip(
+                    node_ids[:-1], node_ids[1:], strict=True
+                )
             ]
-        ) / (2.0 * dt)
-        speed = np.insert(
-            speed,
-            0,
-            nx.shortest_path_length(
-                track_graph_with_bin_centers_edges,
-                source=node_ids[0],
-                target=node_ids[1],
-                weight="distance",
-            )
-            / dt,
         )
-        speed = np.append(
-            speed,
-            nx.shortest_path_length(
-                track_graph_with_bin_centers_edges,
-                source=node_ids[-2],
-                target=node_ids[-1],
-                weight="distance",
-            )
-            / dt,
-        )
-    # Apply Gaussian smoothing
-    smoothed_speed: np.ndarray = gaussian_smooth(np.abs(speed), smooth_sigma, sampling_frequency)
+    except KeyError as e:
+        raise nx.NetworkXNoPath(
+            f"No path between successive MAP positions (node {e}). "
+            "The track graph may be disconnected."
+        ) from e
+    speed = step_distances / dt
+    # Last timepoint uses backward difference (same as its predecessor)
+    speed = np.append(speed, speed[-1])
 
-    # Set speed to NaN for timepoints with invalid posteriors
+    # Set speed to NaN for invalid rows BEFORE smoothing, so placeholder
+    # values from invalid rows don't bleed into valid neighbors
+    speed[~has_valid_data] = np.nan
+
+    # Interpolate over NaN gaps for smoothing, then re-mask
+    valid_mask = ~np.isnan(speed)
+    if valid_mask.any() and not valid_mask.all():
+        indices = np.arange(n_time)
+        speed_filled = np.interp(indices, indices[valid_mask], speed[valid_mask])
+    else:
+        speed_filled = speed.copy()
+
+    # Apply Gaussian smoothing
+    smoothed_speed: np.ndarray = gaussian_smooth(
+        speed_filled, smooth_sigma, sampling_frequency
+    )
+
+    # Re-mask invalid timepoints
     smoothed_speed[~has_valid_data] = np.nan
 
     return smoothed_speed

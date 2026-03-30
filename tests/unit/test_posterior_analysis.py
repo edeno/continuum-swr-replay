@@ -360,8 +360,72 @@ class TestMapSpeed:
         # All speeds should be non-negative
         assert np.all(speed >= 0), "Speed should always be non-negative"
 
-    def test_three_timepoints_central_difference(self):
-        """With 3+ time points, use central difference for middle points."""
+    def test_reversal_speed_correct(self):
+        """Speed at trajectory reversal should reflect actual step speed.
+
+        A forward-then-reverse trajectory moves at constant speed throughout,
+        including at the reversal point. Forward differences correctly capture
+        this because dist(node[t], node[t+1]) measures the actual step taken.
+        """
+        graph = nx.Graph()
+        graph.add_edges_from([(i, i + 1) for i in range(10)])
+        nx.set_edge_attributes(graph, 10.0, "distance")
+
+        # Forward 0→5, reverse 5→0: constant speed of 10cm per step
+        forward = list(range(6))        # [0, 1, 2, 3, 4, 5]
+        backward = list(range(4, -1, -1))  # [4, 3, 2, 1, 0]
+        node_sequence = forward + backward  # 11 timepoints
+        posterior = np.eye(11)[node_sequence]
+        place_bin_center_ind_to_node = np.arange(11)
+
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
+        expected_speed = 10.0 / dt  # 5000 cm/s everywhere
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        # Every timepoint should report ~5000 cm/s, including the reversal
+        np.testing.assert_allclose(speed, expected_speed, rtol=0.05)
+
+    def test_oscillating_speed_correct(self):
+        """Rapidly oscillating trajectory should report correct speed.
+
+        An A→B→A→B pattern moves the same distance each step.
+        """
+        graph = nx.Graph()
+        graph.add_edge(0, 1, distance=10.0)
+        graph.add_edge(1, 2, distance=10.0)
+
+        # Oscillate: 0→2→0→2→0→2
+        node_sequence = [0, 2, 0, 2, 0, 2]
+        posterior = np.zeros((6, 3))
+        for t, n in enumerate(node_sequence):
+            posterior[t, n] = 1.0
+        place_bin_center_ind_to_node = np.arange(3)
+
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
+        # Each step covers 20cm (0→2 or 2→0)
+        expected_speed = 20.0 / dt  # 10000 cm/s
+
+        speed = get_map_speed(
+            posterior,
+            graph,
+            place_bin_center_ind_to_node,
+            sampling_frequency=sampling_frequency,
+            smooth_sigma=0.0001,
+        )
+
+        np.testing.assert_allclose(speed, expected_speed, rtol=0.05)
+
+    def test_three_timepoints_forward_difference(self):
+        """With 3+ time points, all use forward differences."""
         graph = nx.Graph()
         graph.add_edges_from([(0, 1), (1, 2), (2, 3)])
         nx.set_edge_attributes(graph, 20.0, "distance")
@@ -385,20 +449,15 @@ class TestMapSpeed:
             smooth_sigma=0.0001,
         )
 
-        # For 3 points, middle point uses central difference
-        # Distance from 0 to 2 is 40 cm (two edges), over 2*dt
-        expected_middle_speed = 40.0 / (2 * dt)
-        # Edge points use forward/backward difference: 20 cm / dt
-        expected_edge_speed = 20.0 / dt
+        # All points use forward difference: dist(t, t+1) / dt
+        # Each step is 20 cm in dt seconds
+        expected_speed = 20.0 / dt
 
         assert len(speed) == 3
-        # Use relaxed tolerance due to smoothing
-        assert speed[0] == pytest.approx(expected_edge_speed, rel=0.05)
-        assert speed[1] == pytest.approx(expected_middle_speed, rel=0.05)
-        assert speed[2] == pytest.approx(expected_edge_speed, rel=0.05)
+        np.testing.assert_allclose(speed, expected_speed, rtol=0.05)
 
     def test_nonuniform_edges_last_speed_correct(self):
-        """With non-uniform edges, last timepoint should use backward difference."""
+        """With non-uniform edges, speed should reflect each step's distance."""
         graph = nx.Graph()
         graph.add_edge(0, 1, distance=10.0)
         graph.add_edge(1, 2, distance=10.0)
@@ -419,10 +478,11 @@ class TestMapSpeed:
             smooth_sigma=0.0001,
         )
 
-        # Last timepoint: backward difference = dist(2,3)/dt = 40/0.002 = 20000
+        # Forward differences: speed[t] = dist(node[t], node[t+1]) / dt
+        # speed[2] = dist(2,3)/dt = 40/0.002 = 20000
+        expected_second_last = 40.0 / dt
+        # Last timepoint repeats backward difference = dist(2,3)/dt = 20000
         expected_last = 40.0 / dt
-        # Second-to-last: central difference = dist(1,3)/(2*dt) = 50/0.004 = 12500
-        expected_second_last = 50.0 / (2 * dt)
 
         assert speed[2] == pytest.approx(expected_second_last, rel=0.05)
         assert speed[3] == pytest.approx(expected_last, rel=0.05)

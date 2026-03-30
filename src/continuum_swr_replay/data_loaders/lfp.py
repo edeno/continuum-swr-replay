@@ -62,7 +62,12 @@ from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
 from spyglass.lfp.lfp_merge import LFPOutput
 from spyglass.ripple.v1 import RippleTimesV1
 
-from ..parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
+from ..parameters import (
+    HSE_CLOSE_EVENT_THRESHOLD_SEC,
+    HSE_MINIMUM_DURATION_SEC,
+    HSE_ZSCORE_THRESHOLD,
+    MAX_SPEED_THRESHOLD_CM_PER_SEC,
+)
 from ..types import MultiunitData, RippleData, ThetaData
 
 # Ignore warnings
@@ -235,8 +240,8 @@ def get_multiunit_HSE(
     mean = np.nanmean(multiunit_firing_rate)
     std = np.nanstd(multiunit_firing_rate)
 
-    # Avoid division by zero if firing rate is constant
-    if std == 0 or np.isnan(std):
+    # Avoid division by near-zero if firing rate is constant
+    if std < 1e-10 or np.isnan(std):
         multiunit_rate_zscore = pd.DataFrame(
             np.zeros_like(multiunit_firing_rate),
             index=bin_time,
@@ -251,9 +256,9 @@ def get_multiunit_HSE(
         speed,
         sampling_frequency,
         speed_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
-        minimum_duration=0.015,
-        zscore_threshold=2.0,
-        close_event_threshold=0.0,
+        minimum_duration=HSE_MINIMUM_DURATION_SEC,
+        zscore_threshold=HSE_ZSCORE_THRESHOLD,
+        close_event_threshold=HSE_CLOSE_EVENT_THRESHOLD_SEC,
         use_speed_threshold_for_zscore=False,
     )
 
