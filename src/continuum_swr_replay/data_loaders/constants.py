@@ -40,27 +40,20 @@ NWB_FILES = [
     "chimi20200212_.nwb",
     "chimi20200213_.nwb",
     "chimi20200214_.nwb",
-    "chimi20200215_.nwb",
     "chimi20200216_.nwb",
     "chimi20200217_.nwb",
     "chimi20200218_.nwb",
-    "chimi20200219_.nwb",
     "chimi20200220_.nwb",
     "chimi20200221_.nwb",
     "chimi20200222_.nwb",
     "chimi20200223_.nwb",
     "chimi20200224_.nwb",
     "chimi20200225_.nwb",
-    "chimi20200226_.nwb",
     "chimi20200227_.nwb",
     "chimi20200228_.nwb",
-    "chimi20200301_.nwb",
-    "chimi20200302_.nwb",
-    "chimi20200303_.nwb",
     "chimi20200304_.nwb",
     "chimi20200305_.nwb",
     "chimi20200306_.nwb",
-    "chimi20200307_.nwb",
     "chimi20200308_.nwb",
     "chimi20200310_.nwb",
     "chimi20200311_.nwb",
@@ -82,27 +75,21 @@ NWB_FILES = [
     "j1620210719_.nwb",
     "j1620210720_.nwb",
     "j1620210721_.nwb",
-    "peanut20201124_.nwb",
     "peanut20201125_.nwb",
-    "peanut20201126_.nwb",
     "peanut20201127_.nwb",
     "peanut20201128_.nwb",
     "peanut20201129_.nwb",
-    "peanut20201130_.nwb",
     "peanut20201201_.nwb",
     "peanut20201202_.nwb",
     "peanut20201203_.nwb",
     "peanut20201204_.nwb",
     "peanut20201205_.nwb",
     "peanut20201206_.nwb",
-    "peanut20201207_.nwb",
     "peanut20201208_.nwb",
     "peanut20201209_.nwb",
     "senor20201027_.nwb",
     "senor20201028_.nwb",
-    "senor20201029_.nwb",
     "senor20201030_.nwb",
-    "senor20201031_.nwb",
     "senor20201101_.nwb",
     "senor20201102_.nwb",
     "senor20201103_.nwb",
@@ -110,7 +97,6 @@ NWB_FILES = [
     "senor20201105_.nwb",
     "senor20201106_.nwb",
     "senor20201107_.nwb",
-    "senor20201108_.nwb",
     "senor20201109_.nwb",
     "senor20201110_.nwb",
     "senor20201111_.nwb",
@@ -121,16 +107,13 @@ NWB_FILES = [
     "senor20201116_.nwb",
     "senor20201117_.nwb",
     "senor20201118_.nwb",
-    "senor20201119_.nwb",
     "senor20201120_.nwb",
     "senor20201121_.nwb",
     "wilbur20210326_.nwb",
-    "wilbur20210327_.nwb",
     "wilbur20210328_.nwb",
     "wilbur20210329_.nwb",
     "wilbur20210330_.nwb",
     "wilbur20210331_.nwb",
-    "wilbur20210401_.nwb",
     "wilbur20210402_.nwb",
     "wilbur20210403_.nwb",
     "wilbur20210404_.nwb",
@@ -145,16 +128,21 @@ NWB_FILES = [
     "wilbur20210413_.nwb",
     "wilbur20210414_.nwb",
     "wilbur20210415_.nwb",
-    "wilbur20210416_.nwb",
 ]
-"""Complete list of 109 NWB files from 5 animals performing the spatial bandit task.
+"""Complete list of 91 NWB files from 5 animals performing the spatial bandit task.
 
 Animals and session counts:
-- chimi: 29 sessions (Feb-Mar 2020)
+- chimi: 22 sessions (Feb-Mar 2020)
 - j16: 16 sessions (Jul 2021)
-- peanut: 16 sessions (Nov-Dec 2020)
-- senor: 26 sessions (Oct-Nov 2020)
-- wilbur: 22 sessions (Mar-Apr 2021)
+- peanut: 12 sessions (Nov-Dec 2020)
+- senor: 22 sessions (Oct-Nov 2020)
+- wilbur: 19 sessions (Mar-Apr 2021)
+
+Excluded sessions (no noPrePostTrialTimes intervals due to trial parsing issues):
+chimi20200215, chimi20200219, chimi20200226, chimi20200301, chimi20200302,
+chimi20200303, chimi20200307, peanut20201124, peanut20201126, peanut20201130,
+peanut20201207, senor20201029, senor20201031, senor20201108, senor20201119,
+wilbur20210327, wilbur20210401, wilbur20210416
 """
 
 WELL_PATCH_MAPPING = {
