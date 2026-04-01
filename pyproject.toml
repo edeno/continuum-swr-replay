@@ -41,8 +41,9 @@ dependencies = [
     "dask[distributed]",
     "pyarrow>=14.0.0",
 
-    # NetCDF4 support for large files (>2GB)
+    # NetCDF support for large files (>2GB)
     "netcdf4>=1.6.0",
+    "h5netcdf>=1.0.0",
 ]
 
 [project.optional-dependencies]
