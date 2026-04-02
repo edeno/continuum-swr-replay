@@ -669,6 +669,7 @@ def run_decode(
                 non_stationary=non_stationary,
             )
 
+        logger.info("Organizing results...")
         data_over_time, posterior = organize_results(
             data,
             results,
