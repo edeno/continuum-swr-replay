@@ -143,6 +143,11 @@ chimi20200215, chimi20200219, chimi20200226, chimi20200301, chimi20200302,
 chimi20200303, chimi20200307, peanut20201124, peanut20201126, peanut20201130,
 peanut20201207, senor20201029, senor20201031, senor20201108, senor20201119,
 wilbur20210327, wilbur20210401, wilbur20210416
+
+Epochs with missing Spyglass pipeline entries (fail during HPC decoding):
+- senor20201104_06_r3: missing LFPBandV1 entry (no ripple detection data)
+- senor20201104_08_r4: missing LFPBandV1 entry (no ripple detection data)
+- senor20201105_09_r4: missing TrackGraph entry (no linearized position data)
 """
 
 WELL_PATCH_MAPPING = {
