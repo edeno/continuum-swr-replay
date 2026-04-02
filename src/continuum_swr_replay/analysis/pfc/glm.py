@@ -225,18 +225,21 @@ def test_theta_modulation(
         modulation : Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
         preferred_phase : Preferred theta phase in radians.
     """
-    is_running = ~is_immobile
+    reindexed_theta = reindex_by(
+        theta_phase,
+        is_immobile.index,
+        tolerance=1.0 / sampling_frequency,
+    )
+    # Theta phase may have NaN where no match exists within tolerance.
+    # Build a joint mask so the design matrix, response, and boolean
+    # index all have the same length.
+    valid = reindexed_theta.notna().to_numpy()
+    is_running = (~is_immobile).to_numpy() & valid
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
     design_matrix = dmatrix(
         formula,
-        {
-            "theta_phase": reindex_by(
-                theta_phase,
-                is_immobile.index,
-                tolerance=1.0 / sampling_frequency,
-            )
-        },
+        {"theta_phase": reindexed_theta[valid]},
         return_type="dataframe",
     )
 
@@ -248,7 +251,7 @@ def test_theta_modulation(
 
     theta_glm_model = sm.GLM(
         neuron_spike_count[is_running],
-        design_matrix.values[is_running],
+        design_matrix.values[is_running[valid]],
         family=sm.families.Poisson(),
     )
     theta_glm_results = theta_glm_model.fit()
