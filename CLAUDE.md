@@ -211,15 +211,17 @@ This project uses **JAX** for machine learning and requires CUDA 12 for GPU acce
 
 ## Animal and Session Information
 
-The dataset includes recordings from 5 animals across multiple sessions:
+The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). There are 91 NWB files and 221 total epochs across all animals:
 
-- **chimi**: 29 sessions (Feb-Mar 2020)
-- **j16**: 16 sessions (Jul 2021)
-- **peanut**: 16 sessions (Nov-Dec 2020)
-- **senor**: 26 sessions (Oct-Nov 2020)
-- **wilbur**: 22 sessions (Mar-Apr 2021)
+| Animal | NWB Files | Epochs | Dates |
+|--------|-----------|--------|-------|
+| chimi | 22 | 45 | Feb-Mar 2020 |
+| j16 | 16 | 58 | Jul 2021 |
+| peanut | 12 | 13 | Nov-Dec 2020 |
+| senor | 22 | 61 | Oct-Nov 2020 |
+| wilbur | 19 | 44 | Mar-Apr 2021 |
 
-All sessions use the spatial bandit task configuration. See `NWB_FILES` in `load_data_bandit.py` for the complete list.
+Epoch counts are computed dynamically by `get_epoch_info()`, which queries Spyglass for all valid intervals per NWB file. See `NWB_FILES` in `data_loaders/constants.py` for the complete file list.
 
 ## Running Decoding Analysis
 
