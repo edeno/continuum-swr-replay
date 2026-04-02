@@ -138,15 +138,9 @@ def plot_glm_results(
     }
     model_names = [model_list_to_mode_names[model_name] for model_name in model_list]
 
-    model_names_to_event = {
-        "SWR": "SWR",
-        "Non-Local, SWR": "non_local_SWR",
-        "Non-Local, No SWR": "non_local_no_SWR",
-        "Non-Local": "non_local",
-    }
     event_start_times = [
         event_times[model_name].start_time
-        for model_name in model_names_to_event.values()
+        for model_name in model_list
     ]
 
     # Row 1: GLM modulation coefficients
