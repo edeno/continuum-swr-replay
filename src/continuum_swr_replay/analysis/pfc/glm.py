@@ -451,6 +451,7 @@ def process_neuron(
     immobility_design_matrices: dict[str, NDArray],
     spline_basis: NDArray,
     lag_time: NDArray,
+    logger_name: str | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
@@ -561,6 +562,8 @@ def process_neuron(
         Comparing this with ``no_SWR_modulation`` tests whether the
         non-SWR replay response is robust to the choice of SWR control.
     """
+    _logger = logging.getLogger(logger_name) if logger_name else logger
+
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
     sampling_frequency = 1 / np.median(np.diff(time))
 
@@ -726,7 +729,7 @@ def process_neuron(
         )
 
     except (ValueError, np.linalg.LinAlgError):
-        logger.warning(
+        _logger.warning(
             "GLM fitting failed for neuron; falling back to firing rates only",
             exc_info=True,
         )
@@ -889,6 +892,7 @@ def run_session(
                 immobility_design_matrices,
                 spline_basis,
                 lag_time,
+                logger_name=logger.name,
             )
             for neuron_spike_times in data["spike_times"][brain_area]
         ]
@@ -907,6 +911,7 @@ def run_session(
                     immobility_design_matrices,
                     spline_basis,
                     lag_time,
+                    logger_name=logger.name,
                 )
             )
 
