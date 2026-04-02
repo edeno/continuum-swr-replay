@@ -34,10 +34,19 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 16
 
 import logging
 import logging.config
+import os
 import subprocess
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+
+# Pin BLAS/OpenMP threads to 1 per process to prevent thread oversubscription
+# when running multiple Dask workers. Each worker runs one session serially,
+# and statsmodels GLM (IRLS) is single-threaded anyway.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 from pathlib import Path
 from typing import Any
 
@@ -162,6 +171,7 @@ def run_analysis(
     immobility_threshold: float = MAX_SPEED_THRESHOLD_CM_PER_SEC,
     log_directory: str | Path = "logs",
     overwrite: bool = False,
+    git_hash: str = "",
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -181,6 +191,8 @@ def run_analysis(
         Directory for log files
     overwrite : bool
         Whether to overwrite existing results
+    git_hash : str
+        Pre-computed git hash for logging
     """
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
@@ -197,14 +209,7 @@ def run_analysis(
         return
 
     logger.info(" START ".center(50, "#"))
-
-    git_hash = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-    ).stdout
-    logger.info(f"Git Hash: {git_hash.rstrip()}")
+    logger.info(f"Git Hash: {git_hash}")
     logger.info(f"brain_area: {brain_area}")
     logger.info(f"sampling_frequency: {sampling_frequency}")
     logger.info(f"immobility_threshold: {immobility_threshold}")
@@ -227,6 +232,7 @@ def run_analysis(
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
+        logger.info("Saving results...")
 
         neuron_stats.to_pickle(save_file)
         np.save(
@@ -279,6 +285,7 @@ def get_command_line_arguments() -> Namespace:
     )
     parser.add_argument(
         "--brain_area", type=str, default="mPFC",
+        choices=["mPFC", "OFC"],
         help="Brain area to analyze: mPFC or OFC (default: mPFC)",
     )
     parser.add_argument(
@@ -383,6 +390,13 @@ def main() -> None:
     Path(args.log_directory).mkdir(exist_ok=True, parents=True)
     PROCESSED_DATA_DIR.mkdir(exist_ok=True, parents=True)
 
+    git_hash = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    ).stdout.rstrip()
+
     epoch_info = get_epoch_info()
     epoch_info = _filter_epoch_info(epoch_info, args)
     epoch_info = _filter_to_sorted_sessions(epoch_info)
@@ -399,11 +413,14 @@ def main() -> None:
                 immobility_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
                 log_directory=args.log_directory,
                 overwrite=args.overwrite,
+                git_hash=git_hash,
             )
     else:
         cluster = LocalCluster(
             local_directory=args.local_scratch_dir,
             n_workers=args.n_workers,
+            threads_per_worker=1,
+            processes=True,
         )
 
         with Client(cluster):
@@ -416,6 +433,7 @@ def main() -> None:
                     immobility_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
                     log_directory=args.log_directory,
                     overwrite=args.overwrite,
+                    git_hash=git_hash,
                 )
                 for epoch in epoch_info.itertuples()
             ]

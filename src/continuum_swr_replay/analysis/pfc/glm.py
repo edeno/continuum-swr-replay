@@ -28,7 +28,9 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times : NDArray
         Spike times in seconds
     time : NDArray
-        Time bin edges in seconds
+        Time bin centers in seconds (e.g., from position_info.index).
+        Internally, midpoints between consecutive values are used as bin
+        edges via ``np.digitize(spike_times, time[1:-1])``.
 
     Returns
     -------
@@ -268,7 +270,7 @@ def test_theta_modulation(
 
 def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
     if lags is None:
-        lags = np.arange(-100, 100, 1)
+        lags = np.arange(-100, 101, 1)
     signal_df = pd.DataFrame(signal)
     return np.concatenate(
         [signal_df.shift(lag, fill_value=0).to_numpy() for lag in lags], axis=1
@@ -305,16 +307,23 @@ def _make_conv_spline_basis(
     if not times:
         raise ValueError("times dict must be non-empty")
 
+    # Compute spline basis and lag_time once (they depend only on lags/knots,
+    # not on per-event indicator signals)
+    lag_time = lags / sampling_frequency
+    spline_basis = np.asarray(
+        dmatrix(
+            "bs(lag_time, knots=knots) - 1",
+            {"lag_time": lag_time, "knots": knots},
+        )
+    )
+
     conv_spline_basis: dict[str, NDArray] = {}
-    spline_basis: NDArray | None = None
-    lag_time: NDArray | None = None
     for times_name, times_df in times.items():
         is_time = get_spikecount_per_time_bin(
             times_df.start_time, position_info.index.to_numpy()
         )
-        conv_spline_basis[times_name], spline_basis, lag_time = create_conv_basis(
-            is_time, lags, knots, sampling_frequency
-        )
+        lagged = create_lagged_signal(is_time, lags)
+        conv_spline_basis[times_name] = lagged @ spline_basis
 
     return conv_spline_basis, spline_basis, lag_time
 
@@ -423,9 +432,11 @@ def get_frac_null_deviance(
 def get_frac_explained_deviance(
     full_model: Any, reduced_model: Any, constant_model: Any
 ) -> float:
+    denominator = constant_model.deviance - full_model.deviance
+    if abs(denominator) < 1e-10:
+        return 0.0
     return float(
-        (reduced_model.deviance - full_model.deviance)
-        / (constant_model.deviance - full_model.deviance)
+        (reduced_model.deviance - full_model.deviance) / denominator
     )
 
 
@@ -575,6 +586,18 @@ def process_neuron(
         results, models = _fit_immobility_models(
             is_immobile, immobility_design_matrices, neuron_spike_count
         )
+
+        # Check for silent non-convergence (NaN parameters from rank-deficient design)
+        nan_models = [
+            name for name, res in results.items()
+            if np.any(np.isnan(res.params))
+        ]
+        if nan_models:
+            raise ValueError(
+                f"GLM IRLS produced NaN params for models: {nan_models}. "
+                f"Immobility firing rate: "
+                f"{neuron_stats['immobility_avg_firing_rate']:.3f} Hz."
+            )
 
         ## Likelihood ratio tests
         # SWR-controlled decomposition: does replay add to SWR response?
@@ -812,6 +835,12 @@ def run_session(
         len(data["ripple_times"]),
     )
 
+    # Non-local events are filtered to immobility (line above) because
+    # non-local classification during running is unreliable. SWR times are
+    # intentionally NOT filtered: SWR detection already constrains to
+    # low-movement periods, and the full ripple set is needed so the SWR
+    # convolution kernel properly controls for ripple-related responses
+    # in the SWR-controlled decomposition.
     event_times = {
         "non_local_no_SWR": non_local_no_SWR_times,
         "non_local_SWR": non_local_SWR_times,
@@ -821,6 +850,10 @@ def run_session(
 
     time = data["position_info"].index.to_numpy()
     is_immobile = data["position_info"].head_speed <= immobility_threshold
+    logger.info(
+        "Immobility fraction: %.3f (%d/%d time bins)",
+        is_immobile.mean(), is_immobile.sum(), len(is_immobile),
+    )
 
     logger.info("Building design matrices...")
     immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
