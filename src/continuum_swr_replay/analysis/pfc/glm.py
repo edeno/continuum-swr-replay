@@ -53,12 +53,16 @@ def reindex_by(
 ) -> pd.Series | pd.DataFrame:
     """Reindex pandas object to new index using nearest neighbor.
 
+    Uses pd.merge_asof for efficient O(n log n) nearest-neighbor matching.
+    The original pd.reindex(method='nearest') can use O(n*m) memory when
+    source and target indices have different sampling rates.
+
     Parameters
     ----------
     df : pd.Series | pd.DataFrame
-        Data to reindex.
+        Data to reindex. Index must be sorted.
     index : pd.Index
-        Target index to align to.
+        Target index to align to. Must be sorted.
     tolerance : float | None, optional
         Maximum distance for nearest neighbor match (in index units, typically
         seconds for time indices). If None, uses unlimited matching which may
@@ -79,7 +83,22 @@ def reindex_by(
             UserWarning,
             stacklevel=2,
         )
-    return df.reindex(index, method="nearest", tolerance=tolerance)
+
+    target_df = pd.DataFrame(index=index)
+    source_df = df.copy() if isinstance(df, pd.DataFrame) else df.to_frame()
+
+    merged = pd.merge_asof(
+        target_df,
+        source_df,
+        left_index=True,
+        right_index=True,
+        direction="nearest",
+        tolerance=tolerance,
+    )
+
+    if isinstance(df, pd.Series):
+        return merged.iloc[:, 0].rename(df.name)
+    return merged
 
 
 def likelihood_ratio_test(
