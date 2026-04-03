@@ -264,12 +264,12 @@ def get_command_line_arguments() -> Namespace:
         formatter_class=RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--local_scratch_dir", type=str, default=".local_scratch",
-        help="Local scratch directory for Dask workers",
+        "--local_scratch_dir", type=str, default="/tmp/dask_scratch",
+        help="Local scratch directory for Dask workers (default: /tmp/dask_scratch)",
     )
     parser.add_argument(
-        "--n_workers", type=int, default=32,
-        help="Number of Dask workers (default: 32)",
+        "--n_workers", type=int, default=4,
+        help="Number of Dask workers (default: 4)",
     )
     parser.add_argument(
         "--animal", type=str, default=None,
