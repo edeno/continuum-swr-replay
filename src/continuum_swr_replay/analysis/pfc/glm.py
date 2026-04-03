@@ -252,7 +252,7 @@ def test_theta_modulation(
     # Theta phase may have NaN where no match exists within tolerance.
     # Build a joint mask so the design matrix, response, and boolean
     # index all have the same length.
-    valid = reindexed_theta.notna().to_numpy()
+    valid = reindexed_theta.notna().to_numpy().ravel()
     is_running = (~is_immobile).to_numpy() & valid
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
