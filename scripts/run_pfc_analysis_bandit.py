@@ -421,6 +421,7 @@ def main() -> None:
             n_workers=args.n_workers,
             threads_per_worker=1,
             processes=True,
+            memory_limit="400GB",
         )
 
         with Client(cluster):
