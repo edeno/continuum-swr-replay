@@ -880,12 +880,18 @@ def run_session(
         is_immobile.mean(), is_immobile.sum(), len(is_immobile),
     )
 
+    # Fit with wider lag window (±250ms) so spline boundary artifacts
+    # fall outside the reported window (±200ms). The returned modulation
+    # arrays are trimmed to the reporting window after fitting.
+    fit_lags = np.arange(-125, 126, 1)
+    report_lags = np.arange(-100, 101, 1)
+
     logger.info("Building design matrices...")
     immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
         event_times,
         data["position_info"],
         sampling_frequency=sampling_frequency,
-        lags=np.arange(-100, 101, 1),
+        lags=fit_lags,
     )
 
     if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
@@ -949,6 +955,16 @@ def run_session(
     non_local_no_SWR_modulation = np.stack(
         non_local_no_SWR_modulation_list, axis=1
     )
+
+    # Trim modulation arrays from fit window (±250ms) to report window (±200ms)
+    # to remove spline boundary artifacts at the edges
+    report_mask = np.isin(
+        np.round(lag_time, 6), np.round(report_lags / sampling_frequency, 6)
+    )
+    SWR_modulation = SWR_modulation[report_mask]
+    no_SWR_modulation = no_SWR_modulation[report_mask]
+    non_local_SWR_modulation = non_local_SWR_modulation[report_mask]
+    non_local_no_SWR_modulation = non_local_no_SWR_modulation[report_mask]
 
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
