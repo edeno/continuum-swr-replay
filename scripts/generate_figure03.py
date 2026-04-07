@@ -144,10 +144,11 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
 
 def plot_event_duration_distribution(
     event_types: dict,
-    output_dir: Path,
-    figure_name: str,
+    output_dir: Path | None = None,
+    figure_name: str | None = None,
     formats: list[str] | None = None,
     dpi: int = 300,
+    ax: plt.Axes | None = None,
 ) -> None:
     """Plot event duration distribution comparing all vs no-SWR overlap.
 
@@ -155,16 +156,21 @@ def plot_event_duration_distribution(
     ----------
     event_types : dict
         Dictionary of event type DataFrames
-    output_dir : Path
-        Output directory
-    figure_name : str
-        Base name for the figure
+    output_dir : Path, optional
+        Output directory (standalone mode)
+    figure_name : str, optional
+        Base name for the figure (standalone mode)
     formats : list of str, optional
         Output formats
     dpi : int
         DPI for raster formats
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
     """
-    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+
     for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
         event_times = get_event_start_end_times(
             event_types[event_type], event_col="non_local_event"
@@ -174,7 +180,7 @@ def plot_event_duration_distribution(
         color = (
             COLORS["Non-Local"]
             if event_type == "non_local_immobile_no_overlap_SWR"
-            else "lightgrey"
+            else COLORS["All Events"]
         )
         label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
         ax.hist(
@@ -190,12 +196,13 @@ def plot_event_duration_distribution(
     ax.set_xlabel("Event Duration (ms)")
     ax.set_ylabel("Density")
     ax.legend()
-    sns.despine(ax=ax)
-    plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
-    plt.close(fig)
-    logging.info(f"Saved: {figure_name}")
+    if standalone:
+        sns.despine(ax=ax)
+        plt.tight_layout()
+        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        plt.close(fig)
+        logging.info(f"Saved: {figure_name}")
 
 
 def plot_hpd_distribution(
@@ -410,11 +417,12 @@ def plot_position_animal_vs_replay(
 def plot_triggered_averages(
     data_over_time: pd.DataFrame,
     event_types: dict,
-    output_dir: Path,
-    figure_name: str,
+    output_dir: Path | None = None,
+    figure_name: str | None = None,
     time_col: str = "start_time",
     formats: list[str] | None = None,
     dpi: int = 300,
+    axes: list[plt.Axes] | None = None,
 ) -> None:
     """Plot event-triggered averages of physiological signals.
 
@@ -424,16 +432,18 @@ def plot_triggered_averages(
         Full dataset
     event_types : dict
         Dictionary of event type DataFrames
-    output_dir : Path
-        Output directory
-    figure_name : str
-        Base name for the figure
+    output_dir : Path, optional
+        Output directory (standalone mode)
+    figure_name : str, optional
+        Base name for the figure (standalone mode)
     time_col : str
         Column to use for alignment ('start_time' or 'end_time')
     formats : list of str, optional
         Output formats
     dpi : int
         DPI for raster formats
+    axes : list of matplotlib Axes, optional
+        List of 4 axes for the 4 signals. If None, creates standalone figure.
     """
     signal_types = [
         "Non-Local_prob",
@@ -470,19 +480,22 @@ def plot_triggered_averages(
         event_id_col="non_local_event",
     )
 
+    standalone = axes is None
     n_signals = len(signal_types)
-    fig, axes = plt.subplots(
-        nrows=n_signals,
-        ncols=1,
-        figsize=get_figure_size(n_signals, 1),
-        sharex=True,
-        constrained_layout=True,
-    )
+    if standalone:
+        fig, axes = plt.subplots(
+            nrows=n_signals,
+            ncols=1,
+            figsize=get_figure_size(n_signals, 1),
+            sharex=True,
+            constrained_layout=True,
+        )
+        axes = list(axes.flatten())
 
     no_overlap_mean_all = signal_windows.mean(dim="event")
     overlap_mean_all = signal_windows_overlap.mean(dim="event")
 
-    for i, (ax, signal_type) in enumerate(zip(axes.flatten(), signal_types)):
+    for i, (ax, signal_type) in enumerate(zip(axes, signal_types)):
         no_overlap_mean = no_overlap_mean_all.sel(signal=signal_type)
         overlap_mean = overlap_mean_all.sel(signal=signal_type)
 
@@ -499,19 +512,25 @@ def plot_triggered_averages(
             time,
             no_overlap_mean.values - no_overlap_sem,
             no_overlap_mean.values + no_overlap_sem,
-            color="C0",
+            color=COLORS["Non-Local"],
             alpha=0.3,
         )
         ax.fill_between(
             time,
             overlap_mean.values - overlap_sem,
             overlap_mean.values + overlap_sem,
-            color="C1",
+            color=COLORS["SWR"],
             alpha=0.3,
         )
 
-        ax.plot(time, no_overlap_mean.values, label="No SWR Overlap", color="C0")
-        ax.plot(time, overlap_mean.values, label="SWR Overlap", color="C1")
+        ax.plot(
+            time, no_overlap_mean.values,
+            label="No SWR Overlap", color=COLORS["Non-Local"],
+        )
+        ax.plot(
+            time, overlap_mean.values,
+            label="SWR Overlap", color=COLORS["SWR"],
+        )
 
         # Set ylabel based on signal type
         if signal_type.endswith("_zscore"):
@@ -531,22 +550,24 @@ def plot_triggered_averages(
         ax.axhline(0.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
 
         if i == 0:
-            ax.legend(loc="upper right", fontsize=8)
+            ax.legend(loc="upper right")
 
     axes[-1].set_xlabel("Time from Event (s)")
     axes[-1].set_xlim(-1.0, 1.0)
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
-    plt.close(fig)
-    logging.info(f"Saved: {figure_name}")
+    if standalone:
+        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        plt.close(fig)
+        logging.info(f"Saved: {figure_name}")
 
 
 def plot_replay_position_by_swr(
     data_over_time: pd.DataFrame,
-    output_dir: Path,
-    figure_name: str,
+    output_dir: Path | None = None,
+    figure_name: str | None = None,
     formats: list[str] | None = None,
     dpi: int = 300,
+    ax: plt.Axes | None = None,
 ) -> None:
     """Plot replay position distribution by SWR overlap status.
 
@@ -554,16 +575,20 @@ def plot_replay_position_by_swr(
     ----------
     data_over_time : pd.DataFrame
         Full dataset
-    output_dir : Path
-        Output directory
-    figure_name : str
-        Base name for the figure
+    output_dir : Path, optional
+        Output directory (standalone mode)
+    figure_name : str, optional
+        Base name for the figure (standalone mode)
     formats : list of str, optional
         Output formats
     dpi : int
         DPI for raster formats
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
     """
-    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
     # Use nanmedian to handle potential NaN values
     unique_positions = data_over_time["max_linear_position"].unique()
@@ -601,20 +626,22 @@ def plot_replay_position_by_swr(
     ax.set_ylabel("Density")
     ax.set_xlim(0, 1)
     ax.legend()
-    sns.despine(ax=ax)
-    plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
-    plt.close(fig)
-    logging.info(f"Saved: {figure_name}")
+    if standalone:
+        sns.despine(ax=ax)
+        plt.tight_layout()
+        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        plt.close(fig)
+        logging.info(f"Saved: {figure_name}")
 
 
 def plot_swr_zscore_by_state(
     data_over_time: pd.DataFrame,
-    output_dir: Path,
-    figure_name: str,
+    output_dir: Path | None = None,
+    figure_name: str | None = None,
     formats: list[str] | None = None,
     dpi: int = 300,
+    ax: plt.Axes | None = None,
 ) -> None:
     """Plot SWR z-score distribution by local/non-local state.
 
@@ -622,16 +649,20 @@ def plot_swr_zscore_by_state(
     ----------
     data_over_time : pd.DataFrame
         Full dataset
-    output_dir : Path
-        Output directory
-    figure_name : str
-        Base name for the figure
+    output_dir : Path, optional
+        Output directory (standalone mode)
+    figure_name : str, optional
+        Base name for the figure (standalone mode)
     formats : list of str, optional
         Output formats
     dpi : int
         DPI for raster formats
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
     """
-    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
     is_immobile = data_over_time.head_speed < 4.0
 
@@ -660,20 +691,22 @@ def plot_swr_zscore_by_state(
     ax.set_xlabel("SWR Z-score")
     ax.set_ylabel("Density")
     ax.legend()
-    sns.despine(ax=ax)
-    plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
-    plt.close(fig)
-    logging.info(f"Saved: {figure_name}")
+    if standalone:
+        sns.despine(ax=ax)
+        plt.tight_layout()
+        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        plt.close(fig)
+        logging.info(f"Saved: {figure_name}")
 
 
 def plot_replay_speed_by_swr(
     data_over_time: pd.DataFrame,
-    output_dir: Path,
-    figure_name: str,
+    output_dir: Path | None = None,
+    figure_name: str | None = None,
     formats: list[str] | None = None,
     dpi: int = 300,
+    ax: plt.Axes | None = None,
 ) -> None:
     """Plot replay speed distribution by SWR overlap status.
 
@@ -681,16 +714,20 @@ def plot_replay_speed_by_swr(
     ----------
     data_over_time : pd.DataFrame
         Full dataset
-    output_dir : Path
-        Output directory
-    figure_name : str
-        Base name for the figure
+    output_dir : Path, optional
+        Output directory (standalone mode)
+    figure_name : str, optional
+        Base name for the figure (standalone mode)
     formats : list of str, optional
         Output formats
     dpi : int
         DPI for raster formats
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
     """
-    fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
     bins = np.arange(0, 3000, 100)
 
@@ -723,12 +760,13 @@ def plot_replay_speed_by_swr(
     ax.set_xlabel("Replay Speed (cm/s)")
     ax.set_ylabel("Density")
     ax.legend()
-    sns.despine(ax=ax)
-    plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
-    plt.close(fig)
-    logging.info(f"Saved: {figure_name}")
+    if standalone:
+        sns.despine(ax=ax)
+        plt.tight_layout()
+        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        plt.close(fig)
+        logging.info(f"Saved: {figure_name}")
 
 
 def main() -> None:
