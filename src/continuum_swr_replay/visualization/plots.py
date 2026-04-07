@@ -260,7 +260,7 @@ def plot_peri_event_probability(
     h = axes[0].pcolormesh(
         t, n, event_probs_sorted.T, vmin=0.0, vmax=1.0, cmap="cividis"
     )
-    axes[0].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[0].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[0].set_ylabel("Event number")
     axes[0].set_title("Non-Local Event Probability")
     plt.colorbar(h, ax=axes[0])
@@ -269,7 +269,7 @@ def plot_peri_event_probability(
     h = axes[1].pcolormesh(
         t, n, event_swr_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r"
     )
-    axes[1].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[1].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[1].set_ylabel("Event number")
     axes[1].set_title("SWR z-score")
     plt.colorbar(h, ax=axes[1])
@@ -278,34 +278,34 @@ def plot_peri_event_probability(
     h = axes[2].pcolormesh(
         t, n, event_mua_zscores_sorted.T, vmin=-3, vmax=3, cmap="RdBu_r"
     )
-    axes[2].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[2].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[2].set_ylabel("Event number")
     axes[2].set_title("MUA z-score")
     plt.colorbar(h, ax=axes[2])
 
     if show_end_times:
         for ax in axes[:3]:
-            ax.scatter(duration, np.arange(n_events), color=COLORS["clusterless"], s=1)
+            ax.scatter(duration, np.arange(n_events), color=COLORS["Non-Local"], s=1)
 
     # Non-Local IQR
     prob_iqr = np.nanpercentile(event_probs_sorted, [25, 50, 75], axis=1)
-    axes[3].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[3].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[3].plot(
-        relative_time, prob_iqr[1], color=COLORS["clusterless"], label="Non-Local"
+        relative_time, prob_iqr[1], color=COLORS["Non-Local"], label="Non-Local"
     )
     axes[3].fill_between(
         relative_time,
         prob_iqr[0],
         prob_iqr[2],
         alpha=0.5,
-        color=COLORS["clusterless"],
+        color=COLORS["Non-Local"],
     )
     axes[3].set_ylabel("Prob.")
     axes[3].legend()
 
     # SWR IQR
     swr_iqr = np.nanpercentile(event_swr_zscores_sorted, [25, 50, 75], axis=1)
-    axes[4].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[4].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[4].plot(relative_time, swr_iqr[1], color=COLORS["SWR"], label="SWR")
     axes[4].fill_between(
         relative_time,
@@ -321,7 +321,7 @@ def plot_peri_event_probability(
 
     # MUA IQR
     mua_iqr = np.nanpercentile(event_mua_zscores_sorted, [25, 50, 75], axis=1)
-    axes[5].axvline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[5].axvline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[5].plot(relative_time, mua_iqr[1], color=COLORS["MUA"], label="MUA")
     axes[5].fill_between(
         relative_time,
@@ -332,7 +332,7 @@ def plot_peri_event_probability(
     )
     axes[5].set_ylabel("z-score")
     axes[5].set_ylim(-3, 3)
-    axes[5].axhline(0, color=COLORS["clusterless"], linestyle="--")
+    axes[5].axhline(0, color=COLORS["Non-Local"], linestyle="--")
     axes[5].legend()
 
     axes[-1].set_xlabel("Time relative to event (s)")
@@ -414,19 +414,46 @@ def plot_theta_phase(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
     ax.set_yticklabels([r"$-\pi$", r"$0$", r"$\pi$"])
 
 
+def _intervals_to_mask(
+    intervals: pd.DataFrame,
+    time_idx: NDArray[np.floating],
+) -> NDArray[np.bool_]:
+    """Convert start/end interval DataFrame to a boolean mask over time_idx.
+
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        Must have ``start_time`` and ``end_time`` columns.
+    time_idx : np.ndarray
+        Time values to label.
+
+    Returns
+    -------
+    np.ndarray of bool
+    """
+    if intervals.empty:
+        return np.zeros(len(time_idx), dtype=bool)
+    starts = intervals["start_time"].to_numpy()[:, np.newaxis]
+    ends = intervals["end_time"].to_numpy()[:, np.newaxis]
+    return ((time_idx >= starts) & (time_idx <= ends)).any(axis=0)
+
+
 def plot_multiunit_firing(
     data: dict[str, Any],
     time_slice: slice,
     ax: Axes,
     plot_multiunit_zscore: bool = False,
     plot_thresholds: bool = False,
+    brain_area: str = "HPC",
 ) -> None:
     """Plot multiunit activity.
 
     Parameters
     ----------
     data : dict
-        Data dictionary containing multiunit data
+        Data dictionary from load_data(). Uses keys ``multiunit_firing_rate``
+        or ``multiunit_rate_zscore`` (dict[str, pd.DataFrame] keyed by brain
+        area) and ``hse_times`` (dict[str, pd.DataFrame]).
     time_slice : slice
         Time slice to plot
     ax : matplotlib.axes.Axes
@@ -435,15 +462,24 @@ def plot_multiunit_firing(
         Whether to plot z-scored MUA, by default False
     plot_thresholds : bool, optional
         Whether to plot threshold lines, by default False
+    brain_area : str, optional
+        Brain area to plot, by default "HPC"
     """
+    key = "multiunit_rate_zscore" if plot_multiunit_zscore else "multiunit_firing_rate"
+    multiunit_data = data[key]
+    # Resolve dict-by-brain-area to a single DataFrame
+    if isinstance(multiunit_data, dict):
+        multiunit_firing = multiunit_data[brain_area]
+    else:
+        multiunit_firing = multiunit_data
+
     if plot_multiunit_zscore:
-        multiunit_firing = data["multiunit_rate_zscore"]
         ax.set_ylabel("MUA\n[Std].")
         if plot_thresholds:
             ax.axhline(2, color="grey", linestyle="--", linewidth=1, zorder=10)
     else:
-        multiunit_firing = data["multiunit_firing_rate"]
         ax.set_ylabel("MUA\n[spikes/s]")
+
     max_multiunit = np.ceil(multiunit_firing.values.max()).astype(int)
     min_multiunit = (
         np.floor(multiunit_firing.values.min()).astype(int)
@@ -456,27 +492,13 @@ def plot_multiunit_firing(
         multiunit_firing.loc[time_slice].to_numpy().squeeze(),
         color="black",
     )
-    # Compute HSE labels on the fly from hse_times if not pre-computed
+
+    # Compute HSE active periods from hse_times
     time_idx = multiunit_firing.loc[time_slice].index.to_numpy()
-    if "multiunit_high_synchrony_labels" in data:
-        hse_is_active = (
-            data["multiunit_high_synchrony_labels"]
-            .loc[time_slice]
-            .values.squeeze()
-            > 0
-        )
-    elif "hse_times" in data:
-        hse_times = data["hse_times"]
-        # hse_times may be a dict by brain area
-        if isinstance(hse_times, dict):
-            hse_times = next(iter(hse_times.values()), pd.DataFrame())
-        hse_is_active = np.zeros(len(time_idx), dtype=bool)
-        for _, row in hse_times.iterrows():
-            hse_is_active |= (time_idx >= row.start_time) & (
-                time_idx <= row.end_time
-            )
-    else:
-        hse_is_active = np.zeros(len(time_idx), dtype=bool)
+    hse_times = data.get("hse_times", {})
+    if isinstance(hse_times, dict):
+        hse_times = hse_times.get(brain_area, pd.DataFrame())
+    hse_is_active = _intervals_to_mask(hse_times, time_idx)
 
     ax.fill_between(
         time_idx,
@@ -516,17 +538,10 @@ def plot_ripple_consensus_trace_zscore(
     max_consensus = max(int(np.ceil(ripple_consensus_trace.max())), 5)
     min_consensus = min(int(np.ceil(ripple_consensus_trace.min())), -1)
 
-    # Compute ripple labels on the fly from ripple_times if not pre-computed
-    if "ripple_labels" in data:
-        ripple_is_active = data["ripple_labels"].loc[time_slice].values.squeeze() > 0
-    else:
-        ripple_times = data["ripple_times"]
-        time_idx = ripple_consensus_trace.index.to_numpy()
-        ripple_is_active = np.zeros(len(time_idx), dtype=bool)
-        for _, row in ripple_times.iterrows():
-            ripple_is_active |= (time_idx >= row.start_time) & (
-                time_idx <= row.end_time
-            )
+    # Compute ripple active periods from ripple_times
+    time_idx = ripple_consensus_trace.index.to_numpy()
+    ripple_times = data.get("ripple_times", pd.DataFrame())
+    ripple_is_active = _intervals_to_mask(ripple_times, time_idx)
 
     ax.fill_between(
         ripple_consensus_trace.index,
@@ -560,13 +575,15 @@ def plot_spike_times(
     results: xr.Dataset,
     ax: Axes,
     data_type: str = "clusterless",
+    brain_area: str = "HPC",
 ) -> None:
     """Plot spike raster with non-local events highlighted.
 
     Parameters
     ----------
     data : dict
-        Data dictionary containing spike times
+        Data dictionary from load_data(). Uses ``spike_times`` key which is
+        a dict[str, list[np.ndarray]] keyed by brain area.
     time_slice : slice
         Time slice to plot
     detector : Detector
@@ -579,17 +596,14 @@ def plot_spike_times(
         Axes to plot on
     data_type : str, optional
         Type of spike data ("clusterless" or "sorted"), by default "clusterless"
+    brain_area : str, optional
+        Brain area to plot spikes from, by default "HPC"
     """
-    # Support both old format (data["clusterless_spike_times"]) and
-    # current format (data["spike_times"]["HPC"])
-    if data_type == "clusterless":
-        spike_times = data.get(
-            "clusterless_spike_times", data.get("spike_times", {}).get("HPC", [])
-        )
+    spike_times_dict = data.get("spike_times", {})
+    if isinstance(spike_times_dict, dict):
+        spike_times = spike_times_dict.get(brain_area, [])
     else:
-        spike_times = data.get(
-            "sorted_spike_times", data.get("spike_times", {}).get("mPFC", [])
-        )
+        spike_times = spike_times_dict
     n_neurons = len(spike_times)
     acausal_state_probabilities = results.sel(
         time=time_slice
