@@ -89,6 +89,17 @@ from .posterior_analysis import (
     get_map_speed,
     get_posterior_stats,
 )
+from .quality_metrics import (
+    compute_calibration_curve,
+    compute_error_by_track_segment,
+    compute_local_decoding_error,
+    compute_local_state_collapse_details,
+    compute_no_spike_firing_correspondence,
+    compute_non_local_during_movement,
+    compute_non_local_event_context,
+    compute_session_quality_summary,
+    compute_state_fraction_during_movement,
+)
 from .result_loading import load_results
 from .triggered_analysis import get_signal_windows
 
@@ -104,4 +115,13 @@ __all__ = [
     "get_map_speed",
     "get_posterior_stats",
     "get_data_over_time",
+    "compute_calibration_curve",
+    "compute_error_by_track_segment",
+    "compute_local_decoding_error",
+    "compute_local_state_collapse_details",
+    "compute_no_spike_firing_correspondence",
+    "compute_non_local_during_movement",
+    "compute_non_local_event_context",
+    "compute_session_quality_summary",
+    "compute_state_fraction_during_movement",
 ]
