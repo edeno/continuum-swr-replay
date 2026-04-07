@@ -456,11 +456,32 @@ def plot_multiunit_firing(
         multiunit_firing.loc[time_slice].to_numpy().squeeze(),
         color="black",
     )
+    # Compute HSE labels on the fly from hse_times if not pre-computed
+    time_idx = multiunit_firing.loc[time_slice].index.to_numpy()
+    if "multiunit_high_synchrony_labels" in data:
+        hse_is_active = (
+            data["multiunit_high_synchrony_labels"]
+            .loc[time_slice]
+            .values.squeeze()
+            > 0
+        )
+    elif "hse_times" in data:
+        hse_times = data["hse_times"]
+        # hse_times may be a dict by brain area
+        if isinstance(hse_times, dict):
+            hse_times = next(iter(hse_times.values()), pd.DataFrame())
+        hse_is_active = np.zeros(len(time_idx), dtype=bool)
+        for _, row in hse_times.iterrows():
+            hse_is_active |= (time_idx >= row.start_time) & (
+                time_idx <= row.end_time
+            )
+    else:
+        hse_is_active = np.zeros(len(time_idx), dtype=bool)
+
     ax.fill_between(
-        multiunit_firing.loc[time_slice].index.to_numpy(),
-        np.ones_like(multiunit_firing.loc[time_slice].index.to_numpy()) * max_multiunit,
-        where=data["multiunit_high_synchrony_labels"].loc[time_slice].values.squeeze()
-        > 0,
+        time_idx,
+        np.ones_like(time_idx) * max_multiunit,
+        where=hse_is_active,
         color=COLORS["MUA"],
         zorder=-2,
         alpha=0.6,
@@ -490,15 +511,27 @@ def plot_ripple_consensus_trace_zscore(
     plot_thresholds : bool, optional
         Whether to plot threshold lines, by default False
     """
-    ripple_consensus_trace = data["ripple_consensus_trace_zscore"].loc[time_slice]
+    ripple_consensus_trace = data["zscored_ripple_consensus_trace"].loc[time_slice]
 
     max_consensus = max(int(np.ceil(ripple_consensus_trace.max())), 5)
     min_consensus = min(int(np.ceil(ripple_consensus_trace.min())), -1)
 
+    # Compute ripple labels on the fly from ripple_times if not pre-computed
+    if "ripple_labels" in data:
+        ripple_is_active = data["ripple_labels"].loc[time_slice].values.squeeze() > 0
+    else:
+        ripple_times = data["ripple_times"]
+        time_idx = ripple_consensus_trace.index.to_numpy()
+        ripple_is_active = np.zeros(len(time_idx), dtype=bool)
+        for _, row in ripple_times.iterrows():
+            ripple_is_active |= (time_idx >= row.start_time) & (
+                time_idx <= row.end_time
+            )
+
     ax.fill_between(
         ripple_consensus_trace.index,
         np.ones_like(ripple_consensus_trace.index) * max_consensus,
-        where=data["ripple_labels"].loc[time_slice].values.squeeze() > 0,
+        where=ripple_is_active,
         color=COLORS["SWR"],
         zorder=-2,
         alpha=0.6,
@@ -547,11 +580,16 @@ def plot_spike_times(
     data_type : str, optional
         Type of spike data ("clusterless" or "sorted"), by default "clusterless"
     """
-    spike_times = (
-        data["clusterless_spike_times"]
-        if data_type == "clusterless"
-        else data["sorted_spike_times"]
-    )
+    # Support both old format (data["clusterless_spike_times"]) and
+    # current format (data["spike_times"]["HPC"])
+    if data_type == "clusterless":
+        spike_times = data.get(
+            "clusterless_spike_times", data.get("spike_times", {}).get("HPC", [])
+        )
+    else:
+        spike_times = data.get(
+            "sorted_spike_times", data.get("spike_times", {}).get("mPFC", [])
+        )
     n_neurons = len(spike_times)
     acausal_state_probabilities = results.sel(
         time=time_slice
