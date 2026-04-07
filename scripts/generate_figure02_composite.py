@@ -214,7 +214,7 @@ def generate_figure(
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
-    gs = GridSpec(2, 1, figure=fig, height_ratios=[1.8, 1.0], hspace=0.35)
+    gs = GridSpec(2, 1, figure=fig, height_ratios=[1.6, 1.2], hspace=0.35)
 
     # ── Row 1: Real data example (panel a) — 4 stacked sub-rows ──
     gs_a = gs[0].subgridspec(4, 1, hspace=0.05,
@@ -230,6 +230,13 @@ def generate_figure(
         data, time_slice, results, env, detector, ax_posterior
     )
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
+
+    # Convert absolute timestamps to relative time (seconds from event start)
+    t0 = time_slice.start
+    for ax in [ax_swr, ax_raster, ax_posterior, ax_probs]:
+        ticks = ax.get_xticks()
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([f"{t - t0:.1f}" for t in ticks])
 
     # Remove x-labels from non-bottom sub-rows
     for ax in [ax_swr, ax_raster, ax_posterior]:

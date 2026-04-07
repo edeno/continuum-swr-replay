@@ -77,6 +77,7 @@ def plot_single_model_glm(
     glm_result,
     event_start_times,
     title=None,
+    color=None,
 ):
     """Plot GLM modulation + raster + PSTH for a single model on 3 axes.
 
@@ -98,6 +99,8 @@ def plot_single_model_glm(
         Event start times
     title : str, optional
         Panel title (defaults to model_name)
+    color : str, optional
+        Color for the modulation line and fill
     """
     ax_mod, ax_raster, ax_psth = axes
     lag_bounds = lag_time[0], lag_time[-1]
@@ -105,12 +108,13 @@ def plot_single_model_glm(
 
     # Row 1: GLM modulation coefficients
     modulation = glm_result.params[1:] @ spline_basis.T
-    ax_mod.plot(lag_time, modulation)
+    ax_mod.plot(lag_time, modulation, color=color)
     ax_mod.fill_between(
         lag_time,
         (glm_result.params[1:] + glm_result.bse[1:]) @ spline_basis.T,
         (glm_result.params[1:] - glm_result.bse[1:]) @ spline_basis.T,
         alpha=0.25,
+        color=color,
     )
     ax_mod.axhline(0, color="black", linestyle="--", linewidth=0.5)
     ax_mod.axvline(0, color="black", linestyle="--", linewidth=0.5)
@@ -161,6 +165,7 @@ def plot_single_neuron_aic(glm_results, ax, model_list=None):
     ax.set_ylabel("ΔAIC")
     ax.set_title("Model comparison")
     ax.tick_params(axis="both", which="both", length=3, direction="out")
+    ax.tick_params(axis="x", labelsize=5)
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +245,8 @@ def plot_significance_on_ax(df, ax):
     tests = {
         "SWR": "SWR vs. constant: fdr_q",
         "Replay": "non_local vs. constant: fdr_q",
-        "non-SWR\nreplay": "non_local_no_SWR vs. constant: fdr_q",
-        "Replay\nbeyond SWR": "SWR + non_local_no_SWR vs. SWR: fdr_q",
+        "no-SWR": "non_local_no_SWR vs. constant: fdr_q",
+        "Beyond\nSWR": "SWR + non_local_no_SWR vs. SWR: fdr_q",
     }
 
     n_total = len(df)
@@ -256,15 +261,16 @@ def plot_significance_on_ax(df, ax):
                     f"{frac:.0f}%", ha="center", fontsize=5)
 
     ax.axhline(5, color="gray", linewidth=0.5, linestyle="--")
-    ax.set_ylabel("% neurons\n(FDR q<0.05)")
+    ax.set_ylabel("% sig.")
     ax.set_ylim(0, max(fracs) * 1.3)
+    ax.tick_params(axis="x", labelsize=5)
 
 
 def plot_aic_selection_on_ax(df, ax):
     """Plot AIC model selection distribution on provided ax."""
     n_total = len(df)
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
-    model_labels = ["Const.", "SWR", "Replay", "SWR +\nnon-SWR"]
+    model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
     model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], "#e6ab02"]
 
     counts = df["min_aic_model"].value_counts()
@@ -276,6 +282,7 @@ def plot_aic_selection_on_ax(df, ax):
             ax.text(bar.get_x() + bar.get_width() / 2, val + 1,
                     f"{val:.0f}%", ha="center", fontsize=5)
     ax.set_ylabel("% neurons")
+    ax.tick_params(axis="x", labelsize=5)
     ax.set_title("Best model (AIC)")
 
 
@@ -382,6 +389,7 @@ def generate_figure(
         neuron_spike_times, glm_results["non_local_no_SWR"],
         event_times["non_local_no_SWR"].start_time,
         title="Non-SWR\nReplay",
+        color=COLORS["Non-Local"],
     )
 
     # Panel b: SWR (3 sub-rows)
@@ -393,6 +401,7 @@ def generate_figure(
         neuron_spike_times, glm_results["SWR"],
         event_times["SWR"].start_time,
         title="SWR",
+        color=COLORS["SWR"],
     )
 
     # Panel c: AIC

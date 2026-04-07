@@ -475,7 +475,7 @@ def generate_figure(n_neurons=30, seed=42):
     # --- Create figure ---
     set_figure_defaults(context="paper")
 
-    fig_height = min(TWO_COLUMN * 1.55, PAGE_HEIGHT)
+    fig_height = min(TWO_COLUMN * 1.35, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
@@ -483,7 +483,7 @@ def generate_figure(n_neurons=30, seed=42):
     gs_main = GridSpec(
         3, 1, figure=fig,
         height_ratios=[1.4, 0.8, 2.0],
-        hspace=0.35,
+        hspace=0.20,
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──

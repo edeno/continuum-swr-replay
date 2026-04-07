@@ -251,13 +251,20 @@ def generate_figure(
     )
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
 
+    # Convert absolute timestamps to relative time (seconds from event start)
+    t0 = time_slice.start
+    for ax in [ax_swr, ax_raster, ax_posterior, ax_probs]:
+        ticks = ax.get_xticks()
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([f"{t - t0:.1f}" for t in ticks])
+
     # Remove x-labels from non-bottom sub-rows
     for ax in [ax_swr, ax_raster, ax_posterior]:
         ax.tick_params(labelbottom=False)
     ax_probs.set_xlabel("Time (s)")
 
     # ── Row 2: Statistics panels (b, c, d, e) ──
-    gs_bot = gs[1].subgridspec(1, 4, width_ratios=[1, 1, 1, 1], wspace=0.45)
+    gs_bot = gs[1].subgridspec(1, 4, width_ratios=[1, 1.1, 1, 1], wspace=0.55)
 
     # Panel b: SWR z-score by state
     ax_b = fig.add_subplot(gs_bot[0])
@@ -270,6 +277,7 @@ def generate_figure(
     # Panel d: Replay speed by SWR
     ax_d = fig.add_subplot(gs_bot[2])
     plot_replay_speed_by_swr(data_over_time, ax=ax_d)
+    ax_d.set_xlim(0, 1500)  # Focus on meaningful range
 
     # Panel e: Replay position by SWR
     ax_e = fig.add_subplot(gs_bot[3])
