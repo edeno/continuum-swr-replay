@@ -226,7 +226,8 @@ COLORS = {
     "MUA": "#7570b3",
     "Non-Local": "#1b9e77",
     "Local": "#add8e6",  # Soft Blue for Local
-    "No-Spike": "#b0b0b0",  # Light Beige for No-Spike
+    "No-Spike": "#b0b0b0",  # Light Gray for No-Spike
+    "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
 }
 
 __all__ = [
