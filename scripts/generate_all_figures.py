@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 """Generate all manuscript figures.
 
-This script orchestrates the generation of all figures for the manuscript by
-running each figure generation script in sequence. It provides progress reporting
-and error handling.
+This script orchestrates the generation of all composite figures for the
+manuscript by running each figure generation script in sequence.
 
 Figures generated:
-- Figure 1: Simulated non-local detection example
-- Figure 2: Non-local event detection and characterization (4 panels)
-- Figure 3: Event characteristics and physiological correlates
-- Figure 4: GLM analysis of mPFC modulation
+- Figure 1: Switching state-space model (simulated example)
+- Figure 2: Model works on real data (example + distributions + triggered avg)
+- Figure 3: Events outside SWR/MUA (example + z-score + Venn + speed + position)
+- Figure 4: PFC responds regardless (GLM + population heatmaps + significance)
 
 Usage:
     python scripts/generate_all_figures.py
-    python scripts/generate_all_figures.py --output-dir paper/figures --format pdf
     python scripts/generate_all_figures.py --skip figure01 figure04
+    python scripts/generate_all_figures.py --only figure02 figure03
 """
 
 import argparse
@@ -31,24 +30,30 @@ logging.basicConfig(
 )
 
 
-# Map of figure scripts
+# Map of figure scripts and their output directories
 FIGURE_SCRIPTS = {
-    "figure01": "scripts/generate_figure01.py",
-    "figure02a": "scripts/generate_figure02a_distributions.py",
-    "figure02b": "scripts/generate_figure02b_triggered_averages.py",
-    "figure02c": "scripts/generate_figure02c_overlaps.py",
-    "figure02d": "scripts/generate_figure02d_timing.py",
-    "figure03": "scripts/generate_figure03.py",
-    "figure04": "scripts/generate_figure04.py",
+    "figure01": {
+        "script": "scripts/generate_figure01.py",
+        "output_dir": "paper/figures/figure01",
+    },
+    "figure02": {
+        "script": "scripts/generate_figure02_composite.py",
+        "output_dir": "paper/figures/figure02",
+    },
+    "figure03": {
+        "script": "scripts/generate_figure03_composite.py",
+        "output_dir": "paper/figures/figure03",
+    },
+    "figure04": {
+        "script": "scripts/generate_figure04_composite.py",
+        "output_dir": "paper/figures/figure04",
+    },
 }
 
 
 def run_figure_script(
     script_name: str,
-    script_path: str,
-    output_dir: Path,
-    format: str,
-    dpi: int,
+    script_config: dict,
     data_dir: Path | None,
 ) -> tuple[bool, float]:
     """Run a single figure generation script.
@@ -57,16 +62,10 @@ def run_figure_script(
     ----------
     script_name : str
         Name of the figure (e.g., "figure01")
-    script_path : str
-        Path to the script file
-    output_dir : Path
-        Output directory for figures
-    format : str
-        Output format (pdf, png, svg)
-    dpi : int
-        DPI for raster formats
+    script_config : dict
+        Script configuration with 'script' and 'output_dir' keys
     data_dir : Path | None
-        Data directory (if applicable)
+        Data directory override (if applicable)
 
     Returns
     -------
@@ -75,17 +74,12 @@ def run_figure_script(
     """
     logging.info(f"Generating {script_name}...")
 
-    # Build command
-    cmd = ["uv", "run", "python", script_path]
-    cmd.extend(["--output-dir", str(output_dir)])
-    cmd.extend(["--format", format])
-    cmd.extend(["--dpi", str(dpi)])
+    cmd = ["uv", "run", "python", script_config["script"]]
+    cmd.extend(["--output-dir", script_config["output_dir"]])
 
-    # Add data-dir for applicable scripts
-    if data_dir and script_name not in ["figure01", "figure04"]:
+    if data_dir and script_name != "figure01":
         cmd.extend(["--data-dir", str(data_dir)])
 
-    # Run script
     start_time = time.time()
     try:
         subprocess.run(
@@ -95,12 +89,12 @@ def run_figure_script(
             text=True,
         )
         elapsed = time.time() - start_time
-        logging.info(f" {script_name} completed in {elapsed:.1f}s")
+        logging.info(f"  {script_name} completed in {elapsed:.1f}s")
         return True, elapsed
     except subprocess.CalledProcessError as e:
         elapsed = time.time() - start_time
-        logging.error(f" {script_name} failed after {elapsed:.1f}s")
-        logging.error(f"  Error: {e.stderr[:500]}")  # Show first 500 chars
+        logging.error(f"  {script_name} failed after {elapsed:.1f}s")
+        logging.error(f"  Error: {e.stderr[-500:]}")
         return False, elapsed
 
 
@@ -110,29 +104,10 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("paper/figures"),
-        help="Output directory for all figures (default: paper/figures)",
-    )
-    parser.add_argument(
-        "--format",
-        type=str,
-        choices=["pdf", "png", "svg"],
-        default="pdf",
-        help="Output format for all figures (default: pdf)",
-    )
-    parser.add_argument(
-        "--dpi",
-        type=int,
-        default=300,
-        help="DPI for raster formats (default: 300)",
-    )
-    parser.add_argument(
         "--data-dir",
         type=Path,
         default=None,
-        help="Data directory for figure02/03 scripts (default: PROCESSED_DATA_DIR)",
+        help="Data directory override (default: PROCESSED_DATA_DIR)",
     )
     parser.add_argument(
         "--skip",
@@ -144,13 +119,10 @@ def main() -> None:
         "--only",
         nargs="*",
         default=[],
-        help="Only generate specific figure(s) (e.g., --only figure02a figure03)",
+        help="Only generate specific figure(s) (e.g., --only figure02 figure03)",
     )
 
     args = parser.parse_args()
-
-    # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine which figures to generate
     if args.only:
@@ -173,11 +145,7 @@ def main() -> None:
     logging.info("=" * 60)
     logging.info("Generating Manuscript Figures")
     logging.info("=" * 60)
-    logging.info(f"Output directory: {args.output_dir}")
-    logging.info(f"Format: {args.format} (DPI: {args.dpi})")
-    if args.data_dir:
-        logging.info(f"Data directory: {args.data_dir}")
-    logging.info(f"Figures to generate: {', '.join(figures_to_generate.keys())}")
+    logging.info(f"Figures: {', '.join(figures_to_generate.keys())}")
     if args.skip:
         logging.info(f"Skipping: {', '.join(args.skip)}")
     logging.info("=" * 60)
@@ -186,10 +154,8 @@ def main() -> None:
     results = {}
     total_start = time.time()
 
-    for name, script in figures_to_generate.items():
-        success, elapsed = run_figure_script(
-            name, script, args.output_dir, args.format, args.dpi, args.data_dir
-        )
+    for name, config in figures_to_generate.items():
+        success, elapsed = run_figure_script(name, config, args.data_dir)
         results[name] = {"success": success, "time": elapsed}
 
     total_elapsed = time.time() - total_start
@@ -203,10 +169,10 @@ def main() -> None:
     failed = [name for name, res in results.items() if not res["success"]]
 
     for name in successful:
-        logging.info(f" {name:12s} {results[name]['time']:6.1f}s")
+        logging.info(f"  {name:12s} {results[name]['time']:6.1f}s")
 
     for name in failed:
-        logging.error(f" {name:12s} {results[name]['time']:6.1f}s")
+        logging.error(f"  {name:12s} {results[name]['time']:6.1f}s")
 
     logging.info("-" * 60)
     logging.info(
