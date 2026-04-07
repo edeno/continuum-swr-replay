@@ -221,10 +221,61 @@ def get_electrode_group_info(nwb_file_name: str) -> pd.DataFrame:
     return electrode_group_df
 
 
+_MAX_TETRODE_ELECTRODES = 4
+
+
+def _get_tetrode_sort_group_ids(
+    nwb_file_name: str,
+    restriction: dict,
+) -> set[int]:
+    """Get sort group IDs that correspond to tetrodes (<=4 electrodes).
+
+    Non-tetrode sort groups (e.g., 32-channel probes) can be processed with
+    tetrode preprocessing parameters but produce high-dimensional waveform
+    features that are incompatible with clusterless decoding calibrated for
+    tetrode marks.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name.
+    restriction : dict
+        UnitMarks restriction dict.
+
+    Returns
+    -------
+    set[int]
+        Sort group IDs with <= 4 electrodes.
+    """
+    unit_mark_keys = pd.DataFrame(
+        (UnitMarks & restriction).fetch("sort_group_id", as_dict=True)
+    )
+    sort_group_ids = unit_mark_keys["sort_group_id"].unique()
+
+    tetrode_ids = set()
+    for sg_id in sort_group_ids:
+        sg_restriction = {"nwb_file_name": nwb_file_name, "sort_group_id": sg_id}
+        n_electrodes = len(SortGroup.SortGroupElectrode & sg_restriction)
+        if n_electrodes <= _MAX_TETRODE_ELECTRODES:
+            tetrode_ids.add(int(sg_id))
+        else:
+            logger.warning(
+                "Excluding sort group %d from %s: %d electrodes (not a tetrode)",
+                sg_id, nwb_file_name, n_electrodes,
+            )
+
+    return tetrode_ids
+
+
 def get_hpc_marks(
     nwb_file_name: str,
 ) -> tuple[list[NDArray[np.float64]], list[NDArray[np.float64]]]:
     """Get hippocampus clusterless marks (spike times and waveform features).
+
+    Only includes sort groups with <= 4 electrodes (tetrodes). Sort groups
+    with more electrodes (e.g., 32-channel probes) are excluded because their
+    high-dimensional waveform features are incompatible with the clusterless
+    decoding kernel bandwidth (``waveform_std``) calibrated for tetrode marks.
 
     Parameters
     ----------
@@ -256,8 +307,19 @@ def get_hpc_marks(
         # Fall back to alternative parameter name
         restriction = {**restriction_base, "sorter_params_name": "default_clusterless"}
 
+    # Filter to tetrode sort groups only
+    tetrode_sg_ids = _get_tetrode_sort_group_ids(nwb_file_name, restriction)
+    if not tetrode_sg_ids:
+        raise ValueError(
+            f"No tetrode sort groups found for {nwb_file_name!r}"
+        )
+
+    tetrode_restriction = [
+        {**restriction, "sort_group_id": sg_id} for sg_id in sorted(tetrode_sg_ids)
+    ]
+
     # Fetch data once with the correct parameter
-    marks = (UnitMarks & restriction).fetch_dataframe()
+    marks = (UnitMarks & tetrode_restriction).fetch_dataframe()
     if len(marks) == 0:
         raise ValueError(
             f"No UnitMarks found for {nwb_file_name!r} with either "
