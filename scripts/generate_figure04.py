@@ -41,7 +41,6 @@ import seaborn as sns
 from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
 
 import continuum_swr_replay.figure_utilities as figure_utilities
-
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -53,8 +52,8 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_results,
 )
 from continuum_swr_replay.analysis.pfc import (
-    _fit_immobility_models,
-    _make_design_matrices,
+    fit_immobility_models,
+    make_design_matrices,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
@@ -276,7 +275,7 @@ def main() -> None:
         data["position_info"].head_speed <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     )
 
-    immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
+    immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
         event_times,
         data["position_info"],
         sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
@@ -290,7 +289,7 @@ def main() -> None:
 
     # Fit GLM models
     print("Fitting GLM models...")
-    glm_results, glm_models = _fit_immobility_models(
+    glm_results, glm_models = fit_immobility_models(
         is_immobile, immobility_design_matrices, neuron_spike_count
     )
 

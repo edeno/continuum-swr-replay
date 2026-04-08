@@ -133,76 +133,6 @@ def likelihood_ratio_test(
     return likelihood_ratio, p_value
 
 
-def test_theta_modulation_v1(
-    position_info: pd.DataFrame, theta_phase: pd.Series, neuron_spike_times: NDArray
-) -> tuple[float, float, float, float]:
-    """Test theta phase modulation of neuron firing (original version).
-
-    NOTE: This is an older implementation kept for backward compatibility.
-    Consider using `test_theta_modulation()` instead, which uses pre-computed
-    spike counts and regularization for more robust parameter estimates.
-
-    Differences from newer version:
-    - Takes raw spike times instead of pre-computed counts
-    - Derives running state from position_info instead of is_immobile flag
-    - Does not use regularization for modulation estimation
-
-    Parameters
-    ----------
-    position_info : pd.DataFrame
-        Position data with head_speed column
-    theta_phase : pd.Series
-        Theta phase timeseries
-    neuron_spike_times : NDArray
-        Spike times in seconds
-
-    Returns
-    -------
-    tuple[float, float, float, float]
-        likelihood_ratio : Likelihood ratio statistic
-        p_val : P-value from chi-square test
-        modulation : Theta modulation strength
-        preferred_phase : Preferred theta phase in radians
-    """
-    is_running = position_info.head_speed > 4.0
-
-    formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
-    design_matrix = dmatrix(
-        formula,
-        {"theta_phase": reindex_by(theta_phase, position_info.index)},
-        return_type="dataframe",
-    )
-    response = get_spikecount_per_time_bin(
-        neuron_spike_times, position_info.index.to_numpy()
-    )
-
-    constant_glm_model = sm.GLM(
-        response[is_running],
-        np.ones_like(response[is_running]),
-        family=sm.families.Poisson(),
-    ).fit()
-
-    theta_glm_model = sm.GLM(
-        response[is_running],
-        design_matrix.values[is_running],
-        family=sm.families.Poisson(),
-    ).fit()
-
-    likelihood_ratio, p_val = likelihood_ratio_test(
-        theta_glm_model.deviance,
-        constant_glm_model.deviance,
-        theta_glm_model.df_resid,
-        constant_glm_model.df_resid,
-    )
-
-    modulation = np.sqrt(
-        theta_glm_model.params[1] ** 2 + theta_glm_model.params[2] ** 2
-    )
-    preferred_phase = np.arctan2(theta_glm_model.params[2], theta_glm_model.params[1])
-
-    return likelihood_ratio, p_val, modulation, preferred_phase
-
-
 def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
     return likelihood_ratio_test(
         full_model.deviance,
@@ -874,7 +804,7 @@ def run_session(
     }
 
     time = data["position_info"].index.to_numpy()
-    is_immobile = data["position_info"].head_speed <= immobility_threshold
+    is_immobile = data["position_info"].head_speed < immobility_threshold
     logger.info(
         "Immobility fraction: %.3f (%d/%d time bins)",
         is_immobile.mean(), is_immobile.sum(), len(is_immobile),

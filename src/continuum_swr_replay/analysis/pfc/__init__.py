@@ -50,17 +50,17 @@ Examples
 """
 
 from continuum_swr_replay.analysis.pfc.glm import (
-    _fit_immobility_models,
-    _make_design_matrices,
+    _fit_immobility_models as fit_immobility_models,
+    _make_design_matrices as make_design_matrices,
     get_spikecount_per_time_bin,
     process_neuron,
     run_session,
 )
 
 __all__ = [
-    "_make_design_matrices",
+    "make_design_matrices",
+    "fit_immobility_models",
     "get_spikecount_per_time_bin",
     "process_neuron",
-    "_fit_immobility_models",
     "run_session",
 ]

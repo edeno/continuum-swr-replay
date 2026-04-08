@@ -42,8 +42,8 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_results,
 )
 from continuum_swr_replay.analysis.pfc import (
-    _fit_immobility_models,
-    _make_design_matrices,
+    fit_immobility_models,
+    make_design_matrices,
 )
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.data_loaders import load_data
@@ -349,7 +349,7 @@ def generate_figure(
     time = data["position_info"].index.to_numpy()
     is_immobile = data["position_info"].head_speed <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
-    immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
+    immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
         event_times, data["position_info"],
         sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
         lags=np.arange(-100, 101, 1),
@@ -359,7 +359,7 @@ def generate_figure(
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
 
     print("Fitting GLM models...")
-    glm_results, _ = _fit_immobility_models(
+    glm_results, _ = fit_immobility_models(
         is_immobile, immobility_design_matrices, neuron_spike_count
     )
 
