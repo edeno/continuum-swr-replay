@@ -165,6 +165,7 @@ Generate a movie of a replay event:
 ...     SWR_zscore=swr_zscore,
 ...     movie_name='replay_event.mp4'
 ... )
+
 """
 
 # Figurl visualizations

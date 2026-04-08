@@ -113,6 +113,7 @@ Create a comprehensive decoding figure:
 ...     time_slice=slice(1234.0, 1240.0)
 ... )
 >>> plt.savefig('detector_output.pdf', dpi=300)
+
 """
 
 from __future__ import annotations
@@ -168,6 +169,7 @@ def plot_peri_event_probability(
         Whether to show event end times, by default False
     sampling_frequency : int, optional
         Sampling frequency in Hz, by default 500
+
     """
     non_local_prob = results.acausal_state_probabilities.sel(
         states=["Non-Local Continuous", "Non-Local Fragmented"]
@@ -349,6 +351,7 @@ def plot_theta_lfp(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
         Time slice to plot
     ax : matplotlib.axes.Axes
         Axes to plot on
+
     """
     theta_lfp = data["theta_lfp"].loc[time_slice]
     ax.plot(theta_lfp.index, theta_lfp, color="black")
@@ -370,6 +373,7 @@ def plot_theta_power_zscore(
         Axes to plot on
     plot_thresholds : bool, optional
         Whether to plot threshold lines, by default False
+
     """
     theta_power_zscore = data["theta_power_zscore"].loc[time_slice]
 
@@ -400,6 +404,7 @@ def plot_theta_phase(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
         Time slice to plot
     ax : matplotlib.axes.Axes
         Axes to plot on
+
     """
     theta_phase = data["theta_phase"].loc[time_slice]
 
@@ -430,6 +435,7 @@ def _intervals_to_mask(
     Returns
     -------
     np.ndarray of bool
+
     """
     if intervals.empty:
         return np.zeros(len(time_idx), dtype=bool)
@@ -464,6 +470,7 @@ def plot_multiunit_firing(
         Whether to plot threshold lines, by default False
     brain_area : str, optional
         Brain area to plot, by default "HPC"
+
     """
     key = "multiunit_rate_zscore" if plot_multiunit_zscore else "multiunit_firing_rate"
     multiunit_data = data[key]
@@ -532,6 +539,7 @@ def plot_ripple_consensus_trace_zscore(
         Axes to plot on
     plot_thresholds : bool, optional
         Whether to plot threshold lines, by default False
+
     """
     ripple_consensus_trace = data["zscored_ripple_consensus_trace"].loc[time_slice]
 
@@ -598,6 +606,7 @@ def plot_spike_times(
         Type of spike data ("clusterless" or "sorted"), by default "clusterless"
     brain_area : str, optional
         Brain area to plot spikes from, by default "HPC"
+
     """
     spike_times_dict = data.get("spike_times", {})
     if isinstance(spike_times_dict, dict):
@@ -671,6 +680,7 @@ def plot_acausal_probabilities(
         Whether to plot threshold lines, by default False
     plot_local : bool, optional
         Whether to plot local and no-spike states, by default False
+
     """
     time = results.sel(time=time_slice).time
     non_local_prob = results.acausal_state_probabilities.sel(
@@ -749,6 +759,7 @@ def plot_conditional_non_local_posterior(
         Axes to plot on
     posterior_max : float, optional
         Maximum value for colormap, by default 0.25
+
     """
     cmap = copy.copy(plt.get_cmap("bone_r"))
     cmap.set_bad(color="lightgrey", alpha=1.0)
@@ -809,6 +820,7 @@ def plot_speed(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
         Time slice to plot
     ax : matplotlib.axes.Axes
         Axes to plot on
+
     """
     position_info = data["position_info"].loc[time_slice]
     speed = np.asarray(position_info.nose_vel).squeeze()
@@ -831,6 +843,7 @@ def plot_head_direction(data: dict[str, Any], time_slice: slice, ax: Axes) -> No
         Time slice to plot
     ax : matplotlib.axes.Axes
         Axes to plot on
+
     """
     position_info = data["position_info"].loc[time_slice]
     direction = np.asarray(position_info.body_dir).squeeze()
@@ -880,6 +893,7 @@ def plot_detector(
         Type of spike data, by default "clusterless"
     posterior_max : float, optional
         Maximum value for posterior colormap, by default 0.25
+
     """
     if time_slice is None:
         time_slice = slice(results.time.values[0], results.time.values[-1])
@@ -987,6 +1001,7 @@ def plot_graph_as_1D(
         Size of reward well markers, by default 10
     edge_linewidth : int, optional
         Line width for edges, by default 2
+
     """
     if ax is None:
         ax = plt.gca()

@@ -55,6 +55,7 @@ Examples
 >>> speed = get_map_speed(nl_posterior, track_graph, bin_centers, sampling_frequency=500)
 >>> # Get comprehensive statistics
 >>> stats = get_posterior_stats(results, position_info, detector, env)
+
 """
 
 from typing import Literal
@@ -93,6 +94,7 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
         Normalized posterior conditioned on non-local state.
         Time points with negligible non-local probability are forward-filled
         from the nearest valid time point.
+
     """
     acausal_posterior = (
         results.acausal_posterior.sel(state="Non-Local Continuous")
@@ -152,6 +154,7 @@ def get_map_speed(
     ------
     ValueError
         If sampling_frequency is not positive
+
     """
     if sampling_frequency <= 0:
         raise ValueError(
@@ -285,6 +288,7 @@ def get_posterior_stats(
         Maximum linear position observed
     posterior : xr.DataArray
         Posterior distribution (returned for reuse)
+
     """
     smooth_sigma = 0.0025
 

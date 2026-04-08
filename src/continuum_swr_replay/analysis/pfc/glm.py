@@ -1,3 +1,10 @@
+"""Generalized Linear Model analysis for PFC neural activity.
+
+Fits Poisson GLMs relating single-unit spiking activity to hippocampal
+replay events (SWR-coincident and non-SWR) during immobility, and tests
+theta phase modulation during running.
+"""
+
 import logging
 import warnings
 from typing import Any
@@ -36,6 +43,7 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     -------
     NDArray
         Spike counts per time bin (length matches time array)
+
     """
     spike_times = spike_times[
         np.logical_and(spike_times >= time[0], spike_times <= time[-1])
@@ -74,6 +82,7 @@ def reindex_by(
     pd.Series | pd.DataFrame
         Reindexed data with values from nearest time point within tolerance.
         Values outside tolerance will be NaN.
+
     """
     if tolerance is None:
         warnings.warn(
@@ -86,6 +95,10 @@ def reindex_by(
 
     target_df = pd.DataFrame(index=index)
     source_df = df.copy() if isinstance(df, pd.DataFrame) else df.to_frame()
+
+    # Ensure index dtypes match for merge_asof (empty Series may have int index)
+    if len(source_df) == 0:
+        source_df.index = source_df.index.astype(target_df.index.dtype)
 
     merged = pd.merge_asof(
         target_df,
@@ -173,6 +186,7 @@ def test_theta_modulation(
         p_value : P-value from chi-square test.
         modulation : Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
         preferred_phase : Preferred theta phase in radians.
+
     """
     reindexed_theta = reindex_by(
         theta_phase,
@@ -219,6 +233,7 @@ def test_theta_modulation(
 
 
 def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
+    """Create matrix of time-shifted copies of a signal for convolution GLM."""
     if lags is None:
         lags = np.arange(-100, 101, 1)
     signal_df = pd.DataFrame(signal)
@@ -230,6 +245,7 @@ def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArra
 def create_conv_basis(
     count: NDArray, lags: NDArray, knots: NDArray, sampling_frequency: float
 ) -> tuple[NDArray, NDArray, NDArray]:
+    """Create convolution spline basis from event indicator counts."""
     lag_time = lags / sampling_frequency
     spline_basis = np.asarray(
         dmatrix(
@@ -374,6 +390,7 @@ def _fit_immobility_models(
 def get_frac_null_deviance(
     full_model: Any, reduced_model: Any, constant_model: Any
 ) -> float:
+    """Compute fraction of total deviance explained by additional terms."""
     return float(
         (reduced_model.deviance - full_model.deviance) / constant_model.deviance
     )
@@ -382,6 +399,7 @@ def get_frac_null_deviance(
 def get_frac_explained_deviance(
     full_model: Any, reduced_model: Any, constant_model: Any
 ) -> float:
+    """Compute fraction of model-explained deviance attributable to reduced terms."""
     denominator = constant_model.deviance - full_model.deviance
     if abs(denominator) < 1e-10:
         return 0.0
@@ -473,6 +491,8 @@ def process_neuron(
         Shape (n_lag_times, n_basis_functions).
     lag_time : NDArray
         Lag times in seconds corresponding to spline_basis rows.
+    logger_name : str | None, optional
+        Logger name for per-neuron messages. If None, uses module logger.
 
     Returns
     -------
@@ -508,6 +528,7 @@ def process_neuron(
         for replay-coincident ripples only. Shape (n_lag_times,).
         Comparing this with ``no_swr_modulation`` tests whether the
         non-SWR replay response is robust to the choice of SWR control.
+
     """
     _logger = logging.getLogger(logger_name) if logger_name else logger
 
@@ -749,6 +770,7 @@ def run_session(
         Non-SWR replay modulation from replay-split model, controlling
         for replay-coincident ripples only.
         Shape (n_lag_times, n_neurons).
+
     """
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"

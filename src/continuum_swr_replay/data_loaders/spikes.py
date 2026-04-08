@@ -39,6 +39,7 @@ See Also
 --------
 load_data : Main data loading orchestrator
 position : Position data that defines time bounds for spike filtering
+
 """
 
 from __future__ import annotations
@@ -104,6 +105,7 @@ def detect_coincident_spikes(
     -----
     Returns empty lists ([], []) when input is empty or all arrays are empty.
     Downstream code should check for empty results before further processing.
+
     """
     if not spike_times or all(len(st) == 0 for st in spike_times):
         return [], []
@@ -185,6 +187,7 @@ def get_electrode_group_info(nwb_file_name: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Electrode group information with targeted location labels
+
     """
     nwb_file_abspath = Nwbfile.get_abs_path(nwb_file_name)
     nwb_file = get_nwb_file(nwb_file_abspath)
@@ -246,6 +249,7 @@ def _get_tetrode_sort_group_ids(
     -------
     set[int]
         Sort group IDs with <= 4 electrodes.
+
     """
     unit_mark_keys = pd.DataFrame(
         (UnitMarks & restriction).fetch("sort_group_id", as_dict=True)
@@ -287,6 +291,7 @@ def get_hpc_marks(
     tuple
         - spike_times: list of arrays with spike times per tetrode
         - spike_waveform_features: list of arrays with waveform features
+
     """
     # Base restriction shared by both parameter options
     restriction_base = {
@@ -358,6 +363,7 @@ def get_pfc_spike_times(
     -------
     list
         List of arrays with spike times per unit
+
     """
     restriction = {
         "nwb_file_name": nwb_file_name,
@@ -420,6 +426,7 @@ def get_spike_data(nwb_file_name: str) -> SpikeDataDict:
         Dictionary containing:
         - spike_times: dict mapping brain area to list of spike time arrays
         - spike_waveform_features: dict mapping brain area to list of feature arrays
+
     """
     spike_times = {}
     spike_waveform_features = {}
@@ -473,6 +480,7 @@ def filter_spike_times(
     filtered_spike_waveform_features : dict
         Dictionary mapping brain area to list of filtered feature arrays.
         Entries correspond 1:1 with filtered_spike_times.
+
     """
     filtered_spike_times = {}
     filtered_spike_waveform_features = {}

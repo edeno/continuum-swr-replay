@@ -17,6 +17,7 @@ Notes
 - Color definitions are in continuum_swr_replay.parameters.COLORS
 - NWB file lists and other data parameters are in continuum_swr_replay.parameters
 - This module focuses on analysis-specific constants shared across figure scripts
+
 """
 
 import numpy as np

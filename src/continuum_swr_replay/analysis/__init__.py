@@ -16,6 +16,7 @@ See Also
 --------
 continuum_swr_replay.analysis.constants : Default thresholds and bin definitions
 continuum_swr_replay.analysis.hippocampus : Hippocampus-specific analysis
+
 """
 
 __all__ = []

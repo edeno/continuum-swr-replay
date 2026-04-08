@@ -62,6 +62,7 @@ Examples
 >>> dio_data = load_dios("chimi20200212_.nwb", (100.0, 1000.0))
 >>> beam_breaks = dio_data["beam_breaks"]
 >>> pump_events = dio_data["pump_events"]
+
 """
 
 import warnings
@@ -94,6 +95,7 @@ def convert_dio_events_to_start_stop_times(
     -------
     pd.DataFrame
         DataFrame with start_time, end_time, event_name, and event_number columns
+
     """
     start_indices = event.astype(bool).to_numpy().nonzero()[0]
     end_indices = start_indices + 1
@@ -136,6 +138,7 @@ def _load_dio_event_type(
     --------
     load_dios : Main function that uses this helper for all event types
     convert_dio_events_to_start_stop_times : Converts raw events to intervals
+
     """
     events = {
         nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
@@ -173,6 +176,7 @@ def load_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> DIOEventD
         - beam_breaks: pd.DataFrame with poke events
         - pump_events: pd.DataFrame with reward pump events
         - light_events: pd.DataFrame with light events
+
     """
     beam_breaks = _load_dio_event_type(nwb_file_name, "Poke%", valid_times)
     pump_events = _load_dio_event_type(nwb_file_name, "Pump%", valid_times)

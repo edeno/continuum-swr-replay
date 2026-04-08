@@ -119,6 +119,7 @@ Create a custom synchronized layout:
 ...     pn.Row(decode_plot, speed_dropdown),
 ...     speed_plot
 ... )
+
 """
 
 from __future__ import annotations
@@ -173,6 +174,7 @@ def create_scrolling_line_plot(
     -------
     hv.DynamicMap
         Holoviews dynamic map with scrolling plot
+
     """
     n_time = len(data)
     n_samples = int((window_lim[1] - window_lim[0]) * sampling_frequency)
@@ -216,6 +218,7 @@ def create_player(
     -------
     pn.widgets.Player
         Panel player widget
+
     """
     base_interval = int(1000 / sampling_frequency)  # ms/frame
     player = pn.widgets.Player(
@@ -249,6 +252,7 @@ def create_playback_speed_dropdown(
     -------
     pn.widgets.Select
         Panel select dropdown widget
+
     """
     # Dropdown to control the speed of the player (interval)
     speed_options = {
@@ -324,6 +328,7 @@ def create_visualization(
     -------
     pn.Row
         Panel row layout containing all visualizations
+
     """
     # Import here to avoid circular dependency
     from .figurl import create_2D_decoding_plot

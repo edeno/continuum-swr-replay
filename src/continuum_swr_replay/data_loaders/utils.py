@@ -52,6 +52,7 @@ Examples
 >>> # Get training mask excluding ripples
 >>> from continuum_swr_replay.parameters import TrainingType
 >>> mask = get_training_timepoints(data, TrainingType.NO_RIPPLE)
+
 """
 
 from __future__ import annotations
@@ -107,6 +108,7 @@ def parse_nwb_filename(filename: str) -> tuple[str, int]:
 
     >>> parse_nwb_filename("j1620210706_.nwb")
     ('j16', 20210706)
+
     """
     # Pattern: {animal_name}{8_digits}_.nwb
     # Animal name is one or more alphanumeric chars (non-greedy), date is exactly 8 digits
@@ -148,6 +150,7 @@ def get_epoch_info() -> pd.DataFrame:
     modified externally during runtime, the cached result will be stale.
     This is acceptable for typical analysis workflows where the database
     is static.
+
     """
     epoch_info = (
         pd.DataFrame(
@@ -242,6 +245,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     Time points within [start_time, end_time] (inclusive) are labeled with
     sequential integers starting from 1. Time points outside all events are
     labeled 0.
+
     """
     event_labels = pd.DataFrame(0, index=time, columns=["event_number"], dtype=int)
 
@@ -286,6 +290,7 @@ def get_training_timepoints(
     >>> mask = get_training_timepoints(data, TrainingType.ALL)
     >>> # Using string (backward compatible)
     >>> mask = get_training_timepoints(data, "all")
+
     """
     # Convert string to enum if needed (backward compatibility)
     if isinstance(training_type, str):

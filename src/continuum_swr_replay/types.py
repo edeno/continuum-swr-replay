@@ -91,6 +91,7 @@ class SessionData(TypedDict, total=False):
         - dist_to_goal: Distance remaining to goal well
         - time_to_goal: Time since trial start
         - turn_direction: Sequence of turns in trial
+
     """
 
     # Position and tracking
@@ -163,6 +164,7 @@ class SessionDataKeys(StrEnum):
     >>> # Check membership
     >>> if "position_info" in SessionDataKeys:
     ...     print("Valid key")
+
     """
 
     # Position and tracking
@@ -227,6 +229,7 @@ class DataLoadingPreset:
     >>> from continuum_swr_replay.types import SessionDataKeys
     >>> custom = DataLoadingPreset.NEURAL | {SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES}
     >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
+
     """
 
     # Minimal - just position and spikes for basic decoding
@@ -298,6 +301,7 @@ class ClusterlessParams(TypedDict):
         Block size for GPU memory management during decoding. Controls how
         many time bins are processed simultaneously. Should be a power of 2
         for optimal GPU performance.
+
     """
 
     position_std: float
@@ -317,6 +321,7 @@ class SortedSpikesParams(TypedDict):
         Block size for GPU memory management during decoding. Controls how
         many time bins are processed simultaneously. Should be a power of 2
         for optimal GPU performance.
+
     """
 
     position_std: float
@@ -340,6 +345,7 @@ class PositionInfoDict(TypedDict):
         List of edge spacings for linearization
     track_graph : nx.Graph
         NetworkX graph representing track topology
+
     """
 
     position_info: pd.DataFrame
@@ -359,6 +365,7 @@ class SpikeDataDict(TypedDict):
     spike_waveform_features : dict[str, list[NDArray[np.float64]]]
         Waveform features for clusterless decoding (primarily HPC).
         Shape: (n_spikes, n_features) per sort group.
+
     """
 
     spike_times: dict[str, list[NDArray[np.float64]]]
@@ -376,6 +383,7 @@ class DIOEventData(TypedDict):
         DataFrame with reward pump events
     light_events : pd.DataFrame
         DataFrame with light on/off events
+
     """
 
     beam_breaks: pd.DataFrame
@@ -394,6 +402,7 @@ class ThetaData(TypedDict):
         Theta phase timeseries
     theta_power : pd.Series
         Theta power timeseries
+
     """
 
     theta_filtered_lfp: pd.DataFrame
@@ -416,6 +425,7 @@ class RippleData(TypedDict):
         Ripple consensus trace (combined signal across electrodes)
     zscored_ripple_consensus_trace : pd.Series
         Z-scored ripple consensus trace
+
     """
 
     ripple_times: pd.DataFrame
@@ -436,6 +446,7 @@ class MultiunitData(TypedDict):
         Population firing rates for each brain area
     multiunit_rate_zscore : dict[str, pd.DataFrame]
         Z-scored firing rates for each brain area
+
     """
 
     hse_times: dict[str, pd.DataFrame]
@@ -452,6 +463,7 @@ class WellNodeData(TypedDict):
         Array of starting well node IDs
     to_well : NDArray[np.int_]
         Array of ending well node IDs
+
     """
 
     from_well: NDArray[np.int_]

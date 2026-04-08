@@ -31,6 +31,7 @@ def load_population_data(
         Each shape (n_lag_times, n_good_neurons).
     lag_time : np.ndarray
         Lag time axis in seconds.
+
     """
     lag_time = np.arange(-100, 101) / 500.0
 

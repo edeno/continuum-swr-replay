@@ -46,6 +46,7 @@ Examples
 >>> theta_data = get_theta("chimi20200212_.nwb", "02_r1")
 >>> ripple_data = get_ripple("chimi20200212_.nwb", "02_r1", "Kay")
 >>> multiunit_data = get_multiunit(spike_times, position_info)
+
 """
 
 import warnings
@@ -93,6 +94,7 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
         - theta_filtered_lfp: pd.DataFrame with filtered LFP
         - theta_phase: pd.Series with theta phase
         - theta_power: pd.Series with theta power
+
     """
     theta_lfp_key = {
         "nwb_file_name": nwb_file_name,
@@ -142,6 +144,7 @@ def get_ripple(
         - ripple_lfps: pd.DataFrame with raw ripple LFP
         - ripple_consensus_trace: pd.Series with ripple consensus trace
         - zscored_ripple_consensus_trace: pd.Series with z-scored consensus trace
+
     """
     # Ripples
     if ripple_detector_name == "Kay":
@@ -210,6 +213,7 @@ def get_multiunit_hse(
         - hse_times: pd.DataFrame with HSE start/end times
         - multiunit_firing_rate: pd.DataFrame with population firing rate
         - multiunit_rate_zscore: pd.DataFrame with z-scored firing rate
+
     """
     sampling_frequency = 1 / np.median(np.diff(bin_time))
     start_time, end_time = bin_time[[0, -1]]
@@ -284,6 +288,7 @@ def get_multiunit(
         - hse_times: dict mapping brain area to HSE times
         - multiunit_firing_rate: dict mapping brain area to firing rates
         - multiunit_rate_zscore: dict mapping brain area to z-scored rates
+
     """
     # Get multiunit HSE
     hse_times = {}
@@ -324,6 +329,7 @@ def filter_ripple_lfp_time(
     -------
     RippleData
         New dictionary with filtered ripple data matching position time bounds
+
     """
     position_time_slice = slice(position_time[0], position_time[-1])
 

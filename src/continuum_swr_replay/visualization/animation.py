@@ -100,6 +100,7 @@ Generate higher quality movie:
 ...     video_slowdown=4,  # Faster playback
 ...     vmax=0.1  # Adjust posterior color scale
 ... )
+
 """
 
 from __future__ import annotations
@@ -164,6 +165,7 @@ def _setup_line(
     - Black spines (top, right) to blend with background
     - White text (set by dark_background style context)
     - Animated line with clip_on=False for visibility
+
     """
     (line,) = ax.plot([], color=color, linewidth=2, animated=True, clip_on=False)
     ax.set_ylim(ylim)
@@ -214,6 +216,7 @@ def _update_line(
 
     The windowing approach creates a scrolling effect where the current
     time stays centered while historical and future data scroll past.
+
     """
     try:
         line.set_data(
@@ -280,6 +283,7 @@ def make_non_local_movie(
     - Right: Three scrolling time series (Non-Local prob, SWR z-score, MUA rate)
 
     The function uses matplotlib animation and requires ffmpeg to be installed.
+
     """
     if position_name is None:
         position_name = ["head_position_x", "head_position_y"]

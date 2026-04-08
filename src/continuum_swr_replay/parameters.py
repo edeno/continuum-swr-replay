@@ -60,6 +60,7 @@ Examples
 2.0
 >>> TrainingType.NO_RIPPLE.value
 'no_ripple'
+
 """
 
 from dataclasses import dataclass
@@ -148,6 +149,7 @@ class DecodingParameters:
     ValueError
         If block_size is not a power of 2, or if any standard deviation
         or bin size parameter is not positive.
+
     """
 
     place_bin_size: float = PLACE_BIN_SIZE_1D
@@ -163,6 +165,7 @@ class DecodingParameters:
         ValueError
             If block_size is not a power of 2, or if any parameter
             that should be positive is not.
+
         """
         # Validate block_size is a power of 2
         # Powers of 2 have exactly one bit set, so n & (n-1) == 0
@@ -211,6 +214,7 @@ class TrainingType(str, Enum):
     'all'
     >>> TrainingType.ALL == "all"
     True
+
     """
 
     ALL = "all"

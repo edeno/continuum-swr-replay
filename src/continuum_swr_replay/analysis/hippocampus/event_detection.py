@@ -31,6 +31,7 @@ Find events that overlap with ripples:
 ... )
 >>> print(f"Non-local events with ripples: {len(overlap_events)}")
 >>> print(f"Non-local events without ripples: {len(no_overlap_events)}")
+
 """
 
 import numpy as np
@@ -68,6 +69,7 @@ def get_confident_times(
     times : pd.DataFrame
         DataFrame with columns: start_time, end_time, duration, max_speed
         Indexed by event_number (1-based)
+
     """
     confident_times = np.asarray(
         segment_boolean_series(
@@ -139,6 +141,7 @@ def get_overlap_times(
         Non-local events that overlap with ripples
     no_overlap_non_local_times : pd.DataFrame
         Non-local events that do not overlap with ripples
+
     """
     non_local_labels = get_labels(non_local_times, results.time)
     ripple_labels = get_labels(ripple_times, results.time)

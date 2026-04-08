@@ -61,6 +61,7 @@ Examples
 ...     sampling_frequency=500.0
 ... )
 >>> task_vars[["path_progress", "dist_to_goal", "turn_direction"]].head()
+
 """
 
 from concurrent.futures import ProcessPoolExecutor
@@ -112,6 +113,7 @@ def path_progress_for_run_segment(
     -------
     np.ndarray
         Path progress values (0 to 1) for each time point
+
     """
     path = nx.shortest_path(track_graph, source=start_node, target=end_node)
     path_edges = list(zip(path[:-1], path[1:], strict=True))
@@ -182,6 +184,7 @@ def _precompute_segment_distances_to_goal(
     -------
     dict[int, tuple[float, float, float]]
         Mapping from segment_id to (dist_node1_to_goal, dist_node2_to_goal, edge_length)
+
     """
     segment_distances = {}
 
@@ -241,6 +244,7 @@ def dist_to_goal(
     -------
     np.ndarray
         Distance to goal for each time point
+
     """
     n = len(position_info)
     if n == 0:
@@ -314,6 +318,7 @@ def turn_direction(
     -------
     str
         Turn direction sequence (e.g., "left-right-left")
+
     """
     trial_segment_ids = position_info.loc[
         trial.start_time : trial.end_time
@@ -382,6 +387,7 @@ def _process_single_trial(
     -------
     dict
         Dictionary containing trial results with time indices
+
     """
     (
         trial_dict,
@@ -494,6 +500,7 @@ def make_task_variables(
         - turn_direction
         - is_no_reward_{N} (for each N in omission_shifts, e.g., is_no_reward_1)
         - is_patch_change{N} (for each N in patch_change_shifts, e.g., is_patch_change-1)
+
     """
     if omission_shifts is None:
         omission_shifts = list(DEFAULT_OMISSION_SHIFTS)

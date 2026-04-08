@@ -54,6 +54,7 @@ Examples
 ... )
 >>> summary = compute_session_quality_summary(data)
 >>> print(summary[["animal", "day", "epoch", "median_error_cm", "local_fraction", "n_flags"]])
+
 """
 
 from __future__ import annotations
@@ -97,6 +98,7 @@ def compute_local_decoding_error(
     pd.DataFrame
         One row per session with columns: ``median_error_cm``,
         ``p90_error_cm``, ``mean_error_cm``, ``n_local_bins``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -156,6 +158,7 @@ def compute_state_fraction_during_movement(
         ``nospike_fraction``, ``nonlocal_continuous_fraction``,
         ``nonlocal_fragmented_fraction``, ``n_moving_bins``,
         ``max_collapse_duration_sec``, ``n_collapse_episodes``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -236,6 +239,7 @@ def compute_non_local_during_movement(
         ``nonlocal_movement_mean_duration_ms``,
         ``nonlocal_movement_median_duration_ms``,
         ``nonlocal_movement_fraction``, ``n_nonlocal_movement_events``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -296,7 +300,7 @@ def compute_error_by_track_segment(
     local_prob_threshold: float = 0.5,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Decoding error broken down by track segment.
+    """Compute decoding error broken down by track segment.
 
     Identifies spatial blind spots where place field coverage is poor by
     computing per-segment decoding error during local state.
@@ -315,6 +319,7 @@ def compute_error_by_track_segment(
     pd.DataFrame
         One row per (session, track_segment_id) with columns:
         ``median_error_cm``, ``n_bins``, ``segment_fraction``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -371,6 +376,7 @@ def compute_no_spike_firing_correspondence(
     pd.DataFrame
         One row per session with columns: ``nospike_mua_rho``,
         ``nospike_mua_pvalue``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -424,6 +430,7 @@ def compute_non_local_event_context(
         One row per session with columns: ``n_non_local_events``,
         ``frac_swr``, ``frac_theta``, ``frac_neither``, ``theta_mrl``,
         ``theta_mean_angle``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -520,6 +527,7 @@ def compute_local_state_collapse_details(
         ``episode_id``, ``start_time``, ``end_time``, ``duration_sec``,
         ``mean_hpd``, ``mean_error_cm``, ``median_nonlocal_prob``,
         ``classification``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -618,6 +626,7 @@ def compute_calibration_curve(
         One row per (session, prob_bin) with columns: ``prob_bin_center``,
         ``median_error_cm``, ``n_bins_in_group``, ``calibration_slope``,
         ``is_monotonic_decreasing``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -711,6 +720,7 @@ def compute_session_quality_summary(
         ``flag_high_error``, ``flag_local_collapse``,
         ``flag_nospike_wrong_sign``, ``flag_poor_calibration``,
         ``flag_low_swr_overlap``, ``n_flags``.
+
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)

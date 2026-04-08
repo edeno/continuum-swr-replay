@@ -34,6 +34,7 @@ Examples
 1
 >>> WELL_PATCH_MAPPING[4]  # Well 4 is in patch 3
 3
+
 """
 
 NWB_FILES = [

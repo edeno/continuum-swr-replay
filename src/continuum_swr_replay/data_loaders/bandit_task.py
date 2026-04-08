@@ -22,6 +22,7 @@ See Also
 --------
 get_epoch_info : Get list of all available sessions and epochs
 get_training_timepoints : Select time points for decoder training
+
 """
 
 from __future__ import annotations
@@ -307,6 +308,7 @@ def load_data(
     0   1235.123   1235.248   0.125
     1   1237.891   1238.012   0.121
     2   1242.456   1242.598   0.142
+
     """
     from ..types import SessionDataKeys
 

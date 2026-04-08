@@ -67,6 +67,7 @@ Examples
 ... )
 >>> trials = make_trials_df_from_well_visits(well_visits)
 >>> trials[["from_well", "to_well", "is_reward"]].head()
+
 """
 
 import networkx as nx
@@ -93,6 +94,7 @@ def get_poke_in_poke_out_times(
     -------
     pd.DataFrame
         Merged poke events with start_time, end_time, and duration
+
     """
     # Handle empty DataFrame
     if len(beam_breaks) == 0:
@@ -130,6 +132,7 @@ def get_run_intervals(poke_times: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         Run intervals with start_time, end_time, and duration
+
     """
     return (
         pd.DataFrame(
@@ -163,6 +166,7 @@ def get_start_end_node_id(
     -------
     WellNodeData
         TypedDict with 'from_well' and 'to_well' node ID arrays
+
     """
     projected_cols = ["projected_x_position", "projected_y_position"]
 
@@ -230,6 +234,7 @@ def make_well_visits_df(
     -------
     pd.DataFrame
         Well visits with trial structure and reward information
+
     """
     poke_times = get_poke_in_poke_out_times(beam_breaks)
     poke_times = pd.concat(
@@ -312,6 +317,7 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         Trials with aggregated information (reward, timing, start/end wells)
+
     """
     trials = well_visits.groupby("trial_number").agg(
         is_reward=("is_reward", lambda x: x.sum() > 0),

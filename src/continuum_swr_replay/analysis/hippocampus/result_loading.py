@@ -25,6 +25,7 @@ Load results only (without detector):
 ... )
 >>> # detector and env will be None
 >>> print(f"States: {list(results.states.values)}")
+
 """
 
 import xarray as xr
@@ -61,6 +62,7 @@ def load_results(
         Fitted detector model (None if load_detector=False)
     env : Environment | None
         Environment configuration (None if load_detector=False)
+
     """
     epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
 

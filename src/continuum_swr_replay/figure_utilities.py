@@ -70,6 +70,7 @@ Presentation figure:
 >>> ax.plot(x, y, color=WONG[1], linewidth=4)
 >>> ax.set_xlabel('Time (s)', fontsize=24, fontweight='bold')
 >>> save_figure("slide_figure")
+
 """
 
 from __future__ import annotations
@@ -248,6 +249,7 @@ def get_figure_size(
 
     >>> get_figure_size(1, 5)  # 5 panels in a row
     (7.01, 0.87)
+
     """
     if aspect_ratio is None:
         aspect_ratio = GOLDEN_RATIO
@@ -423,6 +425,7 @@ def set_figure_defaults(
     >>> fig, ax = plt.subplots(figsize=(10, 5.625), dpi=150,
     ...                        constrained_layout=True)
     >>> ax.plot(x, y, linewidth=4)  # Bold line for visibility
+
     """
     # Reset to matplotlib defaults first to prevent stale settings
     mpl.rcParams.update(mpl.rcParamsDefault)
@@ -644,6 +647,7 @@ def save_figure(
     Custom formats:
 
     >>> save_figure("fig", formats=["pdf", "svg", "png"])
+
     """
     if formats is None:
         formats = ["pdf", "png"]
@@ -725,6 +729,7 @@ def cm_to_inch(cm: float) -> float:
     --------
     >>> cm_to_inch(10)
     3.937007874015748
+
     """
     return cm / 2.54
 
@@ -790,6 +795,7 @@ def figure_size_from_panels(
     ...     panel_height_cm=3.0,
     ...     wspace_cm=1.0
     ... )
+
     """
     if panel_height_cm is None:
         panel_height_cm = panel_width_cm * GOLDEN_RATIO
@@ -877,6 +883,7 @@ def label_panels(
     Custom labels:
 
     >>> label_panels(axes.flatten(), labels=['A1', 'A2', 'B1', 'B2'])
+
     """
     if isinstance(axes, np.ndarray):
         axes = axes.flatten()
@@ -931,6 +938,7 @@ def validate_figure_quality() -> bool:
     >>> ax.plot(x, y)
     >>> if validate_figure_quality():
     ...     save_figure("figure_1")
+
     """
     fig = plt.gcf()
     passed = True

@@ -21,6 +21,7 @@ See Also
 --------
 load_data : Main data loading orchestrator that uses these functions
 trials : Trial construction that depends on position data
+
 """
 
 from __future__ import annotations
@@ -102,6 +103,7 @@ def get_interpolated_position_info(
     --------
     get_position_info : Main position loading function that calls this
     track_linearization.get_linearized_position : Underlying linearization function
+
     """
     if position_columns is None:
         position_columns = ["head_position_x", "head_position_y"]
@@ -193,6 +195,7 @@ def get_position_info(
     Index(['head_position_x', 'head_position_y', 'head_speed', ...])
     >>> pos_data['track_graph'].number_of_nodes()
     6  # Six wells in the environment
+
     """
     position_key = {
         "nwb_file_name": nwb_file_name,

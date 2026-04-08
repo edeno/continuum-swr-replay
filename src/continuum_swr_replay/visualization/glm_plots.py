@@ -37,6 +37,7 @@ Examples
 See Also
 --------
 continuum_swr_replay.analysis.pfc : PFC analysis and GLM fitting
+
 """
 
 from __future__ import annotations
@@ -104,6 +105,7 @@ def plot_raster_relative_to_event(
     >>> plt.xlabel("Time from event (s)")
     >>> plt.ylabel("Event #")
     >>> plt.show()
+
     """
     if ax is None:
         ax = plt.gca()
@@ -189,6 +191,7 @@ def plot_hist_relative_to_event(
     >>> plt.xlabel("Time from event (s)")
     >>> plt.ylabel("Firing rate (sp/s)")
     >>> plt.show()
+
     """
     if ax is None:
         ax = plt.gca()
@@ -299,6 +302,7 @@ def plot_aics(
     See Also
     --------
     continuum_swr_replay.analysis.pfc._fit_immobility_models : GLM fitting
+
     """
     if model_list is None:
         model_list = [

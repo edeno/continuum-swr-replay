@@ -75,6 +75,7 @@ Examples
 >>> from continuum_swr_replay.analysis.hippocampus import load_results, get_data_over_time
 >>> results, detector, env = load_results("chimi20200212_02_r1_HPC")
 >>> data_df = get_data_over_time(results, data, detector, env, threshold=0.80)
+
 """
 
 from .data_aggregation import get_data_over_time, get_event_types, load_data_over_time

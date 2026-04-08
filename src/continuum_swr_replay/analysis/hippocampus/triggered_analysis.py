@@ -80,6 +80,7 @@ def get_signal_windows(
     >>> mean_triggered = signal_windows.mean(dim="event")
     >>> # Plot
     >>> mean_triggered.sel(signal="SWR_zscore").plot()
+
     """
     # Validate inputs
     if sampling_frequency <= 0:

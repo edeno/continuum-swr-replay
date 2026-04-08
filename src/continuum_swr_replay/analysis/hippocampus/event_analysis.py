@@ -67,6 +67,7 @@ def get_immobile_events(
     ...     speed_threshold=4.0,
     ...     method="endpoints"
     ... )
+
     """
     # Set default group_cols
     if group_cols is None:
@@ -157,6 +158,7 @@ def get_event_start_end_times(
     >>> print(event_times.head())
        animal       day epoch  non_local_event  start_time  end_time  duration
     0  chimi  20200212  02_r1                1     1234.56   1234.62      0.06
+
     """
     # Set default group_cols
     if group_cols is None:
@@ -215,6 +217,7 @@ def get_event_durations_ms(event_times: pd.DataFrame) -> pd.Series:
     >>> durations_ms = get_event_durations_ms(event_times)
     >>> print(f"Mean duration: {durations_ms.mean():.1f} ms")
     Mean duration: 85.3 ms
+
     """
     if "duration" not in event_times.columns:
         raise ValueError("event_times must have 'duration' column")

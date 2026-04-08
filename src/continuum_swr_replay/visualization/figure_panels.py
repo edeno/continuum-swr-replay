@@ -54,6 +54,7 @@ def plot_event_duration_distribution(
         Standalone-mode save parameters (ignored when ``ax`` is provided).
     ax : matplotlib Axes, optional
         Axes to plot on. If None, creates standalone figure.
+
     """
     standalone = ax is None
     if standalone:
@@ -117,6 +118,7 @@ def plot_triggered_averages(
         Column to use for alignment ('start_time' or 'end_time').
     axes : list of matplotlib Axes, optional
         List of 4 axes for the 4 signals. If None, creates standalone figure.
+
     """
     signal_types = [
         "Non-Local_prob",

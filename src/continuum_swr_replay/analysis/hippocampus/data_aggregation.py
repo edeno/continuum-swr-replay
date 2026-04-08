@@ -98,6 +98,7 @@ Examples
 >>> data_df[["non_local_event", "ahead_behind_distance", "map_speed"]].head()
 >>> # Access state probabilities
 >>> data_df[["Local_prob", "Non-Local_Continuous_prob"]].head()
+
 """
 
 from pathlib import Path
@@ -168,6 +169,7 @@ def get_data_over_time(
         - Position and behavioral variables (from position_info)
     posterior : xr.DataArray
         Conditional non-local posterior distribution
+
     """
     # Validate required data keys
     required_keys = [
@@ -293,6 +295,7 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
     -------
     pd.DataFrame
         Concatenated data with derived Non-Local_prob and distance columns.
+
     """
     data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
     data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
@@ -316,6 +319,7 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
     -------
     dict
         Dictionary mapping event type names to filtered DataFrames.
+
     """
     non_local_immobile = get_immobile_events(
         data_over_time,

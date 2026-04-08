@@ -67,6 +67,7 @@ Display in Jupyter notebook:
 
 >>> from IPython.display import IFrame
 >>> IFrame(url, width=1200, height=800)
+
 """
 
 from __future__ import annotations
@@ -107,6 +108,7 @@ def _create_speed_view(speed: pd.Series) -> vv.TimeseriesGraph:
     -------
     vv.TimeseriesGraph
         Speed timeseries graph view.
+
     """
     return vv.TimeseriesGraph().add_line_series(
         name="Speed [cm/s]",
@@ -129,6 +131,7 @@ def _create_head_direction_view(head_direction: pd.Series) -> vv.TimeseriesGraph
     -------
     vv.TimeseriesGraph
         Head direction timeseries graph view with y-range [-π, π].
+
     """
     return vv.TimeseriesGraph(
         y_range=[-np.pi, np.pi],
@@ -159,6 +162,7 @@ def _create_mua_view(
     -------
     vv.TimeseriesGraph
         MUA timeseries graph view with event intervals and z-score line.
+
     """
     multiunit_firing_rate_view = vv.TimeseriesGraph()
     multiunit_firing_rate_view.add_interval_series(
@@ -195,6 +199,7 @@ def _create_swr_view(
     -------
     vv.TimeseriesGraph
         SWR timeseries graph view with event intervals and z-score line.
+
     """
     ripple_zscore_view = vv.TimeseriesGraph()
     ripple_zscore_view.add_interval_series(
@@ -225,6 +230,7 @@ def _create_theta_view(theta_filtered_lfp: pd.Series) -> vv.TimeseriesGraph:
     -------
     vv.TimeseriesGraph
         Theta LFP timeseries graph view.
+
     """
     theta_view = vv.TimeseriesGraph()
     theta_view.add_line_series(
@@ -254,6 +260,7 @@ def _create_non_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGrap
     vv.TimeseriesGraph
         Non-local probability timeseries graph view with event intervals
         and probability lines for continuous and fragmented states.
+
     """
     non_local_times = get_confident_times(
         results.sel(states="Non-Local Continuous").acausal_state_probabilities
@@ -305,6 +312,7 @@ def _create_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGraph:
     vv.TimeseriesGraph
         Local probability timeseries graph view with event intervals
         and probability lines for local and no-spike states.
+
     """
     local_times = get_confident_times(
         results.sel(states="Local").acausal_state_probabilities,
@@ -359,6 +367,7 @@ def _create_ahead_behind_distance_view(
     -------
     vv.TimeseriesGraph
         Ahead-behind distance timeseries graph view.
+
     """
     return vv.TimeseriesGraph().add_line_series(
         name="Ahead-Behind Distance",
@@ -389,6 +398,7 @@ def _create_hpd_view(
     -------
     vv.TimeseriesGraph
         HPD timeseries graph view.
+
     """
     return vv.TimeseriesGraph().add_line_series(
         name="HPD",
@@ -503,6 +513,7 @@ def create_interactive_1D_decoding_figurl(
     ...     label="chimi_20200212_02_r1_HPC"
     ... )
     >>> print(f"View results at: {url}")
+
     """
     if posterior is None:
         posterior = get_conditional_non_local_posterior(results)
@@ -630,6 +641,7 @@ def create_multiregion_figurl(
     ...     },
     ...     label="chimi_20200212_multiregion"
     ... )
+
     """
     # Multiunit firing rate view
     multiunit_firing_rate_view = vv.TimeseriesGraph()
@@ -804,6 +816,7 @@ def create_2D_decoding_plot(
     ...     height=600
     ... )
     >>> decode_plot  # Display in Jupyter notebook
+
     """
     n_time = len(posterior.time)
 
