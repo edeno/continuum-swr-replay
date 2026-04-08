@@ -136,14 +136,14 @@ def likelihood_ratio_test(
     Returns
     -------
     likelihood_ratio : float
-    p_valueue : float
+    p_value : float
 
     """
     degrees_of_freedom = degrees_of_freedom_restricted - degrees_of_freedom_full
     likelihood_ratio = deviance_restricted - deviance_full
-    p_valueue = scipy.stats.chi2.sf(likelihood_ratio, df=degrees_of_freedom)
+    p_value = scipy.stats.chi2.sf(likelihood_ratio, df=degrees_of_freedom)
 
-    return likelihood_ratio, p_valueue
+    return likelihood_ratio, p_value
 
 
 def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:

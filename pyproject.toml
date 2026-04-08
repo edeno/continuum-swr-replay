@@ -102,6 +102,7 @@ allow_any_generics = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+collect_ignore_glob = ["src/*"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
