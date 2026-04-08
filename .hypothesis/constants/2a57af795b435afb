@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/trials.py
-# hypothesis_version: 6.147.0
-
-[0.0, 0.0001, 1.0, 'duration', 'end_time', 'event_name', 'first', 'from_patch', 'from_well', 'is_patch_change', 'is_reward', 'is_run', 'last', 'max', 'min', 'pos', 'projected_x_position', 'projected_y_position', 'right', 'start_time', 'sum', 'to_patch', 'to_well', 'trial_number']

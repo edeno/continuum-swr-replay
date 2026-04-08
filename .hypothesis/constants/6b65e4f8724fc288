@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/parameters.py
-# hypothesis_version: 6.147.0
-
-[0.5, 0.8, 0.95, 2.0, 6.0, 24.0, 500, '#1b9e77', '#7570b3', '#add8e6', '#b0b0b0', '#d95f02', 'Local', 'MUA', 'No-Spike', 'Non-Local', 'Processed-Data', 'SWR', 'all', 'block_size', 'figures', 'no_ripple', 'place_bin_size', 'position_std', 'waveform_std']

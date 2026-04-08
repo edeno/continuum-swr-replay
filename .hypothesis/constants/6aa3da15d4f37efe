@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py
-# hypothesis_version: 6.147.0
-
-[0.8, 500, 'HPC', 'Local', 'Local_prob', 'MUA_event', 'MUA_zscore', 'No-Spike', 'No-Spike_prob', 'Non-Local Continuous', 'Non-Local Fragmented', 'SWR_event', 'SWR_zscore', '_.nwb', 'animal', 'day', 'epoch', 'hpd', 'hse_times', 'map_estimate', 'map_speed', 'max_coverage', 'max_distance', 'max_linear_position', 'n_MUA', 'n_SWR', 'n_SWR_MUA', 'n_SWR_no_MUA', 'n_non_local', 'n_non_local_MUA', 'n_non_local_SWR', 'n_non_local_no_MUA', 'n_non_local_no_SWR', 'nearest', 'non_local_event', 'nwb_file_name', 'position_info', 'ripple_times', 'theta_phase', 'theta_power', 'theta_power_zscore']

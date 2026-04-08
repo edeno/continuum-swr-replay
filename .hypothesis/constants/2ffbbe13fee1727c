@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/analysis/hippocampus/posterior_analysis.py
-# hypothesis_version: 6.147.0
-
-[0.0025, 0.95, 2.0, 500.0, 500, 'Non-Local Continuous', 'Non-Local Fragmented', 'body_orientation', 'distance', 'head_orientation', 'position', 'position_info', 'projected_x_position', 'projected_y_position', 'track_graph']

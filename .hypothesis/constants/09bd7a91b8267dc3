@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/spikes.py
-# hypothesis_version: 6.147.0
-
-[4e-05, 0.33, 'CA1', 'CorpusCallosum', 'HPC', 'OFC', 'ac_em_xs', 'clusterless_fixed', 'curation_id', 'datajoint', 'default', 'default_clusterless', 'description', 'device', 'electrode_group_name', 'hdmf', 'ignore', 'labels', 'mPFC', 'mark_param_name', 'mountainsort4', 'nwb_file_name', 'preproc_params_name', 'pynwb', 'records', 'sort_group_id', 'sort_interval_name', 'sorter', 'sorter_params_name', 'spike_times', 'targeted_location', 'team_name', 'time_bin_ind', 'units']

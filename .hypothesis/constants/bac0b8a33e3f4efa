@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/events.py
-# hypothesis_version: 6.147.0
-
-['beam_breaks', 'datajoint', 'dio', 'dio_event_name', 'end_time', 'event_name', 'event_number', 'hdmf', 'ignore', 'light_events', 'nwb_file_name', 'pump_events', 'pynwb', 'start_time', 'time']

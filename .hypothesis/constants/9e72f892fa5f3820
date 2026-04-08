@@ -1,4 +1,0 @@
-# file: /cumulus/edeno/continuum-swr-replay/src/continuum_swr_replay/data_loaders/task_variables.py
-# hypothesis_version: 6.147.0
-
-[0.0, 500.0, '-', 'cur_pos', 'dist_to_goal', 'distance', 'edge_id', 'extrapolate', 'goal_node_id', 'left', 'path_progress', 'pos', 'previous', 'projected_x_position', 'projected_y_position', 'right', 'start_node_id', 'time_to_goal', 'track_segment_id', 'trial_number', 'turn_direction']
