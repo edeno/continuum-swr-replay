@@ -11,7 +11,7 @@ plot_raster_relative_to_event
     Create event-aligned spike raster plot showing spike times relative to event onsets.
 plot_hist_relative_to_event
     Create peri-stimulus time histogram (PSTH) showing firing rate relative to events.
-plot_AICs
+plot_aics
     Compare GLM models using Akaike Information Criterion (AIC) values.
 
 Examples
@@ -245,7 +245,7 @@ def plot_hist_relative_to_event(
     return ax
 
 
-def plot_AICs(
+def plot_aics(
     glm_results: dict,
     model_list: list[str] | None = None,
     figsize: tuple[float, float] = (4, 3),
@@ -293,7 +293,7 @@ def plot_AICs(
     ...     result = MagicMock()
     ...     result.aic = aic
     ...     glm_results[name] = result
-    >>> fig, ax = plot_AICs(glm_results, model_list=["constant", "SWR", "non_local"])
+    >>> fig, ax = plot_aics(glm_results, model_list=["constant", "SWR", "non_local"])
     >>> plt.show()
 
     See Also

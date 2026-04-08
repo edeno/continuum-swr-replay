@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.visualization.glm_plots import (
-    plot_AICs,
+    plot_aics,
     plot_hist_relative_to_event,
     plot_raster_relative_to_event,
 )
@@ -260,7 +260,7 @@ class TestPlotAICs:
 
     def test_basic_aic_plot(self, mock_glm_results):
         """Test that AIC comparison plot is created correctly."""
-        fig, ax = plot_AICs(
+        fig, ax = plot_aics(
             glm_results=mock_glm_results,
             model_list=["constant", "SWR", "non_local"],
         )
@@ -281,7 +281,7 @@ class TestPlotAICs:
         mock_result.aic = 940.0
         mock_glm_results["SWR + non_local_no_SWR"] = mock_result
 
-        fig, ax = plot_AICs(glm_results=mock_glm_results)
+        fig, ax = plot_aics(glm_results=mock_glm_results)
 
         # Default list has 6 models
         assert len(ax.collections[0].get_offsets()) == 6
@@ -290,7 +290,7 @@ class TestPlotAICs:
 
     def test_model_name_mapping(self, mock_glm_results):
         """Test that model names are properly formatted."""
-        fig, ax = plot_AICs(
+        fig, ax = plot_aics(
             glm_results=mock_glm_results,
             model_list=["constant", "non_local_SWR"],
         )
@@ -309,7 +309,7 @@ class TestPlotAICs:
         model_list = ["constant", "SWR", "non_local"]
         expected_aics = [1000.0, 950.0, 925.0]
 
-        fig, ax = plot_AICs(
+        fig, ax = plot_aics(
             glm_results=mock_glm_results,
             model_list=model_list,
         )
@@ -325,7 +325,7 @@ class TestPlotAICs:
 
     def test_custom_figsize(self, mock_glm_results):
         """Test custom figure size."""
-        fig, ax = plot_AICs(
+        fig, ax = plot_aics(
             glm_results=mock_glm_results,
             model_list=["constant", "SWR"],
             figsize=(6, 4),
@@ -339,7 +339,7 @@ class TestPlotAICs:
 
     def test_xlabel_set(self, mock_glm_results):
         """Test that x-axis label is set correctly."""
-        fig, ax = plot_AICs(
+        fig, ax = plot_aics(
             glm_results=mock_glm_results,
             model_list=["constant", "SWR"],
         )

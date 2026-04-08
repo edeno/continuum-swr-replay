@@ -178,7 +178,7 @@ from .figurl import (
 
 # Static plots
 from .glm_plots import (
-    plot_AICs,
+    plot_aics,
     plot_hist_relative_to_event,
     plot_raster_relative_to_event,
 )
@@ -228,7 +228,7 @@ __all__ = [
     # GLM plots
     "plot_raster_relative_to_event",
     "plot_hist_relative_to_event",
-    "plot_AICs",
+    "plot_aics",
     # Interactive components
     "create_scrolling_line_plot",
     "create_player",

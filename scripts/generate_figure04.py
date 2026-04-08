@@ -55,7 +55,7 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.glm_plots import (
-    plot_AICs,
+    plot_aics,
     plot_hist_relative_to_event,
     plot_raster_relative_to_event,
 )
