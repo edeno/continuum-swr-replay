@@ -129,18 +129,22 @@ def get_overlap_times(
     Parameters
     ----------
     non_local_times : pd.DataFrame
-        Time intervals of non-local events
+        Non-local event intervals with ``start_time``, ``end_time``,
+        ``duration``, ``max_speed`` columns. From ``get_confident_times``.
     ripple_times : pd.DataFrame
-        Time intervals of ripple events
+        Ripple event intervals with ``start_time`` and ``end_time`` columns.
     results : xr.Dataset
-        Decoding results containing time coordinate
+        Decoding results; only the ``time`` coordinate is used for
+        computing temporal overlap via ``get_labels``.
 
     Returns
     -------
     overlap_non_local_times : pd.DataFrame
-        Non-local events that overlap with ripples
+        Subset of ``non_local_times`` that overlap with at least one ripple.
+        Same columns as input.
     no_overlap_non_local_times : pd.DataFrame
-        Non-local events that do not overlap with ripples
+        Subset of ``non_local_times`` that do not overlap with any ripple.
+        Same columns as input.
 
     """
     non_local_labels = get_labels(non_local_times, results.time)

@@ -170,22 +170,26 @@ def test_theta_modulation(
 
     Parameters
     ----------
-    theta_phase : pd.Series
-        Theta phase timeseries (radians).
-    is_immobile : pd.Series
+    theta_phase : pd.Series, shape (n_lfp_samples,)
+        Theta phase timeseries (radians). May have different sampling
+        rate from ``is_immobile``; reindexed internally.
+    is_immobile : pd.Series, shape (n_time,)
         Boolean series indicating immobility at each time bin.
-    neuron_spike_count : NDArray
-        Binned spike counts aligned to is_immobile.index.
+    neuron_spike_count : NDArray, shape (n_time,)
+        Binned spike counts aligned to ``is_immobile.index``.
     sampling_frequency : float
         Sampling frequency in Hz, used to set reindex tolerance.
 
     Returns
     -------
-    tuple[float, float, float, float]
-        likelihood_ratio : Likelihood ratio statistic (theta vs constant).
-        p_value : P-value from chi-square test.
-        modulation : Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
-        preferred_phase : Preferred theta phase in radians.
+    likelihood_ratio : float
+        Likelihood ratio statistic (theta vs constant).
+    p_value : float
+        P-value from chi-square test.
+    modulation : float
+        Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
+    preferred_phase : float
+        Preferred theta phase in radians (-pi to pi).
 
     """
     reindexed_theta = reindex_by(
@@ -470,7 +474,24 @@ def _fit_immobility_models(
 def get_frac_null_deviance(
     full_model: Any, reduced_model: Any, constant_model: Any
 ) -> float:
-    """Compute fraction of total deviance explained by additional terms."""
+    """Compute fraction of total (null) deviance explained by additional terms.
+
+    Parameters
+    ----------
+    full_model : statsmodels GLMResults
+        More complex model (lower deviance).
+    reduced_model : statsmodels GLMResults
+        Simpler nested model (higher deviance).
+    constant_model : statsmodels GLMResults
+        Intercept-only model (highest deviance = total deviance).
+
+    Returns
+    -------
+    float
+        (reduced.deviance - full.deviance) / constant.deviance.
+        Non-negative for properly nested models.
+
+    """
     return float(
         (reduced_model.deviance - full_model.deviance) / constant_model.deviance
     )
@@ -479,7 +500,24 @@ def get_frac_null_deviance(
 def get_frac_explained_deviance(
     full_model: Any, reduced_model: Any, constant_model: Any
 ) -> float:
-    """Compute fraction of model-explained deviance attributable to reduced terms."""
+    """Compute fraction of model-explained deviance attributable to reduced terms.
+
+    Parameters
+    ----------
+    full_model : statsmodels GLMResults
+        Most complex model.
+    reduced_model : statsmodels GLMResults
+        Simpler nested model.
+    constant_model : statsmodels GLMResults
+        Intercept-only model.
+
+    Returns
+    -------
+    float
+        (reduced.deviance - full.deviance) / (constant.deviance - full.deviance).
+        Returns 0.0 if the full model explains no deviance.
+
+    """
     denominator = constant_model.deviance - full_model.deviance
     if abs(denominator) < 1e-10:
         return 0.0
@@ -556,20 +594,20 @@ def process_neuron(
 
     Parameters
     ----------
-    neuron_spike_times : NDArray
+    neuron_spike_times : NDArray, shape (n_spikes,)
         Spike times in seconds.
-    is_immobile : pd.Series
+    is_immobile : pd.Series, shape (n_time,)
         Boolean series indicating immobility at each time bin.
-    theta_phase : pd.Series
+    theta_phase : pd.Series, shape (n_lfp_samples,)
         Theta phase timeseries (radians).
-    time : NDArray
-        Time bin centers in seconds (from position_info index).
+    time : NDArray, shape (n_time,)
+        Time bin centers in seconds (from ``position_info.index``).
     immobility_design_matrices : dict[str, NDArray]
         Pre-computed design matrices keyed by model name.
-    spline_basis : NDArray
+        Each value has shape ``(n_time, n_features)``.
+    spline_basis : NDArray, shape (n_lags, n_basis)
         Spline basis functions for reconstructing peri-event modulation.
-        Shape (n_lag_times, n_basis_functions).
-    lag_time : NDArray
+    lag_time : NDArray, shape (n_lags,)
         Lag times in seconds corresponding to spline_basis rows.
     logger_name : str | None, optional
         Logger name for per-neuron messages. If None, uses module logger.

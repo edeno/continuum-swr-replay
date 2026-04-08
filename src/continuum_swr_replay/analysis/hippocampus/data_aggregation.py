@@ -313,12 +313,18 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
     Parameters
     ----------
     data_over_time : pd.DataFrame
-        Aggregated data with event labels.
+        Aggregated data with ``non_local_event``, ``SWR_event``,
+        ``MUA_event``, and ``head_speed`` columns.
 
     Returns
     -------
-    dict
-        Dictionary mapping event type names to filtered DataFrames.
+    dict[str, pd.DataFrame]
+        Keys: ``non_local_immobile``, ``swr_events``, ``mua_events``,
+        ``non_local_immobile_overlap_swr``, ``non_local_immobile_overlap_mua``,
+        ``non_local_immobile_no_overlap``, ``non_local_immobile_no_overlap_swr``,
+        ``non_local_immobile_no_overlap_mua``, ``swr_events_no_non_local``,
+        ``mua_events_no_non_local``. Each value is a filtered subset of
+        the input DataFrame.
 
     """
     non_local_immobile = get_immobile_events(

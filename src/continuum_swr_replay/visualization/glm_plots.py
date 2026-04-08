@@ -253,7 +253,7 @@ def plot_aics(
     model_list: list[str] | None = None,
     figsize: tuple[float, float] = (4, 3),
 ) -> tuple[plt.Figure, Axes]:
-    """Compare GLM models using Akaike Information Criterion (AIC).
+    r"""Compare GLM models using Akaike Information Criterion (AIC).
 
     Creates a scatter plot showing AIC values for different GLM models. Lower
     AIC values indicate better model fit penalized for complexity. Points are

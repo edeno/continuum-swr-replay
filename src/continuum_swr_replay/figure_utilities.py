@@ -834,7 +834,7 @@ def label_panels(
     fontsize: int = 8,
     fontweight: str = "bold",
 ) -> None:
-    """Add a, b, c, d labels to multi-panel figures.
+    r"""Add a, b, c, d labels to multi-panel figures.
 
     Automatically labels panels in reading order (left-to-right, top-to-bottom).
 

@@ -237,7 +237,19 @@ def plot_swr_zscore_by_state(
     dpi: int = 300,
     ax: plt.Axes | None = None,
 ) -> None:
-    """Plot SWR z-score distribution by local/non-local state."""
+    """Plot SWR z-score distribution by local/non-local state.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data with ``SWR_zscore``, ``Local_prob``,
+        ``Non-Local_prob``, and ``head_speed`` columns.
+    output_dir, figure_name, formats, dpi :
+        Standalone-mode save parameters (ignored when ``ax`` is provided).
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
+
+    """
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
@@ -278,7 +290,19 @@ def plot_replay_speed_by_swr(
     dpi: int = 300,
     ax: plt.Axes | None = None,
 ) -> None:
-    """Plot replay speed distribution by SWR overlap status."""
+    """Plot replay speed distribution by SWR overlap status.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data with ``map_speed``, ``non_local_event``,
+        and ``SWR_event`` columns.
+    output_dir, figure_name, formats, dpi :
+        Standalone-mode save parameters (ignored when ``ax`` is provided).
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
+
+    """
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
@@ -323,7 +347,19 @@ def plot_replay_position_by_swr(
     dpi: int = 300,
     ax: plt.Axes | None = None,
 ) -> None:
-    """Plot replay position distribution by SWR overlap status."""
+    """Plot replay position distribution by SWR overlap status.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data with ``map_estimate``, ``max_linear_position``,
+        ``non_local_event``, and ``SWR_event`` columns.
+    output_dir, figure_name, formats, dpi :
+        Standalone-mode save parameters (ignored when ``ax`` is provided).
+    ax : matplotlib Axes, optional
+        Axes to plot on. If None, creates standalone figure.
+
+    """
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)

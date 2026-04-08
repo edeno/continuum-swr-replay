@@ -134,21 +134,21 @@ def get_map_speed(
 
     Parameters
     ----------
-    posterior : xr.DataArray | np.ndarray
-        Posterior probability distribution over position
+    posterior : xr.DataArray | np.ndarray, shape (n_time, n_positions)
+        Posterior probability distribution over position.
     track_graph_with_bin_centers_edges : nx.Graph
-        Track graph with bin centers as nodes and edges representing connectivity
-    place_bin_center_ind_to_node : np.ndarray
-        Mapping from place bin center index to node ID
+        Track graph with bin centers as nodes and edges representing connectivity.
+    place_bin_center_ind_to_node : np.ndarray, shape (n_positions,)
+        Mapping from place bin center index to node ID in the track graph.
     sampling_frequency : float, optional
-        Samples per second, by default 500.0
+        Samples per second, by default 500.0.
     smooth_sigma : float, optional
-        Gaussian smoothing parameter (seconds), by default 0.0025
+        Gaussian smoothing parameter (seconds), by default 0.0025.
 
     Returns
     -------
-    map_speed : np.ndarray
-        Speed (cm/s) of the most likely decoded position over time
+    np.ndarray, shape (n_time,)
+        Speed (cm/s) of the most likely decoded position over time.
 
     Raises
     ------
