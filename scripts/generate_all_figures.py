@@ -37,15 +37,15 @@ FIGURE_SCRIPTS = {
         "output_dir": "paper/figures/figure01",
     },
     "figure02": {
-        "script": "scripts/generate_figure02_composite.py",
+        "script": "scripts/generate_figure02.py",
         "output_dir": "paper/figures/figure02",
     },
     "figure03": {
-        "script": "scripts/generate_figure03_composite.py",
+        "script": "scripts/generate_figure03.py",
         "output_dir": "paper/figures/figure03",
     },
     "figure04": {
-        "script": "scripts/generate_figure04_composite.py",
+        "script": "scripts/generate_figure04.py",
         "output_dir": "paper/figures/figure04",
     },
 }
