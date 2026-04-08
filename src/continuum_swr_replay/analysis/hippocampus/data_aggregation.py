@@ -100,16 +100,23 @@ Examples
 >>> data_df[["Local_prob", "Non-Local_Continuous_prob"]].head()
 """
 
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 from scipy.stats import zscore
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
 from ...types import SessionData
+from .event_analysis import get_immobile_events
 from .event_detection import get_confident_times, get_overlap_times
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
 
@@ -243,16 +250,16 @@ def get_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": data["theta_phase"]
-            .reindex(results.time, method="nearest")
+            .reindex(results.time, method="nearest", tolerance=0.004)
             .squeeze(),
             "theta_power_zscore": zscore(
                 data["theta_power"]
                 .squeeze()
-                .reindex(results.time, method="nearest")
+                .reindex(results.time, method="nearest", tolerance=0.004)
                 .squeeze()
             ),
             "SWR_zscore": data["zscored_ripple_consensus_trace"]
-            .reindex(results.time, method="nearest")
+            .reindex(results.time, method="nearest", tolerance=0.004)
             .squeeze(),
             "MUA_zscore": data["multiunit_rate_zscore"][brain_area].squeeze(),
             "n_non_local": len(non_local_times),
@@ -272,3 +279,87 @@ def get_data_over_time(
     )
 
     return pd.concat((data_over_time, data["position_info"]), axis=1), posterior
+
+
+def load_data_over_time(data_dir: Path) -> pd.DataFrame:
+    """Load and concatenate all processed session data.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Directory containing ``*_HPC_80_data_over_time.pkl`` files.
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated data with derived Non-Local_prob and distance columns.
+    """
+    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
+    data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
+    data_over_time["Non-Local_prob"] = (
+        data_over_time["Non-Local_Continuous_prob"]
+        + data_over_time["Non-Local_Fragmented_prob"]
+    )
+    data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])
+    return data_over_time
+
+
+def get_event_types(data_over_time: pd.DataFrame) -> dict:
+    """Classify non-local events by overlap with SWR and MUA.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data with event labels.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping event type names to filtered DataFrames.
+    """
+    non_local_immobile = get_immobile_events(
+        data_over_time,
+        event_col="non_local_event",
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        method="endpoints",
+    )
+
+    swr_events = data_over_time.loc[data_over_time["SWR_event"] > 0]
+    mua_events = data_over_time.loc[data_over_time["MUA_event"] > 0]
+
+    non_local_immobile_overlap_swr = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).filter(lambda g: (g["SWR_event"] > 0).any())
+    non_local_immobile_overlap_mua = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).filter(lambda g: (g["MUA_event"] > 0).any())
+
+    non_local_immobile_no_overlap = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).filter(lambda g: (g["SWR_event"] == 0).all() & (g["MUA_event"] == 0).all())
+    non_local_immobile_no_overlap_SWR = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).filter(lambda g: (g["SWR_event"] == 0).all())
+    non_local_immobile_no_overlap_MUA = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"]
+    ).filter(lambda g: (g["MUA_event"] == 0).all())
+    swr_events_no_non_local = swr_events.groupby(
+        ["animal", "day", "epoch", "SWR_event"]
+    ).filter(lambda g: (g["non_local_event"] == 0).all())
+    mua_events_no_non_local = mua_events.groupby(
+        ["animal", "day", "epoch", "MUA_event"]
+    ).filter(lambda g: (g["non_local_event"] == 0).all())
+
+    return {
+        "non_local_immobile": non_local_immobile,
+        "swr_events": swr_events,
+        "mua_events": mua_events,
+        "non_local_immobile_overlap_swr": non_local_immobile_overlap_swr,
+        "non_local_immobile_overlap_mua": non_local_immobile_overlap_mua,
+        "non_local_immobile_no_overlap": non_local_immobile_no_overlap,
+        "non_local_immobile_no_overlap_SWR": non_local_immobile_no_overlap_SWR,
+        "non_local_immobile_no_overlap_MUA": non_local_immobile_no_overlap_MUA,
+        "swr_events_no_non_local": swr_events_no_non_local,
+        "mua_events_no_non_local": mua_events_no_non_local,
+    }

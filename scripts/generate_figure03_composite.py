@@ -30,14 +30,6 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-# Import refactored panel functions
-from generate_figure03 import (
-    load_data_over_time,
-    plot_replay_position_by_swr,
-    plot_replay_speed_by_swr,
-    plot_swr_zscore_by_state,
-)
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.figure_utilities as figure_utilities
@@ -48,6 +40,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.hippocampus import (
     get_confident_times,
     get_overlap_times,
+    load_data_over_time,
     load_results,
 )
 from continuum_swr_replay.data_loaders import load_data
@@ -60,6 +53,11 @@ from continuum_swr_replay.figure_utilities import (
 from continuum_swr_replay.parameters import (
     COLORS,
     PROCESSED_DATA_DIR,
+)
+from continuum_swr_replay.visualization.figure_panels import (
+    plot_replay_position_by_swr,
+    plot_replay_speed_by_swr,
+    plot_swr_zscore_by_state,
 )
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,
@@ -299,7 +297,7 @@ def main():
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/figure03"),
     )
-    parser.add_argument("--nwb-file-name", type=str, default="chimi20200216_.nwb")
+    parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")
     parser.add_argument(
         "--data-dir", type=Path, default=PROCESSED_DATA_DIR,

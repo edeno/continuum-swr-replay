@@ -27,13 +27,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-# Import refactored panel functions from figure03
-from generate_figure03 import (
-    get_event_types,
-    load_data_over_time,
-    plot_triggered_averages,
-)
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.figure_utilities as figure_utilities
@@ -44,8 +37,10 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.hippocampus import (
     get_confident_times,
     get_event_start_end_times,
+    get_event_types,
     get_immobile_events,
     get_overlap_times,
+    load_data_over_time,
     load_results,
 )
 from continuum_swr_replay.data_loaders import load_data
@@ -60,6 +55,7 @@ from continuum_swr_replay.parameters import (
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
+from continuum_swr_replay.visualization.figure_panels import plot_triggered_averages
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,
     plot_conditional_non_local_posterior,

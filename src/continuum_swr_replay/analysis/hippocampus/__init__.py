@@ -77,7 +77,7 @@ Examples
 >>> data_df = get_data_over_time(results, data, detector, env, threshold=0.80)
 """
 
-from .data_aggregation import get_data_over_time
+from .data_aggregation import get_data_over_time, get_event_types, load_data_over_time
 from .event_analysis import (
     get_event_durations_ms,
     get_event_start_end_times,
@@ -115,6 +115,8 @@ __all__ = [
     "get_map_speed",
     "get_posterior_stats",
     "get_data_over_time",
+    "load_data_over_time",
+    "get_event_types",
     "compute_calibration_curve",
     "compute_error_by_track_segment",
     "compute_local_decoding_error",
