@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from concurrent.futures import Future, ProcessPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -182,7 +181,6 @@ def load_data(
     epoch_name: str,
     ripple_detector_name: str = "Kay",
     include: frozenset[str] | None = None,
-    parallel: bool = True,
 ) -> SessionData:
     """Load data for a given session and epoch with selective loading.
 
@@ -205,13 +203,6 @@ def load_data(
         Use DataLoadingPreset for common configurations or create custom sets.
         Position data (position_info, track_graph) is always loaded as it
         defines time bounds for other data types
-    parallel : bool, optional
-        Whether to use parallel loading for independent data components.
-        Default True. Uses ProcessPoolExecutor to load spike, ripple, theta,
-        and DIO data concurrently, which can reduce load time by 30-45%.
-        Set to False to use sequential loading (useful for debugging).
-        Note: Uses process-based parallelism to avoid DataJoint connection
-        threading issues.
 
     Returns
     -------
@@ -351,172 +342,69 @@ def load_data(
         "linear_edge_spacing": position_data["linear_edge_spacing"],
     }
 
-    # Parallel loading of independent components (if enabled)
-    if parallel:
-        logger.debug("Using parallel loading for independent data components")
+    # Load and process spike data
+    if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
+        SessionDataKeys.SPIKE_WAVEFORM_FEATURES
+    ):
+        spike_data = get_spike_data(nwb_file_name)
+        _process_spike_data(
+            spike_data, position_data["position_info"].index, should_load, result
+        )
 
-        # Define loading tasks for independent components
-        futures: dict[str, Future[Any]] = {}
+    # Load and process ripple data
+    if any(
+        should_load(key)
+        for key in [
+            SessionDataKeys.RIPPLE_TIMES,
+            SessionDataKeys.RIPPLE_FILTERED_LFPS,
+            SessionDataKeys.RIPPLE_LFPS,
+            SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
+            SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
+        ]
+    ):
+        ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
+        _process_ripple_data(
+            ripple_data, position_data["position_info"].index, should_load, result
+        )
 
-        with ProcessPoolExecutor(max_workers=4) as executor:
-            # Submit spike loading task
-            if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
-                SessionDataKeys.SPIKE_WAVEFORM_FEATURES
-            ):
-                futures["spike"] = executor.submit(get_spike_data, nwb_file_name)
+    # Load and process theta data
+    if any(
+        should_load(key)
+        for key in [
+            SessionDataKeys.THETA_FILTERED_LFP,
+            SessionDataKeys.THETA_PHASE,
+            SessionDataKeys.THETA_POWER,
+        ]
+    ):
+        theta_data = get_theta(nwb_file_name, epoch_name)
+        _process_theta_data(theta_data, should_load, result)
 
-            # Submit ripple loading task
-            if any(
-                should_load(key)
-                for key in [
-                    SessionDataKeys.RIPPLE_TIMES,
-                    SessionDataKeys.RIPPLE_FILTERED_LFPS,
-                    SessionDataKeys.RIPPLE_LFPS,
-                    SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
-                    SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
-                ]
-            ):
-                futures["ripple"] = executor.submit(
-                    get_ripple, nwb_file_name, epoch_name, ripple_detector_name
-                )
+    # Load and process DIO events and behavioral data
+    if any(
+        should_load(key)
+        for key in [
+            SessionDataKeys.BEAM_BREAKS,
+            SessionDataKeys.PUMP_EVENTS,
+            SessionDataKeys.LIGHT_EVENTS,
+            SessionDataKeys.WELL_VISITS,
+            SessionDataKeys.TRIALS,
+            SessionDataKeys.TASK_VARIABLES,
+        ]
+    ):
+        dio_events = load_dios(
+            nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
+        )
+        _process_behavioral_data(dio_events, position_data, should_load, result)
 
-            # Submit theta loading task
-            if any(
-                should_load(key)
-                for key in [
-                    SessionDataKeys.THETA_FILTERED_LFP,
-                    SessionDataKeys.THETA_PHASE,
-                    SessionDataKeys.THETA_POWER,
-                ]
-            ):
-                futures["theta"] = executor.submit(get_theta, nwb_file_name, epoch_name)
+    # Process multiunit data (depends on spike_times being loaded)
+    if "spike_times" in result:
+        _process_multiunit_data(
+            result["spike_times"], position_data["position_info"], should_load, result
+        )
 
-            # Submit DIO loading task
-            if any(
-                should_load(key)
-                for key in [
-                    SessionDataKeys.BEAM_BREAKS,
-                    SessionDataKeys.PUMP_EVENTS,
-                    SessionDataKeys.LIGHT_EVENTS,
-                    SessionDataKeys.WELL_VISITS,
-                    SessionDataKeys.TRIALS,
-                    SessionDataKeys.TASK_VARIABLES,
-                ]
-            ):
-                futures["dio"] = executor.submit(
-                    load_dios,
-                    nwb_file_name,
-                    position_data["position_info"].index.to_numpy()[[0, -1]],
-                )
-
-            # Submit electrode group info loading task
-            if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
-                futures["electrode"] = executor.submit(
-                    get_electrode_group_info, nwb_file_name
-                )
-
-            # Wait for all futures to complete and collect results
-            raw_data: dict[str, Any] = {}
-            for name, future in futures.items():
-                try:
-                    raw_data[name] = future.result(timeout=600)  # 10 minute timeout
-                    logger.debug(f"Completed loading {name} data")
-                except Exception as e:
-                    logger.error(f"Error loading {name} data: {e}")
-                    raise
-
-        # Process raw data using helper functions
-        if "spike" in raw_data:
-            _process_spike_data(
-                raw_data["spike"], position_data["position_info"].index, should_load, result
-            )
-
-        if "ripple" in raw_data:
-            _process_ripple_data(
-                raw_data["ripple"], position_data["position_info"].index, should_load, result
-            )
-
-        if "theta" in raw_data:
-            _process_theta_data(raw_data["theta"], should_load, result)
-
-        if "dio" in raw_data:
-            _process_behavioral_data(raw_data["dio"], position_data, should_load, result)
-
-        if "spike_times" in result:
-            _process_multiunit_data(
-                result["spike_times"], position_data["position_info"], should_load, result
-            )
-
-        if "electrode" in raw_data:
-            result["electrode_group_info"] = raw_data["electrode"]
-
-    else:
-        # Sequential loading (for debugging or when parallel is disabled)
-        logger.debug("Using sequential loading")
-
-        # Load and process spike data
-        if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
-            SessionDataKeys.SPIKE_WAVEFORM_FEATURES
-        ):
-            spike_data = get_spike_data(nwb_file_name)
-            _process_spike_data(
-                spike_data, position_data["position_info"].index, should_load, result
-            )
-
-        # Load and process ripple data
-        if any(
-            should_load(key)
-            for key in [
-                SessionDataKeys.RIPPLE_TIMES,
-                SessionDataKeys.RIPPLE_FILTERED_LFPS,
-                SessionDataKeys.RIPPLE_LFPS,
-                SessionDataKeys.RIPPLE_CONSENSUS_TRACE,
-                SessionDataKeys.ZSCORED_RIPPLE_CONSENSUS_TRACE,
-            ]
-        ):
-            ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
-            _process_ripple_data(
-                ripple_data, position_data["position_info"].index, should_load, result
-            )
-
-        # Load and process theta data
-        if any(
-            should_load(key)
-            for key in [
-                SessionDataKeys.THETA_FILTERED_LFP,
-                SessionDataKeys.THETA_PHASE,
-                SessionDataKeys.THETA_POWER,
-            ]
-        ):
-            theta_data = get_theta(nwb_file_name, epoch_name)
-            _process_theta_data(theta_data, should_load, result)
-
-        # Load and process DIO events and behavioral data
-        if any(
-            should_load(key)
-            for key in [
-                SessionDataKeys.BEAM_BREAKS,
-                SessionDataKeys.PUMP_EVENTS,
-                SessionDataKeys.LIGHT_EVENTS,
-                SessionDataKeys.WELL_VISITS,
-                SessionDataKeys.TRIALS,
-                SessionDataKeys.TASK_VARIABLES,
-            ]
-        ):
-            dio_events = load_dios(
-                nwb_file_name, position_data["position_info"].index.to_numpy()[[0, -1]]
-            )
-            _process_behavioral_data(dio_events, position_data, should_load, result)
-
-        # Process multiunit data (depends on spike_times being loaded)
-        if "spike_times" in result:
-            _process_multiunit_data(
-                result["spike_times"], position_data["position_info"], should_load, result
-            )
-
-        # Load electrode group info
-        if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
-            result["electrode_group_info"] = get_electrode_group_info(nwb_file_name)
+    # Load electrode group info
+    if should_load(SessionDataKeys.ELECTRODE_GROUP_INFO):
+        result["electrode_group_info"] = get_electrode_group_info(nwb_file_name)
 
     # Return result dict - type checkers will validate it matches SessionData
     # The dict is built dynamically based on the include parameter

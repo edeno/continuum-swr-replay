@@ -621,13 +621,10 @@ def run_decode(
         logger.info(f"ripple_detector_name: {ripple_detector_name}")
         logger.info(f"brain_area: {brain_area}")
         logger.info("Loading data...")
-        # parallel=False because this runs in a Dask worker (daemon process)
-        # which cannot spawn child processes
         data = load_data(
             nwb_file_name,
             epoch_name,
             ripple_detector_name=ripple_detector_name,
-            parallel=False,
         )
 
         if not data["spike_times"]:
