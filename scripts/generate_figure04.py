@@ -172,7 +172,7 @@ def plot_single_neuron_aic(glm_results, ax, model_list=None):
 # Panel d — Population heatmaps (accepts axes)
 # ---------------------------------------------------------------------------
 
-def plot_population_heatmaps_on_axes(swr_mod, no_swr_mod, lag_time, axes):
+def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
     """Plot side-by-side heatmaps on provided (ax1, ax2) axes."""
     ax1, ax2 = axes
     peak_times = lag_time[np.argmax(np.abs(swr_mod), axis=0)]
@@ -212,13 +212,13 @@ def plot_population_heatmaps_on_axes(swr_mod, no_swr_mod, lag_time, axes):
 # Panel e — Population average (accepts ax)
 # ---------------------------------------------------------------------------
 
-def plot_population_average_on_ax(modulations, lag_time, ax):
+def plot_population_average(modulations, lag_time, ax):
     """Plot population mean ± SEM modulation on provided ax."""
     lag_ms = lag_time * 1000
 
     for name, color, label in [
-        ("SWR", COLORS["SWR"], "SWR"),
-        ("no_SWR", COLORS["Non-Local"], "Non-SWR replay"),
+        ("swr", COLORS["SWR"], "SWR"),
+        ("no_swr", COLORS["Non-Local"], "Non-SWR replay"),
     ]:
         arr = modulations[name]
         mean = np.nanmean(arr, axis=1)
@@ -233,14 +233,14 @@ def plot_population_average_on_ax(modulations, lag_time, ax):
     ax.set_ylabel("Log firing rate change")
     ax.set_xlim(lag_ms[0], lag_ms[-1])
     ax.legend(frameon=False)
-    ax.set_title(f"Population (n={modulations['SWR'].shape[1]:,})")
+    ax.set_title(f"Population (n={modulations['swr'].shape[1]:,})")
 
 
 # ---------------------------------------------------------------------------
 # Panel f — Significance + AIC (accepts axes)
 # ---------------------------------------------------------------------------
 
-def plot_significance_on_ax(df, ax):
+def plot_significance(df, ax):
     """Plot fraction of significant neurons on provided ax."""
     tests = {
         "SWR": "SWR vs. constant: fdr_q",
@@ -266,7 +266,7 @@ def plot_significance_on_ax(df, ax):
     ax.tick_params(axis="x", labelsize=5)
 
 
-def plot_aic_selection_on_ax(df, ax):
+def plot_aic_selection(df, ax):
     """Plot AIC model selection distribution on provided ax."""
     n_total = len(df)
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
@@ -413,8 +413,8 @@ def generate_figure(
     ax_d1 = fig.add_subplot(gs_mid[0])
     ax_d2 = fig.add_subplot(gs_mid[1])
 
-    im = plot_population_heatmaps_on_axes(
-        modulations["SWR"], modulations["no_SWR"],
+    im = plot_population_heatmaps(
+        modulations["swr"], modulations["no_swr"],
         pop_lag_time, [ax_d1, ax_d2],
     )
 
@@ -429,15 +429,15 @@ def generate_figure(
 
     # Panel e: population average
     ax_e = fig.add_subplot(gs_bot[0])
-    plot_population_average_on_ax(modulations, pop_lag_time, ax_e)
+    plot_population_average(modulations, pop_lag_time, ax_e)
 
     # Panel f: significance bars + AIC selection
     gs_f = gs_bot[1].subgridspec(1, 2, wspace=0.4)
     ax_f1 = fig.add_subplot(gs_f[0])
     ax_f2 = fig.add_subplot(gs_f[1])
 
-    plot_significance_on_ax(pop_df, ax_f1)
-    plot_aic_selection_on_ax(pop_df, ax_f2)
+    plot_significance(pop_df, ax_f1)
+    plot_aic_selection(pop_df, ax_f2)
 
     # ── Panel Labels ──
     label_panels(

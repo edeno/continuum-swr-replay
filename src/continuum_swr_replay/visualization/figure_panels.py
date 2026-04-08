@@ -59,7 +59,7 @@ def plot_event_duration_distribution(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
+    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_swr"):
         event_times = get_event_start_end_times(
             event_types[event_type], event_col="non_local_event"
         )
@@ -67,7 +67,7 @@ def plot_event_duration_distribution(
 
         color = (
             COLORS["Non-Local"]
-            if event_type == "non_local_immobile_no_overlap_SWR"
+            if event_type == "non_local_immobile_no_overlap_swr"
             else COLORS["All Events"]
         )
         label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
@@ -126,7 +126,7 @@ def plot_triggered_averages(
     ]
 
     non_local_start_end_time = get_event_start_end_times(
-        event_types["non_local_immobile_no_overlap_SWR"], event_col="non_local_event"
+        event_types["non_local_immobile_no_overlap_swr"], event_col="non_local_event"
     )
     signal_windows = get_signal_windows(
         data=data_over_time,

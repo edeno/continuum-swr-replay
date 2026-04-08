@@ -16,7 +16,7 @@ get_multiunit
 
 Helper Functions
 ----------------
-get_multiunit_HSE
+get_multiunit_hse
     Compute HSE detection for a single brain area's spike data.
 filter_ripple_lfp_time
     Filter ripple data to match position time bounds.
@@ -188,7 +188,7 @@ def get_ripple(
     }
 
 
-def get_multiunit_HSE(
+def get_multiunit_hse(
     spike_times: list[NDArray[np.float64]],
     speed: NDArray[np.float64],
     bin_time: NDArray[np.float64],
@@ -295,7 +295,7 @@ def get_multiunit(
             hse_times[brain_area],
             multiunit_firing_rate[brain_area],
             multiunit_rate_zscore[brain_area],
-        ) = get_multiunit_HSE(
+        ) = get_multiunit_hse(
             spike_times[brain_area],
             position_info.head_speed.to_numpy(),
             position_info.index.to_numpy(),

@@ -27,7 +27,7 @@ def load_population_data(
     df : pd.DataFrame
         Per-neuron statistics, filtered and with FDR-corrected p-values.
     modulations : dict[str, np.ndarray]
-        Modulation time courses keyed by "SWR", "no_SWR", "nl_SWR", "nl_no_SWR".
+        Modulation time courses keyed by "swr", "no_swr", "non_local_swr", "non_local_no_swr".
         Each shape (n_lag_times, n_good_neurons).
     lag_time : np.ndarray
         Lag time axis in seconds.
@@ -90,10 +90,10 @@ def load_population_data(
         df[fdr_col] = false_discovery_control(pvals, method="bh")
 
     modulations = {
-        "SWR": swr_all,
-        "no_SWR": no_swr_all,
-        "nl_SWR": nl_swr_all,
-        "nl_no_SWR": nl_no_swr_all,
+        "swr": swr_all,
+        "no_swr": no_swr_all,
+        "non_local_swr": nl_swr_all,
+        "non_local_no_swr": nl_no_swr_all,
     }
 
     return df, modulations, lag_time

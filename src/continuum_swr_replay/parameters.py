@@ -185,7 +185,7 @@ class DecodingParameters:
 # Singleton instance of decoding parameters
 DECODING_PARAMS: Final = DecodingParameters()
 
-PROBABILITY_THRESHOLDS = [0.50, 0.80, 0.95]
+PROBABILITY_THRESHOLDS: Final[list[float]] = [0.50, 0.80, 0.95]
 
 
 class TrainingType(str, Enum):

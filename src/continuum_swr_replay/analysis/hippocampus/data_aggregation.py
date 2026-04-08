@@ -198,8 +198,8 @@ def get_data_over_time(
         non_local_times.max_speed < MAX_SPEED_THRESHOLD_CM_PER_SEC
     ]
     non_local_labels = get_labels(non_local_times, results.time)
-    SWR_labels = get_labels(data["ripple_times"], results.time)
-    MUA_labels = get_labels(data["hse_times"][brain_area], results.time)
+    swr_labels = get_labels(data["ripple_times"], results.time)
+    mua_labels = get_labels(data["hse_times"][brain_area], results.time)
 
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
         non_local_times, data["ripple_times"], results
@@ -223,13 +223,13 @@ def get_data_over_time(
     ) = get_posterior_stats(
         data, env, sampling_frequency=sampling_frequency, posterior=posterior
     )
-    animal, date = parse_nwb_filename(nwb_file_name)
+    animal, day = parse_nwb_filename(nwb_file_name)
 
     data_over_time = pd.DataFrame(
         {
             "non_local_event": non_local_labels.squeeze(),
-            "SWR_event": SWR_labels.squeeze(),
-            "MUA_event": MUA_labels.squeeze(),
+            "SWR_event": swr_labels.squeeze(),
+            "MUA_event": mua_labels.squeeze(),
             "Local_prob": results.sel(
                 states="Local"
             ).acausal_state_probabilities.squeeze(),
@@ -272,7 +272,7 @@ def get_data_over_time(
             "n_SWR_MUA": len(SWR_MUA_times),
             "n_SWR_no_MUA": len(SWR_no_MUA_times),
             "animal": animal,
-            "day": date,
+            "day": day,
             "epoch": epoch_name,
             "nwb_file_name": nwb_file_name,
         }
@@ -338,10 +338,10 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
     non_local_immobile_no_overlap = non_local_immobile.groupby(
         ["animal", "day", "epoch", "non_local_event"]
     ).filter(lambda g: (g["SWR_event"] == 0).all() & (g["MUA_event"] == 0).all())
-    non_local_immobile_no_overlap_SWR = non_local_immobile.groupby(
+    non_local_immobile_no_overlap_swr = non_local_immobile.groupby(
         ["animal", "day", "epoch", "non_local_event"]
     ).filter(lambda g: (g["SWR_event"] == 0).all())
-    non_local_immobile_no_overlap_MUA = non_local_immobile.groupby(
+    non_local_immobile_no_overlap_mua = non_local_immobile.groupby(
         ["animal", "day", "epoch", "non_local_event"]
     ).filter(lambda g: (g["MUA_event"] == 0).all())
     swr_events_no_non_local = swr_events.groupby(
@@ -358,8 +358,8 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
         "non_local_immobile_overlap_swr": non_local_immobile_overlap_swr,
         "non_local_immobile_overlap_mua": non_local_immobile_overlap_mua,
         "non_local_immobile_no_overlap": non_local_immobile_no_overlap,
-        "non_local_immobile_no_overlap_SWR": non_local_immobile_no_overlap_SWR,
-        "non_local_immobile_no_overlap_MUA": non_local_immobile_no_overlap_MUA,
+        "non_local_immobile_no_overlap_swr": non_local_immobile_no_overlap_swr,
+        "non_local_immobile_no_overlap_mua": non_local_immobile_no_overlap_mua,
         "swr_events_no_non_local": swr_events_no_non_local,
         "mua_events_no_non_local": mua_events_no_non_local,
     }

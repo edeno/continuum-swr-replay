@@ -123,14 +123,14 @@ def likelihood_ratio_test(
     Returns
     -------
     likelihood_ratio : float
-    p_value : float
+    p_valueue : float
 
     """
     degrees_of_freedom = degrees_of_freedom_restricted - degrees_of_freedom_full
     likelihood_ratio = deviance_restricted - deviance_full
-    p_value = scipy.stats.chi2.sf(likelihood_ratio, df=degrees_of_freedom)
+    p_valueue = scipy.stats.chi2.sf(likelihood_ratio, df=degrees_of_freedom)
 
-    return likelihood_ratio, p_value
+    return likelihood_ratio, p_valueue
 
 
 def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
@@ -170,7 +170,7 @@ def test_theta_modulation(
     -------
     tuple[float, float, float, float]
         likelihood_ratio : Likelihood ratio statistic (theta vs constant).
-        p_val : P-value from chi-square test.
+        p_value : P-value from chi-square test.
         modulation : Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
         preferred_phase : Preferred theta phase in radians.
     """
@@ -203,7 +203,7 @@ def test_theta_modulation(
     )
     theta_glm_results = theta_glm_model.fit()
 
-    likelihood_ratio, p_val = _lr_test(theta_glm_results, constant_glm_results)
+    likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
 
     # Fit regularized model to avoid overfitting for modulation and preferred phase
     theta_glm_results = theta_glm_model.fit_regularized(alpha=1e-20, L1_wt=0.0)
@@ -215,7 +215,7 @@ def test_theta_modulation(
         theta_glm_results.params[2], theta_glm_results.params[1]
     )
 
-    return likelihood_ratio, p_val, modulation, preferred_phase
+    return likelihood_ratio, p_value, modulation, preferred_phase
 
 
 def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
@@ -434,18 +434,18 @@ def process_neuron(
     replay). AIC: ``min_aic_model``.
 
     **Q3. Do PFC neurons respond to non-local events lacking a detected SWR?**
-    ``non_local_no_SWR vs constant``. Modulation: ``no_SWR_modulation``.
+    ``non_local_no_SWR vs constant``. Modulation: ``no_swr_modulation``.
 
     **Q4. Is the non-SWR replay response robust to sub-threshold ripple
     confounds?**
-    Compare ``no_SWR_modulation`` (controlling for all SWRs) vs
-    ``non_local_no_SWR_modulation`` (controlling for replay-coincident
+    Compare ``no_swr_modulation`` (controlling for all SWRs) vs
+    ``non_local_no_swr_modulation`` (controlling for replay-coincident
     SWRs only). ``non_local_SWR + non_local_no_SWR vs non_local_SWR``.
 
     **Q5. Do SWR-coincident and non-SWR replay drive different responses?**
     ``non_local_SWR + non_local_no_SWR vs non_local`` (does splitting
     improve fit?). AIC: ``min_aic_model_replay_split``. Compare
-    ``non_local_SWR_modulation`` vs ``non_local_no_SWR_modulation`` shapes.
+    ``non_local_swr_modulation`` vs ``non_local_no_swr_modulation`` shapes.
 
     **Q6. What is the relationship to theta modulation during running?**
     ``theta_mod``, ``theta_preferred_phase``, firing rates.
@@ -494,19 +494,19 @@ def process_neuron(
 
         Empty dict with only firing rates if GLM fitting fails.
 
-    SWR_modulation : NDArray
+    swr_modulation : NDArray
         SWR peri-event modulation from SWR-controlled model
         (``SWR + non_local_no_SWR``). Shape (n_lag_times,).
-    no_SWR_modulation : NDArray
+    no_swr_modulation : NDArray
         Non-SWR replay modulation from SWR-controlled model, controlling
         for all detected ripples. Shape (n_lag_times,).
-    non_local_SWR_modulation : NDArray
+    non_local_swr_modulation : NDArray
         SWR-coincident replay modulation from replay-split model
         (``non_local_SWR + non_local_no_SWR``). Shape (n_lag_times,).
-    non_local_no_SWR_modulation : NDArray
+    non_local_no_swr_modulation : NDArray
         Non-SWR replay modulation from replay-split model, controlling
         for replay-coincident ripples only. Shape (n_lag_times,).
-        Comparing this with ``no_SWR_modulation`` tests whether the
+        Comparing this with ``no_swr_modulation`` tests whether the
         non-SWR replay response is robust to the choice of SWR control.
     """
     _logger = logging.getLogger(logger_name) if logger_name else logger
@@ -630,23 +630,23 @@ def process_neuron(
         reg_swr_ctrl = models["SWR + non_local_no_SWR"].fit_regularized(
             alpha=1e-20, L1_wt=0.0
         )
-        SWR_modulation = (
+        swr_modulation = (
             spline_basis @ reg_swr_ctrl.params[1 : n_basis_functions + 1]
         )
-        no_SWR_modulation = (
+        no_swr_modulation = (
             spline_basis @ reg_swr_ctrl.params[n_basis_functions + 1 :]
         )
 
-        SWR_max_mod_ind = np.argmax(np.abs(SWR_modulation))
-        neuron_stats["SWR_max_mod"] = SWR_modulation[SWR_max_mod_ind]
-        neuron_stats["SWR_max_mod_time"] = lag_time[SWR_max_mod_ind]
+        swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
+        neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
+        neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
 
-        no_SWR_max_mod_ind = np.argmax(np.abs(no_SWR_modulation))
+        no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
         neuron_stats["non_local_no_SWR_max_mod"] = (
-            no_SWR_modulation[no_SWR_max_mod_ind]
+            no_swr_modulation[no_swr_max_mod_ind]
         )
         neuron_stats["non_local_no_SWR_max_mod_time"] = (
-            lag_time[no_SWR_max_mod_ind]
+            lag_time[no_swr_max_mod_ind]
         )
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
@@ -654,25 +654,25 @@ def process_neuron(
         reg_replay_split = models[
             "non_local_SWR + non_local_no_SWR"
         ].fit_regularized(alpha=1e-20, L1_wt=0.0)
-        non_local_SWR_modulation = (
+        non_local_swr_modulation = (
             spline_basis @ reg_replay_split.params[1 : n_basis_functions + 1]
         )
-        non_local_no_SWR_modulation = (
+        non_local_no_swr_modulation = (
             spline_basis @ reg_replay_split.params[n_basis_functions + 1 :]
         )
 
-        nls_max_ind = np.argmax(np.abs(non_local_SWR_modulation))
+        non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
         neuron_stats["non_local_SWR_max_mod"] = (
-            non_local_SWR_modulation[nls_max_ind]
+            non_local_swr_modulation[non_local_swr_max_ind]
         )
-        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[nls_max_ind]
+        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
 
-        nlns_max_ind = np.argmax(np.abs(non_local_no_SWR_modulation))
+        non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
         neuron_stats["non_local_no_SWR_split_max_mod"] = (
-            non_local_no_SWR_modulation[nlns_max_ind]
+            non_local_no_swr_modulation[non_local_no_swr_max_ind]
         )
         neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
-            lag_time[nlns_max_ind]
+            lag_time[non_local_no_swr_max_ind]
         )
 
     except (ValueError, np.linalg.LinAlgError):
@@ -688,17 +688,17 @@ def process_neuron(
             neuron_spike_count[is_immobile].mean() * sampling_frequency
         )
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
-        SWR_modulation = nan_modulation
-        no_SWR_modulation = nan_modulation
-        non_local_SWR_modulation = nan_modulation
-        non_local_no_SWR_modulation = nan_modulation
+        swr_modulation = nan_modulation
+        no_swr_modulation = nan_modulation
+        non_local_swr_modulation = nan_modulation
+        non_local_no_swr_modulation = nan_modulation
 
     return (
         neuron_stats,
-        SWR_modulation,
-        no_SWR_modulation,
-        non_local_SWR_modulation,
-        non_local_no_SWR_modulation,
+        swr_modulation,
+        no_swr_modulation,
+        non_local_swr_modulation,
+        non_local_no_swr_modulation,
     )
 
 
@@ -736,16 +736,16 @@ def run_session(
         Per-neuron statistics. Shape (n_neurons, n_stats). Includes GLM
         comparison results, theta modulation, firing rates, and AIC model
         selection.
-    SWR_modulation : NDArray
+    swr_modulation : NDArray
         SWR peri-event modulation from SWR-controlled model.
         Shape (n_lag_times, n_neurons).
-    no_SWR_modulation : NDArray
+    no_swr_modulation : NDArray
         Non-SWR replay modulation from SWR-controlled model, controlling
         for all detected ripples. Shape (n_lag_times, n_neurons).
-    non_local_SWR_modulation : NDArray
+    non_local_swr_modulation : NDArray
         SWR-coincident replay modulation from replay-split model.
         Shape (n_lag_times, n_neurons).
-    non_local_no_SWR_modulation : NDArray
+    non_local_no_swr_modulation : NDArray
         Non-SWR replay modulation from replay-split model, controlling
         for replay-coincident ripples only.
         Shape (n_lag_times, n_neurons).
@@ -870,18 +870,18 @@ def run_session(
 
     (
         neuron_stats_list,
-        SWR_modulation_list,
-        no_SWR_modulation_list,
-        non_local_SWR_modulation_list,
-        non_local_no_SWR_modulation_list,
+        swr_modulation_list,
+        no_swr_modulation_list,
+        non_local_swr_modulation_list,
+        non_local_no_swr_modulation_list,
     ) = zip(*result, strict=True)
 
     neuron_stats = pd.DataFrame(list(neuron_stats_list))
-    SWR_modulation = np.stack(SWR_modulation_list, axis=1)
-    no_SWR_modulation = np.stack(no_SWR_modulation_list, axis=1)
-    non_local_SWR_modulation = np.stack(non_local_SWR_modulation_list, axis=1)
-    non_local_no_SWR_modulation = np.stack(
-        non_local_no_SWR_modulation_list, axis=1
+    swr_modulation = np.stack(swr_modulation_list, axis=1)
+    no_swr_modulation = np.stack(no_swr_modulation_list, axis=1)
+    non_local_swr_modulation = np.stack(non_local_swr_modulation_list, axis=1)
+    non_local_no_swr_modulation = np.stack(
+        non_local_no_swr_modulation_list, axis=1
     )
 
     # Trim modulation arrays from fit window (±250ms) to report window (±200ms)
@@ -889,10 +889,10 @@ def run_session(
     report_mask = np.isin(
         np.round(lag_time, 6), np.round(report_lags / sampling_frequency, 6)
     )
-    SWR_modulation = SWR_modulation[report_mask]
-    no_SWR_modulation = no_SWR_modulation[report_mask]
-    non_local_SWR_modulation = non_local_SWR_modulation[report_mask]
-    non_local_no_SWR_modulation = non_local_no_SWR_modulation[report_mask]
+    swr_modulation = swr_modulation[report_mask]
+    no_swr_modulation = no_swr_modulation[report_mask]
+    non_local_swr_modulation = non_local_swr_modulation[report_mask]
+    non_local_no_swr_modulation = non_local_no_swr_modulation[report_mask]
 
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
@@ -902,8 +902,8 @@ def run_session(
 
     return (
         neuron_stats,
-        SWR_modulation,
-        no_SWR_modulation,
-        non_local_SWR_modulation,
-        non_local_no_SWR_modulation,
+        swr_modulation,
+        no_swr_modulation,
+        non_local_swr_modulation,
+        non_local_no_swr_modulation,
     )

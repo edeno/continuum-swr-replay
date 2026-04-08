@@ -1,6 +1,6 @@
 """Tests for multiunit HSE (High Synchrony Event) detection.
 
-Tests get_multiunit_HSE — a pure numpy function with no Spyglass dependency.
+Tests get_multiunit_hse — a pure numpy function with no Spyglass dependency.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.data_loaders.lfp import get_multiunit_HSE
+from continuum_swr_replay.data_loaders.lfp import get_multiunit_hse
 
 
 class TestGetMultiunitHSE:
@@ -35,7 +35,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 50)) for _ in range(5)]
 
-        hse_times, firing_rate, zscore = get_multiunit_HSE(
+        hse_times, firing_rate, zscore = get_multiunit_hse(
             spike_times, low_speed, bin_time
         )
 
@@ -48,7 +48,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 50)) for _ in range(5)]
 
-        _, firing_rate, zscore = get_multiunit_HSE(
+        _, firing_rate, zscore = get_multiunit_hse(
             spike_times, low_speed, bin_time
         )
 
@@ -60,7 +60,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 50)) for _ in range(5)]
 
-        _, firing_rate, _ = get_multiunit_HSE(spike_times, low_speed, bin_time)
+        _, firing_rate, _ = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         np.testing.assert_array_equal(firing_rate.index.to_numpy(), bin_time)
 
@@ -68,7 +68,7 @@ class TestGetMultiunitHSE:
         """Empty spike arrays should give zero firing rate."""
         spike_times = [np.array([]) for _ in range(5)]
 
-        _, firing_rate, zscore = get_multiunit_HSE(
+        _, firing_rate, zscore = get_multiunit_hse(
             spike_times, low_speed, bin_time
         )
 
@@ -78,7 +78,7 @@ class TestGetMultiunitHSE:
         """Constant firing rate should give zero z-score (std=0 guard)."""
         spike_times = [np.array([]) for _ in range(5)]
 
-        _, _, zscore = get_multiunit_HSE(spike_times, low_speed, bin_time)
+        _, _, zscore = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         np.testing.assert_array_equal(zscore.values, 0.0)
 
@@ -96,7 +96,7 @@ class TestGetMultiunitHSE:
             for _ in range(10)
         ]
 
-        hse_times, _, _ = get_multiunit_HSE(spike_times, high_speed, bin_time)
+        hse_times, _, _ = get_multiunit_hse(spike_times, high_speed, bin_time)
 
         # High speed should suppress detection
         assert len(hse_times) == 0
@@ -106,7 +106,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 50)) for _ in range(5)]
 
-        hse_times, _, _ = get_multiunit_HSE(spike_times, low_speed, bin_time)
+        hse_times, _, _ = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         assert "start_time" in hse_times.columns
         assert "end_time" in hse_times.columns
@@ -117,7 +117,7 @@ class TestGetMultiunitHSE:
         # Lots of spikes to increase chance of HSE detection
         spike_times = [np.sort(rng.uniform(0, 2, 200)) for _ in range(10)]
 
-        hse_times, _, _ = get_multiunit_HSE(spike_times, low_speed, bin_time)
+        hse_times, _, _ = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         if len(hse_times) > 0:
             assert hse_times["start_time"].min() >= bin_time[0]
@@ -133,8 +133,8 @@ class TestGetMultiunitHSE:
             np.concatenate([st, rng.uniform(100, 200, 50)]) for st in spike_times_in
         ]
 
-        _, rate_in, _ = get_multiunit_HSE(spike_times_in, low_speed, bin_time)
-        _, rate_out, _ = get_multiunit_HSE(spike_times_out, low_speed, bin_time)
+        _, rate_in, _ = get_multiunit_hse(spike_times_in, low_speed, bin_time)
+        _, rate_out, _ = get_multiunit_hse(spike_times_out, low_speed, bin_time)
 
         # Firing rates should be identical since out-of-range spikes are filtered
         np.testing.assert_array_equal(rate_in.values, rate_out.values)
@@ -144,7 +144,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 100))]
 
-        hse_times, firing_rate, zscore = get_multiunit_HSE(
+        hse_times, firing_rate, zscore = get_multiunit_hse(
             spike_times, low_speed, bin_time
         )
 
@@ -156,7 +156,7 @@ class TestGetMultiunitHSE:
         # Need enough spikes for non-trivial distribution
         spike_times = [np.sort(rng.uniform(0, 2, 500)) for _ in range(10)]
 
-        _, _, zscore = get_multiunit_HSE(spike_times, low_speed, bin_time)
+        _, _, zscore = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         values = zscore.values.flatten()
         # Z-score should be close to mean=0, std=1

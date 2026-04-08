@@ -138,7 +138,7 @@ def get_example_event_slice(data, results, event_type="non_local_SWR",
 # Panel b — Non-local probability distribution
 # ---------------------------------------------------------------------------
 
-def plot_nonlocal_prob_distribution(data_over_time, ax):
+def plot_non_local_prob_distribution(data_over_time, ax):
     """Plot bimodal non-local probability distribution during immobility."""
     is_immobile = data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
@@ -244,7 +244,7 @@ def generate_figure(
 
     # Panel b: probability distribution
     ax_b = fig.add_subplot(gs_bot[0])
-    plot_nonlocal_prob_distribution(data_over_time, ax_b)
+    plot_non_local_prob_distribution(data_over_time, ax_b)
 
     # Panel c: triggered averages (4 stacked signals)
     gs_c = gs_bot[1].subgridspec(4, 1, hspace=0.08)
