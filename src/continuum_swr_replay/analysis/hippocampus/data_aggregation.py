@@ -203,14 +203,14 @@ def get_data_over_time(
     swr_labels = get_labels(data["ripple_times"], results.time)
     mua_labels = get_labels(data["hse_times"][brain_area], results.time)
 
-    non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
+    non_local_swr_times, non_local_no_swr_times = get_overlap_times(
         non_local_times, data["ripple_times"], results
     )
-    non_local_MUA_times, non_local_no_MUA_times = get_overlap_times(
+    non_local_mua_times, non_local_no_mua_times = get_overlap_times(
         non_local_times, data["hse_times"][brain_area], results
     )
 
-    SWR_MUA_times, SWR_no_MUA_times = get_overlap_times(
+    swr_mua_times, swr_no_mua_times = get_overlap_times(
         data["ripple_times"], data["hse_times"][brain_area], results
     )
     (
@@ -267,12 +267,12 @@ def get_data_over_time(
             "n_non_local": len(non_local_times),
             "n_SWR": len(data["ripple_times"]),
             "n_MUA": len(data["hse_times"][brain_area]),
-            "n_non_local_SWR": len(non_local_SWR_times),
-            "n_non_local_no_SWR": len(non_local_no_SWR_times),
-            "n_non_local_MUA": len(non_local_MUA_times),
-            "n_non_local_no_MUA": len(non_local_no_MUA_times),
-            "n_SWR_MUA": len(SWR_MUA_times),
-            "n_SWR_no_MUA": len(SWR_no_MUA_times),
+            "n_non_local_SWR": len(non_local_swr_times),
+            "n_non_local_no_SWR": len(non_local_no_swr_times),
+            "n_non_local_MUA": len(non_local_mua_times),
+            "n_non_local_no_MUA": len(non_local_no_mua_times),
+            "n_SWR_MUA": len(swr_mua_times),
+            "n_SWR_no_MUA": len(swr_no_mua_times),
             "animal": animal,
             "day": day,
             "epoch": epoch_name,

@@ -371,7 +371,7 @@ def _make_design_matrices(
         times, position_info, sampling_frequency=sampling_frequency, lags=lags
     )
 
-    non_local_no_SWR_design_matrix = np.concatenate(
+    non_local_no_swr_design_matrix = np.concatenate(
         [
             constant_design_matrix,
             conv_spline_basis["non_local_no_SWR"],
@@ -379,7 +379,7 @@ def _make_design_matrices(
         axis=1,
     )
 
-    non_local_SWR_design_matrix = np.concatenate(
+    non_local_swr_design_matrix = np.concatenate(
         [
             constant_design_matrix,
             conv_spline_basis["non_local_SWR"],
@@ -387,7 +387,7 @@ def _make_design_matrices(
         axis=1,
     )
 
-    SWR_design_matrix = np.concatenate(
+    swr_design_matrix = np.concatenate(
         [
             constant_design_matrix,
             conv_spline_basis["SWR"],
@@ -395,7 +395,7 @@ def _make_design_matrices(
         axis=1,
     )
 
-    non_local_SWR_and_non_local_no_SWR_design_matrix = np.concatenate(
+    non_local_swr_and_non_local_no_swr_design_matrix = np.concatenate(
         [
             constant_design_matrix,
             conv_spline_basis["non_local_no_SWR"],
@@ -404,7 +404,7 @@ def _make_design_matrices(
         axis=1,
     )
 
-    SWR_and_non_local_no_SWR_design_matrix = np.concatenate(
+    swr_and_non_local_no_swr_design_matrix = np.concatenate(
         [
             constant_design_matrix,
             conv_spline_basis["SWR"],
@@ -423,11 +423,11 @@ def _make_design_matrices(
 
     design_matrices = {
         "constant": constant_design_matrix,
-        "non_local_no_SWR": non_local_no_SWR_design_matrix,
-        "non_local_SWR": non_local_SWR_design_matrix,
-        "SWR": SWR_design_matrix,
-        "non_local_SWR + non_local_no_SWR": non_local_SWR_and_non_local_no_SWR_design_matrix,
-        "SWR + non_local_no_SWR": SWR_and_non_local_no_SWR_design_matrix,
+        "non_local_no_SWR": non_local_no_swr_design_matrix,
+        "non_local_SWR": non_local_swr_design_matrix,
+        "SWR": swr_design_matrix,
+        "non_local_SWR + non_local_no_SWR": non_local_swr_and_non_local_no_swr_design_matrix,
+        "SWR + non_local_no_SWR": swr_and_non_local_no_swr_design_matrix,
         "non_local": non_local_design_matrix,
     }
 
@@ -917,14 +917,14 @@ def run_session(
         non_local_times.max_speed < immobility_threshold
     ]
 
-    non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
+    non_local_swr_times, non_local_no_swr_times = get_overlap_times(
         non_local_times, data["ripple_times"], results
     )
     logger.info(
         "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",
         len(non_local_times),
-        len(non_local_SWR_times),
-        len(non_local_no_SWR_times),
+        len(non_local_swr_times),
+        len(non_local_no_swr_times),
         len(data["ripple_times"]),
     )
 
@@ -935,8 +935,8 @@ def run_session(
     # convolution kernel properly controls for ripple-related responses
     # in the SWR-controlled decomposition.
     event_times = {
-        "non_local_no_SWR": non_local_no_SWR_times,
-        "non_local_SWR": non_local_SWR_times,
+        "non_local_no_SWR": non_local_no_swr_times,
+        "non_local_SWR": non_local_swr_times,
         "non_local": non_local_times,
         "SWR": data["ripple_times"],
     }
