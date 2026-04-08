@@ -179,28 +179,26 @@ def test_theta_modulation(
         is_immobile.index,
         tolerance=1.0 / sampling_frequency,
     )
-    # Theta phase may have NaN where no match exists within tolerance.
-    # Build a joint mask so the design matrix, response, and boolean
-    # index all have the same length.
+    # Joint mask: running AND theta phase available
     valid = reindexed_theta.notna().to_numpy().ravel()
-    is_running = (~is_immobile).to_numpy() & valid
+    joint_mask = (~is_immobile).to_numpy() & valid
 
     formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
     design_matrix = dmatrix(
         formula,
-        {"theta_phase": reindexed_theta[valid]},
+        {"theta_phase": reindexed_theta[joint_mask]},
         return_type="dataframe",
     )
 
     constant_glm_results = sm.GLM(
-        neuron_spike_count[is_running],
-        np.ones_like(neuron_spike_count[is_running]),
+        neuron_spike_count[joint_mask],
+        np.ones_like(neuron_spike_count[joint_mask]),
         family=sm.families.Poisson(),
     ).fit()
 
     theta_glm_model = sm.GLM(
-        neuron_spike_count[is_running],
-        design_matrix.values[is_running[valid]],
+        neuron_spike_count[joint_mask],
+        design_matrix.values,
         family=sm.families.Poisson(),
     )
     theta_glm_results = theta_glm_model.fit()
