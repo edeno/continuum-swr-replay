@@ -53,22 +53,22 @@ def get_confident_times(
 
     Parameters
     ----------
-    prob : xr.DataArray
-        Probability of state over time
-    speed : np.ndarray | None, optional
-        Speed of animal at each time point, by default None
-    time : np.ndarray | None, optional
-        Time values corresponding to probability samples, by default None
+    prob : xr.DataArray, shape (n_time,)
+        Probability of state over time.
+    speed : np.ndarray, shape (n_time,), optional
+        Speed of animal at each time point, by default None.
+    time : np.ndarray, shape (n_time,), optional
+        Time values in seconds, by default None.
     prob_threshold : float, optional
-        Threshold for confident state classification, by default 0.8
+        Threshold for confident state classification, by default 0.8.
     minimum_duration : float, optional
-        Minimum duration (seconds) for confident state, by default 0.015
+        Minimum duration (seconds) for confident state, by default 0.015.
 
     Returns
     -------
-    times : pd.DataFrame
-        DataFrame with columns: start_time, end_time, duration, max_speed
-        Indexed by event_number (1-based)
+    pd.DataFrame, shape (n_events, 4)
+        Columns: ``start_time``, ``end_time``, ``duration``, ``max_speed``.
+        Indexed by event_number (1-based).
 
     """
     confident_times = np.asarray(

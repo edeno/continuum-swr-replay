@@ -427,13 +427,14 @@ def _intervals_to_mask(
 
     Parameters
     ----------
-    intervals : pd.DataFrame
+    intervals : pd.DataFrame, shape (n_events, >=2)
         Must have ``start_time`` and ``end_time`` columns.
-    time_idx : np.ndarray
+    time_idx : np.ndarray, shape (n_time,)
         Time values to label.
 
     Returns
     -------
+    np.ndarray of bool, shape (n_time,)
     np.ndarray of bool
 
     """

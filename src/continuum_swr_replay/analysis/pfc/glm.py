@@ -32,17 +32,17 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
 
     Parameters
     ----------
-    spike_times : NDArray
-        Spike times in seconds
-    time : NDArray
+    spike_times : NDArray, shape (n_spikes,)
+        Spike times in seconds.
+    time : NDArray, shape (n_time_bins,)
         Time bin centers in seconds (e.g., from position_info.index).
         Internally, midpoints between consecutive values are used as bin
         edges via ``np.digitize(spike_times, time[1:-1])``.
 
     Returns
     -------
-    NDArray
-        Spike counts per time bin (length matches time array)
+    NDArray, shape (n_time_bins,)
+        Spike counts per time bin.
 
     """
     spike_times = spike_times[
@@ -233,7 +233,22 @@ def test_theta_modulation(
 
 
 def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
-    """Create matrix of time-shifted copies of a signal for convolution GLM."""
+    """Create matrix of time-shifted copies of a signal for convolution GLM.
+
+    Parameters
+    ----------
+    signal : NDArray, shape (n_time,) or (n_time, 1)
+        Input signal (e.g., event indicator).
+    lags : NDArray, shape (n_lags,), optional
+        Lag indices in samples. Default: np.arange(-100, 101).
+
+    Returns
+    -------
+    NDArray, shape (n_time, n_lags)
+        Each column is the signal shifted by the corresponding lag.
+        Out-of-bounds values are zero-filled.
+
+    """
     if lags is None:
         lags = np.arange(-100, 101, 1)
     signal_df = pd.DataFrame(signal)
@@ -245,7 +260,29 @@ def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArra
 def create_conv_basis(
     count: NDArray, lags: NDArray, knots: NDArray, sampling_frequency: float
 ) -> tuple[NDArray, NDArray, NDArray]:
-    """Create convolution spline basis from event indicator counts."""
+    """Create convolution spline basis from event indicator counts.
+
+    Parameters
+    ----------
+    count : NDArray, shape (n_time,)
+        Event indicator (0/1) time series.
+    lags : NDArray, shape (n_lags,)
+        Lag indices in samples.
+    knots : NDArray, shape (n_knots,)
+        Internal knot positions for B-spline basis (in seconds).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+
+    Returns
+    -------
+    conv_spline_basis : NDArray, shape (n_time, n_basis)
+        Lagged signal projected onto spline basis.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        B-spline basis functions evaluated at lag times.
+    lag_time : NDArray, shape (n_lags,)
+        Lag times in seconds.
+
+    """
     lag_time = lags / sampling_frequency
     spline_basis = np.asarray(
         dmatrix(
@@ -300,6 +337,30 @@ def _make_design_matrices(
     sampling_frequency: float = 500,
     lags: NDArray | None = None,
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
+    """Build GLM design matrices for all model variants.
+
+    Parameters
+    ----------
+    times : dict[str, pd.DataFrame]
+        Event times keyed by name. Each DataFrame must have ``start_time``.
+    position_info : pd.DataFrame
+        Position data (index defines time bins).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    lags : NDArray, shape (n_lags,), optional
+        Lag indices in samples.
+
+    Returns
+    -------
+    design_matrices : dict[str, NDArray]
+        Design matrices keyed by model name. Each shape
+        (n_time, 1 + n_basis * n_event_types_in_model).
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        B-spline basis functions.
+    lag_time : NDArray, shape (n_lags,)
+        Lag times in seconds.
+
+    """
     constant_design_matrix = np.ones((len(position_info), 1))
 
     conv_spline_basis, spline_basis, lag_time = _make_conv_spline_basis(
@@ -374,6 +435,25 @@ def _fit_immobility_models(
     design_matrices: dict[str, NDArray],
     neuron_spike_count: NDArray,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fit Poisson GLMs for each design matrix during immobility.
+
+    Parameters
+    ----------
+    is_immobile : pd.Series, shape (n_time,)
+        Boolean mask for immobile time bins.
+    design_matrices : dict[str, NDArray]
+        Design matrices keyed by model name, each shape (n_time, n_features).
+    neuron_spike_count : NDArray, shape (n_time,)
+        Spike counts per time bin.
+
+    Returns
+    -------
+    glm_results : dict[str, statsmodels GLMResults]
+        Fitted model results keyed by model name.
+    glm_models : dict[str, statsmodels GLM]
+        Unfitted model objects keyed by model name.
+
+    """
     glm_models = {
         model_name: sm.GLM(
             neuron_spike_count[is_immobile],
