@@ -1,7 +1,10 @@
 """Model hierarchy definitions for replay content analysis.
 
-Defines a sequence of nested models (M0-M7) that build up complexity,
-allowing systematic model comparison via AIC/BIC/LRT at each step.
+Defines a sequence of nested models (M0-M7) for the conditional Poisson
+(multinomial-count) framework. Only arm-varying predictors appear as main
+effects; event-level constants (time_since_stop, is_swr, etc.) appear only
+in interactions with arm-varying predictors, because they cancel in the
+conditional likelihood's within-event normalization.
 """
 
 from __future__ import annotations
@@ -17,8 +20,9 @@ class ModelSpec:
     ----------
     name : str
         Short identifier (e.g., "M0", "M1").
-    predictors : list[str]
-        Column names to use as fixed-effect predictors.
+    predictors : tuple[str, ...]
+        Column names to use as fixed-effect predictors. Immutable tuple
+        for true frozen dataclass safety.
     description : str
         Human-readable description of what the model tests.
     parent : str | None
@@ -26,54 +30,61 @@ class ModelSpec:
     """
 
     name: str
-    predictors: list[str]
+    predictors: tuple[str, ...]
     description: str
     parent: str | None
 
 
-# Base predictors (arm-level binary indicators)
-_BASE = ["is_current", "is_prev", "is_next"]
+# ── Arm-varying main effects ──
+# These vary across the 9 arms within an event and are identifiable.
 
-# Reward and recency (binary main effect + continuous, per-arm)
-# is_last_rewarded must be included as main effect before its interactions
-# (swr_x_rewarded, omission_x_rewarded) appear in later models.
-_REWARD_RECENCY = ["is_last_rewarded", "visit_recency", "cumulative_reward"]
+_BASE: tuple[str, ...] = ("is_current", "is_prev", "is_next")
 
-# Distance control (continuous, event-level)
-_DISTANCE = ["log_distance"]
+# Reward and recency (arm-varying: binary + continuous)
+_REWARD_RECENCY: tuple[str, ...] = (
+    "is_last_rewarded",
+    "visit_recency",
+    "cumulative_reward",
+)
 
-# Temporal dynamics (continuous + interactions)
-_TEMPORAL = ["time_since_stop", "time_x_current", "time_x_prev"]
+# Arm-specific distance (arm-varying: continuous)
+_DISTANCE: tuple[str, ...] = ("dist_to_arm",)
 
-# SWR distinction (binary + interactions)
-_SWR = [
-    "is_swr",
+# ── Event-level × arm-varying interactions ──
+# Event-level variables (time_since_stop, is_swr, etc.) are constant across
+# all 9 arms within an event and cancel in the conditional likelihood.
+# They can only appear as interactions with arm-varying predictors.
+
+_TEMPORAL_INTERACTIONS: tuple[str, ...] = (
+    "time_x_current",
+    "time_x_next",
+    "time_x_prev",
+)
+
+_SWR_INTERACTIONS: tuple[str, ...] = (
     "swr_x_current",
-    "swr_x_rewarded",
-    "swr_x_prev",
     "swr_x_next",
-]
+    "swr_x_prev",
+    "swr_x_rewarded",
+)
 
-# Task context (binary + interactions)
-_CONTEXT = [
-    "is_after_switch",
+_CONTEXT_INTERACTIONS: tuple[str, ...] = (
     "switch_x_current",
     "switch_x_prev",
-    "is_after_omission",
     "omission_x_rewarded",
-]
+)
 
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
         name="M0",
-        predictors=[],
-        description="Null (intercept only)",
+        predictors=(),
+        description="Null (uniform allocation across arms)",
         parent=None,
     ),
     "M1": ModelSpec(
         name="M1",
-        predictors=["is_current"],
+        predictors=("is_current",),
         description="Proximity bias",
         parent="M0",
     ),
@@ -92,24 +103,37 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M4": ModelSpec(
         name="M4",
         predictors=_BASE + _REWARD_RECENCY + _DISTANCE,
-        description="Distance control (proximity confound)",
+        description="Arm-specific distance control",
         parent="M3",
     ),
     "M5": ModelSpec(
         name="M5",
-        predictors=_BASE + _REWARD_RECENCY + _DISTANCE + _TEMPORAL,
+        predictors=_BASE + _REWARD_RECENCY + _DISTANCE + _TEMPORAL_INTERACTIONS,
         description="Temporal dynamics (Mallory hypothesis)",
         parent="M4",
     ),
     "M6": ModelSpec(
         name="M6",
-        predictors=_BASE + _REWARD_RECENCY + _DISTANCE + _TEMPORAL + _SWR,
+        predictors=(
+            _BASE
+            + _REWARD_RECENCY
+            + _DISTANCE
+            + _TEMPORAL_INTERACTIONS
+            + _SWR_INTERACTIONS
+        ),
         description="SWR distinction (survives after timing control?)",
         parent="M5",
     ),
     "M7": ModelSpec(
         name="M7",
-        predictors=(_BASE + _REWARD_RECENCY + _DISTANCE + _TEMPORAL + _SWR + _CONTEXT),
+        predictors=(
+            _BASE
+            + _REWARD_RECENCY
+            + _DISTANCE
+            + _TEMPORAL_INTERACTIONS
+            + _SWR_INTERACTIONS
+            + _CONTEXT_INTERACTIONS
+        ),
         description="Full model with task context interactions",
         parent="M6",
     ),

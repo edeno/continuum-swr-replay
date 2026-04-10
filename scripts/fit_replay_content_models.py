@@ -1,18 +1,22 @@
 #!/usr/bin/env python
 """Fit the replay content model hierarchy (M0-M7) on pre-computed data.
 
+Primary model: Conditional Poisson regression (multinomial-count softmax).
+Robustness check: Conditional Logit on dominant arm.
+
 Loads the master long-format dataset from prepare_replay_content_data.py,
-fits per-session GLMs for each model, compares nested models, and saves
-results.
+fits per-session models for each model in the hierarchy, compares nested
+models via AIC (primary) and LRT, and saves results.
 
 Usage:
     uv run python scripts/fit_replay_content_models.py                # fit all
-    uv run python scripts/fit_replay_content_models.py --models M0,M1,M2  # subset
+    uv run python scripts/fit_replay_content_models.py --models M0,M1,M2
+    uv run python scripts/fit_replay_content_models.py --cv           # + CV
+    uv run python scripts/fit_replay_content_models.py --logit        # + logit robustness
 """
 
 import argparse
 import logging
-import pickle
 import time
 
 import pandas as pd
@@ -20,13 +24,11 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
-    fit_glm,
-    fit_mixed_effects,
+    fit_conditional_logit,
+    fit_conditional_poisson,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.model_checking import (
-    aggregate_diagnostics,
-    cross_validate_session,
-    print_diagnostic_summary,
+    cross_validate_conditional_poisson,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.model_comparison import (
     run_full_hierarchy_comparison,
@@ -53,50 +55,56 @@ def fit_model_per_session(
     predictors: list[str],
     run_cv: bool = False,
 ) -> pd.DataFrame:
-    """Fit one model across all sessions, returning per-session results.
+    """Fit conditional Poisson model across all sessions.
 
     Parameters
     ----------
     long_df : pd.DataFrame
-        Master long-format data.
+        Master count-based long-format data with event_uid.
     model_name : str
         Model identifier (e.g., "M0").
     predictors : list[str]
         Predictor columns for this model.
     run_cv : bool
-        If True, also run 5-fold cross-validation per session.
+        If True, also run event-based cross-validation per session.
 
     Returns
     -------
     pd.DataFrame
-        One row per session with coefficients and diagnostics.
+        One row per session with coefficients and fit statistics.
     """
     results = []
 
     for keys, group in long_df.groupby(SESSION_COLS):
-        # Drop rows with NaN in required predictors
-        if predictors:
-            sub = group.dropna(subset=predictors + ["replay_here"])
-        else:
-            sub = group.dropna(subset=["replay_here"])
-
-        if len(sub) < 18:  # minimum 2 events worth of data (9 arms * 2)
+        # Do NOT drop rows here — fit_conditional_poisson handles
+        # event-wise NaN filtering internally, preserving the 9-arm
+        # candidate set for every retained event.
+        if len(group) < 18:  # minimum 2 events (9 arms * 2)
             continue
 
-        r = fit_glm(sub, predictors=predictors)
+        r = fit_conditional_poisson(
+            group,
+            predictors=list(predictors),
+            response_col="arm_count",
+            event_col="event_uid",
+        )
         if r is None:
             continue
 
         # Cross-validation
         if run_cv:
-            cv = cross_validate_session(sub, predictors=predictors)
+            cv = cross_validate_conditional_poisson(
+                group,
+                predictors=list(predictors),
+                event_col="event_uid",
+                response_col="arm_count",
+            )
             if cv is not None:
                 r.update(cv)
 
         r["model"] = model_name
         for col, val in zip(SESSION_COLS, keys, strict=True):
             r[col] = val
-        r["n_events"] = len(sub) // 9
 
         results.append(r)
 
@@ -118,14 +126,14 @@ def print_model_results(
     print(f"{'=' * 60}")
 
     print(f"\nFit quality (n={len(mdf)} sessions):")
-    for metric in ["pseudo_r2", "brier", "aic"]:
+    for metric in ["aic", "bic", "llf"]:
         if metric in mdf.columns:
             vals = mdf[metric].dropna()
             if len(vals) > 0:
-                print(f"  {metric}: median={vals.median():.4f}")
+                print(f"  {metric}: median={vals.median():.2f}")
 
     if not predictors:
-        print("  (null model — intercept only)")
+        print("  (null model — uniform allocation)")
         return
 
     # Coefficients with FDR correction
@@ -149,26 +157,18 @@ def print_model_results(
         _, corrected, _, _ = multipletests([x[1] for x in raw_pvals], method="fdr_bh")
         corrected_map = {x[0]: c for x, c in zip(raw_pvals, corrected, strict=True)}
 
-    print("\nCoefficients (FDR-corrected p-values):")
-    print(f"  {'Predictor':<25} {'Median':>8} {'!=0 p':>10}")
-    print(f"  {'-' * 45}")
+    print("\nCoefficients (median across sessions, FDR-corrected Wilcoxon p):")
+    print(f"  {'Predictor':<25} {'Median':>8} {'SE':>8} {'!=0 p':>10}")
+    print(f"  {'-' * 55}")
     for pred in predictors:
         if pred not in coef_info:
             continue
         vals = coef_info[pred]
+        se_col = f"bse_{pred}"
+        se = mdf[se_col].median() if se_col in mdf.columns else float("nan")
         p = corrected_map.get(pred)
         p_str = f"{p:.2e}" if p is not None else "—"
-        print(f"  {pred:<25} {vals.median():8.3f} {p_str:>10}")
-
-    # Key diagnostics
-    for metric, label in [
-        ("cond_number", "Cond#"),
-        ("max_abs_coef", "Max|coef|"),
-    ]:
-        if metric in mdf.columns:
-            vals = mdf[metric].dropna()
-            if len(vals) > 0:
-                print(f"\n  {label}: median={vals.median():.1f}")
+        print(f"  {pred:<25} {vals.median():8.3f} {se:8.3f} {p_str:>10}")
 
 
 def main():
@@ -185,12 +185,12 @@ def main():
     parser.add_argument(
         "--cv",
         action="store_true",
-        help="Run 5-fold cross-validation per session (slower)",
+        help="Run event-based cross-validation per session (slower)",
     )
     parser.add_argument(
-        "--mixed",
+        "--logit",
         action="store_true",
-        help="Also fit mixed-effects models (slowest)",
+        help="Also fit conditional logit on dominant arm (robustness)",
     )
     args = parser.parse_args()
 
@@ -200,42 +200,88 @@ def main():
     else:
         model_names = list(MODEL_HIERARCHY.keys())
 
-    # Load data
-    long_path = INPUT_DIR / "long.pkl"
-    if not long_path.exists():
+    # Load count-based long format
+    count_path = INPUT_DIR / "long_count.pkl"
+    if not count_path.exists():
+        # Fall back to legacy path
+        count_path = INPUT_DIR / "long.pkl"
+    if not count_path.exists():
         logging.error(
-            "Long-format data not found at %s. Run prepare_replay_content_data.py first.",
-            long_path,
+            "Long-format data not found. Run prepare_replay_content_data.py first."
         )
         return
 
-    logging.info("Loading %s...", long_path)
-    long_df = pd.read_pickle(long_path)
+    logging.info("Loading %s...", count_path)
+    long_df = pd.read_pickle(count_path)
     logging.info(
         "Loaded %d rows, %d sessions",
         len(long_df),
         long_df.groupby(SESSION_COLS).ngroups,
     )
 
-    # Fit each model
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    all_results = []
-
+    # Collect the union of all predictors across requested models so we
+    # can restrict to a common complete-case event set. This ensures that
+    # M0 through M7 are all fit on the *same* events per session, which
+    # is required for valid AIC deltas and LRTs.
+    all_predictors: set[str] = set()
+    valid_model_names = []
     for model_name in model_names:
         if model_name not in MODEL_HIERARCHY:
             logging.warning("Unknown model: %s", model_name)
             continue
-
         spec = MODEL_HIERARCHY[model_name]
-        predictors = spec.predictors
-
-        # Check that all predictors exist in the data
-        missing = [p for p in predictors if p not in long_df.columns]
+        missing = [p for p in spec.predictors if p not in long_df.columns]
         if missing:
             logging.warning(
                 "Model %s: missing predictors %s — skipping", model_name, missing
             )
             continue
+        all_predictors.update(spec.predictors)
+        valid_model_names.append(model_name)
+
+    if not valid_model_names:
+        logging.error("No valid models to fit")
+        return
+
+    # Pre-filter to common complete-case event set: drop entire events
+    # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
+    required_cols = ["arm_count", "event_uid"] + sorted(all_predictors)
+    available_cols = [c for c in required_cols if c in long_df.columns]
+    has_nan = long_df[available_cols].isna().any(axis=1)
+    events_with_nan = long_df.loc[has_nan, "event_uid"].unique()
+    n_before = long_df["event_uid"].nunique()
+    long_df = long_df[~long_df["event_uid"].isin(events_with_nan)].reset_index(
+        drop=True
+    )
+    n_after = long_df["event_uid"].nunique()
+    if n_before != n_after:
+        logging.info(
+            "Filtered to common complete-case events: %d → %d events "
+            "(%d dropped due to NaN in %s)",
+            n_before,
+            n_after,
+            n_before - n_after,
+            sorted(all_predictors),
+        )
+
+    # Also drop zero-count events
+    event_totals = long_df.groupby("event_uid")["arm_count"].transform("sum")
+    long_df = long_df[event_totals > 0].reset_index(drop=True)
+
+    logging.info(
+        "Fitting on %d rows, %d sessions, %d events",
+        len(long_df),
+        long_df.groupby(SESSION_COLS).ngroups,
+        long_df["event_uid"].nunique(),
+    )
+
+    # Fit each model
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    all_results = []
+
+    for model_name in valid_model_names:
+        spec = MODEL_HIERARCHY[model_name]
+        predictors = list(spec.predictors)
 
         cv_label = " + CV" if args.cv else ""
         logging.info(
@@ -249,18 +295,11 @@ def main():
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
 
         if len(mdf) > 0:
-            # Save per-model results
             model_path = OUTPUT_DIR / f"{model_name}.pkl"
             mdf.to_pickle(model_path)
             logging.info("  Saved to %s", model_path)
 
-            # Print summary
             print_model_results(model_name, mdf, predictors)
-
-            # Print aggregated diagnostics
-            diag = aggregate_diagnostics(mdf, predictors)
-            print_diagnostic_summary(diag, model_name, predictors)
-
             all_results.append(mdf)
 
     if not all_results:
@@ -301,61 +340,41 @@ def main():
                     f"{wp:>12}"
                 )
 
-    # Mixed-effects fitting
-    if args.mixed:
-        mixed_dir = OUTPUT_DIR / "mixed_effects"
-        mixed_dir.mkdir(parents=True, exist_ok=True)
+    # Conditional logit robustness check
+    if args.logit:
+        logging.info("Fitting conditional logit robustness checks...")
+        logit_dir = OUTPUT_DIR / "logit"
+        logit_dir.mkdir(parents=True, exist_ok=True)
 
         for model_name in model_names:
             if model_name not in MODEL_HIERARCHY:
                 continue
             spec = MODEL_HIERARCHY[model_name]
             if not spec.predictors:
-                logging.info("Skipping mixed-effects %s (no predictors)", model_name)
                 continue
-            predictors = spec.predictors
+            predictors = list(spec.predictors)
             missing = [p for p in predictors if p not in long_df.columns]
             if missing:
                 continue
 
-            logging.info(
-                "Fitting mixed-effects %s (%d rows, %d sessions)...",
-                model_name,
-                len(long_df),
-                long_df.groupby(SESSION_COLS).ngroups,
-            )
-            t0 = time.time()
-            me_result = fit_mixed_effects(long_df, predictors)
-            elapsed = time.time() - t0
-
-            if me_result is not None:
-                me_path = mixed_dir / f"{model_name}_mixed.pkl"
-                with open(me_path, "wb") as f:
-                    pickle.dump(me_result, f)
-                logging.info(
-                    "  %s mixed: %ds, LL=%.0f", model_name, elapsed, me_result["ll"]
+            logit_results = []
+            for keys, group in long_df.groupby(SESSION_COLS):
+                r = fit_conditional_logit(
+                    group, predictors=predictors, event_col="event_uid"
                 )
+                if r is not None:
+                    r["model"] = model_name
+                    for col, val in zip(SESSION_COLS, keys, strict=True):
+                        r[col] = val
+                    logit_results.append(r)
 
-                print(f"\n  MIXED-EFFECTS {model_name}:")
-                for name, mean, sd in zip(
-                    me_result["fe_names"],
-                    me_result["fe_mean"],
-                    me_result["fe_sd"],
-                    strict=True,
-                ):
-                    z = abs(mean / sd) if sd > 0 else 0
-                    sig = (
-                        "***"
-                        if z > 3.29
-                        else "**"
-                        if z > 2.58
-                        else "*"
-                        if z > 1.96
-                        else ""
-                    )
-                    print(f"    {name:<30}: {mean:8.4f} ± {sd:.4f} (z={z:.1f}) {sig}")
-            else:
-                logging.warning("  %s mixed: FAILED", model_name)
+            if logit_results:
+                logit_df = pd.DataFrame(logit_results)
+                logit_path = logit_dir / f"{model_name}_logit.pkl"
+                logit_df.to_pickle(logit_path)
+                logging.info(
+                    "  %s logit: %d sessions saved", model_name, len(logit_df)
+                )
 
     logging.info("Done!")
 

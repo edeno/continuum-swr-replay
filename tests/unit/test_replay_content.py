@@ -1,7 +1,8 @@
 """Tests for the replay_content analysis subpackage.
 
 Covers the most critical functions: spatial mapping, event collapsing,
-predictor computation, GLM fitting, and cross-validation.
+arm counts, predictor computation (including dist_to_arm), conditional
+Poisson fitting, cross-validation, and model comparison.
 """
 
 import networkx as nx
@@ -12,13 +13,18 @@ import pytest
 from continuum_swr_replay.analysis.hippocampus.replay_content.event_collapsing import (
     _modal,
     add_interaction_columns,
+    compute_arm_counts,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
     _log_likelihood,
     _null_log_likelihood,
+    fit_conditional_logit,
+    fit_conditional_poisson,
     fit_glm,
+    fit_null_model_conditional,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.model_checking import (
+    cross_validate_conditional_poisson,
     cross_validate_session,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.model_comparison import (
@@ -29,6 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import (
+    compute_dist_to_arm,
     compute_time_since_stop,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
@@ -101,6 +108,40 @@ def sample_long_format():
     return pd.DataFrame(rows)
 
 
+@pytest.fixture
+def sample_count_long_format():
+    """Create sample count-based long-format data for ConditionalPoisson."""
+    np.random.seed(42)
+    n_events = 50
+    n_arms = 9
+    rows = []
+    for event in range(n_events):
+        # Generate random counts that sum to ~30 timebins
+        raw_counts = np.random.poisson(3, n_arms)
+        # Ensure at least one arm has counts
+        if raw_counts.sum() == 0:
+            raw_counts[0] = 1
+        current_arm = np.random.choice(n_arms)
+        for arm in range(n_arms):
+            rows.append(
+                {
+                    "event_uid": event,
+                    "arm_id": arm,
+                    "arm_count": int(raw_counts[arm]),
+                    "is_current": int(arm == current_arm),
+                    "is_prev": int(arm == (current_arm + 1) % n_arms),
+                    "is_next": int(arm == (current_arm - 1) % n_arms),
+                    "is_last_rewarded": int(arm == 0),
+                    "is_swr": int(event % 2 == 0),
+                    "animal": "test",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "non_local_event": event + 1,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 # ── Tests: Spatial Mapping ──
 
 
@@ -130,7 +171,6 @@ class TestComputeTimeSinceStop:
 
     def test_single_bout(self):
         """All timebins in one bout should have increasing time_since_stop."""
-        # Simulate 100 timebins at 500 Hz (2ms apart)
         times = np.arange(0, 0.2, 0.002)
         nl = pd.DataFrame({"head_speed": 1.0}, index=times)
         result = compute_time_since_stop(nl)
@@ -140,21 +180,46 @@ class TestComputeTimeSinceStop:
 
     def test_two_bouts_separated_by_gap(self):
         """A gap > BOUT_GAP_THRESHOLD_SEC should start a new bout."""
-        bout1 = np.arange(0, 0.05, 0.002)  # 25 timebins
-        bout2 = np.arange(1.0, 1.05, 0.002)  # 25 timebins, 0.95s gap
+        bout1 = np.arange(0, 0.05, 0.002)
+        bout2 = np.arange(1.0, 1.05, 0.002)
         times = np.concatenate([bout1, bout2])
         nl = pd.DataFrame({"head_speed": 1.0}, index=times)
         result = compute_time_since_stop(nl)
-
-        # First bout starts at 0
         assert result.iloc[0] == pytest.approx(0.0)
-        # Second bout resets to 0
         assert result.iloc[len(bout1)] == pytest.approx(0.0)
 
     def test_empty_dataframe(self):
         nl = pd.DataFrame({"head_speed": []}, index=pd.Index([], dtype=float))
         result = compute_time_since_stop(nl)
         assert len(result) == 0
+
+
+class TestComputeDistToArm:
+    """Test dist_to_arm computation."""
+
+    def test_adjacent_arm_has_distance_one(self, sample_track_graph):
+        """Arms adjacent to the current well should have small distance."""
+        dists = compute_dist_to_arm(0, sample_track_graph)
+        # Well 0 is adjacent to arm 0 (edge 0-6) and arm 6 (edge 0-1)
+        assert dists[0] == 0  # arm 0 connects to well 0
+        assert dists[6] == 0  # arm 6 connects wells 0-1
+
+    def test_all_distances_non_negative_or_nan(self, sample_track_graph):
+        """Distances should be non-negative (NaN for unreachable arms)."""
+        for well in range(6):
+            dists = compute_dist_to_arm(well, sample_track_graph)
+            for arm, dist in dists.items():
+                assert np.isnan(dist) or dist >= 0, (
+                    f"Well {well}, arm {arm}: dist={dist}"
+                )
+
+    def test_nan_well_returns_nan(self, sample_track_graph):
+        dists = compute_dist_to_arm(np.nan, sample_track_graph)
+        assert all(np.isnan(v) for v in dists.values())
+
+    def test_returns_all_arms(self, sample_track_graph):
+        dists = compute_dist_to_arm(0, sample_track_graph)
+        assert len(dists) == 9
 
 
 # ── Tests: Event Collapsing ──
@@ -196,11 +261,62 @@ class TestAddInteractionColumns:
         assert df["switch_x_current"].iloc[1] == 0
 
 
+class TestComputeArmCounts:
+    """Test per-arm timebin counting."""
+
+    def test_counts_sum_to_total(self):
+        """Arm counts should sum to total_count for each event."""
+        nl = pd.DataFrame(
+            {
+                "animal": "test",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "non_local_event": [1, 1, 1, 1, 2, 2, 2],
+                "replay_arm": [0, 0, 1, 3, 2, 2, 5],
+                "SWR_event": [1, 1, 0, 0, 0, 0, 1],
+            }
+        )
+        result = compute_arm_counts(nl)
+        assert len(result) == 2  # 2 events
+
+        for _, row in result.iterrows():
+            count_cols = [c for c in result.columns if c.startswith("arm_count_")]
+            assert row[count_cols].sum() == row["total_count"]
+
+    def test_junction_bins_excluded(self):
+        """Timebins with replay_arm not in ALL_ARMS should be excluded."""
+        nl = pd.DataFrame(
+            {
+                "animal": "test",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "non_local_event": [1, 1, 1],
+                "replay_arm": [0, np.nan, -1],  # NaN and -1 excluded
+                "SWR_event": [0, 0, 0],
+            }
+        )
+        result = compute_arm_counts(nl)
+        assert result["total_count"].iloc[0] == 1  # only arm 0 counted
+
+    def test_empty_returns_empty(self):
+        nl = pd.DataFrame(
+            {
+                "non_local_event": [0, 0],  # no events > 0
+                "replay_arm": [1, 2],
+                "animal": "test",
+                "day": 20200101,
+                "epoch": "02_r1",
+            }
+        )
+        result = compute_arm_counts(nl)
+        assert len(result) == 0
+
+
 # ── Tests: GLM Fitting ──
 
 
 class TestFitGlm:
-    """Test GLM fitting function."""
+    """Test legacy GLM fitting function."""
 
     def test_null_model(self):
         """Empty predictor list should fit intercept-only."""
@@ -233,18 +349,154 @@ class TestFitGlm:
         assert np.isfinite(result["bic"])
 
 
+# ── Tests: Conditional Poisson Fitting ──
+
+
+class TestFitConditionalPoisson:
+    """Test conditional Poisson model fitting."""
+
+    def test_null_model(self, sample_count_long_format):
+        """Empty predictors should return analytical null."""
+        result = fit_conditional_poisson(
+            sample_count_long_format, predictors=[], event_col="event_uid"
+        )
+        assert result is not None
+        assert result["n_params"] == 0
+        assert result["llf"] < 0
+
+    def test_one_predictor(self, sample_count_long_format):
+        result = fit_conditional_poisson(
+            sample_count_long_format,
+            predictors=["is_current"],
+            event_col="event_uid",
+        )
+        assert result is not None
+        assert "coef_is_current" in result
+        assert "bse_is_current" in result
+        assert "pval_is_current" in result
+        assert result["n_params"] == 1
+        assert np.isfinite(result["aic"])
+
+    def test_multiple_predictors(self, sample_count_long_format):
+        result = fit_conditional_poisson(
+            sample_count_long_format,
+            predictors=["is_current", "is_prev", "is_next"],
+            event_col="event_uid",
+        )
+        assert result is not None
+        assert result["n_params"] == 3
+
+    def test_returns_none_for_insufficient_data(self):
+        """Should return None when too few events."""
+        df = pd.DataFrame(
+            {
+                "arm_count": [1, 0, 0],
+                "event_uid": [0, 0, 0],
+                "x": [1, 0, 0],
+            }
+        )
+        result = fit_conditional_poisson(df, predictors=["x"], event_col="event_uid")
+        assert result is None
+
+    def test_null_model_analytical(self, sample_count_long_format):
+        """Null model ℓ₀ should equal -Σ L_e · log(9)."""
+        result = fit_null_model_conditional(
+            sample_count_long_format, event_col="event_uid"
+        )
+        # Verify analytically
+        total_count = sample_count_long_format.groupby("event_uid")[
+            "arm_count"
+        ].sum()
+        expected_ll = -float(total_count.sum()) * np.log(9)
+        assert result["llf"] == pytest.approx(expected_ll, rel=1e-6)
+        assert result["n_params"] == 0
+
+    def test_recovers_known_signal(self):
+        """ConditionalPoisson should detect a strong signal in synthetic data."""
+        np.random.seed(123)
+        n_events = 200
+        n_arms = 9
+        beta_current = 1.5  # strong positive effect
+
+        rows = []
+        for event in range(n_events):
+            current_arm = np.random.choice(n_arms)
+            # Generate counts from softmax with known beta
+            eta = np.zeros(n_arms)
+            eta[current_arm] = beta_current
+            probs = np.exp(eta) / np.exp(eta).sum()
+            counts = np.random.multinomial(50, probs)
+
+            for arm in range(n_arms):
+                rows.append(
+                    {
+                        "event_uid": event,
+                        "arm_count": int(counts[arm]),
+                        "is_current": int(arm == current_arm),
+                    }
+                )
+
+        df = pd.DataFrame(rows)
+        result = fit_conditional_poisson(
+            df, predictors=["is_current"], event_col="event_uid"
+        )
+        assert result is not None
+        # Coefficient should be positive and close to 1.5
+        assert result["coef_is_current"] > 0.5
+        assert result["coef_is_current"] < 3.0
+        # Should be highly significant
+        assert result["pval_is_current"] < 0.001
+
+
+class TestFitConditionalLogit:
+    """Test conditional logit robustness model."""
+
+    def test_fits_on_count_data(self, sample_count_long_format):
+        result = fit_conditional_logit(
+            sample_count_long_format,
+            predictors=["is_current"],
+            event_col="event_uid",
+        )
+        assert result is not None
+        assert "coef_is_current" in result
+
+
 # ── Tests: Cross-Validation ──
 
 
+class TestCrossValidateConditionalPoisson:
+    """Test event-based CV for conditional Poisson."""
+
+    def test_cv_produces_results(self, sample_count_long_format):
+        result = cross_validate_conditional_poisson(
+            sample_count_long_format,
+            predictors=["is_current"],
+            event_col="event_uid",
+            n_folds=5,
+        )
+        assert result is not None
+        assert "cv_ll_per_event_mean" in result
+        assert "cv_ll_per_timebin_mean" in result
+        assert result["cv_n_folds"] >= 2
+
+    def test_null_model_cv(self, sample_count_long_format):
+        result = cross_validate_conditional_poisson(
+            sample_count_long_format,
+            predictors=[],
+            event_col="event_uid",
+            n_folds=5,
+        )
+        assert result is not None
+        assert result["cv_ll_per_event_mean"] < 0  # log-likelihood is negative
+
+
 class TestCrossValidateSession:
-    """Test event-based cross-validation."""
+    """Test legacy binary cross-validation."""
 
     def test_cv_produces_results(self, sample_long_format):
         result = cross_validate_session(
             sample_long_format, predictors=["is_current"], n_folds=2
         )
-        # With only 5 events, might return None if folds are too small
-        # But should not crash
         assert result is None or "cv_brier_mean" in result
 
     def test_null_model_cv(self, sample_long_format):
@@ -269,7 +521,6 @@ class TestCrossValidateSession:
         for train_idx, test_idx in gkf.split(sample_long_format, y, groups):
             train_events = set(groups[train_idx])
             test_events = set(groups[test_idx])
-            # No event should appear in both train and test
             assert train_events & test_events == set()
 
     def test_cv_brier_is_non_negative(self, sample_long_format):
@@ -315,6 +566,97 @@ class TestModelComparison:
         assert result["lr_stat"].iloc[0] > 0
         assert result["df_diff"].iloc[0] == 1
 
+    def test_compare_with_llf_column(self):
+        """Should work with 'llf' column from conditional Poisson."""
+        parent = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-100.0],
+                "aic": [200.0],
+                "bic": [200.0],
+                "n_params": [0],
+            }
+        )
+        child = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-90.0],
+                "aic": [182.0],
+                "bic": [184.0],
+                "n_params": [1],
+            }
+        )
+        result = compare_nested_models(parent, child)
+        assert len(result) == 1
+        assert result["delta_aic"].iloc[0] > 0
+
+    def test_mismatched_n_events_invalidates_comparison(self):
+        """delta_aic/bic/LRT should be NaN when n_events differs."""
+        parent = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-100.0],
+                "aic": [200.0],
+                "bic": [200.0],
+                "n_params": [0],
+                "n_events": [50],
+            }
+        )
+        child = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-90.0],
+                "aic": [182.0],
+                "bic": [184.0],
+                "n_params": [1],
+                "n_events": [45],  # fewer events due to NaN filtering
+            }
+        )
+        result = compare_nested_models(parent, child)
+        assert len(result) == 1
+        assert np.isnan(result["delta_aic"].iloc[0])
+        assert np.isnan(result["delta_bic"].iloc[0])
+        assert np.isnan(result["lr_pvalue"].iloc[0])
+
+    def test_matched_n_events_preserves_comparison(self):
+        """Comparisons should be valid when n_events matches."""
+        parent = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-100.0],
+                "aic": [200.0],
+                "bic": [200.0],
+                "n_params": [0],
+                "n_events": [50],
+            }
+        )
+        child = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["e1"],
+                "llf": [-90.0],
+                "aic": [182.0],
+                "bic": [184.0],
+                "n_params": [1],
+                "n_events": [50],  # same events
+            }
+        )
+        result = compare_nested_models(parent, child)
+        assert len(result) == 1
+        assert result["delta_aic"].iloc[0] > 0  # child better
+        assert np.isfinite(result["lr_pvalue"].iloc[0])
+
     def test_summarize_comparison(self):
         comp = pd.DataFrame(
             {
@@ -359,8 +701,29 @@ class TestModelSpecs:
             preds = spec.predictors
             if "swr_x_rewarded" in preds or "omission_x_rewarded" in preds:
                 assert "is_last_rewarded" in preds, (
-                    f"{name} has reward interactions without is_last_rewarded main effect"
+                    f"{name} has reward interactions without is_last_rewarded"
                 )
+
+    def test_no_event_level_main_effects(self):
+        """Event-level constants should not appear as main effects."""
+        event_level = {"time_since_stop", "is_swr", "is_after_switch",
+                       "is_after_omission", "log_distance"}
+        for name, spec in MODEL_HIERARCHY.items():
+            for pred in spec.predictors:
+                assert pred not in event_level, (
+                    f"{name} has event-level main effect '{pred}' "
+                    f"which cancels in conditional likelihood"
+                )
+
+    def test_m0_has_no_predictors(self):
+        assert MODEL_HIERARCHY["M0"].predictors == ()
+        assert MODEL_HIERARCHY["M0"].parent is None
+
+    def test_dist_to_arm_in_m4(self):
+        assert "dist_to_arm" in MODEL_HIERARCHY["M4"].predictors
+
+    def test_time_x_next_in_m5(self):
+        assert "time_x_next" in MODEL_HIERARCHY["M5"].predictors
 
 
 # ── Tests: Log-Likelihood ──
@@ -371,8 +734,8 @@ class TestLogLikelihood:
         y = np.array([1, 0, 1, 0])
         y_pred = np.array([0.999, 0.001, 0.999, 0.001])
         ll = _log_likelihood(y, y_pred)
-        assert ll < 0  # always negative
-        assert ll > -1  # close to 0 for good predictions
+        assert ll < 0
+        assert ll > -1
 
     def test_null_equals_null_function(self):
         y = np.array([1, 0, 1, 0, 1])

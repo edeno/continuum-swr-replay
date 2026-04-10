@@ -1,5 +1,8 @@
 """Compare nested models via AIC, BIC, and likelihood ratio tests.
 
+AIC is the primary comparison metric. BIC is secondary. LRT is valid
+for unregularized fits only.
+
 Provides functions for comparing consecutive models in the hierarchy
 (M0 vs M1, M1 vs M2, etc.) both at the per-session level and aggregated
 across sessions.
@@ -42,8 +45,16 @@ def compare_nested_models(
     if session_cols is None:
         session_cols = ["animal", "day", "epoch"]
 
-    merged = parent_results[session_cols + ["ll", "aic", "bic", "n_params"]].merge(
-        child_results[session_cols + ["ll", "aic", "bic", "n_params"]],
+    # Accept both "ll" (legacy binomial) and "llf" (conditional Poisson)
+    ll_col = "llf" if "llf" in parent_results.columns else "ll"
+
+    fit_cols = [ll_col, "aic", "bic", "n_params"]
+    # Include n_events if available (for LRT validity check)
+    if "n_events" in parent_results.columns and "n_events" in child_results.columns:
+        fit_cols = fit_cols + ["n_events"]
+
+    merged = parent_results[session_cols + fit_cols].merge(
+        child_results[session_cols + fit_cols],
         on=session_cols,
         suffixes=("_parent", "_child"),
     )
@@ -51,15 +62,38 @@ def compare_nested_models(
     if len(merged) == 0:
         return pd.DataFrame()
 
-    # Delta AIC/BIC: positive = child model better
+    ll_parent = f"{ll_col}_parent"
+    ll_child = f"{ll_col}_child"
+
+    # Delta AIC/BIC and LRT require parent and child to be fit on
+    # the same observations. Callers must ensure this by pre-filtering
+    # to a common complete-case event set before fitting.
     merged["delta_aic"] = merged["aic_parent"] - merged["aic_child"]
     merged["delta_bic"] = merged["bic_parent"] - merged["bic_child"]
 
-    # Likelihood ratio test
-    merged["lr_stat"] = -2 * (merged["ll_parent"] - merged["ll_child"])
-    df_diff = merged["n_params_child"].iloc[0] - merged["n_params_parent"].iloc[0]
-    merged["df_diff"] = int(df_diff)
-    merged["lr_pvalue"] = chi2.sf(merged["lr_stat"].clip(lower=0), df=max(df_diff, 1))
+    merged["lr_stat"] = -2 * (merged[ll_parent] - merged[ll_child])
+    merged["df_diff"] = merged["n_params_child"] - merged["n_params_parent"]
+    merged["lr_pvalue"] = chi2.sf(
+        merged["lr_stat"].clip(lower=0), df=merged["df_diff"].clip(lower=1)
+    )
+
+    # Invalidate all comparison metrics when parent and child used
+    # different event counts (indicates the caller did not pre-filter
+    # to a common complete-case event set).
+    if "n_events_parent" in merged.columns and "n_events_child" in merged.columns:
+        different_n = merged["n_events_parent"] != merged["n_events_child"]
+        if different_n.any():
+            import logging
+
+            logging.warning(
+                "%d/%d sessions have mismatched event counts between "
+                "parent and child — invalidating comparisons. "
+                "Pre-filter to a common event set before fitting.",
+                different_n.sum(),
+                len(merged),
+            )
+        for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
+            merged.loc[different_n, col] = np.nan
 
     return merged
 
@@ -97,7 +131,7 @@ def summarize_comparison(
         "parent": parent_name,
         "child": child_name,
         "n_sessions": len(comparison_df),
-        "df_diff": int(comparison_df["df_diff"].iloc[0]),
+        "df_diff": int(comparison_df["df_diff"].median()),
         "delta_aic_median": float(daic.median()),
         "delta_aic_q25": float(daic.quantile(0.25)),
         "delta_aic_q75": float(daic.quantile(0.75)),

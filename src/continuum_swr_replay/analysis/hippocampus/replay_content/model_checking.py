@@ -1,16 +1,246 @@
 """Model checking utilities for the replay content model hierarchy.
 
-Provides cross-validation, aggregated diagnostic summaries, and
-separation detection beyond the per-fit diagnostics in fitting.py.
+Provides cross-validation (held-out conditional log-likelihood),
+Pearson residuals, and diagnostic summaries for the conditional
+Poisson (multinomial-count) model.
+
+Also retains legacy binary cross-validation for backward compatibility.
 """
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
+from statsmodels.discrete.conditional_models import ConditionalPoisson
 
-from .fitting import ALPHA, _log_likelihood
+from .fitting import ALPHA  # used by legacy cross_validate_session
+
+logger = logging.getLogger(__name__)
+
+
+def cross_validate_conditional_poisson(
+    long_df: pd.DataFrame,
+    predictors: list[str],
+    event_col: str = "event_uid",
+    response_col: str = "arm_count",
+    n_folds: int = 5,
+) -> dict | None:
+    """Event-based K-fold CV for conditional Poisson model.
+
+    Splits events into folds. For each fold, fits the model on training
+    events and evaluates held-out conditional log-likelihood on test events.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format data (9 rows per event) with counts and predictors.
+    predictors : list[str]
+        Arm-varying predictor columns.
+    event_col : str
+        Column with globally unique event IDs.
+    response_col : str
+        Column with integer arm counts.
+    n_folds : int
+        Number of CV folds.
+
+    Returns
+    -------
+    dict | None
+        CV metrics: mean/std held-out conditional LL per event and per
+        timebin. None if insufficient data.
+    """
+    from sklearn.model_selection import GroupKFold
+
+    if event_col not in long_df.columns or response_col not in long_df.columns:
+        return None
+
+    required = [event_col, response_col] + predictors
+    df = long_df[required].copy()
+
+    # Event-wise NaN filtering: drop entire events if any row has NaN,
+    # so the candidate set stays at 9 arms for all retained events.
+    has_nan = df[required].isna().any(axis=1)
+    events_with_nan = df.loc[has_nan, event_col].unique()
+    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    if len(df) == 0:
+        return None
+
+    groups = df[event_col].values
+    unique_events = np.unique(groups)
+    n_events = len(unique_events)
+
+    if n_events < n_folds * 2:
+        return None
+
+    y = df[response_col].values.astype(int)
+    n_arms = 9  # constant for this task
+
+    gkf = GroupKFold(n_splits=n_folds)
+
+    ll_per_event = []
+    ll_per_timebin = []
+
+    for train_idx, test_idx in gkf.split(df, y, groups):
+        y_train = y[train_idx]
+        y_test = y[test_idx]
+        groups_test = groups[test_idx]
+
+        if len(predictors) == 0:
+            # Null model: uniform allocation
+            # ℓ = -Σ_e L_e · log(n_arms)
+            event_totals = pd.Series(y_test).groupby(groups_test).sum()
+            fold_ll = -float(event_totals.sum()) * np.log(n_arms)
+            n_test_events = len(event_totals)
+            total_timebins = event_totals.sum()
+        else:
+            X_train = df.iloc[train_idx][predictors].values.astype(float)
+            X_test = df.iloc[test_idx][predictors].values.astype(float)
+            groups_train = groups[train_idx]
+
+            try:
+                model = ConditionalPoisson(y_train, X_train, groups=groups_train)
+                result = model.fit(disp=0)
+            except Exception:
+                continue
+
+            # Compute held-out conditional LL
+            fold_ll = _held_out_conditional_ll(
+                y_test, X_test, groups_test, result.params
+            )
+            n_test_events = len(np.unique(groups_test))
+            total_timebins = y_test.sum()
+
+        if n_test_events > 0:
+            ll_per_event.append(fold_ll / n_test_events)
+        if total_timebins > 0:
+            ll_per_timebin.append(fold_ll / total_timebins)
+
+    if len(ll_per_event) < 2:
+        return None
+
+    return {
+        "cv_ll_per_event_mean": float(np.mean(ll_per_event)),
+        "cv_ll_per_event_std": float(np.std(ll_per_event)),
+        "cv_ll_per_timebin_mean": float(np.mean(ll_per_timebin)),
+        "cv_ll_per_timebin_std": float(np.std(ll_per_timebin)),
+        "cv_n_folds": len(ll_per_event),
+    }
+
+
+def _held_out_conditional_ll(
+    y: np.ndarray,
+    X: np.ndarray,
+    groups: np.ndarray,
+    params: np.ndarray,
+) -> float:
+    """Compute conditional log-likelihood on held-out data.
+
+    For each event e with arm counts c_ea and linear predictor η_ea = Xβ:
+        ℓ_e = Σ_a c_ea · η_ea - L_e · log(Σ_a exp(η_ea))
+
+    Parameters
+    ----------
+    y : array of shape (n_rows,)
+        Arm counts.
+    X : array of shape (n_rows, n_predictors)
+        Predictor matrix.
+    groups : array of shape (n_rows,)
+        Event group IDs.
+    params : array of shape (n_predictors,)
+        Fitted coefficients.
+
+    Returns
+    -------
+    float
+        Total conditional log-likelihood across all events.
+    """
+    eta = X @ params
+    total_ll = 0.0
+
+    for event_id in np.unique(groups):
+        mask = groups == event_id
+        eta_e = eta[mask]
+        c_e = y[mask]
+        L_e = c_e.sum()
+
+        if L_e == 0:
+            continue
+
+        # Log-sum-exp for numerical stability
+        max_eta = eta_e.max()
+        log_sum_exp = max_eta + np.log(np.sum(np.exp(eta_e - max_eta)))
+        total_ll += np.sum(c_e * eta_e) - L_e * log_sum_exp
+
+    return float(total_ll)
+
+
+def compute_pearson_residuals(
+    long_df: pd.DataFrame,
+    fit_result: dict,
+    predictors: list[str],
+    event_col: str = "event_uid",
+    response_col: str = "arm_count",
+) -> pd.DataFrame:
+    """Compute Pearson residuals at the event-arm level.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format data.
+    fit_result : dict
+        Output of fit_conditional_poisson.
+    predictors : list[str]
+        Predictor columns.
+    event_col : str
+        Event ID column.
+    response_col : str
+        Count column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Original data with added ``predicted_frac`` and ``pearson_resid``
+        columns.
+    """
+    required = [event_col, response_col] + predictors
+    df = long_df.copy()
+
+    # Event-wise NaN filtering (same as fitter): drop entire events
+    # if any row has NaN in required columns.
+    has_nan = df[required].isna().any(axis=1)
+    events_with_nan = df.loc[has_nan, event_col].unique()
+    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+
+    params = np.array([fit_result[f"coef_{p}"] for p in predictors])
+
+    X = df[predictors].values.astype(float)
+    eta = X @ params
+
+    # Predicted fractions per event (softmax within event, stabilized)
+    df["_eta"] = eta
+    max_eta = df.groupby(event_col)["_eta"].transform("max")
+    df["_shifted_exp"] = np.exp(df["_eta"] - max_eta)
+    sum_shifted = df.groupby(event_col)["_shifted_exp"].transform("sum")
+    df["predicted_frac"] = df["_shifted_exp"] / sum_shifted
+
+    # Observed fraction
+    total_count = df.groupby(event_col)[response_col].transform("sum")
+    df["observed_frac"] = df[response_col] / total_count.clip(lower=1)
+
+    # Pearson residual: (observed - expected) / sqrt(expected * (1 - expected/L_e))
+    expected_count = df["predicted_frac"] * total_count
+    variance = expected_count * (1 - df["predicted_frac"])
+    df["pearson_resid"] = (df[response_col] - expected_count) / np.sqrt(
+        variance.clip(lower=1e-10)
+    )
+
+    df = df.drop(columns=["_eta", "_shifted_exp"])
+    return df
+
+
+# ── Legacy binary CV (kept for backward compatibility) ──
 
 
 def cross_validate_session(
@@ -19,15 +249,15 @@ def cross_validate_session(
     n_folds: int = 5,
     alpha: float = ALPHA,
 ) -> dict | None:
-    """K-fold cross-validation for one session's long-format data.
+    """K-fold cross-validation for binary logistic model (legacy).
 
-    Splits events (not rows) into folds to avoid data leakage — all 9
-    rows for an event go into the same fold.
+    .. deprecated::
+        Use ``cross_validate_conditional_poisson`` instead.
 
     Parameters
     ----------
     long_df : pd.DataFrame
-        Long-format data for a single session.
+        Long-format data with ``replay_here`` response.
     predictors : list[str]
         Predictor columns.
     n_folds : int
@@ -38,13 +268,13 @@ def cross_validate_session(
     Returns
     -------
     dict | None
-        CV metrics: mean/std Brier score, mean/std log-loss.
-        None if insufficient data.
+        CV metrics. None if insufficient data.
     """
+    import statsmodels.api as sm
     from sklearn.model_selection import GroupKFold
 
-    # Use non_local_event as the group variable for event-based splitting.
-    # GroupKFold ensures all rows for an event stay in the same fold.
+    from .fitting import _log_likelihood
+
     if "non_local_event" not in long_df.columns:
         return None
 
@@ -68,7 +298,6 @@ def cross_validate_session(
             continue
 
         if len(predictors) == 0:
-            # Null model: predict test fold with training mean
             p_train = y_train.mean()
             y_pred = np.full_like(y_test, p_train, dtype=float)
         else:
@@ -98,164 +327,3 @@ def cross_validate_session(
         "cv_ll_std": float(np.std(ll_scores)),
         "cv_n_folds": len(brier_scores),
     }
-
-
-def check_separation(
-    fit_result: dict,
-    predictors: list[str],
-    threshold: float = 5.0,
-) -> dict:
-    """Check for quasi-complete separation indicators.
-
-    Parameters
-    ----------
-    fit_result : dict
-        Output of fit_glm.
-    predictors : list[str]
-        Predictor names.
-    threshold : float
-        Coefficient magnitude threshold suggesting separation.
-
-    Returns
-    -------
-    dict
-        Separation flags and the largest coefficient.
-    """
-    max_coef = fit_result.get("max_abs_coef", 0.0)
-    large_coefs = []
-    for pred in predictors:
-        col = f"coef_{pred}"
-        if col in fit_result and abs(fit_result[col]) > threshold:
-            large_coefs.append(pred)
-
-    return {
-        "separation_flag": len(large_coefs) > 0,
-        "n_large_coefs": len(large_coefs),
-        "large_coef_names": large_coefs,
-        "max_abs_coef": max_coef,
-    }
-
-
-def aggregate_diagnostics(
-    model_results: pd.DataFrame,
-    predictors: list[str],
-) -> dict:
-    """Aggregate per-session diagnostics into a summary.
-
-    Parameters
-    ----------
-    model_results : pd.DataFrame
-        Per-session fit results for one model.
-    predictors : list[str]
-        Predictor names.
-
-    Returns
-    -------
-    dict
-        Summary statistics for each diagnostic metric.
-    """
-    summary = {
-        "n_sessions": len(model_results),
-    }
-
-    # Fit quality
-    for metric in ["pseudo_r2", "brier", "aic", "bic", "ll"]:
-        if metric in model_results.columns:
-            vals = model_results[metric].dropna()
-            if len(vals) > 0:
-                summary[f"{metric}_median"] = float(vals.median())
-                summary[f"{metric}_q25"] = float(vals.quantile(0.25))
-                summary[f"{metric}_q75"] = float(vals.quantile(0.75))
-
-    # Collinearity
-    if "cond_number" in model_results.columns:
-        vals = model_results["cond_number"].dropna()
-        if len(vals) > 0:
-            summary["cond_number_median"] = float(vals.median())
-            summary["cond_number_max"] = float(vals.max())
-
-    # VIF per predictor
-    for pred in predictors:
-        col = f"vif_{pred}"
-        if col in model_results.columns:
-            vals = model_results[col].dropna()
-            vals = vals[np.isfinite(vals)]
-            if len(vals) > 0:
-                summary[f"vif_{pred}_median"] = float(vals.median())
-                summary[f"vif_{pred}_max"] = float(vals.max())
-
-    # Residuals
-    for metric in ["resid_mean", "resid_std", "resid_skew", "resid_abs_max"]:
-        if metric in model_results.columns:
-            vals = model_results[metric].dropna()
-            if len(vals) > 0:
-                summary[f"{metric}_median"] = float(vals.median())
-
-    # Calibration
-    if "calib_slope" in model_results.columns:
-        vals = model_results["calib_slope"].dropna()
-        if len(vals) > 0:
-            summary["calib_slope_median"] = float(vals.median())
-
-    # Separation
-    if "max_abs_coef" in model_results.columns:
-        vals = model_results["max_abs_coef"].dropna()
-        summary["n_sessions_large_coef"] = int((vals > 5.0).sum())
-
-    # CV metrics (if present)
-    for metric in ["cv_brier_mean", "cv_ll_mean"]:
-        if metric in model_results.columns:
-            vals = model_results[metric].dropna()
-            if len(vals) > 0:
-                summary[f"{metric}_median"] = float(vals.median())
-
-    return summary
-
-
-def print_diagnostic_summary(
-    summary: dict,
-    model_name: str,
-    predictors: list[str],
-) -> None:
-    """Print a formatted diagnostic summary."""
-    print(f"\n  DIAGNOSTICS for {model_name}:")
-    print(f"    Sessions: {summary.get('n_sessions', 0)}")
-
-    # Fit quality
-    for metric in ["pseudo_r2", "brier", "aic"]:
-        key = f"{metric}_median"
-        if key in summary:
-            print(f"    {metric}: {summary[key]:.4f}")
-
-    # Collinearity
-    if "cond_number_median" in summary:
-        print(
-            f"    Condition #: median={summary['cond_number_median']:.0f}, "
-            f"max={summary.get('cond_number_max', 0):.0f}"
-        )
-
-    # VIF
-    vif_strs = []
-    for pred in predictors[:6]:  # limit to first 6 for readability
-        key = f"vif_{pred}_median"
-        if key in summary:
-            vif_strs.append(f"{pred}={summary[key]:.1f}")
-    if vif_strs:
-        print(f"    VIF: {', '.join(vif_strs)}")
-
-    # Residuals
-    if "resid_skew_median" in summary:
-        print(f"    Resid skew: {summary['resid_skew_median']:.3f}")
-
-    # Calibration
-    if "calib_slope_median" in summary:
-        print(f"    Calibration: {summary['calib_slope_median']:.2f} (1.0=perfect)")
-
-    # Separation
-    n_large = summary.get("n_sessions_large_coef", 0)
-    if n_large > 0:
-        print(f"    WARNING: {n_large} sessions with |coef| > 5")
-
-    # CV
-    if "cv_brier_mean_median" in summary:
-        print(f"    CV Brier: {summary['cv_brier_mean_median']:.4f}")

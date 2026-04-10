@@ -99,7 +99,9 @@ def well_to_arm_set(well_id: float, track_graph) -> set[int]:
     arms = set()
     for u, v, data in track_graph.edges(data=True):
         if u == well_id or v == well_id:
-            arms.add(data["edge_id"])
+            eid = data.get("edge_id")
+            if eid is not None:
+                arms.add(eid)
     if len(arms) == 0:
         logger.warning("No arms found for well %d", well_id)
     return arms

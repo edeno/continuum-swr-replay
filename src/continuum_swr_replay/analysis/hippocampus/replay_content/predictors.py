@@ -142,39 +142,6 @@ def compute_event_time_since_stop(
     return merged["time_since_stop"].values
 
 
-def compute_event_log_distance(
-    events: pd.DataFrame,
-    nl: pd.DataFrame,
-) -> np.ndarray:
-    """Compute log(1 + |distance|) for each event.
-
-    Parameters
-    ----------
-    events : pd.DataFrame
-        Event-level data.
-    nl : pd.DataFrame
-        Non-local immobile timebins with ``ahead_behind_distance``.
-
-    Returns
-    -------
-    np.ndarray
-        One value per event row.
-    """
-    abs_dist = nl["ahead_behind_distance"].abs()
-    event_dist = (
-        nl[nl["non_local_event"] > 0]
-        .assign(abs_dist=abs_dist)
-        .groupby(["animal", "day", "epoch", "non_local_event"])["abs_dist"]
-        .median()
-    )
-
-    merge_keys = ["animal", "day", "epoch", "non_local_event"]
-    merged = events[merge_keys].merge(
-        event_dist.reset_index(), on=merge_keys, how="left"
-    )
-    return np.log1p(merged["abs_dist"].values)
-
-
 def compute_visit_recency_for_event(
     event_time: float,
     trials: pd.DataFrame,
@@ -274,97 +241,85 @@ def compute_cumulative_reward_for_event(
     return result
 
 
-def add_per_arm_continuous_predictors(
-    long_df: pd.DataFrame,
-    events: pd.DataFrame,
-    trials_per_session: dict[tuple, pd.DataFrame],
-    track_graphs: dict[tuple, object],
-    session_cols: list[str] | None = None,
-) -> pd.DataFrame:
-    """Add per-arm continuous predictors (visit_recency, cumulative_reward).
+def compute_dist_to_arm(
+    current_well: int | float,
+    track_graph,
+) -> dict[int, float]:
+    """Graph shortest-path distance from a well to each arm.
 
-    This is the slow step — computes visit_recency and cumulative_reward
-    for each event by looking backward through trial history.
+    For each arm (edge), computes the shortest-path distance from the
+    animal's current well to the nearest endpoint of that arm. This gives
+    an arm-varying continuous predictor that is identifiable in the
+    conditional Poisson model.
 
     Parameters
     ----------
-    long_df : pd.DataFrame
-        Long-format data (9 rows per event).
-    events : pd.DataFrame
-        Event-level data with session identifiers and event times.
-    trials_per_session : dict
-        {(animal, day, epoch): trials_df} for each session.
-    track_graphs : dict
-        {(animal, day, epoch): track_graph} for each session.
-    session_cols : list[str] | None
-        Session grouping columns.
+    current_well : int or float
+        Well node ID (0-5) where the animal currently is. If NaN, returns
+        NaN for all arms.
+    track_graph : networkx.Graph
+        Track graph with ``edge_id`` attributes on edges and optional
+        ``distance`` edge weights.
 
     Returns
     -------
-    pd.DataFrame
-        long_df with visit_recency and cumulative_reward columns.
+    dict[int, float]
+        ``{arm_id: distance}`` for each of the 9 arms. Distance is 0 for
+        arms adjacent to the current well.
     """
-    if session_cols is None:
-        session_cols = ["animal", "day", "epoch"]
+    import networkx as nx
 
-    # Build a per-event × per-arm DataFrame of visit_recency and
-    # cumulative_reward, then merge into long_df by key columns.
-    # This is safe regardless of event ordering or NaN filtering.
-    merge_keys = session_cols + ["non_local_event"]
-    rows = []
+    if np.isnan(current_well):
+        return dict.fromkeys(ALL_ARMS, np.nan)
 
-    for _, event in events.iterrows():
-        session_key = tuple(event[c] for c in session_cols)
-        trials = trials_per_session.get(session_key)
-        tg = track_graphs.get(session_key)
+    current_well = int(current_well)
 
-        if trials is None or tg is None:
-            continue
-
-        event_time = event.get("event_midpoint_time", np.nan)
-        if np.isnan(event_time):
-            continue
-
-        vr = compute_visit_recency_for_event(event_time, trials, tg)
-        cr = compute_cumulative_reward_for_event(event_time, trials, tg)
-
-        for arm in ALL_ARMS:
-            row = {c: event[c] for c in merge_keys}
-            row["arm_id"] = arm
-            row["visit_recency"] = vr[arm]
-            row["cumulative_reward"] = cr[arm]
-            rows.append(row)
-
-    if not rows:
-        long_df["visit_recency"] = np.nan
-        long_df["cumulative_reward"] = np.nan
-        return long_df
-
-    predictor_df = pd.DataFrame(rows)
-
-    # Merge on event + arm keys — safe regardless of row order or filtering
-    long_df = long_df.merge(
-        predictor_df,
-        on=merge_keys + ["arm_id"],
-        how="left",
-        suffixes=("", "_new"),
+    # Compute shortest path lengths from current_well to all nodes.
+    # Use edge weights ("distance") if available; fall back to hop count.
+    has_weights = any(
+        "distance" in d for _, _, d in track_graph.edges(data=True)
     )
+    try:
+        if has_weights:
+            lengths = dict(
+                nx.single_source_dijkstra_path_length(
+                    track_graph, current_well, weight="distance"
+                )
+            )
+        else:
+            lengths = dict(
+                nx.single_source_shortest_path_length(track_graph, current_well)
+            )
+    except nx.NodeNotFound:
+        return dict.fromkeys(ALL_ARMS, np.nan)
 
-    # Handle case where columns already exist (from a prior run)
-    for col in ["visit_recency", "cumulative_reward"]:
-        new_col = f"{col}_new"
-        if new_col in long_df.columns:
-            long_df[col] = long_df[new_col]
-            long_df = long_df.drop(columns=[new_col])
+    # For each arm, find the minimum distance to either endpoint
+    arm_to_endpoints: dict[int, list[int]] = {}
+    for u, v, data in track_graph.edges(data=True):
+        arm_id = data.get("edge_id")
+        if arm_id is not None:
+            arm_to_endpoints.setdefault(arm_id, []).extend([u, v])
 
-    return long_df
+    result = {}
+    for arm in ALL_ARMS:
+        endpoints = arm_to_endpoints.get(arm, [])
+        if not endpoints:
+            result[arm] = np.nan
+        else:
+            dists = [lengths.get(n, np.nan) for n in endpoints]
+            valid = [d for d in dists if not np.isnan(d)]
+            result[arm] = float(min(valid)) if valid else np.nan
+
+    return result
 
 
 def add_temporal_interactions(df: pd.DataFrame) -> None:
     """Add time-based interaction columns (in place).
 
-    Creates time_x_current and time_x_prev from time_since_stop.
+    Creates time_x_current, time_x_prev, and time_x_next from
+    time_since_stop.
     """
     if "time_since_stop" in df.columns:
         df["time_x_current"] = df["time_since_stop"] * df["is_current"]
         df["time_x_prev"] = df["time_since_stop"] * df["is_prev"]
+        df["time_x_next"] = df["time_since_stop"] * df["is_next"]
