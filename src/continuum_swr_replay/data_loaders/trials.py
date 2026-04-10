@@ -149,9 +149,16 @@ def get_run_intervals(poke_times: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_start_end_node_id(
-    position_info: pd.DataFrame, track_graph: nx.Graph, times: pd.DataFrame
+    position_info: pd.DataFrame,
+    track_graph: nx.Graph,
+    times: pd.DataFrame,
+    well_nodes: list[int] | None = None,
 ) -> WellNodeData:
     """Determine start and end well nodes for each interval.
+
+    Finds the nearest well node to the animal's projected position at
+    the start and end of each interval. Only considers actual well nodes
+    (not internal junction nodes) to prevent misassignment.
 
     Parameters
     ----------
@@ -161,6 +168,10 @@ def get_start_end_node_id(
         Track graph with node positions
     times : pd.DataFrame
         Times with start_time and end_time columns
+    well_nodes : list[int] | None
+        Node IDs to consider as wells. If None, uses the well nodes
+        from WELL_PATCH_MAPPING if they exist in the graph, otherwise
+        falls back to all graph nodes.
 
     Returns
     -------
@@ -189,18 +200,42 @@ def get_start_end_node_id(
     end_time_pos = position_info.iloc[end_indices][projected_cols].to_numpy()
 
     node_attrs = nx.get_node_attributes(track_graph, "pos")
-    node_pos = np.array(list(node_attrs.values()))
-    node_ids = np.array(list(node_attrs.keys()))
 
-    start_node_ids = node_ids[
+    # Determine which nodes to consider as wells
+    if well_nodes is not None:
+        candidate_ids = sorted(well_nodes)
+    else:
+        # Default: use WELL_PATCH_MAPPING wells if they exist in the graph,
+        # otherwise fall back to all graph nodes (for test compatibility).
+        well_mapping_keys = sorted(WELL_PATCH_MAPPING.keys())
+        if all(n in node_attrs for n in well_mapping_keys):
+            candidate_ids = well_mapping_keys
+        else:
+            import logging
+
+            logging.warning(
+                "WELL_PATCH_MAPPING nodes not found in track graph. "
+                "Falling back to all graph nodes for well assignment. "
+                "This is expected in tests but not in production."
+            )
+            candidate_ids = sorted(node_attrs.keys())
+
+    candidate_pos = np.array([node_attrs[n] for n in candidate_ids])
+    candidate_arr = np.array(candidate_ids)
+
+    start_node_ids = candidate_arr[
         np.argmin(
-            np.linalg.norm(start_time_pos[:, None, :] - node_pos[None, :, :], axis=2),
+            np.linalg.norm(
+                start_time_pos[:, None, :] - candidate_pos[None, :, :], axis=2
+            ),
             axis=1,
         )
     ]
-    end_node_ids = node_ids[
+    end_node_ids = candidate_arr[
         np.argmin(
-            np.linalg.norm(end_time_pos[:, None, :] - node_pos[None, :, :], axis=2),
+            np.linalg.norm(
+                end_time_pos[:, None, :] - candidate_pos[None, :, :], axis=2
+            ),
             axis=1,
         )
     ]

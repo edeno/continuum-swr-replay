@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate Figure 2: The model works on real data.
 
-Composite figure with 3 panels:
+Composite figure with 7 panels:
 
     Row 1 (panel a — full width):
         Real data example showing ~2s around a non-local event during SWR.
@@ -14,9 +14,15 @@ Composite figure with 3 panels:
         c: Event-triggered averages at event start (4 signals stacked:
            non-local prob, theta, MUA, SWR z-score)
 
+    Row 3 (panels d, e, f, g):
+        d: Calibration curve — decoding error vs. local probability
+        e: Decoding error distribution during local state across sessions
+        f: State probability by theta phase (doubled axis, movement only)
+        g: State fractions during movement vs. immobility
+
 Usage:
-    python scripts/generate_figure02_composite.py
-    python scripts/generate_figure02_composite.py --output-dir paper/figures/figure02
+    python scripts/generate_figure02.py
+    python scripts/generate_figure02.py --output-dir paper/figures/figure02
 """
 
 import argparse
@@ -55,7 +61,13 @@ from continuum_swr_replay.parameters import (
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
-from continuum_swr_replay.visualization.figure_panels import plot_triggered_averages
+from continuum_swr_replay.visualization.figure_panels import (
+    plot_calibration_curve,
+    plot_decoding_error_distribution,
+    plot_state_fractions_by_movement,
+    plot_state_probability_by_theta_phase,
+    plot_triggered_averages,
+)
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,
     plot_conditional_non_local_posterior,
@@ -206,11 +218,11 @@ def generate_figure(
     )
 
     # --- Create figure ---
-    fig_height = min(7.0, PAGE_HEIGHT)
+    fig_height = PAGE_HEIGHT
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
-    gs = GridSpec(2, 1, figure=fig, height_ratios=[1.6, 1.2], hspace=0.35)
+    gs = GridSpec(3, 1, figure=fig, height_ratios=[1.6, 1.2, 1.0], hspace=0.35)
 
     # ── Row 1: Real data example (panel a) — 4 stacked sub-rows ──
     gs_a = gs[0].subgridspec(4, 1, hspace=0.05,
@@ -240,14 +252,14 @@ def generate_figure(
     ax_probs.set_xlabel("Time (s)")
 
     # ── Row 2: Statistics panels (b, c) ──
-    gs_bot = gs[1].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.35)
+    gs_mid = gs[1].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.35)
 
     # Panel b: probability distribution
-    ax_b = fig.add_subplot(gs_bot[0])
+    ax_b = fig.add_subplot(gs_mid[0])
     plot_non_local_prob_distribution(data_over_time, ax_b)
 
     # Panel c: triggered averages (4 stacked signals)
-    gs_c = gs_bot[1].subgridspec(4, 1, hspace=0.08)
+    gs_c = gs_mid[1].subgridspec(4, 1, hspace=0.08)
     ax_c = [fig.add_subplot(gs_c[i]) for i in range(4)]
     # Share x-axis across triggered average sub-panels
     for i in range(1, 4):
@@ -260,10 +272,25 @@ def generate_figure(
         time_col="start_time", axes=ax_c,
     )
 
+    # ── Row 3: Validation panels (d, e, f, g) ──
+    gs_bot = gs[2].subgridspec(1, 4, wspace=0.5, width_ratios=[1.0, 1.0, 1.0, 1.3])
+
+    ax_d = fig.add_subplot(gs_bot[0])
+    plot_calibration_curve(data_over_time, ax=ax_d)
+
+    ax_e = fig.add_subplot(gs_bot[1])
+    plot_decoding_error_distribution(data_over_time, ax=ax_e)
+
+    ax_f = fig.add_subplot(gs_bot[2])
+    plot_state_probability_by_theta_phase(data_over_time, ax=ax_f)
+
+    ax_g = fig.add_subplot(gs_bot[3])
+    plot_state_fractions_by_movement(data_over_time, ax=ax_g)
+
     # ── Panel Labels ──
     label_panels(
-        [ax_swr, ax_b, ax_c[0]],
-        labels=["a", "b", "c"],
+        [ax_swr, ax_b, ax_c[0], ax_d, ax_e, ax_f, ax_g],
+        labels=["a", "b", "c", "d", "e", "f", "g"],
     )
 
     return fig
