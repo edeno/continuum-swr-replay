@@ -1,23 +1,33 @@
 #!/usr/bin/env python
 """Generate Figure 4: PFC neurons respond to replay regardless of SWR detection.
 
-Composite figure with 6 panels in 3 rows:
+Composite figure with 4 panels in 3 rows:
 
-    Row 1 (panels a, b, c):
-        Single-neuron example showing GLM modulation, spike raster, and PSTH
-        for non-SWR replay (a) and SWR (b) events, plus AIC model comparison (c).
+    Row 1 (panel a):
+        Single-neuron example — overlaid GLM modulation curves and PSTHs
+        for SWR and non-SWR replay events on the same mPFC neuron. Shows
+        that the neuron responds to both event types with similar shape.
 
-    Row 2 (panel d):
-        Population heatmaps — SWR and non-SWR replay modulation (same neuron
-        sort order) showing parallel response structure.
+    Row 2 (panel b):
+        Population heatmaps — SWR and non-SWR replay modulation with the
+        same neuron sort order, showing parallel response structure
+        across the whole population.
 
-    Row 3 (panels e, f):
-        e: Population average modulation curves (mean ± SEM)
-        f: Significance bars (fraction of neurons modulated) + AIC model selection
+    Row 3 (panels c, d):
+        c: Population average modulation curves (mean ± SEM) for SWR vs
+           non-SWR replay.
+        d: Consolidated statistics — fraction of neurons significantly
+           modulated by each event type, and distribution of best-AIC
+           model across the population.
+
+April 2026: the figure was tightened from 6 panels to 4. The previous
+standalone single-neuron AIC was dropped (it duplicated the population
+AIC), and the two side-by-side single-neuron columns were collapsed
+into one overlay panel.
 
 Usage:
-    python scripts/generate_figure04_composite.py
-    python scripts/generate_figure04_composite.py --output-dir paper/figures/figure04
+    python scripts/generate_figure04.py
+    python scripts/generate_figure04.py --output-dir paper/figures/figure04
 """
 
 import argparse
@@ -26,7 +36,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
 
@@ -54,118 +63,116 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
 )
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
-from continuum_swr_replay.visualization.glm_plots import (
-    plot_aics,
-    plot_hist_relative_to_event,
-    plot_raster_relative_to_event,
-)
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
 
 # ---------------------------------------------------------------------------
-# Panels a-b — Single-neuron GLM results (one model per call)
+# Panel a — Single-neuron example (overlaid SWR + non-SWR modulation)
 # ---------------------------------------------------------------------------
 
-def plot_single_model_glm(
+def plot_single_neuron_overlay(
     axes,
-    model_name,
     lag_time,
     spline_basis,
     neuron_spike_times,
-    glm_result,
-    event_start_times,
-    title=None,
-    color=None,
+    glm_results,
+    event_times,
+    model_configs,
 ):
-    """Plot GLM modulation + raster + PSTH for a single model on 3 axes.
+    """Plot overlaid GLM modulation curves for one neuron + per-event PSTHs.
+
+    Sub-row 1 : one modulation-curve axis with a curve per model config
+                (typically SWR and non-SWR replay on the same axes).
+    Sub-row 2 : overlaid PSTHs — one line per event type.
 
     Parameters
     ----------
-    axes : list of 3 Axes
-        [ax_modulation, ax_raster, ax_psth]
-    model_name : str
-        Display name for the model
+    axes : list of 2 matplotlib.axes.Axes
+        [ax_modulation, ax_psth]
     lag_time : np.ndarray
-        Time lags in seconds
+        Time lags in seconds (covers both positive and negative lags).
     spline_basis : np.ndarray
-        Spline basis functions
+        Spline basis matching ``glm_result.params[1:]``.
     neuron_spike_times : np.ndarray
-        Spike times for the neuron
-    glm_result : statsmodels result
-        Fitted GLM result
-    event_start_times : pd.Series
-        Event start times
-    title : str, optional
-        Panel title (defaults to model_name)
-    color : str, optional
-        Color for the modulation line and fill
+        Spike times for the example neuron (seconds).
+    glm_results : dict[str, statsmodels result]
+        Full dict of fitted GLMs; only the models in ``model_configs``
+        are plotted.
+    event_times : dict[str, pd.DataFrame]
+        Event interval tables keyed by name (columns: start_time, end_time).
+    model_configs : list of dict
+        Each entry: ``{"model": str, "label": str, "color": str,
+        "event_key": str}``. ``model`` is a key into ``glm_results``,
+        ``event_key`` is a key into ``event_times`` (used for the PSTH).
+
     """
-    ax_mod, ax_raster, ax_psth = axes
+    ax_mod, ax_psth = axes
     lag_bounds = lag_time[0], lag_time[-1]
     modulation_bounds = np.log(0.5), np.log(2.0)
 
-    # Row 1: GLM modulation coefficients
-    modulation = glm_result.params[1:] @ spline_basis.T
-    ax_mod.plot(lag_time, modulation, color=color)
-    ax_mod.fill_between(
-        lag_time,
-        (glm_result.params[1:] + glm_result.bse[1:]) @ spline_basis.T,
-        (glm_result.params[1:] - glm_result.bse[1:]) @ spline_basis.T,
-        alpha=0.25,
-        color=color,
-    )
+    # ── Sub-row 1: overlaid modulation curves ──
+    for cfg in model_configs:
+        result = glm_results[cfg["model"]]
+        modulation = result.params[1:] @ spline_basis.T
+        upper = (result.params[1:] + result.bse[1:]) @ spline_basis.T
+        lower = (result.params[1:] - result.bse[1:]) @ spline_basis.T
+
+        ax_mod.plot(
+            lag_time, modulation, color=cfg["color"],
+            linewidth=1.2, label=cfg["label"],
+        )
+        ax_mod.fill_between(
+            lag_time, lower, upper, color=cfg["color"], alpha=0.2,
+        )
+
     ax_mod.axhline(0, color="black", linestyle="--", linewidth=0.5)
     ax_mod.axvline(0, color="black", linestyle="--", linewidth=0.5)
-    ax_mod.set_title(title or model_name)
     ax_mod.set_ylim(modulation_bounds)
     ax_mod.set_xticks((lag_bounds[0], 0, lag_bounds[1]))
     ax_mod.set_yticks((modulation_bounds[0], 0, modulation_bounds[1]))
-    ax_mod.set_ylabel("Mod.")
     ax_mod.set_yticklabels(
-        (np.exp(modulation_bounds[0]), 1, np.exp(modulation_bounds[1]))
+        (f"{np.exp(modulation_bounds[0]):.1f}", "1", f"{np.exp(modulation_bounds[1]):.1f}")
     )
+    ax_mod.set_ylabel("GLM\nmodulation")
+    ax_mod.legend(frameon=False, fontsize=6, loc="upper right")
     ax_mod.tick_params(labelbottom=False)
+    ax_mod.set_title("Example mPFC neuron", fontsize=8, pad=4)
 
-    # Row 2: Spike raster
-    plot_raster_relative_to_event(neuron_spike_times, event_start_times, lag_bounds, ax_raster)
-    ax_raster.set_ylabel("Event")
-    ax_raster.tick_params(labelbottom=False)
+    # ── Sub-row 2: overlaid PSTHs ──
+    # Cheap manual PSTH: compute spike-count density in lag bins around
+    # each event start for each event type.
+    psth_bin_ms = 10.0
+    psth_edges = np.arange(lag_bounds[0], lag_bounds[1] + psth_bin_ms / 1000.0, psth_bin_ms / 1000.0)
+    psth_centers = 0.5 * (psth_edges[:-1] + psth_edges[1:])
 
-    # Row 3: PSTH
-    plot_hist_relative_to_event(neuron_spike_times, event_start_times, lag_bounds, ax_psth)
-    ax_psth.set_ylabel("Rate\n[sp/s]")
-    ax_psth.set_xlabel("Time from\nevent (s)")
+    for cfg in model_configs:
+        events = event_times[cfg["event_key"]]
+        if len(events) == 0:
+            continue
+        starts = events["start_time"].to_numpy()
+        rel = []
+        for t0 in starts:
+            in_window = (neuron_spike_times >= t0 + lag_bounds[0]) & (
+                neuron_spike_times <= t0 + lag_bounds[1]
+            )
+            rel.append(neuron_spike_times[in_window] - t0)
+        if rel:
+            all_rel = np.concatenate(rel)
+        else:
+            all_rel = np.array([])
+        counts, _ = np.histogram(all_rel, bins=psth_edges)
+        rate = counts / (len(starts) * (psth_bin_ms / 1000.0))
+        ax_psth.plot(
+            psth_centers, rate, color=cfg["color"], linewidth=1.2,
+            label=cfg["label"],
+        )
 
-
-# ---------------------------------------------------------------------------
-# Panel c — Single-neuron AIC
-# ---------------------------------------------------------------------------
-
-def plot_single_neuron_aic(glm_results, ax, model_list=None):
-    """Plot AIC comparison for a single neuron on provided axes."""
-    if model_list is None:
-        model_list = ["constant", "SWR", "SWR + non_local_no_SWR", "non_local"]
-
-    model_labels = {
-        "constant": "Const.",
-        "SWR": "SWR",
-        "SWR + non_local_no_SWR": "SWR +\nnon-SWR",
-        "non_local": "Replay",
-    }
-
-    aics = [glm_results[m].aic for m in model_list]
-    min_aic = min(aics)
-    delta_aics = [a - min_aic for a in aics]
-    labels = [model_labels.get(m, m) for m in model_list]
-
-    colors = ["gray", COLORS["SWR"], "#e6ab02", COLORS["Non-Local"]]
-    ax.bar(labels, delta_aics, color=colors[:len(model_list)], alpha=0.7, edgecolor="none")
-    ax.set_ylabel("ΔAIC")
-    ax.set_title("Model comparison")
-    ax.tick_params(axis="both", which="both", length=3, direction="out")
-    ax.tick_params(axis="x", labelsize=5)
+    ax_psth.axvline(0, color="black", linestyle="--", linewidth=0.5)
+    ax_psth.set_xlim(lag_bounds)
+    ax_psth.set_xlabel("Time from event (s)")
+    ax_psth.set_ylabel("Firing\nrate (Hz)")
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +262,7 @@ def plot_significance(df, ax):
     colors_list = [COLORS["SWR"], COLORS["Non-Local"], COLORS["Non-Local"], COLORS["Non-Local"]]
 
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
-    for bar, frac in zip(bars, fracs):
+    for bar, frac in zip(bars, fracs, strict=True):
         if frac > 2:
             ax.text(bar.get_x() + bar.get_width() / 2, frac + 1,
                     f"{frac:.0f}%", ha="center", fontsize=5)
@@ -277,7 +284,7 @@ def plot_aic_selection(df, ax):
     vals = [100 * counts.get(m, 0) / n_total for m in model_order]
 
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
-    for bar, val in zip(bars, vals):
+    for bar, val in zip(bars, vals, strict=True):
         if val > 2:
             ax.text(bar.get_x() + bar.get_width() / 2, val + 1,
                     f"{val:.0f}%", ha="center", fontsize=5)
@@ -370,79 +377,90 @@ def generate_figure(
     )
 
     # --- Create figure ---
+    # 4-panel layout (was 6): the standalone single-neuron AIC was dropped
+    # because it duplicated the population AIC in the stats panel, and
+    # the two side-by-side single-neuron columns were collapsed into one
+    # overlay panel.
+    #
+    #     Row 1: panel a — single neuron overlay (modulation + PSTH,
+    #                      overlaid SWR and non-SWR replay)
+    #     Row 2: panel b — population heatmaps (2 side by side)
+    #     Row 3: panel c — population average
+    #            panel d — consolidated stats (% modulated + best AIC)
     print("Assembling composite figure...")
     fig_height = min(8.5, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
+    gs = GridSpec(3, 1, figure=fig, height_ratios=[1.4, 1.4, 1.2], hspace=0.4)
 
-    gs = GridSpec(3, 1, figure=fig, height_ratios=[2.0, 1.2, 1.5], hspace=0.4)
+    # ── Row 1: panel a — overlaid single-neuron example ──
+    # Two sub-rows inside the row: modulation curve on top, PSTH below.
+    # Center it within the row with a 1:2:1 left/mid/right width split so
+    # the curves don't stretch to full 2-column width.
+    gs_a_outer = gs[0].subgridspec(1, 3, width_ratios=[0.6, 2.0, 0.6])
+    gs_a = gs_a_outer[0, 1].subgridspec(2, 1, hspace=0.1, height_ratios=[1.0, 0.8])
+    ax_a_mod = fig.add_subplot(gs_a[0])
+    ax_a_psth = fig.add_subplot(gs_a[1], sharex=ax_a_mod)
 
-    # ── Row 1: Single neuron example (a, b, c) ──
-    gs_top = gs[0].subgridspec(1, 3, width_ratios=[1, 1, 0.8], wspace=0.5)
-
-    # Panel a: non-SWR replay (3 sub-rows)
-    gs_a = gs_top[0].subgridspec(3, 1, hspace=0.1)
-    ax_a = [fig.add_subplot(gs_a[i]) for i in range(3)]
-
-    plot_single_model_glm(
-        ax_a, "Non-SWR Replay", lag_time, spline_basis,
-        neuron_spike_times, glm_results["non_local_no_SWR"],
-        event_times["non_local_no_SWR"].start_time,
-        title="Non-SWR\nReplay",
-        color=COLORS["Non-Local"],
+    model_configs = [
+        {
+            "model": "SWR",
+            "label": "SWR",
+            "color": COLORS["SWR"],
+            "event_key": "SWR",
+        },
+        {
+            "model": "non_local_no_SWR",
+            "label": "non-SWR replay",
+            "color": COLORS["Non-Local"],
+            "event_key": "non_local_no_SWR",
+        },
+    ]
+    plot_single_neuron_overlay(
+        axes=[ax_a_mod, ax_a_psth],
+        lag_time=lag_time,
+        spline_basis=spline_basis,
+        neuron_spike_times=neuron_spike_times,
+        glm_results=glm_results,
+        event_times=event_times,
+        model_configs=model_configs,
     )
 
-    # Panel b: SWR (3 sub-rows)
-    gs_b = gs_top[1].subgridspec(3, 1, hspace=0.1)
-    ax_b = [fig.add_subplot(gs_b[i]) for i in range(3)]
-
-    plot_single_model_glm(
-        ax_b, "SWR", lag_time, spline_basis,
-        neuron_spike_times, glm_results["SWR"],
-        event_times["SWR"].start_time,
-        title="SWR",
-        color=COLORS["SWR"],
-    )
-
-    # Panel c: AIC
-    ax_c = fig.add_subplot(gs_top[2])
-    plot_single_neuron_aic(glm_results, ax_c)
-
-    # ── Row 2: Population heatmaps (d) ──
-    gs_mid = gs[1].subgridspec(1, 2, wspace=0.15)
-    ax_d1 = fig.add_subplot(gs_mid[0])
-    ax_d2 = fig.add_subplot(gs_mid[1])
-
+    # ── Row 2: panel b — population heatmaps (side by side) ──
+    gs_b = gs[1].subgridspec(1, 2, wspace=0.15)
+    ax_b1 = fig.add_subplot(gs_b[0])
+    ax_b2 = fig.add_subplot(gs_b[1])
     im = plot_population_heatmaps(
         modulations["swr"], modulations["no_swr"],
-        pop_lag_time, [ax_d1, ax_d2],
+        pop_lag_time, [ax_b1, ax_b2],
     )
-
     vmin, vmax = -np.log(2), np.log(2)
-    cbar = fig.colorbar(im, ax=[ax_d1, ax_d2], shrink=0.8, pad=0.02)
+    cbar = fig.colorbar(im, ax=[ax_b1, ax_b2], shrink=0.8, pad=0.02)
     cbar.set_label("Log FR change")
     cbar.set_ticks([vmin, 0, vmax])
     cbar.set_ticklabels(["0.5x", "1x", "2x"])
 
-    # ── Row 3: Population average (e) + significance/AIC (f) ──
-    gs_bot = gs[2].subgridspec(1, 2, width_ratios=[1, 1.2], wspace=0.45)
+    # ── Row 3: panel c (population average) + panel d (stats) ──
+    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.3], wspace=0.35)
 
-    # Panel e: population average
-    ax_e = fig.add_subplot(gs_bot[0])
-    plot_population_average(modulations, pop_lag_time, ax_e)
+    # Panel c: population average modulation
+    ax_c = fig.add_subplot(gs_cd[0])
+    plot_population_average(modulations, pop_lag_time, ax_c)
 
-    # Panel f: significance bars + AIC selection
-    gs_f = gs_bot[1].subgridspec(1, 2, wspace=0.4)
-    ax_f1 = fig.add_subplot(gs_f[0])
-    ax_f2 = fig.add_subplot(gs_f[1])
-
-    plot_significance(pop_df, ax_f1)
-    plot_aic_selection(pop_df, ax_f2)
+    # Panel d: consolidated stats — % significant + best-AIC
+    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.4)
+    ax_d1 = fig.add_subplot(gs_d[0])
+    ax_d2 = fig.add_subplot(gs_d[1])
+    plot_significance(pop_df, ax_d1)
+    plot_aic_selection(pop_df, ax_d2)
 
     # ── Panel Labels ──
     label_panels(
-        [ax_a[0], ax_b[0], ax_c, ax_d1, ax_e, ax_f1],
-        labels=["a", "b", "c", "d", "e", "f"],
+        [ax_a_mod, ax_b1, ax_c, ax_d1],
+        labels=["a", "b", "c", "d"],
+        xpos=-0.08,
+        ypos=1.15,
+        fontsize=11,
     )
 
     return fig
@@ -464,7 +482,7 @@ def main():
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    fig = generate_figure(
+    generate_figure(
         nwb_file_name=args.nwb_file_name,
         epoch_name=args.epoch_name,
         neuron_ind=args.neuron_ind,

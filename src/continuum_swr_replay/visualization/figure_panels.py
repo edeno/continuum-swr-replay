@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -30,6 +31,7 @@ from continuum_swr_replay.analysis.hippocampus import (
 )
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
+    PANEL_SINGLE_SQUARE,
     get_figure_size,
     save_figure,
 )
@@ -1017,3 +1019,98 @@ def plot_event_timing_offsets(
     if standalone:
         plt.tight_layout()
 
+
+
+def plot_swr_nl_venn_2circle(
+    counts: dict[str, int],
+    ax: plt.Axes | None = None,
+) -> None:
+    """Two-circle Venn of SWR events and immobile non-local events.
+
+    Shows the three-region breakdown:
+
+    - "SWR only"         = SWR events not overlapping any non-local event
+    - "both"             = the shared overlap region
+    - "non-local only"   = immobile non-local events not overlapping any SWR
+
+    Each region's count is annotated along with the percent of its
+    parent population, which makes the ~68% SWR → NL vs ~60% NL → no-SWR
+    asymmetry readable at a glance.
+
+    Parameters
+    ----------
+    counts : dict
+        Output of :func:`compute_swr_nl_event_counts`.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. If None, a standalone figure is created.
+
+    Notes
+    -----
+    The two "shared" counts (``n_swr_with_nl`` vs ``n_nl_immobile_with_swr``)
+    typically differ by <1% because a single SWR can overlap multiple
+    non-local events or vice versa. Their mean is shown as a single
+    number in the overlap region; the caption can clarify.
+
+    """
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE_SQUARE)
+
+    n_swr = counts["n_swr"]
+    n_nl = counts["n_nl_immobile"]
+    n_swr_with_nl = counts["n_swr_with_nl"]
+    n_nl_with_swr = counts["n_nl_immobile_with_swr"]
+
+    n_swr_only = n_swr - n_swr_with_nl
+    n_nl_only = n_nl - n_nl_with_swr
+    n_shared = (n_swr_with_nl + n_nl_with_swr) // 2
+
+    # Circle geometry in data coordinates; set_aspect("equal") keeps circles
+    # round regardless of panel aspect.
+    r = 1.0
+    c_swr = (-0.55, 0.0)
+    c_nl = (0.55, 0.0)
+
+    circle_swr = mpatches.Circle(
+        c_swr, r, fc=COLORS["SWR"], alpha=0.45, ec="black", lw=0.8,
+    )
+    circle_nl = mpatches.Circle(
+        c_nl, r, fc=COLORS["Non-Local"], alpha=0.45, ec="black", lw=0.8,
+    )
+    ax.add_patch(circle_swr)
+    ax.add_patch(circle_nl)
+
+    # Region counts inside each visible wedge
+    ax.text(
+        -1.1, 0.0, f"{n_swr_only:,}",
+        ha="center", va="center", fontsize=8, fontweight="bold",
+    )
+    ax.text(
+        1.1, 0.0, f"{n_nl_only:,}",
+        ha="center", va="center", fontsize=8, fontweight="bold",
+    )
+    ax.text(
+        0.0, 0.0, f"{n_shared:,}",
+        ha="center", va="center", fontsize=8, fontweight="bold", color="white",
+    )
+
+    # Circle labels above the circles
+    ax.text(
+        c_swr[0], 1.15, f"SWR\n(n={n_swr:,})",
+        ha="center", va="bottom", fontsize=7, fontweight="bold",
+        color=COLORS["SWR"],
+    )
+    ax.text(
+        c_nl[0], 1.15, f"non-local\n(n={n_nl:,})",
+        ha="center", va="bottom", fontsize=7, fontweight="bold",
+        color=COLORS["Non-Local"],
+    )
+
+    # Leave plenty of vertical headroom for the two labels above
+    ax.set_xlim(-2.1, 2.1)
+    ax.set_ylim(-1.3, 1.7)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    if standalone:
+        plt.tight_layout()
