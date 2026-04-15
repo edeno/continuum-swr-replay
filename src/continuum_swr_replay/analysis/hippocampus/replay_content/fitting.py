@@ -49,7 +49,10 @@ def fit_conditional_poisson(
     predictors : list[str]
         Column names for arm-varying predictors.
     response_col : str
-        Column with integer timebin counts per arm.
+        Column with non-negative per-arm response values. Integer timebin
+        counts (``arm_count_hard``) are the primary use; fractional
+        responses (``arm_count_soft``, ``arm_posterior_mass``) are also
+        supported for robustness analyses.
     event_col : str
         Column with globally unique event IDs (grouping variable).
 
@@ -83,7 +86,7 @@ def fit_conditional_poisson(
     event_totals = df.groupby(event_col)[response_col].transform("sum")
     df = df[event_totals > 0].reset_index(drop=True)
 
-    y = df[response_col].values.astype(int)
+    y = df[response_col].values.astype(float)
     groups = df[event_col].values
 
     n_events = len(np.unique(groups))

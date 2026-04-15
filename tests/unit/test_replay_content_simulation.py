@@ -108,6 +108,70 @@ class TestContinuousPredictor:
         assert abs(z) < 3, f"visit_recency z={z:.2f}"
 
 
+class TestFractionalResponse:
+    """Fitter must accept non-integer responses without silent truncation.
+
+    ``arm_count_hard`` is integer, but the robustness responses
+    ``arm_count_soft`` and ``arm_posterior_mass`` are fractional. Before
+    the fix, ``fit_conditional_poisson`` cast the response to int, which
+    silently floored soft responses < 1 to zero and destroyed information.
+    """
+
+    def test_integer_and_float_responses_agree(self):
+        """Casting integer counts to float must not change β̂."""
+        beta = {"is_current": 0.8, "is_prev": 0.4}
+        df = simulate_counts(beta, n_events=300, L_e=25, seed=101)
+        fit_int = fit_conditional_poisson(df, predictors=list(beta))
+
+        df_float = df.copy()
+        df_float["arm_count"] = df_float["arm_count"].astype(float)
+        fit_float = fit_conditional_poisson(df_float, predictors=list(beta))
+
+        assert fit_int is not None and fit_float is not None
+        for p in beta:
+            assert fit_int[f"coef_{p}"] == pytest.approx(
+                fit_float[f"coef_{p}"], rel=1e-9
+            )
+            assert fit_int[f"bse_{p}"] == pytest.approx(
+                fit_float[f"bse_{p}"], rel=1e-9
+            )
+
+    def test_subunit_fractional_response_is_not_floored(self):
+        """Responses in (0, 1) must influence the fit, not be floored to 0.
+
+        Scaling all counts by a constant < 1 yields a likelihood that is a
+        positive-scalar multiple of the integer case, so β̂ is unchanged
+        and ``bse`` scales by 1/sqrt(scale). If the old ``.astype(int)``
+        truncation were still in effect, every response would floor to 0,
+        the all-zero event filter would drop every event, and the fit
+        would return None.
+        """
+        beta = {"is_current": 1.0}
+        df = simulate_counts(beta, n_events=300, L_e=25, seed=102)
+
+        scale = 0.3
+        df_frac = df.copy()
+        df_frac["arm_count"] = df_frac["arm_count"].astype(float) * scale
+
+        fit_int = fit_conditional_poisson(df, predictors=list(beta))
+        fit_frac = fit_conditional_poisson(df_frac, predictors=list(beta))
+
+        assert fit_int is not None
+        assert fit_frac is not None, (
+            "fit returned None — fractional responses were likely floored"
+        )
+        # β̂ is mathematically invariant to a positive scalar rescaling of
+        # the response; numerical match is at the optimizer's convergence
+        # tolerance, not machine epsilon.
+        assert fit_frac["coef_is_current"] == pytest.approx(
+            fit_int["coef_is_current"], rel=1e-4
+        )
+        # bse scales by 1/sqrt(scale) because the information matrix scales
+        # linearly with the response.
+        expected_bse = fit_int["bse_is_current"] / np.sqrt(scale)
+        assert fit_frac["bse_is_current"] == pytest.approx(expected_bse, rel=1e-2)
+
+
 # ── Tier C tests: posterior/MAP-space simulation ──
 
 
