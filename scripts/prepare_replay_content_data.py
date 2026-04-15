@@ -1,21 +1,25 @@
 #!/usr/bin/env python
-"""Prepare master event-level and long-format datasets for replay content analysis.
+"""Build the four canonical replay-content tables across all sessions.
 
-Processes all sessions once, computing all predictors needed for M0-M7.
-Saves to Processed-Data/replay_content/ for fast iteration on model fitting.
+Thin driver over :mod:`continuum_swr_replay.analysis.replay.tables`. For
+each session it loads the pre-saved ``data_over_time.pkl``,
+``environment.pkl``, and ``results.nc``, pulls ``trials`` +
+``track_graph`` from Spyglass, and calls the four table builders.
 
-All per-arm predictors (visit_recency, cumulative_reward, dist_to_arm),
-temporal interactions, and event UIDs are computed inside prepare_session()
-so that each session is self-contained.
+Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
 
-Produces two long-format outputs:
-- long_count.pkl: count-based (primary, for ConditionalPoisson)
-- long_binary.pkl: binary modal-arm (robustness, for ConditionalLogit)
+- ``event_table.pkl`` — one row per non-local event
+- ``event_arm_table.pkl`` — one row per (event, arm)
+- ``event_sequence_table.pkl`` — one row per in-event timebin
+- ``stop_table.pkl`` — one row per stopping period (incl. zero-event)
 
-Usage:
+Usage::
+
     uv run python scripts/prepare_replay_content_data.py           # full run
     uv run python scripts/prepare_replay_content_data.py --test    # 2 per animal
 """
+
+from __future__ import annotations
 
 import argparse
 import logging
@@ -25,8 +29,14 @@ import time
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
-    prepare_session,
+from continuum_swr_replay.analysis.replay.posterior_io import (
+    load_conditional_posterior,
+)
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_arm_table,
+    build_event_sequence_table,
+    build_event_table,
+    build_stop_table,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
@@ -43,7 +53,13 @@ OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 
 
 def find_sessions(max_per_animal: int | None = None):
-    """Find all sessions with data_over_time and environment files."""
+    """Yield every session that has ``data_over_time.pkl`` and ``environment.pkl`` on disk.
+
+    ``results.nc`` absence is not a hard skip here — that's inspected
+    per session in :func:`main` so sessions without the conditional
+    posterior still contribute the event / event-arm / stop tables
+    (with ``posterior_*`` columns as NaN).
+    """
     dot_files = sorted(PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl"))
     env_files = {
         f.stem.replace("_environment", ""): f
@@ -65,12 +81,15 @@ def find_sessions(max_per_animal: int | None = None):
         if not nwb_match:
             continue
 
+        results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
+
         by_animal.setdefault(animal, []).append(
             {
                 "nwb_file_name": nwb_match[0],
                 "epoch_name": epoch,
                 "dot_file": f,
                 "env_file": env_files[session_id],
+                "results_file": results_path if results_path.exists() else None,
             }
         )
 
@@ -82,6 +101,66 @@ def find_sessions(max_per_animal: int | None = None):
         selected.extend(sessions)
 
     return selected
+
+
+def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
+    """Run all four builders on one session; return the four frames or ``None``.
+
+    Returns ``None`` when the session cannot be loaded or the decoder
+    produced no non-local events. Callers concatenate the non-empty
+    returns into the global canonical tables.
+    """
+    nwb = session["nwb_file_name"]
+    epoch = session["epoch_name"]
+
+    dot = pd.read_pickle(session["dot_file"])
+    with open(session["env_file"], "rb") as f:
+        env = pickle.load(f)
+
+    # Trials + track_graph come from Spyglass (slow; ~30 s).
+    data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
+    trials = data.get("trials")
+    track_graph = data.get("track_graph")
+    if trials is None or track_graph is None:
+        return None
+
+    # Conditional posterior is optional — sessions without a saved
+    # ``results.nc`` still emit the three tables whose posterior
+    # columns degrade to NaN.
+    posterior = None
+    if session["results_file"] is not None:
+        try:
+            posterior = load_conditional_posterior(session["results_file"])
+        except Exception as e:  # noqa: BLE001 - surface the reason and keep going
+            logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
+
+    event_table = build_event_table(
+        dot, env, trials, track_graph, conditional_posterior=posterior
+    )
+    if len(event_table) == 0:
+        return None
+
+    stop_table = build_stop_table(dot, trials, track_graph)
+    event_arm_table = build_event_arm_table(
+        event_table,
+        dot,
+        env,
+        trials,
+        track_graph,
+        conditional_posterior=posterior,
+    )
+    event_sequence_table = (
+        build_event_sequence_table(dot, env, posterior)
+        if posterior is not None
+        else None
+    )
+
+    return {
+        "event_table": event_table,
+        "event_arm_table": event_arm_table,
+        "stop_table": stop_table,
+        "event_sequence_table": event_sequence_table,
+    }
 
 
 def main():
@@ -98,40 +177,29 @@ def main():
     logging.info("Found %d sessions", len(sessions))
 
     t0 = time.time()
-    all_events = []
-    all_long_count = []
-    all_long_binary = []
-    session_cols = ["animal", "day", "epoch"]
+    all_event_tables: list[pd.DataFrame] = []
+    all_event_arm_tables: list[pd.DataFrame] = []
+    all_stop_tables: list[pd.DataFrame] = []
+    all_event_sequence_tables: list[pd.DataFrame] = []
 
     for i, session in enumerate(sessions):
         nwb = session["nwb_file_name"]
         epoch = session["epoch_name"]
 
         try:
-            # Load pre-saved data (fast)
-            dot = pd.read_pickle(session["dot_file"])
-            with open(session["env_file"], "rb") as f:
-                env = pickle.load(f)
-
-            # Load trials from Spyglass (slow, ~30s)
-            data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
-            trials = data.get("trials")
-            track_graph = data.get("track_graph")
-
-        except Exception as e:
-            logging.warning("Skip %s %s: %s", nwb, epoch, e)
+            result = _process_session(session)
+        except Exception as e:  # noqa: BLE001 - best-effort; log and continue
+            logging.warning("skip %s %s: %s", nwb, epoch, e)
             continue
 
-        result = prepare_session(dot, env, trials, track_graph)
         if result is None:
             continue
 
-        events, long_count, long_binary = result
-
-        all_events.append(events)
-        all_long_count.append(long_count)
-        if len(long_binary) > 0:
-            all_long_binary.append(long_binary)
+        all_event_tables.append(result["event_table"])
+        all_event_arm_tables.append(result["event_arm_table"])
+        all_stop_tables.append(result["stop_table"])
+        if result["event_sequence_table"] is not None:
+            all_event_sequence_tables.append(result["event_sequence_table"])
 
         if (i + 1) % 10 == 0:
             elapsed = time.time() - t0
@@ -144,74 +212,58 @@ def main():
                 int(remaining),
             )
 
-        del dot  # free memory
-
-    if not all_events:
-        logging.error("No sessions produced data")
+    if not all_event_tables:
+        logging.error("no sessions produced data")
         return
 
-    # Concatenate
-    events_all = pd.concat(all_events, ignore_index=True)
-    long_count_all = pd.concat(all_long_count, ignore_index=True)
-    long_binary_all = (
-        pd.concat(all_long_binary, ignore_index=True) if all_long_binary else None
+    event_table_all = pd.concat(all_event_tables, ignore_index=True)
+    event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
+    stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
+    event_sequence_table_all = (
+        pd.concat(all_event_sequence_tables, ignore_index=True)
+        if all_event_sequence_tables
+        else None
     )
 
+    session_cols = ["animal", "day", "epoch"]
     logging.info(
-        "Events: %d, Count rows: %d, Sessions: %d",
-        len(events_all),
-        len(long_count_all),
-        events_all.groupby(session_cols).ngroups,
+        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
+        len(event_table_all),
+        len(event_arm_table_all),
+        len(stop_table_all),
+        event_table_all.groupby(session_cols).ngroups,
     )
 
-    # Save
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    for name, frame in (
+        ("event_table", event_table_all),
+        ("event_arm_table", event_arm_table_all),
+        ("stop_table", stop_table_all),
+        ("event_sequence_table", event_sequence_table_all),
+    ):
+        if frame is None:
+            logging.info("  %s: skipped (no data)", name)
+            continue
+        path = OUTPUT_DIR / f"{name}.pkl"
+        frame.to_pickle(path)
+        logging.info("saved %s → %s (%d rows)", name, path, len(frame))
 
-    events_path = OUTPUT_DIR / "events.pkl"
-    events_all.to_pickle(events_path)
-    logging.info("Saved events to %s (%d rows)", events_path, len(events_all))
+    logging.info("total time: %ds", int(time.time() - t0))
 
-    count_path = OUTPUT_DIR / "long_count.pkl"
-    long_count_all.to_pickle(count_path)
-    logging.info(
-        "Saved count long-format to %s (%d rows)", count_path, len(long_count_all)
-    )
-
-    if long_binary_all is not None:
-        binary_path = OUTPUT_DIR / "long_binary.pkl"
-        long_binary_all.to_pickle(binary_path)
-        logging.info(
-            "Saved binary long-format to %s (%d rows)",
-            binary_path,
-            len(long_binary_all),
+    # Minimal sanity output — full invariant checks live in the unit
+    # test suite; this only guards against obvious shape regressions.
+    sum_n_events = int(stop_table_all["n_events"].sum())
+    if sum_n_events != len(event_table_all):
+        logging.warning(
+            "cross-table drift: Σ stop_table.n_events = %d, len(event_table) = %d",
+            sum_n_events,
+            len(event_table_all),
         )
-
-    # Summary statistics
-    total_time = time.time() - t0
-    logging.info("Total time: %ds", int(total_time))
-    logging.info("Columns in count long: %s", sorted(long_count_all.columns.tolist()))
-
-    # Validate
-    for col in [
-        "arm_count",
-        "event_uid",
-        "is_current",
-        "is_prev",
-        "is_next",
-        "is_swr",
-        "time_since_stop",
-        "visit_recency",
-        "cumulative_reward",
-        "dist_to_arm",
-        "time_x_current",
-        "time_x_prev",
-        "time_x_next",
-    ]:
-        if col in long_count_all.columns:
-            nan_frac = long_count_all[col].isna().mean()
-            logging.info("  %s: %.1f%% NaN", col, nan_frac * 100)
-        else:
-            logging.warning("  %s: MISSING", col)
+    else:
+        logging.info(
+            "cross-table invariant OK: Σ n_events == len(event_table) == %d",
+            len(event_table_all),
+        )
 
 
 if __name__ == "__main__":
