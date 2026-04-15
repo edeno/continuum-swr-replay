@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
-from .spatial_mapping import map_estimate_to_arm, well_to_arm_set
+from .spatial_mapping import arm_to_well, map_estimate_to_arm, well_to_arm_set
 from .summaries import n_nonlocal_bins, nonlocal_weight_sum
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
@@ -66,6 +66,16 @@ def _add_trial_context(
     - ``is_after_omission`` — ``~current trip's is_reward``
     - ``is_after_reward`` — current trip's ``is_reward``
     - ``reward_outcome`` — current trip's ``is_reward`` as float
+
+    Note
+    ----
+    ``reward_outcome`` and ``is_after_reward`` are identical by
+    construction on this task (``reward_outcome`` = ``is_reward``;
+    ``is_after_reward`` = ``is_reward`` because the current trip just
+    completed). Both are kept to satisfy the plan's canonical schema,
+    which names them separately; ``is_after_omission`` is the
+    complement. ``is_after_stay`` is added in :func:`build_event_table`,
+    not here (it needs no trial-level computation).
     """
     dot_times = dot.index.values
     n_trials = len(trials)
@@ -151,7 +161,7 @@ def _time_since_stop(
     """
     event_times = np.asarray(event_times, dtype=float)
     if bout_start_times.size == 0:
-        return np.zeros_like(event_times)
+        return np.full_like(event_times, np.nan)
     idx = np.searchsorted(bout_start_times, event_times, side="right") - 1
     idx = np.clip(idx, 0, bout_start_times.size - 1)
     return np.clip(event_times - bout_start_times[idx], 0, None)
@@ -316,14 +326,19 @@ def build_event_table(
     event_id_series = nl["non_local_event"].to_numpy()
 
     # --- 3. Per-event summaries via the shared summary helpers ---
+    # ``nl`` is already filtered to ``nonlocal_prob > nonlocal_threshold``
+    # (plus immobility and non-zero event label), so the hard-count
+    # helper must not apply the threshold a second time — passing 0.0
+    # means "count every row you were given". Keeps the two filter
+    # definitions from silently diverging if one is ever tuned without
+    # the other. ``nonlocal_weight_sum`` sums the raw w_t over the same
+    # pre-filtered rows; this matches the legacy ``prepare_session``
+    # aggregation contract.
+    nonlocal_prob_arr = nl["nonlocal_prob"].to_numpy()
     ids_sorted, n_bins = n_nonlocal_bins(
-        nl["nonlocal_prob"].to_numpy(),
-        event_id_series,
-        threshold=nonlocal_threshold,
+        nonlocal_prob_arr, event_id_series, threshold=0.0
     )
-    _, weight_sum = nonlocal_weight_sum(
-        nl["nonlocal_prob"].to_numpy(), event_id_series
-    )
+    _, weight_sum = nonlocal_weight_sum(nonlocal_prob_arr, event_id_series)
 
     # --- 4. Per-event metadata (groupby once, iterate sorted ids) ---
     groups = nl.groupby("non_local_event", sort=True)
@@ -336,17 +351,26 @@ def build_event_table(
         arms_real = arm_series[real_arm_mask]
         n_junction = int((~real_arm_mask).sum())
 
-        # current_arm: modal track_segment_id (animal's physical position)
+        # current_arm: modal track_segment_id (the arm the animal is
+        # physically on during the event). Accept only leaf arms — the
+        # ones that touch a well. ``arm_to_well`` returns NaN for trunk
+        # arms (6/7/8 in the bandit graph) because they connect two
+        # junctions and no well, which is the same condition the legacy
+        # ``_add_per_arm_predictors_single_session`` uses to trigger the
+        # ``prev_trial_to_well`` fallback. Driving the check off the
+        # graph — rather than hard-coding {0..5} — keeps the fallback
+        # correct on any track graph.
         ts = g["track_segment_id"] if "track_segment_id" in g.columns else pd.Series(dtype=float)
         ts_modal = _safe_mode(ts)
-        # Fall back to prev_trial_to_well's arm if the modal segment is
-        # not a leaf arm (trunk arms 6/7/8 cannot be an animal's well).
-        if np.isnan(ts_modal) or int(ts_modal) not in ALL_ARMS:
+        current_arm = np.nan
+        if not np.isnan(ts_modal):
+            well_of_modal = arm_to_well(ts_modal, track_graph)
+            if not np.isnan(well_of_modal):
+                current_arm = float(ts_modal)
+        if np.isnan(current_arm):
             current_arm = _single_arm_from_well(
                 _safe_first(g["prev_trial_to_well"]), track_graph
             )
-        else:
-            current_arm = float(ts_modal)
 
         prev_arm = _single_arm_from_well(
             _safe_first(g["prev_trial_from_well"]), track_graph
@@ -390,7 +414,11 @@ def build_event_table(
                 "reward_outcome": reward_outcome,
                 "n_junction_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
-                "event_midpoint_time": float(np.mean(times)),
+                # Legacy ``prepare_session`` uses the middle-index
+                # timestamp, not the mean — preserve that choice for
+                # Phase B gate parity even though the two coincide when
+                # timebins are uniformly sampled.
+                "event_midpoint_time": float(times[len(times) // 2]),
             }
         )
 
