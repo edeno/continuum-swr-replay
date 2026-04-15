@@ -1,0 +1,397 @@
+#!/usr/bin/env python
+"""Visualize the replay-content GLM pipeline as a data-flow figure.
+
+Follows ONE real event through every transformation step, so the reader
+can see the actual data shape changing at each stage:
+
+    raw decoder timeseries
+        ↓ filter to non-local immobile  +  event detection
+    per-timebin replay_arm sequence  (this event only)
+        ↓ collapse to event  +  per-arm counts
+    9-element count vector  (the multinomial sufficient statistic)
+        ↓ long-format expansion  +  add indicators
+    9-row × predictor design matrix  (this event)
+        ↓ pool across all sessions  +  fit ConditionalPoisson
+    population coefficient distribution
+
+Output:
+- ``paper/figures/qc_diagnosis/pipeline_data_flow.{png,pdf}``
+"""
+
+from __future__ import annotations
+
+import argparse
+import pickle
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Rectangle
+
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+    map_estimate_to_arm,
+)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+# Colour code for each arm (0..8). Patches share families:
+# arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
+# 6-8 = trunks (greys).
+ARM_COLORS = {
+    0: "#1f77b4", 1: "#5ba3d8",
+    2: "#2ca02c", 3: "#7fc97f",
+    4: "#d62728", 5: "#e87a7a",
+    6: "#5a5a5a", 7: "#7a7a7a", 8: "#9a9a9a",
+}
+
+
+def load_session(animal: str, day: int, epoch: str):
+    base = f"{animal}{day}_{epoch}_HPC"
+    dot_path = PROCESSED_DATA_DIR / f"{base}_80_data_over_time.pkl"
+    env_path = PROCESSED_DATA_DIR / f"{base}_environment.pkl"
+    dot = pd.read_pickle(dot_path)
+    with open(env_path, "rb") as f:
+        env = pickle.load(f)
+    dot = dot.copy()
+    dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].values, env)
+    dot["Non-Local_prob"] = (
+        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
+    )
+    return dot, env
+
+
+def make_figure(
+    *,
+    dot: pd.DataFrame,
+    event_id: int,
+    long_count: pd.DataFrame,
+    events: pd.DataFrame,
+    m3_fits: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    # Pull the event we're going to feature, and a window around it.
+    ev_rows = dot[dot["non_local_event"] == event_id]
+    t_start = ev_rows.index.min()
+    t_end = ev_rows.index.max()
+    pad = max(1.0, 1.5 * (t_end - t_start))
+    win = dot.loc[t_start - pad : t_end + pad].copy()
+    win_t = win.index.values - t_start  # seconds relative to event onset
+
+    # Get the per-arm count vector for this event from the saved long_count.
+    lc_event = long_count[long_count["non_local_event"] == event_id].sort_values("arm_id")
+    counts = lc_event.set_index("arm_id")["arm_count"].reindex(range(9), fill_value=0)
+    track_seg = int(events[events["non_local_event"] == event_id]["track_segment_id"].iloc[0])
+
+    # Indicator columns from the long_count for the long-format mini-table.
+    indicator_cols = [
+        "arm_id",
+        "arm_count",
+        "is_current",
+        "is_prev",
+        "is_next",
+        "is_last_rewarded",
+    ]
+    long_table = lc_event[indicator_cols].copy()
+    long_table["arm_id"] = long_table["arm_id"].astype(int)
+    long_table["arm_count"] = long_table["arm_count"].astype(int)
+    for c in long_table.columns[2:]:
+        long_table[c] = long_table[c].astype(int)
+
+    # Per-session M3 coefficients across all 218 sessions.
+    coef_cols = [
+        "coef_is_current",
+        "coef_is_prev",
+        "coef_is_next",
+        "coef_is_last_rewarded",
+        "coef_visit_recency",
+        "coef_cumulative_reward",
+    ]
+    coef_long = m3_fits[coef_cols].rename(
+        columns=lambda c: c.replace("coef_", "")
+    )
+
+    # ── Layout: 3 rows × 2 cols ──
+    fig = plt.figure(figsize=(13, 11), constrained_layout=True)
+    gs = fig.add_gridspec(3, 2, height_ratios=[1.1, 1.0, 1.2])
+    ax_a = fig.add_subplot(gs[0, 0])
+    ax_b = fig.add_subplot(gs[0, 1], sharex=ax_a)
+    ax_c = fig.add_subplot(gs[1, 0])
+    ax_d = fig.add_subplot(gs[1, 1])
+    ax_e = fig.add_subplot(gs[2, 0])
+    ax_f = fig.add_subplot(gs[2, 1])
+
+    # ── (A) Filters: speed + non-local prob over a 6-sec window ──
+    ax = ax_a
+    ax.plot(win_t, win["head_speed"].values, color="#444", lw=1, label="head_speed")
+    ax.axhline(
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        color="#444",
+        ls="--",
+        lw=0.8,
+        alpha=0.6,
+    )
+    ax.set_ylabel("speed (cm/s)", color="#444")
+    ax.tick_params(axis="y", labelcolor="#444")
+    ax.set_xlabel("time relative to event onset (s)")
+    ax.set_title(
+        "(A) Raw decoder per-timebin\nfilter: head_speed < 4  AND  Non-Local_prob > 0.8"
+    )
+    ax2 = ax.twinx()
+    ax2.plot(
+        win_t,
+        win["Non-Local_prob"].values,
+        color="#a55a3b",
+        lw=1,
+        label="Non-Local_prob",
+    )
+    ax2.axhline(DEFAULT_NON_LOCAL_THRESHOLD, color="#a55a3b", ls="--", lw=0.8, alpha=0.6)
+    ax2.set_ylabel("Non-Local prob", color="#a55a3b")
+    ax2.tick_params(axis="y", labelcolor="#a55a3b")
+    ax2.set_ylim(0, 1.05)
+    # Shade non-local events in the window
+    nl_in_window = win[win["non_local_event"] > 0]
+    for ev_in_win, g in nl_in_window.groupby("non_local_event"):
+        s = g.index.min() - t_start
+        e = g.index.max() - t_start
+        is_featured = ev_in_win == event_id
+        ax.axvspan(
+            s, e, color="#3b6ea5" if is_featured else "#cccccc",
+            alpha=0.4 if is_featured else 0.25,
+            zorder=0,
+        )
+    ax.text(
+        0.02, 0.95,
+        f"event {event_id}",
+        transform=ax.transAxes, fontsize=9, color="#3b6ea5", fontweight="bold",
+        va="top",
+    )
+
+    # ── (B) MAP estimate scatter colored by replay_arm ──
+    ax = ax_b
+    valid = win["replay_arm"].notna() & (win["non_local_event"] > 0)
+    colors = [ARM_COLORS[int(a)] for a in win.loc[valid, "replay_arm"]]
+    ax.scatter(
+        win_t[valid.values],
+        win.loc[valid, "map_estimate"].values,
+        c=colors,
+        s=4,
+        alpha=0.7,
+    )
+    # Faint scatter for non-event timebins
+    other = win["replay_arm"].notna() & (win["non_local_event"] == 0)
+    ax.scatter(
+        win_t[other.values],
+        win.loc[other, "map_estimate"].values,
+        c="lightgrey",
+        s=2,
+        alpha=0.3,
+    )
+    ax.axvspan(0, t_end - t_start, color="#3b6ea5", alpha=0.15, zorder=0)
+    ax.set_ylabel("MAP linear position (cm)")
+    ax.set_xlabel("time relative to event onset (s)")
+    ax.set_title(
+        "(B) MAP → arm  (map_estimate_to_arm)\n"
+        f"each non-local timebin assigned to one of 9 arms; "
+        f"animal physically on arm {track_seg}"
+    )
+
+    # ── (C) Per-timebin replay_arm sequence for the featured event ──
+    ax = ax_c
+    ev_t = (ev_rows.index.values - t_start)
+    ev_arms = ev_rows["replay_arm"].fillna(-1).astype(int).values
+    for arm in range(9):
+        mask = ev_arms == arm
+        ax.scatter(
+            ev_t[mask],
+            np.full(mask.sum(), arm),
+            color=ARM_COLORS[arm],
+            s=18,
+            marker="s",
+        )
+    ax.set_yticks(range(9))
+    ax.set_yticklabels([f"arm {a}" for a in range(9)])
+    ax.invert_yaxis()
+    ax.set_xlabel("time relative to event onset (s)")
+    ax.set_title(
+        f"(C) Per-timebin replay_arm — event {event_id} only\n"
+        f"{len(ev_rows)} timebins; this is what compute_arm_counts sums"
+    )
+    ax.axhline(track_seg, color="#444", ls=":", lw=0.8, alpha=0.5)
+    ax.text(
+        ev_t[-1],
+        track_seg + 0.4,
+        f"  ← animal physically here (arm {track_seg})",
+        fontsize=8,
+        color="#444",
+        va="center",
+    )
+
+    # ── (D) Per-arm count vector for the featured event ──
+    ax = ax_d
+    bars = ax.bar(
+        range(9),
+        counts.values,
+        color=[ARM_COLORS[a] for a in range(9)],
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    ax.set_xticks(range(9))
+    ax.set_xticklabels([f"arm {a}" for a in range(9)], rotation=0, fontsize=8)
+    ax.set_ylabel("arm_count")
+    ax.set_title(
+        f"(D) Per-event count vector — event {event_id}\n"
+        f"L_e = {int(counts.sum())} timebins; the multinomial sufficient statistic"
+    )
+    for b, v in zip(bars, counts.values, strict=True):
+        if v > 0:
+            ax.text(
+                b.get_x() + b.get_width() / 2,
+                v + 0.5,
+                f"{int(v)}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    # ── (E) Long-format mini-table for this event ──
+    ax = ax_e
+    ax.axis("off")
+    table_data = long_table.values
+    col_labels = long_table.columns.tolist()
+    table = ax.table(
+        cellText=table_data,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="center",
+        colColours=["#e8eef5"] * len(col_labels),
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.25)
+    # Color arm_id cells by arm color for visual link
+    for row in range(len(table_data)):
+        arm = int(table_data[row, 0])
+        cell = table[(row + 1, 0)]
+        cell.set_facecolor(ARM_COLORS[arm])
+        cell.set_text_props(color="white" if arm < 6 else "black", fontweight="bold")
+    ax.set_title(
+        f"(E) Long-format expansion — event {event_id} becomes 9 rows\n"
+        "this is the input row block to fit_conditional_poisson",
+        pad=12,
+    )
+
+    # ── (F) Population coefficient distribution across sessions ──
+    ax = ax_f
+    positions = np.arange(len(coef_long.columns))
+    # Clip view to a sensible range — a handful of sessions have
+    # degenerate fits with |β| > 5 driven by quasi-separation in small
+    # event sets; they distort the y-axis without conveying signal.
+    y_lo, y_hi = -2.5, 2.5
+    n_outliers = {
+        c: int(((coef_long[c] > y_hi) | (coef_long[c] < y_lo)).sum())
+        for c in coef_long.columns
+    }
+    clipped = coef_long.clip(lower=y_lo, upper=y_hi)
+    bp = ax.boxplot(
+        [clipped[c].dropna() for c in clipped.columns],
+        positions=positions,
+        widths=0.6,
+        patch_artist=True,
+        medianprops=dict(color="black", linewidth=1.5),
+        flierprops=dict(markersize=3, alpha=0.5),
+    )
+    for patch in bp["boxes"]:
+        patch.set_facecolor("#3b6ea5")
+        patch.set_alpha(0.6)
+    # Annotate medians
+    for i, c in enumerate(coef_long.columns):
+        med = float(coef_long[c].median())
+        ax.text(
+            i,
+            min(max(med, y_lo), y_hi) + 0.12,
+            f"{med:+.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontweight="bold",
+            color="#1a2433",
+        )
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(coef_long.columns, rotation=20, ha="right", fontsize=8)
+    ax.set_ylabel("coefficient (clipped to ±2.5)")
+    ax.set_ylim(y_lo, y_hi)
+    n_clipped_total = sum(n_outliers.values())
+    ax.set_title(
+        f"(F) Fitted coefficients — pooled across {len(m3_fits)} sessions  (M3)\n"
+        f"per-session ConditionalPoisson fits; {n_clipped_total} extreme outliers clipped"
+    )
+
+    fig.suptitle(
+        "Replay-content GLM pipeline — one event traced through every transformation",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for ext in ["png", "pdf"]:
+        fig.savefig(
+            output_dir / f"pipeline_data_flow.{ext}",
+            dpi=200 if ext == "png" else None,
+            bbox_inches="tight",
+        )
+    plt.close(fig)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--animal", default="chimi")
+    parser.add_argument("--day", type=int, default=20200213)
+    parser.add_argument("--epoch", default="02_r1")
+    parser.add_argument("--event-id", type=int, default=14)
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
+    )
+    args = parser.parse_args()
+
+    dot, env = load_session(args.animal, args.day, args.epoch)
+    long_count = pd.read_pickle(
+        Path("Processed-Data/replay_content/long_count.pkl")
+    )
+    events = pd.read_pickle(
+        Path("Processed-Data/replay_content/events.pkl")
+    )
+    m3_fits = pd.read_pickle(
+        Path("Processed-Data/replay_content/models/M3.pkl")
+    )
+
+    sess_mask = (
+        (long_count["animal"] == args.animal)
+        & (long_count["day"] == args.day)
+        & (long_count["epoch"] == args.epoch)
+    )
+    long_count = long_count[sess_mask]
+    events = events[
+        (events["animal"] == args.animal)
+        & (events["day"] == args.day)
+        & (events["epoch"] == args.epoch)
+    ]
+
+    make_figure(
+        dot=dot,
+        event_id=args.event_id,
+        long_count=long_count,
+        events=events,
+        m3_fits=m3_fits,
+        output_dir=args.output_dir,
+    )
+    print(f"Saved data-flow figure to {args.output_dir}/pipeline_data_flow.{{png,pdf}}")
+
+
+if __name__ == "__main__":
+    main()
