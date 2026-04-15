@@ -17,17 +17,26 @@ subsequent commits. Deferred columns are listed explicitly in
 
 Canonical column names follow the plan's Section 1. Intermediate
 columns added by ``_add_trial_context`` (``prev_well``,
-``current_well``, ``next_well``, ``last_reward_well``) use short
+``current_well``, ``next_well``, ``last_rewarded_well``) use short
 well-suffixed names; per-arm scalars in the canonical tables
 (``prev_arm``, ``current_arm``, ``next_arm``, ``last_rewarded_arm``)
 come from ``_single_arm_from_well(well_id, track_graph)``.
 
-The decoder writes two integer event-label columns into
-``data_over_time.pkl``: ``SWR_event`` and ``MUA_event``. These carry
-more information than the booleans derived from them (``is_swr`` =
-``SWR_event > 0``; same for MUA) and are consumed by ``quality_metrics``
-and ``event_analysis`` via groupby-by-ripple aggregation. They are
-intentionally exempt from the Phase B canonical rename.
+Three symbols are intentionally exempt from the Phase B canonical
+rename's grep-zero rule:
+
+- ``SWR_event`` and ``MUA_event`` — integer event-label columns
+  written into ``data_over_time.pkl`` by the decoder. They carry
+  more information than the booleans derived from them (``is_swr`` =
+  ``SWR_event > 0``; same for MUA) and are consumed by
+  ``quality_metrics`` / ``event_analysis`` via groupby-by-ripple
+  aggregation. Renaming would force a decoder re-run across all
+  session pickles.
+- ``last_rewarded_well`` — the intermediate column written by
+  ``_add_trial_context``. Kept in symmetry with the canonical
+  output scalar ``last_rewarded_arm`` so the well↔arm pairing
+  (``prev_well``/``prev_arm``, ``current_well``/``current_arm``,
+  etc.) reads consistently.
 """
 
 from __future__ import annotations
@@ -85,7 +94,7 @@ def _add_trial_context(
     -------------
     - ``prev_well``, ``current_well``
     - ``next_well``
-    - ``last_reward_well``
+    - ``last_rewarded_well``
     - ``is_after_switch`` — current trip's ``is_patch_change``
     - ``is_after_omission`` — ``~current trip's is_reward``
     - ``is_after_reward`` — current trip's ``is_reward``
@@ -113,7 +122,7 @@ def _add_trial_context(
             "prev_well",
             "current_well",
             "next_well",
-            "last_reward_well",
+            "last_rewarded_well",
             "reward_outcome",
             "is_after_reward",
             "is_after_omission",
@@ -152,11 +161,11 @@ def _add_trial_context(
     if len(rewarded_end_times) > 0:
         rew_idx = np.searchsorted(rewarded_end_times, dot_times, side="right") - 1
         rew_idx_clipped = np.clip(rew_idx, 0, None)
-        dot["last_reward_well"] = np.where(
+        dot["last_rewarded_well"] = np.where(
             rew_idx >= 0, rewarded_wells[rew_idx_clipped], np.nan
         )
     else:
-        dot["last_reward_well"] = np.nan
+        dot["last_rewarded_well"] = np.nan
 
     current_reward = np.where(
         valid, is_reward[current_clipped].astype(float), np.nan
@@ -537,7 +546,7 @@ def build_event_table(
             _safe_first(g["next_well"]), track_graph
         )
         last_rewarded_arm = _single_arm_from_well(
-            _safe_first(g["last_reward_well"]), track_graph
+            _safe_first(g["last_rewarded_well"]), track_graph
         )
 
         is_after_switch = _safe_first(g["is_after_switch"])
@@ -941,7 +950,7 @@ def build_stop_table(
             _safe_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = _single_arm_from_well(
-            _safe_first(g["last_reward_well"]), track_graph
+            _safe_first(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals
