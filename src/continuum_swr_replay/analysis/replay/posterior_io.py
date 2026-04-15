@@ -40,7 +40,16 @@ def load_conditional_posterior(results_path: str | Path) -> xr.DataArray:
     Notes
     -----
     Uses the ``h5netcdf`` engine to match how the file was written. The
-    returned DataArray is lazy-loaded if the file is chunked; call
+    stored ``acausal_posterior`` has dims ``(time, state_bins)`` with
+    ``state`` / ``position`` as **non-index** coordinates on
+    ``state_bins`` — a side effect of the netCDF round-trip. Before
+    calling :func:`get_conditional_non_local_posterior`, we rebuild the
+    ``state_bins`` multi-index over those coords so
+    ``posterior.sel(state="Non-Local Continuous")`` resolves. This
+    mirrors the same fix in
+    :func:`analysis.hippocampus.result_loading.load_results`.
+
+    The returned DataArray is lazy-loaded if the file is chunked; call
     ``.load()`` on the caller side if eager materialization is desired.
     """
     # Import lazily to avoid a circular dependency at module import time:
@@ -50,4 +59,6 @@ def load_conditional_posterior(results_path: str | Path) -> xr.DataArray:
     )
 
     results = xr.open_dataset(Path(results_path), engine="h5netcdf")
+    state_bin_coord_names = list(results["state_bins"].coords)
+    results = results.set_index(state_bins=state_bin_coord_names)
     return get_conditional_non_local_posterior(results)
