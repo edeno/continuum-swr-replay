@@ -33,9 +33,13 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from .spatial import arm_dist_rank, dist_to_arm_from_well
 from .spatial_mapping import arm_to_well, map_estimate_to_arm, well_to_arm_set
 from .summaries import (
+    arm_count_hard,
+    arm_count_soft,
     arm_map_from_posterior,
+    arm_posterior_mass,
     n_nonlocal_bins,
     nonlocal_weight_sum,
     posterior_mass_total,
@@ -920,6 +924,215 @@ def build_stop_table(
     return per_bout[column_order]
 
 
+def build_event_arm_table(
+    event_table: pd.DataFrame,
+    dot: pd.DataFrame,
+    env,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    *,
+    conditional_posterior=None,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> pd.DataFrame:
+    """Plan Section 2.2: one row per (event, arm) — nine rows per event.
+
+    Assumes ``event_table`` was produced by :func:`build_event_table`
+    on the same ``dot`` / ``trials`` / ``track_graph``. Broadcasts
+    event-level fields (including ``stop_id``, context flags, and
+    event-level posterior columns) across arms and augments each
+    (event, arm) row with the three arm-count responses, the binary
+    arm indicators, spatial and reward predictors, and the interaction
+    terms from plan §1.7.
+
+    ``nominal_reward_prob`` is emitted as NaN — it requires the
+    contingency-block loader that Phase B intentionally defers.
+
+    Parameters
+    ----------
+    event_table : pd.DataFrame
+        Output of :func:`build_event_table`.
+    dot, env, trials, track_graph
+        Same as :func:`build_event_table`. ``env`` is needed for
+        ``map_estimate_to_arm`` and, when ``conditional_posterior`` is
+        passed, for the ``place_bin_centers_nodes_df_`` edge_id vector.
+    conditional_posterior : xr.DataArray, optional
+        When supplied, the ``arm_posterior_mass`` column is populated
+        via :func:`summaries.arm_posterior_mass`; otherwise it is NaN.
+    speed_threshold, nonlocal_threshold : float
+        Kept in lockstep with :func:`build_event_table`. Any drift
+        would invalidate the ``event_id`` join.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: see :func:`_event_arm_table_columns`. Empty (correct
+        schema) if ``event_table`` is empty.
+    """
+    column_order = _event_arm_table_columns()
+    if len(event_table) == 0:
+        return pd.DataFrame(columns=column_order)
+
+    n_arms = len(ALL_ARMS)
+    n_events = len(event_table)
+
+    dot = _prepare_dot(dot, env)
+    in_event = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
+    nl = dot.loc[in_event]
+
+    # Arm-count responses via the shared helpers. Junction bins (NaN
+    # ``replay_arm``) are excluded from the MAP-arm counts — they can
+    # still contribute to the posterior-mass response via
+    # :func:`posterior_to_arm_marginal`, which zeroes junction bins
+    # and renormalizes per timebin.
+    arm_series = nl["replay_arm"]
+    real_mask = arm_series.isin(ALL_ARMS).to_numpy()
+    arm_map_real = arm_series.to_numpy()[real_mask].astype(np.int64)
+    event_id_real = nl["non_local_event"].to_numpy()[real_mask]
+    nonlocal_prob_real = nl["nonlocal_prob"].to_numpy()[real_mask]
+    nonlocal_prob_all = nl["nonlocal_prob"].to_numpy()
+    event_id_all = nl["non_local_event"].to_numpy()
+
+    ids_real, counts_hard = arm_count_hard(
+        nonlocal_prob_real, arm_map_real, event_id_real, n_arms=n_arms, threshold=0.0
+    )
+    _, counts_soft = arm_count_soft(
+        nonlocal_prob_real, arm_map_real, event_id_real, n_arms=n_arms
+    )
+
+    # Align count matrices with event_table's event order. ``ids_real``
+    # comes from np.unique (sorted), so missing events (those whose
+    # every in-event timebin was on a junction bin — extremely rare)
+    # need zero rows filled in.
+    ev_ids = event_table["non_local_event"].to_numpy().astype(np.int64)
+    hard_aligned = _align_count_matrix(counts_hard, ids_real, ev_ids, n_arms)
+    soft_aligned = _align_count_matrix(counts_soft, ids_real, ev_ids, n_arms)
+
+    if conditional_posterior is not None:
+        edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
+        post_vals = _align_posterior_to_dot(conditional_posterior, dot)
+        post_in_event = post_vals[in_event.to_numpy()]
+        arm_posterior = posterior_to_arm_marginal(
+            post_in_event, edge_id, n_arms=n_arms
+        )
+        ids_all, mass = arm_posterior_mass(
+            nonlocal_prob_all, arm_posterior, event_id_all
+        )
+        mass_aligned = _align_count_matrix(mass, ids_all, ev_ids, n_arms)
+    else:
+        mass_aligned = np.full((n_events, n_arms), np.nan)
+
+    # Broadcast event-level fields to 9-per-event, then attach per-arm
+    # columns. ``np.repeat`` on the numpy representation avoids copying
+    # the whole frame's index repeatedly.
+    long = event_table.loc[event_table.index.repeat(n_arms)].reset_index(drop=True)
+    long["arm"] = np.tile(ALL_ARMS, n_events)
+    long["arm_count_hard"] = hard_aligned.flatten()
+    long["arm_count_soft"] = soft_aligned.flatten()
+    long["arm_posterior_mass"] = mass_aligned.flatten()
+
+    # arm_fraction: defined only when n_nonlocal_bins > 0.
+    n_bins_long = long["n_nonlocal_bins"].to_numpy()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        frac = np.where(
+            n_bins_long > 0,
+            long["arm_count_hard"].to_numpy() / np.maximum(n_bins_long, 1),
+            np.nan,
+        )
+    long["arm_fraction"] = frac
+
+    # Binary indicators: scalar equality against event-level arm cols.
+    # On real bandit graph each well has degree 1 so is_prev / is_next
+    # / is_last_rewarded are 1 on exactly one arm per event. If a
+    # reference arm is NaN (session boundary, no last-rewarded, etc.),
+    # the indicator is 0 for every arm of that event.
+    arm_arr = long["arm"].to_numpy()
+    long["is_current"] = _eq_indicator(arm_arr, long["current_arm"].to_numpy())
+    long["is_prev"] = _eq_indicator(arm_arr, long["prev_arm"].to_numpy())
+    long["is_next"] = _eq_indicator(arm_arr, long["next_arm"].to_numpy())
+    long["is_last_rewarded"] = _eq_indicator(
+        arm_arr, long["last_rewarded_arm"].to_numpy()
+    )
+    long["arm_patch_id"] = np.array([_arm_to_patch(a) for a in arm_arr])
+    long["is_same_patch"] = _eq_indicator(
+        long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
+    )
+
+    # Per-event per-arm predictors: dist_to_arm, arm_dist_rank,
+    # visit_recency, cumulative_reward, recent_reward_rate. Iterate
+    # events (cost = n_events × n_arms × trials — dominated by the
+    # trials scan; still acceptable at project scale).
+    dist_vals = np.full(n_events * n_arms, np.nan)
+    rank_vals = np.full(n_events * n_arms, np.nan)
+    vr_vals = np.full(n_events * n_arms, np.nan)
+    cr_vals = np.full(n_events * n_arms, np.nan)
+    rrr_vals = np.full(n_events * n_arms, np.nan)
+
+    for i, ev_row in event_table.iterrows():
+        base = i * n_arms
+        current_arm_val = ev_row["current_arm"]
+        current_well = (
+            arm_to_well(current_arm_val, track_graph)
+            if not np.isnan(current_arm_val)
+            else np.nan
+        )
+        dists = dist_to_arm_from_well(current_well, track_graph)
+        dist_arr = np.array([dists[a] for a in ALL_ARMS])
+        ranks = arm_dist_rank(dist_arr)
+
+        event_time = ev_row["event_midpoint_time"]
+        if np.isnan(event_time) or len(trials) == 0:
+            vr = dict.fromkeys(ALL_ARMS, np.nan)
+            cr = dict.fromkeys(ALL_ARMS, np.nan)
+            rrr = dict.fromkeys(ALL_ARMS, np.nan)
+        else:
+            vr = _visit_recency_per_arm(event_time, trials, track_graph)
+            cr = _cumulative_reward_per_arm(event_time, trials, track_graph)
+            rrr = _recent_reward_rate_per_arm(event_time, trials, track_graph)
+
+        for j, a in enumerate(ALL_ARMS):
+            idx = base + j
+            dist_vals[idx] = dist_arr[j]
+            rank_vals[idx] = ranks[j]
+            vr_vals[idx] = vr[a]
+            cr_vals[idx] = cr[a]
+            rrr_vals[idx] = rrr[a]
+
+    long["dist_to_arm"] = dist_vals
+    long["arm_dist_rank"] = rank_vals
+    long["visit_recency"] = vr_vals
+    long["cumulative_reward"] = cr_vals
+    long["recent_reward_rate"] = rrr_vals
+    long["nominal_reward_prob"] = np.nan  # deferred; requires block loader
+
+    # Interactions (plan §1.7). Event-level × arm-level products.
+    tss = long["time_since_stop"].to_numpy()
+    is_swr_i = long["is_swr"].astype(int).to_numpy()
+    is_mua_i = long["is_mua"].astype(int).to_numpy()
+    is_after_switch = long["is_after_switch"].to_numpy()
+    is_after_omission = long["is_after_omission"].to_numpy()
+    ic = long["is_current"].to_numpy()
+    ip = long["is_prev"].to_numpy()
+    inx = long["is_next"].to_numpy()
+    ilr = long["is_last_rewarded"].to_numpy()
+
+    long["time_x_current"] = tss * ic
+    long["time_x_prev"] = tss * ip
+    long["time_x_next"] = tss * inx
+    long["swr_x_current"] = is_swr_i * ic
+    long["swr_x_prev"] = is_swr_i * ip
+    long["swr_x_next"] = is_swr_i * inx
+    long["swr_x_last_rewarded"] = is_swr_i * ilr
+    long["mua_x_current"] = is_mua_i * ic
+    long["mua_x_prev"] = is_mua_i * ip
+    long["mua_x_next"] = is_mua_i * inx
+    long["switch_x_current"] = is_after_switch * ic
+    long["switch_x_prev"] = is_after_switch * ip
+    long["omission_x_last_rewarded"] = is_after_omission * ilr
+
+    return long[column_order]
+
+
 # ── Helpers ──
 
 
@@ -968,6 +1181,134 @@ def _hash_stop_id(
         }
     )
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+
+
+def _align_count_matrix(
+    counts: np.ndarray,
+    ids_sorted: np.ndarray,
+    target_ids: np.ndarray,
+    n_arms: int,
+) -> np.ndarray:
+    """Reindex a ``(n_events_src, n_arms)`` count matrix to ``target_ids``.
+
+    Missing source events (e.g., every in-event timebin on a junction
+    bin) fill as zeros (appropriate for count responses) or NaN (for
+    posterior-mass). Callers pass a float/int matrix and the fill is
+    inferred from the dtype.
+    """
+    mapping = {int(i): k for k, i in enumerate(ids_sorted)}
+    fill = np.nan if np.issubdtype(counts.dtype, np.floating) else 0
+    out = np.full((target_ids.size, n_arms), fill, dtype=counts.dtype)
+    for k, tid in enumerate(target_ids):
+        src_idx = mapping.get(int(tid))
+        if src_idx is not None:
+            out[k] = counts[src_idx]
+    return out
+
+
+def _eq_indicator(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Elementwise ``int(values == reference)`` with NaN-in-reference = 0."""
+    values = np.asarray(values, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    out = (values == reference).astype(int)
+    out[np.isnan(reference)] = 0
+    return out
+
+
+def _visit_recency_per_arm(
+    event_time: float,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    n_default: int | None = None,
+) -> dict[int, float]:
+    """Trials since each arm was last visited (port of legacy helper).
+
+    Direct port of ``predictors.compute_visit_recency_for_event``.
+    ``n_default = n_trials + 1`` for arms never visited.
+    """
+    n_trials = len(trials)
+    if n_default is None:
+        n_default = n_trials + 1
+    past = trials[trials["end_time"] <= event_time]
+    result = {arm: float(n_default) for arm in ALL_ARMS}
+    for trial_offset, trial in enumerate(reversed(list(past.itertuples()))):
+        trials_ago = trial_offset + 1
+        for well_col in ("to_well", "from_well"):
+            well_id = getattr(trial, well_col)
+            if np.isnan(well_id):
+                continue
+            arms = well_to_arm_set(well_id, track_graph)
+            for arm in arms:
+                if result[arm] == float(n_default):
+                    result[arm] = float(trials_ago)
+        if all(v != float(n_default) for v in result.values()):
+            break
+    return result
+
+
+def _cumulative_reward_per_arm(
+    event_time: float,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    window: int = 10,
+) -> dict[int, float]:
+    """Reward count at each arm over the last ``window`` trials.
+
+    Port of ``predictors.compute_cumulative_reward_for_event``.
+    """
+    past = trials[trials["end_time"] <= event_time].tail(window)
+    result = dict.fromkeys(ALL_ARMS, 0.0)
+    for trial in past.itertuples():
+        if not trial.is_reward:
+            continue
+        well_id = trial.to_well
+        if np.isnan(well_id):
+            continue
+        arms = well_to_arm_set(well_id, track_graph)
+        for arm in arms:
+            result[arm] += 1.0
+    return result
+
+
+def _recent_reward_rate_per_arm(
+    event_time: float,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    k: int = 5,
+) -> dict[int, float]:
+    """Fraction of the last ``k`` visits to each arm that were rewarded.
+
+    New (not in legacy). A "visit to arm *a*" is a completed trial
+    whose ``to_well`` touches arm *a*. Rate = fraction of the last
+    *k* such trials that were rewarded. Returns ``NaN`` for arms with
+    no past visits.
+    """
+    past = trials[trials["end_time"] <= event_time]
+    if len(past) == 0:
+        return dict.fromkeys(ALL_ARMS, np.nan)
+
+    to_wells = past["to_well"].to_numpy()
+    rewards = past["is_reward"].to_numpy()
+
+    result: dict[int, float] = {}
+    for arm in ALL_ARMS:
+        # Cache-friendly per-trial check: is the arm adjacent to
+        # to_well? Computing well_to_arm_set each row is cheap on this
+        # graph (9 edges) but cached nevertheless via the inner loop.
+        matches = np.array(
+            [
+                (not np.isnan(w)) and (arm in well_to_arm_set(w, track_graph))
+                for w in to_wells
+            ],
+            dtype=bool,
+        )
+        arm_rewards = rewards[matches][-k:]
+        result[arm] = (
+            float(np.asarray(arm_rewards, dtype=float).mean())
+            if arm_rewards.size > 0
+            else np.nan
+        )
+    return result
 
 
 def _assign_bout(
@@ -1065,6 +1406,76 @@ def _stop_table_columns() -> list[str]:
         "current_patch",
         "prev_patch",
         "next_patch",
+    ]
+
+
+def _event_arm_table_columns() -> list[str]:
+    """Canonical column order for ``event_arm_table``."""
+    return [
+        # Identifiers (broadcast from event_table)
+        "animal",
+        "day",
+        "epoch",
+        "non_local_event",
+        "event_id",
+        "stop_idx",
+        "stop_id",
+        # Event-level context (broadcast)
+        "event_start",
+        "event_end",
+        "event_duration",
+        "time_since_stop",
+        "is_swr",
+        "is_mua",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
+        "n_nonlocal_bins",
+        # Per-arm identity
+        "arm",
+        "arm_patch_id",
+        # Content responses
+        "arm_count_hard",
+        "arm_count_soft",
+        "arm_posterior_mass",
+        "arm_fraction",
+        # Binary indicators
+        "is_current",
+        "is_prev",
+        "is_next",
+        "is_last_rewarded",
+        "is_same_patch",
+        # Spatial
+        "dist_to_arm",
+        "arm_dist_rank",
+        # Reward / value
+        "visit_recency",
+        "cumulative_reward",
+        "recent_reward_rate",
+        "nominal_reward_prob",
+        # Interactions (plan §1.7)
+        "time_x_current",
+        "time_x_prev",
+        "time_x_next",
+        "swr_x_current",
+        "swr_x_prev",
+        "swr_x_next",
+        "swr_x_last_rewarded",
+        "mua_x_current",
+        "mua_x_prev",
+        "mua_x_next",
+        "switch_x_current",
+        "switch_x_prev",
+        "omission_x_last_rewarded",
     ]
 
 

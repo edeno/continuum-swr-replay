@@ -8,10 +8,16 @@ produces non-local events on a graph of arms.
 """
 
 from .spatial import arm_dist_rank, dist_to_arm_from_well
-from .tables import build_event_sequence_table, build_event_table, build_stop_table
+from .tables import (
+    build_event_arm_table,
+    build_event_sequence_table,
+    build_event_table,
+    build_stop_table,
+)
 
 __all__ = [
     "arm_dist_rank",
+    "build_event_arm_table",
     "build_event_sequence_table",
     "build_event_table",
     "build_stop_table",
