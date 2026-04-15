@@ -176,6 +176,18 @@ def main():
     sessions = find_sessions(max_per_animal=max_per_animal)
     logging.info("Found %d sessions", len(sessions))
 
+    # Warn if the output directory still holds artifacts from the
+    # legacy pipeline — silent coexistence lets downstream scripts
+    # accidentally read stale pickles.
+    for legacy_name in ("events.pkl", "long_count.pkl", "long_binary.pkl"):
+        legacy_path = OUTPUT_DIR / legacy_name
+        if legacy_path.exists():
+            logging.warning(
+                "legacy output %s still present — delete it to avoid "
+                "stale reads downstream",
+                legacy_path,
+            )
+
     t0 = time.time()
     all_event_tables: list[pd.DataFrame] = []
     all_event_arm_tables: list[pd.DataFrame] = []
@@ -188,7 +200,12 @@ def main():
 
         try:
             result = _process_session(session)
-        except Exception as e:  # noqa: BLE001 - best-effort; log and continue
+        except (FileNotFoundError, OSError, ValueError) as e:
+            # Skip-and-continue is only appropriate for data-gap
+            # errors (missing file, corrupt input, unexpected shape).
+            # ``KeyError`` / ``AttributeError`` / ``AssertionError``
+            # are propagated — they indicate a code bug and silent
+            # skips would hide the regression across the run.
             logging.warning("skip %s %s: %s", nwb, epoch, e)
             continue
 
@@ -234,6 +251,26 @@ def main():
         event_table_all.groupby(session_cols).ngroups,
     )
 
+    # Cross-table invariant gate — run BEFORE saving, not after. A
+    # failed check means the concatenated frames disagree across
+    # tables; persisting them would publish an inconsistent dataset
+    # to downstream consumers. The full invariant sweep runs in
+    # tests/unit/test_replay_tables.py; this is a cheap end-to-end
+    # guard for the concat path.
+    sum_n_events = int(stop_table_all["n_events"].sum())
+    if sum_n_events != len(event_table_all):
+        logging.error(
+            "cross-table drift: Σ stop_table.n_events = %d, "
+            "len(event_table) = %d — refusing to write output",
+            sum_n_events,
+            len(event_table_all),
+        )
+        return
+    logging.info(
+        "cross-table invariant OK: Σ n_events == len(event_table) == %d",
+        len(event_table_all),
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, frame in (
         ("event_table", event_table_all),
@@ -249,21 +286,6 @@ def main():
         logging.info("saved %s → %s (%d rows)", name, path, len(frame))
 
     logging.info("total time: %ds", int(time.time() - t0))
-
-    # Minimal sanity output — full invariant checks live in the unit
-    # test suite; this only guards against obvious shape regressions.
-    sum_n_events = int(stop_table_all["n_events"].sum())
-    if sum_n_events != len(event_table_all):
-        logging.warning(
-            "cross-table drift: Σ stop_table.n_events = %d, len(event_table) = %d",
-            sum_n_events,
-            len(event_table_all),
-        )
-    else:
-        logging.info(
-            "cross-table invariant OK: Σ n_events == len(event_table) == %d",
-            len(event_table_all),
-        )
 
 
 if __name__ == "__main__":
