@@ -15,10 +15,19 @@ posterior-dependent columns, MUA wiring, and invariant tests come in
 subsequent commits. Deferred columns are listed explicitly in
 ``build_event_table``'s docstring.
 
-Canonical column names follow the plan's Section 1; the legacy names
-(``non_local_event`` alongside ``event_id``, ``is_swr_flag``, ``replay_arm``,
-``prev_trial_from_well`` etc.) still appear in other modules but are
-slated for rename in a later Phase B commit.
+Canonical column names follow the plan's Section 1. Intermediate
+columns added by ``_add_trial_context`` (``prev_well``,
+``current_well``, ``next_well``, ``last_reward_well``) use short
+well-suffixed names; per-arm scalars in the canonical tables
+(``prev_arm``, ``current_arm``, ``next_arm``, ``last_rewarded_arm``)
+come from ``_single_arm_from_well(well_id, track_graph)``.
+
+The decoder writes two integer event-label columns into
+``data_over_time.pkl``: ``SWR_event`` and ``MUA_event``. These carry
+more information than the booleans derived from them (``is_swr`` =
+``SWR_event > 0``; same for MUA) and are consumed by ``quality_metrics``
+and ``event_analysis`` via groupby-by-ripple aggregation. They are
+intentionally exempt from the Phase B canonical rename.
 """
 
 from __future__ import annotations
@@ -74,9 +83,9 @@ def _add_trial_context(
 
     Columns added
     -------------
-    - ``prev_trial_from_well``, ``prev_trial_to_well``
-    - ``next_trial_to_well``
-    - ``last_rewarded_well``
+    - ``prev_well``, ``current_well``
+    - ``next_well``
+    - ``last_reward_well``
     - ``is_after_switch`` — current trip's ``is_patch_change``
     - ``is_after_omission`` — ``~current trip's is_reward``
     - ``is_after_reward`` — current trip's ``is_reward``
@@ -101,10 +110,10 @@ def _add_trial_context(
     # or for unit-test fixtures that stub trial context out entirely).
     if n_trials == 0:
         for col in (
-            "prev_trial_from_well",
-            "prev_trial_to_well",
-            "next_trial_to_well",
-            "last_rewarded_well",
+            "prev_well",
+            "current_well",
+            "next_well",
+            "last_reward_well",
             "reward_outcome",
             "is_after_reward",
             "is_after_omission",
@@ -128,13 +137,13 @@ def _add_trial_context(
     next_valid = valid & (next_idx < n_trials)
     next_clipped = np.clip(next_idx, 0, n_trials - 1)
 
-    dot["prev_trial_from_well"] = np.where(
+    dot["prev_well"] = np.where(
         valid, from_wells[current_clipped], np.nan
     )
-    dot["prev_trial_to_well"] = np.where(
+    dot["current_well"] = np.where(
         valid, to_wells[current_clipped], np.nan
     )
-    dot["next_trial_to_well"] = np.where(
+    dot["next_well"] = np.where(
         next_valid, to_wells[next_clipped], np.nan
     )
 
@@ -143,11 +152,11 @@ def _add_trial_context(
     if len(rewarded_end_times) > 0:
         rew_idx = np.searchsorted(rewarded_end_times, dot_times, side="right") - 1
         rew_idx_clipped = np.clip(rew_idx, 0, None)
-        dot["last_rewarded_well"] = np.where(
+        dot["last_reward_well"] = np.where(
             rew_idx >= 0, rewarded_wells[rew_idx_clipped], np.nan
         )
     else:
-        dot["last_rewarded_well"] = np.nan
+        dot["last_reward_well"] = np.nan
 
     current_reward = np.where(
         valid, is_reward[current_clipped].astype(float), np.nan
@@ -265,15 +274,15 @@ def _arm_to_patch(arm: float) -> float:
 
 
 def _prepare_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
-    """Return a copy of ``dot`` annotated with ``replay_arm`` and ``nonlocal_prob``.
+    """Return a copy of ``dot`` annotated with ``decoded_arm`` and ``nonlocal_prob``.
 
-    ``replay_arm`` comes from :func:`map_estimate_to_arm` (junction bins
+    ``decoded_arm`` comes from :func:`map_estimate_to_arm` (junction bins
     excluded). ``nonlocal_prob`` is the sum of the two non-local state
     posteriors — this is the ``w_t`` that drives event filtering and
     per-event weight sums.
     """
     dot = dot.copy()
-    dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
+    dot["decoded_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
     dot["nonlocal_prob"] = (
         dot["Non-Local_Continuous_prob"].to_numpy()
         + dot["Non-Local_Fragmented_prob"].to_numpy()
@@ -436,10 +445,10 @@ def build_event_table(
     ``non_local_event`` under the same ``event_id``; callers that need
     paranoia can group on the tuple instead.
 
-    ``current_arm`` is the modal ``replay_arm`` of the animal's physical
+    ``current_arm`` is the modal ``decoded_arm`` of the animal's physical
     position during the event (from the decoder's map estimate on
     ``head_position``-derived track-segment labeling). Falls back to
-    ``well_to_arm_set(prev_trial_to_well)`` when the modal position
+    ``well_to_arm_set(current_well)`` when the modal position
     lands on a trunk arm — matches the pre-refactor semantic in
     ``data_preparation._add_per_arm_predictors_single_session``.
     """
@@ -495,7 +504,7 @@ def build_event_table(
 
     for ev_id, g in groups:
         times = g.index.to_numpy()
-        arm_series = g["replay_arm"]
+        arm_series = g["decoded_arm"]
         real_arm_mask = arm_series.isin(ALL_ARMS)
         arms_real = arm_series[real_arm_mask]
         n_junction = int((~real_arm_mask).sum())
@@ -506,7 +515,7 @@ def build_event_table(
         # arms (6/7/8 in the bandit graph) because they connect two
         # junctions and no well, which is the same condition the legacy
         # ``_add_per_arm_predictors_single_session`` uses to trigger the
-        # ``prev_trial_to_well`` fallback. Driving the check off the
+        # ``current_well`` fallback. Driving the check off the
         # graph — rather than hard-coding {0..5} — keeps the fallback
         # correct on any track graph.
         ts = g["track_segment_id"] if "track_segment_id" in g.columns else pd.Series(dtype=float)
@@ -518,17 +527,17 @@ def build_event_table(
                 current_arm = float(ts_modal)
         if np.isnan(current_arm):
             current_arm = _single_arm_from_well(
-                _safe_first(g["prev_trial_to_well"]), track_graph
+                _safe_first(g["current_well"]), track_graph
             )
 
         prev_arm = _single_arm_from_well(
-            _safe_first(g["prev_trial_from_well"]), track_graph
+            _safe_first(g["prev_well"]), track_graph
         )
         next_arm = _single_arm_from_well(
-            _safe_first(g["next_trial_to_well"]), track_graph
+            _safe_first(g["next_well"]), track_graph
         )
         last_rewarded_arm = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _safe_first(g["last_reward_well"]), track_graph
         )
 
         is_after_switch = _safe_first(g["is_after_switch"])
@@ -922,17 +931,17 @@ def build_stop_table(
                 ca = float(ts_modal)
         if np.isnan(ca):
             ca = _single_arm_from_well(
-                _safe_first(g["prev_trial_to_well"]), track_graph
+                _safe_first(g["current_well"]), track_graph
             )
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["prev_trial_from_well"]), track_graph
+            _safe_first(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["next_trial_to_well"]), track_graph
+            _safe_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _safe_first(g["last_reward_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals
@@ -1010,11 +1019,11 @@ def build_event_arm_table(
     nl = dot.loc[in_event]
 
     # Arm-count responses via the shared helpers. Junction bins (NaN
-    # ``replay_arm``) are excluded from the MAP-arm counts — they can
+    # ``decoded_arm``) are excluded from the MAP-arm counts — they can
     # still contribute to the posterior-mass response via
     # :func:`posterior_to_arm_marginal`, which zeroes junction bins
     # and renormalizes per timebin.
-    arm_series = nl["replay_arm"]
+    arm_series = nl["decoded_arm"]
     real_mask = arm_series.isin(ALL_ARMS).to_numpy()
     arm_map_real = arm_series.to_numpy()[real_mask].astype(np.int64)
     event_id_real = nl["non_local_event"].to_numpy()[real_mask]
