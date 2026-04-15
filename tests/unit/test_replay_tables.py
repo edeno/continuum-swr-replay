@@ -163,6 +163,51 @@ def tiny_session_with_posterior(tiny_session):
 # ── Regression tests ──
 
 
+def test_trunk_arm_triggers_current_well_fallback():
+    """Trunk-arm events must route through the ``current_well`` fallback.
+
+    Regression coverage for the refactored trunk fallback: when the
+    modal ``track_segment_id`` is a trunk arm (6/7/8 — no well
+    attached), ``build_event_table`` must re-derive ``current_arm`` by
+    reading the renamed intermediate column ``current_well`` (was
+    ``prev_trial_to_well`` before Phase B4). A misspelling of that
+    column name would silently produce ``current_arm = NaN`` for every
+    trunk event; a real crash would instead surface as ``KeyError``.
+    """
+    dot = _tiny_dot_with_two_events()
+    # Force both events onto trunk arm 7 (patch junction 7 ↔ center 9).
+    for sl in (slice(20, 30), slice(60, 70)):
+        rows = dot.index[sl]
+        dot.loc[rows, "track_segment_id"] = 7
+
+    # Stub trials with a single trip that ended at well 3 (adjacent to
+    # leaf arm 3). Both events should see ``current_well = 3`` via
+    # trial context and therefore ``current_arm = 3`` via the fallback.
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0],
+            "end_time": [1.0],
+            "from_well": [0],
+            "to_well": [3],
+            "from_patch": [1],
+            "to_patch": [2],
+            "is_reward": [True],
+            "is_patch_change": [True],
+        }
+    )
+    env = _EnvStub()
+    graph = _bandit_graph()
+
+    et = build_event_table(dot, env, trials, graph)
+    assert len(et) == 2
+    # Both events should hit the fallback — track_segment_id == 7 is a
+    # trunk arm, so arm_to_well returns NaN and current_arm is
+    # re-derived from current_well (= 3) via _single_arm_from_well.
+    assert (et["current_arm"] == 3).all(), (
+        f"trunk-arm fallback failed — got {et['current_arm'].tolist()}"
+    )
+
+
 def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
     """``build_event_arm_table`` must tolerate any index on ``event_table``.
 
