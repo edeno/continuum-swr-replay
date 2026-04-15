@@ -85,12 +85,23 @@ from .event_analysis import (
     get_immobile_events,
 )
 from .event_detection import get_confident_times, get_overlap_times
+from .hpc_raw_stats import (
+    DISCRETE_STATE_ORDER,
+    RAW_STAT_COLUMNS,
+    TRANSITION_MATRIX_COLUMNS,
+    apply_raw_stats_flags,
+    check_transition_matrix_flags,
+    compute_hpc_raw_stats_single,
+    extract_discrete_transition_matrix,
+)
 from .posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_speed,
     get_posterior_stats,
 )
 from .quality_metrics import (
+    compute_behavior_state_breakdown,
+    compute_bout_nonlocal_dominance,
     compute_calibration_curve,
     compute_error_by_track_segment,
     compute_local_decoding_error,
@@ -98,6 +109,7 @@ from .quality_metrics import (
     compute_no_spike_firing_correspondence,
     compute_non_local_during_movement,
     compute_non_local_event_context,
+    compute_running_error_tail,
     compute_session_quality_summary,
     compute_state_fraction_during_movement,
 )
@@ -118,6 +130,8 @@ __all__ = [
     "get_data_over_time",
     "load_data_over_time",
     "get_event_types",
+    "compute_behavior_state_breakdown",
+    "compute_bout_nonlocal_dominance",
     "compute_calibration_curve",
     "compute_error_by_track_segment",
     "compute_local_decoding_error",
@@ -125,6 +139,14 @@ __all__ = [
     "compute_no_spike_firing_correspondence",
     "compute_non_local_during_movement",
     "compute_non_local_event_context",
+    "compute_running_error_tail",
     "compute_session_quality_summary",
     "compute_state_fraction_during_movement",
+    "DISCRETE_STATE_ORDER",
+    "RAW_STAT_COLUMNS",
+    "TRANSITION_MATRIX_COLUMNS",
+    "apply_raw_stats_flags",
+    "check_transition_matrix_flags",
+    "compute_hpc_raw_stats_single",
+    "extract_discrete_transition_matrix",
 ]

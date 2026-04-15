@@ -28,6 +28,15 @@ compute_state_fraction_during_movement
     Fraction of movement time in each decoder state.
 compute_non_local_during_movement
     Rate and duration of non-local events during movement.
+compute_behavior_state_breakdown
+    Per-session running vs. immobile time split and decoder state fractions
+    during immobility.
+compute_bout_nonlocal_dominance
+    Per-session fraction of running bouts dominated by non-local state.
+    Catches localized decoder failures hidden by session-level means.
+compute_running_error_tail
+    Per-session tail percentiles of decoding error during running (local
+    state only). Catches catastrophic episodic errors hidden by the median.
 compute_error_by_track_segment
     Decoding error broken down by track segment.
 compute_no_spike_firing_correspondence
@@ -291,6 +300,302 @@ def compute_non_local_during_movement(
             })
 
     return moving.groupby(group_cols, sort=False).apply(
+        _session_stats, include_groups=False,
+    ).reset_index()
+
+
+def compute_behavior_state_breakdown(
+    data: pd.DataFrame,
+    speed_threshold: float = 4.0,
+    group_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Per-session breakdown of time spent running vs. immobile and in each state.
+
+    Complements :func:`compute_state_fraction_during_movement` (which covers
+    only the running side) by adding:
+
+    - the overall running / immobile time split, and
+    - the decoder state fractions during **immobility**
+      (``head_speed <= speed_threshold``).
+
+    State fractions are expected fractions computed as the mean of the
+    per-timebin state probabilities, matching the convention in
+    :func:`compute_state_fraction_during_movement`. A combined
+    ``immobile_nonlocal_fraction`` (continuous + fragmented) is also reported
+    since for SWR-replay QC the continuous/fragmented split is often less
+    important than the local vs. non-local contrast.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        ``data_over_time`` DataFrame with columns ``head_speed``, ``Local_prob``,
+        ``No-Spike_prob``, ``Non-Local_Continuous_prob``,
+        ``Non-Local_Fragmented_prob``.
+    speed_threshold : float, optional
+        Speed (cm/s) above which the animal is considered running.
+    group_cols : list[str] | None, optional
+        Session grouping columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with columns: ``running_fraction``,
+        ``immobile_fraction``, ``n_running_bins``, ``n_immobile_bins``,
+        ``n_total_bins``, ``immobile_local_fraction``,
+        ``immobile_nospike_fraction``, ``immobile_nonlocal_continuous_fraction``,
+        ``immobile_nonlocal_fragmented_fraction``, ``immobile_nonlocal_fraction``.
+
+    """
+    if group_cols is None:
+        group_cols = list(_DEFAULT_GROUP_COLS)
+
+    out_cols = group_cols + [
+        "running_fraction",
+        "immobile_fraction",
+        "n_running_bins",
+        "n_immobile_bins",
+        "n_total_bins",
+        "immobile_local_fraction",
+        "immobile_nospike_fraction",
+        "immobile_nonlocal_continuous_fraction",
+        "immobile_nonlocal_fragmented_fraction",
+        "immobile_nonlocal_fraction",
+    ]
+
+    if data.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    def _session_stats(group: pd.DataFrame) -> pd.Series:
+        n_total = len(group)
+        running_mask = group["head_speed"] > speed_threshold
+        n_running = int(running_mask.sum())
+        n_immobile = n_total - n_running
+
+        immobile = group.loc[~running_mask]
+        if n_immobile > 0:
+            imm_local = float(immobile["Local_prob"].mean())
+            imm_nospike = float(immobile["No-Spike_prob"].mean())
+            imm_nlc = float(immobile["Non-Local_Continuous_prob"].mean())
+            imm_nlf = float(immobile["Non-Local_Fragmented_prob"].mean())
+        else:
+            imm_local = imm_nospike = imm_nlc = imm_nlf = np.nan
+
+        return pd.Series({
+            "running_fraction": n_running / n_total if n_total > 0 else np.nan,
+            "immobile_fraction": n_immobile / n_total if n_total > 0 else np.nan,
+            "n_running_bins": n_running,
+            "n_immobile_bins": n_immobile,
+            "n_total_bins": n_total,
+            "immobile_local_fraction": imm_local,
+            "immobile_nospike_fraction": imm_nospike,
+            "immobile_nonlocal_continuous_fraction": imm_nlc,
+            "immobile_nonlocal_fragmented_fraction": imm_nlf,
+            "immobile_nonlocal_fraction": (
+                imm_nlc + imm_nlf if np.isfinite(imm_nlc) else np.nan
+            ),
+        })
+
+    return data.groupby(group_cols, sort=False).apply(
+        _session_stats, include_groups=False,
+    ).reset_index()
+
+
+def compute_bout_nonlocal_dominance(
+    data: pd.DataFrame,
+    speed_threshold: float = 4.0,
+    min_bout_duration_sec: float = 0.5,
+    bout_nonlocal_threshold: float = 0.5,
+    sampling_frequency: float = 500.0,
+    group_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Per-session fraction of running bouts dominated by non-local state.
+
+    A running bout is a contiguous interval where ``head_speed > speed_threshold``.
+    Bouts shorter than ``min_bout_duration_sec`` are excluded. For each remaining
+    bout, the mean non-local probability (continuous + fragmented) is computed;
+    bouts where that mean exceeds ``bout_nonlocal_threshold`` are counted as
+    "non-local dominant".
+
+    This complements :func:`compute_state_fraction_during_movement`, whose
+    session-level mean can mask directional, arm-specific, or episodic failures
+    where a subset of runs is fully mis-decoded while the aggregate mean still
+    looks healthy. For example, a session with local_fraction=0.77 overall can
+    still have 10% of its running bouts at >50% non-local.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        ``data_over_time`` DataFrame with columns ``head_speed``, ``Local_prob``,
+        ``Non-Local_Continuous_prob``, ``Non-Local_Fragmented_prob``.
+    speed_threshold : float, optional
+        Speed (cm/s) above which the animal is considered running.
+    min_bout_duration_sec : float, optional
+        Minimum duration (seconds) for a bout to be considered.
+    bout_nonlocal_threshold : float, optional
+        Mean non-local probability above which a bout is counted as dominated
+        by non-local state.
+    sampling_frequency : float, optional
+        Sampling rate in Hz.
+    group_cols : list[str] | None, optional
+        Session grouping columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with columns: ``n_running_bouts``,
+        ``n_running_bouts_nonlocal_dominant``,
+        ``frac_running_bouts_nonlocal_dominant``,
+        ``max_bout_nonlocal_fraction``, ``median_bout_local_fraction``.
+
+    """
+    if group_cols is None:
+        group_cols = list(_DEFAULT_GROUP_COLS)
+
+    out_cols = group_cols + [
+        "n_running_bouts",
+        "n_running_bouts_nonlocal_dominant",
+        "frac_running_bouts_nonlocal_dominant",
+        "max_bout_nonlocal_fraction",
+        "median_bout_local_fraction",
+    ]
+
+    if data.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    min_bout_bins = int(round(min_bout_duration_sec * sampling_frequency))
+
+    def _session_stats(group: pd.DataFrame) -> pd.Series:
+        running_mask = (group["head_speed"] > speed_threshold).to_numpy()
+        labeled, n_raw_bouts = label(running_mask)
+        if n_raw_bouts == 0:
+            return pd.Series({
+                "n_running_bouts": 0,
+                "n_running_bouts_nonlocal_dominant": 0,
+                "frac_running_bouts_nonlocal_dominant": np.nan,
+                "max_bout_nonlocal_fraction": np.nan,
+                "median_bout_local_fraction": np.nan,
+            })
+
+        local = group["Local_prob"].to_numpy()
+        nonlocal_prob = (
+            group["Non-Local_Continuous_prob"].to_numpy()
+            + group["Non-Local_Fragmented_prob"].to_numpy()
+        )
+
+        bout_nonlocal_means: list[float] = []
+        bout_local_means: list[float] = []
+        for i in range(1, n_raw_bouts + 1):
+            m = labeled == i
+            if int(m.sum()) < min_bout_bins:
+                continue
+            bout_nonlocal_means.append(float(nonlocal_prob[m].mean()))
+            bout_local_means.append(float(local[m].mean()))
+
+        n_bouts = len(bout_nonlocal_means)
+        if n_bouts == 0:
+            return pd.Series({
+                "n_running_bouts": 0,
+                "n_running_bouts_nonlocal_dominant": 0,
+                "frac_running_bouts_nonlocal_dominant": np.nan,
+                "max_bout_nonlocal_fraction": np.nan,
+                "median_bout_local_fraction": np.nan,
+            })
+
+        bout_nl = np.asarray(bout_nonlocal_means)
+        bout_lc = np.asarray(bout_local_means)
+        n_dominant = int((bout_nl > bout_nonlocal_threshold).sum())
+        return pd.Series({
+            "n_running_bouts": n_bouts,
+            "n_running_bouts_nonlocal_dominant": n_dominant,
+            "frac_running_bouts_nonlocal_dominant": n_dominant / n_bouts,
+            "max_bout_nonlocal_fraction": float(bout_nl.max()),
+            "median_bout_local_fraction": float(np.median(bout_lc)),
+        })
+
+    return data.groupby(group_cols, sort=False).apply(
+        _session_stats, include_groups=False,
+    ).reset_index()
+
+
+def compute_running_error_tail(
+    data: pd.DataFrame,
+    speed_threshold: float = 4.0,
+    local_prob_threshold: float = 0.5,
+    group_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Upper-tail decoding error during running, restricted to local state.
+
+    Complements ``median_error_cm`` (from :func:`compute_local_decoding_error`)
+    by reporting tail percentiles of ``abs(ahead_behind_distance)`` during
+    running. Catastrophic episodic failures contribute heavily to the tail
+    while leaving the median near baseline — these are the cases where the
+    decoder loses the animal for a single run rather than drifting globally.
+
+    Only timebins with ``head_speed > speed_threshold`` AND
+    ``Local_prob > local_prob_threshold`` are included, so the percentiles
+    measure error at moments when the decoder itself claims to be confident.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        ``data_over_time`` DataFrame with ``head_speed``, ``Local_prob``,
+        ``ahead_behind_distance``.
+    speed_threshold : float, optional
+        Speed (cm/s) above which the animal is considered running.
+    local_prob_threshold : float, optional
+        Minimum ``Local_prob`` for local state.
+    group_cols : list[str] | None, optional
+        Session grouping columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with columns: ``p90_running_local_error_cm``,
+        ``p99_running_local_error_cm``, ``frac_running_local_error_gt20cm``,
+        ``frac_running_local_error_gt50cm``, ``n_running_local_bins``.
+
+    """
+    if group_cols is None:
+        group_cols = list(_DEFAULT_GROUP_COLS)
+
+    out_cols = group_cols + [
+        "p90_running_local_error_cm",
+        "p99_running_local_error_cm",
+        "frac_running_local_error_gt20cm",
+        "frac_running_local_error_gt50cm",
+        "n_running_local_bins",
+    ]
+
+    mask = (
+        (data["head_speed"] > speed_threshold)
+        & (data["Local_prob"] > local_prob_threshold)
+    )
+    subset = data.loc[mask].copy()
+    if subset.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    subset["abs_err"] = subset["ahead_behind_distance"].abs()
+
+    def _session_stats(group: pd.DataFrame) -> pd.Series:
+        err = group["abs_err"].to_numpy()
+        valid = err[np.isfinite(err)]
+        if valid.size == 0:
+            return pd.Series({
+                "p90_running_local_error_cm": np.nan,
+                "p99_running_local_error_cm": np.nan,
+                "frac_running_local_error_gt20cm": np.nan,
+                "frac_running_local_error_gt50cm": np.nan,
+                "n_running_local_bins": 0,
+            })
+        return pd.Series({
+            "p90_running_local_error_cm": float(np.percentile(valid, 90)),
+            "p99_running_local_error_cm": float(np.percentile(valid, 99)),
+            "frac_running_local_error_gt20cm": float((valid > 20).mean()),
+            "frac_running_local_error_gt50cm": float((valid > 50).mean()),
+            "n_running_local_bins": int(valid.size),
+        })
+
+    return subset.groupby(group_cols, sort=False).apply(
         _session_stats, include_groups=False,
     ).reset_index()
 
@@ -682,6 +987,8 @@ def compute_session_quality_summary(
     error_flag_threshold_cm: float = 15.0,
     local_fraction_flag_threshold: float = 0.5,
     swr_overlap_flag_threshold: float = 0.2,
+    bout_dominant_flag_threshold: float = 0.15,
+    running_error_p90_flag_threshold_cm: float = 175.0,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Aggregate all quality metrics into a single per-session summary.
@@ -710,6 +1017,19 @@ def compute_session_quality_summary(
         Local fraction below this triggers ``flag_local_collapse``.
     swr_overlap_flag_threshold : float, optional
         SWR overlap fraction below this triggers ``flag_low_swr_overlap``.
+    bout_dominant_flag_threshold : float, optional
+        Fraction of running bouts dominated by non-local state above which
+        ``flag_bout_nonlocal_dominant`` triggers. Catches localized decoder
+        failures that are hidden in session-level state means. The default
+        (0.15) was calibrated against the dataset: the median across 218
+        sessions is ~6% and 0.15 flags the worst ~10%.
+    running_error_p90_flag_threshold_cm : float, optional
+        p90 of running-local decoding error above which
+        ``flag_running_error_tail`` triggers. Catches catastrophic episodic
+        errors that are hidden in the median. The default (175 cm) flags
+        the worst ~10% of sessions; the dataset median is ~97 cm because
+        the decoder has a baseline tail of ~1% of local-state bins decoded
+        far from the animal on every session.
     group_cols : list[str] | None, optional
         Session grouping columns.
 
@@ -741,6 +1061,20 @@ def compute_session_quality_summary(
         sampling_frequency=sampling_frequency, group_cols=group_cols,
     )
 
+    behavior_state_df = compute_behavior_state_breakdown(
+        data, speed_threshold=speed_threshold, group_cols=group_cols,
+    )
+
+    bout_dominance_df = compute_bout_nonlocal_dominance(
+        data, speed_threshold=speed_threshold,
+        sampling_frequency=sampling_frequency, group_cols=group_cols,
+    )
+
+    running_error_df = compute_running_error_tail(
+        data, speed_threshold=speed_threshold,
+        local_prob_threshold=local_prob_threshold, group_cols=group_cols,
+    )
+
     nospike_df = compute_no_spike_firing_correspondence(data, group_cols=group_cols)
 
     context_df = compute_non_local_event_context(
@@ -755,7 +1089,16 @@ def compute_session_quality_summary(
     )
 
     summary = error_df
-    for df in [state_df, nonlocal_move_df, nospike_df, context_df, calib_session]:
+    for df in [
+        state_df,
+        nonlocal_move_df,
+        behavior_state_df,
+        bout_dominance_df,
+        running_error_df,
+        nospike_df,
+        context_df,
+        calib_session,
+    ]:
         if not df.empty:
             summary = summary.merge(df, on=group_cols, how="outer")
 
@@ -779,6 +1122,14 @@ def compute_session_quality_summary(
     )
     summary["flag_low_swr_overlap"] = _flag(
         "frac_swr", lambda x: x < swr_overlap_flag_threshold,
+    )
+    summary["flag_bout_nonlocal_dominant"] = _flag(
+        "frac_running_bouts_nonlocal_dominant",
+        lambda x: x > bout_dominant_flag_threshold,
+    )
+    summary["flag_running_error_tail"] = _flag(
+        "p90_running_local_error_cm",
+        lambda x: x > running_error_p90_flag_threshold_cm,
     )
 
     flag_cols = [c for c in summary.columns if c.startswith("flag_")]

@@ -15,12 +15,18 @@ from __future__ import annotations
 import argparse
 import logging
 import warnings
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
+    RAW_STAT_COLUMNS,
+    TRANSITION_MATRIX_COLUMNS,
+    apply_raw_stats_flags,
+)
 from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     compute_calibration_curve,
     compute_error_by_track_segment,
@@ -32,6 +38,43 @@ from continuum_swr_replay.parameters import (
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
+
+RAW_STATS_JOIN_COLS = ["animal", "day", "epoch"]
+RAW_STATS_DATA_COLS = list(RAW_STAT_COLUMNS) + list(TRANSITION_MATRIX_COLUMNS)
+
+
+def maybe_merge_raw_stats(
+    summary: pd.DataFrame,
+    raw_stats_csv: Path,
+) -> pd.DataFrame:
+    """Merge an optional hpc_raw_stats.csv into the quality summary.
+
+    Drops any raw-stat columns already present on ``summary`` (so repeated
+    runs don't accumulate ``_x``/``_y`` suffixes), then left-merges on
+    animal/day/epoch. If the CSV does not exist or is empty, returns
+    ``summary`` unchanged.
+    """
+    if not raw_stats_csv.exists():
+        logger.info("No raw-stats CSV at %s; skipping merge", raw_stats_csv)
+        return summary
+    raw = pd.read_csv(raw_stats_csv)
+    if raw.empty:
+        return summary
+    raw["day"] = raw["day"].astype(str)
+    summary = summary.copy()
+    summary["day"] = summary["day"].astype(str)
+    drop_cols = [c for c in RAW_STATS_DATA_COLS if c in summary.columns]
+    if drop_cols:
+        summary = summary.drop(columns=drop_cols)
+    keep = RAW_STATS_JOIN_COLS + [c for c in RAW_STATS_DATA_COLS if c in raw.columns]
+    merged = summary.merge(
+        raw[keep], on=RAW_STATS_JOIN_COLS, how="left", validate="many_to_one",
+    )
+    logger.info(
+        "Merged raw stats for %d/%d sessions from %s",
+        merged["rate_hz_per_tetrode"].notna().sum(), len(merged), raw_stats_csv.name,
+    )
+    return apply_raw_stats_flags(merged)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,7 +119,43 @@ def print_summary(summary: pd.DataFrame) -> None:
     print(f"Decoding Quality Summary: {n} sessions")
     print(f"{'='*60}")
     print(f"  Median error (cm):    {summary['median_error_cm'].median():.1f} (median across sessions)")
+    print(f"  Running fraction:     {summary['running_fraction'].median():.2f} (median across sessions)")
     print(f"  Local fraction:       {summary['local_fraction'].median():.2f} (median during movement)")
+    print(
+        "  Immobile local/nl:    "
+        f"{summary['immobile_local_fraction'].median():.2f} / "
+        f"{summary['immobile_nonlocal_fraction'].median():.2f} (median during immobility)"
+    )
+    if "p90_running_local_error_cm" in summary.columns:
+        print(
+            "  Running err p90/p99:  "
+            f"{summary['p90_running_local_error_cm'].median():.1f} / "
+            f"{summary['p99_running_local_error_cm'].median():.1f} cm "
+            "(median of per-session tail)"
+        )
+    if "frac_running_bouts_nonlocal_dominant" in summary.columns:
+        print(
+            "  Frac bouts NL-dom:    "
+            f"{summary['frac_running_bouts_nonlocal_dominant'].median():.3f} "
+            "(median across sessions)"
+        )
+    if "rate_hz_per_tetrode" in summary.columns:
+        print(
+            "  Hz/tetrode (HPC):     "
+            f"{summary['rate_hz_per_tetrode'].median():.1f} "
+            "(median across sessions)"
+        )
+    if "wf_per_tet_abs_median_max" in summary.columns:
+        print(
+            "  Worst-tet amp med:    "
+            f"{summary['wf_per_tet_abs_median_max'].median():.0f} "
+            "(median across sessions)"
+        )
+    if "T_local_local" in summary.columns:
+        diag_cols = ["T_local_local", "T_nospike_nospike", "T_nlc_nlc", "T_nlf_nlf"]
+        present = [c for c in diag_cols if c in summary.columns]
+        meds = [f"{summary[c].median():.3f}" for c in present]
+        print("  Self-transitions:     " + " / ".join(meds) + "  (Local / No-Spike / NL-C / NL-F)")
     print(f"  No-spike/MUA rho:     {summary['nospike_mua_rho'].median():.3f} (median)")
     print(f"  Calibration slope:    {summary['calibration_slope'].median():.1f} (median)")
     print(f"  Sessions with flags:  {n_flagged}/{n}")
@@ -322,6 +401,14 @@ def main():
         "--figure_dir", type=str, default="quality_metrics",
         help="Subdirectory under FIGURE_DIR for plots",
     )
+    parser.add_argument(
+        "--raw_stats_csv", type=str, default="hpc_raw_stats.csv",
+        help=(
+            "Optional raw-data stats CSV (from scripts/compute_hpc_raw_stats.py) "
+            "to merge into the summary. If the file does not exist, the merge "
+            "is silently skipped."
+        ),
+    )
     args = parser.parse_args()
 
     data = load_all_sessions(animal=args.animal, threshold=args.threshold)
@@ -335,6 +422,9 @@ def main():
         logger.info("Computing quality metrics...")
         summary = compute_session_quality_summary(
             data, sampling_frequency=SAMPLING_FREQUENCY,
+        )
+        summary = maybe_merge_raw_stats(
+            summary, PROCESSED_DATA_DIR / args.raw_stats_csv,
         )
         summary.to_csv(output_path, index=False)
         logger.info("Saved summary to %s", output_path)
