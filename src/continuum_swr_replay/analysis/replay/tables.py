@@ -180,6 +180,41 @@ def _immobility_bout_starts(
     return imm_times[transitions]
 
 
+def _immobility_bout_intervals(
+    dot: pd.DataFrame,
+    speed_col: str = "head_speed",
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Start and end timestamps for every contiguous immobility bout.
+
+    Generalization of :func:`_immobility_bout_starts` that also emits
+    bout ends — the first immobile sample's timestamp through the last
+    consecutive immobile sample's timestamp, inclusive. An interval of
+    length 1 (a single-sample bout) gets identical start and end.
+
+    A session that never drops below the speed threshold returns two
+    empty arrays.
+
+    Returns
+    -------
+    starts : np.ndarray, shape (n_bouts,)
+    ends : np.ndarray, shape (n_bouts,)
+    """
+    imm = (dot[speed_col] < speed_threshold).to_numpy()
+    times = dot.index.to_numpy()
+    if imm.size == 0 or not imm.any():
+        return np.array([]), np.array([])
+
+    # Pad with False at both ends so transitions capture edge bouts.
+    # Rising edges: first True of a run. Falling edges: first False
+    # after the run — shift back by 1 to get the last True index.
+    padded = np.concatenate(([False], imm, [False]))
+    diff = np.diff(padded.astype(np.int8))
+    start_idx = np.where(diff == 1)[0]          # index into imm of run starts
+    end_idx = np.where(diff == -1)[0] - 1       # index into imm of run last-True
+    return times[start_idx], times[end_idx]
+
+
 def _time_since_stop(
     event_times: np.ndarray,
     bout_start_times: np.ndarray,
@@ -403,8 +438,9 @@ def build_event_table(
 
     # Per-session immobility bouts — computed from the full frame so
     # bout starts are correct even when an event begins partway through
-    # a bout.
-    bout_starts = _immobility_bout_starts(
+    # a bout. Both start and end timestamps are needed so events can be
+    # mapped onto a stable ``stop_id`` (the hash of the bout index).
+    bout_starts, bout_ends = _immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
     )
 
@@ -585,11 +621,20 @@ def build_event_table(
         per_event["posterior_hpd_width_80"] = hpd[0.8]
         per_event["posterior_hpd_width_95"] = hpd[0.95]
 
-    # --- 8. Identifiers + stable hash ---
+    # --- 8. Identifiers + stable hashes ---
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "day", day)
     per_event.insert(2, "epoch", epoch)
     per_event["event_id"] = _hash_event_id(per_event)
+
+    # stop_id: each event's event_start belongs to exactly one
+    # immobility bout (the in-event filter guarantees immobility, so
+    # ``_assign_bout`` should find a valid bout for every row).
+    stop_idx = _assign_bout(
+        per_event["event_start"].to_numpy(), bout_starts, bout_ends
+    )
+    per_event["stop_idx"] = stop_idx
+    per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
 
     return per_event[column_order]
 
@@ -696,6 +741,185 @@ def build_event_sequence_table(
     return out[column_order]
 
 
+def build_stop_table(
+    dot: pd.DataFrame,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    *,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> pd.DataFrame:
+    """One row per immobility bout, **including zero-event bouts**.
+
+    This is the plan's Section 2.4 table — the stop-level canonical
+    view of the session. Every contiguous immobility bout (defined by
+    ``head_speed < speed_threshold``) becomes a row, regardless of
+    whether any non-local event fired during it. Stage 4 Part 1
+    (hurdle occurrence model) requires the zero-event rows.
+
+    The ``stop_id`` column is a 63-bit hash of
+    ``(animal, day, epoch, stop_idx)`` and matches
+    :func:`build_event_table`'s ``stop_id`` row-for-row, so the two
+    tables join cleanly.
+
+    Deferred to later chunks: aggregated replay-summary columns
+    (Σ ``arm_count_hard`` per arm, etc.) that require
+    ``event_arm_table``.
+
+    Parameters
+    ----------
+    dot, trials, track_graph, speed_threshold, nonlocal_threshold
+        Same roles as in :func:`build_event_table`. ``env`` is not
+        needed here — the stop table never touches the decoded arm of
+        replay timebins.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: see :func:`_stop_table_columns`.
+    """
+    if "animal" not in dot.columns:
+        raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
+    animal = str(dot["animal"].iloc[0])
+    day = int(dot["day"].iloc[0])
+    epoch = str(dot["epoch"].iloc[0])
+
+    dot = dot.copy()
+    dot["nonlocal_prob"] = (
+        dot["Non-Local_Continuous_prob"].to_numpy()
+        + dot["Non-Local_Fragmented_prob"].to_numpy()
+    )
+    dot = _add_trial_context(dot, trials)
+
+    bout_starts, bout_ends = _immobility_bout_intervals(
+        dot, speed_col="head_speed", speed_threshold=speed_threshold
+    )
+    column_order = _stop_table_columns()
+    if bout_starts.size == 0:
+        return pd.DataFrame(columns=column_order)
+
+    n_bouts = bout_starts.size
+    times = dot.index.to_numpy()
+    row_bout_idx = _assign_bout(times, bout_starts, bout_ends)  # -1 for mobile rows
+
+    # Per-bout aggregations — use pandas groupby on the in-bout rows.
+    in_bout = row_bout_idx >= 0
+    bout_rows = dot.loc[in_bout].assign(_bout_idx=row_bout_idx[in_bout])
+    grouped = bout_rows.groupby("_bout_idx", sort=True)
+
+    per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
+    per_bout["stop_start"] = bout_starts
+    per_bout["stop_end"] = bout_ends
+    per_bout["immobility_time"] = bout_ends - bout_starts
+
+    per_bout["is_swr_stop"] = (
+        grouped["SWR_event"].apply(lambda s: (s > 0).any()).reindex(
+            np.arange(n_bouts), fill_value=False
+        ).to_numpy()
+    )
+    if "MUA_event" in dot.columns:
+        per_bout["is_mua_stop"] = (
+            grouped["MUA_event"].apply(lambda s: (s > 0).any()).reindex(
+                np.arange(n_bouts), fill_value=False
+            ).to_numpy()
+        )
+    else:
+        per_bout["is_mua_stop"] = False
+
+    # n_events: unique non_local_event > 0 within the bout AND with
+    # nonlocal_prob above threshold (the same three-clause filter used
+    # by ``_in_event_mask``; immobility is already satisfied by virtue
+    # of being in a bout).
+    event_mask = (
+        (bout_rows["non_local_event"] > 0)
+        & (bout_rows["nonlocal_prob"] > nonlocal_threshold)
+    )
+    event_rows = bout_rows.loc[event_mask]
+    n_events_per_bout = (
+        event_rows.groupby("_bout_idx")["non_local_event"]
+        .nunique()
+        .reindex(np.arange(n_bouts), fill_value=0)
+        .astype(np.int64)
+        .to_numpy()
+    )
+    per_bout["has_replay"] = n_events_per_bout > 0
+    per_bout["n_events"] = n_events_per_bout
+
+    # Trial-context at bout start: first in-bout row's trial-derived
+    # values. For zero-event bouts these are still meaningful (the
+    # animal's behavioral state at the time of the stop).
+    first_row = grouped.first()
+    for col in (
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+    ):
+        if col == "is_after_stay":
+            # Not produced by _add_trial_context; derive from is_after_switch.
+            stay = np.where(
+                np.isnan(first_row["is_after_switch"].to_numpy()),
+                np.nan,
+                1.0 - first_row["is_after_switch"].to_numpy(),
+            )
+            per_bout["is_after_stay"] = pd.Series(stay).reindex(
+                np.arange(n_bouts)
+            ).to_numpy()
+        else:
+            per_bout[col] = (
+                first_row[col]
+                .reindex(np.arange(n_bouts))
+                .to_numpy()
+            )
+
+    # Arm / patch fields. ``current_arm`` uses the same modal-segment +
+    # trunk-fallback rule as event-level current_arm; at a well-stop
+    # the modal segment is a leaf arm.
+    current_arm_vals = np.full(n_bouts, np.nan)
+    prev_arm_vals = np.full(n_bouts, np.nan)
+    next_arm_vals = np.full(n_bouts, np.nan)
+    last_rew_vals = np.full(n_bouts, np.nan)
+    for bi, (_, g) in enumerate(grouped):
+        ts_modal = _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
+        ca = np.nan
+        if not np.isnan(ts_modal):
+            well_of_modal = arm_to_well(ts_modal, track_graph)
+            if not np.isnan(well_of_modal):
+                ca = float(ts_modal)
+        if np.isnan(ca):
+            ca = _single_arm_from_well(
+                _safe_first(g["prev_trial_to_well"]), track_graph
+            )
+        current_arm_vals[bi] = ca
+        prev_arm_vals[bi] = _single_arm_from_well(
+            _safe_first(g["prev_trial_from_well"]), track_graph
+        )
+        next_arm_vals[bi] = _single_arm_from_well(
+            _safe_first(g["next_trial_to_well"]), track_graph
+        )
+        last_rew_vals[bi] = _single_arm_from_well(
+            _safe_first(g["last_rewarded_well"]), track_graph
+        )
+
+    per_bout["current_arm"] = current_arm_vals
+    per_bout["prev_arm"] = prev_arm_vals
+    per_bout["next_arm"] = next_arm_vals
+    per_bout["last_rewarded_arm"] = last_rew_vals
+    per_bout["current_patch"] = [_arm_to_patch(a) for a in current_arm_vals]
+    per_bout["prev_patch"] = [_arm_to_patch(a) for a in prev_arm_vals]
+    per_bout["next_patch"] = [_arm_to_patch(a) for a in next_arm_vals]
+
+    per_bout.insert(0, "animal", animal)
+    per_bout.insert(1, "day", day)
+    per_bout.insert(2, "epoch", epoch)
+    per_bout["stop_id"] = _hash_stop_id(
+        animal, day, epoch, per_bout["stop_idx"].to_numpy()
+    )
+
+    return per_bout[column_order]
+
+
 # ── Helpers ──
 
 
@@ -726,6 +950,46 @@ def _hash_event_id(events: pd.DataFrame) -> np.ndarray:
     """63-bit stable hash of ``(animal, day, epoch, non_local_event)``."""
     keys = events[["animal", "day", "epoch", "non_local_event"]]
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+
+
+def _hash_stop_id(
+    animal: str,
+    day: int,
+    epoch: str,
+    stop_idx: np.ndarray,
+) -> np.ndarray:
+    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout."""
+    keys = pd.DataFrame(
+        {
+            "animal": animal,
+            "day": day,
+            "epoch": epoch,
+            "stop_idx": np.asarray(stop_idx, dtype=np.int64),
+        }
+    )
+    return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+
+
+def _assign_bout(
+    event_times: np.ndarray,
+    bout_starts: np.ndarray,
+    bout_ends: np.ndarray,
+) -> np.ndarray:
+    """Return the bout index containing each timestamp, or ``-1`` if none.
+
+    ``bout_starts`` and ``bout_ends`` must be sorted and the same length
+    (inclusive intervals). For each ``t`` in ``event_times`` the result
+    is the unique ``i`` with ``bout_starts[i] <= t <= bout_ends[i]``,
+    or ``-1`` if no bout contains ``t`` (e.g., the timestamp fell in a
+    mobile gap between bouts).
+    """
+    event_times = np.asarray(event_times, dtype=float)
+    if bout_starts.size == 0:
+        return np.full(event_times.shape, -1, dtype=np.int64)
+    idx = np.searchsorted(bout_starts, event_times, side="right") - 1
+    clipped = np.clip(idx, 0, bout_starts.size - 1)
+    in_bout = (idx >= 0) & (event_times <= bout_ends[clipped])
+    return np.where(in_bout, idx, -1).astype(np.int64)
 
 
 def _event_table_columns() -> list[str]:
@@ -769,6 +1033,38 @@ def _event_table_columns() -> list[str]:
         "posterior_hpd_width_95",
         "n_junction_bins",
         "n_unique_arms",
+        "stop_idx",
+        "stop_id",
+    ]
+
+
+def _stop_table_columns() -> list[str]:
+    """Canonical column order for ``stop_table``."""
+    return [
+        "animal",
+        "day",
+        "epoch",
+        "stop_idx",
+        "stop_id",
+        "stop_start",
+        "stop_end",
+        "immobility_time",
+        "is_swr_stop",
+        "is_mua_stop",
+        "has_replay",
+        "n_events",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
     ]
 
 
