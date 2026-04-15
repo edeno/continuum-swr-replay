@@ -197,3 +197,6 @@ tests/baselines/**/*.log
 # Paper figures (generated artifacts)
 paper/figures/**/*.pdf
 paper/figures/**/*.png
+
+# Pickle artifacts (detector models, environments, cached data)
+*.pkl
