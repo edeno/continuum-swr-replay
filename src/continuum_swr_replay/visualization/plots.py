@@ -419,30 +419,91 @@ def plot_theta_phase(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
     ax.set_yticklabels([r"$-\pi$", r"$0$", r"$\pi$"])
 
 
+def intervals_to_timebins(
+    intervals: pd.DataFrame,
+    time_idx: NDArray[np.floating],
+    *,
+    start_col: str = "start_time",
+    end_col: str = "end_time",
+    value_col: str | None = None,
+    fill_value: Any = np.nan,
+) -> NDArray:
+    """Project per-interval values onto a per-timebin axis.
+
+    For every timepoint in ``time_idx``, find the interval (row of
+    ``intervals``) that contains it and return the corresponding
+    value. Timebins outside every interval return ``fill_value`` (or
+    ``False`` when ``value_col`` is ``None``). Intervals are treated
+    as closed: ``start <= t <= end``.
+
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        Interval table with ``start_col`` / ``end_col`` columns. When
+        ``value_col`` is given it must be present too. Non-overlapping
+        intervals are expected (events / stops / trials are all
+        non-overlapping by construction); behavior with overlapping
+        intervals is "closest-start wins".
+    time_idx : np.ndarray, shape (n_time,)
+        Time values to label. Does not need to be sorted.
+    start_col, end_col : str
+        Column names for interval bounds.
+    value_col : str, optional
+        Column to carry onto the timebin axis. ``None`` returns a
+        boolean membership mask (the legacy ``_intervals_to_mask``
+        behavior).
+    fill_value : any
+        Value for timebins outside every interval (only used when
+        ``value_col`` is given).
+
+    Returns
+    -------
+    np.ndarray, shape (n_time,)
+        Boolean mask if ``value_col is None``; else a value array
+        whose dtype matches ``intervals[value_col]`` (promoted as
+        needed to hold ``fill_value``).
+
+    Notes
+    -----
+    Uses ``searchsorted`` on a sorted copy of the intervals — O(N log
+    N) up-front plus O(T log N) per query — rather than the naive
+    broadcast ``any(axis=0)`` pattern that materializes an
+    ``(N, T)`` boolean matrix. On a full session (T ≈ 1.8M, N ≈ 1000)
+    the broadcast form would be ~2 GB; this stays linear.
+    """
+    if intervals.empty:
+        if value_col is None:
+            return np.zeros(len(time_idx), dtype=bool)
+        return np.full(len(time_idx), fill_value)
+
+    order = np.argsort(intervals[start_col].to_numpy())
+    starts = intervals[start_col].to_numpy()[order]
+    ends = intervals[end_col].to_numpy()[order]
+    time_arr = np.asarray(time_idx)
+
+    idx = np.searchsorted(starts, time_arr, side="right") - 1
+    clipped = np.clip(idx, 0, starts.size - 1)
+    in_interval = (idx >= 0) & (time_arr <= ends[clipped])
+
+    if value_col is None:
+        return in_interval
+
+    values = intervals[value_col].to_numpy()[order]
+    # ``np.where`` promotes the output dtype to accommodate
+    # ``fill_value`` (e.g., int values + NaN fill → float64).
+    return np.where(in_interval, values[clipped], fill_value)
+
+
 def _intervals_to_mask(
     intervals: pd.DataFrame,
     time_idx: NDArray[np.floating],
 ) -> NDArray[np.bool_]:
-    """Convert start/end interval DataFrame to a boolean mask over time_idx.
+    """Boolean shortcut for :func:`intervals_to_timebins`.
 
-    Parameters
-    ----------
-    intervals : pd.DataFrame, shape (n_events, >=2)
-        Must have ``start_time`` and ``end_time`` columns.
-    time_idx : np.ndarray, shape (n_time,)
-        Time values to label.
-
-    Returns
-    -------
-    np.ndarray of bool, shape (n_time,)
-    np.ndarray of bool
-
+    Backward-compatible wrapper around the generalized helper. Kept
+    so existing call sites (e.g., ``plot_spike_times``) don't change.
     """
-    if intervals.empty:
-        return np.zeros(len(time_idx), dtype=bool)
-    starts = intervals["start_time"].to_numpy()[:, np.newaxis]
-    ends = intervals["end_time"].to_numpy()[:, np.newaxis]
-    return ((time_idx >= starts) & (time_idx <= ends)).any(axis=0)
+    return intervals_to_timebins(intervals, time_idx, value_col=None).astype(bool)
 
 
 def plot_multiunit_firing(

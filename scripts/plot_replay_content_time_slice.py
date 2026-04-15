@@ -39,13 +39,13 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.replay.model_specs import (
-    MODEL_HIERARCHY,
-)
 from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import (
     compute_cumulative_reward_for_event,
     compute_dist_to_arm,
     compute_visit_recency_for_event,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (
+    MODEL_HIERARCHY,
 )
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     arm_to_well,
@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import build_arm_color_map
 from continuum_swr_replay.visualization.plots import plot_graph_as_1D
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -62,28 +63,6 @@ PATCH_PALETTE = {1: "#4e79a7", 2: "#e15759", 3: "#59a14f"}
 
 # Full M7 predictor list (what the model actually sees)
 M7_PREDICTORS = list(MODEL_HIERARCHY["M7"].predictors)
-
-
-def build_arm_color_map(track_graph, edge_order):
-    """Build an arm_id → color map consistent with plot_graph_as_1D."""
-    cmap = matplotlib.colormaps.get_cmap("tab10")
-    colors = getattr(cmap, "colors", None)
-    if colors is not None:
-        edge_colors = np.array(colors)
-    else:
-        edge_colors = np.array([cmap(i / 10) for i in range(10)])
-
-    arm_color_map = {}
-    for edge_ind, edge in enumerate(edge_order):
-        eid = track_graph.edges[tuple(edge)].get("edge_id")
-        if eid is not None:
-            arm_color_map[int(eid)] = tuple(edge_colors[edge_ind % len(edge_colors)])
-
-    for arm in ALL_ARMS:
-        if arm not in arm_color_map:
-            arm_color_map[arm] = tuple(edge_colors[arm % len(edge_colors)])
-
-    return arm_color_map
 
 
 # ── Posterior helpers ────────────────────────────────────────────────────
