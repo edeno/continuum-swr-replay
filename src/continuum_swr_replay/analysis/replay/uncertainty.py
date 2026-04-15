@@ -125,6 +125,14 @@ def _arm_hpd_count(arm_posterior: np.ndarray, coverage: float) -> np.ndarray:
         coords={"position": np.arange(arm_posterior.shape[1])},
     )
     threshold = get_highest_posterior_threshold(arm_da, coverage=coverage)
+    # Sanity: ``get_highest_posterior_threshold`` is contracted to
+    # return one threshold per timebin. Explicit check so a future
+    # package change would surface as a clear assertion here rather
+    # than as a subtle broadcast error further downstream.
+    assert threshold.shape == (arm_posterior.shape[0],), (
+        f"unexpected threshold shape {threshold.shape} "
+        f"for arm_posterior of shape {arm_posterior.shape}"
+    )
     return (arm_posterior >= threshold[:, None]).sum(axis=1).astype(float)
 
 

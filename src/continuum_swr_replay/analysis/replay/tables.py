@@ -327,6 +327,20 @@ def _align_posterior_to_dot(
             f"entries but dot has {len(dot)}; the two must be aligned "
             "1-to-1 (both come from the same decoder run)."
         )
+    # Length-match alone is not enough — bin-centered vs. edge-indexed
+    # time would slide every row by half a sample without tripping the
+    # length check. Explicitly verify the two time axes agree within a
+    # microsecond (500 Hz sampling = 2 ms between bins, so 1 µs is
+    # well below any legitimate numerical noise).
+    if "time" in conditional_posterior.coords:
+        post_times = np.asarray(conditional_posterior["time"].values, dtype=float)
+        drift = float(np.abs(post_times - dot.index.to_numpy(dtype=float)).max())
+        if drift > 1e-6:
+            raise ValueError(
+                f"conditional_posterior time axis drifts from dot.index "
+                f"by up to {drift:.3g}s — the two must share the same "
+                "time origin, not just the same length."
+            )
     return post_vals
 
 
@@ -769,6 +783,16 @@ def build_stop_table(
     Deferred to later chunks: aggregated replay-summary columns
     (Σ ``arm_count_hard`` per arm, etc.) that require
     ``event_arm_table``.
+
+    Note
+    ----
+    Single-sample bouts — when the animal dips below the speed
+    threshold for exactly one timebin — yield ``immobility_time == 0``
+    rows. They are kept as-is here; ``stop_table`` is the raw
+    canonical frame and downstream consumers decide whether to filter
+    them (e.g., Stage 4's hurdle logistic, which uses
+    ``log(immobility_time)``, will need to exclude or clip them).
+
 
     Parameters
     ----------
