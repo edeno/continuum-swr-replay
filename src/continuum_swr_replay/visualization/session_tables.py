@@ -28,7 +28,11 @@ import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
+from continuum_swr_replay.analysis.replay.spatial_mapping import well_to_arm_set
+from continuum_swr_replay.data_loaders.constants import (
+    TRACK_SEGMENT_TO_PATCH,
+    WELL_PATCH_MAPPING,
+)
 from continuum_swr_replay.parameters import COLORS
 
 from .palettes import patch_grouped_arm_palette
@@ -40,6 +44,8 @@ from .plots import (
     plot_speed,
     plot_spike_times,
 )
+
+_ALL_ARMS: tuple[int, ...] = tuple(sorted(TRACK_SEGMENT_TO_PATCH.keys()))
 
 # Core panels (always available). Later chunks register additional
 # panel names in this registry.
@@ -66,6 +72,7 @@ class _PanelContext:
     event_sequence_table: pd.DataFrame
     stop_table: pd.DataFrame
     trials: pd.DataFrame
+    track_graph: Any
     time_slice: slice
     arm_palette: dict[int, tuple[float, float, float, float]]
     env: Any
@@ -187,6 +194,238 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
     ax.set_yticks(sorted(WELL_PATCH_MAPPING))
 
 
+# ── Future-covariate debug: arm markers + mismatch pointers ──
+
+
+def _well_to_single_arm(well: float, track_graph: Any) -> float:
+    """Scalar arm for a well node, NaN if well is NaN or not in graph.
+
+    Mirrors the ``_single_arm_from_well`` helper in
+    ``analysis.replay.tables``; we duplicate the tiny helper here so
+    the visualization package does not take a hard dependency on the
+    tables module. On the real bandit graph each well is degree-1 so
+    ``well_to_arm_set`` returns a 1-element set.
+    """
+    if well is None or (isinstance(well, float) and np.isnan(well)):
+        return np.nan
+    arms = well_to_arm_set(int(well), track_graph)
+    if not arms:
+        return np.nan
+    return float(min(arms))
+
+
+def _compute_mismatch_table(
+    event_table: pd.DataFrame,
+    trials: pd.DataFrame,
+    track_graph: Any,
+) -> pd.DataFrame:
+    """Compare canonical ``next_arm`` against trials' actual next trip.
+
+    For every event, the independent ground truth is: the first trial
+    whose ``start_time`` is strictly greater than ``event_midpoint_time``.
+    Its ``to_well`` is mapped to an arm via
+    :func:`well_to_arm_set`. The canonical value comes from
+    ``event_table['next_arm']`` — same one downstream GLMs consume.
+
+    ``match`` is ``True`` when the canonical and actual arms are equal
+    OR when both are ``NaN`` (legitimate session end: the last event
+    has no next trip). Any other combination is a mismatch and will be
+    drawn in red by :func:`_plot_mismatch_pointers`.
+    """
+    if len(event_table) == 0:
+        return pd.DataFrame(
+            columns=[
+                "event_id",
+                "event_midpoint_time",
+                "canonical_next_arm",
+                "actual_next_to_well",
+                "actual_next_arm",
+                "match",
+            ]
+        )
+
+    event_times = event_table["event_midpoint_time"].to_numpy()
+    start_times = (
+        trials["start_time"].to_numpy() if len(trials) > 0 else np.array([])
+    )
+    to_wells = trials["to_well"].to_numpy() if len(trials) > 0 else np.array([])
+
+    actual_to_well = np.full(len(event_times), np.nan)
+    if start_times.size > 0:
+        next_idx = np.searchsorted(start_times, event_times, side="right")
+        valid = next_idx < start_times.size
+        actual_to_well[valid] = to_wells[next_idx[valid]]
+
+    actual_arm = np.array(
+        [_well_to_single_arm(w, track_graph) for w in actual_to_well]
+    )
+    canonical = event_table["next_arm"].to_numpy(dtype=float)
+
+    both_nan = np.isnan(canonical) & np.isnan(actual_arm)
+    equal = (canonical == actual_arm) & ~np.isnan(canonical) & ~np.isnan(actual_arm)
+    match = both_nan | equal
+
+    return pd.DataFrame(
+        {
+            "event_id": event_table["event_id"].to_numpy(),
+            "event_midpoint_time": event_times,
+            "canonical_next_arm": canonical,
+            "actual_next_to_well": actual_to_well,
+            "actual_next_arm": actual_arm,
+            "match": match,
+        }
+    )
+
+
+def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
+    """Canonical arm references per event.
+
+    At each event's ``event_midpoint_time``, four markers in the
+    arm-palette color:
+
+    - ``current_arm`` — filled circle
+    - ``prev_arm`` — upward triangle ▲
+    - ``next_arm`` — downward triangle ▼ (**post-hoc**)
+    - ``last_rewarded_arm`` — star ★
+
+    Markers are skipped where the corresponding column is NaN. Y-axis
+    is the 9-arm index space grouped visually by the patch palette.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    et = ctx.event_table
+    in_window = (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
+    et = et.loc[in_window]
+
+    for arm in _ALL_ARMS:
+        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+
+    if len(et) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+    else:
+        times = et["event_midpoint_time"].to_numpy()
+        palette = ctx.arm_palette
+        marker_spec = (
+            ("current_arm", "o", 36),
+            ("prev_arm", "^", 36),
+            ("next_arm", "v", 36),
+            ("last_rewarded_arm", "*", 60),
+        )
+        for col, marker, size in marker_spec:
+            arms = et[col].to_numpy(dtype=float)
+            mask = ~np.isnan(arms)
+            if not mask.any():
+                continue
+            colors = [palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in arms[mask]]
+            ax.scatter(
+                times[mask],
+                arms[mask],
+                marker=marker,
+                s=size,
+                c=colors,
+                edgecolor="black",
+                linewidths=0.3,
+                zorder=3,
+                clip_on=False,
+            )
+
+    ax.set_ylabel("Arm\ncurr/prev/\nnext/rew")
+    ax.set_ylim(-0.5, 8.5)
+    ax.set_yticks(list(_ALL_ARMS))
+
+
+def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
+    """Canonical ``next_arm`` versus trials' actual next trip.
+
+    For every event in the window: a ▼ at the canonical
+    ``event_table['next_arm']`` and a × at the arm derived independently
+    from ``trials`` (the ``to_well`` of the first trial whose
+    ``start_time`` is strictly greater than ``event_midpoint_time``).
+    A vertical connector between them — **red when the two disagree**,
+    thin grey when they match.
+
+    ``(NaN, NaN)`` — the legitimate session-end case where the last
+    event has no next trip — is treated as a match.
+
+    The underlying mismatch table is computed once per ``ctx`` and
+    stashed on the context so the caller can retrieve it from the
+    public entry point.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    mismatch = _compute_mismatch_table(
+        ctx.event_table, ctx.trials, ctx.track_graph
+    )
+    in_window = (
+        (mismatch["event_midpoint_time"] >= lo)
+        & (mismatch["event_midpoint_time"] <= hi)
+    )
+    view = mismatch.loc[in_window]
+
+    for arm in _ALL_ARMS:
+        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+    else:
+        times = view["event_midpoint_time"].to_numpy()
+        canonical = view["canonical_next_arm"].to_numpy(dtype=float)
+        actual = view["actual_next_arm"].to_numpy(dtype=float)
+        is_match = view["match"].to_numpy(dtype=bool)
+
+        # Connector lines first so markers sit on top.
+        for t, c_arm, a_arm, match in zip(times, canonical, actual, is_match, strict=True):
+            if np.isnan(c_arm) or np.isnan(a_arm):
+                continue
+            color = "lightgrey" if match else "red"
+            lw = 0.5 if match else 1.6
+            ax.plot(
+                [t, t], [c_arm, a_arm],
+                color=color, linewidth=lw, zorder=2, clip_on=False,
+            )
+
+        palette = ctx.arm_palette
+        c_mask = ~np.isnan(canonical)
+        if c_mask.any():
+            ax.scatter(
+                times[c_mask],
+                canonical[c_mask],
+                marker="v",
+                s=36,
+                c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in canonical[c_mask]],
+                edgecolor="black",
+                linewidths=0.3,
+                zorder=3,
+                clip_on=False,
+                label="canonical next_arm",
+            )
+        a_mask = ~np.isnan(actual)
+        if a_mask.any():
+            ax.scatter(
+                times[a_mask],
+                actual[a_mask],
+                marker="x",
+                s=40,
+                c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in actual[a_mask]],
+                linewidths=1.0,
+                zorder=4,
+                clip_on=False,
+                label="actual next_arm (from trials)",
+            )
+
+    ax.set_ylabel("next_arm\ncanonical\nvs actual")
+    ax.set_ylim(-0.5, 8.5)
+    ax.set_yticks(list(_ALL_ARMS))
+
+    # Stash the full (unfiltered) mismatch table on the context so the
+    # public entry point can return it without recomputing.
+    ctx.__dict__.setdefault("_mismatch_table", mismatch)
+
+
 # ── Panel registry ──
 
 
@@ -198,6 +437,8 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "conditional_posterior": _plot_conditional_posterior,
     "speed": _plot_speed,
     "trial_rail": _plot_trial_rail,
+    "arm_markers": _plot_arm_markers,
+    "mismatch_pointers": _plot_mismatch_pointers,
 }
 
 # Relative height weight per panel — inherits the ``plot_detector``
@@ -210,6 +451,8 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "conditional_posterior": 3.0,
     "speed": 1.0,
     "trial_rail": 1.0,
+    "arm_markers": 1.4,
+    "mismatch_pointers": 1.4,
 }
 
 
@@ -244,6 +487,7 @@ def plot_session_tables(
     stop_table: pd.DataFrame,
     *,
     trials: pd.DataFrame | None = None,
+    track_graph: Any = None,
     time_window: tuple[float, float] | None = None,
     panels: Sequence[str] = DEFAULT_PANELS,
     figsize: tuple[float, float] = (12.0, 9.0),
@@ -291,6 +535,13 @@ def plot_session_tables(
                 "trials not provided and not present in ``data``; "
                 "pass ``trials=`` explicitly."
             )
+    if track_graph is None:
+        track_graph = data.get("track_graph")
+        if track_graph is None:
+            raise KeyError(
+                "track_graph not provided and not present in ``data``; "
+                "pass ``track_graph=`` explicitly."
+            )
 
     unknown = [p for p in panels if p not in _PANEL_REGISTRY]
     if unknown:
@@ -316,6 +567,7 @@ def plot_session_tables(
         event_sequence_table=event_sequence_table,
         stop_table=stop_table,
         trials=trials,
+        track_graph=track_graph,
         time_slice=time_slice,
         arm_palette=patch_grouped_arm_palette(),
         env=env,
@@ -343,18 +595,14 @@ def plot_session_tables(
     axes[-1].set_xlim(t_start, t_end)
     sns.despine(offset=5)
 
-    # Stable return type: (fig, empty mismatch_table) — populated by
-    # the chunk that lands the mismatch-pointer panel.
-    mismatch_table = pd.DataFrame(
-        columns=[
-            "event_id",
-            "event_midpoint_time",
-            "canonical_next_arm",
-            "actual_next_to_well",
-            "actual_next_arm",
-            "match",
-        ]
+    # If the mismatch-pointers panel ran it stashed the full table on
+    # ctx. Otherwise compute once here so callers get the same shape
+    # regardless of panel selection (useful for headless CI / audit).
+    mismatch_table = getattr(
+        ctx, "_mismatch_table", None
     )
+    if mismatch_table is None:
+        mismatch_table = _compute_mismatch_table(event_table, trials, track_graph)
 
     if save_path is not None:
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
