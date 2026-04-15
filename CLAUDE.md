@@ -12,6 +12,10 @@ This is a neuroscience research project analyzing continuum replay during Sharp 
 
 Data is stored in NWB (Neurodata Without Borders) format and managed through the Spyglass neuroscience data pipeline.
 
+For a detailed description of the behavioral task, training protocol,
+implant, and recording setup, see
+[docs/task_description.md](docs/task_description.md).
+
 ## Development Setup
 
 This project uses **UV** for package management (not pip/conda):
@@ -94,19 +98,53 @@ Returns a dictionary containing all data types as pandas DataFrames or lists, in
 
 ### Spatial Bandit Task Structure
 
-The task uses a multi-well track environment with:
+The task uses a "three-legged spider" track with 6 wells organized into 3
+patches. The track graph has:
+
+- **10 nodes**: 6 wells (nodes 0-5, all degree-1 terminals) + 3 patch
+  junctions (nodes 6, 7, 8) + 1 center junction (node 9)
+- **9 edges (arms)**:
+  - **Leaf arms** (6 total): each connects one well to its patch junction
+    - arm 0: well 0 ↔ patch junction 6
+    - arm 1: well 1 ↔ patch junction 6
+    - arm 2: well 2 ↔ patch junction 7
+    - arm 3: well 3 ↔ patch junction 7
+    - arm 4: well 4 ↔ patch junction 8
+    - arm 5: well 5 ↔ patch junction 8
+  - **Trunk arms** (3 total): each connects a patch junction to the center
+    - arm 6: patch junction 6 ↔ center junction 9
+    - arm 7: patch junction 7 ↔ center junction 9
+    - arm 8: patch junction 8 ↔ center junction 9
+
+**IMPORTANT consequence**: each well is degree-1, so it touches exactly ONE
+arm. `well_to_arm_set(well_i)` returns `{i}` for i in 0..5. Predictors
+derived from wells (`is_prev`, `is_next`, `is_last_rewarded`) mark exactly
+one of the nine arms per event — not two. The animal's `track_segment_id`
+when stopped at a well also equals that same single arm, so `is_current`
+collapses with `well_to_arm_set(prev_trial_to_well)`.
+
+Task-level primitives:
 
 - **Wells** (nodes 0-5) grouped into 3 **patches** (1-3)
-- **Track segments** (edges) connecting wells, represented as a NetworkX graph
 - **Trials**: Runs from one well to another, may include reward at destination
 - **Well visits**: Poke-in/poke-out intervals at wells
 - **Patch changes**: Trials that move between different patches
 
 Key mappings:
 
-- `WELL_PATCH_MAPPING`: Maps well IDs to patch IDs
-- `TRACK_SEGMENT_TO_PATCH`: Maps track segment IDs to patch IDs
+- `WELL_PATCH_MAPPING` (wells → patches): `{0:1, 1:1, 2:2, 3:2, 4:3, 5:3}`
+- `TRACK_SEGMENT_TO_PATCH` (arms → patches): leaf arms match their well's
+  patch; trunk arms carry the patch label of the leaves they join.
+  `{0:1, 1:1, 6:1, 2:2, 3:2, 7:2, 4:3, 5:3, 8:3}`
 - `TRACK_SEGMENT_TO_EDGE_ID`: Maps track segments to graph edge IDs
+
+**Junction place bins**: The non_local_detector creates placeholder place
+bins at track-graph junctions with `edge_id = -1` (interpolation artifacts
+from `edge_spacing > 0`, not real spatial positions). Any MAP-to-arm or
+posterior-to-arm computation MUST exclude these bins before argmax or
+normalization — otherwise the MAP can silently land on a junction bin and
+return NaN. See `map_estimate_to_arm` in `replay_content/spatial_mapping.py`
+for the canonical nearest-neighbor-over-real-bins pattern.
 
 ### Data Integration with Spyglass
 
@@ -307,6 +345,30 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 5. **Interval naming**: Spyglass uses " noPrePostTrialTimes" suffix for trimmed intervals
 6. **Track graph**: NetworkX graph where nodes are wells (0-5) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
+
+## Terminology (figure captions, axis labels, docstrings)
+
+The paper distinguishes model-detected events from SWR-detector events. Use
+these terms consistently in figure captions, axis labels, legends, and
+user-facing docstrings. "Replay" is reserved for informal prose in the
+manuscript body — do not use it as an axis label or variable name.
+
+- **non-local event** — an interval where the detector's Non-Local state
+  probability exceeds 0.8 during immobility. Never call it "replay event"
+  or "detected replay" in code or labels.
+- **SWR event** — an interval from the SWR (ripple) detector, independent
+  of the model.
+- **SWR-coincident non-local event** — a non-local event that overlaps
+  with at least one SWR event. Not "SWR-overlap" (ambiguous direction).
+- **non-SWR non-local event** — a non-local event that does not overlap
+  with any SWR event. Not "no-overlap event" or "SWR-free replay".
+- **Local state / non-local state** — the model's state labels. Keep the
+  hyphen. "Non-Local" (title case) is acceptable in the model's internal
+  state names from `non_local_detector`, but prose and labels should
+  prefer lower-case "non-local".
+- **decoder** — the non-local detector's full output. Use "decoder" when
+  you mean that specific model; avoid "model" as a generic term since
+  Figure 4 also introduces GLM models.
 
 ## Notes on Data Quality
 
