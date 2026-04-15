@@ -37,6 +37,12 @@ from continuum_swr_replay.parameters import (
     COLORS,
     SAMPLING_FREQUENCY,
 )
+from continuum_swr_replay.visualization.plots import (
+    plot_acausal_probabilities,
+    plot_conditional_non_local_posterior,
+    plot_ripple_consensus_trace_zscore,
+    plot_spike_times,
+)
 
 
 def plot_event_duration_distribution(
@@ -106,6 +112,7 @@ def plot_triggered_averages(
     formats: list[str] | None = None,
     dpi: int = 300,
     axes: list[plt.Axes] | None = None,
+    signals: list[str] | None = None,
 ) -> None:
     """Plot event-triggered averages of physiological signals.
 
@@ -120,15 +127,24 @@ def plot_triggered_averages(
     time_col : str
         Column to use for alignment ('start_time' or 'end_time').
     axes : list of matplotlib Axes, optional
-        List of 4 axes for the 4 signals. If None, creates standalone figure.
+        Axes to draw on, one per signal in ``signals`` (in order). If
+        None, a standalone figure is created with one row per signal.
+    signals : list of str, optional
+        Which signal columns to plot, in order top-to-bottom. Defaults
+        to the full four-signal stack used in the original Figure 2
+        design. For the current (reduced) Figure 2, pass
+        ``["Non-Local_prob", "SWR_zscore"]``.
 
     """
-    signal_types = [
-        "Non-Local_prob",
-        "theta_power_zscore",
-        "MUA_zscore",
-        "SWR_zscore",
-    ]
+    if signals is None:
+        signal_types = [
+            "Non-Local_prob",
+            "theta_power_zscore",
+            "MUA_zscore",
+            "SWR_zscore",
+        ]
+    else:
+        signal_types = list(signals)
 
     non_local_start_end_time = get_event_start_end_times(
         event_types["non_local_immobile_no_overlap_swr"], event_col="non_local_event"
@@ -171,7 +187,7 @@ def plot_triggered_averages(
     no_overlap_mean_all = signal_windows.mean(dim="event")
     overlap_mean_all = signal_windows_overlap.mean(dim="event")
 
-    for i, (ax, signal_type) in enumerate(zip(axes, signal_types)):
+    for i, (ax, signal_type) in enumerate(zip(axes, signal_types, strict=True)):
         no_overlap_mean = no_overlap_mean_all.sel(signal=signal_type)
         overlap_mean = overlap_mean_all.sel(signal=signal_type)
 
@@ -736,3 +752,268 @@ def plot_state_probability_by_theta_phase(
 
     if standalone:
         plt.tight_layout()
+
+
+def plot_event_example_stack(
+    data: dict,
+    results,
+    detector,
+    env,
+    time_slice: slice,
+    axes: list,
+    *,
+    column_title: str | None = None,
+    show_ylabels: bool = True,
+    relative_time_center: float | None = None,
+) -> None:
+    """Plot one stacked example event (SWR / raster / posterior / state probs).
+
+    Produces the 4-row visual used as a building block for panel a in
+    Figures 2 and 3. The caller is responsible for creating and arranging
+    the four axes (typically from a GridSpec).
+
+    Parameters
+    ----------
+    data : dict
+        Session data dictionary from :func:`load_data`.
+    results : xr.Dataset
+        Decoding results for the session.
+    detector : Detector
+        Fitted non-local detector, used by the raster and posterior plots.
+    env : Environment
+        Environment object matching the detector.
+    time_slice : slice
+        Time window to plot (absolute seconds).
+    axes : list of matplotlib.axes.Axes
+        Exactly four axes, ordered top-to-bottom: SWR trace, raster,
+        conditional non-local posterior, acausal state probabilities.
+    column_title : str, optional
+        Title to place above the top sub-row (SWR trace axis).
+    show_ylabels : bool, default True
+        If False, the y-axis labels are blanked — useful when this column
+        is to the right of another column that already carries the labels.
+    relative_time_center : float, optional
+        If provided, the x-axis tick labels on the bottom sub-row are
+        rewritten as offsets from this absolute time (e.g. the event
+        center). If None, absolute timestamps are kept.
+
+    """
+    if len(axes) != 4:
+        raise ValueError(
+            f"plot_event_example_stack needs exactly 4 axes, got {len(axes)}"
+        )
+    ax_swr, ax_raster, ax_post, ax_probs = axes
+
+    plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
+    plot_spike_times(
+        data, time_slice, detector, env, results, ax_raster,
+    )
+    plot_conditional_non_local_posterior(
+        data, time_slice, results, env, detector, ax_post,
+    )
+    plot_acausal_probabilities(
+        results, time_slice, ax_probs, plot_local=True,
+    )
+
+    # Hide x tick labels on every sub-row except the bottom one
+    for ax in (ax_swr, ax_raster, ax_post):
+        ax.tick_params(labelbottom=False)
+
+    if relative_time_center is not None:
+        ticks = ax_probs.get_xticks()
+        ax_probs.set_xticks(ticks)
+        ax_probs.set_xticklabels(
+            [f"{t - relative_time_center:.2f}" for t in ticks]
+        )
+        ax_probs.set_xlabel("Time from event center (s)")
+
+    if not show_ylabels:
+        for ax in (ax_swr, ax_raster, ax_post, ax_probs):
+            ax.set_ylabel("")
+
+    if column_title is not None:
+        ax_swr.set_title(column_title, fontsize=8, pad=6)
+
+
+def plot_swr_overlap_class_bar(
+    counts: dict[str, int],
+    ax: plt.Axes | None = None,
+) -> None:
+    """Horizontal stacked bar of non-local events by SWR-overlap class.
+
+    Shows the three-way breakdown of immobile non-local events into
+    "contained within SWR", "extends beyond SWR", and "no SWR overlap".
+    Designed as Figure 2 panel b — the same three categories that
+    panel a's three example columns represent.
+
+    Parameters
+    ----------
+    counts : dict
+        Output of :func:`compute_swr_overlap_class_counts`. Must
+        contain the keys ``contained``, ``extends``, ``none``, and
+        ``total``.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. If None, a standalone figure is created.
+
+    """
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+
+    total = counts["total"]
+    if total == 0:
+        raise ValueError("No events in counts dict (total=0)")
+
+    # Order: contained (leftmost) -> extends -> none (rightmost)
+    # This matches the left-to-right ordering of the three example
+    # columns in Figure 2 panel a.
+    order = ("contained", "extends", "none")
+    segment_colors = {
+        "contained": COLORS["SWR"],
+        "extends": "#b5825a",        # neutral sand: "both but extends"
+        "none": COLORS["Non-Local"],
+    }
+    segment_labels = {
+        "contained": "contained\nwithin SWR",
+        "extends": "extends\nbeyond SWR",
+        "none": "no SWR\noverlap",
+    }
+
+    left = 0.0
+    for cls in order:
+        frac = counts[cls] / total
+        ax.barh(
+            0,
+            frac,
+            left=left,
+            height=0.55,
+            color=segment_colors[cls],
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        if frac > 0.05:
+            ax.text(
+                left + frac / 2,
+                0,
+                f"{100 * frac:.0f}%\n{segment_labels[cls]}",
+                ha="center",
+                va="center",
+                color="white",
+                fontsize=6,
+                fontweight="bold",
+            )
+        left += frac
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.6, 0.6)
+    ax.set_yticks([0])
+    ax.set_yticklabels(
+        [f"non-local events\n(immobile, n={total:,})"],
+        fontsize=7,
+    )
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"])
+    ax.set_xlabel("Fraction of events")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="y", length=0)
+
+    if standalone:
+        plt.tight_layout()
+
+
+def plot_event_timing_offsets(
+    offsets: pd.DataFrame,
+    axes: list[plt.Axes] | None = None,
+    *,
+    xlim_ms: tuple[float, float] = (-100.0, 100.0),
+    bin_width_ms: float = 5.0,
+) -> None:
+    """Two side-by-side histograms of non-local/SWR timing offsets.
+
+    Takes the per-overlap ``start_diff`` and ``end_diff`` DataFrame from
+    :func:`compute_event_timing_offsets` and renders:
+
+        - Left axis:  non-local-start minus SWR-start (ms)
+        - Right axis: non-local-end   minus SWR-end   (ms)
+
+    Positive left-axis / negative right-axis means non-local events
+    are typically contained inside the SWR window. A long tail on
+    either side means a subset of events extend beyond the SWR
+    envelope.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame
+        Per-overlap offset DataFrame with ``start_diff`` and
+        ``end_diff`` columns (seconds).
+    axes : list of matplotlib.axes.Axes, optional
+        Two axes [left, right]. If None, a standalone 1x2 figure
+        is created.
+    xlim_ms : tuple of float
+        X-axis limits in milliseconds. Default ±100 ms.
+    bin_width_ms : float
+        Histogram bin width in milliseconds.
+
+    """
+    standalone = axes is None
+    if standalone:
+        fig, axes = plt.subplots(
+            1, 2, figsize=(5.0, 2.2),
+            sharey=True, constrained_layout=True,
+        )
+        axes = list(axes)
+
+    if len(axes) != 2:
+        raise ValueError(
+            f"plot_event_timing_offsets needs exactly 2 axes, got {len(axes)}"
+        )
+    ax_start, ax_end = axes
+
+    bins = np.arange(xlim_ms[0], xlim_ms[1] + bin_width_ms, bin_width_ms)
+
+    for ax, col, xlabel, title in (
+        (
+            ax_start,
+            "start_diff",
+            "NL start − SWR start (ms)",
+            "Start alignment",
+        ),
+        (
+            ax_end,
+            "end_diff",
+            "NL end − SWR end (ms)",
+            "End alignment",
+        ),
+    ):
+        values_ms = offsets[col].to_numpy() * 1000.0
+        ax.hist(
+            values_ms,
+            bins=bins,
+            color=COLORS["Non-Local"],
+            alpha=0.7,
+            edgecolor="none",
+            density=True,
+        )
+
+        median_ms = float(np.median(values_ms))
+        ax.axvline(
+            0.0, color="grey", linestyle="-", linewidth=0.75, alpha=0.6,
+        )
+        ax.axvline(
+            median_ms, color="black", linestyle="--", linewidth=1.0,
+            label=f"median {median_ms:+.0f} ms",
+        )
+
+        ax.set_xlabel(xlabel)
+        ax.set_xlim(xlim_ms)
+        ax.set_title(title, fontsize=8, pad=4)
+        ax.legend(fontsize=6, frameon=False, loc="upper right")
+        sns.despine(ax=ax)
+
+    ax_start.set_ylabel("Density")
+
+    if standalone:
+        plt.tight_layout()
+
