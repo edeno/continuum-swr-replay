@@ -34,7 +34,18 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
 from .spatial_mapping import arm_to_well, map_estimate_to_arm, well_to_arm_set
-from .summaries import n_nonlocal_bins, nonlocal_weight_sum
+from .summaries import (
+    arm_map_from_posterior,
+    n_nonlocal_bins,
+    nonlocal_weight_sum,
+    posterior_mass_total,
+    posterior_to_arm_marginal,
+)
+from .uncertainty import (
+    posterior_entropy_mean,
+    posterior_hpd_widths,
+    posterior_peak_mean,
+)
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 
@@ -211,6 +222,75 @@ def _arm_to_patch(arm: float) -> float:
     return float(TRACK_SEGMENT_TO_PATCH.get(int(arm), np.nan))
 
 
+# ── Shared prep for the event / event-sequence builders ──
+
+
+def _prepare_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
+    """Return a copy of ``dot`` annotated with ``replay_arm`` and ``nonlocal_prob``.
+
+    ``replay_arm`` comes from :func:`map_estimate_to_arm` (junction bins
+    excluded). ``nonlocal_prob`` is the sum of the two non-local state
+    posteriors — this is the ``w_t`` that drives event filtering and
+    per-event weight sums.
+    """
+    dot = dot.copy()
+    dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
+    dot["nonlocal_prob"] = (
+        dot["Non-Local_Continuous_prob"].to_numpy()
+        + dot["Non-Local_Fragmented_prob"].to_numpy()
+    )
+    return dot
+
+
+def _in_event_mask(
+    dot: pd.DataFrame,
+    speed_threshold: float,
+    nonlocal_threshold: float,
+) -> pd.Series:
+    """Boolean mask over ``dot`` for in-event timebins.
+
+    A row is in-event iff the decoder assigned a non-local event label,
+    the animal was immobile, and the smoothed non-local posterior
+    cleared the threshold. Matches the legacy ``prepare_session``
+    filter.
+    """
+    return (
+        (dot["non_local_event"] > 0)
+        & (dot["head_speed"] < speed_threshold)
+        & (dot["nonlocal_prob"] > nonlocal_threshold)
+    )
+
+
+def _align_posterior_to_dot(
+    conditional_posterior,
+    dot: pd.DataFrame,
+) -> np.ndarray:
+    """Return a ``(T_dot, n_position_bins)`` posterior array aligned to ``dot.index``.
+
+    The decoder writes ``results.nc`` with a ``time`` coordinate that is
+    the same time axis produced by
+    :func:`data_aggregation.get_data_over_time` — so in practice the two
+    are already 1-to-1. We still assert lengths match to catch silent
+    misalignment if the aggregator and decoder ever diverge.
+
+    Parameters
+    ----------
+    conditional_posterior : xr.DataArray
+        Shape ``(time, position)`` from
+        :func:`posterior_io.load_conditional_posterior`.
+    dot : pd.DataFrame
+        Time-indexed data-over-time frame.
+    """
+    post_vals = np.asarray(conditional_posterior.values)
+    if post_vals.shape[0] != len(dot):
+        raise ValueError(
+            f"conditional_posterior time axis has {post_vals.shape[0]} "
+            f"entries but dot has {len(dot)}; the two must be aligned "
+            "1-to-1 (both come from the same decoder run)."
+        )
+    return post_vals
+
+
 # ── Public API ──
 
 
@@ -220,6 +300,7 @@ def build_event_table(
     trials: pd.DataFrame,
     track_graph: nx.Graph,
     *,
+    conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
@@ -229,14 +310,18 @@ def build_event_table(
     (``dot``) plus the session's ``env`` / ``trials`` / ``track_graph``
     and emits the event-level slice of the plan's canonical schema.
 
-    Chunk 1 scope: columns that can be derived from ``dot`` alone — no
-    ``results.nc`` loading, no stop-level aggregation, no per-timebin
-    conditional posterior. Subsequent commits add
-    ``posterior_mass_total`` / ``posterior_peak_mean`` / ``posterior_entropy_mean``
-    / ``posterior_hpd_width_{50,80,95}`` (chunk 2, needs ``results.nc``),
-    ``stop_id`` / stop-level ``immobility_time`` (chunk 3,
-    ``build_stop_table``), and ``block_number`` / ``trials_since_block_change``
-    (requires contingency-block loader not yet wired).
+    ``conditional_posterior`` is optional. When supplied (e.g., from
+    :func:`posterior_io.load_conditional_posterior`), six additional
+    columns are populated: ``posterior_mass_total``,
+    ``posterior_peak_mean``, ``posterior_entropy_mean``, and
+    ``posterior_hpd_width_{50,80,95}``. When not supplied those columns
+    are ``NaN`` so the schema is stable across call sites.
+
+    Still deferred to later chunks (intentionally absent from the
+    current output): ``stop_id`` and the stop-level ``immobility_time``
+    aggregation (chunk 3, ``build_stop_table``); ``block_number`` and
+    ``trials_since_block_change`` (requires a contingency-block loader
+    not yet wired).
 
     Parameters
     ----------
@@ -313,12 +398,7 @@ def build_event_table(
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
 
-    dot = dot.copy()
-    dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
-    dot["nonlocal_prob"] = (
-        dot["Non-Local_Continuous_prob"].to_numpy()
-        + dot["Non-Local_Fragmented_prob"].to_numpy()
-    )
+    dot = _prepare_dot(dot, env)
     dot = _add_trial_context(dot, trials)
 
     # Per-session immobility bouts — computed from the full frame so
@@ -329,11 +409,7 @@ def build_event_table(
     )
 
     # --- 2. Filter to in-event timebins ---
-    in_event_mask = (
-        (dot["non_local_event"] > 0)
-        & (dot["head_speed"] < speed_threshold)
-        & (dot["nonlocal_prob"] > nonlocal_threshold)
-    )
+    in_event_mask = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
     nl = dot.loc[in_event_mask]
 
     # Empty-output short-circuit — return a correctly-typed empty frame
@@ -463,13 +539,161 @@ def build_event_table(
     )
     per_event["time_since_stop"] = tss_by_event
 
-    # --- 7. Identifiers + stable hash ---
+    # --- 7. Conditional-posterior-dependent columns ---
+    # Absent ``conditional_posterior`` — emit the canonical columns as
+    # NaN so the schema is stable across call sites. When supplied, we
+    # marginalize to arms inside ``nl`` (same in-event filter as the
+    # rest of the builder) and feed the helpers in
+    # :mod:`summaries` / :mod:`uncertainty`.
+    posterior_cols = (
+        "posterior_mass_total",
+        "posterior_peak_mean",
+        "posterior_entropy_mean",
+        "posterior_hpd_width_50",
+        "posterior_hpd_width_80",
+        "posterior_hpd_width_95",
+    )
+    if conditional_posterior is None:
+        for c in posterior_cols:
+            per_event[c] = np.nan
+    else:
+        edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
+        post_vals = _align_posterior_to_dot(conditional_posterior, dot)
+        post_in_event = post_vals[in_event_mask.to_numpy()]
+        arm_posterior = posterior_to_arm_marginal(
+            post_in_event, edge_id, n_arms=len(ALL_ARMS)
+        )
+
+        _, mass_total = posterior_mass_total(nonlocal_prob_arr, event_id_series)
+        _, peak = posterior_peak_mean(
+            arm_posterior, nonlocal_prob_arr, event_id_series
+        )
+        _, entropy = posterior_entropy_mean(
+            arm_posterior, nonlocal_prob_arr, event_id_series
+        )
+        _, hpd = posterior_hpd_widths(
+            arm_posterior,
+            nonlocal_prob_arr,
+            event_id_series,
+            coverages=(0.5, 0.8, 0.95),
+        )
+
+        per_event["posterior_mass_total"] = mass_total
+        per_event["posterior_peak_mean"] = peak
+        per_event["posterior_entropy_mean"] = entropy
+        per_event["posterior_hpd_width_50"] = hpd[0.5]
+        per_event["posterior_hpd_width_80"] = hpd[0.8]
+        per_event["posterior_hpd_width_95"] = hpd[0.95]
+
+    # --- 8. Identifiers + stable hash ---
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "day", day)
     per_event.insert(2, "epoch", epoch)
     per_event["event_id"] = _hash_event_id(per_event)
 
     return per_event[column_order]
+
+
+def build_event_sequence_table(
+    dot: pd.DataFrame,
+    env,
+    conditional_posterior,
+    *,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> pd.DataFrame:
+    """One row per in-event timebin with the arm-marginal posterior.
+
+    This is the plan's Section 2.3 table — the per-timebin canonical
+    view of what the decoder said each timebin represented, inside
+    non-local events. Its ``event_id`` hash matches
+    :func:`build_event_table` row-for-row, so the two can be joined on
+    ``event_id`` without loss.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        Same as :func:`build_event_table`.
+    env : Environment
+        Same as :func:`build_event_table`; ``place_bin_centers_nodes_df_``
+        supplies the ``edge_id`` vector that drives the arm-posterior
+        collapse (junction bins excluded and renormalized in
+        :func:`summaries.posterior_to_arm_marginal`).
+    conditional_posterior : xr.DataArray
+        Shape ``(time, position)`` — from
+        :func:`posterior_io.load_conditional_posterior`. Must have the
+        same time length as ``dot``.
+    speed_threshold, nonlocal_threshold : float
+        Same defaults as :func:`build_event_table`. Keeping the two
+        filters in lockstep is important: ``event_sequence_table`` and
+        ``event_table`` must cover exactly the same in-event rows, or
+        joins across them drift.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns:
+
+        - ``animal``, ``day``, ``epoch``, ``non_local_event``,
+          ``event_id`` (identifiers; matches ``event_table``)
+        - ``t_in_event`` — 0-indexed position within the event
+        - ``time`` — raw timebin timestamp in seconds
+        - ``nonlocal_prob`` — ``w_t`` at the timebin
+        - ``decoded_arm_map`` — MAP arm from the arm-marginal posterior
+        - ``arm_posterior_0`` … ``arm_posterior_8`` — per-arm
+          probabilities (rows sum to 1 up to fp tolerance)
+
+    Notes
+    -----
+    The arm-marginal posterior used here is the same one that feeds
+    :func:`build_event_table`'s posterior-dependent columns — no
+    arithmetic difference can leak between the two tables.
+    """
+    if "animal" not in dot.columns:
+        raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
+    animal = str(dot["animal"].iloc[0])
+    day = int(dot["day"].iloc[0])
+    epoch = str(dot["epoch"].iloc[0])
+
+    dot = _prepare_dot(dot, env)
+    in_event_mask = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
+
+    column_order = _event_sequence_table_columns()
+    if not in_event_mask.any():
+        return pd.DataFrame(columns=column_order)
+
+    nl = dot.loc[in_event_mask]
+    edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
+    post_vals = _align_posterior_to_dot(conditional_posterior, dot)
+    post_in_event = post_vals[in_event_mask.to_numpy()]
+    arm_posterior = posterior_to_arm_marginal(
+        post_in_event, edge_id, n_arms=len(ALL_ARMS)
+    )
+    decoded_arm_map = arm_map_from_posterior(arm_posterior)
+
+    # t_in_event: 0-indexed position within each event, in timebin order.
+    # ``groupby(...).cumcount()`` preserves the original row order within
+    # each group, which matches the sort-by-time order of ``nl`` since
+    # ``dot`` is time-sorted.
+    t_in_event = nl.groupby("non_local_event", sort=False).cumcount().to_numpy()
+
+    out = pd.DataFrame(
+        {
+            "animal": animal,
+            "day": day,
+            "epoch": epoch,
+            "non_local_event": nl["non_local_event"].to_numpy(),
+            "t_in_event": t_in_event,
+            "time": nl.index.to_numpy(),
+            "nonlocal_prob": nl["nonlocal_prob"].to_numpy(),
+            "decoded_arm_map": decoded_arm_map,
+        }
+    )
+    for arm in ALL_ARMS:
+        out[f"arm_posterior_{arm}"] = arm_posterior[:, arm]
+
+    out["event_id"] = _hash_event_id(out)
+    return out[column_order]
 
 
 # ── Helpers ──
@@ -537,6 +761,29 @@ def _event_table_columns() -> list[str]:
         "next_patch",
         "n_nonlocal_bins",
         "nonlocal_weight_sum",
+        "posterior_mass_total",
+        "posterior_peak_mean",
+        "posterior_entropy_mean",
+        "posterior_hpd_width_50",
+        "posterior_hpd_width_80",
+        "posterior_hpd_width_95",
         "n_junction_bins",
         "n_unique_arms",
     ]
+
+
+def _event_sequence_table_columns() -> list[str]:
+    """Canonical column order for ``event_sequence_table``."""
+    cols = [
+        "animal",
+        "day",
+        "epoch",
+        "non_local_event",
+        "event_id",
+        "t_in_event",
+        "time",
+        "nonlocal_prob",
+        "decoded_arm_map",
+    ]
+    cols.extend(f"arm_posterior_{a}" for a in ALL_ARMS)
+    return cols
