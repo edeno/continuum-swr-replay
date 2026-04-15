@@ -79,6 +79,25 @@ def _add_trial_context(
     """
     dot_times = dot.index.values
     n_trials = len(trials)
+
+    # Empty-trials short-circuit: populate every trial-derived column
+    # with NaN so the schema is complete and ``build_event_table`` can
+    # still run end-to-end (e.g., for a session with no valid trials
+    # or for unit-test fixtures that stub trial context out entirely).
+    if n_trials == 0:
+        for col in (
+            "prev_trial_from_well",
+            "prev_trial_to_well",
+            "next_trial_to_well",
+            "last_rewarded_well",
+            "reward_outcome",
+            "is_after_reward",
+            "is_after_omission",
+            "is_after_switch",
+        ):
+            dot[col] = np.nan
+        return dot
+
     trial_start_times = trials["start_time"].values
     trial_end_times = trials["end_time"].values
     to_wells = trials["to_well"].values
