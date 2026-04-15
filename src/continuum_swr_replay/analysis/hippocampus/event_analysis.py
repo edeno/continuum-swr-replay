@@ -223,3 +223,121 @@ def get_event_durations_ms(event_times: pd.DataFrame) -> pd.Series:
         raise ValueError("event_times must have 'duration' column")
 
     return event_times["duration"] * 1000.0
+
+
+def compute_event_timing_offsets(
+    data_over_time: pd.DataFrame,
+    reference_event_col: str = "SWR_event",
+    target_event_col: str = "non_local_event",
+) -> pd.DataFrame:
+    """Per-overlap time offsets between two event types.
+
+    For each (reference, target) event pair that shares at least one
+    timepoint, computes
+
+        start_diff = target_start - reference_start
+        end_diff   = target_end   - reference_end
+
+    Positive ``start_diff`` means the target starts later than the
+    reference; negative ``end_diff`` means the target ends earlier.
+    For Figure 2, the canonical call is
+
+        offsets = compute_event_timing_offsets(
+            data_over_time, "SWR_event", "non_local_event",
+        )
+
+    which answers "when, relative to the SWR window, do non-local
+    events start and end?" A distribution centered at positive
+    ``start_diff`` and negative ``end_diff`` means non-local events
+    typically sit inside the SWR window.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Time-indexed aggregated data with ``animal``, ``day``,
+        ``epoch``, and the two event columns.
+    reference_event_col : str, default "SWR_event"
+        Event column whose boundaries are treated as the reference (t=0).
+    target_event_col : str, default "non_local_event"
+        Event column whose boundaries are compared to the reference.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per overlapping (reference_id, target_id) pair with
+        columns ``animal``, ``day``, ``epoch``, the two event id
+        columns, and ``start_diff`` / ``end_diff`` (seconds).
+
+    Notes
+    -----
+    If a single reference event overlaps with multiple target events,
+    the result includes one row per (reference, target) pair. Same if
+    a target event overlaps multiple references. Duplicates are not
+    collapsed.
+
+    """
+    group_cols = ["animal", "day", "epoch"]
+
+    # Precompute per-event start and end times for both event types
+    def event_bounds(df: pd.DataFrame, event_col: str) -> pd.DataFrame:
+        active = df[df[event_col] > 0]
+        if len(active) == 0:
+            return pd.DataFrame(
+                columns=[*group_cols, event_col, "start_time", "end_time"],
+            )
+        # Use the time-index of the aggregated data as the canonical time
+        bounds = (
+            active.reset_index(names="time")
+            .groupby([*group_cols, event_col])
+            .agg(start_time=("time", "min"), end_time=("time", "max"))
+            .reset_index()
+        )
+        return bounds
+
+    ref_bounds = event_bounds(data_over_time, reference_event_col)
+    tgt_bounds = event_bounds(data_over_time, target_event_col)
+
+    # For each reference event, find all target events that share any
+    # timepoint during it. We do this by iterating sessions because
+    # the per-session event counts are small enough that a vectorised
+    # cross-join within each session is cheap.
+    rows: list[dict] = []
+    key_cols = group_cols
+    for key, ref_session in ref_bounds.groupby(key_cols, sort=False):
+        tgt_session = tgt_bounds[
+            (tgt_bounds[key_cols[0]] == key[0])
+            & (tgt_bounds[key_cols[1]] == key[1])
+            & (tgt_bounds[key_cols[2]] == key[2])
+        ]
+        if len(tgt_session) == 0:
+            continue
+        # Broadcast overlap check: (ref_end >= tgt_start) AND (ref_start <= tgt_end)
+        ref_starts = ref_session["start_time"].to_numpy()
+        ref_ends = ref_session["end_time"].to_numpy()
+        tgt_starts = tgt_session["start_time"].to_numpy()
+        tgt_ends = tgt_session["end_time"].to_numpy()
+
+        overlap = (
+            (ref_ends[:, None] >= tgt_starts[None, :])
+            & (ref_starts[:, None] <= tgt_ends[None, :])
+        )
+        ref_idx, tgt_idx = overlap.nonzero()
+        if ref_idx.size == 0:
+            continue
+
+        ref_ids = ref_session[reference_event_col].to_numpy()
+        tgt_ids = tgt_session[target_event_col].to_numpy()
+        for ri, ti in zip(ref_idx, tgt_idx, strict=True):
+            rows.append(
+                {
+                    group_cols[0]: key[0],
+                    group_cols[1]: key[1],
+                    group_cols[2]: key[2],
+                    reference_event_col: ref_ids[ri],
+                    target_event_col: tgt_ids[ti],
+                    "start_diff": tgt_starts[ti] - ref_starts[ri],
+                    "end_diff": tgt_ends[ti] - ref_ends[ri],
+                }
+            )
+
+    return pd.DataFrame(rows)

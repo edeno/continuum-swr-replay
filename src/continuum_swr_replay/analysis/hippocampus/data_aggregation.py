@@ -373,3 +373,123 @@ def get_event_types(data_over_time: pd.DataFrame) -> dict:
         "swr_events_no_non_local": swr_events_no_non_local,
         "mua_events_no_non_local": mua_events_no_non_local,
     }
+
+
+def compute_swr_overlap_class_counts(
+    data_over_time: pd.DataFrame,
+) -> dict[str, int]:
+    """Count immobile non-local events by SWR-overlap geometry.
+
+    Uses a timepoint-level rule equivalent to the interval-based
+    :func:`classify_swr_overlap`: if every timepoint of a non-local
+    event has ``SWR_event > 0`` the event is "contained", if some but
+    not all do it "extends" beyond the SWR, and if none do it is
+    "none".
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data containing ``non_local_event``, ``SWR_event``,
+        ``head_speed``, ``animal``, ``day``, and ``epoch`` columns.
+
+    Returns
+    -------
+    dict[str, int]
+        Mapping ``{"contained": n, "extends": n, "none": n,
+        "total": n}``. ``total`` is the number of immobile non-local
+        events (sum of the three class counts).
+
+    Notes
+    -----
+    This aggregates across all sessions. For per-session or
+    per-animal breakdowns, call this on a filtered DataFrame.
+
+    """
+    non_local_immobile = get_immobile_events(
+        data_over_time,
+        event_col="non_local_event",
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        method="endpoints",
+    )
+
+    def _classify(group: pd.DataFrame) -> str:
+        has_swr = group["SWR_event"] > 0
+        if not has_swr.any():
+            return "none"
+        if has_swr.all():
+            return "contained"
+        return "extends"
+
+    classes = non_local_immobile.groupby(
+        ["animal", "day", "epoch", "non_local_event"],
+    ).apply(_classify)
+    counts = classes.value_counts()
+    return {
+        "contained": int(counts.get("contained", 0)),
+        "extends": int(counts.get("extends", 0)),
+        "none": int(counts.get("none", 0)),
+        "total": int(counts.sum()),
+    }
+
+
+def compute_swr_nl_event_counts(
+    data_over_time: pd.DataFrame,
+) -> dict[str, int]:
+    """Event-level totals and overlap for the SWR / immobile non-local pair.
+
+    Designed as the data source for a 2-circle Venn (Figure 3 panel b).
+    Reports four numbers:
+
+    - ``n_swr``                — total SWR events (any speed)
+    - ``n_swr_with_nl``        — SWR events overlapping at least one NL event
+    - ``n_nl_immobile``        — total immobile non-local events
+    - ``n_nl_immobile_with_swr`` — immobile NL events overlapping at least one SWR
+
+    The two "with" counts may differ by a few percent because a single
+    SWR can overlap multiple NL events, or vice versa. For a Venn
+    diagram, the natural "shared" region is the mean of the two counts
+    (both refer to the same underlying overlap interval set but are
+    counted from different sides).
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated data with ``non_local_event``, ``SWR_event``,
+        ``head_speed``, and session group columns.
+
+    Returns
+    -------
+    dict[str, int]
+        Counts dict suitable for :func:`plot_swr_nl_venn_2circle`.
+
+    """
+    # Immobile non-local events
+    nl_immobile = get_immobile_events(
+        data_over_time,
+        event_col="non_local_event",
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        method="endpoints",
+    )
+    nl_groups = nl_immobile.loc[nl_immobile["non_local_event"] > 0].groupby(
+        ["animal", "day", "epoch", "non_local_event"],
+    )
+    nl_with_swr = nl_groups.apply(lambda g: (g["SWR_event"] > 0).any())
+    n_nl = len(nl_with_swr)
+    n_nl_with_swr = int(nl_with_swr.sum())
+
+    # All SWR events (not filtered by speed — ripple detection is speed-agnostic)
+    swr_groups = data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(
+        ["animal", "day", "epoch", "SWR_event"],
+    )
+    swr_with_nl = swr_groups.apply(lambda g: (g["non_local_event"] > 0).any())
+    n_swr = len(swr_with_nl)
+    n_swr_with_nl = int(swr_with_nl.sum())
+
+    return {
+        "n_swr": n_swr,
+        "n_swr_with_nl": n_swr_with_nl,
+        "n_nl_immobile": n_nl,
+        "n_nl_immobile_with_swr": n_nl_with_swr,
+    }

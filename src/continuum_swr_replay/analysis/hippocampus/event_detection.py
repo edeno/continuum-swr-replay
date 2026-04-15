@@ -166,3 +166,130 @@ def get_overlap_times(
     ]
 
     return overlap_non_local_times, no_overlap_non_local_times
+
+
+def classify_swr_overlap(
+    non_local_events: pd.DataFrame,
+    ripple_times: pd.DataFrame,
+) -> pd.DataFrame:
+    """Label each non-local event by its SWR-overlap geometry.
+
+    Adds an ``overlap_class`` column taking one of three values:
+
+    - ``"contained"`` : the non-local event is fully inside at least one
+      SWR event (non-local start >= SWR start AND non-local end <=
+      SWR end).
+    - ``"extends"``   : the non-local event overlaps at least one SWR
+      event but is not fully contained in any of them — it extends
+      before or after the SWR window.
+    - ``"none"``      : the non-local event does not overlap any SWR
+      event.
+
+    Parameters
+    ----------
+    non_local_events : pd.DataFrame
+        Non-local event intervals with ``start_time`` and ``end_time``
+        columns (as returned by :func:`get_confident_times`).
+    ripple_times : pd.DataFrame
+        SWR event intervals with ``start_time`` and ``end_time`` columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``non_local_events`` with an added ``overlap_class``
+        column.
+
+    Notes
+    -----
+    "Contained" and "extends" are decided per non-local event. If a
+    non-local event overlaps multiple SWRs, we label it "contained" as
+    soon as any one SWR fully contains it; otherwise "extends".
+
+    """
+    classes: list[str] = []
+    swr_starts = ripple_times["start_time"].to_numpy()
+    swr_ends = ripple_times["end_time"].to_numpy()
+
+    for ev in non_local_events.itertuples():
+        # Any SWR that overlaps this non-local event at all
+        overlap_mask = (swr_ends >= ev.start_time) & (
+            swr_starts <= ev.end_time
+        )
+        if not overlap_mask.any():
+            classes.append("none")
+            continue
+        # Any SWR that fully contains this non-local event?
+        contained_mask = (
+            overlap_mask
+            & (swr_starts <= ev.start_time)
+            & (swr_ends >= ev.end_time)
+        )
+        if contained_mask.any():
+            classes.append("contained")
+        else:
+            classes.append("extends")
+
+    out = non_local_events.copy()
+    out["overlap_class"] = classes
+    return out
+
+
+def select_typical_event_by_class(
+    classified_events: pd.DataFrame,
+    non_local_prob: xr.DataArray,
+    peak_threshold: float = 0.9,
+) -> dict[str, pd.Series]:
+    """Pick one deterministic "typical" event per SWR-overlap class.
+
+    For each overlap class ("contained", "extends", "none"), selects the
+    event closest to that class's median duration among events whose peak
+    non-local probability meets ``peak_threshold``. If no events in a
+    class meet the peak threshold, the rule falls back to the full class.
+
+    Parameters
+    ----------
+    classified_events : pd.DataFrame
+        Non-local event table with an ``overlap_class`` column (from
+        :func:`classify_swr_overlap`).
+    non_local_prob : xr.DataArray
+        Combined non-local state probability time series, used to
+        compute per-event peak probability.
+    peak_threshold : float, default 0.9
+        Minimum peak non-local probability for an event to count as
+        "clean" for selection.
+
+    Returns
+    -------
+    dict
+        Mapping ``class -> pd.Series`` (one selected event per class).
+        A class with no events is omitted from the dict.
+
+    """
+    time_vals = non_local_prob.time.to_numpy()
+    prob_vals = non_local_prob.to_numpy().squeeze()
+
+    def peak_prob(start: float, end: float) -> float:
+        mask = (time_vals >= start) & (time_vals <= end)
+        if not mask.any():
+            return 0.0
+        return float(prob_vals[mask].max())
+
+    chosen: dict[str, pd.Series] = {}
+    for cls in ("contained", "extends", "none"):
+        subset = classified_events[
+            classified_events["overlap_class"] == cls
+        ]
+        if len(subset) == 0:
+            continue
+        subset = subset.copy()
+        subset["peak_prob"] = [
+            peak_prob(ev.start_time, ev.end_time)
+            for ev in subset.itertuples()
+        ]
+        clean = subset[subset["peak_prob"] >= peak_threshold]
+        if len(clean) == 0:
+            clean = subset
+        median_duration = clean["duration"].median()
+        idx = (clean["duration"] - median_duration).abs().idxmin()
+        chosen[cls] = clean.loc[idx]
+    return chosen

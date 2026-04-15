@@ -78,13 +78,25 @@ Examples
 
 """
 
-from .data_aggregation import get_data_over_time, get_event_types, load_data_over_time
+from .data_aggregation import (
+    compute_swr_nl_event_counts,
+    compute_swr_overlap_class_counts,
+    get_data_over_time,
+    get_event_types,
+    load_data_over_time,
+)
 from .event_analysis import (
+    compute_event_timing_offsets,
     get_event_durations_ms,
     get_event_start_end_times,
     get_immobile_events,
 )
-from .event_detection import get_confident_times, get_overlap_times
+from .event_detection import (
+    classify_swr_overlap,
+    get_confident_times,
+    get_overlap_times,
+    select_typical_event_by_class,
+)
 from .hpc_raw_stats import (
     DISCRETE_STATE_ORDER,
     RAW_STAT_COLUMNS,
@@ -120,9 +132,12 @@ __all__ = [
     "load_results",
     "get_confident_times",
     "get_overlap_times",
+    "classify_swr_overlap",
+    "select_typical_event_by_class",
     "get_immobile_events",
     "get_event_start_end_times",
     "get_event_durations_ms",
+    "compute_event_timing_offsets",
     "get_signal_windows",
     "get_conditional_non_local_posterior",
     "get_map_speed",
@@ -130,6 +145,8 @@ __all__ = [
     "get_data_over_time",
     "load_data_over_time",
     "get_event_types",
+    "compute_swr_overlap_class_counts",
+    "compute_swr_nl_event_counts",
     "compute_behavior_state_breakdown",
     "compute_bout_nonlocal_dominance",
     "compute_calibration_curve",
