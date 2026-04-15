@@ -16,7 +16,7 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
-from .spatial_mapping import well_to_arm_set
+from continuum_swr_replay.analysis.replay.spatial_mapping import well_to_arm_set
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 

@@ -51,7 +51,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
     add_trial_context,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
 from continuum_swr_replay.data_loaders import load_data

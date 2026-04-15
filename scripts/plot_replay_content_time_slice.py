@@ -39,7 +39,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import (
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import (
@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import 
     compute_dist_to_arm,
     compute_visit_recency_for_event,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+from continuum_swr_replay.analysis.replay.spatial_mapping import (
     arm_to_well,
     well_to_arm_set,
 )

@@ -15,7 +15,7 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.event_collapsing i
     add_interaction_columns,
     compute_arm_counts,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
+from continuum_swr_replay.analysis.replay.fitting import (
     _log_likelihood,
     _null_log_likelihood,
     fit_conditional_logit,
@@ -23,22 +23,22 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
     fit_glm,
     fit_null_model_conditional,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_checking import (
+from continuum_swr_replay.analysis.replay.model_checking import (
     cross_validate_conditional_poisson,
     cross_validate_session,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_comparison import (
+from continuum_swr_replay.analysis.replay.model_comparison import (
     compare_nested_models,
     summarize_comparison,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import (
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import (
     compute_dist_to_arm,
     compute_time_since_stop,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+from continuum_swr_replay.analysis.replay.spatial_mapping import (
     arm_to_well,
     well_to_arm_set,
 )

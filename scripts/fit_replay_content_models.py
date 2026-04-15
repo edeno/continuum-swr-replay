@@ -23,17 +23,17 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
+from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_checking import (
+from continuum_swr_replay.analysis.replay.model_checking import (
     cross_validate_conditional_poisson,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_comparison import (
+from continuum_swr_replay.analysis.replay.model_comparison import (
     run_full_hierarchy_comparison,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import (
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR

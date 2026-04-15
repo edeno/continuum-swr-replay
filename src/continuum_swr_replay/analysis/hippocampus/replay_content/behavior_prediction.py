@@ -21,7 +21,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import LeaveOneGroupOut
 
-from .spatial_mapping import well_to_arm_set
+from continuum_swr_replay.analysis.replay.spatial_mapping import well_to_arm_set
 
 logger = logging.getLogger(__name__)
 

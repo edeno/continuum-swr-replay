@@ -31,13 +31,20 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .data_preparation import add_event_uid
-from .event_collapsing import (
+# NOTE: data_preparation and event_collapsing still live in the legacy
+# ``hippocampus/replay_content/`` module; they will be rewritten into
+# ``analysis/replay/tables.py`` in Phase B3 and these imports will flip
+# to the new location.
+from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
+    add_event_uid,
+)
+from continuum_swr_replay.analysis.hippocampus.replay_content.event_collapsing import (
     ALL_ARMS,
     collapse_to_events,
     compute_arm_counts,
     make_long_format_arm,
 )
+
 from .spatial_mapping import arm_to_well, map_estimate_to_arm
 
 DEFAULT_PREDICTORS: tuple[str, ...] = (

@@ -34,7 +34,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR

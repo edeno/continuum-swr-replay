@@ -35,7 +35,11 @@ from .predictors import (
     compute_time_since_stop,
     compute_visit_recency_for_event,
 )
-from .spatial_mapping import arm_to_well, map_estimate_to_arm, map_estimate_to_patch
+from continuum_swr_replay.analysis.replay.spatial_mapping import (
+    arm_to_well,
+    map_estimate_to_arm,
+    map_estimate_to_patch,
+)
 
 logger = logging.getLogger(__name__)
 

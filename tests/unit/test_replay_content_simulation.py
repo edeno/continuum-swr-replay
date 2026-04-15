@@ -11,10 +11,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.replay_content.fitting import (
+from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_poisson,
 )
-from continuum_swr_replay.analysis.hippocampus.replay_content.simulation import (
+from continuum_swr_replay.analysis.replay.simulation import (
     DEFAULT_PREDICTORS,
     make_synthetic_env,
     simulate_autocorrelated_counts,

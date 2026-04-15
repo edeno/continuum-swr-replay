@@ -13,7 +13,7 @@ import seaborn as sns
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import (
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.parameters import COLORS

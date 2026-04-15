@@ -20,7 +20,7 @@ import pandas as pd
 import seaborn as sns
 
 import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.hippocampus.replay_content.model_specs import (
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
