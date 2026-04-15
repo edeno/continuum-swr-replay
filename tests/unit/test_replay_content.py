@@ -39,6 +39,7 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.predictors import 
     compute_time_since_stop,
 )
 from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping import (
+    arm_to_well,
     well_to_arm_set,
 )
 
@@ -47,36 +48,39 @@ from continuum_swr_replay.analysis.hippocampus.replay_content.spatial_mapping im
 
 @pytest.fixture
 def sample_track_graph():
-    """Create a simple track graph with 6 wells and 9 edges."""
+    """Create a track graph matching the real bandit task structure.
+
+    Structure: 6 wells (nodes 0-5, all degree-1 terminals), 3 patch
+    junctions (6, 7, 8, degree 3 each), 1 center junction (node 9, degree 3),
+    9 edges total — 6 "leaf arms" (well → patch junction) and 3 "trunk arms"
+    (patch junction → center junction).
+    """
     G = nx.Graph()
-    # Add 6 well nodes with positions
+    # Wells (patch layout: wells 0-1 in patch 1, 2-3 in patch 2, 4-5 in patch 3)
     well_positions = {
-        0: (0, 0),
-        1: (10, 0),
-        2: (0, 10),
-        3: (10, 10),
-        4: (0, 20),
-        5: (10, 20),
+        0: (0, 0), 1: (10, 0),
+        2: (0, 10), 3: (10, 10),
+        4: (0, 20), 5: (10, 20),
     }
     for node, pos in well_positions.items():
         G.add_node(node, pos=pos)
-    # Add 4 junction nodes
-    for node, pos in [(6, (5, 5)), (7, (5, 5)), (8, (5, 15)), (9, (5, 15))]:
+    # Patch junctions (6, 7, 8) and center junction (9)
+    for node, pos in [(6, (5, 2)), (7, (5, 12)), (8, (5, 22)), (9, (5, 12))]:
         G.add_node(node, pos=pos)
-    # Add 9 edges with edge_id
+    # Edges: leaf arms (well → patch junction) + trunk arms (patch junction → center)
     edges = [
-        (0, 6, 0),
-        (1, 6, 1),
-        (0, 1, 6),
-        (2, 7, 2),
-        (3, 7, 3),
-        (2, 3, 7),
-        (4, 8, 4),
-        (5, 8, 5),
-        (4, 5, 8),
+        (0, 6, 0),   # well 0 → patch junction 6 via arm 0
+        (1, 6, 1),   # well 1 → patch junction 6 via arm 1
+        (2, 7, 2),   # well 2 → patch junction 7 via arm 2
+        (3, 7, 3),   # well 3 → patch junction 7 via arm 3
+        (4, 8, 4),   # well 4 → patch junction 8 via arm 4
+        (5, 8, 5),   # well 5 → patch junction 8 via arm 5
+        (6, 9, 6),   # patch junction 6 → center 9 via arm 6
+        (7, 9, 7),   # patch junction 7 → center 9 via arm 7
+        (8, 9, 8),   # patch junction 8 → center 9 via arm 8
     ]
     for u, v, eid in edges:
-        G.add_edge(u, v, edge_id=eid)
+        G.add_edge(u, v, edge_id=eid, distance=10.0)
     return G
 
 
@@ -157,10 +161,121 @@ class TestWellToArmSet:
         arms = well_to_arm_set(np.nan, sample_track_graph)
         assert arms == set()
 
-    def test_each_well_has_two_arms(self, sample_track_graph):
+    def test_each_well_has_one_arm(self, sample_track_graph):
+        """On the real bandit graph wells are degree-1 terminals."""
+        expected = {0: {0}, 1: {1}, 2: {2}, 3: {3}, 4: {4}, 5: {5}}
         for well_id in range(6):
             arms = well_to_arm_set(well_id, sample_track_graph)
-            assert len(arms) == 2, f"Well {well_id} has {len(arms)} arms"
+            assert arms == expected[well_id], (
+                f"well {well_id} → {arms}, expected {expected[well_id]}"
+            )
+
+
+class TestArmToWell:
+    """Test arm_to_well (inverse of well_to_arm_set for leaf arms)."""
+
+    def test_leaf_arms_return_their_well(self, sample_track_graph):
+        for arm in range(6):
+            well = arm_to_well(arm, sample_track_graph)
+            assert well == float(arm), (
+                f"arm {arm} should return well {arm}, got {well}"
+            )
+
+    def test_trunk_arms_return_nan(self, sample_track_graph):
+        for arm in [6, 7, 8]:
+            well = arm_to_well(arm, sample_track_graph)
+            assert np.isnan(well), (
+                f"trunk arm {arm} should return NaN, got {well}"
+            )
+
+    def test_nan_arm_returns_nan(self, sample_track_graph):
+        assert np.isnan(arm_to_well(np.nan, sample_track_graph))
+
+    def test_roundtrip_with_well_to_arm_set(self, sample_track_graph):
+        """well → leaf arm → well should be the identity for wells 0-5."""
+        for well in range(6):
+            arms = well_to_arm_set(well, sample_track_graph)
+            assert len(arms) == 1
+            arm = next(iter(arms))
+            back_to_well = arm_to_well(arm, sample_track_graph)
+            assert back_to_well == float(well)
+
+
+class TestAddTrialContext:
+    """In-progress trip semantics for add_trial_context."""
+
+    @pytest.fixture
+    def simple_trials(self):
+        """Three trips: 0→1, 1→0, 0→1 with contiguous boundaries."""
+        return pd.DataFrame(
+            {
+                "start_time": [0.0, 10.0, 20.0],
+                "end_time": [10.0, 20.0, 30.0],
+                "from_well": [0, 1, 0],
+                "to_well": [1, 0, 1],
+                "from_patch": [1, 1, 1],
+                "to_patch": [1, 1, 1],
+                "is_reward": [True, False, True],
+                "is_patch_change": [False, False, False],
+            }
+        )
+
+    def test_in_progress_trip_during_immobility(self, simple_trials):
+        """Time mid-trip should report the in-progress trip's from_well."""
+        from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
+            add_trial_context,
+        )
+
+        # Sample times: in the middle of each trip
+        times = np.array([5.0, 15.0, 25.0])
+        dot = pd.DataFrame({"x": [1.0, 2.0, 3.0]}, index=times)
+        dot = add_trial_context(dot, simple_trials)
+
+        # t=5.0 is during trip 0 (0→1)
+        assert dot["prev_trial_from_well"].iloc[0] == 0
+        assert dot["prev_trial_to_well"].iloc[0] == 1
+        assert dot["next_trial_to_well"].iloc[0] == 0  # next trip is 1→0
+
+        # t=15.0 is during trip 1 (1→0)
+        assert dot["prev_trial_from_well"].iloc[1] == 1
+        assert dot["prev_trial_to_well"].iloc[1] == 0
+        assert dot["next_trial_to_well"].iloc[1] == 1  # next trip is 0→1
+
+        # t=25.0 is during trip 2 (0→1)
+        assert dot["prev_trial_from_well"].iloc[2] == 0
+        assert dot["prev_trial_to_well"].iloc[2] == 1
+        assert np.isnan(dot["next_trial_to_well"].iloc[2])  # last trip
+
+    def test_omission_flag_uses_current_trip(self, simple_trials):
+        """is_after_omission reflects the current (in-progress) trip's reward."""
+        from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
+            add_trial_context,
+        )
+
+        times = np.array([5.0, 15.0, 25.0])
+        dot = pd.DataFrame({"x": [1.0, 2.0, 3.0]}, index=times)
+        dot = add_trial_context(dot, simple_trials)
+
+        # Trip 0 is_reward=True → is_after_omission=False
+        assert dot["is_after_omission"].iloc[0] == 0.0
+        # Trip 1 is_reward=False → is_after_omission=True
+        assert dot["is_after_omission"].iloc[1] == 1.0
+        # Trip 2 is_reward=True → is_after_omission=False
+        assert dot["is_after_omission"].iloc[2] == 0.0
+
+    def test_before_first_trip_is_nan(self, simple_trials):
+        """Times before any trip starts should be NaN for context."""
+        from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
+            add_trial_context,
+        )
+
+        times = np.array([-1.0])
+        dot = pd.DataFrame({"x": [1.0]}, index=times)
+        dot = add_trial_context(dot, simple_trials)
+
+        assert np.isnan(dot["prev_trial_from_well"].iloc[0])
+        assert np.isnan(dot["prev_trial_to_well"].iloc[0])
+        assert np.isnan(dot["next_trial_to_well"].iloc[0])
 
 
 # ── Tests: Predictors ──
@@ -197,12 +312,18 @@ class TestComputeTimeSinceStop:
 class TestComputeDistToArm:
     """Test dist_to_arm computation."""
 
-    def test_adjacent_arm_has_distance_one(self, sample_track_graph):
-        """Arms adjacent to the current well should have small distance."""
+    def test_own_arm_has_distance_zero(self, sample_track_graph):
+        """The leaf arm attached to a well has distance 0 (well IS an endpoint).
+
+        On the real-graph-shaped fixture each edge is 10 cm. From well 0:
+        - arm 0 (well 0 → patch junction 6) has endpoint 0, so dist 0
+        - arm 6 (patch junction 6 → center 9) has endpoint 6 at 10 cm away
+        - arm 1 (well 1 → patch junction 6) has endpoint 6 at 10 cm away
+        """
         dists = compute_dist_to_arm(0, sample_track_graph)
-        # Well 0 is adjacent to arm 0 (edge 0-6) and arm 6 (edge 0-1)
-        assert dists[0] == 0  # arm 0 connects to well 0
-        assert dists[6] == 0  # arm 6 connects wells 0-1
+        assert dists[0] == 0
+        assert dists[6] == 10
+        assert dists[1] == 10
 
     def test_all_distances_non_negative_or_nan(self, sample_track_graph):
         """Distances should be non-negative (NaN for unreachable arms)."""

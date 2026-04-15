@@ -35,7 +35,7 @@ from .predictors import (
     compute_time_since_stop,
     compute_visit_recency_for_event,
 )
-from .spatial_mapping import map_estimate_to_arm, map_estimate_to_patch
+from .spatial_mapping import arm_to_well, map_estimate_to_arm, map_estimate_to_patch
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +76,39 @@ def add_trial_context(
 ) -> pd.DataFrame:
     """Add trial-derived context columns to data_over_time.
 
-    Adds per-timepoint columns for previous trial origin/destination wells,
-    next trial destination well, most recently rewarded well, and task
-    context flags (is_after_switch, is_after_omission).
+    Uses **in-progress trip semantics**: at each timepoint t, the
+    "current trip" is the latest trial whose ``start_time`` is at or
+    before t. This is the trip the animal is currently completing
+    (or has just completed, if t falls in the gap between two trips).
+
+    The trip the animal is currently on tells us:
+    - where it came from (``prev_trial_from_well`` = current trip's
+      from_well)
+    - where it has arrived / will arrive (``prev_trial_to_well`` =
+      current trip's to_well — equal to the animal's current well during
+      sustained immobility at a destination)
+    - whether the trip was a patch switch / omission
+      (``is_after_switch``, ``is_after_omission``)
+
+    The "next trip" is the trial immediately following the current one
+    in the trial sequence (trial boundaries are contiguous, so we use
+    positional indexing rather than a strict time comparison).
+
+    .. note::
+        This is a fix relative to the previous behavior, which used
+        ``searchsorted(end_times, t)`` and returned the previously
+        *completed* trip — incorrect when the animal has already arrived
+        at the destination of an in-progress trip whose ``end_time`` is
+        still in the future (e.g., during sustained immobility at a
+        well, before the trial detector formally closes the trial).
 
     Parameters
     ----------
     dot : pd.DataFrame
         data_over_time DataFrame (time-indexed).
     trials : pd.DataFrame
-        Trial DataFrame with columns: end_time, to_well, from_well,
-        to_patch, from_patch, is_reward, is_patch_change.
+        Trial DataFrame with columns: start_time, end_time, to_well,
+        from_well, to_patch, from_patch, is_reward, is_patch_change.
 
     Returns
     -------
@@ -94,9 +116,8 @@ def add_trial_context(
         dot with added columns (modified in place and returned).
     """
     dot_times = dot.index.values
-    trial_end_times = trials["end_time"].values
-    trial_idx = np.searchsorted(trial_end_times, dot_times, side="right")
     n_trials = len(trials)
+    trial_start_times = trials["start_time"].values
     to_patches = trials["to_patch"].values
     from_patches = trials["from_patch"].values
     to_wells = trials["to_well"].values
@@ -104,25 +125,39 @@ def add_trial_context(
     is_reward = trials["is_reward"].values
     is_patch_change = trials["is_patch_change"].values
 
-    prev_idx = np.clip(trial_idx - 1, 0, n_trials - 1)
-    next_idx = np.clip(trial_idx, 0, n_trials - 1)
+    # Current trip = latest trial whose start_time <= dot_time. This is
+    # the trip the animal is currently completing or has just finished.
+    current_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
+    valid = current_idx >= 0  # at least one trip has started
+
+    current_clipped = np.clip(current_idx, 0, n_trials - 1)
+    next_idx = current_idx + 1
+    next_valid = valid & (next_idx < n_trials)
+    next_clipped = np.clip(next_idx, 0, n_trials - 1)
 
     # Patch-level
     dot["prev_trial_from_patch"] = np.where(
-        trial_idx > 0, from_patches[prev_idx], np.nan
+        valid, from_patches[current_clipped], np.nan
     )
     dot["next_trial_to_patch"] = np.where(
-        trial_idx < n_trials, to_patches[next_idx], np.nan
+        next_valid, to_patches[next_clipped], np.nan
     )
 
-    # Well-level: origin and destination of previous trial, destination of next
-    dot["prev_trial_from_well"] = np.where(trial_idx > 0, from_wells[prev_idx], np.nan)
-    dot["prev_trial_to_well"] = np.where(trial_idx > 0, to_wells[prev_idx], np.nan)
+    # Well-level
+    dot["prev_trial_from_well"] = np.where(
+        valid, from_wells[current_clipped], np.nan
+    )
+    dot["prev_trial_to_well"] = np.where(
+        valid, to_wells[current_clipped], np.nan
+    )
     dot["next_trial_to_well"] = np.where(
-        trial_idx < n_trials, to_wells[next_idx], np.nan
+        next_valid, to_wells[next_clipped], np.nan
     )
 
-    # Most recently rewarded well
+    # Most recently rewarded well: use end times here because reward is
+    # only "delivered" at trial completion. Use the latest rewarded trip
+    # whose end_time is at or before t.
+    trial_end_times = trials["end_time"].values
     rewarded_end_times = trial_end_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(rewarded_end_times) > 0:
@@ -134,12 +169,12 @@ def add_trial_context(
     else:
         dot["last_rewarded_well"] = np.nan
 
-    # Task context flags
+    # Task context flags: properties of the current (in-progress) trip.
     dot["is_after_switch"] = np.where(
-        trial_idx > 0, is_patch_change[prev_idx].astype(float), np.nan
+        valid, is_patch_change[current_clipped].astype(float), np.nan
     )
     dot["is_after_omission"] = np.where(
-        trial_idx > 0, (~is_reward[prev_idx]).astype(float), np.nan
+        valid, (~is_reward[current_clipped]).astype(float), np.nan
     )
 
     return dot
@@ -183,9 +218,16 @@ def _add_per_arm_predictors_single_session(
             vr = dict.fromkeys(ALL_ARMS, np.nan)
             cr = dict.fromkeys(ALL_ARMS, np.nan)
 
-        # dist_to_arm: distance from the animal's current well (destination
-        # of the most recently completed trial) to each arm.
-        current_well = event.get("prev_trial_to_well", np.nan)
+        # dist_to_arm: distance from the animal's current well to each arm.
+        # Derive the current well from the modal track_segment_id during the
+        # event (the arm the animal is physically on). This is more accurate
+        # than prev_trial_to_well when the animal has already arrived at the
+        # destination of an in-progress trial that hasn't formally "ended".
+        current_arm = event.get("track_segment_id", np.nan)
+        current_well = arm_to_well(current_arm, track_graph)
+        # Fall back to prev_trial_to_well if track_segment_id is not a leaf arm
+        if np.isnan(current_well):
+            current_well = event.get("prev_trial_to_well", np.nan)
         dists = compute_dist_to_arm(current_well, track_graph)
 
         for arm in ALL_ARMS:

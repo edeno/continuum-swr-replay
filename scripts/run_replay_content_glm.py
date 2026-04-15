@@ -158,12 +158,8 @@ def map_estimate_to_arm(map_estimate, env):
 def well_to_arm_set(well_id, track_graph):
     """Get the set of arm (edge) IDs adjacent to a well node.
 
-    Each well connects to 2 arms. This means is_prev/is_next (which use
-    wells) mark 2 of 9 arms as 1, while is_current (which uses
-    track_segment_id) marks only 1 arm. Coefficients for is_prev/is_next
-    reflect a 2-arm "well neighborhood" effect, not a single-arm effect.
-    This asymmetry is intentional: the animal's previous/next location is
-    known at the well level, not the arm level.
+    On the real bandit graph each well is degree-1, so this returns a
+    set of size 1. Well i maps to leaf arm i.
     """
     if np.isnan(well_id):
         return set()

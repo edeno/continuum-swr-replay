@@ -18,9 +18,12 @@ logger = logging.getLogger(__name__)
 def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     """Map decoded linear position to patch ID (1, 2, or 3).
 
-    Finds the nearest place bin for each MAP estimate, looks up its edge_id,
-    and maps to a patch via TRACK_SEGMENT_TO_PATCH. Junction bins (edge_id=-1)
-    map to NaN.
+    Finds the nearest real track place bin for each MAP estimate and
+    maps its edge_id to a patch via TRACK_SEGMENT_TO_PATCH.
+
+    Junction bins (edge_id=-1) are excluded from the nearest-neighbor
+    lookup because they are interpolation placeholders at edge gaps in
+    the linearization, not real spatial positions.
 
     Parameters
     ----------
@@ -32,23 +35,36 @@ def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Patch IDs (1, 2, or 3). NaN where map_estimate is NaN or at junctions.
+        Patch IDs (1, 2, or 3). NaN where map_estimate is NaN.
     """
     map_est = np.asarray(map_estimate, dtype=float)
     bin_df = env.place_bin_centers_nodes_df_
     lp = np.asarray(bin_df["linear_position"])
     ei = np.asarray(bin_df["edge_id"])
+
+    # Exclude junction bins (edge_id == -1) from nearest-neighbor lookup
+    real_mask = ei >= 0
+    lp_real = lp[real_mask]
+    ei_real = ei[real_mask]
+
     result = np.full(len(map_est), np.nan)
     valid = ~np.isnan(map_est)
-    if valid.any():
-        idx = np.abs(lp[None, :] - map_est[valid, None]).argmin(axis=1)
-        result[valid] = [TRACK_SEGMENT_TO_PATCH.get(int(ei[j]), np.nan) for j in idx]
+    if valid.any() and len(lp_real) > 0:
+        idx = np.abs(lp_real[None, :] - map_est[valid, None]).argmin(axis=1)
+        result[valid] = [
+            TRACK_SEGMENT_TO_PATCH.get(int(ei_real[j]), np.nan) for j in idx
+        ]
     return result
 
 
 def map_estimate_to_arm(map_estimate: np.ndarray, env) -> np.ndarray:
     """Map decoded linear position to arm/track segment ID (0-8).
 
+    Junction bins (edge_id=-1) are excluded from the nearest-neighbor
+    lookup because they are interpolation placeholders at edge gaps in
+    the linearization, not real spatial positions. Every valid MAP
+    estimate therefore maps to a real arm.
+
     Parameters
     ----------
     map_estimate : array-like
@@ -59,27 +75,77 @@ def map_estimate_to_arm(map_estimate: np.ndarray, env) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Arm IDs (0-8). NaN where map_estimate is NaN or at junctions (edge=-1).
+        Arm IDs (0-8). NaN only where map_estimate is NaN.
     """
     map_est = np.asarray(map_estimate, dtype=float)
     bin_df = env.place_bin_centers_nodes_df_
     lp = np.asarray(bin_df["linear_position"])
     ei = np.asarray(bin_df["edge_id"])
+
+    # Exclude junction bins (edge_id == -1) from nearest-neighbor lookup
+    real_mask = ei >= 0
+    lp_real = lp[real_mask]
+    ei_real = ei[real_mask]
+
     result = np.full(len(map_est), np.nan)
     valid = ~np.isnan(map_est)
-    if valid.any():
-        idx = np.abs(lp[None, :] - map_est[valid, None]).argmin(axis=1)
-        edges = ei[idx]
-        result[valid] = [float(e) if e >= 0 else np.nan for e in edges]
+    if valid.any() and len(lp_real) > 0:
+        idx = np.abs(lp_real[None, :] - map_est[valid, None]).argmin(axis=1)
+        result[valid] = ei_real[idx].astype(float)
     return result
+
+
+def arm_to_well(arm_id: float, track_graph, well_ids: set[int] | None = None) -> float:
+    """Return the well node at the terminal end of a leaf arm.
+
+    For leaf arms (well ↔ patch junction), returns the well node ID.
+    For trunk arms (patch junction ↔ center junction) or any arm that
+    does not touch a well, returns NaN.
+
+    Parameters
+    ----------
+    arm_id : float
+        Arm/edge ID. NaN returns NaN.
+    track_graph : networkx.Graph
+        Track graph with edge_id attributes.
+    well_ids : set[int] | None
+        Set of node IDs that are wells. Defaults to {0, 1, 2, 3, 4, 5}.
+
+    Returns
+    -------
+    float
+        Well node ID (0-5), or NaN if the arm is not a leaf arm.
+    """
+    if np.isnan(arm_id):
+        return np.nan
+    if well_ids is None:
+        well_ids = {0, 1, 2, 3, 4, 5}
+    arm_id_int = int(arm_id)
+    for u, v, data in track_graph.edges(data=True):
+        if data.get("edge_id") != arm_id_int:
+            continue
+        if u in well_ids:
+            return float(u)
+        if v in well_ids:
+            return float(v)
+        return np.nan
+    return np.nan
 
 
 def well_to_arm_set(well_id: float, track_graph) -> set[int]:
     """Get the set of arm (edge) IDs adjacent to a well node.
 
-    Each well connects to 2 arms. This means predictors derived from wells
-    (is_prev, is_next, is_last_rewarded) mark 2 of 9 arms as 1, while
-    is_current (from track_segment_id) marks only 1 arm.
+    On the real bandit track graph each well is a terminal (degree-1)
+    node connecting to exactly one "leaf" arm, which in turn reaches a
+    patch junction and then the center junction via a "trunk" arm.
+    So ``well_to_arm_set`` returns a set of size 1 per valid well,
+    and the predictors derived from wells (``is_prev``, ``is_next``,
+    ``is_last_rewarded``) each mark exactly one of the nine arms.
+
+    This function is written generically for any track graph, so it
+    will return larger sets for hypothetical graphs where wells have
+    higher degree (e.g., minimal test fixtures with direct well-to-well
+    edges).
 
     Parameters
     ----------
@@ -91,7 +157,7 @@ def well_to_arm_set(well_id: float, track_graph) -> set[int]:
     Returns
     -------
     set[int]
-        Edge IDs (arm IDs) adjacent to the well.
+        Edge IDs (arm IDs) adjacent to the well (size 1 on the real graph).
     """
     if np.isnan(well_id):
         return set()
