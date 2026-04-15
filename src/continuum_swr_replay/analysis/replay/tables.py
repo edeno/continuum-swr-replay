@@ -831,11 +831,16 @@ def build_stop_table(
         per_bout["is_mua_stop"] = False
 
     # n_events: unique non_local_event > 0 within the bout AND with
-    # nonlocal_prob above threshold (the same three-clause filter used
-    # by ``_in_event_mask``; immobility is already satisfied by virtue
-    # of being in a bout).
+    # nonlocal_prob above threshold AND speed below threshold — all
+    # three clauses of ``_in_event_mask``. The speed clause is
+    # typically redundant (bout membership already implies low speed)
+    # but kept for consistency with ``build_event_table`` so
+    # ``n_events`` in ``stop_table`` exactly equals the number of
+    # events in ``event_table`` for that stop, even when a single
+    # noisy sample pushes speed above threshold mid-bout.
     event_mask = (
         (bout_rows["non_local_event"] > 0)
+        & (bout_rows["head_speed"] < speed_threshold)
         & (bout_rows["nonlocal_prob"] > nonlocal_threshold)
     )
     event_rows = bout_rows.loc[event_mask]
@@ -1068,8 +1073,14 @@ def build_event_arm_table(
     cr_vals = np.full(n_events * n_arms, np.nan)
     rrr_vals = np.full(n_events * n_arms, np.nan)
 
-    for i, ev_row in event_table.iterrows():
-        base = i * n_arms
+    # Use ``enumerate`` — not ``i`` from ``iterrows`` — so this loop
+    # works regardless of what ``event_table``'s index looks like.
+    # After a cross-session ``pd.concat`` (Phase B4) the index is no
+    # longer a zero-based ``RangeIndex``; using the label as a
+    # positional offset would silently scatter writes into the wrong
+    # output slots or raise ``IndexError``.
+    for pos, (_, ev_row) in enumerate(event_table.iterrows()):
+        base = pos * n_arms
         current_arm_val = ev_row["current_arm"]
         current_well = (
             arm_to_well(current_arm_val, track_graph)
@@ -1223,13 +1234,20 @@ def _visit_recency_per_arm(
 ) -> dict[int, float]:
     """Trials since each arm was last visited (port of legacy helper).
 
-    Direct port of ``predictors.compute_visit_recency_for_event``.
-    ``n_default = n_trials + 1`` for arms never visited.
+    Direct port of ``predictors.compute_visit_recency_for_event``
+    with one correctness tightening: when there are no past trials at
+    ``event_time`` (session start or empty-trials stub), every arm
+    returns ``NaN`` rather than ``n_default = n_trials + 1``. The
+    legacy fallback coerced "never visited" to a finite "1 trial ago"
+    for empty sessions — misleading for downstream GLMs that interpret
+    ``visit_recency`` as a quantitative predictor.
     """
+    past = trials[trials["end_time"] <= event_time]
+    if len(past) == 0:
+        return dict.fromkeys(ALL_ARMS, np.nan)
     n_trials = len(trials)
     if n_default is None:
         n_default = n_trials + 1
-    past = trials[trials["end_time"] <= event_time]
     result = {arm: float(n_default) for arm in ALL_ARMS}
     for trial_offset, trial in enumerate(reversed(list(past.itertuples()))):
         trials_ago = trial_offset + 1
