@@ -80,6 +80,54 @@ def posterior_entropy_mean(
     return _weighted_mean_by_event(entropy, nonlocal_prob, event_id)
 
 
+def _arm_hpd_count(arm_posterior: np.ndarray, coverage: float) -> np.ndarray:
+    """Per-timebin count of arms in the HPD credible set at ``coverage``.
+
+    Uses ``non_local_detector.model_checking.highest_posterior_density.get_highest_posterior_threshold``
+    to find the density threshold that captures at least ``coverage`` of
+    the mass per timebin, then counts arms whose probability is at or
+    above that threshold — i.e., the tie-inclusive HPD set size. This
+    matches how :func:`non_local_detector` computes the position-level
+    HPD (the ``hpd`` column in ``data_over_time.pkl`` represents the cm
+    area of that same set via
+    :func:`get_HPD_spatial_coverage`), so arm-level and position-level
+    HPD carry consistent semantics across the project.
+
+    The returned count differs from a "smallest-k reaching coverage"
+    definition only when ties push additional arms to the same density
+    — a rare case on a 9-arm marginal of a realistic posterior.
+
+    Parameters
+    ----------
+    arm_posterior : np.ndarray, shape (T, n_arms)
+        Rows sum to 1 (arm-marginal posterior).
+    coverage : float
+        Target coverage in (0, 1].
+
+    Returns
+    -------
+    width : np.ndarray, shape (T,), float
+    """
+    # Imported lazily — keeps ``uncertainty`` importable without the
+    # detector package on callers that only use peak / entropy.
+    import xarray as xr
+    from non_local_detector.model_checking.highest_posterior_density import (
+        get_highest_posterior_threshold,
+    )
+
+    # get_highest_posterior_threshold takes an xr.DataArray and ignores
+    # the non-time coord (it reshapes to (n_time, -1) internally) — the
+    # wrap is just to satisfy the type. A nominal "position" dim is
+    # required because the helper uses that name internally.
+    arm_da = xr.DataArray(
+        arm_posterior,
+        dims=("time", "position"),
+        coords={"position": np.arange(arm_posterior.shape[1])},
+    )
+    threshold = get_highest_posterior_threshold(arm_da, coverage=coverage)
+    return (arm_posterior >= threshold[:, None]).sum(axis=1).astype(float)
+
+
 def posterior_hpd_width(
     arm_posterior: np.ndarray,
     nonlocal_prob: np.ndarray,
@@ -89,10 +137,10 @@ def posterior_hpd_width(
 ) -> tuple[np.ndarray, np.ndarray]:
     """w_t-weighted mean HPD credible-set width per event, at ``coverage``.
 
-    For each timebin: sort arm probabilities in descending order, take
-    the smallest number of arms whose cumulative mass is at least
-    ``coverage``, and return that count. The per-event value is the
-    ``w_t``-weighted mean of these counts.
+    Per-timebin HPD size via :func:`_arm_hpd_count` (uses
+    :mod:`non_local_detector`'s threshold routine — see helper
+    docstring for the exact definition), then aggregated as a
+    ``w_t``-weighted mean per event.
 
     A width of 1 means the decoder places ``coverage`` of its mass on a
     single arm (confident); a width near ``n_arms`` means the posterior
@@ -107,20 +155,7 @@ def posterior_hpd_width(
     if not 0 < coverage <= 1:
         raise ValueError(f"coverage must be in (0, 1]; got {coverage}")
     arm_posterior = np.asarray(arm_posterior, dtype=float)
-
-    # Sort each timebin's arm probabilities in descending order and
-    # cumsum. The smallest k with cumsum[k-1] >= coverage is the HPD
-    # width; np.argmax returns the first True index, so width = argmax+1.
-    sorted_desc = -np.sort(-arm_posterior, axis=1)
-    cumsum = np.cumsum(sorted_desc, axis=1)
-    meets = cumsum >= coverage - 1e-12  # guard against fp underflow
-
-    # argmax on a bool row returns the first True; if no True (can only
-    # happen with a zero-row / numerical corner), fall back to n_arms.
-    any_true = meets.any(axis=1)
-    width = np.where(any_true, meets.argmax(axis=1) + 1, arm_posterior.shape[1])
-    width = width.astype(float)
-
+    width = _arm_hpd_count(arm_posterior, coverage)
     return _weighted_mean_by_event(width, nonlocal_prob, event_id)
 
 
@@ -134,12 +169,10 @@ def posterior_hpd_widths(
     *,
     coverages: tuple[float, ...] = (0.5, 0.8, 0.95),
 ) -> tuple[np.ndarray, dict[float, np.ndarray]]:
-    """Compute HPD widths at several coverage levels in one pass.
+    """Compute HPD widths at several coverage levels.
 
-    Sorts and cumsums the arm posterior once per timebin and thresholds
-    at each coverage, then does a single weighted-mean aggregation per
-    coverage. Equivalent to calling :func:`posterior_hpd_width` once per
-    coverage but avoids the repeated sort and group-index computation.
+    Equivalent to calling :func:`posterior_hpd_width` once per coverage
+    but shares the per-event group-index computation across coverages.
 
     Returns ``(event_ids, {coverage: widths})``.
     """
@@ -152,21 +185,13 @@ def posterior_hpd_widths(
     arm_posterior = np.asarray(arm_posterior, dtype=float)
     nonlocal_prob = np.asarray(nonlocal_prob, dtype=float)
 
-    # One sort, one cumsum, one group lookup.
-    sorted_desc = -np.sort(-arm_posterior, axis=1)
-    cumsum = np.cumsum(sorted_desc, axis=1)
     unique, inv, n_events = _group_by_event(event_id)
     denom = np.bincount(inv, weights=nonlocal_prob, minlength=n_events)
-    n_arms = arm_posterior.shape[1]
 
     widths_by_coverage: dict[float, np.ndarray] = {}
     for c in coverages:
-        meets = cumsum >= c - 1e-12
-        any_true = meets.any(axis=1)
-        per_bin_width = np.where(any_true, meets.argmax(axis=1) + 1, n_arms).astype(
-            float
-        )
-        numer = np.bincount(inv, weights=per_bin_width * nonlocal_prob, minlength=n_events)
+        width = _arm_hpd_count(arm_posterior, c)
+        numer = np.bincount(inv, weights=width * nonlocal_prob, minlength=n_events)
         with np.errstate(divide="ignore", invalid="ignore"):
             widths_by_coverage[c] = np.where(denom > 0, numer / denom, np.nan)
 

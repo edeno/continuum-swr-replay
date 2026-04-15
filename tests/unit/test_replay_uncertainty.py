@@ -102,20 +102,18 @@ class TestPosteriorHpdWidth:
             )
             np.testing.assert_allclose(width, 1.0)
 
-    def test_uniform_posterior_width_grows_with_coverage(self):
+    def test_uniform_posterior_width_is_n_arms_at_all_coverages(self):
+        # Tie-inclusive HPD (matches non_local_detector's definition):
+        # every arm has the same probability under a uniform posterior,
+        # so every arm lies at or above the density threshold at every
+        # coverage — the HPD set is always all 9 arms.
         n_arms = 9
         arm_post = _uniform_posterior(T=4, n_arms=n_arms)
         w = np.ones(4)
         event_id = np.zeros(4, dtype=int)
-        # Each arm = 1/9 ≈ 0.111.
-        # 0.5 coverage needs ceil(0.5 * 9) = 5 arms.
-        # 0.8 coverage needs 8. 0.95 needs 9.
-        _, w50 = posterior_hpd_width(arm_post, w, event_id, coverage=0.5)
-        _, w80 = posterior_hpd_width(arm_post, w, event_id, coverage=0.8)
-        _, w95 = posterior_hpd_width(arm_post, w, event_id, coverage=0.95)
-        np.testing.assert_allclose(w50, 5.0)
-        np.testing.assert_allclose(w80, 8.0)
-        np.testing.assert_allclose(w95, 9.0)
+        for cov in (0.5, 0.8, 0.95):
+            _, width = posterior_hpd_width(arm_post, w, event_id, coverage=cov)
+            np.testing.assert_allclose(width, n_arms)
 
     def test_hpd_ordering_invariant(self):
         """Plan requirement: width_50 ≤ width_80 ≤ width_95 per event."""
