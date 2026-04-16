@@ -610,6 +610,64 @@ def _plot_arm_fraction(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+# ── Per-arm predictor panels (trials → per-arm event-arm row) ──
+
+
+def _plot_visit_recency(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="visit_recency",
+        cmap_name="viridis_r", vmin=1, vmax=None,
+        label="visit\nrecency",
+    )
+
+
+def _plot_cumulative_reward(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="cumulative_reward",
+        cmap_name="viridis", vmin=0, vmax=None,
+        label="cumul.\nreward",
+    )
+
+
+def _plot_recent_reward_rate(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="recent_reward_rate",
+        cmap_name="RdYlGn", vmin=0.0, vmax=1.0,
+        label="recent\nreward\nrate",
+    )
+
+
+def _plot_nominal_reward_prob(ax: Axes, ctx: _PanelContext) -> None:
+    """Programmed reward probability per arm.
+
+    Currently all NaN — the contingency-block loader that populates
+    this column was intentionally deferred in Phase B. The panel
+    still draws (as an empty heatmap) so the viz stays layout-stable
+    once the column is wired.
+    """
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="nominal_reward_prob",
+        cmap_name="RdYlGn", vmin=0.0, vmax=1.0,
+        label="nominal\np(R)",
+    )
+
+
+def _plot_dist_to_arm(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="dist_to_arm",
+        cmap_name="viridis_r", vmin=0, vmax=None,
+        label="dist to\narm",
+    )
+
+
+def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="arm_dist_rank",
+        cmap_name="viridis_r", vmin=1, vmax=len(_ALL_ARMS),
+        label="arm\ndist rank",
+    )
+
+
 # ── Scalar per-event panels ──
 
 
@@ -772,6 +830,12 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "hpd_widths": _plot_hpd_widths,
     "n_nonlocal_bins": _plot_n_nonlocal_bins,
     "time_since_stop": _plot_time_since_stop,
+    "visit_recency": _plot_visit_recency,
+    "cumulative_reward": _plot_cumulative_reward,
+    "recent_reward_rate": _plot_recent_reward_rate,
+    "nominal_reward_prob": _plot_nominal_reward_prob,
+    "dist_to_arm": _plot_dist_to_arm,
+    "arm_dist_rank": _plot_arm_dist_rank,
 }
 
 # Relative height weight per panel — inherits the ``plot_detector``
@@ -796,6 +860,12 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "hpd_widths": 1.0,
     "n_nonlocal_bins": 1.0,
     "time_since_stop": 1.0,
+    "visit_recency": 1.4,
+    "cumulative_reward": 1.4,
+    "recent_reward_rate": 1.4,
+    "nominal_reward_prob": 1.4,
+    "dist_to_arm": 1.4,
+    "arm_dist_rank": 1.4,
 }
 
 
