@@ -1,29 +1,21 @@
 #!/usr/bin/env python
 """Generate Figure 3: Non-local events exist outside detected SWRs.
 
-Composite figure with 5 panels:
+Composite figure with 4 panels:
 
     Row 1 (panel a — full width):
         Real data example showing ~2s around a non-local event WITHOUT
         SWR. Stacked sub-rows: SWR z-score (flat), spike raster,
         non-local posterior (shows clear replay), state probabilities.
 
-    Row 2 (panels b, c, d, e):
-        b: 2-circle Venn of SWR events and immobile non-local events.
-           Answers "how often do these populations overlap?" and
-           shows the SWR→NL vs NL→SWR asymmetry that motivates the
-           rest of the row.
-        c: SWR z-score density for Local vs Non-Local timepoints —
+    Row 2 (panels b, c, d):
+        b: SWR z-score density for Local vs Non-Local timepoints —
            shows non-local activity lives at low SWR power, not just
            barely below the SWR threshold.
-        d: Replay speed by SWR status — low-SWR replay moves more
+        c: Replay speed by SWR status — low-SWR replay moves more
            slowly.
-        e: Replay position by SWR status — non-SWR replay represents
+        d: Replay position by SWR status — non-SWR replay represents
            reward zones.
-
-Panel order was reshuffled in April 2026: the Venn is now panel b
-(first statistic after the example) rather than panel c, because
-"how often does this happen?" is the reader's first question.
 
 Usage:
     python scripts/generate_figure03.py
@@ -44,7 +36,6 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import (
-    compute_swr_nl_event_counts,
     get_confident_times,
     get_overlap_times,
     load_data_over_time,
@@ -61,7 +52,6 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.figure_panels import (
     plot_replay_position_by_swr,
     plot_replay_speed_by_swr,
-    plot_swr_nl_venn_2circle,
     plot_swr_zscore_by_state,
 )
 from continuum_swr_replay.visualization.plots import (
@@ -165,12 +155,12 @@ def generate_figure(
     time_slice = find_non_swr_example_event(data, results)
 
     # --- Create figure ---
-    fig_height = min(8.5, PAGE_HEIGHT)
+    fig_height = min(7.0, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
-    # 3 rows: (a) example stack, (b) Venn in its own row, (c/d/e) stats
-    gs = GridSpec(3, 1, figure=fig, height_ratios=[1.8, 0.9, 1.1], hspace=0.35)
+    # 2 rows: (a) example stack, (b/c/d) stats
+    gs = GridSpec(2, 1, figure=fig, height_ratios=[1.8, 1.1], hspace=0.35)
 
     # ── Row 1: Real data example (panel a) — 4 stacked sub-rows ──
     gs_a = gs[0].subgridspec(4, 1, hspace=0.05,
@@ -199,47 +189,26 @@ def generate_figure(
         ax.tick_params(labelbottom=False)
     ax_probs.set_xlabel("Time (s)")
 
-    # ── Row 2: panel b — Venn in its own row so it has space to breathe ──
-    # Panel order was reshuffled so the reader's first question after
-    # panel a ("how often does this happen?") is answered immediately
-    # by the Venn in panel b. Old panel b (SWR z-score by state)
-    # becomes the new panel c.
-    logging.info("Computing SWR / non-local event Venn counts...")
-    venn_counts = compute_swr_nl_event_counts(data_over_time)
-    logging.info(
-        f"  SWR: {venn_counts['n_b']:,} total, "
-        f"{venn_counts['n_b_with_a']:,} with NL"
-    )
-    logging.info(
-        f"  NL (immobile): {venn_counts['n_a']:,} total, "
-        f"{venn_counts['n_a_with_b']:,} with SWR"
-    )
-    # Center the Venn within its row, leaving left/right margins so
-    # the circles don't stretch full width.
-    gs_b = gs[1].subgridspec(1, 3, width_ratios=[1.0, 2.0, 1.0])
-    ax_b = fig.add_subplot(gs_b[0, 1])
-    plot_swr_nl_venn_2circle(venn_counts, ax=ax_b)
+    # ── Row 2: panels b, c, d (stats panels) ──
+    gs_bcd = gs[1].subgridspec(1, 3, wspace=0.4)
 
-    # ── Row 3: panels c, d, e (stats panels) ──
-    gs_cde = gs[2].subgridspec(1, 3, wspace=0.5)
+    # Panel b: SWR z-score by state
+    ax_b = fig.add_subplot(gs_bcd[0])
+    plot_swr_zscore_by_state(data_over_time, ax=ax_b)
 
-    # Panel c: SWR z-score by state (was old panel b)
-    ax_c = fig.add_subplot(gs_cde[0])
-    plot_swr_zscore_by_state(data_over_time, ax=ax_c)
+    # Panel c: Replay speed by SWR
+    ax_c = fig.add_subplot(gs_bcd[1])
+    plot_replay_speed_by_swr(data_over_time, ax=ax_c)
+    ax_c.set_xlim(0, 1500)  # Focus on meaningful range
 
-    # Panel d: Replay speed by SWR
-    ax_d = fig.add_subplot(gs_cde[1])
-    plot_replay_speed_by_swr(data_over_time, ax=ax_d)
-    ax_d.set_xlim(0, 1500)  # Focus on meaningful range
-
-    # Panel e: Replay position by SWR
-    ax_e = fig.add_subplot(gs_cde[2])
-    plot_replay_position_by_swr(data_over_time, ax=ax_e)
+    # Panel d: Replay position by SWR
+    ax_d = fig.add_subplot(gs_bcd[2])
+    plot_replay_position_by_swr(data_over_time, ax=ax_d)
 
     # ── Panel Labels ──
     label_panels(
-        [ax_swr, ax_b, ax_c, ax_d, ax_e],
-        labels=["a", "b", "c", "d", "e"],
+        [ax_swr, ax_b, ax_c, ax_d],
+        labels=["a", "b", "c", "d"],
         xpos=-0.08,
         ypos=1.15,
         fontsize=11,
