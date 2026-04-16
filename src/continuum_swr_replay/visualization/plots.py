@@ -885,7 +885,19 @@ def plot_speed(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
 
     """
     position_info = data["position_info"].loc[time_slice]
-    speed = np.asarray(position_info.nose_vel).squeeze()
+    # ``data_loaders.position`` canonically produces ``head_speed``;
+    # older datasets used ``nose_vel``. Prefer the canonical column
+    # and fall back so this panel works on legacy data without a
+    # rerun.
+    if "head_speed" in position_info.columns:
+        speed = np.asarray(position_info.head_speed).squeeze()
+    elif "nose_vel" in position_info.columns:
+        speed = np.asarray(position_info.nose_vel).squeeze()
+    else:
+        raise KeyError(
+            "position_info has neither 'head_speed' nor 'nose_vel'; "
+            f"available columns: {list(position_info.columns)}"
+        )
     max_speed = np.ceil(speed.max()).astype(int)
     max_speed = max(5, max_speed)
     ax.fill_between(position_info.index, speed, color="lightgrey")
