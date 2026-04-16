@@ -136,6 +136,13 @@ def _plot_conditional_posterior(ax: Axes, ctx: _PanelContext) -> None:
 
 def _plot_speed(ax: Axes, ctx: _PanelContext) -> None:
     plot_speed(ctx.data, ctx.time_slice, ax)
+    from continuum_swr_replay.analysis.constants import (
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    ax.axhline(
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        color="grey", linestyle="--", linewidth=0.8, zorder=5,
+    )
 
 
 # ── New: trial rail ──
@@ -355,6 +362,26 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 clip_on=False,
             )
 
+    # Legend for the four marker types.
+    from matplotlib.lines import Line2D as _L2D
+    ax.legend(
+        handles=[
+            _L2D([], [], marker="o", color="grey", markersize=6,
+                 markeredgecolor="black", markeredgewidth=0.3,
+                 linestyle="none", label="current"),
+            _L2D([], [], marker="^", color="grey", markersize=6,
+                 markeredgecolor="black", markeredgewidth=0.3,
+                 linestyle="none", label="prev"),
+            _L2D([], [], marker="v", color="grey", markersize=6,
+                 markeredgecolor="black", markeredgewidth=0.3,
+                 linestyle="none", label="next (post-hoc)"),
+            _L2D([], [], marker="*", color="grey", markersize=8,
+                 markeredgecolor="black", markeredgewidth=0.3,
+                 linestyle="none", label="last rewarded"),
+        ],
+        bbox_to_anchor=(1.02, 1), loc="upper left",
+        fontsize=7, framealpha=0.7,
+    )
     ax.set_ylabel("Arm\nIdentity")
     ax.set_ylim(-0.5, 8.5)
     ax.set_yticks(list(_ALL_ARMS))
@@ -401,19 +428,13 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
         actual = view["actual_next_arm"].to_numpy(dtype=float)
         is_match = view["match"].to_numpy(dtype=bool)
 
-        # Small vertical offset so the canonical ▼ and actual × stay
-        # visually distinguishable even when they're at the same arm.
-        # Without it, "everything matches" (the expected healthy case)
-        # reads as "nothing is plotted".
-        dy = 0.18
+        # Small x-jitter so ▼ (canonical) and × (actual) don't
+        # overplot when they agree, but both sit at the SAME y so
+        # agreement reads as "same row" and disagreement reads as
+        # "different rows connected by a red line".
+        dt_jitter = (ctx.time_slice.stop - ctx.time_slice.start) * 0.003
 
-        # Connector lines first so markers sit on top. We always draw
-        # a connector — thin grey for matches (short segment of length
-        # 2*dy), bold red for mismatches (spans the arm gap + offsets).
-        # Half-NaN events (one side has a next_arm, the other doesn't
-        # — legitimate at session boundaries but still a mismatch)
-        # get a short red stub around the side that does have a value
-        # so the red-highlights-disagreement cue is preserved.
+        # Connector lines first so markers sit on top.
         for t, c_arm, a_arm, match in zip(times, canonical, actual, is_match, strict=True):
             c_nan, a_nan = np.isnan(c_arm), np.isnan(a_arm)
             if c_nan and a_nan:
@@ -421,23 +442,22 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
             if c_nan ^ a_nan:
                 present = c_arm if not c_nan else a_arm
                 ax.plot(
-                    [t, t], [present - dy, present + dy],
+                    [t, t], [present - 0.15, present + 0.15],
                     color="red", linewidth=1.6, zorder=2, clip_on=False,
                 )
                 continue
-            color = "lightgrey" if match else "red"
-            lw = 0.5 if match else 1.6
-            ax.plot(
-                [t, t], [c_arm - dy, a_arm + dy],
-                color=color, linewidth=lw, zorder=2, clip_on=False,
-            )
+            if not match:
+                ax.plot(
+                    [t, t], [c_arm, a_arm],
+                    color="red", linewidth=1.6, zorder=2, clip_on=False,
+                )
 
         palette = ctx.arm_palette
         c_mask = ~np.isnan(canonical)
         if c_mask.any():
             ax.scatter(
-                times[c_mask],
-                canonical[c_mask] - dy,
+                times[c_mask] - dt_jitter,
+                canonical[c_mask],
                 marker="v",
                 s=36,
                 c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in canonical[c_mask]],
@@ -445,20 +465,18 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
                 linewidths=0.3,
                 zorder=3,
                 clip_on=False,
-                label="canonical next_arm",
             )
         a_mask = ~np.isnan(actual)
         if a_mask.any():
             ax.scatter(
-                times[a_mask],
-                actual[a_mask] + dy,
+                times[a_mask] + dt_jitter,
+                actual[a_mask],
                 marker="x",
                 s=40,
                 c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in actual[a_mask]],
                 linewidths=1.0,
                 zorder=4,
                 clip_on=False,
-                label="actual next_arm (from trials)",
             )
 
     ax.set_ylabel("Next-Arm\nCheck")
@@ -750,7 +768,7 @@ def _plot_arm_mass_stackplot(ax: Axes, ctx: _PanelContext) -> None:
     est = ctx.event_sequence_table
     view = est[(est["time"] >= lo) & (est["time"] <= hi)]
 
-    ax.set_ylabel("arm mass\n(stacked)")
+    ax.set_ylabel("Arm Mass\n(proportion)")
     ax.set_ylim(0, 1.01)
     ax.set_yticks([0, 0.5, 1])
 
