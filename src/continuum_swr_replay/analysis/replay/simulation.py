@@ -31,21 +31,12 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-# NOTE: data_preparation and event_collapsing still live in the legacy
-# ``hippocampus/replay_content/`` module; they will be rewritten into
-# ``analysis/replay/tables.py`` in Phase B3 and these imports will flip
-# to the new location.
-from continuum_swr_replay.analysis.hippocampus.replay_content.data_preparation import (
-    add_event_uid,
-)
-from continuum_swr_replay.analysis.hippocampus.replay_content.event_collapsing import (
-    ALL_ARMS,
-    collapse_to_events,
-    compute_arm_counts,
-    make_long_format_arm,
-)
+from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
-from .spatial_mapping import arm_to_well, map_estimate_to_arm
+from .spatial_mapping import map_estimate_to_arm
+from .summaries import arm_count_hard as _arm_count_hard_fn
+
+ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 
 DEFAULT_PREDICTORS: tuple[str, ...] = (
     "is_current",
@@ -910,7 +901,6 @@ def simulate_full_pipeline(
     # Sample per-timebin chosen arms and MAP estimates.
     rows = []
     chosen_all = []
-    decoded_all = []
     for e in range(n_events):
         n_bins = int(L_e_arr[e])
         chosen = rng.choice(n_arms, size=n_bins, p=probs[e])
@@ -937,30 +927,64 @@ def simulate_full_pipeline(
                 }
             )
     nl = pd.DataFrame(rows)
-    # Real pipeline computes replay_arm via map_estimate_to_arm — do the same.
-    nl["replay_arm"] = map_estimate_to_arm(nl["map_estimate"].values, env)
-    decoded_all = nl["replay_arm"].values
+    # Canonical pipeline: map MAP estimate → arm via the same
+    # ``map_estimate_to_arm`` the production code uses, then aggregate
+    # per-event counts via ``summaries.arm_count_hard``.
+    decoded_arm = map_estimate_to_arm(nl["map_estimate"].values, env)
+    nl["decoded_arm"] = decoded_arm
     chosen_arr = np.concatenate(chosen_all)
-    fraction_on_chosen = float(np.mean(decoded_all == chosen_arr))
+    fraction_on_chosen = float(np.mean(decoded_arm == chosen_arr))
 
-    # Run through the real transformation chain.
-    events = collapse_to_events(nl, level="arm")
-    arm_counts = compute_arm_counts(nl)
-    merge_keys = ["animal", "day", "epoch", "non_local_event"]
-    events = events.merge(
-        arm_counts[merge_keys + ["total_count"]], on=merge_keys, how="left"
+    # Filter out junction bins (decoded_arm not in ALL_ARMS → NaN from
+    # map_estimate_to_arm when sigma pushes MAP onto a junction).
+    real_mask = np.isin(decoded_arm, ALL_ARMS) & ~np.isnan(decoded_arm)
+    event_ids = nl["non_local_event"].values[real_mask].astype(np.int64)
+    arm_map = decoded_arm[real_mask].astype(np.int64)
+    # Use a dummy nonlocal_prob of 1.0 (all timebins are "in event")
+    # and threshold=0.0 (count every row).
+    ids_sorted, counts = _arm_count_hard_fn(
+        np.ones(real_mask.sum()),
+        arm_map,
+        event_ids,
+        n_arms=len(ALL_ARMS),
+        threshold=0.0,
     )
-    events = events[events["total_count"] > 0].copy()
-    long_count = make_long_format_arm(
-        events, track_graph, response="count", arm_counts_df=arm_counts
-    )
-    long_count = add_event_uid(long_count)
+
+    # Build the long-format DataFrame with the KNOWN design-matrix
+    # indicators (not re-derived from trials, because the test
+    # controls the design). This mirrors the canonical
+    # ``event_arm_table`` layout.
+    n_arms = len(ALL_ARMS)
+    long_rows = []
+    for idx, ev_id in enumerate(ids_sorted):
+        e = int(ev_id) - 1  # 0-indexed into the synthetic event arrays
+        for j, arm in enumerate(ALL_ARMS):
+            row = {
+                "event_uid": int(ev_id),
+                "arm_id": arm,
+                "arm_count": int(counts[idx, j]),
+            }
+            for p_idx, p_name in enumerate(predictor_list):
+                row[p_name] = float(design[e, j, p_idx])
+            long_rows.append(row)
+
+    long_count = pd.DataFrame(long_rows)
+
+    # Filter out zero-total events (all timebins on junction bins).
+    event_totals = long_count.groupby("event_uid")["arm_count"].transform("sum")
+    long_count = long_count[event_totals > 0].reset_index(drop=True)
 
     mean_arms_per_event = float(
-        (
-            arm_counts[[f"arm_count_{a}" for a in ALL_ARMS]] > 0
-        ).sum(axis=1).mean()
+        (counts > 0).sum(axis=1).mean()
     )
+
+    # Minimal events frame for backward compat with callers that
+    # inspect the second return value.
+    events = pd.DataFrame({
+        "non_local_event": ids_sorted,
+        "total_count": counts.sum(axis=1),
+    })
+    events = events[events["total_count"] > 0].copy()
 
     diagnostics = {
         "fraction_on_chosen": fraction_on_chosen,
