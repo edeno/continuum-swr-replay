@@ -610,6 +610,145 @@ def _plot_arm_fraction(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+# ── Scalar per-event panels ──
+
+
+def _draw_event_scalar_stem(
+    ax: Axes,
+    ctx: _PanelContext,
+    *,
+    value_col: str,
+    ylabel: str,
+    ylim: tuple[float, float] | None = None,
+    baseline: float = 0.0,
+    marker_color: str = "#3F51B5",
+) -> None:
+    """Stem plot of a per-event scalar against time.
+
+    One value per event at ``event_midpoint_time``: a thin vertical
+    line from ``baseline`` to the value, plus a dot at the top. Works
+    for any column of ``event_table`` whose dtype is numeric.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    et = ctx.event_table
+    in_window = (
+        (et["event_midpoint_time"] >= lo)
+        & (et["event_midpoint_time"] <= hi)
+    )
+    view = et.loc[in_window]
+
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.axhline(baseline, color="grey", linewidth=0.3, zorder=0)
+    ax.set_ylabel(ylabel)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+
+    times = view["event_midpoint_time"].to_numpy()
+    values = view[value_col].to_numpy(dtype=float)
+    finite = np.isfinite(values)
+    if not finite.any():
+        ax.text(
+            0.5, 0.5, f"{value_col}: all NaN in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+    ax.vlines(
+        times[finite], baseline, values[finite],
+        color="black", linewidth=0.5, zorder=2,
+    )
+    ax.scatter(
+        times[finite], values[finite],
+        s=12, c=marker_color, zorder=3, clip_on=False,
+    )
+
+
+def _plot_posterior_peak_mean(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_scalar_stem(
+        ax, ctx,
+        value_col="posterior_peak_mean",
+        ylabel="posterior\npeak_mean",
+        ylim=(1 / len(_ALL_ARMS) - 0.05, 1.05),
+        baseline=1 / len(_ALL_ARMS),
+    )
+
+
+def _plot_posterior_entropy_mean(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_scalar_stem(
+        ax, ctx,
+        value_col="posterior_entropy_mean",
+        ylabel="posterior\nentropy_mean",
+        ylim=(-0.05, float(np.log(len(_ALL_ARMS))) + 0.1),
+        baseline=0.0,
+    )
+
+
+def _plot_hpd_widths(ax: Axes, ctx: _PanelContext) -> None:
+    """Three HPD widths (50/80/95) overlaid on one axis.
+
+    Line thickness increases with coverage so the heavier coverage
+    level is visually "outside" the lighter one, matching the
+    monotonicity invariant ``width_50 ≤ width_80 ≤ width_95``.
+    A mismatch with the invariant would read as a crossover.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    et = ctx.event_table
+    in_window = (
+        (et["event_midpoint_time"] >= lo)
+        & (et["event_midpoint_time"] <= hi)
+    )
+    view = et.loc[in_window].sort_values("event_midpoint_time")
+
+    ax.set_ylim(0.8, len(_ALL_ARMS) + 0.2)
+    ax.set_ylabel("HPD width\n50/80/95")
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+
+    times = view["event_midpoint_time"].to_numpy()
+    specs = (
+        ("posterior_hpd_width_50", 0.8, "#a6cee3", "50"),
+        ("posterior_hpd_width_80", 1.3, "#1f78b4", "80"),
+        ("posterior_hpd_width_95", 1.8, "#08306b", "95"),
+    )
+    for col, lw, color, label in specs:
+        vals = view[col].to_numpy(dtype=float)
+        ax.plot(
+            times, vals, color=color, linewidth=lw, marker="o",
+            markersize=3, zorder=3, clip_on=False, label=label,
+        )
+    ax.legend(loc="upper right", fontsize=7, framealpha=0.7)
+
+
+def _plot_n_nonlocal_bins(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_scalar_stem(
+        ax, ctx,
+        value_col="n_nonlocal_bins",
+        ylabel="n_nonlocal\nbins",
+        ylim=None,
+        baseline=0.0,
+    )
+
+
+def _plot_time_since_stop(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_scalar_stem(
+        ax, ctx,
+        value_col="time_since_stop",
+        ylabel="time_since\nstop [s]",
+        ylim=None,
+        baseline=0.0,
+    )
+
+
 # ── Panel registry ──
 
 
@@ -628,6 +767,11 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "arm_count_soft": _plot_arm_count_soft,
     "arm_posterior_mass": _plot_arm_posterior_mass,
     "arm_fraction": _plot_arm_fraction,
+    "posterior_peak_mean": _plot_posterior_peak_mean,
+    "posterior_entropy_mean": _plot_posterior_entropy_mean,
+    "hpd_widths": _plot_hpd_widths,
+    "n_nonlocal_bins": _plot_n_nonlocal_bins,
+    "time_since_stop": _plot_time_since_stop,
 }
 
 # Relative height weight per panel — inherits the ``plot_detector``
@@ -647,6 +791,11 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "arm_count_soft": 1.4,
     "arm_posterior_mass": 1.4,
     "arm_fraction": 1.4,
+    "posterior_peak_mean": 1.0,
+    "posterior_entropy_mean": 1.0,
+    "hpd_widths": 1.0,
+    "n_nonlocal_bins": 1.0,
+    "time_since_stop": 1.0,
 }
 
 
