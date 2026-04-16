@@ -461,9 +461,27 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
                 label="actual next_arm (from trials)",
             )
 
-    ax.set_ylabel("Next-Arm\nMismatch")
+    ax.set_ylabel("Next-Arm\nCheck")
     ax.set_ylim(-0.5, 8.5)
     ax.set_yticks(list(_ALL_ARMS))
+
+    # Legend — explain the two markers and the connector color.
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([], [], marker="v", color="grey", markersize=6,
+               markeredgecolor="black", markeredgewidth=0.3,
+               linestyle="none", label="canonical next_arm"),
+        Line2D([], [], marker="x", color="grey", markersize=6,
+               markeredgewidth=1.0,
+               linestyle="none", label="actual (from trials)"),
+        Line2D([], [], color="lightgrey", linewidth=1.5, label="match"),
+        Line2D([], [], color="red", linewidth=1.5, label="MISMATCH"),
+    ]
+    ax.legend(
+        handles=legend_handles,
+        bbox_to_anchor=(1.02, 1), loc="upper left",
+        fontsize=7, framealpha=0.7,
+    )
 
     # Stash the full (unfiltered) mismatch table on the context so the
     # public entry point can return it without recomputing.
