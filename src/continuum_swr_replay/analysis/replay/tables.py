@@ -70,7 +70,10 @@ from ._helpers import (
     assign_bout as _assign_bout,
 )
 from ._helpers import (
-    cumulative_reward_per_arm as _cumulative_reward_per_arm,
+    build_well_to_arm_map as _build_well_to_arm_map,
+)
+from ._helpers import (
+    cumulative_reward_all_events as _cumulative_reward_all_events,
 )
 from ._helpers import (
     eq_indicator as _eq_indicator,
@@ -85,7 +88,7 @@ from ._helpers import (
     immobility_bout_intervals as _immobility_bout_intervals,
 )
 from ._helpers import (
-    recent_reward_rate_per_arm as _recent_reward_rate_per_arm,
+    recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
     safe_first as _safe_first,
@@ -100,7 +103,7 @@ from ._helpers import (
     time_since_stop as _time_since_stop,
 )
 from ._helpers import (
-    visit_recency_per_arm as _visit_recency_per_arm,
+    visit_recency_all_events as _visit_recency_all_events,
 )
 from .spatial import arm_dist_rank, dist_to_arm_from_well
 from .spatial_mapping import arm_to_well, map_estimate_to_arm
@@ -403,10 +406,13 @@ def build_event_table(
     # --- 5. Align summary arrays (sorted by event id) with per_event ---
     # summaries.* returned unique_ids in sorted order; groupby(sort=True)
     # yields events in the same order — assert to catch drift.
-    np.testing.assert_array_equal(
+    if not np.array_equal(
         per_event["non_local_event"].to_numpy(),
         ids_sorted.astype(per_event["non_local_event"].dtype),
-    )
+    ):
+        raise RuntimeError(
+            "Event-id sort mismatch between groupby result and per_event table"
+        )
     per_event["n_nonlocal_bins"] = n_bins
     per_event["nonlocal_weight_sum"] = weight_sum
 
@@ -474,6 +480,11 @@ def build_event_table(
     # immobility bout (the in-event filter guarantees immobility, so
     # ``_assign_bout`` should find a valid bout for every row).
     stop_idx = _assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
+    n_outside = int((stop_idx < 0).sum())
+    if n_outside > 0:
+        raise ValueError(
+            f"{n_outside}/{len(stop_idx)} events fall outside all immobility bouts"
+        )
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
 
@@ -914,56 +925,54 @@ def build_event_arm_table(
     )
 
     # Per-event per-arm predictors: dist_to_arm, arm_dist_rank,
-    # visit_recency, cumulative_reward, recent_reward_rate. Iterate
-    # events (cost = n_events × n_arms × trials — dominated by the
-    # trials scan; still acceptable at project scale).
-    dist_vals = np.full(n_events * n_arms, np.nan)
-    rank_vals = np.full(n_events * n_arms, np.nan)
-    vr_vals = np.full(n_events * n_arms, np.nan)
-    cr_vals = np.full(n_events * n_arms, np.nan)
-    rrr_vals = np.full(n_events * n_arms, np.nan)
+    # visit_recency, cumulative_reward, recent_reward_rate.
+    # Vectorized: precompute well→arm map once, then batch all events.
+    well_to_arm_map = _build_well_to_arm_map(track_graph)
 
-    # Use ``enumerate`` — not ``i`` from ``iterrows`` — so this loop
-    # works regardless of what ``event_table``'s index looks like.
-    # After a cross-session ``pd.concat`` (Phase B4) the index is no
-    # longer a zero-based ``RangeIndex``; using the label as a
-    # positional offset would silently scatter writes into the wrong
-    # output slots or raise ``IndexError``.
-    for pos, (_, ev_row) in enumerate(event_table.iterrows()):
-        base = pos * n_arms
-        current_arm_val = ev_row["current_arm"]
-        current_well = (
-            arm_to_well(current_arm_val, track_graph)
-            if not np.isnan(current_arm_val)
-            else np.nan
-        )
-        dists = dist_to_arm_from_well(current_well, track_graph)
-        dist_arr = np.array([dists[a] for a in ALL_ARMS])
-        ranks = arm_dist_rank(dist_arr)
+    # -- dist_to_arm and arm_dist_rank (per unique current_well) --
+    current_arms = event_table["current_arm"].to_numpy()
+    # Compute distances for each unique current_arm value
+    unique_arms = np.unique(current_arms[np.isfinite(current_arms)])
+    dist_cache: dict[int, np.ndarray] = {}
+    rank_cache: dict[int, np.ndarray] = {}
+    for ua in unique_arms:
+        cw = arm_to_well(ua, track_graph)
+        dists = dist_to_arm_from_well(cw, track_graph)
+        d = np.array([dists[a] for a in ALL_ARMS])
+        dist_cache[int(ua)] = d
+        rank_cache[int(ua)] = arm_dist_rank(d)
 
-        event_time = ev_row["event_midpoint_time"]
-        if np.isnan(event_time) or len(trials) == 0:
-            vr = dict.fromkeys(ALL_ARMS, np.nan)
-            cr = dict.fromkeys(ALL_ARMS, np.nan)
-            rrr = dict.fromkeys(ALL_ARMS, np.nan)
-        else:
-            vr = _visit_recency_per_arm(event_time, trials, track_graph)
-            cr = _cumulative_reward_per_arm(event_time, trials, track_graph)
-            rrr = _recent_reward_rate_per_arm(event_time, trials, track_graph)
+    nan_row = np.full(n_arms, np.nan)
+    dist_2d = np.array(
+        [dist_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row for a in current_arms]
+    )
+    rank_2d = np.array(
+        [rank_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row for a in current_arms]
+    )
 
-        for j, a in enumerate(ALL_ARMS):
-            idx = base + j
-            dist_vals[idx] = dist_arr[j]
-            rank_vals[idx] = ranks[j]
-            vr_vals[idx] = vr[a]
-            cr_vals[idx] = cr[a]
-            rrr_vals[idx] = rrr[a]
+    # -- visit_recency, cumulative_reward, recent_reward_rate (batch) --
+    event_times = event_table["event_midpoint_time"].to_numpy()
+    if len(trials) > 0:
+        vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)
+        cr_2d = _cumulative_reward_all_events(event_times, trials, well_to_arm_map)
+        rrr_2d = _recent_reward_rate_all_events(event_times, trials, well_to_arm_map)
+    else:
+        vr_2d = np.full((n_events, n_arms), np.nan)
+        cr_2d = np.full((n_events, n_arms), np.nan)
+        rrr_2d = np.full((n_events, n_arms), np.nan)
 
-    long["dist_to_arm"] = dist_vals
-    long["arm_dist_rank"] = rank_vals
-    long["visit_recency"] = vr_vals
-    long["cumulative_reward"] = cr_vals
-    long["recent_reward_rate"] = rrr_vals
+    # Events with NaN midpoint time get NaN for trial-derived columns
+    nan_mask = np.isnan(event_times)
+    if nan_mask.any():
+        vr_2d[nan_mask] = np.nan
+        cr_2d[nan_mask] = np.nan
+        rrr_2d[nan_mask] = np.nan
+
+    long["dist_to_arm"] = dist_2d.flatten()
+    long["arm_dist_rank"] = rank_2d.flatten()
+    long["visit_recency"] = vr_2d.flatten()
+    long["cumulative_reward"] = cr_2d.flatten()
+    long["recent_reward_rate"] = rrr_2d.flatten()
     long["nominal_reward_prob"] = np.nan  # deferred; requires block loader
 
     # Interactions (plan §1.7). Event-level × arm-level products.

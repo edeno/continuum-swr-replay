@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import networkx as nx
 import numpy as np
+from scipy.stats import rankdata as _scipy_rankdata
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
@@ -48,7 +49,9 @@ def dist_to_arm_from_well(
         the well is ``NaN`` or not in the graph, or for any arm whose
         endpoints are unreachable.
     """
-    if current_well is None or (isinstance(current_well, float) and np.isnan(current_well)):
+    if current_well is None or (
+        isinstance(current_well, float) and np.isnan(current_well)
+    ):
         return dict.fromkeys(ALL_ARMS, np.nan)
 
     current_well = int(current_well)
@@ -110,18 +113,7 @@ def arm_dist_rank(distances: np.ndarray) -> np.ndarray:
     if not finite.any():
         return ranks
 
-    finite_vals = distances[finite]
-    # "min" ranking: equal values share the smallest rank of the tie.
-    order = np.argsort(finite_vals, kind="stable")
-    sorted_vals = finite_vals[order]
-    finite_ranks = np.empty(finite_vals.shape, dtype=float)
-    # Emit rank 1 for the min; equal values share that rank.
-    rank = 1
-    for i in range(len(sorted_vals)):
-        if i > 0 and sorted_vals[i] != sorted_vals[i - 1]:
-            rank = i + 1
-        finite_ranks[order[i]] = rank
-    ranks[finite] = finite_ranks
+    ranks[finite] = _scipy_rankdata(distances[finite], method="min")
     return ranks
 
 

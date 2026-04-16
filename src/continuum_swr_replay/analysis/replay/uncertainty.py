@@ -38,9 +38,7 @@ def _weighted_mean_by_event(
     values = np.asarray(values, dtype=float)
     nonlocal_prob = np.asarray(nonlocal_prob, dtype=float)
     unique, inv, n_events = _group_by_event(event_id)
-    numerator = np.bincount(
-        inv, weights=values * nonlocal_prob, minlength=n_events
-    )
+    numerator = np.bincount(inv, weights=values * nonlocal_prob, minlength=n_events)
     denominator = np.bincount(inv, weights=nonlocal_prob, minlength=n_events)
     with np.errstate(divide="ignore", invalid="ignore"):
         mean = np.where(denominator > 0, numerator / denominator, np.nan)

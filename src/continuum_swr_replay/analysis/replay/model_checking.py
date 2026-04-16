@@ -70,7 +70,7 @@ def cross_validate_conditional_poisson(
     if n_events < n_folds * 2:
         return None
 
-    y = df[response_col].values.astype(int)
+    y = df[response_col].values.astype(float)
     n_arms = 9  # constant for this task
 
     gkf = GroupKFold(n_splits=n_folds)
@@ -153,23 +153,30 @@ def _held_out_conditional_ll(
         Total conditional log-likelihood across all events.
     """
     eta = X @ params
-    total_ll = 0.0
+    y = np.asarray(y, dtype=float)
 
-    for event_id in np.unique(groups):
-        mask = groups == event_id
-        eta_e = eta[mask]
-        c_e = y[mask]
-        L_e = c_e.sum()
+    unique_groups, inverse = np.unique(groups, return_inverse=True)
+    n_groups = len(unique_groups)
 
-        if L_e == 0:
-            continue
+    # Per-group sums via bincount
+    L = np.bincount(inverse, weights=y, minlength=n_groups)
+    cy_eta = np.bincount(inverse, weights=y * eta, minlength=n_groups)
 
-        # Log-sum-exp for numerical stability
-        max_eta = eta_e.max()
-        log_sum_exp = max_eta + np.log(np.sum(np.exp(eta_e - max_eta)))
-        total_ll += np.sum(c_e * eta_e) - L_e * log_sum_exp
+    # Per-group log-sum-exp (numerically stable)
+    # Sort by group for reduceat
+    order = np.argsort(inverse, kind="stable")
+    eta_sorted = eta[order]
+    inv_sorted = inverse[order]
+    group_starts = np.searchsorted(inv_sorted, np.arange(n_groups))
 
-    return float(total_ll)
+    max_eta = np.maximum.reduceat(eta_sorted, group_starts)
+    exp_shifted = np.exp(eta[order] - max_eta[inv_sorted])
+    sum_exp = np.bincount(inv_sorted, weights=exp_shifted, minlength=n_groups)
+    log_sum_exp = max_eta + np.log(sum_exp)
+
+    # Total LL, skipping groups where L == 0
+    event_ll = cy_eta - L * log_sum_exp
+    return float(event_ll[L > 0].sum())
 
 
 def compute_pearson_residuals(

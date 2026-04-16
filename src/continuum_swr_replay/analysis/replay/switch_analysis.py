@@ -71,7 +71,12 @@ def build_switch_aligned_table(
         return pd.DataFrame()
 
     valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-    valid["prev_is_switch"] = valid["is_switch"].shift(1, fill_value=0)
+    valid["prev_is_switch"] = (
+        valid.groupby(["animal", "day", "epoch"])["is_switch"]
+        .shift(1)
+        .fillna(0)
+        .astype(int)
+    )
     first_switches = valid[(valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)]
 
     if len(first_switches) == 0:

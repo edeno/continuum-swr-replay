@@ -793,9 +793,12 @@ def make_bandit_track_graph():
 
     g = nx.Graph()
     well_positions = {
-        0: (0, 0), 1: (10, 0),
-        2: (0, 10), 3: (10, 10),
-        4: (0, 20), 5: (10, 20),
+        0: (0, 0),
+        1: (10, 0),
+        2: (0, 10),
+        3: (10, 10),
+        4: (0, 20),
+        5: (10, 20),
     }
     for node, pos in well_positions.items():
         g.add_node(node, pos=pos)
@@ -987,16 +990,16 @@ def simulate_full_pipeline(
     event_totals = long_count.groupby("event_uid")["arm_count"].transform("sum")
     long_count = long_count[event_totals > 0].reset_index(drop=True)
 
-    mean_arms_per_event = float(
-        (counts > 0).sum(axis=1).mean()
-    )
+    mean_arms_per_event = float((counts > 0).sum(axis=1).mean())
 
     # Minimal events frame for backward compat with callers that
     # inspect the second return value.
-    events = pd.DataFrame({
-        "non_local_event": ids_sorted,
-        "total_count": counts.sum(axis=1),
-    })
+    events = pd.DataFrame(
+        {
+            "non_local_event": ids_sorted,
+            "total_count": counts.sum(axis=1),
+        }
+    )
     events = events[events["total_count"] > 0].copy()
 
     diagnostics = {
