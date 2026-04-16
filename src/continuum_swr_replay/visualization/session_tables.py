@@ -111,6 +111,27 @@ def _plot_conditional_posterior(ax: Axes, ctx: _PanelContext) -> None:
     plot_conditional_non_local_posterior(
         ctx.data, ctx.time_slice, ctx.results, ctx.env, ctx.detector, ax
     )
+    # Arm-label overlay — annotate the y-axis with arm IDs at the
+    # mean linear position of each arm's place bins so the reader
+    # can tell "this posterior blob is on arm 3" without mental
+    # arithmetic. Mirrors the ``plot_graph_as_1D`` annotations in
+    # ``plot_replay_content_time_slice.py``.
+    bin_df = ctx.env.place_bin_centers_nodes_df_
+    edge_ids = np.asarray(bin_df["edge_id"])
+    lin_pos = np.asarray(bin_df["linear_position"])
+    palette = ctx.arm_palette
+    t_left = ctx.time_slice.start
+    for arm in _ALL_ARMS:
+        mask = edge_ids == arm
+        if not mask.any():
+            continue
+        y_center = float(lin_pos[mask].mean())
+        color = palette.get(arm, (0.3, 0.3, 0.3, 1.0))
+        ax.text(
+            t_left, y_center, f"a{arm}",
+            fontsize=7, va="center", ha="right",
+            color=color, fontweight="bold", clip_on=False,
+        )
 
 
 def _plot_speed(ax: Axes, ctx: _PanelContext) -> None:
@@ -182,11 +203,11 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             clip_on=False,
         )
 
-    # Patch-change markers — a colored tick at the x-axis, since the
-    # change is a trip-level fact not a positional one.
+    # Patch-change markers — purple ticks (deliberately NOT the SWR
+    # orange, which would collide with SWR shading in panels 1–2).
     if is_patch_change.any():
         for t in end_times[is_patch_change]:
-            ax.axvline(t, color=COLORS["SWR"], linewidth=0.5, alpha=0.4)
+            ax.axvline(t, color="#9467bd", linewidth=0.7, alpha=0.5)
 
     # Per-well horizontal guidelines so step levels are easy to read.
     for well in sorted(WELL_PATCH_MAPPING):
@@ -334,7 +355,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 clip_on=False,
             )
 
-    ax.set_ylabel("Arm\ncurr/prev/\nnext/rew")
+    ax.set_ylabel("Arm\nIdentity")
     ax.set_ylim(-0.5, 8.5)
     ax.set_yticks(list(_ALL_ARMS))
 
@@ -440,7 +461,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
                 label="actual next_arm (from trials)",
             )
 
-    ax.set_ylabel("next_arm\ncanonical\nvs actual")
+    ax.set_ylabel("Next-Arm\nMismatch")
     ax.set_ylim(-0.5, 8.5)
     ax.set_yticks(list(_ALL_ARMS))
 
@@ -692,6 +713,136 @@ def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+# ── Stacked-area arm mass (composition over time) ──
+
+
+def _plot_arm_mass_stackplot(ax: Axes, ctx: _PanelContext) -> None:
+    """Per-timebin arm-posterior composition as a stacked area.
+
+    Each arm's band height is proportional to its posterior mass at
+    that timebin; the total always sums to 1. Colored by the patch-
+    grouped palette. More readable than the pcolormesh heatmap for
+    answering "which arm dominated?" since the visual weight is
+    directly proportional.
+
+    Gaps between events are left white by drawing one stackplot
+    per event (same strategy as ``_plot_arm_posterior_heatmap``).
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    est = ctx.event_sequence_table
+    view = est[(est["time"] >= lo) & (est["time"] <= hi)]
+
+    ax.set_ylabel("arm mass\n(stacked)")
+    ax.set_ylim(0, 1.01)
+    ax.set_yticks([0, 0.5, 1])
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no in-event timebins in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+
+    arm_cols = [f"arm_posterior_{a}" for a in _ALL_ARMS]
+    palette = ctx.arm_palette
+    colors = [palette.get(a, (0.5, 0.5, 0.5, 1.0)) for a in _ALL_ARMS]
+
+    for _event_id, rows in view.groupby("event_id", sort=False):
+        times = rows["time"].to_numpy()
+        if times.size < 2:
+            continue
+        mass = rows[arm_cols].to_numpy().T  # (n_arms, T)
+        ax.stackplot(
+            times, mass, colors=colors,
+            edgecolor="none", alpha=0.95,
+        )
+
+
+# ── Replay fraction by role ──
+
+
+# Role-specific shapes and desaturated colors for replay_frac_by_role.
+# Deliberately DIFFERENT from the arm_markers panel (which uses
+# ○ ▲ ▼ ★ with the arm-palette). The visual vocabulary separation
+# signals "panel 9 = magnitude by role, panel 8 = arm identity".
+_ROLE_SPEC = (
+    ("current", "is_current", "s", "#708090"),       # square, slate
+    ("prev", "is_prev", "D", "#5f9ea0"),             # diamond, cadet blue
+    ("next (post-hoc)", "is_next", "P", "#cd5c5c"),  # plus, indian red
+    ("last_rewarded", "is_last_rewarded", "h", "#daa520"),  # hexagon, goldenrod
+)
+
+
+def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
+    """Per-event arm_fraction at each of four canonical arm roles.
+
+    For each event: look up the ``arm_fraction`` of the row where
+    ``is_current == 1``, ``is_prev == 1``, ``is_next == 1``, and
+    ``is_last_rewarded == 1``. Plot four stems per event at
+    ``event_midpoint_time`` so the reader can immediately answer
+    "how much replay went to the future destination vs. where the
+    animal came from vs. where it is now?"
+
+    This is the per-event analog of the plan's Stage 1 descriptive
+    variables (``replay_frac_current`` / ``replay_frac_next`` /
+    ``replay_frac_prev`` / ``replay_frac_last_rewarded``).
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    eat = ctx.event_arm_table
+    et = ctx.event_table
+    in_window = (
+        (et["event_midpoint_time"] >= lo)
+        & (et["event_midpoint_time"] <= hi)
+    )
+    et_w = et.loc[in_window]
+
+    ax.set_ylabel("Replay Frac\n(by role)")
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_yticks([0, 0.5, 1])
+    ax.axhline(1.0 / len(_ALL_ARMS), color="grey", linewidth=0.5,
+               linestyle="--", zorder=0, label="uniform 1/N")
+
+    if len(et_w) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+
+    # Small x-offset per role so stems don't overlap.
+    times = et_w["event_midpoint_time"].to_numpy()
+    dt = float(np.median(np.abs(np.diff(times)))) if len(times) > 1 else 1.0
+    offsets = np.linspace(-0.08 * dt, 0.08 * dt, len(_ROLE_SPEC))
+
+    for (label, indicator_col, marker, color), x_off in zip(
+        _ROLE_SPEC, offsets, strict=True
+    ):
+        fracs = np.full(len(et_w), np.nan)
+        for i, (_, ev_row) in enumerate(et_w.iterrows()):
+            arm_rows = eat[eat["event_id"] == ev_row["event_id"]]
+            role_row = arm_rows[arm_rows[indicator_col] == 1]
+            if len(role_row) == 1:
+                fracs[i] = float(role_row["arm_fraction"].iloc[0])
+        finite = np.isfinite(fracs)
+        if not finite.any():
+            continue
+        ax.vlines(
+            times[finite] + x_off, 0, fracs[finite],
+            color=color, linewidth=0.6, zorder=2,
+        )
+        ax.scatter(
+            times[finite] + x_off, fracs[finite],
+            s=24, marker=marker, color=color,
+            edgecolor="black", linewidths=0.3,
+            zorder=3, clip_on=False, label=label,
+        )
+
+    ax.legend(
+        bbox_to_anchor=(1.02, 1), loc="upper left",
+        fontsize=7, framealpha=0.7,
+    )
+
+
 # ── Event / stop activity panels ──
 
 
@@ -828,35 +979,35 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
 
 
 def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
-    """Event-level boolean context flags as colored ticks per event.
+    """Event-level boolean context flags as a binary heatmap.
 
-    Six flag rows stacked vertically (``is_after_reward``,
-    ``is_after_omission``, ``is_after_switch``, ``is_after_stay``,
-    ``is_swr``, ``is_mua``) with a colored tick at each event's
-    ``event_midpoint_time`` when the flag is True. Reads directly
-    from ``event_table`` — no derivation.
+    Six flag rows (``is_after_reward``, ``is_after_omission``,
+    ``is_after_switch``, ``is_after_stay``, ``is_swr``, ``is_mua``)
+    displayed as filled cells per event: colored when True, white
+    when False. The heatmap encoding is more legible than ``|``
+    ticks at this density because flag co-occurrence within a single
+    event reads as a filled column rather than overlapping marks.
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
     view = et[
         (et["event_midpoint_time"] >= lo)
         & (et["event_midpoint_time"] <= hi)
-    ]
+    ].sort_values("event_midpoint_time")
 
     flag_specs = (
-        ("is_after_reward", 5, "#2ca02c"),
-        ("is_after_omission", 4, "#d62728"),
-        ("is_after_switch", 3, "#9467bd"),
-        ("is_after_stay", 2, "#8c564b"),
-        ("is_swr", 1, COLORS["SWR"]),
-        ("is_mua", 0, COLORS["MUA"]),
+        ("is_after_reward", "#2ca02c"),
+        ("is_after_omission", "#d62728"),
+        ("is_after_switch", "#9467bd"),
+        ("is_after_stay", "#8c564b"),
+        ("is_swr", COLORS["SWR"]),
+        ("is_mua", COLORS["MUA"]),
     )
-    ax.set_yticks([y for _, y, _ in flag_specs])
-    ax.set_yticklabels([name for name, _, _ in flag_specs], fontsize=7)
-    ax.set_ylim(-0.6, 5.6)
-    ax.set_ylabel("context\nflags")
-    for _, y, _ in flag_specs:
-        ax.axhline(y, color="lightgrey", linewidth=0.3, zorder=0)
+    flag_names = [name for name, _ in flag_specs]
+    ax.set_yticks(range(len(flag_specs)))
+    ax.set_yticklabels(flag_names, fontsize=7)
+    ax.set_ylim(-0.5, len(flag_specs) - 0.5)
+    ax.set_ylabel("Context\nFlags")
 
     if len(view) == 0:
         ax.text(
@@ -865,19 +1016,22 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
         )
         return
 
-    times = view["event_midpoint_time"].to_numpy()
-    for flag, y_level, color in flag_specs:
-        # Flag columns are float (0.0 / 1.0 / NaN) from _add_trial_context
-        # for context flags, bool for is_swr / is_mua.
-        vals = view[flag].to_numpy()
-        mask = np.asarray(vals, dtype=float) == 1.0
-        if mask.any():
-            ax.scatter(
-                times[mask],
-                np.full(int(mask.sum()), y_level),
-                s=24, marker="|", color=color, linewidths=1.5,
-                zorder=3, clip_on=False,
-            )
+    n_events = len(view)
+    starts = view["event_start"].to_numpy()
+    ends = view["event_end"].to_numpy()
+
+    for row_idx, (flag, color) in enumerate(flag_specs):
+        vals = np.asarray(view[flag].to_numpy(), dtype=float)
+        for j in range(n_events):
+            if vals[j] == 1.0:
+                rect = Rectangle(
+                    (starts[j], row_idx - 0.4),
+                    width=max(ends[j] - starts[j], (hi - lo) * 0.003),
+                    height=0.8,
+                    facecolor=color, edgecolor="none", alpha=0.85,
+                    zorder=2,
+                )
+                ax.add_patch(rect)
 
 
 # ── Scalar per-event panels ──
@@ -996,7 +1150,10 @@ def _plot_hpd_widths(ax: Axes, ctx: _PanelContext) -> None:
             times, vals, color=color, linewidth=lw, marker="o",
             markersize=3, zorder=3, clip_on=False, label=label,
         )
-    ax.legend(loc="upper right", fontsize=7, framealpha=0.7)
+    ax.legend(
+        bbox_to_anchor=(1.02, 1), loc="upper left",
+        fontsize=7, framealpha=0.7,
+    )
 
 
 def _plot_n_nonlocal_bins(ax: Axes, ctx: _PanelContext) -> None:
@@ -1048,6 +1205,8 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "nominal_reward_prob": _plot_nominal_reward_prob,
     "dist_to_arm": _plot_dist_to_arm,
     "arm_dist_rank": _plot_arm_dist_rank,
+    "arm_mass_stackplot": _plot_arm_mass_stackplot,
+    "replay_frac_by_role": _plot_replay_frac_by_role,
     "event_bars": _plot_event_bars,
     "stop_activity": _plot_stop_activity,
     "context_flags": _plot_context_flags,
@@ -1081,6 +1240,8 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "nominal_reward_prob": 1.4,
     "dist_to_arm": 1.4,
     "arm_dist_rank": 1.4,
+    "arm_mass_stackplot": 1.4,
+    "replay_frac_by_role": 1.2,
     "event_bars": 1.2,
     "stop_activity": 1.2,
     "context_flags": 1.4,
@@ -1224,10 +1385,25 @@ def plot_session_tables(
 
     axes[-1].set_xlabel("Time [s]")
     axes[-1].set_xlim(t_start, t_end)
-    # Suppress the ``+1.625935e9`` offset notation — session times are
-    # seconds-since-epoch; absolute values read fine and the offset
-    # notation clutters the axis without aiding interpretation.
     axes[-1].ticklabel_format(useOffset=False, style="plain", axis="x")
+
+    # Vertical event-span guides across ALL panels so the reader can
+    # correlate "what is the state probability here?" with "what is
+    # the arm fraction here?" without manually tracking x-coordinates.
+    et_windowed = event_table[
+        (event_table["event_start"] <= t_end)
+        & (event_table["event_end"] >= t_start)
+    ]
+    for _, ev_row in et_windowed.iterrows():
+        for ax in axes:
+            ax.axvspan(
+                ev_row["event_start"],
+                ev_row["event_end"],
+                alpha=0.04,
+                color="black",
+                zorder=0,
+            )
+
     sns.despine(offset=5)
 
     # If the mismatch-pointers panel ran it stashed the full table on
