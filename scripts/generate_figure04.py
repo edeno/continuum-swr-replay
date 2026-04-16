@@ -441,14 +441,14 @@ def generate_figure(
     cbar.set_ticklabels(["0.5x", "1x", "2x"])
 
     # ── Row 3: panel c (population average) + panel d (stats) ──
-    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.3], wspace=0.35)
+    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.3], wspace=0.25)
 
     # Panel c: population average modulation
     ax_c = fig.add_subplot(gs_cd[0])
     plot_population_average(modulations, pop_lag_time, ax_c)
 
     # Panel d: consolidated stats — % significant + best-AIC
-    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.4)
+    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.3)
     ax_d1 = fig.add_subplot(gs_d[0])
     ax_d2 = fig.add_subplot(gs_d[1])
     plot_significance(pop_df, ax_d1)
