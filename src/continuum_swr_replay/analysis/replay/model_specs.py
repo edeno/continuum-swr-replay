@@ -68,6 +68,12 @@ _SWR_INTERACTIONS: tuple[str, ...] = (
     "swr_x_last_rewarded",
 )
 
+_MUA_INTERACTIONS: tuple[str, ...] = (
+    "mua_x_current",
+    "mua_x_next",
+    "mua_x_prev",
+)
+
 _CONTEXT_INTERACTIONS: tuple[str, ...] = (
     "switch_x_current",
     "switch_x_prev",
@@ -120,8 +126,9 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
             + _DISTANCE
             + _TEMPORAL_INTERACTIONS
             + _SWR_INTERACTIONS
+            + _MUA_INTERACTIONS
         ),
-        description="SWR distinction (survives after timing control?)",
+        description="SWR + MUA event-type interactions",
         parent="M5",
     ),
     "M7": ModelSpec(
@@ -132,6 +139,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
             + _DISTANCE
             + _TEMPORAL_INTERACTIONS
             + _SWR_INTERACTIONS
+            + _MUA_INTERACTIONS
             + _CONTEXT_INTERACTIONS
         ),
         description="Full model with task context interactions",
