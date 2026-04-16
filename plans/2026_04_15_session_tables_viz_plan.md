@@ -226,8 +226,11 @@ before any viz panels land:
 5. Event-level scalar group panels.
 6. Per-arm predictor group panels.
 7. Event / stop activity panels.
-8. CLI driver at `scripts/plot_canonical_session.py`.
-9. Reviewer pass + real-data run on a cached j16 session.
+8. Reviewer pass + real-data run on a cached j16 session.
+
+*(CLI driver was considered but dropped — callers use
+`plot_session_tables` directly from a notebook or analysis
+script.)*
 
 ## Out of scope for v1
 

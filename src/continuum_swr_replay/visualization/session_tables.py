@@ -389,8 +389,20 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
         # Connector lines first so markers sit on top. We always draw
         # a connector — thin grey for matches (short segment of length
         # 2*dy), bold red for mismatches (spans the arm gap + offsets).
+        # Half-NaN events (one side has a next_arm, the other doesn't
+        # — legitimate at session boundaries but still a mismatch)
+        # get a short red stub around the side that does have a value
+        # so the red-highlights-disagreement cue is preserved.
         for t, c_arm, a_arm, match in zip(times, canonical, actual, is_match, strict=True):
-            if np.isnan(c_arm) or np.isnan(a_arm):
+            c_nan, a_nan = np.isnan(c_arm), np.isnan(a_arm)
+            if c_nan and a_nan:
+                continue
+            if c_nan ^ a_nan:
+                present = c_arm if not c_nan else a_arm
+                ax.plot(
+                    [t, t], [present - dy, present + dy],
+                    color="red", linewidth=1.6, zorder=2, clip_on=False,
+                )
                 continue
             color = "lightgrey" if match else "red"
             lw = 0.5 if match else 1.6
@@ -476,13 +488,25 @@ def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
     arm_cols = [f"arm_posterior_{a}" for a in _ALL_ARMS]
     edges_a = np.arange(len(_ALL_ARMS) + 1) - 0.5
 
+    # Derive a fallback ``dt`` from the global time diffs so single-
+    # timebin events still get a visible cell (1/sampling_frequency on
+    # the bandit data, ~2 ms). Without this, single-timebin events
+    # drop out of the heatmap but the MAP-dot overlay still draws
+    # them, leaving a confusing lone dot with no background.
+    all_times = view["time"].to_numpy()
+    diffs = np.diff(all_times)
+    dt_fallback = float(np.median(diffs[diffs > 0])) if (diffs > 0).any() else 0.002
+
     # Draw one pcolormesh per event — matplotlib doesn't interpolate
     # across discontinuous x, so per-event calls keep gaps white.
     for _event_id, rows in view.groupby("event_id", sort=False):
         times = rows["time"].to_numpy()
-        if times.size < 2:
+        if times.size < 1:
             continue
-        dt = float(np.median(np.diff(times)))
+        if times.size == 1:
+            dt = dt_fallback
+        else:
+            dt = float(np.median(np.diff(times)))
         edges_t = np.concatenate([times - dt / 2, [times[-1] + dt / 2]])
         posterior = rows[arm_cols].to_numpy().T  # (n_arms, T)
         ax.pcolormesh(
