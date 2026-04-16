@@ -1,0 +1,121 @@
+"""Poisson rate model for replay event occurrence (Stage 2).
+
+Tests whether the NUMBER of replay events per stop depends on
+behavioral context, independently of replay CONTENT. The response is
+``n_events`` (count of non-local events per stop); the offset is
+``log(immobility_time)`` so that coefficients are interpretable as
+multiplicative changes in event rate per second of immobility.
+
+Model hierarchy:
+
+- **R0**: intercept only — baseline event rate.
+- **R1**: + ``is_after_reward``, ``is_after_omission``,
+  ``is_after_switch`` — does behavioral context change event rate?
+- **R3**: R1 fitted separately for SWR-only, MUA-only, and neither
+  event types (``is_swr_stop`` / ``is_mua_stop``).
+
+R2 (+ ``trials_since_block_change``, ``block_number``) is deferred
+until the contingency-block loader is wired.
+
+``exp(γ)`` = multiplicative change in events per second of
+immobility. ``exp(γ) = 1.5`` means 50% more events per second when
+the predictor is active.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
+logger = logging.getLogger(__name__)
+
+
+def fit_rate_model(
+    stop_table: pd.DataFrame,
+    predictors: list[str],
+    *,
+    response_col: str = "n_events",
+    offset_col: str = "immobility_time",
+    min_stops: int = 20,
+) -> dict | None:
+    """Fit a Poisson GLM on event counts per stop.
+
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        One session's ``stop_table`` (includes zero-event stops).
+    predictors : list[str]
+        Columns to use as fixed effects. Empty list fits the
+        intercept-only null (R0).
+    response_col : str
+        Count column. Default ``n_events``.
+    offset_col : str
+        Exposure column — ``log(offset_col)`` enters as an offset.
+        Stops with ``offset_col <= 0`` are excluded (single-sample
+        bouts where ``immobility_time == 0``).
+    min_stops : int
+        Minimum number of valid stops to attempt fitting.
+
+    Returns
+    -------
+    dict | None
+        Coefficients (``coef_*``), standard errors (``bse_*``),
+        p-values (``pval_*``), rate ratios (``rr_*`` = exp(coef)),
+        plus fit statistics. None if fitting fails.
+    """
+    required = [response_col, offset_col] + predictors
+    missing = [c for c in required if c not in stop_table.columns]
+    if missing:
+        logger.error("Missing columns: %s", missing)
+        return None
+
+    df = stop_table[required].copy()
+    df = df.dropna(subset=required)
+
+    # Exclude zero-duration stops (log(0) = -inf).
+    df = df[df[offset_col] > 0].reset_index(drop=True)
+
+    if len(df) < min_stops:
+        return None
+
+    y = df[response_col].values.astype(float)
+    offset = np.log(df[offset_col].values.astype(float))
+
+    if predictors:
+        X = sm.add_constant(df[predictors].values.astype(float))
+        col_names = ["intercept"] + predictors
+    else:
+        X = np.ones((len(df), 1))
+        col_names = ["intercept"]
+
+    try:
+        model = sm.GLM(y, X, family=sm.families.Poisson(), offset=offset)
+        result = model.fit(disp=0)
+    except Exception:
+        logger.warning("Poisson GLM failed for predictors %s", predictors)
+        return None
+
+    coefs = dict(zip(col_names, result.params, strict=True))
+    bse = dict(zip(col_names, result.bse, strict=True))
+    pvals = dict(zip(col_names, result.pvalues, strict=True))
+
+    output = {
+        **{f"coef_{k}": float(v) for k, v in coefs.items()},
+        **{f"bse_{k}": float(v) for k, v in bse.items()},
+        **{f"pval_{k}": float(v) for k, v in pvals.items()},
+        **{f"rr_{k}": float(np.exp(v)) for k, v in coefs.items()},
+        "n_stops": len(df),
+        "n_events_total": int(y.sum()),
+        "n_params": len(col_names),
+        "llf": float(result.llf),
+        "aic": float(result.aic),
+        "bic": float(result.bic),
+        "deviance": float(result.deviance),
+        "pearson_chi2": float(result.pearson_chi2),
+        "mean_rate": float(y.sum() / np.exp(offset).sum()),
+    }
+
+    return output
