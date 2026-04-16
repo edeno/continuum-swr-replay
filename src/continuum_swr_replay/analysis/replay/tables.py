@@ -148,15 +148,9 @@ def _add_trial_context(
     next_valid = valid & (next_idx < n_trials)
     next_clipped = np.clip(next_idx, 0, n_trials - 1)
 
-    dot["prev_well"] = np.where(
-        valid, from_wells[current_clipped], np.nan
-    )
-    dot["current_well"] = np.where(
-        valid, to_wells[current_clipped], np.nan
-    )
-    dot["next_well"] = np.where(
-        next_valid, to_wells[next_clipped], np.nan
-    )
+    dot["prev_well"] = np.where(valid, from_wells[current_clipped], np.nan)
+    dot["current_well"] = np.where(valid, to_wells[current_clipped], np.nan)
+    dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
     # Most recently rewarded well. Use ``goal_arrival_time`` (beam-
     # break ≈ reward delivery, ~46 ms delay) rather than
@@ -202,9 +196,7 @@ def _add_trial_context(
     else:
         dot["_last_reward_time"] = np.nan
 
-    current_reward = np.where(
-        valid, is_reward[current_clipped].astype(float), np.nan
-    )
+    current_reward = np.where(valid, is_reward[current_clipped].astype(float), np.nan)
     dot["reward_outcome"] = current_reward
     dot["is_after_reward"] = current_reward
     dot["is_after_omission"] = np.where(valid, 1.0 - current_reward, np.nan)
@@ -267,8 +259,8 @@ def _immobility_bout_intervals(
     # after the run — shift back by 1 to get the last True index.
     padded = np.concatenate(([False], imm, [False]))
     diff = np.diff(padded.astype(np.int8))
-    start_idx = np.where(diff == 1)[0]          # index into imm of run starts
-    end_idx = np.where(diff == -1)[0] - 1       # index into imm of run last-True
+    start_idx = np.where(diff == 1)[0]  # index into imm of run starts
+    end_idx = np.where(diff == -1)[0] - 1  # index into imm of run last-True
     return times[start_idx], times[end_idx]
 
 
@@ -562,7 +554,11 @@ def build_event_table(
         # ``current_well`` fallback. Driving the check off the
         # graph — rather than hard-coding {0..5} — keeps the fallback
         # correct on any track graph.
-        ts = g["track_segment_id"] if "track_segment_id" in g.columns else pd.Series(dtype=float)
+        ts = (
+            g["track_segment_id"]
+            if "track_segment_id" in g.columns
+            else pd.Series(dtype=float)
+        )
         ts_modal = _safe_mode(ts)
         current_arm = np.nan
         if not np.isnan(ts_modal):
@@ -574,12 +570,8 @@ def build_event_table(
                 _safe_first(g["current_well"]), track_graph
             )
 
-        prev_arm = _single_arm_from_well(
-            _safe_first(g["prev_well"]), track_graph
-        )
-        next_arm = _single_arm_from_well(
-            _safe_first(g["next_well"]), track_graph
-        )
+        prev_arm = _single_arm_from_well(_safe_first(g["prev_well"]), track_graph)
+        next_arm = _single_arm_from_well(_safe_first(g["next_well"]), track_graph)
         last_rewarded_arm = _single_arm_from_well(
             _safe_first(g["last_rewarded_well"]), track_graph
         )
@@ -614,10 +606,11 @@ def build_event_table(
                 "is_after_reward": is_after_reward,
                 "is_after_stay": is_after_stay,
                 "reward_outcome": reward_outcome,
-                "is_stay": float(
-                    _arm_to_patch(next_arm) == _arm_to_patch(current_arm)
+                "is_stay": float(_arm_to_patch(next_arm) == _arm_to_patch(current_arm))
+                if not (
+                    np.isnan(_arm_to_patch(next_arm))
+                    or np.isnan(_arm_to_patch(current_arm))
                 )
-                if not (np.isnan(_arm_to_patch(next_arm)) or np.isnan(_arm_to_patch(current_arm)))
                 else np.nan,
                 "n_junction_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
@@ -683,9 +676,7 @@ def build_event_table(
         )
 
         _, mass_total = posterior_mass_total(nonlocal_prob_arr, event_id_series)
-        _, peak = posterior_peak_mean(
-            arm_posterior, nonlocal_prob_arr, event_id_series
-        )
+        _, peak = posterior_peak_mean(arm_posterior, nonlocal_prob_arr, event_id_series)
         _, entropy = posterior_entropy_mean(
             arm_posterior, nonlocal_prob_arr, event_id_series
         )
@@ -712,9 +703,7 @@ def build_event_table(
     # stop_id: each event's event_start belongs to exactly one
     # immobility bout (the in-event filter guarantees immobility, so
     # ``_assign_bout`` should find a valid bout for every row).
-    stop_idx = _assign_bout(
-        per_event["event_start"].to_numpy(), bout_starts, bout_ends
-    )
+    stop_idx = _assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
 
@@ -905,15 +894,17 @@ def build_stop_table(
     per_bout["immobility_time"] = bout_ends - bout_starts
 
     per_bout["is_swr_stop"] = (
-        grouped["SWR_event"].apply(lambda s: (s > 0).any()).reindex(
-            np.arange(n_bouts), fill_value=False
-        ).to_numpy()
+        grouped["SWR_event"]
+        .apply(lambda s: (s > 0).any())
+        .reindex(np.arange(n_bouts), fill_value=False)
+        .to_numpy()
     )
     if "MUA_event" in dot.columns:
         per_bout["is_mua_stop"] = (
-            grouped["MUA_event"].apply(lambda s: (s > 0).any()).reindex(
-                np.arange(n_bouts), fill_value=False
-            ).to_numpy()
+            grouped["MUA_event"]
+            .apply(lambda s: (s > 0).any())
+            .reindex(np.arange(n_bouts), fill_value=False)
+            .to_numpy()
         )
     else:
         per_bout["is_mua_stop"] = False
@@ -960,15 +951,11 @@ def build_stop_table(
                 np.nan,
                 1.0 - first_row["is_after_switch"].to_numpy(),
             )
-            per_bout["is_after_stay"] = pd.Series(stay).reindex(
-                np.arange(n_bouts)
-            ).to_numpy()
-        else:
-            per_bout[col] = (
-                first_row[col]
-                .reindex(np.arange(n_bouts))
-                .to_numpy()
+            per_bout["is_after_stay"] = (
+                pd.Series(stay).reindex(np.arange(n_bouts)).to_numpy()
             )
+        else:
+            per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
     # Arm / patch fields. ``current_arm`` uses the same modal-segment +
     # trunk-fallback rule as event-level current_arm; at a well-stop
@@ -978,16 +965,16 @@ def build_stop_table(
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
-        ts_modal = _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
+        ts_modal = (
+            _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
+        )
         ca = np.nan
         if not np.isnan(ts_modal):
             well_of_modal = arm_to_well(ts_modal, track_graph)
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = _single_arm_from_well(
-                _safe_first(g["current_well"]), track_graph
-            )
+            ca = _single_arm_from_well(_safe_first(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = _single_arm_from_well(
             _safe_first(g["prev_well"]), track_graph
@@ -1010,7 +997,9 @@ def build_stop_table(
     per_bout["next_patch"] = nxt_patch
     # is_stay: will the next trip be within the same patch? Post-hoc.
     both_valid = ~np.isnan(cur_patch.astype(float)) & ~np.isnan(nxt_patch.astype(float))
-    per_bout["is_stay"] = np.where(both_valid, (cur_patch == nxt_patch).astype(float), np.nan)
+    per_bout["is_stay"] = np.where(
+        both_valid, (cur_patch == nxt_patch).astype(float), np.nan
+    )
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "day", day)
@@ -1110,9 +1099,7 @@ def build_event_arm_table(
         edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
         post_vals = _align_posterior_to_dot(conditional_posterior, dot)
         post_in_event = post_vals[in_event.to_numpy()]
-        arm_posterior = posterior_to_arm_marginal(
-            post_in_event, edge_id, n_arms=n_arms
-        )
+        arm_posterior = posterior_to_arm_marginal(post_in_event, edge_id, n_arms=n_arms)
         ids_all, mass = arm_posterior_mass(
             nonlocal_prob_all, arm_posterior, event_id_all
         )
@@ -1240,6 +1227,65 @@ def build_event_arm_table(
 
 
 # ── Helpers ──
+
+
+def build_event_patch_table(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+) -> pd.DataFrame:
+    """Collapse event-arm table to event-patch level (3 rows per event).
+
+    Sums ``arm_count_hard`` across arms within each patch, and
+    aggregates per-arm predictors to patch level. The result is ready
+    for patch-level conditional Poisson fitting (``MODEL_PATCH``).
+
+    Parameters
+    ----------
+    event_table : pd.DataFrame
+        Canonical event table (for ``last_rewarded_arm`` → patch mapping).
+    event_arm_table : pd.DataFrame
+        Canonical event-arm table (9 rows per event).
+
+    Returns
+    -------
+    pd.DataFrame
+        3 rows per event (one per patch), with columns:
+        ``event_id``, ``patch``, ``patch_count_hard``,
+        ``is_current_patch``, ``is_last_rewarded_patch``,
+        ``cumulative_reward_patch``, ``visit_recency_patch``.
+    """
+    eat = event_arm_table.copy()
+    eat["patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
+
+    patch_eat = (
+        eat.groupby(["event_id", "patch"])
+        .agg(
+            patch_count_hard=("arm_count_hard", "sum"),
+            is_current_patch=("is_same_patch", "max"),
+            cumulative_reward_patch=("cumulative_reward", "sum"),
+            visit_recency_patch=("visit_recency", "min"),
+        )
+        .reset_index()
+    )
+
+    # is_last_rewarded_patch: is the last-rewarded arm in this patch?
+    last_rew = event_table[["event_id", "last_rewarded_arm"]].copy()
+    last_rew["last_rewarded_patch"] = last_rew["last_rewarded_arm"].map(
+        lambda a: float(TRACK_SEGMENT_TO_PATCH.get(int(a), np.nan))
+        if pd.notna(a)
+        else np.nan
+    )
+    patch_eat = patch_eat.merge(
+        last_rew[["event_id", "last_rewarded_patch"]],
+        on="event_id",
+        how="left",
+    )
+    patch_eat["is_last_rewarded_patch"] = (
+        patch_eat["patch"] == patch_eat["last_rewarded_patch"]
+    ).astype(int)
+    patch_eat = patch_eat.drop(columns=["last_rewarded_patch"])
+
+    return patch_eat
 
 
 def _safe_mode(series: pd.Series) -> float:

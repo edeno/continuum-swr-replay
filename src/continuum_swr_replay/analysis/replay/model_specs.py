@@ -202,7 +202,12 @@ MODEL_A: dict[str, ModelSpec] = {
     ),
     "A3": ModelSpec(
         name="A3",
-        predictors=("dist_to_arm", "is_last_rewarded", "visit_recency", "cumulative_reward"),
+        predictors=(
+            "dist_to_arm",
+            "is_last_rewarded",
+            "visit_recency",
+            "cumulative_reward",
+        ),
         description="+ reward history",
         parent="A2",
     ),
@@ -229,17 +234,70 @@ MODEL_B: dict[str, ModelSpec] = {
     ),
     "B3": ModelSpec(
         name="B3",
-        predictors=("is_current", "is_same_patch", "is_last_rewarded", "current_x_last_rewarded"),
+        predictors=(
+            "is_current",
+            "is_same_patch",
+            "is_last_rewarded",
+            "current_x_last_rewarded",
+        ),
         description="+ most-recent reward (with interaction)",
         parent="B2",
     ),
     "B4": ModelSpec(
         name="B4",
         predictors=(
-            "is_current", "is_same_patch", "is_last_rewarded", "current_x_last_rewarded",
-            "visit_recency", "cumulative_reward",
+            "is_current",
+            "is_same_patch",
+            "is_last_rewarded",
+            "current_x_last_rewarded",
+            "visit_recency",
+            "cumulative_reward",
         ),
         description="+ reward history",
         parent="B3",
+    ),
+}
+
+# ── Patch-level models ──
+#
+# Collapse 9 arms to 3 patches (sum arm_count_hard across arms within
+# each patch). Eliminates trunk/leaf distinction and provides a cleaner
+# test of the value/exploration question. The response is patch-level
+# count; the conditional Poisson conditions on the event total as before
+# but with 3 candidate patches instead of 9 arms.
+#
+# Predictors use ``_patch`` suffix to distinguish from the arm-level
+# versions — e.g., ``is_current_patch`` (= is the animal in this
+# patch?) and ``cumulative_reward_patch`` (= sum of rewards across
+# both wells in this patch over the last 10 trials).
+
+MODEL_PATCH: dict[str, ModelSpec] = {
+    "P0": ModelSpec(
+        name="P0",
+        predictors=(),
+        description="Null (uniform across patches)",
+        parent=None,
+    ),
+    "P1": ModelSpec(
+        name="P1",
+        predictors=("is_current_patch",),
+        description="Current-patch bias",
+        parent="P0",
+    ),
+    "P2": ModelSpec(
+        name="P2",
+        predictors=("is_current_patch", "is_last_rewarded_patch"),
+        description="+ last-rewarded patch",
+        parent="P1",
+    ),
+    "P3": ModelSpec(
+        name="P3",
+        predictors=(
+            "is_current_patch",
+            "is_last_rewarded_patch",
+            "cumulative_reward_patch",
+        ),
+        description="+ patch-level reward history",
+        parent="P2",
     ),
 }
