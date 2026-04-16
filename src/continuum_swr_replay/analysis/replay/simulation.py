@@ -251,8 +251,10 @@ def simulate_with_event_covariates(
 
     # Arm-varying base binary predictors, sampled per event.
     current = rng.choice(leaf, size=n_events)
-    prev = rng.choice(leaf, size=n_events)
-    nxt = rng.choice(leaf, size=n_events)
+    # Task constraint: prev and next are always different from current
+    # (consecutive pokes at the same port are never rewarded).
+    prev = np.array([rng.choice(leaf[leaf != c]) for c in current])
+    nxt = np.array([rng.choice(leaf[leaf != c]) for c in current])
     rewarded = rng.choice(leaf, size=n_events)
     arm_grid = np.arange(n_arms)[None, :]
     arm_features: dict[str, np.ndarray] = {

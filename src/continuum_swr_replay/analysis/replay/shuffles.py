@@ -114,6 +114,19 @@ def stop_label_shuffle(
     """
     if rng is None:
         rng = np.random.default_rng()
+    # Guard: stop_table must be a single session. Cross-session
+    # shuffle would swap labels between sessions, which is never
+    # the intent (reviewer flag #10).
+    session_cols = ["animal", "day", "epoch"]
+    available = [c for c in session_cols if c in stop_table.columns]
+    if available:
+        n_sessions = stop_table[available].drop_duplicates().shape[0]
+        if n_sessions > 1:
+            raise ValueError(
+                f"stop_label_shuffle received {n_sessions} sessions; "
+                "pass one session at a time to avoid cross-session "
+                "label contamination."
+            )
     out = stop_table.copy()
     perm = rng.permutation(len(out))
     for col in columns:

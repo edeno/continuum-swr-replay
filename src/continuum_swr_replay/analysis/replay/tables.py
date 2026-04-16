@@ -156,10 +156,21 @@ def _add_trial_context(
         next_valid, to_wells[next_clipped], np.nan
     )
 
-    rewarded_end_times = trial_end_times[is_reward]
+    # Most recently rewarded well. Use ``goal_arrival_time`` (beam-
+    # break = reward delivery) rather than ``trial.end_time``
+    # (departure from well). Replay fires during the well-visit
+    # period BETWEEN arrival and departure — using end_time would
+    # miss the current trial's reward for the entire 1–8 s visit
+    # window, causing ``last_rewarded_well`` to point to the PREVIOUS
+    # reward location instead of the arm the animal is currently at.
+    # Falls back to end_time if goal_arrival_time is unavailable.
+    if "goal_arrival_time" in trials.columns:
+        reward_timestamps = trials["goal_arrival_time"].values[is_reward]
+    else:
+        reward_timestamps = trial_end_times[is_reward]
     rewarded_wells = to_wells[is_reward]
-    if len(rewarded_end_times) > 0:
-        rew_idx = np.searchsorted(rewarded_end_times, dot_times, side="right") - 1
+    if len(reward_timestamps) > 0:
+        rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
         rew_idx_clipped = np.clip(rew_idx, 0, None)
         dot["last_rewarded_well"] = np.where(
             rew_idx >= 0, rewarded_wells[rew_idx_clipped], np.nan
