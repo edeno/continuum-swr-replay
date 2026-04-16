@@ -277,7 +277,7 @@ class TestComputeNonLocalEventContext:
         result = compute_non_local_event_context(
             session_with_events, theta_power_threshold=2.0,
         )
-        assert result["n_non_local_events"].iloc[0] == 3
+        assert result["n_events"].iloc[0] == 3
         assert result["frac_swr"].iloc[0] == pytest.approx(1 / 3)
         assert result["frac_theta"].iloc[0] == pytest.approx(1 / 3)
         assert result["frac_neither"].iloc[0] == pytest.approx(1 / 3)

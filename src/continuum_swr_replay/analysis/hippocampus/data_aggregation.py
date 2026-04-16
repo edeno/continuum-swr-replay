@@ -67,7 +67,7 @@ Position and behavioral data:
 Filtering and Processing
 -------------------------
 - Events exceeding max speed threshold are filtered out
-- Missing values are forward-filled to maintain continuity
+- Missing values are handled via nearest-neighbor reindexing with tolerance
 - Z-scoring is applied to relevant continuous variables
 - Event overlap detection uses interval-based logic
 - All data is aligned to the same temporal resolution (default 500 Hz)
@@ -78,7 +78,7 @@ Notes
 - Non-local threshold typically set to 0.8 for classification
 - Ahead/behind distance uses graph shortest path (can be negative)
 - MAP speed is smoothed before computation to reduce noise
-- Missing behavioral data is handled gracefully with forward-fill
+- Missing behavioral data is handled via nearest-neighbor alignment
 
 See Also
 --------
@@ -284,7 +284,11 @@ def get_data_over_time(
 
 
 def load_data_over_time(data_dir: Path) -> pd.DataFrame:
-    """Load and concatenate all processed session data.
+    """Load and concatenate all NonLocal processed session data.
+
+    This loads data from the 4-state NonLocal detector only. For
+    ContFrag (2-state) data, use
+    :func:`continuum_swr_replay.analysis.contfrag.load_contfrag_data_over_time`.
 
     Parameters
     ----------
@@ -307,122 +311,139 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
     return data_over_time
 
 
-def get_event_types(data_over_time: pd.DataFrame) -> dict:
-    """Classify non-local events by overlap with SWR and MUA.
+def get_event_types(
+    data_over_time: pd.DataFrame,
+    event_col: str = "non_local_event",
+) -> dict:
+    """Classify events by overlap with other detectors (SWR, MUA).
+
+    Works for any primary event column: ``non_local_event`` (model-
+    detected), ``SWR_event`` (ripple-detected), or ``MUA_event``
+    (high-synchrony-detected). The two "other" detector columns are
+    inferred from the remaining pair among {SWR_event, MUA_event,
+    non_local_event}.
 
     Parameters
     ----------
     data_over_time : pd.DataFrame
-        Aggregated data with ``non_local_event``, ``SWR_event``,
+        Aggregated data with ``event_col``, ``SWR_event``,
         ``MUA_event``, and ``head_speed`` columns.
+    event_col : str, optional
+        Primary event column, by default ``"non_local_event"``.
 
     Returns
     -------
     dict[str, pd.DataFrame]
-        Keys: ``non_local_immobile``, ``swr_events``, ``mua_events``,
-        ``non_local_immobile_overlap_swr``, ``non_local_immobile_overlap_mua``,
-        ``non_local_immobile_no_overlap``, ``non_local_immobile_no_overlap_swr``,
-        ``non_local_immobile_no_overlap_mua``, ``swr_events_no_non_local``,
-        ``mua_events_no_non_local``. Each value is a filtered subset of
-        the input DataFrame.
+        Keys use ``event_col`` as prefix, e.g. for
+        ``event_col="SWR_event"``:
+        ``SWR_event_immobile``, ``SWR_event_immobile_overlap_MUA_event``,
+        etc. Each value is a filtered subset of the input DataFrame.
 
     """
-    non_local_immobile = get_immobile_events(
+    all_event_cols = {"non_local_event", "SWR_event", "MUA_event"}
+    if event_col not in all_event_cols:
+        raise ValueError(
+            f"event_col must be one of {sorted(all_event_cols)}; got {event_col!r}"
+        )
+    other_cols = sorted(all_event_cols - {event_col})
+
+    immobile = get_immobile_events(
         data_over_time,
-        event_col="non_local_event",
+        event_col=event_col,
         speed_col="head_speed",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         method="endpoints",
     )
 
-    swr_events = data_over_time.loc[data_over_time["SWR_event"] > 0]
-    mua_events = data_over_time.loc[data_over_time["MUA_event"] > 0]
+    group_keys = ["animal", "day", "epoch", event_col]
 
-    non_local_immobile_overlap_swr = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"]
-    ).filter(lambda g: (g["SWR_event"] > 0).any())
-    non_local_immobile_overlap_mua = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"]
-    ).filter(lambda g: (g["MUA_event"] > 0).any())
-
-    non_local_immobile_no_overlap = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"]
-    ).filter(lambda g: (g["SWR_event"] == 0).all() & (g["MUA_event"] == 0).all())
-    non_local_immobile_no_overlap_swr = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"]
-    ).filter(lambda g: (g["SWR_event"] == 0).all())
-    non_local_immobile_no_overlap_mua = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"]
-    ).filter(lambda g: (g["MUA_event"] == 0).all())
-    swr_events_no_non_local = swr_events.groupby(
-        ["animal", "day", "epoch", "SWR_event"]
-    ).filter(lambda g: (g["non_local_event"] == 0).all())
-    mua_events_no_non_local = mua_events.groupby(
-        ["animal", "day", "epoch", "MUA_event"]
-    ).filter(lambda g: (g["non_local_event"] == 0).all())
-
-    return {
-        "non_local_immobile": non_local_immobile,
-        "swr_events": swr_events,
-        "mua_events": mua_events,
-        "non_local_immobile_overlap_swr": non_local_immobile_overlap_swr,
-        "non_local_immobile_overlap_mua": non_local_immobile_overlap_mua,
-        "non_local_immobile_no_overlap": non_local_immobile_no_overlap,
-        "non_local_immobile_no_overlap_swr": non_local_immobile_no_overlap_swr,
-        "non_local_immobile_no_overlap_mua": non_local_immobile_no_overlap_mua,
-        "swr_events_no_non_local": swr_events_no_non_local,
-        "mua_events_no_non_local": mua_events_no_non_local,
+    result: dict[str, pd.DataFrame] = {
+        f"{event_col}_immobile": immobile,
     }
+
+    # Raw events for each "other" detector
+    for oc in other_cols:
+        if oc in data_over_time.columns:
+            result[f"{oc}_events"] = data_over_time.loc[
+                data_over_time[oc] > 0
+            ]
+
+    # Overlap / no-overlap with each "other" detector
+    for oc in other_cols:
+        if oc not in data_over_time.columns:
+            continue
+        result[f"{event_col}_immobile_overlap_{oc}"] = immobile.groupby(
+            group_keys
+        ).filter(lambda g, c=oc: (g[c] > 0).any())
+        result[f"{event_col}_immobile_no_overlap_{oc}"] = immobile.groupby(
+            group_keys
+        ).filter(lambda g, c=oc: (g[c] == 0).all())
+
+    # No overlap with ANY other detector
+    if all(oc in data_over_time.columns for oc in other_cols):
+        result[f"{event_col}_immobile_no_overlap"] = immobile.groupby(
+            group_keys
+        ).filter(
+            lambda g: all((g[oc] == 0).all() for oc in other_cols)
+        )
+
+    # Other-detector events that do NOT overlap the primary
+    for oc in other_cols:
+        if oc not in data_over_time.columns:
+            continue
+        oc_events = data_over_time.loc[data_over_time[oc] > 0]
+        result[f"{oc}_events_no_{event_col}"] = oc_events.groupby(
+            ["animal", "day", "epoch", oc]
+        ).filter(lambda g, ec=event_col: (g[ec] == 0).all())
+
+    return result
 
 
 def compute_swr_overlap_class_counts(
     data_over_time: pd.DataFrame,
+    event_col: str = "non_local_event",
+    overlap_col: str = "SWR_event",
 ) -> dict[str, int]:
-    """Count immobile non-local events by SWR-overlap geometry.
+    """Count immobile events by overlap geometry with another detector.
 
-    Uses a timepoint-level rule equivalent to the interval-based
-    :func:`classify_swr_overlap`: if every timepoint of a non-local
-    event has ``SWR_event > 0`` the event is "contained", if some but
-    not all do it "extends" beyond the SWR, and if none do it is
-    "none".
+    Classifies each event as "contained" (every timebin overlaps),
+    "extends" (partial overlap), or "none" (no overlap).
 
     Parameters
     ----------
     data_over_time : pd.DataFrame
-        Aggregated data containing ``non_local_event``, ``SWR_event``,
+        Aggregated data containing ``event_col``, ``overlap_col``,
         ``head_speed``, ``animal``, ``day``, and ``epoch`` columns.
+    event_col : str, optional
+        Primary event column, by default ``"non_local_event"``.
+    overlap_col : str, optional
+        Column to check overlap against, by default ``"SWR_event"``.
 
     Returns
     -------
     dict[str, int]
         Mapping ``{"contained": n, "extends": n, "none": n,
-        "total": n}``. ``total`` is the number of immobile non-local
-        events (sum of the three class counts).
-
-    Notes
-    -----
-    This aggregates across all sessions. For per-session or
-    per-animal breakdowns, call this on a filtered DataFrame.
+        "total": n}``.
 
     """
-    non_local_immobile = get_immobile_events(
+    immobile = get_immobile_events(
         data_over_time,
-        event_col="non_local_event",
+        event_col=event_col,
         speed_col="head_speed",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         method="endpoints",
     )
 
     def _classify(group: pd.DataFrame) -> str:
-        has_swr = group["SWR_event"] > 0
-        if not has_swr.any():
+        has_overlap = group[overlap_col] > 0
+        if not has_overlap.any():
             return "none"
-        if has_swr.all():
+        if has_overlap.all():
             return "contained"
         return "extends"
 
-    classes = non_local_immobile.groupby(
-        ["animal", "day", "epoch", "non_local_event"],
+    classes = immobile.groupby(
+        ["animal", "day", "epoch", event_col],
     ).apply(_classify)
     counts = classes.value_counts()
     return {
@@ -435,61 +456,69 @@ def compute_swr_overlap_class_counts(
 
 def compute_swr_nl_event_counts(
     data_over_time: pd.DataFrame,
+    event_col_a: str = "non_local_event",
+    event_col_b: str = "SWR_event",
+    *,
+    immobile_col_a: bool = True,
 ) -> dict[str, int]:
-    """Event-level totals and overlap for the SWR / immobile non-local pair.
+    """Event-level totals and overlap for two event detectors.
 
-    Designed as the data source for a 2-circle Venn (Figure 3 panel b).
-    Reports four numbers:
-
-    - ``n_swr``                — total SWR events (any speed)
-    - ``n_swr_with_nl``        — SWR events overlapping at least one NL event
-    - ``n_nl_immobile``        — total immobile non-local events
-    - ``n_nl_immobile_with_swr`` — immobile NL events overlapping at least one SWR
-
-    The two "with" counts may differ by a few percent because a single
-    SWR can overlap multiple NL events, or vice versa. For a Venn
-    diagram, the natural "shared" region is the mean of the two counts
-    (both refer to the same underlying overlap interval set but are
-    counted from different sides).
+    Designed as the data source for a 2-circle Venn diagram. Reports
+    four numbers: total count for each detector and how many of each
+    overlap with the other.
 
     Parameters
     ----------
     data_over_time : pd.DataFrame
-        Aggregated data with ``non_local_event``, ``SWR_event``,
-        ``head_speed``, and session group columns.
+        Aggregated data with both event columns, ``head_speed``, and
+        session group columns.
+    event_col_a : str, optional
+        First event column (immobility-filtered if ``immobile_col_a``),
+        by default ``"non_local_event"``.
+    event_col_b : str, optional
+        Second event column (not speed-filtered), by default ``"SWR_event"``.
+    immobile_col_a : bool, optional
+        Whether to apply immobility filter to event_col_a, by default True.
+        Set to True for model-detected events (non_local_event) where
+        immobility filtering is standard. Set to False for externally-
+        detected events (SWR_event, MUA_event) that are not speed-gated.
 
     Returns
     -------
     dict[str, int]
-        Counts dict suitable for :func:`plot_swr_nl_venn_2circle`.
+        Keys: ``n_a``, ``n_a_with_b``, ``n_b``, ``n_b_with_a``.
 
     """
-    # Immobile non-local events
-    nl_immobile = get_immobile_events(
-        data_over_time,
-        event_col="non_local_event",
-        speed_col="head_speed",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        method="endpoints",
-    )
-    nl_groups = nl_immobile.loc[nl_immobile["non_local_event"] > 0].groupby(
-        ["animal", "day", "epoch", "non_local_event"],
-    )
-    nl_with_swr = nl_groups.apply(lambda g: (g["SWR_event"] > 0).any())
-    n_nl = len(nl_with_swr)
-    n_nl_with_swr = int(nl_with_swr.sum())
+    # Event A (optionally immobility-filtered)
+    if immobile_col_a:
+        a_data = get_immobile_events(
+            data_over_time,
+            event_col=event_col_a,
+            speed_col="head_speed",
+            speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+            method="endpoints",
+        )
+    else:
+        a_data = data_over_time.loc[data_over_time[event_col_a] > 0]
 
-    # All SWR events (not filtered by speed — ripple detection is speed-agnostic)
-    swr_groups = data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(
-        ["animal", "day", "epoch", "SWR_event"],
+    a_groups = a_data.loc[a_data[event_col_a] > 0].groupby(
+        ["animal", "day", "epoch", event_col_a],
     )
-    swr_with_nl = swr_groups.apply(lambda g: (g["non_local_event"] > 0).any())
-    n_swr = len(swr_with_nl)
-    n_swr_with_nl = int(swr_with_nl.sum())
+    a_with_b = a_groups.apply(lambda g: (g[event_col_b] > 0).any())
+    n_a = len(a_with_b)
+    n_a_with_b = int(a_with_b.sum())
+
+    # Event B (not speed-filtered)
+    b_groups = data_over_time.loc[data_over_time[event_col_b] > 0].groupby(
+        ["animal", "day", "epoch", event_col_b],
+    )
+    b_with_a = b_groups.apply(lambda g: (g[event_col_a] > 0).any())
+    n_b = len(b_with_a)
+    n_b_with_a = int(b_with_a.sum())
 
     return {
-        "n_swr": n_swr,
-        "n_swr_with_nl": n_swr_with_nl,
-        "n_nl_immobile": n_nl,
-        "n_nl_immobile_with_swr": n_nl_with_swr,
+        "n_a": n_a,
+        "n_a_with_b": n_a_with_b,
+        "n_b": n_b,
+        "n_b_with_a": n_b_with_a,
     }

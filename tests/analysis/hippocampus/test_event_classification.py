@@ -61,16 +61,16 @@ class TestGetEventTypes:
         result = get_event_types(df)
 
         expected_keys = {
-            "non_local_immobile",
-            "swr_events",
-            "mua_events",
-            "non_local_immobile_overlap_swr",
-            "non_local_immobile_overlap_mua",
-            "non_local_immobile_no_overlap",
-            "non_local_immobile_no_overlap_swr",
-            "non_local_immobile_no_overlap_mua",
-            "swr_events_no_non_local",
-            "mua_events_no_non_local",
+            "non_local_event_immobile",
+            "SWR_event_events",
+            "MUA_event_events",
+            "non_local_event_immobile_overlap_MUA_event",
+            "non_local_event_immobile_overlap_SWR_event",
+            "non_local_event_immobile_no_overlap",
+            "non_local_event_immobile_no_overlap_MUA_event",
+            "non_local_event_immobile_no_overlap_SWR_event",
+            "SWR_event_events_no_non_local_event",
+            "MUA_event_events_no_non_local_event",
         }
         assert set(result.keys()) == expected_keys
 
@@ -79,7 +79,7 @@ class TestGetEventTypes:
         result = get_event_types(df)
 
         # Event 1 overlaps with SWR
-        overlap_events = result["non_local_immobile_overlap_swr"][
+        overlap_events = result["non_local_event_immobile_overlap_SWR_event"][
             "non_local_event"
         ].unique()
         assert 1 in overlap_events
@@ -89,7 +89,7 @@ class TestGetEventTypes:
         result = get_event_types(df)
 
         # Event 3 (at index 600) has no SWR or MUA overlap
-        no_overlap = result["non_local_immobile_no_overlap"]
+        no_overlap = result["non_local_event_immobile_no_overlap"]
         no_overlap_events = no_overlap["non_local_event"].unique()
         assert 3 in no_overlap_events
         assert 1 not in no_overlap_events  # overlaps with SWR
@@ -99,12 +99,12 @@ class TestGetEventTypes:
         df = _make_data_over_time()
         result = get_event_types(df)
 
-        all_nl = result["non_local_immobile"]["non_local_event"].unique()
+        all_nl = result["non_local_event_immobile"]["non_local_event"].unique()
         overlap_swr = set(
-            result["non_local_immobile_overlap_swr"]["non_local_event"].unique()
+            result["non_local_event_immobile_overlap_SWR_event"]["non_local_event"].unique()
         )
         no_overlap_swr = set(
-            result["non_local_immobile_no_overlap_swr"]["non_local_event"].unique()
+            result["non_local_event_immobile_no_overlap_SWR_event"]["non_local_event"].unique()
         )
 
         # Every non-local event should be in exactly one of overlap/no_overlap
@@ -120,7 +120,7 @@ class TestGetEventTypes:
         result = get_event_types(df)
 
         # SWR event 2 (at index 500) has no non-local overlap
-        swr_no_nl = result["swr_events_no_non_local"]
+        swr_no_nl = result["SWR_event_events_no_non_local_event"]
         assert 2 in swr_no_nl["SWR_event"].unique()
 
     def test_no_events_returns_empty_dataframes(self):
@@ -128,5 +128,5 @@ class TestGetEventTypes:
         # All events are zero, so after filtering head_speed, immobile events empty
         result = get_event_types(df)
 
-        assert len(result["non_local_immobile"]) == 0
-        assert len(result["swr_events"]) == 0
+        assert len(result["non_local_event_immobile"]) == 0
+        assert len(result["SWR_event_events"]) == 0

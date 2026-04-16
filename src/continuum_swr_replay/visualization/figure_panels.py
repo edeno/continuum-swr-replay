@@ -71,7 +71,7 @@ def plot_event_duration_distribution(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_swr"):
+    for event_type in ("non_local_event_immobile", "non_local_event_immobile_no_overlap_SWR_event"):
         event_times = get_event_start_end_times(
             event_types[event_type], event_col="non_local_event"
         )
@@ -79,7 +79,7 @@ def plot_event_duration_distribution(
 
         color = (
             COLORS["Non-Local"]
-            if event_type == "non_local_immobile_no_overlap_swr"
+            if event_type == "non_local_event_immobile_no_overlap_SWR_event"
             else COLORS["All Events"]
         )
         label = "No SWR Overlap" if "no_overlap" in event_type else "All Events"
@@ -149,7 +149,7 @@ def plot_triggered_averages(
         signal_types = list(signals)
 
     non_local_start_end_time = get_event_start_end_times(
-        event_types["non_local_immobile_no_overlap_swr"], event_col="non_local_event"
+        event_types["non_local_event_immobile_no_overlap_SWR_event"], event_col="non_local_event"
     )
     signal_windows = get_signal_windows(
         data=data_over_time,
@@ -162,7 +162,7 @@ def plot_triggered_averages(
     )
 
     non_local_start_end_time_overlap = get_event_start_end_times(
-        event_types["non_local_immobile_overlap_swr"], event_col="non_local_event"
+        event_types["non_local_event_immobile_overlap_SWR_event"], event_col="non_local_event"
     )
     signal_windows_overlap = get_signal_windows(
         data=data_over_time,
@@ -1056,10 +1056,10 @@ def plot_swr_nl_venn_2circle(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE_SQUARE)
 
-    n_swr = counts["n_swr"]
-    n_nl = counts["n_nl_immobile"]
-    n_swr_with_nl = counts["n_swr_with_nl"]
-    n_nl_with_swr = counts["n_nl_immobile_with_swr"]
+    n_swr = counts.get("n_b", counts.get("n_swr", 0))
+    n_nl = counts.get("n_a", counts.get("n_nl_immobile", 0))
+    n_swr_with_nl = counts.get("n_b_with_a", counts.get("n_swr_with_nl", 0))
+    n_nl_with_swr = counts.get("n_a_with_b", counts.get("n_nl_immobile_with_swr", 0))
 
     n_swr_only = n_swr - n_swr_with_nl
     n_nl_only = n_nl - n_nl_with_swr

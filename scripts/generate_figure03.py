@@ -207,12 +207,12 @@ def generate_figure(
     logging.info("Computing SWR / non-local event Venn counts...")
     venn_counts = compute_swr_nl_event_counts(data_over_time)
     logging.info(
-        f"  SWR: {venn_counts['n_swr']:,} total, "
-        f"{venn_counts['n_swr_with_nl']:,} with NL"
+        f"  SWR: {venn_counts['n_b']:,} total, "
+        f"{venn_counts['n_b_with_a']:,} with NL"
     )
     logging.info(
-        f"  NL (immobile): {venn_counts['n_nl_immobile']:,} total, "
-        f"{venn_counts['n_nl_immobile_with_swr']:,} with SWR"
+        f"  NL (immobile): {venn_counts['n_a']:,} total, "
+        f"{venn_counts['n_a_with_b']:,} with SWR"
     )
     # Center the Venn within its row, leaving left/right margins so
     # the circles don't stretch full width.

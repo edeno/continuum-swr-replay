@@ -708,17 +708,17 @@ def compute_non_local_event_context(
     data: pd.DataFrame,
     theta_power_threshold: float = 2.0,
     group_cols: list[str] | None = None,
+    event_col: str = "non_local_event",
 ) -> pd.DataFrame:
-    """Classify non-local events by neural context.
+    """Classify events by neural context (SWR, theta, neither).
 
-    Each non-local event is classified as:
+    Each event is classified as:
     - **SWR-associated**: overlaps with a sharp-wave ripple (``SWR_event > 0``)
     - **Theta-associated**: high theta power (no SWR overlap)
     - **Neither**: no SWR, low theta power
 
     For theta-associated events, computes circular statistics on theta phase
-    to check whether non-local activity clusters at specific theta phases
-    (expected for theta sequences) rather than being uniformly distributed.
+    to check whether activity clusters at specific theta phases.
 
     Parameters
     ----------
@@ -728,11 +728,13 @@ def compute_non_local_event_context(
         Z-score threshold for high theta power.
     group_cols : list[str] | None, optional
         Session grouping columns.
+    event_col : str, optional
+        Event label column, by default ``"non_local_event"``.
 
     Returns
     -------
     pd.DataFrame
-        One row per session with columns: ``n_non_local_events``,
+        One row per session with columns: ``n_events``,
         ``frac_swr``, ``frac_theta``, ``frac_neither``, ``theta_mrl``,
         ``theta_mean_angle``.
 
@@ -740,14 +742,14 @@ def compute_non_local_event_context(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    event_group_cols = group_cols + ["non_local_event"]
+    event_group_cols = group_cols + [event_col]
 
-    non_local = data.loc[data["non_local_event"] > 0]
+    non_local = data.loc[data[event_col] > 0]
 
     if non_local.empty:
         return pd.DataFrame(
             columns=group_cols + [
-                "n_non_local_events", "frac_swr", "frac_theta", "frac_neither",
+                "n_events", "frac_swr", "frac_theta", "frac_neither",
                 "theta_mrl", "theta_mean_angle",
             ]
         )
@@ -772,7 +774,7 @@ def compute_non_local_event_context(
     def _session_context(group: pd.DataFrame) -> pd.Series:
         n = len(group)
         result = {
-            "n_non_local_events": n,
+            "n_events": n,
             "frac_swr": group["is_swr"].sum() / n,
             "frac_theta": group["is_theta"].sum() / n,
             "frac_neither": group["is_neither"].sum() / n,
