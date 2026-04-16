@@ -243,6 +243,58 @@ Once a final set of analyses is chosen across D–F:
 
 ---
 
+## Phase H — State-space GLM for time-varying replay content
+
+Deferred until after the static M0–M8 hierarchy runs on the full
+dataset and Stages 5–6 establish whether replay predicts behavior.
+
+**Scientific question**: does replay content change in the stops
+leading up to a patch switch? Specifically, does the ``is_same_patch``
+coefficient weaken before the animal leaves its current patch —
+indicating that replay "anticipates" switching by shifting content
+toward alternative patches?
+
+**Approach**: state-space conditional Poisson (multinomial logit) with
+time-varying coefficients. A subset of coefficients (``is_same_patch``,
+``is_current``, possibly ``is_last_rewarded``) evolve via a random
+walk; the rest stay static. The model infers when and how much the
+coefficients change, without pre-specifying ``trials_to_switch`` or
+``patch_reward_rate`` as covariates.
+
+```
+β_t ~ N(β_{t-1}, Q)                         # state evolution
+c_e ~ Multinomial(L_e, softmax(X_e β_t))    # observation
+```
+
+**Implementation**: extend ``state_space_practice.multinomial_choice``
+(already installed in ``state-space-playground``, installable here).
+The existing ``MultinomialChoiceModel`` uses the same softmax
+observation model + Laplace-GaussNewton updates; the extension adds
+a design matrix X_ea so the latent state is per-predictor
+coefficients β_t rather than per-option values.
+
+**Comparison against static model**: the state-space model's
+marginal likelihood (or leave-one-event-out predictive density)
+directly compares against the static conditional Poisson. If the
+time-varying model wins, the dynamics are real.
+
+**Alternative prospective predictors** that could enter the static
+model instead (simpler, no state-space needed):
+- ``n_consecutive_omissions`` at current patch (giving-up time)
+- ``recent_patch_reward_rate`` (patch-level, last K trials)
+- ``reward_rate_difference`` (current patch minus best alternative)
+
+These interact with ``is_same_patch`` to test whether patch bias
+weakens when the current patch is performing poorly. If these
+capture most of the dynamics, the state-space model confirms but
+doesn't add much.
+
+**Prerequisites**: static M0–M8 on full dataset (Phase D), Stages
+5–6 (Phase E), and ideally a fitted behavior model (Stage 7B) for
+comparison against latent-value predictions.
+
+---
+
 ## Out of scope for this plan
 
 - Stage 7B — latent value (requires behavior model).
