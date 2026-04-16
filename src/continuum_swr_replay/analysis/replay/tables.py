@@ -1179,6 +1179,7 @@ def build_event_arm_table(
     inx = long["is_next"].to_numpy()
     ilr = long["is_last_rewarded"].to_numpy()
 
+    long["current_x_last_rewarded"] = ic * ilr
     long["time_x_current"] = tss * ic
     long["time_x_prev"] = tss * ip
     long["time_x_next"] = tss * inx
@@ -1535,7 +1536,8 @@ def _event_arm_table_columns() -> list[str]:
         "cumulative_reward",
         "recent_reward_rate",
         "nominal_reward_prob",
-        # Interactions (plan §1.7)
+        # Interactions (plan §1.7 + collinearity control)
+        "current_x_last_rewarded",
         "time_x_current",
         "time_x_prev",
         "time_x_next",

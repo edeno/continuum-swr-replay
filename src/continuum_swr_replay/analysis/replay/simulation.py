@@ -63,6 +63,11 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "time_x_next": ("is_next", "time_since_stop"),
 }
 
+# Arm-level × arm-level interactions (both factors vary across arms).
+_ARM_ARM_INTERACTIONS: dict[str, tuple[str, str]] = {
+    "current_x_last_rewarded": ("is_current", "is_last_rewarded"),
+}
+
 _BASE_BINARY = ("is_current", "is_prev", "is_next", "is_last_rewarded")
 _CONTINUOUS_ARM = ("visit_recency", "cumulative_reward", "dist_to_arm")
 _EVENT_LEVEL = ("is_swr", "is_after_switch", "is_after_omission", "time_since_stop")
@@ -274,6 +279,10 @@ def simulate_with_event_covariates(
     interaction_cols: dict[str, np.ndarray] = {}
     for name, (base, ev) in _INTERACTION_FACTORS.items():
         interaction_cols[name] = arm_features[base] * event_broadcast[ev]
+
+    # Arm × arm interactions (both factors vary across arms).
+    for name, (left, right) in _ARM_ARM_INTERACTIONS.items():
+        interaction_cols[name] = arm_features[left] * arm_features[right]
 
     all_columns: dict[str, np.ndarray] = {
         **arm_features,

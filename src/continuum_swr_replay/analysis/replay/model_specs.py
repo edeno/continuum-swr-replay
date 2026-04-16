@@ -48,9 +48,15 @@ class ModelSpec:
 
 _BASE: tuple[str, ...] = ("is_current", "is_prev")
 
-# Reward and recency (arm-varying: binary + continuous)
+# Reward and recency (arm-varying: binary + continuous).
+# ``current_x_last_rewarded`` absorbs the 58% overlap between
+# ``is_current`` and ``is_last_rewarded`` (the animal is often AT the
+# just-rewarded port during immobility). Without the interaction their
+# coefficients double-count the overlap; with it, each main effect is
+# interpretable as "the boost when the OTHER indicator is 0."
 _REWARD_RECENCY: tuple[str, ...] = (
     "is_last_rewarded",
+    "current_x_last_rewarded",
     "visit_recency",
     "cumulative_reward",
 )
