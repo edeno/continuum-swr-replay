@@ -668,6 +668,194 @@ def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+# ── Event / stop activity panels ──
+
+
+_EVENT_TYPE_COLORS = {
+    (True, True): "#5e4fa2",    # both SWR and MUA — deep purple
+    (True, False): COLORS["SWR"],   # SWR only
+    (False, True): COLORS["MUA"],   # MUA only
+    (False, False): "#808080",  # neither — grey
+}
+
+
+def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
+    """One bar per event, spanning ``event_start → event_end``.
+
+    Height = ``n_nonlocal_bins`` (event size). Fill color encodes
+    event-type membership:
+
+    - SWR only → orange (``COLORS["SWR"]``)
+    - MUA only → purple (``COLORS["MUA"]``)
+    - Both → deep purple
+    - Neither → grey
+
+    Reads directly from ``event_table``. Lets the user see event
+    density, duration, and type at a glance without having to
+    correlate across panels.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    et = ctx.event_table
+    view = et[(et["event_start"] <= hi) & (et["event_end"] >= lo)]
+
+    ax.set_ylabel("n_nonlocal\nbins")
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        ax.set_ylim(0, 1)
+        return
+
+    starts = view["event_start"].to_numpy()
+    ends = view["event_end"].to_numpy()
+    heights = view["n_nonlocal_bins"].to_numpy(dtype=float)
+    is_swr = view["is_swr"].to_numpy(dtype=bool)
+    is_mua = view["is_mua"].to_numpy(dtype=bool)
+
+    for start, end, height, swr, mua in zip(
+        starts, ends, heights, is_swr, is_mua, strict=True
+    ):
+        color = _EVENT_TYPE_COLORS[(bool(swr), bool(mua))]
+        rect = Rectangle(
+            (start, 0.0),
+            width=max(end - start, 1e-3),
+            height=height,
+            facecolor=color,
+            edgecolor="none",
+            zorder=2,
+        )
+        ax.add_patch(rect)
+
+    ax.set_ylim(0, float(heights.max()) * 1.1 if heights.size else 1.0)
+
+
+def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
+    """Per-stop activity bars.
+
+    For every stop in window: a vertical stem at the stop's center
+    from 0 to ``n_events``. A filled marker at the top means the
+    stop had at least one non-local event (``has_replay=True``);
+    hollow means zero-event. Small 'S' / 'M' letter labels above the
+    stem flag ``is_swr_stop`` / ``is_mua_stop``.
+
+    Zero-event stops are the hurdle model's Part-1 inputs; their
+    visual presence here is itself a sanity check that
+    ``build_stop_table`` is emitting them.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    st = ctx.stop_table
+    view = st[(st["stop_start"] <= hi) & (st["stop_end"] >= lo)]
+
+    ax.set_ylabel("n_events\nper stop")
+    ax.axhline(0, color="grey", linewidth=0.3, zorder=0)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no stops in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        ax.set_ylim(0, 1)
+        return
+
+    mids = 0.5 * (
+        view["stop_start"].to_numpy() + view["stop_end"].to_numpy()
+    )
+    n_events = view["n_events"].to_numpy(dtype=float)
+    has_replay = view["has_replay"].to_numpy(dtype=bool)
+    is_swr_stop = view["is_swr_stop"].to_numpy(dtype=bool)
+    is_mua_stop = view["is_mua_stop"].to_numpy(dtype=bool)
+
+    ax.vlines(mids, 0, n_events, color="black", linewidth=0.5, zorder=2)
+    # Two-pass scatter so "has_replay" stops are filled and
+    # zero-event stops are hollow but both use the same axis.
+    filled = has_replay
+    if filled.any():
+        ax.scatter(
+            mids[filled], n_events[filled],
+            s=18, c="#3F51B5", edgecolor="black", linewidths=0.5,
+            zorder=3, clip_on=False,
+        )
+    if (~filled).any():
+        ax.scatter(
+            mids[~filled], n_events[~filled],
+            s=18, facecolor="white", edgecolor="black", linewidths=0.5,
+            zorder=3, clip_on=False,
+        )
+
+    ymax = float(n_events.max()) * 1.15 if n_events.size else 1.0
+    for x, swr, mua, n in zip(mids, is_swr_stop, is_mua_stop, n_events, strict=True):
+        y = max(n, 0.05 * ymax) + 0.05 * ymax
+        if swr:
+            ax.text(
+                x, y, "S",
+                ha="center", va="bottom", fontsize=7,
+                color=COLORS["SWR"], weight="bold",
+            )
+        if mua:
+            ax.text(
+                x, y + 0.08 * ymax, "M",
+                ha="center", va="bottom", fontsize=7,
+                color=COLORS["MUA"], weight="bold",
+            )
+
+    ax.set_ylim(0, ymax if ymax > 0 else 1.0)
+
+
+def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
+    """Event-level boolean context flags as colored ticks per event.
+
+    Six flag rows stacked vertically (``is_after_reward``,
+    ``is_after_omission``, ``is_after_switch``, ``is_after_stay``,
+    ``is_swr``, ``is_mua``) with a colored tick at each event's
+    ``event_midpoint_time`` when the flag is True. Reads directly
+    from ``event_table`` — no derivation.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    et = ctx.event_table
+    view = et[
+        (et["event_midpoint_time"] >= lo)
+        & (et["event_midpoint_time"] <= hi)
+    ]
+
+    flag_specs = (
+        ("is_after_reward", 5, "#2ca02c"),
+        ("is_after_omission", 4, "#d62728"),
+        ("is_after_switch", 3, "#9467bd"),
+        ("is_after_stay", 2, "#8c564b"),
+        ("is_swr", 1, COLORS["SWR"]),
+        ("is_mua", 0, COLORS["MUA"]),
+    )
+    ax.set_yticks([y for _, y, _ in flag_specs])
+    ax.set_yticklabels([name for name, _, _ in flag_specs], fontsize=7)
+    ax.set_ylim(-0.6, 5.6)
+    ax.set_ylabel("context\nflags")
+    for _, y, _ in flag_specs:
+        ax.axhline(y, color="lightgrey", linewidth=0.3, zorder=0)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        return
+
+    times = view["event_midpoint_time"].to_numpy()
+    for flag, y_level, color in flag_specs:
+        # Flag columns are float (0.0 / 1.0 / NaN) from _add_trial_context
+        # for context flags, bool for is_swr / is_mua.
+        vals = view[flag].to_numpy()
+        mask = np.asarray(vals, dtype=float) == 1.0
+        if mask.any():
+            ax.scatter(
+                times[mask],
+                np.full(int(mask.sum()), y_level),
+                s=24, marker="|", color=color, linewidths=1.5,
+                zorder=3, clip_on=False,
+            )
+
+
 # ── Scalar per-event panels ──
 
 
@@ -836,6 +1024,9 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "nominal_reward_prob": _plot_nominal_reward_prob,
     "dist_to_arm": _plot_dist_to_arm,
     "arm_dist_rank": _plot_arm_dist_rank,
+    "event_bars": _plot_event_bars,
+    "stop_activity": _plot_stop_activity,
+    "context_flags": _plot_context_flags,
 }
 
 # Relative height weight per panel — inherits the ``plot_detector``
@@ -866,6 +1057,9 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "nominal_reward_prob": 1.4,
     "dist_to_arm": 1.4,
     "arm_dist_rank": 1.4,
+    "event_bars": 1.2,
+    "stop_activity": 1.2,
+    "context_flags": 1.4,
 }
 
 
