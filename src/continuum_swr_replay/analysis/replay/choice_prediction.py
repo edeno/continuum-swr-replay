@@ -39,12 +39,13 @@ def predict_arm_fractions(
     fit_result: dict,
     predictors: list[str],
     event_col: str = "event_id",
+    fraction_col: str = "arm_fraction",
 ) -> pd.DataFrame:
     """Compute model-predicted arm fractions and residuals per event-arm.
 
-    Given a fitted content model (e.g. M3), computes
+    Given a fitted content model (e.g. M5), computes
     ``softmax(X @ beta)`` within each event to get predicted fractions,
-    then ``residual_frac = arm_fraction - predicted_frac``.
+    then ``residual_frac = fraction_col - predicted_frac``.
 
     Parameters
     ----------
@@ -57,6 +58,10 @@ def predict_arm_fractions(
         Predictor column names used in the content model.
     event_col : str
         Event grouping column.
+    fraction_col : str
+        Column with observed arm fractions. Use ``"arm_fraction"``
+        (default, MAP-based) or ``"arm_fraction_posterior"``
+        (full-posterior-based).
 
     Returns
     -------
@@ -77,7 +82,7 @@ def predict_arm_fractions(
     sum_shifted = eat.groupby(event_col)["_shifted_exp"].transform("sum")
     eat["predicted_frac"] = eat["_shifted_exp"] / sum_shifted
 
-    eat["residual_frac"] = eat["arm_fraction"] - eat["predicted_frac"]
+    eat["residual_frac"] = eat[fraction_col] - eat["predicted_frac"]
 
     return eat.drop(columns=["_eta", "_shifted_exp"])
 
@@ -88,6 +93,8 @@ def build_residualized_choice_dataset(
     stop_table: pd.DataFrame,
     content_fit: dict,
     content_predictors: list[str],
+    *,
+    fraction_col: str = "arm_fraction",
 ) -> pd.DataFrame:
     """Build choice dataset with both raw and residualized replay.
 
@@ -102,7 +109,10 @@ def build_residualized_choice_dataset(
     content_fit : dict
         Fitted content model result (from ``fit_conditional_poisson``).
     content_predictors : list[str]
-        Predictors used in the content model (e.g. M3 predictors).
+        Predictors used in the content model (e.g. M5 predictors).
+    fraction_col : str
+        Column with observed arm fractions. ``"arm_fraction"``
+        (default) or ``"arm_fraction_posterior"``.
 
     Returns
     -------
@@ -110,7 +120,9 @@ def build_residualized_choice_dataset(
         Choice dataset with ``replay_frac`` (raw) and
         ``replay_frac_residual`` (content-model residualized) columns.
     """
-    eat_resid = predict_arm_fractions(event_arm_table, content_fit, content_predictors)
+    eat_resid = predict_arm_fractions(
+        event_arm_table, content_fit, content_predictors, fraction_col=fraction_col
+    )
 
     # Aggregate residual_frac to stop × arm level.
     stop_arm_resid = (
@@ -119,7 +131,9 @@ def build_residualized_choice_dataset(
         .reset_index()
     )
 
-    choice_df = build_choice_dataset(event_table, event_arm_table, stop_table)
+    choice_df = build_choice_dataset(
+        event_table, event_arm_table, stop_table, fraction_col=fraction_col
+    )
     if len(choice_df) == 0:
         return choice_df
 
@@ -137,6 +151,8 @@ def build_choice_dataset(
     event_table: pd.DataFrame,
     event_arm_table: pd.DataFrame,
     stop_table: pd.DataFrame,
+    *,
+    fraction_col: str = "arm_fraction",
 ) -> pd.DataFrame:
     """Build a stop × arm choice dataset for Stage 5A.
 
@@ -149,6 +165,9 @@ def build_choice_dataset(
     ----------
     event_table, event_arm_table, stop_table
         Canonical tables from :mod:`tables`.
+    fraction_col : str
+        Column with observed arm fractions. ``"arm_fraction"``
+        (default, MAP-based) or ``"arm_fraction_posterior"``.
 
     Returns
     -------
@@ -158,8 +177,7 @@ def build_choice_dataset(
         - ``stop_id`` — grouping key for conditional logistic
         - ``arm`` — candidate arm ID
         - ``chosen`` — 1 if the animal chose this arm, 0 otherwise
-        - ``replay_frac`` — mean ``arm_fraction`` across events in
-          this stop (0 if no event decoded to this arm)
+        - ``replay_frac`` — mean fraction across events in this stop
         - ``visit_recency``, ``cumulative_reward``,
           ``recent_reward_rate``, ``dist_to_arm``, ``is_same_patch``
           — behavioral baseline predictors (from the last event in
@@ -174,14 +192,14 @@ def build_choice_dataset(
     if len(valid_stops) == 0:
         return pd.DataFrame()
 
-    # Aggregate replay content to stop × arm: mean arm_fraction
+    # Aggregate replay content to stop × arm: mean fraction
     # across events within each stop.
     eat = event_arm_table[
         [
             "event_id",
             "stop_id",
             "arm",
-            "arm_fraction",
+            fraction_col,
             "visit_recency",
             "cumulative_reward",
             "recent_reward_rate",
@@ -190,11 +208,11 @@ def build_choice_dataset(
         ]
     ].copy()
 
-    # Mean arm_fraction per (stop, arm) across events in that stop.
+    # Mean fraction per (stop, arm) across events in that stop.
     stop_arm = (
         eat.groupby(["stop_id", "arm"])
         .agg(
-            replay_frac=("arm_fraction", "mean"),
+            replay_frac=(fraction_col, "mean"),
             visit_recency=("visit_recency", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             recent_reward_rate=("recent_reward_rate", "last"),

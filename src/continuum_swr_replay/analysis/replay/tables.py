@@ -907,6 +907,20 @@ def build_event_arm_table(
         )
     long["arm_fraction"] = frac
 
+    # arm_fraction_posterior: posterior-mass-based fraction. Uses
+    # nonlocal_weight_sum as the denominator (= posterior_mass_total
+    # under renormalization). NaN when posterior is unavailable or
+    # nonlocal_weight_sum == 0.
+    nws_long = long["nonlocal_weight_sum"].to_numpy()
+    apm = long["arm_posterior_mass"].to_numpy()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        frac_post = np.where(
+            (nws_long > 0) & np.isfinite(apm),
+            apm / np.maximum(nws_long, 1e-10),
+            np.nan,
+        )
+    long["arm_fraction_posterior"] = frac_post
+
     # Binary indicators: scalar equality against event-level arm cols.
     # On real bandit graph each well has degree 1 so is_prev / is_next
     # / is_last_rewarded are 1 on exactly one arm per event. If a
@@ -944,10 +958,16 @@ def build_event_arm_table(
 
     nan_row = np.full(n_arms, np.nan)
     dist_2d = np.array(
-        [dist_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row for a in current_arms]
+        [
+            dist_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row
+            for a in current_arms
+        ]
     )
     rank_2d = np.array(
-        [rank_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row for a in current_arms]
+        [
+            rank_cache.get(int(a), nan_row) if np.isfinite(a) else nan_row
+            for a in current_arms
+        ]
     )
 
     # -- visit_recency, cumulative_reward, recent_reward_rate (batch) --
@@ -1202,6 +1222,7 @@ def _event_arm_table_columns() -> list[str]:
         "arm_count_soft",
         "arm_posterior_mass",
         "arm_fraction",
+        "arm_fraction_posterior",
         # Binary indicators
         "is_current",
         "is_prev",

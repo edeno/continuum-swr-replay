@@ -261,10 +261,22 @@ def build_control_aligned_table(
 def stop_patch_replay(
     event_arm_table: pd.DataFrame,
     event_table: pd.DataFrame,
+    *,
+    fraction_col: str = "arm_fraction",
 ) -> pd.DataFrame:
     """Compute per-stop replay fraction on current vs non-current patches.
 
     Vectorized implementation — avoids per-group ``.apply()`` lambdas.
+
+    Parameters
+    ----------
+    event_arm_table : pd.DataFrame
+        Canonical event-arm table.
+    event_table : pd.DataFrame
+        Canonical event table.
+    fraction_col : str
+        Column with observed arm fractions. ``"arm_fraction"``
+        (default, MAP-based) or ``"arm_fraction_posterior"``.
 
     Returns a DataFrame indexed by ``stop_id`` with columns:
     ``replay_frac_current_patch``, ``replay_frac_noncurrent``, and
@@ -284,9 +296,9 @@ def stop_patch_replay(
     # Flag arms in the current patch
     is_cp = (eat["_patch"] == eat["current_patch"]).astype(int)
 
-    # Per-event: sum arm_fraction for current-patch and noncurrent arms
-    eat["_frac_cp"] = eat["arm_fraction"] * is_cp
-    eat["_frac_nc"] = eat["arm_fraction"] * (1 - is_cp)
+    # Per-event: sum fraction for current-patch and noncurrent arms
+    eat["_frac_cp"] = eat[fraction_col] * is_cp
+    eat["_frac_nc"] = eat[fraction_col] * (1 - is_cp)
 
     event_agg = eat.groupby(["stop_id", "event_id"]).agg(
         replay_frac_current_patch=("_frac_cp", "sum"),
