@@ -112,8 +112,10 @@ def fit_conditional_poisson(
     bic = n_params * np.log(n_events) - 2 * llf
 
     # Pseudo-R² against the analytical null (uniform allocation).
-    # n_arms = rows per event (constant across events in our setup).
-    n_arms = len(df) // n_events if n_events > 0 else 9
+    # Use 9 explicitly — the bandit task always has 9 arms per event.
+    # The inferred ``len(df) // n_events`` can be wrong when NaN
+    # filtering drops arms from some events (reviewer flag #1).
+    n_arms = 9
     total_count = float(y.sum())
     llf_null = -total_count * np.log(n_arms)
     pseudo_r2 = (
