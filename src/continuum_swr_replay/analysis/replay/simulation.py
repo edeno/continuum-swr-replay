@@ -55,6 +55,7 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "swr_x_prev": ("is_prev", "is_swr"),
     "swr_x_next": ("is_next", "is_swr"),
     "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
+    "mua_x_last_rewarded": ("is_last_rewarded", "is_mua"),
     "switch_x_current": ("is_current", "is_after_switch"),
     "switch_x_prev": ("is_prev", "is_after_switch"),
     "omission_x_last_rewarded": ("is_last_rewarded", "is_after_omission"),
@@ -267,6 +268,7 @@ def simulate_with_event_covariates(
     # Event-level scalars, broadcast to all arms.
     event_scalars: dict[str, np.ndarray] = {
         "is_swr": (rng.random(n_events) < 0.5).astype(float),
+        "is_mua": (rng.random(n_events) < 0.5).astype(float),
         "is_after_switch": (rng.random(n_events) < 0.3).astype(float),
         "is_after_omission": (rng.random(n_events) < 0.3).astype(float),
         "time_since_stop": rng.uniform(0, 5, size=n_events),

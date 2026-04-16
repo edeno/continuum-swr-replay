@@ -1190,6 +1190,7 @@ def build_event_arm_table(
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
+    long["mua_x_last_rewarded"] = is_mua_i * ilr
     long["switch_x_current"] = is_after_switch * ic
     long["switch_x_prev"] = is_after_switch * ip
     long["omission_x_last_rewarded"] = is_after_omission * ilr
@@ -1548,6 +1549,7 @@ def _event_arm_table_columns() -> list[str]:
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",
+        "mua_x_last_rewarded",
         "switch_x_current",
         "switch_x_prev",
         "omission_x_last_rewarded",
