@@ -301,3 +301,39 @@ MODEL_PATCH: dict[str, ModelSpec] = {
         parent="P2",
     ),
 }
+
+# ── Post-switch patch model ──
+#
+# Fit ONLY on events where is_after_switch == 1. On switch trials
+# current_patch ≠ prev_patch, so they are identifiable (correlation
+# ≈ -0.5, VIF < 2). On stay trials these are collinear (r = 0.95,
+# VIF > 20) and must not be combined.
+#
+# Results on 7 j16 sessions:
+# - is_current_patch is STRONGER after switches (median +1.66 larger
+#   coefficient, 7/7, p=0.016) — replay immediately represents the
+#   new patch
+# - is_prev_patch is reliably NEGATIVE (7/7, median −1.8) — the
+#   patch the animal just left is actively suppressed, below even
+#   the unrelated third patch
+
+MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
+    "PS0": ModelSpec(
+        name="PS0",
+        predictors=(),
+        description="Null (switch events only)",
+        parent=None,
+    ),
+    "PS1": ModelSpec(
+        name="PS1",
+        predictors=("is_current_patch",),
+        description="Current-patch bias (switch events only)",
+        parent="PS0",
+    ),
+    "PS2": ModelSpec(
+        name="PS2",
+        predictors=("is_current_patch", "is_prev_patch"),
+        description="+ previous-patch suppression",
+        parent="PS1",
+    ),
+}

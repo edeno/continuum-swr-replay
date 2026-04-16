@@ -51,8 +51,59 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import (
+    ALL_ARMS,
+)
+from ._helpers import (
+    add_trial_context as _add_trial_context,
+)
+from ._helpers import (
+    align_count_matrix as _align_count_matrix,
+)
+from ._helpers import (
+    align_posterior_to_dot as _align_posterior_to_dot,
+)
+from ._helpers import (
+    arm_to_patch as _arm_to_patch,
+)
+from ._helpers import (
+    assign_bout as _assign_bout,
+)
+from ._helpers import (
+    cumulative_reward_per_arm as _cumulative_reward_per_arm,
+)
+from ._helpers import (
+    eq_indicator as _eq_indicator,
+)
+from ._helpers import (
+    hash_event_id as _hash_event_id,
+)
+from ._helpers import (
+    hash_stop_id as _hash_stop_id,
+)
+from ._helpers import (
+    immobility_bout_intervals as _immobility_bout_intervals,
+)
+from ._helpers import (
+    recent_reward_rate_per_arm as _recent_reward_rate_per_arm,
+)
+from ._helpers import (
+    safe_first as _safe_first,
+)
+from ._helpers import (
+    safe_mode as _safe_mode,
+)
+from ._helpers import (
+    single_arm_from_well as _single_arm_from_well,
+)
+from ._helpers import (
+    time_since_stop as _time_since_stop,
+)
+from ._helpers import (
+    visit_recency_per_arm as _visit_recency_per_arm,
+)
 from .spatial import arm_dist_rank, dist_to_arm_from_well
-from .spatial_mapping import arm_to_well, map_estimate_to_arm, well_to_arm_set
+from .spatial_mapping import arm_to_well, map_estimate_to_arm
 from .summaries import (
     arm_count_hard,
     arm_count_soft,
@@ -68,243 +119,6 @@ from .uncertainty import (
     posterior_hpd_widths,
     posterior_peak_mean,
 )
-
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
-
-
-# ── Trial-derived context (port of legacy add_trial_context) ──
-
-
-def _add_trial_context(
-    dot: pd.DataFrame,
-    trials: pd.DataFrame,
-) -> pd.DataFrame:
-    """Attach per-timebin trial-derived columns to ``dot`` (in place, returned).
-
-    In-progress trip semantics: at each timepoint ``t``, the "current
-    trip" is the latest trial whose ``start_time`` is at or before ``t``.
-    This is the trip the animal is currently completing (or has just
-    completed, if ``t`` falls in the gap between two trips).
-
-    Direct port of the legacy ``data_preparation.add_trial_context`` so
-    coefficient values at Phase B gate match pre-refactor numbers
-    exactly. Kept private; ``build_event_table`` owns the behavior.
-
-    Columns added
-    -------------
-    - ``prev_well``, ``current_well``
-    - ``next_well``
-    - ``last_rewarded_well``
-    - ``is_after_switch`` — current trip's ``is_patch_change``
-    - ``is_after_omission`` — ``~current trip's is_reward``
-    - ``is_after_reward`` — current trip's ``is_reward``
-    - ``reward_outcome`` — current trip's ``is_reward`` as float
-
-    Note
-    ----
-    ``reward_outcome`` and ``is_after_reward`` are identical by
-    construction on this task (``reward_outcome`` = ``is_reward``;
-    ``is_after_reward`` = ``is_reward`` because the current trip just
-    completed). Both are kept to satisfy the plan's canonical schema,
-    which names them separately; ``is_after_omission`` is the
-    complement. ``is_after_stay`` is added in :func:`build_event_table`,
-    not here (it needs no trial-level computation).
-    """
-    dot_times = dot.index.values
-    n_trials = len(trials)
-
-    # Empty-trials short-circuit: populate every trial-derived column
-    # with NaN so the schema is complete and ``build_event_table`` can
-    # still run end-to-end (e.g., for a session with no valid trials
-    # or for unit-test fixtures that stub trial context out entirely).
-    if n_trials == 0:
-        for col in (
-            "prev_well",
-            "current_well",
-            "next_well",
-            "last_rewarded_well",
-            "reward_outcome",
-            "is_after_reward",
-            "is_after_omission",
-            "is_after_switch",
-            "_goal_arrival_time",
-            "_last_reward_time",
-        ):
-            dot[col] = np.nan
-        return dot
-
-    trial_start_times = trials["start_time"].values
-    trial_end_times = trials["end_time"].values
-    to_wells = trials["to_well"].values
-    from_wells = trials["from_well"].values
-    is_reward = trials["is_reward"].values
-    is_patch_change = trials["is_patch_change"].values
-
-    current_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
-    valid = current_idx >= 0
-
-    current_clipped = np.clip(current_idx, 0, n_trials - 1)
-    next_idx = current_idx + 1
-    next_valid = valid & (next_idx < n_trials)
-    next_clipped = np.clip(next_idx, 0, n_trials - 1)
-
-    dot["prev_well"] = np.where(valid, from_wells[current_clipped], np.nan)
-    dot["current_well"] = np.where(valid, to_wells[current_clipped], np.nan)
-    dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
-
-    # Most recently rewarded well. Use ``goal_arrival_time`` (beam-
-    # break ≈ reward delivery, ~46 ms delay) rather than
-    # ``trial.end_time`` (departure from well, 1–8 s later). Replay
-    # fires during the well-visit window BETWEEN arrival and
-    # departure — using end_time misses the current trial's reward.
-    if "goal_arrival_time" in trials.columns:
-        reward_timestamps = trials["goal_arrival_time"].values[is_reward]
-    else:
-        # Fall back to trial end_time — less precise (off by 1–8 s)
-        # but correct for legacy data or test fixtures without
-        # goal_arrival_time.
-        reward_timestamps = trial_end_times[is_reward]
-    rewarded_wells = to_wells[is_reward]
-    if len(reward_timestamps) > 0:
-        rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
-        rew_idx_clipped = np.clip(rew_idx, 0, None)
-        dot["last_rewarded_well"] = np.where(
-            rew_idx >= 0, rewarded_wells[rew_idx_clipped], np.nan
-        )
-    else:
-        dot["last_rewarded_well"] = np.nan
-
-    # Port-entry timing: goal_arrival_time of the current trip =
-    # when the animal entered the destination port. Used to compute
-    # time_since_port_entry per event (more precise than the speed-
-    # based time_since_stop).
-    if "goal_arrival_time" in trials.columns:
-        goal_arrival_times = trials["goal_arrival_time"].values
-        dot["_goal_arrival_time"] = np.where(
-            valid, goal_arrival_times[current_clipped], np.nan
-        )
-    else:
-        dot["_goal_arrival_time"] = np.nan
-
-    # Reward timing: goal_arrival_time of the most recently rewarded
-    # trial (≈ pump time, ~46 ms delay). Used to compute
-    # time_since_reward per event.
-    if len(reward_timestamps) > 0:
-        dot["_last_reward_time"] = np.where(
-            rew_idx >= 0, reward_timestamps[rew_idx_clipped], np.nan
-        )
-    else:
-        dot["_last_reward_time"] = np.nan
-
-    current_reward = np.where(valid, is_reward[current_clipped].astype(float), np.nan)
-    dot["reward_outcome"] = current_reward
-    dot["is_after_reward"] = current_reward
-    dot["is_after_omission"] = np.where(valid, 1.0 - current_reward, np.nan)
-    dot["is_after_switch"] = np.where(
-        valid, is_patch_change[current_clipped].astype(float), np.nan
-    )
-
-    return dot
-
-
-# ── Immobility-bout helpers (port of legacy compute_time_since_stop) ──
-
-
-def _immobility_bout_starts(
-    dot: pd.DataFrame,
-    speed_col: str = "head_speed",
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-) -> np.ndarray:
-    """Timestamps at which speed crossed from above to below the threshold.
-
-    Includes the first sample if the session starts immobile. Direct
-    port of the legacy bout-detection logic in
-    ``predictors.compute_time_since_stop``.
-    """
-    imm = (dot[speed_col] < speed_threshold).to_numpy()
-    imm_times = dot.index.to_numpy()
-    transitions = np.where(~imm[:-1] & imm[1:])[0] + 1
-    if len(imm) > 0 and imm[0]:
-        transitions = np.concatenate([[0], transitions])
-    return imm_times[transitions]
-
-
-def _immobility_bout_intervals(
-    dot: pd.DataFrame,
-    speed_col: str = "head_speed",
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Start and end timestamps for every contiguous immobility bout.
-
-    Generalization of :func:`_immobility_bout_starts` that also emits
-    bout ends — the first immobile sample's timestamp through the last
-    consecutive immobile sample's timestamp, inclusive. An interval of
-    length 1 (a single-sample bout) gets identical start and end.
-
-    A session that never drops below the speed threshold returns two
-    empty arrays.
-
-    Returns
-    -------
-    starts : np.ndarray, shape (n_bouts,)
-    ends : np.ndarray, shape (n_bouts,)
-    """
-    imm = (dot[speed_col] < speed_threshold).to_numpy()
-    times = dot.index.to_numpy()
-    if imm.size == 0 or not imm.any():
-        return np.array([]), np.array([])
-
-    # Pad with False at both ends so transitions capture edge bouts.
-    # Rising edges: first True of a run. Falling edges: first False
-    # after the run — shift back by 1 to get the last True index.
-    padded = np.concatenate(([False], imm, [False]))
-    diff = np.diff(padded.astype(np.int8))
-    start_idx = np.where(diff == 1)[0]  # index into imm of run starts
-    end_idx = np.where(diff == -1)[0] - 1  # index into imm of run last-True
-    return times[start_idx], times[end_idx]
-
-
-def _time_since_stop(
-    event_times: np.ndarray,
-    bout_start_times: np.ndarray,
-) -> np.ndarray:
-    """Seconds from most recent immobility-bout start to each event time.
-
-    Clamps negative values (event before any detected bout) to 0. Returns
-    an empty array if ``bout_start_times`` is empty.
-    """
-    event_times = np.asarray(event_times, dtype=float)
-    if bout_start_times.size == 0:
-        return np.full_like(event_times, np.nan)
-    idx = np.searchsorted(bout_start_times, event_times, side="right") - 1
-    idx = np.clip(idx, 0, bout_start_times.size - 1)
-    return np.clip(event_times - bout_start_times[idx], 0, None)
-
-
-# ── Scalar extractions from per-arm sets ──
-
-
-def _single_arm_from_well(well: float, track_graph: nx.Graph) -> float:
-    """Deterministic scalar arm for a well, ``NaN`` if the well is NaN or isolated.
-
-    On the real bandit graph each well is degree-1, so
-    :func:`well_to_arm_set` returns a 1-element set. On fixtures with
-    higher-degree wells, returns the minimum arm index for determinism.
-    """
-    if well is None or (isinstance(well, float) and np.isnan(well)):
-        return np.nan
-    arms = well_to_arm_set(well, track_graph)
-    if len(arms) == 0:
-        return np.nan
-    return float(min(arms))
-
-
-def _arm_to_patch(arm: float) -> float:
-    """Patch ID for an arm, ``NaN`` propagating."""
-    if arm is None or (isinstance(arm, float) and np.isnan(arm)):
-        return np.nan
-    return float(TRACK_SEGMENT_TO_PATCH.get(int(arm), np.nan))
-
 
 # ── Shared prep for the event / event-sequence builders ──
 
@@ -343,50 +157,6 @@ def _in_event_mask(
         & (dot["head_speed"] < speed_threshold)
         & (dot["nonlocal_prob"] > nonlocal_threshold)
     )
-
-
-def _align_posterior_to_dot(
-    conditional_posterior,
-    dot: pd.DataFrame,
-) -> np.ndarray:
-    """Return a ``(T_dot, n_position_bins)`` posterior array aligned to ``dot.index``.
-
-    The decoder writes ``results.nc`` with a ``time`` coordinate that is
-    the same time axis produced by
-    :func:`data_aggregation.get_data_over_time` — so in practice the two
-    are already 1-to-1. We still assert lengths match to catch silent
-    misalignment if the aggregator and decoder ever diverge.
-
-    Parameters
-    ----------
-    conditional_posterior : xr.DataArray
-        Shape ``(time, position)`` from
-        :func:`posterior_io.load_conditional_posterior`.
-    dot : pd.DataFrame
-        Time-indexed data-over-time frame.
-    """
-    post_vals = np.asarray(conditional_posterior.values)
-    if post_vals.shape[0] != len(dot):
-        raise ValueError(
-            f"conditional_posterior time axis has {post_vals.shape[0]} "
-            f"entries but dot has {len(dot)}; the two must be aligned "
-            "1-to-1 (both come from the same decoder run)."
-        )
-    # Length-match alone is not enough — bin-centered vs. edge-indexed
-    # time would slide every row by half a sample without tripping the
-    # length check. Explicitly verify the two time axes agree within a
-    # microsecond (500 Hz sampling = 2 ms between bins, so 1 µs is
-    # well below any legitimate numerical noise).
-    if "time" in conditional_posterior.coords:
-        post_times = np.asarray(conditional_posterior["time"].values, dtype=float)
-        drift = float(np.abs(post_times - dot.index.to_numpy(dtype=float)).max())
-        if drift > 1e-6:
-            raise ValueError(
-                f"conditional_posterior time axis drifts from dot.index "
-                f"by up to {drift:.3g}s — the two must share the same "
-                "time origin, not just the same length."
-            )
-    return post_vals
 
 
 # ── Public API ──
@@ -1226,9 +996,6 @@ def build_event_arm_table(
     return long[column_order]
 
 
-# ── Helpers ──
-
-
 def build_event_patch_table(
     event_table: pd.DataFrame,
     event_arm_table: pd.DataFrame,
@@ -1285,211 +1052,23 @@ def build_event_patch_table(
     ).astype(int)
     patch_eat = patch_eat.drop(columns=["last_rewarded_patch"])
 
-    return patch_eat
-
-
-def _safe_mode(series: pd.Series) -> float:
-    """Mode of a series (first value on tie), ``NaN`` if empty or all NaN."""
-    if len(series) == 0:
-        return np.nan
-    valid = series.dropna()
-    if len(valid) == 0:
-        return np.nan
-    mode = valid.mode()
-    if len(mode) == 0:
-        return np.nan
-    return float(mode.iloc[0])
-
-
-def _safe_first(series: pd.Series) -> float:
-    """First non-NaN value of a series, ``NaN`` if empty or all NaN."""
-    if len(series) == 0:
-        return np.nan
-    valid = series.dropna()
-    if len(valid) == 0:
-        return np.nan
-    return float(valid.iloc[0])
-
-
-def _hash_event_id(events: pd.DataFrame) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, non_local_event)``."""
-    keys = events[["animal", "day", "epoch", "non_local_event"]]
-    return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
-
-
-def _hash_stop_id(
-    animal: str,
-    day: int,
-    epoch: str,
-    stop_idx: np.ndarray,
-) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout."""
-    keys = pd.DataFrame(
-        {
-            "animal": animal,
-            "day": day,
-            "epoch": epoch,
-            "stop_idx": np.asarray(stop_idx, dtype=np.int64),
-        }
+    # is_prev_patch: is this the patch the animal just came from?
+    prev_p = event_table[["event_id", "prev_patch"]].copy()
+    patch_eat = patch_eat.merge(prev_p, on="event_id", how="left")
+    patch_eat["is_prev_patch"] = (patch_eat["patch"] == patch_eat["prev_patch"]).astype(
+        int
     )
-    return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+    patch_eat = patch_eat.drop(columns=["prev_patch"])
 
+    # switch_x_current_patch: is_after_switch × is_current_patch
+    switch_col = event_table[["event_id", "is_after_switch"]].copy()
+    patch_eat = patch_eat.merge(switch_col, on="event_id", how="left")
+    patch_eat["switch_x_current_patch"] = (
+        patch_eat["is_after_switch"] * patch_eat["is_current_patch"]
+    )
+    patch_eat = patch_eat.drop(columns=["is_after_switch"])
 
-def _align_count_matrix(
-    counts: np.ndarray,
-    ids_sorted: np.ndarray,
-    target_ids: np.ndarray,
-    n_arms: int,
-) -> np.ndarray:
-    """Reindex a ``(n_events_src, n_arms)`` count matrix to ``target_ids``.
-
-    Missing source events (e.g., every in-event timebin on a junction
-    bin) fill as zeros (appropriate for count responses) or NaN (for
-    posterior-mass). Callers pass a float/int matrix and the fill is
-    inferred from the dtype.
-    """
-    mapping = {int(i): k for k, i in enumerate(ids_sorted)}
-    fill = np.nan if np.issubdtype(counts.dtype, np.floating) else 0
-    out = np.full((target_ids.size, n_arms), fill, dtype=counts.dtype)
-    for k, tid in enumerate(target_ids):
-        src_idx = mapping.get(int(tid))
-        if src_idx is not None:
-            out[k] = counts[src_idx]
-    return out
-
-
-def _eq_indicator(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
-    """Elementwise ``int(values == reference)`` with NaN-in-reference = 0."""
-    values = np.asarray(values, dtype=float)
-    reference = np.asarray(reference, dtype=float)
-    out = (values == reference).astype(int)
-    out[np.isnan(reference)] = 0
-    return out
-
-
-def _visit_recency_per_arm(
-    event_time: float,
-    trials: pd.DataFrame,
-    track_graph: nx.Graph,
-    n_default: int | None = None,
-) -> dict[int, float]:
-    """Trials since each arm was last visited (port of legacy helper).
-
-    Direct port of ``predictors.compute_visit_recency_for_event``
-    with one correctness tightening: when there are no past trials at
-    ``event_time`` (session start or empty-trials stub), every arm
-    returns ``NaN`` rather than ``n_default = n_trials + 1``. The
-    legacy fallback coerced "never visited" to a finite "1 trial ago"
-    for empty sessions — misleading for downstream GLMs that interpret
-    ``visit_recency`` as a quantitative predictor.
-    """
-    past = trials[trials["end_time"] <= event_time]
-    if len(past) == 0:
-        return dict.fromkeys(ALL_ARMS, np.nan)
-    n_trials = len(trials)
-    if n_default is None:
-        n_default = n_trials + 1
-    result = {arm: float(n_default) for arm in ALL_ARMS}
-    for trial_offset, trial in enumerate(reversed(list(past.itertuples()))):
-        trials_ago = trial_offset + 1
-        for well_col in ("to_well", "from_well"):
-            well_id = getattr(trial, well_col)
-            if np.isnan(well_id):
-                continue
-            arms = well_to_arm_set(well_id, track_graph)
-            for arm in arms:
-                if result[arm] == float(n_default):
-                    result[arm] = float(trials_ago)
-        if all(v != float(n_default) for v in result.values()):
-            break
-    return result
-
-
-def _cumulative_reward_per_arm(
-    event_time: float,
-    trials: pd.DataFrame,
-    track_graph: nx.Graph,
-    window: int = 10,
-) -> dict[int, float]:
-    """Reward count at each arm over the last ``window`` trials.
-
-    Port of ``predictors.compute_cumulative_reward_for_event``.
-    """
-    past = trials[trials["end_time"] <= event_time].tail(window)
-    result = dict.fromkeys(ALL_ARMS, 0.0)
-    for trial in past.itertuples():
-        if not trial.is_reward:
-            continue
-        well_id = trial.to_well
-        if np.isnan(well_id):
-            continue
-        arms = well_to_arm_set(well_id, track_graph)
-        for arm in arms:
-            result[arm] += 1.0
-    return result
-
-
-def _recent_reward_rate_per_arm(
-    event_time: float,
-    trials: pd.DataFrame,
-    track_graph: nx.Graph,
-    k: int = 5,
-) -> dict[int, float]:
-    """Fraction of the last ``k`` visits to each arm that were rewarded.
-
-    New (not in legacy). A "visit to arm *a*" is a completed trial
-    whose ``to_well`` touches arm *a*. Rate = fraction of the last
-    *k* such trials that were rewarded. Returns ``NaN`` for arms with
-    no past visits.
-    """
-    past = trials[trials["end_time"] <= event_time]
-    if len(past) == 0:
-        return dict.fromkeys(ALL_ARMS, np.nan)
-
-    to_wells = past["to_well"].to_numpy()
-    rewards = past["is_reward"].to_numpy()
-
-    result: dict[int, float] = {}
-    for arm in ALL_ARMS:
-        # Cache-friendly per-trial check: is the arm adjacent to
-        # to_well? Computing well_to_arm_set each row is cheap on this
-        # graph (9 edges) but cached nevertheless via the inner loop.
-        matches = np.array(
-            [
-                (not np.isnan(w)) and (arm in well_to_arm_set(w, track_graph))
-                for w in to_wells
-            ],
-            dtype=bool,
-        )
-        arm_rewards = rewards[matches][-k:]
-        result[arm] = (
-            float(np.asarray(arm_rewards, dtype=float).mean())
-            if arm_rewards.size > 0
-            else np.nan
-        )
-    return result
-
-
-def _assign_bout(
-    event_times: np.ndarray,
-    bout_starts: np.ndarray,
-    bout_ends: np.ndarray,
-) -> np.ndarray:
-    """Return the bout index containing each timestamp, or ``-1`` if none.
-
-    ``bout_starts`` and ``bout_ends`` must be sorted and the same length
-    (inclusive intervals). For each ``t`` in ``event_times`` the result
-    is the unique ``i`` with ``bout_starts[i] <= t <= bout_ends[i]``,
-    or ``-1`` if no bout contains ``t`` (e.g., the timestamp fell in a
-    mobile gap between bouts).
-    """
-    event_times = np.asarray(event_times, dtype=float)
-    if bout_starts.size == 0:
-        return np.full(event_times.shape, -1, dtype=np.int64)
-    idx = np.searchsorted(bout_starts, event_times, side="right") - 1
-    clipped = np.clip(idx, 0, bout_starts.size - 1)
-    in_bout = (idx >= 0) & (event_times <= bout_ends[clipped])
-    return np.where(in_bout, idx, -1).astype(np.int64)
+    return patch_eat
 
 
 def _event_table_columns() -> list[str]:
