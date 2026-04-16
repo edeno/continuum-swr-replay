@@ -35,8 +35,29 @@ from continuum_swr_replay.analysis.replay.model_comparison import (
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
+    MODEL_HIERARCHY_MUA,
+    MODEL_HIERARCHY_SWR,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+# Map event source to model hierarchy and input directory
+_EVENT_SOURCE_CONFIG = {
+    "non_local": {
+        "hierarchy": MODEL_HIERARCHY,
+        "input_dir_name": "replay_content",
+        "table_name": "event_arm_table",
+    },
+    "SWR": {
+        "hierarchy": MODEL_HIERARCHY_SWR,
+        "input_dir_name": "contfrag_replay_content",
+        "table_name": "event_arm_table_swr",
+    },
+    "MUA": {
+        "hierarchy": MODEL_HIERARCHY_MUA,
+        "input_dir_name": "contfrag_replay_content",
+        "table_name": "event_arm_table_mua",
+    },
+}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,8 +65,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
-OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content" / "models"
 SESSION_COLS = ["animal", "day", "epoch"]
 
 
@@ -123,10 +142,13 @@ def print_model_results(
     model_name: str,
     mdf: pd.DataFrame,
     predictors: list[str],
+    hierarchy: dict | None = None,
 ) -> None:
     """Print summary for one model."""
+    if hierarchy is None:
+        hierarchy = MODEL_HIERARCHY
     print(f"\n{'=' * 60}")
-    spec = MODEL_HIERARCHY[model_name]
+    spec = hierarchy[model_name]
     print(f"{model_name}: {spec.description}")
     print(f"{'=' * 60}")
 
@@ -197,23 +219,34 @@ def main():
         action="store_true",
         help="Also fit conditional logit on dominant arm (robustness)",
     )
+    parser.add_argument(
+        "--event-source",
+        type=str,
+        default="non_local",
+        choices=["non_local", "SWR", "MUA"],
+        help="Event source: non_local (model-detected), SWR, or MUA (default: non_local)",
+    )
     args = parser.parse_args()
+
+    # Select hierarchy and input paths based on event source
+    source_config = _EVENT_SOURCE_CONFIG[args.event_source]
+    hierarchy = source_config["hierarchy"]
+    input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
+    output_dir = input_dir / "models"
 
     # Determine which models to fit
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
     else:
-        model_names = list(MODEL_HIERARCHY.keys())
+        model_names = list(hierarchy.keys())
 
-    # Load the canonical event-arm table produced by
-    # prepare_replay_content_data.py (Phase B). Falls back to the legacy
-    # ``long_count.pkl`` so the script can still run on old pickles.
-    canonical_path = INPUT_DIR / "event_arm_table.pkl"
-    legacy_path = INPUT_DIR / "long_count.pkl"
+    # Load the event-arm table. For non_local, falls back to legacy naming.
+    canonical_path = input_dir / f"{source_config['table_name']}.pkl"
+    legacy_path = input_dir / "long_count.pkl"
     if canonical_path.exists():
         count_path = canonical_path
         canonical = True
-    elif legacy_path.exists():
+    elif args.event_source == "non_local" and legacy_path.exists():
         count_path = legacy_path
         canonical = False
         logging.warning(
@@ -222,8 +255,8 @@ def main():
         )
     else:
         logging.error(
-            "Neither event_arm_table.pkl nor long_count.pkl found. "
-            "Run prepare_replay_content_data.py first."
+            "%s not found. Run the appropriate prepare script first.",
+            canonical_path,
         )
         return
 
@@ -242,10 +275,10 @@ def main():
     all_predictors: set[str] = set()
     valid_model_names = []
     for model_name in model_names:
-        if model_name not in MODEL_HIERARCHY:
+        if model_name not in hierarchy:
             logging.warning("Unknown model: %s", model_name)
             continue
-        spec = MODEL_HIERARCHY[model_name]
+        spec = hierarchy[model_name]
         missing = [p for p in spec.predictors if p not in long_df.columns]
         if missing:
             logging.warning(
@@ -297,11 +330,11 @@ def main():
     )
 
     # Fit each model
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     all_results = []
 
     for model_name in valid_model_names:
-        spec = MODEL_HIERARCHY[model_name]
+        spec = hierarchy[model_name]
         predictors = list(spec.predictors)
 
         cv_label = " + CV" if args.cv else ""
@@ -321,11 +354,11 @@ def main():
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
 
         if len(mdf) > 0:
-            model_path = OUTPUT_DIR / f"{model_name}.pkl"
+            model_path = output_dir / f"{model_name}.pkl"
             mdf.to_pickle(model_path)
             logging.info("  Saved to %s", model_path)
 
-            print_model_results(model_name, mdf, predictors)
+            print_model_results(model_name, mdf, predictors, hierarchy)
             all_results.append(mdf)
 
     if not all_results:
@@ -334,7 +367,7 @@ def main():
 
     # Combine all results
     combined = pd.concat(all_results, ignore_index=True)
-    combined_path = OUTPUT_DIR / "all_models.pkl"
+    combined_path = output_dir / "all_models.pkl"
     combined.to_pickle(combined_path)
     logging.info("Saved combined results to %s", combined_path)
 
@@ -343,7 +376,7 @@ def main():
         logging.info("Running nested model comparisons...")
         comparison = run_full_hierarchy_comparison(combined)
         if len(comparison) > 0:
-            comp_path = OUTPUT_DIR / "model_comparison.pkl"
+            comp_path = output_dir / "model_comparison.pkl"
             comparison.to_pickle(comp_path)
             logging.info("Saved comparison to %s", comp_path)
 
@@ -369,19 +402,14 @@ def main():
     # Conditional logit robustness check
     if args.logit:
         logging.info("Fitting conditional logit robustness checks...")
-        logit_dir = OUTPUT_DIR / "logit"
+        logit_dir = output_dir / "logit"
         logit_dir.mkdir(parents=True, exist_ok=True)
 
-        for model_name in model_names:
-            if model_name not in MODEL_HIERARCHY:
-                continue
-            spec = MODEL_HIERARCHY[model_name]
+        for model_name in valid_model_names:
+            spec = hierarchy[model_name]
             if not spec.predictors:
                 continue
             predictors = list(spec.predictors)
-            missing = [p for p in predictors if p not in long_df.columns]
-            if missing:
-                continue
 
             logit_results = []
             for keys, group in long_df.groupby(SESSION_COLS):

@@ -1,0 +1,822 @@
+"""Canonical per-session tables for ContFrag replay content analysis.
+
+This module produces event tables from externally-defined events (SWR or
+high-MUA times), using the ContFrag classifier's decoded posterior for
+content analysis. The key difference from the NonLocal tables
+(``analysis.replay.tables``) is that events come from external detectors,
+not from model-detected non-local probability thresholding.
+
+The ContFrag model has 2 states (Continuous, Fragmented), both of which
+decode meaningful spatial content. Event-level summaries include the
+state composition during each event (continuous_prob_mean, dominant_state).
+"""
+
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+
+from ..replay._helpers import (
+    ALL_ARMS,
+    add_trial_context,
+    align_count_matrix,
+    align_posterior_to_dot,
+    arm_to_patch,
+    assign_bout,
+    cumulative_reward_per_arm,
+    eq_indicator,
+    hash_stop_id,
+    immobility_bout_intervals,
+    recent_reward_rate_per_arm,
+    safe_first,
+    safe_mode,
+    single_arm_from_well,
+    time_since_stop,
+    visit_recency_per_arm,
+)
+from ..replay.spatial import arm_dist_rank, dist_to_arm_from_well
+from ..replay.spatial_mapping import arm_to_well, map_estimate_to_arm
+from ..replay.summaries import (
+    arm_count_hard,
+    arm_count_soft,
+    arm_posterior_mass,
+    posterior_to_arm_marginal,
+)
+from ..replay.uncertainty import (
+    posterior_entropy_mean,
+    posterior_hpd_widths,
+    posterior_peak_mean,
+)
+
+
+def _prepare_contfrag_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
+    """Annotate ``dot`` with ``decoded_arm`` for ContFrag data.
+
+    Unlike the NonLocal version, there is no ``nonlocal_prob`` column
+    to compute — both states always decode position.
+    """
+    dot = dot.copy()
+    dot["decoded_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
+    return dot
+
+
+def _in_contfrag_event_mask(
+    dot: pd.DataFrame,
+    speed_threshold: float,
+    event_source: str = "SWR",
+) -> pd.Series:
+    """Boolean mask for in-event timebins using external event detectors.
+
+    A row is in-event iff the external detector flagged it (SWR_event > 0
+    or MUA_event > 0) AND the animal was immobile.
+    """
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    return (dot[event_col] > 0) & (dot["head_speed"] < speed_threshold)
+
+
+def _hash_contfrag_event_id(
+    events: pd.DataFrame,
+    event_source: str = "SWR",
+) -> np.ndarray:
+    """63-bit stable hash of ``(animal, day, epoch, event_label)``."""
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    keys = events[["animal", "day", "epoch", event_col]]
+    return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+
+
+def build_contfrag_event_table(
+    dot: pd.DataFrame,
+    env,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    *,
+    event_source: str = "SWR",
+    conditional_posterior=None,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> pd.DataFrame:
+    """One row per externally-defined event with canonical event-level columns.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        Time-indexed data-over-time frame from
+        ``get_contfrag_data_over_time()``.
+    env : Environment
+        Decoder environment for ``map_estimate_to_arm``.
+    trials : pd.DataFrame
+        Trial frame with ``start_time``, ``end_time``, ``to_well``,
+        ``from_well``, ``is_reward``, ``is_patch_change``.
+    track_graph : nx.Graph
+        Session track graph.
+    event_source : {"SWR", "MUA"}
+        Which external event detector to use for event boundaries.
+    conditional_posterior : xr.DataArray, optional
+        Combined posterior for posterior-dependent columns.
+    speed_threshold : float
+        Head-speed threshold for immobility (cm/s).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per event. Includes all standard event-table columns
+        plus ContFrag-specific: ``continuous_prob_mean``,
+        ``fragmented_prob_mean``, ``dominant_state`` (ties go to
+        Continuous), ``continuous_fraction``.
+    """
+    if "animal" not in dot.columns:
+        raise KeyError("dot must carry 'animal' column (set by get_contfrag_data_over_time)")
+    animal = str(dot["animal"].iloc[0])
+    day = int(dot["day"].iloc[0])
+    epoch = str(dot["epoch"].iloc[0])
+
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+
+    dot = _prepare_contfrag_dot(dot, env)
+    dot = add_trial_context(dot, trials)
+
+    bout_starts, bout_ends = immobility_bout_intervals(
+        dot, speed_col="head_speed", speed_threshold=speed_threshold
+    )
+
+    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    ev = dot.loc[in_event]
+
+    column_order = _contfrag_event_table_columns(event_source)
+    if len(ev) == 0:
+        return pd.DataFrame(columns=column_order)
+
+    event_id_series = ev[event_col].to_numpy()
+
+    groups = ev.groupby(event_col, sort=True)
+    event_records: list[dict] = []
+
+    for ev_id, g in groups:
+        times = g.index.to_numpy()
+        arm_series = g["decoded_arm"]
+        real_arm_mask = arm_series.isin(ALL_ARMS)
+        arms_real = arm_series[real_arm_mask]
+        n_junction = int((~real_arm_mask).sum())
+
+        # current_arm: modal track_segment_id
+        ts = (
+            g["track_segment_id"]
+            if "track_segment_id" in g.columns
+            else pd.Series(dtype=float)
+        )
+        ts_modal = safe_mode(ts)
+        current_arm = np.nan
+        if not np.isnan(ts_modal):
+            well_of_modal = arm_to_well(ts_modal, track_graph)
+            if not np.isnan(well_of_modal):
+                current_arm = float(ts_modal)
+        if np.isnan(current_arm):
+            current_arm = single_arm_from_well(
+                safe_first(g["current_well"]), track_graph
+            )
+
+        prev_arm = single_arm_from_well(safe_first(g["prev_well"]), track_graph)
+        next_arm = single_arm_from_well(safe_first(g["next_well"]), track_graph)
+        last_rewarded_arm = single_arm_from_well(
+            safe_first(g["last_rewarded_well"]), track_graph
+        )
+
+        is_after_switch = safe_first(g["is_after_switch"])
+        is_after_omission = safe_first(g["is_after_omission"])
+        is_after_reward = safe_first(g["is_after_reward"])
+        reward_outcome = safe_first(g["reward_outcome"])
+        is_after_stay = (
+            1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
+        )
+
+        # ContFrag-specific: state composition during event
+        cont_prob = g["Continuous_prob"].to_numpy()
+        frag_prob = g["Fragmented_prob"].to_numpy()
+        cont_mean = float(np.nanmean(cont_prob))
+        frag_mean = float(np.nanmean(frag_prob))
+        dominant = "Continuous" if cont_mean >= frag_mean else "Fragmented"
+        cont_frac = float(np.nanmean(cont_prob > frag_prob))
+
+        record = {
+            event_col: int(ev_id),
+            "event_start": float(times[0]),
+            "event_end": float(times[-1]),
+            "event_duration": float(times[-1] - times[0]),
+            "is_swr": bool((g["SWR_event"] > 0).any()),
+            "is_mua": bool((g["MUA_event"] > 0).any())
+            if "MUA_event" in g.columns
+            else False,
+            "continuous_prob_mean": cont_mean,
+            "fragmented_prob_mean": frag_mean,
+            "dominant_state": dominant,
+            "continuous_fraction": cont_frac,
+            "current_arm": current_arm,
+            "prev_arm": prev_arm,
+            "next_arm": next_arm,
+            "last_rewarded_arm": last_rewarded_arm,
+            "current_patch": arm_to_patch(current_arm),
+            "prev_patch": arm_to_patch(prev_arm),
+            "next_patch": arm_to_patch(next_arm),
+            "is_after_switch": is_after_switch,
+            "is_after_omission": is_after_omission,
+            "is_after_reward": is_after_reward,
+            "is_after_stay": is_after_stay,
+            "reward_outcome": reward_outcome,
+            "is_stay": float(arm_to_patch(next_arm) == arm_to_patch(current_arm))
+            if not (
+                np.isnan(arm_to_patch(next_arm))
+                or np.isnan(arm_to_patch(current_arm))
+            )
+            else np.nan,
+            "n_timebins": len(g),
+            "n_junction_bins": n_junction,
+            "n_unique_arms": int(arms_real.nunique()),
+            "event_midpoint_time": float(times[len(times) // 2]),
+            "time_since_port_entry": float(
+                times[len(times) // 2] - safe_first(g["_goal_arrival_time"])
+            )
+            if not np.isnan(safe_first(g["_goal_arrival_time"]))
+            else np.nan,
+            "time_since_reward": float(
+                times[len(times) // 2] - safe_first(g["_last_reward_time"])
+            )
+            if not np.isnan(safe_first(g["_last_reward_time"]))
+            else np.nan,
+        }
+        event_records.append(record)
+
+    per_event = pd.DataFrame.from_records(event_records)
+
+    # time_since_stop per event
+    per_timebin_tss = time_since_stop(ev.index.to_numpy(), bout_starts)
+    tss_by_event = (
+        pd.Series(per_timebin_tss, index=ev.index)
+        .groupby(ev[event_col].to_numpy(), sort=True)
+        .median()
+        .to_numpy()
+    )
+    per_event["time_since_stop"] = tss_by_event
+
+    # Posterior-dependent columns
+    posterior_cols = (
+        "posterior_peak_mean",
+        "posterior_entropy_mean",
+        "posterior_hpd_width_50",
+        "posterior_hpd_width_80",
+        "posterior_hpd_width_95",
+    )
+    if conditional_posterior is None:
+        for c in posterior_cols:
+            per_event[c] = np.nan
+    else:
+        edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
+        post_vals = align_posterior_to_dot(conditional_posterior, dot)
+        post_in_event = post_vals[in_event.to_numpy()]
+        arm_posterior = posterior_to_arm_marginal(
+            post_in_event, edge_id, n_arms=len(ALL_ARMS)
+        )
+        # For ContFrag, weight = 1.0 for all timebins (both states decode)
+        weights = np.ones(len(post_in_event))
+        _, peak = posterior_peak_mean(arm_posterior, weights, event_id_series)
+        _, entropy = posterior_entropy_mean(arm_posterior, weights, event_id_series)
+        _, hpd = posterior_hpd_widths(
+            arm_posterior, weights, event_id_series, coverages=(0.5, 0.8, 0.95)
+        )
+        per_event["posterior_peak_mean"] = peak
+        per_event["posterior_entropy_mean"] = entropy
+        per_event["posterior_hpd_width_50"] = hpd[0.5]
+        per_event["posterior_hpd_width_80"] = hpd[0.8]
+        per_event["posterior_hpd_width_95"] = hpd[0.95]
+
+    # Identifiers + stable hashes
+    per_event.insert(0, "animal", animal)
+    per_event.insert(1, "day", day)
+    per_event.insert(2, "epoch", epoch)
+    per_event["event_id"] = _hash_contfrag_event_id(per_event, event_source)
+
+    # stop_id
+    stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
+    per_event["stop_idx"] = stop_idx
+    per_event["stop_id"] = hash_stop_id(animal, day, epoch, stop_idx)
+
+    return per_event[column_order]
+
+
+def build_contfrag_event_arm_table(
+    event_table: pd.DataFrame,
+    dot: pd.DataFrame,
+    env,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    *,
+    event_source: str = "SWR",
+    conditional_posterior=None,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> pd.DataFrame:
+    """One row per (event, arm) for externally-defined events.
+
+    Parameters
+    ----------
+    event_table : pd.DataFrame
+        Output of ``build_contfrag_event_table()``.
+    dot, env, trials, track_graph
+        Same as ``build_contfrag_event_table()``.
+    event_source : {"SWR", "MUA"}
+        Which external event detector defines event boundaries.
+    conditional_posterior : xr.DataArray, optional
+        Combined posterior for arm_posterior_mass.
+    speed_threshold : float
+        Head-speed threshold for immobility.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: see ``_contfrag_event_arm_table_columns()``.
+    """
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    column_order = _contfrag_event_arm_table_columns(event_source)
+    if len(event_table) == 0:
+        return pd.DataFrame(columns=column_order)
+
+    n_arms = len(ALL_ARMS)
+    n_events = len(event_table)
+
+    dot = _prepare_contfrag_dot(dot, env)
+    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    ev = dot.loc[in_event]
+
+    # Arm counts — weight = 1.0 for all timebins (both states decode position)
+    arm_series = ev["decoded_arm"]
+    real_mask = arm_series.isin(ALL_ARMS).to_numpy()
+    arm_map_real = arm_series.to_numpy()[real_mask].astype(np.int64)
+    event_id_real = ev[event_col].to_numpy()[real_mask]
+    weights_real = np.ones(real_mask.sum())
+    weights_all = np.ones(len(ev))
+    event_id_all = ev[event_col].to_numpy()
+
+    ids_real, counts_hard = arm_count_hard(
+        weights_real, arm_map_real, event_id_real, n_arms=n_arms, threshold=0.0
+    )
+    _, counts_soft = arm_count_soft(
+        weights_real, arm_map_real, event_id_real, n_arms=n_arms
+    )
+
+    ev_ids = event_table[event_col].to_numpy().astype(np.int64)
+    hard_aligned = align_count_matrix(counts_hard, ids_real, ev_ids, n_arms)
+    soft_aligned = align_count_matrix(counts_soft, ids_real, ev_ids, n_arms)
+
+    if conditional_posterior is not None:
+        edge_id = np.asarray(env.place_bin_centers_nodes_df_["edge_id"])
+        post_vals = align_posterior_to_dot(conditional_posterior, dot)
+        post_in_event = post_vals[in_event.to_numpy()]
+        arm_posterior = posterior_to_arm_marginal(post_in_event, edge_id, n_arms=n_arms)
+        ids_all, mass = arm_posterior_mass(weights_all, arm_posterior, event_id_all)
+        mass_aligned = align_count_matrix(mass, ids_all, ev_ids, n_arms)
+    else:
+        mass_aligned = np.full((n_events, n_arms), np.nan)
+
+    # Broadcast event-level fields to 9-per-event
+    long = event_table.loc[event_table.index.repeat(n_arms)].reset_index(drop=True)
+    long["arm"] = np.tile(ALL_ARMS, n_events)
+    long["arm_count_hard"] = hard_aligned.flatten()
+    long["arm_count_soft"] = soft_aligned.flatten()
+    long["arm_posterior_mass"] = mass_aligned.flatten()
+
+    # arm_fraction
+    n_bins_long = long["n_timebins"].to_numpy()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        frac = np.where(
+            n_bins_long > 0,
+            long["arm_count_hard"].to_numpy() / np.maximum(n_bins_long, 1),
+            np.nan,
+        )
+    long["arm_fraction"] = frac
+
+    # Binary indicators
+    arm_arr = long["arm"].to_numpy()
+    long["is_current"] = eq_indicator(arm_arr, long["current_arm"].to_numpy())
+    long["is_prev"] = eq_indicator(arm_arr, long["prev_arm"].to_numpy())
+    long["is_next"] = eq_indicator(arm_arr, long["next_arm"].to_numpy())
+    long["is_last_rewarded"] = eq_indicator(
+        arm_arr, long["last_rewarded_arm"].to_numpy()
+    )
+    long["arm_patch_id"] = np.array([arm_to_patch(a) for a in arm_arr])
+    long["is_same_patch"] = eq_indicator(
+        long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
+    )
+
+    # Per-event per-arm predictors
+    dist_vals = np.full(n_events * n_arms, np.nan)
+    rank_vals = np.full(n_events * n_arms, np.nan)
+    vr_vals = np.full(n_events * n_arms, np.nan)
+    cr_vals = np.full(n_events * n_arms, np.nan)
+    rrr_vals = np.full(n_events * n_arms, np.nan)
+
+    for pos, (_, ev_row) in enumerate(event_table.iterrows()):
+        base = pos * n_arms
+        current_arm_val = ev_row["current_arm"]
+        current_well = (
+            arm_to_well(current_arm_val, track_graph)
+            if not np.isnan(current_arm_val)
+            else np.nan
+        )
+        dists = dist_to_arm_from_well(current_well, track_graph)
+        dist_arr = np.array([dists[a] for a in ALL_ARMS])
+        ranks = arm_dist_rank(dist_arr)
+
+        event_time = ev_row["event_midpoint_time"]
+        if np.isnan(event_time) or len(trials) == 0:
+            vr = dict.fromkeys(ALL_ARMS, np.nan)
+            cr = dict.fromkeys(ALL_ARMS, np.nan)
+            rrr = dict.fromkeys(ALL_ARMS, np.nan)
+        else:
+            vr = visit_recency_per_arm(event_time, trials, track_graph)
+            cr = cumulative_reward_per_arm(event_time, trials, track_graph)
+            rrr = recent_reward_rate_per_arm(event_time, trials, track_graph)
+
+        for j, a in enumerate(ALL_ARMS):
+            idx = base + j
+            dist_vals[idx] = dist_arr[j]
+            rank_vals[idx] = ranks[j]
+            vr_vals[idx] = vr[a]
+            cr_vals[idx] = cr[a]
+            rrr_vals[idx] = rrr[a]
+
+    long["dist_to_arm"] = dist_vals
+    long["arm_dist_rank"] = rank_vals
+    long["visit_recency"] = vr_vals
+    long["cumulative_reward"] = cr_vals
+    long["recent_reward_rate"] = rrr_vals
+    long["nominal_reward_prob"] = np.nan
+
+    # Interactions
+    tss = long["time_since_stop"].to_numpy()
+    is_swr_i = long["is_swr"].astype(int).to_numpy()
+    is_mua_i = long["is_mua"].astype(int).to_numpy()
+    is_after_switch_arr = long["is_after_switch"].to_numpy()
+    is_after_omission_arr = long["is_after_omission"].to_numpy()
+    ic = long["is_current"].to_numpy()
+    ip = long["is_prev"].to_numpy()
+    inx = long["is_next"].to_numpy()
+    ilr = long["is_last_rewarded"].to_numpy()
+
+    long["current_x_last_rewarded"] = ic * ilr
+    long["time_x_current"] = tss * ic
+    long["time_x_prev"] = tss * ip
+    long["time_x_next"] = tss * inx
+    long["swr_x_current"] = is_swr_i * ic
+    long["swr_x_prev"] = is_swr_i * ip
+    long["swr_x_next"] = is_swr_i * inx
+    long["swr_x_last_rewarded"] = is_swr_i * ilr
+    long["mua_x_current"] = is_mua_i * ic
+    long["mua_x_prev"] = is_mua_i * ip
+    long["mua_x_next"] = is_mua_i * inx
+    long["mua_x_last_rewarded"] = is_mua_i * ilr
+    long["switch_x_current"] = is_after_switch_arr * ic
+    long["switch_x_prev"] = is_after_switch_arr * ip
+    long["omission_x_last_rewarded"] = is_after_omission_arr * ilr
+
+    # ContFrag-specific interactions
+    cont_mean = long["continuous_prob_mean"].to_numpy()
+    long["continuous_x_current"] = cont_mean * ic
+    long["continuous_x_prev"] = cont_mean * ip
+    long["continuous_x_next"] = cont_mean * inx
+    long["continuous_x_last_rewarded"] = cont_mean * ilr
+
+    return long[column_order]
+
+
+def build_contfrag_stop_table(
+    dot: pd.DataFrame,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+    *,
+    event_source: str = "SWR",
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> pd.DataFrame:
+    """One row per immobility bout, including zero-event bouts.
+
+    The ``stop_id`` hash matches ``build_contfrag_event_table``'s
+    ``stop_id`` row-for-row, so the two tables join cleanly.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        ContFrag data-over-time frame.
+    trials : pd.DataFrame
+        Trial frame from Spyglass.
+    track_graph : nx.Graph
+        Session track graph.
+    event_source : {"SWR", "MUA"}
+        Which external detector defines events.
+    speed_threshold : float
+        Head-speed threshold for immobility.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: see ``_contfrag_stop_table_columns()``.
+    """
+    if "animal" not in dot.columns:
+        raise KeyError("dot must carry 'animal' column")
+    animal = str(dot["animal"].iloc[0])
+    day = int(dot["day"].iloc[0])
+    epoch = str(dot["epoch"].iloc[0])
+
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+
+    dot = dot.copy()
+    dot = add_trial_context(dot, trials)
+
+    bout_starts, bout_ends = immobility_bout_intervals(
+        dot, speed_col="head_speed", speed_threshold=speed_threshold
+    )
+    column_order = _contfrag_stop_table_columns()
+    if bout_starts.size == 0:
+        return pd.DataFrame(columns=column_order)
+
+    n_bouts = bout_starts.size
+    times = dot.index.to_numpy()
+    row_bout_idx = assign_bout(times, bout_starts, bout_ends)
+
+    in_bout = row_bout_idx >= 0
+    bout_rows = dot.loc[in_bout].assign(_bout_idx=row_bout_idx[in_bout])
+    grouped = bout_rows.groupby("_bout_idx", sort=True)
+
+    per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
+    per_bout["stop_start"] = bout_starts
+    per_bout["stop_end"] = bout_ends
+    per_bout["immobility_time"] = bout_ends - bout_starts
+
+    per_bout["is_swr_stop"] = (
+        grouped["SWR_event"]
+        .apply(lambda s: (s > 0).any())
+        .reindex(np.arange(n_bouts), fill_value=False)
+        .to_numpy()
+    )
+    if "MUA_event" in dot.columns:
+        per_bout["is_mua_stop"] = (
+            grouped["MUA_event"]
+            .apply(lambda s: (s > 0).any())
+            .reindex(np.arange(n_bouts), fill_value=False)
+            .to_numpy()
+        )
+    else:
+        per_bout["is_mua_stop"] = False
+
+    # n_events: unique events within the bout during immobility
+    event_mask = (
+        (bout_rows[event_col] > 0) & (bout_rows["head_speed"] < speed_threshold)
+    )
+    event_rows = bout_rows.loc[event_mask]
+    n_events_per_bout = (
+        event_rows.groupby("_bout_idx")[event_col]
+        .nunique()
+        .reindex(np.arange(n_bouts), fill_value=0)
+        .astype(np.int64)
+        .to_numpy()
+    )
+    per_bout["has_replay"] = n_events_per_bout > 0
+    per_bout["n_events"] = n_events_per_bout
+
+    # Trial context at bout start
+    first_row = grouped.first()
+    for col in (
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+    ):
+        if col == "is_after_stay":
+            stay = np.where(
+                np.isnan(first_row["is_after_switch"].to_numpy()),
+                np.nan,
+                1.0 - first_row["is_after_switch"].to_numpy(),
+            )
+            per_bout["is_after_stay"] = (
+                pd.Series(stay).reindex(np.arange(n_bouts)).to_numpy()
+            )
+        else:
+            per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+
+    # Arm / patch fields
+    current_arm_vals = np.full(n_bouts, np.nan)
+    prev_arm_vals = np.full(n_bouts, np.nan)
+    next_arm_vals = np.full(n_bouts, np.nan)
+    last_rew_vals = np.full(n_bouts, np.nan)
+    for bi, (_, g) in enumerate(grouped):
+        ts_modal = (
+            safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
+        )
+        ca = np.nan
+        if not np.isnan(ts_modal):
+            well_of_modal = arm_to_well(ts_modal, track_graph)
+            if not np.isnan(well_of_modal):
+                ca = float(ts_modal)
+        if np.isnan(ca):
+            ca = single_arm_from_well(safe_first(g["current_well"]), track_graph)
+        current_arm_vals[bi] = ca
+        prev_arm_vals[bi] = single_arm_from_well(
+            safe_first(g["prev_well"]), track_graph
+        )
+        next_arm_vals[bi] = single_arm_from_well(
+            safe_first(g["next_well"]), track_graph
+        )
+        last_rew_vals[bi] = single_arm_from_well(
+            safe_first(g["last_rewarded_well"]), track_graph
+        )
+
+    per_bout["current_arm"] = current_arm_vals
+    per_bout["prev_arm"] = prev_arm_vals
+    per_bout["next_arm"] = next_arm_vals
+    per_bout["last_rewarded_arm"] = last_rew_vals
+    cur_patch = np.array([arm_to_patch(a) for a in current_arm_vals])
+    nxt_patch = np.array([arm_to_patch(a) for a in next_arm_vals])
+    per_bout["current_patch"] = cur_patch
+    per_bout["prev_patch"] = [arm_to_patch(a) for a in prev_arm_vals]
+    per_bout["next_patch"] = nxt_patch
+    both_valid = ~np.isnan(cur_patch.astype(float)) & ~np.isnan(nxt_patch.astype(float))
+    per_bout["is_stay"] = np.where(
+        both_valid, (cur_patch == nxt_patch).astype(float), np.nan
+    )
+
+    per_bout.insert(0, "animal", animal)
+    per_bout.insert(1, "day", day)
+    per_bout.insert(2, "epoch", epoch)
+    per_bout["stop_id"] = hash_stop_id(
+        animal, day, epoch, per_bout["stop_idx"].to_numpy()
+    )
+
+    return per_bout[column_order]
+
+
+# ── Column definitions ──
+
+
+def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
+    """Canonical column order for ContFrag event table."""
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    return [
+        "animal",
+        "day",
+        "epoch",
+        event_col,
+        "event_id",
+        "event_start",
+        "event_end",
+        "event_duration",
+        "event_midpoint_time",
+        "time_since_stop",
+        "time_since_port_entry",
+        "time_since_reward",
+        "is_swr",
+        "is_mua",
+        "continuous_prob_mean",
+        "fragmented_prob_mean",
+        "dominant_state",
+        "continuous_fraction",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "is_stay",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
+        "n_timebins",
+        "posterior_peak_mean",
+        "posterior_entropy_mean",
+        "posterior_hpd_width_50",
+        "posterior_hpd_width_80",
+        "posterior_hpd_width_95",
+        "n_junction_bins",
+        "n_unique_arms",
+        "stop_idx",
+        "stop_id",
+    ]
+
+
+def _contfrag_stop_table_columns() -> list[str]:
+    """Canonical column order for ContFrag stop table."""
+    return [
+        "animal",
+        "day",
+        "epoch",
+        "stop_idx",
+        "stop_id",
+        "stop_start",
+        "stop_end",
+        "immobility_time",
+        "is_swr_stop",
+        "is_mua_stop",
+        "has_replay",
+        "n_events",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "is_stay",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
+    ]
+
+
+def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
+    """Canonical column order for ContFrag event-arm table."""
+    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    return [
+        # Identifiers
+        "animal",
+        "day",
+        "epoch",
+        event_col,
+        "event_id",
+        "stop_idx",
+        "stop_id",
+        # Event-level context
+        "event_start",
+        "event_end",
+        "event_duration",
+        "time_since_stop",
+        "time_since_port_entry",
+        "time_since_reward",
+        "is_swr",
+        "is_mua",
+        "continuous_prob_mean",
+        "fragmented_prob_mean",
+        "dominant_state",
+        "continuous_fraction",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "is_stay",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
+        "n_timebins",
+        # Per-arm identity
+        "arm",
+        "arm_patch_id",
+        # Content responses
+        "arm_count_hard",
+        "arm_count_soft",
+        "arm_posterior_mass",
+        "arm_fraction",
+        # Binary indicators
+        "is_current",
+        "is_prev",
+        "is_next",
+        "is_last_rewarded",
+        "is_same_patch",
+        # Spatial
+        "dist_to_arm",
+        "arm_dist_rank",
+        # Reward / value
+        "visit_recency",
+        "cumulative_reward",
+        "recent_reward_rate",
+        "nominal_reward_prob",
+        # Interactions
+        "current_x_last_rewarded",
+        "time_x_current",
+        "time_x_prev",
+        "time_x_next",
+        "swr_x_current",
+        "swr_x_prev",
+        "swr_x_next",
+        "swr_x_last_rewarded",
+        "mua_x_current",
+        "mua_x_prev",
+        "mua_x_next",
+        "mua_x_last_rewarded",
+        "switch_x_current",
+        "switch_x_prev",
+        "omission_x_last_rewarded",
+        # ContFrag-specific interactions
+        "continuous_x_current",
+        "continuous_x_prev",
+        "continuous_x_next",
+        "continuous_x_last_rewarded",
+    ]

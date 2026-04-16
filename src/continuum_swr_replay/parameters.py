@@ -106,6 +106,14 @@ DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
     "OFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
 }
 
+# Continuous-Fragmented classifier configuration by brain area
+# 2-state model: [Continuous (RandomWalk), Fragmented (Uniform)]
+CONTFRAG_DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
+    "HPC": ("ContFragClusterlessClassifier", "clusterless"),
+    "mPFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
+    "OFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
+}
+
 
 @dataclass(frozen=True)
 class DecodingParameters:
@@ -234,6 +242,11 @@ COLORS = {
     "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
 }
 
+CONTFRAG_COLORS = {
+    "Continuous": "#1b9e77",  # Teal green (smooth trajectory)
+    "Fragmented": "#d95f02",  # Orange (disjointed representation)
+}
+
 __all__ = [
     # Sampling and thresholds
     "SAMPLING_FREQUENCY",
@@ -255,6 +268,7 @@ __all__ = [
     "WAVEFORM_STD",
     "BLOCK_SIZE",
     "DETECTOR_CONFIG",
+    "CONTFRAG_DETECTOR_CONFIG",
     # Decoding parameters (dataclass)
     "DecodingParameters",
     "DECODING_PARAMS",
@@ -262,4 +276,5 @@ __all__ = [
     "TrainingType",
     # Color schemes
     "COLORS",
+    "CONTFRAG_COLORS",
 ]
