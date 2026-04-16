@@ -377,14 +377,22 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
         actual = view["actual_next_arm"].to_numpy(dtype=float)
         is_match = view["match"].to_numpy(dtype=bool)
 
-        # Connector lines first so markers sit on top.
+        # Small vertical offset so the canonical ▼ and actual × stay
+        # visually distinguishable even when they're at the same arm.
+        # Without it, "everything matches" (the expected healthy case)
+        # reads as "nothing is plotted".
+        dy = 0.18
+
+        # Connector lines first so markers sit on top. We always draw
+        # a connector — thin grey for matches (short segment of length
+        # 2*dy), bold red for mismatches (spans the arm gap + offsets).
         for t, c_arm, a_arm, match in zip(times, canonical, actual, is_match, strict=True):
             if np.isnan(c_arm) or np.isnan(a_arm):
                 continue
             color = "lightgrey" if match else "red"
             lw = 0.5 if match else 1.6
             ax.plot(
-                [t, t], [c_arm, a_arm],
+                [t, t], [c_arm - dy, a_arm + dy],
                 color=color, linewidth=lw, zorder=2, clip_on=False,
             )
 
@@ -393,7 +401,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
         if c_mask.any():
             ax.scatter(
                 times[c_mask],
-                canonical[c_mask],
+                canonical[c_mask] - dy,
                 marker="v",
                 s=36,
                 c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in canonical[c_mask]],
@@ -407,7 +415,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
         if a_mask.any():
             ax.scatter(
                 times[a_mask],
-                actual[a_mask],
+                actual[a_mask] + dy,
                 marker="x",
                 s=40,
                 c=[palette.get(int(a), (0.5, 0.5, 0.5, 1.0)) for a in actual[a_mask]],
@@ -593,6 +601,10 @@ def plot_session_tables(
 
     axes[-1].set_xlabel("Time [s]")
     axes[-1].set_xlim(t_start, t_end)
+    # Suppress the ``+1.625935e9`` offset notation — session times are
+    # seconds-since-epoch; absolute values read fine and the offset
+    # notation clutters the axis without aiding interpretation.
+    axes[-1].ticklabel_format(useOffset=False, style="plain", axis="x")
     sns.despine(offset=5)
 
     # If the mismatch-pointers panel ran it stashed the full table on

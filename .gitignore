@@ -200,3 +200,9 @@ paper/figures/**/*.png
 
 # Pickle artifacts (detector models, environments, cached data)
 *.pkl
+paper/figures/qc_diagnosis/event_collapse_assumptions.csv
+
+# Scratch / exploratory outputs — figures from real-data sanity runs,
+# notebook scratchpads, etc. Not committed; keep the directory for
+# convenience but ignore its contents.
+scratch/
