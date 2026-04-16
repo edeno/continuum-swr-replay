@@ -20,13 +20,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import xarray as xr
 from matplotlib.axes import Axes
+from matplotlib.cm import ScalarMappable
 from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 
 from continuum_swr_replay.analysis.replay.spatial_mapping import well_to_arm_set
 from continuum_swr_replay.data_loaders.constants import (
@@ -434,6 +437,179 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
     ctx.__dict__.setdefault("_mismatch_table", mismatch)
 
 
+# ── Content panels: posterior → per-arm content heatmaps ──
+
+
+def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
+    """Per-timebin arm-marginal posterior as a 9×T heatmap.
+
+    Reads ``event_sequence_table.arm_posterior_{0..8}`` and draws a
+    ``pcolormesh`` per event (so gaps between events stay white
+    instead of smeared). Overlays the per-timebin MAP arm
+    (``decoded_arm``) as black dots so the reader can tell where the
+    MAP landed on each timebin.
+
+    This is the direct arm-marginal counterpart of
+    :func:`plot_conditional_non_local_posterior`: the raw posterior
+    collapsed to 9 arms via
+    :func:`summaries.posterior_to_arm_marginal`. A bug in that
+    collapse or in ``arm_posterior_mass`` downstream would surface as
+    a heatmap that disagrees with the position-bin panel above it.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    est = ctx.event_sequence_table
+    view = est[(est["time"] >= lo) & (est["time"] <= hi)]
+
+    for arm in _ALL_ARMS:
+        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no in-event timebins in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        ax.set_ylabel("arm\nposterior")
+        ax.set_ylim(-0.5, 8.5)
+        ax.set_yticks(list(_ALL_ARMS))
+        return
+
+    arm_cols = [f"arm_posterior_{a}" for a in _ALL_ARMS]
+    edges_a = np.arange(len(_ALL_ARMS) + 1) - 0.5
+
+    # Draw one pcolormesh per event — matplotlib doesn't interpolate
+    # across discontinuous x, so per-event calls keep gaps white.
+    for _event_id, rows in view.groupby("event_id", sort=False):
+        times = rows["time"].to_numpy()
+        if times.size < 2:
+            continue
+        dt = float(np.median(np.diff(times)))
+        edges_t = np.concatenate([times - dt / 2, [times[-1] + dt / 2]])
+        posterior = rows[arm_cols].to_numpy().T  # (n_arms, T)
+        ax.pcolormesh(
+            edges_t, edges_a, posterior, cmap="bone_r", vmin=0.0, vmax=1.0,
+            shading="flat", zorder=1,
+        )
+
+    # MAP-arm overlay (decoded_arm_map per timebin).
+    ax.scatter(
+        view["time"].to_numpy(),
+        view["decoded_arm_map"].to_numpy(),
+        s=4, c="black", marker=".", zorder=4, clip_on=False,
+    )
+
+    ax.set_ylabel("arm\nposterior")
+    ax.set_ylim(-0.5, 8.5)
+    ax.set_yticks(list(_ALL_ARMS))
+
+
+def _draw_event_arm_heatmap(
+    ax: Axes,
+    ctx: _PanelContext,
+    *,
+    value_col: str,
+    cmap_name: str,
+    vmin: float | None,
+    vmax: float | None,
+    label: str,
+) -> None:
+    """Shared: per-(event, arm) value drawn as colored rectangles.
+
+    ``event_arm_table`` has 9 rows per event; we draw each as a
+    rectangle spanning ``[event_start, event_end]`` at arm height ±
+    0.5. Color is ``cmap_name`` normalized by ``(vmin, vmax)`` — when
+    either is ``None`` it is inferred from the data in the active
+    time window so the palette uses the full range available.
+    """
+    lo, hi = ctx.time_slice.start, ctx.time_slice.stop
+    # ``event_arm_table`` already carries the broadcast
+    # ``event_start`` / ``event_end`` per row (from Phase B4 canonical
+    # schema), so no merge with ``event_table`` is needed.
+    eat = ctx.event_arm_table
+    view = eat[(eat["event_start"] <= hi) & (eat["event_end"] >= lo)]
+
+    for arm in _ALL_ARMS:
+        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+
+    if len(view) == 0:
+        ax.text(
+            0.5, 0.5, "no events in window",
+            transform=ax.transAxes, ha="center", va="center", color="grey",
+        )
+        ax.set_ylabel(label)
+        ax.set_ylim(-0.5, 8.5)
+        ax.set_yticks(list(_ALL_ARMS))
+        return
+
+    values = view[value_col].to_numpy(dtype=float)
+    finite = np.isfinite(values)
+    if vmin is None:
+        vmin = float(values[finite].min()) if finite.any() else 0.0
+    if vmax is None:
+        vmax = float(values[finite].max()) if finite.any() else 1.0
+    if vmax <= vmin:
+        vmax = vmin + 1.0
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    cmap = plt.get_cmap(cmap_name)
+
+    # Iterate rows via numpy columns to avoid .iterrows() overhead.
+    arms = view["arm"].to_numpy()
+    starts = view["event_start"].to_numpy()
+    ends = view["event_end"].to_numpy()
+    for start, end, arm, val in zip(starts, ends, arms, values, strict=True):
+        if not np.isfinite(val):
+            continue
+        rect = Rectangle(
+            (start, arm - 0.5),
+            width=max(end - start, 1e-3),  # avoid zero-width on tiny events
+            height=1.0,
+            facecolor=cmap(norm(val)),
+            edgecolor="none",
+            zorder=1,
+        )
+        ax.add_patch(rect)
+
+    # Colorbar inside the axis as a narrow tall strip on the right.
+    sm = ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array([])
+    ax.figure.colorbar(sm, ax=ax, shrink=0.7, pad=0.01, aspect=10)
+
+    ax.set_ylabel(label)
+    ax.set_ylim(-0.5, 8.5)
+    ax.set_yticks(list(_ALL_ARMS))
+
+
+def _plot_arm_count_hard(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="arm_count_hard",
+        cmap_name="viridis", vmin=0, vmax=None,
+        label="arm_count\nhard",
+    )
+
+
+def _plot_arm_count_soft(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="arm_count_soft",
+        cmap_name="viridis", vmin=0, vmax=None,
+        label="arm_count\nsoft",
+    )
+
+
+def _plot_arm_posterior_mass(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="arm_posterior_mass",
+        cmap_name="viridis", vmin=0, vmax=None,
+        label="arm_post.\nmass",
+    )
+
+
+def _plot_arm_fraction(ax: Axes, ctx: _PanelContext) -> None:
+    _draw_event_arm_heatmap(
+        ax, ctx, value_col="arm_fraction",
+        cmap_name="viridis", vmin=0.0, vmax=1.0,
+        label="arm\nfraction",
+    )
+
+
 # ── Panel registry ──
 
 
@@ -447,6 +623,11 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "trial_rail": _plot_trial_rail,
     "arm_markers": _plot_arm_markers,
     "mismatch_pointers": _plot_mismatch_pointers,
+    "arm_posterior_heatmap": _plot_arm_posterior_heatmap,
+    "arm_count_hard": _plot_arm_count_hard,
+    "arm_count_soft": _plot_arm_count_soft,
+    "arm_posterior_mass": _plot_arm_posterior_mass,
+    "arm_fraction": _plot_arm_fraction,
 }
 
 # Relative height weight per panel — inherits the ``plot_detector``
@@ -461,6 +642,11 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "trial_rail": 1.0,
     "arm_markers": 1.4,
     "mismatch_pointers": 1.4,
+    "arm_posterior_heatmap": 2.0,
+    "arm_count_hard": 1.4,
+    "arm_count_soft": 1.4,
+    "arm_posterior_mass": 1.4,
+    "arm_fraction": 1.4,
 }
 
 
