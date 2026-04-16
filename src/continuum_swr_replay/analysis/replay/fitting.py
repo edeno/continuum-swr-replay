@@ -108,6 +108,10 @@ def fit_conditional_poisson(
     llf = result.llf
     n_params = len(predictors)
     aic = 2 * n_params - 2 * llf
+    # BIC with n = n_events (the number of conditioning groups).
+    # Alternative choices (n_rows = n_event x n_arm pairs, or total
+    # count) yield different penalty scales; we use n_events for
+    # consistency with the conditional-Poisson likelihood structure.
     bic = n_params * np.log(n_events) - 2 * llf
 
     # Pseudo-R² against the analytical null (uniform allocation).
@@ -139,8 +143,8 @@ def fit_conditional_poisson(
     try:
         diag = _compute_conditional_diagnostics(X, predictors)
         output.update(diag)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("VIF/conditional diagnostics skipped: %s", exc)
 
     return output
 

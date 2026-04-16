@@ -155,8 +155,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         truth = {
             "is_current": 0.5,
             "is_prev": 0.4,
-            "is_last_rewarded": 0.6,
-            "current_x_last_rewarded": -0.3,
+            "cumulative_reward": 0.6,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M2", "M3"])
@@ -164,7 +163,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         lr_stat = 2 * (fits["M3"]["llf"] - fits["M2"]["llf"])
         assert lr_stat > 6, (
             f"LR statistic M3 vs M2 = {lr_stat:.2f}; "
-            f"expected > 6 for the active reward effects to register"
+            f"expected > 6 for the active cumulative_reward to register"
         )
 
 
