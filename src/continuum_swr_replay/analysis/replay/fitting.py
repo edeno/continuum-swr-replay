@@ -111,6 +111,17 @@ def fit_conditional_poisson(
     aic = 2 * n_params - 2 * llf
     bic = n_params * np.log(n_events) - 2 * llf
 
+    # Pseudo-R² against the analytical null (uniform allocation).
+    # n_arms = rows per event (constant across events in our setup).
+    n_arms = len(df) // n_events if n_events > 0 else 9
+    total_count = float(y.sum())
+    llf_null = -total_count * np.log(n_arms)
+    pseudo_r2 = (
+        1.0 - llf / llf_null
+        if np.isfinite(llf_null) and llf_null != 0
+        else np.nan
+    )
+
     output = {
         **{f"coef_{k}": v for k, v in coefs.items()},
         **{f"bse_{k}": v for k, v in bse.items()},
@@ -119,8 +130,10 @@ def fit_conditional_poisson(
         "n_rows": len(df),
         "n_params": n_params,
         "llf": float(llf),
+        "llf_null": float(llf_null),
         "aic": float(aic),
         "bic": float(bic),
+        "pseudo_r2": float(pseudo_r2),
     }
 
     # Diagnostics
@@ -175,8 +188,11 @@ def fit_null_model_conditional(
         "n_rows": len(long_df),
         "n_params": 0,
         "llf": float(llf),
+        "llf_null": float(llf),
         "aic": float(-2 * llf),  # 2*0 - 2*llf
         "bic": float(-2 * llf),  # 0*log(n) - 2*llf
+        "pseudo_r2": 0.0,
+        "predicted_frac": 1.0 / n_arms,
     }
 
 
