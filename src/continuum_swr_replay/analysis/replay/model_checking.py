@@ -3,8 +3,6 @@
 Provides cross-validation (held-out conditional log-likelihood),
 Pearson residuals, and diagnostic summaries for the conditional
 Poisson (multinomial-count) model.
-
-Also retains legacy binary cross-validation for backward compatibility.
 """
 
 from __future__ import annotations
@@ -14,8 +12,6 @@ import logging
 import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
-
-from .fitting import ALPHA  # used by legacy cross_validate_session
 
 logger = logging.getLogger(__name__)
 
@@ -238,92 +234,3 @@ def compute_pearson_residuals(
 
     df = df.drop(columns=["_eta", "_shifted_exp"])
     return df
-
-
-# ── Legacy binary CV (kept for backward compatibility) ──
-
-
-def cross_validate_session(
-    long_df: pd.DataFrame,
-    predictors: list[str],
-    n_folds: int = 5,
-    alpha: float = ALPHA,
-) -> dict | None:
-    """K-fold cross-validation for binary logistic model (legacy).
-
-    .. deprecated::
-        Use ``cross_validate_conditional_poisson`` instead.
-
-    Parameters
-    ----------
-    long_df : pd.DataFrame
-        Long-format data with ``replay_here`` response.
-    predictors : list[str]
-        Predictor columns.
-    n_folds : int
-        Number of CV folds.
-    alpha : float
-        L2 regularization strength.
-
-    Returns
-    -------
-    dict | None
-        CV metrics. None if insufficient data.
-    """
-    import statsmodels.api as sm
-    from sklearn.model_selection import GroupKFold
-
-    from .fitting import _log_likelihood
-
-    if "non_local_event" not in long_df.columns:
-        return None
-
-    groups = long_df["non_local_event"].values
-    n_unique_events = len(np.unique(groups))
-
-    if n_unique_events < n_folds * 2:
-        return None
-
-    y = long_df["replay_here"].values
-    gkf = GroupKFold(n_splits=n_folds)
-
-    brier_scores = []
-    ll_scores = []
-
-    for train_idx, test_idx in gkf.split(long_df, y, groups):
-        y_train = y[train_idx]
-        y_test = y[test_idx]
-
-        if y_train.sum() < 3 or y_test.sum() < 1:
-            continue
-
-        if len(predictors) == 0:
-            p_train = y_train.mean()
-            y_pred = np.full_like(y_test, p_train, dtype=float)
-        else:
-            X_train = sm.add_constant(
-                long_df.iloc[train_idx][predictors].values.astype(float)
-            )
-            X_test = sm.add_constant(
-                long_df.iloc[test_idx][predictors].values.astype(float)
-            )
-            try:
-                model = sm.GLM(y_train, X_train, family=sm.families.Binomial())
-                result = model.fit_regularized(alpha=alpha, L1_wt=0, refit=False)
-                y_pred = result.predict(X_test)
-            except Exception:
-                continue
-
-        brier_scores.append(float(np.mean((y_test - y_pred) ** 2)))
-        ll_scores.append(_log_likelihood(y_test, y_pred) / len(y_test))
-
-    if len(brier_scores) < 2:
-        return None
-
-    return {
-        "cv_brier_mean": float(np.mean(brier_scores)),
-        "cv_brier_std": float(np.std(brier_scores)),
-        "cv_ll_mean": float(np.mean(ll_scores)),
-        "cv_ll_std": float(np.std(ll_scores)),
-        "cv_n_folds": len(brier_scores),
-    }
