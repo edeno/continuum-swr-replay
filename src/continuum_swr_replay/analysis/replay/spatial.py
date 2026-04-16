@@ -1,17 +1,12 @@
-"""Graph-spatial helpers for per-arm predictors.
-
-Two helpers used by the canonical event-arm table:
+"""Graph-spatial helpers for per-arm predictors and QC metrics.
 
 - :func:`dist_to_arm_from_well` — shortest-path graph distance from a
-  well node to each arm (edge). Matches the pre-refactor
-  ``predictors.compute_dist_to_arm`` semantics so replacing it in the
-  pipeline does not change coefficient values.
+  well node to each arm (edge).
 - :func:`arm_dist_rank` — within-event rank of distances, 1 = closest.
-
-Kept deliberately small. Other "spatial" concepts mentioned in the
-analysis plan (``path_continuity``, sequence-level ``forward_score``)
-live elsewhere — ``path_continuity`` is a QC-layer helper that needs
-shuffles, and the sequence scores operate on the event-sequence table.
+- :func:`arm_adjacency` — which arms share a graph node (for
+  ``path_continuity``).
+- :func:`path_continuity` — per-event fraction of consecutive
+  decoded-arm pairs that are graph-adjacent (Stage 0 QC metric).
 """
 
 from __future__ import annotations
@@ -128,3 +123,78 @@ def arm_dist_rank(distances: np.ndarray) -> np.ndarray:
         finite_ranks[order[i]] = rank
     ranks[finite] = finite_ranks
     return ranks
+
+
+def arm_adjacency(track_graph: nx.Graph) -> dict[int, set[int]]:
+    """For each arm, the set of other arms that share a graph node.
+
+    Two arms (edges) are "adjacent" when they share at least one
+    endpoint node — e.g., on the bandit graph arms 0 and 1 both
+    touch patch junction 6, so they are adjacent.
+
+    Parameters
+    ----------
+    track_graph : networkx.Graph
+        Track graph with ``edge_id`` on edges.
+
+    Returns
+    -------
+    dict[int, set[int]]
+        ``{arm_id: {neighbor_arm_ids}}`` for every arm whose edge
+        carries an ``edge_id`` attribute.
+    """
+    node_to_arms: dict[int, set[int]] = {}
+    for u, v, data in track_graph.edges(data=True):
+        eid = data.get("edge_id")
+        if eid is None:
+            continue
+        eid = int(eid)
+        node_to_arms.setdefault(u, set()).add(eid)
+        node_to_arms.setdefault(v, set()).add(eid)
+
+    adj: dict[int, set[int]] = {}
+    for arms in node_to_arms.values():
+        for a in arms:
+            adj.setdefault(a, set()).update(arms - {a})
+    return adj
+
+
+def path_continuity(
+    decoded_arms: np.ndarray,
+    adjacency: dict[int, set[int]],
+) -> float:
+    """Fraction of consecutive decoded-arm pairs that are graph-adjacent.
+
+    Plan §1.4: ``path_continuity_e = (1/(T_e - 1)) Σ 1[arm_{t+1} ∈
+    neighbors(arm_t)]``. Self-transitions (same arm on consecutive
+    timebins) count as adjacent. Returns ``NaN`` for sequences shorter
+    than 2 valid consecutive pairs.
+
+    Parameters
+    ----------
+    decoded_arms : np.ndarray, shape (T,)
+        Per-timebin MAP arm (integer arm IDs, may contain NaN).
+    adjacency : dict[int, set[int]]
+        Output of :func:`arm_adjacency`.
+
+    Returns
+    -------
+    float
+        In [0, 1]. ``NaN`` if fewer than 2 valid consecutive pairs.
+    """
+    arms = np.asarray(decoded_arms, dtype=float)
+    if arms.size < 2:
+        return np.nan
+    a_prev = arms[:-1]
+    a_next = arms[1:]
+    both_valid = np.isfinite(a_prev) & np.isfinite(a_next)
+    if not both_valid.any():
+        return np.nan
+    n_pairs = int(both_valid.sum())
+    n_adjacent = 0
+    for prev_arm, next_arm in zip(
+        a_prev[both_valid].astype(int), a_next[both_valid].astype(int), strict=True
+    ):
+        if prev_arm == next_arm or next_arm in adjacency.get(prev_arm, set()):
+            n_adjacent += 1
+    return n_adjacent / n_pairs
