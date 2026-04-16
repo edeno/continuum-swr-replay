@@ -18,7 +18,6 @@ generative story.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.replay.fitting import (
@@ -30,7 +29,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.simulation import (
     simulate_with_event_covariates,
 )
-
 
 # ── Interaction recovery ──
 
@@ -46,7 +44,7 @@ class TestInteractionRecovery:
             ("swr_x_current", "is_current"),
             ("switch_x_prev", "is_prev"),
             ("time_x_next", "is_next"),
-            ("omission_x_rewarded", "is_last_rewarded"),
+            ("omission_x_last_rewarded", "is_last_rewarded"),
         ],
     )
     def test_recover_single_interaction(self, interaction, base):

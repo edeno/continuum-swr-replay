@@ -54,10 +54,10 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "swr_x_current": ("is_current", "is_swr"),
     "swr_x_prev": ("is_prev", "is_swr"),
     "swr_x_next": ("is_next", "is_swr"),
-    "swr_x_rewarded": ("is_last_rewarded", "is_swr"),
+    "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
     "switch_x_current": ("is_current", "is_after_switch"),
     "switch_x_prev": ("is_prev", "is_after_switch"),
-    "omission_x_rewarded": ("is_last_rewarded", "is_after_omission"),
+    "omission_x_last_rewarded": ("is_last_rewarded", "is_after_omission"),
     "time_x_current": ("is_current", "time_since_stop"),
     "time_x_prev": ("is_prev", "time_since_stop"),
     "time_x_next": ("is_next", "time_since_stop"),
@@ -222,7 +222,7 @@ def simulate_with_event_covariates(
     used by ``model_specs.MODEL_HIERARCHY`` — including the continuous
     arm-varying predictors (``visit_recency``, ``cumulative_reward``,
     ``dist_to_arm``) and the event×arm interaction columns
-    (``swr_x_*``, ``switch_x_*``, ``omission_x_rewarded``, ``time_x_*``).
+    (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``, ``time_x_*``).
 
     Per event we sample event-level covariates (``is_swr``,
     ``is_after_switch``, ``is_after_omission``, ``time_since_stop``) and
