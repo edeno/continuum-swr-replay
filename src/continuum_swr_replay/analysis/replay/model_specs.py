@@ -62,10 +62,10 @@ class ModelSpec:
 # ── Primary arm-level hierarchy ──
 #
 # Designed for reliable per-session convergence (max VIF < 3 through
-# M5; < 25 at M6 where is_last_rewarded enters). Tested on 7 j16
-# sessions: M0–M5 converge 7/7; M6–M7 converge 7/7.
+# M4; < 25 at M5 where is_last_rewarded enters). Tested on 7 j16
+# sessions: M0–M6 converge 7/7.
 #
-# SWR interactions enter at M7. These test whether the current-arm
+# SWR interactions enter at M6. These test whether the current-arm
 # and previous-arm biases differ during SWR events. Only spatial
 # interactions are included (swr_x_current, swr_x_prev); reward
 # interactions (swr_x_last_rewarded) are excluded due to perfect

@@ -27,14 +27,12 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 logger = logging.getLogger(__name__)
 
-ALPHA = 0.01  # L2 regularization strength (fallback ridge)
-
 
 def fit_conditional_poisson(
     long_df: pd.DataFrame,
     predictors: list[str],
-    response_col: str = "arm_count",
-    event_col: str = "event_uid",
+    response_col: str = "arm_count_hard",
+    event_col: str = "event_id",
 ) -> dict | None:
     """Fit a conditional Poisson model on long-format count data.
 
@@ -151,8 +149,8 @@ def fit_conditional_poisson(
 
 def fit_null_model_conditional(
     long_df: pd.DataFrame,
-    event_col: str = "event_uid",
-    response_col: str = "arm_count",
+    event_col: str = "event_id",
+    response_col: str = "arm_count_hard",
     n_arms: int = 9,
 ) -> dict:
     """Analytical null model for conditional Poisson.
@@ -202,7 +200,8 @@ def fit_null_model_conditional(
 def fit_conditional_logit(
     long_df: pd.DataFrame,
     predictors: list[str],
-    event_col: str = "event_uid",
+    response_col: str = "arm_count_hard",
+    event_col: str = "event_id",
 ) -> dict | None:
     """Fit conditional logit on dominant arm (robustness check).
 
@@ -212,9 +211,11 @@ def fit_conditional_logit(
     Parameters
     ----------
     long_df : pd.DataFrame
-        Long-format data with ``arm_count`` and event identifiers.
+        Long-format data with arm counts and event identifiers.
     predictors : list[str]
         Arm-varying predictor columns.
+    response_col : str
+        Column with arm counts for determining dominant arm.
     event_col : str
         Column with globally unique event IDs.
 
@@ -226,7 +227,6 @@ def fit_conditional_logit(
     if len(predictors) == 0:
         return None
 
-    response_col = "arm_count" if "arm_count" in long_df.columns else "replay_here"
     required = [event_col, response_col] + predictors
     missing = [c for c in required if c not in long_df.columns]
     if missing:
@@ -241,13 +241,10 @@ def fit_conditional_logit(
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     # Determine dominant arm per event
-    if response_col == "arm_count":
-        idx = df.groupby(event_col)["arm_count"].idxmax()
-        df["dominant"] = 0
-        df.loc[idx, "dominant"] = 1
-        y = df["dominant"].values
-    else:
-        y = df["replay_here"].values
+    idx = df.groupby(event_col)[response_col].idxmax()
+    df["dominant"] = 0
+    df.loc[idx, "dominant"] = 1
+    y = df["dominant"].values
 
     groups = df[event_col].values
     n_events = len(np.unique(groups))

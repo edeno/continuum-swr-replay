@@ -23,6 +23,7 @@ def build_switch_aligned_table(
     *,
     content_fit: dict | None = None,
     content_predictors: list[str] | None = None,
+    fraction_col: str = "arm_fraction",
     max_lag: int = 20,
 ) -> pd.DataFrame:
     """Align replay content to stops preceding patch switches.
@@ -86,7 +87,7 @@ def build_switch_aligned_table(
     if content_fit is not None and content_predictors is not None:
         eat = predict_arm_fractions(eat, content_fit, content_predictors)
 
-    stop_replay = stop_patch_replay(eat, event_table)
+    stop_replay = stop_patch_replay(eat, event_table, fraction_col=fraction_col)
 
     rows = []
     for ep_i, (_idx, sw_row) in enumerate(first_switches.iterrows()):
@@ -145,6 +146,7 @@ def build_control_aligned_table(
     *,
     content_fit: dict | None = None,
     content_predictors: list[str] | None = None,
+    fraction_col: str = "arm_fraction",
     max_lag: int = 20,
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
@@ -183,7 +185,7 @@ def build_control_aligned_table(
     if content_fit is not None and content_predictors is not None:
         eat = predict_arm_fractions(eat, content_fit, content_predictors)
 
-    stop_replay = stop_patch_replay(eat, event_table)
+    stop_replay = stop_patch_replay(eat, event_table, fraction_col=fraction_col)
 
     if len(switch_episodes) == 0:
         return pd.DataFrame()

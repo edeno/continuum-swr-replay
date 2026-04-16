@@ -383,19 +383,19 @@ def visit_recency_all_events(
 
     end_times = trials["end_time"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
-    from_wells = trials["from_well"].to_numpy()
 
-    # For each trial, collect the arm indices it touches (to_well and from_well).
-    # Build per-arm arrays of trial indices (sorted by trial order).
+    # For each trial, record which arm was visited (to_well = destination).
+    # Uses to_well only, consistent with cumulative_reward_all_events.
+    # A "visit" is arriving at a well, not departing from one.
     arm_visit_indices: list[np.ndarray] = [np.empty(0, dtype=np.intp) for _ in ALL_ARMS]
     for ti in range(n_trials_total):
-        for w in (to_wells[ti], from_wells[ti]):
-            if np.isnan(w):
-                continue
-            arm_id = well_to_arm.get(int(w))
-            if arm_id is not None and arm_id in arm_idx:
-                j = arm_idx[arm_id]
-                arm_visit_indices[j] = np.append(arm_visit_indices[j], ti)
+        w = to_wells[ti]
+        if np.isnan(w):
+            continue
+        arm_id = well_to_arm.get(int(w))
+        if arm_id is not None and arm_id in arm_idx:
+            j = arm_idx[arm_id]
+            arm_visit_indices[j] = np.append(arm_visit_indices[j], ti)
 
     # cutoff[i] = number of trials with end_time <= event_times[i]
     cutoffs = np.searchsorted(end_times, event_times, side="right")
@@ -414,7 +414,9 @@ def visit_recency_all_events(
         n_vis = np.searchsorted(visits, cutoffs, side="left")
         # The last visit before cutoff is at visits[n_vis - 1]
         has_visit = (~no_past) & (n_vis > 0)
-        last_visit_trial_idx = np.where(has_visit, visits[np.clip(n_vis - 1, 0, visits.size - 1)], -1)
+        last_visit_trial_idx = np.where(
+            has_visit, visits[np.clip(n_vis - 1, 0, visits.size - 1)], -1
+        )
         # trials_ago = cutoff - last_visit_trial_idx
         trials_ago = np.where(has_visit, cutoffs - last_visit_trial_idx, default_f)
         out[has_visit, j] = trials_ago[has_visit].astype(float)
@@ -570,7 +572,5 @@ def recent_reward_rate_per_arm(
 ) -> dict[int, float]:
     """Fraction of the last ``k`` visits to each arm that were rewarded."""
     w2a = build_well_to_arm_map(track_graph)
-    row = recent_reward_rate_all_events(
-        np.array([event_time]), trials, w2a, k=k
-    )
+    row = recent_reward_rate_all_events(np.array([event_time]), trials, w2a, k=k)
     return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}

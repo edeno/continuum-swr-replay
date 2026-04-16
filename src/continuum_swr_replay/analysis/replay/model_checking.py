@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 def cross_validate_conditional_poisson(
     long_df: pd.DataFrame,
     predictors: list[str],
-    event_col: str = "event_uid",
-    response_col: str = "arm_count",
+    event_col: str = "event_id",
+    response_col: str = "arm_count_hard",
     n_folds: int = 5,
 ) -> dict | None:
     """Event-based K-fold CV for conditional Poisson model.
@@ -183,8 +183,8 @@ def compute_pearson_residuals(
     long_df: pd.DataFrame,
     fit_result: dict,
     predictors: list[str],
-    event_col: str = "event_uid",
-    response_col: str = "arm_count",
+    event_col: str = "event_id",
+    response_col: str = "arm_count_hard",
 ) -> pd.DataFrame:
     """Compute Pearson residuals at the event-arm level.
 
@@ -215,6 +215,10 @@ def compute_pearson_residuals(
     has_nan = df[required].isna().any(axis=1)
     events_with_nan = df.loc[has_nan, event_col].unique()
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+
+    # Remove zero-count events (same as fitter).
+    event_totals = df.groupby(event_col)[response_col].transform("sum")
+    df = df[event_totals > 0].reset_index(drop=True)
 
     params = np.array([fit_result[f"coef_{p}"] for p in predictors])
 
