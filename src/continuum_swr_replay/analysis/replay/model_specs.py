@@ -167,3 +167,79 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         parent="M7",
     ),
 }
+
+# ── Alternative spatial specifications ──
+#
+# Models A and B answer the same question ("does replay depend on
+# spatial proximity?") with different parameterizations to check
+# robustness against the severe collinearity (VIF 10–55) among
+# is_current / dist_to_arm / is_same_patch on the bandit graph.
+#
+# Model A: distance gradient only (1 continuous predictor, no collinearity)
+# Model B: binary indicators only (low collinearity, categorical)
+#
+# Each is layered with the same reward predictors so reward effects
+# can be compared across specifications.
+
+MODEL_A: dict[str, ModelSpec] = {
+    "A0": ModelSpec(
+        name="A0",
+        predictors=(),
+        description="Null",
+        parent=None,
+    ),
+    "A1": ModelSpec(
+        name="A1",
+        predictors=("dist_to_arm",),
+        description="Distance gradient",
+        parent="A0",
+    ),
+    "A2": ModelSpec(
+        name="A2",
+        predictors=("dist_to_arm", "is_last_rewarded"),
+        description="+ most-recent reward",
+        parent="A1",
+    ),
+    "A3": ModelSpec(
+        name="A3",
+        predictors=("dist_to_arm", "is_last_rewarded", "visit_recency", "cumulative_reward"),
+        description="+ reward history",
+        parent="A2",
+    ),
+}
+
+MODEL_B: dict[str, ModelSpec] = {
+    "B0": ModelSpec(
+        name="B0",
+        predictors=(),
+        description="Null",
+        parent=None,
+    ),
+    "B1": ModelSpec(
+        name="B1",
+        predictors=("is_current",),
+        description="Current-arm indicator",
+        parent="B0",
+    ),
+    "B2": ModelSpec(
+        name="B2",
+        predictors=("is_current", "is_same_patch"),
+        description="+ same-patch indicator",
+        parent="B1",
+    ),
+    "B3": ModelSpec(
+        name="B3",
+        predictors=("is_current", "is_same_patch", "is_last_rewarded", "current_x_last_rewarded"),
+        description="+ most-recent reward (with interaction)",
+        parent="B2",
+    ),
+    "B4": ModelSpec(
+        name="B4",
+        predictors=(
+            "is_current", "is_same_patch", "is_last_rewarded", "current_x_last_rewarded",
+            "visit_recency", "cumulative_reward",
+        ),
+        description="+ reward history",
+        parent="B3",
+    ),
+}

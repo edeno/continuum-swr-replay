@@ -127,6 +127,8 @@ def _add_trial_context(
             "is_after_reward",
             "is_after_omission",
             "is_after_switch",
+            "_goal_arrival_time",
+            "_last_reward_time",
         ):
             dot[col] = np.nan
         return dot
@@ -157,16 +159,16 @@ def _add_trial_context(
     )
 
     # Most recently rewarded well. Use ``goal_arrival_time`` (beam-
-    # break = reward delivery) rather than ``trial.end_time``
-    # (departure from well). Replay fires during the well-visit
-    # period BETWEEN arrival and departure — using end_time would
-    # miss the current trial's reward for the entire 1–8 s visit
-    # window, causing ``last_rewarded_well`` to point to the PREVIOUS
-    # reward location instead of the arm the animal is currently at.
-    # Falls back to end_time if goal_arrival_time is unavailable.
+    # break ≈ reward delivery, ~46 ms delay) rather than
+    # ``trial.end_time`` (departure from well, 1–8 s later). Replay
+    # fires during the well-visit window BETWEEN arrival and
+    # departure — using end_time misses the current trial's reward.
     if "goal_arrival_time" in trials.columns:
         reward_timestamps = trials["goal_arrival_time"].values[is_reward]
     else:
+        # Fall back to trial end_time — less precise (off by 1–8 s)
+        # but correct for legacy data or test fixtures without
+        # goal_arrival_time.
         reward_timestamps = trial_end_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(reward_timestamps) > 0:
@@ -177,6 +179,28 @@ def _add_trial_context(
         )
     else:
         dot["last_rewarded_well"] = np.nan
+
+    # Port-entry timing: goal_arrival_time of the current trip =
+    # when the animal entered the destination port. Used to compute
+    # time_since_port_entry per event (more precise than the speed-
+    # based time_since_stop).
+    if "goal_arrival_time" in trials.columns:
+        goal_arrival_times = trials["goal_arrival_time"].values
+        dot["_goal_arrival_time"] = np.where(
+            valid, goal_arrival_times[current_clipped], np.nan
+        )
+    else:
+        dot["_goal_arrival_time"] = np.nan
+
+    # Reward timing: goal_arrival_time of the most recently rewarded
+    # trial (≈ pump time, ~46 ms delay). Used to compute
+    # time_since_reward per event.
+    if len(reward_timestamps) > 0:
+        dot["_last_reward_time"] = np.where(
+            rew_idx >= 0, reward_timestamps[rew_idx_clipped], np.nan
+        )
+    else:
+        dot["_last_reward_time"] = np.nan
 
     current_reward = np.where(
         valid, is_reward[current_clipped].astype(float), np.nan
@@ -597,11 +621,17 @@ def build_event_table(
                 else np.nan,
                 "n_junction_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
-                # Legacy ``prepare_session`` uses the middle-index
-                # timestamp, not the mean — preserve that choice for
-                # Phase B gate parity even though the two coincide when
-                # timebins are uniformly sampled.
                 "event_midpoint_time": float(times[len(times) // 2]),
+                "time_since_port_entry": float(
+                    times[len(times) // 2] - _safe_first(g["_goal_arrival_time"])
+                )
+                if not np.isnan(_safe_first(g["_goal_arrival_time"]))
+                else np.nan,
+                "time_since_reward": float(
+                    times[len(times) // 2] - _safe_first(g["_last_reward_time"])
+                )
+                if not np.isnan(_safe_first(g["_last_reward_time"]))
+                else np.nan,
             }
         )
 
@@ -1433,6 +1463,8 @@ def _event_table_columns() -> list[str]:
         "event_duration",
         "event_midpoint_time",
         "time_since_stop",
+        "time_since_port_entry",
+        "time_since_reward",
         "is_swr",
         "is_mua",
         "is_after_switch",
@@ -1510,6 +1542,8 @@ def _event_arm_table_columns() -> list[str]:
         "event_end",
         "event_duration",
         "time_since_stop",
+        "time_since_port_entry",
+        "time_since_reward",
         "is_swr",
         "is_mua",
         "is_after_switch",
