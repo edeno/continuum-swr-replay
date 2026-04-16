@@ -21,8 +21,6 @@ from .model_checking import (
     cross_validate_conditional_poisson,
 )
 from .model_specs import (
-    MODEL_A,
-    MODEL_B,
     MODEL_HIERARCHY,
     MODEL_PATCH,
     MODEL_PATCH_SWITCH,
@@ -49,8 +47,6 @@ from .tables import (
 )
 
 __all__ = [
-    "MODEL_A",
-    "MODEL_B",
     "MODEL_HIERARCHY",
     "MODEL_PATCH",
     "MODEL_PATCH_SWITCH",
