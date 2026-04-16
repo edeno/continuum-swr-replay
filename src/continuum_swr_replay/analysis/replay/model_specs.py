@@ -60,7 +60,7 @@ _REWARD_HISTORY: tuple[str, ...] = (
     "cumulative_reward",
 )
 
-_DISTANCE: tuple[str, ...] = ("dist_to_arm",)
+_DISTANCE: tuple[str, ...] = ("dist_to_arm", "is_same_patch")
 
 # ── Event-level × arm-varying interactions ──
 
