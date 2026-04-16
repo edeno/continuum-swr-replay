@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
@@ -28,6 +29,108 @@ from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 logger = logging.getLogger(__name__)
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
+
+
+# ── Residualized replay ──
+
+
+def predict_arm_fractions(
+    event_arm_table: pd.DataFrame,
+    fit_result: dict,
+    predictors: list[str],
+    event_col: str = "event_id",
+) -> pd.DataFrame:
+    """Compute model-predicted arm fractions and residuals per event-arm.
+
+    Given a fitted content model (e.g. M3), computes
+    ``softmax(X @ beta)`` within each event to get predicted fractions,
+    then ``residual_frac = arm_fraction - predicted_frac``.
+
+    Parameters
+    ----------
+    event_arm_table : pd.DataFrame
+        Canonical event-arm table (9 rows per event).
+    fit_result : dict
+        Output of :func:`fitting.fit_conditional_poisson`. Must contain
+        ``coef_{predictor}`` keys.
+    predictors : list[str]
+        Predictor column names used in the content model.
+    event_col : str
+        Event grouping column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of *event_arm_table* with ``predicted_frac`` and
+        ``residual_frac`` columns added.
+    """
+    eat = event_arm_table.copy()
+
+    params = np.array([fit_result[f"coef_{p}"] for p in predictors])
+    X = eat[predictors].values.astype(float)
+    eta = X @ params
+
+    # Numerically stable softmax within each event
+    eat["_eta"] = eta
+    max_eta = eat.groupby(event_col)["_eta"].transform("max")
+    eat["_shifted_exp"] = np.exp(eat["_eta"] - max_eta)
+    sum_shifted = eat.groupby(event_col)["_shifted_exp"].transform("sum")
+    eat["predicted_frac"] = eat["_shifted_exp"] / sum_shifted
+
+    eat["residual_frac"] = eat["arm_fraction"] - eat["predicted_frac"]
+
+    return eat.drop(columns=["_eta", "_shifted_exp"])
+
+
+def build_residualized_choice_dataset(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    stop_table: pd.DataFrame,
+    content_fit: dict,
+    content_predictors: list[str],
+) -> pd.DataFrame:
+    """Build choice dataset with both raw and residualized replay.
+
+    Fits ``predict_arm_fractions`` on the content model, aggregates
+    residuals to the stop × arm level, then merges into the standard
+    choice dataset from :func:`build_choice_dataset`.
+
+    Parameters
+    ----------
+    event_table, event_arm_table, stop_table
+        Canonical tables.
+    content_fit : dict
+        Fitted content model result (from ``fit_conditional_poisson``).
+    content_predictors : list[str]
+        Predictors used in the content model (e.g. M3 predictors).
+
+    Returns
+    -------
+    pd.DataFrame
+        Choice dataset with ``replay_frac`` (raw) and
+        ``replay_frac_residual`` (content-model residualized) columns.
+    """
+    eat_resid = predict_arm_fractions(event_arm_table, content_fit, content_predictors)
+
+    # Aggregate residual_frac to stop × arm level.
+    stop_arm_resid = (
+        eat_resid.groupby(["stop_id", "arm"])
+        .agg(replay_frac_residual=("residual_frac", "mean"))
+        .reset_index()
+    )
+
+    choice_df = build_choice_dataset(event_table, event_arm_table, stop_table)
+    if len(choice_df) == 0:
+        return choice_df
+
+    choice_df = choice_df.merge(
+        stop_arm_resid[["stop_id", "arm", "replay_frac_residual"]],
+        on=["stop_id", "arm"],
+        how="left",
+    )
+    choice_df["replay_frac_residual"] = choice_df["replay_frac_residual"].fillna(0.0)
+
+    return choice_df
 
 
 def build_choice_dataset(
@@ -73,10 +176,19 @@ def build_choice_dataset(
 
     # Aggregate replay content to stop × arm: mean arm_fraction
     # across events within each stop.
-    eat = event_arm_table[["event_id", "stop_id", "arm", "arm_fraction",
-                           "visit_recency", "cumulative_reward",
-                           "recent_reward_rate", "dist_to_arm",
-                           "is_same_patch"]].copy()
+    eat = event_arm_table[
+        [
+            "event_id",
+            "stop_id",
+            "arm",
+            "arm_fraction",
+            "visit_recency",
+            "cumulative_reward",
+            "recent_reward_rate",
+            "dist_to_arm",
+            "is_same_patch",
+        ]
+    ].copy()
 
     # Mean arm_fraction per (stop, arm) across events in that stop.
     stop_arm = (
@@ -94,29 +206,36 @@ def build_choice_dataset(
 
     # Join with stop-level info.
     stop_info = valid_stops[
-        ["stop_id", "animal", "day", "epoch",
-         "current_arm", "next_arm", "n_events",
-         "reward_outcome", "is_after_reward", "is_after_omission"]
+        [
+            "stop_id",
+            "animal",
+            "day",
+            "epoch",
+            "current_arm",
+            "next_arm",
+            "n_events",
+            "reward_outcome",
+            "is_after_reward",
+            "is_after_omission",
+        ]
     ].copy()
 
     choice_df = stop_arm.merge(stop_info, on="stop_id", how="inner")
 
     # Exclude current arm from choice set.
-    choice_df = choice_df[
-        choice_df["arm"] != choice_df["current_arm"]
-    ].reset_index(drop=True)
+    choice_df = choice_df[choice_df["arm"] != choice_df["current_arm"]].reset_index(
+        drop=True
+    )
 
     # Response: did the animal choose this arm?
-    choice_df["chosen"] = (
-        choice_df["arm"] == choice_df["next_arm"]
-    ).astype(int)
+    choice_df["chosen"] = (choice_df["arm"] == choice_df["next_arm"]).astype(int)
 
     # Sanity: exactly one chosen arm per stop.
     chosen_per_stop = choice_df.groupby("stop_id")["chosen"].sum()
     valid_stop_ids = chosen_per_stop[chosen_per_stop == 1].index
-    choice_df = choice_df[
-        choice_df["stop_id"].isin(valid_stop_ids)
-    ].reset_index(drop=True)
+    choice_df = choice_df[choice_df["stop_id"].isin(valid_stop_ids)].reset_index(
+        drop=True
+    )
 
     return choice_df
 
