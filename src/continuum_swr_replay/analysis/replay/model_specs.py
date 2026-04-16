@@ -5,6 +5,14 @@ Defines a sequence of nested models (M0-M7) for the conditional Poisson
 effects; event-level constants (time_since_stop, is_swr, etc.) appear only
 in interactions with arm-varying predictors, because they cancel in the
 conditional likelihood's within-event normalization.
+
+``is_next`` is excluded from the hierarchy because the Spatial Bandit
+task's alternation structure (consecutive pokes at the same port are
+never rewarded) makes ``prev_arm == next_arm`` on >90% of events.
+The two indicators are too collinear for their coefficients to be
+independently interpretable. ``is_next`` remains in the canonical
+tables for post-hoc retrospective analyses (Stage 5B) but does not
+enter the primary content model.
 """
 
 from __future__ import annotations
@@ -38,7 +46,7 @@ class ModelSpec:
 # ── Arm-varying main effects ──
 # These vary across the 9 arms within an event and are identifiable.
 
-_BASE: tuple[str, ...] = ("is_current", "is_prev", "is_next")
+_BASE: tuple[str, ...] = ("is_current", "is_prev")
 
 # Reward and recency (arm-varying: binary + continuous)
 _REWARD_RECENCY: tuple[str, ...] = (
@@ -57,20 +65,17 @@ _DISTANCE: tuple[str, ...] = ("dist_to_arm",)
 
 _TEMPORAL_INTERACTIONS: tuple[str, ...] = (
     "time_x_current",
-    "time_x_next",
     "time_x_prev",
 )
 
 _SWR_INTERACTIONS: tuple[str, ...] = (
     "swr_x_current",
-    "swr_x_next",
     "swr_x_prev",
     "swr_x_last_rewarded",
 )
 
 _MUA_INTERACTIONS: tuple[str, ...] = (
     "mua_x_current",
-    "mua_x_next",
     "mua_x_prev",
 )
 
@@ -97,13 +102,13 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M2": ModelSpec(
         name="M2",
         predictors=_BASE,
-        description="Spatial context (current + previous + next)",
+        description="Spatial context (current + previous)",
         parent="M1",
     ),
     "M3": ModelSpec(
         name="M3",
         predictors=_BASE + _REWARD_RECENCY,
-        description="Reward history + visit recency (Gillespie hypothesis)",
+        description="Reward history + visit recency",
         parent="M2",
     ),
     "M4": ModelSpec(
@@ -115,7 +120,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M5": ModelSpec(
         name="M5",
         predictors=_BASE + _REWARD_RECENCY + _DISTANCE + _TEMPORAL_INTERACTIONS,
-        description="Temporal dynamics (Mallory hypothesis)",
+        description="Temporal dynamics",
         parent="M4",
     ),
     "M6": ModelSpec(
