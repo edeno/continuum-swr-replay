@@ -65,13 +65,13 @@ _SWR_INTERACTIONS: tuple[str, ...] = (
     "swr_x_current",
     "swr_x_next",
     "swr_x_prev",
-    "swr_x_rewarded",
+    "swr_x_last_rewarded",
 )
 
 _CONTEXT_INTERACTIONS: tuple[str, ...] = (
     "switch_x_current",
     "switch_x_prev",
-    "omission_x_rewarded",
+    "omission_x_last_rewarded",
 )
 
 

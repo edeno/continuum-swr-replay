@@ -54,19 +54,28 @@ def fit_model_per_session(
     model_name: str,
     predictors: list[str],
     run_cv: bool = False,
+    response_col: str = "arm_count",
+    event_col: str = "event_uid",
 ) -> pd.DataFrame:
     """Fit conditional Poisson model across all sessions.
 
     Parameters
     ----------
     long_df : pd.DataFrame
-        Master count-based long-format data with event_uid.
+        Event-arm table (canonical ``event_arm_table.pkl`` or legacy
+        ``long_count.pkl``).
     model_name : str
         Model identifier (e.g., "M0").
     predictors : list[str]
         Predictor columns for this model.
     run_cv : bool
         If True, also run event-based cross-validation per session.
+    response_col : str
+        Column name for the count response (``"arm_count_hard"``
+        canonical, ``"arm_count"`` legacy).
+    event_col : str
+        Column name for the event grouping key (``"event_id"``
+        canonical, ``"event_uid"`` legacy).
 
     Returns
     -------
@@ -76,28 +85,24 @@ def fit_model_per_session(
     results = []
 
     for keys, group in long_df.groupby(SESSION_COLS):
-        # Do NOT drop rows here — fit_conditional_poisson handles
-        # event-wise NaN filtering internally, preserving the 9-arm
-        # candidate set for every retained event.
         if len(group) < 18:  # minimum 2 events (9 arms * 2)
             continue
 
         r = fit_conditional_poisson(
             group,
             predictors=list(predictors),
-            response_col="arm_count",
-            event_col="event_uid",
+            response_col=response_col,
+            event_col=event_col,
         )
         if r is None:
             continue
 
-        # Cross-validation
         if run_cv:
             cv = cross_validate_conditional_poisson(
                 group,
                 predictors=list(predictors),
-                event_col="event_uid",
-                response_col="arm_count",
+                event_col=event_col,
+                response_col=response_col,
             )
             if cv is not None:
                 r.update(cv)
@@ -200,14 +205,25 @@ def main():
     else:
         model_names = list(MODEL_HIERARCHY.keys())
 
-    # Load count-based long format
-    count_path = INPUT_DIR / "long_count.pkl"
-    if not count_path.exists():
-        # Fall back to legacy path
-        count_path = INPUT_DIR / "long.pkl"
-    if not count_path.exists():
+    # Load the canonical event-arm table produced by
+    # prepare_replay_content_data.py (Phase B). Falls back to the legacy
+    # ``long_count.pkl`` so the script can still run on old pickles.
+    canonical_path = INPUT_DIR / "event_arm_table.pkl"
+    legacy_path = INPUT_DIR / "long_count.pkl"
+    if canonical_path.exists():
+        count_path = canonical_path
+        canonical = True
+    elif legacy_path.exists():
+        count_path = legacy_path
+        canonical = False
+        logging.warning(
+            "using legacy long_count.pkl — run prepare_replay_content_data.py "
+            "to regenerate canonical event_arm_table.pkl"
+        )
+    else:
         logging.error(
-            "Long-format data not found. Run prepare_replay_content_data.py first."
+            "Neither event_arm_table.pkl nor long_count.pkl found. "
+            "Run prepare_replay_content_data.py first."
         )
         return
 
@@ -243,17 +259,22 @@ def main():
         logging.error("No valid models to fit")
         return
 
+    # Resolve canonical vs. legacy column names so the rest of the
+    # script always uses canonical names.
+    response_col = "arm_count_hard" if canonical else "arm_count"
+    event_col = "event_id" if canonical else "event_uid"
+
     # Pre-filter to common complete-case event set: drop entire events
     # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
-    required_cols = ["arm_count", "event_uid"] + sorted(all_predictors)
+    required_cols = [response_col, event_col] + sorted(all_predictors)
     available_cols = [c for c in required_cols if c in long_df.columns]
     has_nan = long_df[available_cols].isna().any(axis=1)
-    events_with_nan = long_df.loc[has_nan, "event_uid"].unique()
-    n_before = long_df["event_uid"].nunique()
-    long_df = long_df[~long_df["event_uid"].isin(events_with_nan)].reset_index(
+    events_with_nan = long_df.loc[has_nan, event_col].unique()
+    n_before = long_df[event_col].nunique()
+    long_df = long_df[~long_df[event_col].isin(events_with_nan)].reset_index(
         drop=True
     )
-    n_after = long_df["event_uid"].nunique()
+    n_after = long_df[event_col].nunique()
     if n_before != n_after:
         logging.info(
             "Filtered to common complete-case events: %d → %d events "
@@ -265,14 +286,14 @@ def main():
         )
 
     # Also drop zero-count events
-    event_totals = long_df.groupby("event_uid")["arm_count"].transform("sum")
+    event_totals = long_df.groupby(event_col)[response_col].transform("sum")
     long_df = long_df[event_totals > 0].reset_index(drop=True)
 
     logging.info(
         "Fitting on %d rows, %d sessions, %d events",
         len(long_df),
         long_df.groupby(SESSION_COLS).ngroups,
-        long_df["event_uid"].nunique(),
+        long_df[event_col].nunique(),
     )
 
     # Fit each model
@@ -289,7 +310,12 @@ def main():
         )
         t0 = time.time()
 
-        mdf = fit_model_per_session(long_df, model_name, predictors, run_cv=args.cv)
+        mdf = fit_model_per_session(
+            long_df, model_name, predictors,
+            run_cv=args.cv,
+            response_col=response_col,
+            event_col=event_col,
+        )
 
         elapsed = time.time() - t0
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
@@ -360,7 +386,7 @@ def main():
             logit_results = []
             for keys, group in long_df.groupby(SESSION_COLS):
                 r = fit_conditional_logit(
-                    group, predictors=predictors, event_col="event_uid"
+                    group, predictors=predictors, event_col=event_col
                 )
                 if r is not None:
                     r["model"] = model_name
