@@ -579,6 +579,11 @@ def build_event_table(
                 "is_after_reward": is_after_reward,
                 "is_after_stay": is_after_stay,
                 "reward_outcome": reward_outcome,
+                "is_stay": float(
+                    _arm_to_patch(next_arm) == _arm_to_patch(current_arm)
+                )
+                if not (np.isnan(_arm_to_patch(next_arm)) or np.isnan(_arm_to_patch(current_arm)))
+                else np.nan,
                 "n_junction_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
                 # Legacy ``prepare_session`` uses the middle-index
@@ -957,9 +962,14 @@ def build_stop_table(
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals
-    per_bout["current_patch"] = [_arm_to_patch(a) for a in current_arm_vals]
+    cur_patch = np.array([_arm_to_patch(a) for a in current_arm_vals])
+    nxt_patch = np.array([_arm_to_patch(a) for a in next_arm_vals])
+    per_bout["current_patch"] = cur_patch
     per_bout["prev_patch"] = [_arm_to_patch(a) for a in prev_arm_vals]
-    per_bout["next_patch"] = [_arm_to_patch(a) for a in next_arm_vals]
+    per_bout["next_patch"] = nxt_patch
+    # is_stay: will the next trip be within the same patch? Post-hoc.
+    both_valid = ~np.isnan(cur_patch.astype(float)) & ~np.isnan(nxt_patch.astype(float))
+    per_bout["is_stay"] = np.where(both_valid, (cur_patch == nxt_patch).astype(float), np.nan)
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "day", day)
@@ -1417,6 +1427,7 @@ def _event_table_columns() -> list[str]:
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "is_stay",
         "current_arm",
         "prev_arm",
         "next_arm",
@@ -1459,6 +1470,7 @@ def _stop_table_columns() -> list[str]:
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "is_stay",
         "current_arm",
         "prev_arm",
         "next_arm",
@@ -1492,6 +1504,7 @@ def _event_arm_table_columns() -> list[str]:
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "is_stay",
         "current_arm",
         "prev_arm",
         "next_arm",
