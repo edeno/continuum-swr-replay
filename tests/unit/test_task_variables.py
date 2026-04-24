@@ -345,11 +345,16 @@ class TestTurnDirection:
         for i, edge in enumerate(bandit_track_graph.edges):
             bandit_track_graph.edges[edge]['edge_id'] = i
 
-        track_edges = np.array(list(bandit_track_graph.edges))
+        track_segment_id_to_edge = {
+            bandit_track_graph.edges[edge]["edge_id"]: edge
+            for edge in bandit_track_graph.edges
+        }
 
         # This should detect turn direction
         # Note: Actual result depends on graph structure
-        direction = turn_direction(trial, pos_info, bandit_track_graph, track_edges)
+        direction = turn_direction(
+            trial, pos_info, bandit_track_graph, track_segment_id_to_edge
+        )
 
         # Direction should be a string
         assert isinstance(direction, str)
@@ -376,8 +381,8 @@ class TestTurnDirection:
         Cross product: (10)(10) - (0)(0) = 100 > 0 => "left"
         """
         graph = nx.Graph()
-        graph.add_edges_from([(0, 1), (1, 2)])
-        nx.set_edge_attributes(graph, {(0, 1): 10.0, (1, 2): 10.0}, "distance")
+        graph.add_edge(0, 1, edge_id=0, distance=10.0)
+        graph.add_edge(1, 2, edge_id=1, distance=10.0)
         graph.nodes[0]['pos'] = (0, 0)
         graph.nodes[1]['pos'] = (10, 0)
         graph.nodes[2]['pos'] = (10, 10)
@@ -405,9 +410,11 @@ class TestTurnDirection:
             'from_well': 0,
             'to_well': 2,
         })
-        track_edges = np.array([(0, 1), (1, 2)])
+        track_segment_id_to_edge = {
+            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
+        }
 
-        direction = turn_direction(trial, pos_info, graph, track_edges)
+        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
         assert direction == "left"
 
     def test_known_right_turn_geometry(self):
@@ -419,8 +426,8 @@ class TestTurnDirection:
         Cross product: (10)(-10) - (0)(0) = -100 < 0 => "right"
         """
         graph = nx.Graph()
-        graph.add_edges_from([(0, 1), (1, 2)])
-        nx.set_edge_attributes(graph, {(0, 1): 10.0, (1, 2): 10.0}, "distance")
+        graph.add_edge(0, 1, edge_id=0, distance=10.0)
+        graph.add_edge(1, 2, edge_id=1, distance=10.0)
         graph.nodes[0]['pos'] = (0, 0)
         graph.nodes[1]['pos'] = (10, 0)
         graph.nodes[2]['pos'] = (10, -10)
@@ -448,10 +455,79 @@ class TestTurnDirection:
             'from_well': 0,
             'to_well': 2,
         })
-        track_edges = np.array([(0, 1), (1, 2)])
+        track_segment_id_to_edge = {
+            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
+        }
 
-        direction = turn_direction(trial, pos_info, graph, track_edges)
+        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
         assert direction == "right"
+
+    def test_turn_direction_uses_edge_id_not_iteration_order(self):
+        """turn_direction must resolve track_segment_id via the
+        ``edge_id`` attribute, not positional indexing into
+        ``np.array(graph.edges)``.
+
+        Construct a 4-node linear graph whose edge_id attributes are
+        shuffled relative to insertion order:
+
+            node 0 --- node 1 --- node 2 --- node 3   (y-up coordinates)
+            (0,0)     (10,0)     (10,10)    (10,20)
+
+            iteration order: [(0,1), (1,2), (2,3)]
+            edge_ids:         2      0      1
+
+        Trial traverses well 0 → node 1 → well 2, so it uses edges
+        (0,1) and (1,2) — their edge_ids are 2 and 0. The animal is on
+        track_segment_id=2 for the first half, track_segment_id=0 for
+        the second half.
+
+        With the fix, track_segment_id → (u,v) lookup returns
+        (0,1) and (1,2), the L-turn at node 1 computes as "left"
+        (cross product > 0). With positional indexing into the
+        numpy-array-of-edges, track_edges[0] would be (0,1) and
+        track_edges[2] would be (2,3) — wrong edges, wrong geometry.
+        """
+        graph = nx.Graph()
+        graph.add_edge(0, 1, edge_id=2, distance=10.0)
+        graph.add_edge(1, 2, edge_id=0, distance=10.0)
+        graph.add_edge(2, 3, edge_id=1, distance=10.0)
+        graph.nodes[0]["pos"] = (0, 0)
+        graph.nodes[1]["pos"] = (10, 0)
+        graph.nodes[2]["pos"] = (10, 10)
+        graph.nodes[3]["pos"] = (10, 20)
+
+        track_segment_id_to_edge = {
+            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
+        }
+
+        time = np.arange(0, 1.0, 0.002)
+        n = len(time)
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": np.concatenate([
+                    np.full(n // 2, 2, dtype=int),   # on edge (0,1) (edge_id=2)
+                    np.zeros(n - n // 2, dtype=int), # on edge (1,2) (edge_id=0)
+                ]),
+                "projected_x_position": np.concatenate([
+                    np.linspace(0, 10, n // 2),
+                    np.full(n - n // 2, 10.0),
+                ]),
+                "projected_y_position": np.concatenate([
+                    np.zeros(n // 2),
+                    np.linspace(0, 10, n - n // 2),
+                ]),
+            },
+            index=time,
+        )
+        trial = pd.Series(
+            {"start_time": 0.0, "end_time": 1.0, "from_well": 0, "to_well": 2}
+        )
+
+        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
+        assert direction == "left", (
+            f"turn_direction resolved segment_ids via numpy position "
+            f"instead of edge_id attribute; got {direction!r}"
+        )
 
     def test_straight_path_no_turns(self, simple_linear_track):
         """Straight path should have no turns."""
@@ -478,9 +554,14 @@ class TestTurnDirection:
         simple_linear_track.edges[(0, 1)]['edge_id'] = 0
         simple_linear_track.edges[(1, 2)]['edge_id'] = 1
 
-        track_edges = np.array([(0, 1), (1, 2)])
+        track_segment_id_to_edge = {
+            simple_linear_track.edges[edge]["edge_id"]: edge
+            for edge in simple_linear_track.edges
+        }
 
-        direction = turn_direction(trial, pos_info, simple_linear_track, track_edges)
+        direction = turn_direction(
+            trial, pos_info, simple_linear_track, track_segment_id_to_edge
+        )
 
         # Collinear segments have zero cross product, classified as "right"
         # by the np.where(cross > 0, "left", "right") convention

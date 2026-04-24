@@ -299,7 +299,7 @@ def turn_direction(
     trial: pd.Series,
     position_info: pd.DataFrame,
     track_graph: nx.Graph,
-    track_edges: np.ndarray,
+    track_segment_id_to_edge: dict[int, tuple[int, int]],
 ) -> str:
     """Determine turn direction sequence for a trial.
 
@@ -311,8 +311,12 @@ def turn_direction(
         Position info for the trial
     track_graph : nx.Graph
         Track graph
-    track_edges : np.ndarray
-        Array of track edges
+    track_segment_id_to_edge : dict[int, tuple[int, int]]
+        Map from each edge's ``edge_id`` attribute to its ``(u, v)``
+        endpoint tuple. Callers must build this from the graph's
+        ``edge_id`` attribute — not from ``np.array(track_graph.edges)``,
+        because NetworkX edge iteration order is not guaranteed to
+        match the ``edge_id`` sequence.
 
     Returns
     -------
@@ -342,7 +346,9 @@ def turn_direction(
 
     # Ensure that the trial is in the correct traversal direction
     # track_segment_id does not contain node order information
-    trial_nodes = track_edges[trial_segment_ids]
+    trial_nodes = np.array(
+        [track_segment_id_to_edge[int(sid)] for sid in trial_segment_ids]
+    )
 
     if trial_nodes[0][0] != trial.from_well:
         trial_nodes = trial_nodes[::-1]
@@ -372,7 +378,7 @@ def turn_direction(
 
 def _process_single_trial(
     trial_data: tuple[
-        dict, pd.DataFrame, nx.Graph, np.ndarray, dict, np.ndarray, np.ndarray, float
+        dict, pd.DataFrame, nx.Graph, dict, np.ndarray, np.ndarray, float
     ],
 ) -> dict:
     """Process a single trial in parallel.
@@ -380,8 +386,9 @@ def _process_single_trial(
     Parameters
     ----------
     trial_data : tuple
-        Contains (trial_dict, position_info, track_graph, track_edges, track_segment_id_to_edge,
-                  is_prev_reward_omission_row, is_patch_change_row, sampling_frequency)
+        Contains (trial_dict, position_info, track_graph,
+                  track_segment_id_to_edge, is_prev_reward_omission_row,
+                  is_patch_change_row, sampling_frequency)
 
     Returns
     -------
@@ -393,7 +400,6 @@ def _process_single_trial(
         trial_dict,
         position_info,
         track_graph,
-        track_edges,
         track_segment_id_to_edge,
         is_prev_reward_omission_row,
         is_patch_change_row,
@@ -419,7 +425,7 @@ def _process_single_trial(
 
     # Compute all variables for this trial
     trial_turn_direction = turn_direction(
-        trial, trial_position, track_graph, track_edges
+        trial, trial_position, track_graph, track_segment_id_to_edge
     )
 
     start_to_goal_position = position_info.loc[from_start_time_to_goal]
@@ -520,8 +526,6 @@ def make_task_variables(
     n_shifts = len(omission_shifts)
     is_prev_reward_omission_pos = np.full((n_time, n_shifts), False)
 
-    track_edges = np.array(track_graph.edges)
-
     track_segment_id_to_edge = {
         track_graph.edges[edge]["edge_id"]: edge for edge in track_graph.edges
     }
@@ -560,7 +564,6 @@ def make_task_variables(
                     trial_dict,
                     position_info,
                     track_graph,
-                    track_edges,
                     track_segment_id_to_edge,
                     is_prev_reward_omission.loc[trial.Index].to_numpy(),
                     is_patch_change.loc[trial.Index].to_numpy(),
@@ -619,7 +622,10 @@ def make_task_variables(
             start_node_id[is_in_trial] = trial.from_well
             goal_node_id[is_in_trial] = trial.to_well
             turn_direction_arr[is_in_trial] = turn_direction(
-                trial, position_info.loc[is_in_trial], track_graph, track_edges
+                trial,
+                position_info.loc[is_in_trial],
+                track_graph,
+                track_segment_id_to_edge,
             )
             path_progress[from_start_time_to_goal] = path_progress_for_run_segment(
                 position_info.loc[from_start_time_to_goal],
