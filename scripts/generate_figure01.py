@@ -36,6 +36,7 @@ import numpy as np
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
+
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -58,6 +59,7 @@ STATE_COLORS = {
 }
 STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
+ANIMAL_POS_COLOR = "magenta"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -138,6 +140,7 @@ def plot_state_diagram(ax):
         ("No-Spike", "Non-Local\nContinuous"),
         ("No-Spike", "Non-Local\nFragmented"),
         ("Non-Local\nContinuous", "Local"),
+        ("Non-Local\nContinuous", "Non-Local\nFragmented"),
         ("Non-Local\nFragmented", "Local"),
     ]
     for from_state, to_state in cross_transitions:
@@ -176,76 +179,78 @@ def plot_observation_models(ax):
     n_pts = 200
     x = np.linspace(0, 1, n_pts)
     animal_pos = 0.3
-    place_field_center = 0.65
-    place_field = np.exp(-0.5 * ((x - place_field_center) / 0.10) ** 2)
+    likelihood_center = 0.4
+    likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
     gs_inner = GridSpecFromSubplotSpec(
-        2, 2, subplot_spec=ax.get_subplotspec(), wspace=0.30, hspace=0.60
+        2, 2, subplot_spec=ax.get_subplotspec(), wspace=0.10, hspace=0.50,
     )
 
     configs = [
         ("Local", STATE_COLORS_SHORT[0]),
         ("No-Spike", STATE_COLORS_SHORT[1]),
-        ("Continuous", STATE_COLORS_SHORT[2]),
-        ("Fragmented", STATE_COLORS_SHORT[3]),
+        ("Continuous\n Non-Local", STATE_COLORS_SHORT[2]),
+        ("Fragmented\nNon-Local", STATE_COLORS_SHORT[3]),
     ]
+    likelihood_alpha = 0.7
 
     for idx, (name, color) in enumerate(configs):
         row, col = idx // 2, idx % 2
         sub_ax = ax.figure.add_subplot(gs_inner[row, col])
 
+
         if name == "Local":
-            # Show place field curve in gray
-            sub_ax.plot(x, place_field, color="#aaaaaa", linewidth=0.8)
-            sub_ax.fill_between(x, place_field, alpha=0.08, color="#aaaaaa")
+            # Show likelihood curve in gray
+            sub_ax.plot(x, likelihood, color="#aaaaaa", linewidth=0.8, alpha=likelihood_alpha)
+            sub_ax.fill_between(x, likelihood, alpha=likelihood_alpha, color="#aaaaaa")
             # Vertical line at animal position
-            sub_ax.axvline(animal_pos, color="black", linewidth=0.8,
-                           linestyle="--", alpha=0.6)
+            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
+                           linestyle="--")
             # Dot at the evaluated point
-            val = np.interp(animal_pos, x, place_field)
+            val = np.interp(animal_pos, x, likelihood)
             sub_ax.plot(animal_pos, val, "o", color=color, markersize=5, zorder=10)
             # Arrow from dot to result annotation
             sub_ax.annotate(
-                f"$\\lambda(x_{{animal}})$",
-                xy=(animal_pos, val), xytext=(animal_pos + 0.25, val + 0.25),
+                "$\\lambda(x_{{animal}})$",
+                xy=(animal_pos, val), xytext=(animal_pos + 0.30, val + 0.30),
                 fontsize=5, color=color, fontweight="bold",
-                arrowprops=dict(arrowstyle="->", color=color, lw=0.8),
+                arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
                 ha="center",
             )
-            desc = "Scalar: rate at\nanimal's position"
+            desc = "Scalar: likelihood at\nanimal's position"
 
         elif name == "No-Spike":
             # Show place field curve grayed out / crossed out
-            sub_ax.plot(x, place_field, color="#cccccc", linewidth=0.8)
-            sub_ax.fill_between(x, place_field, alpha=0.05, color="#cccccc")
             # Flat near-zero line
-            sub_ax.axhline(0.02, color=color, linewidth=1.2, linestyle="-")
+            sub_ax.axhline(0.05, color=color, linewidth=1.2, linestyle="-")
+            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
+                           linestyle="--")
             sub_ax.text(
                 0.5, 0.12, r"$\lambda \approx 0$",
                 ha="center", va="bottom", fontsize=6, color=color,
                 fontweight="bold", transform=sub_ax.transAxes,
             )
-            desc = "Scalar: expects\nsilence"
+            desc = "Scalar: expects\n constant low rate"
 
         else:  # Continuous or Fragmented
             # Show the full place field as the evaluated likelihood
-            sub_ax.plot(x, place_field, color=color, linewidth=1.0)
-            sub_ax.fill_between(x, place_field, alpha=0.3, color=color)
+            sub_ax.plot(x, likelihood, color=color, linewidth=1.0)
+            sub_ax.fill_between(x, likelihood, alpha=0.3, color=color)
             # Animal position for reference
-            sub_ax.axvline(animal_pos, color="black", linewidth=0.8,
+            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--", alpha=0.4)
             # Bracket or annotation showing "all positions"
             sub_ax.annotate(
                 "", xy=(0.05, -0.06), xytext=(0.95, -0.06),
                 xycoords="axes fraction", textcoords="axes fraction",
-                arrowprops=dict(arrowstyle="<->", color=color, lw=0.8),
+                arrowprops={"arrowstyle": "<->", "color": color, "lw": 0.8},
             )
             sub_ax.text(
                 0.5, -0.16, r"$\lambda(x)$ for all $x$",
                 ha="center", va="top", fontsize=4.5, color=color,
                 fontweight="bold", transform=sub_ax.transAxes,
             )
-            desc = "Vector: rate at\nevery position"
+            desc = "Vector: likelihood at\nevery position"
 
         # Formatting
         sub_ax.set_xlim(0, 1)
@@ -260,7 +265,7 @@ def plot_observation_models(ax):
             name, fontsize=5.5, color=color, fontweight="bold", pad=2,
         )
         sub_ax.text(
-            0.5, -0.35, desc, ha="center", va="top", fontsize=4,
+            0.5, -0.15, desc, ha="center", va="top", fontsize=4,
             transform=sub_ax.transAxes, color="#555555", linespacing=0.9,
         )
 
@@ -542,7 +547,7 @@ def main():
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    fig = generate_figure(n_neurons=args.n_neurons, seed=args.seed)
+    _ = generate_figure(n_neurons=args.n_neurons, seed=args.seed)
 
     print(f"Saving to {args.output_dir}...")
     save_figure("figure01", base_dir=args.output_dir, dpi=args.dpi)
