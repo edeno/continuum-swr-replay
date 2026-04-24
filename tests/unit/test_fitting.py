@@ -29,7 +29,6 @@ def _make_long_df(event_arm_counts, predictor_values=None):
         Per-(event, arm) values for the single ``is_prev`` predictor.
         Defaults to 1 on arm 0, 0 elsewhere.
     """
-    n_arms = 3
     rows = []
     for ev, counts in enumerate(event_arm_counts):
         for arm, count in enumerate(counts):
