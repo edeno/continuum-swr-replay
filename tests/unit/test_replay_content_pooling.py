@@ -1,7 +1,7 @@
 """Session/animal pooling tests for the replay-content GLM.
 
 The production fit pools events across animals via a shared
-``ConditionalPoisson`` regression. The model conditions on ``event_uid``,
+``ConditionalPoisson`` regression. The model conditions on ``event_id``,
 but it has no per-animal intercept or random effect. We probe two
 distinct concerns:
 
@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.replay.simulation import (
 
 def _pool_animals(per_animal_betas, *, n_events_per_animal, L_e, seed):
     """Concatenate Tier-A simulations from multiple animals into one
-    long-format frame with globally unique ``event_uid``s."""
+    long-format frame with globally unique ``event_id``s."""
     rng = np.random.default_rng(seed)
     parts = []
     offset = 0
@@ -42,9 +42,9 @@ def _pool_animals(per_animal_betas, *, n_events_per_animal, L_e, seed):
             else n_events_per_animal
         )
         df = simulate_counts(beta, n_events=n, L_e=L_e, seed=int(rng.integers(0, 1e9)))
-        df["event_uid"] = df["event_uid"].astype(int) + offset
+        df["event_id"] = df["event_id"].astype(int) + offset
         df["animal"] = f"a{i}"
-        offset = int(df["event_uid"].max()) + 1
+        offset = int(df["event_id"].max()) + 1
         parts.append(df)
     return pd.concat(parts, ignore_index=True)
 

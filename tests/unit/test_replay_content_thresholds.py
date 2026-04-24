@@ -32,11 +32,11 @@ from continuum_swr_replay.analysis.replay.simulation import (
 def _mix_signal_and_noise(beta_signal, n_signal, n_noise, L_e, seed):
     """Pool ``n_signal`` events generated under ``beta_signal`` with
     ``n_noise`` events generated under all-zero β (uniform over arms).
-    All events have globally unique ``event_uid``s."""
+    All events have globally unique ``event_id``s."""
     sig = simulate_counts(beta_signal, n_events=n_signal, L_e=L_e, seed=seed)
     noise_beta = dict.fromkeys(beta_signal, 0.0)
     noi = simulate_counts(noise_beta, n_events=n_noise, L_e=L_e, seed=seed + 1_000_000)
-    noi["event_uid"] = noi["event_uid"].astype(int) + n_signal
+    noi["event_id"] = noi["event_id"].astype(int) + n_signal
     return pd.concat([sig, noi], ignore_index=True)
 
 
@@ -96,9 +96,9 @@ class TestEventSizeFilter:
         df_full = simulate_counts(beta, n_events=n_events, L_e=L_e, seed=13)
 
         # Keep only events with total_count > 10 (drops the short ones)
-        totals = df_full.groupby("event_uid")["arm_count"].sum()
+        totals = df_full.groupby("event_id")["arm_count_hard"].sum()
         kept_events = totals[totals > 10].index
-        df_filtered = df_full[df_full["event_uid"].isin(kept_events)].copy()
+        df_filtered = df_full[df_full["event_id"].isin(kept_events)].copy()
 
         fit_full = fit_conditional_poisson(df_full, predictors=list(beta))
         fit_filtered = fit_conditional_poisson(df_filtered, predictors=list(beta))
@@ -122,7 +122,7 @@ class TestEventSizeFilter:
         df_full = simulate_counts(beta, n_events=n_events, L_e=L_e, seed=29)
 
         # Keep first half — equivalent to a permissive vs strict threshold
-        kept = df_full["event_uid"] < n_events // 2
+        kept = df_full["event_id"] < n_events // 2
         df_strict = df_full[kept].copy()
 
         fit_full = fit_conditional_poisson(df_full, predictors=list(beta))

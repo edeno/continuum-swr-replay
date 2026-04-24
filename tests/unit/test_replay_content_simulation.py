@@ -111,8 +111,8 @@ class TestContinuousPredictor:
 class TestFractionalResponse:
     """Fitter must accept non-integer responses without silent truncation.
 
-    ``arm_count_hard`` is integer, but the robustness responses
-    ``arm_count_soft`` and ``arm_posterior_mass`` are fractional. Before
+    ``arm_count_hard_hard`` is integer, but the robustness responses
+    ``arm_count_hard_soft`` and ``arm_posterior_mass`` are fractional. Before
     the fix, ``fit_conditional_poisson`` cast the response to int, which
     silently floored soft responses < 1 to zero and destroyed information.
     """
@@ -124,7 +124,7 @@ class TestFractionalResponse:
         fit_int = fit_conditional_poisson(df, predictors=list(beta))
 
         df_float = df.copy()
-        df_float["arm_count"] = df_float["arm_count"].astype(float)
+        df_float["arm_count_hard"] = df_float["arm_count_hard"].astype(float)
         fit_float = fit_conditional_poisson(df_float, predictors=list(beta))
 
         assert fit_int is not None and fit_float is not None
@@ -151,7 +151,7 @@ class TestFractionalResponse:
 
         scale = 0.3
         df_frac = df.copy()
-        df_frac["arm_count"] = df_frac["arm_count"].astype(float) * scale
+        df_frac["arm_count_hard"] = df_frac["arm_count_hard"].astype(float) * scale
 
         fit_int = fit_conditional_poisson(df, predictors=list(beta))
         fit_frac = fit_conditional_poisson(df_frac, predictors=list(beta))
@@ -244,7 +244,7 @@ class TestSpatialSmearingAttenuates:
         assert fit_smeared["coef_is_current"] < beta["is_current"]
 
 
-# ── Full-pipeline tests: real compute_arm_counts → make_long_format_arm chain ──
+# ── Full-pipeline tests: real compute_arm_count_hards → make_long_format_arm chain ──
 
 
 class TestFullPipelineRecovery:
@@ -258,7 +258,7 @@ class TestFullPipelineRecovery:
         assert diag["n_events_used"] > 40
         # 9 rows per surviving event
         assert len(long_df) == diag["n_events_used"] * 9
-        assert {"event_uid", "arm_id", "arm_count", "is_current"}.issubset(
+        assert {"event_id", "arm_id", "arm_count_hard", "is_current"}.issubset(
             long_df.columns
         )
 

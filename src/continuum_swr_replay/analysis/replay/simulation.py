@@ -1,8 +1,8 @@
 """Synthetic-data generators for validating the conditional Poisson model.
 
 Tier A — ``simulate_counts``: sufficient-statistic simulation. Draws
-``arm_count ~ Multinomial(L_e, softmax(X β_true))`` directly, bypassing the
-posterior/MAP pipeline. Self-consistency check on the estimator.
+``arm_count_hard ~ Multinomial(L_e, softmax(X β_true))`` directly, bypassing
+the posterior/MAP pipeline. Self-consistency check on the estimator.
 
 Tier C — ``simulate_posterior_bumps``: posterior/MAP-space simulation. For
 each timebin the chosen arm is drawn from softmax(X β_true), then a MAP
@@ -169,7 +169,7 @@ def simulate_counts(
     -------
     pd.DataFrame
         Long-format frame with one row per (event, arm). Columns:
-        ``event_uid``, ``arm_id``, ``arm_count``, plus one column per
+        ``event_id``, ``arm_id``, ``arm_count_hard``, plus one column per
         predictor. Compatible with ``fit_conditional_poisson``.
     """
     rng = np.random.default_rng(seed)
@@ -205,9 +205,9 @@ def simulate_counts(
     arm_ids = np.tile(ALL_ARMS, n_events)
 
     data: dict[str, np.ndarray] = {
-        "event_uid": event_ids,
+        "event_id": event_ids,
         "arm_id": arm_ids,
-        "arm_count": counts.reshape(-1),
+        "arm_count_hard": counts.reshape(-1),
     }
     for k, name in enumerate(predictor_list):
         data[name] = design[:, :, k].reshape(-1)
@@ -321,9 +321,9 @@ def simulate_with_event_covariates(
     event_ids = np.repeat(np.arange(n_events), n_arms)
     arm_ids = np.tile(ALL_ARMS, n_events)
     data: dict[str, np.ndarray] = {
-        "event_uid": event_ids,
+        "event_id": event_ids,
         "arm_id": arm_ids,
-        "arm_count": counts.reshape(-1),
+        "arm_count_hard": counts.reshape(-1),
     }
     for name, arr in all_columns.items():
         data[name] = arr.reshape(-1)
@@ -420,9 +420,9 @@ def simulate_autocorrelated_counts(
     event_ids = np.repeat(np.arange(n_events), n_arms)
     arm_ids = np.tile(ALL_ARMS, n_events)
     data: dict[str, np.ndarray] = {
-        "event_uid": event_ids,
+        "event_id": event_ids,
         "arm_id": arm_ids,
-        "arm_count": counts.reshape(-1),
+        "arm_count_hard": counts.reshape(-1),
     }
     for k, name in enumerate(predictor_list):
         data[name] = design[:, :, k].reshape(-1)
@@ -565,8 +565,8 @@ def simulate_posterior_bumps(
     -------
     long_df : pd.DataFrame
         Long-format frame matching the schema of ``simulate_counts`` —
-        one row per (event, arm) with ``event_uid``, ``arm_id``,
-        ``arm_count``, and one column per predictor. The arm counts come
+        one row per (event, arm) with ``event_id``, ``arm_id``,
+        ``arm_count_hard``, and one column per predictor. The arm counts come
         from running every per-timebin MAP through ``map_estimate_to_arm``.
     diagnostics : dict
         ``fraction_on_chosen``: fraction of timebins whose decoded arm
@@ -624,10 +624,10 @@ def simulate_posterior_bumps(
         [np.full(int(L_e_arr[e]), e) for e in range(n_events)]
     )
     bin_df = pd.DataFrame(
-        {"event_uid": event_repeats, "decoded_arm": decoded_arm.astype(int)}
+        {"event_id": event_repeats, "decoded_arm": decoded_arm.astype(int)}
     )
     counts_wide = (
-        bin_df.groupby(["event_uid", "decoded_arm"])
+        bin_df.groupby(["event_id", "decoded_arm"])
         .size()
         .unstack(fill_value=0)
         .reindex(columns=ALL_ARMS, fill_value=0)
@@ -638,9 +638,9 @@ def simulate_posterior_bumps(
     event_ids = np.repeat(np.arange(n_events), n_arms)
     arm_ids = np.tile(ALL_ARMS, n_events)
     data: dict[str, np.ndarray] = {
-        "event_uid": event_ids,
+        "event_id": event_ids,
         "arm_id": arm_ids,
-        "arm_count": counts.reshape(-1),
+        "arm_count_hard": counts.reshape(-1),
     }
     for k, name in enumerate(predictor_list):
         data[name] = design[:, :, k].reshape(-1)
@@ -756,9 +756,9 @@ def simulate_hard_vs_soft_counts(
         event_ids = np.repeat(np.arange(n_events), n_arms)
         arm_ids = np.tile(ALL_ARMS, n_events)
         d: dict[str, np.ndarray] = {
-            "event_uid": event_ids,
+            "event_id": event_ids,
             "arm_id": arm_ids,
-            "arm_count": counts.reshape(-1),
+            "arm_count_hard": counts.reshape(-1),
         }
         for k, name in enumerate(predictor_list):
             d[name] = design[:, :, k].reshape(-1)
@@ -860,8 +860,8 @@ def simulate_full_pipeline(
     Returns
     -------
     long_count : pd.DataFrame
-        Output of ``make_long_format_arm`` with ``event_uid``,
-        ``arm_count``, and the binary indicator predictors. Ready to pass
+        Output of ``make_long_format_arm`` with ``event_id``,
+        ``arm_count_hard``, and the binary indicator predictors. Ready to pass
         to ``fit_conditional_poisson``.
     events : pd.DataFrame
         Output of ``collapse_to_events`` (one row per event, modal arm).
@@ -976,9 +976,9 @@ def simulate_full_pipeline(
         e = int(ev_id) - 1  # 0-indexed into the synthetic event arrays
         for j, arm in enumerate(ALL_ARMS):
             row = {
-                "event_uid": int(ev_id),
+                "event_id": int(ev_id),
                 "arm_id": arm,
-                "arm_count": int(counts[idx, j]),
+                "arm_count_hard": int(counts[idx, j]),
             }
             for p_idx, p_name in enumerate(predictor_list):
                 row[p_name] = float(design[e, j, p_idx])
@@ -987,7 +987,7 @@ def simulate_full_pipeline(
     long_count = pd.DataFrame(long_rows)
 
     # Filter out zero-total events (all timebins on junction bins).
-    event_totals = long_count.groupby("event_uid")["arm_count"].transform("sum")
+    event_totals = long_count.groupby("event_id")["arm_count_hard"].transform("sum")
     long_count = long_count[event_totals > 0].reset_index(drop=True)
 
     mean_arms_per_event = float((counts > 0).sum(axis=1).mean())
