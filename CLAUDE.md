@@ -346,30 +346,6 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 6. **Track graph**: NetworkX graph where nodes are wells (0-5) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 
-## Terminology (figure captions, axis labels, docstrings)
-
-The paper distinguishes model-detected events from SWR-detector events. Use
-these terms consistently in figure captions, axis labels, legends, and
-user-facing docstrings. "Replay" is reserved for informal prose in the
-manuscript body — do not use it as an axis label or variable name.
-
-- **non-local event** — an interval where the detector's Non-Local state
-  probability exceeds 0.8 during immobility. Never call it "replay event"
-  or "detected replay" in code or labels.
-- **SWR event** — an interval from the SWR (ripple) detector, independent
-  of the model.
-- **SWR-coincident non-local event** — a non-local event that overlaps
-  with at least one SWR event. Not "SWR-overlap" (ambiguous direction).
-- **non-SWR non-local event** — a non-local event that does not overlap
-  with any SWR event. Not "no-overlap event" or "SWR-free replay".
-- **Local state / non-local state** — the model's state labels. Keep the
-  hyphen. "Non-Local" (title case) is acceptable in the model's internal
-  state names from `non_local_detector`, but prose and labels should
-  prefer lower-case "non-local".
-- **decoder** — the non-local detector's full output. Use "decoder" when
-  you mean that specific model; avoid "model" as a generic term since
-  Figure 4 also introduces GLM models.
-
 ## Notes on Data Quality
 
 - Not all sessions have recordings from all brain areas (check keys in `spike_times` dict)
