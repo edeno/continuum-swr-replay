@@ -900,7 +900,7 @@ def run_session(
     )
 
     logger.info("Loading session data...")
-    data = load_data(nwb_file_name, epoch_name, parallel=False)
+    data = load_data(nwb_file_name, epoch_name)
 
     logger.info("Identifying non-local events...")
     non_local_prob = results.acausal_state_probabilities.sel(
