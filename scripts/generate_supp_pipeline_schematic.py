@@ -18,7 +18,6 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-
 STEPS = [
     {
         "title": "0. Decoder output",
@@ -88,14 +87,14 @@ def draw_schematic(output_dir: Path) -> None:
     shape_color = "#2c3e50"
     note_color = "#7a3b3b"
 
-    arrow_kwargs = dict(
-        arrowstyle="-|>",
-        mutation_scale=18,
-        linewidth=1.5,
-        color=edge_color,
-        shrinkA=0,
-        shrinkB=0,
-    )
+    arrow_kwargs = {
+        "arrowstyle": "-|>",
+        "mutation_scale": 18,
+        "linewidth": 1.5,
+        "color": edge_color,
+        "shrinkA": 0,
+        "shrinkB": 0,
+    }
 
     box_w = 9.0
     box_x = 0.5

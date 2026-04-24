@@ -58,7 +58,6 @@ from continuum_swr_replay.analysis.pfc import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     ONE_COLUMN,
-    PANEL_SINGLE,
     get_figure_size,
     save_figure,
 )

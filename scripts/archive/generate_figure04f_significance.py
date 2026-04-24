@@ -14,16 +14,15 @@ import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.figure_utilities import (
     FIGURE_TWO_PANEL_HORIZONTAL,
     save_figure,
 )
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")

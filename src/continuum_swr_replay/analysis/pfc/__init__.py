@@ -52,7 +52,11 @@ Examples
 
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models as fit_immobility_models,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
     _make_design_matrices as make_design_matrices,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
     get_spikecount_per_time_bin,
     process_neuron,
     run_session,

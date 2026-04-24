@@ -319,7 +319,7 @@ def plot_transition_kernels(fig, gs_slot):
                 trans[i, :] /= trans[i, :].sum()
 
         # Shared vmax so uniform vs random walk are visually comparable
-        im = sub_ax.imshow(
+        sub_ax.imshow(
             trans, aspect="equal", cmap="magma",
             vmin=0, vmax=0.15,
             interpolation="nearest", origin="lower",

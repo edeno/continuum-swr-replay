@@ -15,7 +15,6 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     get_data_over_time,
 )
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================

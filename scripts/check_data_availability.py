@@ -25,11 +25,13 @@ logging.getLogger("datajoint").setLevel(logging.CRITICAL)
 logging.getLogger("pynwb").setLevel(logging.CRITICAL)
 logging.getLogger("hdmf").setLevel(logging.CRITICAL)
 
-from continuum_swr_replay.data_loaders.events import load_dios
-from continuum_swr_replay.data_loaders.lfp import get_ripple, get_theta
-from continuum_swr_replay.data_loaders.position import get_position_info
-from continuum_swr_replay.data_loaders.spikes import get_spike_data
-from continuum_swr_replay.data_loaders.utils import get_epoch_info
+# Project imports are intentionally placed after warning/logger silencing
+# so that import-time chatter from spyglass/datajoint/pynwb is suppressed.
+from continuum_swr_replay.data_loaders.events import load_dios  # noqa: E402
+from continuum_swr_replay.data_loaders.lfp import get_ripple, get_theta  # noqa: E402
+from continuum_swr_replay.data_loaders.position import get_position_info  # noqa: E402
+from continuum_swr_replay.data_loaders.spikes import get_spike_data  # noqa: E402
+from continuum_swr_replay.data_loaders.utils import get_epoch_info  # noqa: E402
 
 
 def check_position(nwb_file_name: str, epoch_name: str) -> dict:

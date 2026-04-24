@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-
 import pytest
 
 from continuum_swr_replay.data_loaders.utils import get_labels, parse_nwb_filename

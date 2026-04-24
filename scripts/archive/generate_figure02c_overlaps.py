@@ -40,12 +40,9 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_immobile_events,
 )
 from continuum_swr_replay.figure_utilities import (
-    FIGURE_THREE_PANEL_HORIZONTAL,
     FIGURE_TWO_PANEL_HORIZONTAL,
-    ONE_COLUMN,
     PANEL_SINGLE,
     PANEL_SINGLE_SQUARE,
-    TWO_COLUMN,
     get_figure_size,
     save_figure,
 )

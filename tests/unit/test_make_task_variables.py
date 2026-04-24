@@ -14,7 +14,6 @@ import pytest
 
 from continuum_swr_replay.data_loaders.task_variables import make_task_variables
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================

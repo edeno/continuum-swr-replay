@@ -20,7 +20,6 @@ Two figures:
 from __future__ import annotations
 
 import argparse
-import pickle
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -69,7 +68,7 @@ def figure_trial_sanity(
 
     fig, axes = plt.subplots(
         3, 1, figsize=(12, 8), sharex=True, constrained_layout=True,
-        gridspec_kw=dict(height_ratios=[1.5, 0.7, 0.6]),
+        gridspec_kw={"height_ratios": [1.5, 0.7, 0.6]},
     )
 
     # (1) track_segment_id over time
@@ -115,7 +114,7 @@ def figure_trial_sanity(
     # (3) Trip-membership label per timebin (which trip is in-progress?)
     ax = axes[2]
     # For each trip in window, draw a horizontal bar colored by the trip's to_well arm
-    for i, (_, t) in enumerate(trips_in_win.iterrows()):
+    for _i, (_, t) in enumerate(trips_in_win.iterrows()):
         s = max(0, t["start_time"] - window_start)
         e = min(window_seconds, t["end_time"] - window_start)
         to_arm = int(t["to_well"])
@@ -153,7 +152,7 @@ def figure_predictor_collapse(*, output_dir: Path) -> None:
     }
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), constrained_layout=True,
-                             gridspec_kw=dict(width_ratios=[1.2, 1]))
+                             gridspec_kw={"width_ratios": [1.2, 1]})
 
     # (A) Bar chart: % of events where each context column == current arm
     ax = axes[0]

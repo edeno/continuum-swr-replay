@@ -1,7 +1,6 @@
 """Tests for switch_analysis session-boundary handling."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 
@@ -36,9 +35,6 @@ def _make_two_session_stop_table() -> pd.DataFrame:
 def test_shift_does_not_leak_across_sessions():
     """The first stop of session 2 should be identified as a first-switch,
     not suppressed by the last stop of session 1 being a switch."""
-    from continuum_swr_replay.analysis.replay.switch_analysis import (
-        build_switch_aligned_table,
-    )
 
     stop_table = _make_two_session_stop_table()
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-import xarray as xr
 
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     get_signal_windows,

@@ -374,7 +374,7 @@ class TestSEUnderCoverageUnderAutocorrelation:
 
     def test_calibration_degrades_with_autocorrelation(self):
         beta = {"is_current": 0.6}
-        common = dict(n_events=120, L_e=20, n_replicates=40)
+        common = {"n_events": 120, "L_e": 20, "n_replicates": 40}
 
         coefs_iid, bses_iid = _replicated_fits(
             simulate_autocorrelated_counts, beta, rho=0.0, **common

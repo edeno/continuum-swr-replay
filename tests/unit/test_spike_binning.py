@@ -8,7 +8,6 @@ expected values.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
 

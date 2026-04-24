@@ -3,9 +3,10 @@
 Loads and filters the batch PFC GLM results for use by figure04 panel scripts.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from scipy.stats import false_discovery_control
 
 

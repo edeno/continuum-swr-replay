@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 from track_linearization import make_track_graph
 
 from continuum_swr_replay.data_loaders.position import get_interpolated_position_info

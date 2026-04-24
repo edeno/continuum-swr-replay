@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # These tests will use mock data since we don't have access to real NWB files
 # In practice, you would use a small test NWB file
@@ -69,7 +68,7 @@ class TestDataLoadingIntegration:
 
         assert len(hpc_times) == len(hpc_features)
 
-        for times, features in zip(hpc_times, hpc_features):
+        for times, features in zip(hpc_times, hpc_features, strict=True):
             assert len(times) == features.shape[0], \
                 "Feature count must match spike count"
 
@@ -252,7 +251,8 @@ class TestSelectiveDataLoading:
 
     def test_minimal_preset_loads_only_required_keys(self, mock_session_data):
         """MINIMAL preset should only include position and spike data."""
-        from continuum_swr_replay.types import DataLoadingPreset, SessionDataKeys as SDK
+        from continuum_swr_replay.types import DataLoadingPreset
+        from continuum_swr_replay.types import SessionDataKeys as SDK
 
         # Simulate what load_data would return with MINIMAL preset
         # (In practice this would use load_data with include=DataLoadingPreset.MINIMAL)
@@ -269,7 +269,8 @@ class TestSelectiveDataLoading:
 
     def test_neural_preset_includes_lfp_data(self, mock_session_data):
         """NEURAL preset should include all neural data."""
-        from continuum_swr_replay.types import DataLoadingPreset, SessionDataKeys as SDK
+        from continuum_swr_replay.types import DataLoadingPreset
+        from continuum_swr_replay.types import SessionDataKeys as SDK
 
         # NEURAL extends MINIMAL with ripple, theta, and multiunit
         assert SDK.RIPPLE_TIMES in DataLoadingPreset.NEURAL
@@ -282,7 +283,8 @@ class TestSelectiveDataLoading:
 
     def test_behavioral_preset_excludes_neural_data(self, mock_session_data):
         """BEHAVIORAL preset should not include spike or LFP data."""
-        from continuum_swr_replay.types import DataLoadingPreset, SessionDataKeys as SDK
+        from continuum_swr_replay.types import DataLoadingPreset
+        from continuum_swr_replay.types import SessionDataKeys as SDK
 
         # Should include position and task data
         assert SDK.POSITION_INFO in DataLoadingPreset.BEHAVIORAL
@@ -296,7 +298,8 @@ class TestSelectiveDataLoading:
 
     def test_decoding_preset_includes_everything_needed(self, mock_session_data):
         """DECODING preset should include all data needed for decoding."""
-        from continuum_swr_replay.types import DataLoadingPreset, SessionDataKeys as SDK
+        from continuum_swr_replay.types import DataLoadingPreset
+        from continuum_swr_replay.types import SessionDataKeys as SDK
 
         # Should include all neural data (from NEURAL)
         assert SDK.SPIKE_TIMES in DataLoadingPreset.DECODING
@@ -310,7 +313,8 @@ class TestSelectiveDataLoading:
 
     def test_preset_union_works(self, mock_session_data):
         """Should be able to extend presets with custom keys."""
-        from continuum_swr_replay.types import DataLoadingPreset, SessionDataKeys as SDK
+        from continuum_swr_replay.types import DataLoadingPreset
+        from continuum_swr_replay.types import SessionDataKeys as SDK
 
         # Extend MINIMAL with trials
         custom = DataLoadingPreset.MINIMAL | {SDK.TRIALS, SDK.WELL_VISITS}

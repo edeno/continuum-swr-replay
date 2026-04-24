@@ -18,6 +18,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
     get_frac_explained_deviance,
     get_frac_null_deviance,
     process_neuron,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
     test_theta_modulation as run_theta_modulation_test,
 )
 

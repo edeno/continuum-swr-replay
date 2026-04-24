@@ -70,12 +70,12 @@ from types import SimpleNamespace
 import networkx as nx
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
+from scipy.interpolate import interp1d
 
 # Opt in to future pandas behavior: fillna on object dtype will no longer
 # silently downcast. This suppresses the FutureWarning.
 pd.set_option("future.no_silent_downcasting", True)
-from numpy.typing import NDArray
-from scipy.interpolate import interp1d
 
 # Minimum meaningful distance for path progress calculation (in cm).
 # Distances below this threshold are treated as zero to avoid division

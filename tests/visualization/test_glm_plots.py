@@ -251,7 +251,7 @@ class TestPlotAICs:
         model_names = ["constant", "SWR", "non_local_SWR", "non_local_no_SWR", "non_local"]
         aic_values = [1000.0, 950.0, 920.0, 930.0, 925.0]
 
-        for name, aic in zip(model_names, aic_values):
+        for name, aic in zip(model_names, aic_values, strict=True):
             mock_result = MagicMock()
             mock_result.aic = aic
             mock_results[name] = mock_result

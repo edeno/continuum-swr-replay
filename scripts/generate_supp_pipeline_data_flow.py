@@ -27,8 +27,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import Rectangle
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -302,8 +300,8 @@ def make_figure(
         positions=positions,
         widths=0.6,
         patch_artist=True,
-        medianprops=dict(color="black", linewidth=1.5),
-        flierprops=dict(markersize=3, alpha=0.5),
+        medianprops={"color": "black", "linewidth": 1.5},
+        flierprops={"markersize": 3, "alpha": 0.5},
     )
     for patch in bp["boxes"]:
         patch.set_facecolor("#3b6ea5")

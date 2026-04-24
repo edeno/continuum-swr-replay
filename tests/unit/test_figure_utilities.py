@@ -503,7 +503,6 @@ class TestSaveFigure:
         set transparent=False for dark backgrounds and transparent=True
         for light backgrounds when transparent=None.
         """
-        import matplotlib.colors as mcolors
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create figure with dark background
@@ -586,7 +585,7 @@ class TestValidateFigureQuality:
 
         # Layout engine should be unchanged
         layout_engine_after = fig.get_layout_engine()
-        assert type(layout_engine_before) == type(layout_engine_after)
+        assert type(layout_engine_before) is type(layout_engine_after)
 
         plt.close(fig)
 

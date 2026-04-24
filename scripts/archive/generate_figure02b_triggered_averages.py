@@ -42,7 +42,6 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_signal_windows,
 )
 from continuum_swr_replay.figure_utilities import (
-    PANEL_SINGLE_TALL,
     get_figure_size,
     save_figure,
 )

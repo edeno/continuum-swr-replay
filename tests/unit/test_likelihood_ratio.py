@@ -7,7 +7,6 @@ the paper's core findings about modulation.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 import scipy.stats
 

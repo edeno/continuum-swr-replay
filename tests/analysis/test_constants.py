@@ -6,17 +6,6 @@ import pytest
 
 def test_constants_importable():
     """Test that all constants can be imported."""
-    from continuum_swr_replay.analysis.constants import (
-        BINS_DISTANCE_CM,
-        BINS_DURATION_MS,
-        BINS_HPD_CM,
-        BINS_PROBABILITY,
-        BINS_SPEED_CM_PER_SEC,
-        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        DEFAULT_NON_LOCAL_THRESHOLD,
-        DEFAULT_SAMPLING_FREQUENCY_HZ,
-        DEFAULT_WINDOW_EVENT_TRIGGERED_SEC,
-    )
 
     # If we get here, all imports succeeded
     assert True

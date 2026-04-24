@@ -141,7 +141,7 @@ class TestPooledSEUnderHeterogeneity:
         tau = 0.3  # between-animal SD of true β
 
         coefs, bses = [], []
-        for r in range(n_replicates):
+        for _r in range(n_replicates):
             per_animal = [
                 {"is_current": float(rng.normal(mu, tau))} for _ in range(n_animals)
             ]

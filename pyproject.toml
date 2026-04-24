@@ -84,6 +84,8 @@ ignore = [
 # Allow imports after TYPE_CHECKING blocks (standard pattern to avoid circular imports)
 # Also allow "unused" imports in TYPE_CHECKING blocks - they're used by type checkers
 "src/continuum_swr_replay/data_loaders/bandit_task.py" = ["E402", "F401"]
+# Archived figure scripts retained for historical reference; not linted.
+"scripts/archive/**" = ["ALL"]
 
 [tool.mypy]
 python_version = "3.11"

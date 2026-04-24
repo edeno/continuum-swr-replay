@@ -6,7 +6,6 @@ Tests the critical coincident spike detection algorithm and spike filtering.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from continuum_swr_replay.data_loaders.spikes import (
     detect_coincident_spikes,
@@ -488,7 +487,7 @@ class TestSpikeDataIntegrity:
 
         for brain_area in filtered_times:
             for i, (times, feats) in enumerate(
-                zip(filtered_times[brain_area], filtered_features[brain_area])
+                zip(filtered_times[brain_area], filtered_features[brain_area], strict=True)
             ):
                 assert feats.shape[0] == len(times), (
                     f"{brain_area} sort group {i}: {feats.shape[0]} features != {len(times)} spikes"
