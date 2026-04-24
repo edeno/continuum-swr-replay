@@ -142,10 +142,14 @@ def summarize_comparison(
         "lrt_significant": int(lr_sig),
     }
 
-    # Wilcoxon signed-rank on delta-AIC
-    if len(daic) >= 5:
+    # Wilcoxon signed-rank on delta-AIC. Drop NaN sessions first —
+    # scipy's default nan_policy="propagate" returns NaN whenever any
+    # input is NaN, which silently invalidates the omnibus p whenever
+    # the mismatched-n_events guard marked some sessions NaN.
+    daic_valid = daic.dropna()
+    if len(daic_valid) >= 5:
         try:
-            _, p = wilcoxon(daic)
+            _, p = wilcoxon(daic_valid)
             result["wilcoxon_p"] = float(p)
         except ValueError:
             result["wilcoxon_p"] = np.nan
