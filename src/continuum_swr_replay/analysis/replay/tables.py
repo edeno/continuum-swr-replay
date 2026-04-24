@@ -897,12 +897,19 @@ def build_event_arm_table(
     long["arm_count_soft"] = soft_aligned.flatten()
     long["arm_posterior_mass"] = mass_aligned.flatten()
 
-    # arm_fraction: defined only when n_nonlocal_bins > 0.
-    n_bins_long = long["n_nonlocal_bins"].to_numpy()
+    # arm_fraction: numerator and denominator must cover the same set
+    # of timebins. ``arm_count_hard`` excludes NaN-``decoded_arm``
+    # timebins (counted as ``n_junction_bins``); the denominator must
+    # exclude them too, or the fraction deflates below 1 whenever any
+    # MAP failed to attribute to a real arm. NaN when no real-arm
+    # bins exist (denominator <= 0).
+    n_real_bins_long = (
+        long["n_nonlocal_bins"].to_numpy() - long["n_junction_bins"].to_numpy()
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         frac = np.where(
-            n_bins_long > 0,
-            long["arm_count_hard"].to_numpy() / np.maximum(n_bins_long, 1),
+            n_real_bins_long > 0,
+            long["arm_count_hard"].to_numpy() / np.maximum(n_real_bins_long, 1),
             np.nan,
         )
     long["arm_fraction"] = frac

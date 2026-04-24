@@ -381,6 +381,48 @@ class TestEventArmTableInvariants:
         frac_sum = eat.groupby("event_id")["arm_fraction"].sum()
         np.testing.assert_allclose(frac_sum.to_numpy(), 1.0, atol=1e-12)
 
+    def test_arm_fraction_sums_to_1_when_junction_bins_present(self, tiny_session):
+        """arm_fraction must sum to 1 per event even when some timebins
+        have no arm attribution (NaN ``decoded_arm`` — counted as
+        ``n_junction_bins``). ``arm_count_hard`` excludes those timebins
+        from the numerator, so the denominator must exclude them too
+        — otherwise the fraction deflates below 1 whenever any MAP
+        failed to attribute to a real arm.
+        """
+        dot, env, trials, graph = tiny_session
+        # Force half of event 1's timebins to have NaN map_estimate —
+        # decoded_arm becomes NaN there, so n_junction_bins = 5.
+        event_1_rows = dot.index[dot["non_local_event"] == 1]
+        dot.loc[event_1_rows[:5], "map_estimate"] = np.nan
+
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+
+        # Event 1 now has junction bins; event 2 does not.
+        ev1 = et[et["non_local_event"] == 1].iloc[0]
+        assert ev1["n_junction_bins"] == 5
+        assert ev1["n_nonlocal_bins"] == 10
+
+        frac_sum = eat.groupby("non_local_event")["arm_fraction"].sum()
+        np.testing.assert_allclose(frac_sum.to_numpy(), 1.0, atol=1e-12)
+
+    def test_arm_fraction_nan_for_all_junction_event(self, tiny_session):
+        """Events where every timebin has NaN decoded_arm have a
+        denominator of zero — arm_fraction must be NaN for all 9 arms
+        (not +inf, not 0, not silently 0/0)."""
+        dot, env, trials, graph = tiny_session
+        event_1_rows = dot.index[dot["non_local_event"] == 1]
+        dot.loc[event_1_rows, "map_estimate"] = np.nan
+
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+
+        event_1_eat = eat[eat["non_local_event"] == 1]
+        assert event_1_eat["arm_fraction"].isna().all()
+        # Event 2 is untouched and still sums to 1.
+        event_2_sum = eat[eat["non_local_event"] == 2]["arm_fraction"].sum()
+        assert np.isclose(event_2_sum, 1.0)
+
     def test_sum_arm_posterior_mass_equals_posterior_mass_total(
         self, tiny_session_with_posterior
     ):
