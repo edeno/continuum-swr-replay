@@ -675,7 +675,7 @@ def process_neuron(
             neuron_spike_count[is_immobile].mean() * sampling_frequency
         )
 
-        results, models = _fit_immobility_models(
+        results, _ = _fit_immobility_models(
             is_immobile, immobility_design_matrices, neuron_spike_count
         )
 
@@ -762,18 +762,22 @@ def process_neuron(
         )
 
         ## Modulation time courses
+        # Use the same unregularized fits that LR tests and AIC use —
+        # otherwise neuron_stats (AIC-based) and the modulation arrays
+        # are from logically separate fits, which silently disagree if
+        # IRLS converges differently for the regularized vs unregularized
+        # paths. The previous fit_regularized(alpha=1e-20) call was
+        # numerically near-identical but logically a second fit.
         n_basis_functions = spline_basis.shape[1]
 
         # SWR-controlled model: SWR and non-SWR replay modulation
         # controlling for all detected ripples
-        reg_swr_ctrl = models["SWR + non_local_no_SWR"].fit_regularized(
-            alpha=1e-20, L1_wt=0.0
-        )
+        swr_ctrl_params = results["SWR + non_local_no_SWR"].params
         swr_modulation = (
-            spline_basis @ reg_swr_ctrl.params[1 : n_basis_functions + 1]
+            spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
         )
         no_swr_modulation = (
-            spline_basis @ reg_swr_ctrl.params[n_basis_functions + 1 :]
+            spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
         )
 
         swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
@@ -790,14 +794,12 @@ def process_neuron(
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
         # controlling for replay-coincident ripples only
-        reg_replay_split = models[
-            "non_local_SWR + non_local_no_SWR"
-        ].fit_regularized(alpha=1e-20, L1_wt=0.0)
+        replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
         non_local_swr_modulation = (
-            spline_basis @ reg_replay_split.params[1 : n_basis_functions + 1]
+            spline_basis @ replay_split_params[1 : n_basis_functions + 1]
         )
         non_local_no_swr_modulation = (
-            spline_basis @ reg_replay_split.params[n_basis_functions + 1 :]
+            spline_basis @ replay_split_params[n_basis_functions + 1 :]
         )
 
         non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
