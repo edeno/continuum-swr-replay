@@ -240,6 +240,12 @@ def fit_conditional_logit(
     events_with_nan = df.loc[has_nan, event_col].unique()
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
+    # Remove events where every arm has zero count — idxmax would
+    # arbitrarily pick the first row as "dominant", creating a spurious
+    # observation. Matches fit_conditional_poisson's filter at :83.
+    event_totals = df.groupby(event_col)[response_col].transform("sum")
+    df = df[event_totals > 0].reset_index(drop=True)
+
     # Determine dominant arm per event
     idx = df.groupby(event_col)[response_col].idxmax()
     df["dominant"] = 0
