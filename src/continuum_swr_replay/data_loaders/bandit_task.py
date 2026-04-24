@@ -323,8 +323,10 @@ def load_data(
     ).fetch1("position_interval_name")
     position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
 
-    # Drop time points with NaN positions (typically at start/end when tracking unavailable)
-    # This ensures all time-indexed data will be aligned to valid position times
+    # Defense in depth: get_position_info now trims the interpolation
+    # grid to the valid interval, so this dropna should be a no-op in
+    # the typical case. Kept as a safety net against per-frame DLC
+    # tracking gaps that may leave NaN x/y inside the valid window.
     n_before = len(position_data["position_info"])
     position_data["position_info"] = position_data["position_info"].dropna(
         subset=["head_position_x", "head_position_y"]

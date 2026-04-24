@@ -262,9 +262,15 @@ def get_position_info(
                 "interval_list_name": epoch_name + " noPrePostTrialTimes",
             }
         ).fetch1("valid_times")
-        position_info = position_info.loc[
-            valid_interval_times[0][0] : valid_interval_times[-1][1]
-        ]
+        # Slice both axes to the valid interval — position_info is the
+        # raw DLC frame, ``time`` is the interpolation grid. They come
+        # from independent Spyglass tables, so each must be trimmed
+        # explicitly. Without this, ``get_interpolated_position_info``
+        # extrapolates across the pre/post-trial gap, leaving NaN rows
+        # that downstream callers then have to ``dropna`` away.
+        t_start, t_end = valid_interval_times[0][0], valid_interval_times[-1][1]
+        position_info = position_info.loc[t_start:t_end]
+        time = time[(time >= t_start) & (time <= t_end)]
     except DataJointError as e:
         logger.debug(
             "No noPrePostTrialTimes interval for %s %s: %s", nwb_file_name, epoch_name, e
