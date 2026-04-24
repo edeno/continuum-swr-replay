@@ -218,13 +218,13 @@ def plot_triggered_averages(
         ax.plot(
             time,
             no_overlap_mean.values,
-            label="No SWR Overlap",
+            label="non-SWR non-local",
             color=COLORS["Non-Local"],
         )
         ax.plot(
             time,
             overlap_mean.values,
-            label="SWR Overlap",
+            label="SWR-coincident non-local",
             color=COLORS["SWR"],
         )
 
@@ -353,7 +353,7 @@ def plot_replay_speed_by_swr(
         density=True,
         alpha=0.7,
         color=COLORS["SWR"],
-        label="With SWR",
+        label="SWR-coincident non-local",
     )
 
     no_swr_mask = (data_over_time["non_local_event"] > 0) & (
@@ -365,7 +365,7 @@ def plot_replay_speed_by_swr(
         density=True,
         alpha=0.7,
         color=COLORS["Non-Local"],
-        label="Without SWR",
+        label="non-SWR non-local",
     )
 
     ax.set_xlabel("Replay Speed (cm/s)")
@@ -418,7 +418,7 @@ def plot_replay_position_by_swr(
         density=True,
         alpha=0.7,
         color=COLORS["SWR"],
-        label="With SWR",
+        label="SWR-coincident non-local",
     )
 
     no_swr_mask = (data_over_time["non_local_event"] > 0) & (
@@ -431,7 +431,7 @@ def plot_replay_position_by_swr(
         density=True,
         alpha=0.7,
         color=COLORS["Non-Local"],
-        label="Without SWR",
+        label="non-SWR non-local",
     )
 
     ax.set_xlabel("Normalized Replay Position")
