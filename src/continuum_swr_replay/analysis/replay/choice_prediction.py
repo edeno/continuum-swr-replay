@@ -185,8 +185,17 @@ def build_choice_dataset(
         - ``n_events`` — number of replay events in this stop
         - Session identifiers (``animal``, ``day``, ``epoch``)
     """
-    # Stops with replay and a valid next choice.
-    has_replay = stop_table["has_replay"] & stop_table["next_arm"].notna()
+    # Stops with replay, a valid next choice, and a defined current arm.
+    # current_arm is required so the ``arm != current_arm`` exclusion
+    # below removes exactly one arm from the 9-arm candidate set; when
+    # current_arm is NaN the comparison evaluates True for every arm
+    # (IEEE 754), silently inflating the choice set to 9 arms for those
+    # stops.
+    has_replay = (
+        stop_table["has_replay"]
+        & stop_table["next_arm"].notna()
+        & stop_table["current_arm"].notna()
+    )
     valid_stops = stop_table.loc[has_replay].copy()
 
     if len(valid_stops) == 0:
