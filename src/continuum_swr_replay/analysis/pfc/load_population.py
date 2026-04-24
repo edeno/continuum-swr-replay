@@ -9,6 +9,19 @@ import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
 
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+
+
+def _extract_animal(nwb_file_name: str) -> str:
+    """Animal name from an NWB filename.
+
+    Wraps ``parse_nwb_filename`` so that j16 sessions resolve to ``"j16"``
+    rather than ``"j1"`` (which is what the historical
+    ``str.split("2")[0]`` heuristic produced — the date YYYYMMDD often
+    contains a ``"2"`` early on).
+    """
+    return parse_nwb_filename(nwb_file_name)[0]
+
 
 def load_population_data(
     data_dir: Path,
@@ -54,7 +67,7 @@ def load_population_data(
         nl_no_swr_list.append(np.load(f"{base}.non_local_no_SWR_modulation.npy"))
 
     df = pd.concat(dfs, ignore_index=True)
-    df["animal"] = df["nwb_file_name"].str.split("2").str[0]
+    df["animal"] = df["nwb_file_name"].map(_extract_animal)
 
     swr_all = np.hstack(swr_list)
     no_swr_all = np.hstack(no_swr_list)
