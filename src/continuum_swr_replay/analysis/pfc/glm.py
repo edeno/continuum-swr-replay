@@ -762,12 +762,9 @@ def process_neuron(
         )
 
         ## Modulation time courses
-        # Use the same unregularized fits that LR tests and AIC use —
-        # otherwise neuron_stats (AIC-based) and the modulation arrays
-        # are from logically separate fits, which silently disagree if
-        # IRLS converges differently for the regularized vs unregularized
-        # paths. The previous fit_regularized(alpha=1e-20) call was
-        # numerically near-identical but logically a second fit.
+        # Share fits with the LR-test / AIC path so neuron_stats and
+        # the modulation arrays can never disagree due to divergent
+        # IRLS convergence.
         n_basis_functions = spline_basis.shape[1]
 
         # SWR-controlled model: SWR and non-SWR replay modulation

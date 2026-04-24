@@ -78,10 +78,7 @@ def fit_conditional_poisson(
     events_with_nan = df.loc[has_nan, event_col].unique()
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
-    # Remove events where all arm counts are zero (degenerate for
-    # conditional likelihood — undefined 0/0 allocation).
-    event_totals = df.groupby(event_col)[response_col].transform("sum")
-    df = df[event_totals > 0].reset_index(drop=True)
+    df = _drop_zero_count_events(df, event_col, response_col)
 
     y = df[response_col].values.astype(float)
     groups = df[event_col].values
@@ -240,11 +237,7 @@ def fit_conditional_logit(
     events_with_nan = df.loc[has_nan, event_col].unique()
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
-    # Remove events where every arm has zero count — idxmax would
-    # arbitrarily pick the first row as "dominant", creating a spurious
-    # observation. Matches fit_conditional_poisson's filter at :83.
-    event_totals = df.groupby(event_col)[response_col].transform("sum")
-    df = df[event_totals > 0].reset_index(drop=True)
+    df = _drop_zero_count_events(df, event_col, response_col)
 
     # Determine dominant arm per event
     idx = df.groupby(event_col)[response_col].idxmax()
@@ -283,6 +276,19 @@ def fit_conditional_logit(
 
 
 # ── Internal helpers ──
+
+
+def _drop_zero_count_events(
+    df: pd.DataFrame, event_col: str, response_col: str
+) -> pd.DataFrame:
+    """Drop events whose ``response_col`` sums to 0 across all rows.
+
+    The conditional likelihood is undefined (0/0) for such events;
+    fit_conditional_logit's idxmax would silently pick an arbitrary
+    "dominant" arm otherwise.
+    """
+    event_totals = df.groupby(event_col)[response_col].transform("sum")
+    return df[event_totals > 0].reset_index(drop=True)
 
 
 def _compute_conditional_diagnostics(

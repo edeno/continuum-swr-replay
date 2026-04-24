@@ -108,6 +108,9 @@ def get_contfrag_data_over_time(
 
     animal, day = parse_nwb_filename(nwb_file_name)
 
+    def _nearest(series):
+        return series.reindex(results.time, method="nearest", tolerance=0.004)
+
     data_over_time = pd.DataFrame(
         {
             "SWR_event": swr_labels.squeeze(),
@@ -125,21 +128,14 @@ def get_contfrag_data_over_time(
             "max_coverage": max_coverage,
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
-            "theta_phase": data["theta_phase"]
-            .reindex(results.time, method="nearest", tolerance=0.004)
-            .squeeze(),
+            "theta_phase": _nearest(data["theta_phase"]).squeeze(),
             "theta_power_zscore": zscore(
-                data["theta_power"]
-                .squeeze()
-                .reindex(results.time, method="nearest", tolerance=0.004)
-                .squeeze()
+                _nearest(data["theta_power"].squeeze()).squeeze()
             ),
-            "SWR_zscore": data["zscored_ripple_consensus_trace"]
-            .reindex(results.time, method="nearest", tolerance=0.004)
-            .squeeze(),
-            "MUA_zscore": data["multiunit_rate_zscore"][brain_area]
-            .squeeze()
-            .reindex(results.time, method="nearest", tolerance=0.004),
+            "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
+            "MUA_zscore": _nearest(
+                data["multiunit_rate_zscore"][brain_area].squeeze()
+            ),
             "n_SWR": len(data["ripple_times"]),
             "n_MUA": len(data["hse_times"][brain_area]),
             "n_SWR_MUA": len(swr_mua_times),
