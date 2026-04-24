@@ -266,10 +266,14 @@ def classify_swr_overlap_geometry(
 
     The three coarse classes are (in terms of subclasses above):
 
-    - ``"contained"`` = ``swr_contains_event``
-    - ``"partial"`` = ``event_contains_swr`` ∪ ``single_swr_partial`` ∪
+    - ``"swr_contained"`` = ``swr_contains_event``
+    - ``"swr_partial"`` = ``event_contains_swr`` ∪ ``single_swr_partial`` ∪
       ``multi_swr_no_gap`` ∪ ``multi_swr_gap``
-    - ``"no_overlap"`` = ``no_overlap``
+    - ``"non_swr"`` = ``no_overlap``
+
+    Display labels for figures / captions: ``"SWR-contained"``,
+    ``"SWR-partial"``, ``"non-SWR"``. The binary axis used elsewhere in
+    the paper is ``SWR-coincident = SWR-contained ∪ SWR-partial``.
 
     Parameters
     ----------
@@ -285,7 +289,7 @@ def classify_swr_overlap_geometry(
         Copy of ``non_local_events`` with five added columns:
 
         - ``overlap_class`` : coarse label
-          (``"no_overlap"`` / ``"partial"`` / ``"contained"``)
+          (``"non_swr"`` / ``"swr_partial"`` / ``"swr_contained"``)
         - ``overlap_subclass`` : fine label (one of the six strings
           listed above)
         - ``n_swrs_overlapping`` : int, count of SWRs intersecting the
@@ -327,7 +331,7 @@ def classify_swr_overlap_geometry(
         n_overlap_arr[i] = n_overlap
 
         if n_overlap == 0:
-            classes[i] = "no_overlap"
+            classes[i] = "non_swr"
             subclasses[i] = "no_overlap"
             event_has_non_swr_time_arr[i] = True
             continue
@@ -341,7 +345,7 @@ def classify_swr_overlap_geometry(
             & (overlapping_ends >= ev.end_time)
         )
         if containing_mask.any():
-            classes[i] = "contained"
+            classes[i] = "swr_contained"
             subclasses[i] = "swr_contains_event"
             # Event sits inside an SWR, so every timebin is SWR-covered.
             event_has_non_swr_time_arr[i] = False
@@ -379,7 +383,7 @@ def classify_swr_overlap_geometry(
         event_has_non_swr_time = union_duration < event_duration - 1e-6
         event_has_non_swr_time_arr[i] = event_has_non_swr_time
 
-        classes[i] = "partial"
+        classes[i] = "swr_partial"
         if contains_any_swr:
             subclasses[i] = "event_contains_swr"
         elif n_overlap == 1:

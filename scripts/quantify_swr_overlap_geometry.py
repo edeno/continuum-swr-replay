@@ -52,9 +52,9 @@ SUBCLASS_DESCRIPTIONS = {
     "swr_contains_event":  "single SWR fully contains the event",
 }
 COARSE_ORDER = [
-    ("contained",  "SWR-contained (event inside one SWR)"),
-    ("partial",    "partial overlap (event extends past SWR boundaries)"),
-    ("no_overlap", "non-SWR (no overlap)"),
+    ("swr_contained", "SWR-contained (event inside one SWR)"),
+    ("swr_partial",   "SWR-partial (event extends past SWR boundaries)"),
+    ("non_swr",       "non-SWR (no overlap)"),
 ]
 
 

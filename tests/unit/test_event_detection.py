@@ -619,7 +619,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(1.0, 2.0)
         swr = _swrs([(3.0, 4.0), (5.0, 6.0)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "no_overlap"
+        assert out["overlap_class"] == "non_swr"
         assert out["overlap_subclass"] == "no_overlap"
         assert out["n_swrs_overlapping"] == 0
         assert not out["contains_any_swr"]
@@ -630,7 +630,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(1.0, 2.0)
         swr = _swrs([(0.5, 2.5)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "contained"
+        assert out["overlap_class"] == "swr_contained"
         assert out["overlap_subclass"] == "swr_contains_event"
         assert out["n_swrs_overlapping"] == 1
         assert not out["event_has_non_swr_time"]
@@ -647,7 +647,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(0.0, 10.0)
         swr = _swrs([(3.0, 5.0)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "partial"
+        assert out["overlap_class"] == "swr_partial"
         assert out["overlap_subclass"] == "event_contains_swr"
         assert out["n_swrs_overlapping"] == 1
         assert out["contains_any_swr"]
@@ -659,7 +659,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(1.0, 2.0)
         swr = _swrs([(1.5, 2.5)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "partial"
+        assert out["overlap_class"] == "swr_partial"
         assert out["overlap_subclass"] == "single_swr_partial"
         assert out["n_swrs_overlapping"] == 1
         assert not out["contains_any_swr"]
@@ -675,7 +675,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(0.0, 1.0)
         swr = _swrs([(-0.2, 0.5), (0.5, 1.2)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "partial"
+        assert out["overlap_class"] == "swr_partial"
         assert out["overlap_subclass"] == "multi_swr_no_gap"
         assert out["n_swrs_overlapping"] == 2
         assert not out["contains_any_swr"]
@@ -686,7 +686,7 @@ class TestClassifySwrOverlapGeometry:
         ev = _event(0.0, 1.0)
         swr = _swrs([(-0.1, 0.3), (0.7, 1.1)])
         out = classify_swr_overlap_geometry(ev, swr).iloc[0]
-        assert out["overlap_class"] == "partial"
+        assert out["overlap_class"] == "swr_partial"
         assert out["overlap_subclass"] == "multi_swr_gap"
         assert out["n_swrs_overlapping"] == 2
         assert not out["contains_any_swr"]
@@ -721,9 +721,9 @@ class TestClassifySwrOverlapGeometry:
         # "none"/"extends"/"contained" strings. Map between them here
         # to verify they agree on category membership.
         coarse_to_legacy = {
-            "no_overlap": "none",
-            "partial": "extends",
-            "contained": "contained",
+            "non_swr": "none",
+            "swr_partial": "extends",
+            "swr_contained": "contained",
         }
         for i in range(len(geom)):
             new_coarse = geom.iloc[i]["overlap_class"]
