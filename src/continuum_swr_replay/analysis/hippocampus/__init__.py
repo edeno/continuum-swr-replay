@@ -93,6 +93,7 @@ from .event_analysis import (
 )
 from .event_detection import (
     classify_swr_overlap,
+    classify_swr_overlap_geometry,
     get_confident_times,
     get_overlap_times,
     select_typical_event_by_class,
@@ -133,6 +134,7 @@ __all__ = [
     "get_confident_times",
     "get_overlap_times",
     "classify_swr_overlap",
+    "classify_swr_overlap_geometry",
     "select_typical_event_by_class",
     "get_immobile_events",
     "get_event_start_end_times",

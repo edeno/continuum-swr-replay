@@ -234,6 +234,170 @@ def classify_swr_overlap(
     return out
 
 
+def classify_swr_overlap_geometry(
+    non_local_events: pd.DataFrame,
+    ripple_times: pd.DataFrame,
+) -> pd.DataFrame:
+    """Fine-grained interval geometry between non-local events and SWRs.
+
+    Extends :func:`classify_swr_overlap` to distinguish sub-cases of the
+    overlapping-but-not-contained bucket. Useful for methods-section
+    breakdowns and for auditing what the coarser three-way split
+    aggregates over.
+
+    Sub-class partition (mutually exclusive, collectively exhaustive):
+
+    - ``"no_overlap"`` — no SWR intersects the event
+    - ``"event_contains_swr"`` — the event strictly contains at least
+      one SWR (event extends past both boundaries of some overlapping
+      SWR)
+    - ``"single_swr_partial"`` — the event overlaps exactly one SWR,
+      and neither interval contains the other (partial overlap at one
+      boundary)
+    - ``"multi_swr_no_gap"`` — the event overlaps two or more SWRs and
+      every timebin of the event is inside some SWR (tiled by a
+      contiguous train of SWRs with no gaps). Expected to be very rare
+      because SWR detectors typically enforce a minimum inter-event
+      separation.
+    - ``"multi_swr_gap"`` — the event overlaps two or more SWRs and at
+      least one timebin of the event is outside every SWR (tiled with
+      gap(s))
+    - ``"swr_contains_event"`` — a single SWR fully contains the event
+
+    The three coarse classes are (in terms of subclasses above):
+
+    - ``"contained"`` = ``swr_contains_event``
+    - ``"partial"`` = ``event_contains_swr`` ∪ ``single_swr_partial`` ∪
+      ``multi_swr_no_gap`` ∪ ``multi_swr_gap``
+    - ``"no_overlap"`` = ``no_overlap``
+
+    Parameters
+    ----------
+    non_local_events : pd.DataFrame
+        Non-local event intervals with ``start_time`` and ``end_time``
+        columns (as returned by :func:`get_confident_times`).
+    ripple_times : pd.DataFrame
+        SWR event intervals with ``start_time`` and ``end_time`` columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``non_local_events`` with five added columns:
+
+        - ``overlap_class`` : coarse label
+          (``"no_overlap"`` / ``"partial"`` / ``"contained"``)
+        - ``overlap_subclass`` : fine label (one of the six strings
+          listed above)
+        - ``n_swrs_overlapping`` : int, count of SWRs intersecting the
+          event
+        - ``contains_any_swr`` : bool, True if the event strictly
+          contains at least one SWR
+        - ``event_has_non_swr_time`` : bool, True if any part of the
+          event is outside every SWR
+
+    Notes
+    -----
+    Boundary-equality conventions: ``"swr_contains_event"`` allows
+    boundary equality (``SWR.start == event.start`` is still
+    "contained"). ``"event_contains_swr"`` uses strict inequality so a
+    boundary-matched SWR is not "strictly inside" the event.
+    Containment is decided before the partial-overlap logic, so a
+    ``"swr_contains_event"`` row never also appears in a
+    partial-overlap subclass count.
+
+    The ``event_has_non_swr_time`` flag is computed by clipping each
+    overlapping SWR to the event window, merging the clipped intervals,
+    and comparing merged duration to event duration (with 1 μs
+    tolerance to absorb floating-point noise).
+
+    """
+    swr_starts = ripple_times["start_time"].to_numpy()
+    swr_ends = ripple_times["end_time"].to_numpy()
+
+    n_events = len(non_local_events)
+    classes: list[str] = [""] * n_events
+    subclasses: list[str] = [""] * n_events
+    n_overlap_arr = np.zeros(n_events, dtype=int)
+    contains_any_swr_arr = np.zeros(n_events, dtype=bool)
+    event_has_non_swr_time_arr = np.zeros(n_events, dtype=bool)
+
+    for i, ev in enumerate(non_local_events.itertuples()):
+        overlap_mask = (swr_ends >= ev.start_time) & (swr_starts <= ev.end_time)
+        n_overlap = int(overlap_mask.sum())
+        n_overlap_arr[i] = n_overlap
+
+        if n_overlap == 0:
+            classes[i] = "no_overlap"
+            subclasses[i] = "no_overlap"
+            event_has_non_swr_time_arr[i] = True
+            continue
+
+        overlapping_starts = swr_starts[overlap_mask]
+        overlapping_ends = swr_ends[overlap_mask]
+
+        # Any single SWR fully contains this event?
+        containing_mask = (
+            (overlapping_starts <= ev.start_time)
+            & (overlapping_ends >= ev.end_time)
+        )
+        if containing_mask.any():
+            classes[i] = "contained"
+            subclasses[i] = "swr_contains_event"
+            # Event sits inside an SWR, so every timebin is SWR-covered.
+            event_has_non_swr_time_arr[i] = False
+            continue
+
+        # Neither contained. Decide among the partial-overlap subclasses.
+        strict_contained_mask = (
+            (overlapping_starts > ev.start_time)
+            & (overlapping_ends < ev.end_time)
+        )
+        contains_any_swr = bool(strict_contained_mask.any())
+        contains_any_swr_arr[i] = contains_any_swr
+
+        # Does the event have any timebins outside every SWR?
+        # Clip each overlapping SWR to [ev.start, ev.end], merge, and
+        # compare total merged duration to event duration.
+        clipped_starts = np.maximum(overlapping_starts, ev.start_time)
+        clipped_ends = np.minimum(overlapping_ends, ev.end_time)
+        sort_idx = np.argsort(clipped_starts)
+        sorted_starts = clipped_starts[sort_idx]
+        sorted_ends = clipped_ends[sort_idx]
+        merged_starts = [float(sorted_starts[0])]
+        merged_ends = [float(sorted_ends[0])]
+        for j in range(1, len(sorted_starts)):
+            if sorted_starts[j] <= merged_ends[-1]:
+                merged_ends[-1] = max(merged_ends[-1], float(sorted_ends[j]))
+            else:
+                merged_starts.append(float(sorted_starts[j]))
+                merged_ends.append(float(sorted_ends[j]))
+        union_duration = sum(
+            end - start
+            for start, end in zip(merged_starts, merged_ends, strict=True)
+        )
+        event_duration = ev.end_time - ev.start_time
+        event_has_non_swr_time = union_duration < event_duration - 1e-6
+        event_has_non_swr_time_arr[i] = event_has_non_swr_time
+
+        classes[i] = "partial"
+        if contains_any_swr:
+            subclasses[i] = "event_contains_swr"
+        elif n_overlap == 1:
+            subclasses[i] = "single_swr_partial"
+        elif not event_has_non_swr_time:
+            subclasses[i] = "multi_swr_no_gap"
+        else:
+            subclasses[i] = "multi_swr_gap"
+
+    out = non_local_events.copy()
+    out["overlap_class"] = classes
+    out["overlap_subclass"] = subclasses
+    out["n_swrs_overlapping"] = n_overlap_arr
+    out["contains_any_swr"] = contains_any_swr_arr
+    out["event_has_non_swr_time"] = event_has_non_swr_time_arr
+    return out
+
+
 def select_typical_event_by_class(
     classified_events: pd.DataFrame,
     non_local_prob: xr.DataArray,
