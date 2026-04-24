@@ -716,18 +716,11 @@ class TestClassifySwrOverlapGeometry:
         # Every row has exactly one subclass (no empty strings).
         assert (geom["overlap_subclass"] != "").all()
 
-        # Coarse labels differ between the two functions — the new
-        # function uses descriptive names, the old one uses the legacy
-        # "none"/"extends"/"contained" strings. Map between them here
-        # to verify they agree on category membership.
-        coarse_to_legacy = {
-            "non_swr": "none",
-            "swr_partial": "extends",
-            "swr_contained": "contained",
-        }
+        # Both functions now use the same coarse-class vocabulary,
+        # so geom["overlap_class"] and coarse["overlap_class"] must
+        # agree row-for-row.
         for i in range(len(geom)):
-            new_coarse = geom.iloc[i]["overlap_class"]
-            legacy_coarse = coarse.iloc[i]["overlap_class"]
-            assert coarse_to_legacy[new_coarse] == legacy_coarse, (
-                f"Event {i}: new={new_coarse}, legacy={legacy_coarse}"
+            assert geom.iloc[i]["overlap_class"] == coarse.iloc[i]["overlap_class"], (
+                f"Event {i}: geometry={geom.iloc[i]['overlap_class']}, "
+                f"classify={coarse.iloc[i]['overlap_class']}"
             )

@@ -4,13 +4,13 @@
 Composite 6-panel figure with the following narrative:
 
     a — Three example non-local events, one per SWR-overlap class
-        (contained within SWR / extends beyond SWR / no SWR), picked
-        deterministically from a single session. Anchors the reader in
-        real data and previews panel b.
+        (SWR-contained / SWR-partial / non-SWR), picked deterministically
+        from a single session. Anchors the reader in real data and
+        previews panel b.
 
     b — Stacked bar of immobile non-local events by SWR-overlap class
-        (contained / extends / none). Shows the three-way population
-        breakdown that panel a previews.
+        (SWR-contained / SWR-partial / non-SWR). Shows the three-way
+        population breakdown that panel a previews.
 
     c — Event-triggered averages of non-local probability and SWR
         z-score around non-local event starts, split by SWR-overlap
@@ -87,11 +87,11 @@ logging.basicConfig(
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
-CLASS_ORDER = ("contained", "extends", "none")
+CLASS_ORDER = ("swr_contained", "swr_partial", "non_swr")
 CLASS_TITLES = {
-    "contained": "contained within SWR",
-    "extends": "extends beyond SWR",
-    "none": "no SWR overlap",
+    "swr_contained": "SWR-contained",
+    "swr_partial": "SWR-partial",
+    "non_swr": "non-SWR",
 }
 
 
@@ -167,9 +167,9 @@ def generate_figure(
     class_counts = compute_swr_overlap_class_counts(data_over_time)
     logging.info(
         f"  {class_counts['total']:,} immobile NL events; "
-        f"contained {class_counts['contained']:,} / "
-        f"extends {class_counts['extends']:,} / "
-        f"none {class_counts['none']:,}"
+        f"SWR-contained {class_counts['swr_contained']:,} / "
+        f"SWR-partial {class_counts['swr_partial']:,} / "
+        f"non-SWR {class_counts['non_swr']:,}"
     )
 
     logging.info("Computing NL/SWR timing offsets (panel d)...")

@@ -844,16 +844,16 @@ def plot_swr_overlap_class_bar(
     """Horizontal stacked bar of non-local events by SWR-overlap class.
 
     Shows the three-way breakdown of immobile non-local events into
-    "contained within SWR", "extends beyond SWR", and "no SWR overlap".
-    Designed as Figure 2 panel b — the same three categories that
-    panel a's three example columns represent.
+    SWR-contained, SWR-partial, and non-SWR. Designed as Figure 2
+    panel b — the same three categories that panel a's three example
+    columns represent.
 
     Parameters
     ----------
     counts : dict
         Output of :func:`compute_swr_overlap_class_counts`. Must
-        contain the keys ``contained``, ``extends``, ``none``, and
-        ``total``.
+        contain the keys ``swr_contained``, ``swr_partial``,
+        ``non_swr``, and ``total``.
     ax : matplotlib.axes.Axes, optional
         Axes to draw on. If None, a standalone figure is created.
 
@@ -866,19 +866,19 @@ def plot_swr_overlap_class_bar(
     if total == 0:
         raise ValueError("No events in counts dict (total=0)")
 
-    # Order: contained (leftmost) -> extends -> none (rightmost)
-    # This matches the left-to-right ordering of the three example
-    # columns in Figure 2 panel a.
-    order = ("contained", "extends", "none")
+    # Order: SWR-contained (leftmost) -> SWR-partial -> non-SWR
+    # (rightmost). Matches the left-to-right ordering of the three
+    # example columns in Figure 2 panel a.
+    order = ("swr_contained", "swr_partial", "non_swr")
     segment_colors = {
-        "contained": COLORS["SWR"],
-        "extends": "#b5825a",        # neutral sand: "both but extends"
-        "none": COLORS["Non-Local"],
+        "swr_contained": COLORS["SWR"],
+        "swr_partial": "#b5825a",        # neutral sand: overlap but not contained
+        "non_swr": COLORS["Non-Local"],
     }
     segment_labels = {
-        "contained": "contained\nwithin SWR",
-        "extends": "extends\nbeyond SWR",
-        "none": "no SWR\noverlap",
+        "swr_contained": "SWR-\ncontained",
+        "swr_partial": "SWR-\npartial",
+        "non_swr": "non-SWR",
     }
 
     left = 0.0

@@ -176,14 +176,21 @@ def classify_swr_overlap(
 
     Adds an ``overlap_class`` column taking one of three values:
 
-    - ``"contained"`` : the non-local event is fully inside at least one
-      SWR event (non-local start >= SWR start AND non-local end <=
-      SWR end).
-    - ``"extends"``   : the non-local event overlaps at least one SWR
-      event but is not fully contained in any of them — it extends
-      before or after the SWR window.
-    - ``"none"``      : the non-local event does not overlap any SWR
-      event.
+    - ``"swr_contained"`` : the non-local event is fully inside at
+      least one SWR event (``event.start >= swr.start`` AND
+      ``event.end <= swr.end`` for some SWR).
+    - ``"swr_partial"``   : the non-local event overlaps at least one
+      SWR event but is not fully inside any of them. Covers the
+      sub-cases enumerated by
+      :func:`classify_swr_overlap_geometry` — ``event_contains_swr``,
+      ``single_swr_partial``, ``multi_swr_no_gap``, and
+      ``multi_swr_gap``.
+    - ``"non_swr"``       : the non-local event does not overlap any
+      SWR event.
+
+    These three classes correspond directly to the paper's
+    SWR-coincident / non-SWR axis:
+    ``SWR-coincident = swr_contained ∪ swr_partial``.
 
     Parameters
     ----------
@@ -201,9 +208,9 @@ def classify_swr_overlap(
 
     Notes
     -----
-    "Contained" and "extends" are decided per non-local event. If a
-    non-local event overlaps multiple SWRs, we label it "contained" as
-    soon as any one SWR fully contains it; otherwise "extends".
+    Classification is per-event. If a non-local event overlaps multiple
+    SWRs, it is labeled ``"swr_contained"`` as soon as any one SWR
+    fully contains it; otherwise ``"swr_partial"``.
 
     """
     classes: list[str] = []
@@ -216,7 +223,7 @@ def classify_swr_overlap(
             swr_starts <= ev.end_time
         )
         if not overlap_mask.any():
-            classes.append("none")
+            classes.append("non_swr")
             continue
         # Any SWR that fully contains this non-local event?
         contained_mask = (
@@ -225,9 +232,9 @@ def classify_swr_overlap(
             & (swr_ends >= ev.end_time)
         )
         if contained_mask.any():
-            classes.append("contained")
+            classes.append("swr_contained")
         else:
-            classes.append("extends")
+            classes.append("swr_partial")
 
     out = non_local_events.copy()
     out["overlap_class"] = classes
@@ -409,10 +416,11 @@ def select_typical_event_by_class(
 ) -> dict[str, pd.Series]:
     """Pick one deterministic "typical" event per SWR-overlap class.
 
-    For each overlap class ("contained", "extends", "none"), selects the
-    event closest to that class's median duration among events whose peak
-    non-local probability meets ``peak_threshold``. If no events in a
-    class meet the peak threshold, the rule falls back to the full class.
+    For each overlap class (``"swr_contained"``, ``"swr_partial"``,
+    ``"non_swr"``), selects the event closest to that class's median
+    duration among events whose peak non-local probability meets
+    ``peak_threshold``. If no events in a class meet the peak threshold,
+    the rule falls back to the full class.
 
     Parameters
     ----------
@@ -443,7 +451,7 @@ def select_typical_event_by_class(
         return float(prob_vals[mask].max())
 
     chosen: dict[str, pd.Series] = {}
-    for cls in ("contained", "extends", "none"):
+    for cls in ("swr_contained", "swr_partial", "non_swr"):
         subset = classified_events[
             classified_events["overlap_class"] == cls
         ]

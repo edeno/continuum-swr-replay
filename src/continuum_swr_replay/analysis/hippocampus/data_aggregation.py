@@ -404,16 +404,27 @@ def compute_swr_overlap_class_counts(
     event_col: str = "non_local_event",
     overlap_col: str = "SWR_event",
 ) -> dict[str, int]:
-    """Count immobile events by overlap geometry with another detector.
+    """Count immobile events by SWR-overlap class.
 
-    Classifies each event as "contained" (every timebin overlaps),
-    "extends" (partial overlap), or "none" (no overlap).
+    Per-session: derives non-local-event and SWR intervals from the
+    timebin labels in ``data_over_time`` and delegates to
+    :func:`classify_swr_overlap` for per-event classification. Counts
+    are aggregated across all sessions.
+
+    Uses the event-level definition of "contained" (does any single
+    SWR fully span the event) so the counts match the example-panel
+    classification in Figure 2. The alternative timebin-level
+    definition (does every timebin overlap some SWR) labels events
+    tiled by two adjacent SWRs as ``swr_contained``, which the
+    event-level rule calls ``swr_partial``.
 
     Parameters
     ----------
     data_over_time : pd.DataFrame
         Aggregated data containing ``event_col``, ``overlap_col``,
         ``head_speed``, ``animal``, ``day``, and ``epoch`` columns.
+        Time must be the DataFrame index (production) or present as a
+        column named ``"time"`` (tests).
     event_col : str, optional
         Primary event column, by default ``"non_local_event"``.
     overlap_col : str, optional
@@ -422,10 +433,12 @@ def compute_swr_overlap_class_counts(
     Returns
     -------
     dict[str, int]
-        Mapping ``{"contained": n, "extends": n, "none": n,
-        "total": n}``.
+        Mapping ``{"swr_contained": n, "swr_partial": n,
+        "non_swr": n, "total": n}``.
 
     """
+    from .event_detection import classify_swr_overlap
+
     immobile = get_immobile_events(
         data_over_time,
         event_col=event_col,
@@ -434,24 +447,38 @@ def compute_swr_overlap_class_counts(
         method="endpoints",
     )
 
-    def _classify(group: pd.DataFrame) -> str:
-        has_overlap = group[overlap_col] > 0
-        if not has_overlap.any():
-            return "none"
-        if has_overlap.all():
-            return "contained"
-        return "extends"
+    # Normalize time to a column called "time". Production has time as
+    # the DataFrame index; tests sometimes have it as a column.
+    if "time" not in immobile.columns:
+        immobile = immobile.copy()
+        immobile["time"] = immobile.index
 
-    classes = immobile.groupby(
-        ["animal", "day", "epoch", event_col],
-    ).apply(_classify)
-    counts = classes.value_counts()
-    return {
-        "contained": int(counts.get("contained", 0)),
-        "extends": int(counts.get("extends", 0)),
-        "none": int(counts.get("none", 0)),
-        "total": int(counts.sum()),
-    }
+    counts = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0}
+
+    for _session_key, session_df in immobile.groupby(
+        ["animal", "day", "epoch"], sort=False
+    ):
+        event_intervals = (
+            session_df.loc[session_df[event_col] > 0]
+            .groupby(event_col)["time"]
+            .agg(start_time="min", end_time="max")
+            .reset_index(drop=True)
+        )
+        if len(event_intervals) == 0:
+            continue
+        swr_intervals = (
+            session_df.loc[session_df[overlap_col] > 0]
+            .groupby(overlap_col)["time"]
+            .agg(start_time="min", end_time="max")
+            .reset_index(drop=True)
+        )
+
+        classified = classify_swr_overlap(event_intervals, swr_intervals)
+        session_counts = classified["overlap_class"].value_counts()
+        for cls in counts:
+            counts[cls] += int(session_counts.get(cls, 0))
+
+    return {**counts, "total": sum(counts.values())}
 
 
 def compute_swr_nl_event_counts(
