@@ -100,6 +100,7 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
         "nwb_file_name": nwb_file_name,
         "filter_name": "theta_5_11",
         "filter_sampling_rate": 1000,
+        "lfp_band_sampling_rate": 1000,
         "target_interval_list_name": epoch_name + " noPrePostTrialTimes",
     }
     theta_table = LFPBandV1 & theta_lfp_key
