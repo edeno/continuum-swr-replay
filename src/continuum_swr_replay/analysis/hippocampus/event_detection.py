@@ -41,6 +41,11 @@ from ripple_detection.core import segment_boolean_series
 
 from continuum_swr_replay.data_loaders import get_labels
 
+# Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
+# classify_swr_overlap_geometry when comparing an event's duration to
+# the total duration of its SWR coverage.
+INTERVAL_TOLERANCE_SEC = 1e-6
+
 
 def get_confident_times(
     prob: xr.DataArray,
@@ -318,8 +323,8 @@ def classify_swr_overlap_geometry(
 
     The ``event_has_non_swr_time`` flag is computed by clipping each
     overlapping SWR to the event window, merging the clipped intervals,
-    and comparing merged duration to event duration (with 1 μs
-    tolerance to absorb floating-point noise).
+    and comparing merged duration to event duration (with
+    ``INTERVAL_TOLERANCE_SEC`` to absorb floating-point noise).
 
     """
     swr_starts = ripple_times["start_time"].to_numpy()
@@ -387,7 +392,9 @@ def classify_swr_overlap_geometry(
             for start, end in zip(merged_starts, merged_ends, strict=True)
         )
         event_duration = ev.end_time - ev.start_time
-        event_has_non_swr_time = union_duration < event_duration - 1e-6
+        event_has_non_swr_time = (
+            union_duration < event_duration - INTERVAL_TOLERANCE_SEC
+        )
         event_has_non_swr_time_arr[i] = event_has_non_swr_time
 
         classes[i] = "swr_partial"

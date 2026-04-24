@@ -458,20 +458,10 @@ def compute_swr_overlap_class_counts(
     for _session_key, session_df in immobile.groupby(
         ["animal", "day", "epoch"], sort=False
     ):
-        event_intervals = (
-            session_df.loc[session_df[event_col] > 0]
-            .groupby(event_col)["time"]
-            .agg(start_time="min", end_time="max")
-            .reset_index(drop=True)
-        )
+        event_intervals = _intervals_from_labels(session_df, event_col)
         if len(event_intervals) == 0:
             continue
-        swr_intervals = (
-            session_df.loc[session_df[overlap_col] > 0]
-            .groupby(overlap_col)["time"]
-            .agg(start_time="min", end_time="max")
-            .reset_index(drop=True)
-        )
+        swr_intervals = _intervals_from_labels(session_df, overlap_col)
 
         classified = classify_swr_overlap(event_intervals, swr_intervals)
         session_counts = classified["overlap_class"].value_counts()
@@ -479,6 +469,20 @@ def compute_swr_overlap_class_counts(
             counts[cls] += int(session_counts.get(cls, 0))
 
     return {**counts, "total": sum(counts.values())}
+
+
+def _intervals_from_labels(session_df: pd.DataFrame, label_col: str) -> pd.DataFrame:
+    """Per-label (start_time, end_time) table from a timebin-labeled frame.
+
+    Expects a ``time`` column; positive values in ``label_col`` mark
+    timebins belonging to distinct events, with 0 treated as background.
+    """
+    return (
+        session_df.loc[session_df[label_col] > 0]
+        .groupby(label_col)["time"]
+        .agg(start_time="min", end_time="max")
+        .reset_index(drop=True)
+    )
 
 
 def compute_swr_nl_event_counts(
