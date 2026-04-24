@@ -137,7 +137,9 @@ def get_contfrag_data_over_time(
             "SWR_zscore": data["zscored_ripple_consensus_trace"]
             .reindex(results.time, method="nearest", tolerance=0.004)
             .squeeze(),
-            "MUA_zscore": data["multiunit_rate_zscore"][brain_area].squeeze(),
+            "MUA_zscore": data["multiunit_rate_zscore"][brain_area]
+            .squeeze()
+            .reindex(results.time, method="nearest", tolerance=0.004),
             "n_SWR": len(data["ripple_times"]),
             "n_MUA": len(data["hse_times"][brain_area]),
             "n_SWR_MUA": len(swr_mua_times),

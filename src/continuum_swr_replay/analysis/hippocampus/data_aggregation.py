@@ -263,7 +263,9 @@ def get_data_over_time(
             "SWR_zscore": data["zscored_ripple_consensus_trace"]
             .reindex(results.time, method="nearest", tolerance=0.004)
             .squeeze(),
-            "MUA_zscore": data["multiunit_rate_zscore"][brain_area].squeeze(),
+            "MUA_zscore": data["multiunit_rate_zscore"][brain_area]
+            .squeeze()
+            .reindex(results.time, method="nearest", tolerance=0.004),
             "n_non_local": len(non_local_times),
             "n_SWR": len(data["ripple_times"]),
             "n_MUA": len(data["hse_times"][brain_area]),
