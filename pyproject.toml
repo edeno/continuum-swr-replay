@@ -1,7 +1,7 @@
 [project]
 name = "continuum-swr-replay"
 version = "0.1.0"
-description = "Add your description here"
+description = "Analysis of continuum hippocampal replay during Sharp Wave Ripples in a spatial bandit task."
 readme = "README.md"
 authors = [{ name = "Eric Denovellis", email = "eric.denovellis@ucsf.edu" }]
 requires-python = ">=3.11,<3.13"
