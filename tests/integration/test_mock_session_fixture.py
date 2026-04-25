@@ -1,7 +1,16 @@
-"""Integration tests for the complete data loading pipeline.
+"""Tests for the mock_session_data fixture.
 
-Tests that the full load_data() function correctly orchestrates all
-data loading steps and returns properly structured data.
+These tests pin the SHAPE and INVARIANTS of the
+``conftest.py::mock_session_data`` fixture — the synthetic
+SessionData dict that the rest of the test suite relies on. They do
+**NOT** exercise the real :func:`load_data` pipeline; that function
+reads from the Spyglass DataJoint database, which is not available
+in CI. A regression in the loader would be invisible here.
+
+A separate, DB-gated test file would be the natural home for true
+end-to-end coverage. For now, these fixture-shape tests catch
+schema drift in the mock and keep downstream unit tests honest about
+what they assume the loader returns.
 """
 
 from __future__ import annotations
@@ -9,12 +18,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# These tests will use mock data since we don't have access to real NWB files
-# In practice, you would use a small test NWB file
 
-
-class TestDataLoadingIntegration:
-    """Integration tests for load_data() function."""
+class TestMockSessionFixtureStructure:
+    """Schema invariants of the mock_session_data fixture."""
 
     def test_mock_load_data_structure(self, mock_session_data):
         """Test that mock session data has all required keys."""
@@ -165,8 +171,8 @@ class TestDataLoadingIntegration:
         assert (durations > 0).all(), "Ripple durations must be positive"
 
 
-class TestDataLoadingEdgeCases:
-    """Test edge cases in data loading."""
+class TestMockSessionFixtureEdgeCases:
+    """Edge cases in fixture-derived data structures."""
 
     def test_missing_brain_area_handled_gracefully(self, mock_session_data):
         """Should handle missing brain areas without crashing."""
