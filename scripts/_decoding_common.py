@@ -8,6 +8,7 @@ Contains the common infrastructure used by both ``run_decoding_bandit.py``
 import logging
 import logging.config
 import os
+import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -224,7 +225,7 @@ def run_batch(
         epoch_info = get_epoch_info()
         epoch_info = filter_epoch_info(epoch_info, args)
 
-        results = [
+        delayed = [
             dask.delayed(run_decode_fn)(
                 nwb_file_name=epoch.Index[0],
                 epoch_name=epoch.Index[1],
@@ -239,4 +240,22 @@ def run_batch(
             for epoch in epoch_info.itertuples()
         ]
 
-        dask.compute(*results)
+        # Per-session run_decode_fn returns the epoch_identifier on
+        # failure (after logging the exception) and None on success or
+        # graceful skip. dask.compute returns a tuple of these.
+        outcomes = dask.compute(*delayed)
+        failures = [r for r in outcomes if r is not None]
+        n_total = len(outcomes)
+
+        if failures:
+            sys.stderr.write(
+                f"\n{len(failures)}/{n_total} session(s) FAILED:\n"
+            )
+            for ident in failures:
+                sys.stderr.write(f"  - {ident}\n")
+            sys.stderr.write(
+                "See logs/<epoch_identifier>.log for tracebacks.\n"
+            )
+            sys.exit(1)
+
+        print(f"\nAll {n_total} session(s) completed.")

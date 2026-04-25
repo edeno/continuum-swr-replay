@@ -341,6 +341,7 @@ def run_decode(
         logger.info("Done!")
     except Exception as e:
         logger.exception(e)
+        return epoch_identifier  # Sentinel: run_batch treats non-None as failure.
 
 
 def main() -> None:
