@@ -100,9 +100,10 @@ def plot_event_duration_distribution(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        if figure_name is not None:
+            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-        logging.info(f"Saved: {figure_name}")
 
 
 def plot_triggered_averages(
@@ -253,9 +254,10 @@ def plot_triggered_averages(
     axes[-1].set_xlim(-1.0, 1.0)
 
     if standalone:
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        if figure_name is not None:
+            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-        logging.info(f"Saved: {figure_name}")
 
 
 def plot_swr_zscore_by_state(
@@ -312,9 +314,10 @@ def plot_swr_zscore_by_state(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        if figure_name is not None:
+            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-        logging.info(f"Saved: {figure_name}")
 
 
 def plot_replay_speed_by_swr(
@@ -375,9 +378,10 @@ def plot_replay_speed_by_swr(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        if figure_name is not None:
+            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-        logging.info(f"Saved: {figure_name}")
 
 
 def plot_replay_position_by_swr(
@@ -442,9 +446,10 @@ def plot_replay_position_by_swr(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        if figure_name is not None:
+            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-        logging.info(f"Saved: {figure_name}")
 
 
 def plot_calibration_curve(
