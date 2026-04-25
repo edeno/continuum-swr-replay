@@ -2,6 +2,10 @@
 
 This directory contains baseline PDF outputs from figure generation scripts, used for visual comparison during refactoring to ensure output consistency.
 
+## Per-baseline status
+
+The authoritative status (and provenance) for each baseline lives in **[`manifest.json`](manifest.json)** — `git_sha`, `data_md5`, `generated_date`, and a `status` field of `temporary` / `quarantined` / `missing` / (eventually) `valid`. Regression tests should consult `manifest.json` before comparing output to a baseline. Quarantined or missing baselines must short-circuit the comparison.
+
 ## Current Status
 
 **Generated:** 2025-11-19

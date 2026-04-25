@@ -1,0 +1,30 @@
+{
+  "baselines": {
+    "figure02": {
+      "git_sha": "unknown",
+      "data_md5": "unknown",
+      "generated_date": "2025-11-19",
+      "status": "temporary",
+      "status_detail": "Generated from /cumulus/edeno/non_local_paper/Processed-Data (16 GB old processed data). To be regenerated from fresh decoding output. Use for structural spot-checks only — not pixel-perfect comparison."
+    },
+    "figure03": {
+      "git_sha": "unknown",
+      "data_md5": "unknown",
+      "generated_date": "2025-11-19",
+      "status": "quarantined",
+      "status_detail": "Partial: 13/16 panels generated successfully. Generation crashed at panel 14 due to corrupted source data (concatenated NWB filenames in a numeric column). Do not use for regression comparison until baselines are regenerated from fresh data."
+    },
+    "figure04": {
+      "git_sha": null,
+      "data_md5": null,
+      "generated_date": null,
+      "status": "missing",
+      "status_detail": "Cannot be generated yet — mPFC modulation files were not available at baseline time."
+    }
+  },
+  "regression_policy": {
+    "default": "Spot-check structure and panel count only. Treat panel-by-panel pixel comparison as advisory, not blocking, on these baselines.",
+    "regenerate_after": "Fresh decoding pipeline run completes and re-baselines are produced.",
+    "manifest_contract": "Before any regression test compares output to a baseline, it must check this manifest's status field. Status 'quarantined' or 'missing' must short-circuit the comparison; status 'temporary' permits structural-only checks."
+  }
+}
