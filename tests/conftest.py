@@ -38,18 +38,21 @@ def simple_linear_track() -> nx.Graph:
 
 
 @pytest.fixture
-def bandit_track_graph() -> nx.Graph:
-    """Create a simplified bandit task track (6 wells, 3 patches).
+def simplified_star_track() -> nx.Graph:
+    """Create a 7-node star graph for tests that don't need realistic topology.
 
-    This is a simplified version of the actual task structure:
-    - 6 wells (nodes 0-5)
-    - 3 patches (wells 0-1, 2-3, 4-5)
-    - Center node (6) connects all wells
+    Six wells (nodes 0-5) connect directly to a single center node (6)
+    via 6 edges. NOT the real bandit topology — the production task is
+    a 10-node, 9-edge spider with patch junctions between wells and
+    center (see CLAUDE.md). Tests that depend on the real topology
+    (multi-segment paths, trunk-arm semantics, patch junctions) should
+    construct their own graph; this fixture is a minimal substrate for
+    tests where only the well-to-center degree-1 property matters.
 
     Returns
     -------
     track_graph : nx.Graph
-        Graph representing spatial bandit task structure
+        7-node star: 6 wells + 1 center, 6 edges.
     """
     graph = nx.Graph()
 

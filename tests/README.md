@@ -112,7 +112,7 @@ Shared fixtures are defined in `conftest.py`:
 
 ### Track Graph Fixtures
 - `simple_linear_track` - 3-node linear track for basic tests
-- `bandit_track_graph` - Simplified 6-well bandit task structure
+- `simplified_star_track` - Simplified 6-well bandit task structure
 - `track_with_shortcut` - Track with alternative paths
 
 ### Data Fixtures

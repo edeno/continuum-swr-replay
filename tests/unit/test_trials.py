@@ -317,12 +317,12 @@ class TestGetStartEndNodeID:
         assert len(result['from_well']) == 2
         assert len(result['to_well']) == 2
 
-    def test_handles_2d_positions(self, bandit_track_graph):
+    def test_handles_2d_positions(self, simplified_star_track):
         """Should work with 2D position data."""
         # Set positions for a few wells
-        bandit_track_graph.nodes[0]['pos'] = (0, 0)
-        bandit_track_graph.nodes[1]['pos'] = (10, 10)
-        bandit_track_graph.nodes[2]['pos'] = (20, 0)
+        simplified_star_track.nodes[0]['pos'] = (0, 0)
+        simplified_star_track.nodes[1]['pos'] = (10, 10)
+        simplified_star_track.nodes[2]['pos'] = (20, 0)
 
         # More time points to avoid indexing issues
         position_info = pd.DataFrame({
@@ -335,7 +335,7 @@ class TestGetStartEndNodeID:
             'end_time': [1.2],
         })
 
-        result = get_start_end_node_id(position_info, bandit_track_graph, times)
+        result = get_start_end_node_id(position_info, simplified_star_track, times)
 
         # Should identify nearest nodes in 2D
         assert result['from_well'][0] == 0  # Near (0,0)

@@ -168,7 +168,7 @@ class TestPathProgressForRunSegment:
         assert np.all(progress >= 0.0)
         assert np.all(progress <= 1.0)
 
-    def test_multi_segment_path(self, bandit_track_graph):
+    def test_multi_segment_path(self, simplified_star_track):
         """Test progress on a multi-segment path (center to outer well)."""
         time = np.arange(0, 1.0, 0.002)
 
@@ -194,17 +194,17 @@ class TestPathProgressForRunSegment:
             6: (10, 0),  # Center
         }
         for node, pos in positions.items():
-            bandit_track_graph.nodes[node]['pos'] = pos
+            simplified_star_track.nodes[node]['pos'] = pos
 
         # Set edge IDs
         edge_id = 0
-        for edge in bandit_track_graph.edges:
-            bandit_track_graph.edges[edge]['edge_id'] = edge_id
+        for edge in simplified_star_track.edges:
+            simplified_star_track.edges[edge]['edge_id'] = edge_id
             edge_id += 1
 
         progress = path_progress_for_run_segment(
             pos_info,
-            bandit_track_graph,
+            simplified_star_track,
             start_node=0,
             end_node=2,
         )
@@ -309,7 +309,7 @@ class TestDistToGoal:
 class TestTurnDirection:
     """Test turn direction calculation."""
 
-    def test_left_turn_detection(self, bandit_track_graph):
+    def test_left_turn_detection(self, simplified_star_track):
         """Left turn should be detected correctly."""
         # Create a path with a left turn
         # Set node positions to create geometry
@@ -320,8 +320,8 @@ class TestTurnDirection:
             6: (5, 0),    # Center node
         }
         for node, pos in positions.items():
-            if node in bandit_track_graph.nodes:
-                bandit_track_graph.nodes[node]['pos'] = pos
+            if node in simplified_star_track.nodes:
+                simplified_star_track.nodes[node]['pos'] = pos
 
         # Create trial data
         time = np.arange(0, 1.0, 0.002)
@@ -342,12 +342,12 @@ class TestTurnDirection:
         })
 
         # Set edge IDs
-        for i, edge in enumerate(bandit_track_graph.edges):
-            bandit_track_graph.edges[edge]['edge_id'] = i
+        for i, edge in enumerate(simplified_star_track.edges):
+            simplified_star_track.edges[edge]['edge_id'] = i
 
         # This should detect turn direction
         # Note: Actual result depends on graph structure
-        direction = turn_direction(trial, pos_info, bandit_track_graph)
+        direction = turn_direction(trial, pos_info, simplified_star_track)
 
         # Direction should be a string
         assert isinstance(direction, str)
