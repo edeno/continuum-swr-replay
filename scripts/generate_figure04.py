@@ -278,7 +278,7 @@ def plot_aic_selection(df, ax):
     n_total = len(df)
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
     model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
-    model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], "#e6ab02"]
+    model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
     counts = df["min_aic_model"].value_counts()
     vals = [100 * counts.get(m, 0) / n_total for m in model_order]

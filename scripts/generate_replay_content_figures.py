@@ -23,7 +23,7 @@ import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_behavior_prediction_results,
     plot_coefficient_forest,
@@ -129,7 +129,7 @@ def main():
             labels = [n.replace("is_", "").replace("_x_", "×") for n in me["fe_names"]]
 
             colors = [
-                "#1b9e77" if abs(m / s) > 1.96 else "#cccccc"
+                COLORS["Non-Local"] if abs(m / s) > 1.96 else "#cccccc"
                 for m, s in zip(means, sds, strict=True)
             ]
 

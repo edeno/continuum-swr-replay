@@ -240,6 +240,9 @@ COLORS = {
     "Local": "#add8e6",  # Soft Blue for Local
     "No-Spike": "#b0b0b0",  # Light Gray for No-Spike
     "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
+    # Joint SWR + non-SWR-non-local model bar in Figure 4's AIC
+    # comparison. Same Dark2 family as SWR/MUA/Non-Local.
+    "Combined": "#e6ab02",
 }
 
 CONTFRAG_COLORS = {

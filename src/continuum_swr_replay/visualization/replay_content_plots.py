@@ -51,7 +51,7 @@ def plot_model_hierarchy_comparison(
     q25 = comparison_df.get("delta_aic_q25", pd.Series(dtype=float)).values
     q75 = comparison_df.get("delta_aic_q75", pd.Series(dtype=float)).values
 
-    colors = ["#1b9e77" if d > 0 else "#d95f02" for d in daic]
+    colors = [COLORS["Non-Local"] if d > 0 else COLORS["SWR"] for d in daic]
     ax.bar(range(len(steps)), daic, color=colors, alpha=0.7, edgecolor="none")
 
     # Error bars if IQR available
