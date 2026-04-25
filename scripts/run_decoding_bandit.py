@@ -288,7 +288,7 @@ def run_decode(
     non_local_threshold: float = 0.8,
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
-) -> None:
+) -> str | None:
     epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     if ripple_detector_name != "Kay":
         epoch_identifier += f"_{ripple_detector_name}"

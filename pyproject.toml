@@ -81,10 +81,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Allow imports after the TYPE_CHECKING block (standard pattern to avoid
-# circular imports). F401 stays ON file-wide so import drift in this
-# (the most complex data loader) gets surfaced — TYPE_CHECKING-only
-# imports get a per-line ``# noqa: F401`` instead.
+# E402 only — the file has imports below a TYPE_CHECKING block which
+# triggers module-import-not-at-top-of-file. F401 stays ON file-wide so
+# any future genuinely-unused import in this 1000+ line data loader
+# surfaces; ruff already recognizes TYPE_CHECKING imports as used given
+# the file's ``from __future__ import annotations``.
 "src/continuum_swr_replay/data_loaders/bandit_task.py" = ["E402"]
 # Archived figure scripts retained for historical reference; not linted.
 "scripts/archive/**" = ["ALL"]

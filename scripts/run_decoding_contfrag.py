@@ -253,8 +253,15 @@ def run_decode(
     non_stationary: bool = False,
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
-) -> None:
-    """Run ContFrag decoding for a single session."""
+) -> str | None:
+    """Run ContFrag decoding for a single session.
+
+    Returns
+    -------
+    str | None
+        ``None`` on success or graceful skip; the ``epoch_identifier``
+        on caught exception so ``run_batch`` can aggregate failures.
+    """
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
         f"_{brain_area}_contfrag"
