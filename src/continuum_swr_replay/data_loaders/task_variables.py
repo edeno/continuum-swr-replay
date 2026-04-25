@@ -299,7 +299,6 @@ def turn_direction(
     trial: pd.Series,
     position_info: pd.DataFrame,
     track_graph: nx.Graph,
-    track_segment_id_to_edge: dict[int, tuple[int, int]],
 ) -> str:
     """Determine turn direction sequence for a trial.
 
@@ -310,13 +309,9 @@ def turn_direction(
     position_info : pd.DataFrame
         Position info for the trial
     track_graph : nx.Graph
-        Track graph
-    track_segment_id_to_edge : dict[int, tuple[int, int]]
-        Map from each edge's ``edge_id`` attribute to its ``(u, v)``
-        endpoint tuple. Callers must build this from the graph's
-        ``edge_id`` attribute — not from ``np.array(track_graph.edges)``,
-        because NetworkX edge iteration order is not guaranteed to
-        match the ``edge_id`` sequence.
+        Track graph. Must have an ``edge_id`` attribute on every edge —
+        the linearizer's edge ordering, which is the source of truth
+        for ``track_segment_id`` values in ``position_info``.
 
     Returns
     -------
@@ -346,8 +341,11 @@ def turn_direction(
 
     # Ensure that the trial is in the correct traversal direction
     # track_segment_id does not contain node order information
+    edge_for_segment = {
+        track_graph.edges[edge]["edge_id"]: edge for edge in track_graph.edges
+    }
     trial_nodes = np.array(
-        [track_segment_id_to_edge[int(sid)] for sid in trial_segment_ids]
+        [edge_for_segment[int(sid)] for sid in trial_segment_ids]
     )
 
     if trial_nodes[0][0] != trial.from_well:
@@ -424,9 +422,7 @@ def _process_single_trial(
     trial_position = position_info.loc[is_in_trial]
 
     # Compute all variables for this trial
-    trial_turn_direction = turn_direction(
-        trial, trial_position, track_graph, track_segment_id_to_edge
-    )
+    trial_turn_direction = turn_direction(trial, trial_position, track_graph)
 
     start_to_goal_position = position_info.loc[from_start_time_to_goal]
     trial_path_progress = path_progress_for_run_segment(
@@ -622,10 +618,7 @@ def make_task_variables(
             start_node_id[is_in_trial] = trial.from_well
             goal_node_id[is_in_trial] = trial.to_well
             turn_direction_arr[is_in_trial] = turn_direction(
-                trial,
-                position_info.loc[is_in_trial],
-                track_graph,
-                track_segment_id_to_edge,
+                trial, position_info.loc[is_in_trial], track_graph
             )
             path_progress[from_start_time_to_goal] = path_progress_for_run_segment(
                 position_info.loc[from_start_time_to_goal],

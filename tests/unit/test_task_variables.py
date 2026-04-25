@@ -345,16 +345,9 @@ class TestTurnDirection:
         for i, edge in enumerate(bandit_track_graph.edges):
             bandit_track_graph.edges[edge]['edge_id'] = i
 
-        track_segment_id_to_edge = {
-            bandit_track_graph.edges[edge]["edge_id"]: edge
-            for edge in bandit_track_graph.edges
-        }
-
         # This should detect turn direction
         # Note: Actual result depends on graph structure
-        direction = turn_direction(
-            trial, pos_info, bandit_track_graph, track_segment_id_to_edge
-        )
+        direction = turn_direction(trial, pos_info, bandit_track_graph)
 
         # Direction should be a string
         assert isinstance(direction, str)
@@ -410,11 +403,8 @@ class TestTurnDirection:
             'from_well': 0,
             'to_well': 2,
         })
-        track_segment_id_to_edge = {
-            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
-        }
 
-        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
+        direction = turn_direction(trial, pos_info, graph)
         assert direction == "left"
 
     def test_known_right_turn_geometry(self):
@@ -455,11 +445,8 @@ class TestTurnDirection:
             'from_well': 0,
             'to_well': 2,
         })
-        track_segment_id_to_edge = {
-            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
-        }
 
-        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
+        direction = turn_direction(trial, pos_info, graph)
         assert direction == "right"
 
     def test_turn_direction_uses_edge_id_not_iteration_order(self):
@@ -496,10 +483,6 @@ class TestTurnDirection:
         graph.nodes[2]["pos"] = (10, 10)
         graph.nodes[3]["pos"] = (10, 20)
 
-        track_segment_id_to_edge = {
-            graph.edges[edge]["edge_id"]: edge for edge in graph.edges
-        }
-
         time = np.arange(0, 1.0, 0.002)
         n = len(time)
         pos_info = pd.DataFrame(
@@ -523,7 +506,7 @@ class TestTurnDirection:
             {"start_time": 0.0, "end_time": 1.0, "from_well": 0, "to_well": 2}
         )
 
-        direction = turn_direction(trial, pos_info, graph, track_segment_id_to_edge)
+        direction = turn_direction(trial, pos_info, graph)
         assert direction == "left", (
             f"turn_direction resolved segment_ids via numpy position "
             f"instead of edge_id attribute; got {direction!r}"
@@ -554,14 +537,7 @@ class TestTurnDirection:
         simple_linear_track.edges[(0, 1)]['edge_id'] = 0
         simple_linear_track.edges[(1, 2)]['edge_id'] = 1
 
-        track_segment_id_to_edge = {
-            simple_linear_track.edges[edge]["edge_id"]: edge
-            for edge in simple_linear_track.edges
-        }
-
-        direction = turn_direction(
-            trial, pos_info, simple_linear_track, track_segment_id_to_edge
-        )
+        direction = turn_direction(trial, pos_info, simple_linear_track)
 
         # Collinear segments have zero cross product, classified as "right"
         # by the np.where(cross > 0, "left", "right") convention
