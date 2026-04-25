@@ -33,7 +33,6 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 16
 """
 
 import logging
-import logging.config
 import os
 import subprocess
 import sys
@@ -48,11 +47,11 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 from pathlib import Path
-from typing import Any
 
 import dask
 import numpy as np
 import pandas as pd
+from _decoding_common import setup_logger
 from dask.distributed import Client, LocalCluster
 
 from continuum_swr_replay.analysis.pfc import run_session
@@ -70,86 +69,18 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 
 
-class SkipChecksumFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        return "Skipped checksum" not in record.getMessage()
-
-
-def setup_logger(
-    name_logfile: str,
-    path_logfile: str | Path,
-    *,
-    level: int = logging.INFO,
-) -> logging.Logger:
-    """Set up a logger that logs to console and a file.
-
-    Parameters
-    ----------
-    name_logfile : str
-        Logger name.
-    path_logfile : str | Path
-        Path to the logfile. Parent dirs will be created if absent.
-    level : int
-        Logging level (default: INFO).
-
-    Returns
-    -------
-    logging.Logger
-        Configured logger.
-    """
-    log_path = Path(path_logfile)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    level_name = logging.getLevelName(level)
-
-    config: dict[str, Any] = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "filters": {
-            "skip_checksum": {
-                "()": SkipChecksumFilter,
-            },
-        },
-        "formatters": {
-            "standard": {
-                "format": "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
-                "datefmt": "%d-%b-%y %H:%M:%S",
-            },
-        },
-        "handlers": {
-            "file": {
-                "class": "logging.FileHandler",
-                "filename": str(log_path),
-                "mode": "w",
-                "encoding": "utf-8",
-                "formatter": "standard",
-                "filters": ["skip_checksum"],
-            },
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "standard",
-                "filters": ["skip_checksum"],
-            },
-        },
-        "loggers": {
-            name_logfile: {
-                "handlers": ["file", "console"],
-                "level": level_name,
-                "propagate": False,
-            },
-        },
-    }
-
-    logging.config.dictConfig(config)
-    return logging.getLogger(name_logfile)
-
-
 def results_exist(
     save_folder: Path,
     epoch_identifier: str,
     overwrite: bool,
 ) -> bool:
-    """Check if all modulation result files already exist for this session."""
+    """Check if all modulation result files already exist for this session.
+
+    Distinct from ``_decoding_common.results_exist`` because the PFC
+    pipeline writes a different set of files (modulation .npy arrays
+    plus a single .pkl) than the decoder pipeline (results .nc, detector
+    .pkl, environment .pkl).
+    """
     if overwrite:
         return False
     save_base = save_folder / f"{epoch_identifier}_modulation"
