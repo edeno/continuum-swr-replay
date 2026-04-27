@@ -37,6 +37,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
     MODEL_HIERARCHY_MUA,
     MODEL_HIERARCHY_SWR,
+    MODEL_PATCH,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -57,6 +58,19 @@ _EVENT_SOURCE_CONFIG = {
         "input_dir_name": "contfrag_replay_content",
         "table_name": "event_arm_table_mua",
     },
+}
+
+# When --hierarchy patch is selected, the table and response column are
+# different but the input directory is shared with the corresponding
+# event-source. event_id remains the grouping key (globally unique).
+_PATCH_OVERRIDES = {
+    "non_local": {
+        "hierarchy": MODEL_PATCH,
+        "table_name": "event_patch_table",
+    },
+    # SWR / MUA patch hierarchies not yet built; surface a clear error.
+    "SWR": {"hierarchy": None, "table_name": "event_patch_table_swr"},
+    "MUA": {"hierarchy": None, "table_name": "event_patch_table_mua"},
 }
 
 logging.basicConfig(
@@ -226,18 +240,42 @@ def main():
         choices=["non_local", "SWR", "MUA"],
         help="Event source: non_local (model-detected), SWR, or MUA (default: non_local)",
     )
+    parser.add_argument(
+        "--hierarchy",
+        type=str,
+        default="arm",
+        choices=["arm", "patch"],
+        help=(
+            "Resolution: 'arm' (9 arms, M0-M6) or 'patch' (3 patches, "
+            "P0-P3). Patch fits use event_patch_table.pkl and "
+            "patch_count_hard."
+        ),
+    )
     args = parser.parse_args()
 
-    # Select hierarchy and input paths based on event source
+    # Select hierarchy and input paths based on event source. The
+    # --hierarchy flag overrides the model dict and table name when
+    # 'patch' is selected; the input directory follows the event source.
     source_config = _EVENT_SOURCE_CONFIG[args.event_source]
-    hierarchy = source_config["hierarchy"]
-    if hierarchy is None:
-        raise NotImplementedError(
-            f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
-            "in analysis/replay/model_specs.py. Define it before running."
-        )
+    if args.hierarchy == "patch":
+        override = _PATCH_OVERRIDES[args.event_source]
+        hierarchy = override["hierarchy"]
+        table_name = override["table_name"]
+        if hierarchy is None:
+            raise NotImplementedError(
+                f"Patch hierarchy not defined for event source {args.event_source!r}. "
+                "Add MODEL_PATCH_SWR / MODEL_PATCH_MUA in model_specs.py first."
+            )
+    else:
+        hierarchy = source_config["hierarchy"]
+        table_name = source_config["table_name"]
+        if hierarchy is None:
+            raise NotImplementedError(
+                f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
+                "in analysis/replay/model_specs.py. Define it before running."
+            )
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
-    output_dir = input_dir / "models"
+    output_dir = input_dir / ("models_patch" if args.hierarchy == "patch" else "models")
 
     # Determine which models to fit
     if args.models:
@@ -245,13 +283,17 @@ def main():
     else:
         model_names = list(hierarchy.keys())
 
-    # Load the event-arm table. For non_local, falls back to legacy naming.
-    canonical_path = input_dir / f"{source_config['table_name']}.pkl"
+    # Load the input table. For non_local arm fits, fall back to legacy naming.
+    canonical_path = input_dir / f"{table_name}.pkl"
     legacy_path = input_dir / "long_count.pkl"
     if canonical_path.exists():
         count_path = canonical_path
         canonical = True
-    elif args.event_source == "non_local" and legacy_path.exists():
+    elif (
+        args.event_source == "non_local"
+        and args.hierarchy == "arm"
+        and legacy_path.exists()
+    ):
         count_path = legacy_path
         canonical = False
         logging.warning(
@@ -297,10 +339,15 @@ def main():
         logging.error("No valid models to fit")
         return
 
-    # Resolve canonical vs. legacy column names so the rest of the
-    # script always uses canonical names.
-    response_col = "arm_count_hard" if canonical else "arm_count"
-    event_col = "event_id" if canonical else "event_uid"
+    # Resolve response/event column names. Patch hierarchy uses
+    # patch_count_hard; arm hierarchy keeps the legacy fallback for
+    # non_local + long_count.pkl.
+    if args.hierarchy == "patch":
+        response_col = "patch_count_hard"
+        event_col = "event_id"
+    else:
+        response_col = "arm_count_hard" if canonical else "arm_count"
+        event_col = "event_id" if canonical else "event_uid"
 
     # Pre-filter to common complete-case event set: drop entire events
     # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
@@ -379,7 +426,7 @@ def main():
     # Run hierarchy comparison
     if len(all_results) >= 2:
         logging.info("Running nested model comparisons...")
-        comparison = run_full_hierarchy_comparison(combined)
+        comparison = run_full_hierarchy_comparison(combined, hierarchy=hierarchy)
         if len(comparison) > 0:
             comp_path = output_dir / "model_comparison.pkl"
             comparison.to_pickle(comp_path)

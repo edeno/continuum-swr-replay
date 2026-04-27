@@ -162,6 +162,7 @@ def summarize_comparison(
 def run_full_hierarchy_comparison(
     all_results: pd.DataFrame,
     session_cols: list[str] | None = None,
+    hierarchy: dict | None = None,
 ) -> pd.DataFrame:
     """Compare all consecutive models in the hierarchy.
 
@@ -172,15 +173,21 @@ def run_full_hierarchy_comparison(
         which model each row comes from.
     session_cols : list[str] | None
         Session grouping columns.
+    hierarchy : dict | None
+        Model hierarchy dict mapping model name → ModelSpec. Defaults
+        to :data:`MODEL_HIERARCHY` (arm-level M0–M6); pass
+        :data:`MODEL_PATCH` to compare the patch hierarchy.
 
     Returns
     -------
     pd.DataFrame
-        One row per comparison step (M0→M1, M1→M2, ..., M6→M7).
+        One row per comparison step.
     """
+    if hierarchy is None:
+        hierarchy = MODEL_HIERARCHY
     comparisons = []
 
-    for model_name, spec in MODEL_HIERARCHY.items():
+    for model_name, spec in hierarchy.items():
         if spec.parent is None:
             continue
 
