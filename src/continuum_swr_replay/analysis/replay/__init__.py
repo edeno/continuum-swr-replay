@@ -27,6 +27,16 @@ from .model_specs import (
     ModelSpec,
 )
 from .rate_model import fit_rate_model
+from .retrospective import (
+    arm_path_well_to_well,
+    chosen_arm_fraction,
+    chosen_patch_fraction,
+    compute_retrospective_metrics,
+    contains_path_to_next,
+    ends_at_next,
+    ends_at_next_patch,
+    retrospective_alignment_with_shuffle,
+)
 from .shuffles import (
     circular_time_shuffle,
     next_arm_circular_shift,
