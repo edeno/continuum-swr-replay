@@ -30,6 +30,8 @@ from dataclasses import dataclass
 
 __all__ = [
     "MODEL_HIERARCHY",
+    "MODEL_HIERARCHY_MUA",
+    "MODEL_HIERARCHY_SWR",
     "MODEL_PATCH",
     "MODEL_PATCH_SWITCH",
     "ModelSpec",
@@ -148,6 +150,28 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # versions — e.g., ``is_current_patch`` (= is the animal in this
 # patch?) and ``cumulative_reward_patch`` (= sum of rewards across
 # both wells in this patch over the last 10 trials).
+
+# ── Event-source-restricted hierarchies (ContFrag pipeline) ──
+#
+# When events are externally restricted to SWR or MUA windows, the
+# corresponding flag is constant by construction (every SWR-event has
+# is_swr == 1; every MUA-event has is_mua == 1) so that flag's
+# interactions with arm-varying predictors collapse onto the main
+# effects and are unidentifiable. The hierarchy therefore mirrors
+# MODEL_HIERARCHY's M0–M5 and stops there.
+#
+# A cross-modality M6 (mua_x_* inside SWR-events, swr_x_* inside
+# MUA-events) is potentially identifiable when the cross-modality
+# flag varies, but should only be added once the ContFrag event_arm
+# tables are built and the cross-modality variability is verified.
+
+_M0_TO_M5 = {
+    name: MODEL_HIERARCHY[name] for name in ("M0", "M1", "M2", "M3", "M4", "M5")
+}
+
+MODEL_HIERARCHY_SWR: dict[str, ModelSpec] = dict(_M0_TO_M5)
+MODEL_HIERARCHY_MUA: dict[str, ModelSpec] = dict(_M0_TO_M5)
+
 
 MODEL_PATCH: dict[str, ModelSpec] = {
     "P0": ModelSpec(

@@ -231,6 +231,11 @@ def main():
     # Select hierarchy and input paths based on event source
     source_config = _EVENT_SOURCE_CONFIG[args.event_source]
     hierarchy = source_config["hierarchy"]
+    if hierarchy is None:
+        raise NotImplementedError(
+            f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
+            "in analysis/replay/model_specs.py. Define it before running."
+        )
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
     output_dir = input_dir / "models"
 
@@ -304,9 +309,7 @@ def main():
     has_nan = long_df[available_cols].isna().any(axis=1)
     events_with_nan = long_df.loc[has_nan, event_col].unique()
     n_before = long_df[event_col].nunique()
-    long_df = long_df[~long_df[event_col].isin(events_with_nan)].reset_index(
-        drop=True
-    )
+    long_df = long_df[~long_df[event_col].isin(events_with_nan)].reset_index(drop=True)
     n_after = long_df[event_col].nunique()
     if n_before != n_after:
         logging.info(
@@ -344,7 +347,9 @@ def main():
         t0 = time.time()
 
         mdf = fit_model_per_session(
-            long_df, model_name, predictors,
+            long_df,
+            model_name,
+            predictors,
             run_cv=args.cv,
             response_col=response_col,
             event_col=event_col,
@@ -426,9 +431,7 @@ def main():
                 logit_df = pd.DataFrame(logit_results)
                 logit_path = logit_dir / f"{model_name}_logit.pkl"
                 logit_df.to_pickle(logit_path)
-                logging.info(
-                    "  %s logit: %d sessions saved", model_name, len(logit_df)
-                )
+                logging.info("  %s logit: %d sessions saved", model_name, len(logit_df))
 
     logging.info("Done!")
 
