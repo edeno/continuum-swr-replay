@@ -1,0 +1,343 @@
+"""Tests for analysis/replay/learning.py.
+
+Stage 6 asks whether replay content modulates the stay/leave decision
+after reward vs. omission. Two pieces:
+
+- :func:`stop_replay_summary` collapses per-event arm-fractions to one
+  row per stop, picking out the fraction that landed on each
+  task-relevant role (current, previous, last-rewarded, best by recent
+  reward rate).
+- :func:`fit_is_stay_logistic` fits a per-session logistic:
+  ``is_stay ~ is_after_omission * frac_on_<role>`` and reports the
+  interaction coefficient.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.replay.learning import (
+    fit_is_stay_logistic_per_session,
+    fit_is_stay_pooled_gee,
+    stop_replay_summary,
+)
+
+
+def _make_tables(events: list[dict], stops: list[dict]) -> tuple[pd.DataFrame, ...]:
+    """Build minimal event_table / event_arm_table / stop_table.
+
+    Each event in ``events`` must include: stop_id, event_id,
+    current_arm, prev_arm, last_rewarded_arm, and ``arm_fracs`` (a
+    list of 9 floats summing to 1).
+    Each stop in ``stops`` must include: stop_id, current_arm,
+    last_rewarded_arm, is_after_reward, is_after_omission, is_stay.
+    """
+    sess = {"animal": "test", "day": 1, "epoch": "01_r1"}
+
+    ev_rows = []
+    ea_rows = []
+    for e in events:
+        ev_rows.append(
+            {
+                **sess,
+                "stop_id": e["stop_id"],
+                "event_id": e["event_id"],
+                "current_arm": e["current_arm"],
+                "prev_arm": e["prev_arm"],
+                "last_rewarded_arm": e["last_rewarded_arm"],
+                "is_swr": e.get("is_swr", False),
+                "is_mua": e.get("is_mua", False),
+            }
+        )
+        for arm in range(9):
+            ea_rows.append(
+                {
+                    **sess,
+                    "stop_id": e["stop_id"],
+                    "event_id": e["event_id"],
+                    "arm": arm,
+                    "arm_fraction": e["arm_fracs"][arm],
+                    "recent_reward_rate": e.get("rrr", [np.nan] * 9)[arm],
+                    "is_swr": e.get("is_swr", False),
+                    "is_mua": e.get("is_mua", False),
+                }
+            )
+    st_rows = []
+    for s in stops:
+        st_rows.append({**sess, **s})
+
+    return (
+        pd.DataFrame(ev_rows),
+        pd.DataFrame(ea_rows),
+        pd.DataFrame(st_rows),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# stop_replay_summary
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestStopReplaySummary:
+    def test_basic_aggregation(self):
+        ev, ea, st = _make_tables(
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+                {
+                    "stop_id": 1,
+                    "event_id": 101,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "arm_fracs": [0.30, 0.40, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": False,
+                    "is_mua_stop": False,
+                    "n_events": 2,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        out = stop_replay_summary(st, ev, ea)
+        assert len(out) == 1
+        row = out.iloc[0]
+        # Mean of [0.50, 0.30] on current arm 0
+        assert row["frac_on_current"] == pytest.approx(0.40)
+        # Mean of [0.20, 0.40] on prev arm 1
+        assert row["frac_on_prev"] == pytest.approx(0.30)
+        # last_rewarded == prev here
+        assert row["frac_on_last_rewarded"] == pytest.approx(0.30)
+        # Best arm by recent_reward_rate is arm 0 (rrr=0.8)
+        assert row["frac_on_best"] == pytest.approx(0.40)
+        # PATCH-LEVEL fractions. Patch 1 = arms {0, 1, 6}; current_arm=0
+        # → current_patch=1; arm_fracs sum on patch 1 per event:
+        #   event 100: 0.50 + 0.20 + 0.05 = 0.75
+        #   event 101: 0.30 + 0.40 + 0.05 = 0.75
+        # Mean across the two events = 0.75.
+        assert row["frac_on_current_patch"] == pytest.approx(0.75)
+        # prev_arm=1, prev_patch=1 → same as current_patch = 0.75
+        assert row["frac_on_prev_patch"] == pytest.approx(0.75)
+        # last_rewarded_arm=1, patch=1 → 0.75
+        assert row["frac_on_last_rewarded_patch"] == pytest.approx(0.75)
+        # best_arm=0, patch=1 → 0.75
+        assert row["frac_on_best_patch"] == pytest.approx(0.75)
+        # Behavioral pass-throughs
+        assert int(row["is_after_reward"]) == 1
+        assert int(row["is_stay"]) == 1
+        assert int(row["n_events_with_replay"]) == 2
+
+    def test_zero_event_stops_have_nan_summaries(self):
+        ev, ea, st = _make_tables(
+            events=[],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": False,
+                    "is_mua_stop": False,
+                    "n_events": 0,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        out = stop_replay_summary(st, ev, ea)
+        assert len(out) == 1
+        # No replay events → all four fraction columns are NaN.
+        for col in (
+            "frac_on_current",
+            "frac_on_prev",
+            "frac_on_last_rewarded",
+            "frac_on_best",
+        ):
+            assert np.isnan(out[col].iloc[0])
+        assert int(out["n_events_with_replay"].iloc[0]) == 0
+
+    def test_swr_mua_stratified_fractions(self):
+        # Two events: one SWR, one non-SWR. The SWR-only fraction
+        # should equal the SWR-event arm_fraction at that role.
+        ev, ea, st = _make_tables(
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_swr": True,
+                    "arm_fracs": [0.80, 0.05, 0.05, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+                {
+                    "stop_id": 1,
+                    "event_id": 101,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_swr": False,
+                    "arm_fracs": [0.10, 0.50, 0.10, 0.10, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": True,
+                    "is_mua_stop": False,
+                    "n_events": 2,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        out = stop_replay_summary(st, ev, ea)
+        row = out.iloc[0]
+        assert row["frac_on_current_swr"] == pytest.approx(0.80)
+        assert row["frac_on_current_non_swr"] == pytest.approx(0.10)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# fit_is_stay_logistic_per_session
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestFitIsStayLogistic:
+    def test_recovers_simulated_interaction_sign(self):
+        """If is_stay = sigmoid(2 * is_after_omission * frac_on_last_rewarded),
+        the fit should return a clearly positive coefficient on the
+        is_after_omission × frac_on_last_rewarded interaction."""
+        rng = np.random.default_rng(0)
+        n_stops = 200
+        is_after_omission = rng.integers(0, 2, n_stops)
+        frac = rng.uniform(0, 1, n_stops)
+        # True linear predictor
+        beta_omission = -0.5
+        beta_frac = 0.0
+        beta_inter = 3.0
+        eta = (
+            beta_omission * is_after_omission
+            + beta_frac * frac
+            + (beta_inter * is_after_omission * frac)
+        )
+        p = 1 / (1 + np.exp(-eta))
+        is_stay = (rng.uniform(0, 1, n_stops) < p).astype(int)
+
+        df = pd.DataFrame(
+            {
+                "animal": "test",
+                "day": 1,
+                "epoch": "01_r1",
+                "stop_id": np.arange(n_stops),
+                "is_after_omission": is_after_omission,
+                "frac_on_last_rewarded": frac,
+                "is_stay": is_stay,
+            }
+        )
+
+        coefs = fit_is_stay_logistic_per_session(
+            df,
+            content_col="frac_on_last_rewarded",
+        )
+        assert len(coefs) == 1
+        row = coefs.iloc[0]
+        # Recover the *sign* and rough magnitude of the interaction.
+        assert row["beta_inter"] > 1.0
+        assert row["beta_inter"] < 5.0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# fit_is_stay_pooled_gee
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestFitIsStayPooledGEE:
+    def test_recovers_pooled_interaction_with_session_clustering(self):
+        """Multi-session simulation: every session has the same
+        interaction effect, but session-level random intercepts
+        added on top. The pooled GEE should recover the interaction
+        with a tight cluster-robust SE."""
+        rng = np.random.default_rng(0)
+        rows = []
+        n_sessions = 30
+        n_per = 60
+        true_inter = 2.5
+        for s in range(n_sessions):
+            session_intercept = rng.normal(0, 0.8)
+            for _ in range(n_per):
+                outcome = int(rng.integers(0, 2))
+                frac = float(rng.uniform(0, 1))
+                eta = session_intercept - 0.3 * outcome + true_inter * outcome * frac
+                p = 1 / (1 + np.exp(-eta))
+                y = int(rng.uniform() < p)
+                rows.append(
+                    {
+                        "animal": f"a{s:03d}",
+                        "day": 1,
+                        "epoch": "01_r1",
+                        "stop_id": len(rows),
+                        "is_after_omission": outcome,
+                        "frac_on_last_rewarded": frac,
+                        "is_stay": y,
+                    }
+                )
+        df = pd.DataFrame(rows)
+
+        result = fit_is_stay_pooled_gee(df, content_col="frac_on_last_rewarded")
+        assert result["status"] == "ok"
+        assert result["n_sessions"] == n_sessions
+        # Recover the sign and rough magnitude.
+        assert result["beta_inter"] > 1.0
+        assert result["beta_inter"] < 5.0
+        # Should be highly significant given the strong simulated effect.
+        assert result["p_inter"] < 1e-4
+
+    def test_constant_target_returns_status(self):
+        df = pd.DataFrame(
+            {
+                "animal": "a",
+                "day": 1,
+                "epoch": "01_r1",
+                "stop_id": np.arange(100),
+                "is_after_omission": np.tile([0, 1], 50),
+                "frac_on_last_rewarded": np.linspace(0, 1, 100),
+                "is_stay": np.ones(100, dtype=int),
+            }
+        )
+        result = fit_is_stay_pooled_gee(df, content_col="frac_on_last_rewarded")
+        assert result["status"] == "constant_target_or_outcome"
