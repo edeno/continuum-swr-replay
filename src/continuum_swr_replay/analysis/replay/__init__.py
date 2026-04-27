@@ -17,6 +17,7 @@ from .fitting import (
     fit_null_model_conditional,
 )
 from .learning import (
+    StopSummaryConfig,
     fit_is_stay_logistic_per_session,
     fit_is_stay_pooled_gee,
     stop_replay_summary,
@@ -66,6 +67,7 @@ __all__ = [
     "MODEL_PATCH",
     "MODEL_PATCH_SWITCH",
     "ModelSpec",
+    "StopSummaryConfig",
     "arm_dist_rank",
     "arm_path_well_to_well",
     "build_choice_dataset",

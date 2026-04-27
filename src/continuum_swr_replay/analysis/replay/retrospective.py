@@ -345,9 +345,9 @@ def ends_at_next_patch(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["ends_at_next_patch"] = (
-        merged["_last_patch"].astype("Int64") == merged["next_patch"].astype("Int64")
-    )
+    out["ends_at_next_patch"] = merged["_last_patch"].astype("Int64") == merged[
+        "next_patch"
+    ].astype("Int64")
     return out
 
 
@@ -480,8 +480,19 @@ def retrospective_alignment_with_shuffle(
             if m in sm_means:
                 shuffled_acc[m].append(sm_means[m])
 
+    # n_events counts events that contributed to the retrospective
+    # metrics (i.e., events with a valid next_arm). Counting len(real)
+    # would over-report whenever the outer-merge in
+    # compute_retrospective_metrics fans out — events without a
+    # next_arm are dropped, but rows in the merged frame are not 1:1
+    # with input events in general.
+    if "next_arm" in event_table.columns:
+        n_events = int(event_table["next_arm"].notna().sum())
+    else:
+        n_events = int(len(event_table))
+
     out: dict[str, float] = {
-        "n_events": int(len(real)),
+        "n_events": n_events,
         "n_shuffles": int(n_shuffles),
     }
     for m in metrics:

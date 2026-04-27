@@ -25,7 +25,12 @@ from continuum_swr_replay.analysis.replay.learning import (
 )
 
 
-def _make_tables(events: list[dict], stops: list[dict]) -> tuple[pd.DataFrame, ...]:
+def _make_tables(
+    events: list[dict],
+    stops: list[dict],
+    *,
+    broadcast_role_cols_to_event_arm: bool = True,
+) -> tuple[pd.DataFrame, ...]:
     """Build minimal event_table / event_arm_table / stop_table.
 
     Each event in ``events`` must include: stop_id, event_id,
@@ -33,6 +38,13 @@ def _make_tables(events: list[dict], stops: list[dict]) -> tuple[pd.DataFrame, .
     list of 9 floats summing to 1).
     Each stop in ``stops`` must include: stop_id, current_arm,
     last_rewarded_arm, is_after_reward, is_after_omission, is_stay.
+
+    When ``broadcast_role_cols_to_event_arm`` is True (the production
+    schema), the role columns ``current_arm``/``prev_arm``/
+    ``last_rewarded_arm`` are duplicated onto every row of the
+    event_arm_table — this exercises the suffix-collision-avoidance
+    path. When False, the event_arm_table omits them and the merge
+    falls back to pulling them from event_table.
     """
     sess = {"animal": "test", "day": 1, "epoch": "01_r1"}
 
@@ -52,18 +64,21 @@ def _make_tables(events: list[dict], stops: list[dict]) -> tuple[pd.DataFrame, .
             }
         )
         for arm in range(9):
-            ea_rows.append(
-                {
-                    **sess,
-                    "stop_id": e["stop_id"],
-                    "event_id": e["event_id"],
-                    "arm": arm,
-                    "arm_fraction": e["arm_fracs"][arm],
-                    "recent_reward_rate": e.get("rrr", [np.nan] * 9)[arm],
-                    "is_swr": e.get("is_swr", False),
-                    "is_mua": e.get("is_mua", False),
-                }
-            )
+            ea_row = {
+                **sess,
+                "stop_id": e["stop_id"],
+                "event_id": e["event_id"],
+                "arm": arm,
+                "arm_fraction": e["arm_fracs"][arm],
+                "recent_reward_rate": e.get("rrr", [np.nan] * 9)[arm],
+                "is_swr": e.get("is_swr", False),
+                "is_mua": e.get("is_mua", False),
+            }
+            if broadcast_role_cols_to_event_arm:
+                ea_row["current_arm"] = e["current_arm"]
+                ea_row["prev_arm"] = e["prev_arm"]
+                ea_row["last_rewarded_arm"] = e["last_rewarded_arm"]
+            ea_rows.append(ea_row)
     st_rows = []
     for s in stops:
         st_rows.append({**sess, **s})
@@ -230,6 +245,113 @@ class TestStopReplaySummary:
         row = out.iloc[0]
         assert row["frac_on_current_swr"] == pytest.approx(0.80)
         assert row["frac_on_current_non_swr"] == pytest.approx(0.10)
+
+    def test_non_swr_complement_excludes_unknown_swr_flag(self):
+        # When is_swr is NaN/None for some events, those events count
+        # toward neither the SWR nor the non-SWR stratum (conservative
+        # interpretation: missing flag = unknown). A pandas BooleanDtype
+        # with NA must not crash the mask construction.
+        ev, ea, st = _make_tables(
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_swr": True,
+                    "arm_fracs": [0.80, 0.05, 0.05, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+                {
+                    "stop_id": 1,
+                    "event_id": 101,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_swr": False,
+                    "arm_fracs": [0.10, 0.50, 0.10, 0.10, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": True,
+                    "is_mua_stop": False,
+                    "n_events": 2,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        # Cast is_swr to nullable BooleanDtype on event_arm_table and
+        # set the second event's flag to NA. The summary must complete
+        # without raising and must exclude the NA event from both
+        # frac_on_current_swr and frac_on_current_non_swr.
+        ea = ea.copy()
+        ea["is_swr"] = ea["is_swr"].astype("boolean")
+        ea.loc[ea["event_id"] == 101, "is_swr"] = pd.NA
+        ev = ev.copy()
+        ev["is_swr"] = ev["is_swr"].astype("boolean")
+        ev.loc[ev["event_id"] == 101, "is_swr"] = pd.NA
+
+        out = stop_replay_summary(st, ev, ea)
+        row = out.iloc[0]
+        # Only event 100 has known is_swr=True → current_swr = 0.80
+        assert row["frac_on_current_swr"] == pytest.approx(0.80)
+        # event 101 has is_swr=NA → excluded from non_swr; nothing left
+        # in the non_swr stratum, so frac_on_current_non_swr is NaN.
+        assert np.isnan(row["frac_on_current_non_swr"])
+
+    def test_event_arm_table_without_role_columns_falls_back(self):
+        # When the event_arm_table omits the role columns (legacy
+        # fixtures, or future tables built without the broadcast),
+        # stop_replay_summary must pull them from event_table.
+        ev, ea, st = _make_tables(
+            broadcast_role_cols_to_event_arm=False,
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": False,
+                    "is_mua_stop": False,
+                    "n_events": 1,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        # Sanity: confirm the fixture really lacks the role columns.
+        assert "current_arm" not in ea.columns
+        out = stop_replay_summary(st, ev, ea)
+        row = out.iloc[0]
+        assert row["frac_on_current"] == pytest.approx(0.50)
+        assert row["frac_on_prev"] == pytest.approx(0.20)
 
 
 # ─────────────────────────────────────────────────────────────────────
