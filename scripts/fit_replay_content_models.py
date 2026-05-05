@@ -89,6 +89,7 @@ def fit_model_per_session(
     run_cv: bool = False,
     response_col: str = "arm_count",
     event_col: str = "event_uid",
+    n_categories: int = 9,
 ) -> pd.DataFrame:
     """Fit conditional Poisson model across all sessions.
 
@@ -126,6 +127,7 @@ def fit_model_per_session(
             predictors=list(predictors),
             response_col=response_col,
             event_col=event_col,
+            n_categories=n_categories,
         )
         if r is None:
             continue
@@ -136,6 +138,7 @@ def fit_model_per_session(
                 predictors=list(predictors),
                 event_col=event_col,
                 response_col=response_col,
+                n_categories=n_categories,
             )
             if cv is not None:
                 r.update(cv)
@@ -393,6 +396,11 @@ def main():
         )
         t0 = time.time()
 
+        # Patch hierarchy collapses 9 arms to 3 patches; the null /
+        # pseudo-R² / CV baselines must use log(3) instead of log(9)
+        # for P0–P3 to be on the right chance footing.
+        n_categories = 3 if args.hierarchy == "patch" else 9
+
         mdf = fit_model_per_session(
             long_df,
             model_name,
@@ -400,6 +408,7 @@ def main():
             run_cv=args.cv,
             response_col=response_col,
             event_col=event_col,
+            n_categories=n_categories,
         )
 
         elapsed = time.time() - t0

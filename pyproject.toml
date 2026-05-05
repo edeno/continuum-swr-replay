@@ -112,8 +112,11 @@ ignore_missing_imports = true
 allow_any_generics = true
 
 [tool.pytest.ini_options]
+# ``testpaths = ["tests"]`` already keeps collection out of ``src/``;
+# the previous ``collect_ignore_glob`` entry triggered a
+# ``PytestConfigWarning: Unknown config option`` because that hook is
+# only honored at the conftest module level, not in the ini config.
 testpaths = ["tests"]
-collect_ignore_glob = ["src/*"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",

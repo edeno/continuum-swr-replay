@@ -70,7 +70,10 @@ def find_sessions(max_per_animal: int | None = None):
         if not match:
             continue
         animal_date, epoch, brain_area = match.group(1), match.group(2), match.group(3)
-        animal = re.match(r"([a-z]+)", animal_date).group(1)
+        # animal_date is captured as ``\w+\d{8}`` so the animal id is
+        # everything before the trailing 8-digit date. ``re.match(r"[a-z]+", ...)``
+        # would collapse digit-bearing ids (``j162021...`` → ``j``).
+        animal = animal_date[:-8]
         session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
         if session_id not in env_files:
             continue

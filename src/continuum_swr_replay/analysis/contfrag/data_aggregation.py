@@ -111,6 +111,17 @@ def get_contfrag_data_over_time(
     def _nearest(series):
         return series.reindex(results.time, method="nearest", tolerance=0.004)
 
+    # Length guard runs first so we can construct on position_info.index
+    # safely; without that index the axis=1 concat below would align a
+    # default RangeIndex against a time index and silently produce a
+    # 2N-row NaN-filled frame.
+    if len(results.time) != len(data["position_info"]):
+        raise ValueError(
+            f"results.time ({len(results.time)}) and position_info "
+            f"({len(data['position_info'])}) have different lengths; "
+            "they must be aligned 1-to-1."
+        )
+
     data_over_time = pd.DataFrame(
         {
             "SWR_event": swr_labels.squeeze(),
@@ -144,15 +155,9 @@ def get_contfrag_data_over_time(
             "day": day,
             "epoch": epoch_name,
             "nwb_file_name": nwb_file_name,
-        }
+        },
+        index=data["position_info"].index,
     )
-
-    if len(data_over_time) != len(data["position_info"]):
-        raise ValueError(
-            f"data_over_time ({len(data_over_time)}) and position_info "
-            f"({len(data['position_info'])}) have different lengths; "
-            "they must be aligned 1-to-1."
-        )
 
     return pd.concat((data_over_time, data["position_info"]), axis=1), posterior
 

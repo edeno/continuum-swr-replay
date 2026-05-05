@@ -22,6 +22,7 @@ def cross_validate_conditional_poisson(
     event_col: str = "event_id",
     response_col: str = "arm_count_hard",
     n_folds: int = 5,
+    n_categories: int = 9,
 ) -> dict | None:
     """Event-based K-fold CV for conditional Poisson model.
 
@@ -31,15 +32,21 @@ def cross_validate_conditional_poisson(
     Parameters
     ----------
     long_df : pd.DataFrame
-        Long-format data (9 rows per event) with counts and predictors.
+        Long-format data (one row per (event, category)) with counts and
+        predictors. ``n_categories`` rows per event in the canonical
+        case (9 for arm-level, 3 for patch-level fits).
     predictors : list[str]
-        Arm-varying predictor columns.
+        Category-varying predictor columns.
     event_col : str
         Column with globally unique event IDs.
     response_col : str
-        Column with integer arm counts.
+        Column with integer category counts.
     n_folds : int
         Number of CV folds.
+    n_categories : int, optional
+        Number of candidate categories per event under the null
+        (uniform) model. Use 9 for arm-level fits, 3 for patch-level.
+        Affects the null fold-LL only.
 
     Returns
     -------
@@ -71,7 +78,10 @@ def cross_validate_conditional_poisson(
         return None
 
     y = df[response_col].values.astype(float)
-    n_arms = 9  # constant for this task
+    # Arm-level fits use 9; patch-level fits override to 3. Without this
+    # being threaded through, the null fold-LL would silently use log(9)
+    # for patch CV and the resulting baseline would be wrong.
+    n_arms = n_categories
 
     gkf = GroupKFold(n_splits=n_folds)
 

@@ -56,15 +56,38 @@ def load_population_data(
     dfs = []
     swr_list, no_swr_list, nl_swr_list, nl_no_swr_list = [], [], [], []
 
-    for p in pkls:
-        df_sess = pd.read_pickle(p)
-        dfs.append(df_sess)
+    n_lag_times = len(lag_time)
 
+    for p in pkls:
         base = str(p).replace("_modulation.pkl", "_modulation")
-        swr_list.append(np.load(f"{base}.SWR_modulation.npy"))
-        no_swr_list.append(np.load(f"{base}.no_SWR_modulation.npy"))
-        nl_swr_list.append(np.load(f"{base}.non_local_SWR_modulation.npy"))
-        nl_no_swr_list.append(np.load(f"{base}.non_local_no_SWR_modulation.npy"))
+        sess_swr = np.load(f"{base}.SWR_modulation.npy")
+        sess_no_swr = np.load(f"{base}.no_SWR_modulation.npy")
+        sess_nl_swr = np.load(f"{base}.non_local_SWR_modulation.npy")
+        sess_nl_no_swr = np.load(f"{base}.non_local_no_SWR_modulation.npy")
+
+        # Sessions with no surviving neurons in this brain area save
+        # placeholder arrays of shape ``(0, 0)`` (see ``run_session``
+        # in analysis/pfc/glm.py). hstack would silently broadcast a
+        # ``(0, 0)`` array against the expected ``(n_lag_times, k)``,
+        # producing a 0-row population matrix and breaking every
+        # downstream consumer. Skip such sessions explicitly.
+        if any(
+            arr.ndim != 2 or arr.shape[0] != n_lag_times
+            for arr in (sess_swr, sess_no_swr, sess_nl_swr, sess_nl_no_swr)
+        ):
+            continue
+
+        dfs.append(pd.read_pickle(p))
+        swr_list.append(sess_swr)
+        no_swr_list.append(sess_no_swr)
+        nl_swr_list.append(sess_nl_swr)
+        nl_no_swr_list.append(sess_nl_no_swr)
+
+    if not dfs:
+        raise FileNotFoundError(
+            f"No usable mPFC modulation files in {data_dir} "
+            "(every session had empty / wrong-shape arrays)"
+        )
 
     df = pd.concat(dfs, ignore_index=True)
     df["animal"] = df["nwb_file_name"].map(_extract_animal)

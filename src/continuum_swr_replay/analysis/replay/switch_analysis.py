@@ -97,8 +97,17 @@ def build_switch_aligned_table(
         day = sw_row["day"]
         epoch = sw_row["epoch"]
 
+        # Restrict to the switch's own session — stop_idx is only
+        # session-local, so without this filter a switch in (animal A,
+        # day D, epoch E) could match preceding stops from any other
+        # session that happens to have a stop_idx within the lag
+        # window. Lines 116-118 then write the switch's session keys
+        # onto every row, masking the cross-session contamination.
         preceding = st[
-            (st["stop_idx"] < sw_stop_idx)
+            (st["animal"] == animal)
+            & (st["day"] == day)
+            & (st["epoch"] == epoch)
+            & (st["stop_idx"] < sw_stop_idx)
             & (st["stop_idx"] >= sw_stop_idx - max_lag)
             & st["has_replay"]
         ]
@@ -221,8 +230,16 @@ def build_control_aligned_table(
         anchor_idx = rng.integers(0, len(possible_anchors))
         anchor_stop_idx = possible_anchors.iloc[anchor_idx]["stop_idx"]
 
+        # Match the switch-aligned builder: stop_idx is session-local,
+        # so the preceding-stop filter must restrict to the anchor's
+        # own session. Otherwise the writer at lines ~237-241 stamps
+        # this episode's session keys onto stops drawn from other
+        # sessions that happened to share the stop_idx range.
         preceding = st[
-            (st["stop_idx"] < anchor_stop_idx)
+            (st["animal"] == animal)
+            & (st["day"] == day)
+            & (st["epoch"] == epoch)
+            & (st["stop_idx"] < anchor_stop_idx)
             & (st["stop_idx"] >= anchor_stop_idx - max_lag)
             & st["has_replay"]
         ]

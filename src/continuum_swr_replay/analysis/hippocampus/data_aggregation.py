@@ -230,6 +230,17 @@ def get_data_over_time(
     def _nearest(series):
         return series.reindex(results.time, method="nearest", tolerance=0.004)
 
+    # Build with the position_info time index so axis=1 concat aligns by
+    # time instead of falling back to a default RangeIndex (which would
+    # produce a 2N-row frame full of NaNs against the time-indexed
+    # position frame). Length guard mirrors the contfrag path.
+    if len(results.time) != len(data["position_info"]):
+        raise ValueError(
+            f"results.time ({len(results.time)}) and position_info "
+            f"({len(data['position_info'])}) have different lengths; "
+            "they must be aligned 1-to-1."
+        )
+
     data_over_time = pd.DataFrame(
         {
             "non_local_event": non_local_labels.squeeze(),
@@ -275,7 +286,8 @@ def get_data_over_time(
             "day": day,
             "epoch": epoch_name,
             "nwb_file_name": nwb_file_name,
-        }
+        },
+        index=data["position_info"].index,
     )
 
     return pd.concat((data_over_time, data["position_info"]), axis=1), posterior
@@ -299,8 +311,15 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
         Concatenated data with derived Non-Local_prob and distance columns.
 
     """
-    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
-    data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
+    # Sort and check explicitly so an empty directory raises a
+    # targeted FileNotFoundError instead of pandas' generic
+    # "No objects to concatenate" — matches the contfrag loader.
+    files = sorted(data_dir.glob("*_HPC_80_data_over_time.pkl"))
+    if not files:
+        raise FileNotFoundError(
+            f"No *_HPC_80_data_over_time.pkl files found in {data_dir}"
+        )
+    data_over_time = pd.concat([pd.read_pickle(p) for p in files])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]
         + data_over_time["Non-Local_Fragmented_prob"]

@@ -11,10 +11,7 @@ uv sync --extra dev
 # Run all tests
 uv run pytest
 
-# Run with coverage
-uv run pytest --cov=src/continuum_swr_replay --cov-report=html
-
-# Run specific test file
+# Run a specific test file
 uv run pytest tests/unit/test_spikes.py
 
 # Run tests matching a pattern
@@ -28,16 +25,22 @@ uv run pytest -v
 
 ```
 tests/
-├── conftest.py              # Shared fixtures and test configuration
-├── unit/                    # Unit tests for individual functions
-│   ├── test_spikes.py      # Spike processing tests
-│   ├── test_task_variables.py  # Task variable computation tests
-│   └── test_lfp.py         # LFP processing tests
-├── integration/             # Integration tests for complete workflows
-│   └── test_data_loading.py   # Full data loading pipeline tests
-└── property/                # Property-based tests (requires hypothesis)
-    └── test_mathematical_invariants.py  # Mathematical property tests
+├── conftest.py                              # Shared fixtures
+├── unit/                                    # ~30 function-level test files
+│   ├── test_basic.py                        # Dependency-free smoke tests
+│   ├── test_spikes.py                       # Spike processing
+│   ├── test_lfp.py                          # LFP processing
+│   ├── test_task_variables.py               # Task variable derivation
+│   ├── test_replay_tables.py                # Replay-content tables
+│   └── …                                    # See ``ls tests/unit`` for full list
+├── integration/
+│   └── test_mock_session_fixture.py         # Mock-session preset surface tests
+└── property/
+    └── test_mathematical_invariants.py      # Hypothesis-based property tests
 ```
+
+Anything that requires the lab VPN / live DataJoint is gated behind the
+``integration`` pytest marker and not collected by default.
 
 ## Test Categories
 
@@ -96,12 +99,11 @@ Test mathematical invariants that should hold for all inputs using [hypothesis](
 - Probability distributions sum to 1
 - Spike filtering preserves order
 
-**Install hypothesis:**
-```bash
-uv pip install hypothesis
-```
+``hypothesis`` is already pulled in by the ``dev`` extra
+(``uv sync --extra dev``); no separate install step is needed.
 
 **Run property tests:**
+
 ```bash
 uv run pytest tests/property/
 ```
@@ -298,10 +300,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
       - name: Run tests
-        run: uv run pytest --cov --cov-report=xml
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        run: uv run pytest
 ```
+
+To collect coverage in CI, add ``pytest-cov`` to the ``dev`` extra
+first; it is intentionally not part of the default dev set.
 
 ## Debugging Failed Tests
 
@@ -332,18 +335,18 @@ uv run pytest -l
 
 ## Coverage Reports
 
-Generate coverage report:
+``pytest-cov`` is not in the default ``dev`` extra. Add it explicitly
+when you want coverage:
+
 ```bash
+uv add --dev pytest-cov
 uv run pytest --cov=src/continuum_swr_replay --cov-report=html
 ```
 
-View in browser:
-```bash
-open htmlcov/index.html  # macOS
-xdg-open htmlcov/index.html  # Linux
-```
+Then open ``htmlcov/index.html`` in a browser.
 
-Coverage goals:
+Aspirational coverage targets (not currently enforced):
+
 - **Critical modules** (spikes, task_variables, lfp): >80%
 - **Analysis modules** (event_detection, posterior_analysis): >60%
 - **Visualization modules**: >40%

@@ -10,6 +10,10 @@ Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
 
 - ``event_table.pkl`` — one row per non-local event
 - ``event_arm_table.pkl`` — one row per (event, arm)
+- ``event_patch_table.pkl`` — one row per (event, patch); collapsed from
+  ``event_arm_table`` via :func:`build_event_patch_table` so the
+  ``--hierarchy patch`` path of ``fit_replay_content_models.py`` has its
+  required input alongside the per-arm tables.
 - ``event_sequence_table.pkl`` — one row per in-event timebin
 - ``stop_table.pkl`` — one row per stopping period (incl. zero-event)
 
@@ -34,6 +38,7 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 )
 from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
+    build_event_patch_table,
     build_event_sequence_table,
     build_event_table,
     build_stop_table,
@@ -72,7 +77,12 @@ def find_sessions(max_per_animal: int | None = None):
         if not match:
             continue
         animal_date, epoch = match.group(1), match.group(2)
-        animal = re.match(r"([a-z]+)", animal_date).group(1)
+        # The outer regex enforces exactly 8 trailing digits (the date),
+        # so the animal id is everything before them. The previous
+        # ``re.match(r"([a-z]+)", animal_date)`` collapsed digit-bearing
+        # ids — e.g. ``j162021...`` matched only ``j``, merging j16
+        # sessions under ``j``.
+        animal = animal_date[:-8]
         session_id = f"{animal_date}_{epoch}_HPC"
         if session_id not in env_files:
             continue
@@ -241,6 +251,14 @@ def main():
         if all_event_sequence_tables
         else None
     )
+    # Patch table is a deterministic projection of the per-arm table
+    # (sums arm_count_hard within each patch and aggregates predictors
+    # to patch level). Save it alongside the others so the documented
+    # ``fit_replay_content_models.py --hierarchy patch`` path has its
+    # required input.
+    event_patch_table_all = build_event_patch_table(
+        event_table_all, event_arm_table_all
+    )
 
     session_cols = ["animal", "day", "epoch"]
     logging.info(
@@ -275,6 +293,7 @@ def main():
     for name, frame in (
         ("event_table", event_table_all),
         ("event_arm_table", event_arm_table_all),
+        ("event_patch_table", event_patch_table_all),
         ("stop_table", stop_table_all),
         ("event_sequence_table", event_sequence_table_all),
     ):

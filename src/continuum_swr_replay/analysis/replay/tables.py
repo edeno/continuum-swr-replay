@@ -1104,6 +1104,19 @@ def build_event_patch_table(
     )
     patch_eat = patch_eat.drop(columns=["is_after_switch"])
 
+    # Session keys are required by the patch-level fitter, which groups
+    # by ["animal", "day", "epoch"] before fitting per session. Without
+    # them, ``fit_replay_content_models.py --hierarchy patch`` raises
+    # KeyError before fitting; loading the joined table would otherwise
+    # silently mix events across sessions.
+    session_cols = ["animal", "day", "epoch"]
+    if all(col in event_table.columns for col in session_cols):
+        patch_eat = patch_eat.merge(
+            event_table[["event_id", *session_cols]],
+            on="event_id",
+            how="left",
+        )
+
     return patch_eat
 
 
