@@ -40,6 +40,8 @@ def load_results(
     epoch_name: str,
     decoding_brain_area: str = "HPC",
     load_detector: bool = True,
+    non_stationary: bool = False,
+    ripple_detector_name: str = "Kay",
 ) -> tuple[xr.Dataset, NonLocalClusterlessDetector | None, Environment | None]:
     """Load saved decoding results and detector model.
 
@@ -53,6 +55,13 @@ def load_results(
         Brain area used for decoding, by default "HPC"
     load_detector : bool, optional
         Whether to load the detector model, by default True
+    non_stationary : bool, optional
+        Whether the saved run used a non-stationary transition model. Must
+        match the value passed to ``run_decoding_bandit.py`` so that the
+        ``_non_stationary`` filename suffix is reconstructed correctly.
+    ripple_detector_name : str, optional
+        Ripple detector used for the saved run. Non-Kay detectors append
+        ``_{ripple_detector_name}`` to the filename.
 
     Returns
     -------
@@ -64,10 +73,16 @@ def load_results(
         Environment configuration (None if load_detector=False)
 
     """
-    epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
+    epoch_identifier = (
+        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{decoding_brain_area}"
+    )
+    if ripple_detector_name != "Kay":
+        epoch_identifier += f"_{ripple_detector_name}"
+    if non_stationary:
+        epoch_identifier += "_non_stationary"
 
     results = xr.open_dataset(
-        PROCESSED_DATA_DIR / f"{epoch_identifier}_{decoding_brain_area}_results.nc",
+        PROCESSED_DATA_DIR / f"{epoch_identifier}_results.nc",
         engine="h5netcdf",
     )
     state_bin_coord_names = list(results["state_bins"].coords)
@@ -75,8 +90,7 @@ def load_results(
 
     if load_detector:
         detector = NonLocalClusterlessDetector.load_model(
-            PROCESSED_DATA_DIR
-            / f"{epoch_identifier}_{decoding_brain_area}_detector.pkl"
+            PROCESSED_DATA_DIR / f"{epoch_identifier}_detector.pkl"
         )
         env = detector.environments[0]
     else:

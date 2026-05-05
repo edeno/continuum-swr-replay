@@ -12,6 +12,8 @@ def load_contfrag_results(
     epoch_name: str,
     decoding_brain_area: str = "HPC",
     load_detector: bool = True,
+    non_stationary: bool = False,
+    ripple_detector_name: str = "Kay",
 ) -> tuple[xr.Dataset, ContFragClusterlessClassifier | None, Environment | None]:
     """Load saved ContFrag decoding results and classifier model.
 
@@ -25,6 +27,13 @@ def load_contfrag_results(
         Brain area used for decoding, by default "HPC".
     load_detector : bool, optional
         Whether to load the classifier model, by default True.
+    non_stationary : bool, optional
+        Whether the saved run used a non-stationary transition model. Must
+        match the value passed to ``run_decoding_contfrag.py`` so that the
+        ``_non_stationary`` filename suffix is reconstructed correctly.
+    ripple_detector_name : str, optional
+        Ripple detector used for the saved run. Non-Kay detectors append
+        ``_{ripple_detector_name}`` to the filename.
 
     Returns
     -------
@@ -39,6 +48,10 @@ def load_contfrag_results(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
         f"_{decoding_brain_area}_contfrag"
     )
+    if ripple_detector_name != "Kay":
+        epoch_identifier += f"_{ripple_detector_name}"
+    if non_stationary:
+        epoch_identifier += "_non_stationary"
 
     results = xr.open_dataset(
         PROCESSED_DATA_DIR / f"{epoch_identifier}_results.nc",

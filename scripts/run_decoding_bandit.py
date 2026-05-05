@@ -334,7 +334,13 @@ def run_decode(
 
         if results_exist(save_folder, epoch_identifier, overwrite):
             logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
-            results, detector, env = load_results(nwb_file_name, epoch_name, brain_area)
+            results, detector, env = load_results(
+                nwb_file_name,
+                epoch_name,
+                brain_area,
+                non_stationary=non_stationary,
+                ripple_detector_name=ripple_detector_name,
+            )
         else:
             is_training = get_training_timepoints(data, training_type=training_type)
 
