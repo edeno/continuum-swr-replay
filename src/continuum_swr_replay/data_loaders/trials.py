@@ -181,17 +181,22 @@ def get_start_end_node_id(
     """
     projected_cols = ["projected_x_position", "projected_y_position"]
 
-    # Use searchsorted to find indices, but clamp to valid range
-    # searchsorted with side="right" can return len(position_info) for values
-    # past the end of the index, so we clamp to the last valid index
+    # We want the position row at-or-before each interval boundary.
+    # ``side="right"`` returns the *insertion index after* an exact match,
+    # so ``searchsorted([0, 1], 0, side="right") == 1`` — without the
+    # ``- 1`` correction we would sample the *next* row, mislabeling
+    # ``from_well``/``to_well`` (e.g. for an interval [0, 1] over a
+    # position frame at t=0 (well 0) and t=1 (well 1), both endpoints
+    # would resolve to row 1 → from_well = to_well = 1). Subtract 1
+    # then clamp to the valid index range.
     max_idx = len(position_info) - 1
     start_indices = np.clip(
-        position_info.index.searchsorted(times.start_time.values, side="right"),
+        position_info.index.searchsorted(times.start_time.values, side="right") - 1,
         0,
         max_idx,
     )
     end_indices = np.clip(
-        position_info.index.searchsorted(times.end_time.values, side="right"),
+        position_info.index.searchsorted(times.end_time.values, side="right") - 1,
         0,
         max_idx,
     )

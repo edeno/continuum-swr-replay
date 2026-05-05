@@ -59,10 +59,12 @@ from ripple_detection import (
     multiunit_HSE_detector,
 )
 from scipy.stats import zscore
-from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
-from spyglass.lfp.lfp_merge import LFPOutput
-from spyglass.ripple.v1 import RippleTimesV1
 
+# ``spyglass.{lfp,ripple}`` imports open a DataJoint connection at
+# import time. Defer them into the DB-loading function bodies so that
+# pure helpers (``get_multiunit``, ``get_multiunit_hse``,
+# ``filter_ripple_lfp_time``) — and the unit tests that exercise them
+# — stay offline-importable on machines without VPN.
 from ..parameters import (
     HSE_CLOSE_EVENT_THRESHOLD_SEC,
     HSE_MINIMUM_DURATION_SEC,
@@ -96,6 +98,8 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
         - theta_power: pd.Series with theta power
 
     """
+    from spyglass.lfp.analysis.v1.lfp_band import LFPBandV1
+
     theta_lfp_key = {
         "nwb_file_name": nwb_file_name,
         "filter_name": "theta_5_11",
@@ -147,6 +151,10 @@ def get_ripple(
         - zscored_ripple_consensus_trace: pd.Series with z-scored consensus trace
 
     """
+    from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
+    from spyglass.lfp.lfp_merge import LFPOutput
+    from spyglass.ripple.v1 import RippleTimesV1
+
     # Ripples
     if ripple_detector_name == "Kay":
         ripple_params = "default"
@@ -218,6 +226,13 @@ def get_multiunit_hse(
     """
     sampling_frequency = 1 / np.median(np.diff(bin_time))
     start_time, end_time = bin_time[[0, -1]]
+    # ``np.digitize(t, bin_time[1:])`` assigns spikes to bin index
+    # 0..N-1 where bin ``i`` covers ``[bin_time[i], bin_time[i+1])``
+    # (and bin N-1 also catches ``t == bin_time[-1]``). The previous
+    # ``bin_time[1:-1]`` form produced indices 0..N-2 only, so the
+    # final output bin was unreachable — verified with
+    # ``bin_time=[0,1,2,3]``: spikes at 2.5 and 3.0 both landed in
+    # bin 2 and bin 3 stayed at zero.
     multiunit_spikes = np.stack(
         [
             np.bincount(
@@ -228,7 +243,7 @@ def get_multiunit_hse(
                             unit_spike_times <= end_time,
                         )
                     ],
-                    bin_time[1:-1],
+                    bin_time[1:],
                 ),
                 minlength=bin_time.shape[0],
             )

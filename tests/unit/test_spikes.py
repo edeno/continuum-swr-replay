@@ -86,6 +86,41 @@ class TestCoincidentSpikeDetection:
             assert np.any(np.abs(all_filtered - 4.0) < 0.01), "Spike at t=4.0 should be preserved"
             assert np.any(np.abs(all_filtered - 6.0) < 0.01), "Spike at t=6.0 should be preserved"
 
+    def test_two_of_four_coincident_above_threshold_removed(self):
+        """Two distinct tetrodes spiking within 40μs on a 4-tetrode session
+        is fraction 2/4 = 0.5 > 0.33 default threshold and must be removed.
+
+        Regression test: the previous implementation labeled only the trailing
+        spike of each close cluster, so the leading spike was excluded from
+        ``coincident_fraction``. A 2-spike cluster from 2 tetrodes therefore
+        evaluated as 1/4 = 0.25 < 0.33 and slipped through.
+        """
+        # 4 tetrodes; tetrodes 0+1 produce a 2-spike coincidence at t≈1.0,
+        # everything else is well-separated.
+        spike_times = [
+            np.array([1.0, 5.0]),         # tetrode 0: leading spike of pair
+            np.array([1.00002, 6.0]),     # tetrode 1: trailing spike (20μs)
+            np.array([3.0, 7.0]),         # tetrode 2: clean
+            np.array([4.0, 8.0]),         # tetrode 3: clean
+        ]
+        filtered_times, _ = detect_coincident_spikes(spike_times)
+
+        # Both members of the t≈1.0 coincidence must be gone.
+        all_filtered = np.concatenate([ft for ft in filtered_times if len(ft)])
+        assert not np.any(np.abs(all_filtered - 1.0) < 0.001), (
+            "leading spike of 2-of-4 coincidence should be removed "
+            f"but survived: {all_filtered.tolist()}"
+        )
+        assert not np.any(np.abs(all_filtered - 1.00002) < 0.001), (
+            "trailing spike of 2-of-4 coincidence should be removed "
+            f"but survived: {all_filtered.tolist()}"
+        )
+        # Clean spikes preserved.
+        for clean in (3.0, 4.0, 5.0, 6.0, 7.0, 8.0):
+            assert np.any(np.abs(all_filtered - clean) < 0.001), (
+                f"clean spike at t={clean} should be preserved"
+            )
+
     def test_well_separated_spikes_preserved(self):
         """Well-separated spikes across tetrodes should be preserved."""
         spike_times = [

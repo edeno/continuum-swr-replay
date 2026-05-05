@@ -82,3 +82,24 @@ class TestLazyImports:
             "from continuum_swr_replay.analysis.hippocampus.event_detection "
             "import get_confident_times"
         )
+
+    def test_data_loaders_spikes_pure_helpers_do_not_load_spyglass(self):
+        # The spike-filtering / coincident-detection helpers used by
+        # tests/unit/test_spikes.py are pure numpy/pandas. The DB-loading
+        # functions in the same module (``get_hpc_marks``, etc.) must
+        # keep their spyglass imports function-local so the unit suite
+        # can import these helpers offline.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.data_loaders.spikes "
+            "import detect_coincident_spikes, filter_spike_times"
+        )
+
+    def test_data_loaders_lfp_pure_helpers_do_not_load_spyglass(self):
+        # ``get_multiunit_hse`` / ``get_multiunit`` / ``filter_ripple_lfp_time``
+        # are pure helpers; only ``get_theta`` / ``get_ripple`` need
+        # spyglass at runtime. ``test_lfp.py`` and
+        # ``test_multiunit_hse.py`` should be importable offline.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.data_loaders.lfp "
+            "import get_multiunit, get_multiunit_hse, filter_ripple_lfp_time"
+        )
