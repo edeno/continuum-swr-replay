@@ -67,3 +67,18 @@ class TestLazyImports:
 
     def test_package_root_does_not_load_spyglass(self):
         assert _import_does_not_load_spyglass("import continuum_swr_replay")
+
+    def test_hippocampus_event_analysis_does_not_load_spyglass(self):
+        # Importing a leaf hippocampus submodule used to drag in
+        # ``data_aggregation`` (which imports
+        # ``data_loaders.get_labels`` → spyglass).
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.analysis.hippocampus.event_analysis "
+            "import get_event_start_end_times"
+        )
+
+    def test_hippocampus_event_detection_does_not_load_spyglass(self):
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.analysis.hippocampus.event_detection "
+            "import get_confident_times"
+        )

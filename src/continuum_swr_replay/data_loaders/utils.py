@@ -64,7 +64,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from spyglass.common import IntervalList, PositionIntervalMap, Session
+
+# ``spyglass.common`` is imported inside :func:`get_epoch_info` rather
+# than at module top level. Importing ``spyglass.common`` opens a
+# DataJoint connection at import time, which would re-couple every
+# offline caller of ``utils`` (notably ``get_labels``, used by
+# ``analysis.hippocampus.event_detection`` and friends) to the live
+# database. Keeping it function-local means leaf imports stay offline
+# and only ``get_epoch_info`` actually requires DataJoint.
 
 if TYPE_CHECKING:
     from ..types import SessionData
@@ -152,6 +159,11 @@ def get_epoch_info() -> pd.DataFrame:
     is static.
 
     """
+    # Deferred import: ``spyglass.common`` opens a DataJoint connection
+    # at import time, which we don't want to incur for callers that
+    # only need ``get_labels`` / constants from this module.
+    from spyglass.common import IntervalList, PositionIntervalMap, Session
+
     epoch_info = (
         pd.DataFrame(
             (

@@ -1060,12 +1060,22 @@ def build_event_patch_table(
     eat = event_arm_table.copy()
     eat["patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
 
+    # ``cumulative_reward`` is sometimes NaN (no reward history known
+    # yet for a session). The default pandas sum has ``skipna=True``,
+    # which collapses an all-NaN group to ``0.0`` — turning unknown
+    # reward history into a real zero. ``min_count=1`` preserves NaN
+    # when no non-null observations exist in the group, which is what
+    # the downstream P3 patch model needs to drop those rows from its
+    # complete-case fit instead of conditioning on a fabricated zero.
     patch_eat = (
         eat.groupby(["event_id", "patch"])
         .agg(
             patch_count_hard=("arm_count_hard", "sum"),
             is_current_patch=("is_same_patch", "max"),
-            cumulative_reward_patch=("cumulative_reward", "sum"),
+            cumulative_reward_patch=(
+                "cumulative_reward",
+                lambda s: s.sum(min_count=1),
+            ),
             visit_recency_patch=("visit_recency", "min"),
         )
         .reset_index()
