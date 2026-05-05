@@ -66,7 +66,7 @@ uv run pytest
 ```
 src/continuum_swr_replay/
 ├── data_loaders/          # Data loading from Spyglass/NWB
-│   └── load_data_bandit.py   # Main data loader for spatial bandit task
+│   └── bandit_task.py        # Main data loader for spatial bandit task
 ├── analysis/              # Analysis modules
 │   ├── hippocampus/      # Hippocampus-specific analysis
 │   └── pfc/              # Prefrontal cortex analysis
@@ -78,7 +78,7 @@ paper/                     # Paper materials (data, figures, manuscript)
 
 ## Key Architecture Concepts
 
-### Data Loading Pipeline (`load_data_bandit.py`)
+### Data Loading Pipeline (`bandit_task.py`)
 
 The main entry point is `load_data()` which orchestrates loading all data types for a given session and epoch:
 
@@ -188,7 +188,7 @@ Task-relevant derived variables:
 ### Loading data for a session
 
 ```python
-from continuum_swr_replay.data_loaders.load_data_bandit import load_data, get_epoch_info
+from continuum_swr_replay.data_loaders.bandit_task import load_data, get_epoch_info
 
 # Get all available epochs
 epoch_info = get_epoch_info()
