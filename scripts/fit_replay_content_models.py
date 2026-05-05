@@ -260,6 +260,19 @@ def main():
             "patch_count_hard."
         ),
     )
+    parser.add_argument(
+        "--brain-area",
+        type=str,
+        default="HPC",
+        choices=["HPC", "mPFC", "OFC"],
+        help=(
+            "Brain area suffix used when resolving ContFrag prep "
+            "outputs (event_arm_table_{source}_{brain_area}.pkl). "
+            "Ignored for the non_local event source, which is built "
+            "by ``prepare_replay_content_data.py`` and is not "
+            "partitioned per area."
+        ),
+    )
     args = parser.parse_args()
 
     # Select hierarchy and input paths based on event source. The
@@ -283,8 +296,28 @@ def main():
                 f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
                 "in analysis/replay/model_specs.py. Define it before running."
             )
+    # ContFrag prep partitions outputs by brain area
+    # (event_arm_table_{source}_{brain_area}.pkl) to prevent silent
+    # cross-region merges. The non_local prep is single-area and keeps
+    # the unsuffixed name. Match the prep contract here.
+    if args.event_source in ("SWR", "MUA"):
+        table_name = f"{table_name}_{args.brain_area}"
+
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
-    output_dir = input_dir / ("models_patch" if args.hierarchy == "patch" else "models")
+    # Outputs must also be partitioned per (source, brain_area) for
+    # ContFrag fits — otherwise SWR/HPC, SWR/mPFC, MUA/HPC, etc. all
+    # write into the same ``models/`` directory and overwrite each
+    # other's M0.pkl / all_models.pkl / model_comparison.pkl /
+    # logit/M*_logit.pkl. The non_local pipeline stays unsuffixed
+    # because it is single-area and single-source by construction.
+    base_subdir = "models_patch" if args.hierarchy == "patch" else "models"
+    if args.event_source in ("SWR", "MUA"):
+        output_subdir = (
+            f"{base_subdir}_{args.event_source.lower()}_{args.brain_area}"
+        )
+    else:
+        output_subdir = base_subdir
+    output_dir = input_dir / output_subdir
 
     # Determine which models to fit
     if args.models:

@@ -109,7 +109,14 @@ def get_contfrag_data_over_time(
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
-        return series.reindex(results.time, method="nearest", tolerance=0.004)
+        # Return a positional ndarray; otherwise the Series — indexed
+        # by ``results.time`` — would be re-aligned against
+        # ``position_info.index`` when packed into the DataFrame
+        # below, silently introducing NaNs whenever the two axes
+        # differ by epsilon despite identical lengths.
+        return (
+            series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
+        )
 
     # Length guard runs first so we can construct on position_info.index
     # safely; without that index the axis=1 concat below would align a

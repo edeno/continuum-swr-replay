@@ -59,10 +59,10 @@ get_posterior_stats
 
 Typical Workflow
 ----------------
-1. Load decoding results: results, detector, env = load_results(epoch_id)
-2. Get aggregated data: data_df = get_data_over_time(results, data, detector, ...)
-3. Detect confident events: confident_times = get_confident_times(results, threshold)
-4. Analyze replay properties: speed = get_map_speed(results), stats = get_posterior_stats(results)
+1. Load decoding results: ``results, detector, env = load_results(nwb_file_name, epoch_name)``
+2. Get aggregated data: ``data_df, posterior = get_data_over_time(data, results, env, nwb_file_name, epoch_name, non_local_threshold=0.80)``
+3. Detect confident events: ``confident_times = get_confident_times(results, threshold)``
+4. Analyze replay properties: ``speed = get_map_speed(results)``, ``stats = get_posterior_stats(...)``
 5. Visualize or perform statistical tests on aggregated data
 
 See Also
@@ -73,8 +73,11 @@ continuum_swr_replay.visualization : Plotting functions for replay analysis
 Examples
 --------
 >>> from continuum_swr_replay.analysis.hippocampus import load_results, get_data_over_time
->>> results, detector, env = load_results("chimi20200212_02_r1_HPC")
->>> data_df = get_data_over_time(results, data, detector, env, threshold=0.80)
+>>> results, detector, env = load_results("chimi20200212_.nwb", "02_r1")
+>>> data_df, posterior = get_data_over_time(
+...     data, results, env, "chimi20200212_.nwb", "02_r1",
+...     non_local_threshold=0.80,
+... )
 
 """
 

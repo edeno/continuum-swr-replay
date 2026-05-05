@@ -89,7 +89,7 @@ continuum_swr_replay.data_loaders.bandit_task : Session data loading
 Examples
 --------
 >>> from continuum_swr_replay.analysis.hippocampus import load_results, get_data_over_time
->>> results, detector, env = load_results("chimi20200212_02_r1_HPC")
+>>> results, detector, env = load_results("chimi20200212_.nwb", "02_r1")
 >>> data_df, posterior = get_data_over_time(
 ...     data, results, env, "chimi20200212_.nwb", "02_r1",
 ...     non_local_threshold=0.80
@@ -228,7 +228,16 @@ def get_data_over_time(
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
-        return series.reindex(results.time, method="nearest", tolerance=0.004)
+        # Return a positional ndarray. ``reindex`` returns a Series
+        # indexed by ``results.time``; embedding that Series into the
+        # DataFrame below would make pandas re-align it against
+        # ``position_info.index``, producing NaNs whenever the two
+        # axes differ by even epsilon despite identical lengths. The
+        # length guard above ensures the two are 1-to-1, so a positional
+        # ndarray is safe and matches the bare-numpy columns used here.
+        return (
+            series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
+        )
 
     # Build with the position_info time index so axis=1 concat aligns by
     # time instead of falling back to a default RangeIndex (which would
