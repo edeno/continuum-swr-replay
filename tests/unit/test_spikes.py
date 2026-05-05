@@ -262,7 +262,7 @@ class TestSpikeFiltering:
         spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
     def test_all_spikes_filtered_out(self):
-        """If all spikes outside bounds, tetrode should be dropped."""
+        """If all spikes outside bounds, the brain area is dropped entirely."""
         spike_times = {
             "HPC": [np.array([0.1, 0.2, 0.3])],  # All before position starts
         }
@@ -273,8 +273,10 @@ class TestSpikeFiltering:
 
         spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
 
-        # Tetrode with zero spikes is dropped entirely
-        assert len(spike_times["HPC"]) == 0
+        # No surviving units → brain area absent from both dicts so downstream
+        # "brain_area in data['spike_times']" checks treat the session as
+        # having no HPC data rather than passing an empty list to the decoder.
+        assert "HPC" not in spike_times
         assert "HPC" not in spike_features
 
     def test_empty_tetrodes_dropped_nonempty_kept(self):

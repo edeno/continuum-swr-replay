@@ -254,6 +254,12 @@ def _get_tetrode_sort_group_ids(
     unit_mark_keys = pd.DataFrame(
         (UnitMarks & restriction).fetch("sort_group_id", as_dict=True)
     )
+    # Empty DataJoint fetch yields a DataFrame with no columns, so accessing
+    # "sort_group_id" would raise KeyError. The caller (get_hpc_marks) treats
+    # an empty tetrode set as "no HPC" via ValueError, so return early here
+    # and let it raise the descriptive ValueError that get_spike_data catches.
+    if unit_mark_keys.empty:
+        return set()
     sort_group_ids = unit_mark_keys["sort_group_id"].unique()
 
     tetrode_ids = set()
@@ -526,7 +532,12 @@ def filter_spike_times(
                 brain_area,
             )
 
-        filtered_spike_times[brain_area] = brain_area_filtered_times
+        # Drop the brain area entirely when no surviving units remain. Downstream
+        # decoder code uses dict-membership ("brain_area in data['spike_times']")
+        # to detect availability, so an empty list would otherwise fall through
+        # to perform_decoding. Mirrors the feature-side conditional below.
+        if brain_area_filtered_times:
+            filtered_spike_times[brain_area] = brain_area_filtered_times
 
         if brain_area_filtered_features:
             filtered_spike_waveform_features[brain_area] = brain_area_filtered_features
