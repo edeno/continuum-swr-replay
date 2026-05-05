@@ -3,33 +3,58 @@
 ```bash
 # Install dev deps (pytest, hypothesis, ruff, mypy)
 uv sync --extra dev
+```
 
-# Run the full unit + property suite
-uv run pytest
+## Fast offline slice (no VPN, no DataJoint)
 
-# Or just the fastest sanity slice
+`test_basic.py` is dependency-free and finishes in well under a
+second. It is the right thing to run when reviewing a branch on a
+machine without the lab VPN:
+
+```bash
 uv run pytest tests/unit/test_basic.py
 ```
 
-`test_basic.py` is the smallest entry point — about 45 tests covering
-NumPy/Pandas/NetworkX invariants and other dependency-free checks.
+`tests/unit/test_contfrag_paths.py` and
+`tests/unit/test_contfrag_hash_safety.py` are also strictly offline —
+they load only the named helper functions via `ast` so the package's
+`data_loaders/__init__.py → bandit_task → spyglass` import chain is
+never triggered.
+
+## Full suite (requires a working DataJoint setup)
+
+`uv run pytest` collects the entire `tests/` tree. Many test modules
+import `continuum_swr_replay.*` packages whose `__init__.py` files
+pull in Spyglass, which in turn opens a DataJoint connection at
+import time. Without the lab VPN this either hangs at collection or
+fails with a connection error.
+
+When DataJoint is reachable:
+
+```bash
+uv run pytest                                # full unit + property + visualization + analysis
+uv run pytest tests/unit/test_replay_tables.py
+uv run pytest --ignore=tests/integration     # skip the live-data integration suite
+```
+
+`tests/integration/` is gated behind the `integration` pytest marker
+and requires saved NWB / Spyglass tables in the configured
+`PROCESSED_DATA_DIR`.
 
 ## What's actually here
 
-- `tests/unit/` — function-level tests (spikes, LFP, task variables,
-  replay tables, fitting, decoding, etc.). Roughly 30 files.
+- `tests/unit/` — function-level tests (~30 files: spikes, LFP, task
+  variables, replay tables, fitting, decoding, ContFrag paths, hash
+  safety, etc.).
 - `tests/integration/test_mock_session_fixture.py` — exercises the
   selective-load preset surface against a mock session fixture.
 - `tests/property/test_mathematical_invariants.py` — `hypothesis`-based
-  property tests. `hypothesis` is already pulled in by the `dev` extra.
+  property tests. `hypothesis` is included in the `dev` extra.
 
 ## What's not here
 
-- No live-DataJoint integration suite — anything that needs the lab VPN
-  is staged behind the `integration` marker and not collected by
-  default.
-- No coverage tooling — `pytest-cov` is not in `dev`. Add it explicitly
-  if you want coverage:
+- No coverage tooling — `pytest-cov` is not in `dev`. Add it
+  explicitly if you want coverage:
 
   ```bash
   uv add --dev pytest-cov

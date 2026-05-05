@@ -7,18 +7,34 @@ This directory contains a comprehensive test suite for the neuroscience data ana
 ```bash
 # Install test dependencies
 uv sync --extra dev
+```
 
-# Run all tests
-uv run pytest
+### Fast offline slice (no VPN, no DataJoint)
 
-# Run a specific test file
-uv run pytest tests/unit/test_spikes.py
+These three modules import only standard scientific Python (numpy /
+pandas / networkx / hypothesis) and finish in well under a second.
+They're the right starting point on any machine:
 
-# Run tests matching a pattern
-uv run pytest -k "coincident"
+```bash
+uv run pytest tests/unit/test_basic.py
+uv run pytest tests/unit/test_contfrag_paths.py
+uv run pytest tests/unit/test_contfrag_hash_safety.py
+```
 
-# Run with verbose output
-uv run pytest -v
+### Full suite (requires DataJoint reachability)
+
+`uv run pytest` collects the whole tree. Many modules import
+`continuum_swr_replay.*` packages whose `__init__.py` files trigger
+Spyglass, which opens a DataJoint connection at import time. Without
+the lab VPN this either hangs at collection or fails with a
+connection error.
+
+```bash
+uv run pytest                              # full suite (needs DataJoint)
+uv run pytest tests/unit/test_spikes.py    # one file
+uv run pytest -k "coincident"              # by name pattern
+uv run pytest -v                           # verbose
+uv run pytest --ignore=tests/integration   # skip live-data integration
 ```
 
 ## Test Organization

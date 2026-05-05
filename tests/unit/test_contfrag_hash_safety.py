@@ -3,17 +3,52 @@
 Without ``event_source`` / ``brain_area`` mixed into the hashes,
 concatenating SWR and MUA tables (or HPC and mPFC tables) produces
 silent ID collisions on every join keyed by ``event_id`` / ``stop_id``.
-These tests pin the safety contract so a future refactor of the hash
-inputs cannot regress unnoticed.
+
+These tests must run offline — Spyglass is not reachable on machines
+without the lab VPN. ``analysis.replay._helpers`` and
+``analysis.contfrag.tables`` cannot be imported directly because both
+trigger ``data_loaders/__init__.py → bandit_task → spyglass``.
+Instead we load just the named function bodies via ``ast`` so the
+test only needs pandas / numpy.
 """
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.contfrag.tables import _hash_contfrag_event_id
-from continuum_swr_replay.analysis.replay._helpers import hash_stop_id
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_DIR = REPO_ROOT / "src" / "continuum_swr_replay"
+
+
+def _load_function(rel_module_path: str, attr_name: str):
+    """Compile + exec one named top-level function from ``src/`` by path.
+
+    Avoids triggering the package's ``__init__.py`` import chain so the
+    test stays offline. The functions exercised here use only pandas
+    and numpy at runtime, which we provide via the exec namespace.
+    """
+    src = (SRC_DIR / rel_module_path).read_text()
+    tree = ast.parse(src)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == attr_name:
+            wrapper = ast.Module(body=[node], type_ignores=[])
+            ast.fix_missing_locations(wrapper)
+            ns: dict = {"pd": pd, "np": np}
+            exec(compile(wrapper, rel_module_path, "exec"), ns)  # noqa: S102
+            return ns[attr_name]
+    raise AttributeError(f"{attr_name!r} not found in {rel_module_path}")
+
+
+_hash_contfrag_event_id = _load_function(
+    "analysis/contfrag/tables.py", "_hash_contfrag_event_id"
+)
+hash_stop_id = _load_function(
+    "analysis/replay/_helpers.py", "hash_stop_id"
+)
 
 
 def _two_row_event_frame(event_col: str) -> pd.DataFrame:
@@ -34,12 +69,12 @@ def _two_row_event_frame(event_col: str) -> pd.DataFrame:
 
 class TestEventIdHashSafety:
     def test_swr_vs_mua_same_label_distinct_ids(self):
-        # SWR_event = MUA_event = 3 with identical (animal/day/epoch).
+        # SWR_event = MUA_event = [3, 7] with identical (animal/day/epoch).
         swr = _two_row_event_frame("SWR_event")
         mua = _two_row_event_frame("MUA_event")
         swr_ids = _hash_contfrag_event_id(swr, event_source="SWR")
         mua_ids = _hash_contfrag_event_id(mua, event_source="MUA")
-        # Element-wise: SWR(label=3) ≠ MUA(label=3).
+        # Element-wise: SWR(label) ≠ MUA(label).
         assert not np.any(swr_ids == mua_ids)
 
     def test_hpc_vs_mpfc_same_source_distinct_ids(self):
