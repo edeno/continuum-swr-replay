@@ -103,3 +103,21 @@ class TestLazyImports:
             "from continuum_swr_replay.data_loaders.lfp "
             "import get_multiunit, get_multiunit_hse, filter_ripple_lfp_time"
         )
+
+    def test_pfc_load_population_does_not_load_spyglass(self):
+        # ``_extract_animal`` and the rest of ``load_population`` are
+        # pure pandas; only ``run_session`` in ``glm`` needs Spyglass.
+        # The eager re-export from ``analysis/pfc/__init__.py``
+        # shouldn't drag DataJoint into a leaf import.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.analysis.pfc.load_population "
+            "import _extract_animal"
+        )
+
+    def test_pfc_glm_pure_helpers_do_not_load_spyglass(self):
+        # ``get_spikecount_per_time_bin`` and friends are pure helpers
+        # used by ``tests/unit/test_spike_binning.py``.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.analysis.pfc.glm "
+            "import get_spikecount_per_time_bin"
+        )

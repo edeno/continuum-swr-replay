@@ -118,15 +118,28 @@ def get_contfrag_data_over_time(
             series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
         )
 
-    # Length guard runs first so we can construct on position_info.index
-    # safely; without that index the axis=1 concat below would align a
-    # default RangeIndex against a time index and silently produce a
-    # 2N-row NaN-filled frame.
+    # Length is necessary but not sufficient — same-length axes that
+    # are time-shifted would silently attach event labels to the wrong
+    # rows. Pair the length check with the stricter drift check used
+    # in ``analysis.replay._helpers._align_posterior_to_dot``.
     if len(results.time) != len(data["position_info"]):
         raise ValueError(
             f"results.time ({len(results.time)}) and position_info "
             f"({len(data['position_info'])}) have different lengths; "
             "they must be aligned 1-to-1."
+        )
+    drift = float(
+        np.abs(
+            np.asarray(results.time.values, dtype=float)
+            - data["position_info"].index.to_numpy(dtype=float)
+        ).max()
+    )
+    if drift > 1e-6:
+        raise ValueError(
+            f"results.time drifts from position_info.index by up to "
+            f"{drift:.3g}s — same-length axes do not imply same time "
+            "origin; refusing to attach decoder outputs to position "
+            "rows that don't share their timebase."
         )
 
     data_over_time = pd.DataFrame(

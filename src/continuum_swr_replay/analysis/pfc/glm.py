@@ -17,12 +17,12 @@ import statsmodels.api as sm
 from numpy.typing import NDArray
 from patsy import dmatrix
 
-from continuum_swr_replay.analysis.hippocampus import (
-    get_confident_times,
-    get_overlap_times,
-    load_results,
-)
-from continuum_swr_replay.data_loaders import load_data
+# ``load_data`` and the hippocampus helpers below open a Spyglass /
+# DataJoint connection at import time. We defer those imports into
+# ``run_session`` (the only function that uses them) so that the pure
+# helpers in this module — ``get_spikecount_per_time_bin``,
+# ``process_neuron``, the design-matrix builders — stay offline-
+# importable for unit tests on machines without VPN.
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,9 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
         Spike times in seconds.
     time : NDArray, shape (n_time_bins,)
         Time bin centers in seconds (e.g., from position_info.index).
-        Internally, midpoints between consecutive values are used as bin
-        edges via ``np.digitize(spike_times, time[1:-1])``.
+        Spike ``s`` is assigned to bin ``i`` where
+        ``time[i] <= s < time[i+1]``; spikes at exactly ``time[-1]``
+        fall in the last bin.
 
     Returns
     -------
@@ -48,8 +49,14 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times = spike_times[
         np.logical_and(spike_times >= time[0], spike_times <= time[-1])
     ]
+    # ``np.digitize(s, time[1:])`` produces indices ``0..N-1`` against
+    # a ``minlength=N`` bincount, so all output bins are reachable.
+    # The previous ``time[1:-1]`` form maxed out at index ``N-2``,
+    # leaving the final bin unreachable: e.g. with
+    # ``time=[0,1,2,3]``, spikes at 2.5 and 3.0 both landed in bin 2
+    # and bin 3 stayed at zero.
     return np.bincount(
-        np.digitize(spike_times, time[1:-1]),
+        np.digitize(spike_times, time[1:]),
         minlength=time.shape[0],
     )
 
@@ -889,6 +896,17 @@ def run_session(
         Shape (n_lag_times, n_neurons).
 
     """
+    # Deferred imports: these helpers open Spyglass / DataJoint at
+    # import time. Keeping them function-local lets the rest of the
+    # module (pure GLM helpers + design-matrix builders) stay
+    # offline-importable for unit tests.
+    from continuum_swr_replay.analysis.hippocampus import (
+        get_confident_times,
+        get_overlap_times,
+        load_results,
+    )
+    from continuum_swr_replay.data_loaders import load_data
+
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     )
