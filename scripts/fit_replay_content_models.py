@@ -118,8 +118,14 @@ def fit_model_per_session(
     """
     results = []
 
+    # Minimum 2 events per session, scaled by candidate-set size:
+    # n_categories=9 (arm) → 18 rows, n_categories=3 (patch) → 6 rows.
+    # The previous hardcoded 18 silently skipped valid 2–5 event patch
+    # sessions before fit_conditional_poisson could apply its own
+    # n_events < 2 * len(predictors) gate.
+    min_rows = n_categories * 2
     for keys, group in long_df.groupby(SESSION_COLS):
-        if len(group) < 18:  # minimum 2 events (9 arms * 2)
+        if len(group) < min_rows:
             continue
 
         r = fit_conditional_poisson(

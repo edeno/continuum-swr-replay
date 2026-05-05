@@ -240,12 +240,17 @@ trial_task_vars = data["task_variables"].loc[trial.start_time:trial.end_time]
 
 ## Dependencies and JAX
 
-This project uses **JAX** for machine learning and requires CUDA 12 for GPU acceleration:
+This project uses **JAX** for machine learning. The base install is
+**CPU-only** so the package builds on every platform (including
+macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
-- JAX is installed with CUDA 12 support: `jax[cuda12]`
-- Consider using GPU-aware code when implementing new analyses
-- Dask is available for parallel processing across CPU cores
-- Optional: `dask-cuda` for GPU-based Dask operations
+- Default: `pip install` / `uv sync` resolves plain `jax`.
+- GPU: install the `cuda` extra to pull in `jax[cuda12]` —
+  ``uv sync --extra cuda``. Linux-only.
+- The legacy `gpu` extra also bundles `dask-cuda` and
+  `cuda-bindings` for GPU-aware Dask: ``uv sync --extra gpu``.
+- Consider using GPU-aware code when implementing new analyses.
+- Dask is available for parallel processing across CPU cores.
 
 ## Animal and Session Information
 
