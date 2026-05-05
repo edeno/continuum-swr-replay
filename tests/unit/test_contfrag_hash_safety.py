@@ -1,0 +1,99 @@
+"""Regression tests for ContFrag event_id / stop_id hash safety.
+
+Without ``event_source`` / ``brain_area`` mixed into the hashes,
+concatenating SWR and MUA tables (or HPC and mPFC tables) produces
+silent ID collisions on every join keyed by ``event_id`` / ``stop_id``.
+These tests pin the safety contract so a future refactor of the hash
+inputs cannot regress unnoticed.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+from continuum_swr_replay.analysis.contfrag.tables import _hash_contfrag_event_id
+from continuum_swr_replay.analysis.replay._helpers import hash_stop_id
+
+
+def _two_row_event_frame(event_col: str) -> pd.DataFrame:
+    """Build a minimal frame the hash function expects.
+
+    Same (animal, day, epoch, event_label) tuples on both rows so any
+    collision under the old signature is visible.
+    """
+    return pd.DataFrame(
+        {
+            "animal": ["chimi", "chimi"],
+            "day": [20200212, 20200212],
+            "epoch": ["02_r1", "02_r1"],
+            event_col: [3, 7],
+        }
+    )
+
+
+class TestEventIdHashSafety:
+    def test_swr_vs_mua_same_label_distinct_ids(self):
+        # SWR_event = MUA_event = 3 with identical (animal/day/epoch).
+        swr = _two_row_event_frame("SWR_event")
+        mua = _two_row_event_frame("MUA_event")
+        swr_ids = _hash_contfrag_event_id(swr, event_source="SWR")
+        mua_ids = _hash_contfrag_event_id(mua, event_source="MUA")
+        # Element-wise: SWR(label=3) ≠ MUA(label=3).
+        assert not np.any(swr_ids == mua_ids)
+
+    def test_hpc_vs_mpfc_same_source_distinct_ids(self):
+        events = _two_row_event_frame("SWR_event")
+        hpc = _hash_contfrag_event_id(events, "SWR", brain_area="HPC")
+        mpfc = _hash_contfrag_event_id(events, "SWR", brain_area="mPFC")
+        assert not np.any(hpc == mpfc)
+
+    def test_same_source_and_area_reproducible(self):
+        events = _two_row_event_frame("SWR_event")
+        a = _hash_contfrag_event_id(events, "SWR", brain_area="HPC")
+        b = _hash_contfrag_event_id(events, "SWR", brain_area="HPC")
+        np.testing.assert_array_equal(a, b)
+
+
+class TestStopIdHashSafety:
+    def _stop_idx(self) -> np.ndarray:
+        return np.array([0, 1, 2], dtype=np.int64)
+
+    def test_swr_vs_mua_distinct_ids(self):
+        idx = self._stop_idx()
+        swr = hash_stop_id(
+            "chimi", 20200212, "02_r1", idx, brain_area="HPC", event_source="SWR"
+        )
+        mua = hash_stop_id(
+            "chimi", 20200212, "02_r1", idx, brain_area="HPC", event_source="MUA"
+        )
+        assert not np.any(swr == mua)
+
+    def test_hpc_vs_mpfc_distinct_ids(self):
+        idx = self._stop_idx()
+        hpc = hash_stop_id(
+            "chimi", 20200212, "02_r1", idx, brain_area="HPC", event_source="SWR"
+        )
+        mpfc = hash_stop_id(
+            "chimi", 20200212, "02_r1", idx, brain_area="mPFC", event_source="SWR"
+        )
+        assert not np.any(hpc == mpfc)
+
+    def test_unsuffixed_call_preserves_legacy_hash(self):
+        # NonLocal callers don't pass brain_area / event_source. Their
+        # historical IDs must keep working — i.e. omitting the new
+        # keywords reproduces the pre-fix hash exactly.
+        idx = self._stop_idx()
+        keys = pd.DataFrame(
+            {
+                "animal": "chimi",
+                "day": 20200212,
+                "epoch": "02_r1",
+                "stop_idx": idx,
+            }
+        )
+        legacy = (
+            pd.util.hash_pandas_object(keys, index=False) % (2**63)
+        ).to_numpy()
+        new_unsuffixed = hash_stop_id("chimi", 20200212, "02_r1", idx)
+        np.testing.assert_array_equal(legacy, new_unsuffixed)

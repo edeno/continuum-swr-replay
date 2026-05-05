@@ -59,6 +59,24 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+
+def contfrag_table_basenames(
+    event_source: str, brain_area: str
+) -> dict[str, str]:
+    """Return the canonical ContFrag table basenames for one (source, area).
+
+    The fitter resolves its inputs through the matching helper
+    ``resolve_contfrag_paths`` in ``fit_replay_content_models.py``;
+    keeping the format string in one place lets a unit test pin the
+    prep ↔ fitter contract.
+    """
+    src = event_source.lower()
+    return {
+        "event_table": f"event_table_{src}_{brain_area}",
+        "event_arm_table": f"event_arm_table_{src}_{brain_area}",
+        "stop_table": f"stop_table_{src}_{brain_area}",
+    }
+
 OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
 
 
@@ -173,6 +191,7 @@ def _process_session(
         trials,
         track_graph,
         event_source=event_source,
+        brain_area=brain_area,
         conditional_posterior=posterior,
     )
     if len(event_table) == 0:
@@ -185,6 +204,7 @@ def _process_session(
         trials,
         track_graph,
         event_source=event_source,
+        brain_area=brain_area,
         conditional_posterior=posterior,
     )
 
@@ -193,10 +213,11 @@ def _process_session(
         trials,
         track_graph,
         event_source=event_source,
+        brain_area=brain_area,
     )
 
     # Stamp brain_area onto every output row. The canonical event_id /
-    # stop_id hashes only include (animal, day, epoch, label/idx), so
+    # stop_id hashes already incorporate brain_area + event_source so
     # joins across brain areas would otherwise collide silently.
     for tbl in (event_table, event_arm_table, stop_table):
         tbl["brain_area"] = brain_area
@@ -313,16 +334,15 @@ def main():
         len(event_table_all),
     )
 
-    source_lower = event_source.lower()
-    area_suffix = args.brain_area
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     # Per-brain-area filenames so HPC and mPFC prep runs don't
-    # overwrite each other and so downstream consumers can pick the
-    # right region without re-keying on a brain_area column.
+    # overwrite each other. The basename helper is exposed so the
+    # fitter contract can be unit-tested against this exact format.
+    basenames = contfrag_table_basenames(event_source, args.brain_area)
     for name, frame in (
-        (f"event_table_{source_lower}_{area_suffix}", event_table_all),
-        (f"event_arm_table_{source_lower}_{area_suffix}", event_arm_table_all),
-        (f"stop_table_{source_lower}_{area_suffix}", stop_table_all),
+        (basenames["event_table"], event_table_all),
+        (basenames["event_arm_table"], event_arm_table_all),
+        (basenames["stop_table"], stop_table_all),
     ):
         path = OUTPUT_DIR / f"{name}.pkl"
         frame.to_pickle(path)

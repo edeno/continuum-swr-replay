@@ -279,8 +279,18 @@ def hash_stop_id(
     day: int,
     epoch: str,
     stop_idx: np.ndarray,
+    *,
+    brain_area: str | None = None,
+    event_source: str | None = None,
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout."""
+    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout.
+
+    Optional ``brain_area`` / ``event_source`` keywords are mixed into
+    the hash when supplied. ContFrag callers pass them so SWR/MUA and
+    HPC/mPFC/OFC stop tables never collide on ``stop_id``. The
+    NonLocal pipeline omits both (single-area, single-source by
+    construction) and keeps its existing hashes intact.
+    """
     keys = pd.DataFrame(
         {
             "animal": animal,
@@ -289,6 +299,10 @@ def hash_stop_id(
             "stop_idx": np.asarray(stop_idx, dtype=np.int64),
         }
     )
+    if brain_area is not None:
+        keys["__brain_area"] = brain_area
+    if event_source is not None:
+        keys["__event_source"] = event_source
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
 
 

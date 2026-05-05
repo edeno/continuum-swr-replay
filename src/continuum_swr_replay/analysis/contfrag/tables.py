@@ -82,10 +82,20 @@ def _in_contfrag_event_mask(
 def _hash_contfrag_event_id(
     events: pd.DataFrame,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, event_label)``."""
+    """63-bit stable hash of ``(animal, day, epoch, event_label)``.
+
+    ``event_source`` and ``brain_area`` are mixed into the hash so a
+    SWR/HPC event with label 7 and a MUA/HPC event with label 7 (or
+    SWR/mPFC) cannot collide. Without this, concatenating tables
+    across sources or brain areas produces silent ID collisions on
+    every join keyed by ``event_id``.
+    """
     event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
-    keys = events[["animal", "day", "epoch", event_col]]
+    keys = events[["animal", "day", "epoch", event_col]].copy()
+    keys["__event_source"] = event_source
+    keys["__brain_area"] = brain_area
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
 
 
@@ -96,6 +106,7 @@ def build_contfrag_event_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
@@ -296,12 +307,21 @@ def build_contfrag_event_table(
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "day", day)
     per_event.insert(2, "epoch", epoch)
-    per_event["event_id"] = _hash_contfrag_event_id(per_event, event_source)
+    per_event["event_id"] = _hash_contfrag_event_id(
+        per_event, event_source, brain_area
+    )
 
     # stop_id
     stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
     per_event["stop_idx"] = stop_idx
-    per_event["stop_id"] = hash_stop_id(animal, day, epoch, stop_idx)
+    per_event["stop_id"] = hash_stop_id(
+        animal,
+        day,
+        epoch,
+        stop_idx,
+        brain_area=brain_area,
+        event_source=event_source,
+    )
 
     return per_event[column_order]
 
@@ -314,6 +334,7 @@ def build_contfrag_event_arm_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",  # noqa: ARG001 — passed for API symmetry; event_id is inherited
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
@@ -496,6 +517,7 @@ def build_contfrag_stop_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
     """One row per immobility bout, including zero-event bouts.
@@ -649,7 +671,12 @@ def build_contfrag_stop_table(
     per_bout.insert(1, "day", day)
     per_bout.insert(2, "epoch", epoch)
     per_bout["stop_id"] = hash_stop_id(
-        animal, day, epoch, per_bout["stop_idx"].to_numpy()
+        animal,
+        day,
+        epoch,
+        per_bout["stop_idx"].to_numpy(),
+        brain_area=brain_area,
+        event_source=event_source,
     )
 
     return per_bout[column_order]

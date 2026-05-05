@@ -82,6 +82,41 @@ logging.basicConfig(
 SESSION_COLS = ["animal", "day", "epoch"]
 
 
+def resolve_contfrag_paths(
+    event_source: str,
+    brain_area: str,
+    hierarchy_kind: str,
+) -> tuple[str, str]:
+    """Return ``(table_name, output_subdir)`` for a fit invocation.
+
+    Pure helper extracted so the prep ↔ fitter filename contract has a
+    direct unit-test target. ``event_source`` is one of
+    ``"non_local"`` / ``"SWR"`` / ``"MUA"``; ``hierarchy_kind`` is
+    ``"arm"`` / ``"patch"``.
+
+    Non-local fits stay unsuffixed (their prep is single-area /
+    single-source). ContFrag fits append ``_{brain_area}`` to the
+    table name and ``_{source_lower}_{brain_area}`` to the output
+    subdir so SWR/HPC, SWR/mPFC, MUA/HPC … never overwrite each
+    other's ``M0.pkl`` / ``all_models.pkl``.
+    """
+    if event_source == "non_local":
+        if hierarchy_kind == "patch":
+            return "event_patch_table", "models_patch"
+        return "event_arm_table", "models"
+
+    base_table = (
+        f"event_patch_table_{event_source.lower()}"
+        if hierarchy_kind == "patch"
+        else f"event_arm_table_{event_source.lower()}"
+    )
+    table_name = f"{base_table}_{brain_area}"
+
+    base_subdir = "models_patch" if hierarchy_kind == "patch" else "models"
+    output_subdir = f"{base_subdir}_{event_source.lower()}_{brain_area}"
+    return table_name, output_subdir
+
+
 def fit_model_per_session(
     long_df: pd.DataFrame,
     model_name: str,
@@ -296,27 +331,16 @@ def main():
                 f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
                 "in analysis/replay/model_specs.py. Define it before running."
             )
-    # ContFrag prep partitions outputs by brain area
-    # (event_arm_table_{source}_{brain_area}.pkl) to prevent silent
-    # cross-region merges. The non_local prep is single-area and keeps
-    # the unsuffixed name. Match the prep contract here.
-    if args.event_source in ("SWR", "MUA"):
-        table_name = f"{table_name}_{args.brain_area}"
+    # The (table_name, output_subdir) contract with the prep scripts
+    # lives in ``resolve_contfrag_paths`` so the path-resolution logic
+    # has a direct unit-test target rather than only being exercised
+    # at the end of the long ``main()``. The hierarchy / source
+    # validity gates above are unchanged; this only resolves names.
+    table_name, output_subdir = resolve_contfrag_paths(
+        args.event_source, args.brain_area, args.hierarchy
+    )
 
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
-    # Outputs must also be partitioned per (source, brain_area) for
-    # ContFrag fits — otherwise SWR/HPC, SWR/mPFC, MUA/HPC, etc. all
-    # write into the same ``models/`` directory and overwrite each
-    # other's M0.pkl / all_models.pkl / model_comparison.pkl /
-    # logit/M*_logit.pkl. The non_local pipeline stays unsuffixed
-    # because it is single-area and single-source by construction.
-    base_subdir = "models_patch" if args.hierarchy == "patch" else "models"
-    if args.event_source in ("SWR", "MUA"):
-        output_subdir = (
-            f"{base_subdir}_{args.event_source.lower()}_{args.brain_area}"
-        )
-    else:
-        output_subdir = base_subdir
     output_dir = input_dir / output_subdir
 
     # Determine which models to fit
