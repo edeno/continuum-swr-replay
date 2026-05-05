@@ -167,11 +167,15 @@ def get_event_start_end_times(
     if event_col not in data.columns:
         raise ValueError(f"event_col '{event_col}' not found in data")
 
-    # Extract start/end times for each event
+    # Extract start/end times for each event. Use ``names="time"`` so the
+    # reset column is always called ``"time"`` regardless of whether the
+    # input index was unnamed (default ``"index"``) or already named
+    # something like ``"time"`` — which is the case for time-indexed
+    # ``data_over_time`` frames in real callers.
     event_times = (
-        data.reset_index()
+        data.reset_index(names="time")
         .groupby(group_cols + [event_col])
-        .agg(start_time=("index", "min"), end_time=("index", "max"))
+        .agg(start_time=("time", "min"), end_time=("time", "max"))
         .reset_index()
     )
 

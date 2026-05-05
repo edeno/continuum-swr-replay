@@ -267,6 +267,19 @@ class TestGetEventStartEndTimes:
         with pytest.raises(ValueError, match="event_col.*not found"):
             get_event_start_end_times(labeled_events, event_col="nonexistent")
 
+    def test_named_time_index(self, labeled_events):
+        """Should handle DataFrames whose index already has a name."""
+        # Real ``data_over_time`` frames have index.name == "time", which
+        # used to break the previous reset_index/agg pair that hard-coded
+        # the column name "index".
+        labeled_events.index.name = "time"
+
+        result = get_event_start_end_times(labeled_events, event_col="event")
+
+        assert len(result) == 3
+        assert result[result["event"] == 1]["start_time"].iloc[0] == pytest.approx(0.10)
+        assert result[result["event"] == 1]["end_time"].iloc[0] == pytest.approx(0.19)
+
     def test_custom_group_cols(self):
         """Should work with custom grouping columns."""
         time = np.arange(0.0, 0.1, 0.01)
