@@ -81,11 +81,6 @@ class TestResolveContfragPaths:
         assert table == expected_table
         assert subdir == expected_subdir
 
-    def test_contfrag_patch(self):
-        table, subdir = resolve_contfrag_paths("SWR", "HPC", "patch")
-        assert table == "event_patch_table_swr_HPC"
-        assert subdir == "models_patch_swr_HPC"
-
     def test_swr_and_mua_resolve_to_distinct_subdirs(self):
         # Round-tripping the same brain_area through different sources
         # must not clobber a sibling fit's outputs.

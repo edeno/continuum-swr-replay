@@ -34,12 +34,21 @@ When DataJoint is reachable:
 ```bash
 uv run pytest                                # full unit + property + visualization + analysis
 uv run pytest tests/unit/test_replay_tables.py
-uv run pytest --ignore=tests/integration     # skip the live-data integration suite
+uv run pytest --ignore=tests/integration     # skip the integration directory
 ```
 
-`tests/integration/` is gated behind the `integration` pytest marker
-and requires saved NWB / Spyglass tables in the configured
-`PROCESSED_DATA_DIR`.
+`tests/integration/` currently holds a single file
+(`test_mock_session_fixture.py`) that pins the shape and invariants
+of the synthetic ``mock_session_data`` fixture. The fixture itself
+is mock-only — it does **not** call the real ``load_data`` — but
+several tests in the file do
+``from continuum_swr_replay.types import DataLoadingPreset``, which
+triggers the package's root ``__init__.py`` and pulls in
+``data_loaders → bandit_task → spyglass`` at import time. So the
+file still requires DataJoint reachability to run end-to-end, even
+though no test exercises the loader. The ``integration`` pytest
+marker is registered in ``pyproject.toml`` for future use but is not
+currently applied to any test.
 
 ## What's actually here
 

@@ -34,7 +34,7 @@ uv run pytest                              # full suite (needs DataJoint)
 uv run pytest tests/unit/test_spikes.py    # one file
 uv run pytest -k "coincident"              # by name pattern
 uv run pytest -v                           # verbose
-uv run pytest --ignore=tests/integration   # skip live-data integration
+uv run pytest --ignore=tests/integration   # skip the integration directory
 ```
 
 ## Test Organization
@@ -55,8 +55,17 @@ tests/
     └── test_mathematical_invariants.py      # Hypothesis-based property tests
 ```
 
-Anything that requires the lab VPN / live DataJoint is gated behind the
-``integration`` pytest marker and not collected by default.
+``tests/integration/test_mock_session_fixture.py`` pins the shape /
+invariants of the synthetic ``mock_session_data`` fixture and does
+**not** call the real ``load_data`` pipeline. However, several
+tests in that file do
+``from continuum_swr_replay.types import DataLoadingPreset``, which
+triggers the package's root ``__init__.py`` →
+``data_loaders → bandit_task → spyglass``, so the file still needs
+a working DataJoint setup at import time. The ``integration``
+pytest marker is registered in ``pyproject.toml`` but no test is
+currently decorated with it, so nothing is auto-deselected. There
+is no live-data integration suite at the moment.
 
 ## Test Categories
 
@@ -90,16 +99,23 @@ uv run pytest tests/unit/
 
 ### 2. Integration Tests (`tests/integration/`)
 
-Test complete workflows with realistic data structures.
+Currently a single file, ``test_mock_session_fixture.py``, which
+pins the shape and invariants of the synthetic ``mock_session_data``
+fixture. It does **not** call the real ``load_data`` pipeline (that
+function reads from Spyglass / DataJoint and is not available
+without the lab VPN). A regression in the live loader would be
+invisible here. A separate, DB-gated test file would be the natural
+home for true end-to-end loader tests.
 
-**Coverage:**
-- Full data loading pipeline validation
-- Temporal alignment across data types
-- Data structure integrity
-- Boundary condition handling
-- Missing brain area scenarios
+Note that running this file still requires a working DataJoint
+setup: several tests do
+``from continuum_swr_replay.types import DataLoadingPreset``, which
+triggers ``continuum_swr_replay/__init__.py`` and pulls in
+``data_loaders → bandit_task → spyglass`` at import time even though
+no test invokes ``load_data``.
 
-**Run integration tests:**
+**Run:**
+
 ```bash
 uv run pytest tests/integration/
 ```

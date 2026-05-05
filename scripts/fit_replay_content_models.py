@@ -537,8 +537,18 @@ def main():
 
             logit_results = []
             for keys, group in long_df.groupby(SESSION_COLS):
+                # Forward the resolved response column. Patch fits use
+                # ``patch_count_hard``; without this, the logit call
+                # silently fell back to ``arm_count_hard`` (the
+                # ``fit_conditional_logit`` default), found no such
+                # column on patch tables, and returned ``None`` for
+                # every session — producing an empty ``logit/`` dir
+                # with no robustness outputs.
                 r = fit_conditional_logit(
-                    group, predictors=predictors, event_col=event_col
+                    group,
+                    predictors=predictors,
+                    event_col=event_col,
+                    response_col=response_col,
                 )
                 if r is not None:
                     r["model"] = model_name
