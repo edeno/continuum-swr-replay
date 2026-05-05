@@ -14,8 +14,8 @@ dependencies = [
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
 
-    # Machine learning & JAX
-    "jax[cuda12]>=0.4.4",
+    # Machine learning & JAX (CPU by default; install `cuda` extra for GPU)
+    "jax>=0.4.4",
     "optax",
 
     # Statistical analysis
@@ -56,8 +56,14 @@ dev = [
     "hypothesis>=6.0.0",
 ]
 
-# GPU acceleration (optional)
+# CUDA-accelerated JAX (Linux-only wheels)
+cuda = [
+    "jax[cuda12]>=0.4.4",
+]
+
+# GPU acceleration for Dask (optional, Linux-only)
 gpu = [
+    "jax[cuda12]>=0.4.4",
     "dask-cuda>=24.12.0",
     "cuda-bindings>=12.0.0",  # Required by dask-cuda but not declared as dependency
 ]
@@ -112,9 +118,6 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]
-
-[project.scripts]
-continuum-swr-replay = "continuum_swr_replay:main"
 
 [build-system]
 requires = ["uv_build>=0.8.23,<0.9.0"]
