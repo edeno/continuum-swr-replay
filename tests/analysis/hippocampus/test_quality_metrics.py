@@ -291,6 +291,127 @@ class TestComputeNonLocalEventContext:
         result = compute_non_local_event_context(perfect_session)
         assert len(result) == 0
 
+    def test_one_event_with_nan_theta_phase_does_not_poison_session_stats(self):
+        """Regression: a single event with all-NaN ``theta_phase`` rows
+        used to propagate NaN through the per-event circular mean and
+        then through the session-level
+        ``np.mean(np.exp(1j * phases))``, returning
+        ``theta_mrl=NaN`` and ``theta_mean_angle=NaN`` even when the
+        other theta events had clean phase samples. ``_nearest`` in
+        ``data_aggregation`` returns NaN when no theta sample is within
+        tolerance, so this is a routine occurrence — and it silently
+        masked otherwise-valid theta locking.
+
+        Post-fix ``_circular_mean`` drops non-finite phases, and the
+        session-level reduction filters to events with finite per-event
+        mean phase before applying the ``>= 3`` threshold.
+        """
+        rows = []
+        for ev_id in (1, 2, 3, 4):
+            for _ in range(5):
+                phase = np.nan if ev_id == 4 else (0.5 + 0.05 * (ev_id - 1))
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": phase,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        # All four events classify as theta (non-SWR + theta_power > 0.5).
+        assert result["frac_theta"].iloc[0] == pytest.approx(1.0)
+        # The three surviving phases are all close, so MRL should be ~1.
+        assert np.isfinite(result["theta_mrl"].iloc[0]), (
+            f"theta_mrl={result['theta_mrl'].iloc[0]} — one event's "
+            "missing theta_phase poisoned the session circular mean."
+        )
+        assert result["theta_mrl"].iloc[0] > 0.99
+        assert np.isfinite(result["theta_mean_angle"].iloc[0])
+
+    def test_per_event_circular_mean_drops_internal_nans(self):
+        """Within a single event, NaN phase samples (e.g. some bins
+        had no theta sample within tolerance) must not poison the
+        per-event ``circular_mean_theta_phase``."""
+        rows = []
+        # Event 1: 5 samples, two are NaN — should average over the
+        # three finite samples.
+        finite_phases = [0.5, 0.55, 0.6]
+        sample_phases = [finite_phases[0], np.nan, finite_phases[1], np.nan, finite_phases[2]]
+        for phase in sample_phases:
+            rows.append(
+                {
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                    "theta_power_zscore": 1.5,
+                    "theta_phase": phase,
+                }
+            )
+        # Three more clean events so the session reduction has the
+        # required ``>= 3`` finite events.
+        for ev_id in (2, 3, 4):
+            for _ in range(5):
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": 0.55,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        assert np.isfinite(result["theta_mrl"].iloc[0]), (
+            "Per-event circular mean must drop NaN phase samples "
+            "instead of returning NaN for the whole event."
+        )
+        assert result["theta_mrl"].iloc[0] > 0.99
+
+    def test_all_nan_theta_phases_yield_nan_session_stats(self):
+        """Sanity: if every theta event has only NaN phase samples,
+        the session circular stats remain NaN (the gate fails because
+        no finite per-event phase exists, regardless of event count)."""
+        rows = []
+        for ev_id in (1, 2, 3, 4):
+            for _ in range(5):
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": np.nan,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        assert np.isnan(result["theta_mrl"].iloc[0])
+        assert np.isnan(result["theta_mean_angle"].iloc[0])
+
 
 class TestComputeLocalStateCollapseDetails:
     def test_no_collapse_in_perfect_session(self, perfect_session):

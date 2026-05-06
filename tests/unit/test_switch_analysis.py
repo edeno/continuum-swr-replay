@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.switch_analysis import (
     build_control_aligned_table,
+    build_switch_aligned_table,
 )
 
 
@@ -211,3 +213,303 @@ def test_control_window_excludes_switch_stops():
         f"Offending stop_ids: "
         f"{out['stop_id'].to_numpy()[control_is_stay != 1.0].tolist()}"
     )
+
+
+def _make_patch_relative_fixture():
+    """Replay at stop 0 lives entirely on arm 0 (patch 1). Stops 1, 2
+    are stay stops on patch 2. Stop 3 is the switch (is_stay=0,
+    current_patch=2). Pre-fix the switch-aligned row for stop 0
+    reported ``replay_frac_current_patch=1.0`` against the switch's
+    current_patch=2, even though that replay landed on patch 1.
+    """
+    stop_table = pd.DataFrame([
+        {"animal": "a", "day": 1, "epoch": "e1", "stop_idx": 0, "stop_id": 0,
+         "is_stay": 1.0, "current_patch": 1, "has_replay": True, "n_events": 1},
+        {"animal": "a", "day": 1, "epoch": "e1", "stop_idx": 1, "stop_id": 1,
+         "is_stay": 1.0, "current_patch": 2, "has_replay": False, "n_events": 0},
+        {"animal": "a", "day": 1, "epoch": "e1", "stop_idx": 2, "stop_id": 2,
+         "is_stay": 1.0, "current_patch": 2, "has_replay": False, "n_events": 0},
+        {"animal": "a", "day": 1, "epoch": "e1", "stop_idx": 3, "stop_id": 3,
+         "is_stay": 0.0, "current_patch": 2, "has_replay": False, "n_events": 0},
+    ])
+    event_table = pd.DataFrame([
+        {"event_id": 100, "stop_id": 0, "current_patch": 1,
+         "is_swr": True, "is_mua": False},
+    ])
+    event_arm_table = pd.DataFrame([
+        {"event_id": 100, "stop_id": 0, "arm": arm,
+         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
+        for arm in range(9)
+    ])
+    return stop_table, event_table, event_arm_table
+
+
+def test_switch_aligned_replay_relative_to_switch_patch():
+    """Regression: ``build_switch_aligned_table`` previously aggregated
+    replay relative to each replay stop's OWN current_patch via
+    ``stop_patch_replay``, then stamped the SWITCH's current_patch
+    onto the lag rows. A replay that landed on the previous patch in
+    a multi-patch run was silently re-labeled as "replay on the
+    switch patch". Fix recomputes per-stop, per-patch fractions and
+    looks up by the switch's target patch."""
+    stop_table, event_table, event_arm_table = _make_patch_relative_fixture()
+    out = build_switch_aligned_table(
+        stop_table, event_table, event_arm_table, max_lag=5
+    )
+    assert len(out) == 1
+    row = out.iloc[0]
+    # Replay was 100% on arm 0 = patch 1, switch's current_patch is 2.
+    # Pre-fix: replay_frac_current_patch=1.0 (wrong);
+    # post-fix: replay_frac_current_patch=0.0 (correct).
+    assert row["replay_frac_current_patch"] == 0.0, (
+        f"replay_frac_current_patch={row['replay_frac_current_patch']} — "
+        "replay landed on patch 1 but the switch is on patch 2; "
+        "fraction-on-switch-patch should be 0.0."
+    )
+    assert row["replay_frac_noncurrent"] == 1.0
+
+
+def test_switch_aligned_replay_attributes_when_replay_matches_switch():
+    """Sanity: when the replay actually IS on the switch patch, the
+    fraction is 1.0. Differences from the prior test isolate to which
+    patch the arm sits in, so this rules out an off-by-one in patch
+    indexing."""
+    stop_table, event_table, event_arm_table = _make_patch_relative_fixture()
+    # Move the replay to arm 2 (patch 2), so it now matches the
+    # switch's current_patch=2.
+    event_arm_table = event_arm_table.copy()
+    event_arm_table.loc[
+        event_arm_table["arm"] == 0, "arm_fraction"
+    ] = 0.0
+    event_arm_table.loc[
+        event_arm_table["arm"] == 2, "arm_fraction"
+    ] = 1.0
+    out = build_switch_aligned_table(
+        stop_table, event_table, event_arm_table, max_lag=5
+    )
+    row = out.iloc[0]
+    assert row["replay_frac_current_patch"] == 1.0
+    assert row["replay_frac_noncurrent"] == 0.0
+
+
+def test_control_aligned_replay_relative_to_switch_patch():
+    """Regression: ``build_control_aligned_table`` had the same
+    conceptual mismatch — control replay fractions were aggregated
+    relative to each control stop's own current_patch but stored
+    under the switch episode's patch label, breaking the matched-
+    control contract. Fix uses the same per-stop, per-patch helper as
+    the switch-aligned path.
+    """
+    # Build a session where the replay-bearing control stop sits
+    # within the [anchor - max_lag, anchor) window. Layout:
+    #   stops 0..3    — leading stays, no replay (4 stays)
+    #   stop  4       — replay stop, on patch 1 (1 stay, 5 total)
+    #   stops 5..14   — more leading stays, no replay (10 stays,
+    #                   15 total) — the anchor will be drawn from
+    #                   ``session_stays.iloc[5:]`` (= stop_idx 5..14)
+    # All stops are on patch 1; the matched switch episode has
+    # current_patch=2 (a different patch) and switch_stop_idx well
+    # outside the ±max_lag exclusion zone.
+    rows = []
+    for i in range(4):
+        rows.append({
+            "animal": "a", "day": 1, "epoch": "e1",
+            "stop_idx": i, "stop_id": 1000 + i,
+            "is_stay": 1.0, "current_patch": 1,
+            "has_replay": False, "n_events": 0,
+        })
+    rows.append({
+        "animal": "a", "day": 1, "epoch": "e1",
+        "stop_idx": 4, "stop_id": 0,
+        "is_stay": 1.0, "current_patch": 1,
+        "has_replay": True, "n_events": 1,
+    })
+    for i in range(5, 15):
+        rows.append({
+            "animal": "a", "day": 1, "epoch": "e1",
+            "stop_idx": i, "stop_id": 1000 + i,
+            "is_stay": 1.0, "current_patch": 1,
+            "has_replay": False, "n_events": 0,
+        })
+    stop_table = pd.DataFrame(rows)
+    event_table = pd.DataFrame([
+        {"event_id": 200, "stop_id": 0, "current_patch": 1,
+         "is_swr": True, "is_mua": False},
+    ])
+    event_arm_table = pd.DataFrame([
+        {"event_id": 200, "stop_id": 0, "arm": arm,
+         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
+        for arm in range(9)
+    ])
+    # Matched switch episode: current_patch=2, switch_stop_idx=200
+    # (far outside ±max_lag, so all stays in the session are
+    # eligible anchors).
+    switch_episodes = pd.DataFrame([
+        {"episode_id": 1, "animal": "a", "day": 1, "epoch": "e1",
+         "current_patch": 2, "switch_stop_idx": 200},
+    ])
+
+    # Pin the rng so ``possible_anchors.iloc[5]`` is picked — that
+    # corresponds to stop_idx=10 in the fixture, whose [0, 10) window
+    # straddles the replay stop at stop_idx=4.
+    class _PinnedRng:
+        def integers(self, low, high):  # noqa: ARG002
+            return 5
+
+    out = build_control_aligned_table(
+        stop_table,
+        event_table,
+        event_arm_table,
+        switch_episodes,
+        max_lag=10,
+        rng=_PinnedRng(),
+    )
+    assert len(out) >= 1
+    # Find the row for stop_id 0 (the replay-bearing control stop).
+    row = out[out["stop_id"] == 0].iloc[0]
+    # Replay was on patch 1; matched switch's current_patch=2.
+    # Post-fix: fraction-on-switch-patch is 0.0, not 1.0.
+    assert row["replay_frac_current_patch"] == 0.0, (
+        f"Control row replay_frac_current_patch="
+        f"{row['replay_frac_current_patch']} — replay landed on "
+        "patch 1 but the matched switch episode's current_patch is "
+        "2; fraction should be 0.0 to honor the matched-control "
+        "contract."
+    )
+    assert row["replay_frac_noncurrent"] == 1.0
+    assert row["current_patch"] == 2  # Switch episode's patch is preserved.
+
+
+def _make_two_session_collision_fixture(replay_arms: tuple[int, int]):
+    """Two sessions, both reusing ``stop_id=0`` (session-local IDs).
+    Each session's lone replay event lands entirely on a different
+    arm. Without a session-uniqueness guard, the per-stop, per-patch
+    helper averages across sessions (replay_frac_current_patch=0.5
+    in both rows even though each session's true value is 0.0 or 1.0).
+    """
+    rows_st = []
+    rows_et = []
+    rows_eat = []
+    for animal, day, arm in (("a", 1, replay_arms[0]), ("b", 2, replay_arms[1])):
+        rows_st.extend([
+            {"animal": animal, "day": day, "epoch": "e1",
+             "stop_idx": 0, "stop_id": 0, "is_stay": 1.0,
+             "current_patch": 1, "has_replay": True, "n_events": 1},
+            {"animal": animal, "day": day, "epoch": "e1",
+             "stop_idx": 1, "stop_id": 1, "is_stay": 1.0,
+             "current_patch": 2, "has_replay": False, "n_events": 0},
+            {"animal": animal, "day": day, "epoch": "e1",
+             "stop_idx": 2, "stop_id": 2, "is_stay": 1.0,
+             "current_patch": 2, "has_replay": False, "n_events": 0},
+            {"animal": animal, "day": day, "epoch": "e1",
+             "stop_idx": 3, "stop_id": 3, "is_stay": 0.0,
+             "current_patch": 2, "has_replay": False, "n_events": 0},
+        ])
+        eid = 100 if animal == "a" else 101
+        rows_et.append({
+            "animal": animal, "day": day, "epoch": "e1",
+            "event_id": eid, "stop_id": 0, "current_patch": 1,
+            "is_swr": True, "is_mua": False,
+        })
+        for a in range(9):
+            rows_eat.append({
+                "animal": animal, "day": day, "epoch": "e1",
+                "event_id": eid, "stop_id": 0, "arm": a,
+                "arm_fraction": 1.0 if a == arm else 0.0,
+                "current_patch": 1,
+            })
+    return (
+        pd.DataFrame(rows_st),
+        pd.DataFrame(rows_et),
+        pd.DataFrame(rows_eat),
+    )
+
+
+def test_switch_aligned_session_local_stop_ids_raise():
+    """Regression: ``_stop_replay_per_patch`` must reject
+    cross-session collisions on ``stop_id`` / ``event_id``. Without
+    that guard, the per-stop reduction silently averages across
+    sessions whenever a session-local ID is reused — the user
+    reproduced this with two sessions both using ``stop_id=0``,
+    where the per-patch fractions came back as the cross-session
+    mean (0.5) instead of each session's true value (0.0 or 1.0).
+    """
+    st, et, eat = _make_two_session_collision_fixture(replay_arms=(0, 2))
+    with pytest.raises(ValueError, match="must be globally unique across sessions"):
+        build_switch_aligned_table(st, et, eat, max_lag=5)
+
+
+def test_switch_aligned_globally_unique_ids_partition_per_session():
+    """Sanity: with globally-unique stop_id / event_id (the canonical
+    hashed-ID contract), the helper must NOT mix across sessions —
+    each session's row reflects its own replay arm. Differs from the
+    failing test above only in that the ID values are session-disjoint.
+    """
+    st, et, eat = _make_two_session_collision_fixture(replay_arms=(0, 2))
+    # Reassign IDs so they're globally unique.
+    is_b = (st["animal"] == "b").to_numpy()
+    st.loc[is_b, "stop_id"] += 100
+    is_b_et = (et["animal"] == "b").to_numpy()
+    et.loc[is_b_et, "stop_id"] += 100
+    et.loc[is_b_et, "event_id"] += 100
+    is_b_eat = (eat["animal"] == "b").to_numpy()
+    eat.loc[is_b_eat, "stop_id"] += 100
+    eat.loc[is_b_eat, "event_id"] += 100
+
+    out = build_switch_aligned_table(st, et, eat, max_lag=5)
+    assert len(out) == 2
+    # session a's replay was on arm 0 (patch 1), switch on patch 2.
+    # session b's replay was on arm 2 (patch 2), switch on patch 2.
+    by_animal = out.set_index("animal")
+    assert by_animal.loc["a", "replay_frac_current_patch"] == 0.0
+    assert by_animal.loc["a", "replay_frac_noncurrent"] == 1.0
+    assert by_animal.loc["b", "replay_frac_current_patch"] == 1.0
+    assert by_animal.loc["b", "replay_frac_noncurrent"] == 0.0
+
+
+def test_stop_replay_per_patch_fallback_merge_still_validates_stop_id():
+    """Regression: the uniqueness guard must run AFTER the
+    ``stop_id`` fallback merge from ``event_table``. The previous
+    placement checked ``stop_id`` against ``event_arm_table`` first,
+    which is a no-op when ``stop_id`` isn't a column there — so a
+    session-local ``stop_id`` arriving via the fallback merge slipped
+    through and the per-stop reduction silently averaged across
+    sessions (probe: two sessions with globally-unique ``event_id``
+    but reused ``stop_id=0`` and no ``stop_id`` in
+    ``event_arm_table`` → ``replay_frac_current_patch=0.5`` for both
+    sessions instead of session-specific values).
+    """
+    from continuum_swr_replay.analysis.replay.switch_analysis import (
+        _stop_replay_per_patch,
+    )
+
+    eat = pd.DataFrame(
+        [
+            *(
+                {
+                    "animal": "a", "day": 1, "epoch": "e1",
+                    "event_id": 100, "arm": a,
+                    "arm_fraction": 1.0 if a == 0 else 0.0,
+                }
+                for a in range(9)
+            ),
+            *(
+                {
+                    "animal": "b", "day": 2, "epoch": "e1",
+                    "event_id": 101, "arm": a,
+                    "arm_fraction": 1.0 if a == 2 else 0.0,
+                }
+                for a in range(9)
+            ),
+        ]
+    )
+    et = pd.DataFrame(
+        [
+            {"animal": "a", "day": 1, "epoch": "e1",
+             "event_id": 100, "stop_id": 0},
+            {"animal": "b", "day": 2, "epoch": "e1",
+             "event_id": 101, "stop_id": 0},
+        ]
+    )
+    with pytest.raises(ValueError, match="must be globally unique across sessions"):
+        _stop_replay_per_patch(eat, et, fraction_col="arm_fraction")

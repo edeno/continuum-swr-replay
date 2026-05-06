@@ -785,8 +785,22 @@ def compute_non_local_event_context(
         )
 
     def _circular_mean(phases: pd.Series) -> float:
-        """Circular mean via complex exponentials."""
-        return float(np.angle(np.mean(np.exp(1j * phases.to_numpy()))))
+        """Circular mean via complex exponentials.
+
+        Drops non-finite phases before averaging. ``_nearest`` in
+        ``data_aggregation`` returns NaN when no theta sample is
+        within tolerance of an event timebin; without this filter,
+        ``np.exp(1j * NaN) = NaN`` and ``np.mean`` propagates NaN to
+        the per-event mean phase. That single NaN then poisons the
+        session-level ``np.mean(np.exp(1j * phases))``, masking
+        otherwise-valid theta locking across every other event in
+        the session. Returns NaN only if no finite phase exists.
+        """
+        arr = phases.to_numpy()
+        finite = arr[np.isfinite(arr)]
+        if finite.size == 0:
+            return float("nan")
+        return float(np.angle(np.mean(np.exp(1j * finite))))
 
     event_summary = non_local.groupby(event_group_cols, sort=False).agg(
         has_swr=("SWR_event", lambda x: (x > 0).any()),
@@ -811,9 +825,21 @@ def compute_non_local_event_context(
         }
 
         theta_events = group.loc[group["is_theta"]]
-        if len(theta_events) >= 3:
-            phases = theta_events["circular_mean_theta_phase"].to_numpy()
-            mean_vector = np.mean(np.exp(1j * phases))
+        # Restrict to events with a finite per-event mean phase. The
+        # per-event ``_circular_mean`` drops NaN-phase samples, but a
+        # whole event whose every theta-phase sample was NaN
+        # (e.g. ``_nearest`` returned NaN for every bin) still emits
+        # ``circular_mean_theta_phase = NaN``. Without this filter,
+        # ``np.mean(np.exp(1j * phases))`` propagates that NaN to the
+        # session-level ``theta_mrl`` and ``theta_mean_angle``,
+        # masking otherwise-valid locking across all other events in
+        # the session. Apply the ``>= 3`` threshold to the count of
+        # finite-phase events so the gate matches what's actually
+        # being averaged.
+        finite_phases = theta_events["circular_mean_theta_phase"].to_numpy()
+        finite_phases = finite_phases[np.isfinite(finite_phases)]
+        if finite_phases.size >= 3:
+            mean_vector = np.mean(np.exp(1j * finite_phases))
             result["theta_mrl"] = float(np.abs(mean_vector))
             result["theta_mean_angle"] = float(np.angle(mean_vector))
         else:
