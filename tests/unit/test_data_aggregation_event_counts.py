@@ -47,6 +47,50 @@ class TestEmptyA:
         assert out["n_a_with_b"] == 0
 
 
+class TestCrossSessionTimeCollision:
+    def test_shared_timestamp_across_sessions_does_not_leak_overlap(self):
+        # Two sessions, both starting at t=0.0:
+        #  - Session 1 has a low-speed NL+SWR overlap at t=0.0 (kept).
+        #  - Session 2 has a HIGH-SPEED NL event at t=0.0 (excluded
+        #    by the immobility filter) plus an SWR at t=0.0.
+        # The bare ``index.isin`` form would falsely count session
+        # 2's SWR as overlapping the surviving A-set because the
+        # time index 0.0 also belongs to session 1's surviving row.
+        df = pd.DataFrame(
+            [
+                # Session 1 — low-speed, retained.
+                {
+                    "time": 0.0, "animal": "s1", "day": 1, "epoch": "e",
+                    "head_speed": 0.0, "non_local_event": 1, "SWR_event": 1,
+                },
+                {
+                    "time": 0.5, "animal": "s1", "day": 1, "epoch": "e",
+                    "head_speed": 0.0, "non_local_event": 1, "SWR_event": 1,
+                },
+                # Session 2 — high-speed, excluded from A; SWR present.
+                {
+                    "time": 0.0, "animal": "s2", "day": 1, "epoch": "e",
+                    "head_speed": 50.0, "non_local_event": 1, "SWR_event": 1,
+                },
+                {
+                    "time": 0.5, "animal": "s2", "day": 1, "epoch": "e",
+                    "head_speed": 50.0, "non_local_event": 1, "SWR_event": 1,
+                },
+            ]
+        ).set_index("time").rename_axis(None)
+        out = compute_swr_nl_event_counts(df)
+        # A is just session 1's NL event.
+        assert out["n_a"] == 1
+        # Session 1's SWR overlaps; session 2's SWR does NOT overlap
+        # any retained A row → ``n_b_with_a`` must be 1, not 2.
+        assert out["n_b"] == 2
+        assert out["n_b_with_a"] == 1, (
+            f"n_b_with_a={out['n_b_with_a']} — bare time-index "
+            "matching leaked session 2's high-speed overlap into "
+            "session 1's overlap count."
+        )
+
+
 class TestFilterConsistency:
     def test_high_speed_overlap_does_not_inflate_n_b_with_a(self):
         # Two non-local events: the first overlaps an SWR but is

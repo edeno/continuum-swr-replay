@@ -715,9 +715,13 @@ def build_stop_table(
     per_bout["n_events"] = n_events_per_bout
 
     # Trial-context at bout start: first in-bout row's trial-derived
-    # values. For zero-event bouts these are still meaningful (the
-    # animal's behavioral state at the time of the stop).
-    first_row = grouped.first()
+    # values. ``skipna=False`` is critical — the default ``first()``
+    # silently skips NaNs and surfaces the first valid row anywhere
+    # in the bout, which leaks future trial context into stops whose
+    # actual bout start had no trial active yet (e.g. a bout
+    # spanning a trial boundary inherits the post-boundary trial's
+    # ``is_after_reward`` / ``reward_outcome``).
+    first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -741,6 +745,19 @@ def build_stop_table(
     # Arm / patch fields. ``current_arm`` uses the same modal-segment +
     # trunk-fallback rule as event-level current_arm; at a well-stop
     # the modal segment is a leaf arm.
+    # Bout-start arm context. ``_safe_first`` would silently skip
+    # leading NaNs and pick the first valid value mid-bout — that
+    # leaks trial context into stops whose actual bout start had no
+    # trial active. Use ``_first_value`` to take the first row's
+    # value as-is (NaN if no trial yet), matching ``first(skipna=False)``
+    # above. ``current_arm`` keeps its modal-segment fallback for
+    # well-stops where the animal actually sits on a leaf arm.
+    def _first_value(series: pd.Series) -> float:
+        if len(series) == 0:
+            return np.nan
+        v = series.iloc[0]
+        return float(v) if pd.notna(v) else np.nan
+
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
@@ -755,16 +772,16 @@ def build_stop_table(
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = _single_arm_from_well(_safe_first(g["current_well"]), track_graph)
+            ca = _single_arm_from_well(_first_value(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["prev_well"]), track_graph
+            _first_value(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["next_well"]), track_graph
+            _first_value(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _first_value(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals

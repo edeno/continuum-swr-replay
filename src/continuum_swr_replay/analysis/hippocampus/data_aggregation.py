@@ -600,9 +600,23 @@ def compute_swr_nl_event_counts(
         n_b = 0
         n_b_with_a = 0
     else:
+        # Build a session-keyed match for "this B-row is at the same
+        # (animal, day, epoch, time) as a row that survived A's
+        # filter". A bare ``b_active.index.isin(a_active.index)``
+        # matches purely on the time index, so two sessions that
+        # share a timestamp (e.g. both start at t=0.0) can have an
+        # excluded high-speed A-row in session B falsely flagged as
+        # surviving — the user reproduced ``n_b_with_a == 1`` when
+        # the only SWR overlapped an excluded high-speed NL event.
+        sess_cols = ["animal", "day", "epoch"]
+        a_keys = pd.MultiIndex.from_frame(
+            a_active.reset_index(names="_t")[[*sess_cols, "_t"]]
+        )
+        b_keys = pd.MultiIndex.from_frame(
+            b_active.reset_index(names="_t")[[*sess_cols, "_t"]]
+        )
         a_event_mask_in_b = (
-            b_active.index.isin(a_active.index)
-            & (b_active[event_col_a] > 0)
+            b_keys.isin(a_keys) & (b_active[event_col_a] > 0).to_numpy()
         )
         b_with_a = b_active.assign(_a_in_filter=a_event_mask_in_b).groupby(
             ["animal", "day", "epoch", event_col_b],

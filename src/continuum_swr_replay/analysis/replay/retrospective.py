@@ -241,13 +241,28 @@ def contains_path_to_next(
     sess_keys = [
         c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
     ]
-    arm_sets = (
-        event_sequence_table.groupby([*sess_keys, "event_id"], as_index=False)[
-            "decoded_arm_map"
-        ]
-        .agg(lambda s: frozenset(int(x) for x in s.dropna().unique()))
-        .rename(columns={"decoded_arm_map": "_decoded_arm_set"})
-    )
+    # Empty ``event_sequence_table`` is a legitimate Stage 5B input
+    # (sessions can have events but no in-event timebins yet, e.g.
+    # before posterior reconstruction lands). The previous chained
+    # ``Series.groupby(...).agg(...).rename(columns=...)`` produced
+    # a Series for an empty input, and ``Series.rename`` rejects the
+    # ``columns=`` kwarg with TypeError — which the runner script
+    # then swallows under a broad except, silently dropping the whole
+    # session from Stage 5B. Use named aggregation so the result is
+    # always a DataFrame, even when empty.
+    if event_sequence_table.empty:
+        arm_sets = pd.DataFrame(
+            columns=[*sess_keys, "event_id", "_decoded_arm_set"]
+        )
+    else:
+        arm_sets = event_sequence_table.groupby(
+            [*sess_keys, "event_id"], as_index=False
+        ).agg(
+            _decoded_arm_set=(
+                "decoded_arm_map",
+                lambda s: frozenset(int(x) for x in s.dropna().unique()),
+            )
+        )
 
     merged = ev.merge(arm_sets, on=[*sess_keys, "event_id"], how="left")
     contains = np.array(
@@ -307,21 +322,45 @@ def chosen_patch_fraction(
 
     merged = ev.merge(ea, on=[*sess_keys, "event_id"], how="left")
     in_target_patch = merged["arm_patch"] == merged["next_patch"]
-    merged["_mass"] = merged["arm_fraction"].astype(float).where(in_target_patch, 0.0)
-
     grp_cols = [*sess_keys, "event_id"]
-    # Use ``skipna=False`` so an event whose target-patch arms have
-    # any NaN ``arm_fraction`` propagates NaN. The default
-    # ``.sum()`` is ``skipna=True``, which combined with the
-    # explicit 0.0 on non-target arms silently fabricates
-    # ``chosen_patch_fraction = 0.0`` from a missing-data event —
-    # downstream consumers cannot tell "no replay on the chosen
-    # patch" from "we don't know".
+    # Sum arm_fraction over target-patch arms only. Two failure
+    # modes the previous form fabricated 0.0 for:
+    #   1. event_arm_table contains the event's arms but the
+    #      target-patch arm_fractions are all NaN — handled by
+    #      ``skipna=False`` below.
+    #   2. event_arm_table has no rows for the target patch at all
+    #      (empty event_arm_table or only non-target rows merged
+    #      in). The old ``.where(in_target_patch, 0.0)`` then made
+    #      every retained row zero and ``sum`` returned 0.0.
+    #      Mask non-target rows to NaN instead so their absence is
+    #      visible in the sum.
+    #
+    # We then explicitly require at least one target-patch row per
+    # event: if there are no target arms at all for an event, the
+    # output is NaN, not 0.0. Rows that are non-target but PRESENT
+    # contribute NaN; pandas' ``skipna=False`` sum then propagates
+    # NaN — but we *want* zero for legitimate "all-zero target arms,
+    # no contribution" cases. So we keep non-target as 0.0 only when
+    # ``in_target_patch`` has at least one True per group.
+    merged["_mass"] = merged["arm_fraction"].astype(float).where(
+        in_target_patch, 0.0
+    )
+    has_target_rows = (
+        merged.assign(_in=in_target_patch)
+        .groupby(grp_cols, as_index=False)["_in"]
+        .any()
+        .rename(columns={"_in": "_has_target"})
+    )
     out = (
         merged.groupby(grp_cols, as_index=False)["_mass"]
         .agg(lambda s: s.sum(skipna=False))
         .rename(columns={"_mass": "chosen_patch_fraction"})
+        .merge(has_target_rows, on=grp_cols, how="left")
     )
+    # No target-patch rows merged in → return NaN (cannot tell
+    # "no replay on chosen patch" from "we have no arm data").
+    out.loc[~out["_has_target"].fillna(False), "chosen_patch_fraction"] = np.nan
+    out = out.drop(columns=["_has_target"])
     return out
 
 

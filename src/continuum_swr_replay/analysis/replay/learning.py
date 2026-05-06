@@ -223,10 +223,19 @@ def stop_replay_summary(
     # ~88% of trials, leaving the cross-patch trials uncontaminated.
     ea_p = ea.copy()
     ea_p["_arm_patch"] = ea_p["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    # Use a NaN-aware sum (``skipna=False``) so a per-event-per-patch
+    # group whose target arms have any NaN ``arm_fraction`` propagates
+    # NaN to the patch-level total. The default ``.sum()`` is
+    # ``skipna=True`` and silently fabricates a real zero from
+    # missing data — the user reproduced ``frac_on_current_patch ==
+    # 0.0`` for an event whose target-patch arm fractions were all
+    # NaN, indistinguishable from a confidently-zero replay.
     patch_sums = (
         ea_p.dropna(subset=["_arm_patch"])
-        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)["arm_fraction"]
-        .sum()
+        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)[
+            "arm_fraction"
+        ]
+        .agg(lambda s: s.sum(skipna=False))
         .rename(columns={"arm_fraction": "_patch_frac", "_arm_patch": "_patch"})
     )
     patch_sums["_patch"] = patch_sums["_patch"].astype(int)

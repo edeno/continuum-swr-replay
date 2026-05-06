@@ -117,6 +117,68 @@ class TestChosenPatchFractionNaNPropagation:
             "target-patch arm fractions are all NaN; should propagate NaN"
         )
 
+    def test_missing_target_arm_rows_yield_nan(self):
+        # Event_arm_table has no rows for the target patch (e.g. only
+        # rows for arms outside patch 1). The pre-fix form set every
+        # non-target row to 0.0 and ``sum`` returned 0.0 — visually
+        # identical to "we observed zero replay on the chosen patch".
+        # The fix returns NaN because no target-patch row was present
+        # at all.
+        eat = pd.DataFrame(
+            [
+                {
+                    "animal": "m",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "event_id": 1,
+                    "arm": arm,
+                    # Only arms 4, 5 (patch 3) — no patch-1 rows at all.
+                    "arm_fraction": 0.5,
+                }
+                for arm in (4, 5)
+            ]
+        )
+        et = pd.DataFrame(
+            [
+                {
+                    "animal": "m",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "event_id": 1,
+                    "next_patch": 1,  # patch 1 has no rows merged in
+                }
+            ]
+        )
+        out = chosen_patch_fraction(et, eat)
+        assert pd.isna(out["chosen_patch_fraction"].iloc[0]), (
+            "chosen_patch_fraction returned "
+            f"{out['chosen_patch_fraction'].iloc[0]} for an event "
+            "with no target-patch rows in event_arm_table; "
+            "should propagate NaN, not 0.0."
+        )
+
+    def test_empty_event_arm_table_yields_nan(self):
+        eat = pd.DataFrame(
+            columns=[
+                "animal", "day", "epoch", "event_id", "arm", "arm_fraction",
+            ]
+        )
+        et = pd.DataFrame(
+            [
+                {
+                    "animal": "m",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "event_id": 1,
+                    "next_patch": 1,
+                }
+            ]
+        )
+        out = chosen_patch_fraction(et, eat)
+        # Single event → single row. Must be NaN, not 0.0.
+        assert len(out) == 1
+        assert pd.isna(out["chosen_patch_fraction"].iloc[0])
+
     def test_known_zero_replay_still_returns_zero(self):
         # All arms in the target patch have arm_fraction=0.0
         # (non-NaN). The function must still return 0.0 — the fix

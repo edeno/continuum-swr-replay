@@ -98,11 +98,18 @@ def load_population_data(
     nl_no_swr_all = np.hstack(nl_no_swr_list)
 
     # Filter: GLM succeeded, firing rate threshold, no NaN modulation
+    # in *any* of the four returned modulation arrays. The previous
+    # form only checked ``swr_all`` and ``no_swr_all``, so neurons
+    # with NaN entries in ``nl_swr_all`` / ``nl_no_swr_all`` slipped
+    # through and downstream consumers saw NaN-laced non-local
+    # modulation traces.
     has_fit = df["SWR vs. constant: pval"].notna().values
     has_fr = (df["immobility_avg_firing_rate"] >= min_firing_rate).values
     no_nan_mod = (
         ~np.any(np.isnan(swr_all), axis=0)
         & ~np.any(np.isnan(no_swr_all), axis=0)
+        & ~np.any(np.isnan(nl_swr_all), axis=0)
+        & ~np.any(np.isnan(nl_no_swr_all), axis=0)
     )
     good = has_fit & has_fr & no_nan_mod
 

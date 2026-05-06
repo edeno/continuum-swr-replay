@@ -428,12 +428,21 @@ def build_contfrag_event_arm_table(
     long["arm_count_soft"] = soft_aligned.flatten()
     long["arm_posterior_mass"] = mass_aligned.flatten()
 
-    # arm_fraction
-    n_bins_long = long["n_timebins"].to_numpy()
+    # arm_fraction. Use the count of real-arm bins as the denominator
+    # so the per-arm fractions sum to 1 over an event's real bins,
+    # matching the non-local table convention. The numerator
+    # (``arm_count_hard``) only counts bins whose decoded arm is in
+    # ``ALL_ARMS``; using ``n_timebins`` as the denominator (which
+    # also includes junction / missing-arm bins) silently shrinks the
+    # fraction sum below 1 — the user verified a 5-real / 5-junction
+    # event sums to 0.5.
+    n_real_long = (
+        long["n_timebins"].to_numpy() - long["n_junction_bins"].to_numpy()
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         frac = np.where(
-            n_bins_long > 0,
-            long["arm_count_hard"].to_numpy() / np.maximum(n_bins_long, 1),
+            n_real_long > 0,
+            long["arm_count_hard"].to_numpy() / np.maximum(n_real_long, 1),
             np.nan,
         )
     long["arm_fraction"] = frac
@@ -626,8 +635,13 @@ def build_contfrag_stop_table(
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_events"] = n_events_per_bout
 
-    # Trial context at bout start
-    first_row = grouped.first()
+    # Trial context at bout start. ``skipna=False`` is critical:
+    # the default ``first()`` skips leading NaNs and surfaces the
+    # first valid mid-bout row, leaking trial context into stops
+    # that span a trial boundary (the post-boundary trial's
+    # ``is_after_reward`` / ``reward_outcome`` would attach to a
+    # bout whose actual start had no trial active).
+    first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -647,7 +661,16 @@ def build_contfrag_stop_table(
         else:
             per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields
+    # Arm / patch fields. Use a NaN-strict ``_first_value`` instead
+    # of ``safe_first``: at bout start we want the first row's value
+    # as-is, even if it's NaN (no trial active yet). ``safe_first``
+    # would skip leading NaNs and inherit the next trial's context.
+    def _first_value(series: pd.Series) -> float:
+        if len(series) == 0:
+            return np.nan
+        v = series.iloc[0]
+        return float(v) if pd.notna(v) else np.nan
+
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
@@ -662,16 +685,16 @@ def build_contfrag_stop_table(
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = single_arm_from_well(safe_first(g["current_well"]), track_graph)
+            ca = single_arm_from_well(_first_value(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = single_arm_from_well(
-            safe_first(g["prev_well"]), track_graph
+            _first_value(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = single_arm_from_well(
-            safe_first(g["next_well"]), track_graph
+            _first_value(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = single_arm_from_well(
-            safe_first(g["last_rewarded_well"]), track_graph
+            _first_value(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals
