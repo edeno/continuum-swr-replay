@@ -63,6 +63,52 @@ class TestStopPatchReplayNaNPropagation:
         )
         return eat, et
 
+    def test_missing_current_patch_yields_nan_for_both_summaries(self):
+        # User repro: ``current_patch`` is NaN for the only event,
+        # so "current vs non-current" is undefined. The pre-fix code
+        # made ``is_cp == False`` everywhere (NaN == anything is
+        # False), reporting ``replay_frac_current_patch == 0.0`` and
+        # piling the entire replay fraction into ``replay_frac_noncurrent``.
+        eat = pd.DataFrame(
+            [
+                {
+                    "animal": "m",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "event_id": 1,
+                    "stop_id": 10,
+                    "arm": arm,
+                    "arm_fraction": 1.0 / 9,
+                    "current_patch": np.nan,
+                }
+                for arm in range(9)
+            ]
+        )
+        et = pd.DataFrame(
+            [
+                {
+                    "animal": "m",
+                    "day": 20200101,
+                    "epoch": "02_r1",
+                    "event_id": 1,
+                    "current_patch": np.nan,
+                }
+            ]
+        )
+        out = stop_patch_replay(eat, et)
+        # Both patch-relative summaries undefined when current_patch
+        # is missing.
+        assert out["replay_frac_current_patch"].isna().all(), (
+            "replay_frac_current_patch should be NaN when current_patch "
+            f"is missing; got {out['replay_frac_current_patch'].tolist()}"
+        )
+        assert out["replay_frac_noncurrent"].isna().all(), (
+            f"replay_frac_noncurrent collapsed to "
+            f"{out['replay_frac_noncurrent'].tolist()} for an event with "
+            "missing current_patch — should be NaN, not the full "
+            "replay fraction routed to non-current."
+        )
+
     def test_all_nan_residuals_propagate_nan_to_per_stop_value(self):
         eat, et = self._eat_one_event_all_nan_residuals()
         out = stop_patch_replay(eat, et)

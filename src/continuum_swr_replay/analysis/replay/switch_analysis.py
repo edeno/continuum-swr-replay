@@ -326,12 +326,25 @@ def stop_patch_replay(
         evt_patch = event_table[["event_id", "current_patch"]].drop_duplicates()
         eat = eat.merge(evt_patch, on="event_id", how="left")
 
-    # Flag arms in the current patch
-    is_cp = (eat["_patch"] == eat["current_patch"]).astype(int)
+    # Flag arms in the current patch. ``NaN == anything`` is False
+    # in pandas/numpy, so a missing ``current_patch`` would silently
+    # mark every arm as "non-current" and shovel the whole event's
+    # replay fraction into ``replay_frac_noncurrent`` while reporting
+    # ``replay_frac_current_patch == 0.0``. The current-vs-non-current
+    # split is undefined when the current patch is unknown, so route
+    # those rows to NaN explicitly: NaN × (anything) propagates
+    # through the ``skipna=False`` per-event sum below.
+    cp = eat["current_patch"]
+    p = eat["_patch"]
+    is_cp_float = np.where(
+        cp.isna() | p.isna(),
+        np.nan,
+        (p.to_numpy() == cp.to_numpy()).astype(float),
+    )
 
     # Per-event: sum fraction for current-patch and noncurrent arms
-    eat["_frac_cp"] = eat[fraction_col] * is_cp
-    eat["_frac_nc"] = eat[fraction_col] * (1 - is_cp)
+    eat["_frac_cp"] = eat[fraction_col].to_numpy() * is_cp_float
+    eat["_frac_nc"] = eat[fraction_col].to_numpy() * (1.0 - is_cp_float)
 
     # Per-event sums use ``skipna=False`` so an event with any NaN
     # arm fraction (or NaN residual) propagates NaN to the per-event
@@ -364,7 +377,9 @@ def stop_patch_replay(
 
     # Residualized version if available
     if "residual_frac" in eat.columns:
-        eat["_resid_nc"] = eat["residual_frac"] * (1 - is_cp)
+        # Same NaN-aware multiplication: missing ``current_patch``
+        # routes the residual mass to NaN, not to "non-current".
+        eat["_resid_nc"] = eat["residual_frac"].to_numpy() * (1.0 - is_cp_float)
         event_resid = (
             eat.groupby(["stop_id", "event_id"])["_resid_nc"]
             .apply(lambda s: s.sum(skipna=False))
