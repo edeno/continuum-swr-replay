@@ -131,8 +131,11 @@ def stop_replay_summary(
     For each role in ``{current, prev, last_rewarded, best}``, the
     output has:
 
-    - ``frac_on_<role>``: mean ``arm_fraction`` across events in the
-      stop (NaN if the stop has zero events).
+    - ``frac_on_<role>``: strict mean ``arm_fraction`` across events
+      in the stop (NaN if the stop has zero events OR any event in
+      the stop has NaN ``arm_fraction`` for this role — see the
+      ``_strict_mean`` aggregator below for why a NaN-skipping mean
+      would silently bias the stop toward surviving events).
     - ``frac_on_<role>_swr``: same, restricted to events with
       ``is_swr == True``.
     - ``frac_on_<role>_non_swr``: same, restricted to ``is_swr == False``.
@@ -314,8 +317,21 @@ def stop_replay_summary(
             )
             agg[[*sess_keys, "stop_id"]] = pd.DataFrame(columns=[*sess_keys, "stop_id"])
         else:
+            # Strict NaN-propagating mean: pandas' default ``"mean"``
+            # uses ``skipna=True``, so a stop whose only finite event
+            # has ``frac_on_current_event=0.9`` and a second event with
+            # NaN silently emits ``frac_on_current=0.9`` while
+            # ``n_events_with_replay`` still reports the full count.
+            # That biases the Stage-6 stop-level fractions toward the
+            # subset of events that happened to have a finite
+            # ``arm_fraction`` for this role. Propagate NaN explicitly
+            # so a stop with any missing event-level role fraction is
+            # surfaced as missing, not as a confident value.
+            def _strict_mean(s: pd.Series) -> float:
+                return float(s.mean(skipna=False))
+
             agg_cols = {
-                f"frac_on_{r}{label}": (f"frac_on_{r}_event", "mean")
+                f"frac_on_{r}{label}": (f"frac_on_{r}_event", _strict_mean)
                 for r in role_cols
                 if f"frac_on_{r}_event" in sub.columns
             }
@@ -343,8 +359,12 @@ def stop_replay_summary(
     for agg in agg_dfs:
         summary = summary.merge(agg, on=[*sess_keys, "stop_id"], how="left")
 
-    # n_events_with_replay = events that contributed to the unrestricted
-    # fractions (= n_events). Keep as Int64 for clarity.
+    # n_events_with_replay = total events in the stop. Per-role
+    # contribution counts are NOT exposed; if any event had NaN
+    # ``arm_fraction`` for a given role, the stop's ``frac_on_<role>``
+    # is NaN (strict aggregation above). Treat ``frac_on_<role>``
+    # being NaN as the per-role missing-data signal — don't try to
+    # back out a per-role contributor count from this column.
     summary["n_events_with_replay"] = summary["n_events"].astype("Int64")
 
     return summary

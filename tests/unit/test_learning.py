@@ -277,6 +277,84 @@ class TestStopReplaySummary:
         out = stop_replay_summary(st, ev, ea)
         assert out["frac_on_best"].iloc[0] == pytest.approx(0.10)
 
+    def test_partial_nan_event_propagates_nan_to_stop_summary(self):
+        """Regression: stop-level ``frac_on_<role>`` must be strict.
+
+        Pre-fix, the per-role aggregator was ``"mean"`` (pandas
+        ``skipna=True``), so a stop with two events — one finite, one
+        with NaN ``arm_fraction`` for the current_arm — silently
+        emitted ``frac_on_current = <surviving event's value>`` while
+        ``n_events_with_replay`` still reported the full event count.
+        That biased Stage-6 stop-level fractions toward the subset of
+        events that happened to have a finite arm_fraction for this
+        role.
+
+        Post-fix uses a strict ``skipna=False`` mean so a stop with
+        any missing event-level role fraction is surfaced as missing
+        for that role.
+        """
+        ev, ea, st = _make_tables(
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+                {
+                    "stop_id": 1,
+                    "event_id": 101,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    # arm 0 (= current_arm) is NaN for this event.
+                    # Other arms keep finite values so prev / last_rewarded
+                    # roles still see two finite contributors.
+                    "arm_fracs": [
+                        np.nan, 0.40, 0.10, 0.10, 0.10, 0.10, 0.10, 0.06, 0.04,
+                    ],
+                    "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 1,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": False,
+                    "is_mua_stop": False,
+                    "n_events": 2,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        out = stop_replay_summary(st, ev, ea)
+        row = out.iloc[0]
+        # frac_on_current must propagate NaN — pre-fix would have
+        # emitted 0.50 (the surviving event 100's value).
+        assert np.isnan(row["frac_on_current"]), (
+            f"frac_on_current={row['frac_on_current']!r} — strict "
+            "aggregator should propagate NaN when any event has NaN "
+            "for this role; pre-fix silently emitted the surviving "
+            "event's value."
+        )
+        # Roles whose arms ARE finite in both events stay finite.
+        assert row["frac_on_prev"] == pytest.approx(0.30)
+        assert row["frac_on_last_rewarded"] == pytest.approx(0.30)
+        # n_events_with_replay still reports the total event count
+        # (it's the per-stop event count, not a per-role contributor
+        # count). The per-role NaN above is the missing-data signal.
+        assert int(row["n_events_with_replay"]) == 2
+
 
 # ─────────────────────────────────────────────────────────────────────
 # fit_is_stay_logistic_per_session

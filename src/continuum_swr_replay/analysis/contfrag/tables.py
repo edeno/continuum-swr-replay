@@ -142,7 +142,19 @@ def _summarize_event_state(
         dominant: str | None = (
             "Continuous" if cont_mean >= frag_mean else "Fragmented"
         )
-        cont_frac = float(np.nanmean(cont_prob > frag_prob))
+        # cont_frac counts bins where Continuous > Fragmented. NaN
+        # comparisons silently return False, so ``np.nanmean(cont >
+        # frag)`` has no NaNs left to skip and partial-NaN bins are
+        # counted toward "Fragmented" — biasing the fraction down
+        # whenever either state's probability is missing for some
+        # bins. Restrict to bins where BOTH states are finite so the
+        # comparison is actually defined; if there's no overlap,
+        # surface NaN.
+        paired = np.isfinite(cont_prob) & np.isfinite(frag_prob)
+        if paired.any():
+            cont_frac = float((cont_prob[paired] > frag_prob[paired]).mean())
+        else:
+            cont_frac = float("nan")
     else:
         dominant = None
         cont_frac = float("nan")
