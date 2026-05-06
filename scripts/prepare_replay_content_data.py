@@ -116,9 +116,17 @@ def find_sessions(max_per_animal: int | None = None):
 def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
-    Returns ``None`` when the session cannot be loaded or the decoder
-    produced no non-local events. Callers concatenate the non-empty
-    returns into the global canonical tables.
+    Returns ``None`` only when the session cannot be loaded (missing
+    trials or track graph). Sessions whose decoder produced no
+    non-local events still return a dict — with empty
+    ``event_table`` / ``event_arm_table`` and a ``None``
+    ``event_sequence_table``, but a fully populated ``stop_table``
+    that records the session's immobility bouts. ``stop_table.pkl``
+    is documented to include zero-event bouts, and the rate model
+    fits ``n_events`` per stop over a denominator that must include
+    those rows. Callers concatenate every non-``None`` return into
+    the global canonical tables; ``pd.concat`` accepts the empty
+    per-event frames without complaint.
     """
     nwb = session["nwb_file_name"]
     epoch = session["epoch_name"]
@@ -252,11 +260,27 @@ def main():
     event_table_all = pd.concat(all_event_tables, ignore_index=True)
     event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
     stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
-    event_sequence_table_all = (
-        pd.concat(all_event_sequence_tables, ignore_index=True)
-        if all_event_sequence_tables
-        else None
-    )
+    # Always materialize ``event_sequence_table.pkl`` — even when no
+    # session contributed any sequence rows. Stage 5B (the
+    # retrospective-alignment step) does
+    # ``pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")``
+    # unconditionally, so a missing file would crash a posterior-
+    # unavailable run with FileNotFoundError. The retrospective
+    # helpers already treat an empty sequence frame as a legitimate
+    # input, so writing an empty schema-complete frame is the right
+    # contract here.
+    if all_event_sequence_tables:
+        event_sequence_table_all = pd.concat(
+            all_event_sequence_tables, ignore_index=True
+        )
+    else:
+        from continuum_swr_replay.analysis.replay.tables import (
+            _event_sequence_table_columns,
+        )
+
+        event_sequence_table_all = pd.DataFrame(
+            columns=_event_sequence_table_columns()
+        )
     # Patch table is a deterministic projection of the per-arm table
     # (sums arm_count_hard within each patch and aggregates predictors
     # to patch level). Save it alongside the others so the documented

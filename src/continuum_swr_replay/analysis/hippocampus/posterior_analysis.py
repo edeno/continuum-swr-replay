@@ -227,7 +227,20 @@ def get_map_speed(
         speed[-1] = np.nan
     speed[~has_valid_data] = np.nan
 
-    # Interpolate over NaN gaps for smoothing, then re-mask
+    # Snapshot the full set of "speed must stay NaN" positions BEFORE
+    # interpolation so we can re-apply it after the smoother runs.
+    # This is the union of "step touched a placeholder row" and
+    # "this row's posterior was itself invalid". Re-masking only the
+    # latter (``~has_valid_data``) leaves the interpolated speeds
+    # for invalidated steps next to a NaN frame in place — e.g.
+    # MAP nodes ``[0, 1, NaN, 1, 1]`` ended up with a finite
+    # 6.667 cm/s at index 1 even though that step's destination
+    # was the all-NaN placeholder.
+    invalid_speed_mask = np.isnan(speed)
+
+    # Interpolate over NaN gaps so the smoother has continuous data
+    # to convolve with. The interpolated values are temporary —
+    # re-masked below.
     valid_mask = ~np.isnan(speed)
     if valid_mask.any() and not valid_mask.all():
         indices = np.arange(n_time)
@@ -240,8 +253,10 @@ def get_map_speed(
         speed_filled, smooth_sigma, sampling_frequency
     )
 
-    # Re-mask invalid timepoints
-    smoothed_speed[~has_valid_data] = np.nan
+    # Re-apply the full pre-interpolation invalid mask so step-level
+    # invalidations next to a NaN frame do not survive the
+    # interpolate-smooth round trip.
+    smoothed_speed[invalid_speed_mask] = np.nan
 
     return smoothed_speed
 

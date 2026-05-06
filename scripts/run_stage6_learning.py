@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import logging
 
+import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
@@ -189,7 +190,19 @@ def main() -> None:
         pvals.append(p)
 
     if pvals:
-        _, p_fdr, _, _ = multipletests(pvals, method="fdr_bh")
+        # ``multipletests`` with NaN inputs returns all-NaN adjusted
+        # p-values (verified on this branch's SciPy/statsmodels).
+        # That contaminates every role's FDR when a single role
+        # hits the wilcoxon ValueError path (e.g. all-zero β_inter
+        # samples on current SciPy that don't always raise).
+        # Correct only the finite p-values and pass NaN through for
+        # the failed roles.
+        pvals_arr = np.asarray(pvals, dtype=float)
+        ok = np.isfinite(pvals_arr)
+        p_fdr = np.full_like(pvals_arr, np.nan)
+        if ok.any():
+            _, p_fdr_ok, _, _ = multipletests(pvals_arr[ok], method="fdr_bh")
+            p_fdr[ok] = p_fdr_ok
         for (role, n, med, n_pos, n_neg, p), p_corr in zip(
             role_results, p_fdr, strict=True
         ):

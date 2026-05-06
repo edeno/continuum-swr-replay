@@ -331,8 +331,20 @@ def check_transition_matrix_flags(summary: pd.DataFrame) -> pd.DataFrame:
         row_cols = [f"T_{src}_{dst}" for dst in state_shorts]
         present = [c for c in row_cols if c in out.columns]
         if len(present) == 4:
-            row_sum = out[present].sum(axis=1)
-            errors |= ((row_sum - 1.0).abs() > 1e-6).fillna(False)
+            # Use ``min_count=4`` so a row with any NaN entry yields
+            # NaN instead of pandas' default ``skipna=True`` which
+            # silently sums the non-NaN entries — a row with three
+            # transitions summing to 1.0 and a fourth NaN would
+            # otherwise pass the structural check despite being an
+            # incomplete transition matrix. Any NaN in a complete
+            # 4-column row is also flagged explicitly so the error
+            # is surfaced even for rows whose visible entries
+            # happen to sum to ≠1.
+            row_sum = out[present].sum(axis=1, min_count=4)
+            row_has_nan = out[present].isna().any(axis=1)
+            errors |= (
+                ((row_sum - 1.0).abs() > 1e-6).fillna(False) | row_has_nan
+            )
 
     out["flag_transition_error"] = errors
 
