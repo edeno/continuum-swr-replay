@@ -574,20 +574,41 @@ def compute_swr_nl_event_counts(
     else:
         a_data = data_over_time.loc[data_over_time[event_col_a] > 0]
 
-    a_groups = a_data.loc[a_data[event_col_a] > 0].groupby(
-        ["animal", "day", "epoch", event_col_a],
-    )
-    a_with_b = a_groups.apply(lambda g: (g[event_col_b] > 0).any())
-    n_a = len(a_with_b)
-    n_a_with_b = int(a_with_b.sum())
+    # Event A: count overlaps using the (possibly immobility-filtered)
+    # ``a_data`` frame. ``int(empty_series.sum())`` raises TypeError
+    # because an empty ``groupby.apply`` returns a Series with no
+    # numeric dtype; coerce via float() / fall back to 0 explicitly.
+    a_active = a_data.loc[a_data[event_col_a] > 0]
+    if len(a_active) == 0:
+        n_a = 0
+        n_a_with_b = 0
+    else:
+        a_with_b = a_active.groupby(
+            ["animal", "day", "epoch", event_col_a],
+        ).apply(lambda g: (g[event_col_b] > 0).any())
+        n_a = len(a_with_b)
+        n_a_with_b = int(a_with_b.sum()) if len(a_with_b) else 0
 
-    # Event B (not speed-filtered)
-    b_groups = data_over_time.loc[data_over_time[event_col_b] > 0].groupby(
-        ["animal", "day", "epoch", event_col_b],
-    )
-    b_with_a = b_groups.apply(lambda g: (g[event_col_a] > 0).any())
-    n_b = len(b_with_a)
-    n_b_with_a = int(b_with_a.sum())
+    # Event B: count overlaps against the *same* (filtered) ``a_data``,
+    # not the raw frame. Otherwise ``n_b_with_a`` could count B
+    # events as overlapping A events that this call deliberately
+    # excluded (e.g. high-speed non-local events when A is
+    # immobility-filtered), and ``n_a / n_b_with_a`` becomes a
+    # nonsensical mix of filtered and unfiltered totals.
+    b_active = data_over_time.loc[data_over_time[event_col_b] > 0]
+    if len(b_active) == 0:
+        n_b = 0
+        n_b_with_a = 0
+    else:
+        a_event_mask_in_b = (
+            b_active.index.isin(a_active.index)
+            & (b_active[event_col_a] > 0)
+        )
+        b_with_a = b_active.assign(_a_in_filter=a_event_mask_in_b).groupby(
+            ["animal", "day", "epoch", event_col_b],
+        ).apply(lambda g: g["_a_in_filter"].any())
+        n_b = len(b_with_a)
+        n_b_with_a = int(b_with_a.sum()) if len(b_with_a) else 0
 
     return {
         "n_a": n_a,

@@ -281,6 +281,13 @@ def compute_event_timing_offsets(
 
     """
     group_cols = ["animal", "day", "epoch"]
+    out_cols = [
+        *group_cols,
+        reference_event_col,
+        target_event_col,
+        "start_diff",
+        "end_diff",
+    ]
 
     # Precompute per-event start and end times for both event types
     def event_bounds(df: pd.DataFrame, event_col: str) -> pd.DataFrame:
@@ -344,4 +351,10 @@ def compute_event_timing_offsets(
                 }
             )
 
+    # Always return a frame with the expected schema, even when no
+    # event pairs overlap. Plot helpers (e.g.
+    # ``plot_event_timing_offsets``) index ``offsets["start_diff"]``
+    # directly and would raise KeyError on a bare empty frame.
+    if not rows:
+        return pd.DataFrame(columns=out_cols)
     return pd.DataFrame(rows)

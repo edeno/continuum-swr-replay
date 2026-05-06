@@ -977,6 +977,13 @@ def compute_calibration_curve(
 
     needed_cols = group_cols + ["Local_prob", "ahead_behind_distance"]
     working = data[needed_cols].copy()
+    # Drop rows with NaN ``Local_prob`` BEFORE binning. ``np.digitize``
+    # returns ``len(bin_edges)`` for NaN inputs, which after the
+    # ``.clip(0, n_bins-1)`` below maps every NaN row into the
+    # *highest* probability bin (e.g. ``prob_bin_center=0.95``).
+    # Decoder errors at NaN-Local_prob timepoints (often crashes /
+    # data drops) would then dominate the highest bin's median error.
+    working = working.dropna(subset=["Local_prob"])
     working["error_cm"] = working["ahead_behind_distance"].abs()
 
     bin_edges = np.linspace(0, 1, n_bins + 1)
