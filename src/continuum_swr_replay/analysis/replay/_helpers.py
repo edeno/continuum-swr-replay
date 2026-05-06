@@ -466,7 +466,13 @@ def cumulative_reward_all_events(
     n_trials_total = len(trials)
 
     if n_trials_total == 0:
-        return np.zeros((n_events, n_arms))
+        # Match the no-past-trials contract used by sibling helpers
+        # (``visit_recency_all_events``, ``recent_reward_rate_all_events``):
+        # an event with no completed trials behind it has *unknown*
+        # reward history, not zero reward. Returning zeros here lets
+        # M3 (which adds ``cumulative_reward``) treat these rows as
+        # valid neutral observations rather than missing history.
+        return np.full((n_events, n_arms), np.nan)
 
     # Sort defensively (see ``visit_recency_all_events`` for context).
     trials = trials.sort_values("end_time").reset_index(drop=True)
@@ -495,6 +501,17 @@ def cumulative_reward_all_events(
     window_starts = np.maximum(cutoffs - window, 0)
 
     out = cum[cutoffs] - cum[window_starts]
+
+    # Events before any completed trial have no reward history. The
+    # subtraction above yields ``cum[0] - cum[0] == 0``, which would
+    # silently fabricate "zero rewards observed" for an arm whose
+    # history is genuinely unknown — and the sibling helpers already
+    # propagate NaN for the same case (see lines 432-433 and 543-545).
+    # Surface NaN here too so M3 (+ cumulative_reward) doesn't see
+    # before-trial events as valid neutral reward-history observations.
+    no_past = cutoffs == 0
+    if no_past.any():
+        out[no_past] = np.nan
     return out
 
 
