@@ -119,7 +119,14 @@ def load_population_data(
     nl_swr_all = nl_swr_all[:, good]
     nl_no_swr_all = nl_no_swr_all[:, good]
 
-    # FDR correction on key tests
+    # FDR correction on key tests. ``false_discovery_control`` raises
+    # ``ValueError: ps must include only numbers between 0 and 1`` if
+    # any input is NaN — and the upstream filter only checks the
+    # *primary* ``"SWR vs. constant: pval"`` column, so a neuron with
+    # NaN in any *secondary* test (e.g. ``non_local_no_SWR vs. constant``)
+    # passes ``good`` and then crashes the loader. Apply BH per-test
+    # to the finite p-values only and leave the NaN positions as NaN
+    # in the corresponding ``fdr_q`` column.
     fdr_tests = [
         "SWR vs. constant",
         "non_local vs. constant",
@@ -131,8 +138,13 @@ def load_population_data(
     for test in fdr_tests:
         pval_col = f"{test}: pval"
         fdr_col = f"{test}: fdr_q"
-        pvals = np.clip(df[pval_col].values, 1e-300, 1.0)
-        df[fdr_col] = false_discovery_control(pvals, method="bh")
+        raw = df[pval_col].to_numpy(dtype=float)
+        ok = np.isfinite(raw)
+        fdr_q = np.full_like(raw, np.nan)
+        if ok.any():
+            pvals = np.clip(raw[ok], 1e-300, 1.0)
+            fdr_q[ok] = false_discovery_control(pvals, method="bh")
+        df[fdr_col] = fdr_q
 
     modulations = {
         "swr": swr_all,

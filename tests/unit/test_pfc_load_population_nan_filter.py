@@ -34,6 +34,50 @@ def _required_pval_columns() -> list[str]:
 
 
 class TestLoadPopulationNanFilter:
+    def test_nan_in_secondary_pval_does_not_crash_fdr(self, tmp_path):
+        """User repro: a neuron with finite modulation arrays and a
+        finite ``"SWR vs. constant: pval"`` (so it passes the
+        primary filter) but a NaN in any *secondary* FDR-tested
+        column (e.g. ``"non_local_no_SWR vs. constant: pval"``) used
+        to crash the loader because
+        ``scipy.stats.false_discovery_control`` rejects NaN inputs
+        with ``ValueError``. The fix applies BH per-test to the
+        finite p-values only and leaves ``fdr_q`` NaN where the raw
+        p was NaN."""
+        n_lag_times = 201
+        swr = np.zeros((n_lag_times, 1))
+        no_swr = np.zeros((n_lag_times, 1))
+        nl_swr = np.zeros((n_lag_times, 1))
+        nl_no_swr = np.zeros((n_lag_times, 1))
+
+        df_rows = pd.DataFrame(
+            {
+                "nwb_file_name": ["chimi20200212_.nwb"],
+                "immobility_avg_firing_rate": [10.0],
+            }
+        )
+        for col in _required_pval_columns():
+            df_rows[col] = 0.5
+        # Knock out exactly one secondary column to NaN. Primary
+        # ``"SWR vs. constant: pval"`` stays finite so ``has_fit``
+        # is True.
+        df_rows["non_local_no_SWR vs. constant: pval"] = np.nan
+
+        base = tmp_path / "session_mPFC_modulation"
+        df_rows.to_pickle(base.with_suffix(".pkl"))
+        np.save(base.with_suffix(".SWR_modulation.npy"), swr)
+        np.save(base.with_suffix(".no_SWR_modulation.npy"), no_swr)
+        np.save(base.with_suffix(".non_local_SWR_modulation.npy"), nl_swr)
+        np.save(base.with_suffix(".non_local_no_SWR_modulation.npy"), nl_no_swr)
+
+        # Must not raise.
+        df, _modulations, _ = load_population_data(tmp_path, min_firing_rate=0.0)
+        assert len(df) == 1
+        # The NaN test produces NaN ``fdr_q`` for that test, finite
+        # for the others.
+        assert pd.isna(df["non_local_no_SWR vs. constant: fdr_q"].iloc[0])
+        assert pd.notna(df["SWR vs. constant: fdr_q"].iloc[0])
+
     def test_neurons_with_nan_in_non_local_swr_dropped(self, tmp_path):
         n_lag_times = 201
         # Two neurons. Neuron 0: clean across all four arrays.
