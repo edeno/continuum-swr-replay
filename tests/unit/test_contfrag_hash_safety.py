@@ -24,27 +24,56 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src" / "continuum_swr_replay"
 
 
-def _load_function(rel_module_path: str, attr_name: str):
+def _load_function(
+    rel_module_path: str,
+    attr_name: str,
+    *,
+    extra_top_level_names: tuple[str, ...] = (),
+):
     """Compile + exec one named top-level function from ``src/`` by path.
 
     Avoids triggering the package's ``__init__.py`` import chain so the
     test stays offline. The functions exercised here use only pandas
     and numpy at runtime, which we provide via the exec namespace.
+    Pass ``extra_top_level_names`` to also load top-level constants
+    or helper functions that the target function closes over.
     """
     src = (SRC_DIR / rel_module_path).read_text()
     tree = ast.parse(src)
+    ns: dict = {"pd": pd, "np": np}
+
+    # Pre-load any extra top-level constants / helpers the target needs.
+    for extra in extra_top_level_names:
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == extra
+                for t in node.targets
+            ):
+                wrapper = ast.Module(body=[node], type_ignores=[])
+                ast.fix_missing_locations(wrapper)
+                exec(compile(wrapper, rel_module_path, "exec"), ns)  # noqa: S102
+                break
+            if isinstance(node, ast.FunctionDef) and node.name == extra:
+                wrapper = ast.Module(body=[node], type_ignores=[])
+                ast.fix_missing_locations(wrapper)
+                exec(compile(wrapper, rel_module_path, "exec"), ns)  # noqa: S102
+                break
+
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == attr_name:
             wrapper = ast.Module(body=[node], type_ignores=[])
             ast.fix_missing_locations(wrapper)
-            ns: dict = {"pd": pd, "np": np}
             exec(compile(wrapper, rel_module_path, "exec"), ns)  # noqa: S102
             return ns[attr_name]
     raise AttributeError(f"{attr_name!r} not found in {rel_module_path}")
 
 
+# ``_hash_contfrag_event_id`` calls ``_resolve_event_col``, which in turn
+# reads ``_EVENT_SOURCE_TO_COL``. Pull both into the exec namespace.
 _hash_contfrag_event_id = _load_function(
-    "analysis/contfrag/tables.py", "_hash_contfrag_event_id"
+    "analysis/contfrag/tables.py",
+    "_hash_contfrag_event_id",
+    extra_top_level_names=("_EVENT_SOURCE_TO_COL", "_resolve_event_col"),
 )
 hash_stop_id = _load_function(
     "analysis/replay/_helpers.py", "hash_stop_id"

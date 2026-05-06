@@ -172,9 +172,9 @@ def compute_state_fraction_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "local_fraction", "nospike_fraction",
@@ -184,18 +184,32 @@ def compute_state_fraction_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
-        n = len(group)
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        n_moving = int(is_moving.sum())
+        moving_block = group.loc[is_moving]
         result = {
-            "local_fraction": group["Local_prob"].mean(),
-            "nospike_fraction": group["No-Spike_prob"].mean(),
-            "nonlocal_continuous_fraction": group["Non-Local_Continuous_prob"].mean(),
-            "nonlocal_fragmented_fraction": group["Non-Local_Fragmented_prob"].mean(),
-            "n_moving_bins": n,
+            "local_fraction": moving_block["Local_prob"].mean(),
+            "nospike_fraction": moving_block["No-Spike_prob"].mean(),
+            "nonlocal_continuous_fraction": moving_block[
+                "Non-Local_Continuous_prob"
+            ].mean(),
+            "nonlocal_fragmented_fraction": moving_block[
+                "Non-Local_Fragmented_prob"
+            ].mean(),
+            "n_moving_bins": n_moving,
         }
 
-        collapsed = (group["Local_prob"] < local_prob_threshold).to_numpy()
+        # Label on the FULL timeline so immobile rows act as gaps that
+        # break collapse runs. Filtering first and labeling on the
+        # filtered frame would treat 5 cm/s | 0 cm/s | 5 cm/s as one
+        # contiguous moving stretch and merge two 1-bin events into
+        # one 3-second event.
+        collapsed_and_moving = (
+            (group["Local_prob"] < local_prob_threshold).to_numpy()
+            & is_moving
+        )
         times = group.index.to_numpy()
-        labeled, n_episodes = label(collapsed)
+        labeled, n_episodes = label(collapsed_and_moving)
         if n_episodes > 0:
             episode_durations = np.array([
                 times[labeled == i][-1] - times[labeled == i][0]
@@ -210,7 +224,7 @@ def compute_state_fraction_during_movement(
 
         return pd.Series(result)
 
-    return moving.groupby(group_cols, sort=False).apply(
+    return data.groupby(group_cols, sort=False).apply(
         _session_stats, include_groups=False,
     ).reset_index()
 
@@ -253,9 +267,9 @@ def compute_non_local_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "nonlocal_movement_rate_per_min",
@@ -267,14 +281,30 @@ def compute_non_local_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        n_moving = int(is_moving.sum())
+        if n_moving == 0:
+            return pd.Series({
+                "nonlocal_movement_rate_per_min": 0.0,
+                "nonlocal_movement_mean_duration_ms": 0.0,
+                "nonlocal_movement_median_duration_ms": 0.0,
+                "nonlocal_movement_fraction": 0.0,
+                "n_nonlocal_movement_events": 0,
+            })
+
         nonlocal_prob = (
             group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
         )
-        is_nonlocal = (nonlocal_prob > non_local_threshold).to_numpy()
+        # Label on the FULL timeline so immobile rows act as gaps
+        # that break event runs. Filtering first treated 5/0/5 cm/s
+        # as one contiguous moving stretch and merged separate events.
+        is_nonlocal_and_moving = (
+            (nonlocal_prob > non_local_threshold).to_numpy() & is_moving
+        )
         times = group.index.to_numpy()
-        labeled, n_events = label(is_nonlocal)
+        labeled, n_events = label(is_nonlocal_and_moving)
 
-        total_duration_min = len(group) / sampling_frequency / 60.0
+        total_duration_min = n_moving / sampling_frequency / 60.0
 
         if n_events > 0:
             durations_sec = np.array([
@@ -287,7 +317,7 @@ def compute_non_local_during_movement(
                 "nonlocal_movement_rate_per_min": n_events / total_duration_min,
                 "nonlocal_movement_mean_duration_ms": durations_ms.mean(),
                 "nonlocal_movement_median_duration_ms": np.median(durations_ms),
-                "nonlocal_movement_fraction": is_nonlocal.sum() / len(group),
+                "nonlocal_movement_fraction": is_nonlocal_and_moving.sum() / n_moving,
                 "n_nonlocal_movement_events": n_events,
             })
         else:
@@ -299,7 +329,7 @@ def compute_non_local_during_movement(
                 "n_nonlocal_movement_events": 0,
             })
 
-    return moving.groupby(group_cols, sort=False).apply(
+    return data.groupby(group_cols, sort=False).apply(
         _session_stats, include_groups=False,
     ).reset_index()
 
@@ -839,9 +869,9 @@ def compute_local_state_collapse_details(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "episode_id", "start_time", "end_time", "duration_sec",
@@ -852,11 +882,18 @@ def compute_local_state_collapse_details(
 
     all_episodes = []
 
-    for keys, group in moving.groupby(group_cols, sort=False):
+    for keys, group in data.groupby(group_cols, sort=False):
         if not isinstance(keys, tuple):
             keys = (keys,)
 
-        collapsed = (group["Local_prob"] < local_prob_threshold).to_numpy()
+        # Label on the FULL session timeline so immobile rows act as
+        # gaps that break collapse runs. Filtering first treated
+        # 5/0/5 cm/s as one contiguous moving stretch and merged
+        # separate 1-bin episodes.
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        collapsed = (
+            (group["Local_prob"] < local_prob_threshold).to_numpy() & is_moving
+        )
         labeled, n_episodes = label(collapsed)
 
         if n_episodes == 0:
@@ -1084,11 +1121,19 @@ def compute_session_quality_summary(
     )
 
     calib_df = compute_calibration_curve(data, group_cols=group_cols)
-    calib_session = (
-        calib_df.groupby(group_cols, sort=False)
-        .first()[["calibration_slope", "is_monotonic_decreasing"]]
-        .reset_index()
-    )
+    calib_cols = ["calibration_slope", "is_monotonic_decreasing"]
+    if calib_df.empty or any(c not in calib_df.columns for c in calib_cols):
+        # ``compute_calibration_curve`` returns a strictly empty frame
+        # (no per-session columns at all) when there's nothing to
+        # calibrate; the downstream join would otherwise raise
+        # ``KeyError: ['calibration_slope', 'is_monotonic_decreasing']``.
+        calib_session = pd.DataFrame(columns=group_cols + calib_cols)
+    else:
+        calib_session = (
+            calib_df.groupby(group_cols, sort=False)
+            .first()[calib_cols]
+            .reset_index()
+        )
 
     summary = error_df
     for df in [

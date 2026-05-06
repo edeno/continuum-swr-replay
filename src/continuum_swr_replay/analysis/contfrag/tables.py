@@ -65,6 +65,27 @@ def _prepare_contfrag_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
     return dot
 
 
+_EVENT_SOURCE_TO_COL = {"SWR": "SWR_event", "MUA": "MUA_event"}
+
+
+def _resolve_event_col(event_source: str) -> str:
+    """Map ``event_source`` to its data-over-time column name.
+
+    Strict dispatch: anything other than ``"SWR"`` / ``"MUA"`` raises
+    ``ValueError``. The previous inline form
+    ``"SWR_event" if event_source == "SWR" else "MUA_event"`` silently
+    routed any typo (``"swr"``, ``"Swr"``, ``"ripple"``…) to the MUA
+    column, so direct calls into these public helpers could build a
+    table for the wrong event source without warning.
+    """
+    try:
+        return _EVENT_SOURCE_TO_COL[event_source]
+    except KeyError as exc:
+        raise ValueError(
+            f"event_source must be 'SWR' or 'MUA', got {event_source!r}"
+        ) from exc
+
+
 def _in_contfrag_event_mask(
     dot: pd.DataFrame,
     speed_threshold: float,
@@ -75,7 +96,7 @@ def _in_contfrag_event_mask(
     A row is in-event iff the external detector flagged it (SWR_event > 0
     or MUA_event > 0) AND the animal was immobile.
     """
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return (dot[event_col] > 0) & (dot["head_speed"] < speed_threshold)
 
 
@@ -92,7 +113,7 @@ def _hash_contfrag_event_id(
     across sources or brain areas produces silent ID collisions on
     every join keyed by ``event_id``.
     """
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     keys = events[["animal", "day", "epoch", event_col]].copy()
     keys["__event_source"] = event_source
     keys["__brain_area"] = brain_area
@@ -145,7 +166,7 @@ def build_contfrag_event_table(
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
 
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
 
     dot = _prepare_contfrag_dot(dot, env)
     dot = add_trial_context(dot, trials)
@@ -358,7 +379,7 @@ def build_contfrag_event_arm_table(
     pd.DataFrame
         Columns: see ``_contfrag_event_arm_table_columns()``.
     """
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     column_order = _contfrag_event_arm_table_columns(event_source)
     if len(event_table) == 0:
         return pd.DataFrame(columns=column_order)
@@ -549,7 +570,7 @@ def build_contfrag_stop_table(
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
 
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
 
     dot = dot.copy()
     dot = add_trial_context(dot, trials)
@@ -687,7 +708,7 @@ def build_contfrag_stop_table(
 
 def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
     """Canonical column order for ContFrag event table."""
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return [
         "animal",
         "day",
@@ -766,7 +787,7 @@ def _contfrag_stop_table_columns() -> list[str]:
 
 def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
     """Canonical column order for ContFrag event-arm table."""
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return [
         # Identifiers
         "animal",

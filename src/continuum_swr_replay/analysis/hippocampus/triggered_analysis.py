@@ -130,10 +130,18 @@ def get_signal_windows(
         time_index = group.index.values
         time_min, time_max = time_index[0], time_index[-1]
 
-        # Find closest valid indices for each event time
-        center_idxs = np.searchsorted(time_index, times)
-        # Clip to valid range (handles events outside data timespan)
-        center_idxs = np.clip(center_idxs, 0, len(group) - 1)
+        # Find the *nearest* sample to each event time. ``searchsorted``
+        # alone returns the insertion point (the next sample), which
+        # for an event at 0.0025 s on a 2 ms grid centers the window
+        # on 0.004 s instead of 0.002 s. Compare distances to the
+        # neighbours bracketing the insertion point and pick the
+        # closer one.
+        right = np.searchsorted(time_index, times)
+        right_clipped = np.clip(right, 0, len(time_index) - 1)
+        left_clipped = np.clip(right - 1, 0, len(time_index) - 1)
+        left_d = np.abs(times - time_index[left_clipped])
+        right_d = np.abs(times - time_index[right_clipped])
+        center_idxs = np.where(left_d <= right_d, left_clipped, right_clipped)
 
         # Check if events are within extractable range (accounting for window size)
         # Events exactly at boundaries or outside need special handling

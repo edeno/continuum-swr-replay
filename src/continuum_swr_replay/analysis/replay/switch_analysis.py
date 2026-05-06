@@ -302,6 +302,20 @@ def stop_patch_replay(
     optionally ``replay_frac_residual_noncurrent`` if
     ``residual_frac`` is present in *event_arm_table*.
     """
+    # Both ``stop_id`` and ``event_id`` must be globally unique across
+    # sessions. The per-stop average over events conflates sessions
+    # otherwise, and per-event sums of arm fractions can climb above
+    # 1 as multiple sessions' events with the same id are added
+    # together. Reuse the shared precondition helper.
+    from .choice_prediction import _require_session_unique_ids
+
+    _require_session_unique_ids(
+        event_arm_table, "event_id", helper_name="stop_patch_replay"
+    )
+    _require_session_unique_ids(
+        event_arm_table, "stop_id", helper_name="stop_patch_replay"
+    )
+
     eat = event_arm_table.copy()
 
     # Map arms to patches

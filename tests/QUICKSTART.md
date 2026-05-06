@@ -15,40 +15,33 @@ machine without the lab VPN:
 uv run pytest tests/unit/test_basic.py
 ```
 
-`tests/unit/test_contfrag_paths.py` and
-`tests/unit/test_contfrag_hash_safety.py` are also strictly offline —
-they load only the named helper functions via `ast` so the package's
-`data_loaders/__init__.py → bandit_task → spyglass` import chain is
-never triggered.
-
-## Full suite (requires a working DataJoint setup)
-
-`uv run pytest` collects the entire `tests/` tree. Many test modules
-import `continuum_swr_replay.*` packages whose `__init__.py` files
-pull in Spyglass, which in turn opens a DataJoint connection at
-import time. Without the lab VPN this either hangs at collection or
-fails with a connection error.
-
-When DataJoint is reachable:
+After the lazy-import work landed, the rest of the unit / property /
+visualization / analysis suites also collect and run without a
+working DataJoint connection — the package roots
+(`continuum_swr_replay/__init__.py`,
+`continuum_swr_replay/data_loaders/__init__.py`,
+`continuum_swr_replay/analysis/hippocampus/__init__.py`) re-export
+loader functions through PEP 562 ``__getattr__``, so importing a
+leaf submodule no longer pulls Spyglass at import time. The lazy
+contract is pinned by `tests/unit/test_lazy_imports.py`.
 
 ```bash
-uv run pytest                                # full unit + property + visualization + analysis
+uv run pytest                              # full suite, offline-friendly
+uv run pytest tests/integration/           # mock-fixture tests, also offline
 uv run pytest tests/unit/test_replay_tables.py
-uv run pytest --ignore=tests/integration     # skip the integration directory
 ```
 
-`tests/integration/` currently holds a single file
-(`test_mock_session_fixture.py`) that pins the shape and invariants
-of the synthetic ``mock_session_data`` fixture. The fixture itself
-is mock-only — it does **not** call the real ``load_data`` — but
-several tests in the file do
-``from continuum_swr_replay.types import DataLoadingPreset``, which
-triggers the package's root ``__init__.py`` and pulls in
-``data_loaders → bandit_task → spyglass`` at import time. So the
-file still requires DataJoint reachability to run end-to-end, even
-though no test exercises the loader. The ``integration`` pytest
-marker is registered in ``pyproject.toml`` for future use but is not
-currently applied to any test.
+## When you DO need DataJoint
+
+Only the loader functions themselves require the lab VPN:
+``load_data``, ``get_epoch_info``, ``get_training_timepoints``,
+``get_labels``, ``get_theta``, ``get_ripple``, ``get_hpc_marks``,
+``get_pfc_spike_times``, ``get_electrode_group_info``, and the
+``run_session`` driver in ``analysis/pfc/glm.py``. Tests that
+actually call them (none of the current `tests/` tree does) would
+need DataJoint reachable. The ``integration`` pytest marker is
+registered in ``pyproject.toml`` for future DB-gated tests but is
+not currently applied to any test.
 
 ## What's actually here
 
@@ -56,7 +49,8 @@ currently applied to any test.
   variables, replay tables, fitting, decoding, ContFrag paths, hash
   safety, etc.).
 - `tests/integration/test_mock_session_fixture.py` — exercises the
-  selective-load preset surface against a mock session fixture.
+  selective-load preset surface against a synthetic mock session
+  fixture. Does NOT call the real ``load_data``.
 - `tests/property/test_mathematical_invariants.py` — `hypothesis`-based
   property tests. `hypothesis` is included in the `dev` extra.
 

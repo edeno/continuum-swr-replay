@@ -211,8 +211,20 @@ def get_map_speed(
     # Last timepoint uses backward difference (same as its predecessor)
     speed = np.append(speed, speed[-1])
 
-    # Set speed to NaN for invalid rows BEFORE smoothing, so placeholder
-    # values from invalid rows don't bleed into valid neighbors
+    # Mask any speed whose forward-difference touched a placeholder
+    # row. Each step ``i`` reads ``node[i] → node[i+1]``, so it must
+    # be invalidated whenever EITHER endpoint had no valid posterior.
+    # Without this, the rows immediately before and after an
+    # all-NaN frame would carry the placeholder's contribution: e.g.
+    # valid_node=1, NaN, valid_node=1 returned [10., NaN, 10.] even
+    # though the two valid MAP positions are identical and the
+    # motion was an artefact of node 0 being used as the placeholder.
+    invalid_step = ~(has_valid_data[:-1] & has_valid_data[1:])
+    speed[:-1][invalid_step] = np.nan
+    # The last bin reuses the previous step (backward difference),
+    # so it is invalid if either of its endpoints was invalid.
+    if n_time >= 2 and not (has_valid_data[-1] and has_valid_data[-2]):
+        speed[-1] = np.nan
     speed[~has_valid_data] = np.nan
 
     # Interpolate over NaN gaps for smoothing, then re-mask

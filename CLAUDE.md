@@ -188,7 +188,7 @@ Task-relevant derived variables:
 ### Loading data for a session
 
 ```python
-from continuum_swr_replay.data_loaders.bandit_task import load_data, get_epoch_info
+from continuum_swr_replay.data_loaders import load_data, get_epoch_info
 
 # Get all available epochs
 epoch_info = get_epoch_info()

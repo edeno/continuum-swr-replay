@@ -661,7 +661,14 @@ class TestValidateFigureQuality:
         plt.close(fig)
 
     def test_validation_warns_small_axis_labels_presentation(self):
-        """Test that validation warns about small axis labels in presentation context."""
+        """Test that validation warns about small axis labels in presentation context.
+
+        Pass ``context="presentation"`` explicitly: the DPI heuristic
+        is unreliable on Retina-class macOS backends where matplotlib
+        reports ``fig.dpi = 2 × requested_dpi`` (so a 150-dpi
+        presentation figure shows up as 300 and would be routed to
+        the stricter paper thresholds).
+        """
         from continuum_swr_replay.figure_utilities import (
             PRES_AXIS_LABEL,
             validate_figure_quality,
@@ -674,7 +681,7 @@ class TestValidateFigureQuality:
 
         # Should warn about small X-axis label
         with pytest.warns(UserWarning, match="axis label.*small"):
-            result = validate_figure_quality()
+            result = validate_figure_quality(context="presentation")
             assert result is False
 
         plt.close(fig)

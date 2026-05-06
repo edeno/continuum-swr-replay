@@ -9,33 +9,36 @@ This directory contains a comprehensive test suite for the neuroscience data ana
 uv sync --extra dev
 ```
 
-### Fast offline slice (no VPN, no DataJoint)
+### Running the suite (offline-friendly)
 
-These three modules import only standard scientific Python (numpy /
-pandas / networkx / hypothesis) and finish in well under a second.
-They're the right starting point on any machine:
-
-```bash
-uv run pytest tests/unit/test_basic.py
-uv run pytest tests/unit/test_contfrag_paths.py
-uv run pytest tests/unit/test_contfrag_hash_safety.py
-```
-
-### Full suite (requires DataJoint reachability)
-
-`uv run pytest` collects the whole tree. Many modules import
-`continuum_swr_replay.*` packages whose `__init__.py` files trigger
-Spyglass, which opens a DataJoint connection at import time. Without
-the lab VPN this either hangs at collection or fails with a
-connection error.
+After the lazy-import work landed, the unit / property /
+visualization / analysis / integration suites all collect and run
+without a working DataJoint connection. The package roots
+(`continuum_swr_replay/__init__.py`,
+`continuum_swr_replay/data_loaders/__init__.py`,
+`continuum_swr_replay/analysis/hippocampus/__init__.py`) re-export
+loader functions through PEP 562 ``__getattr__``, and modules with
+spyglass dependencies defer those imports into the function bodies
+that actually need them. The lazy contract is pinned by
+`tests/unit/test_lazy_imports.py`.
 
 ```bash
-uv run pytest                              # full suite (needs DataJoint)
+uv run pytest                              # full suite, offline-friendly
+uv run pytest tests/integration/           # mock-fixture tests, also offline
 uv run pytest tests/unit/test_spikes.py    # one file
 uv run pytest -k "coincident"              # by name pattern
 uv run pytest -v                           # verbose
-uv run pytest --ignore=tests/integration   # skip the integration directory
 ```
+
+`tests/unit/test_basic.py` is the smallest dependency-free starting
+point if you want a sub-second sanity run.
+
+Only the loader functions themselves require the lab VPN at *call*
+time — ``load_data``, ``get_epoch_info``,
+``get_training_timepoints``, ``get_labels``, ``get_theta``,
+``get_ripple``, ``get_hpc_marks``, ``get_pfc_spike_times``,
+``get_electrode_group_info``, and ``analysis.pfc.glm.run_session``.
+None of the current tests invoke them.
 
 ## Test Organization
 
@@ -57,15 +60,12 @@ tests/
 
 ``tests/integration/test_mock_session_fixture.py`` pins the shape /
 invariants of the synthetic ``mock_session_data`` fixture and does
-**not** call the real ``load_data`` pipeline. However, several
-tests in that file do
-``from continuum_swr_replay.types import DataLoadingPreset``, which
-triggers the package's root ``__init__.py`` →
-``data_loaders → bandit_task → spyglass``, so the file still needs
-a working DataJoint setup at import time. The ``integration``
-pytest marker is registered in ``pyproject.toml`` but no test is
-currently decorated with it, so nothing is auto-deselected. There
-is no live-data integration suite at the moment.
+**not** call the real ``load_data`` pipeline. With the lazy root
+exports, the file no longer triggers Spyglass at import time, so it
+runs offline (verified: `pytest tests/integration/` → 25 passed in
+0.14 s). The ``integration`` pytest marker is registered in
+``pyproject.toml`` for future DB-gated tests but is not currently
+applied to any test.
 
 ## Test Categories
 
@@ -107,12 +107,9 @@ without the lab VPN). A regression in the live loader would be
 invisible here. A separate, DB-gated test file would be the natural
 home for true end-to-end loader tests.
 
-Note that running this file still requires a working DataJoint
-setup: several tests do
-``from continuum_swr_replay.types import DataLoadingPreset``, which
-triggers ``continuum_swr_replay/__init__.py`` and pulls in
-``data_loaders → bandit_task → spyglass`` at import time even though
-no test invokes ``load_data``.
+Thanks to the lazy root exports, this file runs offline — importing
+``continuum_swr_replay.types`` no longer drags in
+``data_loaders → bandit_task → spyglass``.
 
 **Run:**
 
