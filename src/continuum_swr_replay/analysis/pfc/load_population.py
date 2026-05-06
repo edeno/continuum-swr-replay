@@ -103,7 +103,20 @@ def load_population_data(
     # with NaN entries in ``nl_swr_all`` / ``nl_no_swr_all`` slipped
     # through and downstream consumers saw NaN-laced non-local
     # modulation traces.
-    has_fit = df["SWR vs. constant: pval"].notna().values
+    #
+    # If every neuron in a saved session had its GLM fail (the
+    # ``fit_neuron`` fallback writes only firing-rate columns), the
+    # primary p-value column may not even exist in that session's
+    # pickle. After ``pd.concat`` it'll exist with NaN for those
+    # rows IFF *some* other session succeeded; if EVERY session
+    # failed, the column is absent entirely and ``df["..."]`` raises
+    # KeyError. Default to all-False ``has_fit`` in that case so
+    # the failed neurons are dropped cleanly.
+    primary_pval_col = "SWR vs. constant: pval"
+    if primary_pval_col in df.columns:
+        has_fit = df[primary_pval_col].notna().values
+    else:
+        has_fit = np.zeros(len(df), dtype=bool)
     has_fr = (df["immobility_avg_firing_rate"] >= min_firing_rate).values
     no_nan_mod = (
         ~np.any(np.isnan(swr_all), axis=0)
@@ -138,6 +151,13 @@ def load_population_data(
     for test in fdr_tests:
         pval_col = f"{test}: pval"
         fdr_col = f"{test}: fdr_q"
+        if pval_col not in df.columns:
+            # Column absent because every session that ran this loader
+            # call had only failed-GLM neurons (the fallback path
+            # writes only firing-rate columns). Surface NaN rather
+            # than KeyError.
+            df[fdr_col] = np.full(len(df), np.nan)
+            continue
         raw = df[pval_col].to_numpy(dtype=float)
         ok = np.isfinite(raw)
         fdr_q = np.full_like(raw, np.nan)

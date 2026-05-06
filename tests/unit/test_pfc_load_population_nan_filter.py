@@ -78,6 +78,40 @@ class TestLoadPopulationNanFilter:
         assert pd.isna(df["non_local_no_SWR vs. constant: fdr_q"].iloc[0])
         assert pd.notna(df["SWR vs. constant: fdr_q"].iloc[0])
 
+    def test_all_failed_session_does_not_keyerror(self, tmp_path):
+        """User repro: a session whose every neuron's GLM failed
+        writes a pickle with only firing-rate columns (the
+        ``fit_neuron`` fallback). The pre-fix loader does
+        ``df["SWR vs. constant: pval"]`` straight away and crashes
+        with ``KeyError`` before the all-NaN modulation filter has
+        a chance to drop the failed rows."""
+        n_lag_times = 201
+        # Failed-GLM fallback writes only firing rates; its modulation
+        # arrays are all-NaN. No p-value columns at all.
+        nan_mod = np.full((n_lag_times, 1), np.nan)
+        df_failed = pd.DataFrame(
+            {
+                "nwb_file_name": ["chimi20200212_.nwb"],
+                "immobility_avg_firing_rate": [10.0],
+                "run_avg_firing_rate": [5.0],
+            }
+        )
+        base = tmp_path / "session_mPFC_modulation"
+        df_failed.to_pickle(base.with_suffix(".pkl"))
+        np.save(base.with_suffix(".SWR_modulation.npy"), nan_mod)
+        np.save(base.with_suffix(".no_SWR_modulation.npy"), nan_mod)
+        np.save(base.with_suffix(".non_local_SWR_modulation.npy"), nan_mod)
+        np.save(base.with_suffix(".non_local_no_SWR_modulation.npy"), nan_mod)
+
+        # Must not raise KeyError. The failed neuron is dropped
+        # by the all-NaN modulation filter.
+        df, modulations, _ = load_population_data(tmp_path, min_firing_rate=0.0)
+        assert len(df) == 0, (
+            f"failed neuron not dropped, len(df)={len(df)}"
+        )
+        for arr in modulations.values():
+            assert arr.shape[1] == 0
+
     def test_neurons_with_nan_in_non_local_swr_dropped(self, tmp_path):
         n_lag_times = 201
         # Two neurons. Neuron 0: clean across all four arrays.

@@ -120,6 +120,35 @@ def _hash_contfrag_event_id(
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
 
 
+def _summarize_event_state(
+    cont_prob: np.ndarray, frag_prob: np.ndarray
+) -> tuple[float, float, str | None, float]:
+    """Per-event Continuous/Fragmented summary with NaN-safe semantics.
+
+    Returns ``(cont_mean, frag_mean, dominant, cont_frac)``.
+
+    Both means are the per-state ``nanmean`` (NaN if that state has no
+    finite bin). ``dominant`` and ``cont_frac`` are well-defined only
+    when *both* states have at least one finite bin — otherwise the
+    comparison ``cont_prob > frag_prob`` and the ``cont_mean >= frag_mean``
+    test silently route NaN-side missingness into a confident label.
+    Surface ``None`` / NaN in those degenerate cases instead.
+    """
+    cont_finite = bool(np.isfinite(cont_prob).any())
+    frag_finite = bool(np.isfinite(frag_prob).any())
+    cont_mean = float(np.nanmean(cont_prob)) if cont_finite else float("nan")
+    frag_mean = float(np.nanmean(frag_prob)) if frag_finite else float("nan")
+    if cont_finite and frag_finite:
+        dominant: str | None = (
+            "Continuous" if cont_mean >= frag_mean else "Fragmented"
+        )
+        cont_frac = float(np.nanmean(cont_prob > frag_prob))
+    else:
+        dominant = None
+        cont_frac = float("nan")
+    return cont_mean, frag_mean, dominant, cont_frac
+
+
 def build_contfrag_event_table(
     dot: pd.DataFrame,
     env,
@@ -225,13 +254,19 @@ def build_contfrag_event_table(
             1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
         )
 
-        # ContFrag-specific: state composition during event
-        cont_prob = g["Continuous_prob"].to_numpy()
-        frag_prob = g["Fragmented_prob"].to_numpy()
-        cont_mean = float(np.nanmean(cont_prob))
-        frag_mean = float(np.nanmean(frag_prob))
-        dominant = "Continuous" if cont_mean >= frag_mean else "Fragmented"
-        cont_frac = float(np.nanmean(cont_prob > frag_prob))
+        # ContFrag-specific: state composition during event. Defer to
+        # ``_summarize_event_state`` for NaN-safe semantics — the
+        # comparison ``cont_prob > frag_prob`` and ``cont_mean >=
+        # frag_mean`` silently route NaN-side missingness into a
+        # confident "Fragmented / 0% Continuous" label, which has
+        # tripped both the all-NaN and the asymmetric (one state's
+        # probabilities all NaN) cases. The helper requires both
+        # states to have at least one finite bin before producing a
+        # label / fraction.
+        cont_mean, frag_mean, dominant, cont_frac = _summarize_event_state(
+            g["Continuous_prob"].to_numpy(),
+            g["Fragmented_prob"].to_numpy(),
+        )
 
         record = {
             event_col: int(ev_id),
