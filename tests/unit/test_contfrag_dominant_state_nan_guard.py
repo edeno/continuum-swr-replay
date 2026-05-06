@@ -130,10 +130,15 @@ class TestContfragDominantStateNaNGuard:
             "the asymmetric NaN bin as a Fragmented win."
         )
 
-    def test_disjoint_finite_bins_yield_nan_cont_frac(self):
+    def test_disjoint_finite_bins_yield_no_label_or_fraction(self):
         # cont=[0.7, NaN], frag=[NaN, 0.2]. Both states have a finite
-        # bin, but they don't overlap on any row, so the bin-wise
-        # comparison is undefined.
+        # bin, but they don't overlap on any row, so neither the
+        # bin-wise comparison nor the cross-state mean comparison is
+        # defined: the per-state nanmeans come from disjoint rows.
+        # Reporting ``dominant="Continuous"`` from those disjoint
+        # means would be a confident label about an event in which no
+        # single bin ever observed both Continuous and Fragmented
+        # probabilities simultaneously.
         cm, fm, dom, cf = _summarize_event_state(
             np.array([0.7, np.nan]),
             np.array([np.nan, 0.2]),
@@ -141,11 +146,26 @@ class TestContfragDominantStateNaNGuard:
         # Means still computable per-state.
         assert np.isclose(cm, 0.7)
         assert np.isclose(fm, 0.2)
-        # Dominant is still computable from the means even with no
-        # paired bin.
-        assert dom == "Continuous"
-        # cont_frac has no defined comparison set → NaN.
+        # Both dominant and cont_frac require at least one paired-
+        # finite bin → both are missing here.
+        assert dom is None, (
+            f"dominant_state={dom!r} on disjoint-finite bins; the "
+            "per-state nanmeans come from non-overlapping rows so the "
+            "comparison is meaningless and dominant should be None."
+        )
         assert np.isnan(cf), (
             f"continuous_fraction={cf} on disjoint-finite bins; the "
             "per-bin comparison has no overlap and should be NaN."
         )
+
+    def test_extreme_disjoint_does_not_fabricate_dominant(self):
+        # User repro: cont=[0.99, NaN], frag=[NaN, 0.01]. Pre-fix gave
+        # dominant="Continuous" with cont_frac=NaN — confident label
+        # from the disjoint per-state means (0.99 vs 0.01) even
+        # though no bin ever observed both states.
+        cm, fm, dom, cf = _summarize_event_state(
+            np.array([0.99, np.nan]),
+            np.array([np.nan, 0.01]),
+        )
+        assert dom is None
+        assert np.isnan(cf)

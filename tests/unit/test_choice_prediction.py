@@ -218,6 +218,66 @@ class TestBuildChoiceDataset:
         arm1 = ds.loc[ds["arm"] == 1, "replay_frac"].iloc[0]
         assert arm1 == pytest.approx((1.0 / 9) / 2)
 
+    def test_partial_nan_event_propagates_nan_replay_frac(self):
+        """Regression: build_choice_dataset's per-(stop, arm) mean
+        must be strict NaN-propagating.
+
+        Pre-fix used pandas' default ``"mean"`` aggregator
+        (``skipna=True``), so a stop with two events — one with
+        finite ``arm_fraction`` and one with NaN — silently emitted
+        ``replay_frac = <surviving event's value>`` while
+        ``n_events == 2``. The downstream chosen-arm sanity check
+        only inspects ``chosen.sum() == 1`` per stop, so it does
+        not detect the NaN that has already been collapsed away.
+        That biases Stage-5A choice prediction toward the subset of
+        events that happened to have a finite ``arm_fraction``.
+
+        Post-fix uses ``mean(skipna=False)`` so any NaN event
+        propagates a NaN ``replay_frac`` for that (stop, arm), and
+        ``fit_choice_model``'s drop-NaN-required-predictors step
+        removes the contaminated stop.
+        """
+        et, eat, st = _make_minimal_tables(
+            [{"stop_id": 1, "current_arm": 0, "next_arm": 3}]
+        )
+        # Add a second event for the same stop where arm 3's
+        # arm_fraction is NaN (other arms keep finite values).
+        new_event_rows = []
+        for arm in range(9):
+            new_event_rows.append({
+                "event_id": 2,
+                "stop_id": 1,
+                "arm": arm,
+                "arm_fraction": np.nan if arm == 3 else 1.0 / 8,
+                "is_prev": 0.0,
+                "is_next": 0.0,
+                "visit_recency": 0.0,
+                "cumulative_reward": 0.0,
+                "recent_reward_rate": 0.0,
+                "dist_to_arm": 1.0,
+                "is_same_patch": 0,
+            })
+        eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)
+        et = pd.concat(
+            [et, pd.DataFrame({"event_id": [2], "stop_id": [1]})],
+            ignore_index=True,
+        )
+
+        ds = build_choice_dataset(et, eat, st)
+        # arm 3 had NaN in event 2; replay_frac for arm 3 must be
+        # NaN, not the surviving event 1's value of 1/9.
+        arm3 = ds.loc[ds["arm"] == 3, "replay_frac"].iloc[0]
+        assert np.isnan(arm3), (
+            f"replay_frac for arm 3 = {arm3} — strict aggregator "
+            "should propagate NaN when any event has NaN "
+            "arm_fraction; pre-fix silently emitted the surviving "
+            "event's value (~0.111)."
+        )
+        # Other arms (no NaN) should still be finite.
+        arm1 = ds.loc[ds["arm"] == 1, "replay_frac"].iloc[0]
+        assert not np.isnan(arm1)
+
+
 # ── predict_arm_fractions ──
 
 

@@ -585,6 +585,21 @@ def fit_is_stay_pooled_gee(
         ]
     )
 
+    # Rank check on the design matrix. The GEE backend silently
+    # pseudo-inverts a rank-deficient X^T W X and returns parameter
+    # estimates with vanishing standard errors — a constant
+    # ``content_col`` (e.g. ``frac_on_last_rewarded == 0.5`` for every
+    # stop) makes column 2 collinear with the intercept and column 3
+    # (``outcome * content``) collinear with ``outcome``, so the
+    # interaction is mathematically unidentified, but ``status`` came
+    # back as ``"ok"`` with ``se_inter`` ~ 1e-17 and a deceptively
+    # significant ``p_inter``. Reject the design before fitting so
+    # downstream FDR / reporting only sees fits with a unique
+    # solution.
+    if np.linalg.matrix_rank(X) < X.shape[1]:
+        base["status"] = "rank_deficient_design"
+        return base
+
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

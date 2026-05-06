@@ -138,23 +138,22 @@ def _summarize_event_state(
     frag_finite = bool(np.isfinite(frag_prob).any())
     cont_mean = float(np.nanmean(cont_prob)) if cont_finite else float("nan")
     frag_mean = float(np.nanmean(frag_prob)) if frag_finite else float("nan")
-    if cont_finite and frag_finite:
+    # Both ``dominant`` and ``cont_frac`` require bins where BOTH
+    # states are finite. NaN comparisons silently return False, so
+    # ``np.nanmean(cont > frag)`` has no NaNs left to skip and would
+    # count partial-NaN bins as "Fragmented" wins. Likewise, when
+    # the two states' finite bins don't overlap (``cont=[0.99, NaN]``,
+    # ``frag=[NaN, 0.01]``), the per-state nanmeans come from disjoint
+    # rows — comparing them as ``cont_mean >= frag_mean`` produces a
+    # confident "Continuous" label even though no bin ever observed
+    # both states simultaneously. Gate both outputs on ``paired.any()``
+    # so degenerate inputs surface as ``None`` / NaN.
+    paired = np.isfinite(cont_prob) & np.isfinite(frag_prob)
+    if paired.any():
         dominant: str | None = (
             "Continuous" if cont_mean >= frag_mean else "Fragmented"
         )
-        # cont_frac counts bins where Continuous > Fragmented. NaN
-        # comparisons silently return False, so ``np.nanmean(cont >
-        # frag)`` has no NaNs left to skip and partial-NaN bins are
-        # counted toward "Fragmented" — biasing the fraction down
-        # whenever either state's probability is missing for some
-        # bins. Restrict to bins where BOTH states are finite so the
-        # comparison is actually defined; if there's no overlap,
-        # surface NaN.
-        paired = np.isfinite(cont_prob) & np.isfinite(frag_prob)
-        if paired.any():
-            cont_frac = float((cont_prob[paired] > frag_prob[paired]).mean())
-        else:
-            cont_frac = float("nan")
+        cont_frac = float((cont_prob[paired] > frag_prob[paired]).mean())
     else:
         dominant = None
         cont_frac = float("nan")

@@ -304,10 +304,22 @@ def build_choice_dataset(
     ].copy()
 
     # Mean fraction per (stop, arm) across events in that stop.
+    # Strict NaN-propagating mean: pandas' default ``"mean"`` uses
+    # ``skipna=True``, so a stop with two events — one finite, one
+    # all-NaN — silently emits the surviving event's value while
+    # ``n_events`` still reports the full count, and the chosen-arm
+    # sanity check below cannot recover the missingness because the
+    # NaN has already been collapsed away. That reintroduces the
+    # surviving-events bias that the residualized path already
+    # guards against (see ``build_residualized_choice_dataset``
+    # for the matching ``mean(skipna=False)`` on residuals).
+    def _strict_mean(s: pd.Series) -> float:
+        return float(s.mean(skipna=False))
+
     stop_arm = (
         eat.groupby(["stop_id", "arm"])
         .agg(
-            replay_frac=(fraction_col, "mean"),
+            replay_frac=(fraction_col, _strict_mean),
             visit_recency=("visit_recency", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             recent_reward_rate=("recent_reward_rate", "last"),

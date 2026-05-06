@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.replay.fitting import (
 )
 from continuum_swr_replay.analysis.replay.simulation import (
     DEFAULT_PREDICTORS,
+    _markov_arm_sequence,
     make_synthetic_env,
     simulate_autocorrelated_counts,
     simulate_counts,
@@ -337,6 +338,59 @@ def _replicated_fits(simulator, beta, n_replicates, **kwargs):
         coefs.append(fit[f"coef_{predictor}"])
         bses.append(fit[f"bse_{predictor}"])
     return np.asarray(coefs), np.asarray(bses)
+
+
+class TestLazyMarkovChainOverdispersesCounts:
+    """Pin the direction of the variance change documented in
+    ``simulation.py`` module + ``simulate_autocorrelated_counts`` docs.
+
+    The lazy Markov chain ``X_{t+1} = X_t (w.p. rho) else fresh ~ pi``
+    has the same marginal pi as iid sampling, but positive autocorrelation
+    INFLATES the variance of the per-event arm count S_i = sum_t I(X_t = i)
+    by a factor approaching ``(1 + rho) / (1 - rho)`` for large L. The
+    docstring previously claimed the variance was *smaller* (which would
+    be underdispersion), and the conclusion that ``bse`` is too narrow
+    requires the opposite — overdispersion. This test fails if anyone
+    rewires the chain in a way that inverts the variance direction OR if
+    the docstring claim is reverted.
+
+    Empirical reference (pi=[0.3, 0.7], L=20, 5000 trials):
+    - iid (rho=0)  variance ≈ 4.07 (matches analytic Multinomial 4.20)
+    - rho=0.8      variance ≈ 30.3 (~7× larger, consistent with
+      asymptotic factor (1+0.8)/(1-0.8) = 9 attenuated by finite L).
+    """
+
+    def test_high_rho_variance_strictly_exceeds_iid_and_multinomial(self):
+        rng = np.random.default_rng(0)
+        pi = np.array([0.3, 0.7])
+        L = 20
+        n_trials = 2000
+
+        def _var_arm0(rho: float) -> float:
+            counts = np.empty(n_trials)
+            for i in range(n_trials):
+                seq = _markov_arm_sequence(pi, rho, L, rng)
+                counts[i] = (seq == 0).sum()
+            return float(counts.var(ddof=1))
+
+        var_iid = _var_arm0(0.0)
+        var_corr = _var_arm0(0.8)
+        multinom_var = L * pi[0] * (1 - pi[0])  # = 4.2
+
+        # iid case must match multinomial within ~25% (sampling noise).
+        assert 0.75 * multinom_var < var_iid < 1.25 * multinom_var, (
+            f"iid variance {var_iid:.2f} should match Multinomial "
+            f"{multinom_var:.2f}; sanity check failed."
+        )
+        # Main pin: rho=0.8 must produce strictly LARGER count
+        # variance than iid, by a wide margin (analytic factor ~9).
+        assert var_corr > 3.0 * var_iid, (
+            f"Expected overdispersion under rho=0.8: var_corr="
+            f"{var_corr:.2f} should be ≫ var_iid={var_iid:.2f} "
+            "(analytic ratio ≈ 9). If this fails the docstring's "
+            "'larger / overdispersion' claim and the bse-too-narrow "
+            "story would be reversed."
+        )
 
 
 class TestAutocorrelationDoesNotBiasPointEstimate:

@@ -77,7 +77,35 @@ def load_population_data(
         ):
             continue
 
-        dfs.append(pd.read_pickle(p))
+        # Cross-session alignment guard. The pickles and the
+        # modulation arrays are loaded independently, then
+        # ``pd.concat`` and ``np.hstack`` are used to assemble the
+        # population. If a single session has a different number of
+        # pickle rows than modulation columns (or its four arrays
+        # disagree on column count), every later session's neurons
+        # silently shift along the modulation axis: the second pickle
+        # row of session A ends up paired with session B's first
+        # modulation column. Validate per session before appending so
+        # the row↔column correspondence is always 1-to-1.
+        df_session = pd.read_pickle(p)
+        n_rows = len(df_session)
+        col_counts = {
+            "SWR_modulation": sess_swr.shape[1],
+            "no_SWR_modulation": sess_no_swr.shape[1],
+            "non_local_SWR_modulation": sess_nl_swr.shape[1],
+            "non_local_no_SWR_modulation": sess_nl_no_swr.shape[1],
+        }
+        if any(c != n_rows for c in col_counts.values()):
+            raise ValueError(
+                f"Per-session shape mismatch in {p.name}: pickle has "
+                f"{n_rows} rows but modulation column counts are "
+                f"{col_counts}. All four modulation arrays must have "
+                f"exactly {n_rows} columns; otherwise concatenation "
+                "across sessions silently misaligns neuron metadata "
+                "with modulation traces."
+            )
+
+        dfs.append(df_session)
         swr_list.append(sess_swr)
         no_swr_list.append(sess_no_swr)
         nl_swr_list.append(sess_nl_swr)

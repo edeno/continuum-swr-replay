@@ -161,8 +161,11 @@ def build_control_aligned_table(
 ) -> pd.DataFrame:
     """Build matched control table for switch-aligned comparison.
 
-    For each switching episode, finds a random stretch of ``max_lag``
-    consecutive stay stops in the same session. Returns the same
+    For each switching episode, picks a random stay anchor in the
+    same session and emits one row per stay stop with replay in the
+    ``[anchor - max_lag, anchor)`` window. The anchor and every
+    contributing preceding stop must satisfy ``is_stay == 1``, so the
+    control window contains no switch dynamics. Returns the same
     columns as :func:`build_switch_aligned_table`.
 
     Parameters
@@ -235,10 +238,18 @@ def build_control_aligned_table(
         # own session. Otherwise the writer at lines ~237-241 stamps
         # this episode's session keys onto stops drawn from other
         # sessions that happened to share the stop_idx range.
+        # Also restrict to ``is_stay == 1``: the matched-control
+        # contract is "stay stops aligned to a stay anchor", and the
+        # anchor was already drawn from ``session_stays``. Without
+        # this filter, a switch stop sitting in [anchor - max_lag,
+        # anchor) would be re-labeled as a control row at its lag,
+        # contaminating the switch-vs-control comparison with the
+        # very switch dynamics it's meant to baseline against.
         preceding = st[
             (st["animal"] == animal)
             & (st["day"] == day)
             & (st["epoch"] == epoch)
+            & (st["is_stay"] == 1)
             & (st["stop_idx"] < anchor_stop_idx)
             & (st["stop_idx"] >= anchor_stop_idx - max_lag)
             & st["has_replay"]

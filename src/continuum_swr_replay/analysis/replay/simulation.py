@@ -16,11 +16,14 @@ Tier B — ``simulate_autocorrelated_counts``: trajectory-level simulation.
 For each event, an arm sequence is drawn from a 9-state Markov chain with
 self-transition probability ``rho`` and stationary distribution
 softmax(X β_true). Marginal arm counts are unbiased (same expectation as
-Tier A), but consecutive timebins are correlated, so per-event count
-variance is *smaller* than Multinomial. This breaks the
-within-event-independence assumption of the conditional Poisson and can
-make ``bse`` from the fit too narrow — exactly the calibration story we
-want to quantify.
+Tier A), but consecutive timebins are positively correlated, so per-event
+count variance is *larger* than Multinomial — overdispersion, not
+underdispersion. (Empirical probe with ``pi=[0.3, 0.7]``, ``L=20``:
+iid variance ≈ 4.07, ``rho=0.8`` variance ≈ 30.35; analytic Multinomial
+variance is 4.20.) The conditional Poisson likelihood treats every
+within-event bin as iid Multinomial, so its information matrix overstates
+how much information each event carries and ``bse`` from the fit becomes
+too narrow — exactly the calibration story we want to quantify.
 """
 
 from __future__ import annotations
@@ -377,10 +380,15 @@ def simulate_autocorrelated_counts(
 
     The marginal per-event arm distribution still equals softmax(X β_true)
     so β̂ from ``fit_conditional_poisson`` should remain unbiased. What
-    changes is the per-event count variance: with rho > 0, the counts are
-    *less* dispersed than Multinomial(L_e, π_e), so the conditional
-    Poisson's information matrix overstates how much information each
-    event carries, and ``bse`` becomes too narrow.
+    changes is the per-event count variance: with rho > 0 the counts are
+    *more* dispersed than Multinomial(L_e, π_e) — overdispersion —
+    because positive autocorrelation lengthens runs of the same arm.
+    For arm i with stationary mass π_i and chain length L, the variance
+    is inflated approximately by the geometric factor (1 + ρ) / (1 - ρ).
+    The conditional Poisson likelihood treats every within-event bin as
+    iid Multinomial, so its information matrix overstates how much
+    information each event carries and ``bse`` from the fit becomes too
+    narrow.
 
     Use ``rho=0`` to reproduce Tier A behavior. Use ``rho=0.7`` (effective
     sample size ≈ 0.18 × L_e) to simulate the kind of strong temporal

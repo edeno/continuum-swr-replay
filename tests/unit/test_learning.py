@@ -465,3 +465,59 @@ class TestFitIsStayPooledGEE:
         )
         result = fit_is_stay_pooled_gee(df, content_col="frac_on_last_rewarded")
         assert result["status"] == "constant_target_or_outcome"
+
+    def test_constant_content_col_rejected_as_rank_deficient(self):
+        """Regression: a constant ``content_col`` makes the design
+        ``[1, outcome, content, outcome*content]`` rank-deficient
+        (column 2 collinear with intercept; column 3 collinear with
+        outcome). Pre-fix, GEE silently returned ``status='ok'`` with
+        ``se_inter`` ~ 1e-17 and a deceptively significant ``p_inter``.
+        The fit must instead be rejected with
+        ``status='rank_deficient_design'`` and NaN coefficients/SEs/
+        p-values, so downstream FDR / reporting cannot pick up a
+        mathematically unidentified interaction.
+        """
+        rng = np.random.default_rng(0)
+        rows = []
+        n_sessions = 30
+        for s in range(n_sessions):
+            for stop_id in range(40):
+                rows.append(
+                    {
+                        "animal": f"a{s:03d}",
+                        "day": 1,
+                        "epoch": "01_r1",
+                        "stop_id": stop_id,
+                        "is_stay": int(rng.integers(0, 2)),
+                        "is_after_omission": int(rng.integers(0, 2)),
+                        # Constant across every stop ⇒ rank-deficient
+                        # design.
+                        "frac_on_last_rewarded": 0.5,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = fit_is_stay_pooled_gee(df, content_col="frac_on_last_rewarded")
+        assert result["status"] == "rank_deficient_design", (
+            f"status={result['status']!r}, beta_inter="
+            f"{result['beta_inter']}, se_inter={result['se_inter']}, "
+            f"p_inter={result['p_inter']} — a constant content_col "
+            "must be rejected before GEE fits a non-identifiable model."
+        )
+        # Coefficients/SEs/p-values must remain NaN — no fit happened.
+        for col in (
+            "beta_intercept",
+            "beta_outcome",
+            "beta_content",
+            "beta_inter",
+            "se_outcome",
+            "se_content",
+            "se_inter",
+            "p_outcome",
+            "p_content",
+            "p_inter",
+        ):
+            assert np.isnan(result[col]), (
+                f"{col}={result[col]} — should be NaN under "
+                "rank_deficient_design, otherwise a downstream "
+                "FDR loop could mistake it for a real fit."
+            )
