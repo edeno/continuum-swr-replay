@@ -39,8 +39,6 @@ import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
-from continuum_swr_replay.data_loaders import get_labels
-
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
 # classify_swr_overlap_geometry when comparing an event's duration to
 # the total duration of its SWR coverage.
@@ -127,7 +125,9 @@ def get_confident_times(
 
 
 def get_overlap_times(
-    non_local_times: pd.DataFrame, ripple_times: pd.DataFrame, results: xr.Dataset
+    non_local_times: pd.DataFrame,
+    ripple_times: pd.DataFrame,
+    results: xr.Dataset | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Find non-local events that overlap with ripple events.
 
@@ -138,9 +138,12 @@ def get_overlap_times(
         ``duration``, ``max_speed`` columns. From ``get_confident_times``.
     ripple_times : pd.DataFrame
         Ripple event intervals with ``start_time`` and ``end_time`` columns.
-    results : xr.Dataset
-        Decoding results; only the ``time`` coordinate is used for
-        computing temporal overlap via ``get_labels``.
+    results : xr.Dataset, optional
+        Unused (retained for backwards compatibility — the previous
+        implementation routed through ``get_labels``, which needed a
+        time index, but inclusive bin labeling counted boundary-touch
+        intervals as overlap; the strict positive-duration check below
+        no longer needs a time grid).
 
     Returns
     -------
@@ -151,24 +154,33 @@ def get_overlap_times(
         Subset of ``non_local_times`` that do not overlap with any ripple.
         Same columns as input.
 
+    Notes
+    -----
+    Boundary semantics: overlap requires positive-duration intersection.
+    A ripple ending exactly at the event's start (or starting exactly
+    at the event's end) shares zero duration with the event and is
+    classified as no-overlap. This matches
+    :func:`classify_swr_overlap` and avoids inflating SWR-coincident
+    counts on back-to-back intervals.
+
     """
-    non_local_labels = get_labels(non_local_times, results.time)
-    ripple_labels = get_labels(ripple_times, results.time)
+    del results  # see docstring — no longer needed.
 
-    overlap_non_local = non_local_labels.loc[
-        ripple_labels.event_number > 0
-    ].event_number.unique()
-    overlap_non_local = overlap_non_local[overlap_non_local > 0]
+    swr_starts = ripple_times["start_time"].to_numpy()
+    swr_ends = ripple_times["end_time"].to_numpy()
+    ev_starts = non_local_times["start_time"].to_numpy()
+    ev_ends = non_local_times["end_time"].to_numpy()
 
-    non_local_ind = np.arange(len(non_local_times))
+    # For each non-local event, True if any ripple has a strict
+    # positive-duration intersection. Vectorized via broadcasting:
+    # shape (n_events, n_ripples).
+    has_overlap = (
+        (swr_ends[None, :] > ev_starts[:, None])
+        & (swr_starts[None, :] < ev_ends[:, None])
+    ).any(axis=1)
 
-    overlap_non_local_times = non_local_times.iloc[
-        non_local_ind[np.isin(non_local_ind, overlap_non_local - 1)]
-    ]
-
-    no_overlap_non_local_times = non_local_times.iloc[
-        non_local_ind[~np.isin(non_local_ind, overlap_non_local - 1)]
-    ]
+    overlap_non_local_times = non_local_times.iloc[has_overlap]
+    no_overlap_non_local_times = non_local_times.iloc[~has_overlap]
 
     return overlap_non_local_times, no_overlap_non_local_times
 
@@ -217,20 +229,31 @@ def classify_swr_overlap(
     SWRs, it is labeled ``"swr_contained"`` as soon as any one SWR
     fully contains it; otherwise ``"swr_partial"``.
 
+    Boundary semantics: overlap requires *positive-duration* intersection.
+    A SWR ending exactly at the event's start time (or starting exactly
+    at the event's end time) shares zero positive duration with the event
+    and is treated as ``non_swr``. The previous form used inclusive
+    inequality (``>=`` / ``<=``) and silently labeled back-to-back
+    intervals as ``swr_partial``, inflating SWR-coincident counts.
+
     """
     classes: list[str] = []
     swr_starts = ripple_times["start_time"].to_numpy()
     swr_ends = ripple_times["end_time"].to_numpy()
 
     for ev in non_local_events.itertuples():
-        # Any SWR that overlaps this non-local event at all
-        overlap_mask = (swr_ends >= ev.start_time) & (
-            swr_starts <= ev.end_time
+        # Strict positive-duration overlap. Boundary contact
+        # (swr_end == event.start or swr_start == event.end) shares
+        # zero duration with the event and is excluded.
+        overlap_mask = (swr_ends > ev.start_time) & (
+            swr_starts < ev.end_time
         )
         if not overlap_mask.any():
             classes.append("non_swr")
             continue
-        # Any SWR that fully contains this non-local event?
+        # Any SWR that fully contains this non-local event? Boundary
+        # equality is allowed for containment (an SWR exactly aligned
+        # with the event still "contains" it).
         contained_mask = (
             overlap_mask
             & (swr_starts <= ev.start_time)
@@ -338,7 +361,10 @@ def classify_swr_overlap_geometry(
     event_has_non_swr_time_arr = np.zeros(n_events, dtype=bool)
 
     for i, ev in enumerate(non_local_events.itertuples()):
-        overlap_mask = (swr_ends >= ev.start_time) & (swr_starts <= ev.end_time)
+        # Strict positive-duration overlap (see ``classify_swr_overlap``
+        # for rationale): a SWR that only touches a boundary of the
+        # event shares zero duration and is not an overlap.
+        overlap_mask = (swr_ends > ev.start_time) & (swr_starts < ev.end_time)
         n_overlap = int(overlap_mask.sum())
         n_overlap_arr[i] = n_overlap
 

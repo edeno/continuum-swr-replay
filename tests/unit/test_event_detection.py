@@ -361,6 +361,57 @@ class TestGetOverlapTimes:
         assert len(overlap) == 2, "Events 1 and 3 should overlap"
         assert len(no_overlap) == 1, "Event 2 should not overlap"
 
+    def test_boundary_touch_at_event_end_is_not_overlap(self):
+        """Regression: a ripple starting exactly at the non-local
+        event's end shares zero positive duration with it. Pre-fix,
+        ``get_labels`` labeled the boundary timebin as inside both
+        intervals (inclusive) and ``get_overlap_times`` reported the
+        event as overlapping; post-fix uses strict positive-duration
+        intersection."""
+        time = np.arange(0.0, 4.01, 0.5)
+        non_local_times = pd.DataFrame({
+            "start_time": [1.0],
+            "end_time": [2.0],
+            "duration": [1.0],
+        }, index=pd.Index([1], name="event_number"))
+        ripple_times = pd.DataFrame({
+            "start_time": [2.0],
+            "end_time": [3.0],
+            "duration": [1.0],
+        })
+        results = self.create_mock_results(time)
+        overlap, no_overlap = get_overlap_times(
+            non_local_times, ripple_times, results
+        )
+        assert len(overlap) == 0, (
+            f"Boundary-touch ripple was reported as overlap "
+            f"(len(overlap)={len(overlap)}); ripple [2.0, 3.0] only "
+            "touches event [1.0, 2.0] at t=2.0 and shares zero "
+            "positive duration."
+        )
+        assert len(no_overlap) == 1
+
+    def test_boundary_touch_at_event_start_is_not_overlap(self):
+        """Mirror case: a ripple ending exactly at the non-local
+        event's start time."""
+        time = np.arange(0.0, 4.01, 0.5)
+        non_local_times = pd.DataFrame({
+            "start_time": [1.0],
+            "end_time": [2.0],
+            "duration": [1.0],
+        }, index=pd.Index([1], name="event_number"))
+        ripple_times = pd.DataFrame({
+            "start_time": [-1.0],
+            "end_time": [1.0],
+            "duration": [2.0],
+        })
+        results = self.create_mock_results(time)
+        overlap, no_overlap = get_overlap_times(
+            non_local_times, ripple_times, results
+        )
+        assert len(overlap) == 0
+        assert len(no_overlap) == 1
+
     def test_empty_ripple_times(self):
         """All events are non-overlapping when no ripples."""
         time = np.arange(0, 1.0, 0.002)
@@ -724,3 +775,45 @@ class TestClassifySwrOverlapGeometry:
                 f"Event {i}: geometry={geom.iloc[i]['overlap_class']}, "
                 f"classify={coarse.iloc[i]['overlap_class']}"
             )
+
+    def test_boundary_touch_at_event_end_is_no_overlap(self):
+        """Regression: a SWR starting exactly at the event's end
+        shares zero positive duration with the event. Pre-fix used
+        inclusive ``>=`` / ``<=`` and labeled this as
+        ``swr_partial`` / ``single_swr_partial``, inflating
+        SWR-coincident counts on back-to-back intervals."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(2.0, 3.0)])
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "non_swr", (
+            f"overlap_class={out['overlap_class']!r} on boundary "
+            "touch — SWR [2.0, 3.0] only contacts event [1.0, 2.0] "
+            "at t=2.0 and shares zero duration."
+        )
+        assert out["overlap_subclass"] == "no_overlap"
+        assert out["n_swrs_overlapping"] == 0
+        # And the coarse classifier must agree.
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "non_swr"
+
+    def test_boundary_touch_at_event_start_is_no_overlap(self):
+        """Mirror case: a SWR ending exactly at the event's start."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(-1.0, 1.0)])
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "non_swr"
+        assert out["overlap_subclass"] == "no_overlap"
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "non_swr"
+
+    def test_minimal_positive_overlap_still_partial(self):
+        """Sanity: any positive-duration overlap, however small, is
+        still ``swr_partial`` — the strict-inequality fix must not
+        also drop genuinely overlapping events."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(1.999, 3.0)])  # 1ms of real overlap
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "swr_partial"
+        assert out["overlap_subclass"] == "single_swr_partial"
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "swr_partial"
