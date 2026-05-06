@@ -24,6 +24,9 @@ from continuum_swr_replay.analysis.replay.choice_prediction import (
 from continuum_swr_replay.analysis.replay.switch_analysis import (
     stop_patch_replay,
 )
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_patch_table,
+)
 
 
 def _two_session_event_arm_table_colliding_event_ids() -> pd.DataFrame:
@@ -98,6 +101,32 @@ class TestStopPatchReplayPrecondition:
         )
         with pytest.raises(ValueError, match="globally unique across sessions"):
             stop_patch_replay(eat, et)
+
+
+class TestBuildEventPatchTablePrecondition:
+    def test_session_local_event_ids_raise(self):
+        # Two sessions, both reusing event_id=1. Without the
+        # precondition, the per-(event_id, patch) groupby silently
+        # fuses across sessions and the merges to event_table
+        # produce a Cartesian product (a tiny repro produced 48 rows
+        # instead of 6).
+        eat = _two_session_event_arm_table_colliding_event_ids()
+        # Add an arm_count_hard column the patch table aggregates.
+        eat["arm_count_hard"] = 1.0
+        eat["is_same_patch"] = 0
+        eat["visit_recency"] = 0.0
+        eat["cumulative_reward"] = 0.0
+        et = (
+            eat[["animal", "day", "epoch", "event_id"]]
+            .drop_duplicates()
+            .assign(
+                last_rewarded_arm=np.nan,
+                prev_patch=np.nan,
+                is_after_switch=0,
+            )
+        )
+        with pytest.raises(ValueError, match="globally unique across sessions"):
+            build_event_patch_table(et, eat)
 
 
 class TestPreconditionPassesOnUniqueIds:

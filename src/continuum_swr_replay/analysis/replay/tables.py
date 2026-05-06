@@ -1074,6 +1074,23 @@ def build_event_patch_table(
         ``is_current_patch``, ``is_last_rewarded_patch``,
         ``cumulative_reward_patch``, ``visit_recency_patch``.
     """
+    # All groupbys / merges below key on ``event_id`` only. If a
+    # caller passes session-local IDs (event_id=1 in two sessions),
+    # the per-(event_id, patch) groupby silently fuses the two
+    # sessions' arm counts and the merges to ``event_table`` then
+    # produce a Cartesian product (a tiny two-session repro produced
+    # 48 rows instead of the expected 6 session-patch rows). Mirror
+    # the precondition already enforced in ``predict_arm_fractions``,
+    # ``build_choice_dataset``, and ``stop_patch_replay``.
+    from .choice_prediction import _require_session_unique_ids
+
+    _require_session_unique_ids(
+        event_arm_table, "event_id", helper_name="build_event_patch_table"
+    )
+    _require_session_unique_ids(
+        event_table, "event_id", helper_name="build_event_patch_table"
+    )
+
     eat = event_arm_table.copy()
     eat["patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
 

@@ -185,6 +185,19 @@ def _process_session(
         except Exception as e:  # noqa: BLE001
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
 
+    # Build the stop table first so zero-event sessions still
+    # contribute their immobility bouts. Returning early on an empty
+    # event_table dropped those sessions, contradicting the
+    # ``stop_table_{source}_{brain_area}.pkl`` contract that
+    # documents zero-event bouts as part of the canonical output.
+    stop_table = build_contfrag_stop_table(
+        dot,
+        trials,
+        track_graph,
+        event_source=event_source,
+        brain_area=brain_area,
+    )
+
     event_table = build_contfrag_event_table(
         dot,
         env,
@@ -194,8 +207,6 @@ def _process_session(
         brain_area=brain_area,
         conditional_posterior=posterior,
     )
-    if len(event_table) == 0:
-        return None
 
     event_arm_table = build_contfrag_event_arm_table(
         event_table,
@@ -206,14 +217,6 @@ def _process_session(
         event_source=event_source,
         brain_area=brain_area,
         conditional_posterior=posterior,
-    )
-
-    stop_table = build_contfrag_stop_table(
-        dot,
-        trials,
-        track_graph,
-        event_source=event_source,
-        brain_area=brain_area,
     )
 
     # Stamp brain_area onto every output row. The canonical event_id /

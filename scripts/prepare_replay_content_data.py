@@ -144,13 +144,19 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
         except Exception as e:  # noqa: BLE001 - surface the reason and keep going
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
 
+    # Build the stop table first — it's a function of immobility
+    # bouts, not non-local events, and the documented
+    # ``stop_table.pkl`` contract (this script's own docstring; the
+    # builder's "**including zero-event bouts**" promise) keeps
+    # zero-event sessions in the dataset. Returning early on an
+    # empty event_table dropped those sessions silently and broke
+    # the downstream rate model, which models n_events per stop
+    # over a denominator that *must* include zero-event stops.
+    stop_table = build_stop_table(dot, trials, track_graph)
+
     event_table = build_event_table(
         dot, env, trials, track_graph, conditional_posterior=posterior
     )
-    if len(event_table) == 0:
-        return None
-
-    stop_table = build_stop_table(dot, trials, track_graph)
     event_arm_table = build_event_arm_table(
         event_table,
         dot,
@@ -161,7 +167,7 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
     )
     event_sequence_table = (
         build_event_sequence_table(dot, env, posterior)
-        if posterior is not None
+        if posterior is not None and len(event_table) > 0
         else None
     )
 
