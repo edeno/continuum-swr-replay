@@ -239,3 +239,17 @@ class TestNextArmCircularShift:
         events = self._events(10, with_next_arm=True).drop(columns=["is_stay"])
         out = next_arm_circular_shift(events, rng=np.random.default_rng(0))
         assert "is_stay" not in out.columns
+
+    def test_raises_on_multi_session_input(self):
+        """Direct helper calls must not roll labels across sessions."""
+        events = pd.DataFrame(
+            {
+                "animal": ["a", "a", "b", "b"],
+                "day": [1, 1, 1, 1],
+                "epoch": ["02_r1", "02_r1", "02_r1", "02_r1"],
+                "event_midpoint_time": [0.0, 1.0, 0.5, 1.5],
+                "next_arm": [0, 1, 2, 3],
+            }
+        )
+        with pytest.raises(ValueError, match="sessions"):
+            next_arm_circular_shift(events, rng=np.random.default_rng(0))

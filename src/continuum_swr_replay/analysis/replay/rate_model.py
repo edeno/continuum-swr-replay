@@ -101,6 +101,8 @@ def fit_rate_model(
     coefs = dict(zip(col_names, result.params, strict=True))
     bse = dict(zip(col_names, result.bse, strict=True))
     pvals = dict(zip(col_names, result.pvalues, strict=True))
+    n_params = len(col_names)
+    bic_llf = n_params * np.log(len(df)) - 2 * float(result.llf)
 
     output = {
         **{f"coef_{k}": float(v) for k, v in coefs.items()},
@@ -109,10 +111,10 @@ def fit_rate_model(
         **{f"rr_{k}": float(np.exp(v)) for k, v in coefs.items()},
         "n_stops": len(df),
         "n_events_total": int(y.sum()),
-        "n_params": len(col_names),
+        "n_params": n_params,
         "llf": float(result.llf),
         "aic": float(result.aic),
-        "bic": float(result.bic),
+        "bic": float(bic_llf),
         "deviance": float(result.deviance),
         "pearson_chi2": float(result.pearson_chi2),
         "mean_rate": float(y.sum() / np.exp(offset).sum()),

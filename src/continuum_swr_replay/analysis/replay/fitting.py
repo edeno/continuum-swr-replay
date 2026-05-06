@@ -187,7 +187,13 @@ def fit_null_model_conditional(
     dict
         Null model fit statistics with 0 parameters.
     """
-    event_totals = long_df.groupby(event_col)[response_col].sum()
+    df = long_df[[event_col, response_col]].copy()
+    has_nan = df[[event_col, response_col]].isna().any(axis=1)
+    events_with_nan = df.loc[has_nan, event_col].unique()
+    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    df = _drop_zero_count_events(df, event_col, response_col)
+
+    event_totals = df.groupby(event_col)[response_col].sum()
     n_events = len(event_totals)
 
     # ℓ₀ = -Σ_e L_e · log(|A_e|)
@@ -196,7 +202,7 @@ def fit_null_model_conditional(
 
     return {
         "n_events": n_events,
-        "n_rows": len(long_df),
+        "n_rows": len(df),
         "n_params": 0,
         "llf": float(llf),
         "llf_null": float(llf),
@@ -242,7 +248,9 @@ def fit_conditional_logit(
     if missing:
         return None
 
-    df = long_df[required].copy()
+    arm_col = "arm" if "arm" in long_df.columns else "arm_id" if "arm_id" in long_df.columns else None
+    select_cols = required + ([arm_col] if arm_col is not None else [])
+    df = long_df[select_cols].copy()
 
     # Event-wise NaN filtering: drop entire events if any row has NaN,
     # consistent with fit_conditional_poisson.
@@ -252,8 +260,18 @@ def fit_conditional_logit(
 
     df = _drop_zero_count_events(df, event_col, response_col)
 
-    # Determine dominant arm per event
-    idx = df.groupby(event_col)[response_col].idxmax()
+    # Determine dominant arm per event. Break ties by the lowest arm id
+    # when an arm column is available; otherwise fall back to pandas'
+    # first-row idxmax behavior for minimal legacy inputs.
+    if arm_col is not None:
+        idx = (
+            df.sort_values([event_col, response_col, arm_col], ascending=[True, False, True])
+            .groupby(event_col, sort=False)
+            .head(1)
+            .index
+        )
+    else:
+        idx = df.groupby(event_col)[response_col].idxmax()
     df["dominant"] = 0
     df.loc[idx, "dominant"] = 1
     y = df["dominant"].values

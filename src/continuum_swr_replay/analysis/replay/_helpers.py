@@ -65,6 +65,14 @@ def add_trial_context(
             dot[col] = np.nan
         return dot
 
+    # ``np.searchsorted`` below assumes ``trial_start_times`` /
+    # ``reward_timestamps`` are non-decreasing. The local data-loader
+    # path produces sorted trials, but Spyglass-loaded or manually
+    # passed frames are not protected — sort defensively so
+    # ``current_well`` / ``last_rewarded_well`` never silently drift
+    # from the true chronological order.
+    trials = trials.sort_values("start_time").reset_index(drop=True)
+
     trial_start_times = trials["start_time"].values
     trial_end_times = trials["end_time"].values
     to_wells = trials["to_well"].values
@@ -395,6 +403,10 @@ def visit_recency_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
+    # ``np.searchsorted`` below assumes ``end_times`` is non-decreasing.
+    # Sort defensively so chronological-order assumptions hold for any
+    # caller (Spyglass-loaded frames are not guaranteed to be sorted).
+    trials = trials.sort_values("end_time").reset_index(drop=True)
     end_times = trials["end_time"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
 
@@ -456,6 +468,8 @@ def cumulative_reward_all_events(
     if n_trials_total == 0:
         return np.zeros((n_events, n_arms))
 
+    # Sort defensively (see ``visit_recency_all_events`` for context).
+    trials = trials.sort_values("end_time").reset_index(drop=True)
     end_times = trials["end_time"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(bool)
@@ -501,6 +515,8 @@ def recent_reward_rate_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
+    # Sort defensively (see ``visit_recency_all_events`` for context).
+    trials = trials.sort_values("end_time").reset_index(drop=True)
     end_times = trials["end_time"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(float)

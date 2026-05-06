@@ -81,6 +81,16 @@ _PATCH_TO_TRUNK_ARM: dict[int, int] = {1: 6, 2: 7, 3: 8}
 _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
 
 
+def _session_keys(df: pd.DataFrame) -> list[str]:
+    """Session-key columns present in ``df``."""
+    return [c for c in ("animal", "day", "epoch") if c in df.columns]
+
+
+def _empty_metric_frame(df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
+    """Empty metric frame preserving available session keys."""
+    return pd.DataFrame(columns=[*_session_keys(df), "event_id", metric_col])
+
+
 def arm_path_well_to_well(current_arm: int, next_arm: int) -> set[int]:
     """Set of arm IDs traversed on the geometric path between two wells.
 
@@ -143,7 +153,7 @@ def chosen_arm_fraction(
         present in ``event_table``.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "chosen_arm_fraction"])
+        return _empty_metric_frame(event_table, "chosen_arm_fraction")
     ev = event_table.dropna(subset=["next_arm"]).copy()
     ev["next_arm"] = ev["next_arm"].astype(int)
 
@@ -181,7 +191,7 @@ def ends_at_next(
         columns are passed through if present.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "ends_at_next"])
+        return _empty_metric_frame(event_table, "ends_at_next")
     ev = event_table.dropna(subset=["next_arm"]).copy()
     ev["next_arm"] = ev["next_arm"].astype(int)
 
@@ -223,7 +233,7 @@ def contains_path_to_next(
         Session-key columns are passed through if present.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "contains_path_to_next"])
+        return _empty_metric_frame(event_table, "contains_path_to_next")
     ev = event_table.dropna(subset=["current_arm", "next_arm"]).copy()
     ev["current_arm"] = ev["current_arm"].astype(int)
     ev["next_arm"] = ev["next_arm"].astype(int)
@@ -286,7 +296,7 @@ def chosen_patch_fraction(
         columns passed through.
     """
     if event_table.empty or "next_patch" not in event_table.columns:
-        return pd.DataFrame(columns=["event_id", "chosen_patch_fraction"])
+        return _empty_metric_frame(event_table, "chosen_patch_fraction")
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
@@ -300,9 +310,16 @@ def chosen_patch_fraction(
     merged["_mass"] = merged["arm_fraction"].astype(float).where(in_target_patch, 0.0)
 
     grp_cols = [*sess_keys, "event_id"]
+    # Use ``skipna=False`` so an event whose target-patch arms have
+    # any NaN ``arm_fraction`` propagates NaN. The default
+    # ``.sum()`` is ``skipna=True``, which combined with the
+    # explicit 0.0 on non-target arms silently fabricates
+    # ``chosen_patch_fraction = 0.0`` from a missing-data event —
+    # downstream consumers cannot tell "no replay on the chosen
+    # patch" from "we don't know".
     out = (
         merged.groupby(grp_cols, as_index=False)["_mass"]
-        .sum()
+        .agg(lambda s: s.sum(skipna=False))
         .rename(columns={"_mass": "chosen_patch_fraction"})
     )
     return out
@@ -327,7 +344,7 @@ def ends_at_next_patch(
         Session-key columns passed through.
     """
     if event_table.empty or "next_patch" not in event_table.columns:
-        return pd.DataFrame(columns=["event_id", "ends_at_next_patch"])
+        return _empty_metric_frame(event_table, "ends_at_next_patch")
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 

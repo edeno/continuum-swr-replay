@@ -333,25 +333,50 @@ def stop_patch_replay(
     eat["_frac_cp"] = eat[fraction_col] * is_cp
     eat["_frac_nc"] = eat[fraction_col] * (1 - is_cp)
 
-    event_agg = eat.groupby(["stop_id", "event_id"]).agg(
-        replay_frac_current_patch=("_frac_cp", "sum"),
-        replay_frac_noncurrent=("_frac_nc", "sum"),
+    # Per-event sums use ``skipna=False`` so an event with any NaN
+    # arm fraction (or NaN residual) propagates NaN to the per-event
+    # value instead of pandas' default skip-NaN behavior, which
+    # silently fabricates a real zero from missing data. The
+    # per-stop mean below uses the same strict semantics so a stop
+    # containing any contaminated event surfaces NaN to downstream
+    # consumers (matching the contract enforced in
+    # ``build_residualized_choice_dataset``).
+    event_agg = pd.DataFrame(
+        {
+            "replay_frac_current_patch": (
+                eat.groupby(["stop_id", "event_id"])["_frac_cp"]
+                .apply(lambda s: s.sum(skipna=False))
+            ),
+            "replay_frac_noncurrent": (
+                eat.groupby(["stop_id", "event_id"])["_frac_nc"]
+                .apply(lambda s: s.sum(skipna=False))
+            ),
+        }
     )
 
-    # Average across events within each stop
-    result = event_agg.groupby("stop_id")[
-        ["replay_frac_current_patch", "replay_frac_noncurrent"]
-    ].mean()
+    # Average across events within each stop, NaN-aware.
+    result = (
+        event_agg.groupby("stop_id")[
+            ["replay_frac_current_patch", "replay_frac_noncurrent"]
+        ]
+        .agg(lambda s: s.mean(skipna=False))
+    )
 
     # Residualized version if available
     if "residual_frac" in eat.columns:
         eat["_resid_nc"] = eat["residual_frac"] * (1 - is_cp)
-        event_resid = eat.groupby(["stop_id", "event_id"]).agg(
-            replay_frac_residual_noncurrent=("_resid_nc", "sum"),
+        event_resid = (
+            eat.groupby(["stop_id", "event_id"])["_resid_nc"]
+            .apply(lambda s: s.sum(skipna=False))
+            .rename("replay_frac_residual_noncurrent")
+            .to_frame()
         )
-        resid_agg = event_resid.groupby("stop_id")[
-            ["replay_frac_residual_noncurrent"]
-        ].mean()
+        resid_agg = (
+            event_resid.groupby("stop_id")["replay_frac_residual_noncurrent"]
+            .apply(lambda s: s.mean(skipna=False))
+            .rename("replay_frac_residual_noncurrent")
+            .to_frame()
+        )
         result = result.join(resid_agg)
 
     return result

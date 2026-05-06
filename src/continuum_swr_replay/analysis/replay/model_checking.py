@@ -70,6 +70,19 @@ def cross_validate_conditional_poisson(
     if len(df) == 0:
         return None
 
+    # Drop zero-count events to match ``fit_conditional_poisson`` (and
+    # the fitter script's pre-filter). The conditional likelihood is
+    # 0 / 0 for events whose response sums to zero; without this the
+    # null-fold LL counts those events in ``n_test_events`` and the
+    # per-event mean drifts (we verified a single zero-count event
+    # shifts ``cv_ll_per_event_mean`` from -2.7465 to -3.2958 while
+    # the per-timebin LL stays identical).
+    from .fitting import _drop_zero_count_events
+
+    df = _drop_zero_count_events(df, event_col, response_col)
+    if len(df) == 0:
+        return None
+
     groups = df[event_col].values
     unique_events = np.unique(groups)
     n_events = len(unique_events)

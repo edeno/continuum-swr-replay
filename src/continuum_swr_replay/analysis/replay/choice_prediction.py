@@ -114,16 +114,36 @@ def predict_arm_fractions(
         eat, event_col, helper_name="predict_arm_fractions"
     )
 
+    # Event-wise NaN filtering matches ``fit_conditional_poisson``:
+    # if any predictor (or the observed fraction) is NaN for any
+    # arm in an event, drop the entire event from the prediction so
+    # the softmax doesn't normalize over a partial choice set. The
+    # event's rows still appear in the output, but with
+    # ``predicted_frac`` and ``residual_frac`` set to NaN — that
+    # keeps row alignment intact for downstream merges while
+    # preventing residuals from being constructed against a
+    # contaminated softmax.
+    required_cols = list(predictors) + [fraction_col]
+    has_nan = eat[required_cols].isna().any(axis=1)
+    events_with_nan = eat.loc[has_nan, event_col].unique()
+    is_dropped = eat[event_col].isin(events_with_nan)
+
     params = np.array([fit_result[f"coef_{p}"] for p in predictors])
     X = eat[predictors].values.astype(float)
     eta = X @ params
 
     # Numerically stable softmax within each event
     eat["_eta"] = eta
+    # Mask dropped events out of max/sum so the softmax of any
+    # surviving event is computed only over its valid rows. (This
+    # is equivalent to dropping events entirely; we keep them in
+    # the frame so callers don't have to re-key on event_id.)
+    eat.loc[is_dropped, "_eta"] = np.nan
     max_eta = eat.groupby(event_col)["_eta"].transform("max")
     eat["_shifted_exp"] = np.exp(eat["_eta"] - max_eta)
     sum_shifted = eat.groupby(event_col)["_shifted_exp"].transform("sum")
     eat["predicted_frac"] = eat["_shifted_exp"] / sum_shifted
+    eat.loc[is_dropped, "predicted_frac"] = np.nan
 
     eat["residual_frac"] = eat[fraction_col] - eat["predicted_frac"]
 
@@ -167,10 +187,17 @@ def build_residualized_choice_dataset(
         event_arm_table, content_fit, content_predictors, fraction_col=fraction_col
     )
 
-    # Aggregate residual_frac to stop × arm level.
+    # Aggregate residual_frac to stop × arm level. Use a NaN-aware
+    # mean (``skipna=False``) so a stop containing ANY event whose
+    # ``predict_arm_fractions`` dropped (NaN residual) propagates
+    # NaN through to the stop-level value. A bare ``mean()`` would
+    # silently average over the surviving events and reintroduce a
+    # partial-event aggregate — the same contamination
+    # ``predict_arm_fractions`` was just hardened against.
     stop_arm_resid = (
-        eat_resid.groupby(["stop_id", "arm"])
-        .agg(replay_frac_residual=("residual_frac", "mean"))
+        eat_resid.groupby(["stop_id", "arm"])["residual_frac"]
+        .apply(lambda s: s.mean(skipna=False))
+        .rename("replay_frac_residual")
         .reset_index()
     )
 
@@ -185,7 +212,14 @@ def build_residualized_choice_dataset(
         on=["stop_id", "arm"],
         how="left",
     )
-    choice_df["replay_frac_residual"] = choice_df["replay_frac_residual"].fillna(0.0)
+    # Do NOT ``fillna(0.0)`` — that fabricates a real zero from
+    # missing data and defeats the event-wise NaN filter in
+    # ``predict_arm_fractions``. Downstream ``fit_choice_model``
+    # already drops any stop with a NaN required predictor, so
+    # propagating NaN here is what makes the filter end-to-end.
+    # Stops whose events were ALL filtered will have NaN
+    # ``replay_frac_residual`` for every arm and be dropped at
+    # fit time.
 
     return choice_df
 
@@ -354,7 +388,16 @@ def fit_choice_model(
         logger.error("Missing columns: %s", missing)
         return None
 
-    df = choice_df[required].dropna().copy()
+    # Drop the whole stop if any required column is NaN on any of its
+    # rows. A bare ``.dropna()`` would silently shrink the choice set
+    # for that stop (e.g. 9 candidate arms → 7), so the conditional
+    # logit's normalization runs over a partial set and "chosen" can
+    # be ambiguous (1 of 7 vs 1 of 9). Mirrors the event-wise NaN
+    # filtering in ``fit_conditional_poisson``.
+    df = choice_df[required].copy()
+    has_nan = df.isna().any(axis=1)
+    bad_stops = df.loc[has_nan, stop_col].unique()
+    df = df[~df[stop_col].isin(bad_stops)].reset_index(drop=True)
 
     # Drop stops where no arm is chosen (shouldn't happen after
     # build_choice_dataset, but defensive).

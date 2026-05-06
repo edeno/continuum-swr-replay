@@ -368,6 +368,27 @@ class TestComputeRetrospectiveMetrics:
         assert bool(out.loc[2, "ends_at_next"]) is True
         assert bool(out.loc[2, "contains_path_to_next"]) is True
 
+    def test_empty_schema_complete_inputs_return_empty_metrics(self):
+        ev = pd.DataFrame(
+            columns=[
+                "animal", "day", "epoch", "event_id", "current_arm",
+                "next_arm", "next_patch",
+            ]
+        )
+        ea = pd.DataFrame(
+            columns=["animal", "day", "epoch", "event_id", "arm", "arm_fraction"]
+        )
+        es = pd.DataFrame(
+            columns=[
+                "animal", "day", "epoch", "event_id", "t_in_event",
+                "decoded_arm_map",
+            ]
+        )
+
+        out = compute_retrospective_metrics(ev, ea, es)
+        assert out.empty
+        assert {"animal", "day", "epoch", "event_id"}.issubset(out.columns)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # retrospective_alignment_with_shuffle

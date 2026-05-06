@@ -95,9 +95,14 @@ def _per_event_best_arm(
     valid = well_only.dropna(subset=["recent_reward_rate"])
     if valid.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "best_arm"])
-    idx = valid.groupby([*sess_keys, "event_id"])["recent_reward_rate"].idxmax()
-    best = valid.loc[idx, [*sess_keys, "event_id", "arm"]].rename(
-        columns={"arm": "best_arm"}
+    best = (
+        valid.sort_values(
+            [*sess_keys, "event_id", "recent_reward_rate", "arm"],
+            ascending=[True, True, True, True, False, True],
+        )
+        .groupby([*sess_keys, "event_id"], sort=False)
+        .head(1)[[*sess_keys, "event_id", "arm"]]
+        .rename(columns={"arm": "best_arm"})
     )
     return best.reset_index(drop=True)
 

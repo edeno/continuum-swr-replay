@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay import fitting as fitting_mod
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -84,3 +85,77 @@ def test_fit_conditional_poisson_filters_zero_count_events():
     result = fit_conditional_poisson(long_df, predictors=["is_prev"])
     assert result is not None
     assert result["n_events"] == 5
+
+
+def test_null_model_filters_zero_count_events_like_non_null_model():
+    """M0 must use the same non-degenerate event set as M1+.
+
+    Otherwise M0/M1 comparisons see mismatched ``n_events`` and
+    correctly invalidate every metric, even though the caller supplied
+    the same input table to both fits.
+    """
+    long_df = _make_long_df(
+        event_arm_counts=[
+            [0, 0, 0],
+            [3, 1, 0],
+            [0, 2, 1],
+            [2, 0, 1],
+            [1, 1, 2],
+            [4, 1, 0],
+        ]
+    )
+    null = fit_conditional_poisson(long_df, predictors=[], n_categories=3)
+    child = fit_conditional_poisson(long_df, predictors=["is_prev"], n_categories=3)
+    assert null["n_events"] == child["n_events"] == 5
+    assert null["n_rows"] == 15
+
+
+def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
+    """Dominant-arm robustness fit should not depend on row order."""
+    long_df = _make_long_df(
+        event_arm_counts=[
+            [2, 2, 0],
+            [3, 1, 0],
+            [0, 2, 1],
+            [2, 0, 1],
+            [1, 1, 2],
+            [4, 1, 0],
+        ],
+        predictor_values=[
+            [0.0, 1.0, 0.0],  # event 1 tie: arm 0 should be dominant
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+        ],
+    )
+    # Put tied arm 1 before tied arm 0; first-row idxmax would choose arm 1.
+    event1 = long_df[long_df["event_id"] == 1].iloc[[1, 0, 2]]
+    rest = long_df[long_df["event_id"] != 1]
+    long_df = pd.concat([event1, rest], ignore_index=True)
+
+    captured: dict[str, np.ndarray] = {}
+
+    class FakeConditionalLogit:
+        def __init__(self, y, X, groups):
+            captured["y"] = np.asarray(y)
+            captured["groups"] = np.asarray(groups)
+
+        def fit(self, disp=0):
+            class Result:
+                params = np.array([0.0])
+                bse = np.array([1.0])
+                pvalues = np.array([1.0])
+                llf = -1.0
+
+            return Result()
+
+    monkeypatch.setattr(fitting_mod, "ConditionalLogit", FakeConditionalLogit)
+
+    result = fit_conditional_logit(long_df, predictors=["is_prev"])
+    assert result is not None
+    event1_y = captured["y"][captured["groups"] == 1]
+    # Event 1 rows are ordered arm 1, arm 0, arm 2. Lowest-arm tie-break
+    # should therefore mark the second row, not the first.
+    np.testing.assert_array_equal(event1_y, np.array([0, 1, 0]))

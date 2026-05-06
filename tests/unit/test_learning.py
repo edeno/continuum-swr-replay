@@ -231,6 +231,52 @@ class TestStopReplaySummary:
         assert row["frac_on_current_swr"] == pytest.approx(0.80)
         assert row["frac_on_current_non_swr"] == pytest.approx(0.10)
 
+    def test_best_arm_ties_break_by_lowest_arm_id(self):
+        """Best-arm lookup should be deterministic, not row-order dependent."""
+        ev, ea, st = _make_tables(
+            events=[
+                {
+                    "stop_id": 1,
+                    "event_id": 100,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    # Arm 5 appears first below and has larger replay mass,
+                    # but arm 0 ties it on recent_reward_rate and should win.
+                    "arm_fracs": [0.10, 0.0, 0.0, 0.0, 0.0, 0.90, 0.0, 0.0, 0.0],
+                    "rrr": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, np.nan, np.nan, np.nan],
+                },
+            ],
+            stops=[
+                {
+                    "stop_id": 1,
+                    "current_arm": 0,
+                    "prev_arm": 1,
+                    "last_rewarded_arm": 1,
+                    "is_after_reward": 0,
+                    "is_after_omission": 0,
+                    "is_after_stay": 0,
+                    "is_after_switch": 0,
+                    "is_stay": 1,
+                    "is_swr_stop": False,
+                    "is_mua_stop": False,
+                    "n_events": 1,
+                    "immobility_time": 5.0,
+                },
+            ],
+        )
+        event100 = ea[ea["event_id"] == 100]
+        ea = pd.concat(
+            [
+                event100[event100["arm"] == 5],
+                event100[event100["arm"] != 5],
+            ],
+            ignore_index=True,
+        )
+
+        out = stop_replay_summary(st, ev, ea)
+        assert out["frac_on_best"].iloc[0] == pytest.approx(0.10)
+
 
 # ─────────────────────────────────────────────────────────────────────
 # fit_is_stay_logistic_per_session

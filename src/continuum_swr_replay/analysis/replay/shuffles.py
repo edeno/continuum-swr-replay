@@ -180,6 +180,16 @@ def next_arm_circular_shift(
     """
     if rng is None:
         rng = np.random.default_rng()
+    session_cols = ["animal", "day", "epoch"]
+    available = [c for c in session_cols if c in event_table.columns]
+    if available:
+        n_sessions = event_table[available].drop_duplicates().shape[0]
+        if n_sessions > 1:
+            raise ValueError(
+                f"next_arm_circular_shift received {n_sessions} sessions; "
+                "pass one session at a time to avoid cross-session label "
+                "contamination."
+            )
     out = event_table.sort_values("event_midpoint_time").copy()
     n = len(out)
     if n < 2:

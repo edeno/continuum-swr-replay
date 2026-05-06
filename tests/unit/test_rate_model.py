@@ -87,6 +87,13 @@ class TestInterceptOnlyRecovery:
             np.exp(fit["coef_intercept"])
         )
 
+    def test_bic_uses_log_likelihood_formula(self):
+        """BIC should be on the same LLF scale as AIC/model comparisons."""
+        df = _simulate_stops(n_stops=100, log_intercept=np.log(1.0), seed=0)
+        fit = fit_rate_model(df, predictors=[])
+        expected = fit["n_params"] * np.log(fit["n_stops"]) - 2 * fit["llf"]
+        assert fit["bic"] == pytest.approx(expected)
+
 
 # ── Coefficient recovery with predictors ──
 
