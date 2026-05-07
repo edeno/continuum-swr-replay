@@ -6,8 +6,10 @@ data pipeline (``build_choice_dataset`` →
 fit (``fit_choice_model``) all live in this module. Pin the
 invariants:
 
-- ``build_choice_dataset``: 8-arm choice sets, exactly one chosen
-  arm per stop, current_arm always excluded, NaN-current_arm filter
+- ``build_choice_dataset``: well-arms-only choice sets (5 arms after
+  removing current_arm; trunk arms 6/7/8 excluded because they can
+  never be next_arm), exactly one chosen arm per stop, current_arm
+  always excluded, NaN-current_arm filter
 - ``predict_arm_fractions``: predictions sum to 1 per event, residual
   has the right sign, numerically-stable softmax handles large logits
 - ``build_residualized_choice_dataset``: residual column merged on
@@ -451,19 +453,22 @@ class TestBuildResidualizedChoiceDataset:
 class TestFitChoiceModel:
     def _choice_df_for_fit(self, n_stops=20, *, beta_replay=2.0, seed=0):
         """Generate a choice dataset where replay_frac is correlated
-        with the chosen arm. Each stop has 8 candidate arms; the
-        chosen arm is sampled from a softmax over replay_frac with
-        coefficient ``beta_replay``."""
+        with the chosen arm. Each stop has 5 candidate arms (matches
+        production: well arms 0-5 minus current_arm). The chosen arm
+        is sampled from a softmax over replay_frac with coefficient
+        ``beta_replay``."""
         rng = np.random.default_rng(seed)
+        well_arms = (0, 1, 2, 3, 4, 5)
+        n_alts = len(well_arms) - 1  # 5 — well arms minus current_arm
         rows = []
         for stop_id in range(1, n_stops + 1):
-            arms = rng.choice(9, size=8, replace=False)
-            replay_frac = rng.uniform(0, 1, size=8)
+            arms = rng.choice(well_arms, size=n_alts, replace=False)
+            replay_frac = rng.uniform(0, 1, size=n_alts)
             replay_frac /= replay_frac.sum()  # normalize
             logits = beta_replay * replay_frac
             probs = np.exp(logits - logits.max())
             probs /= probs.sum()
-            chosen_idx = rng.choice(8, p=probs)
+            chosen_idx = rng.choice(n_alts, p=probs)
             for i, arm in enumerate(arms):
                 rows.append({
                     "stop_id": stop_id,

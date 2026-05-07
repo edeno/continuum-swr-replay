@@ -35,8 +35,10 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times : NDArray, shape (n_spikes,)
         Spike times in seconds.
     time : NDArray, shape (n_time_bins,)
-        Time bin centers in seconds (e.g., from position_info.index).
-        Spike ``s`` is assigned to bin ``i`` where
+        Time bin starts (left edges) in seconds — i.e. each ``time[i]``
+        is the start of bin ``i``, not its center. Matches the
+        sample-bin-start convention used by the data loader's
+        multiunit pipeline. Spike ``s`` is assigned to bin ``i`` where
         ``time[i] <= s < time[i+1]``; spikes at exactly ``time[-1]``
         fall in the last bin.
 

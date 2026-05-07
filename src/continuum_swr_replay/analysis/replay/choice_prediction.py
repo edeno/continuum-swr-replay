@@ -281,9 +281,10 @@ def build_choice_dataset(
     """
     # Stops with replay, a valid next choice, and a defined current arm.
     # current_arm is required so the ``arm != current_arm`` exclusion
-    # below removes exactly one arm from the 9-arm candidate set; when
-    # current_arm is NaN the comparison evaluates True for every arm
-    # (IEEE 754), silently inflating the choice set to 9 arms for those
+    # below removes exactly one arm from the WELL_ARMS candidate set
+    # (5 alternatives after the well-arm filter); when current_arm is
+    # NaN the comparison evaluates True for every arm (IEEE 754),
+    # silently inflating the choice set to all 6 well arms for those
     # stops.
     # Both inputs are aggregated by stop_id later, which produces
     # session-mixing means / drops if stop_id repeats across sessions.
