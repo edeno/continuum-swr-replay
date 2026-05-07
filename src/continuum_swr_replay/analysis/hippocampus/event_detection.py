@@ -124,6 +124,82 @@ def get_confident_times(
     )
 
 
+def event_strict_overlap_keys(
+    data_over_time: pd.DataFrame,
+    primary_col: str,
+    other_col: str,
+    *,
+    session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
+    other_data: pd.DataFrame | None = None,
+) -> set[tuple]:
+    """Per-(session, primary_id) keys whose interval strictly overlaps any other event.
+
+    For each event of ``primary_col`` (id > 0) in each session, derive
+    its [first, last] timestamp interval from the timebin labels and
+    test strict positive-duration overlap against every event of
+    ``other_col`` in the same session. Returns the set of
+    ``(*session_cols, primary_id)`` tuples that pass the strict-overlap
+    test.
+
+    Pass ``other_data`` to draw ``other_col`` bounds from a different
+    frame than the primary (e.g. immobility-filtered ``a_data`` for
+    primary, raw ``data_over_time`` for other). Defaults to using
+    ``data_over_time`` for both sides.
+
+    Why this exists: the inclusive timebin labels written by
+    :func:`continuum_swr_replay.data_loaders.utils.get_labels` make a
+    boundary timestamp visible to BOTH events when their intervals
+    touch (event_a end == event_b start). The label-based
+    ``(g[other_col] > 0).any()`` overlap check then counts boundary
+    contact as overlap, conflicting with the strict positive-duration
+    semantics enforced by :func:`classify_swr_overlap` and
+    :func:`get_overlap_times`. This helper yields the strict-semantic
+    counterpart usable wherever per-event overlap with another
+    detector is needed.
+    """
+    sess = list(session_cols)
+
+    def _bounds(df: pd.DataFrame, ec: str) -> pd.DataFrame:
+        active = df[df[ec] > 0]
+        if len(active) == 0:
+            return pd.DataFrame(columns=[*sess, ec, "_start", "_end"])
+        return (
+            active.reset_index(names="_t")
+            .groupby([*sess, ec])
+            .agg(_start=("_t", "min"), _end=("_t", "max"))
+            .reset_index()
+        )
+
+    p_bounds = _bounds(data_over_time, primary_col)
+    o_source = data_over_time if other_data is None else other_data
+    o_bounds = _bounds(o_source, other_col)
+    keys: set[tuple] = set()
+    if p_bounds.empty or o_bounds.empty:
+        return keys
+
+    for sk, p_grp in p_bounds.groupby(sess, sort=False):
+        sk = sk if isinstance(sk, tuple) else (sk,)
+        mask = np.ones(len(o_bounds), dtype=bool)
+        for col, val in zip(sess, sk, strict=True):
+            mask &= o_bounds[col].to_numpy() == val
+        o_grp = o_bounds.loc[mask]
+        if o_grp.empty:
+            continue
+        p_starts = p_grp["_start"].to_numpy()
+        p_ends = p_grp["_end"].to_numpy()
+        o_starts = o_grp["_start"].to_numpy()
+        o_ends = o_grp["_end"].to_numpy()
+        ovl = (
+            (p_ends[:, None] > o_starts[None, :])
+            & (p_starts[:, None] < o_ends[None, :])
+        ).any(axis=1)
+        p_ids = p_grp[primary_col].to_numpy()
+        for i, hit in enumerate(ovl):
+            if hit:
+                keys.add((*sk, p_ids[i]))
+    return keys
+
+
 def get_overlap_times(
     non_local_times: pd.DataFrame,
     ripple_times: pd.DataFrame,

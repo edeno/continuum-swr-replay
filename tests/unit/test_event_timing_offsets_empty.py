@@ -46,3 +46,28 @@ class TestEmptyOverlapSchema:
                 "would crash on the bare-empty frame the function "
                 "used to return."
             )
+
+    def test_boundary_touch_yields_no_overlap_row(self):
+        """Regression: a SWR ending exactly at a non-local event's
+        start (or vice versa) shares zero positive duration. The
+        previous inclusive ``>=`` / ``<=`` overlap predicate emitted
+        a phantom timing-offset row at start_diff/end_diff = 0 for
+        such back-to-back intervals. Strict positive-duration overlap
+        must not generate that row (matches the convention adopted
+        by ``classify_swr_overlap`` and ``get_overlap_times``)."""
+        # SWR labels [0.0, 1.0]; NL labels [1.0, 2.0]; share t=1.0.
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 5,
+                "day": [1] * 5,
+                "epoch": ["e1"] * 5,
+                "SWR_event": [1, 1, 1, 0, 0],
+                "non_local_event": [0, 0, 2, 2, 2],
+            },
+            index=[0.0, 0.5, 1.0, 1.5, 2.0],
+        )
+        out = compute_event_timing_offsets(df, "SWR_event", "non_local_event")
+        assert len(out) == 0, (
+            f"expected 0 rows on boundary-touch input, got {len(out)}: "
+            f"{out.to_dict('records') if len(out) else ''}"
+        )

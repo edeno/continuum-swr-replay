@@ -803,10 +803,35 @@ def compute_non_local_event_context(
         return float(np.angle(np.mean(np.exp(1j * finite))))
 
     event_summary = non_local.groupby(event_group_cols, sort=False).agg(
-        has_swr=("SWR_event", lambda x: (x > 0).any()),
         mean_theta_power=("theta_power_zscore", "mean"),
         circular_mean_theta_phase=("theta_phase", _circular_mean),
     ).reset_index()
+
+    # Strict positive-duration interval overlap with any SWR. The
+    # previous label-based ``(SWR_event > 0).any()`` aggregator counted
+    # boundary-touch contact (a single shared timestamp from the
+    # inclusive ``get_labels`` writer) as overlap, which conflicts
+    # with ``classify_swr_overlap`` / ``get_overlap_times`` and
+    # inflates ``frac_swr``. Use the shared event-bound overlap helper
+    # so this stays consistent with the rest of the SWR-overlap path.
+    from .event_detection import event_strict_overlap_keys
+
+    swr_overlap_keys = (
+        event_strict_overlap_keys(
+            data, event_col, "SWR_event", session_cols=tuple(group_cols)
+        )
+        if "SWR_event" in data.columns
+        else set()
+    )
+    if swr_overlap_keys:
+        keys_iter = zip(
+            *(event_summary[c].to_numpy() for c in group_cols),
+            event_summary[event_col].to_numpy(),
+            strict=True,
+        )
+        event_summary["has_swr"] = [tuple(k) in swr_overlap_keys for k in keys_iter]
+    else:
+        event_summary["has_swr"] = False
 
     event_summary["is_swr"] = event_summary["has_swr"]
     event_summary["is_theta"] = (

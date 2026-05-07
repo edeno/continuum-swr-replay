@@ -130,3 +130,37 @@ class TestGetEventTypes:
 
         assert len(result["non_local_event_immobile"]) == 0
         assert len(result["SWR_event_events"]) == 0
+
+    def test_boundary_touch_is_no_overlap(self):
+        """Regression: events whose intervals touch at a single
+        boundary timestamp share zero positive duration. The previous
+        label-based ``(g[other_col] > 0).any()`` filter counted that
+        as overlap because ``get_labels`` writes inclusive bin labels.
+        Strict positive-duration semantics must classify it as no
+        overlap (matches ``classify_swr_overlap`` /
+        ``get_overlap_times``)."""
+        # NL labels [0.0, 1.0]; SWR labels [1.0, 2.0]; share t=1.0.
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 5,
+                "day": [1] * 5,
+                "epoch": ["e1"] * 5,
+                "non_local_event": [1, 1, 1, 0, 0],
+                "SWR_event": [0, 0, 2, 2, 2],
+                "MUA_event": [0, 0, 0, 0, 0],
+                "head_speed": [0.0] * 5,
+            },
+            index=[0.0, 0.5, 1.0, 1.5, 2.0],
+        )
+        result = get_event_types(df)
+        assert len(result["non_local_event_immobile_overlap_SWR_event"]) == 0, (
+            "boundary-touch SWR was classified as overlap"
+        )
+        # All NL timebins fall into no_overlap_SWR (full event = 3 bins).
+        assert len(result["non_local_event_immobile_no_overlap_SWR_event"]) == 3
+        # Other-detector "events_no_non_local_event" should also flip:
+        # the SWR has no positive-duration overlap with the NL event,
+        # so it's NOT excluded from the SWR-no-NL bucket.
+        assert 2 in (
+            result["SWR_event_events_no_non_local_event"]["SWR_event"].unique()
+        )

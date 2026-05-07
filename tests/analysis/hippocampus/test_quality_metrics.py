@@ -385,6 +385,35 @@ class TestComputeNonLocalEventContext:
         )
         assert result["theta_mrl"].iloc[0] > 0.99
 
+    def test_boundary_touch_swr_does_not_inflate_frac_swr(self):
+        """Regression: a SWR that only touches a non-local event at
+        a boundary timestamp shares zero positive duration. The
+        previous label-based ``has_swr=("SWR_event", lambda x: (x > 0).any())``
+        aggregator counted that as overlap because ``get_labels``
+        writes inclusive bin labels, inflating ``frac_swr``. Strict
+        positive-duration semantics must classify it as theta- or
+        neither-associated, not SWR-associated."""
+        # NL labels [0.0, 1.0]; SWR labels [1.0, 2.0]; share t=1.0.
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 5,
+                "day": [1] * 5,
+                "epoch": ["e1"] * 5,
+                "non_local_event": [1, 1, 1, 0, 0],
+                "SWR_event": [0, 0, 2, 2, 2],
+                "MUA_event": [0, 0, 0, 0, 0],
+                "head_speed": [0.0] * 5,
+                "theta_phase": [np.nan] * 5,
+                "theta_power_zscore": [0.0] * 5,
+            },
+            index=[0.0, 0.5, 1.0, 1.5, 2.0],
+        )
+        out = compute_non_local_event_context(df)
+        assert out["frac_swr"].iloc[0] == 0.0, (
+            f"frac_swr={out['frac_swr'].iloc[0]} — boundary-touch SWR "
+            "must not be classified as SWR-associated."
+        )
+
     def test_all_nan_theta_phases_yield_nan_session_stats(self):
         """Sanity: if every theta event has only NaN phase samples,
         the session circular stats remain NaN (the gate fails because

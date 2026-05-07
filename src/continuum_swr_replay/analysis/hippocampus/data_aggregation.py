@@ -118,7 +118,11 @@ from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
 from ...types import SessionData
 from .event_analysis import get_immobile_events
-from .event_detection import get_confident_times, get_overlap_times
+from .event_detection import (
+    event_strict_overlap_keys,
+    get_confident_times,
+    get_overlap_times,
+)
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
 
 
@@ -397,8 +401,6 @@ def get_event_types(
         method="endpoints",
     )
 
-    group_keys = ["animal", "day", "epoch", event_col]
-
     result: dict[str, pd.DataFrame] = {
         f"{event_col}_immobile": immobile,
     }
@@ -410,33 +412,67 @@ def get_event_types(
                 data_over_time[oc] > 0
             ]
 
-    # Overlap / no-overlap with each "other" detector
+    # Overlap / no-overlap with each "other" detector. Use strict
+    # positive-duration interval overlap rather than per-timebin label
+    # presence; otherwise events whose intervals only touch at a
+    # boundary timestamp (where ``get_labels`` writes both labels
+    # inclusively) get classified as overlapping. Matches the strict
+    # semantics used by ``classify_swr_overlap`` /
+    # ``get_overlap_times``.
+    def _strict_overlap_mask(df: pd.DataFrame, primary: str, other: str) -> np.ndarray:
+        keys = event_strict_overlap_keys(data_over_time, primary, other)
+        if not keys:
+            return np.zeros(len(df), dtype=bool)
+        return np.array(
+            [
+                (a, d, e, p) in keys
+                for a, d, e, p in zip(
+                    df["animal"].to_numpy(),
+                    df["day"].to_numpy(),
+                    df["epoch"].to_numpy(),
+                    df[primary].to_numpy(),
+                    strict=True,
+                )
+            ]
+        )
+
     for oc in other_cols:
         if oc not in data_over_time.columns:
             continue
-        result[f"{event_col}_immobile_overlap_{oc}"] = immobile.groupby(
-            group_keys
-        ).filter(lambda g, c=oc: (g[c] > 0).any())
-        result[f"{event_col}_immobile_no_overlap_{oc}"] = immobile.groupby(
-            group_keys
-        ).filter(lambda g, c=oc: (g[c] == 0).all())
+        overlap_mask = _strict_overlap_mask(immobile, event_col, oc)
+        result[f"{event_col}_immobile_overlap_{oc}"] = immobile.loc[overlap_mask]
+        result[f"{event_col}_immobile_no_overlap_{oc}"] = immobile.loc[~overlap_mask]
 
     # No overlap with ANY other detector
     if all(oc in data_over_time.columns for oc in other_cols):
-        result[f"{event_col}_immobile_no_overlap"] = immobile.groupby(
-            group_keys
-        ).filter(
-            lambda g: all((g[oc] == 0).all() for oc in other_cols)
-        )
+        any_overlap = np.zeros(len(immobile), dtype=bool)
+        for oc in other_cols:
+            any_overlap |= _strict_overlap_mask(immobile, event_col, oc)
+        result[f"{event_col}_immobile_no_overlap"] = immobile.loc[~any_overlap]
 
     # Other-detector events that do NOT overlap the primary
     for oc in other_cols:
         if oc not in data_over_time.columns:
             continue
         oc_events = data_over_time.loc[data_over_time[oc] > 0]
-        result[f"{oc}_events_no_{event_col}"] = oc_events.groupby(
-            ["animal", "day", "epoch", oc]
-        ).filter(lambda g, ec=event_col: (g[ec] == 0).all())
+        if len(oc_events) == 0:
+            result[f"{oc}_events_no_{event_col}"] = oc_events
+            continue
+        overlap_keys = event_strict_overlap_keys(data_over_time, oc, event_col)
+        if not overlap_keys:
+            result[f"{oc}_events_no_{event_col}"] = oc_events
+            continue
+        oc_keys = list(
+            zip(
+                oc_events["animal"].to_numpy(),
+                oc_events["day"].to_numpy(),
+                oc_events["epoch"].to_numpy(),
+                oc_events[oc].to_numpy(),
+                strict=True,
+            )
+        )
+        no_overlap_mask = np.array([k not in overlap_keys for k in oc_keys])
+        result[f"{oc}_events_no_{event_col}"] = oc_events.loc[no_overlap_mask]
 
     return result
 
@@ -574,55 +610,57 @@ def compute_swr_nl_event_counts(
     else:
         a_data = data_over_time.loc[data_over_time[event_col_a] > 0]
 
-    # Event A: count overlaps using the (possibly immobility-filtered)
-    # ``a_data`` frame. ``int(empty_series.sum())`` raises TypeError
-    # because an empty ``groupby.apply`` returns a Series with no
-    # numeric dtype; coerce via float() / fall back to 0 explicitly.
-    a_active = a_data.loc[a_data[event_col_a] > 0]
-    if len(a_active) == 0:
-        n_a = 0
-        n_a_with_b = 0
-    else:
-        a_with_b = a_active.groupby(
-            ["animal", "day", "epoch", event_col_a],
-        ).apply(lambda g: (g[event_col_b] > 0).any())
-        n_a = len(a_with_b)
-        n_a_with_b = int(a_with_b.sum()) if len(a_with_b) else 0
+    sess_cols = ["animal", "day", "epoch"]
 
-    # Event B: count overlaps against the *same* (filtered) ``a_data``,
-    # not the raw frame. Otherwise ``n_b_with_a`` could count B
-    # events as overlapping A events that this call deliberately
-    # excluded (e.g. high-speed non-local events when A is
-    # immobility-filtered), and ``n_a / n_b_with_a`` becomes a
-    # nonsensical mix of filtered and unfiltered totals.
+    # Strict positive-duration interval overlap on per-event bounds
+    # derived from the timebin labels. The previous form used
+    # ``(g[other] > 0).any()`` over timebins, which counted
+    # boundary-touch contact (a single shared timestamp from the
+    # inclusive ``get_labels`` writer) as overlap — diverging from
+    # the strict semantics enforced by ``classify_swr_overlap`` and
+    # ``get_overlap_times``.
+    #
+    # ``n_a`` is the immobility-filtered per-event count of column A;
+    # ``n_b`` is the unfiltered per-event count of column B. For
+    # ``n_*_with_*``, A-bounds come from the filtered ``a_data`` so a
+    # B event whose only A overlap was excluded by the immobility
+    # filter cannot resurrect it; B-bounds come from raw
+    # ``data_over_time`` to keep the ``n_b`` total consistent with
+    # the existing contract (Venn-diagram totals).
+    a_active = a_data.loc[a_data[event_col_a] > 0]
+    n_a = (
+        int(a_active.groupby([*sess_cols, event_col_a], sort=False).ngroups)
+        if len(a_active)
+        else 0
+    )
     b_active = data_over_time.loc[data_over_time[event_col_b] > 0]
-    if len(b_active) == 0:
-        n_b = 0
-        n_b_with_a = 0
-    else:
-        # Build a session-keyed match for "this B-row is at the same
-        # (animal, day, epoch, time) as a row that survived A's
-        # filter". A bare ``b_active.index.isin(a_active.index)``
-        # matches purely on the time index, so two sessions that
-        # share a timestamp (e.g. both start at t=0.0) can have an
-        # excluded high-speed A-row in session B falsely flagged as
-        # surviving — the user reproduced ``n_b_with_a == 1`` when
-        # the only SWR overlapped an excluded high-speed NL event.
-        sess_cols = ["animal", "day", "epoch"]
-        a_keys = pd.MultiIndex.from_frame(
-            a_active.reset_index(names="_t")[[*sess_cols, "_t"]]
-        )
-        b_keys = pd.MultiIndex.from_frame(
-            b_active.reset_index(names="_t")[[*sess_cols, "_t"]]
-        )
-        a_event_mask_in_b = (
-            b_keys.isin(a_keys) & (b_active[event_col_a] > 0).to_numpy()
-        )
-        b_with_a = b_active.assign(_a_in_filter=a_event_mask_in_b).groupby(
-            ["animal", "day", "epoch", event_col_b],
-        ).apply(lambda g: g["_a_in_filter"].any())
-        n_b = len(b_with_a)
-        n_b_with_a = int(b_with_a.sum()) if len(b_with_a) else 0
+    n_b = (
+        int(b_active.groupby([*sess_cols, event_col_b], sort=False).ngroups)
+        if len(b_active)
+        else 0
+    )
+
+    if n_a == 0 or n_b == 0:
+        return {"n_a": n_a, "n_a_with_b": 0, "n_b": n_b, "n_b_with_a": 0}
+
+    # A-with-B: A bounds from a_data (filtered), B bounds from a_data
+    # too — only B intervals visible to the filtered A frame count
+    # toward this overlap. (The boundary-touch issue applies to B
+    # bounds derived from a_data exactly as it would from raw, so the
+    # source choice doesn't affect strict overlap; what matters is
+    # that B intervals reflect the filtered A-row coverage.)
+    a_with_b_keys = event_strict_overlap_keys(a_data, event_col_a, event_col_b)
+    n_a_with_b = len(a_with_b_keys)
+
+    # B-with-A: B bounds from raw ``data_over_time`` so we can match
+    # them up to the unfiltered ``n_b`` total. A bounds STILL come
+    # from ``a_data`` — keep the existing contract that B events
+    # whose only A overlap was excluded by the immobility filter
+    # don't get counted as overlapping.
+    b_with_a_keys = event_strict_overlap_keys(
+        data_over_time, event_col_b, event_col_a, other_data=a_data,
+    )
+    n_b_with_a = len(b_with_a_keys)
 
     return {
         "n_a": n_a,

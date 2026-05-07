@@ -328,9 +328,14 @@ def compute_event_timing_offsets(
         tgt_starts = tgt_session["start_time"].to_numpy()
         tgt_ends = tgt_session["end_time"].to_numpy()
 
+        # Strict positive-duration overlap (matches
+        # ``classify_swr_overlap`` / ``get_overlap_times``). A
+        # boundary-touch pair shares zero duration and would generate
+        # a phantom timing-offset row at start_diff/end_diff = 0; the
+        # previous inclusive ``>=`` / ``<=`` form admitted those rows.
         overlap = (
-            (ref_ends[:, None] >= tgt_starts[None, :])
-            & (ref_starts[:, None] <= tgt_ends[None, :])
+            (ref_ends[:, None] > tgt_starts[None, :])
+            & (ref_starts[:, None] < tgt_ends[None, :])
         )
         ref_idx, tgt_idx = overlap.nonzero()
         if ref_idx.size == 0:
