@@ -700,6 +700,27 @@ def process_neuron(
                 f"{neuron_stats['immobility_avg_firing_rate']:.3f} Hz."
             )
 
+        # Detect non-estimable models. ``_make_conv_spline_basis``
+        # builds spline regressors for every event class regardless
+        # of whether that class has any events; an empty event class
+        # leaves its spline columns all-zero, so the design matrix is
+        # rank-deficient against the intercept. statsmodels still
+        # returns finite (zero) parameters for those columns and
+        # finite degenerate LR / fractional-deviance values, so the
+        # NaN-params check above doesn't catch them. Mark every
+        # rank-deficient design as non-estimable up front and route
+        # the affected LR tests, AIC selections, and modulation
+        # extractions to NaN below — so downstream consumers can
+        # tell "absent event class" from "estimated zero effect".
+        non_estimable_models = set()
+        for name, design in immobility_design_matrices.items():
+            X_im = design[is_immobile]
+            if X_im.shape[0] == 0:
+                non_estimable_models.add(name)
+                continue
+            if np.linalg.matrix_rank(X_im) < X_im.shape[1]:
+                non_estimable_models.add(name)
+
         ## Likelihood ratio tests
         # SWR-controlled decomposition: does replay add to SWR response?
         # Replay-split decomposition: do SWR-replay and non-SWR-replay differ?
@@ -738,9 +759,21 @@ def process_neuron(
 
         for model1, model2 in test_cases:
             test_name = f"{model1} vs. {model2}"
-            neuron_stats[f"{test_name}: lr"], neuron_stats[f"{test_name}: pval"] = (
-                _lr_test(results[model1], results[model2])
-            )
+            if (
+                model1 in non_estimable_models
+                or model2 in non_estimable_models
+            ):
+                # Either side is rank-deficient (typically because an
+                # event class has zero events in this session), so the
+                # LR statistic / p-value are not meaningful. Mark the
+                # comparison as unavailable rather than emitting a
+                # finite degenerate value.
+                neuron_stats[f"{test_name}: lr"] = np.nan
+                neuron_stats[f"{test_name}: pval"] = np.nan
+            else:
+                neuron_stats[f"{test_name}: lr"], neuron_stats[
+                    f"{test_name}: pval"
+                ] = _lr_test(results[model1], results[model2])
 
         ## Effect sizes: fractional deviance for every LR test
         # frac_null_dev: (reduced - full) / constant deviance
@@ -749,40 +782,62 @@ def process_neuron(
         #   = fraction of full model's explained deviance due to added regressors
         for model1, model2 in test_cases:
             test_name = f"{model1} vs. {model2}"
-            neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
-                results[model1], results[model2], results["constant"]
-            )
-            neuron_stats[f"{test_name}: frac_explained_dev"] = (
-                get_frac_explained_deviance(
-                    results[model1], results[model2], results["constant"]
+            if (
+                model1 in non_estimable_models
+                or model2 in non_estimable_models
+                or "constant" in non_estimable_models
+            ):
+                neuron_stats[f"{test_name}: frac_null_dev"] = np.nan
+                neuron_stats[f"{test_name}: frac_explained_dev"] = np.nan
+            else:
+                neuron_stats[f"{test_name}: frac_null_dev"] = (
+                    get_frac_null_deviance(
+                        results[model1], results[model2], results["constant"]
+                    )
                 )
-            )
+                neuron_stats[f"{test_name}: frac_explained_dev"] = (
+                    get_frac_explained_deviance(
+                        results[model1], results[model2], results["constant"]
+                    )
+                )
 
         ## AIC — SWR-controlled: what best explains immobility firing?
+        # Skip rank-deficient models so a non-estimable design (e.g. a
+        # session with zero ``non_local_no_SWR`` events) cannot be
+        # selected as the "best" model just because statsmodels
+        # returned a finite AIC for its degenerate fit.
+        swr_controlled_candidates = [
+            "constant",
+            "SWR",
+            "non_local",
+            "SWR + non_local_no_SWR",
+        ]
         swr_controlled_aics = {
             model_name: results[model_name].aic
-            for model_name in [
-                "constant",
-                "SWR",
-                "non_local",
-                "SWR + non_local_no_SWR",
-            ]
+            for model_name in swr_controlled_candidates
+            if model_name not in non_estimable_models
         }
-        neuron_stats["min_aic_model"] = min(
-            swr_controlled_aics, key=swr_controlled_aics.get
+        neuron_stats["min_aic_model"] = (
+            min(swr_controlled_aics, key=swr_controlled_aics.get)
+            if swr_controlled_aics
+            else None
         )
 
         ## AIC — Replay-split: is replay one process or two?
+        replay_split_candidates = [
+            "constant",
+            "non_local",
+            "non_local_SWR + non_local_no_SWR",
+        ]
         replay_split_aics = {
             model_name: results[model_name].aic
-            for model_name in [
-                "constant",
-                "non_local",
-                "non_local_SWR + non_local_no_SWR",
-            ]
+            for model_name in replay_split_candidates
+            if model_name not in non_estimable_models
         }
-        neuron_stats["min_aic_model_replay_split"] = min(
-            replay_split_aics, key=replay_split_aics.get
+        neuron_stats["min_aic_model_replay_split"] = (
+            min(replay_split_aics, key=replay_split_aics.get)
+            if replay_split_aics
+            else None
         )
 
         ## Modulation time courses
