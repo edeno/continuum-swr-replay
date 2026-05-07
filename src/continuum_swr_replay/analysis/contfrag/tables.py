@@ -722,16 +722,10 @@ def build_contfrag_stop_table(
         else:
             per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields. Use a NaN-strict ``_first_value`` instead
-    # of ``safe_first``: at bout start we want the first row's value
-    # as-is, even if it's NaN (no trial active yet). ``safe_first``
-    # would skip leading NaNs and inherit the next trial's context.
-    def _first_value(series: pd.Series) -> float:
-        if len(series) == 0:
-            return np.nan
-        v = series.iloc[0]
-        return float(v) if pd.notna(v) else np.nan
-
+    # Arm / patch fields. ``strict_first`` keeps the first row's
+    # NaN-or-finite value as-is so a bout that started before any
+    # trial doesn't inherit the next trial's context via
+    # ``safe_first``'s skip-NaN behavior.
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
@@ -746,16 +740,16 @@ def build_contfrag_stop_table(
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = single_arm_from_well(_first_value(g["current_well"]), track_graph)
+            ca = single_arm_from_well(strict_first(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = single_arm_from_well(
-            _first_value(g["prev_well"]), track_graph
+            strict_first(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = single_arm_from_well(
-            _first_value(g["next_well"]), track_graph
+            strict_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = single_arm_from_well(
-            _first_value(g["last_rewarded_well"]), track_graph
+            strict_first(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals

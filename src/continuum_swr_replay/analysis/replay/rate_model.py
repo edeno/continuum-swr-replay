@@ -98,25 +98,18 @@ def fit_rate_model(
         X = sm.add_constant(raw_X, has_constant="add")
         col_names = ["intercept"] + predictors
 
-        # Full-rank check on the design matrix. A constant predictor
-        # is the most obvious failure mode (column collinear with the
-        # forced intercept), but the same problem appears whenever
-        # any linear combination of design columns is zero — perfectly
-        # collinear predictors (``x2 = 1 - x1``), duplicated
-        # predictors, etc. None of those are caught by a per-column
-        # constancy check, but they all leave the GLM solution
-        # non-unique. ``statsmodels`` then silently pseudo-inverts and
-        # returns finite ``coef_*`` / ``pval_*`` for an unidentified
-        # model — the same hazard the GEE path was hardened against
-        # in ``fit_is_stay_pooled_gee``.
-        if np.linalg.matrix_rank(X) < X.shape[1]:
+        # Full-rank check rejects constant predictors, perfect
+        # collinearity, duplicated columns, and any other zero
+        # linear combination of design columns — statsmodels would
+        # otherwise pseudo-invert and emit finite coefficients /
+        # p-values for an unidentified model.
+        rank = int(np.linalg.matrix_rank(X))
+        if rank < X.shape[1]:
             logger.warning(
                 "Poisson GLM not fit: design matrix [intercept, %s] is "
-                "rank-deficient (rank %d < %d) within the %d-stop "
-                "subset — likely a constant predictor or perfectly "
-                "collinear predictors.",
+                "rank-deficient (rank %d < %d) within the %d-stop subset.",
                 ", ".join(predictors),
-                int(np.linalg.matrix_rank(X)),
+                rank,
                 X.shape[1],
                 len(df),
             )

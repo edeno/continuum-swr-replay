@@ -28,6 +28,8 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean, strict_sum
+
 __all__ = [
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
@@ -238,7 +240,7 @@ def stop_replay_summary(
         .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)[
             "arm_fraction"
         ]
-        .agg(lambda s: s.sum(skipna=False))
+        .agg(strict_sum)
         .rename(columns={"arm_fraction": "_patch_frac", "_arm_patch": "_patch"})
     )
     patch_sums["_patch"] = patch_sums["_patch"].astype(int)
@@ -317,21 +319,11 @@ def stop_replay_summary(
             )
             agg[[*sess_keys, "stop_id"]] = pd.DataFrame(columns=[*sess_keys, "stop_id"])
         else:
-            # Strict NaN-propagating mean: pandas' default ``"mean"``
-            # uses ``skipna=True``, so a stop whose only finite event
-            # has ``frac_on_current_event=0.9`` and a second event with
-            # NaN silently emits ``frac_on_current=0.9`` while
-            # ``n_events_with_replay`` still reports the full count.
-            # That biases the Stage-6 stop-level fractions toward the
-            # subset of events that happened to have a finite
-            # ``arm_fraction`` for this role. Propagate NaN explicitly
-            # so a stop with any missing event-level role fraction is
-            # surfaced as missing, not as a confident value.
-            def _strict_mean(s: pd.Series) -> float:
-                return float(s.mean(skipna=False))
-
+            # ``strict_mean`` keeps a stop with any NaN event-level
+            # role fraction surfaced as NaN — the default ``skipna=True``
+            # mean would silently emit the surviving event's value.
             agg_cols = {
-                f"frac_on_{r}{label}": (f"frac_on_{r}_event", _strict_mean)
+                f"frac_on_{r}{label}": (f"frac_on_{r}_event", strict_mean)
                 for r in role_cols
                 if f"frac_on_{r}_event" in sub.columns
             }

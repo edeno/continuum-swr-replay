@@ -47,6 +47,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
 
+from ._helpers import strict_sum
 from .shuffles import next_arm_circular_shift
 
 __all__ = [
@@ -364,7 +365,7 @@ def chosen_patch_fraction(
     )
     out = (
         merged.groupby(grp_cols, as_index=False)["_mass"]
-        .agg(lambda s: s.sum(skipna=False))
+        .agg(strict_sum)
         .rename(columns={"_mass": "chosen_patch_fraction"})
         .merge(has_target_rows, on=grp_cols, how="left")
     )

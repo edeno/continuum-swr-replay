@@ -13,6 +13,7 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean, strict_sum
 from .choice_prediction import predict_arm_fractions
 
 
@@ -27,9 +28,7 @@ def _stop_replay_per_patch(
     Returns DataFrame indexed by ``stop_id`` with columns ``1``, ``2``,
     ``3`` (patch labels) holding the strict-NaN-aware mean across
     events of the per-event sum of ``fraction_col`` over arms in that
-    patch. Junction arms (arms with no patch label) contribute NaN to
-    every patch column for that event, poisoning the per-event sum
-    (matching the strict semantics of :func:`stop_patch_replay`).
+    patch.
 
     Used by :func:`build_switch_aligned_table` and
     :func:`build_control_aligned_table` to look up replay relative to
@@ -89,11 +88,11 @@ def _stop_replay_per_patch(
                 }
             )
             .groupby(["stop_id", "event_id"])["_contrib"]
-            .apply(lambda s: s.sum(skipna=False))
+            .apply(strict_sum)
         )
         per_stop = (
             per_event.groupby("stop_id")
-            .apply(lambda s: s.mean(skipna=False))
+            .apply(strict_mean)
         )
         out[patch] = per_stop
 
@@ -512,11 +511,11 @@ def stop_patch_replay(
         {
             "replay_frac_current_patch": (
                 eat.groupby(["stop_id", "event_id"])["_frac_cp"]
-                .apply(lambda s: s.sum(skipna=False))
+                .apply(strict_sum)
             ),
             "replay_frac_noncurrent": (
                 eat.groupby(["stop_id", "event_id"])["_frac_nc"]
-                .apply(lambda s: s.sum(skipna=False))
+                .apply(strict_sum)
             ),
         }
     )
@@ -526,7 +525,7 @@ def stop_patch_replay(
         event_agg.groupby("stop_id")[
             ["replay_frac_current_patch", "replay_frac_noncurrent"]
         ]
-        .agg(lambda s: s.mean(skipna=False))
+        .agg(strict_mean)
     )
 
     # Residualized version if available
@@ -536,13 +535,13 @@ def stop_patch_replay(
         eat["_resid_nc"] = eat["residual_frac"].to_numpy() * (1.0 - is_cp_float)
         event_resid = (
             eat.groupby(["stop_id", "event_id"])["_resid_nc"]
-            .apply(lambda s: s.sum(skipna=False))
+            .apply(strict_sum)
             .rename("replay_frac_residual_noncurrent")
             .to_frame()
         )
         resid_agg = (
             event_resid.groupby("stop_id")["replay_frac_residual_noncurrent"]
-            .apply(lambda s: s.mean(skipna=False))
+            .apply(strict_mean)
             .rename("replay_frac_residual_noncurrent")
             .to_frame()
         )

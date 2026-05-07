@@ -722,24 +722,10 @@ def process_neuron(
                 non_estimable_models.add(name)
 
         ## Likelihood ratio tests
-        # SWR-controlled decomposition: does replay add to SWR response?
-        # Replay-split decomposition: do SWR-replay and non-SWR-replay differ?
-        #
-        # Every (full, reduced) pair below must be a true nested pair —
-        # the reduced regressors must lie in the column span of the
-        # full design — otherwise the LR statistic has no chi-square
-        # null distribution and ``frac_*_dev`` no longer represents
-        # "deviance uniquely explained by added regressors". The
-        # tempting comparison ``("SWR + non_local_no_SWR",
-        # "non_local")`` is NOT nested in general: ``non_local =
-        # non_local_SWR + non_local_no_SWR``, but the full design has
-        # ``SWR = non_local_SWR + SWR_only`` and ``non_local_no_SWR``
-        # — ``non_local`` is recoverable only when there are no
-        # SWR-only events (``SWR_only == 0``), which is the empty
-        # special case. Keep that comparison out of the LR / fractional-
-        # deviance machinery to avoid emitting invalid p-values and
-        # "unique deviance explained" interpretations under partial
-        # SWR/non-local overlap.
+        # Every (full, reduced) pair must be nested — the reduced
+        # regressors must lie in the column span of the full design.
+        # ``("SWR + non_local_no_SWR", "non_local")`` is intentionally
+        # absent: it's only nested when there are no SWR-only events.
         test_cases = [
             # Individual event types vs baseline
             ("SWR", "constant"),

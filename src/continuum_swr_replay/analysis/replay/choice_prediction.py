@@ -26,6 +26,8 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean
+
 logger = logging.getLogger(__name__)
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
@@ -207,7 +209,7 @@ def build_residualized_choice_dataset(
     # ``predict_arm_fractions`` was just hardened against.
     stop_arm_resid = (
         eat_resid.groupby(["stop_id", "arm"])["residual_frac"]
-        .apply(lambda s: s.mean(skipna=False))
+        .apply(strict_mean)
         .rename("replay_frac_residual")
         .reset_index()
     )
@@ -321,23 +323,15 @@ def build_choice_dataset(
         ]
     ].copy()
 
-    # Mean fraction per (stop, arm) across events in that stop.
-    # Strict NaN-propagating mean: pandas' default ``"mean"`` uses
-    # ``skipna=True``, so a stop with two events — one finite, one
-    # all-NaN — silently emits the surviving event's value while
-    # ``n_events`` still reports the full count, and the chosen-arm
-    # sanity check below cannot recover the missingness because the
-    # NaN has already been collapsed away. That reintroduces the
-    # surviving-events bias that the residualized path already
-    # guards against (see ``build_residualized_choice_dataset``
-    # for the matching ``mean(skipna=False)`` on residuals).
-    def _strict_mean(s: pd.Series) -> float:
-        return float(s.mean(skipna=False))
-
+    # ``strict_mean`` keeps a stop with any NaN event-level
+    # ``arm_fraction`` surfaced as NaN — the default ``skipna=True``
+    # mean would silently emit the surviving event's value, and the
+    # chosen-arm sanity check below cannot recover the missingness
+    # once the NaN has been collapsed away.
     stop_arm = (
         eat.groupby(["stop_id", "arm"])
         .agg(
-            replay_frac=(fraction_col, _strict_mean),
+            replay_frac=(fraction_col, strict_mean),
             visit_recency=("visit_recency", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             recent_reward_rate=("recent_reward_rate", "last"),

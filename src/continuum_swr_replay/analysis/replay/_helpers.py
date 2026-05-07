@@ -278,6 +278,25 @@ def strict_first(series: pd.Series) -> float:
     return float(v) if pd.notna(v) else np.nan
 
 
+def strict_mean(series: pd.Series) -> float:
+    """``Series.mean`` with ``skipna=False``.
+
+    pandas' default ``"mean"`` aggregator silently drops NaN, so a
+    groupby reduction over a column that contains a mix of finite and
+    NaN values emits the mean of the surviving rows. For Stage-5/6
+    stop-level / arm-level aggregations that's a per-event survivorship
+    bias: a stop with one finite event and one NaN event reports the
+    finite event's value while ``n_events`` still counts both. Use
+    this aggregator instead so any NaN propagates to the output.
+    """
+    return float(series.mean(skipna=False))
+
+
+def strict_sum(series: pd.Series) -> float:
+    """``Series.sum`` with ``skipna=False``."""
+    return float(series.sum(skipna=False))
+
+
 def hash_event_id(
     events: pd.DataFrame,
     event_col: str = "non_local_event",
@@ -518,12 +537,8 @@ def cumulative_reward_all_events(
     n_trials_total = len(trials)
 
     if n_trials_total == 0:
-        # Match the no-past-trials contract used by sibling helpers
-        # (``visit_recency_all_events``, ``recent_reward_rate_all_events``):
-        # an event with no completed trials behind it has *unknown*
-        # reward history, not zero reward. Returning zeros here lets
-        # M3 (which adds ``cumulative_reward``) treat these rows as
-        # valid neutral observations rather than missing history.
+        # No completed trials → unknown history, not zero reward
+        # (matches the sibling helpers).
         return np.full((n_events, n_arms), np.nan)
 
     # Sort defensively by the goal-arrival cutoff (see
@@ -556,13 +571,7 @@ def cumulative_reward_all_events(
 
     out = cum[cutoffs] - cum[window_starts]
 
-    # Events before any completed trial have no reward history. The
-    # subtraction above yields ``cum[0] - cum[0] == 0``, which would
-    # silently fabricate "zero rewards observed" for an arm whose
-    # history is genuinely unknown — and the sibling helpers already
-    # propagate NaN for the same case (see lines 432-433 and 543-545).
-    # Surface NaN here too so M3 (+ cumulative_reward) doesn't see
-    # before-trial events as valid neutral reward-history observations.
+    # No-past-trials → NaN, matching the sibling helpers' contract.
     no_past = cutoffs == 0
     if no_past.any():
         out[no_past] = np.nan
