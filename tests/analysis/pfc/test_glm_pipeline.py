@@ -431,6 +431,100 @@ class TestProcessNeuron:
             if key.endswith(": pval"):
                 assert 0 <= val <= 1, f"{key} = {val} out of range"
 
+    def test_absent_event_class_marks_dependent_outputs_as_unavailable(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, position_info, sampling_frequency,
+    ):
+        """Regression: ``_make_design_matrices`` builds spline
+        regressors for every event class regardless of whether that
+        class has any events. An empty event table leaves its spline
+        columns all-zero, so the design matrix is rank-deficient
+        against the intercept; statsmodels still produces finite
+        zero parameters and finite degenerate LR / fractional-deviance
+        values, and ``process_neuron``'s NaN-params check doesn't
+        catch them.
+
+        Post-fix: rank-deficient designs are detected up front. Any
+        LR test or fractional deviance involving the affected models
+        is NaN; modulation arrays sourced from a rank-deficient
+        design are NaN; and AIC selection skips those models.
+        """
+        # Empty non_local_no_SWR. Other event classes are populated.
+        event_times = {
+            "SWR": pd.DataFrame({"start_time": [1.0, 5.0],
+                                 "end_time": [1.1, 5.1]}),
+            "non_local": pd.DataFrame({"start_time": [1.0, 5.0],
+                                       "end_time": [1.1, 5.1]}),
+            "non_local_SWR": pd.DataFrame({"start_time": [1.0, 5.0],
+                                           "end_time": [1.1, 5.1]}),
+            "non_local_no_SWR": pd.DataFrame(
+                columns=["start_time", "end_time"]
+            ),
+        }
+        dm, spline_basis, lag_time = _make_design_matrices(
+            event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+        )
+
+        # Every test that touches the absent event class must be NaN.
+        for affected in (
+            "non_local_no_SWR vs. constant",
+            "SWR + non_local_no_SWR vs. constant",
+            "SWR + non_local_no_SWR vs. SWR",
+            "SWR + non_local_no_SWR vs. non_local_no_SWR",
+            "non_local_SWR + non_local_no_SWR vs. constant",
+            "non_local_SWR + non_local_no_SWR vs. non_local_SWR",
+            "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
+            "non_local_SWR + non_local_no_SWR vs. non_local",
+        ):
+            for suffix in (": lr", ": pval", ": frac_null_dev",
+                           ": frac_explained_dev"):
+                key = affected + suffix
+                assert np.isnan(stats[key]), (
+                    f"{key} = {stats[key]} but the model uses an empty "
+                    "event class — the LR/dev statistic is not "
+                    "estimable and must be NaN."
+                )
+
+        # Tests that don't touch the absent class stay finite.
+        for unaffected in (
+            "SWR vs. constant",
+            "non_local vs. constant",
+            "non_local_SWR vs. constant",
+        ):
+            assert np.isfinite(stats[unaffected + ": pval"])
+
+        # Modulation curves sourced from rank-deficient designs are
+        # all-NaN; the corresponding max-mod stats are NaN.
+        assert np.all(np.isnan(swr_mod))
+        assert np.all(np.isnan(no_swr_mod))
+        assert np.all(np.isnan(nl_no_swr_mod))
+        for stat in (
+            "SWR_max_mod", "SWR_max_mod_time",
+            "non_local_no_SWR_max_mod", "non_local_no_SWR_max_mod_time",
+            "non_local_no_SWR_split_max_mod",
+            "non_local_no_SWR_split_max_mod_time",
+        ):
+            assert np.isnan(stats[stat])
+        # The replay-split model also depends on non_local_no_SWR, so
+        # its non_local_SWR modulation curve is NaN too.
+        assert np.all(np.isnan(nl_swr_mod))
+        assert np.isnan(stats["non_local_SWR_max_mod"])
+        assert np.isnan(stats["non_local_SWR_max_mod_time"])
+
+        # AIC selectors must skip non-estimable models. With
+        # non_local_no_SWR absent, "SWR + non_local_no_SWR" and
+        # "non_local_SWR + non_local_no_SWR" drop out; the remaining
+        # candidates are constant / SWR / non_local on the SWR side
+        # and constant / non_local on the replay-split side.
+        assert stats["min_aic_model"] in {"constant", "SWR", "non_local"}
+        assert stats["min_aic_model_replay_split"] in {"constant", "non_local"}
+
     def test_non_nested_swr_vs_non_local_lr_test_is_not_emitted(
         self, poisson_spike_times, is_immobile, theta_phase,
         time_axis, simple_event_times, position_info, sampling_frequency,

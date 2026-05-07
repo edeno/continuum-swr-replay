@@ -843,54 +843,76 @@ def process_neuron(
         ## Modulation time courses
         # Share fits with the LR-test / AIC path so neuron_stats and
         # the modulation arrays can never disagree due to divergent
-        # IRLS convergence.
+        # IRLS convergence. When the source model is non-estimable
+        # (rank-deficient design — typically an absent event class),
+        # the spline-by-coefficient product would silently emit a
+        # zero curve from statsmodels' degenerate fit; route those
+        # to NaN so consumers can tell "absent event class" from
+        # "estimated zero modulation".
         n_basis_functions = spline_basis.shape[1]
+        nan_modulation = np.full(spline_basis.shape[0], np.nan)
 
         # SWR-controlled model: SWR and non-SWR replay modulation
         # controlling for all detected ripples
-        swr_ctrl_params = results["SWR + non_local_no_SWR"].params
-        swr_modulation = (
-            spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
-        )
-        no_swr_modulation = (
-            spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
-        )
+        if "SWR + non_local_no_SWR" in non_estimable_models:
+            swr_modulation = nan_modulation
+            no_swr_modulation = nan_modulation
+            neuron_stats["SWR_max_mod"] = np.nan
+            neuron_stats["SWR_max_mod_time"] = np.nan
+            neuron_stats["non_local_no_SWR_max_mod"] = np.nan
+            neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
+        else:
+            swr_ctrl_params = results["SWR + non_local_no_SWR"].params
+            swr_modulation = (
+                spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
+            )
+            no_swr_modulation = (
+                spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
+            )
 
-        swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
-        neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
-        neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
+            swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
+            neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
+            neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
 
-        no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
-        neuron_stats["non_local_no_SWR_max_mod"] = (
-            no_swr_modulation[no_swr_max_mod_ind]
-        )
-        neuron_stats["non_local_no_SWR_max_mod_time"] = (
-            lag_time[no_swr_max_mod_ind]
-        )
+            no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
+            neuron_stats["non_local_no_SWR_max_mod"] = (
+                no_swr_modulation[no_swr_max_mod_ind]
+            )
+            neuron_stats["non_local_no_SWR_max_mod_time"] = (
+                lag_time[no_swr_max_mod_ind]
+            )
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
         # controlling for replay-coincident ripples only
-        replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
-        non_local_swr_modulation = (
-            spline_basis @ replay_split_params[1 : n_basis_functions + 1]
-        )
-        non_local_no_swr_modulation = (
-            spline_basis @ replay_split_params[n_basis_functions + 1 :]
-        )
+        if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
+            non_local_swr_modulation = nan_modulation
+            non_local_no_swr_modulation = nan_modulation
+            neuron_stats["non_local_SWR_max_mod"] = np.nan
+            neuron_stats["non_local_SWR_max_mod_time"] = np.nan
+            neuron_stats["non_local_no_SWR_split_max_mod"] = np.nan
+            neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
+        else:
+            replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
+            non_local_swr_modulation = (
+                spline_basis @ replay_split_params[1 : n_basis_functions + 1]
+            )
+            non_local_no_swr_modulation = (
+                spline_basis @ replay_split_params[n_basis_functions + 1 :]
+            )
 
-        non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
-        neuron_stats["non_local_SWR_max_mod"] = (
-            non_local_swr_modulation[non_local_swr_max_ind]
-        )
-        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
+            non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
+            neuron_stats["non_local_SWR_max_mod"] = (
+                non_local_swr_modulation[non_local_swr_max_ind]
+            )
+            neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
 
-        non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
-        neuron_stats["non_local_no_SWR_split_max_mod"] = (
-            non_local_no_swr_modulation[non_local_no_swr_max_ind]
-        )
-        neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
-            lag_time[non_local_no_swr_max_ind]
-        )
+            non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
+            neuron_stats["non_local_no_SWR_split_max_mod"] = (
+                non_local_no_swr_modulation[non_local_no_swr_max_ind]
+            )
+            neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
+                lag_time[non_local_no_swr_max_ind]
+            )
 
     except (ValueError, np.linalg.LinAlgError):
         _logger.warning(
