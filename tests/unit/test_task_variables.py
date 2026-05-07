@@ -575,6 +575,83 @@ class TestEdgeCases:
         assert progress.shape == (len(time),)
         np.testing.assert_array_equal(progress, np.zeros(len(time)))
 
+    def test_turn_direction_short_trial_returns_empty_string(
+        self, simple_linear_track
+    ):
+        """Regression: ``turn_direction`` calls ``np.diff(times)`` to
+        infer the sampling frequency. A trial slice with 0 or 1
+        position samples (dropped DLC frames, very short DIO trials)
+        produces an empty / NaN diff, then ``int(NaN)`` raised
+        ``ValueError`` and aborted ``make_task_variables`` mid-load.
+        Post-fix returns ``""`` so the surrounding load survives."""
+        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
+            simple_linear_track.nodes[node]["pos"] = pos
+        for i, edge in enumerate(simple_linear_track.edges):
+            simple_linear_track.edges[edge]["edge_id"] = i
+
+        trial = pd.Series(
+            {"start_time": 1.0, "end_time": 1.0, "from_well": 0, "to_well": 1}
+        )
+
+        # Single-sample slice.
+        single = pd.DataFrame(
+            {"track_segment_id": [0]}, index=[1.0]
+        )
+        assert turn_direction(trial, single, simple_linear_track) == ""
+
+        # Empty slice.
+        empty = pd.DataFrame(
+            {"track_segment_id": []}, index=pd.Index([], dtype=float)
+        )
+        assert turn_direction(trial, empty, simple_linear_track) == ""
+
+    def test_path_progress_normalizes_by_planned_path_length_not_max_observed(
+        self, simple_linear_track
+    ):
+        """Regression: ``path_progress_for_run_segment`` previously
+        normalized by ``dist.max()`` — the maximum *observed* distance
+        in the trial slice — not by the planned start-to-goal path
+        length. A half-traversed run with positions only out to the
+        midpoint reported [0.0, 0.5, 1.0] (looks complete) instead of
+        [0.0, 0.25, 0.5] (correctly half-progress)."""
+        # Single-edge graph, 10 cm long, edge_id=0.
+        for node, pos in [(0, (0, 0)), (1, (10, 0))]:
+            simple_linear_track.nodes[node]["pos"] = pos
+        # ``simple_linear_track`` has edges (0,1) and (1,2); we only
+        # exercise (0,1) here.
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+
+        # Half-observed traversal: positions only out to 5 of 10 cm.
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": [0, 0, 0],
+                "projected_x_position": [0.0, 2.5, 5.0],
+                "projected_y_position": [0.0, 0.0, 0.0],
+            },
+            index=[0.0, 0.5, 1.0],
+        )
+
+        progress = path_progress_for_run_segment(
+            pos_info, simple_linear_track, start_node=0, end_node=1
+        )
+        np.testing.assert_allclose(progress, [0.0, 0.25, 0.5])
+
+        # Sanity: a complete traversal still ends at exactly 1.0.
+        full = pd.DataFrame(
+            {
+                "track_segment_id": [0, 0, 0],
+                "projected_x_position": [0.0, 5.0, 10.0],
+                "projected_y_position": [0.0, 0.0, 0.0],
+            },
+            index=[0.0, 0.5, 1.0],
+        )
+        np.testing.assert_allclose(
+            path_progress_for_run_segment(
+                full, simple_linear_track, start_node=0, end_node=1
+            ),
+            [0.0, 0.5, 1.0],
+        )
+
     def test_very_short_segment(self, simple_linear_track):
         """Very short time segment should still work."""
         pos_info = pd.DataFrame({
