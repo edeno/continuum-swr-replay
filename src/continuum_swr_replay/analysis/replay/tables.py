@@ -91,13 +91,13 @@ from ._helpers import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
-    safe_first as _safe_first,
-)
-from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
     single_arm_from_well as _single_arm_from_well,
+)
+from ._helpers import (
+    strict_first as _strict_first,
 )
 from ._helpers import (
     time_since_stop as _time_since_stop,
@@ -338,21 +338,29 @@ def build_event_table(
             well_of_modal = arm_to_well(ts_modal, track_graph)
             if not np.isnan(well_of_modal):
                 current_arm = float(ts_modal)
+        # Trial-derived context columns are NaN at every dot timebin
+        # before the first trial start (see ``add_trial_context``).
+        # ``_safe_first`` would silently skip those leading NaNs and
+        # return the next trial's context, leaking future state into
+        # events whose first timebin had no trial active. The
+        # stop-table builder already uses the strict semantics for the
+        # same hazard — match it here so trial-derived event-level
+        # fields propagate NaN when the event begins before any trial.
         if np.isnan(current_arm):
             current_arm = _single_arm_from_well(
-                _safe_first(g["current_well"]), track_graph
+                _strict_first(g["current_well"]), track_graph
             )
 
-        prev_arm = _single_arm_from_well(_safe_first(g["prev_well"]), track_graph)
-        next_arm = _single_arm_from_well(_safe_first(g["next_well"]), track_graph)
+        prev_arm = _single_arm_from_well(_strict_first(g["prev_well"]), track_graph)
+        next_arm = _single_arm_from_well(_strict_first(g["next_well"]), track_graph)
         last_rewarded_arm = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _strict_first(g["last_rewarded_well"]), track_graph
         )
 
-        is_after_switch = _safe_first(g["is_after_switch"])
-        is_after_omission = _safe_first(g["is_after_omission"])
-        is_after_reward = _safe_first(g["is_after_reward"])
-        reward_outcome = _safe_first(g["reward_outcome"])
+        is_after_switch = _strict_first(g["is_after_switch"])
+        is_after_omission = _strict_first(g["is_after_omission"])
+        is_after_reward = _strict_first(g["is_after_reward"])
+        reward_outcome = _strict_first(g["reward_outcome"])
         is_after_stay = (
             1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
         )
@@ -389,14 +397,14 @@ def build_event_table(
                 "n_unique_arms": int(arms_real.nunique()),
                 "event_midpoint_time": float(times[len(times) // 2]),
                 "time_since_port_entry": float(
-                    times[len(times) // 2] - _safe_first(g["_goal_arrival_time"])
+                    times[len(times) // 2] - _strict_first(g["_goal_arrival_time"])
                 )
-                if not np.isnan(_safe_first(g["_goal_arrival_time"]))
+                if not np.isnan(_strict_first(g["_goal_arrival_time"]))
                 else np.nan,
                 "time_since_reward": float(
-                    times[len(times) // 2] - _safe_first(g["_last_reward_time"])
+                    times[len(times) // 2] - _strict_first(g["_last_reward_time"])
                 )
-                if not np.isnan(_safe_first(g["_last_reward_time"]))
+                if not np.isnan(_strict_first(g["_last_reward_time"]))
                 else np.nan,
             }
         )

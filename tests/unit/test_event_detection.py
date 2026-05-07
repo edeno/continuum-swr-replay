@@ -250,14 +250,8 @@ class TestGetConfidentTimes:
 class TestGetOverlapTimes:
     """Test event overlap detection."""
 
-    def create_mock_results(self, time):
-        """Helper to create minimal xarray Dataset with time coordinate."""
-        return xr.Dataset(coords={"time": time})
-
     def test_perfect_overlap_detected(self):
         """Events completely contained in ripples are detected as overlap."""
-        time = np.arange(0, 1.0, 0.002)
-
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
             "start_time": [0.1],
@@ -272,10 +266,8 @@ class TestGetOverlapTimes:
             "duration": [0.2],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 1, "Event should be detected as overlapping"
@@ -283,7 +275,6 @@ class TestGetOverlapTimes:
 
     def test_partial_overlap_detected(self):
         """Events partially overlapping ripples are detected."""
-        time = np.arange(0, 1.0, 0.002)
 
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
@@ -299,17 +290,14 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 1, "Partial overlap should be detected"
 
     def test_no_overlap_detected(self):
         """Non-overlapping events are correctly separated."""
-        time = np.arange(0, 1.0, 0.002)
 
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
@@ -325,10 +313,8 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0, "No overlap should be detected"
@@ -336,7 +322,6 @@ class TestGetOverlapTimes:
 
     def test_multiple_events_mixed_overlap(self):
         """Multiple events with some overlapping, some not."""
-        time = np.arange(0, 2.0, 0.002)
 
         # Three non-local events
         non_local_times = pd.DataFrame({
@@ -352,10 +337,8 @@ class TestGetOverlapTimes:
             "duration": [0.1, 0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 2, "Events 1 and 3 should overlap"
@@ -368,7 +351,6 @@ class TestGetOverlapTimes:
         intervals (inclusive) and ``get_overlap_times`` reported the
         event as overlapping; post-fix uses strict positive-duration
         intersection."""
-        time = np.arange(0.0, 4.01, 0.5)
         non_local_times = pd.DataFrame({
             "start_time": [1.0],
             "end_time": [2.0],
@@ -379,9 +361,8 @@ class TestGetOverlapTimes:
             "end_time": [3.0],
             "duration": [1.0],
         })
-        results = self.create_mock_results(time)
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
         assert len(overlap) == 0, (
             f"Boundary-touch ripple was reported as overlap "
@@ -394,7 +375,6 @@ class TestGetOverlapTimes:
     def test_boundary_touch_at_event_start_is_not_overlap(self):
         """Mirror case: a ripple ending exactly at the non-local
         event's start time."""
-        time = np.arange(0.0, 4.01, 0.5)
         non_local_times = pd.DataFrame({
             "start_time": [1.0],
             "end_time": [2.0],
@@ -405,16 +385,14 @@ class TestGetOverlapTimes:
             "end_time": [1.0],
             "duration": [2.0],
         })
-        results = self.create_mock_results(time)
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
         assert len(overlap) == 0
         assert len(no_overlap) == 1
 
     def test_empty_ripple_times(self):
         """All events are non-overlapping when no ripples."""
-        time = np.arange(0, 1.0, 0.002)
 
         non_local_times = pd.DataFrame({
             "start_time": [0.1],
@@ -429,10 +407,8 @@ class TestGetOverlapTimes:
             "duration": [],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0, "No overlaps with empty ripples"
@@ -440,7 +416,6 @@ class TestGetOverlapTimes:
 
     def test_empty_non_local_times(self):
         """Empty input returns empty outputs."""
-        time = np.arange(0, 1.0, 0.002)
 
         non_local_times = pd.DataFrame({
             "start_time": [],
@@ -454,10 +429,8 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0

@@ -27,7 +27,7 @@ Find events that overlap with ripples:
 
 >>> from continuum_swr_replay.analysis.hippocampus import get_overlap_times
 >>> overlap_events, no_overlap_events = get_overlap_times(
-...     non_local_times, ripple_times, results
+...     non_local_times, ripple_times
 ... )
 >>> print(f"Non-local events with ripples: {len(overlap_events)}")
 >>> print(f"Non-local events without ripples: {len(no_overlap_events)}")
@@ -127,7 +127,6 @@ def get_confident_times(
 def get_overlap_times(
     non_local_times: pd.DataFrame,
     ripple_times: pd.DataFrame,
-    results: xr.Dataset | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Find non-local events that overlap with ripple events.
 
@@ -138,12 +137,6 @@ def get_overlap_times(
         ``duration``, ``max_speed`` columns. From ``get_confident_times``.
     ripple_times : pd.DataFrame
         Ripple event intervals with ``start_time`` and ``end_time`` columns.
-    results : xr.Dataset, optional
-        Unused (retained for backwards compatibility — the previous
-        implementation routed through ``get_labels``, which needed a
-        time index, but inclusive bin labeling counted boundary-touch
-        intervals as overlap; the strict positive-duration check below
-        no longer needs a time grid).
 
     Returns
     -------
@@ -164,8 +157,6 @@ def get_overlap_times(
     counts on back-to-back intervals.
 
     """
-    del results  # see docstring — no longer needed.
-
     swr_starts = ripple_times["start_time"].to_numpy()
     swr_ends = ripple_times["end_time"].to_numpy()
     ev_starts = non_local_times["start_time"].to_numpy()

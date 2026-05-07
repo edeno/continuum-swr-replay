@@ -342,7 +342,7 @@ def generate_figure(
         non_local_times.max_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     ]
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results_hpc
+        non_local_times, data["ripple_times"]
     )
 
     event_times = {

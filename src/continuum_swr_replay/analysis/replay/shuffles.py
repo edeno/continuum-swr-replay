@@ -144,7 +144,6 @@ def next_arm_circular_shift(
     columns: tuple[str, ...] = (
         "next_arm",
         "next_patch",
-        "is_stay",
     ),
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
@@ -168,15 +167,23 @@ def next_arm_circular_shift(
         One session's ``event_table``, sorted by
         ``event_midpoint_time`` (or sortable).
     columns : tuple of str
-        Which columns to shift. Default includes ``next_arm``,
-        ``next_patch``, and ``is_stay`` — all the post-hoc variables.
+        Which columns to shift. Default is the post-hoc "next-trip"
+        labels (``next_arm``, ``next_patch``); ``current_*`` and
+        ``prev_*`` are NOT rolled because they describe the source
+        row's situation. ``is_stay`` is also not rolled — it's a
+        derived ``current_patch == next_patch`` indicator and is
+        recomputed below from the destination row's ``current_patch``
+        and the shifted ``next_patch``. Rolling the source row's
+        ``is_stay`` would silently keep the wrong current-patch
+        reference.
     rng : numpy Generator, optional
 
     Returns
     -------
     pd.DataFrame
         Copy of ``event_table`` with the post-hoc columns circularly
-        shifted.
+        shifted and ``is_stay`` (when present) recomputed against the
+        destination row's ``current_patch``.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -198,4 +205,18 @@ def next_arm_circular_shift(
     for col in columns:
         if col in out.columns:
             out[col] = np.roll(out[col].to_numpy(), shift)
+
+    # Recompute ``is_stay`` from the destination row's
+    # ``current_patch`` and the just-shifted ``next_patch`` so the
+    # derived indicator stays consistent with the labels actually on
+    # the row. NaN in either side propagates.
+    if (
+        "is_stay" in out.columns
+        and "current_patch" in out.columns
+        and "next_patch" in out.columns
+    ):
+        cp = out["current_patch"].to_numpy(dtype=float)
+        np_arr = out["next_patch"].to_numpy(dtype=float)
+        both_finite = ~np.isnan(cp) & ~np.isnan(np_arr)
+        out["is_stay"] = np.where(both_finite, (cp == np_arr).astype(float), np.nan)
     return out

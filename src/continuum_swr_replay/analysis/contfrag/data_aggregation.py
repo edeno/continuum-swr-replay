@@ -89,7 +89,7 @@ def get_contfrag_data_over_time(
 
     # SWR vs MUA overlap
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area], results
+        data["ripple_times"], data["hse_times"][brain_area]
     )
 
     # Posterior stats on the full posterior

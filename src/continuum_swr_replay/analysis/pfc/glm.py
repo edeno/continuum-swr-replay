@@ -935,7 +935,7 @@ def run_session(
     ]
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results
+        non_local_times, data["ripple_times"]
     )
     logger.info(
         "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",

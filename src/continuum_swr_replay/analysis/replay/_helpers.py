@@ -259,6 +259,24 @@ def safe_first(series: pd.Series) -> float:
     return float(valid.iloc[0])
 
 
+def strict_first(series: pd.Series) -> float:
+    """First row's value as-is — NaN propagates.
+
+    Use this when extracting event-level / bout-level context columns
+    that come from ``add_trial_context``: those columns are NaN at every
+    timebin before the first trial start. ``safe_first`` would silently
+    skip leading NaNs and inherit the *next* trial's context, leaking
+    future state into events that started before any trial existed.
+    ``strict_first`` returns the first row's value as-is (NaN stays
+    NaN), so before-trial events surface as missing context instead of
+    fabricated post-hoc values.
+    """
+    if len(series) == 0:
+        return np.nan
+    v = series.iloc[0]
+    return float(v) if pd.notna(v) else np.nan
+
+
 def hash_event_id(
     events: pd.DataFrame,
     event_col: str = "non_local_event",

@@ -204,14 +204,14 @@ def get_data_over_time(
     mua_labels = get_labels(data["hse_times"][brain_area], results.time)
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results
+        non_local_times, data["ripple_times"]
     )
     non_local_mua_times, non_local_no_mua_times = get_overlap_times(
-        non_local_times, data["hse_times"][brain_area], results
+        non_local_times, data["hse_times"][brain_area]
     )
 
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area], results
+        data["ripple_times"], data["hse_times"][brain_area]
     )
     (
         map_estimate,
