@@ -4,16 +4,13 @@ This module produces the four canonical tables specified in
 ``plans/2026_04_14_replay_content_analysis_plan.md`` Section 2:
 
 - ``event_table`` — one row per non-local event
-- ``event_arm_table`` — one row per event × arm (not yet implemented)
-- ``event_sequence_table`` — one row per in-event timebin (not yet implemented)
+  (:func:`build_event_table`)
+- ``event_arm_table`` — one row per event × arm
+  (:func:`build_event_arm_table`)
+- ``event_sequence_table`` — one row per in-event timebin
+  (:func:`build_event_sequence_table`)
 - ``stop_table`` — one row per stopping period, including zero-event
-  stops (not yet implemented)
-
-This file is being built incrementally (plan Phase B). Chunk 1 lands
-``build_event_table`` only; the other three tables, the conditional-
-posterior-dependent columns, MUA wiring, and invariant tests come in
-subsequent commits. Deferred columns are listed explicitly in
-``build_event_table``'s docstring.
+  stops (:func:`build_stop_table`)
 
 Canonical column names follow the plan's Section 1. Intermediate
 columns added by ``_add_trial_context`` (``prev_well``,

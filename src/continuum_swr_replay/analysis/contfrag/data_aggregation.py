@@ -160,8 +160,14 @@ def get_contfrag_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
+            # ``nan_policy="omit"`` — see the matching call in
+            # ``hippocampus.data_aggregation.get_data_over_time``: the
+            # default ``"propagate"`` would make the entire session's
+            # z-score NaN whenever ``_nearest`` leaves a single bin
+            # unaligned, suppressing theta classification downstream.
             "theta_power_zscore": zscore(
-                _nearest(data["theta_power"].squeeze()).squeeze()
+                _nearest(data["theta_power"].squeeze()).squeeze(),
+                nan_policy="omit",
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
             "MUA_zscore": _nearest(

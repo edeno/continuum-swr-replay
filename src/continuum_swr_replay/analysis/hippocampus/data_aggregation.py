@@ -295,8 +295,14 @@ def get_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
+            # ``nan_policy="omit"``: ``_nearest`` can leave NaN at any
+            # bin where no LFP sample lay within tolerance, and the
+            # default ``"propagate"`` would then make the entire
+            # session's z-score all-NaN — silently suppressing theta
+            # event classification downstream in ``quality_metrics``.
             "theta_power_zscore": zscore(
-                _nearest(data["theta_power"].squeeze()).squeeze()
+                _nearest(data["theta_power"].squeeze()).squeeze(),
+                nan_policy="omit",
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
             "MUA_zscore": _nearest(
