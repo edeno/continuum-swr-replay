@@ -134,6 +134,40 @@ def _patch_relative_fracs(
     return frac_target, frac_nontarget, residual_nt
 
 
+def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
+    """Per-session first-switch rows: each ``is_stay == 0`` row whose
+    immediate predecessor in chronological stop order was not also a
+    switch. Returns ``None`` when no rows have ``is_stay`` defined.
+
+    Sorting by ``[animal, day, epoch, stop_idx]`` before the
+    ``groupby(...).shift(1)`` is load-bearing: it makes ``shift`` walk
+    chronological stop order rather than caller row order, and the
+    ``groupby`` on session keys prevents the cross-session boundary
+    from leaking the previous session's last stop into
+    ``prev_is_switch`` for the next session's first stop. A
+    builder-level test cannot exercise that boundary because a
+    session's first-switch at ``stop_idx == 0`` has no preceding rows
+    to emit, so the bug is non-observable downstream — exposing this
+    helper lets the regression be tested directly.
+    """
+    valid = stop_table[stop_table["is_stay"].notna()].copy()
+    if len(valid) == 0:
+        return None
+    valid = valid.sort_values(
+        ["animal", "day", "epoch", "stop_idx"]
+    ).reset_index(drop=True)
+    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
+    valid["prev_is_switch"] = (
+        valid.groupby(["animal", "day", "epoch"])["is_switch"]
+        .shift(1)
+        .fillna(0)
+        .astype(int)
+    )
+    return valid[
+        (valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)
+    ]
+
+
 def build_switch_aligned_table(
     stop_table: pd.DataFrame,
     event_table: pd.DataFrame,
@@ -185,28 +219,9 @@ def build_switch_aligned_table(
     """
     st = stop_table.copy()
 
-    valid = st[st["is_stay"].notna()].copy()
-    if len(valid) == 0:
+    first_switches = _detect_first_switches(st)
+    if first_switches is None:
         return pd.DataFrame()
-
-    # ``shift(1)`` walks the current row order. Sort by stop_idx
-    # within each session before computing ``prev_is_switch`` so the
-    # "previous" row is the previous stop chronologically — without
-    # this, an unsorted ``stop_table`` (the canonical builder emits
-    # sorted rows, but a caller can pass any frame) would
-    # double-count consecutive switches as separate first-switch
-    # episodes.
-    valid = valid.sort_values(
-        ["animal", "day", "epoch", "stop_idx"]
-    ).reset_index(drop=True)
-    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-    valid["prev_is_switch"] = (
-        valid.groupby(["animal", "day", "epoch"])["is_switch"]
-        .shift(1)
-        .fillna(0)
-        .astype(int)
-    )
-    first_switches = valid[(valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)]
 
     if len(first_switches) == 0:
         return pd.DataFrame()

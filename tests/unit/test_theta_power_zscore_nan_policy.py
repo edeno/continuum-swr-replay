@@ -1,72 +1,115 @@
-"""Regression test: theta_power z-score must use ``nan_policy="omit"``.
+"""Regression test for the theta-power z-score NaN contract.
 
-The default ``scipy.stats.zscore`` (``nan_policy="propagate"``) returns
-all-NaN whenever any input value is NaN. ``_nearest`` in the data-
-aggregation paths can leave NaN at any timebin where no LFP sample
-fell within tolerance, so the propagate default would make the entire
-session's ``theta_power_zscore`` NaN — silently suppressing theta
-event classification downstream in ``quality_metrics.compute_non_local_event_context``.
-This test pins both call sites at the source level so a future
-revision can't accidentally drop the kwarg.
+Both data-aggregation paths (HPC + ContFrag) feed
+``_nearest``-interpolated theta power into ``scipy.stats.zscore``.
+The default ``nan_policy="propagate"`` returns all-NaN whenever any
+input value is NaN — silently suppressing theta event classification
+downstream in :func:`quality_metrics.compute_non_local_event_context`.
+
+Both paths route through the shared
+:func:`continuum_swr_replay.analysis.hippocampus.data_aggregation.theta_power_zscore`
+helper, so this test exercises the helper's behavior directly. A
+regression that drops the kwarg, or replaces the helper, fails the
+behavioral assertion below — not a source-grep that could pass while
+the runtime path still produced NaN.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
-from scipy.stats import zscore
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-HPC_AGG = REPO_ROOT / "src" / "continuum_swr_replay" / "analysis" / "hippocampus" / "data_aggregation.py"
-CONTFRAG_AGG = REPO_ROOT / "src" / "continuum_swr_replay" / "analysis" / "contfrag" / "data_aggregation.py"
-
-
-def _theta_zscore_call(source: str) -> str:
-    """Extract the ``zscore(...)`` block following ``theta_power_zscore``."""
-    marker = '"theta_power_zscore": zscore('
-    start = source.index(marker) + len('"theta_power_zscore": ')
-    # Walk balanced parens.
-    depth = 0
-    for i, ch in enumerate(source[start:], start=start):
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if depth == 0:
-                return source[start : i + 1]
-    raise AssertionError("unterminated zscore(...) call")
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    theta_power_zscore,
+)
 
 
-class TestThetaPowerZScoreNanPolicy:
-    def test_scipy_default_propagates_nan_to_full_series(self):
-        """Document why we pin ``nan_policy="omit"``: the default
-        ``"propagate"`` zeroes out the entire output even when only
-        one input bin is NaN."""
-        out = zscore(np.array([1.0, 2.0, np.nan, 4.0]))
-        assert np.all(np.isnan(out)), (
-            "scipy.stats.zscore default behavior changed — verify the "
-            "data-aggregation paths still need nan_policy='omit'."
+class TestThetaPowerZScore:
+    def test_finite_inputs_match_plain_zscore(self):
+        """When no NaN is present the helper matches a plain z-score."""
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        out = theta_power_zscore(x)
+        np.testing.assert_allclose(
+            out, (x - x.mean()) / x.std(), atol=1e-12
         )
 
-    def test_nan_policy_omit_preserves_finite_z_scores(self):
-        """``nan_policy="omit"`` is the contract we depend on."""
-        out = zscore(np.array([1.0, 2.0, np.nan, 4.0]), nan_policy="omit")
-        # Three finite z-scores around the omitted-NaN mean/std.
-        finite_mask = ~np.isnan(out)
-        assert finite_mask.sum() == 3
-        assert np.allclose(out[finite_mask].mean(), 0.0, atol=1e-12)
+    def test_partial_nan_input_keeps_finite_z_scores(self):
+        """The user's hazard: a single NaN in the trace must not zero
+        out the entire output."""
+        out = theta_power_zscore(np.array([1.0, 2.0, np.nan, 4.0]))
+        finite = ~np.isnan(out)
+        assert finite.sum() == 3, (
+            f"Expected 3 finite z-scores, got {out.tolist()}. The "
+            "default scipy.stats.zscore nan_policy='propagate' "
+            "produces all-NaN; the helper must keep nan_policy='omit'."
+        )
+        # The three finite z-scores are computed against the
+        # NaN-omitted mean/std, so they sum to ~0 and have unit
+        # population std.
+        assert np.isclose(out[finite].mean(), 0.0, atol=1e-12)
 
-    def test_hippocampus_data_aggregation_uses_nan_policy_omit(self):
-        call = _theta_zscore_call(HPC_AGG.read_text())
-        assert 'nan_policy="omit"' in call, (
-            f"hippocampus/data_aggregation.py theta_power_zscore call "
-            f"is missing nan_policy='omit':\n{call}"
+    def test_all_nan_input_returns_all_nan(self):
+        """Sanity: with no finite samples there's nothing to z-score
+        against, so NaN propagates."""
+        out = theta_power_zscore(np.full(5, np.nan))
+        assert np.all(np.isnan(out))
+
+    def test_no_finite_values_when_only_one_finite_sample(self):
+        """Single-finite-sample case: variance is undefined, so the
+        finite slot must NOT carry an informative z-score (it would
+        be a divide-by-zero or 0/0 = NaN). The originally-NaN slots
+        stay NaN.
+
+        Scipy's exact value at the lone finite slot has varied across
+        versions (NaN under ddof=1, 0.0 under ddof=0 on some
+        releases). The contract downstream is: nothing here should
+        be a finite, informative z-score that would fool the
+        ``compute_non_local_event_context`` theta classifier into
+        treating a single sample as a real distribution.
+        """
+        out = theta_power_zscore(np.array([np.nan, 3.0, np.nan, np.nan]))
+        assert np.isnan(out[0]) and np.isnan(out[2]) and np.isnan(out[3])
+        assert not np.isfinite(out[1]), (
+            f"single-finite-sample slot returned a finite z-score "
+            f"({out[1]}); variance is undefined here, so downstream "
+            "code that thresholds on ``|z| > k`` must not see a "
+            "real number."
         )
 
-    def test_contfrag_data_aggregation_uses_nan_policy_omit(self):
-        call = _theta_zscore_call(CONTFRAG_AGG.read_text())
-        assert 'nan_policy="omit"' in call, (
-            f"contfrag/data_aggregation.py theta_power_zscore call "
-            f"is missing nan_policy='omit':\n{call}"
+    def test_returns_ndarray(self):
+        """Helper returns a plain ndarray — downstream xarray/pandas
+        wrapping is the caller's responsibility."""
+        out = theta_power_zscore(np.array([1.0, 2.0, 3.0]))
+        assert isinstance(out, np.ndarray)
+
+
+class TestThetaPowerZScoreCallSitesUseHelper:
+    """Both aggregation paths must route through the shared helper.
+    A future change that inlines ``zscore(...)`` again would re-open
+    the failure mode — so pin the import / call here. Source-level
+    grep is the cheapest way to detect that without instantiating
+    the full Spyglass pipeline."""
+
+    def test_hippocampus_data_aggregation_uses_helper(self):
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[2]
+        src = (
+            repo_root
+            / "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py"
+        ).read_text()
+        assert '"theta_power_zscore": theta_power_zscore(' in src
+
+    def test_contfrag_data_aggregation_uses_helper(self):
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[2]
+        src = (
+            repo_root
+            / "src/continuum_swr_replay/analysis/contfrag/data_aggregation.py"
+        ).read_text()
+        assert '"theta_power_zscore": theta_power_zscore(' in src
+        # And the helper is imported, not redefined.
+        assert (
+            "from continuum_swr_replay.analysis.hippocampus.data_aggregation"
+            in src
         )

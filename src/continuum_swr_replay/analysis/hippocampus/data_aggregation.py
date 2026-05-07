@@ -126,6 +126,64 @@ from .event_detection import (
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
 
 
+def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
+    """Z-score a theta-power trace, ignoring NaN entries.
+
+    ``_nearest``-interpolated traces can leave NaN at any timebin
+    where no LFP sample fell within tolerance. The default
+    ``scipy.stats.zscore(...)`` would propagate that NaN and zero out
+    the entire session's z-score, silently suppressing theta event
+    classification downstream in
+    :func:`quality_metrics.compute_non_local_event_context`. Pass
+    ``nan_policy="omit"`` so finite values keep finite z-scores.
+    Shared between :func:`get_data_over_time` (this module) and the
+    ContFrag aggregator so a regression in either path fails the
+    same regression test.
+    """
+    return np.asarray(zscore(np.asarray(theta_power), nan_policy="omit"))
+
+
+def validate_results_position_time_alignment(
+    results_time: np.ndarray,
+    position_index: pd.Index,
+) -> None:
+    """Refuse to attach decoder outputs to position rows on a
+    different timebase.
+
+    The aggregations in this module and in
+    :mod:`continuum_swr_replay.analysis.contfrag.data_aggregation`
+    build ``data_over_time`` on ``position_info.index`` while pulling
+    column values from ``results.time``-indexed arrays. A length-only
+    check passes when the two axes share row count but are time-
+    shifted, silently attaching event labels / probabilities / MAP
+    stats to the wrong position rows. Pinning the stricter
+    ``np.abs(results.time - position.index).max() > 1e-6`` guard
+    here — and calling it from both aggregators — keeps the two paths
+    in lockstep so a regression on either path fails the same
+    regression test (mirrors the alignment check used in
+    ``analysis.replay._helpers._align_posterior_to_dot``).
+    """
+    if len(results_time) != len(position_index):
+        raise ValueError(
+            f"results.time ({len(results_time)}) and position_info "
+            f"({len(position_index)}) have different lengths; "
+            "they must be aligned 1-to-1."
+        )
+    drift = float(
+        np.abs(
+            np.asarray(results_time, dtype=float)
+            - position_index.to_numpy(dtype=float)
+        ).max()
+    )
+    if drift > 1e-6:
+        raise ValueError(
+            f"results.time drifts from position_info.index by up to "
+            f"{drift:.3g}s — same-length axes do not imply same time "
+            "origin; refusing to attach decoder outputs to position "
+            "rows that don't share their timebase."
+        )
+
+
 def get_data_over_time(
     data: SessionData,
     results: xr.Dataset,
@@ -243,32 +301,14 @@ def get_data_over_time(
             series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
         )
 
-    # Build with the position_info time index so axis=1 concat aligns by
-    # time instead of falling back to a default RangeIndex (which would
-    # produce a 2N-row frame full of NaNs against the time-indexed
-    # position frame). Length is necessary but not sufficient — same-
-    # length but time-shifted axes would silently attach event labels
-    # to the wrong rows. Mirror the stricter drift check used in
-    # ``analysis.replay._helpers._align_posterior_to_dot``.
-    if len(results.time) != len(data["position_info"]):
-        raise ValueError(
-            f"results.time ({len(results.time)}) and position_info "
-            f"({len(data['position_info'])}) have different lengths; "
-            "they must be aligned 1-to-1."
-        )
-    drift = float(
-        np.abs(
-            np.asarray(results.time.values, dtype=float)
-            - data["position_info"].index.to_numpy(dtype=float)
-        ).max()
+    # Build with the position_info time index so axis=1 concat aligns
+    # by time instead of falling back to a default RangeIndex (which
+    # would produce a 2N-row frame full of NaNs against the time-
+    # indexed position frame). The helper enforces the stricter drift
+    # check that mirrors ``analysis.replay._helpers._align_posterior_to_dot``.
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
     )
-    if drift > 1e-6:
-        raise ValueError(
-            f"results.time drifts from position_info.index by up to "
-            f"{drift:.3g}s — same-length axes do not imply same time "
-            "origin; refusing to attach decoder outputs to position "
-            "rows that don't share their timebase."
-        )
 
     data_over_time = pd.DataFrame(
         {
@@ -295,14 +335,8 @@ def get_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
-            # ``nan_policy="omit"``: ``_nearest`` can leave NaN at any
-            # bin where no LFP sample lay within tolerance, and the
-            # default ``"propagate"`` would then make the entire
-            # session's z-score all-NaN — silently suppressing theta
-            # event classification downstream in ``quality_metrics``.
-            "theta_power_zscore": zscore(
-                _nearest(data["theta_power"].squeeze()).squeeze(),
-                nan_policy="omit",
+            "theta_power_zscore": theta_power_zscore(
+                _nearest(data["theta_power"].squeeze()).squeeze()
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
             "MUA_zscore": _nearest(

@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.switch_analysis import (
+    _detect_first_switches,
     build_control_aligned_table,
     build_switch_aligned_table,
 )
@@ -39,39 +40,104 @@ def _make_two_session_stop_table() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _replay_tables_for_stops(
+    stop_table: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build minimal event_table / event_arm_table for every stop with
+    ``has_replay``. One event per stop; replay 100% on arm 0 (patch 1)
+    so the cross-stop alignment helper has bounds to compute.
+    """
+    sess_cols = ["animal", "day", "epoch"]
+    replay_stops = stop_table.loc[stop_table["has_replay"]]
+    event_table = pd.DataFrame(
+        [
+            {
+                **{c: row[c] for c in sess_cols},
+                "event_id": int(row["stop_id"]) + 10_000,
+                "stop_id": int(row["stop_id"]),
+                "current_patch": int(row["current_patch"]),
+                "is_swr": True,
+                "is_mua": False,
+            }
+            for _, row in replay_stops.iterrows()
+        ]
+    )
+    event_arm_rows = []
+    for _, row in replay_stops.iterrows():
+        event_id = int(row["stop_id"]) + 10_000
+        for arm in range(9):
+            event_arm_rows.append(
+                {
+                    **{c: row[c] for c in sess_cols},
+                    "event_id": event_id,
+                    "stop_id": int(row["stop_id"]),
+                    "arm": arm,
+                    "arm_fraction": 1.0 if arm == 0 else 0.0,
+                    "current_patch": int(row["current_patch"]),
+                }
+            )
+    event_arm_table = pd.DataFrame(event_arm_rows)
+    return event_table, event_arm_table
+
+
 def test_shift_does_not_leak_across_sessions():
-    """The first stop of session 2 should be identified as a first-switch,
-    not suppressed by the last stop of session 1 being a switch."""
+    """Regression: ``prev_is_switch`` previously used
+    ``df.shift(1)`` without ``groupby``, so the boundary between
+    session 1's last stop and session 2's first stop leaked — making
+    session 2's first stop look like a continuation of session 1's
+    final switch and getting suppressed from the first-switch set.
 
+    The cross-session boundary is non-observable through the full
+    ``build_switch_aligned_table`` output: session 2's first-switch
+    sits at ``stop_idx == 0`` and emits zero preceding-stop rows
+    either way. The builder calls the private
+    ``_detect_first_switches`` helper, so this test exercises the
+    helper directly — a regression that drops the ``groupby`` keys
+    or the chronological sort fails the assertion below.
+    """
     stop_table = _make_two_session_stop_table()
+    first_switches = _detect_first_switches(stop_table)
 
-    # build_switch_aligned_table needs event_table and event_arm_table;
-    # we only need to test the first_switches identification, which
-    # happens before those are used. Intercept at the point of
-    # first_switches construction by testing the internal logic directly.
-    st = stop_table.copy()
-    valid = st[st["is_stay"].notna()].copy()
-    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-
-    # Apply the fixed groupby shift
-    valid["prev_is_switch"] = (
-        valid.groupby(["animal", "day", "epoch"])["is_switch"]
-        .shift(1)
-        .fillna(0)
-        .astype(int)
+    assert first_switches is not None
+    keys = list(
+        first_switches[["animal", "day", "epoch", "stop_idx"]]
+        .itertuples(index=False, name=None)
+    )
+    assert ("test", 20200101, "02_r1", 4) in keys, (
+        "Session 1's last stop is a switch and must be detected as a "
+        "first-switch episode."
+    )
+    assert ("test", 20200102, "02_r1", 0) in keys, (
+        "Session 2's first stop must be its own first-switch — pre-fix "
+        "the leaked prev_is_switch from session 1's final switch hid "
+        "it from the first-switch set."
     )
 
-    first_switches = valid[(valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)]
 
-    # Session 1 last stop (index 4, is_switch=1, prev_is_switch should be 0) -> first switch
-    # Session 2 first stop (index 5, is_switch=1, prev_is_switch should be 0) -> first switch
-    assert len(first_switches) == 2, (
-        f"Expected 2 first-switches (one per session), got {len(first_switches)}"
+def test_shift_does_not_leak_across_sessions_in_builder():
+    """Companion to the helper-level test above: confirms the builder
+    actually routes through ``_detect_first_switches``. A future
+    refactor that re-inlines the logic (and re-introduces the leak)
+    would still pass the helper-level test if the builder kept its
+    own copy. Build the two-session fixture, call the builder, and
+    require session 1's switch (the only one that emits preceding
+    rows) to appear in the output."""
+    stop_table = _make_two_session_stop_table()
+    event_table, event_arm_table = _replay_tables_for_stops(stop_table)
+
+    out = build_switch_aligned_table(
+        stop_table, event_table, event_arm_table, max_lag=5
     )
 
-    # Verify session 2's first stop is included
-    s2_switches = first_switches[first_switches["day"] == 20200102]
-    assert len(s2_switches) == 1, "Session 2's first stop should be a first-switch"
+    sess1 = out[
+        (out["animal"] == "test")
+        & (out["day"] == 20200101)
+        & (out["epoch"] == "02_r1")
+    ]
+    assert sorted(sess1["switch_stop_idx"].unique().tolist()) == [4], (
+        "Session 1's only switch (stop_idx=4) must drive the episode "
+        "in the builder output."
+    )
 
 
 def test_first_switch_detection_sorts_by_stop_idx():
@@ -124,25 +190,6 @@ def test_first_switch_detection_sorts_by_stop_idx():
         f"Expected only stop_idx=2 as first-switch, got "
         f"{unique_switches} — consecutive switches were "
         "double-counted under unsorted input."
-    )
-
-
-def test_shift_leak_would_fail_without_groupby():
-    """Verify that the old (plain shift) approach WOULD incorrectly suppress
-    session 2's first switch."""
-    stop_table = _make_two_session_stop_table()
-    st = stop_table.copy()
-    valid = st[st["is_stay"].notna()].copy()
-    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-
-    # Old broken approach: plain shift without groupby
-    valid["prev_is_switch"] = valid["is_switch"].shift(1, fill_value=0)
-    first_switches = valid[(valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)]
-
-    # The old approach would see session 1 last stop = switch, then session 2
-    # first stop gets prev_is_switch=1 (leaked), so it's NOT a first-switch.
-    assert len(first_switches) == 1, (
-        "Old approach should find only 1 first-switch due to session leak"
     )
 
 

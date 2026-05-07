@@ -17,8 +17,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
-from scipy.stats import zscore
 
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    theta_power_zscore,
+    validate_results_position_time_alignment,
+)
 from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
@@ -120,27 +123,12 @@ def get_contfrag_data_over_time(
 
     # Length is necessary but not sufficient — same-length axes that
     # are time-shifted would silently attach event labels to the wrong
-    # rows. Pair the length check with the stricter drift check used
-    # in ``analysis.replay._helpers._align_posterior_to_dot``.
-    if len(results.time) != len(data["position_info"]):
-        raise ValueError(
-            f"results.time ({len(results.time)}) and position_info "
-            f"({len(data['position_info'])}) have different lengths; "
-            "they must be aligned 1-to-1."
-        )
-    drift = float(
-        np.abs(
-            np.asarray(results.time.values, dtype=float)
-            - data["position_info"].index.to_numpy(dtype=float)
-        ).max()
+    # rows. The shared helper enforces the stricter drift check used
+    # in ``analysis.replay._helpers._align_posterior_to_dot``; routing
+    # both aggregators through it keeps the two paths in lockstep.
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
     )
-    if drift > 1e-6:
-        raise ValueError(
-            f"results.time drifts from position_info.index by up to "
-            f"{drift:.3g}s — same-length axes do not imply same time "
-            "origin; refusing to attach decoder outputs to position "
-            "rows that don't share their timebase."
-        )
 
     data_over_time = pd.DataFrame(
         {
@@ -160,14 +148,8 @@ def get_contfrag_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
-            # ``nan_policy="omit"`` — see the matching call in
-            # ``hippocampus.data_aggregation.get_data_over_time``: the
-            # default ``"propagate"`` would make the entire session's
-            # z-score NaN whenever ``_nearest`` leaves a single bin
-            # unaligned, suppressing theta classification downstream.
-            "theta_power_zscore": zscore(
-                _nearest(data["theta_power"].squeeze()).squeeze(),
-                nan_policy="omit",
+            "theta_power_zscore": theta_power_zscore(
+                _nearest(data["theta_power"].squeeze()).squeeze()
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
             "MUA_zscore": _nearest(
