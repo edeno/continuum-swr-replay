@@ -490,6 +490,50 @@ class TestComputeCalibrationCurve:
         result = compute_calibration_curve(data)
         assert result["calibration_slope"].iloc[0] < 0
 
+    def test_nan_error_bin_does_not_poison_slope(self):
+        """Regression: a probability bin that contains only rows with
+        NaN ``ahead_behind_distance`` (e.g. timepoints outside the
+        linearized track) used to emit a row with
+        ``median_error_cm = NaN`` and ``n_bins_in_group = 0``. That
+        row then poisoned ``stats.linregress``, leaving every bin's
+        ``calibration_slope`` NaN and ``is_monotonic_decreasing``
+        False — so a session with otherwise usable calibration bins
+        lost the slope diagnostic, and
+        ``compute_session_quality_summary``'s
+        ``flag_poor_calibration`` silently never tripped. The fix
+        drops NaN-error rows before bin aggregation so each emitted
+        bin reflects actual decoded errors.
+        """
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 8,
+                "day": [1] * 8,
+                "epoch": ["e"] * 8,
+                # Two finite-error bins (low and mid Local_prob);
+                # the high bin contains only NaN-error rows.
+                "Local_prob": [0.05, 0.10, 0.40, 0.60, 0.85, 0.95, 0.90, 0.92],
+                "ahead_behind_distance": [
+                    42.0, 40.0, 12.0, 10.0,
+                    np.nan, np.nan, np.nan, np.nan,
+                ],
+            }
+        )
+        out = compute_calibration_curve(df, n_bins=3)
+        # The all-NaN-error high bin must be dropped, leaving exactly
+        # the two finite bins.
+        assert len(out) == 2
+        # Slope must be finite (and negative for a good calibration).
+        slope = float(out["calibration_slope"].iloc[0])
+        assert np.isfinite(slope), (
+            f"calibration_slope={slope} — NaN-error bin still poisons "
+            "the linregress over the surviving finite bins."
+        )
+        assert slope < 0
+        # The two surviving bins are monotonically decreasing
+        # (41 cm at low p → 11 cm at mid p), so the diagnostic must
+        # report True.
+        assert bool(out["is_monotonic_decreasing"].iloc[0]) is True
+
 
 class TestComputeSessionQualitySummary:
     def test_perfect_session_no_flags(self, perfect_session):

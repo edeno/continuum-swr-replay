@@ -1036,6 +1036,18 @@ def compute_calibration_curve(
     # data drops) would then dominate the highest bin's median error.
     working = working.dropna(subset=["Local_prob"])
     working["error_cm"] = working["ahead_behind_distance"].abs()
+    # Also drop rows where the decoded error is NaN (e.g. timebins
+    # outside the linearized track). Otherwise a probability bin
+    # that happens to contain only NaN-error rows yields
+    # ``median_error_cm = NaN`` with ``n_bins_in_group = 0``, which
+    # then poisons ``stats.linregress`` (NaN slope) and
+    # ``np.diff(errors) <= 0`` (False monotonicity). A session with
+    # otherwise usable calibration bins loses the diagnostic and
+    # ``compute_session_quality_summary``'s
+    # ``flag_poor_calibration`` silently never trips. Drop the
+    # NaN-error rows before binning so each emitted bin reflects
+    # actual decoded errors.
+    working = working.dropna(subset=["error_cm"])
 
     bin_edges = np.linspace(0, 1, n_bins + 1)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
