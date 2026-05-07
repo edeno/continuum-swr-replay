@@ -30,6 +30,17 @@ logger = logging.getLogger(__name__)
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 
+# Leaf arms — the six arms that touch a well (one per well, since
+# every well in the bandit graph is degree-1). The animal can only
+# *choose* to visit a well, so these are the eligible alternatives in
+# the conditional-logit choice set. Trunk arms 6/7/8 connect patch
+# junctions and are transit-only — they can never be ``next_arm``,
+# they have no ``recent_reward_rate``, and ``arm_path_well_to_well``
+# already documents that trunk arms cannot be stop endpoints. The
+# learning-stage helpers use the same set under
+# ``StopSummaryConfig.well_arms`` for "best arm" lookups.
+WELL_ARMS: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
+
 _SESSION_COLS = ("animal", "day", "epoch")
 
 
@@ -235,8 +246,14 @@ def build_choice_dataset(
 
     For each stop that has (a) at least one replay event and (b) a
     valid ``next_arm`` (known next destination), produces one row per
-    candidate arm. The current arm is excluded from the choice set
-    (consecutive pokes at the same port are never rewarded).
+    candidate arm. The choice set is the well arms (leaf arms 0-5,
+    one per well) minus ``current_arm`` — the animal can only choose
+    to visit a well, and consecutive pokes at the same port are never
+    rewarded. Trunk arms (6/7/8) are transit-only — they connect
+    patch junctions and can never be ``next_arm`` — so including them
+    in the conditional-logit denominator would treat impossible
+    destinations as unchosen alternatives, distorting the likelihood
+    and coefficient interpretation.
 
     Parameters
     ----------
@@ -347,10 +364,17 @@ def build_choice_dataset(
 
     choice_df = stop_arm.merge(stop_info, on="stop_id", how="inner")
 
-    # Exclude current arm from choice set.
-    choice_df = choice_df[choice_df["arm"] != choice_df["current_arm"]].reset_index(
-        drop=True
-    )
+    # Restrict the choice set to well arms (leaf arms 0-5) minus
+    # current_arm. Trunk arms 6/7/8 are transit-only and can never
+    # be ``next_arm``; including them as unchosen alternatives in
+    # the conditional logit would distort the likelihood. Filter on
+    # the canonical ``WELL_ARMS`` constant rather than slicing
+    # ``ALL_ARMS`` so a future track-graph change can extend the
+    # eligible-destination set in one place.
+    choice_df = choice_df[
+        choice_df["arm"].isin(WELL_ARMS)
+        & (choice_df["arm"] != choice_df["current_arm"])
+    ].reset_index(drop=True)
 
     # Response: did the animal choose this arm?
     choice_df["chosen"] = (choice_df["arm"] == choice_df["next_arm"]).astype(int)

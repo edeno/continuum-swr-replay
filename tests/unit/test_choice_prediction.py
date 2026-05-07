@@ -107,7 +107,9 @@ class TestBuildChoiceDataset:
         """arm != NaN is True for every arm in IEEE 754, so the
         ``choice_df[choice_df['arm'] != choice_df['current_arm']]``
         filter silently keeps all 9 arms when current_arm is NaN.
-        Such stops must be filtered at the stop level."""
+        Such stops must be filtered at the stop level. The choice
+        set is now WELL_ARMS \\ {current_arm} = 5 arms (well arms
+        0-5, minus the well the animal is sitting on)."""
         et, eat, st = _make_minimal_tables(
             [
                 {"stop_id": 1, "current_arm": 0, "next_arm": 3},
@@ -117,7 +119,7 @@ class TestBuildChoiceDataset:
         )
         ds = build_choice_dataset(et, eat, st)
         sizes = ds.groupby("stop_id").size()
-        assert (sizes == 8).all()
+        assert (sizes == 5).all()
         assert 2 not in sizes.index
         assert set(sizes.index) == {1, 3}
 
@@ -141,6 +143,37 @@ class TestBuildChoiceDataset:
         ds = build_choice_dataset(et, eat, st)
         chosen_row = ds.loc[ds["chosen"] == 1].iloc[0]
         assert chosen_row["arm"] == 3
+
+    def test_choice_set_excludes_trunk_arms(self):
+        """Regression: the choice set must be the WELL ARMS (leaf
+        arms 0-5, one per well) minus ``current_arm`` — not
+        ``ALL_ARMS`` minus ``current_arm``. Trunk arms 6/7/8 connect
+        patch junctions and can never be ``next_arm``; including
+        them as unchosen alternatives in the conditional logit
+        denominator changes the likelihood and coefficient
+        interpretation. The same eligible-set is used by
+        ``StopSummaryConfig.well_arms`` for "best arm" lookups, and
+        ``arm_path_well_to_well`` documents that trunk arms cannot be
+        stop endpoints.
+        """
+        et, eat, st = _make_minimal_tables(
+            [
+                {"stop_id": 1, "current_arm": 0, "next_arm": 3},
+                {"stop_id": 2, "current_arm": 5, "next_arm": 2},
+            ]
+        )
+        ds = build_choice_dataset(et, eat, st)
+        # Trunk arms 6, 7, 8 must never appear as candidates.
+        candidates = set(ds["arm"].unique())
+        assert candidates.isdisjoint({6, 7, 8}), (
+            f"trunk arms leaked into choice set: {candidates & {6, 7, 8}}; "
+            "the conditional-logit denominator must be the well arms, "
+            "not all 9 track segments."
+        )
+        # Per-stop choice set is exactly WELL_ARMS \\ {current_arm}.
+        for stop_id, current_arm in [(1, 0), (2, 5)]:
+            stop_arms = set(ds.loc[ds["stop_id"] == stop_id, "arm"])
+            assert stop_arms == {0, 1, 2, 3, 4, 5} - {current_arm}
 
     def test_current_arm_never_in_choice_set(self):
         """current_arm is the arm the animal is sitting on — by
