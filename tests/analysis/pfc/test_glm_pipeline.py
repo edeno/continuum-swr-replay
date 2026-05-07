@@ -430,3 +430,57 @@ class TestProcessNeuron:
         for key, val in stats.items():
             if key.endswith(": pval"):
                 assert 0 <= val <= 1, f"{key} = {val} out of range"
+
+    def test_non_nested_swr_vs_non_local_lr_test_is_not_emitted(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, simple_event_times, position_info, sampling_frequency,
+    ):
+        """Regression: ``("SWR + non_local_no_SWR", "non_local")`` is
+        NOT a nested model pair in general. The full design carries
+        ``SWR`` (= ``non_local_SWR + SWR_only``) plus
+        ``non_local_no_SWR``; the reduced design carries ``non_local``
+        (= ``non_local_SWR + non_local_no_SWR``). Recovering
+        ``non_local`` from the full requires ``SWR_only == 0`` (no
+        SWR-only events), which is the empty special case. Outside
+        that case, the chi-square LR statistic has no valid null
+        distribution and ``frac_*_dev`` no longer represents "unique
+        deviance explained by the added regressors."
+
+        The fix drops that comparison from ``process_neuron``'s
+        ``test_cases`` so the invalid LR / fractional-deviance
+        columns are no longer emitted. The valid sibling comparison
+        ``("non_local_SWR + non_local_no_SWR", "non_local")`` (which
+        IS nested) and the SWR-controlled comparisons against
+        ``"SWR"`` and ``"non_local_no_SWR"`` are preserved.
+        """
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        stats, *_ = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+        )
+
+        invalid_test = "SWR + non_local_no_SWR vs. non_local"
+        for suffix in (": lr", ": pval", ": frac_null_dev", ": frac_explained_dev"):
+            key = invalid_test + suffix
+            assert key not in stats, (
+                f"non-nested comparison {invalid_test!r} still emitted "
+                f"{key!r} — chi-square LR has no valid null distribution "
+                "and 'unique deviance explained' loses its interpretation "
+                "when SWR-only events exist."
+            )
+
+        # Sibling nested comparisons must still be reported.
+        for valid_key in (
+            "non_local_SWR + non_local_no_SWR vs. non_local: pval",
+            "SWR + non_local_no_SWR vs. SWR: pval",
+            "SWR + non_local_no_SWR vs. non_local_no_SWR: pval",
+        ):
+            assert valid_key in stats, (
+                f"valid nested comparison {valid_key!r} was dropped by "
+                "the fix — only the non-nested non_local comparison "
+                "should be removed."
+            )
