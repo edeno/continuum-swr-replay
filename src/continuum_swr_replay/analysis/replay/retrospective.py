@@ -401,9 +401,18 @@ def ends_at_next_patch(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["ends_at_next_patch"] = (
+    # Compute equality on nullable Int64, then fill ``pd.NA`` with
+    # False and cast to plain ``bool`` so this column matches the
+    # docstring contract ("recorded as False" when the last MAP arm
+    # has no patch label) and so ``_per_session_metric_means``'s
+    # ``astype(float)`` → ``np.nanmean`` reduction counts those rows
+    # in the denominator. Without the fillna, ``<NA>`` becomes NaN
+    # under ``astype(float)`` and gets silently dropped, inflating
+    # the per-session mean.
+    eq = (
         merged["_last_patch"].astype("Int64") == merged["next_patch"].astype("Int64")
     )
+    out["ends_at_next_patch"] = eq.fillna(False).astype(bool)
     return out
 
 

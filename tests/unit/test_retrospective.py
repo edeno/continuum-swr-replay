@@ -334,6 +334,69 @@ class TestEndsAtNextPatch:
         out = ends_at_next_patch(ev, es).set_index("event_id")
         assert bool(out.loc[1, "ends_at_next_patch"]) is True
 
+    def test_unmapped_last_arm_recorded_as_false(self):
+        """Regression: docstring says "Bins whose MAP arm has no
+        patch label (NaN, junction-bin artifact) yield NaN and are
+        excluded from the equality test (the row is recorded as
+        False)." Pre-fix the equality on nullable ``Int64`` returned
+        ``pd.NA``, which then survived as NaN through
+        ``_per_session_metric_means``'s ``astype(float)`` →
+        ``np.nanmean`` reduction and got *dropped* from the
+        denominator — so a session with a real True endpoint and one
+        unmapped/junction endpoint reported a mean of 1.0 instead of
+        the documented 0.5.
+        """
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+            ]
+        )
+        es = _make_event_sequence_table(
+            {
+                1: [0, 6, 7, 3],  # ends on arm 3 (patch 2) → True
+                # Arm 9 is not a key in TRACK_SEGMENT_TO_PATCH, so
+                # _last_patch is NaN. Pre-fix: ends_at_next_patch=<NA>;
+                # post-fix: False.
+                2: [0, 6, 7, 9],
+            }
+        )
+        out = ends_at_next_patch(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "ends_at_next_patch"]) is True
+        assert bool(out.loc[2, "ends_at_next_patch"]) is False, (
+            f"unmapped endpoint produced "
+            f"{out.loc[2, 'ends_at_next_patch']!r} instead of False"
+        )
+        # And the column dtype must be plain ``bool`` (not nullable
+        # ``boolean``) so the downstream ``astype(float)`` →
+        # ``np.nanmean`` reduction never sees NaN. Otherwise the
+        # session-mean would silently drop these rows.
+        assert out["ends_at_next_patch"].dtype == bool
+
+    def test_unmapped_endpoint_does_not_inflate_session_mean(self):
+        """End-to-end regression: feed a 2-event table with one True
+        endpoint and one unmapped endpoint through
+        ``_per_session_metric_means`` and assert the reported mean is
+        0.5 (the documented value), not 1.0 (pre-fix)."""
+        from continuum_swr_replay.analysis.replay.retrospective import (
+            _per_session_metric_means,
+        )
+
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+            ]
+        )
+        es = _make_event_sequence_table({1: [0, 6, 7, 3], 2: [0, 6, 7, 9]})
+        metrics = ends_at_next_patch(ev, es)
+        means = _per_session_metric_means(metrics)
+        assert means["ends_at_next_patch"] == 0.5, (
+            f"session mean = {means['ends_at_next_patch']} — unmapped "
+            "endpoint inflated the mean by being dropped from the "
+            "np.nanmean denominator instead of being counted as False."
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # compute_retrospective_metrics
