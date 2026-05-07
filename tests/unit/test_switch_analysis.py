@@ -74,6 +74,59 @@ def test_shift_does_not_leak_across_sessions():
     assert len(s2_switches) == 1, "Session 2's first stop should be a first-switch"
 
 
+def test_first_switch_detection_sorts_by_stop_idx():
+    """Regression: ``prev_is_switch`` walks the current row order, so
+    an unsorted ``stop_table`` made consecutive switches register as
+    separate first-switch episodes. With true ``stop_idx`` order
+    [0=stay, 1=stay, 2=switch, 3=switch] but rows shuffled into
+    [3, 0, 1, 2], the pre-fix builder emitted episodes for both
+    stop_idx=3 and stop_idx=2; only stop_idx=2 should be a
+    first-switch in that run. The fix sorts by
+    ``[animal, day, epoch, stop_idx]`` before computing
+    ``prev_is_switch``.
+    """
+    # Same minimal event_table / event_arm_table fixture as the
+    # patch-relative tests below — replay tied to stop 0 so each
+    # detected first-switch episode adds at least one preceding row.
+    stop_rows = [
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "stop_idx": 3, "stop_id": 3, "is_stay": 0.0,
+         "current_patch": 1, "has_replay": False, "n_events": 0},
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "stop_idx": 0, "stop_id": 0, "is_stay": 1.0,
+         "current_patch": 1, "has_replay": True, "n_events": 1},
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "stop_idx": 1, "stop_id": 1, "is_stay": 1.0,
+         "current_patch": 1, "has_replay": False, "n_events": 0},
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "stop_idx": 2, "stop_id": 2, "is_stay": 0.0,
+         "current_patch": 1, "has_replay": False, "n_events": 0},
+    ]
+    stop_table = pd.DataFrame(stop_rows)
+
+    event_table = pd.DataFrame([
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "event_id": 100, "stop_id": 0, "current_patch": 1,
+         "is_swr": True, "is_mua": False},
+    ])
+    event_arm_table = pd.DataFrame([
+        {"animal": "test", "day": 20200101, "epoch": "02_r1",
+         "event_id": 100, "stop_id": 0, "arm": arm,
+         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
+        for arm in range(9)
+    ])
+
+    out = build_switch_aligned_table(
+        stop_table, event_table, event_arm_table, max_lag=5
+    )
+    unique_switches = sorted(out["switch_stop_idx"].unique().tolist())
+    assert unique_switches == [2], (
+        f"Expected only stop_idx=2 as first-switch, got "
+        f"{unique_switches} — consecutive switches were "
+        "double-counted under unsorted input."
+    )
+
+
 def test_shift_leak_would_fail_without_groupby():
     """Verify that the old (plain shift) approach WOULD incorrectly suppress
     session 2's first switch."""

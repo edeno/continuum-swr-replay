@@ -189,6 +189,16 @@ def build_switch_aligned_table(
     if len(valid) == 0:
         return pd.DataFrame()
 
+    # ``shift(1)`` walks the current row order. Sort by stop_idx
+    # within each session before computing ``prev_is_switch`` so the
+    # "previous" row is the previous stop chronologically — without
+    # this, an unsorted ``stop_table`` (the canonical builder emits
+    # sorted rows, but a caller can pass any frame) would
+    # double-count consecutive switches as separate first-switch
+    # episodes.
+    valid = valid.sort_values(
+        ["animal", "day", "epoch", "stop_idx"]
+    ).reset_index(drop=True)
     valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
     valid["prev_is_switch"] = (
         valid.groupby(["animal", "day", "epoch"])["is_switch"]
