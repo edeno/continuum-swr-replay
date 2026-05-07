@@ -136,22 +136,29 @@ def _summarize_event_state(
     """
     cont_finite = bool(np.isfinite(cont_prob).any())
     frag_finite = bool(np.isfinite(frag_prob).any())
+    # Reported per-state means use each state's own finite bins —
+    # they're independent estimates of the state's average probability
+    # across the event and are meant to be read on their own.
     cont_mean = float(np.nanmean(cont_prob)) if cont_finite else float("nan")
     frag_mean = float(np.nanmean(frag_prob)) if frag_finite else float("nan")
-    # Both ``dominant`` and ``cont_frac`` require bins where BOTH
-    # states are finite. NaN comparisons silently return False, so
-    # ``np.nanmean(cont > frag)`` has no NaNs left to skip and would
-    # count partial-NaN bins as "Fragmented" wins. Likewise, when
-    # the two states' finite bins don't overlap (``cont=[0.99, NaN]``,
-    # ``frag=[NaN, 0.01]``), the per-state nanmeans come from disjoint
-    # rows — comparing them as ``cont_mean >= frag_mean`` produces a
-    # confident "Continuous" label even though no bin ever observed
-    # both states simultaneously. Gate both outputs on ``paired.any()``
-    # so degenerate inputs surface as ``None`` / NaN.
+    # Both ``dominant`` and ``cont_frac`` need a comparable view of
+    # the two states. Compute them from PAIRED-FINITE bins only —
+    # bins where both states have a finite probability — so the
+    # reported label and bin-wise fraction agree. The previous form
+    # built ``dominant`` from the per-state nanmeans (which include
+    # unpaired bins) and ``cont_frac`` from paired bins, so on inputs
+    # like ``cont=[0.9, 0.1]``, ``frag=[0.8, NaN]`` we got
+    # ``dominant='Fragmented'`` (per-state means: 0.5 vs 0.8) while
+    # the only comparable bin had cont > frag, ``cont_frac=1.0``. NaN
+    # comparisons silently return False, so paired-mean masking is
+    # also what stops partial-NaN bins from being counted as
+    # "Fragmented" wins.
     paired = np.isfinite(cont_prob) & np.isfinite(frag_prob)
     if paired.any():
+        paired_cont_mean = float(cont_prob[paired].mean())
+        paired_frag_mean = float(frag_prob[paired].mean())
         dominant: str | None = (
-            "Continuous" if cont_mean >= frag_mean else "Fragmented"
+            "Continuous" if paired_cont_mean >= paired_frag_mean else "Fragmented"
         )
         cont_frac = float((cont_prob[paired] > frag_prob[paired]).mean())
     else:

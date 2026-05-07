@@ -158,6 +158,63 @@ class TestContfragDominantStateNaNGuard:
             "per-bin comparison has no overlap and should be NaN."
         )
 
+    def test_dominant_uses_paired_finite_means_to_match_cont_frac(self):
+        """Regression: the dominant label and the bin-wise
+        ``continuous_fraction`` were computed on different scopes —
+        ``dominant`` from per-state nanmeans (including unpaired bins),
+        ``cont_frac`` from paired-finite bins only. That let
+        unpaired Continuous-only or Fragmented-only bins flip the
+        dominant label even when every paired bin said the opposite.
+
+        User repro: cont=[0.9, 0.1], frag=[0.8, NaN]. The only paired
+        bin (index 0) has cont=0.9 > frag=0.8, so cont_frac=1.0; but
+        per-state nanmeans give cont=0.5, frag=0.8 → pre-fix
+        dominant='Fragmented', a label that disagrees with every
+        comparable bin. Post-fix dominant uses paired-finite means
+        (0.9 vs 0.8 → 'Continuous'), matching cont_frac.
+        """
+        cm, fm, dom, cf = _summarize_event_state(
+            np.array([0.9, 0.1]),
+            np.array([0.8, np.nan]),
+        )
+        # Per-state means stay reported as-is (independent estimates).
+        assert np.isclose(cm, 0.5)
+        assert np.isclose(fm, 0.8)
+        assert dom == "Continuous", (
+            f"dominant={dom!r} disagrees with the paired-finite "
+            "comparison (cont 0.9 > frag 0.8); the unpaired "
+            "Continuous-only bin (cont=0.1) must not flip the label."
+        )
+        assert np.isclose(cf, 1.0)
+
+    def test_dominant_consistent_with_cont_frac_under_partial_asymmetric_nans(self):
+        """End-to-end consistency invariant: whenever
+        ``cont_frac > 0.5`` the label should be ``Continuous``;
+        whenever ``cont_frac < 0.5`` the label should be ``Fragmented``;
+        at exactly 0.5 either label is allowed (tie-break favors
+        Continuous in the implementation). Pre-fix this invariant
+        could break under partial asymmetric NaNs.
+        """
+        cases = [
+            (np.array([0.9, 0.1]), np.array([0.8, np.nan])),       # paired: cont wins
+            (np.array([0.1, 0.9]), np.array([np.nan, 0.8])),       # paired: cont wins (mirror)
+            (np.array([0.2, 0.95]), np.array([0.6, np.nan])),      # paired: frag wins
+            (np.array([0.7, 0.6]), np.array([0.2, 0.3])),          # all-finite, cont
+            (np.array([0.2, 0.3]), np.array([0.7, 0.6])),          # all-finite, frag
+        ]
+        for cont, frag in cases:
+            cm, fm, dom, cf = _summarize_event_state(cont, frag)
+            if cf > 0.5:
+                assert dom == "Continuous", (
+                    f"cont_frac={cf} > 0.5 but dominant={dom!r} "
+                    f"(cont={cont}, frag={frag})"
+                )
+            elif cf < 0.5:
+                assert dom == "Fragmented", (
+                    f"cont_frac={cf} < 0.5 but dominant={dom!r} "
+                    f"(cont={cont}, frag={frag})"
+                )
+
     def test_extreme_disjoint_does_not_fabricate_dominant(self):
         # User repro: cont=[0.99, NaN], frag=[NaN, 0.01]. Pre-fix gave
         # dominant="Continuous" with cont_frac=NaN — confident label
