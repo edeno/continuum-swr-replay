@@ -11,7 +11,7 @@ with a known generative truth that includes interaction terms, then ask:
 3. **Selection power**: when the truth IS M3 (reward binary active),
    does AIC/BIC correctly upgrade from M2 to M3?
 
-These are the validations that determine whether the M0–M8 hierarchy
+These are the validations that determine whether the M0–M6 hierarchy
 comparisons reported in the paper actually identify the right
 generative story.
 """

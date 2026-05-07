@@ -245,7 +245,7 @@ def simulate_with_event_covariates(
 
     The returned long-format frame contains *every* model_specs predictor
     (not just the ones with non-zero β), so a single simulator output can
-    be used to compare nested models in the M0–M7 hierarchy.
+    be used to compare nested models in the M0–M6 hierarchy.
     """
     rng = np.random.default_rng(seed)
     predictor_list = list(beta_true)
