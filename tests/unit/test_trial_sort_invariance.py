@@ -163,6 +163,101 @@ class TestNoPastTrialsContract:
         assert out[1, 0] == 1.0
         assert np.all(out[1, 1:] == 0.0)
 
+    def test_history_cutoffs_use_goal_arrival_time(self):
+        """Regression: ``visit_recency`` / ``cumulative_reward`` /
+        ``recent_reward_rate`` previously cut off "past trials" at
+        ``end_time`` while ``add_trial_context``'s
+        ``last_rewarded_well`` / ``_goal_arrival_time`` /
+        ``_last_reward_time`` use ``goal_arrival_time``. For an
+        event during the post-arrival stop period
+        (``goal_arrival_time <= t < end_time``), the trial is past
+        for the first set of columns but future for the second —
+        so the same event could read "at/after the current reward"
+        in ``last_rewarded_well`` while ``visit_recency`` /
+        ``cumulative_reward`` reported NaN history. The fix pivots
+        all three helpers to use ``goal_arrival_time`` (with
+        ``end_time`` fallback per row) so all four trial-derived
+        columns share the same temporal cutoff.
+        """
+        trials = pd.DataFrame(
+            [
+                {
+                    "start_time": 1.0,
+                    "end_time": 3.0,
+                    "goal_arrival_time": 2.0,
+                    "from_well": 0,
+                    "to_well": 2,
+                    "is_reward": True,
+                    "is_patch_change": False,
+                }
+            ]
+        )
+        # Event at t=2.6 — after the trial's goal_arrival_time but
+        # before its end_time. All four trial-derived columns must
+        # agree the trial is past.
+        event_times = np.array([2.6])
+        vr = visit_recency_all_events(event_times, trials, _well_to_arm())
+        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
+        # arm 2 is the rewarded arm; visit_recency=1 (1 trial ago),
+        # cumulative_reward=1 (one rewarded visit), recent_reward_rate=1.0.
+        assert vr[0, 2] == 1.0, f"visit_recency=NaN-or-wrong: {vr[0, 2]}"
+        assert cr[0, 2] == 1.0, f"cumulative_reward=NaN-or-wrong: {cr[0, 2]}"
+        assert rrr[0, 2] == 1.0, f"recent_reward_rate=NaN-or-wrong: {rrr[0, 2]}"
+
+    def test_history_cutoffs_falls_back_to_end_time_when_goal_arrival_time_missing(
+        self,
+    ):
+        """When ``trials`` lacks ``goal_arrival_time`` (older
+        pipelines), the helpers must fall back to ``end_time``
+        cutoffs without crashing — preserving the legacy contract."""
+        trials = _toy_trials().drop(columns=[])  # no goal_arrival_time
+        assert "goal_arrival_time" not in trials.columns
+        event_times = np.array([0.5, 2.5, 4.5])
+        # Just confirm they run and return the expected shape.
+        vr = visit_recency_all_events(event_times, trials, _well_to_arm())
+        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
+        assert vr.shape == (3, 9)
+        assert cr.shape == (3, 9)
+        assert rrr.shape == (3, 9)
+
+    def test_history_cutoffs_per_row_fallback_for_nan_goal_arrival_time(self):
+        """Per-row NaN ``goal_arrival_time`` falls back to
+        ``end_time`` for that trial — matches
+        ``add_trial_context``'s same-condition fallback."""
+        trials = pd.DataFrame(
+            [
+                # Trial 0 has NaN goal_arrival_time; cutoff = end_time = 1.0.
+                {
+                    "start_time": 0.5,
+                    "end_time": 1.0,
+                    "goal_arrival_time": np.nan,
+                    "from_well": 0,
+                    "to_well": 1,
+                    "is_reward": True,
+                    "is_patch_change": False,
+                },
+                # Trial 1 has finite goal_arrival_time = 2.5.
+                {
+                    "start_time": 1.5,
+                    "end_time": 3.5,
+                    "goal_arrival_time": 2.5,
+                    "from_well": 1,
+                    "to_well": 2,
+                    "is_reward": True,
+                    "is_patch_change": False,
+                },
+            ]
+        )
+        # Event at t=2.0: trial 0 is past (cutoff=1.0 ≤ 2.0); trial 1
+        # is future (cutoff=2.5 > 2.0).
+        event_times = np.array([2.0])
+        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        # arm 1 is rewarded by trial 0 → 1; arm 2 is not yet rewarded.
+        assert cr[0, 1] == 1.0
+        assert cr[0, 2] == 0.0
+
     def test_zero_trials_returns_all_nan(self):
         # ``n_trials_total == 0`` early-return path: pre-fix returned
         # ``np.zeros``, post-fix returns NaN to match the sibling

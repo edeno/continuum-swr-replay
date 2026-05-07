@@ -397,6 +397,35 @@ def build_well_to_arm_map(track_graph: nx.Graph) -> dict[int, int]:
 # ── Vectorized batch helpers (operate on all events at once) ──
 
 
+def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
+    """Per-trial cutoff timestamp for "is this trial past relative to an event?".
+
+    Uses ``goal_arrival_time`` (the moment the animal arrives at and
+    is rewarded at the goal well) when available, falling back to
+    ``end_time`` per-row when ``goal_arrival_time`` is NaN, and
+    per-frame when the column is absent. This matches the convention
+    already used by :func:`add_trial_context` for ``last_rewarded_well``
+    and the ``_goal_arrival_time`` / ``_last_reward_time`` columns.
+
+    Why this matters: between ``goal_arrival_time`` and ``end_time``
+    of the same trial the animal is sitting at the well in the
+    post-arrival stop. Cutting at ``end_time`` makes a replay event
+    during that stop see ``last_rewarded_well`` set to the just-
+    completed well (because that uses ``goal_arrival_time``) while
+    ``visit_recency`` / ``cumulative_reward`` / ``recent_reward_rate``
+    haven't counted the same arrival yet — value history that lags
+    the reward-context columns by the post-arrival window. Using
+    ``goal_arrival_time`` uniformly aligns all four trial-derived
+    columns onto the same temporal cutoff.
+    """
+    if "goal_arrival_time" in trials.columns:
+        cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
+        end = trials["end_time"].to_numpy(dtype=float)
+        missing = ~np.isfinite(cutoff)
+        return np.where(missing, end, cutoff)
+    return trials["end_time"].to_numpy(dtype=float)
+
+
 def visit_recency_all_events(
     event_times: np.ndarray,
     trials: pd.DataFrame,
@@ -421,11 +450,15 @@ def visit_recency_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
-    # ``np.searchsorted`` below assumes ``end_times`` is non-decreasing.
+    # ``np.searchsorted`` below assumes the cutoff times are non-decreasing.
     # Sort defensively so chronological-order assumptions hold for any
     # caller (Spyglass-loaded frames are not guaranteed to be sorted).
-    trials = trials.sort_values("end_time").reset_index(drop=True)
-    end_times = trials["end_time"].to_numpy()
+    # Use ``goal_arrival_time`` (with ``end_time`` fallback) as the
+    # cutoff so this helper aligns with ``add_trial_context`` —
+    # see ``_trial_cutoff_times`` for the rationale.
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
 
     # For each trial, record which arm was visited (to_well = destination).
@@ -441,8 +474,8 @@ def visit_recency_all_events(
             j = arm_idx[arm_id]
             arm_visit_indices[j] = np.append(arm_visit_indices[j], ti)
 
-    # cutoff[i] = number of trials with end_time <= event_times[i]
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    # cutoff[i] = number of trials with cutoff_time <= event_times[i]
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
 
     out = np.full((n_events, n_arms), default_f)
 
@@ -492,9 +525,11 @@ def cumulative_reward_all_events(
         # valid neutral observations rather than missing history.
         return np.full((n_events, n_arms), np.nan)
 
-    # Sort defensively (see ``visit_recency_all_events`` for context).
-    trials = trials.sort_values("end_time").reset_index(drop=True)
-    end_times = trials["end_time"].to_numpy()
+    # Sort defensively by the goal-arrival cutoff (see
+    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(bool)
 
@@ -515,7 +550,7 @@ def cumulative_reward_all_events(
     cum = np.zeros((n_trials_total + 1, n_arms), dtype=float)
     np.cumsum(reward_per_arm, axis=0, out=cum[1:])
 
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
     window_starts = np.maximum(cutoffs - window, 0)
 
     out = cum[cutoffs] - cum[window_starts]
@@ -550,9 +585,11 @@ def recent_reward_rate_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
-    # Sort defensively (see ``visit_recency_all_events`` for context).
-    trials = trials.sort_values("end_time").reset_index(drop=True)
-    end_times = trials["end_time"].to_numpy()
+    # Sort defensively by the goal-arrival cutoff (see
+    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(float)
 
@@ -573,7 +610,7 @@ def recent_reward_rate_all_events(
         arm_visits.append(np.array(vis_idx, dtype=np.intp))
         arm_rewards.append(np.array(vis_rew, dtype=float))
 
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
 
     # Events with no past trials -> NaN
     no_past = cutoffs == 0
