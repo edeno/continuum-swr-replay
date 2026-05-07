@@ -182,7 +182,12 @@ def ends_at_next(
 
     The "last" bin is identified by the maximum ``t_in_event`` per
     event. Events with NaN ``next_arm`` are dropped (no choice to
-    align to).
+    align to). Events with no in-event sequence row (the merge fills
+    NaN ``_last_arm``) — and bins whose final ``decoded_arm_map`` is
+    itself NaN (junction-bin artifact) — are recorded as ``False``,
+    not propagated as missing, so downstream
+    ``_per_session_metric_means``'s ``np.nanmean`` reduction counts
+    them in the denominator.
 
     Returns
     -------
@@ -208,9 +213,15 @@ def ends_at_next(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["ends_at_next"] = merged["_last_arm"].astype("Int64") == merged[
-        "next_arm"
-    ].astype("Int64")
+    # Match the arm-level contract to ``ends_at_next_patch``: an
+    # event with valid ``next_arm`` but no decoded sequence row (or
+    # whose final ``decoded_arm_map`` is NaN, e.g. junction-bin
+    # artifact) records as ``False`` rather than ``pd.NA``. Without
+    # this fillna the nullable equality leaks ``<NA>`` →
+    # ``np.nanmean`` drops the row from the denominator in
+    # ``_per_session_metric_means``, inflating the per-session mean.
+    eq = merged["_last_arm"].astype("Int64") == merged["next_arm"].astype("Int64")
+    out["ends_at_next"] = eq.fillna(False).astype(bool)
     return out
 
 

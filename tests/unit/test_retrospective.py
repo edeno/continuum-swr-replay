@@ -214,6 +214,58 @@ class TestEndsAtNext:
         out = ends_at_next(ev, es).set_index("event_id")
         assert bool(out.loc[1, "ends_at_next"]) is True
 
+    def test_event_with_no_sequence_rows_recorded_as_false(self):
+        """Regression (symmetric to ``ends_at_next_patch``): an event
+        with valid ``next_arm`` but no decoded sequence row produces
+        a NaN ``_last_arm`` after the left merge. Pre-fix the
+        nullable ``Int64`` equality returned ``pd.NA``, which then
+        survived as NaN through ``_per_session_metric_means``'s
+        ``astype(float)`` → ``np.nanmean`` reduction and got
+        *dropped* from the denominator — a session with one True
+        endpoint and one missing sequence reported a mean of 1.0
+        instead of the documented 0.5.
+        """
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+            ]
+        )
+        # Only event 1 has a sequence; event 2's _last_arm is NaN
+        # after the left merge.
+        es = _make_event_sequence_table({1: [0, 6, 7, 3]})
+        out = ends_at_next(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "ends_at_next"]) is True
+        assert bool(out.loc[2, "ends_at_next"]) is False, (
+            f"event-with-no-sequence produced "
+            f"{out.loc[2, 'ends_at_next']!r} instead of False"
+        )
+        # Plain ``bool`` dtype so downstream ``astype(float)`` →
+        # ``np.nanmean`` never sees NaN.
+        assert out["ends_at_next"].dtype == bool
+
+    def test_missing_sequence_endpoint_does_not_inflate_session_mean(self):
+        """End-to-end regression: 2-event table with one True and one
+        missing-sequence endpoint must average to 0.5 (not 1.0)."""
+        from continuum_swr_replay.analysis.replay.retrospective import (
+            _per_session_metric_means,
+        )
+
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+            ]
+        )
+        es = _make_event_sequence_table({1: [0, 6, 7, 3]})
+        metrics = ends_at_next(ev, es)
+        means = _per_session_metric_means(metrics)
+        assert means["ends_at_next"] == 0.5, (
+            f"session mean = {means['ends_at_next']} — missing-sequence "
+            "endpoint inflated the mean by being dropped from the "
+            "np.nanmean denominator instead of being counted as False."
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # contains_path_to_next
