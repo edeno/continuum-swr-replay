@@ -74,7 +74,6 @@ def add_trial_context(
     trials = trials.sort_values("start_time").reset_index(drop=True)
 
     trial_start_times = trials["start_time"].values
-    trial_end_times = trials["end_time"].values
     to_wells = trials["to_well"].values
     from_wells = trials["from_well"].values
     is_reward = trials["is_reward"].values
@@ -92,10 +91,16 @@ def add_trial_context(
     dot["current_well"] = np.where(valid, to_wells[current_clipped], np.nan)
     dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
-    if "goal_arrival_time" in trials.columns:
-        reward_timestamps = trials["goal_arrival_time"].values[is_reward]
-    else:
-        reward_timestamps = trial_end_times[is_reward]
+    # Use the same per-row goal-arrival cutoff convention as
+    # ``_trial_cutoff_times``: ``goal_arrival_time`` when finite,
+    # ``end_time`` when NaN, ``end_time`` everywhere when the column
+    # is absent. The history helpers
+    # (``visit_recency_all_events`` etc.) call ``_trial_cutoff_times``
+    # for the same alignment — this consolidation makes the per-row
+    # NaN fallback match between ``add_trial_context``'s reward /
+    # goal-arrival writes and the history helpers' cutoffs.
+    arrival_times = _trial_cutoff_times(trials)
+    reward_timestamps = arrival_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(reward_timestamps) > 0:
         rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
@@ -106,13 +111,9 @@ def add_trial_context(
     else:
         dot["last_rewarded_well"] = np.nan
 
-    if "goal_arrival_time" in trials.columns:
-        goal_arrival_times = trials["goal_arrival_time"].values
-        dot["_goal_arrival_time"] = np.where(
-            valid, goal_arrival_times[current_clipped], np.nan
-        )
-    else:
-        dot["_goal_arrival_time"] = np.nan
+    dot["_goal_arrival_time"] = np.where(
+        valid, arrival_times[current_clipped], np.nan
+    )
 
     if len(reward_timestamps) > 0:
         dot["_last_reward_time"] = np.where(

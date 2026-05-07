@@ -222,6 +222,69 @@ class TestNoPastTrialsContract:
         assert cr.shape == (3, 9)
         assert rrr.shape == (3, 9)
 
+    def test_add_trial_context_per_row_fallback_for_nan_goal_arrival_time(self):
+        """``add_trial_context`` must apply the same per-row
+        ``goal_arrival_time`` → ``end_time`` fallback that the
+        history helpers use, so all four trial-derived columns
+        (``last_rewarded_well``, ``_goal_arrival_time``,
+        ``_last_reward_time``, plus the history covariates) stay
+        aligned even when individual trials have NaN
+        ``goal_arrival_time``.
+
+        Pre-fix ``add_trial_context`` indexed
+        ``trials["goal_arrival_time"]`` directly, broadcasting NaN
+        into ``reward_timestamps`` (so a NaN-goal-arrival rewarded
+        trial sorted to the end of ``np.searchsorted`` and either
+        was missed entirely or stamped NaN into the dot column).
+        Post-fix it routes through ``_trial_cutoff_times``, which
+        falls back to ``end_time`` per row.
+        """
+        trials = pd.DataFrame(
+            [
+                # Trial 0: rewarded but with NaN goal_arrival_time.
+                # Cutoff falls back to end_time = 1.0.
+                {
+                    "start_time": 0.0,
+                    "end_time": 1.0,
+                    "goal_arrival_time": np.nan,
+                    "from_well": 0,
+                    "to_well": 1,
+                    "is_reward": True,
+                    "is_patch_change": False,
+                },
+                # Trial 1: finite goal_arrival_time = 2.5.
+                {
+                    "start_time": 1.5,
+                    "end_time": 3.5,
+                    "goal_arrival_time": 2.5,
+                    "from_well": 1,
+                    "to_well": 2,
+                    "is_reward": True,
+                    "is_patch_change": False,
+                },
+            ]
+        )
+        # Event at t=2.0: trial 0 is past (cutoff=end_time=1.0 ≤ 2.0);
+        # trial 1's start_time has passed (so ``current_well``
+        # evaluates) but its cutoff=2.5 > 2.0.
+        event_times = np.array([2.0])
+        dot = pd.DataFrame(index=event_times)
+        dot = add_trial_context(dot, trials)
+        # Trial 0's reward (well 1) is past → last_rewarded_well = 1.
+        assert dot["last_rewarded_well"].iloc[0] == 1.0, (
+            f"last_rewarded_well={dot['last_rewarded_well'].iloc[0]} — "
+            "trial 0's NaN goal_arrival_time should fall back to "
+            "end_time=1.0, making the trial visible to the reward-time "
+            "search. Pre-fix this stamped NaN."
+        )
+        # _last_reward_time uses the same arrival_times array → 1.0.
+        assert dot["_last_reward_time"].iloc[0] == 1.0
+        # And the history helpers must agree: trial 0 contributed.
+        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        vr = visit_recency_all_events(event_times, trials, _well_to_arm())
+        assert cr[0, 1] == 1.0
+        assert vr[0, 1] == 1.0  # 1 trial ago
+
     def test_history_cutoffs_per_row_fallback_for_nan_goal_arrival_time(self):
         """Per-row NaN ``goal_arrival_time`` falls back to
         ``end_time`` for that trial — matches
