@@ -123,6 +123,27 @@ class TestGetPokeInPokeOutTimes:
         expected_duration = 3.0 - 1.0  # 2.0 seconds
         assert result.iloc[0]['duration'] == pytest.approx(expected_duration)
 
+    def test_unsorted_input_does_not_corrupt_pokes(self):
+        """Regression: ``shift(-1)`` assumes chronological order
+        within each ``event_name`` group. Pre-fix, an unsorted
+        input produced negative-duration pokes (e.g.
+        ``start_time=3.0, end_time=1.5, duration=-1.5``). The fix
+        sorts each group by ``start_time`` before the
+        inter-event-interval / cumsum step."""
+        beam_breaks = pd.DataFrame([
+            {"event_name": "Poke1", "start_time": 3.0, "end_time": 3.5},
+            {"event_name": "Poke1", "start_time": 1.0, "end_time": 1.5},
+        ])
+        result = get_poke_in_poke_out_times(beam_breaks)
+        assert (result["duration"] >= 0).all(), (
+            f"negative-duration poke leaked: {result.to_dict('records')}"
+        )
+        # Two distinct pokes (gap > default max_inter_event_interval).
+        assert len(result) == 2
+        # Sorted result starts at 1.0.
+        assert result.iloc[0]["start_time"] == pytest.approx(1.0)
+        assert result.iloc[1]["start_time"] == pytest.approx(3.0)
+
     def test_empty_beam_breaks(self):
         """Should handle empty beam breaks DataFrame."""
         beam_breaks = pd.DataFrame({

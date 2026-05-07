@@ -102,6 +102,13 @@ def get_poke_in_poke_out_times(
 
     merged_events = []
     for _, df in beam_breaks.groupby("event_name"):
+        # ``shift(-1)`` below assumes the rows are in chronological
+        # order. Spyglass's ``load_dios`` returns sorted events, but
+        # this helper is also called directly on caller-constructed
+        # frames and the inter-event-interval / label cumsum would
+        # silently produce negative-duration pokes if a row landed
+        # out of order.
+        df = df.sort_values("start_time").reset_index(drop=True)
         interevent_interval = (df.start_time.shift(-1) - df.end_time).fillna(0)
         labels = (
             (interevent_interval > max_inter_event_interval)

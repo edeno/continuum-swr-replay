@@ -121,3 +121,23 @@ class TestLazyImports:
             "from continuum_swr_replay.analysis.pfc.glm "
             "import get_spikecount_per_time_bin"
         )
+
+    def test_data_loaders_events_pure_helpers_do_not_load_spyglass(self):
+        # ``convert_dio_events_to_start_stop_times`` is pure pandas;
+        # the Spyglass ``DIOEvents`` table is only needed by
+        # ``load_dios`` / ``_load_dio_event_type``. Without lazy
+        # imports the helper drags ``spyglass.common`` into every
+        # offline test that touches DIO conversion.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.data_loaders.events "
+            "import convert_dio_events_to_start_stop_times"
+        )
+
+    def test_data_loaders_position_pure_helpers_do_not_load_spyglass(self):
+        # ``get_interpolated_position_info`` is pure
+        # ``track_linearization`` + pandas; the Spyglass tables and
+        # ``DataJointError`` are only needed by ``get_position_info``.
+        assert _import_does_not_load_spyglass(
+            "from continuum_swr_replay.data_loaders.position "
+            "import get_interpolated_position_info"
+        )
