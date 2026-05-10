@@ -19,19 +19,36 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
 )
 
 
+def _prob_array(
+    events: list[tuple[float, float]],
+    *,
+    dt: float = 0.002,
+    duration: float = 1.0,
+    event_value: float = 0.9,
+    base_value: float = 0.0,
+) -> tuple[xr.DataArray, np.ndarray]:
+    """Build the (prob_array, time) pair fed into ``get_confident_times``.
+
+    ``events`` is a list of ``(start, end)`` windows; each is set to
+    ``event_value``. Outside the windows, the array sits at ``base_value``.
+    Returns both the DataArray and the time axis since several tests need
+    the raw ``time`` array (e.g. for ``speed`` alignment).
+    """
+    time = np.arange(0, duration, dt)
+    prob = np.full(len(time), base_value)
+    for start, end in events:
+        prob[(time >= start) & (time < end)] = event_value
+    return xr.DataArray(prob, coords={"time": time}, dims=["time"]), time
+
+
 class TestGetConfidentTimes:
     """Test threshold-based event detection."""
 
     def test_basic_detection_single_event(self):
         """Events above threshold are detected."""
         dt = 0.002  # 500 Hz
-        time = np.arange(0, 1.0, dt)
-        prob = np.zeros(len(time))
-
-        # Single event from 0.1 to 0.2 seconds (100ms > 15ms minimum)
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9  # Above 0.8 threshold
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Single event from 0.1 to 0.2 seconds (100ms > 15ms minimum).
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -49,16 +66,10 @@ class TestGetConfidentTimes:
     def test_minimum_duration_filtering(self):
         """Events below minimum duration are filtered out."""
         dt = 0.001  # 1 kHz for precision
-        time = np.arange(0, 1.0, dt)
-        prob = np.zeros(len(time))
-
-        # Short event (10ms < 15ms minimum)
-        prob[(time >= 0.1) & (time < 0.11)] = 0.9
-
-        # Long event (50ms > 15ms minimum)
-        prob[(time >= 0.5) & (time < 0.55)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Short event (10ms < 15ms minimum) and long event (50ms > 15ms).
+        prob_array, _ = _prob_array(
+            [(0.1, 0.11), (0.5, 0.55)], dt=dt
+        )
 
         events = get_confident_times(
             prob_array,
@@ -72,10 +83,8 @@ class TestGetConfidentTimes:
 
     def test_no_events_below_threshold(self):
         """Returns empty DataFrame when no events exceed threshold."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.full(len(time), 0.5)  # All below 0.8 threshold
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Whole recording at 0.5 — below 0.8 threshold everywhere.
+        prob_array, _ = _prob_array([], dt=0.002, base_value=0.5)
 
         events = get_confident_times(
             prob_array,
@@ -100,15 +109,8 @@ class TestGetConfidentTimes:
     def test_event_at_recording_boundary(self, boundary_type, expected_field, expected_value):
         """Events at recording boundaries (start/end) are handled correctly."""
         dt = 0.002
-        time = np.arange(0, 1.0, dt)
-        prob = np.zeros(len(time))
-
-        if boundary_type == "start":
-            prob[time < 0.05] = 0.9
-        else:  # end
-            prob[time >= 0.95] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        window = (0.0, 0.05) if boundary_type == "start" else (0.95, 1.0 + dt)
+        prob_array, _ = _prob_array([window], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -121,15 +123,10 @@ class TestGetConfidentTimes:
 
     def test_multiple_events_detected(self):
         """Multiple distinct events are all detected."""
-        time = np.arange(0, 1.0, 0.001)
-        prob = np.zeros(len(time))
-
-        # Three events
-        prob[(time >= 0.1) & (time < 0.15)] = 0.9
-        prob[(time >= 0.5) & (time < 0.55)] = 0.9
-        prob[(time >= 0.8) & (time < 0.85)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        prob_array, _ = _prob_array(
+            [(0.1, 0.15), (0.5, 0.55), (0.8, 0.85)],
+            dt=0.001,
+        )
 
         events = get_confident_times(
             prob_array,
@@ -144,15 +141,9 @@ class TestGetConfidentTimes:
 
     def test_speed_calculation_basic(self):
         """Max speed is calculated correctly for each event."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-        speed = np.full(len(time), 5.0)  # Constant 5 cm/s
-
-        # Event from 0.1 to 0.2
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
+        prob_array, time = _prob_array([(0.1, 0.2)], dt=0.002)
+        speed = np.full(len(time), 5.0)  # Constant 5 cm/s baseline
         speed[(time >= 0.15) & (time < 0.16)] = 15.0  # Peak speed in event
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -167,15 +158,10 @@ class TestGetConfidentTimes:
 
     def test_speed_calculation_nan_handling(self):
         """NaN values in speed are handled with nanmax."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.1, 0.2)], dt=0.002)
         speed = np.full(len(time), 5.0)
-
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
         speed[(time >= 0.12) & (time < 0.14)] = np.nan  # NaN in middle of event
         speed[(time >= 0.15) & (time < 0.16)] = 10.0  # Max speed
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -190,11 +176,7 @@ class TestGetConfidentTimes:
 
     def test_speed_none_returns_nan(self):
         """When speed is None, max_speed column contains NaN."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=0.002)
 
         events = get_confident_times(
             prob_array,
@@ -233,13 +215,9 @@ class TestGetConfidentTimes:
 
     def test_duration_accuracy(self):
         """Durations are calculated correctly (end - start)."""
-        time = np.arange(0, 1.0, 0.001)
-        prob = np.zeros(len(time))
-
-        # Event with known duration
-        prob[(time >= 0.2) & (time < 0.3)] = 0.9  # Exactly 100ms
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        dt = 0.001
+        # Event with known duration (exactly 100 ms).
+        prob_array, _ = _prob_array([(0.2, 0.3)], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -247,7 +225,6 @@ class TestGetConfidentTimes:
             minimum_duration=0.015
         )
 
-        dt = 0.001
         computed_duration = events.iloc[0]["end_time"] - events.iloc[0]["start_time"]
         assert events.iloc[0]["duration"] == pytest.approx(computed_duration, abs=1e-10)
         assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=dt + 1e-9)
@@ -464,10 +441,11 @@ class TestEventDetectionEdgeCases:
 
     def test_all_ones_probability(self):
         """All time at high probability creates single event."""
-        time = np.arange(0, 0.1, 0.001)
-        prob = np.ones(len(time))
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # 0.1 s recording @ 1 kHz, prob=1.0 throughout (no event windows
+        # carved out — the base value carries the whole array).
+        prob_array, _ = _prob_array(
+            [], dt=0.001, duration=0.1, base_value=1.0,
+        )
 
         events = get_confident_times(
             prob_array,
@@ -482,13 +460,8 @@ class TestEventDetectionEdgeCases:
 
     def test_probability_exactly_at_threshold(self):
         """Probability exactly at threshold is included (> not >=)."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-
-        # Set to exactly threshold value
-        prob[(time >= 0.1) & (time < 0.2)] = 0.8
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Window set to exactly the threshold value (0.8).
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=0.002, event_value=0.8)
 
         events = get_confident_times(
             prob_array,
@@ -501,13 +474,8 @@ class TestEventDetectionEdgeCases:
 
     def test_very_short_minimum_duration(self):
         """Very short minimum duration (1ms) is respected."""
-        time = np.arange(0, 1.0, 0.0001)  # 10kHz sampling
-        prob = np.zeros(len(time))
-
-        # Very brief event (2ms)
-        prob[(time >= 0.1) & (time < 0.102)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # 10 kHz sampling, very brief event (2 ms).
+        prob_array, _ = _prob_array([(0.1, 0.102)], dt=0.0001)
 
         events = get_confident_times(
             prob_array,
@@ -524,14 +492,8 @@ class TestSpeedCalculationBoundsFix:
 
     def test_event_at_time_boundary_start(self):
         """Events at the start of the time range should have valid speed."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.0, 0.05)], dt=0.002)
         speed = np.full(len(time), 10.0)
-
-        # Event at very start of recording
-        prob[(time >= 0.0) & (time < 0.05)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -547,14 +509,8 @@ class TestSpeedCalculationBoundsFix:
 
     def test_event_at_time_boundary_end(self):
         """Events at the end of the time range should have valid speed."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.95, 1.0)], dt=0.002)
         speed = np.full(len(time), 10.0)
-
-        # Event at very end of recording
-        prob[(time >= 0.95) & (time < 1.0)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -571,13 +527,12 @@ class TestSpeedCalculationBoundsFix:
     def test_event_within_data_bounds_detected(self):
         """When data starts after t=0 (offset position index), the detector
         still finds an event whose probability mask is fully inside the
-        recorded range."""
+        recorded range. Build the array manually because ``_prob_array``
+        assumes a zero-anchored time axis."""
         time = np.arange(0.1, 0.9, 0.002)
         prob = np.zeros(len(time))
         speed = np.full(len(time), 10.0)
-
         prob[(time >= 0.2) & (time < 0.3)] = 0.9
-
         prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
