@@ -259,9 +259,11 @@ class TestMapSpeed:
         # Expected: moving 10 cm every dt seconds
         expected_speed = 10.0 / dt  # 5000 cm/s
         assert len(speed) == 5
-        # All speeds should be approximately the same
-        # Use relaxed tolerance due to smoothing and edge effects
-        np.testing.assert_allclose(speed, expected_speed, rtol=0.15)
+        # Central samples have neighbors on both sides; under uniform 10cm
+        # steps the discrete derivative is exact up to smoothing.
+        np.testing.assert_allclose(speed[1:-1], expected_speed, rtol=0.02)
+        # Boundary samples use a one-sided derivative — looser by design.
+        np.testing.assert_allclose(speed[[0, -1]], expected_speed, rtol=0.15)
 
     @pytest.mark.parametrize("invalid_freq", [0.0, -500.0, -1.0, -0.001])
     def test_invalid_sampling_frequency_raises(self, invalid_freq):

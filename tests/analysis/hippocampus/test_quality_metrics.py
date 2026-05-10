@@ -282,6 +282,57 @@ class TestComputeNonLocalEventContext:
         assert result["frac_theta"].iloc[0] == pytest.approx(1 / 3)
         assert result["frac_neither"].iloc[0] == pytest.approx(1 / 3)
 
+    def test_unequal_classification_proportions(self):
+        """A function that always emits ``[1/3, 1/3, 1/3]`` regardless of
+        input would pass ``test_classifies_swr_theta_neither``. Pin the
+        unequal case: 2 SWR + 1 theta + 0 neither → (2/3, 1/3, 0)."""
+        n = N_BINS
+        time = np.arange(n) / SAMPLING_FREQUENCY
+        non_local_event = np.zeros(n, dtype=int)
+        swr_event = np.zeros(n, dtype=int)
+        theta_power = np.zeros(n)
+
+        # Events 1 and 2: during SWRs
+        non_local_event[100:121] = 1
+        swr_event[100:121] = 1
+        non_local_event[200:221] = 2
+        swr_event[200:221] = 1
+        # Event 3: during high theta
+        non_local_event[400:421] = 3
+        theta_power[400:421] = 3.0
+
+        session = pd.DataFrame(
+            {
+                "Local_prob": np.where(non_local_event > 0, 0.1, 0.9),
+                "No-Spike_prob": np.full(n, 0.05),
+                "Non-Local_Continuous_prob": np.where(non_local_event > 0, 0.7, 0.05),
+                "Non-Local_Fragmented_prob": np.where(non_local_event > 0, 0.15, 0.0),
+                "ahead_behind_distance": np.zeros(n),
+                "map_estimate": np.linspace(0, 100, n),
+                "linear_position": np.linspace(0, 100, n),
+                "head_speed": np.full(n, 2.0),
+                "track_segment_id": np.repeat([0, 1, 2, 3, 4], n // 5),
+                "hpd": np.full(n, 5.0),
+                "non_local_event": non_local_event,
+                "SWR_event": swr_event,
+                "MUA_event": np.zeros(n, dtype=int),
+                "theta_phase": np.full(n, np.pi),
+                "theta_power_zscore": theta_power,
+                "SWR_zscore": np.zeros(n),
+                "MUA_zscore": np.zeros(n),
+                "animal": "mouse_unequal",
+                "day": 20200104,
+                "epoch": "02_r1",
+            },
+            index=time,
+        )
+
+        result = compute_non_local_event_context(session, theta_power_threshold=2.0)
+        assert result["n_events"].iloc[0] == 3
+        assert result["frac_swr"].iloc[0] == pytest.approx(2 / 3)
+        assert result["frac_theta"].iloc[0] == pytest.approx(1 / 3)
+        assert result["frac_neither"].iloc[0] == pytest.approx(0.0)
+
     def test_fractions_sum_to_one(self, session_with_events):
         result = compute_non_local_event_context(session_with_events)
         total = result["frac_swr"].iloc[0] + result["frac_theta"].iloc[0] + result["frac_neither"].iloc[0]

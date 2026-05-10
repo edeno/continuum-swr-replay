@@ -311,7 +311,12 @@ class TestDevianceFractions:
             results["SWR"],
             results["constant"],
         )
-        assert frac >= -1e-10  # non-negative for nested models
+        # Adding nested predictors can only explain *more* null deviance,
+        # so the fraction must be non-negative. A function returning a
+        # constant (e.g. 0.0) for any input would pass ``>= 0`` — pin
+        # finiteness so a NaN/inf regression also trips here.
+        assert np.isfinite(frac)
+        assert frac >= -1e-10
 
     def test_frac_explained_deviance_bounded(
         self, simple_event_times, position_info, is_immobile, spike_count
@@ -326,7 +331,12 @@ class TestDevianceFractions:
             results["SWR"],
             results["constant"],
         )
+        # Bounded fraction must be finite, in [0, 1], and (under the seeded
+        # event fixture) strictly between 0 and 1 — a degenerate output
+        # locked to 0 or 1 indicates broken nested-model accounting.
+        assert np.isfinite(frac)
         assert -1e-6 <= frac <= 1.0 + 1e-6
+        assert 0.0 < frac < 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -357,8 +367,11 @@ class TestThetaModulation:
         lr, p, mod, _ = run_theta_modulation_test(
             theta_phase, is_immobile, spike_count,
         )
-        # p-value should be high (not significant)
-        assert p > 0.01 or mod < 0.5
+        # A function returning (p=0, mod=0) would pass the prior
+        # disjunction (mod < 0.5 is True). Require *both* a non-significant
+        # p-value AND a modest modulation depth so a degenerate output is
+        # caught.
+        assert p > 0.01 and mod < 0.5, f"p={p:.3f}, mod={mod:.3f}"
 
 
 # ---------------------------------------------------------------------------
@@ -382,11 +395,16 @@ class TestProcessNeuron:
             time_axis, dm, spline_basis, lag_time,
         )
 
-        # stats should be a dict with firing rates
+        # Both rates must be strictly positive — the prior ``>= 0`` check
+        # passed silently for a function returning constant 0. Magnitudes
+        # are dominated by Poisson noise (the fixture's run window is only
+        # 1 s of a 10 s epoch), so don't pin a specific Hz value.
         assert "run_avg_firing_rate" in stats
         assert "immobility_avg_firing_rate" in stats
-        assert stats["run_avg_firing_rate"] >= 0
-        assert stats["immobility_avg_firing_rate"] >= 0
+        assert np.isfinite(stats["run_avg_firing_rate"])
+        assert np.isfinite(stats["immobility_avg_firing_rate"])
+        assert stats["run_avg_firing_rate"] > 0
+        assert stats["immobility_avg_firing_rate"] > 0
 
     def test_modulation_arrays_have_correct_shape(
         self, poisson_spike_times, is_immobile, theta_phase,
@@ -405,10 +423,17 @@ class TestProcessNeuron:
         )
 
         n_lags = len(lags)
-        assert swr_mod.shape == (n_lags,)
-        assert no_swr_mod.shape == (n_lags,)
-        assert nl_swr_mod.shape == (n_lags,)
-        assert nl_no_swr_mod.shape == (n_lags,)
+        for arr in (swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod):
+            assert arr.shape == (n_lags,)
+            # A function returning all-NaN/all-zero arrays would pass the
+            # shape check alone.
+            assert np.isfinite(arr).all()
+
+        # The four modulation arrays correspond to distinct event subsets
+        # in the fixture; a regression that duplicates one array across
+        # all four outputs would slip past shape-only checks.
+        assert not np.array_equal(swr_mod, no_swr_mod)
+        assert not np.array_equal(nl_swr_mod, nl_no_swr_mod)
 
     def test_stats_contain_likelihood_ratio_tests(
         self, poisson_spike_times, is_immobile, theta_phase,

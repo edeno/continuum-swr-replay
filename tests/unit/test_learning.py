@@ -400,9 +400,14 @@ class TestFitIsStayLogistic:
         )
         assert len(coefs) == 1
         row = coefs.iloc[0]
-        # Recover the *sign* and rough magnitude of the interaction.
-        assert row["beta_inter"] > 1.0
-        assert row["beta_inter"] < 5.0
+        # Recover the truth (β_inter = 3.0) within ~3 SE — the previous
+        # ``1.0 < β < 5.0`` window accepts a 30% bias silently.
+        assert np.isfinite(row["se_inter"]) and row["se_inter"] > 0
+        z = (row["beta_inter"] - 3.0) / row["se_inter"]
+        assert abs(z) < 3, (
+            f"beta_inter={row['beta_inter']:.3f}, "
+            f"se={row['se_inter']:.3f}, z={z:.2f}"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -445,9 +450,13 @@ class TestFitIsStayPooledGEE:
         result = fit_is_stay_pooled_gee(df, content_col="frac_on_last_rewarded")
         assert result["status"] == "ok"
         assert result["n_sessions"] == n_sessions
-        # Recover the sign and rough magnitude.
-        assert result["beta_inter"] > 1.0
-        assert result["beta_inter"] < 5.0
+        # Recover the truth (β_inter = 2.5) within ~3 cluster-robust SE.
+        assert np.isfinite(result["se_inter"]) and result["se_inter"] > 0
+        z = (result["beta_inter"] - true_inter) / result["se_inter"]
+        assert abs(z) < 3, (
+            f"beta_inter={result['beta_inter']:.3f}, "
+            f"se_inter={result['se_inter']:.3f}, z={z:.2f}"
+        )
         # Should be highly significant given the strong simulated effect.
         assert result["p_inter"] < 1e-4
 

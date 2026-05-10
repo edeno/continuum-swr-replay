@@ -193,7 +193,10 @@ class TestMakeTaskVariablesValues:
         # Trial 0: start=0.0, goal_arrival=1.5
         pre_goal = result.loc[0.0:1.498, "time_to_goal"]
         assert np.all(np.diff(pre_goal.values) >= 0), "time_to_goal should increase"
-        assert pre_goal.iloc[0] == pytest.approx(0.0, abs=0.01)
+        # Position index aligns with trial start at t=0.0 exactly; the
+        # variable is *time since start*, so the first sample must be
+        # exactly zero — a tolerance window would mask trial-anchor drift.
+        assert pre_goal.iloc[0] == 0.0
 
     def test_time_to_goal_zero_after_arrival(
         self, position_info, trials_df, linear_track

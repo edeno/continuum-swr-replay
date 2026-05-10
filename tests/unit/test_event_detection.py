@@ -24,7 +24,8 @@ class TestGetConfidentTimes:
 
     def test_basic_detection_single_event(self):
         """Events above threshold are detected."""
-        time = np.arange(0, 1.0, 0.002)  # 500 Hz, 1 second
+        dt = 0.002  # 500 Hz
+        time = np.arange(0, 1.0, dt)
         prob = np.zeros(len(time))
 
         # Single event from 0.1 to 0.2 seconds (100ms > 15ms minimum)
@@ -38,14 +39,17 @@ class TestGetConfidentTimes:
             minimum_duration=0.015
         )
 
+        # Tolerance is one bin (dt) — tighter tolerances would conflate
+        # bin-edge rounding with sampling-rate drift bugs.
         assert len(events) == 1, "Should detect exactly one event"
-        assert events.iloc[0]["start_time"] == pytest.approx(0.1, abs=0.005)
-        assert events.iloc[0]["end_time"] == pytest.approx(0.2, abs=0.005)
-        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=0.005)
+        assert events.iloc[0]["start_time"] == pytest.approx(0.1, abs=dt + 1e-9)
+        assert events.iloc[0]["end_time"] == pytest.approx(0.2, abs=dt + 1e-9)
+        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=dt + 1e-9)
 
     def test_minimum_duration_filtering(self):
         """Events below minimum duration are filtered out."""
-        time = np.arange(0, 1.0, 0.001)  # 1kHz for precision
+        dt = 0.001  # 1 kHz for precision
+        time = np.arange(0, 1.0, dt)
         prob = np.zeros(len(time))
 
         # Short event (10ms < 15ms minimum)
@@ -64,7 +68,7 @@ class TestGetConfidentTimes:
 
         # Only the long event should be detected
         assert len(events) == 1, "Short event should be filtered out"
-        assert events.iloc[0]["start_time"] == pytest.approx(0.5, abs=0.005)
+        assert events.iloc[0]["start_time"] == pytest.approx(0.5, abs=dt + 1e-9)
 
     def test_no_events_below_threshold(self):
         """Returns empty DataFrame when no events exceed threshold."""
@@ -95,7 +99,8 @@ class TestGetConfidentTimes:
     )
     def test_event_at_recording_boundary(self, boundary_type, expected_field, expected_value):
         """Events at recording boundaries (start/end) are handled correctly."""
-        time = np.arange(0, 1.0, 0.002)
+        dt = 0.002
+        time = np.arange(0, 1.0, dt)
         prob = np.zeros(len(time))
 
         if boundary_type == "start":
@@ -112,7 +117,7 @@ class TestGetConfidentTimes:
         )
 
         assert len(events) == 1
-        assert events.iloc[0][expected_field] == pytest.approx(expected_value, abs=0.005)
+        assert events.iloc[0][expected_field] == pytest.approx(expected_value, abs=dt + 1e-9)
 
     def test_multiple_events_detected(self):
         """Multiple distinct events are all detected."""
@@ -242,9 +247,10 @@ class TestGetConfidentTimes:
             minimum_duration=0.015
         )
 
+        dt = 0.001
         computed_duration = events.iloc[0]["end_time"] - events.iloc[0]["start_time"]
         assert events.iloc[0]["duration"] == pytest.approx(computed_duration, abs=1e-10)
-        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=0.005)
+        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=dt + 1e-9)
 
 
 class TestGetOverlapTimes:
@@ -470,8 +476,9 @@ class TestEventDetectionEdgeCases:
         )
 
         assert len(events) == 1
-        assert events.iloc[0]["start_time"] == pytest.approx(0.0, abs=0.005)
-        assert events.iloc[0]["end_time"] == pytest.approx(0.1, abs=0.005)
+        dt = 0.002  # matches the recording-boundary fixture above
+        assert events.iloc[0]["start_time"] == pytest.approx(0.0, abs=dt + 1e-9)
+        assert events.iloc[0]["end_time"] == pytest.approx(0.1, abs=dt + 1e-9)
 
     def test_probability_exactly_at_threshold(self):
         """Probability exactly at threshold is included (> not >=)."""
