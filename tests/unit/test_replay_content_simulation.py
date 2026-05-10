@@ -397,6 +397,7 @@ class TestAutocorrelationDoesNotBiasPointEstimate:
     """Marginal arm distribution under the lazy Markov chain still equals
     softmax(Xβ), so β̂ should be unbiased even at high rho."""
 
+    @pytest.mark.slow
     def test_mean_coef_close_to_truth_with_high_rho(self):
         beta = {"is_current": 0.7}
         coefs, _ = _replicated_fits(
@@ -426,6 +427,7 @@ class TestSEUnderCoverageUnderAutocorrelation:
     stay near 1 at rho=0 and to drop below 1 at rho=0.8.
     """
 
+    @pytest.mark.slow
     def test_calibration_degrades_with_autocorrelation(self):
         beta = {"is_current": 0.6}
         common = {"n_events": 120, "L_e": 20, "n_replicates": 40}

@@ -7,12 +7,18 @@ under a minute on the dev machine.
 
 ```bash
 uv sync --extra dev
-uv run pytest                              # full suite (~50 s)
+uv run pytest                              # full suite (~37 s)
+uv run pytest -m "not slow"                # fast subset (~28 s, skips 3 statistical tests)
 uv run pytest tests/unit/test_spikes.py    # one file
 uv run pytest -k "coincident"              # by name pattern
 uv run pytest -vv                          # verbose, with full assertion diffs
 uv run pytest --lf                         # rerun only last-failed tests
 ```
+
+The ``slow`` marker is applied to the handful of Monte Carlo /
+Tier-B statistical tests (SE coverage, calibration sweeps) that run
+40+ replicates of a simulated estimator fit. CI runs everything; the
+``-m "not slow"`` form is for tight local cycles.
 
 The package roots (`continuum_swr_replay/__init__.py`,
 `continuum_swr_replay/data_loaders/__init__.py`,
