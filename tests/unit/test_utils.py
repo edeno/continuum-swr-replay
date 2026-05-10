@@ -145,57 +145,44 @@ class TestGetLabels:
 
 
 class TestParseNwbFilename:
-    """Tests for NWB filename parsing."""
+    """Tests for NWB filename parsing.
 
-    def test_letters_only_animal_name(self):
-        """Test parsing filename with letters-only animal name."""
-        animal, date = parse_nwb_filename("chimi20200212_.nwb")
-        assert animal == "chimi"
-        assert date == 20200212
+    The ``j16`` case is the historical-bug anchor: the legacy
+    ``str.split("2")`` parser returned ``"j1"`` because the date
+    20210706 contains a ``"2"`` early on. ``parse_nwb_filename`` is
+    the canonical parser; ``analysis.pfc.load_population._extract_animal``
+    is a thin wrapper around it (covered separately in
+    ``tests/analysis/pfc/test_load_population.py``).
+    """
 
-    def test_another_letters_only_animal(self):
-        """Test parsing another letters-only animal name."""
-        animal, date = parse_nwb_filename("peanut20201125_.nwb")
-        assert animal == "peanut"
-        assert date == 20201125
+    @pytest.mark.parametrize(
+        "filename,expected_animal,expected_date",
+        [
+            ("chimi20200212_.nwb", "chimi", 20200212),
+            ("peanut20201125_.nwb", "peanut", 20201125),
+            ("wilbur20210315_.nwb", "wilbur", 20210315),
+            ("senor20201015_.nwb", "senor", 20201015),
+            # Historical bug: legacy str.split("2")[0] returned "j1".
+            ("j1620210706_.nwb", "j16", 20210706),
+        ],
+    )
+    def test_valid_filenames(self, filename, expected_animal, expected_date):
+        animal, date = parse_nwb_filename(filename)
+        assert animal == expected_animal
+        assert date == expected_date
 
-    def test_alphanumeric_animal_name(self):
-        """Test parsing filename with alphanumeric animal name (e.g., j16)."""
-        animal, date = parse_nwb_filename("j1620210706_.nwb")
-        assert animal == "j16"
-        assert date == 20210706
-
-    def test_short_animal_name(self):
-        """Test parsing filename with short animal name."""
-        animal, date = parse_nwb_filename("wilbur20210315_.nwb")
-        assert animal == "wilbur"
-        assert date == 20210315
-
-    def test_senor_animal_name(self):
-        """Test parsing senor animal name."""
-        animal, date = parse_nwb_filename("senor20201015_.nwb")
-        assert animal == "senor"
-        assert date == 20201015
-
-    def test_invalid_format_missing_underscore(self):
-        """Test that missing underscore raises ValueError."""
+    @pytest.mark.parametrize(
+        "bad_filename",
+        [
+            "chimi20200212.nwb",   # missing underscore
+            "chimi20200212_.txt",  # wrong extension
+            "chimi2020021_.nwb",   # date with < 8 digits
+            "20200212_.nwb",       # no animal name
+        ],
+    )
+    def test_invalid_format_raises(self, bad_filename):
         with pytest.raises(ValueError, match="Invalid NWB filename format"):
-            parse_nwb_filename("chimi20200212.nwb")
-
-    def test_invalid_format_wrong_extension(self):
-        """Test that wrong extension raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid NWB filename format"):
-            parse_nwb_filename("chimi20200212_.txt")
-
-    def test_invalid_format_short_date(self):
-        """Test that date with fewer than 8 digits raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid NWB filename format"):
-            parse_nwb_filename("chimi2020021_.nwb")
-
-    def test_invalid_format_no_animal(self):
-        """Test that filename with no animal name raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid NWB filename format"):
-            parse_nwb_filename("20200212_.nwb")
+            parse_nwb_filename(bad_filename)
 
 
 # Note: get_epoch_info() caching is validated through integration tests.

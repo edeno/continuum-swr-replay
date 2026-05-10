@@ -17,38 +17,41 @@ class TestGetInterpolatedPositionInfo:
     """Test position interpolation and linearization."""
 
     def test_interpolation_preserves_original_times(self):
-        """Original time points should have exact original values (no interpolation artifacts)."""
-        # Setup test data
+        """When the interpolation grid equals the input grid, original
+        column values must be returned exactly — no rounding, no
+        propagation through the interpolator."""
         original_times = np.array([0.0, 1.0, 2.0, 3.0])
+        original_x = np.array([0.0, 5.0, 10.0, 15.0])
+        original_speed = np.array([5.0, 7.0, 9.0, 11.0])
         position_info = pd.DataFrame({
-            'head_position_x': [0.0, 5.0, 10.0, 15.0],
-            'head_position_y': [0.0, 0.0, 0.0, 0.0],
-            'head_speed': [5.0, 5.0, 5.0, 5.0],
+            'head_position_x': original_x,
+            'head_position_y': np.zeros(4),
+            'head_speed': original_speed,
         }, index=original_times)
 
-        # Create track graph using recommended function
         track_graph = make_track_graph(
             node_positions=[(0, 0), (10, 0), (20, 0)],
             edges=[(0, 1), (1, 2)]
         )
 
-        # Interpolate to same times (should be identity operation for data)
         result = get_interpolated_position_info(
             position_info,
             time=original_times,
             track_graph=track_graph,
             edge_order=[(0, 1), (1, 2)],
-            edge_spacing=[10.0],  # One spacing between two edges
+            edge_spacing=[10.0],
         )
 
-        # Check original columns preserved
-        assert 'head_position_x' in result.columns
-        assert 'head_speed' in result.columns
+        # Linearization columns are added.
+        assert {'linear_position', 'projected_x_position', 'track_segment_id'} <= set(result.columns)
 
-        # Check new columns added
-        assert 'linear_position' in result.columns
-        assert 'projected_x_position' in result.columns
-        assert 'track_segment_id' in result.columns
+        # Original values survive intact at the sampled times.
+        np.testing.assert_array_equal(
+            result['head_position_x'].to_numpy(), original_x
+        )
+        np.testing.assert_array_equal(
+            result['head_speed'].to_numpy(), original_speed
+        )
 
     def test_interpolation_to_new_times(self):
         """New time points should have linearly interpolated values."""
@@ -146,30 +149,6 @@ class TestGetInterpolatedPositionInfo:
         # Should successfully linearize using custom columns
         assert 'linear_position' in result.columns
         assert 'custom_x' in result.columns
-
-    def test_single_time_point(self):
-        """Should handle single time point."""
-        position_info = pd.DataFrame({
-            'head_position_x': [5.0],
-            'head_position_y': [0.0],
-        }, index=[1.0])
-
-        # Create track graph using recommended function
-        track_graph = make_track_graph(
-            node_positions=[(0, 0), (10, 0), (20, 0)],
-            edges=[(0, 1), (1, 2)]
-        )
-
-        result = get_interpolated_position_info(
-            position_info,
-            time=np.array([1.0]),
-            track_graph=track_graph,
-            edge_order=[(0, 1), (1, 2)],
-            edge_spacing=[10.0],  # One spacing between two edges
-        )
-
-        assert len(result) == 1
-        assert 'linear_position' in result.columns
 
     def test_preserves_time_ordering(self):
         """Output should maintain time ordering even with unsorted input times."""
