@@ -20,6 +20,7 @@ from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     theta_power_zscore,
+    validate_required_session_data_keys,
     validate_results_position_time_alignment,
 )
 from continuum_swr_replay.data_loaders import get_labels
@@ -67,21 +68,18 @@ def get_contfrag_data_over_time(
     posterior : xr.DataArray
         Combined (Continuous + Fragmented) posterior distribution.
     """
-    required_keys = [
-        "position_info",
-        "ripple_times",
-        "hse_times",
-        "theta_phase",
-        "theta_power",
-        "zscored_ripple_consensus_trace",
-        "multiunit_rate_zscore",
-    ]
-    missing_keys = [k for k in required_keys if k not in data]
-    if missing_keys:
-        raise KeyError(
-            f"Missing required data keys: {missing_keys}. "
-            f"Ensure load_data() was called with DataLoadingPreset.DECODING or equivalent."
-        )
+    validate_required_session_data_keys(
+        data,
+        required_keys=[
+            "position_info",
+            "ripple_times",
+            "hse_times",
+            "theta_phase",
+            "theta_power",
+            "zscored_ripple_consensus_trace",
+            "multiunit_rate_zscore",
+        ],
+    )
 
     # Get combined posterior (both states decode position)
     posterior = get_contfrag_posterior(results, state="combined")

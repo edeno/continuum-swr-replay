@@ -107,22 +107,50 @@ class TestReindexByTolerance:
         assert np.all(np.isnan(result))
 
     def test_reindex_typical_neuroscience_use_case(self):
-        """Test typical use case: resampling spike counts to position time."""
-        # Spike counts at irregular times (e.g., spike detection times)
+        """Test typical use case: resampling spike counts to position time.
+
+        Spike counts live at well-separated times; the position grid
+        samples some bins close to a spike, others far from any
+        spike. Tolerance ``0.5`` s. The fixture is chosen so all
+        nearest-neighbor distances are unambiguously above or below
+        tolerance — the close→match, far→NaN contract holds without
+        depending on float roundoff at the tolerance boundary.
+
+            position_time | nearest spike (dist) | value
+            ------------- | --------------------- | -----
+            0.0           | 0.0 (exact)           | 1.0
+            1.0           | 1.2 (0.2 ≤ tol)       | 4.0
+            2.0           | 2.3 (0.3 ≤ tol)       | 9.0
+            3.0           | 2.3 (0.7 > tol)       | NaN
+            4.0           | 4.4 (0.4 ≤ tol)       | 16.0
+            5.0           | 4.4 (0.6 > tol)       | NaN
+            6.0           | 6.1 (0.1 ≤ tol)       | 36.0
+
+        Pinning the full expected vector catches:
+        - A regression that drops the ``<=`` boundary (tolerance
+          becomes strict ``<``): row at distance exactly ``tol``
+          would flip to NaN, but no row here sits at the boundary,
+          so the test stays robust to that detail.
+        - A regression that loosens the comparator (``<=`` ->
+          ``<= 1.5*tol``): distant rows (3.0, 5.0) would stop being
+          NaN.
+        - A regression that swaps tie-break direction in
+          ``method='nearest'`` for asymmetric-distance bins: would
+          shift values across rows.
+        """
         spike_counts = pd.Series(
-            [0, 1, 0, 2, 1, 0, 1],
-            index=[0.001, 0.003, 0.005, 0.007, 0.009, 0.011, 0.013]
+            [1.0, 4.0, 9.0, 16.0, 36.0],
+            index=[0.0, 1.2, 2.3, 4.4, 6.1],
         )
+        position_time = pd.Index(np.arange(0.0, 7.0, 1.0))
 
-        # Regular position sampling at 500 Hz
-        position_time = pd.Index(np.arange(0.0, 0.015, 0.002))
-
-        # Use tolerance of half the sampling interval
-        result = reindex_by(spike_counts, position_time, tolerance=0.001)
+        result = reindex_by(spike_counts, position_time, tolerance=0.5)
 
         assert len(result) == len(position_time)
-        # Values close to sampling times should match
-        # Values far from any spike time should be NaN
+        expected = np.array(
+            [1.0, 4.0, 9.0, np.nan, 16.0, np.nan, 36.0]
+        )
+        np.testing.assert_array_equal(result.to_numpy(), expected)
 
     def test_reindex_without_tolerance_raises_warning(self):
         """Calling with tolerance=None should raise a UserWarning."""

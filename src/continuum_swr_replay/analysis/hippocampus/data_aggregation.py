@@ -101,6 +101,7 @@ Examples
 
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
@@ -141,6 +142,29 @@ def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
     same regression test.
     """
     return np.asarray(zscore(np.asarray(theta_power), nan_policy="omit"))
+
+
+def validate_required_session_data_keys(
+    data: Mapping[str, object],
+    required_keys: list[str],
+) -> None:
+    """Refuse to aggregate when ``data`` is missing required keys.
+
+    Both ``get_data_over_time`` (this module) and
+    :func:`continuum_swr_replay.analysis.contfrag.data_aggregation.get_contfrag_data_over_time`
+    require the same set of session-data keys (position, theta,
+    ripple, MUA, …). Routing both call sites through this helper
+    keeps the contract — and the error message — in one place so a
+    test can pin the validator behavior directly without
+    instantiating the full aggregation pipeline.
+    """
+    missing_keys = [k for k in required_keys if k not in data]
+    if missing_keys:
+        raise KeyError(
+            f"Missing required data keys: {missing_keys}. "
+            "Ensure load_data() was called with "
+            "DataLoadingPreset.DECODING or equivalent."
+        )
 
 
 def validate_results_position_time_alignment(
@@ -233,18 +257,14 @@ def get_data_over_time(
         Conditional non-local posterior distribution
 
     """
-    # Validate required data keys
-    required_keys = [
-        "position_info", "ripple_times", "hse_times",
-        "theta_phase", "theta_power",
-        "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
-    ]
-    missing_keys = [k for k in required_keys if k not in data]
-    if missing_keys:
-        raise KeyError(
-            f"Missing required data keys: {missing_keys}. "
-            f"Ensure load_data() was called with DataLoadingPreset.DECODING or equivalent."
-        )
+    validate_required_session_data_keys(
+        data,
+        required_keys=[
+            "position_info", "ripple_times", "hse_times",
+            "theta_phase", "theta_power",
+            "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+        ],
+    )
 
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"

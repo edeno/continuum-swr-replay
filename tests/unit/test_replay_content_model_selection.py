@@ -38,6 +38,18 @@ class TestInteractionRecovery:
     also in the model. We test recovery of one interaction at a time, with
     the matching base effect held at a non-zero baseline."""
 
+    # Per-interaction seed so each parametrized case is reproducible
+    # across processes. Using ``hash(interaction) % N`` would silently
+    # vary with PYTHONHASHSEED — under different CI workers the same
+    # test could select different simulation draws and mask
+    # regressions that only fail at one seed.
+    _INTERACTION_SEEDS = {
+        "swr_x_current": 1154,
+        "switch_x_prev": 9541,
+        "current_x_last_rewarded": 1911,
+        "omission_x_last_rewarded": 4273,
+    }
+
     @pytest.mark.parametrize(
         "interaction,base",
         [
@@ -50,7 +62,10 @@ class TestInteractionRecovery:
     def test_recover_single_interaction(self, interaction, base):
         truth = {base: 0.4, interaction: 0.6}
         df = simulate_with_event_covariates(
-            truth, n_events=600, L_e=30, seed=hash(interaction) % 10000
+            truth,
+            n_events=600,
+            L_e=30,
+            seed=self._INTERACTION_SEEDS[interaction],
         )
         fit = fit_conditional_poisson(df, predictors=list(truth))
         assert fit is not None

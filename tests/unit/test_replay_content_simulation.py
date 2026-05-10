@@ -509,13 +509,21 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
         # Both paths attenuate (point estimate strictly below truth).
         assert fit_hard["coef_is_current"] < truth
         assert fit_soft["coef_is_current"] < truth
-        # And the attenuation directions are not equal — there is a real
-        # gap between the two methods on the same data.
-        assert fit_hard["coef_is_current"] != pytest.approx(
-            fit_soft["coef_is_current"], rel=0.02
+        # The empirical claim in the docstring is *directional*: under
+        # this generative regime, hard MAP attenuates LESS than soft
+        # posterior averaging, so ``hard_β̂`` sits between ``soft_β̂``
+        # and ``truth``. A test that only required the two estimates
+        # to differ would still pass if a regression flipped the
+        # ordering — exactly the case the docstring's "swapping MAP
+        # for soft would *worsen* attenuation" claim hinges on.
+        assert (
+            fit_hard["coef_is_current"] > fit_soft["coef_is_current"]
         ), (
             f"hard β̂ = {fit_hard['coef_is_current']:.3f}, "
-            f"soft β̂ = {fit_soft['coef_is_current']:.3f}, truth = {truth}"
+            f"soft β̂ = {fit_soft['coef_is_current']:.3f}, "
+            f"truth = {truth} — hard MAP must attenuate less than soft "
+            "posterior averaging under this regime, otherwise the "
+            "test's docstring claim no longer holds."
         )
 
 

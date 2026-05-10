@@ -111,11 +111,15 @@ class TestPathProgressForRunSegment:
         """Progress must always be in [0, 1] range."""
         time = np.arange(0, 1.0, 0.002)
 
-        # Create position data that might stress the bounds
+        # Seeded ``Generator`` so a regression that relaxes the
+        # clipping-to-[0,1] contract is reproducible across processes.
+        # The repo's deterministic-test convention is "no calls to
+        # global ``np.random.*`` without a fixed seed".
+        rng = np.random.default_rng(0)
         pos_info = pd.DataFrame({
-            'projected_x_position': np.random.randn(len(time)) * 5,
-            'projected_y_position': np.random.randn(len(time)) * 5,
-            'track_segment_id': np.random.choice([0, 1], size=len(time)),
+            'projected_x_position': rng.standard_normal(len(time)) * 5,
+            'projected_y_position': rng.standard_normal(len(time)) * 5,
+            'track_segment_id': rng.choice([0, 1], size=len(time)),
         }, index=time)
 
         # Set node positions

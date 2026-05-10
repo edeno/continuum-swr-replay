@@ -246,26 +246,29 @@ class TestGetDataOverTimeValidation:
             )
 
     def test_all_required_keys_present_does_not_raise_validation(
-        self, mock_session_data_for_aggregation, mock_results, mock_environment
+        self, mock_session_data_for_aggregation
     ):
-        """Complete data dict should pass the key validation check.
+        """Complete data dict passes the key validator with no error.
 
-        Tests only the validation logic, not the full aggregation pipeline.
-        Downstream failures from mock environment are expected and acceptable,
-        but the specific "Missing required data keys" error should not occur.
+        Targets the extracted validator
+        :func:`validate_required_session_data_keys` directly so the
+        test exercises only the validation contract — no need to
+        instantiate the full aggregation pipeline (which would
+        require a real ``Environment``) and no need to swallow a
+        bag of broad downstream exceptions that could mask
+        unrelated regressions in the aggregator. The validator is
+        the same one ``get_data_over_time`` calls, so this is a
+        production-path test, not a re-typed snippet.
         """
-        try:
-            get_data_over_time(
-                mock_session_data_for_aggregation,
-                mock_results,
-                mock_environment,
-                "chimi20200212_.nwb",
-                "02_r1",
-            )
-        except KeyError as e:
-            if "Missing required data keys" in str(e):
-                pytest.fail(f"Validation raised KeyError unexpectedly: {e}")
-            # Other KeyErrors from downstream code (e.g., mock env) are acceptable
-        except (TypeError, AttributeError, ValueError):
-            # Expected failures from mock environment in downstream processing
-            pass
+        from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+            validate_required_session_data_keys,
+        )
+
+        validate_required_session_data_keys(
+            mock_session_data_for_aggregation,
+            required_keys=[
+                "position_info", "ripple_times", "hse_times",
+                "theta_phase", "theta_power",
+                "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+            ],
+        )

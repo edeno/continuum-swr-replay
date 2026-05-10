@@ -131,10 +131,14 @@ class TestCreateLaggedSignal:
         signal = np.array([0, 0, 0, 0, 1], dtype=float)
         lags = np.array([2])
         result = create_lagged_signal(signal, lags)
-        # The 1 at index 4 shifted by 2 would go to index 6, which is OOB
-        # So only zeros remain in the valid range
-        assert result[-1, 0] == 0  # shifted out
-        assert result.sum() == 0 or result[-3, 0] == 0  # no data leaked
+        # The 1 at index 4 shifted by 2 would land at index 6 — OOB,
+        # so the column must be all-zero. Pin the *whole* expected
+        # vector: a regression that leaks the value into any in-range
+        # bin (e.g. via wrap-around or fill-with-edge) would still
+        # have most slots equal to zero, so an
+        # ``any-bin-is-zero``-style assertion silently passes.
+        expected = np.zeros(5, dtype=float)
+        np.testing.assert_array_equal(result[:, 0], expected)
 
     def test_default_lags(self):
         signal = np.zeros(300)
