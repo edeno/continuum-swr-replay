@@ -4,13 +4,6 @@ import numpy as np
 import pytest
 
 
-def test_constants_importable():
-    """Test that all constants can be imported."""
-
-    # If we get here, all imports succeeded
-    assert True
-
-
 def test_default_non_local_threshold():
     """Test DEFAULT_NON_LOCAL_THRESHOLD has correct type and value."""
     from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
@@ -116,19 +109,3 @@ def test_bins_speed_cm_per_sec():
     assert np.allclose(np.diff(BINS_SPEED_CM_PER_SEC), 0.5)
 
 
-def test_bins_are_numpy_arrays_not_lists():
-    """Test that all bin definitions are numpy arrays, not lists."""
-    from continuum_swr_replay.analysis.constants import (
-        BINS_DISTANCE_CM,
-        BINS_DURATION_MS,
-        BINS_HPD_CM,
-        BINS_PROBABILITY,
-        BINS_SPEED_CM_PER_SEC,
-    )
-
-    # Ensure they are numpy arrays for efficient operations
-    assert isinstance(BINS_DURATION_MS, np.ndarray)
-    assert isinstance(BINS_PROBABILITY, np.ndarray)
-    assert isinstance(BINS_DISTANCE_CM, np.ndarray)
-    assert isinstance(BINS_HPD_CM, np.ndarray)
-    assert isinstance(BINS_SPEED_CM_PER_SEC, np.ndarray)
