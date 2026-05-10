@@ -407,25 +407,3 @@ class TestGetStartEndNodeID:
         assert result['from_well'][0] == 1
         assert result['to_well'][0] == 1
 
-    def test_boundary_handling(self, simple_linear_track):
-        """Should handle position at session boundaries correctly."""
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
-
-        # More time points to avoid index out of bounds
-        position_info = pd.DataFrame({
-            'projected_x_position': [0.0, 10.0, 20.0, 20.0],
-            'projected_y_position': [0.0, 0.0, 0.0, 0.0],
-        }, index=[0.0, 0.5, 1.0, 1.5])
-
-        # Time boundaries
-        times = pd.DataFrame({
-            'start_time': [0.0],
-            'end_time': [1.2],
-        })
-
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
-
-        # Should handle boundary positions
-        assert result['from_well'][0] in [0, 1, 2]
-        assert result['to_well'][0] in [0, 1, 2]

@@ -561,13 +561,14 @@ class TestSpeedCalculationBoundsFix:
         # Speed should be computed without index errors
         assert np.isfinite(events.iloc[0]["max_speed"]), "Should have valid speed"
 
-    def test_event_outside_time_range_returns_nan(self):
-        """Events with time range outside data bounds should return NaN speed."""
-        time = np.arange(0.1, 0.9, 0.002)  # Start at 0.1, end before 0.9
+    def test_event_within_data_bounds_detected(self):
+        """When data starts after t=0 (offset position index), the detector
+        still finds an event whose probability mask is fully inside the
+        recorded range."""
+        time = np.arange(0.1, 0.9, 0.002)
         prob = np.zeros(len(time))
         speed = np.full(len(time), 10.0)
 
-        # Event within valid range
         prob[(time >= 0.2) & (time < 0.3)] = 0.9
 
         prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
@@ -577,38 +578,11 @@ class TestSpeedCalculationBoundsFix:
             speed=speed,
             time=time,
             prob_threshold=0.8,
-            minimum_duration=0.015
+            minimum_duration=0.015,
         )
 
         assert len(events) == 1
-        # Should not crash with out-of-bounds errors
-        assert np.isfinite(events.iloc[0]["max_speed"]) or np.isnan(events.iloc[0]["max_speed"])
-
-    def test_empty_time_interval_returns_nan(self):
-        """When start and end indices are equal, should return NaN speed."""
-        time = np.arange(0, 1.0, 0.1)  # Sparse time array
-        prob = np.zeros(len(time))
-        speed = np.full(len(time), 10.0)
-
-        # Very short event that might not span any bins
-        prob[3:5] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
-
-        # Should not crash even with weird edge cases
-        events = get_confident_times(
-            prob_array,
-            speed=speed,
-            time=time,
-            prob_threshold=0.8,
-            minimum_duration=0.01
-        )
-
-        # Result should be valid (either empty or with NaN speeds)
-        for idx in range(len(events)):
-            max_speed = events.iloc[idx]["max_speed"]
-            assert np.isfinite(max_speed) or np.isnan(max_speed), \
-                "Speed should be finite or NaN, never crash"
+        assert events.iloc[0]["max_speed"] == pytest.approx(10.0)
 
 
 def _event(start, end):

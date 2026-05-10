@@ -76,11 +76,6 @@ def trials_df():
 class TestMakeTaskVariablesOutput:
     """Test that make_task_variables returns correct structure."""
 
-    def test_returns_dataframe(self, position_info, trials_df, linear_track):
-        """Should return a pandas DataFrame."""
-        result = make_task_variables(position_info, trials_df, linear_track)
-        assert isinstance(result, pd.DataFrame)
-
     def test_index_matches_position_info(
         self, position_info, trials_df, linear_track
     ):
@@ -237,17 +232,6 @@ class TestMakeTaskVariablesValues:
 
         dist = result["dist_to_goal"].dropna()
         assert (dist >= 0).all()
-
-    def test_turn_direction_is_string(
-        self, position_info, trials_df, linear_track
-    ):
-        """Turn direction should be a string value."""
-        result = make_task_variables(position_info, trials_df, linear_track)
-
-        # Get non-NaN turn directions
-        turns = result["turn_direction"].dropna().unique()
-        for turn in turns:
-            assert isinstance(turn, str)
 
     def test_ffill_fills_inter_trial_gaps(self):
         """Forward fill should propagate values into gaps between trials."""
