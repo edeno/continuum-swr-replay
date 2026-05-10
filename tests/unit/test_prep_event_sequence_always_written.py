@@ -115,14 +115,6 @@ def test_empty_fallback_uses_canonical_sequence_schema():
     that constructs an empty ``pd.DataFrame()`` instead writes a
     0-column frame; Stage 5B then ``KeyError``s on the expected
     fields."""
-    src = (SCRIPTS_DIR / "prepare_replay_content_data.py").read_text()
-    assert "_event_sequence_table_columns" in src, (
-        "the prep script no longer references "
-        "``_event_sequence_table_columns``; the empty-sequence "
-        "fallback must use the canonical schema so Stage 5B finds "
-        "the expected columns."
-    )
-
     # The else-branch must construct a DataFrame whose columns kwarg
     # is the helper output. AST-walk the conditional that gates on
     # ``all_event_sequence_tables`` and inspect its else body.

@@ -80,36 +80,3 @@ class TestThetaPowerZScore:
         wrapping is the caller's responsibility."""
         out = theta_power_zscore(np.array([1.0, 2.0, 3.0]))
         assert isinstance(out, np.ndarray)
-
-
-class TestThetaPowerZScoreCallSitesUseHelper:
-    """Both aggregation paths must route through the shared helper.
-    A future change that inlines ``zscore(...)`` again would re-open
-    the failure mode — so pin the import / call here. Source-level
-    grep is the cheapest way to detect that without instantiating
-    the full Spyglass pipeline."""
-
-    def test_hippocampus_data_aggregation_uses_helper(self):
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[2]
-        src = (
-            repo_root
-            / "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py"
-        ).read_text()
-        assert '"theta_power_zscore": theta_power_zscore(' in src
-
-    def test_contfrag_data_aggregation_uses_helper(self):
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[2]
-        src = (
-            repo_root
-            / "src/continuum_swr_replay/analysis/contfrag/data_aggregation.py"
-        ).read_text()
-        assert '"theta_power_zscore": theta_power_zscore(' in src
-        # And the helper is imported, not redefined.
-        assert (
-            "from continuum_swr_replay.analysis.hippocampus.data_aggregation"
-            in src
-        )

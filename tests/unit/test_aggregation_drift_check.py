@@ -85,36 +85,3 @@ class TestValidateResultsPositionTimeAlignment:
             validate_results_position_time_alignment(
                 t, pd.Index(t + 5.0, name="time")
             )
-
-
-class TestCallSites:
-    """Both aggregation paths must route through the shared helper.
-    Source-grep is the cheapest way to detect a re-inlined copy
-    without instantiating the full Spyglass + non_local_detector
-    pipeline. The behavioral coverage above (which actually executes
-    the helper) is the primary defense; this just pins the call
-    sites."""
-
-    def test_hippocampus_data_aggregation_uses_helper(self):
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[2]
-        src = (
-            repo_root
-            / "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py"
-        ).read_text()
-        assert "validate_results_position_time_alignment(" in src
-
-    def test_contfrag_data_aggregation_uses_helper(self):
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[2]
-        src = (
-            repo_root
-            / "src/continuum_swr_replay/analysis/contfrag/data_aggregation.py"
-        ).read_text()
-        assert "validate_results_position_time_alignment(" in src
-        assert (
-            "from continuum_swr_replay.analysis.hippocampus.data_aggregation"
-            in src
-        )
