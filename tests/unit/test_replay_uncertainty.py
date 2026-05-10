@@ -132,9 +132,9 @@ class TestPosteriorHpdWidth:
         arm_post = _uniform_posterior(T=2, n_arms=3)
         w = np.ones(2)
         event_id = np.zeros(2, dtype=int)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="coverage must be in"):
             posterior_hpd_width(arm_post, w, event_id, coverage=0.0)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="coverage must be in"):
             posterior_hpd_width(arm_post, w, event_id, coverage=1.5)
 
 

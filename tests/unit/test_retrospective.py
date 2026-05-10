@@ -69,9 +69,11 @@ class TestArmPathWellToWell:
 
     def test_invalid_well_raises(self):
         # Trunk arms (6,7,8) and out-of-range arms are not valid wells.
-        with pytest.raises(ValueError):
+        # Match the specific branch so a regression that swaps the two
+        # validators (current_arm vs next_arm) is caught.
+        with pytest.raises(ValueError, match="current_arm=6"):
             arm_path_well_to_well(6, 0)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="next_arm=9"):
             arm_path_well_to_well(0, 9)
 
 
