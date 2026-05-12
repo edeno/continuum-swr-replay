@@ -31,6 +31,7 @@ from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from ._helpers import strict_mean, strict_sum
 
 __all__ = [
+    "StopSummaryConfig",
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
     "stop_replay_summary",
@@ -75,7 +76,7 @@ def _select_arm_fractions(
     ``event_table``, which is where it originates) telling us which
     arm to look up per event.
     """
-    sess_keys = ["animal", "day", "epoch"]
+    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
     keep = event_arm_table[[*sess_keys, "event_id", "arm", arm_col, "arm_fraction"]]
     matched = keep[keep["arm"] == keep[arm_col]]
     return matched[[*sess_keys, "event_id", "arm_fraction"]].rename(
@@ -187,9 +188,11 @@ def stop_replay_summary(
         return out
 
     # ── Per-event arm fractions for each role.
-    # event_table holds the role→arm mapping; merge it into
-    # event_arm_table so the role column is on the same row as the
-    # candidate arm.
+    # event_table holds the role→arm mapping. ``event_arm_table`` may
+    # also carry the role columns broadcast across its 9 rows per
+    # event; in that case we trust the broadcast values and only need
+    # event_table for the stop_id linkage and as a fallback for any
+    # role columns the event-arm table happens to be missing.
     role_cols = list(_ROLES.values())
     available_role_cols = [c for c in role_cols if c in event_table.columns]
     if not available_role_cols and not event_table.empty:
@@ -197,16 +200,16 @@ def stop_replay_summary(
             "event_table is missing all role columns "
             f"({role_cols}); cannot compute stop_replay_summary"
         )
-    ev_role = event_table[[*sess_keys, "event_id", *available_role_cols, "stop_id"]]
-    ea = event_arm_table.merge(
-        ev_role, on=[*sess_keys, "event_id"], how="left", suffixes=("", "_ev")
-    )
-    # If event_arm_table already had a role column, keep its value
-    # (trust the per-event-arm row's snapshot, not the join).
-    for col in available_role_cols:
-        if f"{col}_ev" in ea.columns:
-            ea[col] = ea[col].where(ea[col].notna(), ea[f"{col}_ev"])
-            ea = ea.drop(columns=[f"{col}_ev"])
+    # Only pull role columns from event_table that are NOT already on
+    # event_arm_table — otherwise the merge would create a `<col>_ev`
+    # suffix and force a fragile coalesce. event_arm_table's broadcast
+    # is already correct for production tables.
+    role_cols_to_pull = [
+        c for c in available_role_cols if c not in event_arm_table.columns
+    ]
+    pull_cols = [*sess_keys, "event_id", "stop_id", *role_cols_to_pull]
+    ev_role = event_table[pull_cols]
+    ea = event_arm_table.merge(ev_role, on=[*sess_keys, "event_id"], how="left")
 
     per_event_fracs = []
     for role, arm_col in _ROLES.items():
@@ -302,15 +305,25 @@ def stop_replay_summary(
         pe = pe.merge(df, on=[*sess_keys, "event_id"], how="left")
 
     # ── Aggregate to stop level.
+    # Coerce the SWR/MUA flags to a non-null bool mask. NA/None values
+    # default to False so they're excluded from the *positive* stratum
+    # (e.g., NA-is_swr does not count as an SWR event) and from the
+    # negative complement (we only complement the rows we'd have
+    # included). This is the conservative interpretation — a missing
+    # flag is treated as "unknown, exclude from both is_swr and
+    # is_non_swr selections."
+    is_swr_mask = pe["is_swr"].fillna(False).astype(bool)
+    is_mua_mask = pe["is_mua"].fillna(False).astype(bool)
+    is_swr_known = pe["is_swr"].notna()
     arm_role_cols = ["current", "prev", "last_rewarded", "best"]
     patch_role_cols = [f"{r}_patch" for r in arm_role_cols]
     role_cols = arm_role_cols + patch_role_cols
     agg_dfs = []
     for label, mask in (
         ("", None),
-        ("_swr", pe["is_swr"].astype(bool)),
-        ("_non_swr", ~pe["is_swr"].astype(bool)),
-        ("_mua", pe["is_mua"].astype(bool)),
+        ("_swr", is_swr_mask),
+        ("_non_swr", (~is_swr_mask) & is_swr_known),
+        ("_mua", is_mua_mask),
     ):
         sub = pe if mask is None else pe[mask]
         if sub.empty:

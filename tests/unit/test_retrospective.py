@@ -308,6 +308,25 @@ class TestContainsPathToNext:
         out = contains_path_to_next(ev, es).set_index("event_id")
         assert bool(out.loc[1, "contains_path_to_next"]) is True
 
+    def test_same_arm_requires_decoded_visit(self):
+        # current_arm == next_arm == 3 → path = {3}. The MAP-arm trace
+        # must include arm 3 at least once for the metric to be True.
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 3, "next_arm": 3},
+                {"event_id": 2, "current_arm": 3, "next_arm": 3},
+            ]
+        )
+        es = _make_event_sequence_table(
+            {
+                1: [3, 7, 9],  # visits arm 3 → True
+                2: [7, 9, 0],  # never visits arm 3 → False
+            }
+        )
+        out = contains_path_to_next(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "contains_path_to_next"]) is True
+        assert bool(out.loc[2, "contains_path_to_next"]) is False
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # chosen_patch_fraction (sum of arm_fraction over arms in next_patch)

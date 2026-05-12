@@ -421,9 +421,7 @@ def ends_at_next_patch(
     # in the denominator. Without the fillna, ``<NA>`` becomes NaN
     # under ``astype(float)`` and gets silently dropped, inflating
     # the per-session mean.
-    eq = (
-        merged["_last_patch"].astype("Int64") == merged["next_patch"].astype("Int64")
-    )
+    eq = merged["_last_patch"].astype("Int64") == merged["next_patch"].astype("Int64")
     out["ends_at_next_patch"] = eq.fillna(False).astype(bool)
     return out
 
@@ -557,8 +555,19 @@ def retrospective_alignment_with_shuffle(
             if m in sm_means:
                 shuffled_acc[m].append(sm_means[m])
 
+    # n_events counts events that contributed to the retrospective
+    # metrics (i.e., events with a valid next_arm). Counting len(real)
+    # would over-report whenever the outer-merge in
+    # compute_retrospective_metrics fans out — events without a
+    # next_arm are dropped, but rows in the merged frame are not 1:1
+    # with input events in general.
+    if "next_arm" in event_table.columns:
+        n_events = int(event_table["next_arm"].notna().sum())
+    else:
+        n_events = int(len(event_table))
+
     out: dict[str, float] = {
-        "n_events": int(len(real)),
+        "n_events": n_events,
         "n_shuffles": int(n_shuffles),
     }
     for m in metrics:
