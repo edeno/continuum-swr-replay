@@ -107,6 +107,7 @@ def create_detector(
         environments=env,
         **{param_key: params},
         discrete_transition_type=discrete_transition_type,
+        local_position_std=config.local_position_std,
     )
 
 

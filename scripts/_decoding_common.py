@@ -30,6 +30,7 @@ except ImportError:
 from continuum_swr_replay.data_loaders import get_epoch_info
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
+    LOCAL_POSITION_STD,
     POSITION_STD,
     WAVEFORM_STD,
 )
@@ -38,11 +39,21 @@ from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 
 @dataclass(frozen=True)
 class DecodingConfig:
-    """Configuration for neural decoding."""
+    """Configuration for neural decoding.
+
+    Notes
+    -----
+    ``position_std``, ``waveform_std``, and ``block_size`` configure the
+    encoding-model likelihood (the ``*_algorithm_params`` dict). In contrast,
+    ``local_position_std`` is a detector-level argument that controls the
+    Local state's spatial representation, so it is passed directly to the
+    detector constructor rather than through ``to_*_params``.
+    """
 
     position_std: float = POSITION_STD
     block_size: int = BLOCK_SIZE
     waveform_std: float = WAVEFORM_STD
+    local_position_std: float = LOCAL_POSITION_STD
 
     def to_clusterless_params(self) -> ClusterlessParams:
         """Get parameters for clusterless decoding (HPC)."""

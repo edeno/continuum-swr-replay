@@ -27,10 +27,11 @@ WAVEFORM_STD : float
     Waveform feature space standard deviation (24.0 µV) for clusterless decoding.
 BLOCK_SIZE : int
     GPU processing block size (1024) for memory management.
+LOCAL_POSITION_STD : float
+    Gaussian kernel standard deviation (2.5 cm) for the non-local detector's
+    Local-state spatial representation. ``> 0`` gives a multi-bin Local state.
 DETECTOR_CONFIG : dict
     Maps brain area names to detector class names and types.
-DECODING_PARAMS : DecodingParameters
-    Singleton instance with default decoding parameters.
 PROBABILITY_THRESHOLDS : list
     Probability thresholds for posterior analysis [0.50, 0.80, 0.95].
 COLORS : dict
@@ -38,15 +39,13 @@ COLORS : dict
 
 Classes
 -------
-DecodingParameters
-    Dataclass containing validated decoding parameters.
 TrainingType
     Enum for training data selection strategies (ALL or NO_RIPPLE).
 
 Notes
 -----
 All constants use type hints with Final[] to indicate they should not be
-modified. The DecodingParameters dataclass is frozen for immutability.
+modified.
 
 See Also
 --------
@@ -55,15 +54,14 @@ continuum_swr_replay.data_loaders.constants : Task-specific constants
 
 Examples
 --------
->>> from continuum_swr_replay.parameters import DECODING_PARAMS, TrainingType
->>> DECODING_PARAMS.place_bin_size
+>>> from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, TrainingType
+>>> PLACE_BIN_SIZE_1D
 2.0
 >>> TrainingType.NO_RIPPLE.value
 'no_ripple'
 
 """
 
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Final
@@ -96,6 +94,10 @@ PLACE_BIN_SIZE_2D: Final[float] = 3.5
 POSITION_STD: Final[float] = float(np.sqrt(12.5))  # ~3.536 cm spatial uncertainty
 WAVEFORM_STD: Final[float] = 24.0  # Waveform feature space standard deviation (µV)
 BLOCK_SIZE: Final[int] = 2**10  # GPU processing block size (1024)
+# Local-state spatial representation: Gaussian kernel std (cm) applied over
+# shortest-path track-graph distance, giving the Local state a multi-bin
+# (rather than single-bin) position representation in the non-local detector.
+LOCAL_POSITION_STD: Final[float] = 2.5
 
 # Detector configuration by brain area
 # Maps brain area to (detector_class_name, detector_type_string)
@@ -114,87 +116,6 @@ CONTFRAG_DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
     "OFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
 }
 
-
-@dataclass(frozen=True)
-class DecodingParameters:
-    """Parameters for neural decoding analysis.
-
-    Attributes
-    ----------
-    place_bin_size : float
-        Spatial bin size in cm for position discretization. Smaller bins
-        provide higher spatial resolution but require more computation.
-        Default is 2.0 cm for 1D decoding. Must be positive.
-    waveform_std : float
-        Standard deviation for waveform feature likelihood in µV. Controls
-        how tightly spikes must match the waveform features to contribute
-        to the posterior. Default is 24.0 µV. Must be positive.
-    position_std : float
-        Standard deviation for position likelihood in cm. Derived from
-        sqrt(12.5) ≈ 3.536 cm, which corresponds to uniform spatial uncertainty.
-        Must be positive.
-    block_size : int
-        Block size for GPU memory management during decoding. Controls
-        how many time bins are processed simultaneously. Must be a power
-        of 2 for optimal GPU performance. Default is 1024 (2^10).
-
-    Notes
-    -----
-    These parameters control the non-local detector's decoding algorithm.
-    The geometric mean of state duration is 1 / (1 - p), where:
-    - p = 1 - (1 / n_time_steps)
-    - n_time_steps should equal half a theta cycle
-    - Theta cycles are ~8 Hz or 125 ms per cycle
-    - Half a theta cycle is 62.5 ms
-    - If timestep is 2 ms, then n_time_steps = 31.25
-    - So p = 0.968
-
-    The dataclass is frozen (immutable) to prevent accidental modification
-    of these critical analysis parameters.
-
-    Raises
-    ------
-    ValueError
-        If block_size is not a power of 2, or if any standard deviation
-        or bin size parameter is not positive.
-
-    """
-
-    place_bin_size: float = PLACE_BIN_SIZE_1D
-    waveform_std: float = WAVEFORM_STD
-    position_std: float = POSITION_STD
-    block_size: int = BLOCK_SIZE
-
-    def __post_init__(self) -> None:
-        """Validate parameter values after initialization.
-
-        Raises
-        ------
-        ValueError
-            If block_size is not a power of 2, or if any parameter
-            that should be positive is not.
-
-        """
-        # Validate block_size is a power of 2
-        # Powers of 2 have exactly one bit set, so n & (n-1) == 0
-        if self.block_size <= 0 or (self.block_size & (self.block_size - 1)) != 0:
-            raise ValueError(f"block_size must be power of 2, got {self.block_size}")
-
-        # Validate positive values
-        if self.position_std <= 0:
-            raise ValueError(f"position_std must be positive, got {self.position_std}")
-
-        if self.waveform_std <= 0:
-            raise ValueError(f"waveform_std must be positive, got {self.waveform_std}")
-
-        if self.place_bin_size <= 0:
-            raise ValueError(
-                f"place_bin_size must be positive, got {self.place_bin_size}"
-            )
-
-
-# Singleton instance of decoding parameters
-DECODING_PARAMS: Final = DecodingParameters()
 
 PROBABILITY_THRESHOLDS: Final[list[float]] = [0.50, 0.80, 0.95]
 
@@ -270,11 +191,9 @@ __all__ = [
     "POSITION_STD",
     "WAVEFORM_STD",
     "BLOCK_SIZE",
+    "LOCAL_POSITION_STD",
     "DETECTOR_CONFIG",
     "CONTFRAG_DETECTOR_CONFIG",
-    # Decoding parameters (dataclass)
-    "DecodingParameters",
-    "DECODING_PARAMS",
     # Enums
     "TrainingType",
     # Color schemes
