@@ -30,8 +30,10 @@ import pickle
 import pandas as pd
 
 from continuum_swr_replay.analysis.replay import (
+    MODEL_CHOICE,
     MODEL_PATCH,
     MODEL_PATCH_SWITCH,
+    MODEL_RATE,
     build_choice_dataset,
     build_event_patch_table,
     build_switch_aligned_table,
@@ -131,14 +133,10 @@ def fit_patch_switch(
 
 
 def fit_rate_hierarchy(stop_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Fit R0/R1 Poisson rate models per session.
-
-    R1 drops is_after_reward (perfectly complementary to is_after_omission;
-    keeping both with the intercept is rank-deficient).
-    """
-    specs = {"R0": [], "R1": ["is_after_omission", "is_after_switch"]}
+    """Fit the MODEL_RATE Poisson rate models (R0/R1) per session."""
     out = {}
-    for name, preds in specs.items():
+    for name, spec in MODEL_RATE.items():
+        preds = list(spec.predictors)
         rows = []
         for keys, g in stop_table.groupby(SESS):
             r = fit_rate_model(g, preds, min_stops=20)
@@ -155,21 +153,11 @@ def fit_choice(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     choice = build_choice_dataset(
         tables["event_table"], tables["event_arm_table"], tables["stop_table"]
     )
-    behavior = [
-        c
-        for c in [
-            "visit_recency", "cumulative_reward", "recent_reward_rate",
-            "dist_to_arm", "is_same_patch",
-        ]
-        if c in choice.columns
-    ]
-    specs = {
-        "C_replay_only": ["replay_frac"],
-        "C_behavior": behavior,
-        "C_full": behavior + ["replay_frac"],
-    }
     out = {}
-    for name, preds in specs.items():
+    for name, spec in MODEL_CHOICE.items():
+        # Drop any spec predictor absent from this choice dataset
+        # (the behavioural block is defined optimistically).
+        preds = [p for p in spec.predictors if p in choice.columns]
         rows = []
         for keys, g in choice.groupby(SESS):
             if g["stop_id"].nunique() < 10:

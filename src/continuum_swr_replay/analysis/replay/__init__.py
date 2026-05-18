@@ -29,9 +29,11 @@ from .model_checking import (
 )
 from .model_specs import (
     ARM_FE_PREDICTORS,
+    MODEL_CHOICE,
     MODEL_HIERARCHY,
     MODEL_PATCH,
     MODEL_PATCH_SWITCH,
+    MODEL_RATE,
     ModelSpec,
 )
 from .rate_model import fit_rate_model
@@ -66,9 +68,11 @@ from .tables import (
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_PATCH",
     "MODEL_PATCH_SWITCH",
+    "MODEL_RATE",
     "ModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",

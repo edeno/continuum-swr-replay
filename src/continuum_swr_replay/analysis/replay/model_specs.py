@@ -1,10 +1,24 @@
-"""Model hierarchy definitions for replay content analysis.
+"""Model definitions for replay content analysis.
 
-Defines a sequence of nested models for the conditional Poisson
-(multinomial-count) framework. Only arm-varying predictors appear as
-main effects; event-level constants (time_since_stop, is_swr, etc.)
-appear only in interactions with arm-varying predictors, because they
-cancel in the conditional likelihood's within-event normalization.
+Single source of truth for the four model families, each a dict of
+:class:`ModelSpec`:
+
+- ``MODEL_HIERARCHY`` (+ ``_SWR`` / ``_MUA``) — arm-level nested
+  hierarchy, conditional Poisson on per-arm timebin counts.
+- ``MODEL_PATCH`` (+ ``_SWR`` / ``_MUA`` / ``_SWITCH``) — patch-level
+  conditional Poisson (9 arms collapsed to 3 patches).
+- ``MODEL_RATE`` — ordinary Poisson on per-stop event counts
+  (different estimator; see its section below).
+- ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
+  choice (different estimator again).
+
+The design notes below concern the conditional-Poisson **arm and
+patch** hierarchies. Their defining constraint: only arm-varying
+predictors are identifiable — event-level constants (time_since_stop,
+is_swr, etc.) cancel in the within-event normalization and appear
+only as interactions with arm-varying predictors. That rule does NOT
+apply to ``MODEL_RATE`` (ordinary Poisson, carries an intercept) or
+``MODEL_CHOICE``; see their own sections.
 
 Design decisions informed by exploratory analysis on 7 j16 sessions:
 
@@ -64,6 +78,7 @@ from dataclasses import dataclass
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
     "MODEL_HIERARCHY_SWR",
@@ -71,6 +86,7 @@ __all__ = [
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWITCH",
     "MODEL_PATCH_SWR",
+    "MODEL_RATE",
     "ModelSpec",
 ]
 
@@ -330,5 +346,87 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
         predictors=("is_current_patch", "is_prev_patch"),
         description="+ previous-patch suppression",
         parent="PS1",
+    ),
+}
+
+
+# ── Rate models ──
+#
+# A DIFFERENT estimator from the arm/patch hierarchies: an ordinary
+# Poisson on the per-stop event count (``n_events``) with a
+# ``log(immobility_time)`` offset, fit by ``rate_model.fit_rate_model``.
+# It carries an intercept, so — unlike the conditional Poisson —
+# stop-level constants do NOT cancel and ``is_after_*`` are valid
+# main effects.
+#
+# ``predictors=()`` for R0 means intercept-only (the offset is always
+# included by the fitter). ``is_after_reward`` is intentionally absent
+# from R1: it equals ``1 - is_after_omission`` wherever both are
+# defined, so including it with the intercept is rank-deficient.
+#
+# R3 (the docstring of ``rate_model.py``) is not a separate spec — it
+# is R1 fit separately on SWR-only / MUA-only / neither stops, a split
+# analysis rather than a different predictor set.
+
+MODEL_RATE: dict[str, ModelSpec] = {
+    "R0": ModelSpec(
+        name="R0",
+        predictors=(),
+        description="Null (intercept-only baseline event rate)",
+        parent=None,
+    ),
+    "R1": ModelSpec(
+        name="R1",
+        predictors=("is_after_omission", "is_after_switch"),
+        description="+ reward / switch context",
+        parent="R0",
+    ),
+}
+
+
+# ── Choice-prediction models ──
+#
+# A DIFFERENT estimator again: a conditional logit on the animal's
+# next-arm choice (``choice_prediction.fit_choice_model``), used to
+# ask whether replay content predicts behaviour beyond a behavioural
+# baseline.
+#
+# These three are not a single linear nested chain: ``C_full`` nests
+# both ``C_behavior`` (+ ``replay_frac``) and ``C_replay_only``
+# (+ the behavioural block). ``parent`` encodes the primary test —
+# ``C_full`` vs ``C_behavior``, i.e. does replay add predictive power
+# beyond behaviour — while ``C_replay_only`` is a standalone
+# replay-only reference (``parent=None``).
+#
+# The behavioural block bundles correlated reward-history predictors
+# (``cumulative_reward`` and ``recent_reward_rate``); callers should
+# drop any column absent from the choice dataset before fitting.
+
+_CHOICE_BEHAVIOR = (
+    "visit_recency",
+    "cumulative_reward",
+    "recent_reward_rate",
+    "dist_to_arm",
+    "is_same_patch",
+)
+
+MODEL_CHOICE: dict[str, ModelSpec] = {
+    "C_replay_only": ModelSpec(
+        name="C_replay_only",
+        predictors=("replay_frac",),
+        description="Replay content only",
+        parent=None,
+    ),
+    "C_behavior": ModelSpec(
+        name="C_behavior",
+        predictors=_CHOICE_BEHAVIOR,
+        description="Behavioural baseline (recency, reward history, distance, patch)",
+        parent=None,
+    ),
+    "C_full": ModelSpec(
+        name="C_full",
+        predictors=(*_CHOICE_BEHAVIOR, "replay_frac"),
+        description="Behavioural baseline + replay content",
+        parent="C_behavior",
     ),
 }
