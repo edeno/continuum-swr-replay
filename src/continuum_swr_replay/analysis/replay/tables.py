@@ -1077,6 +1077,7 @@ def build_event_patch_table(
         3 rows per event (one per patch), with columns:
         ``event_id``, ``patch``, ``patch_count_hard``,
         ``is_current_patch``, ``is_last_rewarded_patch``,
+        ``is_last_rewarded_patch_elsewhere``,
         ``cumulative_reward_patch``, ``visit_recency_patch``.
     """
     # All groupbys / merges below key on ``event_id`` only. If a
@@ -1136,6 +1137,17 @@ def build_event_patch_table(
         patch_eat["patch"] == patch_eat["last_rewarded_patch"]
     ).astype(int)
     patch_eat = patch_eat.drop(columns=["last_rewarded_patch"])
+
+    # is_last_rewarded_patch_elsewhere: the last-rewarded patch, but
+    # only where it is NOT the patch the animal currently occupies.
+    # ``is_last_rewarded_patch`` overlaps ``is_current_patch`` heavily
+    # (the animal is usually rewarded in its current patch); the patch
+    # hierarchy uses this disjoint-support residual at P2/P3, mirroring
+    # the arm-level ``is_last_rewarded_elsewhere``. See model_specs.py.
+    patch_eat["is_last_rewarded_patch_elsewhere"] = (
+        patch_eat["is_last_rewarded_patch"].to_numpy()
+        * (1 - patch_eat["is_current_patch"].to_numpy())
+    ).astype(int)
 
     # is_prev_patch: is this the patch the animal just came from?
     prev_p = event_table[["event_id", "prev_patch"]].copy()

@@ -220,17 +220,16 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # patch?) and ``cumulative_reward_patch`` (= sum of rewards across
 # both wells in this patch over the last 10 trials).
 #
-# COLLINEARITY CAVEAT (P2): ``is_last_rewarded_patch`` enters at P2
-# alongside ``is_current_patch``. These suffer the same overlap as
-# the arm-level ``is_current`` / ``is_last_rewarded`` pair (the
-# animal is usually rewarded in the patch it currently occupies),
-# and the overlap is *worse* at 3-patch granularity than at 9-arm
-# granularity. The P2→P1 likelihood-ratio test is therefore only
-# powered by stay-vs-switch and omission events, where the two
-# patches diverge; on pure exploit stretches the P2 coefficient is
-# weakly identified. ``MODEL_PATCH_SWITCH`` (below) is the clean
-# test of the previous-vs-current contrast — it restricts to switch
-# events where ``current_patch != prev_patch`` by construction.
+# P2/P3 use ``is_last_rewarded_patch_elsewhere`` rather than the raw
+# ``is_last_rewarded_patch``. The raw indicator overlaps
+# ``is_current_patch`` heavily (the animal is usually rewarded in
+# the patch it currently occupies) — the same near-collinearity the
+# arm hierarchy avoids with ``is_last_rewarded_elsewhere``. The
+# "elsewhere" form is the last-rewarded patch restricted to events
+# where it is not the current patch; ``is_current_patch`` (P1)
+# already carries the rewarded-in-current-patch case, so this is the
+# identifiable residual with disjoint support. ``MODEL_PATCH_SWITCH``
+# remains the dedicated test of the previous-vs-current contrast.
 
 # ── Event-source-restricted hierarchies (ContFrag pipeline) ──
 #
@@ -270,15 +269,15 @@ MODEL_PATCH: dict[str, ModelSpec] = {
     ),
     "P2": ModelSpec(
         name="P2",
-        predictors=("is_current_patch", "is_last_rewarded_patch"),
-        description="+ last-rewarded patch",
+        predictors=("is_current_patch", "is_last_rewarded_patch_elsewhere"),
+        description="+ last-rewarded patch (when not the current patch)",
         parent="P1",
     ),
     "P3": ModelSpec(
         name="P3",
         predictors=(
             "is_current_patch",
-            "is_last_rewarded_patch",
+            "is_last_rewarded_patch_elsewhere",
             "cumulative_reward_patch",
         ),
         description="+ patch-level reward history",
