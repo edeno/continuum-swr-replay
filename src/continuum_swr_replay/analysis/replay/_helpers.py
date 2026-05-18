@@ -393,6 +393,46 @@ def align_count_matrix(
     return out
 
 
+def add_arm_fixed_effects(
+    df: pd.DataFrame,
+    arm_col: str = "arm",
+    n_dummies: int = 8,
+) -> pd.DataFrame:
+    """Add arm fixed-effect dummy columns ``arm_fe_0`` … ``arm_fe_{n-1}``.
+
+    ``arm_fe_k`` is ``1.0`` where ``df[arm_col] == k`` and ``0.0``
+    otherwise. With nine arms the last arm (8) is the dropped
+    reference category, so ``n_dummies`` defaults to 8 — including all
+    nine dummies would be collinear with the conditional-Poisson
+    per-event normalization.
+
+    The columns are added in place and ``df`` is returned (matching
+    the in-place contract of :func:`add_trial_context`). Existing
+    ``arm_fe_*`` columns are overwritten.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Long-format event-arm frame. Must carry ``arm_col``.
+    arm_col : str
+        Integer arm-id column (``"arm"`` in the canonical event-arm
+        table, ``"arm_id"`` in simulator output).
+    n_dummies : int
+        Number of dummies to emit (arms ``0 .. n_dummies - 1``).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``df`` with the dummy columns added.
+    """
+    if arm_col not in df.columns:
+        raise KeyError(f"add_arm_fixed_effects: missing arm column {arm_col!r}")
+    arm = df[arm_col].to_numpy()
+    for k in range(n_dummies):
+        df[f"arm_fe_{k}"] = (arm == k).astype(float)
+    return df
+
+
 # ── Per-arm reward/visit history helpers ──
 
 
@@ -587,10 +627,24 @@ def recent_reward_rate_all_events(
     """Fraction of last ``k`` visits to each arm that were rewarded, for all events.
 
     Returns ``(n_events, n_arms)`` array.
+
+    Trunk arms (graph edges that touch no well — never a trial
+    destination, so never a reward site) are filled with ``0.0``
+    rather than ``NaN``: their reward rate is structurally zero, not
+    unknown. This matters because the conditional-Poisson fitter
+    drops an entire event if *any* of its nine arm rows is NaN, and
+    every event has three trunk-arm rows — leaving them NaN would
+    annihilate the M3+ event set. A leaf arm that simply has not been
+    visited yet in a session *with* prior trials stays ``NaN`` (a
+    genuine unknown); the no-trial-history rows stay ``NaN`` too,
+    matching the sibling helpers' contract.
     """
     n_arms = len(ALL_ARMS)
     n_events = len(event_times)
     n_trials_total = len(trials)
+    # Arms reachable as a trial destination = leaf arms (values of the
+    # well→arm map). Anything else is a trunk arm.
+    reachable_arms = set(well_to_arm.values())
 
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
@@ -627,6 +681,11 @@ def recent_reward_rate_all_events(
     out = np.full((n_events, n_arms), np.nan)
 
     for j in range(n_arms):
+        # Trunk arm: reward rate is structurally 0 wherever there is
+        # any trial history. ``no_past`` rows stay NaN.
+        if ALL_ARMS[j] not in reachable_arms:
+            out[~no_past, j] = 0.0
+            continue
         visits = arm_visits[j]
         rewards = arm_rewards[j]
         if visits.size == 0:

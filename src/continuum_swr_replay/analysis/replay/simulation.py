@@ -100,7 +100,9 @@ def sample_arm_design(
     returns leaf arms.
 
     Continuous predictors (``visit_recency``, ``cumulative_reward``,
-    ``dist_to_arm``) are sampled from plausible ranges if requested.
+    ``recent_reward_rate``, ``dist_to_arm``) are sampled from plausible
+    ranges if requested. Arm fixed-effect dummies (``arm_fe_0`` …
+    ``arm_fe_7``) are added when requested — constant across events.
     """
     n_arms = len(ALL_ARMS)
     leaf_arms = np.array([0, 1, 2, 3, 4, 5])
@@ -124,8 +126,20 @@ def sample_arm_design(
         feature_cols["visit_recency"] = rng.uniform(0, 10, size=(n_events, n_arms))
     if "cumulative_reward" in predictors:
         feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
+    if "recent_reward_rate" in predictors:
+        # Rewarded fraction of recent visits — a rate in [0, 1].
+        feature_cols["recent_reward_rate"] = rng.uniform(0, 1, size=(n_events, n_arms))
     if "dist_to_arm" in predictors:
         feature_cols["dist_to_arm"] = rng.uniform(0, 100, size=(n_events, n_arms))
+
+    # Arm fixed-effect dummies: arm_fe_k = 1 on arm k, identical across
+    # events (the static per-arm baseline the FE model controls for).
+    for k in range(8):
+        name = f"arm_fe_{k}"
+        if name in predictors:
+            feature_cols[name] = np.tile(
+                (arm_grid == k).astype(float), (n_events, 1)
+            )
 
     missing = [p for p in predictors if p not in feature_cols]
     if missing:
@@ -230,8 +244,10 @@ def simulate_with_event_covariates(
     Extends ``simulate_counts`` to support the full predictor vocabulary
     used by ``model_specs.MODEL_HIERARCHY`` — including the continuous
     arm-varying predictors (``visit_recency``, ``cumulative_reward``,
-    ``dist_to_arm``) and the event×arm interaction columns
-    (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``, ``time_x_*``).
+    ``recent_reward_rate``, ``dist_to_arm``), the arm fixed-effect
+    dummies (``arm_fe_0`` … ``arm_fe_7``), and the event×arm interaction
+    columns (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``,
+    ``time_x_*``).
 
     Per event we sample event-level covariates (``is_swr``,
     ``is_after_switch``, ``is_after_omission``, ``time_since_stop``) and
@@ -267,8 +283,17 @@ def simulate_with_event_covariates(
         "is_last_rewarded": (arm_grid == rewarded[:, None]).astype(float),
         "visit_recency": rng.uniform(0, 10, size=(n_events, n_arms)),
         "cumulative_reward": rng.uniform(0, 5, size=(n_events, n_arms)),
+        "recent_reward_rate": rng.uniform(0, 1, size=(n_events, n_arms)),
         "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
+    # Arm fixed-effect dummies (arm_fe_0 … arm_fe_7): the static
+    # per-arm baseline carried by MODEL_HIERARCHY from M0a on. Constant
+    # across events, so a fit recovers their coefficients at 0 unless
+    # the generative truth assigns them a non-zero β.
+    for k in range(8):
+        arm_features[f"arm_fe_{k}"] = np.tile(
+            (arm_grid == k).astype(float), (n_events, 1)
+        )
 
     # Event-level scalars, broadcast to all arms.
     event_scalars: dict[str, np.ndarray] = {

@@ -5,6 +5,7 @@ simulation utilities, and model comparison/checking helpers used across
 the replay content analysis pipeline.
 """
 
+from ._helpers import add_arm_fixed_effects
 from .choice_prediction import (
     build_choice_dataset,
     build_residualized_choice_dataset,
@@ -27,6 +28,7 @@ from .model_checking import (
     cross_validate_conditional_poisson,
 )
 from .model_specs import (
+    ARM_FE_PREDICTORS,
     MODEL_HIERARCHY,
     MODEL_PATCH,
     MODEL_PATCH_SWITCH,
@@ -63,11 +65,13 @@ from .tables import (
 )
 
 __all__ = [
+    "ARM_FE_PREDICTORS",
     "MODEL_HIERARCHY",
     "MODEL_PATCH",
     "MODEL_PATCH_SWITCH",
     "ModelSpec",
     "StopSummaryConfig",
+    "add_arm_fixed_effects",
     "arm_dist_rank",
     "arm_path_well_to_well",
     "build_choice_dataset",

@@ -23,6 +23,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -38,6 +39,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY_MUA,
     MODEL_HIERARCHY_SWR,
     MODEL_PATCH,
+    MODEL_PATCH_MUA,
+    MODEL_PATCH_SWR,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -63,14 +66,17 @@ _EVENT_SOURCE_CONFIG = {
 # When --hierarchy patch is selected, the table and response column are
 # different but the input directory is shared with the corresponding
 # event-source. event_id remains the grouping key (globally unique).
+# ``table_name`` here is informational only — the actual table name is
+# resolved by ``resolve_contfrag_paths`` further down, which appends the
+# brain-area suffix for the ContFrag sources. The SWR/MUA patch tables
+# are built by ``prepare_contfrag_replay_content_data.py``.
 _PATCH_OVERRIDES = {
     "non_local": {
         "hierarchy": MODEL_PATCH,
         "table_name": "event_patch_table",
     },
-    # SWR / MUA patch hierarchies not yet built; surface a clear error.
-    "SWR": {"hierarchy": None, "table_name": "event_patch_table_swr"},
-    "MUA": {"hierarchy": None, "table_name": "event_patch_table_mua"},
+    "SWR": {"hierarchy": MODEL_PATCH_SWR, "table_name": "event_patch_table_swr"},
+    "MUA": {"hierarchy": MODEL_PATCH_MUA, "table_name": "event_patch_table_mua"},
 }
 
 logging.basicConfig(
@@ -321,7 +327,8 @@ def main():
         if hierarchy is None:
             raise NotImplementedError(
                 f"Patch hierarchy not defined for event source {args.event_source!r}. "
-                "Add MODEL_PATCH_SWR / MODEL_PATCH_MUA in model_specs.py first."
+                "Add an entry to _PATCH_OVERRIDES pointing at a MODEL_PATCH "
+                "variant in model_specs.py."
             )
     else:
         hierarchy = source_config["hierarchy"]
@@ -381,6 +388,20 @@ def main():
         long_df.groupby(SESSION_COLS).ngroups,
     )
 
+    # Generate arm fixed-effect dummies (arm_fe_0 … arm_fe_7) from the
+    # canonical ``arm`` column. The arm hierarchy carries these from M0a
+    # on; they are derived at fit time rather than stored in the
+    # canonical table. Patch tables have no ``arm`` column and the patch
+    # hierarchy does not use arm FE, so this is arm-hierarchy only.
+    if args.hierarchy == "arm":
+        if "arm" in long_df.columns:
+            add_arm_fixed_effects(long_df)
+        else:
+            logging.warning(
+                "no 'arm' column — arm fixed-effect models (M0a+) will be "
+                "skipped as missing-predictor"
+            )
+
     # Collect the union of all predictors across requested models so we
     # can restrict to a common complete-case event set. This ensures that
     # M0 through M7 are all fit on the *same* events per session, which
@@ -433,6 +454,20 @@ def main():
             n_before - n_after,
             sorted(all_predictors),
         )
+    if n_after == 0:
+        # A predictor that is structurally NaN on some arm of every
+        # event (e.g. a stale ``recent_reward_rate`` column predating
+        # the trunk-arm 0.0 fix) wipes out the whole event set under
+        # event-wise complete-case filtering. Fail loudly rather than
+        # fitting M0 on zero events.
+        logging.error(
+            "Complete-case filtering removed ALL %d events — a predictor "
+            "in %s is NaN on some arm of every event. Regenerate the "
+            "event-arm table with the current prepare script.",
+            n_before,
+            sorted(all_predictors),
+        )
+        return
 
     # Also drop zero-count events
     event_totals = long_df.groupby(event_col)[response_col].transform("sum")

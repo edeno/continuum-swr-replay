@@ -8,6 +8,22 @@ cancel in the conditional likelihood's within-event normalization.
 
 Design decisions informed by exploratory analysis on 7 j16 sessions:
 
+- Arm fixed effects (``arm_fe_0`` … ``arm_fe_7``, 8 dummies with arm
+  8 as reference) enter as a baseline model ``M0a`` and are carried
+  by every richer model. They absorb each arm's static replay
+  occupancy so ``is_current`` / ``is_prev`` / ``is_last_rewarded``
+  measure bias *above* an arm's own baseline rather than being
+  inflated by it — important in camp-heavy sessions where the
+  animal sits at one well and ``is_current`` then concentrates on a
+  single arm. See :data:`ARM_FE_PREDICTORS`.
+- ``recent_reward_rate`` (rewarded fraction of the last 5 visits to
+  an arm) is used as the reward-history predictor at M3/M4 rather
+  than ``cumulative_reward`` (a raw reward *count*). The count
+  conflates value with visit frequency — a frequently-visited arm
+  scores high even at a mediocre reward rate — so its M3 coefficient
+  partly re-encodes spatial recency. ``recent_reward_rate`` is a
+  true rate. Cost: it is undefined (NaN) for never-visited arms, so
+  the M3+ complete-case event set is smaller than M0–M2's.
 - ``is_next`` excluded: the alternation structure makes
   ``prev_arm == next_arm`` on >90% of events.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both
@@ -29,13 +45,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 __all__ = [
+    "ARM_FE_PREDICTORS",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
     "MODEL_HIERARCHY_SWR",
     "MODEL_PATCH",
+    "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWITCH",
+    "MODEL_PATCH_SWR",
     "ModelSpec",
 ]
+
+
+# ── Arm fixed effects ──
+#
+# Eight indicator columns ``arm_fe_0`` … ``arm_fe_7`` (``arm_fe_k`` =
+# 1 iff ``arm == k``). Arm 8 is the dropped reference category — with
+# all nine dummies the set is collinear with the conditional
+# likelihood's per-event normalization. These are generated at fit
+# time from the canonical ``arm`` column by
+# ``_helpers.add_arm_fixed_effects`` (they are not stored in the
+# canonical event-arm table).
+ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"arm_fe_{a}" for a in range(8))
 
 
 @dataclass(frozen=True)
@@ -63,9 +94,21 @@ class ModelSpec:
 
 # ── Primary arm-level hierarchy ──
 #
-# Designed for reliable per-session convergence (max VIF < 3 through
-# M4; < 25 at M5 where is_last_rewarded enters). Tested on 7 j16
-# sessions: M0–M6 converge 7/7.
+# M0a (arm fixed effects) enters as a baseline below M1, and every
+# model from M1 on carries the 8 arm-FE dummies so the spatial /
+# reward predictors are estimated above each arm's static occupancy.
+#
+# CONVERGENCE / VIF NOTE: the pre-arm-FE hierarchy was tuned for
+# max VIF < 3 through M4 and converged 7/7 on the j16 pilot. Adding
+# arm fixed effects deliberately introduces competition between
+# ``is_current`` and the dummy of whichever arm the animal occupies
+# — VIF will rise (especially in camp-heavy sessions) and a session
+# where the animal never leaves one well can become rank-deficient
+# (is_current ≡ that arm's dummy) and fail to converge. The
+# ``n_events < 2 * n_predictors`` gate in ``fit_conditional_poisson``
+# also drops more small sessions now (M6 needs ≥30 events). These
+# claims must be re-validated on the full dataset; do not assume the
+# old 7/7 convergence still holds.
 #
 # SWR interactions enter at M6. These test whether the current-arm
 # and previous-arm biases differ during SWR events. Only spatial
@@ -78,6 +121,13 @@ class ModelSpec:
 # terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 # VIF > 70).
 
+_M1 = (*ARM_FE_PREDICTORS, "is_current")
+_M2 = (*_M1, "is_prev")
+_M3 = (*_M2, "recent_reward_rate")
+_M4 = (*_M3, "visit_recency")
+_M5 = (*_M4, "is_last_rewarded")
+_M6 = (*_M5, "swr_x_current", "swr_x_prev")
+
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
         name="M0",
@@ -85,53 +135,45 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         description="Null (uniform allocation across arms)",
         parent=None,
     ),
+    "M0a": ModelSpec(
+        name="M0a",
+        predictors=ARM_FE_PREDICTORS,
+        description="Per-arm geometry baseline (arm fixed effects)",
+        parent="M0",
+    ),
     "M1": ModelSpec(
         name="M1",
-        predictors=("is_current",),
-        description="Current-arm bias",
-        parent="M0",
+        predictors=_M1,
+        description="+ current-arm bias",
+        parent="M0a",
     ),
     "M2": ModelSpec(
         name="M2",
-        predictors=("is_current", "is_prev"),
-        description="Spatial context (current + previous)",
+        predictors=_M2,
+        description="+ previous-arm bias (spatial context)",
         parent="M1",
     ),
     "M3": ModelSpec(
         name="M3",
-        predictors=("is_current", "is_prev", "cumulative_reward"),
-        description="+ cumulative reward history",
+        predictors=_M3,
+        description="+ recent reward rate",
         parent="M2",
     ),
     "M4": ModelSpec(
         name="M4",
-        predictors=("is_current", "is_prev", "cumulative_reward", "visit_recency"),
+        predictors=_M4,
         description="+ visit recency",
         parent="M3",
     ),
     "M5": ModelSpec(
         name="M5",
-        predictors=(
-            "is_current",
-            "is_prev",
-            "cumulative_reward",
-            "visit_recency",
-            "is_last_rewarded",
-        ),
+        predictors=_M5,
         description="+ last-rewarded arm",
         parent="M4",
     ),
     "M6": ModelSpec(
         name="M6",
-        predictors=(
-            "is_current",
-            "is_prev",
-            "cumulative_reward",
-            "visit_recency",
-            "is_last_rewarded",
-            "swr_x_current",
-            "swr_x_prev",
-        ),
+        predictors=_M6,
         description="+ SWR × spatial interactions",
         parent="M5",
     ),
@@ -150,6 +192,18 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # versions — e.g., ``is_current_patch`` (= is the animal in this
 # patch?) and ``cumulative_reward_patch`` (= sum of rewards across
 # both wells in this patch over the last 10 trials).
+#
+# COLLINEARITY CAVEAT (P2): ``is_last_rewarded_patch`` enters at P2
+# alongside ``is_current_patch``. These suffer the same overlap as
+# the arm-level ``is_current`` / ``is_last_rewarded`` pair (the
+# animal is usually rewarded in the patch it currently occupies),
+# and the overlap is *worse* at 3-patch granularity than at 9-arm
+# granularity. The P2→P1 likelihood-ratio test is therefore only
+# powered by stay-vs-switch and omission events, where the two
+# patches diverge; on pure exploit stretches the P2 coefficient is
+# weakly identified. ``MODEL_PATCH_SWITCH`` (below) is the clean
+# test of the previous-vs-current contrast — it restricts to switch
+# events where ``current_patch != prev_patch`` by construction.
 
 # ── Event-source-restricted hierarchies (ContFrag pipeline) ──
 #
@@ -166,7 +220,8 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # tables are built and the cross-modality variability is verified.
 
 _M0_TO_M5 = {
-    name: MODEL_HIERARCHY[name] for name in ("M0", "M1", "M2", "M3", "M4", "M5")
+    name: MODEL_HIERARCHY[name]
+    for name in ("M0", "M0a", "M1", "M2", "M3", "M4", "M5")
 }
 
 MODEL_HIERARCHY_SWR: dict[str, ModelSpec] = dict(_M0_TO_M5)
@@ -203,6 +258,18 @@ MODEL_PATCH: dict[str, ModelSpec] = {
         parent="P2",
     ),
 }
+
+
+# ── Event-source-restricted patch hierarchies (ContFrag pipeline) ──
+#
+# MODEL_PATCH carries no event-type interaction, so the SWR / MUA
+# patch hierarchies are identical in structure — the only difference
+# is the event table they are fit on (ContFrag SWR-event vs MUA-event
+# patch counts). They mirror MODEL_PATCH's full P0–P3, unlike the arm
+# hierarchies which drop M6 (there is no patch-level M6 to drop).
+
+MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(MODEL_PATCH)
+MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(MODEL_PATCH)
 
 # ── Post-switch patch model ──
 #
