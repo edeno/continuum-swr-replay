@@ -25,7 +25,6 @@ import subprocess
 import sys
 import textwrap
 
-
 # Every import statement here must complete in a fresh interpreter
 # without dragging ``spyglass.*`` into ``sys.modules``. Comments after
 # each block name the surface the lazy contract protects — update

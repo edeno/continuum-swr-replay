@@ -13,7 +13,6 @@ from track_linearization import make_track_graph
 
 from continuum_swr_replay.data_loaders.position import get_interpolated_position_info
 
-
 # 3-node linear track shared by every test in this module; the production
 # call signature requires both ``track_graph`` and the parallel
 # ``edge_order`` + ``edge_spacing`` lists, so bundle them once.
