@@ -15,6 +15,8 @@ the case used at decode time (``HPC`` / ``mPFC`` / ``OFC``):
 
 - ``event_table_{source}_{brain_area}.pkl`` — one row per SWR (or MUA) event
 - ``event_arm_table_{source}_{brain_area}.pkl`` — one row per (event, arm)
+- ``event_patch_table_{source}_{brain_area}.pkl`` — one row per (event, patch),
+  collapsed from the event-arm table for the patch-level hierarchy
 - ``stop_table_{source}_{brain_area}.pkl`` — one row per immobility bout
   (incl. zero-event)
 
@@ -48,6 +50,7 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -74,6 +77,7 @@ def contfrag_table_basenames(
     return {
         "event_table": f"event_table_{src}_{brain_area}",
         "event_arm_table": f"event_arm_table_{src}_{brain_area}",
+        "event_patch_table": f"event_patch_table_{src}_{brain_area}",
         "stop_table": f"stop_table_{src}_{brain_area}",
     }
 
@@ -337,6 +341,21 @@ def main():
         len(event_table_all),
     )
 
+    # Collapse to the event-patch table for the patch-level hierarchy.
+    # Built from the concatenated frames so event_id is globally unique
+    # (the ContFrag hash already folds in brain_area + event_source),
+    # which build_event_patch_table requires. brain_area is re-stamped
+    # because the helper only carries the animal/day/epoch session keys.
+    event_patch_table_all = build_event_patch_table(
+        event_table_all, event_arm_table_all
+    )
+    event_patch_table_all["brain_area"] = args.brain_area
+    logging.info(
+        "event_patch rows: %d (= 3 × %d events)",
+        len(event_patch_table_all),
+        event_table_all.groupby(session_cols)["event_id"].nunique().sum(),
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     # Per-brain-area filenames so HPC and mPFC prep runs don't
     # overwrite each other. The basename helper is exposed so the
@@ -345,6 +364,7 @@ def main():
     for name, frame in (
         (basenames["event_table"], event_table_all),
         (basenames["event_arm_table"], event_arm_table_all),
+        (basenames["event_patch_table"], event_patch_table_all),
         (basenames["stop_table"], stop_table_all),
     ):
         path = OUTPUT_DIR / f"{name}.pkl"
