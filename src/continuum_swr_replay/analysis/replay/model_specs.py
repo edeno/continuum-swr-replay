@@ -24,6 +24,18 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   partly re-encodes spatial recency. ``recent_reward_rate`` is a
   true rate. Cost: it is undefined (NaN) for never-visited arms, so
   the M3+ complete-case event set is smaller than M0–M2's.
+- ``is_last_rewarded`` is NOT used as a predictor: it is ~98%
+  identical to ``is_current`` (the animal is usually rewarded where
+  it currently sits), so a model carrying both is near-collinear
+  (VIF tail >100, occasional rank-deficient non-convergence). M5/M6
+  instead use ``is_last_rewarded_elsewhere`` = the last-rewarded arm
+  restricted to events where it differs from the current arm.
+  ``is_current`` (M1) already carries the rewarded-at-current-arm
+  case, so the "elsewhere" indicator is exactly the identifiable
+  residual — reward memory at a non-current arm — with disjoint
+  support from ``is_current``. The trade is honest: it is sparse
+  (~2% of events), so its coefficient has low power rather than a
+  falsely-confident inflated estimate.
 - ``is_next`` excluded: the alternation structure makes
   ``prev_arm == next_arm`` on >90% of events.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both
@@ -33,9 +45,15 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   uninformative (null when estimated independently; VIF 28 and 12
   with ``is_current``). The spatial effect is binary "here vs
   not here," not a distance gradient.
-- SWR interactions limited to spatial predictors only:
-  ``swr_x_last_rewarded`` is r=1.0 with ``swr_x_current`` (because
-  ``is_current ≈ is_last_rewarded``), so it's dropped.
+- SWR interactions limited to spatial predictors only
+  (``swr_x_current``, ``swr_x_prev``). ``swr_x_last_rewarded`` was
+  dropped because it was r=1.0 with ``swr_x_current`` under the old
+  ``is_last_rewarded`` predictor; with ``is_last_rewarded_elsewhere``
+  a ``swr_x_last_rewarded_elsewhere`` term would now be identifiable
+  but is left out — at ~2% event support its SWR interaction is too
+  sparse to power.
+- MUA interactions are a separate analysis (split, not interaction)
+  to avoid the same collinearity.
 - MUA interactions are a separate analysis (split, not interaction)
   to avoid the same collinearity.
 """
@@ -106,15 +124,24 @@ class ModelSpec:
 # where the animal never leaves one well can become rank-deficient
 # (is_current ≡ that arm's dummy) and fail to converge. The
 # ``n_events < 2 * n_predictors`` gate in ``fit_conditional_poisson``
-# also drops more small sessions now (M6 needs ≥30 events). These
-# claims must be re-validated on the full dataset; do not assume the
-# old 7/7 convergence still holds.
+# also drops more small sessions now (M6 needs ≥30 events).
+#
+# M5/M6 use ``is_last_rewarded_elsewhere`` rather than the raw
+# ``is_last_rewarded``. The raw indicator overlaps ``is_current``
+# ~98%; on the full dataset that drove M5/M6 max VIF into the 100s
+# with 3/218 non-convergences. The "elsewhere" indicator has
+# disjoint support from ``is_current`` so the collinearity is gone,
+# at the cost of being sparse (a session with no current≠last-
+# rewarded events yields an all-zero column and M5/M6 are then
+# unidentifiable for that session — fit returns None, as before,
+# but for a clear reason). Convergence / VIF must be re-validated
+# on the regenerated tables.
 #
 # SWR interactions enter at M6. These test whether the current-arm
 # and previous-arm biases differ during SWR events. Only spatial
-# interactions are included (swr_x_current, swr_x_prev); reward
-# interactions (swr_x_last_rewarded) are excluded due to perfect
-# collinearity with swr_x_current.
+# interactions are included (swr_x_current, swr_x_prev); a reward
+# interaction (swr_x_last_rewarded_elsewhere) is now identifiable
+# but omitted as too sparse to power.
 #
 # MUA event-type effects are assessed via split analysis (fit M0–M6
 # separately on MUA-only and non-MUA events) rather than interaction
@@ -125,7 +152,7 @@ _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
 _M3 = (*_M2, "recent_reward_rate")
 _M4 = (*_M3, "visit_recency")
-_M5 = (*_M4, "is_last_rewarded")
+_M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
@@ -168,7 +195,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M5": ModelSpec(
         name="M5",
         predictors=_M5,
-        description="+ last-rewarded arm",
+        description="+ last-rewarded arm (when not the current arm)",
         parent="M4",
     ),
     "M6": ModelSpec(

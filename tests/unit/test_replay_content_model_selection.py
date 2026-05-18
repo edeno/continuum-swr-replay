@@ -127,8 +127,7 @@ class TestSelectionPicksTruthM2:
             "is_current": 0.6,
             "is_prev": 0.7,
             # Everything beyond M2 set to 0
-            "is_last_rewarded": 0.0,
-            "current_x_last_rewarded": 0.0,
+            "is_last_rewarded_elsewhere": 0.0,
             "visit_recency": 0.0,
             "recent_reward_rate": 0.0,
             "dist_to_arm": 0.0,
@@ -150,9 +149,9 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         truth = {
             "is_current": 0.5,
             "is_prev": 0.4,
-            "is_last_rewarded": 0.6,
-            "current_x_last_rewarded": -0.3,
-            # Continuous reward history at 0 — not the truth
+            # Reward-memory signal enters the hierarchy at M5.
+            "is_last_rewarded_elsewhere": 0.6,
+            # M3/M4 predictors at 0 — not the truth
             "visit_recency": 0.0,
             "recent_reward_rate": 0.0,
         }
@@ -160,7 +159,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3", "M4", "M5"])
         for criterion in ["aic", "bic"]:
             winner = _selection_winner(fits, criterion)
-            # Should pick M3+ because the reward binary is active.
+            # Should pick M5 because the reward-memory predictor is active.
             assert winner not in {"M0", "M1", "M2"}, (
                 f"{criterion.upper()} picked {winner}; expected M3+. "
                 f"{criterion}s: {[(n, round(f[criterion], 2)) for n, f in fits.items()]}"

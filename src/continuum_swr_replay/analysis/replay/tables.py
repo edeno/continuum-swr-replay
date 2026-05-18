@@ -951,6 +951,17 @@ def build_event_arm_table(
     long["is_last_rewarded"] = _eq_indicator(
         arm_arr, long["last_rewarded_arm"].to_numpy()
     )
+    # is_last_rewarded_elsewhere: the last-rewarded arm, but only on
+    # events where it is NOT the arm the animal currently occupies.
+    # ``is_last_rewarded`` is ~98% identical to ``is_current`` (the
+    # animal is usually rewarded where it now sits), so the two are
+    # near-collinear in a joint model. ``is_current`` (M1) already
+    # carries the rewarded-at-current-arm case; this indicator is the
+    # identifiable residual — reward memory at a non-current arm — and
+    # has disjoint support from ``is_current`` by construction.
+    long["is_last_rewarded_elsewhere"] = (
+        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
+    ).astype(int)
     long["arm_patch_id"] = np.array([_arm_to_patch(a) for a in arm_arr])
     long["is_same_patch"] = _eq_indicator(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
@@ -1286,6 +1297,7 @@ def _event_arm_table_columns() -> list[str]:
         "is_prev",
         "is_next",
         "is_last_rewarded",
+        "is_last_rewarded_elsewhere",
         "is_same_patch",
         # Spatial
         "dist_to_arm",

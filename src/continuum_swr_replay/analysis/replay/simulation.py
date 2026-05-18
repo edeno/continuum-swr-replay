@@ -120,6 +120,11 @@ def sample_arm_design(
     feature_cols["is_prev"] = (arm_grid == prev[:, None]).astype(float)
     feature_cols["is_next"] = (arm_grid == nxt[:, None]).astype(float)
     feature_cols["is_last_rewarded"] = (arm_grid == rewarded[:, None]).astype(float)
+    # Last-rewarded arm restricted to where it is not the current arm
+    # (the identifiable, non-collinear reward-memory predictor for M5/M6).
+    feature_cols["is_last_rewarded_elsewhere"] = feature_cols["is_last_rewarded"] * (
+        1.0 - feature_cols["is_current"]
+    )
 
     # Continuous: independent across events and arms with arbitrary scale.
     if "visit_recency" in predictors:
@@ -286,6 +291,11 @@ def simulate_with_event_covariates(
         "recent_reward_rate": rng.uniform(0, 1, size=(n_events, n_arms)),
         "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
+    # M5/M6 reward-memory predictor: last-rewarded arm where it is not
+    # the current arm (disjoint support from is_current by construction).
+    arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
+        1.0 - arm_features["is_current"]
+    )
     # Arm fixed-effect dummies (arm_fe_0 … arm_fe_7): the static
     # per-arm baseline carried by MODEL_HIERARCHY from M0a on. Constant
     # across events, so a fit recovers their coefficients at 0 unless
