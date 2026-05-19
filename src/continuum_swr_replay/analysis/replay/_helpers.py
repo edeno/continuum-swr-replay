@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
@@ -396,15 +397,13 @@ def align_count_matrix(
 def add_arm_fixed_effects(
     df: pd.DataFrame,
     arm_col: str = "arm",
-    n_dummies: int = 8,
 ) -> pd.DataFrame:
-    """Add arm fixed-effect dummy columns ``arm_fe_0`` … ``arm_fe_{n-1}``.
+    """Add the arm fixed-effect dummy columns named by ``ARM_FE_PREDICTORS``.
 
-    ``arm_fe_k`` is ``1.0`` where ``df[arm_col] == k`` and ``0.0``
-    otherwise. With nine arms the last arm (8) is the dropped
-    reference category, so ``n_dummies`` defaults to 8 — including all
-    nine dummies would be collinear with the conditional-Poisson
-    per-event normalization.
+    ``arm_fe_k`` is ``1`` where ``df[arm_col] == k`` and ``0`` otherwise.
+    The dropped reference arm (the ninth) is absent from
+    ``ARM_FE_PREDICTORS`` — including all nine dummies would be
+    collinear with the conditional-Poisson per-event normalization.
 
     The columns are added in place and ``df`` is returned (matching
     the in-place contract of :func:`add_trial_context`). Existing
@@ -417,8 +416,6 @@ def add_arm_fixed_effects(
     arm_col : str
         Integer arm-id column (``"arm"`` in the canonical event-arm
         table, ``"arm_id"`` in simulator output).
-    n_dummies : int
-        Number of dummies to emit (arms ``0 .. n_dummies - 1``).
 
     Returns
     -------
@@ -428,8 +425,8 @@ def add_arm_fixed_effects(
     if arm_col not in df.columns:
         raise KeyError(f"add_arm_fixed_effects: missing arm column {arm_col!r}")
     arm = df[arm_col].to_numpy()
-    for k in range(n_dummies):
-        df[f"arm_fe_{k}"] = (arm == k).astype(float)
+    for k, col in enumerate(ARM_FE_PREDICTORS):
+        df[col] = (arm == k).astype(np.int8)
     return df
 
 

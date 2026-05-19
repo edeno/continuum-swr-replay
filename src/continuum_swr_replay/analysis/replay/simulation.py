@@ -36,6 +36,7 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
 
@@ -139,8 +140,7 @@ def sample_arm_design(
 
     # Arm fixed-effect dummies: arm_fe_k = 1 on arm k, identical across
     # events (the static per-arm baseline the FE model controls for).
-    for k in range(8):
-        name = f"arm_fe_{k}"
+    for k, name in enumerate(ARM_FE_PREDICTORS):
         if name in predictors:
             feature_cols[name] = np.tile(
                 (arm_grid == k).astype(float), (n_events, 1)
@@ -296,12 +296,11 @@ def simulate_with_event_covariates(
     arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
         1.0 - arm_features["is_current"]
     )
-    # Arm fixed-effect dummies (arm_fe_0 … arm_fe_7): the static
-    # per-arm baseline carried by MODEL_HIERARCHY from M0a on. Constant
-    # across events, so a fit recovers their coefficients at 0 unless
-    # the generative truth assigns them a non-zero β.
-    for k in range(8):
-        arm_features[f"arm_fe_{k}"] = np.tile(
+    # Arm fixed-effect dummies: constant across events, so a fit
+    # recovers their coefficients at 0 unless the generative truth
+    # assigns them a non-zero β.
+    for k, name in enumerate(ARM_FE_PREDICTORS):
+        arm_features[name] = np.tile(
             (arm_grid == k).astype(float), (n_events, 1)
         )
 

@@ -388,11 +388,9 @@ def main():
         long_df.groupby(SESSION_COLS).ngroups,
     )
 
-    # Generate arm fixed-effect dummies (arm_fe_0 … arm_fe_7) from the
-    # canonical ``arm`` column. The arm hierarchy carries these from M0a
-    # on; they are derived at fit time rather than stored in the
-    # canonical table. Patch tables have no ``arm`` column and the patch
-    # hierarchy does not use arm FE, so this is arm-hierarchy only.
+    # Arm fixed effects are derived at fit time rather than stored in
+    # the canonical table. Patch tables have no ``arm`` column and the
+    # patch hierarchy does not use arm FE, so this is arm-only.
     if args.hierarchy == "arm":
         if "arm" in long_df.columns:
             add_arm_fixed_effects(long_df)

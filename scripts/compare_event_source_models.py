@@ -74,101 +74,79 @@ def _load_tables(event_source: str) -> dict[str, pd.DataFrame]:
         ("stop_table", "stop_table"),
     ]:
         path = d / f"{base}{suffix}.pkl"
-        tables[short] = pickle.load(open(path, "rb"))
+        tables[short] = pd.read_pickle(path)
         logger.info("loaded %s: %d rows", path.name, len(tables[short]))
     return tables
 
 
-def fit_patch_hierarchy(
-    event_table: pd.DataFrame, event_arm_table: pd.DataFrame
-) -> dict[str, pd.DataFrame]:
-    """Fit P0-P3 conditional Poisson per session on patch counts."""
-    patch_table = build_event_patch_table(event_table, event_arm_table)
+def _fit_per_session(table, models, fit_fn) -> dict[str, pd.DataFrame]:
+    """Fit each model in ``models`` per session and stack the results.
+
+    ``fit_fn(group, spec)`` returns a per-session fit dict, or ``None``
+    to skip the session (insufficient data / non-convergence).
+    """
     out = {}
-    for name, spec in MODEL_PATCH.items():
-        preds = list(spec.predictors)
+    for name, spec in models.items():
         rows = []
-        for keys, g in patch_table.groupby(SESS):
-            if g["event_id"].nunique() < 10:
-                continue
-            r = fit_conditional_poisson(
-                g, preds, response_col="patch_count_hard",
-                event_col="event_id", n_categories=3,
-            )
+        for keys, g in table.groupby(SESS):
+            r = fit_fn(g, spec)
             if r is not None:
-                r2 = dict(zip(SESS, keys, strict=True))
-                r2.update(r)
-                rows.append(r2)
+                rows.append({**dict(zip(SESS, keys, strict=True)), **r})
         out[name] = pd.DataFrame(rows)
     return out
+
+
+def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
+    """Patch conditional Poisson on one session; skip if < 10 events."""
+    if g["event_id"].nunique() < 10:
+        return None
+    return fit_conditional_poisson(
+        g, list(spec.predictors), response_col="patch_count_hard",
+        event_col="event_id", n_categories=3,
+    )
+
+
+def fit_patch_hierarchy(patch_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Fit P0-P3 conditional Poisson per session on patch counts."""
+    return _fit_per_session(patch_table, MODEL_PATCH, _fit_patch_conditional)
 
 
 def fit_patch_switch(
-    event_table: pd.DataFrame, event_arm_table: pd.DataFrame
+    patch_table: pd.DataFrame, event_arm_table: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     """Fit PS0-PS2 on switch events only (is_after_switch == 1)."""
-    patch_table = build_event_patch_table(event_table, event_arm_table)
     sw = event_arm_table.groupby("event_id")["is_after_switch"].first()
-    patch_table = patch_table.merge(
+    switch_patch = patch_table.merge(
         sw.rename("is_after_switch"), left_on="event_id", right_index=True, how="left"
     )
-    switch_patch = patch_table[patch_table["is_after_switch"] == 1]
-    out = {}
-    for name, spec in MODEL_PATCH_SWITCH.items():
-        preds = list(spec.predictors)
-        rows = []
-        for keys, g in switch_patch.groupby(SESS):
-            if g["event_id"].nunique() < 10:
-                continue
-            r = fit_conditional_poisson(
-                g, preds, response_col="patch_count_hard",
-                event_col="event_id", n_categories=3,
-            )
-            if r is not None:
-                r2 = dict(zip(SESS, keys, strict=True))
-                r2.update(r)
-                rows.append(r2)
-        out[name] = pd.DataFrame(rows)
-    return out
+    switch_patch = switch_patch[switch_patch["is_after_switch"] == 1]
+    return _fit_per_session(switch_patch, MODEL_PATCH_SWITCH, _fit_patch_conditional)
 
 
 def fit_rate_hierarchy(stop_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Fit the MODEL_RATE Poisson rate models (R0/R1) per session."""
-    out = {}
-    for name, spec in MODEL_RATE.items():
-        preds = list(spec.predictors)
-        rows = []
-        for keys, g in stop_table.groupby(SESS):
-            r = fit_rate_model(g, preds, min_stops=20)
-            if r is not None:
-                r2 = dict(zip(SESS, keys, strict=True))
-                r2.update(r)
-                rows.append(r2)
-        out[name] = pd.DataFrame(rows)
-    return out
+    return _fit_per_session(
+        stop_table,
+        MODEL_RATE,
+        lambda g, spec: fit_rate_model(g, list(spec.predictors), min_stops=20),
+    )
 
 
 def fit_choice(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """Fit choice-prediction conditional logit per session."""
+    """Fit the MODEL_CHOICE conditional logit per session."""
     choice = build_choice_dataset(
         tables["event_table"], tables["event_arm_table"], tables["stop_table"]
     )
-    out = {}
-    for name, spec in MODEL_CHOICE.items():
+
+    def _fit(g: pd.DataFrame, spec) -> dict | None:
+        if g["stop_id"].nunique() < 10:
+            return None
         # Drop any spec predictor absent from this choice dataset
         # (the behavioural block is defined optimistically).
         preds = [p for p in spec.predictors if p in choice.columns]
-        rows = []
-        for keys, g in choice.groupby(SESS):
-            if g["stop_id"].nunique() < 10:
-                continue
-            r = fit_choice_model(g, preds)
-            if r is not None:
-                r2 = dict(zip(SESS, keys, strict=True))
-                r2.update(r)
-                rows.append(r2)
-        out[name] = pd.DataFrame(rows)
-    return out
+        return fit_choice_model(g, preds)
+
+    return _fit_per_session(choice, MODEL_CHOICE, _fit)
 
 
 def run_switch_aligned(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -191,13 +169,14 @@ def main() -> None:
     out_dir = PROCESSED_DATA_DIR / "replay_content" / "event_source_comparison"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Built once — both patch fits consume it.
+    patch_table = build_event_patch_table(
+        tables["event_table"], tables["event_arm_table"]
+    )
+
     results = {
-        "patch_hierarchy": fit_patch_hierarchy(
-            tables["event_table"], tables["event_arm_table"]
-        ),
-        "patch_switch": fit_patch_switch(
-            tables["event_table"], tables["event_arm_table"]
-        ),
+        "patch_hierarchy": fit_patch_hierarchy(patch_table),
+        "patch_switch": fit_patch_switch(patch_table, tables["event_arm_table"]),
         "rate_hierarchy": fit_rate_hierarchy(tables["stop_table"]),
         "choice": fit_choice(tables),
         "switch_aligned": run_switch_aligned(tables),
