@@ -128,7 +128,7 @@ class TestSelectionPicksTruthM2:
             "is_prev": 0.7,
             # Everything beyond M2 set to 0
             "is_last_rewarded_elsewhere": 0.0,
-            "visit_recency": 0.0,
+            "visit_recency_demeaned": 0.0,
             "recent_reward_rate": 0.0,
             "dist_to_arm": 0.0,
         }
@@ -152,7 +152,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
             # Reward-memory signal enters the hierarchy at M5.
             "is_last_rewarded_elsewhere": 0.6,
             # M3/M4 predictors at 0 — not the truth
-            "visit_recency": 0.0,
+            "visit_recency_demeaned": 0.0,
             "recent_reward_rate": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)

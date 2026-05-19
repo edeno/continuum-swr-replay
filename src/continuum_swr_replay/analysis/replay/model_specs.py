@@ -38,6 +38,14 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   partly re-encodes spatial recency. ``recent_reward_rate`` is a
   true rate. Cost: it is undefined (NaN) for never-visited arms, so
   the M3+ complete-case event set is smaller than M0–M2's.
+- M4 uses ``visit_recency_demeaned`` — ``visit_recency`` with each
+  arm's session-mean subtracted — not the raw column. Raw
+  ``visit_recency`` has a large static per-arm component (some arms
+  are visited far more than others) that the ``arm_fe`` block
+  already absorbs; with arm FE in the model the two collide (raw
+  ``visit_recency`` VIF ≈ 27). Demeaning within arm removes the part
+  ``arm_fe`` carries, leaving the identifiable signal: whether an arm
+  was visited longer ago than is typical for that arm.
 - ``is_last_rewarded`` is NOT used as a predictor: it is ~98%
   identical to ``is_current`` (the animal is usually rewarded where
   it currently sits), so a model carrying both is near-collinear
@@ -167,7 +175,7 @@ class ModelSpec:
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
 _M3 = (*_M2, "recent_reward_rate")
-_M4 = (*_M3, "visit_recency")
+_M4 = (*_M3, "visit_recency_demeaned")
 _M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
 
@@ -205,7 +213,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M4": ModelSpec(
         name="M4",
         predictors=_M4,
-        description="+ visit recency",
+        description="+ visit recency (within-arm demeaned)",
         parent="M3",
     ),
     "M5": ModelSpec(
@@ -418,16 +426,17 @@ MODEL_RATE: dict[str, ModelSpec] = {
 # beyond behaviour — while ``C_replay_only`` is a standalone
 # replay-only reference (``parent=None``).
 #
-# The behavioural block bundles correlated reward-history predictors
-# (``cumulative_reward`` and ``recent_reward_rate``); callers should
-# drop any column absent from the choice dataset before fitting.
+# ``is_same_patch`` is excluded from the behavioural block: it is a
+# coarse binary of ``dist_to_arm`` (same-patch arms are close) and the
+# two are near-collinear in the choice dataset (VIF > 700). Only the
+# continuous ``dist_to_arm`` is kept. Callers should still drop any
+# column absent from the choice dataset before fitting.
 
 _CHOICE_BEHAVIOR = (
     "visit_recency",
     "cumulative_reward",
     "recent_reward_rate",
     "dist_to_arm",
-    "is_same_patch",
 )
 
 MODEL_CHOICE: dict[str, ModelSpec] = {
@@ -440,7 +449,7 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
     "C_behavior": ModelSpec(
         name="C_behavior",
         predictors=_CHOICE_BEHAVIOR,
-        description="Behavioural baseline (recency, reward history, distance, patch)",
+        description="Behavioural baseline (recency, reward history, distance)",
         parent=None,
     ),
     "C_full": ModelSpec(

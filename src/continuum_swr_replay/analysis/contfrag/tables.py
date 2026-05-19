@@ -562,6 +562,11 @@ def build_contfrag_event_arm_table(
     long["dist_to_arm"] = dist_vals
     long["arm_dist_rank"] = rank_vals
     long["visit_recency"] = vr_vals
+    # Within-arm-demeaned visit_recency — the part orthogonal to the
+    # arm fixed effects; M4+ uses this (see replay/model_specs.py).
+    long["visit_recency_demeaned"] = long["visit_recency"] - long.groupby("arm")[
+        "visit_recency"
+    ].transform("mean")
     long["cumulative_reward"] = cr_vals
     long["recent_reward_rate"] = rrr_vals
     long["nominal_reward_prob"] = np.nan
@@ -926,6 +931,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "arm_dist_rank",
         # Reward / value
         "visit_recency",
+        "visit_recency_demeaned",
         "cumulative_reward",
         "recent_reward_rate",
         "nominal_reward_prob",

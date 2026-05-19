@@ -128,8 +128,12 @@ def sample_arm_design(
     )
 
     # Continuous: independent across events and arms with arbitrary scale.
-    if "visit_recency" in predictors:
-        feature_cols["visit_recency"] = rng.uniform(0, 10, size=(n_events, n_arms))
+    if "visit_recency" in predictors or "visit_recency_demeaned" in predictors:
+        vr = rng.uniform(0, 10, size=(n_events, n_arms))
+        if "visit_recency" in predictors:
+            feature_cols["visit_recency"] = vr
+        if "visit_recency_demeaned" in predictors:
+            feature_cols["visit_recency_demeaned"] = vr - vr.mean(axis=0, keepdims=True)
     if "cumulative_reward" in predictors:
         feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
     if "recent_reward_rate" in predictors:
@@ -296,6 +300,10 @@ def simulate_with_event_covariates(
     arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
         1.0 - arm_features["is_current"]
     )
+    # M4 visit-recency predictor: visit_recency with each arm's mean
+    # removed (the part orthogonal to the arm fixed effects).
+    _vr = arm_features["visit_recency"]
+    arm_features["visit_recency_demeaned"] = _vr - _vr.mean(axis=0, keepdims=True)
     # Arm fixed-effect dummies: constant across events, so a fit
     # recovers their coefficients at 0 unless the generative truth
     # assigns them a non-zero β.
