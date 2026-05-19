@@ -701,6 +701,59 @@ def recent_reward_rate_all_events(
     return out
 
 
+def recent_trial_reward_rate(
+    query_times: np.ndarray,
+    trials: pd.DataFrame,
+    k: int = 10,
+) -> np.ndarray:
+    """Rewarded fraction of the most recent ``k`` trials before each query time.
+
+    The arm-agnostic counterpart of :func:`recent_reward_rate_all_events`:
+    the denominator is trials, not visits to one arm. A trial is "before"
+    a query time if its goal-arrival cutoff (see :func:`_trial_cutoff_times`)
+    is at or before that time.
+
+    Parameters
+    ----------
+    query_times : np.ndarray, shape (n_query,)
+        Times (s) at which to evaluate the recent reward rate — e.g.
+        immobility-bout start times for the stop-level rate model.
+    trials : pd.DataFrame
+        Must carry ``is_reward`` plus the columns ``_trial_cutoff_times``
+        consumes.
+    k : int
+        Window length in trials.
+
+    Returns
+    -------
+    np.ndarray, shape (n_query,)
+        Rewarded fraction of the last ``k`` trials; ``NaN`` for query
+        times that precede every trial cutoff.
+    """
+    query_times = np.asarray(query_times, dtype=float)
+    if len(trials) == 0:
+        return np.full(query_times.size, np.nan)
+
+    # Sort by the goal-arrival cutoff so ``searchsorted`` is valid; see
+    # ``_trial_cutoff_times`` for why this cutoff (not ``end_time``).
+    cutoff_times = np.sort(_trial_cutoff_times(trials))
+    is_reward = (
+        trials.assign(_cutoff=_trial_cutoff_times(trials))
+        .sort_values("_cutoff")["is_reward"]
+        .to_numpy()
+        .astype(float)
+    )
+    cum = np.concatenate([[0.0], np.cumsum(is_reward)])
+
+    counts = np.searchsorted(cutoff_times, query_times, side="right")
+    window_starts = np.maximum(counts - k, 0)
+    n_in_window = counts - window_starts
+    with np.errstate(invalid="ignore", divide="ignore"):
+        rate = (cum[counts] - cum[window_starts]) / n_in_window
+    rate[counts == 0] = np.nan
+    return rate
+
+
 # ── Scalar per-event wrappers (preserve existing API) ──
 
 

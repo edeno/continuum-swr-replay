@@ -88,6 +88,9 @@ from ._helpers import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
+    recent_trial_reward_rate as _recent_trial_reward_rate,
+)
+from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
@@ -678,6 +681,9 @@ def build_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
+    per_bout["recent_trial_reward_rate"] = _recent_trial_reward_rate(
+        bout_starts, trials
+    )
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -1241,6 +1247,7 @@ def _stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
+        "recent_trial_reward_rate",
         "is_swr_stop",
         "is_mua_stop",
         "has_replay",

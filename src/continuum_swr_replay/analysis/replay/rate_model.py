@@ -6,20 +6,23 @@ behavioral context, independently of replay CONTENT. The response is
 ``log(immobility_time)`` so that coefficients are interpretable as
 multiplicative changes in event rate per second of immobility.
 
-Model hierarchy:
+Model hierarchy (``MODEL_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``is_after_omission``, ``is_after_switch`` — does
-  behavioral context change event rate? ``is_after_reward`` is
-  intentionally excluded: it equals ``1 - is_after_omission``
-  wherever both are defined, so including it alongside the
-  intercept is rank-deficient. The reward effect is read off the
-  sign of the ``is_after_omission`` coefficient.
-- **R3**: R1 fitted separately for SWR-only, MUA-only, and neither
-  event types (``is_swr_stop`` / ``is_mua_stop``).
+- **R1**: + ``is_after_omission``, ``is_after_switch`` — does the
+  immediately preceding trial's context change event rate?
+  ``is_after_reward`` is intentionally excluded: it equals
+  ``1 - is_after_omission`` wherever both are defined, so including
+  it alongside the intercept is rank-deficient. The reward effect is
+  read off the sign of the ``is_after_omission`` coefficient.
+- **R2**: + ``recent_trial_reward_rate`` (rewarded fraction of the
+  last 10 trials) — does event rate track a deeper reward history,
+  beyond the single previous trial?
 
-R2 (+ ``trials_since_block_change``, ``block_number``) is deferred
-until the contingency-block loader is wired.
+A future R3 (+ ``trials_since_block_change``, ``block_number``) is
+deferred until the contingency-block loader is wired. Fitting R0-R2
+separately on SWR-only / MUA-only / neither stops is an analysis
+variant, not a separate model.
 
 ``exp(γ)`` = multiplicative change in events per second of
 immobility. ``exp(γ) = 1.5`` means 50% more events per second when

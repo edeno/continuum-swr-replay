@@ -33,6 +33,7 @@ from ..replay._helpers import (
     hash_stop_id,
     immobility_bout_intervals,
     recent_reward_rate_per_arm,
+    recent_trial_reward_rate,
     safe_mode,
     single_arm_from_well,
     strict_first,
@@ -664,6 +665,9 @@ def build_contfrag_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
+    per_bout["recent_trial_reward_rate"] = recent_trial_reward_rate(
+        bout_starts, trials
+    )
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -843,6 +847,7 @@ def _contfrag_stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
+        "recent_trial_reward_rate",
         "is_swr_stop",
         "is_mua_stop",
         "has_replay",

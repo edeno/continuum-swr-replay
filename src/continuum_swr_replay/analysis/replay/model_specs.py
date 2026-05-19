@@ -364,9 +364,19 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # from R1: it equals ``1 - is_after_omission`` wherever both are
 # defined, so including it with the intercept is rank-deficient.
 #
-# R3 (the docstring of ``rate_model.py``) is not a separate spec — it
-# is R1 fit separately on SWR-only / MUA-only / neither stops, a split
-# analysis rather than a different predictor set.
+# R1 looks only one trial back. R2 adds ``recent_trial_reward_rate``
+# (rewarded fraction of the last 10 trials) — the stop-level analog
+# of the content hierarchy's reward-history axis (``recent_reward_rate``
+# at M3). R2 vs R1 tests whether replay *occurrence* tracks a deeper
+# reward history, not just the immediately preceding trial; it is
+# also the confound check for whether an M3 content effect is partly
+# a rate effect. ``visit_recency`` has no stop-level analog (every
+# trial visits some arm), so the rate hierarchy stops at R2.
+#
+# A future R3 (+ ``trials_since_block_change``, ``block_number``) is
+# deferred until the contingency-block loader is wired. The SWR / MUA
+# split (fit R0-R2 on SWR-only / MUA-only / neither stops) is an
+# analysis variant, not a separate spec.
 
 MODEL_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
@@ -378,8 +388,18 @@ MODEL_RATE: dict[str, ModelSpec] = {
     "R1": ModelSpec(
         name="R1",
         predictors=("is_after_omission", "is_after_switch"),
-        description="+ reward / switch context",
+        description="+ previous-trial reward / switch context",
         parent="R0",
+    ),
+    "R2": ModelSpec(
+        name="R2",
+        predictors=(
+            "is_after_omission",
+            "is_after_switch",
+            "recent_trial_reward_rate",
+        ),
+        description="+ recent reward history (rewarded fraction, last 10 trials)",
+        parent="R1",
     ),
 }
 
