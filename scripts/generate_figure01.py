@@ -5,7 +5,9 @@ This figure explains the non-local detector model to the reader in three rows:
 
     Row 1 (Model Structure):
         A: State transition diagram — 4 discrete states with transition arrows
-        B: Observation model schematic — how each state's likelihood differs
+        B: Observation model schematic — two scenarios side-by-side
+           ("Local wins" and "Non-Local wins"), each showing the four
+           states' likelihoods under that scenario
 
     Row 2 (Continuous Dynamics):
         C: Self-transition kernels for all four states — Local is uniform
@@ -166,26 +168,28 @@ def plot_state_diagram(ax):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def plot_observation_models(fig, gs_slot):
-    """Show how each state computes spike likelihood differently.
+def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
+    """Draw the 4-state likelihood cells for one scenario.
 
-    Local: evaluates lambda weighted by a Gaussian envelope around the
-    animal's position → spatial vector concentrated near the animal.
-    No-Spike: ignores place fields, uses lambda ≈ 0 → single scalar.
-    Non-Local (Cont/Frag): evaluates lambda at all positions → spatial vector.
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    gs_inner : SubplotSpec
+        A 2x2 sub-grid slot. Cells are laid out row-major:
+        (Local, No-Spike) on top; (Continuous, Fragmented) on bottom.
+    x : np.ndarray, shape (n_pts,)
+        Position grid on [0, 1] for the schematic.
+    likelihood : np.ndarray, shape (n_pts,)
+        The place-field curve λ(x).
+    animal_pos : float
+        The animal's position in [0, 1]. Controls where the Local
+        kernel sits and where the magenta dashed line is drawn.
 
-    Returns the four sub-axes (row-major: Local, No-Spike, Continuous,
-    Fragmented). The first is used by ``label_panels`` for the panel "b"
-    label.
+    Returns
+    -------
+    list of matplotlib.axes.Axes
+        The four sub-axes (Local, No-Spike, Continuous, Fragmented).
     """
-    n_pts = 200
-    x = np.linspace(0, 1, n_pts)
-    animal_pos = 0.3
-    likelihood_center = 0.4
-    likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
-
-    gs_inner = gs_slot.subgridspec(2, 2, wspace=0.10, hspace=0.55)
-
     configs = [
         ("Local", STATE_COLORS_SHORT[0]),
         ("No-Spike", STATE_COLORS_SHORT[1]),
@@ -194,29 +198,30 @@ def plot_observation_models(fig, gs_slot):
     ]
     sub_axes = []
 
+    # Pick an annotation side that stays inside the cell regardless of x_animal
+    annot_xtext = animal_pos - 0.35 if animal_pos >= 0.5 else animal_pos + 0.35
+
     for idx, (name, color) in enumerate(configs):
         row, col = idx // 2, idx % 2
         sub_ax = fig.add_subplot(gs_inner[row, col])
         sub_axes.append(sub_ax)
 
-
         if name == "Local":
             sigma_local = 0.05  # schematic kernel width on the [0,1] x-axis
             kernel = np.exp(-0.5 * ((x - animal_pos) / sigma_local) ** 2)
             local_like = likelihood * kernel
-            # Place field λ(x) shown faintly underneath
             sub_ax.plot(x, likelihood, color="#aaaaaa", linewidth=0.8, alpha=0.4)
             sub_ax.fill_between(x, likelihood, alpha=0.2, color="#aaaaaa")
-            # Local likelihood = λ(x) · N(x_animal, σ_L)
             sub_ax.plot(x, local_like, color=color, linewidth=1.0)
             sub_ax.fill_between(x, local_like, alpha=0.45, color=color)
             sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--")
-            peak_val = float(local_like.max())
+            # Arrow tip stays visible even when the bump is tiny
+            peak_y = max(float(local_like.max()), 0.10)
             sub_ax.annotate(
                 r"$\lambda(x)\,\mathcal{N}(x_{\mathrm{animal}}, \sigma_L)$",
-                xy=(animal_pos, peak_val),
-                xytext=(animal_pos + 0.35, peak_val + 0.30),
+                xy=(animal_pos, peak_y),
+                xytext=(annot_xtext, 0.95),
                 fontsize=5, color=color, fontweight="bold",
                 arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
                 ha="center",
@@ -224,8 +229,6 @@ def plot_observation_models(fig, gs_slot):
             desc = "Vector: likelihood\nnear animal's position"
 
         elif name == "No-Spike":
-            # Show place field curve grayed out / crossed out
-            # Flat near-zero line
             sub_ax.axhline(0.05, color=color, linewidth=1.2, linestyle="-")
             sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--")
@@ -236,14 +239,11 @@ def plot_observation_models(fig, gs_slot):
             )
             desc = "Scalar: expects\n constant low rate"
 
-        else:  # Continuous or Fragmented
-            # Show the full place field as the evaluated likelihood
+        else:  # Continuous or Fragmented Non-Local
             sub_ax.plot(x, likelihood, color=color, linewidth=1.0)
             sub_ax.fill_between(x, likelihood, alpha=0.3, color=color)
-            # Animal position for reference
             sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--", alpha=0.4)
-            # Bracket or annotation showing "all positions"
             sub_ax.annotate(
                 "", xy=(0.05, -0.06), xytext=(0.95, -0.06),
                 xycoords="axes fraction", textcoords="axes fraction",
@@ -256,7 +256,6 @@ def plot_observation_models(fig, gs_slot):
             )
             desc = "Vector: likelihood at\nevery position"
 
-        # Formatting
         sub_ax.set_xlim(0, 1)
         sub_ax.set_ylim(-0.05, 1.2)
         sub_ax.set_xticks([])
@@ -274,6 +273,64 @@ def plot_observation_models(fig, gs_slot):
         )
 
     return sub_axes
+
+
+def plot_observation_models(fig, gs_slot):
+    """Show how each state's spike likelihood reacts under two scenarios.
+
+    Two scenarios are placed side-by-side, each containing the 4-state
+    2x2 grid (Local / No-Spike on top; Continuous / Fragmented Non-Local
+    on bottom):
+
+    - "Local wins": x_animal coincides with the place-field peak. The
+      cell fires where its tuning says it should, so the Local
+      likelihood (λ(x)·N(x_animal, σ_L)) is large at the animal's
+      position. The Non-Local likelihood λ(x) is also peaked there, but
+      spread across all bins, so per-bin Non-Local mass is lower.
+    - "Non-Local wins": x_animal is far from the place-field peak. The
+      cell fires where it "shouldn't" — Local likelihood is tiny
+      because λ(x_animal) is near zero. Non-Local likelihood is still
+      peaked at the place-field center, far from the animal,
+      consistent with replay of a different location.
+
+    Returns all sub-axes (8 total), Local-wins block first then
+    Non-Local-wins. The first is used by ``label_panels`` for the
+    panel "b" label.
+    """
+    n_pts = 200
+    x = np.linspace(0, 1, n_pts)
+    likelihood_center = 0.4
+    likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
+
+    # Outer 2x2: thin title row above content row, two scenarios as columns.
+    gs_outer = gs_slot.subgridspec(
+        2, 2, height_ratios=[0.12, 1.0], wspace=0.20, hspace=0.10,
+    )
+
+    scenarios = [
+        # (header, animal_pos)
+        ("Local wins", likelihood_center),   # animal at place-field peak
+        ("Non-Local wins", 0.55),            # animal ~1.5σ_λ from peak;
+        #                                       Local bump shrinks to ~30% of
+        #                                       Non-Local peak but stays visible
+    ]
+
+    all_axes = []
+    for col, (header, animal_pos) in enumerate(scenarios):
+        title_ax = fig.add_subplot(gs_outer[0, col])
+        title_ax.axis("off")
+        title_ax.text(
+            0.5, 0.0, header,
+            ha="center", va="bottom", fontsize=7, fontweight="bold",
+            transform=title_ax.transAxes,
+        )
+
+        gs_scen = gs_outer[1, col].subgridspec(2, 2, wspace=0.10, hspace=0.55)
+        all_axes.extend(
+            _draw_state_cells(fig, gs_scen, x, likelihood, animal_pos)
+        )
+
+    return all_axes
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -525,7 +582,9 @@ def generate_figure(n_neurons=30, seed=42):
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 1.2])
+    # Panel B now contains two scenarios (Local-wins, Non-Local-wins), each
+    # with a 2x2 of state cells, so it needs ~2x its previous width allocation.
+    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.4])
 
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
