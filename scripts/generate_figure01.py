@@ -77,17 +77,23 @@ def plot_state_diagram(ax):
 
     States arranged in a 2x2 grid. Self-loop probabilities annotated.
     Key cross-state arrows shown with faint lines.
+
+    The data limits are deliberately taller-than-wide (xlim range 1.0,
+    ylim range ~1.55) so that with ``set_aspect("equal")`` the diagram
+    fills the panel cell that row 0 of the main gridspec provides (Panel
+    A's slot is now narrow-and-tall because Panel B's allocation was
+    widened to fit two scenarios).
     """
-    ax.set_xlim(-0.1, 1.1)
-    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(-0.27, 1.27)
     ax.set_aspect("equal")
     ax.axis("off")
 
     positions = {
-        "Local": (0.25, 0.75),
-        "No-Spike": (0.75, 0.75),
-        "Non-Local\nContinuous": (0.25, 0.25),
-        "Non-Local\nFragmented": (0.75, 0.25),
+        "Local": (0.25, 1.05),
+        "No-Spike": (0.75, 1.05),
+        "Non-Local\nContinuous": (0.25, -0.05),
+        "Non-Local\nFragmented": (0.75, -0.05),
     }
 
     self_probs = {
@@ -97,7 +103,7 @@ def plot_state_diagram(ax):
         "Non-Local\nFragmented": "0.98",
     }
 
-    radius = 0.14
+    radius = 0.16
 
     for state_name, (cx, cy) in positions.items():
         circle = mpatches.Circle(
@@ -112,7 +118,7 @@ def plot_state_diagram(ax):
         ax.add_patch(circle)
         ax.text(
             cx, cy, state_name,
-            ha="center", va="center", fontsize=5, fontweight="bold",
+            ha="center", va="center", fontsize=5.5, fontweight="bold",
             color="white", zorder=11, linespacing=0.9,
         )
 
