@@ -78,22 +78,25 @@ def plot_state_diagram(ax):
     States arranged in a 2x2 grid. Self-loop probabilities annotated.
     Key cross-state arrows shown with faint lines.
 
-    The data limits are deliberately taller-than-wide (xlim range 1.0,
-    ylim range ~1.55) so that with ``set_aspect("equal")`` the diagram
-    fills the panel cell that row 0 of the main gridspec provides (Panel
-    A's slot is now narrow-and-tall because Panel B's allocation was
-    widened to fit two scenarios).
+    The data limits and gridspec width_ratios are tuned so Panel A
+    renders at roughly the same width and height as one of Panel B's
+    scenario 2x2 blocks (~730 x 820 px at the configured DPI). Aspect
+    is locked equal, and the axes is anchored to the south edge of
+    its slot so the bottom of Panel A's circles aligns with the
+    bottom of Panel B's state cells.
     """
+    # x_range / y_range chosen to match scenario-block aspect 730/820 ≈ 0.89.
     ax.set_xlim(0.0, 1.0)
-    ax.set_ylim(-0.27, 1.27)
+    ax.set_ylim(-0.06, 1.06)
     ax.set_aspect("equal")
+    ax.set_anchor("S")
     ax.axis("off")
 
     positions = {
-        "Local": (0.25, 1.05),
-        "No-Spike": (0.75, 1.05),
-        "Non-Local\nContinuous": (0.25, -0.05),
-        "Non-Local\nFragmented": (0.75, -0.05),
+        "Local": (0.25, 0.80),
+        "No-Spike": (0.75, 0.80),
+        "Non-Local\nContinuous": (0.25, 0.20),
+        "Non-Local\nFragmented": (0.75, 0.20),
     }
 
     self_probs = {
@@ -588,9 +591,11 @@ def generate_figure(n_neurons=30, seed=42):
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──
-    # Panel B now contains two scenarios (Local-wins, Non-Local-wins), each
-    # with a 2x2 of state cells, so it needs ~2x its previous width allocation.
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.4])
+    # Panel B contains two scenarios (Local-wins, Non-Local-wins), each a
+    # 2x2 of state cells. width_ratios are tuned so Panel A renders at
+    # roughly the same width as one scenario block; aspect+anchor inside
+    # plot_state_diagram matches the height too.
+    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.2])
 
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
