@@ -243,7 +243,6 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
                 arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
                 ha=annot_ha,
             )
-            desc = "Vector: likelihood\nnear animal's position"
 
         elif name == "No-Spike":
             sub_ax.axhline(0.05, color=color, linewidth=1.2, linestyle="-")
@@ -254,24 +253,12 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
                 ha="center", va="bottom", fontsize=6, color=color,
                 fontweight="bold", transform=sub_ax.transAxes,
             )
-            desc = "Scalar: expects\n constant low rate"
 
         else:  # Continuous or Fragmented Non-Local
             sub_ax.plot(x, likelihood, color=color, linewidth=1.0)
             sub_ax.fill_between(x, likelihood, alpha=0.3, color=color)
             sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--", alpha=0.4)
-            sub_ax.annotate(
-                "", xy=(0.05, -0.06), xytext=(0.95, -0.06),
-                xycoords="axes fraction", textcoords="axes fraction",
-                arrowprops={"arrowstyle": "<->", "color": color, "lw": 0.8},
-            )
-            sub_ax.text(
-                0.5, -0.16, r"$\lambda(x)$ for all $x$",
-                ha="center", va="top", fontsize=4.5, color=color,
-                fontweight="bold", transform=sub_ax.transAxes,
-            )
-            desc = "Vector: likelihood at\nevery position"
 
         sub_ax.set_xlim(0, 1)
         sub_ax.set_ylim(-0.05, 1.2)
@@ -283,10 +270,6 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
 
         sub_ax.set_title(
             name, fontsize=5.5, color=color, fontweight="bold", pad=2,
-        )
-        sub_ax.text(
-            0.5, -0.15, desc, ha="center", va="top", fontsize=4,
-            transform=sub_ax.transAxes, color="#555555", linespacing=0.9,
         )
 
     return sub_axes
@@ -380,26 +363,26 @@ def plot_transition_kernels(fig, gs_slot):
     configs = [
         {
             "name": "Local\n→ Local",
-            "subtitle": "Uniform\n(re-anchored by observation)",
+            "subtitle": "Uniform (re-anchored)",
             "color": STATE_COLORS_SHORT[0],
             "kind": "uniform",
         },
         {
             "name": "No-Spike\n→ No-Spike",
-            "subtitle": "Identity\n(single-bin discrete state)",
+            "subtitle": "Identity",
             "color": STATE_COLORS_SHORT[1],
             "kind": "identity",
         },
         {
             "name": "Non-Local Continuous\n→ Non-Local Continuous",
-            "subtitle": "Gaussian random walk\n(smooth trajectories)",
+            "subtitle": "Gaussian random walk",
             "color": STATE_COLORS_SHORT[2],
             "kind": "gaussian",
             "sigma": 5.0,
         },
         {
             "name": "Non-Local Fragmented\n→ Non-Local Fragmented",
-            "subtitle": "Uniform\n(jump to any position)",
+            "subtitle": "Uniform (jumps)",
             "color": STATE_COLORS_SHORT[3],
             "kind": "uniform",
         },
@@ -443,13 +426,13 @@ def plot_transition_kernels(fig, gs_slot):
             fontweight="bold", pad=3, linespacing=0.9,
         )
         sub_ax.text(
-            0.5, -0.06, config["subtitle"],
+            0.5, -0.04, config["subtitle"],
             ha="center", va="top", fontsize=4.5,
             transform=sub_ax.transAxes, color="#555555",
-            style="italic", linespacing=0.9,
+            style="italic",
         )
 
-        sub_ax.set_xlabel("position$_t$", fontsize=5, labelpad=10)
+        sub_ax.set_xlabel("position$_t$", fontsize=5, labelpad=12)
         if idx == 0:
             sub_ax.set_ylabel("position$_{t+1}$", fontsize=5, labelpad=2)
 
