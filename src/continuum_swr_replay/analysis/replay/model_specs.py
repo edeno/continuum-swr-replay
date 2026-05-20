@@ -426,17 +426,28 @@ MODEL_RATE: dict[str, ModelSpec] = {
 # beyond behaviour — while ``C_replay_only`` is a standalone
 # replay-only reference (``parent=None``).
 #
-# ``is_same_patch`` is excluded from the behavioural block: it is a
-# coarse binary of ``dist_to_arm`` (same-patch arms are close) and the
-# two are near-collinear in the choice dataset (VIF > 700). Only the
-# continuous ``dist_to_arm`` is kept. Callers should still drop any
-# column absent from the choice dataset before fitting.
+# Two predictors are deliberately excluded from the behavioural block:
+# - ``is_same_patch``: a coarse binary of ``dist_to_arm`` (same-patch
+#   arms are close); the two were near-collinear (VIF > 700).
+# - ``dist_to_arm`` itself: the animal chose the closest arm in ~95-99%
+#   of stops (median 0.99 in sessions that previously failed to fit),
+#   producing quasi-separation that crashed ``ConditionalLogit.fit`` in
+#   ~25% of sessions. Dropping it restores identifiability across all
+#   sessions and de-saturates the baseline so ``C_full`` vs
+#   ``C_behavior`` has room to detect a replay effect. Trade-off: the
+#   replay coefficient is no longer cleanly controlled for distance,
+#   and ``replay_frac`` is correlated with low ``dist_to_arm`` (replay
+#   biases toward the current/closest arm), so a positive
+#   ``replay_frac`` coefficient could partly launder distance. A
+#   switch-style restriction (fit only on stops where the animal did
+#   not pick the closest arm) is the principled alternative; defer.
+# Callers should still drop any column absent from the choice dataset
+# before fitting.
 
 _CHOICE_BEHAVIOR = (
     "visit_recency",
     "cumulative_reward",
     "recent_reward_rate",
-    "dist_to_arm",
 )
 
 MODEL_CHOICE: dict[str, ModelSpec] = {
@@ -449,7 +460,7 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
     "C_behavior": ModelSpec(
         name="C_behavior",
         predictors=_CHOICE_BEHAVIOR,
-        description="Behavioural baseline (recency, reward history, distance)",
+        description="Behavioural baseline (recency, reward history)",
         parent=None,
     ),
     "C_full": ModelSpec(
