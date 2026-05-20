@@ -591,10 +591,13 @@ def generate_figure(n_neurons=30, seed=42):
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
-    # 3 rows: model structure | transition kernels | simulated example
+    # 3 rows: model structure | transition kernels | simulated example.
+    # Row 1 (panel C) is thinner than row 0 because two of its four
+    # heatmaps are uniform (solid color, no internal structure), so
+    # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[1.4, 0.8, 2.0],
+        height_ratios=[1.4, 0.55, 2.0],
         hspace=0.20,
     )
 
