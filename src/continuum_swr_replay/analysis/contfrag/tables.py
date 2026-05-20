@@ -517,6 +517,12 @@ def build_contfrag_event_arm_table(
     long["is_last_rewarded"] = eq_indicator(
         arm_arr, long["last_rewarded_arm"].to_numpy()
     )
+    # M5/M6 identifiable reward-memory predictor: last-rewarded arm
+    # restricted to events where it is NOT the current arm. Mirrors
+    # replay/tables.py — see model_specs.py for the rationale.
+    long["is_last_rewarded_elsewhere"] = (
+        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
+    ).astype(int)
     long["arm_patch_id"] = np.array([arm_to_patch(a) for a in arm_arr])
     long["is_same_patch"] = eq_indicator(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
@@ -590,6 +596,14 @@ def build_contfrag_event_arm_table(
     long["swr_x_prev"] = is_swr_i * ip
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
+    # M7 — SWR × value/memory interactions (mirrors replay/tables.py).
+    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_visit_recency_demeaned"] = (
+        is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_is_last_rewarded_elsewhere"] = (
+        is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
+    )
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -925,6 +939,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "is_prev",
         "is_next",
         "is_last_rewarded",
+        "is_last_rewarded_elsewhere",
         "is_same_patch",
         # Spatial
         "dist_to_arm",
@@ -944,6 +959,9 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
+        "swr_x_recent_reward_rate",
+        "swr_x_visit_recency_demeaned",
+        "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",

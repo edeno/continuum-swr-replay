@@ -161,13 +161,23 @@ class ModelSpec:
 # but for a clear reason). Convergence / VIF must be re-validated
 # on the regenerated tables.
 #
-# SWR interactions enter at M6. These test whether the current-arm
-# and previous-arm biases differ during SWR events. Only spatial
-# interactions are included (swr_x_current, swr_x_prev); a reward
-# interaction (swr_x_last_rewarded_elsewhere) is now identifiable
-# but omitted as too sparse to power.
+# SWR interactions enter at M6 / M7. M6 carries the *spatial* × SWR
+# interactions (swr_x_current, swr_x_prev) — does the local/previous
+# bias differ for SWR-overlapping events? M7 adds the *value/memory*
+# × SWR interactions (swr_x_recent_reward_rate,
+# swr_x_visit_recency_demeaned, swr_x_is_last_rewarded_elsewhere) —
+# does the reward/memory structure of replay differ on SWR events?
+# Splitting M6 from M7 lets the nested LR cleanly separate "spatial
+# is SWR-modulated" from "reward memory is SWR-modulated". The M7
+# interactions are sparser than M6's (the reward-memory one is on
+# ~2% of events × is_swr subset); honest non-identifiability is
+# expected in sessions with no SWR-overlap memory events.
 #
-# MUA event-type effects are assessed via split analysis (fit M0–M6
+# An SWR split (fit M0–M7 separately on is_swr=True and is_swr=False
+# event subsets) is the unrestricted complement to these interaction
+# terms — same pattern documented for MUA below.
+#
+# MUA event-type effects are assessed via split analysis (fit M0–M7
 # separately on MUA-only and non-MUA events) rather than interaction
 # terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 # VIF > 70).
@@ -178,6 +188,12 @@ _M3 = (*_M2, "recent_reward_rate")
 _M4 = (*_M3, "visit_recency_demeaned")
 _M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
+_M7 = (
+    *_M6,
+    "swr_x_recent_reward_rate",
+    "swr_x_visit_recency_demeaned",
+    "swr_x_is_last_rewarded_elsewhere",
+)
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -227,6 +243,12 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         predictors=_M6,
         description="+ SWR × spatial interactions",
         parent="M5",
+    ),
+    "M7": ModelSpec(
+        name="M7",
+        predictors=_M7,
+        description="+ SWR × value/memory interactions",
+        parent="M6",
     ),
 }
 
@@ -307,19 +329,31 @@ MODEL_PATCH: dict[str, ModelSpec] = {
         description="+ patch-level reward history",
         parent="P2",
     ),
+    "P4": ModelSpec(
+        name="P4",
+        predictors=(
+            "is_current_patch",
+            "is_last_rewarded_patch_elsewhere",
+            "cumulative_reward_patch",
+            "swr_x_current_patch",
+            "swr_x_last_rewarded_patch_elsewhere",
+        ),
+        description="+ SWR × patch interactions (spatial + memory)",
+        parent="P3",
+    ),
 }
 
 
 # ── Event-source-restricted patch hierarchies (ContFrag pipeline) ──
 #
-# MODEL_PATCH carries no event-type interaction, so the SWR / MUA
-# patch hierarchies are identical in structure — the only difference
-# is the event table they are fit on (ContFrag SWR-event vs MUA-event
-# patch counts). They mirror MODEL_PATCH's full P0–P3, unlike the arm
-# hierarchies which drop M6 (there is no patch-level M6 to drop).
+# Mirror MODEL_PATCH's P0–P3 but drop P4: under ContFrag event-source
+# restriction is_swr is constant, so the swr_x_* interactions collapse
+# onto the main effects and are unidentifiable — same reason the arm
+# hierarchy SWR/MUA versions stop at M5.
 
-MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(MODEL_PATCH)
-MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(MODEL_PATCH)
+_P0_TO_P3 = {name: MODEL_PATCH[name] for name in ("P0", "P1", "P2", "P3")}
+MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(_P0_TO_P3)
+MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P3)
 
 # ── Post-switch patch model ──
 #
@@ -355,6 +389,17 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
         description="+ previous-patch suppression",
         parent="PS1",
     ),
+    "PS3": ModelSpec(
+        name="PS3",
+        predictors=(
+            "is_current_patch",
+            "is_prev_patch",
+            "swr_x_current_patch",
+            "swr_x_prev_patch",
+        ),
+        description="+ SWR × patch interactions (switch events only)",
+        parent="PS2",
+    ),
 }
 
 
@@ -381,10 +426,15 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # a rate effect. ``visit_recency`` has no stop-level analog (every
 # trial visits some arm), so the rate hierarchy stops at R2.
 #
-# A future R3 (+ ``trials_since_block_change``, ``block_number``) is
-# deferred until the contingency-block loader is wired. The SWR / MUA
-# split (fit R0-R2 on SWR-only / MUA-only / neither stops) is an
-# analysis variant, not a separate spec.
+# R3 adds ``is_swr_stop`` (1 if any timebin in the stop had an SWR).
+# Tests whether stops with SWR overlap have an elevated event rate
+# beyond the reward / switch / history context already in R2. Note
+# that is_swr_stop and n_events are partly mechanistically linked —
+# the question is how much R2's behavioural context already absorbs.
+# A future R4 (+ ``trials_since_block_change``, ``block_number``) is
+# deferred until the contingency-block loader is wired. The MUA
+# split (fit R0–R3 on SWR-only / MUA-only / neither stops) remains
+# an analysis variant, not a separate spec.
 
 MODEL_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
@@ -408,6 +458,17 @@ MODEL_RATE: dict[str, ModelSpec] = {
         ),
         description="+ recent reward history (rewarded fraction, last 10 trials)",
         parent="R1",
+    ),
+    "R3": ModelSpec(
+        name="R3",
+        predictors=(
+            "is_after_omission",
+            "is_after_switch",
+            "recent_trial_reward_rate",
+            "is_swr_stop",
+        ),
+        description="+ SWR-overlap stop indicator",
+        parent="R2",
     ),
 }
 
@@ -467,6 +528,14 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
         name="C_full",
         predictors=(*_CHOICE_BEHAVIOR, "replay_frac"),
         description="Behavioural baseline + replay content",
+        parent="C_behavior",
+    ),
+    "C_full_swr_split": ModelSpec(
+        name="C_full_swr_split",
+        predictors=(*_CHOICE_BEHAVIOR, "replay_frac_swr", "replay_frac_non_swr"),
+        description=(
+            "Behavioural baseline + SWR-overlap and non-SWR replay separately"
+        ),
         parent="C_behavior",
     ),
 }

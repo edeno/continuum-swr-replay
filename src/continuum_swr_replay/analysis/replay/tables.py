@@ -1056,6 +1056,18 @@ def build_event_arm_table(
     long["swr_x_prev"] = is_swr_i * ip
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
+    # M7 — SWR × value/memory interactions. Previously omitted: the
+    # raw swr_x_last_rewarded was r=1.0 with swr_x_current under the
+    # old is_last_rewarded predictor; the _elsewhere fix makes the
+    # reward-memory interaction identifiable. Sparse (~2% of events)
+    # but honest.
+    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_visit_recency_demeaned"] = (
+        is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_is_last_rewarded_elsewhere"] = (
+        is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
+    )
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -1089,9 +1101,11 @@ def build_event_patch_table(
     pd.DataFrame
         3 rows per event (one per patch), with columns:
         ``event_id``, ``patch``, ``patch_count_hard``,
-        ``is_current_patch``, ``is_last_rewarded_patch``,
-        ``is_last_rewarded_patch_elsewhere``,
-        ``cumulative_reward_patch``, ``visit_recency_patch``.
+        ``is_current_patch``, ``is_prev_patch``,
+        ``is_last_rewarded_patch``, ``is_last_rewarded_patch_elsewhere``,
+        ``cumulative_reward_patch``, ``visit_recency_patch``,
+        ``switch_x_current_patch``, ``swr_x_current_patch``,
+        ``swr_x_last_rewarded_patch_elsewhere``, ``swr_x_prev_patch``.
     """
     # All groupbys / merges below key on ``event_id`` only. If a
     # caller passes session-local IDs (event_id=1 in two sessions),
@@ -1177,6 +1191,24 @@ def build_event_patch_table(
         patch_eat["is_after_switch"] * patch_eat["is_current_patch"]
     )
     patch_eat = patch_eat.drop(columns=["is_after_switch"])
+
+    # SWR × patch interactions (P4, PS3). is_swr is event-level — bring
+    # it in from event_table once and reuse for the three products.
+    # Tolerant of test fixtures that omit is_swr: default to all-False.
+    if "is_swr" in event_table.columns:
+        swr_col = event_table[["event_id", "is_swr"]].copy()
+        patch_eat = patch_eat.merge(swr_col, on="event_id", how="left")
+        is_swr_i = patch_eat["is_swr"].fillna(False).astype(int).to_numpy()
+        patch_eat = patch_eat.drop(columns=["is_swr"])
+    else:
+        is_swr_i = np.zeros(len(patch_eat), dtype=int)
+    patch_eat["swr_x_current_patch"] = (
+        is_swr_i * patch_eat["is_current_patch"].to_numpy()
+    )
+    patch_eat["swr_x_last_rewarded_patch_elsewhere"] = (
+        is_swr_i * patch_eat["is_last_rewarded_patch_elsewhere"].to_numpy()
+    )
+    patch_eat["swr_x_prev_patch"] = is_swr_i * patch_eat["is_prev_patch"].to_numpy()
 
     # Session keys are required by the patch-level fitter, which groups
     # by ["animal", "day", "epoch"] before fitting per session. Without
@@ -1343,6 +1375,9 @@ def _event_arm_table_columns() -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
+        "swr_x_recent_reward_rate",
+        "swr_x_visit_recency_demeaned",
+        "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",

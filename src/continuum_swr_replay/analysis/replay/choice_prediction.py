@@ -341,6 +341,34 @@ def build_choice_dataset(
         .reset_index()
     )
 
+    # SWR-overlap-conditional replay fractions per (stop, arm). Each is
+    # the mean ``arm_fraction`` restricted to events where ``is_swr`` is
+    # True (or False) within the stop. A (stop, arm) with no SWR-overlap
+    # events at all gets NaN for ``replay_frac_swr`` — different from
+    # "0 SWR replay on this arm despite SWR events," which would be 0;
+    # honest NaN lets the fitter drop those stops from any model using
+    # the split predictors.
+    if "is_swr" in event_arm_table.columns:
+        eat_swr = event_arm_table[
+            ["stop_id", "arm", fraction_col, "is_swr"]
+        ].copy()
+        swr_frac = (
+            eat_swr[eat_swr["is_swr"]]
+            .groupby(["stop_id", "arm"])[fraction_col]
+            .apply(strict_mean)
+            .rename("replay_frac_swr")
+            .reset_index()
+        )
+        non_swr_frac = (
+            eat_swr[~eat_swr["is_swr"]]
+            .groupby(["stop_id", "arm"])[fraction_col]
+            .apply(strict_mean)
+            .rename("replay_frac_non_swr")
+            .reset_index()
+        )
+        stop_arm = stop_arm.merge(swr_frac, on=["stop_id", "arm"], how="left")
+        stop_arm = stop_arm.merge(non_swr_frac, on=["stop_id", "arm"], how="left")
+
     # Join with stop-level info.
     stop_info = valid_stops[
         [
