@@ -207,8 +207,16 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
     ]
     sub_axes = []
 
-    # Pick an annotation side that stays inside the cell regardless of x_animal
-    annot_xtext = animal_pos - 0.35 if animal_pos >= 0.5 else animal_pos + 0.35
+    # Pick annotation placement so the arrow doesn't cross the formula text.
+    # The text is anchored on its edge nearest the bump (ha=left/right) so it
+    # only extends away from the bump; the arrow tail then sits at that edge
+    # and the shaft sweeps across empty space toward xy.
+    if animal_pos >= 0.5:
+        annot_xtext = animal_pos - 0.25
+        annot_ha = "right"
+    else:
+        annot_xtext = animal_pos + 0.25
+        annot_ha = "left"
 
     for idx, (name, color) in enumerate(configs):
         row, col = idx // 2, idx % 2
@@ -233,7 +241,7 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
                 xytext=(annot_xtext, 0.95),
                 fontsize=5, color=color, fontweight="bold",
                 arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
-                ha="center",
+                ha=annot_ha,
             )
             desc = "Vector: likelihood\nnear animal's position"
 
