@@ -33,7 +33,7 @@ os.environ["JAX_PLATFORMS"] = "cpu"
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+from matplotlib.gridspec import GridSpec
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
@@ -45,6 +45,7 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
+from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 warnings.filterwarnings("ignore")
 
@@ -163,28 +164,25 @@ def plot_state_diagram(ax):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def plot_observation_models(ax):
+def plot_observation_models(fig, gs_slot):
     """Show how each state computes spike likelihood differently.
 
-    Each sub-panel has two rows:
-      - Top: a neuron's place field (lambda(x)) shown as a curve
-      - Bottom: the likelihood OUTPUT for that state
+    Local: evaluates lambda weighted by a Gaussian envelope around the
+    animal's position → spatial vector concentrated near the animal.
+    No-Spike: ignores place fields, uses lambda ≈ 0 → single scalar.
+    Non-Local (Cont/Frag): evaluates lambda at all positions → spatial vector.
 
-    Local: evaluates lambda only at the animal's position → single scalar
-    No-Spike: ignores place fields, uses lambda ≈ 0 → single scalar
-    Non-Local (Cont/Frag): evaluates lambda at all positions → spatial vector
+    Returns the four sub-axes (row-major: Local, No-Spike, Continuous,
+    Fragmented). The first is used by ``label_panels`` for the panel "b"
+    label.
     """
-    ax.axis("off")
-
     n_pts = 200
     x = np.linspace(0, 1, n_pts)
     animal_pos = 0.3
     likelihood_center = 0.4
     likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
-    gs_inner = GridSpecFromSubplotSpec(
-        2, 2, subplot_spec=ax.get_subplotspec(), wspace=0.10, hspace=0.50,
-    )
+    gs_inner = gs_slot.subgridspec(2, 2, wspace=0.10, hspace=0.55)
 
     configs = [
         ("Local", STATE_COLORS_SHORT[0]),
@@ -192,32 +190,36 @@ def plot_observation_models(ax):
         ("Continuous\n Non-Local", STATE_COLORS_SHORT[2]),
         ("Fragmented\nNon-Local", STATE_COLORS_SHORT[3]),
     ]
-    likelihood_alpha = 0.7
+    sub_axes = []
 
     for idx, (name, color) in enumerate(configs):
         row, col = idx // 2, idx % 2
-        sub_ax = ax.figure.add_subplot(gs_inner[row, col])
+        sub_ax = fig.add_subplot(gs_inner[row, col])
+        sub_axes.append(sub_ax)
 
 
         if name == "Local":
-            # Show likelihood curve in gray
-            sub_ax.plot(x, likelihood, color="#aaaaaa", linewidth=0.8, alpha=likelihood_alpha)
-            sub_ax.fill_between(x, likelihood, alpha=likelihood_alpha, color="#aaaaaa")
-            # Vertical line at animal position
+            sigma_local = 0.05  # schematic kernel width on the [0,1] x-axis
+            kernel = np.exp(-0.5 * ((x - animal_pos) / sigma_local) ** 2)
+            local_like = likelihood * kernel
+            # Place field λ(x) shown faintly underneath
+            sub_ax.plot(x, likelihood, color="#aaaaaa", linewidth=0.8, alpha=0.4)
+            sub_ax.fill_between(x, likelihood, alpha=0.2, color="#aaaaaa")
+            # Local likelihood = λ(x) · N(x_animal, σ_L)
+            sub_ax.plot(x, local_like, color=color, linewidth=1.0)
+            sub_ax.fill_between(x, local_like, alpha=0.45, color=color)
             sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                            linestyle="--")
-            # Dot at the evaluated point
-            val = np.interp(animal_pos, x, likelihood)
-            sub_ax.plot(animal_pos, val, "o", color=color, markersize=5, zorder=10)
-            # Arrow from dot to result annotation
+            peak_val = float(local_like.max())
             sub_ax.annotate(
-                "$\\lambda(x_{{animal}})$",
-                xy=(animal_pos, val), xytext=(animal_pos + 0.30, val + 0.30),
+                r"$\lambda(x)\,\mathcal{N}(x_{\mathrm{animal}}, \sigma_L)$",
+                xy=(animal_pos, peak_val),
+                xytext=(animal_pos + 0.35, peak_val + 0.30),
                 fontsize=5, color=color, fontweight="bold",
                 arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
                 ha="center",
             )
-            desc = "Scalar: likelihood at\nanimal's position"
+            desc = "Vector: likelihood\nnear animal's position"
 
         elif name == "No-Spike":
             # Show place field curve grayed out / crossed out
@@ -268,6 +270,8 @@ def plot_observation_models(ax):
             0.5, -0.15, desc, ha="center", va="top", fontsize=4,
             transform=sub_ax.transAxes, color="#555555", linespacing=0.9,
         )
+
+    return sub_axes
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -468,6 +472,7 @@ def generate_figure(n_neurons=30, seed=42):
             "position_std": 6.0,
             "block_size": int(2**8),
         },
+        local_position_std=LOCAL_POSITION_STD,
     )
     results = detector.estimate_parameters(
         position_time=time,
@@ -497,8 +502,7 @@ def generate_figure(n_neurons=30, seed=42):
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
 
-    ax_b = fig.add_subplot(gs_row0[1])
-    plot_observation_models(ax_b)
+    b_axes = plot_observation_models(fig, gs_row0[1])
 
     # ── Row 1: Transition Kernels (c) ──
     kernel_axes = plot_transition_kernels(fig, gs_main[1])
@@ -525,7 +529,7 @@ def generate_figure(n_neurons=30, seed=42):
 
     # ── Panel Labels ──
     label_panels(
-        [ax_a, ax_b, kernel_axes[0], ax_raster],
+        [ax_a, b_axes[0], kernel_axes[0], ax_raster],
         labels=["a", "b", "c", "d"],
     )
 
