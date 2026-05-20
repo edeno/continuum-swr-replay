@@ -271,6 +271,10 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
         sub_ax.set_title(
             name, fontsize=5.5, color=color, fontweight="bold", pad=2,
         )
+        # Label the position axis on the bottom row of each scenario only;
+        # all four cells share the same [0, 1] position axis.
+        if row == 1:
+            sub_ax.set_xlabel("position", fontsize=5, labelpad=3)
 
     return sub_axes
 
