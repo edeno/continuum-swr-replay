@@ -106,7 +106,7 @@ def plot_state_diagram(ax):
         "Non-Local\nFragmented": "0.98",
     }
 
-    radius = 0.16
+    radius = 0.18
 
     for state_name, (cx, cy) in positions.items():
         circle = mpatches.Circle(
@@ -121,7 +121,7 @@ def plot_state_diagram(ax):
         ax.add_patch(circle)
         ax.text(
             cx, cy, state_name,
-            ha="center", va="center", fontsize=5.5, fontweight="bold",
+            ha="center", va="center", fontsize=6, fontweight="bold",
             color="white", zorder=11, linespacing=0.9,
         )
 
@@ -143,7 +143,7 @@ def plot_state_diagram(ax):
         ax.add_patch(arrow)
         ax.text(
             cx + ox * 1.5, cy + oy * 1.5, self_probs[state_name],
-            ha="center", va="center", fontsize=4.5, color="black", alpha=0.7,
+            ha="center", va="center", fontsize=5, color="black", alpha=0.7,
         )
 
     # Cross-state arrows
@@ -202,8 +202,8 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
     configs = [
         ("Local", STATE_COLORS_SHORT[0]),
         ("No-Spike", STATE_COLORS_SHORT[1]),
-        ("Continuous\n Non-Local", STATE_COLORS_SHORT[2]),
-        ("Fragmented\nNon-Local", STATE_COLORS_SHORT[3]),
+        ("Non-Local\nContinuous", STATE_COLORS_SHORT[2]),
+        ("Non-Local\nFragmented", STATE_COLORS_SHORT[3]),
     ]
     sub_axes = []
 
@@ -239,7 +239,7 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
                 r"$\lambda(x)\,\mathcal{N}(x_{\mathrm{animal}}, \sigma_L)$",
                 xy=(animal_pos, peak_y),
                 xytext=(annot_xtext, 0.95),
-                fontsize=5, color=color, fontweight="bold",
+                fontsize=5.5, color=color, fontweight="bold",
                 arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
                 ha=annot_ha,
             )
@@ -269,12 +269,12 @@ def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
         sub_ax.spines["bottom"].set_linewidth(0.5)
 
         sub_ax.set_title(
-            name, fontsize=5.5, color=color, fontweight="bold", pad=2,
+            name, fontsize=6, color=color, fontweight="bold", pad=2,
         )
         # Label the position axis on the bottom row of each scenario only;
         # all four cells share the same [0, 1] position axis.
         if row == 1:
-            sub_ax.set_xlabel("position", fontsize=5, labelpad=3)
+            sub_ax.set_xlabel("position", fontsize=6, labelpad=3)
 
     return sub_axes
 
@@ -426,19 +426,19 @@ def plot_transition_kernels(fig, gs_slot):
         sub_ax.set_yticks([])
 
         sub_ax.set_title(
-            config["name"], fontsize=5, color=config["color"],
+            config["name"], fontsize=5.5, color=config["color"],
             fontweight="bold", pad=3, linespacing=0.9,
         )
         sub_ax.text(
             0.5, -0.04, config["subtitle"],
-            ha="center", va="top", fontsize=4.5,
+            ha="center", va="top", fontsize=5,
             transform=sub_ax.transAxes, color="#555555",
             style="italic",
         )
 
-        sub_ax.set_xlabel("position$_t$", fontsize=5, labelpad=12)
+        sub_ax.set_xlabel("position$_t$", fontsize=5.5, labelpad=12)
         if idx == 0:
-            sub_ax.set_ylabel("position$_{t+1}$", fontsize=5, labelpad=2)
+            sub_ax.set_ylabel("position$_{t+1}$", fontsize=5.5, labelpad=2)
 
     return axes
 
@@ -466,7 +466,7 @@ def plot_spike_raster(ax, spike_times, detector):
     ax.set_ylabel("Neuron", fontsize=7, labelpad=4)
     ax.set_yticks([1, len(spike_times)])
     ax.set_ylim(0, len(spike_times))
-    ax.tick_params(labelsize=5, labelbottom=False)
+    ax.tick_params(labelsize=5.5, labelbottom=False)
 
 
 def plot_posterior(ax, time, position, results):
@@ -483,9 +483,11 @@ def plot_posterior(ax, time, position, results):
         time, pos_coord, nl_pos.T,
         cmap="bone_r", vmin=0, vmax=vmax, rasterized=True,
     )
-    ax.plot(time, position, color=WONG[1], linewidth=0.8, alpha=0.9)
+    # Magenta for the animal's true position, consistent with the dashed line
+    # in panel B and avoiding collision with WONG[1] used for Continuous state.
+    ax.plot(time, position, color=ANIMAL_POS_COLOR, linewidth=0.8, alpha=0.9)
     ax.set_ylabel("Non-local\nposterior\n(cm)", fontsize=7, labelpad=4)
-    ax.tick_params(labelsize=5, labelbottom=False)
+    ax.tick_params(labelsize=5.5, labelbottom=False)
 
 
 def plot_state_probabilities(ax, time, results, detector):
@@ -505,9 +507,9 @@ def plot_state_probabilities(ax, time, results, detector):
         )
     ax.set_ylabel("P(state)", fontsize=7, labelpad=4)
     ax.set_ylim(0, 1.05)
-    ax.tick_params(labelsize=5, labelbottom=False)
+    ax.tick_params(labelsize=5.5, labelbottom=False)
     ax.legend(
-        fontsize=4, loc="upper right", ncol=4, frameon=False,
+        fontsize=5.5, loc="upper right", ncol=4, frameon=False,
         handlelength=1, columnspacing=0.5,
     )
 
@@ -518,12 +520,12 @@ def plot_speed(ax, time, speed):
     ax.axhline(4.0, color="black", linewidth=0.5, linestyle=":", alpha=0.4)
     ax.text(
         time[-1], 4.5, "4 cm/s", ha="right", va="bottom",
-        fontsize=4, alpha=0.5,
+        fontsize=5, alpha=0.7,
     )
     ax.set_ylabel("Speed\n(cm/s)", fontsize=7, labelpad=4)
     ax.set_xlabel("Time (s)", fontsize=7)
     ax.set_ylim(0, None)
-    ax.tick_params(labelsize=5)
+    ax.tick_params(labelsize=5.5)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -574,7 +576,13 @@ def generate_figure(n_neurons=30, seed=42):
     # --- Create figure ---
     set_figure_defaults(context="paper")
 
-    fig_height = min(TWO_COLUMN * 1.35, PAGE_HEIGHT)
+    # fig_height + height_ratios are tuned so that rows 0 and 1 keep their
+    # current absolute heights (preserving the Panel A / Local-wins scenario
+    # block match) while row 2 (Panel D) shrinks: ratio 2.0 -> 1.7 reduces
+    # Panel D by ~15%, and fig_height drops to compensate so the upper rows
+    # are unchanged. Panel D's spike raster (30 neurons) was over-allocated
+    # at the prior height.
+    fig_height = min(TWO_COLUMN * 1.247, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
 
@@ -584,7 +592,7 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[1.4, 0.55, 2.0],
+        height_ratios=[1.4, 0.55, 1.7],
         hspace=0.20,
     )
 
