@@ -296,9 +296,23 @@ def main():
         default="arm",
         choices=["arm", "patch"],
         help=(
-            "Resolution: 'arm' (9 arms, M0-M6) or 'patch' (3 patches, "
-            "P0-P3). Patch fits use event_patch_table.pkl and "
+            "Resolution: 'arm' (9 arms, M0-M7) or 'patch' (3 patches, "
+            "P0-P4). Patch fits use event_patch_table.pkl and "
             "patch_count_hard."
+        ),
+    )
+    parser.add_argument(
+        "--swr-subset",
+        type=str,
+        default="all",
+        choices=["all", "T", "F"],
+        help=(
+            "Restrict to the SWR-overlap subset of events. 'T' keeps "
+            "events with is_swr=True; 'F' keeps is_swr=False. With a "
+            "subset the hierarchy is reduced to MODEL_HIERARCHY_SWR / "
+            "MODEL_PATCH_SWR (i.e. M0-M5 / P0-P3) since swr_x_* "
+            "interactions are constant within a subset. Output is "
+            "written to a suffixed subdirectory (e.g. models_swr_T)."
         ),
     )
     parser.add_argument(
@@ -350,6 +364,23 @@ def main():
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
     output_dir = input_dir / output_subdir
 
+    # SWR subset: restrict to is_swr=True or =False events. Within a
+    # subset is_swr is constant, so the swr_x_* interactions (M6/M7,
+    # P4) collapse onto their main effects and are unidentifiable —
+    # use the *_SWR variants (M0-M5 / P0-P3) which already drop them.
+    # Output goes to a suffixed subdirectory so the unrestricted fits
+    # are not overwritten.
+    if args.swr_subset != "all":
+        if args.hierarchy == "patch":
+            hierarchy = MODEL_PATCH_SWR
+        else:
+            hierarchy = MODEL_HIERARCHY_SWR
+        output_dir = input_dir / f"{output_subdir}_swr_{args.swr_subset}"
+        logging.info(
+            "SWR subset = %s: hierarchy narrowed to %s, output -> %s",
+            args.swr_subset, list(hierarchy.keys()), output_dir,
+        )
+
     # Determine which models to fit
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
@@ -387,6 +418,24 @@ def main():
         len(long_df),
         long_df.groupby(SESSION_COLS).ngroups,
     )
+
+    # Apply the SWR subset filter (--swr-subset T/F). is_swr is
+    # event-level on the event_arm_table and patch table. Drop whole
+    # events / patch-rows where is_swr doesn't match.
+    if args.swr_subset != "all":
+        if "is_swr" not in long_df.columns:
+            logging.error(
+                "--swr-subset requires an 'is_swr' column; not found in %s",
+                count_path,
+            )
+            return
+        keep = long_df["is_swr"] if args.swr_subset == "T" else ~long_df["is_swr"]
+        n_before_rows = len(long_df)
+        long_df = long_df.loc[keep].reset_index(drop=True)
+        logging.info(
+            "SWR subset filter (%s): %d -> %d rows",
+            args.swr_subset, n_before_rows, len(long_df),
+        )
 
     # Arm fixed effects are derived at fit time rather than stored in
     # the canonical table. Patch tables have no ``arm`` column and the
