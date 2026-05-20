@@ -8,8 +8,10 @@ This figure explains the non-local detector model to the reader in three rows:
         B: Observation model schematic — how each state's likelihood differs
 
     Row 2 (Continuous Dynamics):
-        C: Two key self-transition kernels (Continuous vs Fragmented)
-           showing how the non-local states' position dynamics differ
+        C: Self-transition kernels for all four states — Local is uniform
+           (re-anchored by the observation kernel each step under multi-bin
+           local), No-Spike is identity (single-bin), Continuous is a
+           Gaussian random walk, Fragmented is uniform.
 
     Row 3 (Simulated Example — single panel D):
         Spike raster, non-local posterior, state probabilities, speed
@@ -280,30 +282,52 @@ def plot_observation_models(fig, gs_slot):
 
 
 def plot_transition_kernels(fig, gs_slot):
-    """Plot only the two non-local self-transition kernels.
+    """Plot the self-transition kernel for each of the four states.
 
-    Local and No-Spike are point-mass states (no spatial extent), so they
-    have no meaningful spatial transition to show. Only the non-local states
-    have position-to-position dynamics:
+    With ``local_position_std`` set (multi-bin Local), the detector auto-
+    upgrades any ``Discrete()`` transition involving the Local state to
+    ``Uniform()`` (see ``base.initialize_continuous_state_transition``).
+    Effective self-transition diagonals are:
 
-    Continuous → Continuous: Gaussian random walk (smooth replay trajectories)
-    Fragmented → Fragmented: Uniform (discontinuous jumps to any position)
+    - Local → Local: Uniform. The Local state spans all bins; its next-step
+      prior is uniform and the observation kernel re-anchors the posterior
+      around the new animal position.
+    - No-Spike → No-Spike: Discrete (identity). No-Spike stays single-bin;
+      the auto-upgrade does not apply (neither source nor destination is
+      Local).
+    - Non-Local Continuous → Non-Local Continuous: Gaussian random walk
+      (smooth replay trajectories).
+    - Non-Local Fragmented → Non-Local Fragmented: Uniform (jump to any
+      position).
     """
-    gs_inner = gs_slot.subgridspec(1, 2, wspace=0.35)
+    gs_inner = gs_slot.subgridspec(1, 4, wspace=0.25)
 
     n_bins = 50
     configs = [
         {
+            "name": "Local\n→ Local",
+            "subtitle": "Uniform\n(re-anchored by observation)",
+            "color": STATE_COLORS_SHORT[0],
+            "kind": "uniform",
+        },
+        {
+            "name": "No-Spike\n→ No-Spike",
+            "subtitle": "Identity\n(single-bin discrete state)",
+            "color": STATE_COLORS_SHORT[1],
+            "kind": "identity",
+        },
+        {
             "name": "Non-Local Continuous\n→ Non-Local Continuous",
             "subtitle": "Gaussian random walk\n(smooth trajectories)",
             "color": STATE_COLORS_SHORT[2],
+            "kind": "gaussian",
             "sigma": 5.0,
         },
         {
             "name": "Non-Local Fragmented\n→ Non-Local Fragmented",
             "subtitle": "Uniform\n(jump to any position)",
             "color": STATE_COLORS_SHORT[3],
-            "sigma": None,
+            "kind": "uniform",
         },
     ]
 
@@ -312,17 +336,21 @@ def plot_transition_kernels(fig, gs_slot):
         sub_ax = fig.add_subplot(gs_inner[idx])
         axes.append(sub_ax)
 
-        trans = np.zeros((n_bins, n_bins))
-        if config["sigma"] is None:
+        if config["kind"] == "identity":
+            trans = np.eye(n_bins)
+        elif config["kind"] == "uniform":
             trans = np.ones((n_bins, n_bins)) / n_bins
-        else:
+        else:  # gaussian
+            trans = np.zeros((n_bins, n_bins))
             for i in range(n_bins):
                 trans[i, :] = np.exp(
                     -0.5 * ((np.arange(n_bins) - i) / config["sigma"]) ** 2
                 )
                 trans[i, :] /= trans[i, :].sum()
 
-        # Shared vmax so uniform vs random walk are visually comparable
+        # Shared vmax so the four kernels are visually comparable; identity's
+        # diagonal saturates, Gaussian band sits mid-range, uniform reads as a
+        # dim background — a clean gradient of spatial spread.
         sub_ax.imshow(
             trans, aspect="equal", cmap="magma",
             vmin=0, vmax=0.15,
