@@ -177,150 +177,179 @@ def plot_state_diagram(ax):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _draw_state_cells(fig, gs_inner, x, likelihood, animal_pos):
-    """Draw the 4-state likelihood cells for one scenario.
+def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
+                           show_legend=False):
+    """Draw all three state likelihoods overlaid on one axes.
 
     Parameters
     ----------
-    fig : matplotlib.figure.Figure
-    gs_inner : SubplotSpec
-        A 2x2 sub-grid slot. Cells are laid out row-major:
-        (Local, No-Spike) on top; (Continuous, Fragmented) on bottom.
+    ax : matplotlib.axes.Axes
+        Single axes to draw into.
     x : np.ndarray, shape (n_pts,)
         Position grid on [0, 1] for the schematic.
     likelihood : np.ndarray, shape (n_pts,)
-        The place-field curve λ(x).
+        The shared place-field curve λ(x), peaking at 1.0.
     animal_pos : float
-        The animal's position in [0, 1]. Controls where the Local
-        kernel sits and where the magenta dashed line is drawn.
+        Animal's position in [0, 1]. Controls where the Local kernel
+        sits and where the magenta dashed line is drawn.
+    scenario_kind : {"local", "nonlocal", "nospike"}
+        Determines the relative heights of the three curves so the
+        "winning" state's curve is visibly tallest.
+    show_legend : bool
+        Adds a small legend (typically only on the first scenario).
 
-    Returns
-    -------
-    list of matplotlib.axes.Axes
-        The four sub-axes (Local, No-Spike, Continuous, Fragmented).
+    Notes
+    -----
+    Three curves are drawn (collapsing the four states down to three
+    visually distinct likelihoods, since Non-Local Continuous and
+    Non-Local Fragmented have identical observation likelihoods; they
+    only differ in the transition kernel, shown in panel c):
+    - Local: blue, bump = λ(x)·N(x_animal, σ_L).
+    - Non-Local: orange, bump = λ(x), broader than Local.
+    - No-Spike: gray horizontal line at the No-Spike likelihood value.
     """
-    configs = [
-        ("Local", STATE_COLORS_SHORT[0]),
-        ("No-Spike", STATE_COLORS_SHORT[1]),
-        ("Non-Local\nContinuous", STATE_COLORS_SHORT[2]),
-        ("Non-Local\nFragmented", STATE_COLORS_SHORT[3]),
-    ]
-    sub_axes = []
+    local_color = STATE_COLORS_SHORT[0]    # blue
+    nospike_color = STATE_COLORS_SHORT[1]  # gray
+    # Non-Local in panel (b) merges the Continuous and Fragmented states
+    # (they share an observation likelihood; only their transition kernels
+    # differ). Show this visually by filling the curve with the Continuous
+    # orange and overlaying diagonal Fragmented-vermillion stripes — the
+    # striped pattern signals "this represents both non-local states."
+    nonlocal_continuous_color = STATE_COLORS_SHORT[2]  # orange (WONG[1])
+    nonlocal_fragmented_color = STATE_COLORS_SHORT[3]  # vermillion (WONG[6])
 
-    # Pick annotation placement so the arrow doesn't cross the formula text.
-    # The text is anchored on its edge nearest the bump (ha=left/right) so it
-    # only extends away from the bump; the arrow tail then sits at that edge
-    # and the shaft sweeps across empty space toward xy.
-    if animal_pos >= 0.5:
-        annot_xtext = animal_pos - 0.25
-        annot_ha = "right"
+    sigma_local = 0.05
+    kernel = np.exp(-0.5 * ((x - animal_pos) / sigma_local) ** 2)
+
+    # Faithful per-position observation likelihoods (unnormalized kernel,
+    # peak 1):
+    #   Local: λ(x) · N(x; x_a, σ_L)       — concentrated near x_a
+    #   Non-Local: λ(x)                     — spread over the track
+    # At x = x_a the kernel equals 1, so Local(x_a) = Non-Local(x_a) =
+    # λ(x_a). The "wins" story for Local vs Non-Local is therefore
+    # CONCENTRATION (narrow vs broad), not peak height; for No-Spike it
+    # is the bin-less likelihood value relative to the curves' peaks.
+    if scenario_kind == "local":
+        local_curve = likelihood * kernel
+        nonlocal_curve = likelihood
+        nospike_y = 0.10
+    elif scenario_kind == "nonlocal":
+        local_curve = likelihood * kernel
+        nonlocal_curve = likelihood
+        nospike_y = 0.10
+    elif scenario_kind == "nospike":
+        # Empty bin: same Local/Non-Local relationship as above, scaled
+        # down so the No-Spike line sits clearly above their peaks.
+        nospike_scale = 0.30
+        local_curve = likelihood * kernel * nospike_scale
+        nonlocal_curve = likelihood * nospike_scale
+        nospike_y = 0.70
     else:
-        annot_xtext = animal_pos + 0.25
-        annot_ha = "left"
+        raise ValueError(f"Unknown scenario_kind: {scenario_kind!r}")
 
-    for idx, (name, color) in enumerate(configs):
-        row, col = idx // 2, idx % 2
-        sub_ax = fig.add_subplot(gs_inner[row, col])
-        sub_axes.append(sub_ax)
+    # Non-Local drawn first so Local's fill sits on top where they overlap.
+    # The Non-Local fill uses Continuous orange as the background and
+    # Fragmented vermillion as the hatch color so the stripes visually
+    # convey "this curve represents both non-local states."
+    ax.fill_between(
+        x, nonlocal_curve,
+        facecolor=nonlocal_continuous_color,
+        edgecolor=nonlocal_fragmented_color,
+        hatch="///",
+        linewidth=0.0,
+        alpha=0.45,
+    )
+    ax.plot(x, nonlocal_curve, color=nonlocal_continuous_color,
+            linewidth=1.0)
+    # Legend handle for Non-Local: a striped patch with the same hatch.
+    nonlocal_legend_handle = mpatches.Patch(
+        facecolor=nonlocal_continuous_color,
+        edgecolor=nonlocal_fragmented_color,
+        hatch="///",
+        linewidth=0.0,
+        alpha=0.7,
+        label="Non-Local",
+    )
 
-        if name == "Local":
-            sigma_local = 0.05  # schematic kernel width on the [0,1] x-axis
-            kernel = np.exp(-0.5 * ((x - animal_pos) / sigma_local) ** 2)
-            local_like = likelihood * kernel
-            sub_ax.plot(x, likelihood, color="#aaaaaa", linewidth=0.8, alpha=0.4)
-            sub_ax.fill_between(x, likelihood, alpha=0.2, color="#aaaaaa")
-            sub_ax.plot(x, local_like, color=color, linewidth=1.0)
-            sub_ax.fill_between(x, local_like, alpha=0.45, color=color)
-            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
-                           linestyle="--")
-            # Arrow tip stays visible even when the bump is tiny
-            peak_y = max(float(local_like.max()), 0.10)
-            sub_ax.annotate(
-                r"$\lambda(x)\,\mathcal{N}(x_{\mathrm{animal}}, \sigma_L)$",
-                xy=(animal_pos, peak_y),
-                xytext=(annot_xtext, 0.95),
-                fontsize=5.5, color=color, fontweight="bold",
-                arrowprops={"arrowstyle": "->", "color": color, "lw": 0.8},
-                ha=annot_ha,
-            )
+    ax.plot(x, local_curve, color=local_color, linewidth=1.0, label="Local")
+    ax.fill_between(x, local_curve, alpha=0.40, color=local_color)
 
-        elif name == "No-Spike":
-            sub_ax.axhline(0.05, color=color, linewidth=1.2, linestyle="-")
-            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
-                           linestyle="--")
-            sub_ax.text(
-                0.5, 0.12, r"$\lambda \approx 0$",
-                ha="center", va="bottom", fontsize=6, color=color,
-                fontweight="bold", transform=sub_ax.transAxes,
-            )
+    ax.axhline(nospike_y, color=nospike_color, linewidth=1.2,
+               label="No-Spike")
 
-        else:  # Continuous or Fragmented Non-Local
-            sub_ax.plot(x, likelihood, color=color, linewidth=1.0)
-            sub_ax.fill_between(x, likelihood, alpha=0.3, color=color)
-            sub_ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
-                           linestyle="--", alpha=0.4)
+    ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
+               linestyle="--")
 
-        sub_ax.set_xlim(0, 1)
-        sub_ax.set_ylim(-0.05, 1.2)
-        sub_ax.set_xticks([])
-        sub_ax.set_yticks([])
-        for spine in ["top", "right", "left"]:
-            sub_ax.spines[spine].set_visible(False)
-        sub_ax.spines["bottom"].set_linewidth(0.5)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.05, 1.20)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ["top", "right", "left"]:
+        ax.spines[spine].set_visible(False)
+    ax.spines["bottom"].set_linewidth(0.5)
+    ax.set_xlabel("position", fontsize=6, labelpad=3)
 
-        sub_ax.set_title(
-            name, fontsize=6, color=color, fontweight="bold", pad=2,
+    if show_legend:
+        # Build legend manually so the Non-Local entry shows the striped
+        # patch handle. matplotlib's auto-collected handles include the
+        # Local plot line and the No-Spike axhline; combine them with the
+        # explicit Non-Local patch.
+        handles, labels = ax.get_legend_handles_labels()
+        handles = [nonlocal_legend_handle, *handles]
+        labels = ["Non-Local", *labels]
+        ax.legend(
+            handles, labels,
+            fontsize=5.5, loc="upper right", frameon=False,
+            handlelength=1.2, borderpad=0.2, labelspacing=0.3,
         )
-        # Label the position axis on the bottom row of each scenario only;
-        # all four cells share the same [0, 1] position axis.
-        if row == 1:
-            sub_ax.set_xlabel("position", fontsize=6, labelpad=3)
-
-    return sub_axes
 
 
 def plot_observation_models(fig, gs_slot):
-    """Show how each state's spike likelihood reacts under two scenarios.
+    """Show how the state likelihoods react under three scenarios.
 
-    Two scenarios are placed side-by-side, each containing the 4-state
-    2x2 grid (Local / No-Spike on top; Continuous / Fragmented Non-Local
-    on bottom):
+    Each scenario is one plot overlaying three state likelihoods on a
+    shared position axis:
 
     - "Local wins": x_animal coincides with the place-field peak. The
-      cell fires where its tuning says it should, so the Local
-      likelihood (λ(x)·N(x_animal, σ_L)) is large at the animal's
-      position. The Non-Local likelihood λ(x) is also peaked there, but
-      spread across all bins, so per-bin Non-Local mass is lower.
-    - "Non-Local wins": x_animal is far from the place-field peak. The
-      cell fires where it "shouldn't" — Local likelihood is tiny
-      because λ(x_animal) is near zero. Non-Local likelihood is still
-      peaked at the place-field center, far from the animal,
-      consistent with replay of a different location.
+      cell fires where its tuning says it should — Local likelihood
+      (λ(x)·N(x_animal, σ_L)) peaks tall at the animal's position;
+      Non-Local likelihood λ(x) is also peaked there but per-bin mass
+      is lower; No-Spike is small.
+    - "Non-Local wins": x_animal is far from the place-field peak.
+      Local is tiny because λ(x_animal) is near zero; Non-Local is
+      tall at the place-field center, consistent with replay of a
+      different location.
+    - "No-Spike wins": no spike in the bin. No-Spike's bin-less
+      likelihood (drawn as a horizontal line) is larger than the peak
+      of either position-dependent likelihood.
 
-    Returns all sub-axes (8 total), Local-wins block first then
-    Non-Local-wins. The first is used by ``label_panels`` for the
-    panel "b" label.
+    Non-Local Continuous and Non-Local Fragmented are collapsed to a
+    single "Non-Local" curve here because they share an observation
+    likelihood; their distinction lives in the transition kernels
+    (panel c) and dynamics (panel d).
+
+    Returns 3 axes (one per scenario). The first is used by
+    ``label_panels`` for the panel "b" label.
     """
     n_pts = 200
     x = np.linspace(0, 1, n_pts)
     likelihood_center = 0.4
     likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
-    # Outer 2x2: thin title row above content row, two scenarios as columns.
+    # Outer 2x3: thin title row above content row, three scenarios as columns.
     gs_outer = gs_slot.subgridspec(
-        2, 2, height_ratios=[0.12, 1.0], wspace=0.20, hspace=0.10,
+        2, 3, height_ratios=[0.12, 1.0], wspace=0.20, hspace=0.10,
     )
 
     scenarios = [
-        # (header, animal_pos)
-        ("Local wins", likelihood_center),   # animal at place-field peak
-        ("Non-Local wins", 0.55),            # animal ~1.5σ_λ from peak;
-        #                                       Local bump shrinks to ~30% of
-        #                                       Non-Local peak but stays visible
+        # (header, animal_pos, scenario_kind)
+        ("Local wins", likelihood_center, "local"),
+        ("Non-Local wins", 0.55, "nonlocal"),
+        ("No-Spike wins", likelihood_center, "nospike"),
     ]
 
     all_axes = []
-    for col, (header, animal_pos) in enumerate(scenarios):
+    for col, (header, animal_pos, scenario_kind) in enumerate(scenarios):
         title_ax = fig.add_subplot(gs_outer[0, col])
         title_ax.axis("off")
         title_ax.text(
@@ -329,10 +358,12 @@ def plot_observation_models(fig, gs_slot):
             transform=title_ax.transAxes,
         )
 
-        gs_scen = gs_outer[1, col].subgridspec(2, 2, wspace=0.10, hspace=0.55)
-        all_axes.extend(
-            _draw_state_cells(fig, gs_scen, x, likelihood, animal_pos)
+        scen_ax = fig.add_subplot(gs_outer[1, col])
+        _draw_scenario_overlay(
+            scen_ax, x, likelihood, animal_pos, scenario_kind,
+            show_legend=(col == 0),
         )
+        all_axes.append(scen_ax)
 
     return all_axes
 
@@ -592,7 +623,7 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[1.4, 0.55, 1.7],
+        height_ratios=[0.9, 0.55, 1.7],
         hspace=0.20,
     )
 
