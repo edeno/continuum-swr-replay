@@ -619,7 +619,7 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[0.9, 0.55, 1.7],
+        height_ratios=[0.65, 0.55, 1.7],
         hspace=0.20,
     )
 
@@ -628,7 +628,7 @@ def generate_figure(n_neurons=30, seed=42):
     # 2x2 of state cells. width_ratios are tuned so Panel A renders at
     # roughly the same width as one scenario block; aspect+anchor inside
     # plot_state_diagram matches the height too.
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.2])
+    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.6])
 
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
