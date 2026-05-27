@@ -23,9 +23,9 @@ Three pedagogical gaps in the current Figure 1:
 
 In scope:
 
-- Panel (a): self-loops more prominent and correctly labeled; cross-state
-  arrows redrawn as two-way directional arrows with thickness encoding the
-  actual transition probabilities.
+- Panel (a): self-loops more prominent and correctly labeled (0.99, 0.98,
+  0.96, 0.96); cross-state arrows redrawn as a single double-headed line
+  per state pair (topology only — no thickness encoding, no numeric labels).
 - Panel (b): restructured into 3 scenarios (Local wins, Non-Local wins,
   No-Spike wins) with a shared spike raster strip above them.
 - Panel (c), Panel (d): height-only adjustments; no content changes.
@@ -143,9 +143,13 @@ value is the largest of the four state likelihood values," which is the
 state-marginal story the panel is trying to teach.
 
 **Raster-strip height share.** Inside row 0 of the figure, the panel-B slot
-is split into a 2-row sub-gridspec with `height_ratios = [0.3, 0.7]`: the
-shared raster occupies the top 30%, the three scenario blocks share the
-bottom 70%.
+is split into a 3-row sub-gridspec — `[raster, title, content]` — with
+the raster spanning all 3 columns and the title and content rows repeated
+per scenario column. Height ratios of approximately `[0.30, 0.08, 0.62]`
+give the shared raster ~30% of the panel-B slot, the per-scenario title
+row ~8%, and the three 2×2 likelihood-cell blocks the remaining ~62%. The
+title-to-content ratio matches the current `[0.12, 1.0]` split inside
+`plot_observation_models`.
 
 ### Panels (c) and (d): height-only changes
 
@@ -241,9 +245,10 @@ Changes:
     downward connectors.
 - Restructure the panel (b) slot from `gs_outer = subgridspec(2, 2,
   height_ratios=[0.12, 1.0])` (title + content for 2 scenarios) to
-  `gs_outer = subgridspec(3, 3, height_ratios=[raster, title, content])` so
-  the raster spans all 3 columns above the titles, and the title and content
-  rows are repeated per scenario.
+  `gs_outer = subgridspec(3, 3, height_ratios=[0.30, 0.08, 0.62])` so the
+  raster spans all 3 columns in row 0, with per-scenario title rows in row 1
+  and per-scenario 2×2 content rows in row 2. The title-to-content ratio
+  matches the current `[0.12, 1.0]` split.
 - Re-tune row 0 height in `height_ratios` (and figure height if needed).
 
 Verification:
