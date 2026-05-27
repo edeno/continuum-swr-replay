@@ -85,11 +85,14 @@ def plot_state_diagram(ax):
     its slot so the bottom of Panel A's circles aligns with the
     bottom of Panel B's state cells.
     """
-    # x_range / y_range chosen to match scenario-block aspect 730/820 ≈ 0.89.
+    # Aspect locked equal so state circles render as circles. Anchor "N"
+    # aligns Panel A's top with the top of the panel-B scenario plots (no
+    # title row sits above either now), so the two panels share a
+    # horizontal baseline.
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(-0.06, 1.06)
     ax.set_aspect("equal")
-    ax.set_anchor("S")
+    ax.set_anchor("N")
     ax.axis("off")
 
     positions = {
@@ -336,10 +339,10 @@ def plot_observation_models(fig, gs_slot):
     likelihood_center = 0.4
     likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
-    # Outer 2x3: thin title row above content row, three scenarios as columns.
-    gs_outer = gs_slot.subgridspec(
-        2, 3, height_ratios=[0.12, 1.0], wspace=0.20, hspace=0.10,
-    )
+    # One row of three scenario plots. Titles are drawn directly on each
+    # plot via ``set_title`` so they sit close to the data rather than in a
+    # separate title axes above.
+    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.20)
 
     scenarios = [
         # (header, animal_pos, scenario_kind)
@@ -350,19 +353,12 @@ def plot_observation_models(fig, gs_slot):
 
     all_axes = []
     for col, (header, animal_pos, scenario_kind) in enumerate(scenarios):
-        title_ax = fig.add_subplot(gs_outer[0, col])
-        title_ax.axis("off")
-        title_ax.text(
-            0.5, 0.0, header,
-            ha="center", va="bottom", fontsize=7, fontweight="bold",
-            transform=title_ax.transAxes,
-        )
-
-        scen_ax = fig.add_subplot(gs_outer[1, col])
+        scen_ax = fig.add_subplot(gs_outer[0, col])
         _draw_scenario_overlay(
             scen_ax, x, likelihood, animal_pos, scenario_kind,
             show_legend=(col == 0),
         )
+        scen_ax.set_title(header, fontsize=7, fontweight="bold", pad=2)
         all_axes.append(scen_ax)
 
     return all_axes
