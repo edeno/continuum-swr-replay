@@ -58,24 +58,31 @@ midpoint of the arc. Values match the actual transition matrix:
 | Non-Local Continuous | **0.96** (current figure says 0.98 — bug) |
 | Non-Local Fragmented | **0.96** (current figure says 0.98 — bug) |
 
-**Cross-state arrows.** All 6 state pairs are connected by **two directional
-arrows** drawn as paired curved arcs on opposite sides of the line connecting
-the state centers. 12 directional arrows total. No numeric labels. Line
-thickness ∝ transition probability, using 3 visual tiers:
+**Cross-state arrows.** All 6 state pairs are connected by a **single
+double-headed line** (one bidirectional arrow per pair, arrowheads at both
+ends). 6 lines total. **No thickness encoding; no numeric labels.** The
+diagram conveys topology only: every state can transition to every other
+state. The actual numbers live in the transition kernels in panel (c) and
+implicitly in panel (d)'s decoded trajectories.
 
-| Probability | Tier | Line width (pt) |
-|----|----|----|
-| 0.0025 | thinnest | 0.3 |
-| 0.005 / 0.0067 | medium | 0.7 |
-| 0.0175 | thick | 1.5 |
+Rationale for dropping thickness: with only 3 visual tiers across 12 arrows
+in a small panel, the middle tier (0.005 / 0.0067, 1.34× apart) is
+indistinguishable at print resolution, and pruning the encoding back to "just
+show connectivity" matches the pedagogical role of panel (a) — introduce the
+state machine. The asymmetry can be discussed in the figure caption if
+needed.
 
-Color stays the current faint black/gray. A short caption note on the panel
-reads "arrow thickness ∝ transition probability." This communicates the
-asymmetry — Non-Local states return to Local 7× more often than Local jumps
-out (C→L = F→L = 0.0175 vs. L→C = L→F = 0.0025) — without numeric clutter.
+**Self-prob source.** The self-probabilities (0.99, 0.98, 0.96, 0.96) are
+**pulled from the detector at runtime** rather than hardcoded:
 
-**Transition matrix used (rows = source, columns = destination, state order =
-[Local, No-Spike, Continuous, Fragmented]):**
+```python
+from non_local_detector import NonLocalSortedSpikesDetector
+matrix = NonLocalSortedSpikesDetector().discrete_transition_type.values
+self_probs = matrix.diagonal()
+```
+
+This prevents the figure from going silently stale if upstream defaults
+change. The full transition matrix (for reference; not drawn in the figure):
 
 ```
               Local   No-Spike  Continuous  Fragmented
@@ -85,8 +92,11 @@ Continuous    0.0175  0.005     0.96        0.0175
 Fragmented    0.0175  0.005     0.0175      0.96
 ```
 
-Verified against `NonLocalSortedSpikesDetector().discrete_transition_type` in
-`non_local_detector`.
+**Self-loop geometry.** Loop radius ≈ 0.08 in panel-A axis units, outer
+extent ~0.10 beyond the circle edge, routed to the outward corner of each
+state's grid cell: NW for Local, NE for No-Spike, SW for Continuous, SE for
+Fragmented. This keeps the loops in figure margin space and away from the
+diagonal cross-arrows that pass through the panel center.
 
 ### Panel (b): 3 Scenarios with Shared Spike Raster
 
@@ -95,13 +105,18 @@ Restructured into two vertical zones inside the row 0 right-hand slot.
 **Top zone — shared spike raster strip** spanning the full width of panel (b):
 
 - ~6–8 simulated neurons, ordered by place-field peak position.
-- Time axis covering 3 example bins side by side; spikes drawn as black ticks.
-- 3 highlighted time bins marked with vertical light-gray bands (one shade
-  per bin, neutral grays — scenario state colors are reserved for the cells
-  below). Bins labeled `bin₁`, `bin₂`, `bin₃` along the top.
-- Animal position drawn as a thin magenta line across the bottom of the raster
-  (or on a secondary y-axis — final placement decided in implementation).
-- A downward bracket / connector under each highlighted bin pointing into the
+- Raster x-axis on `[0, 1]`. Three highlighted time bins centered at
+  `x = 0.17`, `0.50`, `0.83` so each bin sits directly above its scenario
+  block. Highlight bands span `±0.08` around each center and use light gray
+  shades (e.g., `#dddddd`, `#cccccc`, `#bbbbbb` for bin₁/bin₂/bin₃) —
+  scenario state colors are reserved for the cells below.
+- Spikes drawn as black ticks. Bins labeled `bin₁`, `bin₂`, `bin₃` along the
+  top.
+- **Animal-position trace** drawn in a separate thin axis at the bottom of
+  the raster strip (not overplotted on spike rows), magenta line, height
+  ~15% of the raster strip's vertical extent. This keeps the spike ticks
+  legible and the position trace clearly attributed.
+- A short downward connector under each highlighted bin pointing into the
   scenario block below.
 
 **Bottom zone — 3 scenario blocks side by side**, in order left to right:
@@ -110,10 +125,27 @@ Restructured into two vertical zones inside the row 0 right-hand slot.
 |----|----|----|
 | **1. Local wins** | spikes from cells whose place fields sit at the animal's position | Local cell shows a tall bump at `x_animal`; other three cells show modest/diffuse curves (current behavior). |
 | **2. Non-Local wins** | spikes from cells whose place fields are far from the animal | Continuous/Fragmented cells show prominent bumps away from the magenta `x_animal` line; Local cell is small (current behavior). |
-| **3. No-Spike wins** | empty bin (no spikes) | No-Spike cell shows its horizontal likelihood line drawn at `y ≈ 0.7`; Local/Continuous/Fragmented cells show small bumps at `y ≈ 0.4` so No-Spike literally sits above the others on the y-axis. |
+| **3. No-Spike wins** | empty bin (no spikes) | No-Spike cell shows its horizontal likelihood line drawn at `y = 0.7`; Local/Continuous/Fragmented cells show small bumps peaking at `y = 0.4`. Phase 1 also adds an `(empty bin)` annotation under the scenario title so the visual rule is self-explaining even before the raster is added in Phase 2. |
 
 Each scenario block keeps the existing 2×2 layout (Local + No-Spike on top,
 Continuous + Fragmented on bottom).
+
+**Note on the No-Spike "draw it taller" rule.** The four cells in panel (b)
+show **per-state likelihoods**, not posteriors. The No-Spike state is
+bin-less — its likelihood is a single scalar (not a function of position),
+so drawing it as a horizontal line whose height equals the likelihood value
+is faithful. The Local/Non-Local likelihoods *are* functions of position,
+shown as curves whose peak height represents the maximum likelihood across
+bins. In an empty bin, No-Spike's scalar likelihood exceeds the peak of each
+of the other states' likelihood curves — so a horizontal line at `y = 0.7`
+above curves peaking at `y = 0.4` faithfully says "the No-Spike likelihood
+value is the largest of the four state likelihood values," which is the
+state-marginal story the panel is trying to teach.
+
+**Raster-strip height share.** Inside row 0 of the figure, the panel-B slot
+is split into a 2-row sub-gridspec with `height_ratios = [0.3, 0.7]`: the
+shared raster occupies the top 30%, the three scenario blocks share the
+bottom 70%.
 
 ### Panels (c) and (d): height-only changes
 
@@ -166,25 +198,32 @@ scenario. No shared raster yet — each scenario still stands alone.
 
 Changes:
 
-- Add a third scenario tuple to `plot_observation_models` for No-Spike wins.
+- Add a third scenario tuple to `plot_observation_models` for No-Spike wins
+  with header `"No-Spike wins"` and a smaller secondary header
+  `"(empty bin)"` immediately below it.
 - Modify `_draw_state_cells` so that when a `no_spike_wins=True` flag is
-  passed, the No-Spike cell draws its horizontal line at `y ≈ 0.7` and the
-  Local/Continuous/Fragmented cells draw small bumps at `y ≈ 0.4`. The
-  existing No-Spike cell drawing (`axhline(0.05, …)`) is kept as the default
-  for Local-wins and Non-Local-wins scenarios.
-- Extend the outer 2×2 gridspec in `plot_observation_models` from 2 columns to
-  3 columns.
+  passed, the No-Spike cell draws its horizontal line at `y = 0.7` and the
+  Local/Continuous/Fragmented cells draw small bumps peaking at `y = 0.4`.
+  The existing No-Spike cell drawing (`axhline(0.05, …)`) is kept as the
+  default for Local-wins and Non-Local-wins scenarios.
+- Extend the outer 2×2 gridspec in `plot_observation_models` from 2 columns
+  to 3 columns.
 - Adjust `gs_row0` width ratios from `[1, 2.2]` to `[1, 3.3]`.
-- Adjust panel (a)'s axes data limits / anchor so the circles still align with
-  the bottom of the scenario blocks.
+- Adjust panel (a)'s axes data limits / anchor so the circles still align
+  with the bottom of the scenario blocks.
+- Confirm `label_panels(b_axes[0], …)` still labels the top-left Local-wins
+  cell — `b_axes` now has length 12 (4 cells × 3 scenarios) but index 0 is
+  still the first cell drawn (Local-wins → Local).
 
 Verification:
 
 - Figure renders without overflow.
 - Panel (b) shows 3 scenarios; in the No-Spike-wins one, the gray horizontal
-  No-Spike line sits visually above the four state bumps.
+  No-Spike line sits visually above the four state bumps and the
+  `(empty bin)` annotation reads cleanly.
 - Panel (a) circles still align with the bottom of the leftmost scenario
   block.
+- Panel "b" label still attaches to the top-left Local-wins cell.
 
 ### Phase 2 — Shared spike raster above the 3 scenarios
 
@@ -219,38 +258,35 @@ Verification:
 
 ### Phase 3 — Panel (a) self-loops and cross-arrows
 
-Goal: redraw panel (a) with prominent self-loops and bidirectional thickness-
-encoded cross-arrows.
+Goal: redraw panel (a) with prominent self-loops and double-headed
+cross-state arrows (one line per pair, no thickness encoding, no labels on
+cross-arrows).
 
 Changes:
 
+- Pull the actual diagonal probabilities from
+  `NonLocalSortedSpikesDetector().discrete_transition_type.values.diagonal()`
+  at the top of `plot_state_diagram`. This corrects the current `0.98` for
+  Continuous and Fragmented to `0.96` automatically.
 - Replace `loop_offsets` / `FancyArrowPatch(connectionstyle="arc3,rad=0.4")`
-  with a proper self-loop drawn as a `FancyArrowPatch` using a
-  `connectionstyle="arc3,rad=…"` arc from a small offset on one side of the
-  circle to a small offset on the other side, large enough to be clearly
-  visible. Route per state to its outward corner (NW / NE / SW / SE).
-- Fix self-prob values in `self_probs` dict: Continuous and Fragmented from
-  `"0.98"` to `"0.96"`.
+  with a proper self-loop drawn as a `FancyArrowPatch` arc of radius ≈ 0.08
+  in axis units, outer extent ≈ 0.10 beyond the circle edge, routed per
+  state to its outward corner (NW for Local, NE for No-Spike, SW for
+  Continuous, SE for Fragmented). The self-probability label sits on the
+  outward midpoint of the arc.
 - Replace `cross_transitions = [...]` (currently an irregular subset of 8
-  transitions) with the full set of 12 directional transitions.
-- For each pair `(A, B)`, draw two `FancyArrowPatch` arcs on opposite sides
-  of the chord between the circles, one with arrowhead at B (probability
-  `P[A→B]`) and the other with arrowhead at A (probability `P[B→A]`).
-- Map each transition's probability to a line width tier: 0.3pt / 0.7pt /
-  1.5pt for tiers (`< 0.005`, `0.005–0.01`, `> 0.01`). Source the probabilities
-  from a hardcoded constant matching the `NonLocalSortedSpikesDetector`
-  default matrix.
-- Add a small caption text near the bottom of panel (a) reading "arrow
-  thickness ∝ transition probability."
+  one-directional arrows) with a list of 6 unordered state pairs.
+- For each pair, draw a **single** `FancyArrowPatch` from circle A to circle
+  B with `arrowstyle="<->"` (arrowheads at both ends). No curved arc, no
+  thickness encoding, no label.
 
 Verification:
 
 - All four self-loops are visible at print resolution and carry the correct
-  probability label.
-- Each state pair has two arcs whose thicknesses match the asymmetry in
-  the transition matrix (most visible: C→L and F→L arcs are clearly thicker
-  than L→C and L→F arcs).
-- Caption note is legible and does not collide with state circles.
+  probability label (0.99, 0.98, 0.96, 0.96).
+- Each pair of state circles is connected by exactly one double-headed line.
+- Self-loops do not visually collide with the cross-arrows or with the
+  state labels inside the circles.
 
 ## Risks and Edge Cases
 
@@ -262,14 +298,31 @@ Verification:
   requires shrinking panel (d). Panel (d)'s raster (30 neurons) is currently
   over-tall, so this is safe — but if the layout still doesn't fit,
   `fig_height` can grow up to `PAGE_HEIGHT` before being clamped.
-- **Phase 1 standalone rendering.** Phase 1's figure is valid on its own — the
-  3 scenarios stand without a shared raster, just as the current 2 scenarios
-  do. There is no broken intermediate.
+- **Phase 1 standalone rendering.** Phase 1's figure is valid on its own —
+  the 3 scenarios stand without a shared raster, and the `(empty bin)`
+  annotation under the No-Spike-wins title explains the visual rule even
+  without the upstream raster context.
 - **Self-loop / cross-arrow collision.** Routing self-loops to the outward
   corner of each circle (NW/NE/SW/SE) keeps them in the figure margin where
   no cross-arrows live. The diagonal cross-arrows (Local↔Fragmented and
   No-Spike↔Continuous) cross through the center of the 2×2 — self-loops on
   the outward corners stay out of that path.
+- **Bin-to-scenario x-alignment.** The shared raster's three highlighted
+  bins must visually fall above their scenario blocks. The scenario
+  sub-gridspec uses `wspace` between columns; the raster axis uses absolute
+  positions on `[0, 1]`. Bin centers `0.17 / 0.50 / 0.83` are chosen to
+  match the scenario column centers under the new width split — verify
+  alignment after rendering and tune if needed.
+- **Magenta-on-gray contrast.** The animal-position trace (magenta, color
+  `#FF00FF`-ish) must remain visible against the light-gray highlight bands
+  (`#dddddd` / `#cccccc` / `#bbbbbb`). At the chosen shade range the
+  contrast is fine; if shades darken the trace can switch to a thicker
+  line.
+- **Self-prob bug fix scope.** Prior versions of this figure (commits
+  through `fa5bb0a`) display `0.98` for Continuous and Fragmented self-
+  probabilities. The correction to `0.96` should be flagged in the commit
+  message so reviewers and slide-deck users know to refresh derived
+  materials.
 
 ## Self-Review Notes
 
