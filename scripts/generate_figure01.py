@@ -307,137 +307,6 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
         )
 
 
-def _draw_shared_spike_raster(fig, gs_slot, seed=42):
-    """Draw a shared spike-raster strip above the 3 scenario blocks.
-
-    The strip shows ~7 simulated neurons (ordered by place-field peak)
-    over a normalized time window x ∈ [0, 1]. Three highlighted bins —
-    centered at 0.17, 0.50, 0.83 — sit above the three scenarios:
-
-    - bin₁ (Local wins): spikes from cells whose place fields cover the
-      animal's position (animal at x=0.4 = place-field center).
-    - bin₂ (Non-Local wins): spikes from the same cells with PFs at 0.4,
-      but the animal is now at 0.55 — cells fire "where they shouldn't."
-    - bin₃ (No-Spike wins): empty bin (no spikes).
-
-    Below the spike rows a thin axis shows the animal-position trace
-    (magenta line) so the reader can see what x_animal is during each
-    highlighted bin.
-
-    Parameters
-    ----------
-    fig : matplotlib.figure.Figure
-    gs_slot : SubplotSpec
-        Single slot spanning the 3 scenario columns above.
-    seed : int
-        Random seed for the background-spike pattern (reproducibility).
-
-    Returns
-    -------
-    list of matplotlib.axes.Axes
-        [raster_ax, position_ax]
-    """
-    rng = np.random.default_rng(seed)
-
-    # Raster zone (top ~85%) and animal-position trace (bottom ~15%).
-    gs_inner = gs_slot.subgridspec(
-        2, 1, height_ratios=[0.85, 0.15], hspace=0.05,
-    )
-    raster_ax = fig.add_subplot(gs_inner[0])
-    position_ax = fig.add_subplot(gs_inner[1], sharex=raster_ax)
-
-    n_neurons = 7
-    bin_centers = np.array([0.17, 0.50, 0.83])
-    bin_half_width = 0.04
-    bin_shades = ["#dddddd", "#cccccc", "#bbbbbb"]
-
-    # Highlight bands (behind spike ticks)
-    for center, shade in zip(bin_centers, bin_shades):
-        raster_ax.axvspan(
-            center - bin_half_width, center + bin_half_width,
-            color=shade, alpha=1.0, zorder=0,
-        )
-        position_ax.axvspan(
-            center - bin_half_width, center + bin_half_width,
-            color=shade, alpha=1.0, zorder=0,
-        )
-
-    # Background spikes outside the highlighted bins — gives the raster
-    # texture without contaminating the per-bin story.
-    for i in range(n_neurons):
-        n_bg = rng.integers(2, 6)
-        bg_times = rng.uniform(0.0, 1.0, size=n_bg)
-        bg_times = bg_times[
-            np.all(
-                np.abs(bg_times[:, None] - bin_centers[None, :])
-                > bin_half_width,
-                axis=1,
-            )
-        ]
-        raster_ax.scatter(
-            bg_times, np.full_like(bg_times, i),
-            marker="|", color="black", s=15, linewidths=0.6, zorder=2,
-        )
-
-    # bin₁ (Local wins, animal at 0.4): spikes from middle neurons (PFs
-    # near 0.4) — these are neurons 2 and 3 of the 7.
-    for i in [2, 3]:
-        raster_ax.scatter(
-            [bin_centers[0]], [i],
-            marker="|", color="black", s=15, linewidths=0.8, zorder=3,
-        )
-
-    # bin₂ (Non-Local wins, animal at 0.55): same middle neurons fire,
-    # but the animal is now at 0.55 — cells with PFs at 0.4 firing
-    # while the animal is at 0.55 = "spike in wrong place."
-    for i in [2, 3]:
-        raster_ax.scatter(
-            [bin_centers[1]], [i],
-            marker="|", color="black", s=15, linewidths=0.8, zorder=3,
-        )
-
-    # bin₃ (No-Spike wins): empty — no spikes in this bin.
-
-    raster_ax.set_xlim(0, 1)
-    raster_ax.set_ylim(-0.5, n_neurons + 0.5)
-    raster_ax.set_yticks([0, n_neurons - 1])
-    raster_ax.set_yticklabels(["1", str(n_neurons)])
-    raster_ax.set_ylabel("Neuron", fontsize=6, labelpad=2)
-    raster_ax.tick_params(labelsize=5.5, labelbottom=False)
-    for spine in ["top", "right"]:
-        raster_ax.spines[spine].set_visible(False)
-    raster_ax.spines["left"].set_linewidth(0.5)
-    raster_ax.spines["bottom"].set_visible(False)
-
-    # Bin labels along the top of the raster
-    for i, center in enumerate(bin_centers):
-        raster_ax.text(
-            center, n_neurons + 0.2, f"bin$_{i+1}$",
-            ha="center", va="bottom", fontsize=6, fontweight="bold",
-        )
-
-    # Animal-position trace anchored at the 3 bin centers: 0.4 → 0.55 →
-    # 0.4 (Local-wins pos → Non-Local-wins pos → back).
-    t = np.linspace(0, 1, 200)
-    anim_xs = np.array([0.0, 0.17, 0.50, 0.83, 1.0])
-    anim_ys = np.array([0.4, 0.4, 0.55, 0.4, 0.4])
-    position = np.interp(t, anim_xs, anim_ys)
-
-    position_ax.plot(t, position, color=ANIMAL_POS_COLOR, linewidth=0.8)
-    position_ax.set_xlim(0, 1)
-    position_ax.set_ylim(0.35, 0.60)
-    position_ax.set_xticks([])
-    position_ax.set_yticks([0.4, 0.55])
-    position_ax.set_yticklabels(["0.4", "0.55"], fontsize=5)
-    position_ax.set_ylabel("$x_a$", fontsize=6, labelpad=2)
-    position_ax.tick_params(labelsize=5)
-    for spine in ["top", "right", "bottom"]:
-        position_ax.spines[spine].set_visible(False)
-    position_ax.spines["left"].set_linewidth(0.5)
-
-    return [raster_ax, position_ax]
-
-
 def plot_observation_models(fig, gs_slot):
     """Show how the state likelihoods react under three scenarios.
 
@@ -470,16 +339,10 @@ def plot_observation_models(fig, gs_slot):
     likelihood_center = 0.4
     likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
-    # 2 rows: shared raster on top (spans all 3 columns), three scenario
-    # overlay plots below. The raster shows the spike-train input feeding
-    # the observation model, with 3 highlighted bins aligned vertically
-    # with the 3 scenarios.
-    gs_outer = gs_slot.subgridspec(
-        2, 3, height_ratios=[0.32, 0.68], wspace=0.20, hspace=0.30,
-    )
-
-    # Raster spans the full width
-    _draw_shared_spike_raster(fig, gs_outer[0, :])
+    # One row of three scenario plots. Titles are drawn directly on each
+    # plot via ``set_title`` so they sit close to the data rather than in a
+    # separate title axes above.
+    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.20)
 
     scenarios = [
         # (header, animal_pos, scenario_kind)
@@ -490,7 +353,7 @@ def plot_observation_models(fig, gs_slot):
 
     all_axes = []
     for col, (header, animal_pos, scenario_kind) in enumerate(scenarios):
-        scen_ax = fig.add_subplot(gs_outer[1, col])
+        scen_ax = fig.add_subplot(gs_outer[0, col])
         _draw_scenario_overlay(
             scen_ax, x, likelihood, animal_pos, scenario_kind,
             show_legend=(col == 0),
@@ -756,7 +619,7 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[1.0, 0.55, 1.55],
+        height_ratios=[0.65, 0.55, 1.7],
         hspace=0.20,
     )
 
@@ -765,7 +628,7 @@ def generate_figure(n_neurons=30, seed=42):
     # 2x2 of state cells. width_ratios are tuned so Panel A renders at
     # roughly the same width as one scenario block; aspect+anchor inside
     # plot_state_diagram matches the height too.
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1.4, 2.6])
+    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.6])
 
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
