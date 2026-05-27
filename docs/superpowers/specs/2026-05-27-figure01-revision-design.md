@@ -125,7 +125,7 @@ Restructured into two vertical zones inside the row 0 right-hand slot.
 |----|----|----|
 | **1. Local wins** | spikes from cells whose place fields sit at the animal's position | Local cell shows a tall bump at `x_animal`; other three cells show modest/diffuse curves (current behavior). |
 | **2. Non-Local wins** | spikes from cells whose place fields are far from the animal | Continuous/Fragmented cells show prominent bumps away from the magenta `x_animal` line; Local cell is small (current behavior). |
-| **3. No-Spike wins** | empty bin (no spikes) | No-Spike cell shows its horizontal likelihood line drawn at `y = 0.7`; Local/Continuous/Fragmented cells show small bumps peaking at `y = 0.4`. Phase 1 also adds an `(empty bin)` annotation under the scenario title so the visual rule is self-explaining even before the raster is added in Phase 2. |
+| **3. No-Spike wins** | empty bin (no spikes) | No-Spike cell shows its horizontal likelihood line drawn at `y = 0.7`; Local/Continuous/Fragmented cells show small bumps peaking at `y = 0.4`. |
 
 Each scenario block keeps the existing 2×2 layout (Local + No-Spike on top,
 Continuous + Fragmented on bottom).
@@ -199,8 +199,7 @@ scenario. No shared raster yet — each scenario still stands alone.
 Changes:
 
 - Add a third scenario tuple to `plot_observation_models` for No-Spike wins
-  with header `"No-Spike wins"` and a smaller secondary header
-  `"(empty bin)"` immediately below it.
+  with header `"No-Spike wins"`.
 - Modify `_draw_state_cells` so that when a `no_spike_wins=True` flag is
   passed, the No-Spike cell draws its horizontal line at `y = 0.7` and the
   Local/Continuous/Fragmented cells draw small bumps peaking at `y = 0.4`.
@@ -219,8 +218,7 @@ Verification:
 
 - Figure renders without overflow.
 - Panel (b) shows 3 scenarios; in the No-Spike-wins one, the gray horizontal
-  No-Spike line sits visually above the four state bumps and the
-  `(empty bin)` annotation reads cleanly.
+  No-Spike line sits visually above the four state bumps.
 - Panel (a) circles still align with the bottom of the leftmost scenario
   block.
 - Panel "b" label still attaches to the top-left Local-wins cell.
@@ -299,9 +297,8 @@ Verification:
   over-tall, so this is safe — but if the layout still doesn't fit,
   `fig_height` can grow up to `PAGE_HEIGHT` before being clamped.
 - **Phase 1 standalone rendering.** Phase 1's figure is valid on its own —
-  the 3 scenarios stand without a shared raster, and the `(empty bin)`
-  annotation under the No-Spike-wins title explains the visual rule even
-  without the upstream raster context.
+  the 3 scenarios stand without a shared raster, just as the current 2
+  scenarios do.
 - **Self-loop / cross-arrow collision.** Routing self-loops to the outward
   corner of each circle (NW/NE/SW/SE) keeps them in the figure margin where
   no cross-arrows live. The diagonal cross-arrows (Local↔Fragmented and
