@@ -49,12 +49,16 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.replay._helpers import (
-    hash_event_id,
-    validate_event_ids,
-)
 
 from .event_detection import classify_swr_overlap_geometry
+
+# NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
+# ``analysis/replay/_helpers``. Importing them at module load would close a
+# cycle — ``replay/__init__`` eagerly imports ``replay.tables``, which
+# imports this module — so they are imported lazily inside
+# :func:`build_classified_nonlocal_event_table` instead. The natural
+# dependency direction (replay builds on hippocampus) stays at module
+# scope; only this upward reference is deferred to call time.
 
 _SESSION_COLS = ["animal", "day", "epoch"]
 
@@ -184,8 +188,9 @@ def _match_swr(
         # matching SWR is a classifier/matcher divergence (boundary
         # convention drift, NaN bounds, or mutated event times), not a
         # data condition. Fail loudly rather than emit a row that is
-        # is_swr=True with NaN matched-SWR columns.
-        raise AssertionError(
+        # is_swr=True with NaN matched-SWR columns. RuntimeError (not
+        # AssertionError) so the guard survives ``python -O``.
+        raise RuntimeError(
             f"event [{event_start}, {event_end}] classified {overlap_class!r} "
             f"but no SWR satisfies the matcher's overlap predicate — "
             f"classify_swr_overlap_geometry and _match_swr have diverged."
@@ -239,6 +244,11 @@ def build_classified_nonlocal_event_table(
     ``event_duration`` are in seconds; the four ``*_speed`` columns are in
     cm/s.
     """
+    from continuum_swr_replay.analysis.replay._helpers import (
+        hash_event_id,
+        validate_event_ids,
+    )
+
     missing = [c for c in _REQUIRED_DOT_COLUMNS if c not in dot.columns]
     if missing:
         raise KeyError(

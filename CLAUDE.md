@@ -167,6 +167,25 @@ When modifying data loading, respect the DataJoint query patterns and restrictio
 
 Spike times are organized as lists of arrays: `spike_times[brain_area][sort_group_index]`
 
+### Canonical per-event classification table
+
+The single source of truth for a non-local event's timing and its
+SWR-overlap classification is
+`analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`.
+It produces one row per non-local event over the *full* event-label
+window (no immobility/probability filter), deriving full-window timing,
+per-event speed summaries, peak non-local probability, the 3-way
+`overlap_class` (and 6-way `overlap_subclass`), and the matched SWR. SWR
+intervals are always taken from the `SWR_event` timebin labels; event-level
+`is_swr` means strict positive-duration overlap, not the old inclusive
+`any SWR_event > 0`. (The stop-level `is_swr_stop` flag in
+`build_stop_table` deliberately still uses the inclusive per-timebin rule —
+the two flags do not share a convention.) The replay-content
+`build_event_table` in `analysis/replay/tables.py` builds on top of this:
+it keeps its legacy filtered-survivor-window columns bit-identical and
+merges the classified columns in on `event_id`, carrying the full
+label-window boundary additively as `label_event_*`.
+
 ### Spatial Variables
 
 Position is tracked in multiple coordinate systems:

@@ -24,16 +24,28 @@ rename's grep-zero rule:
 
 - ``SWR_event`` and ``MUA_event`` — integer event-label columns
   written into ``data_over_time.pkl`` by the decoder. They carry
-  more information than the booleans derived from them (``is_swr`` =
-  ``SWR_event > 0``; same for MUA) and are consumed by
-  ``quality_metrics`` / ``event_analysis`` via groupby-by-ripple
-  aggregation. Renaming would force a decoder re-run across all
-  session pickles.
+  more information than the booleans derived from them (``is_mua`` =
+  any ``MUA_event > 0`` within the event; ``SWR_event`` likewise feeds
+  the classified table's strict-overlap ``is_swr`` — see below) and are
+  consumed by ``quality_metrics`` / ``event_analysis`` via
+  groupby-by-ripple aggregation. Renaming would force a decoder re-run
+  across all session pickles.
 - ``last_rewarded_well`` — the intermediate column written by
   ``_add_trial_context``. Kept in symmetry with the canonical
   output scalar ``last_rewarded_arm`` so the well↔arm pairing
   (``prev_well``/``prev_arm``, ``current_well``/``current_arm``,
   etc.) reads consistently.
+
+``is_swr`` is no longer the inclusive ``any SWR_event > 0 within event``
+rule. It now means strict positive-duration overlap with any SWR, taken
+together with the full ``overlap_class`` / ``overlap_subclass`` /
+``matched_swr_*`` / ``label_event_*`` / per-event speed / peak-probability
+columns from the canonical classified event table in
+:mod:`continuum_swr_replay.analysis.hippocampus.event_table`. The legacy
+``event_start`` / ``event_end`` / ``event_duration`` /
+``event_midpoint_time`` columns remain the immobile-high-prob filtered
+survivor window; the full label-window boundary is carried additively as
+``label_event_*``.
 """
 
 from __future__ import annotations
@@ -45,6 +57,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.event_table import (
+    build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
@@ -181,6 +196,29 @@ def build_event_table(
     (``dot``) plus the session's ``env`` / ``trials`` / ``track_graph``
     and emits the event-level slice of the plan's canonical schema.
 
+    The table is composed from two passes over ``dot``:
+
+    - **Legacy aggregates** (timing, arms, patches, context flags, content
+      and posterior summaries, ``stop_id``) are computed over the filtered
+      sub-window — rows where the event label is set, the animal is
+      immobile, and the smoothed non-local posterior clears the threshold
+      (``_in_event_mask``). These columns, including ``event_start`` /
+      ``event_end`` / ``event_duration`` / ``event_midpoint_time``, are the
+      filtered-survivor window and are unchanged from prior versions.
+    - **SWR classification and additive full-window summaries** come from
+      :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
+      computed over the *full* event-label window (no immobility / prob
+      filter), and merged in on ``event_id``: ``is_swr`` (strict
+      positive-duration SWR overlap), ``overlap_class`` /
+      ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``,
+      the per-event speed summaries, ``peak_nonlocal_prob``, and the full
+      label-window boundary as ``label_event_*``.
+
+    The replay population is unchanged: an event appears here iff at least
+    one of its timebins survived ``_in_event_mask`` (the filtered subset is
+    a strict subset of the full label window, so every retained event has a
+    classified row).
+
     ``conditional_posterior`` is optional. When supplied (e.g., from
     :func:`posterior_io.load_conditional_posterior`), six additional
     columns are populated: ``posterior_mass_total``,
@@ -188,11 +226,10 @@ def build_event_table(
     ``posterior_hpd_width_{50,80,95}``. When not supplied those columns
     are ``NaN`` so the schema is stable across call sites.
 
-    Still deferred to later chunks (intentionally absent from the
-    current output): ``stop_id`` and the stop-level ``immobility_time``
-    aggregation (chunk 3, ``build_stop_table``); ``block_number`` and
-    ``trials_since_block_change`` (requires a contingency-block loader
-    not yet wired).
+    Intentionally absent from the current output: the stop-level
+    ``immobility_time`` aggregation (``build_stop_table``);
+    ``block_number`` and ``trials_since_block_change`` (requires a
+    contingency-block loader not yet wired).
 
     Parameters
     ----------
@@ -227,9 +264,12 @@ def build_event_table(
     -------
     Identifiers
         ``animal``, ``day``, ``epoch``, ``non_local_event``, ``event_id``
-    Timing
+    Timing (filtered survivor window)
         ``event_start``, ``event_end``, ``event_duration``,
         ``time_since_stop``
+    Timing (full label window, additive)
+        ``label_event_start``, ``label_event_end``,
+        ``label_event_duration``, ``label_event_midpoint_time``
     Arms (scalar per event)
         ``current_arm``, ``prev_arm``, ``next_arm`` (post-hoc),
         ``last_rewarded_arm``
@@ -239,8 +279,17 @@ def build_event_table(
         ``is_after_switch``, ``is_after_reward``, ``is_after_omission``,
         ``is_after_stay``, ``reward_outcome``
     Event-type
-        ``is_swr`` (any ``SWR_event > 0`` within event),
+        ``is_swr`` (strict positive-duration SWR overlap; see
+        :mod:`continuum_swr_replay.analysis.hippocampus.event_table`),
         ``is_mua`` (any ``MUA_event > 0`` within event)
+    SWR overlap (from the classified table)
+        ``overlap_class``, ``overlap_subclass``, ``n_swrs_overlapping``,
+        ``matched_swr_event``, ``matched_swr_start``, ``matched_swr_end``
+    Per-event speed / peak (full label window)
+        ``max_speed``, ``mean_speed``, ``start_speed``, ``end_speed``,
+        ``endpoints_speed_below_thresh``, ``peak_nonlocal_prob``
+    Stop linkage
+        ``stop_idx``, ``stop_id``
     Content summaries
         ``n_nonlocal_bins``, ``nonlocal_weight_sum``,
         ``n_junction_bins``, ``n_unique_arms``
@@ -371,7 +420,6 @@ def build_event_table(
                 "event_start": float(times[0]),
                 "event_end": float(times[-1]),
                 "event_duration": float(times[-1] - times[0]),
-                "is_swr": bool((g["SWR_event"] > 0).any()),
                 "is_mua": bool((g["MUA_event"] > 0).any())
                 if "MUA_event" in g.columns
                 else False,
@@ -495,6 +543,69 @@ def build_event_table(
         )
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
+
+    # --- 9. Attach SWR classification + additive full-window summaries ---
+    # The groupby in section 4 above produced the legacy
+    # filtered-survivor-window columns (timing + aggregates) unchanged.
+    # build_classified_nonlocal_event_table is the canonical classified
+    # table, computed over the *full* event-label window (no immobility /
+    # probability filter). Merge the two on ``event_id``: left-join from
+    # the filtered legacy population (sort=False preserves its row order
+    # and count) so the replay table keeps its existing ``event_id`` set,
+    # row count, and order. The filtered population is a strict subset of
+    # the full label window, so every legacy event must have a classified
+    # row — assert it.
+    classified = build_classified_nonlocal_event_table(
+        dot, speed_threshold=speed_threshold
+    )
+    classified = classified.rename(
+        columns={
+            "event_start": "label_event_start",
+            "event_end": "label_event_end",
+            "event_duration": "label_event_duration",
+            "event_midpoint_time": "label_event_midpoint_time",
+        }
+    )
+    classified_cols = [
+        "event_id",
+        "label_event_start",
+        "label_event_end",
+        "label_event_duration",
+        "label_event_midpoint_time",
+        "max_speed",
+        "mean_speed",
+        "start_speed",
+        "end_speed",
+        "endpoints_speed_below_thresh",
+        "peak_nonlocal_prob",
+        "is_swr",
+        "overlap_class",
+        "overlap_subclass",
+        "n_swrs_overlapping",
+        "matched_swr_event",
+        "matched_swr_start",
+        "matched_swr_end",
+    ]
+    per_event = per_event.merge(
+        classified[classified_cols],
+        on="event_id",
+        how="left",
+        sort=False,
+        validate="one_to_one",
+    )
+    # ``is_swr`` is a non-nullable bool in the classified table, so a NaN
+    # here can only mean an unmatched left key (a legacy event with no
+    # classified row). Correct *matching* relies on both passes hashing
+    # the same (animal, day, epoch, non_local_event) tuple via
+    # ``hash_event_id`` — this guard catches unmatched rows, not a
+    # hypothetical mismatch from changing the key in only one pass.
+    n_unclassified = int(per_event["is_swr"].isna().sum())
+    if n_unclassified > 0:
+        raise RuntimeError(
+            f"{n_unclassified}/{len(per_event)} replay events have no row in "
+            "the classified event table; the filtered replay population must "
+            "be a subset of the full event-label window."
+        )
 
     return per_event[column_order]
 
@@ -1272,6 +1383,27 @@ def _event_table_columns() -> list[str]:
         "n_unique_arms",
         "stop_idx",
         "stop_id",
+        # Additive full-window timing + SWR classification from
+        # build_classified_nonlocal_event_table (full label window).
+        # Legacy event_start/end/duration/midpoint above remain the
+        # filtered survivor-window values; these label_event_* carry the
+        # full event-label boundary.
+        "label_event_start",
+        "label_event_end",
+        "label_event_duration",
+        "label_event_midpoint_time",
+        "max_speed",
+        "mean_speed",
+        "start_speed",
+        "end_speed",
+        "endpoints_speed_below_thresh",
+        "peak_nonlocal_prob",
+        "overlap_class",
+        "overlap_subclass",
+        "n_swrs_overlapping",
+        "matched_swr_event",
+        "matched_swr_start",
+        "matched_swr_end",
     ]
 
 
