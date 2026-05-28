@@ -276,6 +276,13 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
 
     ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                linestyle="--")
+    # Label the animal-position line just above the x-axis, to the right
+    # of the line so it doesn't obscure the curves at the line's x.
+    ax.text(
+        animal_pos + 0.03, 0.02, r"$x_{\mathrm{animal}}$",
+        color=ANIMAL_POS_COLOR, fontsize=6,
+        ha="left", va="bottom",
+    )
 
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.05, 1.25)
