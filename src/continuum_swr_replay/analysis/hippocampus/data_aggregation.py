@@ -124,6 +124,7 @@ from .event_detection import (
     get_confident_times,
     get_overlap_times,
 )
+from .event_table import intervals_from_labels as _intervals_from_labels
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
 
 
@@ -607,20 +608,6 @@ def compute_swr_overlap_class_counts(
             counts[cls] += int(session_counts.get(cls, 0))
 
     return {**counts, "total": sum(counts.values())}
-
-
-def _intervals_from_labels(session_df: pd.DataFrame, label_col: str) -> pd.DataFrame:
-    """Per-label (start_time, end_time) table from a timebin-labeled frame.
-
-    Expects a ``time`` column; positive values in ``label_col`` mark
-    timebins belonging to distinct events, with 0 treated as background.
-    """
-    return (
-        session_df.loc[session_df[label_col] > 0]
-        .groupby(label_col)["time"]
-        .agg(start_time="min", end_time="max")
-        .reset_index(drop=True)
-    )
 
 
 def compute_swr_nl_event_counts(

@@ -90,6 +90,9 @@ _LAZY_EXPORTS = {
     "get_confident_times": "event_detection",
     "get_overlap_times": "event_detection",
     "select_typical_event_by_class": "event_detection",
+    # event_table — canonical per-non-local-event classification table.
+    "build_classified_nonlocal_event_table": "event_table",
+    "intervals_from_labels": "event_table",
     # hpc_raw_stats.
     "DISCRETE_STATE_ORDER": "hpc_raw_stats",
     "RAW_STAT_COLUMNS": "hpc_raw_stats",
@@ -155,6 +158,10 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         get_confident_times,
         get_overlap_times,
         select_typical_event_by_class,
+    )
+    from .event_table import (  # noqa: F401
+        build_classified_nonlocal_event_table,
+        intervals_from_labels,
     )
     from .hpc_raw_stats import (  # noqa: F401
         DISCRETE_STATE_ORDER,
