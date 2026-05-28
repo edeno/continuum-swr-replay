@@ -269,7 +269,10 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     ax.plot(x, local_curve, color=local_color, linewidth=1.0)
     ax.fill_between(x, local_curve, alpha=0.40, color=local_color)
 
-    ax.axhline(nospike_y, color=nospike_color, linewidth=1.2)
+    # Dashed to signal that No-Spike is a scalar likelihood (no position
+    # dependence), unlike the Local/Non-Local curves which are functions
+    # of x. Different orientation and color from the magenta animal line.
+    ax.axhline(nospike_y, color=nospike_color, linewidth=1.2, linestyle="--")
 
     ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                linestyle="--")
