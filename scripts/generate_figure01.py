@@ -180,8 +180,7 @@ def plot_state_diagram(ax):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
-                           show_legend=False):
+def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     """Draw all three state likelihoods overlaid on one axes.
 
     Parameters
@@ -197,9 +196,8 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
         sits and where the magenta dashed line is drawn.
     scenario_kind : {"local", "nonlocal", "nospike"}
         Determines the relative heights of the three curves so the
-        "winning" state's curve is visibly tallest.
-    show_legend : bool
-        Adds a small legend (typically only on the first scenario).
+        "winning" state's curve is visibly tallest. Also drives the
+        per-scenario placement of in-plot curve labels.
 
     Notes
     -----
@@ -210,6 +208,10 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
     - Local: blue, bump = λ(x)·N(x_animal, σ_L).
     - Non-Local: orange, bump = λ(x), broader than Local.
     - No-Spike: gray horizontal line at the No-Spike likelihood value.
+
+    Each curve is labeled in-plot with colored text (no legend, no
+    leader arrows), placed at scenario-specific positions that sit
+    inside whitespace and clearly identify the curve.
     """
     local_color = STATE_COLORS_SHORT[0]    # blue
     nospike_color = STATE_COLORS_SHORT[1]  # gray
@@ -262,29 +264,18 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
         linewidth=0.0,
         alpha=0.45,
     )
-    ax.plot(x, nonlocal_curve, color=nonlocal_continuous_color,
-            linewidth=1.0)
-    # Legend handle for Non-Local: a striped patch with the same hatch.
-    nonlocal_legend_handle = mpatches.Patch(
-        facecolor=nonlocal_continuous_color,
-        edgecolor=nonlocal_fragmented_color,
-        hatch="///",
-        linewidth=0.0,
-        alpha=0.7,
-        label="Non-Local",
-    )
+    ax.plot(x, nonlocal_curve, color=nonlocal_continuous_color, linewidth=1.0)
 
-    ax.plot(x, local_curve, color=local_color, linewidth=1.0, label="Local")
+    ax.plot(x, local_curve, color=local_color, linewidth=1.0)
     ax.fill_between(x, local_curve, alpha=0.40, color=local_color)
 
-    ax.axhline(nospike_y, color=nospike_color, linewidth=1.2,
-               label="No-Spike")
+    ax.axhline(nospike_y, color=nospike_color, linewidth=1.2)
 
     ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                linestyle="--")
 
     ax.set_xlim(0, 1)
-    ax.set_ylim(-0.05, 1.20)
+    ax.set_ylim(-0.05, 1.25)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ["top", "right", "left"]:
@@ -292,18 +283,30 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind,
     ax.spines["bottom"].set_linewidth(0.5)
     ax.set_xlabel("position", fontsize=6, labelpad=3)
 
-    if show_legend:
-        # Build legend manually so the Non-Local entry shows the striped
-        # patch handle. matplotlib's auto-collected handles include the
-        # Local plot line and the No-Spike axhline; combine them with the
-        # explicit Non-Local patch.
-        handles, labels = ax.get_legend_handles_labels()
-        handles = [nonlocal_legend_handle, *handles]
-        labels = ["Non-Local", *labels]
-        ax.legend(
-            handles, labels,
-            fontsize=5.5, loc="upper right", frameon=False,
-            handlelength=1.2, borderpad=0.2, labelspacing=0.3,
+    # In-plot labels, one per curve, color-coded. Positions per scenario
+    # are chosen to land in whitespace next to the relevant curve, avoiding
+    # overlap with other curves or the animal-position dashed line.
+    label_specs = {
+        "local": [
+            ("Local",     0.40, 1.12, "center", local_color),
+            ("Non-Local", 0.72, 0.55, "left",   nonlocal_continuous_color),
+            ("No-Spike",  0.97, 0.18, "right",  nospike_color),
+        ],
+        "nonlocal": [
+            ("Non-Local", 0.40, 1.12, "center", nonlocal_continuous_color),
+            ("Local",     0.72, 0.42, "left",   local_color),
+            ("No-Spike",  0.97, 0.18, "right",  nospike_color),
+        ],
+        "nospike": [
+            ("No-Spike",  0.97, 0.78, "right",  nospike_color),
+            ("Non-Local", 0.72, 0.30, "left",   nonlocal_continuous_color),
+            ("Local",     0.40, 0.50, "center", local_color),
+        ],
+    }
+    for name, lx, ly, ha, color in label_specs[scenario_kind]:
+        ax.text(
+            lx, ly, name, color=color, fontsize=6.5, fontweight="bold",
+            ha=ha, va="center",
         )
 
 
@@ -356,7 +359,6 @@ def plot_observation_models(fig, gs_slot):
         scen_ax = fig.add_subplot(gs_outer[0, col])
         _draw_scenario_overlay(
             scen_ax, x, likelihood, animal_pos, scenario_kind,
-            show_legend=(col == 0),
         )
         scen_ax.set_title(header, fontsize=7, fontweight="bold", pad=2)
         all_axes.append(scen_ax)
