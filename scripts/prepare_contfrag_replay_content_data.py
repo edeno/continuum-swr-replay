@@ -9,16 +9,26 @@ from Spyglass, and calls the ContFrag table builders.
 Events are defined externally (SWR or MUA times), not by model-detected
 probability thresholding.
 
-Outputs (under ``PROCESSED_DATA_DIR/contfrag_replay_content/``):
+Outputs (under ``PROCESSED_DATA_DIR/contfrag_replay_content/``), with
+``{source}`` lowercase (``swr`` / ``mua``) and ``{brain_area}`` mirroring
+the case used at decode time (``HPC`` / ``mPFC`` / ``OFC``):
 
-- ``event_table_{source}.pkl`` — one row per SWR (or MUA) event
-- ``event_arm_table_{source}.pkl`` — one row per (event, arm)
-- ``stop_table_{source}.pkl`` — one row per immobility bout (incl. zero-event)
+- ``event_table_{source}_{brain_area}.pkl`` — one row per SWR (or MUA) event
+- ``event_arm_table_{source}_{brain_area}.pkl`` — one row per (event, arm)
+- ``event_patch_table_{source}_{brain_area}.pkl`` — one row per (event, patch),
+  collapsed from the event-arm table for the patch-level hierarchy
+- ``stop_table_{source}_{brain_area}.pkl`` — one row per immobility bout
+  (incl. zero-event)
+
+Each row also carries a ``brain_area`` column so cross-area concatenation
+remains traceable. ``fit_replay_content_models.py`` accepts a matching
+``--brain-area`` flag and resolves these per-area filenames.
 
 Usage::
 
-    uv run python scripts/prepare_contfrag_replay_content_data.py                    # SWR events
-    uv run python scripts/prepare_contfrag_replay_content_data.py --event-source MUA # MUA events
+    uv run python scripts/prepare_contfrag_replay_content_data.py                    # SWR / HPC
+    uv run python scripts/prepare_contfrag_replay_content_data.py --event-source MUA # MUA / HPC
+    uv run python scripts/prepare_contfrag_replay_content_data.py --brain-area mPFC  # SWR / mPFC
     uv run python scripts/prepare_contfrag_replay_content_data.py --test             # 2 per animal
 """
 
@@ -40,6 +50,7 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -51,11 +62,43 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+
+def contfrag_table_basenames(
+    event_source: str, brain_area: str
+) -> dict[str, str]:
+    """Return the canonical ContFrag table basenames for one (source, area).
+
+    The fitter resolves its inputs through the matching helper
+    ``resolve_contfrag_paths`` in ``fit_replay_content_models.py``;
+    keeping the format string in one place lets a unit test pin the
+    prep ↔ fitter contract.
+    """
+    src = event_source.lower()
+    return {
+        "event_table": f"event_table_{src}_{brain_area}",
+        "event_arm_table": f"event_arm_table_{src}_{brain_area}",
+        "event_patch_table": f"event_patch_table_{src}_{brain_area}",
+        "stop_table": f"stop_table_{src}_{brain_area}",
+    }
+
 OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
 
 
-def find_sessions(max_per_animal: int | None = None):
-    """Yield sessions that have ContFrag ``data_over_time.pkl`` and ``environment.pkl``."""
+def find_sessions(
+    max_per_animal: int | None = None,
+    brain_area: str | None = None,
+):
+    """Yield sessions that have ContFrag ``data_over_time.pkl`` and ``environment.pkl``.
+
+    When ``brain_area`` is provided, only sessions for that area are
+    returned. Without filtering, the prep script would silently merge
+    HPC + mPFC + OFC sessions into a single combined output even
+    though ``run_decoding_contfrag.py`` writes per-area files; the
+    saved tables would also collide on event_id / stop_id because
+    the canonical hashes do not include brain_area
+    (see ``analysis.replay._helpers.hash_event_id`` /
+    ``hash_stop_id``).
+    """
     dot_files = sorted(PROCESSED_DATA_DIR.glob("*_contfrag_data_over_time.pkl"))
     env_files = {
         f.stem.replace("_environment", ""): f
@@ -69,9 +112,18 @@ def find_sessions(max_per_animal: int | None = None):
         )
         if not match:
             continue
-        animal_date, epoch, brain_area = match.group(1), match.group(2), match.group(3)
-        animal = re.match(r"([a-z]+)", animal_date).group(1)
-        session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
+        animal_date, epoch, file_brain_area = (
+            match.group(1),
+            match.group(2),
+            match.group(3),
+        )
+        if brain_area is not None and file_brain_area != brain_area:
+            continue
+        # animal_date is captured as ``\w+\d{8}`` so the animal id is
+        # everything before the trailing 8-digit date. ``re.match(r"[a-z]+", ...)``
+        # would collapse digit-bearing ids (``j162021...`` → ``j``).
+        animal = animal_date[:-8]
+        session_id = f"{animal_date}_{epoch}_{file_brain_area}_contfrag"
         if session_id not in env_files:
             continue
 
@@ -85,6 +137,7 @@ def find_sessions(max_per_animal: int | None = None):
             {
                 "nwb_file_name": nwb_match[0],
                 "epoch_name": epoch,
+                "brain_area": file_brain_area,
                 "dot_file": f,
                 "env_file": env_files[session_id],
                 "results_file": results_path if results_path.exists() else None,
@@ -117,6 +170,7 @@ def _process_session(
     """Run ContFrag table builders on one session."""
     nwb = session["nwb_file_name"]
     epoch = session["epoch_name"]
+    brain_area = session["brain_area"]
 
     dot = pd.read_pickle(session["dot_file"])
     with open(session["env_file"], "rb") as f:
@@ -135,16 +189,28 @@ def _process_session(
         except Exception as e:  # noqa: BLE001
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
 
+    # Build the stop table first so zero-event sessions still
+    # contribute their immobility bouts. Returning early on an empty
+    # event_table dropped those sessions, contradicting the
+    # ``stop_table_{source}_{brain_area}.pkl`` contract that
+    # documents zero-event bouts as part of the canonical output.
+    stop_table = build_contfrag_stop_table(
+        dot,
+        trials,
+        track_graph,
+        event_source=event_source,
+        brain_area=brain_area,
+    )
+
     event_table = build_contfrag_event_table(
         dot,
         env,
         trials,
         track_graph,
         event_source=event_source,
+        brain_area=brain_area,
         conditional_posterior=posterior,
     )
-    if len(event_table) == 0:
-        return None
 
     event_arm_table = build_contfrag_event_arm_table(
         event_table,
@@ -153,15 +219,15 @@ def _process_session(
         trials,
         track_graph,
         event_source=event_source,
+        brain_area=brain_area,
         conditional_posterior=posterior,
     )
 
-    stop_table = build_contfrag_stop_table(
-        dot,
-        trials,
-        track_graph,
-        event_source=event_source,
-    )
+    # Stamp brain_area onto every output row. The canonical event_id /
+    # stop_id hashes already incorporate brain_area + event_source so
+    # joins across brain areas would otherwise collide silently.
+    for tbl in (event_table, event_arm_table, stop_table):
+        tbl["brain_area"] = brain_area
 
     return {
         "event_table": event_table,
@@ -184,13 +250,30 @@ def main():
         choices=["SWR", "MUA"],
         help="External event detector for event boundaries",
     )
+    parser.add_argument(
+        "--brain-area",
+        type=str,
+        default="HPC",
+        choices=["HPC", "mPFC", "OFC"],
+        help=(
+            "Restrict prep to one brain area. Without this filter, the "
+            "script would silently merge per-area outputs even though "
+            "event_id / stop_id hashes do not encode brain_area, which "
+            "would corrupt downstream joins."
+        ),
+    )
     args = parser.parse_args()
 
     max_per_animal = 2 if args.test else args.max_per_animal
-    sessions = find_sessions(max_per_animal=max_per_animal)
+    sessions = find_sessions(
+        max_per_animal=max_per_animal, brain_area=args.brain_area
+    )
     event_source = args.event_source
     logging.info(
-        "Found %d sessions, event_source=%s", len(sessions), event_source
+        "Found %d %s sessions, event_source=%s",
+        len(sessions),
+        args.brain_area,
+        event_source,
     )
 
     t0 = time.time()
@@ -258,12 +341,31 @@ def main():
         len(event_table_all),
     )
 
-    source_lower = event_source.lower()
+    # Collapse to the event-patch table for the patch-level hierarchy.
+    # Built from the concatenated frames so event_id is globally unique
+    # (the ContFrag hash already folds in brain_area + event_source),
+    # which build_event_patch_table requires. brain_area is re-stamped
+    # because the helper only carries the animal/day/epoch session keys.
+    event_patch_table_all = build_event_patch_table(
+        event_table_all, event_arm_table_all
+    )
+    event_patch_table_all["brain_area"] = args.brain_area
+    logging.info(
+        "event_patch rows: %d (= 3 × %d events)",
+        len(event_patch_table_all),
+        event_table_all.groupby(session_cols)["event_id"].nunique().sum(),
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Per-brain-area filenames so HPC and mPFC prep runs don't
+    # overwrite each other. The basename helper is exposed so the
+    # fitter contract can be unit-tested against this exact format.
+    basenames = contfrag_table_basenames(event_source, args.brain_area)
     for name, frame in (
-        (f"event_table_{source_lower}", event_table_all),
-        (f"event_arm_table_{source_lower}", event_arm_table_all),
-        (f"stop_table_{source_lower}", stop_table_all),
+        (basenames["event_table"], event_table_all),
+        (basenames["event_arm_table"], event_arm_table_all),
+        (basenames["event_patch_table"], event_patch_table_all),
+        (basenames["stop_table"], stop_table_all),
     ):
         path = OUTPUT_DIR / f"{name}.pkl"
         frame.to_pickle(path)

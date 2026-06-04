@@ -69,7 +69,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from spyglass.common import DIOEvents
 
 from ..types import DIOEventData
 
@@ -140,6 +139,12 @@ def _load_dio_event_type(
     convert_dio_events_to_start_stop_times : Converts raw events to intervals
 
     """
+    # Lazy import: Spyglass requires DataJoint connection / VPN at
+    # import time. Keeping this inside the function lets pure helpers
+    # like ``convert_dio_events_to_start_stop_times`` import cleanly
+    # offline.
+    from spyglass.common import DIOEvents
+
     events = {
         nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
         .set_index(pd.Index(nwb_file["dio"].timestamps, name="time"))
@@ -150,6 +155,22 @@ def _load_dio_event_type(
             & f'dio_event_name LIKE "{pattern}"'
         ).fetch_nwb()
     }
+    # Short-circuit when no rows match the LIKE pattern: a session
+    # without any ``Light%`` (or ``Pump%`` / ``Poke%``) events would
+    # otherwise raise ``ValueError: No objects to concatenate`` from
+    # ``pd.concat([])`` and fail the entire ``load_dios`` call. Return
+    # a schema-complete empty frame so downstream consumers see "no
+    # events of this type" rather than a crash.
+    if not events:
+        return pd.DataFrame(
+            columns=["start_time", "end_time"],
+            index=pd.MultiIndex.from_arrays(
+                [
+                    pd.Index([], dtype=str, name="event_name"),
+                    pd.Index([], dtype=int, name="event_number"),
+                ]
+            ),
+        )
     return pd.concat(
         [
             convert_dio_events_to_start_stop_times(event, event_name)

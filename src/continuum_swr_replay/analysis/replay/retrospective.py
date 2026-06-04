@@ -47,6 +47,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
 
+from ._helpers import strict_sum
 from .shuffles import next_arm_circular_shift
 
 __all__ = [
@@ -79,6 +80,16 @@ _PATCH_TO_TRUNK_ARM: dict[int, int] = {1: 6, 2: 7, 3: 8}
 
 # Wells are arms 0–5 (degree-1 leaves of the track graph).
 _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
+
+
+def _session_keys(df: pd.DataFrame) -> list[str]:
+    """Session-key columns present in ``df``."""
+    return [c for c in ("animal", "day", "epoch") if c in df.columns]
+
+
+def _empty_metric_frame(df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
+    """Empty metric frame preserving available session keys."""
+    return pd.DataFrame(columns=[*_session_keys(df), "event_id", metric_col])
 
 
 def arm_path_well_to_well(current_arm: int, next_arm: int) -> set[int]:
@@ -143,7 +154,7 @@ def chosen_arm_fraction(
         present in ``event_table``.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "chosen_arm_fraction"])
+        return _empty_metric_frame(event_table, "chosen_arm_fraction")
     ev = event_table.dropna(subset=["next_arm"]).copy()
     ev["next_arm"] = ev["next_arm"].astype(int)
 
@@ -172,7 +183,12 @@ def ends_at_next(
 
     The "last" bin is identified by the maximum ``t_in_event`` per
     event. Events with NaN ``next_arm`` are dropped (no choice to
-    align to).
+    align to). Events with no in-event sequence row (the merge fills
+    NaN ``_last_arm``) — and bins whose final ``decoded_arm_map`` is
+    itself NaN (junction-bin artifact) — are recorded as ``False``,
+    not propagated as missing, so downstream
+    ``_per_session_metric_means``'s ``np.nanmean`` reduction counts
+    them in the denominator.
 
     Returns
     -------
@@ -181,7 +197,7 @@ def ends_at_next(
         columns are passed through if present.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "ends_at_next"])
+        return _empty_metric_frame(event_table, "ends_at_next")
     ev = event_table.dropna(subset=["next_arm"]).copy()
     ev["next_arm"] = ev["next_arm"].astype(int)
 
@@ -198,9 +214,15 @@ def ends_at_next(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["ends_at_next"] = merged["_last_arm"].astype("Int64") == merged[
-        "next_arm"
-    ].astype("Int64")
+    # Match the arm-level contract to ``ends_at_next_patch``: an
+    # event with valid ``next_arm`` but no decoded sequence row (or
+    # whose final ``decoded_arm_map`` is NaN, e.g. junction-bin
+    # artifact) records as ``False`` rather than ``pd.NA``. Without
+    # this fillna the nullable equality leaks ``<NA>`` →
+    # ``np.nanmean`` drops the row from the denominator in
+    # ``_per_session_metric_means``, inflating the per-session mean.
+    eq = merged["_last_arm"].astype("Int64") == merged["next_arm"].astype("Int64")
+    out["ends_at_next"] = eq.fillna(False).astype(bool)
     return out
 
 
@@ -223,7 +245,7 @@ def contains_path_to_next(
         Session-key columns are passed through if present.
     """
     if event_table.empty:
-        return pd.DataFrame(columns=["event_id", "contains_path_to_next"])
+        return _empty_metric_frame(event_table, "contains_path_to_next")
     ev = event_table.dropna(subset=["current_arm", "next_arm"]).copy()
     ev["current_arm"] = ev["current_arm"].astype(int)
     ev["next_arm"] = ev["next_arm"].astype(int)
@@ -231,13 +253,28 @@ def contains_path_to_next(
     sess_keys = [
         c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
     ]
-    arm_sets = (
-        event_sequence_table.groupby([*sess_keys, "event_id"], as_index=False)[
-            "decoded_arm_map"
-        ]
-        .agg(lambda s: frozenset(int(x) for x in s.dropna().unique()))
-        .rename(columns={"decoded_arm_map": "_decoded_arm_set"})
-    )
+    # Empty ``event_sequence_table`` is a legitimate Stage 5B input
+    # (sessions can have events but no in-event timebins yet, e.g.
+    # before posterior reconstruction lands). The previous chained
+    # ``Series.groupby(...).agg(...).rename(columns=...)`` produced
+    # a Series for an empty input, and ``Series.rename`` rejects the
+    # ``columns=`` kwarg with TypeError — which the runner script
+    # then swallows under a broad except, silently dropping the whole
+    # session from Stage 5B. Use named aggregation so the result is
+    # always a DataFrame, even when empty.
+    if event_sequence_table.empty:
+        arm_sets = pd.DataFrame(
+            columns=[*sess_keys, "event_id", "_decoded_arm_set"]
+        )
+    else:
+        arm_sets = event_sequence_table.groupby(
+            [*sess_keys, "event_id"], as_index=False
+        ).agg(
+            _decoded_arm_set=(
+                "decoded_arm_map",
+                lambda s: frozenset(int(x) for x in s.dropna().unique()),
+            )
+        )
 
     merged = ev.merge(arm_sets, on=[*sess_keys, "event_id"], how="left")
     contains = np.array(
@@ -286,7 +323,7 @@ def chosen_patch_fraction(
         columns passed through.
     """
     if event_table.empty or "next_patch" not in event_table.columns:
-        return pd.DataFrame(columns=["event_id", "chosen_patch_fraction"])
+        return _empty_metric_frame(event_table, "chosen_patch_fraction")
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
@@ -297,14 +334,45 @@ def chosen_patch_fraction(
 
     merged = ev.merge(ea, on=[*sess_keys, "event_id"], how="left")
     in_target_patch = merged["arm_patch"] == merged["next_patch"]
-    merged["_mass"] = merged["arm_fraction"].astype(float).where(in_target_patch, 0.0)
-
     grp_cols = [*sess_keys, "event_id"]
+    # Sum arm_fraction over target-patch arms only. Two failure
+    # modes the previous form fabricated 0.0 for:
+    #   1. event_arm_table contains the event's arms but the
+    #      target-patch arm_fractions are all NaN — handled by
+    #      ``skipna=False`` below.
+    #   2. event_arm_table has no rows for the target patch at all
+    #      (empty event_arm_table or only non-target rows merged
+    #      in). The old ``.where(in_target_patch, 0.0)`` then made
+    #      every retained row zero and ``sum`` returned 0.0.
+    #      Mask non-target rows to NaN instead so their absence is
+    #      visible in the sum.
+    #
+    # We then explicitly require at least one target-patch row per
+    # event: if there are no target arms at all for an event, the
+    # output is NaN, not 0.0. Rows that are non-target but PRESENT
+    # contribute NaN; pandas' ``skipna=False`` sum then propagates
+    # NaN — but we *want* zero for legitimate "all-zero target arms,
+    # no contribution" cases. So we keep non-target as 0.0 only when
+    # ``in_target_patch`` has at least one True per group.
+    merged["_mass"] = merged["arm_fraction"].astype(float).where(
+        in_target_patch, 0.0
+    )
+    has_target_rows = (
+        merged.assign(_in=in_target_patch)
+        .groupby(grp_cols, as_index=False)["_in"]
+        .any()
+        .rename(columns={"_in": "_has_target"})
+    )
     out = (
         merged.groupby(grp_cols, as_index=False)["_mass"]
-        .sum()
+        .agg(strict_sum)
         .rename(columns={"_mass": "chosen_patch_fraction"})
+        .merge(has_target_rows, on=grp_cols, how="left")
     )
+    # No target-patch rows merged in → return NaN (cannot tell
+    # "no replay on chosen patch" from "we have no arm data").
+    out.loc[~out["_has_target"].fillna(False), "chosen_patch_fraction"] = np.nan
+    out = out.drop(columns=["_has_target"])
     return out
 
 
@@ -327,7 +395,7 @@ def ends_at_next_patch(
         Session-key columns passed through.
     """
     if event_table.empty or "next_patch" not in event_table.columns:
-        return pd.DataFrame(columns=["event_id", "ends_at_next_patch"])
+        return _empty_metric_frame(event_table, "ends_at_next_patch")
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
@@ -345,9 +413,16 @@ def ends_at_next_patch(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["ends_at_next_patch"] = merged["_last_patch"].astype("Int64") == merged[
-        "next_patch"
-    ].astype("Int64")
+    # Compute equality on nullable Int64, then fill ``pd.NA`` with
+    # False and cast to plain ``bool`` so this column matches the
+    # docstring contract ("recorded as False" when the last MAP arm
+    # has no patch label) and so ``_per_session_metric_means``'s
+    # ``astype(float)`` → ``np.nanmean`` reduction counts those rows
+    # in the denominator. Without the fillna, ``<NA>`` becomes NaN
+    # under ``astype(float)`` and gets silently dropped, inflating
+    # the per-session mean.
+    eq = merged["_last_patch"].astype("Int64") == merged["next_patch"].astype("Int64")
+    out["ends_at_next_patch"] = eq.fillna(False).astype(bool)
     return out
 
 

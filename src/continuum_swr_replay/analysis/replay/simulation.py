@@ -16,11 +16,14 @@ Tier B — ``simulate_autocorrelated_counts``: trajectory-level simulation.
 For each event, an arm sequence is drawn from a 9-state Markov chain with
 self-transition probability ``rho`` and stationary distribution
 softmax(X β_true). Marginal arm counts are unbiased (same expectation as
-Tier A), but consecutive timebins are correlated, so per-event count
-variance is *smaller* than Multinomial. This breaks the
-within-event-independence assumption of the conditional Poisson and can
-make ``bse`` from the fit too narrow — exactly the calibration story we
-want to quantify.
+Tier A), but consecutive timebins are positively correlated, so per-event
+count variance is *larger* than Multinomial — overdispersion, not
+underdispersion. (Empirical probe with ``pi=[0.3, 0.7]``, ``L=20``:
+iid variance ≈ 4.07, ``rho=0.8`` variance ≈ 30.35; analytic Multinomial
+variance is 4.20.) The conditional Poisson likelihood treats every
+within-event bin as iid Multinomial, so its information matrix overstates
+how much information each event carries and ``bse`` from the fit becomes
+too narrow — exactly the calibration story we want to quantify.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
 
@@ -55,6 +59,9 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "swr_x_prev": ("is_prev", "is_swr"),
     "swr_x_next": ("is_next", "is_swr"),
     "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
+    "swr_x_recent_reward_rate": ("recent_reward_rate", "is_swr"),
+    "swr_x_visit_recency_demeaned": ("visit_recency_demeaned", "is_swr"),
+    "swr_x_is_last_rewarded_elsewhere": ("is_last_rewarded_elsewhere", "is_swr"),
     "mua_x_last_rewarded": ("is_last_rewarded", "is_mua"),
     "switch_x_current": ("is_current", "is_after_switch"),
     "switch_x_prev": ("is_prev", "is_after_switch"),
@@ -97,7 +104,9 @@ def sample_arm_design(
     returns leaf arms.
 
     Continuous predictors (``visit_recency``, ``cumulative_reward``,
-    ``dist_to_arm``) are sampled from plausible ranges if requested.
+    ``recent_reward_rate``, ``dist_to_arm``) are sampled from plausible
+    ranges if requested. Arm fixed-effect dummies (``arm_fe_0`` …
+    ``arm_fe_7``) are added when requested — constant across events.
     """
     n_arms = len(ALL_ARMS)
     leaf_arms = np.array([0, 1, 2, 3, 4, 5])
@@ -115,14 +124,34 @@ def sample_arm_design(
     feature_cols["is_prev"] = (arm_grid == prev[:, None]).astype(float)
     feature_cols["is_next"] = (arm_grid == nxt[:, None]).astype(float)
     feature_cols["is_last_rewarded"] = (arm_grid == rewarded[:, None]).astype(float)
+    # Last-rewarded arm restricted to where it is not the current arm
+    # (the identifiable, non-collinear reward-memory predictor for M5/M6).
+    feature_cols["is_last_rewarded_elsewhere"] = feature_cols["is_last_rewarded"] * (
+        1.0 - feature_cols["is_current"]
+    )
 
     # Continuous: independent across events and arms with arbitrary scale.
-    if "visit_recency" in predictors:
-        feature_cols["visit_recency"] = rng.uniform(0, 10, size=(n_events, n_arms))
+    if "visit_recency" in predictors or "visit_recency_demeaned" in predictors:
+        vr = rng.uniform(0, 10, size=(n_events, n_arms))
+        if "visit_recency" in predictors:
+            feature_cols["visit_recency"] = vr
+        if "visit_recency_demeaned" in predictors:
+            feature_cols["visit_recency_demeaned"] = vr - vr.mean(axis=0, keepdims=True)
     if "cumulative_reward" in predictors:
         feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
+    if "recent_reward_rate" in predictors:
+        # Rewarded fraction of recent visits — a rate in [0, 1].
+        feature_cols["recent_reward_rate"] = rng.uniform(0, 1, size=(n_events, n_arms))
     if "dist_to_arm" in predictors:
         feature_cols["dist_to_arm"] = rng.uniform(0, 100, size=(n_events, n_arms))
+
+    # Arm fixed-effect dummies: arm_fe_k = 1 on arm k, identical across
+    # events (the static per-arm baseline the FE model controls for).
+    for k, name in enumerate(ARM_FE_PREDICTORS):
+        if name in predictors:
+            feature_cols[name] = np.tile(
+                (arm_grid == k).astype(float), (n_events, 1)
+            )
 
     missing = [p for p in predictors if p not in feature_cols]
     if missing:
@@ -227,8 +256,10 @@ def simulate_with_event_covariates(
     Extends ``simulate_counts`` to support the full predictor vocabulary
     used by ``model_specs.MODEL_HIERARCHY`` — including the continuous
     arm-varying predictors (``visit_recency``, ``cumulative_reward``,
-    ``dist_to_arm``) and the event×arm interaction columns
-    (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``, ``time_x_*``).
+    ``recent_reward_rate``, ``dist_to_arm``), the arm fixed-effect
+    dummies (``arm_fe_0`` … ``arm_fe_7``), and the event×arm interaction
+    columns (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``,
+    ``time_x_*``).
 
     Per event we sample event-level covariates (``is_swr``,
     ``is_after_switch``, ``is_after_omission``, ``time_since_stop``) and
@@ -264,8 +295,25 @@ def simulate_with_event_covariates(
         "is_last_rewarded": (arm_grid == rewarded[:, None]).astype(float),
         "visit_recency": rng.uniform(0, 10, size=(n_events, n_arms)),
         "cumulative_reward": rng.uniform(0, 5, size=(n_events, n_arms)),
+        "recent_reward_rate": rng.uniform(0, 1, size=(n_events, n_arms)),
         "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
+    # M5/M6 reward-memory predictor: last-rewarded arm where it is not
+    # the current arm (disjoint support from is_current by construction).
+    arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
+        1.0 - arm_features["is_current"]
+    )
+    # M4 visit-recency predictor: visit_recency with each arm's mean
+    # removed (the part orthogonal to the arm fixed effects).
+    _vr = arm_features["visit_recency"]
+    arm_features["visit_recency_demeaned"] = _vr - _vr.mean(axis=0, keepdims=True)
+    # Arm fixed-effect dummies: constant across events, so a fit
+    # recovers their coefficients at 0 unless the generative truth
+    # assigns them a non-zero β.
+    for k, name in enumerate(ARM_FE_PREDICTORS):
+        arm_features[name] = np.tile(
+            (arm_grid == k).astype(float), (n_events, 1)
+        )
 
     # Event-level scalars, broadcast to all arms.
     event_scalars: dict[str, np.ndarray] = {
@@ -377,10 +425,15 @@ def simulate_autocorrelated_counts(
 
     The marginal per-event arm distribution still equals softmax(X β_true)
     so β̂ from ``fit_conditional_poisson`` should remain unbiased. What
-    changes is the per-event count variance: with rho > 0, the counts are
-    *less* dispersed than Multinomial(L_e, π_e), so the conditional
-    Poisson's information matrix overstates how much information each
-    event carries, and ``bse`` becomes too narrow.
+    changes is the per-event count variance: with rho > 0 the counts are
+    *more* dispersed than Multinomial(L_e, π_e) — overdispersion —
+    because positive autocorrelation lengthens runs of the same arm.
+    For arm i with stationary mass π_i and chain length L, the variance
+    is inflated approximately by the geometric factor (1 + ρ) / (1 - ρ).
+    The conditional Poisson likelihood treats every within-event bin as
+    iid Multinomial, so its information matrix overstates how much
+    information each event carries and ``bse`` from the fit becomes too
+    narrow.
 
     Use ``rho=0`` to reproduce Tier A behavior. Use ``rho=0.7`` (effective
     sample size ≈ 0.18 × L_e) to simulate the kind of strong temporal

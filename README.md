@@ -7,8 +7,8 @@
   # Activate environment
   source .venv/bin/activate  # or uv run for individual commands
 
-  # Run analysis
-  uv run python scripts/hippocampus/run_bandit_analysis.py
+  # Run decoding analysis (see scripts/run_decoding_bandit.py --help)
+  uv run python scripts/run_decoding_bandit.py --animal chimi --brain_area HPC
 
   # Install in development mode
   uv pip install -e .

@@ -19,18 +19,36 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
 )
 
 
+def _prob_array(
+    events: list[tuple[float, float]],
+    *,
+    dt: float = 0.002,
+    duration: float = 1.0,
+    event_value: float = 0.9,
+    base_value: float = 0.0,
+) -> tuple[xr.DataArray, np.ndarray]:
+    """Build the (prob_array, time) pair fed into ``get_confident_times``.
+
+    ``events`` is a list of ``(start, end)`` windows; each is set to
+    ``event_value``. Outside the windows, the array sits at ``base_value``.
+    Returns both the DataArray and the time axis since several tests need
+    the raw ``time`` array (e.g. for ``speed`` alignment).
+    """
+    time = np.arange(0, duration, dt)
+    prob = np.full(len(time), base_value)
+    for start, end in events:
+        prob[(time >= start) & (time < end)] = event_value
+    return xr.DataArray(prob, coords={"time": time}, dims=["time"]), time
+
+
 class TestGetConfidentTimes:
     """Test threshold-based event detection."""
 
     def test_basic_detection_single_event(self):
         """Events above threshold are detected."""
-        time = np.arange(0, 1.0, 0.002)  # 500 Hz, 1 second
-        prob = np.zeros(len(time))
-
-        # Single event from 0.1 to 0.2 seconds (100ms > 15ms minimum)
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9  # Above 0.8 threshold
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        dt = 0.002  # 500 Hz
+        # Single event from 0.1 to 0.2 seconds (100ms > 15ms minimum).
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -38,23 +56,20 @@ class TestGetConfidentTimes:
             minimum_duration=0.015
         )
 
+        # Tolerance is one bin (dt) — tighter tolerances would conflate
+        # bin-edge rounding with sampling-rate drift bugs.
         assert len(events) == 1, "Should detect exactly one event"
-        assert events.iloc[0]["start_time"] == pytest.approx(0.1, abs=0.005)
-        assert events.iloc[0]["end_time"] == pytest.approx(0.2, abs=0.005)
-        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=0.005)
+        assert events.iloc[0]["start_time"] == pytest.approx(0.1, abs=dt + 1e-9)
+        assert events.iloc[0]["end_time"] == pytest.approx(0.2, abs=dt + 1e-9)
+        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=dt + 1e-9)
 
     def test_minimum_duration_filtering(self):
         """Events below minimum duration are filtered out."""
-        time = np.arange(0, 1.0, 0.001)  # 1kHz for precision
-        prob = np.zeros(len(time))
-
-        # Short event (10ms < 15ms minimum)
-        prob[(time >= 0.1) & (time < 0.11)] = 0.9
-
-        # Long event (50ms > 15ms minimum)
-        prob[(time >= 0.5) & (time < 0.55)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        dt = 0.001  # 1 kHz for precision
+        # Short event (10ms < 15ms minimum) and long event (50ms > 15ms).
+        prob_array, _ = _prob_array(
+            [(0.1, 0.11), (0.5, 0.55)], dt=dt
+        )
 
         events = get_confident_times(
             prob_array,
@@ -64,14 +79,12 @@ class TestGetConfidentTimes:
 
         # Only the long event should be detected
         assert len(events) == 1, "Short event should be filtered out"
-        assert events.iloc[0]["start_time"] == pytest.approx(0.5, abs=0.005)
+        assert events.iloc[0]["start_time"] == pytest.approx(0.5, abs=dt + 1e-9)
 
     def test_no_events_below_threshold(self):
         """Returns empty DataFrame when no events exceed threshold."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.full(len(time), 0.5)  # All below 0.8 threshold
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Whole recording at 0.5 — below 0.8 threshold everywhere.
+        prob_array, _ = _prob_array([], dt=0.002, base_value=0.5)
 
         events = get_confident_times(
             prob_array,
@@ -95,15 +108,9 @@ class TestGetConfidentTimes:
     )
     def test_event_at_recording_boundary(self, boundary_type, expected_field, expected_value):
         """Events at recording boundaries (start/end) are handled correctly."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-
-        if boundary_type == "start":
-            prob[time < 0.05] = 0.9
-        else:  # end
-            prob[time >= 0.95] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        dt = 0.002
+        window = (0.0, 0.05) if boundary_type == "start" else (0.95, 1.0 + dt)
+        prob_array, _ = _prob_array([window], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -112,19 +119,14 @@ class TestGetConfidentTimes:
         )
 
         assert len(events) == 1
-        assert events.iloc[0][expected_field] == pytest.approx(expected_value, abs=0.005)
+        assert events.iloc[0][expected_field] == pytest.approx(expected_value, abs=dt + 1e-9)
 
     def test_multiple_events_detected(self):
         """Multiple distinct events are all detected."""
-        time = np.arange(0, 1.0, 0.001)
-        prob = np.zeros(len(time))
-
-        # Three events
-        prob[(time >= 0.1) & (time < 0.15)] = 0.9
-        prob[(time >= 0.5) & (time < 0.55)] = 0.9
-        prob[(time >= 0.8) & (time < 0.85)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        prob_array, _ = _prob_array(
+            [(0.1, 0.15), (0.5, 0.55), (0.8, 0.85)],
+            dt=0.001,
+        )
 
         events = get_confident_times(
             prob_array,
@@ -139,15 +141,9 @@ class TestGetConfidentTimes:
 
     def test_speed_calculation_basic(self):
         """Max speed is calculated correctly for each event."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-        speed = np.full(len(time), 5.0)  # Constant 5 cm/s
-
-        # Event from 0.1 to 0.2
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
+        prob_array, time = _prob_array([(0.1, 0.2)], dt=0.002)
+        speed = np.full(len(time), 5.0)  # Constant 5 cm/s baseline
         speed[(time >= 0.15) & (time < 0.16)] = 15.0  # Peak speed in event
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -162,15 +158,10 @@ class TestGetConfidentTimes:
 
     def test_speed_calculation_nan_handling(self):
         """NaN values in speed are handled with nanmax."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.1, 0.2)], dt=0.002)
         speed = np.full(len(time), 5.0)
-
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
         speed[(time >= 0.12) & (time < 0.14)] = np.nan  # NaN in middle of event
         speed[(time >= 0.15) & (time < 0.16)] = 10.0  # Max speed
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -185,11 +176,7 @@ class TestGetConfidentTimes:
 
     def test_speed_none_returns_nan(self):
         """When speed is None, max_speed column contains NaN."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-        prob[(time >= 0.1) & (time < 0.2)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=0.002)
 
         events = get_confident_times(
             prob_array,
@@ -228,13 +215,9 @@ class TestGetConfidentTimes:
 
     def test_duration_accuracy(self):
         """Durations are calculated correctly (end - start)."""
-        time = np.arange(0, 1.0, 0.001)
-        prob = np.zeros(len(time))
-
-        # Event with known duration
-        prob[(time >= 0.2) & (time < 0.3)] = 0.9  # Exactly 100ms
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        dt = 0.001
+        # Event with known duration (exactly 100 ms).
+        prob_array, _ = _prob_array([(0.2, 0.3)], dt=dt)
 
         events = get_confident_times(
             prob_array,
@@ -244,20 +227,14 @@ class TestGetConfidentTimes:
 
         computed_duration = events.iloc[0]["end_time"] - events.iloc[0]["start_time"]
         assert events.iloc[0]["duration"] == pytest.approx(computed_duration, abs=1e-10)
-        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=0.005)
+        assert events.iloc[0]["duration"] == pytest.approx(0.1, abs=dt + 1e-9)
 
 
 class TestGetOverlapTimes:
     """Test event overlap detection."""
 
-    def create_mock_results(self, time):
-        """Helper to create minimal xarray Dataset with time coordinate."""
-        return xr.Dataset(coords={"time": time})
-
     def test_perfect_overlap_detected(self):
         """Events completely contained in ripples are detected as overlap."""
-        time = np.arange(0, 1.0, 0.002)
-
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
             "start_time": [0.1],
@@ -272,10 +249,8 @@ class TestGetOverlapTimes:
             "duration": [0.2],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 1, "Event should be detected as overlapping"
@@ -283,7 +258,6 @@ class TestGetOverlapTimes:
 
     def test_partial_overlap_detected(self):
         """Events partially overlapping ripples are detected."""
-        time = np.arange(0, 1.0, 0.002)
 
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
@@ -299,17 +273,14 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 1, "Partial overlap should be detected"
 
     def test_no_overlap_detected(self):
         """Non-overlapping events are correctly separated."""
-        time = np.arange(0, 1.0, 0.002)
 
         # Non-local event from 0.1 to 0.2
         non_local_times = pd.DataFrame({
@@ -325,10 +296,8 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0, "No overlap should be detected"
@@ -336,7 +305,6 @@ class TestGetOverlapTimes:
 
     def test_multiple_events_mixed_overlap(self):
         """Multiple events with some overlapping, some not."""
-        time = np.arange(0, 2.0, 0.002)
 
         # Three non-local events
         non_local_times = pd.DataFrame({
@@ -352,18 +320,62 @@ class TestGetOverlapTimes:
             "duration": [0.1, 0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 2, "Events 1 and 3 should overlap"
         assert len(no_overlap) == 1, "Event 2 should not overlap"
 
+    def test_boundary_touch_at_event_end_is_not_overlap(self):
+        """Regression: a ripple starting exactly at the non-local
+        event's end shares zero positive duration with it. Pre-fix,
+        ``get_labels`` labeled the boundary timebin as inside both
+        intervals (inclusive) and ``get_overlap_times`` reported the
+        event as overlapping; post-fix uses strict positive-duration
+        intersection."""
+        non_local_times = pd.DataFrame({
+            "start_time": [1.0],
+            "end_time": [2.0],
+            "duration": [1.0],
+        }, index=pd.Index([1], name="event_number"))
+        ripple_times = pd.DataFrame({
+            "start_time": [2.0],
+            "end_time": [3.0],
+            "duration": [1.0],
+        })
+        overlap, no_overlap = get_overlap_times(
+            non_local_times, ripple_times
+        )
+        assert len(overlap) == 0, (
+            f"Boundary-touch ripple was reported as overlap "
+            f"(len(overlap)={len(overlap)}); ripple [2.0, 3.0] only "
+            "touches event [1.0, 2.0] at t=2.0 and shares zero "
+            "positive duration."
+        )
+        assert len(no_overlap) == 1
+
+    def test_boundary_touch_at_event_start_is_not_overlap(self):
+        """Mirror case: a ripple ending exactly at the non-local
+        event's start time."""
+        non_local_times = pd.DataFrame({
+            "start_time": [1.0],
+            "end_time": [2.0],
+            "duration": [1.0],
+        }, index=pd.Index([1], name="event_number"))
+        ripple_times = pd.DataFrame({
+            "start_time": [-1.0],
+            "end_time": [1.0],
+            "duration": [2.0],
+        })
+        overlap, no_overlap = get_overlap_times(
+            non_local_times, ripple_times
+        )
+        assert len(overlap) == 0
+        assert len(no_overlap) == 1
+
     def test_empty_ripple_times(self):
         """All events are non-overlapping when no ripples."""
-        time = np.arange(0, 1.0, 0.002)
 
         non_local_times = pd.DataFrame({
             "start_time": [0.1],
@@ -378,10 +390,8 @@ class TestGetOverlapTimes:
             "duration": [],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0, "No overlaps with empty ripples"
@@ -389,7 +399,6 @@ class TestGetOverlapTimes:
 
     def test_empty_non_local_times(self):
         """Empty input returns empty outputs."""
-        time = np.arange(0, 1.0, 0.002)
 
         non_local_times = pd.DataFrame({
             "start_time": [],
@@ -403,10 +412,8 @@ class TestGetOverlapTimes:
             "duration": [0.1],
         })
 
-        results = self.create_mock_results(time)
-
         overlap, no_overlap = get_overlap_times(
-            non_local_times, ripple_times, results
+            non_local_times, ripple_times
         )
 
         assert len(overlap) == 0
@@ -434,10 +441,11 @@ class TestEventDetectionEdgeCases:
 
     def test_all_ones_probability(self):
         """All time at high probability creates single event."""
-        time = np.arange(0, 0.1, 0.001)
-        prob = np.ones(len(time))
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # 0.1 s recording @ 1 kHz, prob=1.0 throughout (no event windows
+        # carved out — the base value carries the whole array).
+        prob_array, _ = _prob_array(
+            [], dt=0.001, duration=0.1, base_value=1.0,
+        )
 
         events = get_confident_times(
             prob_array,
@@ -446,18 +454,14 @@ class TestEventDetectionEdgeCases:
         )
 
         assert len(events) == 1
-        assert events.iloc[0]["start_time"] == pytest.approx(0.0, abs=0.005)
-        assert events.iloc[0]["end_time"] == pytest.approx(0.1, abs=0.005)
+        dt = 0.002  # matches the recording-boundary fixture above
+        assert events.iloc[0]["start_time"] == pytest.approx(0.0, abs=dt + 1e-9)
+        assert events.iloc[0]["end_time"] == pytest.approx(0.1, abs=dt + 1e-9)
 
     def test_probability_exactly_at_threshold(self):
         """Probability exactly at threshold is included (> not >=)."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
-
-        # Set to exactly threshold value
-        prob[(time >= 0.1) & (time < 0.2)] = 0.8
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # Window set to exactly the threshold value (0.8).
+        prob_array, _ = _prob_array([(0.1, 0.2)], dt=0.002, event_value=0.8)
 
         events = get_confident_times(
             prob_array,
@@ -470,13 +474,8 @@ class TestEventDetectionEdgeCases:
 
     def test_very_short_minimum_duration(self):
         """Very short minimum duration (1ms) is respected."""
-        time = np.arange(0, 1.0, 0.0001)  # 10kHz sampling
-        prob = np.zeros(len(time))
-
-        # Very brief event (2ms)
-        prob[(time >= 0.1) & (time < 0.102)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
+        # 10 kHz sampling, very brief event (2 ms).
+        prob_array, _ = _prob_array([(0.1, 0.102)], dt=0.0001)
 
         events = get_confident_times(
             prob_array,
@@ -493,14 +492,8 @@ class TestSpeedCalculationBoundsFix:
 
     def test_event_at_time_boundary_start(self):
         """Events at the start of the time range should have valid speed."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.0, 0.05)], dt=0.002)
         speed = np.full(len(time), 10.0)
-
-        # Event at very start of recording
-        prob[(time >= 0.0) & (time < 0.05)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -516,14 +509,8 @@ class TestSpeedCalculationBoundsFix:
 
     def test_event_at_time_boundary_end(self):
         """Events at the end of the time range should have valid speed."""
-        time = np.arange(0, 1.0, 0.002)
-        prob = np.zeros(len(time))
+        prob_array, time = _prob_array([(0.95, 1.0)], dt=0.002)
         speed = np.full(len(time), 10.0)
-
-        # Event at very end of recording
-        prob[(time >= 0.95) & (time < 1.0)] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
             prob_array,
@@ -537,15 +524,15 @@ class TestSpeedCalculationBoundsFix:
         # Speed should be computed without index errors
         assert np.isfinite(events.iloc[0]["max_speed"]), "Should have valid speed"
 
-    def test_event_outside_time_range_returns_nan(self):
-        """Events with time range outside data bounds should return NaN speed."""
-        time = np.arange(0.1, 0.9, 0.002)  # Start at 0.1, end before 0.9
+    def test_event_within_data_bounds_detected(self):
+        """When data starts after t=0 (offset position index), the detector
+        still finds an event whose probability mask is fully inside the
+        recorded range. Build the array manually because ``_prob_array``
+        assumes a zero-anchored time axis."""
+        time = np.arange(0.1, 0.9, 0.002)
         prob = np.zeros(len(time))
         speed = np.full(len(time), 10.0)
-
-        # Event within valid range
         prob[(time >= 0.2) & (time < 0.3)] = 0.9
-
         prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
 
         events = get_confident_times(
@@ -553,38 +540,11 @@ class TestSpeedCalculationBoundsFix:
             speed=speed,
             time=time,
             prob_threshold=0.8,
-            minimum_duration=0.015
+            minimum_duration=0.015,
         )
 
         assert len(events) == 1
-        # Should not crash with out-of-bounds errors
-        assert np.isfinite(events.iloc[0]["max_speed"]) or np.isnan(events.iloc[0]["max_speed"])
-
-    def test_empty_time_interval_returns_nan(self):
-        """When start and end indices are equal, should return NaN speed."""
-        time = np.arange(0, 1.0, 0.1)  # Sparse time array
-        prob = np.zeros(len(time))
-        speed = np.full(len(time), 10.0)
-
-        # Very short event that might not span any bins
-        prob[3:5] = 0.9
-
-        prob_array = xr.DataArray(prob, coords={"time": time}, dims=["time"])
-
-        # Should not crash even with weird edge cases
-        events = get_confident_times(
-            prob_array,
-            speed=speed,
-            time=time,
-            prob_threshold=0.8,
-            minimum_duration=0.01
-        )
-
-        # Result should be valid (either empty or with NaN speeds)
-        for idx in range(len(events)):
-            max_speed = events.iloc[idx]["max_speed"]
-            assert np.isfinite(max_speed) or np.isnan(max_speed), \
-                "Speed should be finite or NaN, never crash"
+        assert events.iloc[0]["max_speed"] == pytest.approx(10.0)
 
 
 def _event(start, end):
@@ -724,3 +684,45 @@ class TestClassifySwrOverlapGeometry:
                 f"Event {i}: geometry={geom.iloc[i]['overlap_class']}, "
                 f"classify={coarse.iloc[i]['overlap_class']}"
             )
+
+    def test_boundary_touch_at_event_end_is_no_overlap(self):
+        """Regression: a SWR starting exactly at the event's end
+        shares zero positive duration with the event. Pre-fix used
+        inclusive ``>=`` / ``<=`` and labeled this as
+        ``swr_partial`` / ``single_swr_partial``, inflating
+        SWR-coincident counts on back-to-back intervals."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(2.0, 3.0)])
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "non_swr", (
+            f"overlap_class={out['overlap_class']!r} on boundary "
+            "touch — SWR [2.0, 3.0] only contacts event [1.0, 2.0] "
+            "at t=2.0 and shares zero duration."
+        )
+        assert out["overlap_subclass"] == "no_overlap"
+        assert out["n_swrs_overlapping"] == 0
+        # And the coarse classifier must agree.
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "non_swr"
+
+    def test_boundary_touch_at_event_start_is_no_overlap(self):
+        """Mirror case: a SWR ending exactly at the event's start."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(-1.0, 1.0)])
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "non_swr"
+        assert out["overlap_subclass"] == "no_overlap"
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "non_swr"
+
+    def test_minimal_positive_overlap_still_partial(self):
+        """Sanity: any positive-duration overlap, however small, is
+        still ``swr_partial`` — the strict-inequality fix must not
+        also drop genuinely overlapping events."""
+        ev = _event(1.0, 2.0)
+        swr = _swrs([(1.999, 3.0)])  # 1ms of real overlap
+        out = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        assert out["overlap_class"] == "swr_partial"
+        assert out["overlap_subclass"] == "single_swr_partial"
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+        assert coarse["overlap_class"] == "swr_partial"

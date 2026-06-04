@@ -346,14 +346,26 @@ def load_data(
         "linear_edge_spacing": position_data["linear_edge_spacing"],
     }
 
-    # Load and process spike data
-    if should_load(SessionDataKeys.SPIKE_TIMES) or should_load(
-        SessionDataKeys.SPIKE_WAVEFORM_FEATURES
+    # Load and process spike data. Multiunit-derived outputs (HSE_TIMES,
+    # MULTIUNIT_FIRING_RATE, MULTIUNIT_RATE_ZSCORE) depend on spike_times,
+    # so load spike_data internally when any of them is requested even if
+    # the caller did not include SPIKE_TIMES itself.
+    spike_times_for_multiunit: dict[str, Any] | None = None
+    multiunit_keys = (
+        SessionDataKeys.HSE_TIMES,
+        SessionDataKeys.MULTIUNIT_FIRING_RATE,
+        SessionDataKeys.MULTIUNIT_RATE_ZSCORE,
+    )
+    if (
+        should_load(SessionDataKeys.SPIKE_TIMES)
+        or should_load(SessionDataKeys.SPIKE_WAVEFORM_FEATURES)
+        or any(should_load(key) for key in multiunit_keys)
     ):
         spike_data = get_spike_data(nwb_file_name)
         _process_spike_data(
             spike_data, position_data["position_info"].index, should_load, result
         )
+        spike_times_for_multiunit = spike_data["spike_times"]
 
     # Load and process ripple data
     if any(
@@ -400,10 +412,13 @@ def load_data(
         )
         _process_behavioral_data(dio_events, position_data, should_load, result)
 
-    # Process multiunit data (depends on spike_times being loaded)
-    if "spike_times" in result:
+    # Process multiunit data (depends on spike_times being loaded internally)
+    if spike_times_for_multiunit is not None:
         _process_multiunit_data(
-            result["spike_times"], position_data["position_info"], should_load, result
+            spike_times_for_multiunit,
+            position_data["position_info"],
+            should_load,
+            result,
         )
 
     # Load electrode group info

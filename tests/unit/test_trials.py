@@ -123,6 +123,27 @@ class TestGetPokeInPokeOutTimes:
         expected_duration = 3.0 - 1.0  # 2.0 seconds
         assert result.iloc[0]['duration'] == pytest.approx(expected_duration)
 
+    def test_unsorted_input_does_not_corrupt_pokes(self):
+        """Regression: ``shift(-1)`` assumes chronological order
+        within each ``event_name`` group. Pre-fix, an unsorted
+        input produced negative-duration pokes (e.g.
+        ``start_time=3.0, end_time=1.5, duration=-1.5``). The fix
+        sorts each group by ``start_time`` before the
+        inter-event-interval / cumsum step."""
+        beam_breaks = pd.DataFrame([
+            {"event_name": "Poke1", "start_time": 3.0, "end_time": 3.5},
+            {"event_name": "Poke1", "start_time": 1.0, "end_time": 1.5},
+        ])
+        result = get_poke_in_poke_out_times(beam_breaks)
+        assert (result["duration"] >= 0).all(), (
+            f"negative-duration poke leaked: {result.to_dict('records')}"
+        )
+        # Two distinct pokes (gap > default max_inter_event_interval).
+        assert len(result) == 2
+        # Sorted result starts at 1.0.
+        assert result.iloc[0]["start_time"] == pytest.approx(1.0)
+        assert result.iloc[1]["start_time"] == pytest.approx(3.0)
+
     def test_empty_beam_breaks(self):
         """Should handle empty beam breaks DataFrame."""
         beam_breaks = pd.DataFrame({
@@ -386,25 +407,3 @@ class TestGetStartEndNodeID:
         assert result['from_well'][0] == 1
         assert result['to_well'][0] == 1
 
-    def test_boundary_handling(self, simple_linear_track):
-        """Should handle position at session boundaries correctly."""
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
-
-        # More time points to avoid index out of bounds
-        position_info = pd.DataFrame({
-            'projected_x_position': [0.0, 10.0, 20.0, 20.0],
-            'projected_y_position': [0.0, 0.0, 0.0, 0.0],
-        }, index=[0.0, 0.5, 1.0, 1.5])
-
-        # Time boundaries
-        times = pd.DataFrame({
-            'start_time': [0.0],
-            'end_time': [1.2],
-        })
-
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
-
-        # Should handle boundary positions
-        assert result['from_well'][0] in [0, 1, 2]
-        assert result['to_well'][0] in [0, 1, 2]

@@ -917,7 +917,7 @@ def label_panels(
 # ==============================================================================
 
 
-def validate_figure_quality() -> bool:
+def validate_figure_quality(context: str | None = None) -> bool:
     """Check current figure for common quality issues.
 
     Validates:
@@ -925,6 +925,19 @@ def validate_figure_quality() -> bool:
     - No layout warnings
     - DPI appropriate for context
     - Constrained layout enabled
+
+    Parameters
+    ----------
+    context : {"paper", "presentation"} | None, optional
+        Which font/DPI thresholds to validate against. When ``None``
+        (default), the context is inferred from ``fig.dpi``: ≥ 300 →
+        ``"paper"``, otherwise ``"presentation"``.
+
+        Note: on Retina-class macOS backends matplotlib reports
+        ``fig.dpi = 2 × requested_dpi`` even when the user asked for
+        ``dpi=150``. Pass ``context="presentation"`` explicitly to
+        avoid being routed to the (stricter) paper thresholds in
+        that case.
 
     Returns
     -------
@@ -936,7 +949,7 @@ def validate_figure_quality() -> bool:
     >>> fig, ax = plt.subplots(figsize=(3.5, 2.5), dpi=450,
     ...                        constrained_layout=True)
     >>> ax.plot(x, y)
-    >>> if validate_figure_quality():
+    >>> if validate_figure_quality(context="paper"):
     ...     save_figure("figure_1")
 
     """
@@ -959,7 +972,20 @@ def validate_figure_quality() -> bool:
         )
         passed = False
 
-    is_paper = fig.dpi >= 300
+    if context is None:
+        # Heuristic fallback. Retina-class backends double the
+        # reported DPI, so a 150-dpi presentation figure shows up as
+        # 300 here. We can't fully disambiguate without explicit
+        # context; the user-facing ``context`` keyword is the
+        # reliable knob.
+        is_paper = fig.dpi >= 300
+    else:
+        if context not in ("paper", "presentation"):
+            raise ValueError(
+                f"context must be 'paper' or 'presentation', got {context!r}"
+            )
+        is_paper = context == "paper"
+
     min_axis_label = PAPER_AXIS_LABEL if is_paper else PRES_AXIS_LABEL
     min_tick_label = PAPER_TICK_LABEL if is_paper else PRES_TICK_LABEL
     context_name = "paper" if is_paper else "presentation"

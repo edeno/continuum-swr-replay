@@ -301,3 +301,44 @@ class TestConvertDIOEventsToStartStopTimes:
 
         assert len(result) == 0
         assert 'start_time' in result.columns
+
+
+class TestLoadDIOEventTypeEmptyPattern:
+    """Regression: ``_load_dio_event_type`` builds an ``events`` dict
+    keyed by ``dio_event_name`` from ``DIOEvents.fetch_nwb()``. When
+    no rows match the SQL ``LIKE`` pattern (e.g. a session that
+    lacks any ``Light%`` events), ``events`` is empty and the
+    subsequent ``pd.concat([])`` raised
+    ``ValueError: No objects to concatenate`` — a missing optional
+    DIO type then crashed the entire ``load_dios`` call. The fix
+    short-circuits to a schema-complete empty frame.
+    """
+
+    def test_empty_pattern_returns_schema_complete_empty_frame(self, monkeypatch):
+        # Stub ``spyglass.common.DIOEvents`` with an object whose
+        # restriction operators no-op and ``fetch_nwb()`` returns
+        # an empty list — matches the "no rows match this LIKE" case
+        # without needing a live Spyglass connection.
+        import sys
+        import types
+
+        spyglass_pkg = types.ModuleType("spyglass")
+        common_mod = types.ModuleType("spyglass.common")
+
+        class _NoMatchQuery:
+            def __and__(self, _other):
+                return self
+
+            def fetch_nwb(self):
+                return []
+
+        common_mod.DIOEvents = _NoMatchQuery()
+        monkeypatch.setitem(sys.modules, "spyglass", spyglass_pkg)
+        monkeypatch.setitem(sys.modules, "spyglass.common", common_mod)
+
+        from continuum_swr_replay.data_loaders.events import _load_dio_event_type
+
+        out = _load_dio_event_type("any.nwb", "Light%", (0.0, 100.0))
+        assert len(out) == 0
+        assert list(out.columns) == ["start_time", "end_time"]
+        assert list(out.index.names) == ["event_name", "event_number"]

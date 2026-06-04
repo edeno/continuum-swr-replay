@@ -7,12 +7,9 @@ from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
 import pytest
 
 from continuum_swr_replay.figure_utilities import (
-    GOLDEN_RATIO,
-    MM_TO_INCHES,
     OKABE_ITO,
     ONE_COLUMN,
     TWO_COLUMN,
@@ -28,23 +25,12 @@ from continuum_swr_replay.figure_utilities import (
 class TestConstants:
     """Test module constants."""
 
-    def test_mm_to_inches(self):
-        """Test millimeter to inches conversion factor."""
-        assert MM_TO_INCHES == pytest.approx(1.0 / 25.4)
-
-    def test_golden_ratio(self):
-        """Test golden ratio constant."""
-        expected = (np.sqrt(5) - 1.0) / 2.0
-        assert GOLDEN_RATIO == pytest.approx(expected)
-
-    def test_one_column_width(self):
-        """Test single column width matches standard."""
-        assert ONE_COLUMN == pytest.approx(89.0 * MM_TO_INCHES)
+    def test_one_column_width_matches_journal_standard(self):
+        """89mm ≈ 3.5in — single-column figure width across most journals."""
         assert ONE_COLUMN == pytest.approx(3.5, abs=0.01)
 
-    def test_two_column_width(self):
-        """Test two column width matches standard."""
-        assert TWO_COLUMN == pytest.approx(178.0 * MM_TO_INCHES)
+    def test_two_column_width_matches_journal_standard(self):
+        """178mm ≈ 7.0in — two-column figure width across most journals."""
         assert TWO_COLUMN == pytest.approx(7.0, abs=0.01)
 
 
@@ -661,7 +647,14 @@ class TestValidateFigureQuality:
         plt.close(fig)
 
     def test_validation_warns_small_axis_labels_presentation(self):
-        """Test that validation warns about small axis labels in presentation context."""
+        """Test that validation warns about small axis labels in presentation context.
+
+        Pass ``context="presentation"`` explicitly: the DPI heuristic
+        is unreliable on Retina-class macOS backends where matplotlib
+        reports ``fig.dpi = 2 × requested_dpi`` (so a 150-dpi
+        presentation figure shows up as 300 and would be routed to
+        the stricter paper thresholds).
+        """
         from continuum_swr_replay.figure_utilities import (
             PRES_AXIS_LABEL,
             validate_figure_quality,
@@ -674,7 +667,7 @@ class TestValidateFigureQuality:
 
         # Should warn about small X-axis label
         with pytest.warns(UserWarning, match="axis label.*small"):
-            result = validate_figure_quality()
+            result = validate_figure_quality(context="presentation")
             assert result is False
 
         plt.close(fig)

@@ -102,6 +102,13 @@ def get_poke_in_poke_out_times(
 
     merged_events = []
     for _, df in beam_breaks.groupby("event_name"):
+        # ``shift(-1)`` below assumes the rows are in chronological
+        # order. Spyglass's ``load_dios`` returns sorted events, but
+        # this helper is also called directly on caller-constructed
+        # frames and the inter-event-interval / label cumsum would
+        # silently produce negative-duration pokes if a row landed
+        # out of order.
+        df = df.sort_values("start_time").reset_index(drop=True)
         interevent_interval = (df.start_time.shift(-1) - df.end_time).fillna(0)
         labels = (
             (interevent_interval > max_inter_event_interval)
@@ -181,17 +188,22 @@ def get_start_end_node_id(
     """
     projected_cols = ["projected_x_position", "projected_y_position"]
 
-    # Use searchsorted to find indices, but clamp to valid range
-    # searchsorted with side="right" can return len(position_info) for values
-    # past the end of the index, so we clamp to the last valid index
+    # We want the position row at-or-before each interval boundary.
+    # ``side="right"`` returns the *insertion index after* an exact match,
+    # so ``searchsorted([0, 1], 0, side="right") == 1`` — without the
+    # ``- 1`` correction we would sample the *next* row, mislabeling
+    # ``from_well``/``to_well`` (e.g. for an interval [0, 1] over a
+    # position frame at t=0 (well 0) and t=1 (well 1), both endpoints
+    # would resolve to row 1 → from_well = to_well = 1). Subtract 1
+    # then clamp to the valid index range.
     max_idx = len(position_info) - 1
     start_indices = np.clip(
-        position_info.index.searchsorted(times.start_time.values, side="right"),
+        position_info.index.searchsorted(times.start_time.values, side="right") - 1,
         0,
         max_idx,
     )
     end_indices = np.clip(
-        position_info.index.searchsorted(times.end_time.values, side="right"),
+        position_info.index.searchsorted(times.end_time.values, side="right") - 1,
         0,
         max_idx,
     )

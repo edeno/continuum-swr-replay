@@ -87,6 +87,13 @@ class TestInterceptOnlyRecovery:
             np.exp(fit["coef_intercept"])
         )
 
+    def test_bic_uses_log_likelihood_formula(self):
+        """BIC should be on the same LLF scale as AIC/model comparisons."""
+        df = _simulate_stops(n_stops=100, log_intercept=np.log(1.0), seed=0)
+        fit = fit_rate_model(df, predictors=[])
+        expected = fit["n_params"] * np.log(fit["n_stops"]) - 2 * fit["llf"]
+        assert fit["bic"] == pytest.approx(expected)
+
 
 # ── Coefficient recovery with predictors ──
 
@@ -215,6 +222,86 @@ class TestEdgeCases:
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         fit = fit_rate_model(df, predictors=["nonexistent_column"])
         assert fit is None
+
+    def test_constant_predictor_returns_none(self):
+        """Regression: ``sm.add_constant`` is a no-op when the input
+        already has a constant column, so the returned ``X`` has
+        ``len(predictors)`` columns instead of
+        ``len(predictors) + 1``. The post-fit
+        ``zip(col_names, result.params, strict=True)`` then raises
+        ``ValueError`` after the GLM has already been fit. The fix
+        rejects rank-deficient designs (any predictor constant within
+        the surviving rows) up front and returns ``None``."""
+        df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
+        # Force the predictor to be constant within the stop subset
+        # that survives the offset > 0 filter.
+        df["is_after_reward"] = 1.0
+        fit = fit_rate_model(df, predictors=["is_after_reward"])
+        assert fit is None, (
+            f"fit_rate_model returned {fit!r} on constant predictor; "
+            "should return None instead of crashing in zip(strict=True) "
+            "after the GLM has already been fit."
+        )
+
+    def test_one_constant_one_varying_predictor_returns_none(self):
+        """Mixed case: even if some predictors vary, a constant one
+        in the same call still makes the design rank-deficient
+        against the intercept and crashes the post-fit zip."""
+        df = _simulate_stops(
+            n_stops=120,
+            log_intercept=0.0,
+            coefs={"is_after_omission": 0.5},
+            seed=0,
+        )
+        df["is_after_reward"] = 1.0
+        fit = fit_rate_model(
+            df, predictors=["is_after_reward", "is_after_omission"]
+        )
+        assert fit is None
+
+    def test_collinear_predictors_returns_none(self):
+        """Regression: a per-column constancy check misses designs
+        like ``x2 = 1 - x1`` — neither predictor is individually
+        constant, but ``[1, x1, x2]`` is rank-2-not-3 and the GLM
+        silently pseudo-inverts to return finite coefficients/p-values
+        for an unidentified model. The full-rank check catches it."""
+        df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=0)
+        rng = np.random.default_rng(1)
+        df["x1"] = rng.integers(0, 2, len(df)).astype(float)
+        df["x2"] = 1.0 - df["x1"].to_numpy()
+        fit = fit_rate_model(df, predictors=["x1", "x2"])
+        assert fit is None, (
+            f"fit_rate_model returned {fit!r} on collinear "
+            "predictors x1 + x2 = 1; the full-rank check should "
+            "reject this before the GLM produces a non-unique "
+            "solution."
+        )
+
+    def test_duplicated_predictors_returns_none(self):
+        """Regression: identical predictor columns also trip the
+        rank check (``[1, a, a]`` has rank 2 < 3)."""
+        df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=0)
+        rng = np.random.default_rng(2)
+        df["a"] = rng.integers(0, 2, len(df)).astype(float)
+        df["b"] = df["a"].to_numpy().copy()
+        fit = fit_rate_model(df, predictors=["a", "b"])
+        assert fit is None
+
+    def test_independent_predictors_still_fit(self):
+        """Sanity: the new rank check must NOT reject identifiable
+        designs."""
+        df = _simulate_stops(
+            n_stops=200,
+            log_intercept=0.0,
+            coefs={"is_after_omission": 0.5, "is_after_reward": 0.3},
+            seed=0,
+        )
+        fit = fit_rate_model(
+            df, predictors=["is_after_omission", "is_after_reward"]
+        )
+        assert fit is not None
+        assert "coef_is_after_omission" in fit
+        assert "coef_is_after_reward" in fit
 
     def test_missing_response_column_returns_none(self):
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)

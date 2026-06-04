@@ -17,12 +17,12 @@ import statsmodels.api as sm
 from numpy.typing import NDArray
 from patsy import dmatrix
 
-from continuum_swr_replay.analysis.hippocampus import (
-    get_confident_times,
-    get_overlap_times,
-    load_results,
-)
-from continuum_swr_replay.data_loaders import load_data
+# ``load_data`` and the hippocampus helpers below open a Spyglass /
+# DataJoint connection at import time. We defer those imports into
+# ``run_session`` (the only function that uses them) so that the pure
+# helpers in this module — ``get_spikecount_per_time_bin``,
+# ``process_neuron``, the design-matrix builders — stay offline-
+# importable for unit tests on machines without VPN.
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,12 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times : NDArray, shape (n_spikes,)
         Spike times in seconds.
     time : NDArray, shape (n_time_bins,)
-        Time bin centers in seconds (e.g., from position_info.index).
-        Internally, midpoints between consecutive values are used as bin
-        edges via ``np.digitize(spike_times, time[1:-1])``.
+        Time bin starts (left edges) in seconds — i.e. each ``time[i]``
+        is the start of bin ``i``, not its center. Matches the
+        sample-bin-start convention used by the data loader's
+        multiunit pipeline. Spike ``s`` is assigned to bin ``i`` where
+        ``time[i] <= s < time[i+1]``; spikes at exactly ``time[-1]``
+        fall in the last bin.
 
     Returns
     -------
@@ -48,8 +51,14 @@ def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
     spike_times = spike_times[
         np.logical_and(spike_times >= time[0], spike_times <= time[-1])
     ]
+    # ``np.digitize(s, time[1:])`` produces indices ``0..N-1`` against
+    # a ``minlength=N`` bincount, so all output bins are reachable.
+    # The previous ``time[1:-1]`` form maxed out at index ``N-2``,
+    # leaving the final bin unreachable: e.g. with
+    # ``time=[0,1,2,3]``, spikes at 2.5 and 3.0 both landed in bin 2
+    # and bin 3 stayed at zero.
     return np.bincount(
-        np.digitize(spike_times, time[1:-1]),
+        np.digitize(spike_times, time[1:]),
         minlength=time.shape[0],
     )
 
@@ -691,9 +700,32 @@ def process_neuron(
                 f"{neuron_stats['immobility_avg_firing_rate']:.3f} Hz."
             )
 
+        # Detect non-estimable models. ``_make_conv_spline_basis``
+        # builds spline regressors for every event class regardless
+        # of whether that class has any events; an empty event class
+        # leaves its spline columns all-zero, so the design matrix is
+        # rank-deficient against the intercept. statsmodels still
+        # returns finite (zero) parameters for those columns and
+        # finite degenerate LR / fractional-deviance values, so the
+        # NaN-params check above doesn't catch them. Mark every
+        # rank-deficient design as non-estimable up front and route
+        # the affected LR tests, AIC selections, and modulation
+        # extractions to NaN below — so downstream consumers can
+        # tell "absent event class" from "estimated zero effect".
+        non_estimable_models = set()
+        for name, design in immobility_design_matrices.items():
+            X_im = design[is_immobile]
+            if X_im.shape[0] == 0:
+                non_estimable_models.add(name)
+                continue
+            if np.linalg.matrix_rank(X_im) < X_im.shape[1]:
+                non_estimable_models.add(name)
+
         ## Likelihood ratio tests
-        # SWR-controlled decomposition: does replay add to SWR response?
-        # Replay-split decomposition: do SWR-replay and non-SWR-replay differ?
+        # Every (full, reduced) pair must be nested — the reduced
+        # regressors must lie in the column span of the full design.
+        # ``("SWR + non_local_no_SWR", "non_local")`` is intentionally
+        # absent: it's only nested when there are no SWR-only events.
         test_cases = [
             # Individual event types vs baseline
             ("SWR", "constant"),
@@ -704,7 +736,6 @@ def process_neuron(
             ("SWR + non_local_no_SWR", "constant"),
             ("SWR + non_local_no_SWR", "SWR"),
             ("SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("SWR + non_local_no_SWR", "non_local"),
             # Replay-split: does splitting replay by SWR status help?
             ("non_local_SWR + non_local_no_SWR", "constant"),
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
@@ -714,9 +745,21 @@ def process_neuron(
 
         for model1, model2 in test_cases:
             test_name = f"{model1} vs. {model2}"
-            neuron_stats[f"{test_name}: lr"], neuron_stats[f"{test_name}: pval"] = (
-                _lr_test(results[model1], results[model2])
-            )
+            if (
+                model1 in non_estimable_models
+                or model2 in non_estimable_models
+            ):
+                # Either side is rank-deficient (typically because an
+                # event class has zero events in this session), so the
+                # LR statistic / p-value are not meaningful. Mark the
+                # comparison as unavailable rather than emitting a
+                # finite degenerate value.
+                neuron_stats[f"{test_name}: lr"] = np.nan
+                neuron_stats[f"{test_name}: pval"] = np.nan
+            else:
+                neuron_stats[f"{test_name}: lr"], neuron_stats[
+                    f"{test_name}: pval"
+                ] = _lr_test(results[model1], results[model2])
 
         ## Effect sizes: fractional deviance for every LR test
         # frac_null_dev: (reduced - full) / constant deviance
@@ -725,93 +768,137 @@ def process_neuron(
         #   = fraction of full model's explained deviance due to added regressors
         for model1, model2 in test_cases:
             test_name = f"{model1} vs. {model2}"
-            neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
-                results[model1], results[model2], results["constant"]
-            )
-            neuron_stats[f"{test_name}: frac_explained_dev"] = (
-                get_frac_explained_deviance(
-                    results[model1], results[model2], results["constant"]
+            if (
+                model1 in non_estimable_models
+                or model2 in non_estimable_models
+                or "constant" in non_estimable_models
+            ):
+                neuron_stats[f"{test_name}: frac_null_dev"] = np.nan
+                neuron_stats[f"{test_name}: frac_explained_dev"] = np.nan
+            else:
+                neuron_stats[f"{test_name}: frac_null_dev"] = (
+                    get_frac_null_deviance(
+                        results[model1], results[model2], results["constant"]
+                    )
                 )
-            )
+                neuron_stats[f"{test_name}: frac_explained_dev"] = (
+                    get_frac_explained_deviance(
+                        results[model1], results[model2], results["constant"]
+                    )
+                )
 
         ## AIC — SWR-controlled: what best explains immobility firing?
+        # Skip rank-deficient models so a non-estimable design (e.g. a
+        # session with zero ``non_local_no_SWR`` events) cannot be
+        # selected as the "best" model just because statsmodels
+        # returned a finite AIC for its degenerate fit.
+        swr_controlled_candidates = [
+            "constant",
+            "SWR",
+            "non_local",
+            "SWR + non_local_no_SWR",
+        ]
         swr_controlled_aics = {
             model_name: results[model_name].aic
-            for model_name in [
-                "constant",
-                "SWR",
-                "non_local",
-                "SWR + non_local_no_SWR",
-            ]
+            for model_name in swr_controlled_candidates
+            if model_name not in non_estimable_models
         }
-        neuron_stats["min_aic_model"] = min(
-            swr_controlled_aics, key=swr_controlled_aics.get
+        neuron_stats["min_aic_model"] = (
+            min(swr_controlled_aics, key=swr_controlled_aics.get)
+            if swr_controlled_aics
+            else None
         )
 
         ## AIC — Replay-split: is replay one process or two?
+        replay_split_candidates = [
+            "constant",
+            "non_local",
+            "non_local_SWR + non_local_no_SWR",
+        ]
         replay_split_aics = {
             model_name: results[model_name].aic
-            for model_name in [
-                "constant",
-                "non_local",
-                "non_local_SWR + non_local_no_SWR",
-            ]
+            for model_name in replay_split_candidates
+            if model_name not in non_estimable_models
         }
-        neuron_stats["min_aic_model_replay_split"] = min(
-            replay_split_aics, key=replay_split_aics.get
+        neuron_stats["min_aic_model_replay_split"] = (
+            min(replay_split_aics, key=replay_split_aics.get)
+            if replay_split_aics
+            else None
         )
 
         ## Modulation time courses
         # Share fits with the LR-test / AIC path so neuron_stats and
         # the modulation arrays can never disagree due to divergent
-        # IRLS convergence.
+        # IRLS convergence. When the source model is non-estimable
+        # (rank-deficient design — typically an absent event class),
+        # the spline-by-coefficient product would silently emit a
+        # zero curve from statsmodels' degenerate fit; route those
+        # to NaN so consumers can tell "absent event class" from
+        # "estimated zero modulation".
         n_basis_functions = spline_basis.shape[1]
+        nan_modulation = np.full(spline_basis.shape[0], np.nan)
 
         # SWR-controlled model: SWR and non-SWR replay modulation
         # controlling for all detected ripples
-        swr_ctrl_params = results["SWR + non_local_no_SWR"].params
-        swr_modulation = (
-            spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
-        )
-        no_swr_modulation = (
-            spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
-        )
+        if "SWR + non_local_no_SWR" in non_estimable_models:
+            swr_modulation = nan_modulation
+            no_swr_modulation = nan_modulation
+            neuron_stats["SWR_max_mod"] = np.nan
+            neuron_stats["SWR_max_mod_time"] = np.nan
+            neuron_stats["non_local_no_SWR_max_mod"] = np.nan
+            neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
+        else:
+            swr_ctrl_params = results["SWR + non_local_no_SWR"].params
+            swr_modulation = (
+                spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
+            )
+            no_swr_modulation = (
+                spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
+            )
 
-        swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
-        neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
-        neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
+            swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
+            neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
+            neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
 
-        no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
-        neuron_stats["non_local_no_SWR_max_mod"] = (
-            no_swr_modulation[no_swr_max_mod_ind]
-        )
-        neuron_stats["non_local_no_SWR_max_mod_time"] = (
-            lag_time[no_swr_max_mod_ind]
-        )
+            no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
+            neuron_stats["non_local_no_SWR_max_mod"] = (
+                no_swr_modulation[no_swr_max_mod_ind]
+            )
+            neuron_stats["non_local_no_SWR_max_mod_time"] = (
+                lag_time[no_swr_max_mod_ind]
+            )
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
         # controlling for replay-coincident ripples only
-        replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
-        non_local_swr_modulation = (
-            spline_basis @ replay_split_params[1 : n_basis_functions + 1]
-        )
-        non_local_no_swr_modulation = (
-            spline_basis @ replay_split_params[n_basis_functions + 1 :]
-        )
+        if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
+            non_local_swr_modulation = nan_modulation
+            non_local_no_swr_modulation = nan_modulation
+            neuron_stats["non_local_SWR_max_mod"] = np.nan
+            neuron_stats["non_local_SWR_max_mod_time"] = np.nan
+            neuron_stats["non_local_no_SWR_split_max_mod"] = np.nan
+            neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
+        else:
+            replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
+            non_local_swr_modulation = (
+                spline_basis @ replay_split_params[1 : n_basis_functions + 1]
+            )
+            non_local_no_swr_modulation = (
+                spline_basis @ replay_split_params[n_basis_functions + 1 :]
+            )
 
-        non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
-        neuron_stats["non_local_SWR_max_mod"] = (
-            non_local_swr_modulation[non_local_swr_max_ind]
-        )
-        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
+            non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
+            neuron_stats["non_local_SWR_max_mod"] = (
+                non_local_swr_modulation[non_local_swr_max_ind]
+            )
+            neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
 
-        non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
-        neuron_stats["non_local_no_SWR_split_max_mod"] = (
-            non_local_no_swr_modulation[non_local_no_swr_max_ind]
-        )
-        neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
-            lag_time[non_local_no_swr_max_ind]
-        )
+            non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
+            neuron_stats["non_local_no_SWR_split_max_mod"] = (
+                non_local_no_swr_modulation[non_local_no_swr_max_ind]
+            )
+            neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
+                lag_time[non_local_no_swr_max_ind]
+            )
 
     except (ValueError, np.linalg.LinAlgError):
         _logger.warning(
@@ -889,6 +976,17 @@ def run_session(
         Shape (n_lag_times, n_neurons).
 
     """
+    # Deferred imports: these helpers open Spyglass / DataJoint at
+    # import time. Keeping them function-local lets the rest of the
+    # module (pure GLM helpers + design-matrix builders) stay
+    # offline-importable for unit tests.
+    from continuum_swr_replay.analysis.hippocampus import (
+        get_confident_times,
+        get_overlap_times,
+        load_results,
+    )
+    from continuum_swr_replay.data_loaders import load_data
+
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     )
@@ -917,7 +1015,7 @@ def run_session(
     ]
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results
+        non_local_times, data["ripple_times"]
     )
     logger.info(
         "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",

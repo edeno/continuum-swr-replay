@@ -131,10 +131,14 @@ class TestCreateLaggedSignal:
         signal = np.array([0, 0, 0, 0, 1], dtype=float)
         lags = np.array([2])
         result = create_lagged_signal(signal, lags)
-        # The 1 at index 4 shifted by 2 would go to index 6, which is OOB
-        # So only zeros remain in the valid range
-        assert result[-1, 0] == 0  # shifted out
-        assert result.sum() == 0 or result[-3, 0] == 0  # no data leaked
+        # The 1 at index 4 shifted by 2 would land at index 6 — OOB,
+        # so the column must be all-zero. Pin the *whole* expected
+        # vector: a regression that leaks the value into any in-range
+        # bin (e.g. via wrap-around or fill-with-edge) would still
+        # have most slots equal to zero, so an
+        # ``any-bin-is-zero``-style assertion silently passes.
+        expected = np.zeros(5, dtype=float)
+        np.testing.assert_array_equal(result[:, 0], expected)
 
     def test_default_lags(self):
         signal = np.zeros(300)
@@ -307,7 +311,12 @@ class TestDevianceFractions:
             results["SWR"],
             results["constant"],
         )
-        assert frac >= -1e-10  # non-negative for nested models
+        # Adding nested predictors can only explain *more* null deviance,
+        # so the fraction must be non-negative. A function returning a
+        # constant (e.g. 0.0) for any input would pass ``>= 0`` — pin
+        # finiteness so a NaN/inf regression also trips here.
+        assert np.isfinite(frac)
+        assert frac >= -1e-10
 
     def test_frac_explained_deviance_bounded(
         self, simple_event_times, position_info, is_immobile, spike_count
@@ -322,7 +331,12 @@ class TestDevianceFractions:
             results["SWR"],
             results["constant"],
         )
+        # Bounded fraction must be finite, in [0, 1], and (under the seeded
+        # event fixture) strictly between 0 and 1 — a degenerate output
+        # locked to 0 or 1 indicates broken nested-model accounting.
+        assert np.isfinite(frac)
         assert -1e-6 <= frac <= 1.0 + 1e-6
+        assert 0.0 < frac < 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -353,8 +367,11 @@ class TestThetaModulation:
         lr, p, mod, _ = run_theta_modulation_test(
             theta_phase, is_immobile, spike_count,
         )
-        # p-value should be high (not significant)
-        assert p > 0.01 or mod < 0.5
+        # A function returning (p=0, mod=0) would pass the prior
+        # disjunction (mod < 0.5 is True). Require *both* a non-significant
+        # p-value AND a modest modulation depth so a degenerate output is
+        # caught.
+        assert p > 0.01 and mod < 0.5, f"p={p:.3f}, mod={mod:.3f}"
 
 
 # ---------------------------------------------------------------------------
@@ -378,11 +395,16 @@ class TestProcessNeuron:
             time_axis, dm, spline_basis, lag_time,
         )
 
-        # stats should be a dict with firing rates
+        # Both rates must be strictly positive — the prior ``>= 0`` check
+        # passed silently for a function returning constant 0. Magnitudes
+        # are dominated by Poisson noise (the fixture's run window is only
+        # 1 s of a 10 s epoch), so don't pin a specific Hz value.
         assert "run_avg_firing_rate" in stats
         assert "immobility_avg_firing_rate" in stats
-        assert stats["run_avg_firing_rate"] >= 0
-        assert stats["immobility_avg_firing_rate"] >= 0
+        assert np.isfinite(stats["run_avg_firing_rate"])
+        assert np.isfinite(stats["immobility_avg_firing_rate"])
+        assert stats["run_avg_firing_rate"] > 0
+        assert stats["immobility_avg_firing_rate"] > 0
 
     def test_modulation_arrays_have_correct_shape(
         self, poisson_spike_times, is_immobile, theta_phase,
@@ -401,10 +423,17 @@ class TestProcessNeuron:
         )
 
         n_lags = len(lags)
-        assert swr_mod.shape == (n_lags,)
-        assert no_swr_mod.shape == (n_lags,)
-        assert nl_swr_mod.shape == (n_lags,)
-        assert nl_no_swr_mod.shape == (n_lags,)
+        for arr in (swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod):
+            assert arr.shape == (n_lags,)
+            # A function returning all-NaN/all-zero arrays would pass the
+            # shape check alone.
+            assert np.isfinite(arr).all()
+
+        # The four modulation arrays correspond to distinct event subsets
+        # in the fixture; a regression that duplicates one array across
+        # all four outputs would slip past shape-only checks.
+        assert not np.array_equal(swr_mod, no_swr_mod)
+        assert not np.array_equal(nl_swr_mod, nl_no_swr_mod)
 
     def test_stats_contain_likelihood_ratio_tests(
         self, poisson_spike_times, is_immobile, theta_phase,
@@ -430,3 +459,151 @@ class TestProcessNeuron:
         for key, val in stats.items():
             if key.endswith(": pval"):
                 assert 0 <= val <= 1, f"{key} = {val} out of range"
+
+    def test_absent_event_class_marks_dependent_outputs_as_unavailable(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, position_info, sampling_frequency,
+    ):
+        """Regression: ``_make_design_matrices`` builds spline
+        regressors for every event class regardless of whether that
+        class has any events. An empty event table leaves its spline
+        columns all-zero, so the design matrix is rank-deficient
+        against the intercept; statsmodels still produces finite
+        zero parameters and finite degenerate LR / fractional-deviance
+        values, and ``process_neuron``'s NaN-params check doesn't
+        catch them.
+
+        Post-fix: rank-deficient designs are detected up front. Any
+        LR test or fractional deviance involving the affected models
+        is NaN; modulation arrays sourced from a rank-deficient
+        design are NaN; and AIC selection skips those models.
+        """
+        # Empty non_local_no_SWR. Other event classes are populated.
+        event_times = {
+            "SWR": pd.DataFrame({"start_time": [1.0, 5.0],
+                                 "end_time": [1.1, 5.1]}),
+            "non_local": pd.DataFrame({"start_time": [1.0, 5.0],
+                                       "end_time": [1.1, 5.1]}),
+            "non_local_SWR": pd.DataFrame({"start_time": [1.0, 5.0],
+                                           "end_time": [1.1, 5.1]}),
+            "non_local_no_SWR": pd.DataFrame(
+                columns=["start_time", "end_time"]
+            ),
+        }
+        dm, spline_basis, lag_time = _make_design_matrices(
+            event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+        )
+
+        # Every test that touches the absent event class must be NaN.
+        for affected in (
+            "non_local_no_SWR vs. constant",
+            "SWR + non_local_no_SWR vs. constant",
+            "SWR + non_local_no_SWR vs. SWR",
+            "SWR + non_local_no_SWR vs. non_local_no_SWR",
+            "non_local_SWR + non_local_no_SWR vs. constant",
+            "non_local_SWR + non_local_no_SWR vs. non_local_SWR",
+            "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
+            "non_local_SWR + non_local_no_SWR vs. non_local",
+        ):
+            for suffix in (": lr", ": pval", ": frac_null_dev",
+                           ": frac_explained_dev"):
+                key = affected + suffix
+                assert np.isnan(stats[key]), (
+                    f"{key} = {stats[key]} but the model uses an empty "
+                    "event class — the LR/dev statistic is not "
+                    "estimable and must be NaN."
+                )
+
+        # Tests that don't touch the absent class stay finite.
+        for unaffected in (
+            "SWR vs. constant",
+            "non_local vs. constant",
+            "non_local_SWR vs. constant",
+        ):
+            assert np.isfinite(stats[unaffected + ": pval"])
+
+        # Modulation curves sourced from rank-deficient designs are
+        # all-NaN; the corresponding max-mod stats are NaN.
+        assert np.all(np.isnan(swr_mod))
+        assert np.all(np.isnan(no_swr_mod))
+        assert np.all(np.isnan(nl_no_swr_mod))
+        for stat in (
+            "SWR_max_mod", "SWR_max_mod_time",
+            "non_local_no_SWR_max_mod", "non_local_no_SWR_max_mod_time",
+            "non_local_no_SWR_split_max_mod",
+            "non_local_no_SWR_split_max_mod_time",
+        ):
+            assert np.isnan(stats[stat])
+        # The replay-split model also depends on non_local_no_SWR, so
+        # its non_local_SWR modulation curve is NaN too.
+        assert np.all(np.isnan(nl_swr_mod))
+        assert np.isnan(stats["non_local_SWR_max_mod"])
+        assert np.isnan(stats["non_local_SWR_max_mod_time"])
+
+        # AIC selectors must skip non-estimable models. With
+        # non_local_no_SWR absent, "SWR + non_local_no_SWR" and
+        # "non_local_SWR + non_local_no_SWR" drop out; the remaining
+        # candidates are constant / SWR / non_local on the SWR side
+        # and constant / non_local on the replay-split side.
+        assert stats["min_aic_model"] in {"constant", "SWR", "non_local"}
+        assert stats["min_aic_model_replay_split"] in {"constant", "non_local"}
+
+    def test_non_nested_swr_vs_non_local_lr_test_is_not_emitted(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, simple_event_times, position_info, sampling_frequency,
+    ):
+        """Regression: ``("SWR + non_local_no_SWR", "non_local")`` is
+        NOT a nested model pair in general. The full design carries
+        ``SWR`` (= ``non_local_SWR + SWR_only``) plus
+        ``non_local_no_SWR``; the reduced design carries ``non_local``
+        (= ``non_local_SWR + non_local_no_SWR``). Recovering
+        ``non_local`` from the full requires ``SWR_only == 0`` (no
+        SWR-only events), which is the empty special case. Outside
+        that case, the chi-square LR statistic has no valid null
+        distribution and ``frac_*_dev`` no longer represents "unique
+        deviance explained by the added regressors."
+
+        The fix drops that comparison from ``process_neuron``'s
+        ``test_cases`` so the invalid LR / fractional-deviance
+        columns are no longer emitted. The valid sibling comparison
+        ``("non_local_SWR + non_local_no_SWR", "non_local")`` (which
+        IS nested) and the SWR-controlled comparisons against
+        ``"SWR"`` and ``"non_local_no_SWR"`` are preserved.
+        """
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        stats, *_ = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+        )
+
+        invalid_test = "SWR + non_local_no_SWR vs. non_local"
+        for suffix in (": lr", ": pval", ": frac_null_dev", ": frac_explained_dev"):
+            key = invalid_test + suffix
+            assert key not in stats, (
+                f"non-nested comparison {invalid_test!r} still emitted "
+                f"{key!r} — chi-square LR has no valid null distribution "
+                "and 'unique deviance explained' loses its interpretation "
+                "when SWR-only events exist."
+            )
+
+        # Sibling nested comparisons must still be reported.
+        for valid_key in (
+            "non_local_SWR + non_local_no_SWR vs. non_local: pval",
+            "SWR + non_local_no_SWR vs. SWR: pval",
+            "SWR + non_local_no_SWR vs. non_local_no_SWR: pval",
+        ):
+            assert valid_key in stats, (
+                f"valid nested comparison {valid_key!r} was dropped by "
+                "the fix — only the non-nested non_local comparison "
+                "should be removed."
+            )

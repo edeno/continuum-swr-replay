@@ -6,8 +6,10 @@ data pipeline (``build_choice_dataset`` →
 fit (``fit_choice_model``) all live in this module. Pin the
 invariants:
 
-- ``build_choice_dataset``: 8-arm choice sets, exactly one chosen
-  arm per stop, current_arm always excluded, NaN-current_arm filter
+- ``build_choice_dataset``: well-arms-only choice sets (5 arms after
+  removing current_arm; trunk arms 6/7/8 excluded because they can
+  never be next_arm), exactly one chosen arm per stop, current_arm
+  always excluded, NaN-current_arm filter
 - ``predict_arm_fractions``: predictions sum to 1 per event, residual
   has the right sign, numerically-stable softmax handles large logits
 - ``build_residualized_choice_dataset``: residual column merged on
@@ -107,7 +109,9 @@ class TestBuildChoiceDataset:
         """arm != NaN is True for every arm in IEEE 754, so the
         ``choice_df[choice_df['arm'] != choice_df['current_arm']]``
         filter silently keeps all 9 arms when current_arm is NaN.
-        Such stops must be filtered at the stop level."""
+        Such stops must be filtered at the stop level. The choice
+        set is now WELL_ARMS \\ {current_arm} = 5 arms (well arms
+        0-5, minus the well the animal is sitting on)."""
         et, eat, st = _make_minimal_tables(
             [
                 {"stop_id": 1, "current_arm": 0, "next_arm": 3},
@@ -117,7 +121,7 @@ class TestBuildChoiceDataset:
         )
         ds = build_choice_dataset(et, eat, st)
         sizes = ds.groupby("stop_id").size()
-        assert (sizes == 8).all()
+        assert (sizes == 5).all()
         assert 2 not in sizes.index
         assert set(sizes.index) == {1, 3}
 
@@ -141,6 +145,37 @@ class TestBuildChoiceDataset:
         ds = build_choice_dataset(et, eat, st)
         chosen_row = ds.loc[ds["chosen"] == 1].iloc[0]
         assert chosen_row["arm"] == 3
+
+    def test_choice_set_excludes_trunk_arms(self):
+        """Regression: the choice set must be the WELL ARMS (leaf
+        arms 0-5, one per well) minus ``current_arm`` — not
+        ``ALL_ARMS`` minus ``current_arm``. Trunk arms 6/7/8 connect
+        patch junctions and can never be ``next_arm``; including
+        them as unchosen alternatives in the conditional logit
+        denominator changes the likelihood and coefficient
+        interpretation. The same eligible-set is used by
+        ``StopSummaryConfig.well_arms`` for "best arm" lookups, and
+        ``arm_path_well_to_well`` documents that trunk arms cannot be
+        stop endpoints.
+        """
+        et, eat, st = _make_minimal_tables(
+            [
+                {"stop_id": 1, "current_arm": 0, "next_arm": 3},
+                {"stop_id": 2, "current_arm": 5, "next_arm": 2},
+            ]
+        )
+        ds = build_choice_dataset(et, eat, st)
+        # Trunk arms 6, 7, 8 must never appear as candidates.
+        candidates = set(ds["arm"].unique())
+        assert candidates.isdisjoint({6, 7, 8}), (
+            f"trunk arms leaked into choice set: {candidates & {6, 7, 8}}; "
+            "the conditional-logit denominator must be the well arms, "
+            "not all 9 track segments."
+        )
+        # Per-stop choice set is exactly WELL_ARMS \\ {current_arm}.
+        for stop_id, current_arm in [(1, 0), (2, 5)]:
+            stop_arms = set(ds.loc[ds["stop_id"] == stop_id, "arm"])
+            assert stop_arms == {0, 1, 2, 3, 4, 5} - {current_arm}
 
     def test_current_arm_never_in_choice_set(self):
         """current_arm is the arm the animal is sitting on — by
@@ -217,6 +252,66 @@ class TestBuildChoiceDataset:
         # arm 1: mean of (1/9, 0) = 1/18
         arm1 = ds.loc[ds["arm"] == 1, "replay_frac"].iloc[0]
         assert arm1 == pytest.approx((1.0 / 9) / 2)
+
+    def test_partial_nan_event_propagates_nan_replay_frac(self):
+        """Regression: build_choice_dataset's per-(stop, arm) mean
+        must be strict NaN-propagating.
+
+        Pre-fix used pandas' default ``"mean"`` aggregator
+        (``skipna=True``), so a stop with two events — one with
+        finite ``arm_fraction`` and one with NaN — silently emitted
+        ``replay_frac = <surviving event's value>`` while
+        ``n_events == 2``. The downstream chosen-arm sanity check
+        only inspects ``chosen.sum() == 1`` per stop, so it does
+        not detect the NaN that has already been collapsed away.
+        That biases Stage-5A choice prediction toward the subset of
+        events that happened to have a finite ``arm_fraction``.
+
+        Post-fix uses ``mean(skipna=False)`` so any NaN event
+        propagates a NaN ``replay_frac`` for that (stop, arm), and
+        ``fit_choice_model``'s drop-NaN-required-predictors step
+        removes the contaminated stop.
+        """
+        et, eat, st = _make_minimal_tables(
+            [{"stop_id": 1, "current_arm": 0, "next_arm": 3}]
+        )
+        # Add a second event for the same stop where arm 3's
+        # arm_fraction is NaN (other arms keep finite values).
+        new_event_rows = []
+        for arm in range(9):
+            new_event_rows.append({
+                "event_id": 2,
+                "stop_id": 1,
+                "arm": arm,
+                "arm_fraction": np.nan if arm == 3 else 1.0 / 8,
+                "is_prev": 0.0,
+                "is_next": 0.0,
+                "visit_recency": 0.0,
+                "cumulative_reward": 0.0,
+                "recent_reward_rate": 0.0,
+                "dist_to_arm": 1.0,
+                "is_same_patch": 0,
+            })
+        eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)
+        et = pd.concat(
+            [et, pd.DataFrame({"event_id": [2], "stop_id": [1]})],
+            ignore_index=True,
+        )
+
+        ds = build_choice_dataset(et, eat, st)
+        # arm 3 had NaN in event 2; replay_frac for arm 3 must be
+        # NaN, not the surviving event 1's value of 1/9.
+        arm3 = ds.loc[ds["arm"] == 3, "replay_frac"].iloc[0]
+        assert np.isnan(arm3), (
+            f"replay_frac for arm 3 = {arm3} — strict aggregator "
+            "should propagate NaN when any event has NaN "
+            "arm_fraction; pre-fix silently emitted the surviving "
+            "event's value (~0.111)."
+        )
+        # Other arms (no NaN) should still be finite.
+        arm1 = ds.loc[ds["arm"] == 1, "replay_frac"].iloc[0]
+        assert not np.isnan(arm1)
+
 
 # ── predict_arm_fractions ──
 
@@ -358,19 +453,22 @@ class TestBuildResidualizedChoiceDataset:
 class TestFitChoiceModel:
     def _choice_df_for_fit(self, n_stops=20, *, beta_replay=2.0, seed=0):
         """Generate a choice dataset where replay_frac is correlated
-        with the chosen arm. Each stop has 8 candidate arms; the
-        chosen arm is sampled from a softmax over replay_frac with
-        coefficient ``beta_replay``."""
+        with the chosen arm. Each stop has 5 candidate arms (matches
+        production: well arms 0-5 minus current_arm). The chosen arm
+        is sampled from a softmax over replay_frac with coefficient
+        ``beta_replay``."""
         rng = np.random.default_rng(seed)
+        well_arms = (0, 1, 2, 3, 4, 5)
+        n_alts = len(well_arms) - 1  # 5 — well arms minus current_arm
         rows = []
         for stop_id in range(1, n_stops + 1):
-            arms = rng.choice(9, size=8, replace=False)
-            replay_frac = rng.uniform(0, 1, size=8)
+            arms = rng.choice(well_arms, size=n_alts, replace=False)
+            replay_frac = rng.uniform(0, 1, size=n_alts)
             replay_frac /= replay_frac.sum()  # normalize
             logits = beta_replay * replay_frac
             probs = np.exp(logits - logits.max())
             probs /= probs.sum()
-            chosen_idx = rng.choice(8, p=probs)
+            chosen_idx = rng.choice(n_alts, p=probs)
             for i, arm in enumerate(arms):
                 rows.append({
                     "stop_id": stop_id,

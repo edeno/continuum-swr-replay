@@ -32,12 +32,7 @@ import warnings
 import networkx as nx
 import numpy as np
 import pandas as pd
-from datajoint import DataJointError
 from numpy.typing import NDArray
-from spyglass.common import IntervalList
-from spyglass.common.common_position import IntervalPositionInfo
-from spyglass.linearization.v0.main import IntervalLinearizedPosition, TrackGraph
-from spyglass.position import PositionOutput
 from track_linearization import get_linearized_position
 
 from ..types import PositionInfoDict
@@ -197,6 +192,19 @@ def get_position_info(
     6  # Six wells in the environment
 
     """
+    # Lazy imports: Spyglass / DataJoint require a database connection
+    # at import time. Keeping these inside the function lets pure
+    # helpers (e.g. ``get_interpolated_position_info``) import cleanly
+    # offline.
+    from datajoint import DataJointError
+    from spyglass.common import IntervalList
+    from spyglass.common.common_position import IntervalPositionInfo
+    from spyglass.linearization.v0.main import (
+        IntervalLinearizedPosition,
+        TrackGraph,
+    )
+    from spyglass.position import PositionOutput
+
     position_key = {
         "nwb_file_name": nwb_file_name,
         "interval_list_name": pos_name,

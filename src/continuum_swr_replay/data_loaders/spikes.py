@@ -52,11 +52,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from scipy.ndimage import label
-from spyglass.common import Nwbfile
-from spyglass.decoding.v0.clusterless import UnitMarks
-from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
-from spyglass.utils.nwb_helper_fn import get_nwb_file
 
+# ``spyglass`` opens a DataJoint connection at module import time. We
+# defer those imports into the DB-loading function bodies so that
+# pure helpers (``detect_coincident_spikes``, ``filter_spike_times``)
+# stay offline-importable for unit tests on machines without VPN.
 from ..types import SpikeDataDict
 
 logger = logging.getLogger(__name__)
@@ -130,15 +130,29 @@ def detect_coincident_spikes(
     is_close = np.concatenate([[False], is_close])
     labels, _ = label(is_close)
 
+    # ``scipy.ndimage.label`` leaves the first spike of each close
+    # cluster with label=0 because ``np.diff`` is backward-looking.
+    # Extend each labeled run backward by one spike so the cluster's
+    # leading spike contributes to ``coincident_fraction``. Without
+    # this, a 2-spike cluster spanning 2 distinct tetrodes on a
+    # 4-tetrode session evaluates as 1/4 (only the trailing spike
+    # counted), which is below the default 0.33 threshold even though
+    # the true coincidence is 2/4 = 0.5 — keeping the artifact in.
+    labels_arr = np.asarray(labels)
+    next_label = np.concatenate([labels_arr[1:], [0]])
+    cluster_labels = np.where(
+        (labels_arr == 0) & (next_label > 0), next_label, labels_arr
+    )
+
     spike_events = pd.DataFrame(
         {
-            "labels": labels,
+            "labels": cluster_labels,
             "sort_group_id": sort_group_id,
             "time_bin_ind": time_bin_ind,
             "spike_times": sorted_spike_times,
         },
     )
-    # Calculate coincident fraction to identify artifacts
+    # Calculate coincident fraction to identify artifacts.
     n_sort_groups = len(spike_times)
     coincident_fraction = (
         spike_events.loc[spike_events.labels > 0]
@@ -148,13 +162,11 @@ def detect_coincident_spikes(
     )
     artifact_labels = coincident_fraction[coincident_fraction > max_coincident_fraction]
 
-    # Build mask of spikes belonging to artifact groups.
-    # scipy.ndimage.label assigns label=0 to the first spike in each cluster
-    # (because np.diff only looks backward), so we must also remove the spike
-    # immediately preceding each artifact-labeled run.
+    # ``cluster_labels`` already includes the leading spike of each
+    # cluster, so flagging artifact rows directly removes every spike
+    # in any too-coincident cluster — no extra ``.shift(-1)`` step
+    # needed.
     is_artifact = spike_events.labels.isin(artifact_labels.index)
-    # Shift forward to also flag the preceding (label=0) spike that starts each cluster
-    is_artifact = is_artifact | is_artifact.shift(-1, fill_value=False)
     spike_events = spike_events.loc[~is_artifact]
 
     grouped = spike_events.groupby("sort_group_id")
@@ -189,6 +201,9 @@ def get_electrode_group_info(nwb_file_name: str) -> pd.DataFrame:
         Electrode group information with targeted location labels
 
     """
+    from spyglass.common import Nwbfile
+    from spyglass.utils.nwb_helper_fn import get_nwb_file
+
     nwb_file_abspath = Nwbfile.get_abs_path(nwb_file_name)
     nwb_file = get_nwb_file(nwb_file_abspath)
     electrode_group_df = []
@@ -251,9 +266,18 @@ def _get_tetrode_sort_group_ids(
         Sort group IDs with <= 4 electrodes.
 
     """
+    from spyglass.decoding.v0.clusterless import UnitMarks
+    from spyglass.spikesorting.v0 import SortGroup
+
     unit_mark_keys = pd.DataFrame(
         (UnitMarks & restriction).fetch("sort_group_id", as_dict=True)
     )
+    # Empty DataJoint fetch yields a DataFrame with no columns, so accessing
+    # "sort_group_id" would raise KeyError. The caller (get_hpc_marks) treats
+    # an empty tetrode set as "no HPC" via ValueError, so return early here
+    # and let it raise the descriptive ValueError that get_spike_data catches.
+    if unit_mark_keys.empty:
+        return set()
     sort_group_ids = unit_mark_keys["sort_group_id"].unique()
 
     tetrode_ids = set()
@@ -293,6 +317,8 @@ def get_hpc_marks(
         - spike_waveform_features: list of arrays with waveform features
 
     """
+    from spyglass.decoding.v0.clusterless import UnitMarks
+
     # Base restriction shared by both parameter options
     restriction_base = {
         "nwb_file_name": nwb_file_name,
@@ -365,6 +391,8 @@ def get_pfc_spike_times(
         List of arrays with spike times per unit
 
     """
+    from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
+
     restriction = {
         "nwb_file_name": nwb_file_name,
         "preproc_params_name": "default",
@@ -526,7 +554,12 @@ def filter_spike_times(
                 brain_area,
             )
 
-        filtered_spike_times[brain_area] = brain_area_filtered_times
+        # Drop the brain area entirely when no surviving units remain. Downstream
+        # decoder code uses dict-membership ("brain_area in data['spike_times']")
+        # to detect availability, so an empty list would otherwise fall through
+        # to perform_decoding. Mirrors the feature-side conditional below.
+        if brain_area_filtered_times:
+            filtered_spike_times[brain_area] = brain_area_filtered_times
 
         if brain_area_filtered_features:
             filtered_spike_waveform_features[brain_area] = brain_area_filtered_features

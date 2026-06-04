@@ -28,11 +28,42 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 logger = logging.getLogger(__name__)
 
 
+def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
+    """True iff the within-group-demeaned design is full column rank.
+
+    Conditional Poisson / Logit identify only **within-group** variation:
+    a predictor that is constant within every group (event/stop) is
+    absorbed by the conditioning and is unidentified — statsmodels still
+    returns a finite estimate with an exploding standard error rather than
+    failing. Demeaning each predictor within its group and checking the
+    rank catches that case *and* globally collinear predictors (a
+    duplicated predictor demeans to a collinear column too).
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, n_predictors)
+        Design matrix (no intercept; conditioned out).
+    groups : np.ndarray, shape (n_rows,)
+        Group label per row (the conditioning variable, e.g. event_id).
+
+    Returns
+    -------
+    bool
+        True when every predictor carries within-group variation and the
+        demeaned design is full rank; False if rank-deficient.
+    """
+    if X.shape[1] == 0:
+        return True
+    centered = X - pd.DataFrame(X).groupby(groups).transform("mean").to_numpy()
+    return int(np.linalg.matrix_rank(centered)) == X.shape[1]
+
+
 def fit_conditional_poisson(
     long_df: pd.DataFrame,
     predictors: list[str],
     response_col: str = "arm_count_hard",
     event_col: str = "event_id",
+    n_categories: int = 9,
 ) -> dict | None:
     """Fit a conditional Poisson model on long-format count data.
 
@@ -42,16 +73,24 @@ def fit_conditional_poisson(
     Parameters
     ----------
     long_df : pd.DataFrame
-        Long-format data (9 rows per event) with arm counts and predictors.
+        Long-format data (one row per (event, category)) with counts and
+        predictors. Defaults to 9 rows per event for the arm-level fit;
+        pass ``n_categories=3`` for the patch-level fit.
     predictors : list[str]
-        Column names for arm-varying predictors.
+        Column names for category-varying predictors.
     response_col : str
-        Column with non-negative per-arm response values. Integer timebin
-        counts (``arm_count_hard``) are the primary use; fractional
-        responses (``arm_count_soft``, ``arm_posterior_mass``) are also
-        supported for robustness analyses.
+        Column with non-negative per-category response values. Integer
+        timebin counts (``arm_count_hard`` / ``patch_count_hard``) are
+        the primary use; fractional responses (``arm_count_soft``,
+        ``arm_posterior_mass``) are also supported for robustness
+        analyses.
     event_col : str
         Column with globally unique event IDs (grouping variable).
+    n_categories : int, optional
+        Number of candidate categories per event under the null
+        (uniform) model. ``9`` for arm-level fits, ``3`` for
+        patch-level. Used in pseudo-R² null likelihood and forwarded to
+        ``fit_null_model_conditional``.
 
     Returns
     -------
@@ -60,7 +99,9 @@ def fit_conditional_poisson(
         None if fitting fails or insufficient data.
     """
     if len(predictors) == 0:
-        return fit_null_model_conditional(long_df, event_col, response_col)
+        return fit_null_model_conditional(
+            long_df, event_col, response_col, n_arms=n_categories
+        )
 
     required = [response_col, event_col] + predictors
     missing = [c for c in required if c not in long_df.columns]
@@ -76,6 +117,13 @@ def fit_conditional_poisson(
     # model use the same |A_e| for every event.
     has_nan = df[required].isna().any(axis=1)
     events_with_nan = df.loc[has_nan, event_col].unique()
+    if len(events_with_nan) > 0:
+        logger.info(
+            "fit_conditional_poisson: dropping %d event(s) with NaN in a required "
+            "column before fitting %s",
+            len(events_with_nan),
+            predictors,
+        )
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
@@ -85,15 +133,35 @@ def fit_conditional_poisson(
 
     n_events = len(np.unique(groups))
     if n_events < 2 * len(predictors):
+        logger.info(
+            "fit_conditional_poisson: %d events < 2*%d predictors; not fitting %s",
+            n_events,
+            len(predictors),
+            predictors,
+        )
         return None
 
     X = df[predictors].values.astype(float)
+
+    # Reject designs the conditional model cannot identify: globally
+    # collinear predictors AND predictors with no within-group variation
+    # (constant within every event), which statsmodels would otherwise fit
+    # with finite-but-meaningless coefficients and exploding SEs.
+    if not within_group_full_rank(X, groups):
+        logger.warning(
+            "fit_conditional_poisson: rank-deficient or within-group-constant "
+            "design; not fitting %s",
+            predictors,
+        )
+        return None
 
     try:
         model = ConditionalPoisson(y, X, groups=groups)
         result = model.fit(disp=0)
     except Exception:
-        logger.warning("ConditionalPoisson failed for predictors %s", predictors)
+        logger.warning(
+            "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
+        )
         return None
 
     coefs = dict(zip(predictors, result.params, strict=True))
@@ -109,13 +177,15 @@ def fit_conditional_poisson(
     # consistency with the conditional-Poisson likelihood structure.
     bic = n_params * np.log(n_events) - 2 * llf
 
-    # Pseudo-R² against the analytical null (uniform allocation).
-    # Use 9 explicitly — the bandit task always has 9 arms per event.
-    # The inferred ``len(df) // n_events`` can be wrong when NaN
-    # filtering drops arms from some events (reviewer flag #1).
-    n_arms = 9
+    # Pseudo-R² against the analytical null (uniform allocation over
+    # ``n_categories`` candidate slots per event). The arm-level fit
+    # uses 9; the patch-level fit (3 patches per event) must override
+    # this — otherwise log(9) is used as the null and pseudo-R² /
+    # AIC / BIC for P0–P3 silently scale against the wrong baseline.
+    # The inferred ``len(df) // n_events`` would be wrong when NaN
+    # filtering drops categories from some events (reviewer flag #1).
     total_count = float(y.sum())
-    llf_null = -total_count * np.log(n_arms)
+    llf_null = -total_count * np.log(n_categories)
     pseudo_r2 = (
         1.0 - llf / llf_null if np.isfinite(llf_null) and llf_null != 0 else np.nan
     )
@@ -174,7 +244,13 @@ def fit_null_model_conditional(
     dict
         Null model fit statistics with 0 parameters.
     """
-    event_totals = long_df.groupby(event_col)[response_col].sum()
+    df = long_df[[event_col, response_col]].copy()
+    has_nan = df[[event_col, response_col]].isna().any(axis=1)
+    events_with_nan = df.loc[has_nan, event_col].unique()
+    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    df = _drop_zero_count_events(df, event_col, response_col)
+
+    event_totals = df.groupby(event_col)[response_col].sum()
     n_events = len(event_totals)
 
     # ℓ₀ = -Σ_e L_e · log(|A_e|)
@@ -183,7 +259,7 @@ def fit_null_model_conditional(
 
     return {
         "n_events": n_events,
-        "n_rows": len(long_df),
+        "n_rows": len(df),
         "n_params": 0,
         "llf": float(llf),
         "llf_null": float(llf),
@@ -227,20 +303,50 @@ def fit_conditional_logit(
     required = [event_col, response_col] + predictors
     missing = [c for c in required if c not in long_df.columns]
     if missing:
+        logger.warning("fit_conditional_logit missing columns: %s", missing)
         return None
 
-    df = long_df[required].copy()
+    arm_col = (
+        "arm"
+        if "arm" in long_df.columns
+        else "arm_id"
+        if "arm_id" in long_df.columns
+        else None
+    )
+    # Guard against a duplicate column if the resolved arm column is also
+    # one of the predictors (would otherwise create a same-named column).
+    select_cols = required + (
+        [arm_col] if arm_col is not None and arm_col not in required else []
+    )
+    df = long_df[select_cols].copy()
 
     # Event-wise NaN filtering: drop entire events if any row has NaN,
     # consistent with fit_conditional_poisson.
     has_nan = df[required].isna().any(axis=1)
     events_with_nan = df.loc[has_nan, event_col].unique()
+    if len(events_with_nan) > 0:
+        logger.info(
+            "fit_conditional_logit: dropping %d event(s) with NaN in a required "
+            "column before fitting %s",
+            len(events_with_nan),
+            predictors,
+        )
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
 
-    # Determine dominant arm per event
-    idx = df.groupby(event_col)[response_col].idxmax()
+    # Determine dominant arm per event. Break ties by the lowest arm id
+    # when an arm column is available; otherwise fall back to pandas'
+    # first-row idxmax behavior for minimal legacy inputs.
+    if arm_col is not None:
+        idx = (
+            df.sort_values([event_col, response_col, arm_col], ascending=[True, False, True])
+            .groupby(event_col, sort=False)
+            .head(1)
+            .index
+        )
+    else:
+        idx = df.groupby(event_col)[response_col].idxmax()
     df["dominant"] = 0
     df.loc[idx, "dominant"] = 1
     y = df["dominant"].values
@@ -248,14 +354,34 @@ def fit_conditional_logit(
     groups = df[event_col].values
     n_events = len(np.unique(groups))
     if n_events < 2 * len(predictors):
+        logger.info(
+            "fit_conditional_logit: %d events < 2*%d predictors; not fitting %s",
+            n_events,
+            len(predictors),
+            predictors,
+        )
         return None
 
     X = df[predictors].values.astype(float)
+
+    # Reject designs the conditional model cannot identify (see
+    # fit_conditional_poisson): globally collinear or within-group-constant
+    # predictors yield finite-but-meaningless coefficients/SEs.
+    if not within_group_full_rank(X, groups):
+        logger.warning(
+            "fit_conditional_logit: rank-deficient or within-group-constant "
+            "design; not fitting %s",
+            predictors,
+        )
+        return None
 
     try:
         model = ConditionalLogit(y, X, groups=groups)
         result = model.fit(disp=0)
     except Exception:
+        logger.warning(
+            "ConditionalLogit failed for predictors %s", predictors, exc_info=True
+        )
         return None
 
     coefs = dict(zip(predictors, result.params, strict=True))

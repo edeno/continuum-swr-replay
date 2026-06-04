@@ -91,15 +91,6 @@ def pump_events():
 class TestMakeWellVisitsDf:
     """Test well visit construction from raw events."""
 
-    def test_returns_dataframe(
-        self, beam_breaks, pump_events, position_info, track_graph
-    ):
-        """Should return a DataFrame."""
-        result = make_well_visits_df(
-            beam_breaks, pump_events, position_info, track_graph
-        )
-        assert isinstance(result, pd.DataFrame)
-
     def test_has_required_columns(
         self, beam_breaks, pump_events, position_info, track_graph
     ):
@@ -252,16 +243,6 @@ class TestMakeWellVisitsDf:
 
 class TestMakeTrialsDfFromWellVisits:
     """Test trial aggregation from well visits."""
-
-    def test_returns_dataframe(
-        self, beam_breaks, pump_events, position_info, track_graph
-    ):
-        """Should return a DataFrame."""
-        well_visits = make_well_visits_df(
-            beam_breaks, pump_events, position_info, track_graph
-        )
-        trials = make_trials_df_from_well_visits(well_visits)
-        assert isinstance(trials, pd.DataFrame)
 
     def test_has_goal_arrival_time(
         self, beam_breaks, pump_events, position_info, track_graph

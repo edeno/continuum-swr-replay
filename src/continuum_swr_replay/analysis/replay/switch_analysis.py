@@ -13,7 +13,159 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean, strict_sum
 from .choice_prediction import predict_arm_fractions
+
+
+def _stop_replay_per_patch(
+    event_arm_table: pd.DataFrame,
+    event_table: pd.DataFrame,
+    *,
+    fraction_col: str,
+) -> pd.DataFrame:
+    """Per-stop fraction of replay mass on each patch label.
+
+    Returns DataFrame indexed by ``stop_id`` with columns ``1``, ``2``,
+    ``3`` (patch labels) holding the strict-NaN-aware mean across
+    events of the per-event sum of ``fraction_col`` over arms in that
+    patch.
+
+    Used by :func:`build_switch_aligned_table` and
+    :func:`build_control_aligned_table` to look up replay relative to
+    a TARGET patch (the switch's patch) rather than each individual
+    replay stop's own current_patch — otherwise replay mass that
+    landed on the previous patch in a multi-patch run would be
+    silently re-labeled as "replay on the switch patch".
+
+    Requires ``stop_id`` and ``event_id`` to be globally unique across
+    sessions, like the rest of the per-stop / per-event helpers in
+    this module — without that, the ``groupby(['stop_id',
+    'event_id'])`` and ``groupby('stop_id')`` reductions silently
+    average across sessions whenever a value is reused.
+    """
+    from .choice_prediction import _require_session_unique_ids
+
+    eat = event_arm_table.copy()
+    eat["_patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
+
+    # Bring ``stop_id`` in BEFORE the uniqueness guards. The guards
+    # are no-ops when ``id_col`` is absent from the frame, so checking
+    # ``event_arm_table`` directly would silently skip the
+    # ``stop_id`` check on the fallback-merge path — and a session-
+    # local ``stop_id`` from ``event_table`` would then mix across
+    # sessions in the per-stop reduction below.
+    if "stop_id" not in eat.columns:
+        eat = eat.merge(
+            event_table[["event_id", "stop_id"]].drop_duplicates(),
+            on="event_id",
+            how="left",
+        )
+
+    _require_session_unique_ids(
+        eat, "event_id", helper_name="_stop_replay_per_patch"
+    )
+    _require_session_unique_ids(
+        eat, "stop_id", helper_name="_stop_replay_per_patch"
+    )
+
+    p_arr = eat["_patch"].to_numpy(dtype=float)
+    f_arr = eat[fraction_col].to_numpy(dtype=float)
+
+    out: dict[int, pd.Series] = {}
+    for patch in (1, 2, 3):
+        is_target = np.where(
+            np.isnan(p_arr),
+            np.nan,
+            (p_arr == patch).astype(float),
+        )
+        contrib = f_arr * is_target
+        per_event = (
+            pd.DataFrame(
+                {
+                    "stop_id": eat["stop_id"].to_numpy(),
+                    "event_id": eat["event_id"].to_numpy(),
+                    "_contrib": contrib,
+                }
+            )
+            .groupby(["stop_id", "event_id"])["_contrib"]
+            .apply(strict_sum)
+        )
+        per_stop = (
+            per_event.groupby("stop_id")
+            .apply(strict_mean)
+        )
+        out[patch] = per_stop
+
+    return pd.DataFrame(out)
+
+
+def _patch_relative_fracs(
+    sid: int,
+    target_patch: float,
+    per_stop_per_patch: pd.DataFrame,
+    per_stop_per_patch_residual: pd.DataFrame | None,
+) -> tuple[float, float, float | None]:
+    """Look up patch-relative replay fractions for a given stop.
+
+    Returns ``(frac_target, frac_nontarget, residual_nontarget)``
+    where the third element is ``None`` if no residual table was
+    provided. Strict NaN propagation: a stop missing from the
+    per-stop tables, or a target_patch outside ``{1, 2, 3}``,
+    yields all NaN.
+    """
+    if (
+        sid not in per_stop_per_patch.index
+        or pd.isna(target_patch)
+        or int(target_patch) not in (1, 2, 3)
+    ):
+        return float("nan"), float("nan"), (None if per_stop_per_patch_residual is None else float("nan"))
+    tp = int(target_patch)
+    sp = per_stop_per_patch.loc[sid]
+    frac_target = float(sp[tp])
+    non_targets = [p for p in (1, 2, 3) if p != tp]
+    frac_nontarget = float(sp[non_targets].sum(skipna=False))
+    residual_nt: float | None = None
+    if per_stop_per_patch_residual is not None:
+        if sid in per_stop_per_patch_residual.index:
+            spr = per_stop_per_patch_residual.loc[sid]
+            residual_nt = float(spr[non_targets].sum(skipna=False))
+        else:
+            residual_nt = float("nan")
+    return frac_target, frac_nontarget, residual_nt
+
+
+def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
+    """Per-session first-switch rows: each ``is_stay == 0`` row whose
+    immediate predecessor in chronological stop order was not also a
+    switch. Returns ``None`` when no rows have ``is_stay`` defined.
+
+    Sorting by ``[animal, day, epoch, stop_idx]`` before the
+    ``groupby(...).shift(1)`` is load-bearing: it makes ``shift`` walk
+    chronological stop order rather than caller row order, and the
+    ``groupby`` on session keys prevents the cross-session boundary
+    from leaking the previous session's last stop into
+    ``prev_is_switch`` for the next session's first stop. A
+    builder-level test cannot exercise that boundary because a
+    session's first-switch at ``stop_idx == 0`` has no preceding rows
+    to emit, so the bug is non-observable downstream — exposing this
+    helper lets the regression be tested directly.
+    """
+    valid = stop_table[stop_table["is_stay"].notna()].copy()
+    if len(valid) == 0:
+        return None
+    valid = valid.sort_values(
+        ["animal", "day", "epoch", "stop_idx"]
+    ).reset_index(drop=True)
+    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
+    valid["prev_is_switch"] = (
+        valid.groupby(["animal", "day", "epoch"])["is_switch"]
+        .shift(1)
+        .fillna(0)
+        .astype(int)
+    )
+    return valid[
+        (valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)
+    ]
 
 
 def build_switch_aligned_table(
@@ -67,18 +219,9 @@ def build_switch_aligned_table(
     """
     st = stop_table.copy()
 
-    valid = st[st["is_stay"].notna()].copy()
-    if len(valid) == 0:
+    first_switches = _detect_first_switches(st)
+    if first_switches is None:
         return pd.DataFrame()
-
-    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-    valid["prev_is_switch"] = (
-        valid.groupby(["animal", "day", "epoch"])["is_switch"]
-        .shift(1)
-        .fillna(0)
-        .astype(int)
-    )
-    first_switches = valid[(valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)]
 
     if len(first_switches) == 0:
         return pd.DataFrame()
@@ -87,7 +230,21 @@ def build_switch_aligned_table(
     if content_fit is not None and content_predictors is not None:
         eat = predict_arm_fractions(eat, content_fit, content_predictors)
 
-    stop_replay = stop_patch_replay(eat, event_table, fraction_col=fraction_col)
+    # Per-stop fraction-on-each-patch table. Looking up by the
+    # SWITCH's current_patch is what makes this switch-relative —
+    # the previous form pre-aggregated using each replay stop's
+    # OWN current_patch via ``stop_patch_replay``, then stamped the
+    # switch's ``current_patch`` onto the lag rows, silently
+    # re-labeling replay that landed on the previous patch as
+    # "replay on the switch patch".
+    per_stop_per_patch = _stop_replay_per_patch(
+        eat, event_table, fraction_col=fraction_col
+    )
+    per_stop_per_patch_residual = (
+        _stop_replay_per_patch(eat, event_table, fraction_col="residual_frac")
+        if "residual_frac" in eat.columns
+        else None
+    )
 
     rows = []
     for ep_i, (_idx, sw_row) in enumerate(first_switches.iterrows()):
@@ -97,8 +254,17 @@ def build_switch_aligned_table(
         day = sw_row["day"]
         epoch = sw_row["epoch"]
 
+        # Restrict to the switch's own session — stop_idx is only
+        # session-local, so without this filter a switch in (animal A,
+        # day D, epoch E) could match preceding stops from any other
+        # session that happens to have a stop_idx within the lag
+        # window. Lines 116-118 then write the switch's session keys
+        # onto every row, masking the cross-session contamination.
         preceding = st[
-            (st["stop_idx"] < sw_stop_idx)
+            (st["animal"] == animal)
+            & (st["day"] == day)
+            & (st["epoch"] == epoch)
+            & (st["stop_idx"] < sw_stop_idx)
             & (st["stop_idx"] >= sw_stop_idx - max_lag)
             & st["has_replay"]
         ]
@@ -107,10 +273,12 @@ def build_switch_aligned_table(
             lag = int(ps_row["stop_idx"] - sw_stop_idx)
             sid = ps_row["stop_id"]
 
-            if sid not in stop_replay.index:
+            if sid not in per_stop_per_patch.index:
                 continue
 
-            sr = stop_replay.loc[sid]
+            frac_cp, frac_nc, residual_nc = _patch_relative_fracs(
+                sid, current_patch, per_stop_per_patch, per_stop_per_patch_residual
+            )
             row = {
                 "episode_id": ep_i,
                 "animal": animal,
@@ -121,16 +289,12 @@ def build_switch_aligned_table(
                 "stop_id": sid,
                 "lag": lag,
                 "current_patch": current_patch,
-                "replay_frac_current_patch": sr.get(
-                    "replay_frac_current_patch", np.nan
-                ),
-                "replay_frac_noncurrent": sr.get("replay_frac_noncurrent", np.nan),
+                "replay_frac_current_patch": frac_cp,
+                "replay_frac_noncurrent": frac_nc,
                 "n_events": int(ps_row["n_events"]),
             }
-            if "replay_frac_residual_noncurrent" in sr.index:
-                row["replay_frac_residual_noncurrent"] = sr[
-                    "replay_frac_residual_noncurrent"
-                ]
+            if residual_nc is not None:
+                row["replay_frac_residual_noncurrent"] = residual_nc
             rows.append(row)
 
     if not rows:
@@ -152,8 +316,11 @@ def build_control_aligned_table(
 ) -> pd.DataFrame:
     """Build matched control table for switch-aligned comparison.
 
-    For each switching episode, finds a random stretch of ``max_lag``
-    consecutive stay stops in the same session. Returns the same
+    For each switching episode, picks a random stay anchor in the
+    same session and emits one row per stay stop with replay in the
+    ``[anchor - max_lag, anchor)`` window. The anchor and every
+    contributing preceding stop must satisfy ``is_stay == 1``, so the
+    control window contains no switch dynamics. Returns the same
     columns as :func:`build_switch_aligned_table`.
 
     Parameters
@@ -185,7 +352,21 @@ def build_control_aligned_table(
     if content_fit is not None and content_predictors is not None:
         eat = predict_arm_fractions(eat, content_fit, content_predictors)
 
-    stop_replay = stop_patch_replay(eat, event_table, fraction_col=fraction_col)
+    # Per-stop fraction-on-each-patch table, looked up by the SWITCH's
+    # current_patch so the control fractions are measured against the
+    # same reference as the switch-aligned table (matched-control
+    # contract). Pre-fix used ``stop_patch_replay``, which aggregates
+    # against each individual control stop's OWN current_patch, so
+    # the matched-control comparison was actually against a moving
+    # reference frame.
+    per_stop_per_patch = _stop_replay_per_patch(
+        eat, event_table, fraction_col=fraction_col
+    )
+    per_stop_per_patch_residual = (
+        _stop_replay_per_patch(eat, event_table, fraction_col="residual_frac")
+        if "residual_frac" in eat.columns
+        else None
+    )
 
     if len(switch_episodes) == 0:
         return pd.DataFrame()
@@ -221,8 +402,24 @@ def build_control_aligned_table(
         anchor_idx = rng.integers(0, len(possible_anchors))
         anchor_stop_idx = possible_anchors.iloc[anchor_idx]["stop_idx"]
 
+        # Match the switch-aligned builder: stop_idx is session-local,
+        # so the preceding-stop filter must restrict to the anchor's
+        # own session. Otherwise the writer at lines ~237-241 stamps
+        # this episode's session keys onto stops drawn from other
+        # sessions that happened to share the stop_idx range.
+        # Also restrict to ``is_stay == 1``: the matched-control
+        # contract is "stay stops aligned to a stay anchor", and the
+        # anchor was already drawn from ``session_stays``. Without
+        # this filter, a switch stop sitting in [anchor - max_lag,
+        # anchor) would be re-labeled as a control row at its lag,
+        # contaminating the switch-vs-control comparison with the
+        # very switch dynamics it's meant to baseline against.
         preceding = st[
-            (st["stop_idx"] < anchor_stop_idx)
+            (st["animal"] == animal)
+            & (st["day"] == day)
+            & (st["epoch"] == epoch)
+            & (st["is_stay"] == 1)
+            & (st["stop_idx"] < anchor_stop_idx)
             & (st["stop_idx"] >= anchor_stop_idx - max_lag)
             & st["has_replay"]
         ]
@@ -230,9 +427,11 @@ def build_control_aligned_table(
         for _, ps_row in preceding.iterrows():
             lag = int(ps_row["stop_idx"] - anchor_stop_idx)
             sid = ps_row["stop_id"]
-            if sid not in stop_replay.index:
+            if sid not in per_stop_per_patch.index:
                 continue
-            sr = stop_replay.loc[sid]
+            frac_cp, frac_nc, residual_nc = _patch_relative_fracs(
+                sid, patch, per_stop_per_patch, per_stop_per_patch_residual
+            )
             row = {
                 "episode_id": ep_id,
                 "animal": animal,
@@ -243,16 +442,12 @@ def build_control_aligned_table(
                 "stop_id": sid,
                 "lag": lag,
                 "current_patch": patch,
-                "replay_frac_current_patch": sr.get(
-                    "replay_frac_current_patch", np.nan
-                ),
-                "replay_frac_noncurrent": sr.get("replay_frac_noncurrent", np.nan),
+                "replay_frac_current_patch": frac_cp,
+                "replay_frac_noncurrent": frac_nc,
                 "n_events": int(ps_row["n_events"]),
             }
-            if "replay_frac_residual_noncurrent" in sr.index:
-                row["replay_frac_residual_noncurrent"] = sr[
-                    "replay_frac_residual_noncurrent"
-                ]
+            if residual_nc is not None:
+                row["replay_frac_residual_noncurrent"] = residual_nc
             rows.append(row)
 
     if not rows:
@@ -285,6 +480,20 @@ def stop_patch_replay(
     optionally ``replay_frac_residual_noncurrent`` if
     ``residual_frac`` is present in *event_arm_table*.
     """
+    # Both ``stop_id`` and ``event_id`` must be globally unique across
+    # sessions. The per-stop average over events conflates sessions
+    # otherwise, and per-event sums of arm fractions can climb above
+    # 1 as multiple sessions' events with the same id are added
+    # together. Reuse the shared precondition helper.
+    from .choice_prediction import _require_session_unique_ids
+
+    _require_session_unique_ids(
+        event_arm_table, "event_id", helper_name="stop_patch_replay"
+    )
+    _require_session_unique_ids(
+        event_arm_table, "stop_id", helper_name="stop_patch_replay"
+    )
+
     eat = event_arm_table.copy()
 
     # Map arms to patches
@@ -295,32 +504,72 @@ def stop_patch_replay(
         evt_patch = event_table[["event_id", "current_patch"]].drop_duplicates()
         eat = eat.merge(evt_patch, on="event_id", how="left")
 
-    # Flag arms in the current patch
-    is_cp = (eat["_patch"] == eat["current_patch"]).astype(int)
-
-    # Per-event: sum fraction for current-patch and noncurrent arms
-    eat["_frac_cp"] = eat[fraction_col] * is_cp
-    eat["_frac_nc"] = eat[fraction_col] * (1 - is_cp)
-
-    event_agg = eat.groupby(["stop_id", "event_id"]).agg(
-        replay_frac_current_patch=("_frac_cp", "sum"),
-        replay_frac_noncurrent=("_frac_nc", "sum"),
+    # Flag arms in the current patch. ``NaN == anything`` is False
+    # in pandas/numpy, so a missing ``current_patch`` would silently
+    # mark every arm as "non-current" and shovel the whole event's
+    # replay fraction into ``replay_frac_noncurrent`` while reporting
+    # ``replay_frac_current_patch == 0.0``. The current-vs-non-current
+    # split is undefined when the current patch is unknown, so route
+    # those rows to NaN explicitly: NaN × (anything) propagates
+    # through the ``skipna=False`` per-event sum below.
+    cp = eat["current_patch"]
+    p = eat["_patch"]
+    is_cp_float = np.where(
+        cp.isna() | p.isna(),
+        np.nan,
+        (p.to_numpy() == cp.to_numpy()).astype(float),
     )
 
-    # Average across events within each stop
-    result = event_agg.groupby("stop_id")[
-        ["replay_frac_current_patch", "replay_frac_noncurrent"]
-    ].mean()
+    # Per-event: sum fraction for current-patch and noncurrent arms
+    eat["_frac_cp"] = eat[fraction_col].to_numpy() * is_cp_float
+    eat["_frac_nc"] = eat[fraction_col].to_numpy() * (1.0 - is_cp_float)
+
+    # Per-event sums use ``skipna=False`` so an event with any NaN
+    # arm fraction (or NaN residual) propagates NaN to the per-event
+    # value instead of pandas' default skip-NaN behavior, which
+    # silently fabricates a real zero from missing data. The
+    # per-stop mean below uses the same strict semantics so a stop
+    # containing any contaminated event surfaces NaN to downstream
+    # consumers (matching the contract enforced in
+    # ``build_residualized_choice_dataset``).
+    event_agg = pd.DataFrame(
+        {
+            "replay_frac_current_patch": (
+                eat.groupby(["stop_id", "event_id"])["_frac_cp"]
+                .apply(strict_sum)
+            ),
+            "replay_frac_noncurrent": (
+                eat.groupby(["stop_id", "event_id"])["_frac_nc"]
+                .apply(strict_sum)
+            ),
+        }
+    )
+
+    # Average across events within each stop, NaN-aware.
+    result = (
+        event_agg.groupby("stop_id")[
+            ["replay_frac_current_patch", "replay_frac_noncurrent"]
+        ]
+        .agg(strict_mean)
+    )
 
     # Residualized version if available
     if "residual_frac" in eat.columns:
-        eat["_resid_nc"] = eat["residual_frac"] * (1 - is_cp)
-        event_resid = eat.groupby(["stop_id", "event_id"]).agg(
-            replay_frac_residual_noncurrent=("_resid_nc", "sum"),
+        # Same NaN-aware multiplication: missing ``current_patch``
+        # routes the residual mass to NaN, not to "non-current".
+        eat["_resid_nc"] = eat["residual_frac"].to_numpy() * (1.0 - is_cp_float)
+        event_resid = (
+            eat.groupby(["stop_id", "event_id"])["_resid_nc"]
+            .apply(strict_sum)
+            .rename("replay_frac_residual_noncurrent")
+            .to_frame()
         )
-        resid_agg = event_resid.groupby("stop_id")[
-            ["replay_frac_residual_noncurrent"]
-        ].mean()
+        resid_agg = (
+            event_resid.groupby("stop_id")["replay_frac_residual_noncurrent"]
+            .apply(strict_mean)
+            .rename("replay_frac_residual_noncurrent")
+            .to_frame()
+        )
         result = result.join(resid_agg)
 
     return result

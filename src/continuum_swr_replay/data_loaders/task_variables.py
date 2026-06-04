@@ -121,7 +121,7 @@ def path_progress_for_run_segment(
 
     dist = np.full(pos_info.shape[0], np.nan)
     time = pos_info.index
-    add: float = 0.0
+    total_path_length: float = 0.0
 
     if len(path_edges) == 0:
         return np.zeros(pos_info.shape[0])
@@ -133,8 +133,8 @@ def path_progress_for_run_segment(
         ].to_numpy()
         start_node_pos = np.array(track_graph.nodes[start_node]["pos"])[None, :]
         dist[is_edge] = np.linalg.norm(proj_pos - start_node_pos, axis=1)
-        dist[is_edge] += add
-        add += float(
+        dist[is_edge] += total_path_length
+        total_path_length += float(
             np.linalg.norm(
                 np.array(track_graph.nodes[start_node]["pos"])
                 - np.array(track_graph.nodes[end_node]["pos"])
@@ -148,12 +148,20 @@ def path_progress_for_run_segment(
         )
         dist[is_nan] = interpolater(time[is_nan])
 
-    # Avoid division by zero if start and end nodes are the same
-    max_dist = dist.max()
-    # Handle both zero and very small values for numerical stability
-    if max_dist <= PATH_PROGRESS_EPSILON or np.isnan(max_dist):
+    # Normalize by the planned start-to-goal path length (sum of
+    # edge lengths along ``shortest_path``), not by the maximum
+    # observed distance — otherwise a half-traversed run with
+    # ``dist`` only reaching the midpoint reports values up to 1.0
+    # and looks complete. ``np.clip`` keeps the output in [0, 1] in
+    # the rare case projected positions overshoot due to tracking
+    # noise. Surviving NaN entries (no observed position matched any
+    # path edge) collapse to 0 — a stop with no path occupancy hasn't
+    # made any progress.
+    if total_path_length <= PATH_PROGRESS_EPSILON:
         return np.zeros(pos_info.shape[0])
-    return np.asarray(np.clip(dist / max_dist, 0.0, 1.0))
+    progress = np.clip(dist / total_path_length, 0.0, 1.0)
+    progress[np.isnan(progress)] = 0.0
+    return np.asarray(progress)
 
 
 def _precompute_segment_distances_to_goal(
@@ -322,9 +330,18 @@ def turn_direction(
     trial_segment_ids = position_info.loc[
         trial.start_time : trial.end_time
     ].track_segment_id.unique()  # pandas unique is not sorted
+
+    # Need ≥2 samples to estimate sampling_frequency from
+    # ``np.diff``. A trial with 0 or 1 position rows (dropped DLC
+    # frames, very short DIO-derived trials) would otherwise produce
+    # NaN here and crash on ``int(NaN)``. No samples ⇒ no turn
+    # sequence to extract.
+    times = position_info.index.to_numpy()
+    if times.size < 2:
+        return ""
     # Require at least 100 ms of occupancy per segment to filter transient noise.
     # At 500 Hz this is 50 samples.
-    sampling_frequency = 1.0 / np.median(np.diff(position_info.index.to_numpy()))
+    sampling_frequency = 1.0 / np.median(np.diff(times))
     min_segment_samples = int(0.1 * sampling_frequency)
     is_bad = (
         position_info.loc[trial.start_time : trial.end_time]

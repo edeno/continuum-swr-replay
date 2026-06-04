@@ -174,6 +174,26 @@ class TestIntervalsToTimebins:
         out = _intervals_to_mask(intervals, time_idx)
         np.testing.assert_array_equal(out, [False, True, False, True, False])
 
+    def test_overlapping_intervals_union(self):
+        """Overlapping intervals form a union — every bin covered by *any*
+        interval must be True."""
+        intervals = pd.DataFrame(
+            {"start_time": [1.0, 1.5], "end_time": [2.0, 2.5]}
+        )
+        time_idx = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+        out = intervals_to_timebins(intervals, time_idx)
+        np.testing.assert_array_equal(
+            out, [False, True, True, True, True, False]
+        )
+
+    def test_zero_width_interval_includes_exact_match(self):
+        """A degenerate ``[t, t]`` interval still includes the bin at
+        exactly ``t`` (boundaries are inclusive on both sides)."""
+        intervals = pd.DataFrame({"start_time": [1.0], "end_time": [1.0]})
+        time_idx = np.array([0.999, 1.0, 1.001])
+        out = intervals_to_timebins(intervals, time_idx)
+        np.testing.assert_array_equal(out, [False, True, False])
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

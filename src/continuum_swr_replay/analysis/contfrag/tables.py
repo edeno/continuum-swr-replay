@@ -33,9 +33,10 @@ from ..replay._helpers import (
     hash_stop_id,
     immobility_bout_intervals,
     recent_reward_rate_per_arm,
-    safe_first,
+    recent_trial_reward_rate,
     safe_mode,
     single_arm_from_well,
+    strict_first,
     time_since_stop,
     visit_recency_per_arm,
 )
@@ -65,6 +66,27 @@ def _prepare_contfrag_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
     return dot
 
 
+_EVENT_SOURCE_TO_COL = {"SWR": "SWR_event", "MUA": "MUA_event"}
+
+
+def _resolve_event_col(event_source: str) -> str:
+    """Map ``event_source`` to its data-over-time column name.
+
+    Strict dispatch: anything other than ``"SWR"`` / ``"MUA"`` raises
+    ``ValueError``. The previous inline form
+    ``"SWR_event" if event_source == "SWR" else "MUA_event"`` silently
+    routed any typo (``"swr"``, ``"Swr"``, ``"ripple"``…) to the MUA
+    column, so direct calls into these public helpers could build a
+    table for the wrong event source without warning.
+    """
+    try:
+        return _EVENT_SOURCE_TO_COL[event_source]
+    except KeyError as exc:
+        raise ValueError(
+            f"event_source must be 'SWR' or 'MUA', got {event_source!r}"
+        ) from exc
+
+
 def _in_contfrag_event_mask(
     dot: pd.DataFrame,
     speed_threshold: float,
@@ -75,18 +97,75 @@ def _in_contfrag_event_mask(
     A row is in-event iff the external detector flagged it (SWR_event > 0
     or MUA_event > 0) AND the animal was immobile.
     """
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return (dot[event_col] > 0) & (dot["head_speed"] < speed_threshold)
 
 
 def _hash_contfrag_event_id(
     events: pd.DataFrame,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, event_label)``."""
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
-    keys = events[["animal", "day", "epoch", event_col]]
+    """63-bit stable hash of ``(animal, day, epoch, event_label)``.
+
+    ``event_source`` and ``brain_area`` are mixed into the hash so a
+    SWR/HPC event with label 7 and a MUA/HPC event with label 7 (or
+    SWR/mPFC) cannot collide. Without this, concatenating tables
+    across sources or brain areas produces silent ID collisions on
+    every join keyed by ``event_id``.
+    """
+    event_col = _resolve_event_col(event_source)
+    keys = events[["animal", "day", "epoch", event_col]].copy()
+    keys["__event_source"] = event_source
+    keys["__brain_area"] = brain_area
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
+
+
+def _summarize_event_state(
+    cont_prob: np.ndarray, frag_prob: np.ndarray
+) -> tuple[float, float, str | None, float]:
+    """Per-event Continuous/Fragmented summary with NaN-safe semantics.
+
+    Returns ``(cont_mean, frag_mean, dominant, cont_frac)``.
+
+    Both means are the per-state ``nanmean`` (NaN if that state has no
+    finite bin). ``dominant`` and ``cont_frac`` are well-defined only
+    when *both* states have at least one finite bin — otherwise the
+    comparison ``cont_prob > frag_prob`` and the ``cont_mean >= frag_mean``
+    test silently route NaN-side missingness into a confident label.
+    Surface ``None`` / NaN in those degenerate cases instead.
+    """
+    cont_finite = bool(np.isfinite(cont_prob).any())
+    frag_finite = bool(np.isfinite(frag_prob).any())
+    # Reported per-state means use each state's own finite bins —
+    # they're independent estimates of the state's average probability
+    # across the event and are meant to be read on their own.
+    cont_mean = float(np.nanmean(cont_prob)) if cont_finite else float("nan")
+    frag_mean = float(np.nanmean(frag_prob)) if frag_finite else float("nan")
+    # Both ``dominant`` and ``cont_frac`` need a comparable view of
+    # the two states. Compute them from PAIRED-FINITE bins only —
+    # bins where both states have a finite probability — so the
+    # reported label and bin-wise fraction agree. The previous form
+    # built ``dominant`` from the per-state nanmeans (which include
+    # unpaired bins) and ``cont_frac`` from paired bins, so on inputs
+    # like ``cont=[0.9, 0.1]``, ``frag=[0.8, NaN]`` we got
+    # ``dominant='Fragmented'`` (per-state means: 0.5 vs 0.8) while
+    # the only comparable bin had cont > frag, ``cont_frac=1.0``. NaN
+    # comparisons silently return False, so paired-mean masking is
+    # also what stops partial-NaN bins from being counted as
+    # "Fragmented" wins.
+    paired = np.isfinite(cont_prob) & np.isfinite(frag_prob)
+    if paired.any():
+        paired_cont_mean = float(cont_prob[paired].mean())
+        paired_frag_mean = float(frag_prob[paired].mean())
+        dominant: str | None = (
+            "Continuous" if paired_cont_mean >= paired_frag_mean else "Fragmented"
+        )
+        cont_frac = float((cont_prob[paired] > frag_prob[paired]).mean())
+    else:
+        dominant = None
+        cont_frac = float("nan")
+    return cont_mean, frag_mean, dominant, cont_frac
 
 
 def build_contfrag_event_table(
@@ -96,6 +175,7 @@ def build_contfrag_event_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
@@ -134,7 +214,7 @@ def build_contfrag_event_table(
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
 
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
 
     dot = _prepare_contfrag_dot(dot, env)
     dot = add_trial_context(dot, trials)
@@ -174,32 +254,46 @@ def build_contfrag_event_table(
             well_of_modal = arm_to_well(ts_modal, track_graph)
             if not np.isnan(well_of_modal):
                 current_arm = float(ts_modal)
+        # Trial-derived context columns are NaN at every dot timebin
+        # before the first trial start (see ``add_trial_context``).
+        # ``safe_first`` would skip leading NaNs and return the next
+        # trial's context, leaking future state into events whose first
+        # timebin had no trial active. The stop-table builder already
+        # uses the strict semantics for the same hazard — match it
+        # here so trial-derived event-level fields propagate NaN when
+        # the event begins before any trial.
         if np.isnan(current_arm):
             current_arm = single_arm_from_well(
-                safe_first(g["current_well"]), track_graph
+                strict_first(g["current_well"]), track_graph
             )
 
-        prev_arm = single_arm_from_well(safe_first(g["prev_well"]), track_graph)
-        next_arm = single_arm_from_well(safe_first(g["next_well"]), track_graph)
+        prev_arm = single_arm_from_well(strict_first(g["prev_well"]), track_graph)
+        next_arm = single_arm_from_well(strict_first(g["next_well"]), track_graph)
         last_rewarded_arm = single_arm_from_well(
-            safe_first(g["last_rewarded_well"]), track_graph
+            strict_first(g["last_rewarded_well"]), track_graph
         )
 
-        is_after_switch = safe_first(g["is_after_switch"])
-        is_after_omission = safe_first(g["is_after_omission"])
-        is_after_reward = safe_first(g["is_after_reward"])
-        reward_outcome = safe_first(g["reward_outcome"])
+        is_after_switch = strict_first(g["is_after_switch"])
+        is_after_omission = strict_first(g["is_after_omission"])
+        is_after_reward = strict_first(g["is_after_reward"])
+        reward_outcome = strict_first(g["reward_outcome"])
         is_after_stay = (
             1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
         )
 
-        # ContFrag-specific: state composition during event
-        cont_prob = g["Continuous_prob"].to_numpy()
-        frag_prob = g["Fragmented_prob"].to_numpy()
-        cont_mean = float(np.nanmean(cont_prob))
-        frag_mean = float(np.nanmean(frag_prob))
-        dominant = "Continuous" if cont_mean >= frag_mean else "Fragmented"
-        cont_frac = float(np.nanmean(cont_prob > frag_prob))
+        # ContFrag-specific: state composition during event. Defer to
+        # ``_summarize_event_state`` for NaN-safe semantics — the
+        # comparison ``cont_prob > frag_prob`` and ``cont_mean >=
+        # frag_mean`` silently route NaN-side missingness into a
+        # confident "Fragmented / 0% Continuous" label, which has
+        # tripped both the all-NaN and the asymmetric (one state's
+        # probabilities all NaN) cases. The helper requires both
+        # states to have at least one finite bin before producing a
+        # label / fraction.
+        cont_mean, frag_mean, dominant, cont_frac = _summarize_event_state(
+            g["Continuous_prob"].to_numpy(),
+            g["Fragmented_prob"].to_numpy(),
+        )
 
         record = {
             event_col: int(ev_id),
@@ -237,14 +331,14 @@ def build_contfrag_event_table(
             "n_unique_arms": int(arms_real.nunique()),
             "event_midpoint_time": float(times[len(times) // 2]),
             "time_since_port_entry": float(
-                times[len(times) // 2] - safe_first(g["_goal_arrival_time"])
+                times[len(times) // 2] - strict_first(g["_goal_arrival_time"])
             )
-            if not np.isnan(safe_first(g["_goal_arrival_time"]))
+            if not np.isnan(strict_first(g["_goal_arrival_time"]))
             else np.nan,
             "time_since_reward": float(
-                times[len(times) // 2] - safe_first(g["_last_reward_time"])
+                times[len(times) // 2] - strict_first(g["_last_reward_time"])
             )
-            if not np.isnan(safe_first(g["_last_reward_time"]))
+            if not np.isnan(strict_first(g["_last_reward_time"]))
             else np.nan,
         }
         event_records.append(record)
@@ -296,12 +390,21 @@ def build_contfrag_event_table(
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "day", day)
     per_event.insert(2, "epoch", epoch)
-    per_event["event_id"] = _hash_contfrag_event_id(per_event, event_source)
+    per_event["event_id"] = _hash_contfrag_event_id(
+        per_event, event_source, brain_area
+    )
 
     # stop_id
     stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
     per_event["stop_idx"] = stop_idx
-    per_event["stop_id"] = hash_stop_id(animal, day, epoch, stop_idx)
+    per_event["stop_id"] = hash_stop_id(
+        animal,
+        day,
+        epoch,
+        stop_idx,
+        brain_area=brain_area,
+        event_source=event_source,
+    )
 
     return per_event[column_order]
 
@@ -314,6 +417,7 @@ def build_contfrag_event_arm_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",  # noqa: ARG001 — passed for API symmetry; event_id is inherited
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
@@ -337,7 +441,7 @@ def build_contfrag_event_arm_table(
     pd.DataFrame
         Columns: see ``_contfrag_event_arm_table_columns()``.
     """
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     column_order = _contfrag_event_arm_table_columns(event_source)
     if len(event_table) == 0:
         return pd.DataFrame(columns=column_order)
@@ -386,12 +490,21 @@ def build_contfrag_event_arm_table(
     long["arm_count_soft"] = soft_aligned.flatten()
     long["arm_posterior_mass"] = mass_aligned.flatten()
 
-    # arm_fraction
-    n_bins_long = long["n_timebins"].to_numpy()
+    # arm_fraction. Use the count of real-arm bins as the denominator
+    # so the per-arm fractions sum to 1 over an event's real bins,
+    # matching the non-local table convention. The numerator
+    # (``arm_count_hard``) only counts bins whose decoded arm is in
+    # ``ALL_ARMS``; using ``n_timebins`` as the denominator (which
+    # also includes junction / missing-arm bins) silently shrinks the
+    # fraction sum below 1 — the user verified a 5-real / 5-junction
+    # event sums to 0.5.
+    n_real_long = (
+        long["n_timebins"].to_numpy() - long["n_junction_bins"].to_numpy()
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         frac = np.where(
-            n_bins_long > 0,
-            long["arm_count_hard"].to_numpy() / np.maximum(n_bins_long, 1),
+            n_real_long > 0,
+            long["arm_count_hard"].to_numpy() / np.maximum(n_real_long, 1),
             np.nan,
         )
     long["arm_fraction"] = frac
@@ -404,6 +517,12 @@ def build_contfrag_event_arm_table(
     long["is_last_rewarded"] = eq_indicator(
         arm_arr, long["last_rewarded_arm"].to_numpy()
     )
+    # M5/M6 identifiable reward-memory predictor: last-rewarded arm
+    # restricted to events where it is NOT the current arm. Mirrors
+    # replay/tables.py — see model_specs.py for the rationale.
+    long["is_last_rewarded_elsewhere"] = (
+        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
+    ).astype(int)
     long["arm_patch_id"] = np.array([arm_to_patch(a) for a in arm_arr])
     long["is_same_patch"] = eq_indicator(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
@@ -449,6 +568,11 @@ def build_contfrag_event_arm_table(
     long["dist_to_arm"] = dist_vals
     long["arm_dist_rank"] = rank_vals
     long["visit_recency"] = vr_vals
+    # Within-arm-demeaned visit_recency — the part orthogonal to the
+    # arm fixed effects; M4+ uses this (see replay/model_specs.py).
+    long["visit_recency_demeaned"] = long["visit_recency"] - long.groupby("arm")[
+        "visit_recency"
+    ].transform("mean")
     long["cumulative_reward"] = cr_vals
     long["recent_reward_rate"] = rrr_vals
     long["nominal_reward_prob"] = np.nan
@@ -472,6 +596,14 @@ def build_contfrag_event_arm_table(
     long["swr_x_prev"] = is_swr_i * ip
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
+    # M7 — SWR × value/memory interactions (mirrors replay/tables.py).
+    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_visit_recency_demeaned"] = (
+        is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_is_last_rewarded_elsewhere"] = (
+        is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
+    )
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -496,6 +628,7 @@ def build_contfrag_stop_table(
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
+    brain_area: str = "HPC",
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
     """One row per immobility bout, including zero-event bouts.
@@ -527,7 +660,7 @@ def build_contfrag_stop_table(
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
 
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
 
     dot = dot.copy()
     dot = add_trial_context(dot, trials)
@@ -551,6 +684,9 @@ def build_contfrag_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
+    per_bout["recent_trial_reward_rate"] = recent_trial_reward_rate(
+        bout_starts, trials
+    )
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -583,8 +719,13 @@ def build_contfrag_stop_table(
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_events"] = n_events_per_bout
 
-    # Trial context at bout start
-    first_row = grouped.first()
+    # Trial context at bout start. ``skipna=False`` is critical:
+    # the default ``first()`` skips leading NaNs and surfaces the
+    # first valid mid-bout row, leaking trial context into stops
+    # that span a trial boundary (the post-boundary trial's
+    # ``is_after_reward`` / ``reward_outcome`` would attach to a
+    # bout whose actual start had no trial active).
+    first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -604,7 +745,10 @@ def build_contfrag_stop_table(
         else:
             per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields
+    # Arm / patch fields. ``strict_first`` keeps the first row's
+    # NaN-or-finite value as-is so a bout that started before any
+    # trial doesn't inherit the next trial's context via
+    # ``safe_first``'s skip-NaN behavior.
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
@@ -619,16 +763,16 @@ def build_contfrag_stop_table(
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = single_arm_from_well(safe_first(g["current_well"]), track_graph)
+            ca = single_arm_from_well(strict_first(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = single_arm_from_well(
-            safe_first(g["prev_well"]), track_graph
+            strict_first(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = single_arm_from_well(
-            safe_first(g["next_well"]), track_graph
+            strict_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = single_arm_from_well(
-            safe_first(g["last_rewarded_well"]), track_graph
+            strict_first(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals
@@ -649,7 +793,12 @@ def build_contfrag_stop_table(
     per_bout.insert(1, "day", day)
     per_bout.insert(2, "epoch", epoch)
     per_bout["stop_id"] = hash_stop_id(
-        animal, day, epoch, per_bout["stop_idx"].to_numpy()
+        animal,
+        day,
+        epoch,
+        per_bout["stop_idx"].to_numpy(),
+        brain_area=brain_area,
+        event_source=event_source,
     )
 
     return per_bout[column_order]
@@ -660,7 +809,7 @@ def build_contfrag_stop_table(
 
 def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
     """Canonical column order for ContFrag event table."""
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return [
         "animal",
         "day",
@@ -717,6 +866,7 @@ def _contfrag_stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
+        "recent_trial_reward_rate",
         "is_swr_stop",
         "is_mua_stop",
         "has_replay",
@@ -739,7 +889,7 @@ def _contfrag_stop_table_columns() -> list[str]:
 
 def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
     """Canonical column order for ContFrag event-arm table."""
-    event_col = "SWR_event" if event_source == "SWR" else "MUA_event"
+    event_col = _resolve_event_col(event_source)
     return [
         # Identifiers
         "animal",
@@ -789,12 +939,14 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "is_prev",
         "is_next",
         "is_last_rewarded",
+        "is_last_rewarded_elsewhere",
         "is_same_patch",
         # Spatial
         "dist_to_arm",
         "arm_dist_rank",
         # Reward / value
         "visit_recency",
+        "visit_recency_demeaned",
         "cumulative_reward",
         "recent_reward_rate",
         "nominal_reward_prob",
@@ -807,6 +959,9 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
+        "swr_x_recent_reward_rate",
+        "swr_x_visit_recency_demeaned",
+        "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",

@@ -89,7 +89,7 @@ continuum_swr_replay.data_loaders.bandit_task : Session data loading
 Examples
 --------
 >>> from continuum_swr_replay.analysis.hippocampus import load_results, get_data_over_time
->>> results, detector, env = load_results("chimi20200212_02_r1_HPC")
+>>> results, detector, env = load_results("chimi20200212_.nwb", "02_r1")
 >>> data_df, posterior = get_data_over_time(
 ...     data, results, env, "chimi20200212_.nwb", "02_r1",
 ...     non_local_threshold=0.80
@@ -101,6 +101,7 @@ Examples
 
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
@@ -118,8 +119,93 @@ from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
 from ...types import SessionData
 from .event_analysis import get_immobile_events
-from .event_detection import get_confident_times, get_overlap_times
+from .event_detection import (
+    event_strict_overlap_keys,
+    get_confident_times,
+    get_overlap_times,
+)
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
+
+
+def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
+    """Z-score a theta-power trace, ignoring NaN entries.
+
+    ``_nearest``-interpolated traces can leave NaN at any timebin
+    where no LFP sample fell within tolerance. The default
+    ``scipy.stats.zscore(...)`` would propagate that NaN and zero out
+    the entire session's z-score, silently suppressing theta event
+    classification downstream in
+    :func:`quality_metrics.compute_non_local_event_context`. Pass
+    ``nan_policy="omit"`` so finite values keep finite z-scores.
+    Shared between :func:`get_data_over_time` (this module) and the
+    ContFrag aggregator so a regression in either path fails the
+    same regression test.
+    """
+    return np.asarray(zscore(np.asarray(theta_power), nan_policy="omit"))
+
+
+def validate_required_session_data_keys(
+    data: Mapping[str, object],
+    required_keys: list[str],
+) -> None:
+    """Refuse to aggregate when ``data`` is missing required keys.
+
+    Both ``get_data_over_time`` (this module) and
+    :func:`continuum_swr_replay.analysis.contfrag.data_aggregation.get_contfrag_data_over_time`
+    require the same set of session-data keys (position, theta,
+    ripple, MUA, …). Routing both call sites through this helper
+    keeps the contract — and the error message — in one place so a
+    test can pin the validator behavior directly without
+    instantiating the full aggregation pipeline.
+    """
+    missing_keys = [k for k in required_keys if k not in data]
+    if missing_keys:
+        raise KeyError(
+            f"Missing required data keys: {missing_keys}. "
+            "Ensure load_data() was called with "
+            "DataLoadingPreset.DECODING or equivalent."
+        )
+
+
+def validate_results_position_time_alignment(
+    results_time: np.ndarray,
+    position_index: pd.Index,
+) -> None:
+    """Refuse to attach decoder outputs to position rows on a
+    different timebase.
+
+    The aggregations in this module and in
+    :mod:`continuum_swr_replay.analysis.contfrag.data_aggregation`
+    build ``data_over_time`` on ``position_info.index`` while pulling
+    column values from ``results.time``-indexed arrays. A length-only
+    check passes when the two axes share row count but are time-
+    shifted, silently attaching event labels / probabilities / MAP
+    stats to the wrong position rows. Pinning the stricter
+    ``np.abs(results.time - position.index).max() > 1e-6`` guard
+    here — and calling it from both aggregators — keeps the two paths
+    in lockstep so a regression on either path fails the same
+    regression test (mirrors the alignment check used in
+    ``analysis.replay._helpers._align_posterior_to_dot``).
+    """
+    if len(results_time) != len(position_index):
+        raise ValueError(
+            f"results.time ({len(results_time)}) and position_info "
+            f"({len(position_index)}) have different lengths; "
+            "they must be aligned 1-to-1."
+        )
+    drift = float(
+        np.abs(
+            np.asarray(results_time, dtype=float)
+            - position_index.to_numpy(dtype=float)
+        ).max()
+    )
+    if drift > 1e-6:
+        raise ValueError(
+            f"results.time drifts from position_info.index by up to "
+            f"{drift:.3g}s — same-length axes do not imply same time "
+            "origin; refusing to attach decoder outputs to position "
+            "rows that don't share their timebase."
+        )
 
 
 def get_data_over_time(
@@ -171,18 +257,14 @@ def get_data_over_time(
         Conditional non-local posterior distribution
 
     """
-    # Validate required data keys
-    required_keys = [
-        "position_info", "ripple_times", "hse_times",
-        "theta_phase", "theta_power",
-        "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
-    ]
-    missing_keys = [k for k in required_keys if k not in data]
-    if missing_keys:
-        raise KeyError(
-            f"Missing required data keys: {missing_keys}. "
-            f"Ensure load_data() was called with DataLoadingPreset.DECODING or equivalent."
-        )
+    validate_required_session_data_keys(
+        data,
+        required_keys=[
+            "position_info", "ripple_times", "hse_times",
+            "theta_phase", "theta_power",
+            "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+        ],
+    )
 
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
@@ -204,14 +286,14 @@ def get_data_over_time(
     mua_labels = get_labels(data["hse_times"][brain_area], results.time)
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results
+        non_local_times, data["ripple_times"]
     )
     non_local_mua_times, non_local_no_mua_times = get_overlap_times(
-        non_local_times, data["hse_times"][brain_area], results
+        non_local_times, data["hse_times"][brain_area]
     )
 
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area], results
+        data["ripple_times"], data["hse_times"][brain_area]
     )
     (
         map_estimate,
@@ -228,7 +310,25 @@ def get_data_over_time(
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
-        return series.reindex(results.time, method="nearest", tolerance=0.004)
+        # Return a positional ndarray. ``reindex`` returns a Series
+        # indexed by ``results.time``; embedding that Series into the
+        # DataFrame below would make pandas re-align it against
+        # ``position_info.index``, producing NaNs whenever the two
+        # axes differ by even epsilon despite identical lengths. The
+        # length guard above ensures the two are 1-to-1, so a positional
+        # ndarray is safe and matches the bare-numpy columns used here.
+        return (
+            series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
+        )
+
+    # Build with the position_info time index so axis=1 concat aligns
+    # by time instead of falling back to a default RangeIndex (which
+    # would produce a 2N-row frame full of NaNs against the time-
+    # indexed position frame). The helper enforces the stricter drift
+    # check that mirrors ``analysis.replay._helpers._align_posterior_to_dot``.
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
+    )
 
     data_over_time = pd.DataFrame(
         {
@@ -255,7 +355,7 @@ def get_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
-            "theta_power_zscore": zscore(
+            "theta_power_zscore": theta_power_zscore(
                 _nearest(data["theta_power"].squeeze()).squeeze()
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
@@ -275,7 +375,8 @@ def get_data_over_time(
             "day": day,
             "epoch": epoch_name,
             "nwb_file_name": nwb_file_name,
-        }
+        },
+        index=data["position_info"].index,
     )
 
     return pd.concat((data_over_time, data["position_info"]), axis=1), posterior
@@ -299,8 +400,15 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
         Concatenated data with derived Non-Local_prob and distance columns.
 
     """
-    data_path = data_dir.glob("*_HPC_80_data_over_time.pkl")
-    data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
+    # Sort and check explicitly so an empty directory raises a
+    # targeted FileNotFoundError instead of pandas' generic
+    # "No objects to concatenate" — matches the contfrag loader.
+    files = sorted(data_dir.glob("*_HPC_80_data_over_time.pkl"))
+    if not files:
+        raise FileNotFoundError(
+            f"No *_HPC_80_data_over_time.pkl files found in {data_dir}"
+        )
+    data_over_time = pd.concat([pd.read_pickle(p) for p in files])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]
         + data_over_time["Non-Local_Fragmented_prob"]
@@ -353,8 +461,6 @@ def get_event_types(
         method="endpoints",
     )
 
-    group_keys = ["animal", "day", "epoch", event_col]
-
     result: dict[str, pd.DataFrame] = {
         f"{event_col}_immobile": immobile,
     }
@@ -366,67 +472,90 @@ def get_event_types(
                 data_over_time[oc] > 0
             ]
 
-    # Overlap / no-overlap with each "other" detector
+    # Overlap / no-overlap with each "other" detector. Use strict
+    # positive-duration interval overlap rather than per-timebin label
+    # presence; otherwise events whose intervals only touch at a
+    # boundary timestamp (where ``get_labels`` writes both labels
+    # inclusively) get classified as overlapping. Matches the strict
+    # semantics used by ``classify_swr_overlap`` /
+    # ``get_overlap_times``.
+    def _strict_overlap_mask(df: pd.DataFrame, primary: str, other: str) -> np.ndarray:
+        keys = event_strict_overlap_keys(data_over_time, primary, other)
+        if not keys:
+            return np.zeros(len(df), dtype=bool)
+        return np.array(
+            [
+                (a, d, e, p) in keys
+                for a, d, e, p in zip(
+                    df["animal"].to_numpy(),
+                    df["day"].to_numpy(),
+                    df["epoch"].to_numpy(),
+                    df[primary].to_numpy(),
+                    strict=True,
+                )
+            ]
+        )
+
     for oc in other_cols:
         if oc not in data_over_time.columns:
             continue
-        result[f"{event_col}_immobile_overlap_{oc}"] = immobile.groupby(
-            group_keys
-        ).filter(lambda g, c=oc: (g[c] > 0).any())
-        result[f"{event_col}_immobile_no_overlap_{oc}"] = immobile.groupby(
-            group_keys
-        ).filter(lambda g, c=oc: (g[c] == 0).all())
+        overlap_mask = _strict_overlap_mask(immobile, event_col, oc)
+        result[f"{event_col}_immobile_overlap_{oc}"] = immobile.loc[overlap_mask]
+        result[f"{event_col}_immobile_no_overlap_{oc}"] = immobile.loc[~overlap_mask]
 
     # No overlap with ANY other detector
     if all(oc in data_over_time.columns for oc in other_cols):
-        result[f"{event_col}_immobile_no_overlap"] = immobile.groupby(
-            group_keys
-        ).filter(
-            lambda g: all((g[oc] == 0).all() for oc in other_cols)
-        )
+        any_overlap = np.zeros(len(immobile), dtype=bool)
+        for oc in other_cols:
+            any_overlap |= _strict_overlap_mask(immobile, event_col, oc)
+        result[f"{event_col}_immobile_no_overlap"] = immobile.loc[~any_overlap]
 
     # Other-detector events that do NOT overlap the primary
     for oc in other_cols:
         if oc not in data_over_time.columns:
             continue
         oc_events = data_over_time.loc[data_over_time[oc] > 0]
-        result[f"{oc}_events_no_{event_col}"] = oc_events.groupby(
-            ["animal", "day", "epoch", oc]
-        ).filter(lambda g, ec=event_col: (g[ec] == 0).all())
+        if len(oc_events) == 0:
+            result[f"{oc}_events_no_{event_col}"] = oc_events
+            continue
+        overlap_keys = event_strict_overlap_keys(data_over_time, oc, event_col)
+        if not overlap_keys:
+            result[f"{oc}_events_no_{event_col}"] = oc_events
+            continue
+        oc_keys = list(
+            zip(
+                oc_events["animal"].to_numpy(),
+                oc_events["day"].to_numpy(),
+                oc_events["epoch"].to_numpy(),
+                oc_events[oc].to_numpy(),
+                strict=True,
+            )
+        )
+        no_overlap_mask = np.array([k not in overlap_keys for k in oc_keys])
+        result[f"{oc}_events_no_{event_col}"] = oc_events.loc[no_overlap_mask]
 
     return result
 
 
 def compute_swr_overlap_class_counts(
-    data_over_time: pd.DataFrame,
-    event_col: str = "non_local_event",
-    overlap_col: str = "SWR_event",
+    classified_events: pd.DataFrame,
 ) -> dict[str, int]:
-    """Count immobile events by SWR-overlap class.
+    """Count immobile non-local events by SWR-overlap class.
 
-    Per-session: derives non-local-event and SWR intervals from the
-    timebin labels in ``data_over_time`` and delegates to
-    :func:`classify_swr_overlap` for per-event classification. Counts
-    are aggregated across all sessions.
-
-    Uses the event-level definition of "contained" (does any single
-    SWR fully span the event) so the counts match the example-panel
-    classification in Figure 2. The alternative timebin-level
-    definition (does every timebin overlap some SWR) labels events
-    tiled by two adjacent SWRs as ``swr_contained``, which the
-    event-level rule calls ``swr_partial``.
+    Operates on the output of
+    :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
+    restricted to immobile events (``endpoints_speed_below_thresh``), and
+    tallies the ``overlap_class`` column. The single overlap convention
+    (strict positive-duration overlap, "contained" = some single SWR spans
+    the event) lives in that builder, so this is a thin tally with no
+    classification logic of its own.
 
     Parameters
     ----------
-    data_over_time : pd.DataFrame
-        Aggregated data containing ``event_col``, ``overlap_col``,
-        ``head_speed``, ``animal``, ``day``, and ``epoch`` columns.
-        Time must be the DataFrame index (production) or present as a
-        column named ``"time"`` (tests).
-    event_col : str, optional
-        Primary event column, by default ``"non_local_event"``.
-    overlap_col : str, optional
-        Column to check overlap against, by default ``"SWR_event"``.
+    classified_events : pd.DataFrame
+        Per-non-local-event table with ``overlap_class`` and
+        ``endpoints_speed_below_thresh`` columns. May be the builder's
+        zero-row empty frame.
 
     Returns
     -------
@@ -435,52 +564,24 @@ def compute_swr_overlap_class_counts(
         "non_swr": n, "total": n}``.
 
     """
-    from .event_detection import classify_swr_overlap
-
-    immobile = get_immobile_events(
-        data_over_time,
-        event_col=event_col,
-        speed_col="head_speed",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        method="endpoints",
-    )
-
-    # Normalize time to a column called "time". Production has time as
-    # the DataFrame index; tests sometimes have it as a column.
-    if "time" not in immobile.columns:
-        immobile = immobile.copy()
-        immobile["time"] = immobile.index
-
-    counts = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0}
-
-    for _session_key, session_df in immobile.groupby(
-        ["animal", "day", "epoch"], sort=False
-    ):
-        event_intervals = _intervals_from_labels(session_df, event_col)
-        if len(event_intervals) == 0:
-            continue
-        swr_intervals = _intervals_from_labels(session_df, overlap_col)
-
-        classified = classify_swr_overlap(event_intervals, swr_intervals)
-        session_counts = classified["overlap_class"].value_counts()
-        for cls in counts:
-            counts[cls] += int(session_counts.get(cls, 0))
-
-    return {**counts, "total": sum(counts.values())}
-
-
-def _intervals_from_labels(session_df: pd.DataFrame, label_col: str) -> pd.DataFrame:
-    """Per-label (start_time, end_time) table from a timebin-labeled frame.
-
-    Expects a ``time`` column; positive values in ``label_col`` mark
-    timebins belonging to distinct events, with 0 treated as background.
-    """
-    return (
-        session_df.loc[session_df[label_col] > 0]
-        .groupby(label_col)["time"]
-        .agg(start_time="min", end_time="max")
-        .reset_index(drop=True)
-    )
+    zero = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0, "total": 0}
+    if classified_events.empty:
+        return zero
+    # ``.loc`` + ``astype(bool)`` so the builder's zero-row empty frame
+    # (where ``endpoints_speed_below_thresh`` is object-dtype) still indexes
+    # cleanly rather than raising on a non-boolean mask.
+    immobile = classified_events.loc[
+        classified_events["endpoints_speed_below_thresh"].astype(bool)
+    ]
+    if immobile.empty:
+        return zero
+    counts = immobile["overlap_class"].value_counts().to_dict()
+    return {
+        "swr_contained": int(counts.get("swr_contained", 0)),
+        "swr_partial": int(counts.get("swr_partial", 0)),
+        "non_swr": int(counts.get("non_swr", 0)),
+        "total": int(len(immobile)),
+    }
 
 
 def compute_swr_nl_event_counts(
@@ -530,20 +631,57 @@ def compute_swr_nl_event_counts(
     else:
         a_data = data_over_time.loc[data_over_time[event_col_a] > 0]
 
-    a_groups = a_data.loc[a_data[event_col_a] > 0].groupby(
-        ["animal", "day", "epoch", event_col_a],
-    )
-    a_with_b = a_groups.apply(lambda g: (g[event_col_b] > 0).any())
-    n_a = len(a_with_b)
-    n_a_with_b = int(a_with_b.sum())
+    sess_cols = ["animal", "day", "epoch"]
 
-    # Event B (not speed-filtered)
-    b_groups = data_over_time.loc[data_over_time[event_col_b] > 0].groupby(
-        ["animal", "day", "epoch", event_col_b],
+    # Strict positive-duration interval overlap on per-event bounds
+    # derived from the timebin labels. The previous form used
+    # ``(g[other] > 0).any()`` over timebins, which counted
+    # boundary-touch contact (a single shared timestamp from the
+    # inclusive ``get_labels`` writer) as overlap — diverging from
+    # the strict semantics enforced by ``classify_swr_overlap`` and
+    # ``get_overlap_times``.
+    #
+    # ``n_a`` is the immobility-filtered per-event count of column A;
+    # ``n_b`` is the unfiltered per-event count of column B. For
+    # ``n_*_with_*``, A-bounds come from the filtered ``a_data`` so a
+    # B event whose only A overlap was excluded by the immobility
+    # filter cannot resurrect it; B-bounds come from raw
+    # ``data_over_time`` to keep the ``n_b`` total consistent with
+    # the existing contract (Venn-diagram totals).
+    a_active = a_data.loc[a_data[event_col_a] > 0]
+    n_a = (
+        int(a_active.groupby([*sess_cols, event_col_a], sort=False).ngroups)
+        if len(a_active)
+        else 0
     )
-    b_with_a = b_groups.apply(lambda g: (g[event_col_a] > 0).any())
-    n_b = len(b_with_a)
-    n_b_with_a = int(b_with_a.sum())
+    b_active = data_over_time.loc[data_over_time[event_col_b] > 0]
+    n_b = (
+        int(b_active.groupby([*sess_cols, event_col_b], sort=False).ngroups)
+        if len(b_active)
+        else 0
+    )
+
+    if n_a == 0 or n_b == 0:
+        return {"n_a": n_a, "n_a_with_b": 0, "n_b": n_b, "n_b_with_a": 0}
+
+    # A-with-B: A bounds from a_data (filtered), B bounds from a_data
+    # too — only B intervals visible to the filtered A frame count
+    # toward this overlap. (The boundary-touch issue applies to B
+    # bounds derived from a_data exactly as it would from raw, so the
+    # source choice doesn't affect strict overlap; what matters is
+    # that B intervals reflect the filtered A-row coverage.)
+    a_with_b_keys = event_strict_overlap_keys(a_data, event_col_a, event_col_b)
+    n_a_with_b = len(a_with_b_keys)
+
+    # B-with-A: B bounds from raw ``data_over_time`` so we can match
+    # them up to the unfiltered ``n_b`` total. A bounds STILL come
+    # from ``a_data`` — keep the existing contract that B events
+    # whose only A overlap was excluded by the immobility filter
+    # don't get counted as overlapping.
+    b_with_a_keys = event_strict_overlap_keys(
+        data_over_time, event_col_b, event_col_a, other_data=a_data,
+    )
+    n_b_with_a = len(b_with_a_keys)
 
     return {
         "n_a": n_a,

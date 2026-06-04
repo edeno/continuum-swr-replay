@@ -69,9 +69,11 @@ class TestArmPathWellToWell:
 
     def test_invalid_well_raises(self):
         # Trunk arms (6,7,8) and out-of-range arms are not valid wells.
-        with pytest.raises(ValueError):
+        # Match the specific branch so a regression that swaps the two
+        # validators (current_arm vs next_arm) is caught.
+        with pytest.raises(ValueError, match="current_arm=6"):
             arm_path_well_to_well(6, 0)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="next_arm=9"):
             arm_path_well_to_well(0, 9)
 
 
@@ -214,6 +216,58 @@ class TestEndsAtNext:
         out = ends_at_next(ev, es).set_index("event_id")
         assert bool(out.loc[1, "ends_at_next"]) is True
 
+    def test_event_with_no_sequence_rows_recorded_as_false(self):
+        """Regression (symmetric to ``ends_at_next_patch``): an event
+        with valid ``next_arm`` but no decoded sequence row produces
+        a NaN ``_last_arm`` after the left merge. Pre-fix the
+        nullable ``Int64`` equality returned ``pd.NA``, which then
+        survived as NaN through ``_per_session_metric_means``'s
+        ``astype(float)`` → ``np.nanmean`` reduction and got
+        *dropped* from the denominator — a session with one True
+        endpoint and one missing sequence reported a mean of 1.0
+        instead of the documented 0.5.
+        """
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+            ]
+        )
+        # Only event 1 has a sequence; event 2's _last_arm is NaN
+        # after the left merge.
+        es = _make_event_sequence_table({1: [0, 6, 7, 3]})
+        out = ends_at_next(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "ends_at_next"]) is True
+        assert bool(out.loc[2, "ends_at_next"]) is False, (
+            f"event-with-no-sequence produced "
+            f"{out.loc[2, 'ends_at_next']!r} instead of False"
+        )
+        # Plain ``bool`` dtype so downstream ``astype(float)`` →
+        # ``np.nanmean`` never sees NaN.
+        assert out["ends_at_next"].dtype == bool
+
+    def test_missing_sequence_endpoint_does_not_inflate_session_mean(self):
+        """End-to-end regression: 2-event table with one True and one
+        missing-sequence endpoint must average to 0.5 (not 1.0)."""
+        from continuum_swr_replay.analysis.replay.retrospective import (
+            _per_session_metric_means,
+        )
+
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+            ]
+        )
+        es = _make_event_sequence_table({1: [0, 6, 7, 3]})
+        metrics = ends_at_next(ev, es)
+        means = _per_session_metric_means(metrics)
+        assert means["ends_at_next"] == 0.5, (
+            f"session mean = {means['ends_at_next']} — missing-sequence "
+            "endpoint inflated the mean by being dropped from the "
+            "np.nanmean denominator instead of being counted as False."
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # contains_path_to_next
@@ -353,6 +407,69 @@ class TestEndsAtNextPatch:
         out = ends_at_next_patch(ev, es).set_index("event_id")
         assert bool(out.loc[1, "ends_at_next_patch"]) is True
 
+    def test_unmapped_last_arm_recorded_as_false(self):
+        """Regression: docstring says "Bins whose MAP arm has no
+        patch label (NaN, junction-bin artifact) yield NaN and are
+        excluded from the equality test (the row is recorded as
+        False)." Pre-fix the equality on nullable ``Int64`` returned
+        ``pd.NA``, which then survived as NaN through
+        ``_per_session_metric_means``'s ``astype(float)`` →
+        ``np.nanmean`` reduction and got *dropped* from the
+        denominator — so a session with a real True endpoint and one
+        unmapped/junction endpoint reported a mean of 1.0 instead of
+        the documented 0.5.
+        """
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+            ]
+        )
+        es = _make_event_sequence_table(
+            {
+                1: [0, 6, 7, 3],  # ends on arm 3 (patch 2) → True
+                # Arm 9 is not a key in TRACK_SEGMENT_TO_PATCH, so
+                # _last_patch is NaN. Pre-fix: ends_at_next_patch=<NA>;
+                # post-fix: False.
+                2: [0, 6, 7, 9],
+            }
+        )
+        out = ends_at_next_patch(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "ends_at_next_patch"]) is True
+        assert bool(out.loc[2, "ends_at_next_patch"]) is False, (
+            f"unmapped endpoint produced "
+            f"{out.loc[2, 'ends_at_next_patch']!r} instead of False"
+        )
+        # And the column dtype must be plain ``bool`` (not nullable
+        # ``boolean``) so the downstream ``astype(float)`` →
+        # ``np.nanmean`` reduction never sees NaN. Otherwise the
+        # session-mean would silently drop these rows.
+        assert out["ends_at_next_patch"].dtype == bool
+
+    def test_unmapped_endpoint_does_not_inflate_session_mean(self):
+        """End-to-end regression: feed a 2-event table with one True
+        endpoint and one unmapped endpoint through
+        ``_per_session_metric_means`` and assert the reported mean is
+        0.5 (the documented value), not 1.0 (pre-fix)."""
+        from continuum_swr_replay.analysis.replay.retrospective import (
+            _per_session_metric_means,
+        )
+
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+            ]
+        )
+        es = _make_event_sequence_table({1: [0, 6, 7, 3], 2: [0, 6, 7, 9]})
+        metrics = ends_at_next_patch(ev, es)
+        means = _per_session_metric_means(metrics)
+        assert means["ends_at_next_patch"] == 0.5, (
+            f"session mean = {means['ends_at_next_patch']} — unmapped "
+            "endpoint inflated the mean by being dropped from the "
+            "np.nanmean denominator instead of being counted as False."
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # compute_retrospective_metrics
@@ -386,6 +503,27 @@ class TestComputeRetrospectiveMetrics:
         assert bool(out.loc[1, "contains_path_to_next"]) is True
         assert bool(out.loc[2, "ends_at_next"]) is True
         assert bool(out.loc[2, "contains_path_to_next"]) is True
+
+    def test_empty_schema_complete_inputs_return_empty_metrics(self):
+        ev = pd.DataFrame(
+            columns=[
+                "animal", "day", "epoch", "event_id", "current_arm",
+                "next_arm", "next_patch",
+            ]
+        )
+        ea = pd.DataFrame(
+            columns=["animal", "day", "epoch", "event_id", "arm", "arm_fraction"]
+        )
+        es = pd.DataFrame(
+            columns=[
+                "animal", "day", "epoch", "event_id", "t_in_event",
+                "decoded_arm_map",
+            ]
+        )
+
+        out = compute_retrospective_metrics(ev, ea, es)
+        assert out.empty
+        assert {"animal", "day", "epoch", "event_id"}.issubset(out.columns)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -172,9 +172,9 @@ def compute_state_fraction_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "local_fraction", "nospike_fraction",
@@ -184,18 +184,32 @@ def compute_state_fraction_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
-        n = len(group)
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        n_moving = int(is_moving.sum())
+        moving_block = group.loc[is_moving]
         result = {
-            "local_fraction": group["Local_prob"].mean(),
-            "nospike_fraction": group["No-Spike_prob"].mean(),
-            "nonlocal_continuous_fraction": group["Non-Local_Continuous_prob"].mean(),
-            "nonlocal_fragmented_fraction": group["Non-Local_Fragmented_prob"].mean(),
-            "n_moving_bins": n,
+            "local_fraction": moving_block["Local_prob"].mean(),
+            "nospike_fraction": moving_block["No-Spike_prob"].mean(),
+            "nonlocal_continuous_fraction": moving_block[
+                "Non-Local_Continuous_prob"
+            ].mean(),
+            "nonlocal_fragmented_fraction": moving_block[
+                "Non-Local_Fragmented_prob"
+            ].mean(),
+            "n_moving_bins": n_moving,
         }
 
-        collapsed = (group["Local_prob"] < local_prob_threshold).to_numpy()
+        # Label on the FULL timeline so immobile rows act as gaps that
+        # break collapse runs. Filtering first and labeling on the
+        # filtered frame would treat 5 cm/s | 0 cm/s | 5 cm/s as one
+        # contiguous moving stretch and merge two 1-bin events into
+        # one 3-second event.
+        collapsed_and_moving = (
+            (group["Local_prob"] < local_prob_threshold).to_numpy()
+            & is_moving
+        )
         times = group.index.to_numpy()
-        labeled, n_episodes = label(collapsed)
+        labeled, n_episodes = label(collapsed_and_moving)
         if n_episodes > 0:
             episode_durations = np.array([
                 times[labeled == i][-1] - times[labeled == i][0]
@@ -210,7 +224,7 @@ def compute_state_fraction_during_movement(
 
         return pd.Series(result)
 
-    return moving.groupby(group_cols, sort=False).apply(
+    return data.groupby(group_cols, sort=False).apply(
         _session_stats, include_groups=False,
     ).reset_index()
 
@@ -253,9 +267,9 @@ def compute_non_local_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "nonlocal_movement_rate_per_min",
@@ -267,14 +281,30 @@ def compute_non_local_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        n_moving = int(is_moving.sum())
+        if n_moving == 0:
+            return pd.Series({
+                "nonlocal_movement_rate_per_min": 0.0,
+                "nonlocal_movement_mean_duration_ms": 0.0,
+                "nonlocal_movement_median_duration_ms": 0.0,
+                "nonlocal_movement_fraction": 0.0,
+                "n_nonlocal_movement_events": 0,
+            })
+
         nonlocal_prob = (
             group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
         )
-        is_nonlocal = (nonlocal_prob > non_local_threshold).to_numpy()
+        # Label on the FULL timeline so immobile rows act as gaps
+        # that break event runs. Filtering first treated 5/0/5 cm/s
+        # as one contiguous moving stretch and merged separate events.
+        is_nonlocal_and_moving = (
+            (nonlocal_prob > non_local_threshold).to_numpy() & is_moving
+        )
         times = group.index.to_numpy()
-        labeled, n_events = label(is_nonlocal)
+        labeled, n_events = label(is_nonlocal_and_moving)
 
-        total_duration_min = len(group) / sampling_frequency / 60.0
+        total_duration_min = n_moving / sampling_frequency / 60.0
 
         if n_events > 0:
             durations_sec = np.array([
@@ -287,7 +317,7 @@ def compute_non_local_during_movement(
                 "nonlocal_movement_rate_per_min": n_events / total_duration_min,
                 "nonlocal_movement_mean_duration_ms": durations_ms.mean(),
                 "nonlocal_movement_median_duration_ms": np.median(durations_ms),
-                "nonlocal_movement_fraction": is_nonlocal.sum() / len(group),
+                "nonlocal_movement_fraction": is_nonlocal_and_moving.sum() / n_moving,
                 "n_nonlocal_movement_events": n_events,
             })
         else:
@@ -299,7 +329,7 @@ def compute_non_local_during_movement(
                 "n_nonlocal_movement_events": 0,
             })
 
-    return moving.groupby(group_cols, sort=False).apply(
+    return data.groupby(group_cols, sort=False).apply(
         _session_stats, include_groups=False,
     ).reset_index()
 
@@ -755,14 +785,53 @@ def compute_non_local_event_context(
         )
 
     def _circular_mean(phases: pd.Series) -> float:
-        """Circular mean via complex exponentials."""
-        return float(np.angle(np.mean(np.exp(1j * phases.to_numpy()))))
+        """Circular mean via complex exponentials.
+
+        Drops non-finite phases before averaging. ``_nearest`` in
+        ``data_aggregation`` returns NaN when no theta sample is
+        within tolerance of an event timebin; without this filter,
+        ``np.exp(1j * NaN) = NaN`` and ``np.mean`` propagates NaN to
+        the per-event mean phase. That single NaN then poisons the
+        session-level ``np.mean(np.exp(1j * phases))``, masking
+        otherwise-valid theta locking across every other event in
+        the session. Returns NaN only if no finite phase exists.
+        """
+        arr = phases.to_numpy()
+        finite = arr[np.isfinite(arr)]
+        if finite.size == 0:
+            return float("nan")
+        return float(np.angle(np.mean(np.exp(1j * finite))))
 
     event_summary = non_local.groupby(event_group_cols, sort=False).agg(
-        has_swr=("SWR_event", lambda x: (x > 0).any()),
         mean_theta_power=("theta_power_zscore", "mean"),
         circular_mean_theta_phase=("theta_phase", _circular_mean),
     ).reset_index()
+
+    # Strict positive-duration interval overlap with any SWR. The
+    # previous label-based ``(SWR_event > 0).any()`` aggregator counted
+    # boundary-touch contact (a single shared timestamp from the
+    # inclusive ``get_labels`` writer) as overlap, which conflicts
+    # with ``classify_swr_overlap`` / ``get_overlap_times`` and
+    # inflates ``frac_swr``. Use the shared event-bound overlap helper
+    # so this stays consistent with the rest of the SWR-overlap path.
+    from .event_detection import event_strict_overlap_keys
+
+    swr_overlap_keys = (
+        event_strict_overlap_keys(
+            data, event_col, "SWR_event", session_cols=tuple(group_cols)
+        )
+        if "SWR_event" in data.columns
+        else set()
+    )
+    if swr_overlap_keys:
+        keys_iter = zip(
+            *(event_summary[c].to_numpy() for c in group_cols),
+            event_summary[event_col].to_numpy(),
+            strict=True,
+        )
+        event_summary["has_swr"] = [tuple(k) in swr_overlap_keys for k in keys_iter]
+    else:
+        event_summary["has_swr"] = False
 
     event_summary["is_swr"] = event_summary["has_swr"]
     event_summary["is_theta"] = (
@@ -781,9 +850,21 @@ def compute_non_local_event_context(
         }
 
         theta_events = group.loc[group["is_theta"]]
-        if len(theta_events) >= 3:
-            phases = theta_events["circular_mean_theta_phase"].to_numpy()
-            mean_vector = np.mean(np.exp(1j * phases))
+        # Restrict to events with a finite per-event mean phase. The
+        # per-event ``_circular_mean`` drops NaN-phase samples, but a
+        # whole event whose every theta-phase sample was NaN
+        # (e.g. ``_nearest`` returned NaN for every bin) still emits
+        # ``circular_mean_theta_phase = NaN``. Without this filter,
+        # ``np.mean(np.exp(1j * phases))`` propagates that NaN to the
+        # session-level ``theta_mrl`` and ``theta_mean_angle``,
+        # masking otherwise-valid locking across all other events in
+        # the session. Apply the ``>= 3`` threshold to the count of
+        # finite-phase events so the gate matches what's actually
+        # being averaged.
+        finite_phases = theta_events["circular_mean_theta_phase"].to_numpy()
+        finite_phases = finite_phases[np.isfinite(finite_phases)]
+        if finite_phases.size >= 3:
+            mean_vector = np.mean(np.exp(1j * finite_phases))
             result["theta_mrl"] = float(np.abs(mean_vector))
             result["theta_mean_angle"] = float(np.angle(mean_vector))
         else:
@@ -839,9 +920,9 @@ def compute_local_state_collapse_details(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    moving = data.loc[data["head_speed"] > speed_threshold]
+    is_moving_full = data["head_speed"] > speed_threshold
 
-    if moving.empty:
+    if not is_moving_full.any():
         return pd.DataFrame(
             columns=group_cols + [
                 "episode_id", "start_time", "end_time", "duration_sec",
@@ -852,11 +933,18 @@ def compute_local_state_collapse_details(
 
     all_episodes = []
 
-    for keys, group in moving.groupby(group_cols, sort=False):
+    for keys, group in data.groupby(group_cols, sort=False):
         if not isinstance(keys, tuple):
             keys = (keys,)
 
-        collapsed = (group["Local_prob"] < local_prob_threshold).to_numpy()
+        # Label on the FULL session timeline so immobile rows act as
+        # gaps that break collapse runs. Filtering first treated
+        # 5/0/5 cm/s as one contiguous moving stretch and merged
+        # separate 1-bin episodes.
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        collapsed = (
+            (group["Local_prob"] < local_prob_threshold).to_numpy() & is_moving
+        )
         labeled, n_episodes = label(collapsed)
 
         if n_episodes == 0:
@@ -940,7 +1028,26 @@ def compute_calibration_curve(
 
     needed_cols = group_cols + ["Local_prob", "ahead_behind_distance"]
     working = data[needed_cols].copy()
+    # Drop rows with NaN ``Local_prob`` BEFORE binning. ``np.digitize``
+    # returns ``len(bin_edges)`` for NaN inputs, which after the
+    # ``.clip(0, n_bins-1)`` below maps every NaN row into the
+    # *highest* probability bin (e.g. ``prob_bin_center=0.95``).
+    # Decoder errors at NaN-Local_prob timepoints (often crashes /
+    # data drops) would then dominate the highest bin's median error.
+    working = working.dropna(subset=["Local_prob"])
     working["error_cm"] = working["ahead_behind_distance"].abs()
+    # Also drop rows where the decoded error is NaN (e.g. timebins
+    # outside the linearized track). Otherwise a probability bin
+    # that happens to contain only NaN-error rows yields
+    # ``median_error_cm = NaN`` with ``n_bins_in_group = 0``, which
+    # then poisons ``stats.linregress`` (NaN slope) and
+    # ``np.diff(errors) <= 0`` (False monotonicity). A session with
+    # otherwise usable calibration bins loses the diagnostic and
+    # ``compute_session_quality_summary``'s
+    # ``flag_poor_calibration`` silently never trips. Drop the
+    # NaN-error rows before binning so each emitted bin reflects
+    # actual decoded errors.
+    working = working.dropna(subset=["error_cm"])
 
     bin_edges = np.linspace(0, 1, n_bins + 1)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -1084,11 +1191,19 @@ def compute_session_quality_summary(
     )
 
     calib_df = compute_calibration_curve(data, group_cols=group_cols)
-    calib_session = (
-        calib_df.groupby(group_cols, sort=False)
-        .first()[["calibration_slope", "is_monotonic_decreasing"]]
-        .reset_index()
-    )
+    calib_cols = ["calibration_slope", "is_monotonic_decreasing"]
+    if calib_df.empty or any(c not in calib_df.columns for c in calib_cols):
+        # ``compute_calibration_curve`` returns a strictly empty frame
+        # (no per-session columns at all) when there's nothing to
+        # calibrate; the downstream join would otherwise raise
+        # ``KeyError: ['calibration_slope', 'is_monotonic_decreasing']``.
+        calib_session = pd.DataFrame(columns=group_cols + calib_cols)
+    else:
+        calib_session = (
+            calib_df.groupby(group_cols, sort=False)
+            .first()[calib_cols]
+            .reset_index()
+        )
 
     summary = error_df
     for df in [

@@ -11,7 +11,7 @@ with a known generative truth that includes interaction terms, then ask:
 3. **Selection power**: when the truth IS M3 (reward binary active),
    does AIC/BIC correctly upgrade from M2 to M3?
 
-These are the validations that determine whether the M0–M8 hierarchy
+These are the validations that determine whether the M0–M6 hierarchy
 comparisons reported in the paper actually identify the right
 generative story.
 """
@@ -38,6 +38,18 @@ class TestInteractionRecovery:
     also in the model. We test recovery of one interaction at a time, with
     the matching base effect held at a non-zero baseline."""
 
+    # Per-interaction seed so each parametrized case is reproducible
+    # across processes. Using ``hash(interaction) % N`` would silently
+    # vary with PYTHONHASHSEED — under different CI workers the same
+    # test could select different simulation draws and mask
+    # regressions that only fail at one seed.
+    _INTERACTION_SEEDS = {
+        "swr_x_current": 1154,
+        "switch_x_prev": 9541,
+        "current_x_last_rewarded": 1911,
+        "omission_x_last_rewarded": 4273,
+    }
+
     @pytest.mark.parametrize(
         "interaction,base",
         [
@@ -50,7 +62,10 @@ class TestInteractionRecovery:
     def test_recover_single_interaction(self, interaction, base):
         truth = {base: 0.4, interaction: 0.6}
         df = simulate_with_event_covariates(
-            truth, n_events=600, L_e=30, seed=hash(interaction) % 10000
+            truth,
+            n_events=600,
+            L_e=30,
+            seed=self._INTERACTION_SEEDS[interaction],
         )
         fit = fit_conditional_poisson(df, predictors=list(truth))
         assert fit is not None
@@ -112,10 +127,9 @@ class TestSelectionPicksTruthM2:
             "is_current": 0.6,
             "is_prev": 0.7,
             # Everything beyond M2 set to 0
-            "is_last_rewarded": 0.0,
-            "current_x_last_rewarded": 0.0,
-            "visit_recency": 0.0,
-            "cumulative_reward": 0.0,
+            "is_last_rewarded_elsewhere": 0.0,
+            "visit_recency_demeaned": 0.0,
+            "recent_reward_rate": 0.0,
             "dist_to_arm": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=7)
@@ -135,17 +149,17 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         truth = {
             "is_current": 0.5,
             "is_prev": 0.4,
-            "is_last_rewarded": 0.6,
-            "current_x_last_rewarded": -0.3,
-            # Continuous reward history at 0 — not the truth
-            "visit_recency": 0.0,
-            "cumulative_reward": 0.0,
+            # Reward-memory signal enters the hierarchy at M5.
+            "is_last_rewarded_elsewhere": 0.6,
+            # M3/M4 predictors at 0 — not the truth
+            "visit_recency_demeaned": 0.0,
+            "recent_reward_rate": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3", "M4", "M5"])
         for criterion in ["aic", "bic"]:
             winner = _selection_winner(fits, criterion)
-            # Should pick M3+ because the reward binary is active.
+            # Should pick M5 because the reward-memory predictor is active.
             assert winner not in {"M0", "M1", "M2"}, (
                 f"{criterion.upper()} picked {winner}; expected M3+. "
                 f"{criterion}s: {[(n, round(f[criterion], 2)) for n, f in fits.items()]}"
@@ -155,7 +169,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         truth = {
             "is_current": 0.5,
             "is_prev": 0.4,
-            "cumulative_reward": 0.6,
+            "recent_reward_rate": 0.6,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M2", "M3"])
@@ -163,7 +177,7 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         lr_stat = 2 * (fits["M3"]["llf"] - fits["M2"]["llf"])
         assert lr_stat > 6, (
             f"LR statistic M3 vs M2 = {lr_stat:.2f}; "
-            f"expected > 6 for the active cumulative_reward to register"
+            f"expected > 6 for the active recent_reward_rate to register"
         )
 
 

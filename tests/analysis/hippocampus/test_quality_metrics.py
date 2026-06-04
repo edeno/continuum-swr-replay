@@ -282,6 +282,57 @@ class TestComputeNonLocalEventContext:
         assert result["frac_theta"].iloc[0] == pytest.approx(1 / 3)
         assert result["frac_neither"].iloc[0] == pytest.approx(1 / 3)
 
+    def test_unequal_classification_proportions(self):
+        """A function that always emits ``[1/3, 1/3, 1/3]`` regardless of
+        input would pass ``test_classifies_swr_theta_neither``. Pin the
+        unequal case: 2 SWR + 1 theta + 0 neither → (2/3, 1/3, 0)."""
+        n = N_BINS
+        time = np.arange(n) / SAMPLING_FREQUENCY
+        non_local_event = np.zeros(n, dtype=int)
+        swr_event = np.zeros(n, dtype=int)
+        theta_power = np.zeros(n)
+
+        # Events 1 and 2: during SWRs
+        non_local_event[100:121] = 1
+        swr_event[100:121] = 1
+        non_local_event[200:221] = 2
+        swr_event[200:221] = 1
+        # Event 3: during high theta
+        non_local_event[400:421] = 3
+        theta_power[400:421] = 3.0
+
+        session = pd.DataFrame(
+            {
+                "Local_prob": np.where(non_local_event > 0, 0.1, 0.9),
+                "No-Spike_prob": np.full(n, 0.05),
+                "Non-Local_Continuous_prob": np.where(non_local_event > 0, 0.7, 0.05),
+                "Non-Local_Fragmented_prob": np.where(non_local_event > 0, 0.15, 0.0),
+                "ahead_behind_distance": np.zeros(n),
+                "map_estimate": np.linspace(0, 100, n),
+                "linear_position": np.linspace(0, 100, n),
+                "head_speed": np.full(n, 2.0),
+                "track_segment_id": np.repeat([0, 1, 2, 3, 4], n // 5),
+                "hpd": np.full(n, 5.0),
+                "non_local_event": non_local_event,
+                "SWR_event": swr_event,
+                "MUA_event": np.zeros(n, dtype=int),
+                "theta_phase": np.full(n, np.pi),
+                "theta_power_zscore": theta_power,
+                "SWR_zscore": np.zeros(n),
+                "MUA_zscore": np.zeros(n),
+                "animal": "mouse_unequal",
+                "day": 20200104,
+                "epoch": "02_r1",
+            },
+            index=time,
+        )
+
+        result = compute_non_local_event_context(session, theta_power_threshold=2.0)
+        assert result["n_events"].iloc[0] == 3
+        assert result["frac_swr"].iloc[0] == pytest.approx(2 / 3)
+        assert result["frac_theta"].iloc[0] == pytest.approx(1 / 3)
+        assert result["frac_neither"].iloc[0] == pytest.approx(0.0)
+
     def test_fractions_sum_to_one(self, session_with_events):
         result = compute_non_local_event_context(session_with_events)
         total = result["frac_swr"].iloc[0] + result["frac_theta"].iloc[0] + result["frac_neither"].iloc[0]
@@ -290,6 +341,156 @@ class TestComputeNonLocalEventContext:
     def test_no_events_returns_empty(self, perfect_session):
         result = compute_non_local_event_context(perfect_session)
         assert len(result) == 0
+
+    def test_one_event_with_nan_theta_phase_does_not_poison_session_stats(self):
+        """Regression: a single event with all-NaN ``theta_phase`` rows
+        used to propagate NaN through the per-event circular mean and
+        then through the session-level
+        ``np.mean(np.exp(1j * phases))``, returning
+        ``theta_mrl=NaN`` and ``theta_mean_angle=NaN`` even when the
+        other theta events had clean phase samples. ``_nearest`` in
+        ``data_aggregation`` returns NaN when no theta sample is within
+        tolerance, so this is a routine occurrence — and it silently
+        masked otherwise-valid theta locking.
+
+        Post-fix ``_circular_mean`` drops non-finite phases, and the
+        session-level reduction filters to events with finite per-event
+        mean phase before applying the ``>= 3`` threshold.
+        """
+        rows = []
+        for ev_id in (1, 2, 3, 4):
+            for _ in range(5):
+                phase = np.nan if ev_id == 4 else (0.5 + 0.05 * (ev_id - 1))
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": phase,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        # All four events classify as theta (non-SWR + theta_power > 0.5).
+        assert result["frac_theta"].iloc[0] == pytest.approx(1.0)
+        # The three surviving phases are all close, so MRL should be ~1.
+        assert np.isfinite(result["theta_mrl"].iloc[0]), (
+            f"theta_mrl={result['theta_mrl'].iloc[0]} — one event's "
+            "missing theta_phase poisoned the session circular mean."
+        )
+        assert result["theta_mrl"].iloc[0] > 0.99
+        assert np.isfinite(result["theta_mean_angle"].iloc[0])
+
+    def test_per_event_circular_mean_drops_internal_nans(self):
+        """Within a single event, NaN phase samples (e.g. some bins
+        had no theta sample within tolerance) must not poison the
+        per-event ``circular_mean_theta_phase``."""
+        rows = []
+        # Event 1: 5 samples, two are NaN — should average over the
+        # three finite samples.
+        finite_phases = [0.5, 0.55, 0.6]
+        sample_phases = [finite_phases[0], np.nan, finite_phases[1], np.nan, finite_phases[2]]
+        for phase in sample_phases:
+            rows.append(
+                {
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                    "theta_power_zscore": 1.5,
+                    "theta_phase": phase,
+                }
+            )
+        # Three more clean events so the session reduction has the
+        # required ``>= 3`` finite events.
+        for ev_id in (2, 3, 4):
+            for _ in range(5):
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": 0.55,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        assert np.isfinite(result["theta_mrl"].iloc[0]), (
+            "Per-event circular mean must drop NaN phase samples "
+            "instead of returning NaN for the whole event."
+        )
+        assert result["theta_mrl"].iloc[0] > 0.99
+
+    def test_boundary_touch_swr_does_not_inflate_frac_swr(self):
+        """Regression: a SWR that only touches a non-local event at
+        a boundary timestamp shares zero positive duration. The
+        previous label-based ``has_swr=("SWR_event", lambda x: (x > 0).any())``
+        aggregator counted that as overlap because ``get_labels``
+        writes inclusive bin labels, inflating ``frac_swr``. Strict
+        positive-duration semantics must classify it as theta- or
+        neither-associated, not SWR-associated."""
+        # NL labels [0.0, 1.0]; SWR labels [1.0, 2.0]; share t=1.0.
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 5,
+                "day": [1] * 5,
+                "epoch": ["e1"] * 5,
+                "non_local_event": [1, 1, 1, 0, 0],
+                "SWR_event": [0, 0, 2, 2, 2],
+                "MUA_event": [0, 0, 0, 0, 0],
+                "head_speed": [0.0] * 5,
+                "theta_phase": [np.nan] * 5,
+                "theta_power_zscore": [0.0] * 5,
+            },
+            index=[0.0, 0.5, 1.0, 1.5, 2.0],
+        )
+        out = compute_non_local_event_context(df)
+        assert out["frac_swr"].iloc[0] == 0.0, (
+            f"frac_swr={out['frac_swr'].iloc[0]} — boundary-touch SWR "
+            "must not be classified as SWR-associated."
+        )
+
+    def test_all_nan_theta_phases_yield_nan_session_stats(self):
+        """Sanity: if every theta event has only NaN phase samples,
+        the session circular stats remain NaN (the gate fails because
+        no finite per-event phase exists, regardless of event count)."""
+        rows = []
+        for ev_id in (1, 2, 3, 4):
+            for _ in range(5):
+                rows.append(
+                    {
+                        "animal": "a",
+                        "day": 1,
+                        "epoch": "e1",
+                        "non_local_event": ev_id,
+                        "SWR_event": 0,
+                        "theta_power_zscore": 1.5,
+                        "theta_phase": np.nan,
+                    }
+                )
+        df = pd.DataFrame(rows)
+        result = compute_non_local_event_context(
+            df,
+            event_col="non_local_event",
+            theta_power_threshold=0.5,
+        )
+        assert np.isnan(result["theta_mrl"].iloc[0])
+        assert np.isnan(result["theta_mean_angle"].iloc[0])
 
 
 class TestComputeLocalStateCollapseDetails:
@@ -339,6 +540,50 @@ class TestComputeCalibrationCurve:
         })
         result = compute_calibration_curve(data)
         assert result["calibration_slope"].iloc[0] < 0
+
+    def test_nan_error_bin_does_not_poison_slope(self):
+        """Regression: a probability bin that contains only rows with
+        NaN ``ahead_behind_distance`` (e.g. timepoints outside the
+        linearized track) used to emit a row with
+        ``median_error_cm = NaN`` and ``n_bins_in_group = 0``. That
+        row then poisoned ``stats.linregress``, leaving every bin's
+        ``calibration_slope`` NaN and ``is_monotonic_decreasing``
+        False — so a session with otherwise usable calibration bins
+        lost the slope diagnostic, and
+        ``compute_session_quality_summary``'s
+        ``flag_poor_calibration`` silently never tripped. The fix
+        drops NaN-error rows before bin aggregation so each emitted
+        bin reflects actual decoded errors.
+        """
+        df = pd.DataFrame(
+            {
+                "animal": ["a"] * 8,
+                "day": [1] * 8,
+                "epoch": ["e"] * 8,
+                # Two finite-error bins (low and mid Local_prob);
+                # the high bin contains only NaN-error rows.
+                "Local_prob": [0.05, 0.10, 0.40, 0.60, 0.85, 0.95, 0.90, 0.92],
+                "ahead_behind_distance": [
+                    42.0, 40.0, 12.0, 10.0,
+                    np.nan, np.nan, np.nan, np.nan,
+                ],
+            }
+        )
+        out = compute_calibration_curve(df, n_bins=3)
+        # The all-NaN-error high bin must be dropped, leaving exactly
+        # the two finite bins.
+        assert len(out) == 2
+        # Slope must be finite (and negative for a good calibration).
+        slope = float(out["calibration_slope"].iloc[0])
+        assert np.isfinite(slope), (
+            f"calibration_slope={slope} — NaN-error bin still poisons "
+            "the linregress over the surviving finite bins."
+        )
+        assert slope < 0
+        # The two surviving bins are monotonically decreasing
+        # (41 cm at low p → 11 cm at mid p), so the diagnostic must
+        # report True.
+        assert bool(out["is_monotonic_decreasing"].iloc[0]) is True
 
 
 class TestComputeSessionQualitySummary:

@@ -23,6 +23,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -38,6 +39,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY_MUA,
     MODEL_HIERARCHY_SWR,
     MODEL_PATCH,
+    MODEL_PATCH_MUA,
+    MODEL_PATCH_SWR,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -63,14 +66,17 @@ _EVENT_SOURCE_CONFIG = {
 # When --hierarchy patch is selected, the table and response column are
 # different but the input directory is shared with the corresponding
 # event-source. event_id remains the grouping key (globally unique).
+# ``table_name`` here is informational only — the actual table name is
+# resolved by ``resolve_contfrag_paths`` further down, which appends the
+# brain-area suffix for the ContFrag sources. The SWR/MUA patch tables
+# are built by ``prepare_contfrag_replay_content_data.py``.
 _PATCH_OVERRIDES = {
     "non_local": {
         "hierarchy": MODEL_PATCH,
         "table_name": "event_patch_table",
     },
-    # SWR / MUA patch hierarchies not yet built; surface a clear error.
-    "SWR": {"hierarchy": None, "table_name": "event_patch_table_swr"},
-    "MUA": {"hierarchy": None, "table_name": "event_patch_table_mua"},
+    "SWR": {"hierarchy": MODEL_PATCH_SWR, "table_name": "event_patch_table_swr"},
+    "MUA": {"hierarchy": MODEL_PATCH_MUA, "table_name": "event_patch_table_mua"},
 }
 
 logging.basicConfig(
@@ -82,6 +88,41 @@ logging.basicConfig(
 SESSION_COLS = ["animal", "day", "epoch"]
 
 
+def resolve_contfrag_paths(
+    event_source: str,
+    brain_area: str,
+    hierarchy_kind: str,
+) -> tuple[str, str]:
+    """Return ``(table_name, output_subdir)`` for a fit invocation.
+
+    Pure helper extracted so the prep ↔ fitter filename contract has a
+    direct unit-test target. ``event_source`` is one of
+    ``"non_local"`` / ``"SWR"`` / ``"MUA"``; ``hierarchy_kind`` is
+    ``"arm"`` / ``"patch"``.
+
+    Non-local fits stay unsuffixed (their prep is single-area /
+    single-source). ContFrag fits append ``_{brain_area}`` to the
+    table name and ``_{source_lower}_{brain_area}`` to the output
+    subdir so SWR/HPC, SWR/mPFC, MUA/HPC … never overwrite each
+    other's ``M0.pkl`` / ``all_models.pkl``.
+    """
+    if event_source == "non_local":
+        if hierarchy_kind == "patch":
+            return "event_patch_table", "models_patch"
+        return "event_arm_table", "models"
+
+    base_table = (
+        f"event_patch_table_{event_source.lower()}"
+        if hierarchy_kind == "patch"
+        else f"event_arm_table_{event_source.lower()}"
+    )
+    table_name = f"{base_table}_{brain_area}"
+
+    base_subdir = "models_patch" if hierarchy_kind == "patch" else "models"
+    output_subdir = f"{base_subdir}_{event_source.lower()}_{brain_area}"
+    return table_name, output_subdir
+
+
 def fit_model_per_session(
     long_df: pd.DataFrame,
     model_name: str,
@@ -89,6 +130,7 @@ def fit_model_per_session(
     run_cv: bool = False,
     response_col: str = "arm_count",
     event_col: str = "event_uid",
+    n_categories: int = 9,
 ) -> pd.DataFrame:
     """Fit conditional Poisson model across all sessions.
 
@@ -117,8 +159,14 @@ def fit_model_per_session(
     """
     results = []
 
+    # Minimum 2 events per session, scaled by candidate-set size:
+    # n_categories=9 (arm) → 18 rows, n_categories=3 (patch) → 6 rows.
+    # The previous hardcoded 18 silently skipped valid 2–5 event patch
+    # sessions before fit_conditional_poisson could apply its own
+    # n_events < 2 * len(predictors) gate.
+    min_rows = n_categories * 2
     for keys, group in long_df.groupby(SESSION_COLS):
-        if len(group) < 18:  # minimum 2 events (9 arms * 2)
+        if len(group) < min_rows:
             continue
 
         r = fit_conditional_poisson(
@@ -126,6 +174,7 @@ def fit_model_per_session(
             predictors=list(predictors),
             response_col=response_col,
             event_col=event_col,
+            n_categories=n_categories,
         )
         if r is None:
             continue
@@ -136,6 +185,7 @@ def fit_model_per_session(
                 predictors=list(predictors),
                 event_col=event_col,
                 response_col=response_col,
+                n_categories=n_categories,
             )
             if cv is not None:
                 r.update(cv)
@@ -246,9 +296,36 @@ def main():
         default="arm",
         choices=["arm", "patch"],
         help=(
-            "Resolution: 'arm' (9 arms, M0-M6) or 'patch' (3 patches, "
-            "P0-P3). Patch fits use event_patch_table.pkl and "
+            "Resolution: 'arm' (9 arms, M0-M7) or 'patch' (3 patches, "
+            "P0-P4). Patch fits use event_patch_table.pkl and "
             "patch_count_hard."
+        ),
+    )
+    parser.add_argument(
+        "--swr-subset",
+        type=str,
+        default="all",
+        choices=["all", "T", "F"],
+        help=(
+            "Restrict to the SWR-overlap subset of events. 'T' keeps "
+            "events with is_swr=True; 'F' keeps is_swr=False. With a "
+            "subset the hierarchy is reduced to MODEL_HIERARCHY_SWR / "
+            "MODEL_PATCH_SWR (i.e. M0-M5 / P0-P3) since swr_x_* "
+            "interactions are constant within a subset. Output is "
+            "written to a suffixed subdirectory (e.g. models_swr_T)."
+        ),
+    )
+    parser.add_argument(
+        "--brain-area",
+        type=str,
+        default="HPC",
+        choices=["HPC", "mPFC", "OFC"],
+        help=(
+            "Brain area suffix used when resolving ContFrag prep "
+            "outputs (event_arm_table_{source}_{brain_area}.pkl). "
+            "Ignored for the non_local event source, which is built "
+            "by ``prepare_replay_content_data.py`` and is not "
+            "partitioned per area."
         ),
     )
     args = parser.parse_args()
@@ -264,7 +341,8 @@ def main():
         if hierarchy is None:
             raise NotImplementedError(
                 f"Patch hierarchy not defined for event source {args.event_source!r}. "
-                "Add MODEL_PATCH_SWR / MODEL_PATCH_MUA in model_specs.py first."
+                "Add an entry to _PATCH_OVERRIDES pointing at a MODEL_PATCH "
+                "variant in model_specs.py."
             )
     else:
         hierarchy = source_config["hierarchy"]
@@ -274,8 +352,34 @@ def main():
                 f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
                 "in analysis/replay/model_specs.py. Define it before running."
             )
+    # The (table_name, output_subdir) contract with the prep scripts
+    # lives in ``resolve_contfrag_paths`` so the path-resolution logic
+    # has a direct unit-test target rather than only being exercised
+    # at the end of the long ``main()``. The hierarchy / source
+    # validity gates above are unchanged; this only resolves names.
+    table_name, output_subdir = resolve_contfrag_paths(
+        args.event_source, args.brain_area, args.hierarchy
+    )
+
     input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
-    output_dir = input_dir / ("models_patch" if args.hierarchy == "patch" else "models")
+    output_dir = input_dir / output_subdir
+
+    # SWR subset: restrict to is_swr=True or =False events. Within a
+    # subset is_swr is constant, so the swr_x_* interactions (M6/M7,
+    # P4) collapse onto their main effects and are unidentifiable —
+    # use the *_SWR variants (M0-M5 / P0-P3) which already drop them.
+    # Output goes to a suffixed subdirectory so the unrestricted fits
+    # are not overwritten.
+    if args.swr_subset != "all":
+        if args.hierarchy == "patch":
+            hierarchy = MODEL_PATCH_SWR
+        else:
+            hierarchy = MODEL_HIERARCHY_SWR
+        output_dir = input_dir / f"{output_subdir}_swr_{args.swr_subset}"
+        logging.info(
+            "SWR subset = %s: hierarchy narrowed to %s, output -> %s",
+            args.swr_subset, list(hierarchy.keys()), output_dir,
+        )
 
     # Determine which models to fit
     if args.models:
@@ -314,6 +418,36 @@ def main():
         len(long_df),
         long_df.groupby(SESSION_COLS).ngroups,
     )
+
+    # Apply the SWR subset filter (--swr-subset T/F). is_swr is
+    # event-level on the event_arm_table and patch table. Drop whole
+    # events / patch-rows where is_swr doesn't match.
+    if args.swr_subset != "all":
+        if "is_swr" not in long_df.columns:
+            logging.error(
+                "--swr-subset requires an 'is_swr' column; not found in %s",
+                count_path,
+            )
+            return
+        keep = long_df["is_swr"] if args.swr_subset == "T" else ~long_df["is_swr"]
+        n_before_rows = len(long_df)
+        long_df = long_df.loc[keep].reset_index(drop=True)
+        logging.info(
+            "SWR subset filter (%s): %d -> %d rows",
+            args.swr_subset, n_before_rows, len(long_df),
+        )
+
+    # Arm fixed effects are derived at fit time rather than stored in
+    # the canonical table. Patch tables have no ``arm`` column and the
+    # patch hierarchy does not use arm FE, so this is arm-only.
+    if args.hierarchy == "arm":
+        if "arm" in long_df.columns:
+            add_arm_fixed_effects(long_df)
+        else:
+            logging.warning(
+                "no 'arm' column — arm fixed-effect models (M0a+) will be "
+                "skipped as missing-predictor"
+            )
 
     # Collect the union of all predictors across requested models so we
     # can restrict to a common complete-case event set. This ensures that
@@ -367,6 +501,20 @@ def main():
             n_before - n_after,
             sorted(all_predictors),
         )
+    if n_after == 0:
+        # A predictor that is structurally NaN on some arm of every
+        # event (e.g. a stale ``recent_reward_rate`` column predating
+        # the trunk-arm 0.0 fix) wipes out the whole event set under
+        # event-wise complete-case filtering. Fail loudly rather than
+        # fitting M0 on zero events.
+        logging.error(
+            "Complete-case filtering removed ALL %d events — a predictor "
+            "in %s is NaN on some arm of every event. Regenerate the "
+            "event-arm table with the current prepare script.",
+            n_before,
+            sorted(all_predictors),
+        )
+        return
 
     # Also drop zero-count events
     event_totals = long_df.groupby(event_col)[response_col].transform("sum")
@@ -393,6 +541,11 @@ def main():
         )
         t0 = time.time()
 
+        # Patch hierarchy collapses 9 arms to 3 patches; the null /
+        # pseudo-R² / CV baselines must use log(3) instead of log(9)
+        # for P0–P3 to be on the right chance footing.
+        n_categories = 3 if args.hierarchy == "patch" else 9
+
         mdf = fit_model_per_session(
             long_df,
             model_name,
@@ -400,6 +553,7 @@ def main():
             run_cv=args.cv,
             response_col=response_col,
             event_col=event_col,
+            n_categories=n_categories,
         )
 
         elapsed = time.time() - t0
@@ -465,8 +619,18 @@ def main():
 
             logit_results = []
             for keys, group in long_df.groupby(SESSION_COLS):
+                # Forward the resolved response column. Patch fits use
+                # ``patch_count_hard``; without this, the logit call
+                # silently fell back to ``arm_count_hard`` (the
+                # ``fit_conditional_logit`` default), found no such
+                # column on patch tables, and returned ``None`` for
+                # every session — producing an empty ``logit/`` dir
+                # with no robustness outputs.
                 r = fit_conditional_logit(
-                    group, predictors=predictors, event_col=event_col
+                    group,
+                    predictors=predictors,
+                    event_col=event_col,
+                    response_col=response_col,
                 )
                 if r is not None:
                     r["model"] = model_name

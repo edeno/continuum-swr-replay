@@ -273,8 +273,20 @@ def _plot_nonlocal_movement(summary: pd.DataFrame, output_path) -> None:
 def _plot_calibration_curves(data: pd.DataFrame, output_path) -> None:
     """D: Calibration curves by animal."""
     calib = compute_calibration_curve(data)
-    animals = sorted(calib["animal"].unique())
+    animals = sorted(calib["animal"].unique()) if "animal" in calib.columns else []
     n_animals = len(animals)
+    # ``compute_calibration_curve`` legitimately returns an empty
+    # frame on degenerate inputs (all-NaN ``Local_prob``, no
+    # decoder bins survive the filter, etc.). ``plt.subplots(1, 0)``
+    # raises ``ValueError: Number of columns must be a positive
+    # integer, not 0``, so log + skip the panel rather than crash
+    # the whole quality-metrics pipeline.
+    if n_animals == 0:
+        print(
+            "[run_quality_metrics] no calibration data available; "
+            "skipping calibration_curves.pdf"
+        )
+        return
 
     fig, axes = plt.subplots(1, n_animals, figsize=(4 * n_animals, 4), squeeze=False)
 

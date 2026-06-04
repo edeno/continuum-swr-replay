@@ -256,7 +256,7 @@ def main() -> None:
 
     # Separate non-local events by SWR overlap
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
-        non_local_times, data["ripple_times"], results
+        non_local_times, data["ripple_times"]
     )
 
     # Organize event times

@@ -28,6 +28,8 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean, strict_sum
+
 __all__ = [
     "StopSummaryConfig",
     "fit_is_stay_logistic_per_session",
@@ -96,9 +98,14 @@ def _per_event_best_arm(
     valid = well_only.dropna(subset=["recent_reward_rate"])
     if valid.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "best_arm"])
-    idx = valid.groupby([*sess_keys, "event_id"])["recent_reward_rate"].idxmax()
-    best = valid.loc[idx, [*sess_keys, "event_id", "arm"]].rename(
-        columns={"arm": "best_arm"}
+    best = (
+        valid.sort_values(
+            [*sess_keys, "event_id", "recent_reward_rate", "arm"],
+            ascending=[True, True, True, True, False, True],
+        )
+        .groupby([*sess_keys, "event_id"], sort=False)
+        .head(1)[[*sess_keys, "event_id", "arm"]]
+        .rename(columns={"arm": "best_arm"})
     )
     return best.reset_index(drop=True)
 
@@ -127,8 +134,11 @@ def stop_replay_summary(
     For each role in ``{current, prev, last_rewarded, best}``, the
     output has:
 
-    - ``frac_on_<role>``: mean ``arm_fraction`` across events in the
-      stop (NaN if the stop has zero events).
+    - ``frac_on_<role>``: strict mean ``arm_fraction`` across events
+      in the stop (NaN if the stop has zero events OR any event in
+      the stop has NaN ``arm_fraction`` for this role — see the
+      ``_strict_mean`` aggregator below for why a NaN-skipping mean
+      would silently bias the stop toward surviving events).
     - ``frac_on_<role>_swr``: same, restricted to events with
       ``is_swr == True``.
     - ``frac_on_<role>_non_swr``: same, restricted to ``is_swr == False``.
@@ -221,10 +231,19 @@ def stop_replay_summary(
     # ~88% of trials, leaving the cross-patch trials uncontaminated.
     ea_p = ea.copy()
     ea_p["_arm_patch"] = ea_p["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    # Use a NaN-aware sum (``skipna=False``) so a per-event-per-patch
+    # group whose target arms have any NaN ``arm_fraction`` propagates
+    # NaN to the patch-level total. The default ``.sum()`` is
+    # ``skipna=True`` and silently fabricates a real zero from
+    # missing data — the user reproduced ``frac_on_current_patch ==
+    # 0.0`` for an event whose target-patch arm fractions were all
+    # NaN, indistinguishable from a confidently-zero replay.
     patch_sums = (
         ea_p.dropna(subset=["_arm_patch"])
-        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)["arm_fraction"]
-        .sum()
+        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)[
+            "arm_fraction"
+        ]
+        .agg(strict_sum)
         .rename(columns={"arm_fraction": "_patch_frac", "_arm_patch": "_patch"})
     )
     patch_sums["_patch"] = patch_sums["_patch"].astype(int)
@@ -313,8 +332,11 @@ def stop_replay_summary(
             )
             agg[[*sess_keys, "stop_id"]] = pd.DataFrame(columns=[*sess_keys, "stop_id"])
         else:
+            # ``strict_mean`` keeps a stop with any NaN event-level
+            # role fraction surfaced as NaN — the default ``skipna=True``
+            # mean would silently emit the surviving event's value.
             agg_cols = {
-                f"frac_on_{r}{label}": (f"frac_on_{r}_event", "mean")
+                f"frac_on_{r}{label}": (f"frac_on_{r}_event", strict_mean)
                 for r in role_cols
                 if f"frac_on_{r}_event" in sub.columns
             }
@@ -342,8 +364,12 @@ def stop_replay_summary(
     for agg in agg_dfs:
         summary = summary.merge(agg, on=[*sess_keys, "stop_id"], how="left")
 
-    # n_events_with_replay = events that contributed to the unrestricted
-    # fractions (= n_events). Keep as Int64 for clarity.
+    # n_events_with_replay = total events in the stop. Per-role
+    # contribution counts are NOT exposed; if any event had NaN
+    # ``arm_fraction`` for a given role, the stop's ``frac_on_<role>``
+    # is NaN (strict aggregation above). Treat ``frac_on_<role>``
+    # being NaN as the per-role missing-data signal — don't try to
+    # back out a per-role contributor count from this column.
     summary["n_events_with_replay"] = summary["n_events"].astype("Int64")
 
     return summary
@@ -563,6 +589,21 @@ def fit_is_stay_pooled_gee(
             outcome * content,
         ]
     )
+
+    # Rank check on the design matrix. The GEE backend silently
+    # pseudo-inverts a rank-deficient X^T W X and returns parameter
+    # estimates with vanishing standard errors — a constant
+    # ``content_col`` (e.g. ``frac_on_last_rewarded == 0.5`` for every
+    # stop) makes column 2 collinear with the intercept and column 3
+    # (``outcome * content``) collinear with ``outcome``, so the
+    # interaction is mathematically unidentified, but ``status`` came
+    # back as ``"ok"`` with ``se_inter`` ~ 1e-17 and a deceptively
+    # significant ``p_inter``. Reject the design before fitting so
+    # downstream FDR / reporting only sees fits with a unique
+    # solution.
+    if np.linalg.matrix_rank(X) < X.shape[1]:
+        base["status"] = "rank_deficient_design"
+        return base
 
     try:
         with warnings.catch_warnings():

@@ -17,6 +17,14 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
 )
 
 
+def _linear_graph(n_nodes: int, edge_cm: float = 10.0) -> nx.Graph:
+    """Chain graph: 0 — 1 — ... — (n_nodes-1), every edge ``edge_cm`` long."""
+    graph = nx.Graph()
+    graph.add_edges_from((i, i + 1) for i in range(n_nodes - 1))
+    nx.set_edge_attributes(graph, edge_cm, "distance")
+    return graph
+
+
 class TestConditionalNonLocalPosterior:
     """Test posterior conditioning on non-local state."""
 
@@ -162,11 +170,8 @@ class TestMapSpeed:
 
     def test_single_timepoint_returns_nan(self):
         """With only one time point, speed should be NaN."""
-        # Create simple linear track graph
-        graph = nx.Graph()
-        graph.add_edge(0, 1, distance=10.0)
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
 
-        # Single timepoint posterior (all probability at node 0)
         posterior = np.array([[1.0, 0.0]])
         place_bin_center_ind_to_node = np.array([0, 1])
 
@@ -182,15 +187,12 @@ class TestMapSpeed:
 
     def test_two_timepoints_basic_speed(self):
         """With two time points, compute distance / dt."""
-        graph = nx.Graph()
-        graph.add_edge(0, 1, distance=20.0)  # 20 cm apart
-
-        # Two timepoints: move from node 0 to node 1
+        graph = _linear_graph(n_nodes=2, edge_cm=20.0)
         posterior = np.array([[1.0, 0.0], [0.0, 1.0]])
         place_bin_center_ind_to_node = np.array([0, 1])
 
-        sampling_frequency = 500.0  # Hz
-        dt = 1 / sampling_frequency  # 0.002 seconds
+        sampling_frequency = 500.0
+        dt = 1 / sampling_frequency
 
         speed = get_map_speed(
             posterior,
@@ -202,24 +204,15 @@ class TestMapSpeed:
 
         expected_speed = 20.0 / dt  # 20 cm / 0.002 s = 10000 cm/s
         assert len(speed) == 2
-        # Both speeds should be approximately the same (repeated edge speed)
         # Use relaxed tolerance due to smoothing
         assert speed[0] == pytest.approx(expected_speed, rel=0.05)
         assert speed[1] == pytest.approx(expected_speed, rel=0.05)
 
     def test_stationary_animal_zero_speed(self):
         """Animal staying at same position should have zero speed."""
-        graph = nx.Graph()
-        graph.add_edge(0, 1, distance=10.0)
-
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
         # Five timepoints, all at node 0 (stationary)
-        posterior = np.array([
-            [1.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 0.0],
-        ])
+        posterior = np.tile([1.0, 0.0], (5, 1))
         place_bin_center_ind_to_node = np.array([0, 1])
 
         speed = get_map_speed(
@@ -230,19 +223,14 @@ class TestMapSpeed:
             smooth_sigma=0.0001,
         )
 
-        # Speed should be approximately zero (distance = 0)
         np.testing.assert_allclose(speed, 0.0, atol=1e-6)
 
     def test_linear_movement_speed(self):
         """Test speed calculation with linear movement along track."""
-        # Create 5-node linear track
-        graph = nx.Graph()
-        edges = [(0, 1), (1, 2), (2, 3), (3, 4)]
-        for edge in edges:
-            graph.add_edge(*edge, distance=10.0)  # 10 cm per edge
+        graph = _linear_graph(n_nodes=5, edge_cm=10.0)
 
         # Move from node 0 to node 4 over 5 timepoints
-        posterior = np.eye(5)  # Diagonal: 0→1→2→3→4
+        posterior = np.eye(5)
         place_bin_center_ind_to_node = np.arange(5)
 
         sampling_frequency = 500.0
@@ -256,19 +244,18 @@ class TestMapSpeed:
             smooth_sigma=0.0001,
         )
 
-        # Expected: moving 10 cm every dt seconds
         expected_speed = 10.0 / dt  # 5000 cm/s
         assert len(speed) == 5
-        # All speeds should be approximately the same
-        # Use relaxed tolerance due to smoothing and edge effects
-        np.testing.assert_allclose(speed, expected_speed, rtol=0.15)
+        # Central samples have neighbors on both sides; under uniform 10cm
+        # steps the discrete derivative is exact up to smoothing.
+        np.testing.assert_allclose(speed[1:-1], expected_speed, rtol=0.02)
+        # Boundary samples use a one-sided derivative — looser by design.
+        np.testing.assert_allclose(speed[[0, -1]], expected_speed, rtol=0.15)
 
     @pytest.mark.parametrize("invalid_freq", [0.0, -500.0, -1.0, -0.001])
     def test_invalid_sampling_frequency_raises(self, invalid_freq):
         """Zero or negative sampling frequency should raise ValueError."""
-        graph = nx.Graph()
-        graph.add_edge(0, 1, distance=10.0)
-
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
         posterior = np.array([[1.0, 0.0], [0.0, 1.0]])
         place_bin_center_ind_to_node = np.array([0, 1])
 
@@ -305,10 +292,7 @@ class TestMapSpeed:
 
     def test_smoothing_reduces_noise(self):
         """Gaussian smoothing should reduce speed fluctuations."""
-        # Create linear track
-        graph = nx.Graph()
-        for i in range(10):
-            graph.add_edge(i, i + 1, distance=10.0)
+        graph = _linear_graph(n_nodes=11, edge_cm=10.0)
 
         # Create noisy movement pattern
         node_sequence = [0, 1, 0, 2, 1, 3, 2, 4, 3, 5, 4]
@@ -339,10 +323,7 @@ class TestMapSpeed:
 
     def test_absolute_speed_always_positive(self):
         """Speed should always be non-negative (uses np.abs)."""
-        # Create linear track
-        graph = nx.Graph()
-        graph.add_edges_from([(0, 1), (1, 2), (2, 3)])
-        nx.set_edge_attributes(graph, 10.0, "distance")
+        graph = _linear_graph(n_nodes=4, edge_cm=10.0)
 
         # Forward then backward movement: 0→1→2→3→2→1→0
         node_sequence = [0, 1, 2, 3, 2, 1, 0]
@@ -367,9 +348,7 @@ class TestMapSpeed:
         including at the reversal point. Forward differences correctly capture
         this because dist(node[t], node[t+1]) measures the actual step taken.
         """
-        graph = nx.Graph()
-        graph.add_edges_from([(i, i + 1) for i in range(10)])
-        nx.set_edge_attributes(graph, 10.0, "distance")
+        graph = _linear_graph(n_nodes=11, edge_cm=10.0)
 
         # Forward 0→5, reverse 5→0: constant speed of 10cm per step
         forward = list(range(6))        # [0, 1, 2, 3, 4, 5]
@@ -398,9 +377,7 @@ class TestMapSpeed:
 
         An A→B→A→B pattern moves the same distance each step.
         """
-        graph = nx.Graph()
-        graph.add_edge(0, 1, distance=10.0)
-        graph.add_edge(1, 2, distance=10.0)
+        graph = _linear_graph(n_nodes=3, edge_cm=10.0)
 
         # Oscillate: 0→2→0→2→0→2
         node_sequence = [0, 2, 0, 2, 0, 2]
@@ -426,9 +403,7 @@ class TestMapSpeed:
 
     def test_three_timepoints_forward_difference(self):
         """With 3+ time points, all use forward differences."""
-        graph = nx.Graph()
-        graph.add_edges_from([(0, 1), (1, 2), (2, 3)])
-        nx.set_edge_attributes(graph, 20.0, "distance")
+        graph = _linear_graph(n_nodes=4, edge_cm=20.0)
 
         # Three nodes: 0 → 1 → 2
         posterior = np.array([

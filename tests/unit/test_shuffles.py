@@ -239,3 +239,105 @@ class TestNextArmCircularShift:
         events = self._events(10, with_next_arm=True).drop(columns=["is_stay"])
         out = next_arm_circular_shift(events, rng=np.random.default_rng(0))
         assert "is_stay" not in out.columns
+
+    def test_raises_on_multi_session_input(self):
+        """Direct helper calls must not roll labels across sessions."""
+        events = pd.DataFrame(
+            {
+                "animal": ["a", "a", "b", "b"],
+                "day": [1, 1, 1, 1],
+                "epoch": ["02_r1", "02_r1", "02_r1", "02_r1"],
+                "event_midpoint_time": [0.0, 1.0, 0.5, 1.5],
+                "next_arm": [0, 1, 2, 3],
+            }
+        )
+        with pytest.raises(ValueError, match="sessions"):
+            next_arm_circular_shift(events, rng=np.random.default_rng(0))
+
+    def test_is_stay_recomputed_against_destination_current_patch(self):
+        """Regression: ``is_stay`` was previously rolled alongside
+        ``next_arm``/``next_patch``, preserving the source row's old
+        ``current_patch`` reference. After the shift the destination
+        row's ``current_patch`` is paired with the new ``next_patch``,
+        so ``is_stay`` must be recomputed as
+        ``current_patch == shifted_next_patch``.
+
+        Probe: 3 events with mixed ``current_patch`` values where the
+        rolled ``is_stay`` (source-row-derived) disagrees with the
+        correct value computed from the destination row's
+        ``current_patch`` and the just-shifted ``next_patch``.
+        """
+        events = pd.DataFrame(
+            [
+                {
+                    "event_midpoint_time": 0.0,
+                    "current_patch": 1.0,
+                    "next_arm": 0,
+                    "next_patch": 2.0,
+                    "is_stay": 0.0,
+                },
+                {
+                    "event_midpoint_time": 1.0,
+                    "current_patch": 2.0,
+                    "next_arm": 1,
+                    "next_patch": 1.0,
+                    "is_stay": 0.0,
+                },
+                {
+                    "event_midpoint_time": 2.0,
+                    "current_patch": 1.0,
+                    "next_arm": 2,
+                    "next_patch": 1.0,
+                    "is_stay": 1.0,
+                },
+            ]
+        )
+
+        class _PinnedRng:
+            def integers(self, low, high):  # noqa: ARG002
+                return 1
+
+        out = next_arm_circular_shift(events, rng=_PinnedRng())
+        # After shift=1: next_patch becomes [1.0, 2.0, 1.0]; the
+        # destination current_patch is [1.0, 2.0, 1.0]. So all three
+        # rows match → is_stay should be all 1.0. Pre-fix the rolled
+        # is_stay was [1.0, 0.0, 0.0].
+        np.testing.assert_array_equal(
+            out["is_stay"].to_numpy(), np.array([1.0, 1.0, 1.0])
+        )
+        # And the consistency invariant must hold:
+        cp = out["current_patch"].to_numpy()
+        npat = out["next_patch"].to_numpy()
+        expected = (cp == npat).astype(float)
+        np.testing.assert_array_equal(out["is_stay"].to_numpy(), expected)
+
+    def test_is_stay_propagates_nan_when_current_or_next_patch_is_nan(self):
+        """If either ``current_patch`` or the shifted ``next_patch``
+        is NaN, ``is_stay`` must propagate NaN (matches the
+        builders' contract)."""
+        events = pd.DataFrame(
+            [
+                {
+                    "event_midpoint_time": 0.0,
+                    "current_patch": 1.0,
+                    "next_arm": 0,
+                    "next_patch": 2.0,
+                    "is_stay": 0.0,
+                },
+                {
+                    "event_midpoint_time": 1.0,
+                    "current_patch": np.nan,
+                    "next_arm": 1,
+                    "next_patch": 1.0,
+                    "is_stay": np.nan,
+                },
+            ]
+        )
+
+        class _PinnedRng:
+            def integers(self, low, high):  # noqa: ARG002
+                return 1
+
+        out = next_arm_circular_shift(events, rng=_PinnedRng())
+        # Row 1 has current_patch=NaN → is_stay=NaN.
+        assert np.isnan(out["is_stay"].iloc[1])

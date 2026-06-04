@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
@@ -65,8 +66,15 @@ def add_trial_context(
             dot[col] = np.nan
         return dot
 
+    # ``np.searchsorted`` below assumes ``trial_start_times`` /
+    # ``reward_timestamps`` are non-decreasing. The local data-loader
+    # path produces sorted trials, but Spyglass-loaded or manually
+    # passed frames are not protected — sort defensively so
+    # ``current_well`` / ``last_rewarded_well`` never silently drift
+    # from the true chronological order.
+    trials = trials.sort_values("start_time").reset_index(drop=True)
+
     trial_start_times = trials["start_time"].values
-    trial_end_times = trials["end_time"].values
     to_wells = trials["to_well"].values
     from_wells = trials["from_well"].values
     is_reward = trials["is_reward"].values
@@ -84,10 +92,16 @@ def add_trial_context(
     dot["current_well"] = np.where(valid, to_wells[current_clipped], np.nan)
     dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
-    if "goal_arrival_time" in trials.columns:
-        reward_timestamps = trials["goal_arrival_time"].values[is_reward]
-    else:
-        reward_timestamps = trial_end_times[is_reward]
+    # Use the same per-row goal-arrival cutoff convention as
+    # ``_trial_cutoff_times``: ``goal_arrival_time`` when finite,
+    # ``end_time`` when NaN, ``end_time`` everywhere when the column
+    # is absent. The history helpers
+    # (``visit_recency_all_events`` etc.) call ``_trial_cutoff_times``
+    # for the same alignment — this consolidation makes the per-row
+    # NaN fallback match between ``add_trial_context``'s reward /
+    # goal-arrival writes and the history helpers' cutoffs.
+    arrival_times = _trial_cutoff_times(trials)
+    reward_timestamps = arrival_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(reward_timestamps) > 0:
         rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
@@ -98,13 +112,9 @@ def add_trial_context(
     else:
         dot["last_rewarded_well"] = np.nan
 
-    if "goal_arrival_time" in trials.columns:
-        goal_arrival_times = trials["goal_arrival_time"].values
-        dot["_goal_arrival_time"] = np.where(
-            valid, goal_arrival_times[current_clipped], np.nan
-        )
-    else:
-        dot["_goal_arrival_time"] = np.nan
+    dot["_goal_arrival_time"] = np.where(
+        valid, arrival_times[current_clipped], np.nan
+    )
 
     if len(reward_timestamps) > 0:
         dot["_last_reward_time"] = np.where(
@@ -251,6 +261,43 @@ def safe_first(series: pd.Series) -> float:
     return float(valid.iloc[0])
 
 
+def strict_first(series: pd.Series) -> float:
+    """First row's value as-is — NaN propagates.
+
+    Use this when extracting event-level / bout-level context columns
+    that come from ``add_trial_context``: those columns are NaN at every
+    timebin before the first trial start. ``safe_first`` would silently
+    skip leading NaNs and inherit the *next* trial's context, leaking
+    future state into events that started before any trial existed.
+    ``strict_first`` returns the first row's value as-is (NaN stays
+    NaN), so before-trial events surface as missing context instead of
+    fabricated post-hoc values.
+    """
+    if len(series) == 0:
+        return np.nan
+    v = series.iloc[0]
+    return float(v) if pd.notna(v) else np.nan
+
+
+def strict_mean(series: pd.Series) -> float:
+    """``Series.mean`` with ``skipna=False``.
+
+    pandas' default ``"mean"`` aggregator silently drops NaN, so a
+    groupby reduction over a column that contains a mix of finite and
+    NaN values emits the mean of the surviving rows. For Stage-5/6
+    stop-level / arm-level aggregations that's a per-event survivorship
+    bias: a stop with one finite event and one NaN event reports the
+    finite event's value while ``n_events`` still counts both. Use
+    this aggregator instead so any NaN propagates to the output.
+    """
+    return float(series.mean(skipna=False))
+
+
+def strict_sum(series: pd.Series) -> float:
+    """``Series.sum`` with ``skipna=False``."""
+    return float(series.sum(skipna=False))
+
+
 def hash_event_id(
     events: pd.DataFrame,
     event_col: str = "non_local_event",
@@ -279,8 +326,18 @@ def hash_stop_id(
     day: int,
     epoch: str,
     stop_idx: np.ndarray,
+    *,
+    brain_area: str | None = None,
+    event_source: str | None = None,
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout."""
+    """63-bit stable hash of ``(animal, day, epoch, stop_idx)`` per bout.
+
+    Optional ``brain_area`` / ``event_source`` keywords are mixed into
+    the hash when supplied. ContFrag callers pass them so SWR/MUA and
+    HPC/mPFC/OFC stop tables never collide on ``stop_id``. The
+    NonLocal pipeline omits both (single-area, single-source by
+    construction) and keeps its existing hashes intact.
+    """
     keys = pd.DataFrame(
         {
             "animal": animal,
@@ -289,6 +346,10 @@ def hash_stop_id(
             "stop_idx": np.asarray(stop_idx, dtype=np.int64),
         }
     )
+    if brain_area is not None:
+        keys["__brain_area"] = brain_area
+    if event_source is not None:
+        keys["__event_source"] = event_source
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
 
 
@@ -333,6 +394,42 @@ def align_count_matrix(
     return out
 
 
+def add_arm_fixed_effects(
+    df: pd.DataFrame,
+    arm_col: str = "arm",
+) -> pd.DataFrame:
+    """Add the arm fixed-effect dummy columns named by ``ARM_FE_PREDICTORS``.
+
+    ``arm_fe_k`` is ``1`` where ``df[arm_col] == k`` and ``0`` otherwise.
+    The dropped reference arm (the ninth) is absent from
+    ``ARM_FE_PREDICTORS`` — including all nine dummies would be
+    collinear with the conditional-Poisson per-event normalization.
+
+    The columns are added in place and ``df`` is returned (matching
+    the in-place contract of :func:`add_trial_context`). Existing
+    ``arm_fe_*`` columns are overwritten.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Long-format event-arm frame. Must carry ``arm_col``.
+    arm_col : str
+        Integer arm-id column (``"arm"`` in the canonical event-arm
+        table, ``"arm_id"`` in simulator output).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``df`` with the dummy columns added.
+    """
+    if arm_col not in df.columns:
+        raise KeyError(f"add_arm_fixed_effects: missing arm column {arm_col!r}")
+    arm = df[arm_col].to_numpy()
+    for k, col in enumerate(ARM_FE_PREDICTORS):
+        df[col] = (arm == k).astype(np.int8)
+    return df
+
+
 # ── Per-arm reward/visit history helpers ──
 
 
@@ -355,6 +452,35 @@ def build_well_to_arm_map(track_graph: nx.Graph) -> dict[int, int]:
 
 
 # ── Vectorized batch helpers (operate on all events at once) ──
+
+
+def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
+    """Per-trial cutoff timestamp for "is this trial past relative to an event?".
+
+    Uses ``goal_arrival_time`` (the moment the animal arrives at and
+    is rewarded at the goal well) when available, falling back to
+    ``end_time`` per-row when ``goal_arrival_time`` is NaN, and
+    per-frame when the column is absent. This matches the convention
+    already used by :func:`add_trial_context` for ``last_rewarded_well``
+    and the ``_goal_arrival_time`` / ``_last_reward_time`` columns.
+
+    Why this matters: between ``goal_arrival_time`` and ``end_time``
+    of the same trial the animal is sitting at the well in the
+    post-arrival stop. Cutting at ``end_time`` makes a replay event
+    during that stop see ``last_rewarded_well`` set to the just-
+    completed well (because that uses ``goal_arrival_time``) while
+    ``visit_recency`` / ``cumulative_reward`` / ``recent_reward_rate``
+    haven't counted the same arrival yet — value history that lags
+    the reward-context columns by the post-arrival window. Using
+    ``goal_arrival_time`` uniformly aligns all four trial-derived
+    columns onto the same temporal cutoff.
+    """
+    if "goal_arrival_time" in trials.columns:
+        cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
+        end = trials["end_time"].to_numpy(dtype=float)
+        missing = ~np.isfinite(cutoff)
+        return np.where(missing, end, cutoff)
+    return trials["end_time"].to_numpy(dtype=float)
 
 
 def visit_recency_all_events(
@@ -381,7 +507,15 @@ def visit_recency_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
-    end_times = trials["end_time"].to_numpy()
+    # ``np.searchsorted`` below assumes the cutoff times are non-decreasing.
+    # Sort defensively so chronological-order assumptions hold for any
+    # caller (Spyglass-loaded frames are not guaranteed to be sorted).
+    # Use ``goal_arrival_time`` (with ``end_time`` fallback) as the
+    # cutoff so this helper aligns with ``add_trial_context`` —
+    # see ``_trial_cutoff_times`` for the rationale.
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
 
     # For each trial, record which arm was visited (to_well = destination).
@@ -397,8 +531,8 @@ def visit_recency_all_events(
             j = arm_idx[arm_id]
             arm_visit_indices[j] = np.append(arm_visit_indices[j], ti)
 
-    # cutoff[i] = number of trials with end_time <= event_times[i]
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    # cutoff[i] = number of trials with cutoff_time <= event_times[i]
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
 
     out = np.full((n_events, n_arms), default_f)
 
@@ -440,9 +574,15 @@ def cumulative_reward_all_events(
     n_trials_total = len(trials)
 
     if n_trials_total == 0:
-        return np.zeros((n_events, n_arms))
+        # No completed trials → unknown history, not zero reward
+        # (matches the sibling helpers).
+        return np.full((n_events, n_arms), np.nan)
 
-    end_times = trials["end_time"].to_numpy()
+    # Sort defensively by the goal-arrival cutoff (see
+    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(bool)
 
@@ -463,10 +603,15 @@ def cumulative_reward_all_events(
     cum = np.zeros((n_trials_total + 1, n_arms), dtype=float)
     np.cumsum(reward_per_arm, axis=0, out=cum[1:])
 
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
     window_starts = np.maximum(cutoffs - window, 0)
 
     out = cum[cutoffs] - cum[window_starts]
+
+    # No-past-trials → NaN, matching the sibling helpers' contract.
+    no_past = cutoffs == 0
+    if no_past.any():
+        out[no_past] = np.nan
     return out
 
 
@@ -479,15 +624,33 @@ def recent_reward_rate_all_events(
     """Fraction of last ``k`` visits to each arm that were rewarded, for all events.
 
     Returns ``(n_events, n_arms)`` array.
+
+    Trunk arms (graph edges that touch no well — never a trial
+    destination, so never a reward site) are filled with ``0.0``
+    rather than ``NaN``: their reward rate is structurally zero, not
+    unknown. This matters because the conditional-Poisson fitter
+    drops an entire event if *any* of its nine arm rows is NaN, and
+    every event has three trunk-arm rows — leaving them NaN would
+    annihilate the M3+ event set. A leaf arm that simply has not been
+    visited yet in a session *with* prior trials stays ``NaN`` (a
+    genuine unknown); the no-trial-history rows stay ``NaN`` too,
+    matching the sibling helpers' contract.
     """
     n_arms = len(ALL_ARMS)
     n_events = len(event_times)
     n_trials_total = len(trials)
+    # Arms reachable as a trial destination = leaf arms (values of the
+    # well→arm map). Anything else is a trunk arm.
+    reachable_arms = set(well_to_arm.values())
 
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
-    end_times = trials["end_time"].to_numpy()
+    # Sort defensively by the goal-arrival cutoff (see
+    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
     is_reward = trials["is_reward"].to_numpy().astype(float)
 
@@ -508,13 +671,18 @@ def recent_reward_rate_all_events(
         arm_visits.append(np.array(vis_idx, dtype=np.intp))
         arm_rewards.append(np.array(vis_rew, dtype=float))
 
-    cutoffs = np.searchsorted(end_times, event_times, side="right")
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
 
     # Events with no past trials -> NaN
     no_past = cutoffs == 0
     out = np.full((n_events, n_arms), np.nan)
 
     for j in range(n_arms):
+        # Trunk arm: reward rate is structurally 0 wherever there is
+        # any trial history. ``no_past`` rows stay NaN.
+        if ALL_ARMS[j] not in reachable_arms:
+            out[~no_past, j] = 0.0
+            continue
         visits = arm_visits[j]
         rewards = arm_rewards[j]
         if visits.size == 0:
@@ -531,6 +699,59 @@ def recent_reward_rate_all_events(
             out[i, j] = rewards[start:nv].mean()
 
     return out
+
+
+def recent_trial_reward_rate(
+    query_times: np.ndarray,
+    trials: pd.DataFrame,
+    k: int = 10,
+) -> np.ndarray:
+    """Rewarded fraction of the most recent ``k`` trials before each query time.
+
+    The arm-agnostic counterpart of :func:`recent_reward_rate_all_events`:
+    the denominator is trials, not visits to one arm. A trial is "before"
+    a query time if its goal-arrival cutoff (see :func:`_trial_cutoff_times`)
+    is at or before that time.
+
+    Parameters
+    ----------
+    query_times : np.ndarray, shape (n_query,)
+        Times (s) at which to evaluate the recent reward rate — e.g.
+        immobility-bout start times for the stop-level rate model.
+    trials : pd.DataFrame
+        Must carry ``is_reward`` plus the columns ``_trial_cutoff_times``
+        consumes.
+    k : int
+        Window length in trials.
+
+    Returns
+    -------
+    np.ndarray, shape (n_query,)
+        Rewarded fraction of the last ``k`` trials; ``NaN`` for query
+        times that precede every trial cutoff.
+    """
+    query_times = np.asarray(query_times, dtype=float)
+    if len(trials) == 0:
+        return np.full(query_times.size, np.nan)
+
+    # Sort by the goal-arrival cutoff so ``searchsorted`` is valid; see
+    # ``_trial_cutoff_times`` for why this cutoff (not ``end_time``).
+    cutoff_times = np.sort(_trial_cutoff_times(trials))
+    is_reward = (
+        trials.assign(_cutoff=_trial_cutoff_times(trials))
+        .sort_values("_cutoff")["is_reward"]
+        .to_numpy()
+        .astype(float)
+    )
+    cum = np.concatenate([[0.0], np.cumsum(is_reward)])
+
+    counts = np.searchsorted(cutoff_times, query_times, side="right")
+    window_starts = np.maximum(counts - k, 0)
+    n_in_window = counts - window_starts
+    with np.errstate(invalid="ignore", divide="ignore"):
+        rate = (cum[counts] - cum[window_starts]) / n_in_window
+    rate[counts == 0] = np.nan
+    return rate
 
 
 # ── Scalar per-event wrappers (preserve existing API) ──

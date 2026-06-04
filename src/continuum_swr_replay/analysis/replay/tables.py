@@ -4,16 +4,13 @@ This module produces the four canonical tables specified in
 ``plans/2026_04_14_replay_content_analysis_plan.md`` Section 2:
 
 - ``event_table`` — one row per non-local event
-- ``event_arm_table`` — one row per event × arm (not yet implemented)
-- ``event_sequence_table`` — one row per in-event timebin (not yet implemented)
+  (:func:`build_event_table`)
+- ``event_arm_table`` — one row per event × arm
+  (:func:`build_event_arm_table`)
+- ``event_sequence_table`` — one row per in-event timebin
+  (:func:`build_event_sequence_table`)
 - ``stop_table`` — one row per stopping period, including zero-event
-  stops (not yet implemented)
-
-This file is being built incrementally (plan Phase B). Chunk 1 lands
-``build_event_table`` only; the other three tables, the conditional-
-posterior-dependent columns, MUA wiring, and invariant tests come in
-subsequent commits. Deferred columns are listed explicitly in
-``build_event_table``'s docstring.
+  stops (:func:`build_stop_table`)
 
 Canonical column names follow the plan's Section 1. Intermediate
 columns added by ``_add_trial_context`` (``prev_well``,
@@ -27,16 +24,28 @@ rename's grep-zero rule:
 
 - ``SWR_event`` and ``MUA_event`` — integer event-label columns
   written into ``data_over_time.pkl`` by the decoder. They carry
-  more information than the booleans derived from them (``is_swr`` =
-  ``SWR_event > 0``; same for MUA) and are consumed by
-  ``quality_metrics`` / ``event_analysis`` via groupby-by-ripple
-  aggregation. Renaming would force a decoder re-run across all
-  session pickles.
+  more information than the booleans derived from them (``is_mua`` =
+  any ``MUA_event > 0`` within the event; ``SWR_event`` likewise feeds
+  the classified table's strict-overlap ``is_swr`` — see below) and are
+  consumed by ``quality_metrics`` / ``event_analysis`` via
+  groupby-by-ripple aggregation. Renaming would force a decoder re-run
+  across all session pickles.
 - ``last_rewarded_well`` — the intermediate column written by
   ``_add_trial_context``. Kept in symmetry with the canonical
   output scalar ``last_rewarded_arm`` so the well↔arm pairing
   (``prev_well``/``prev_arm``, ``current_well``/``current_arm``,
   etc.) reads consistently.
+
+``is_swr`` is no longer the inclusive ``any SWR_event > 0 within event``
+rule. It now means strict positive-duration overlap with any SWR, taken
+together with the full ``overlap_class`` / ``overlap_subclass`` /
+``matched_swr_*`` / ``label_event_*`` / per-event speed / peak-probability
+columns from the canonical classified event table in
+:mod:`continuum_swr_replay.analysis.hippocampus.event_table`. The legacy
+``event_start`` / ``event_end`` / ``event_duration`` /
+``event_midpoint_time`` columns remain the immobile-high-prob filtered
+survivor window; the full label-window boundary is carried additively as
+``label_event_*``.
 """
 
 from __future__ import annotations
@@ -48,6 +57,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.event_table import (
+    build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
@@ -91,13 +103,16 @@ from ._helpers import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
-    safe_first as _safe_first,
+    recent_trial_reward_rate as _recent_trial_reward_rate,
 )
 from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
     single_arm_from_well as _single_arm_from_well,
+)
+from ._helpers import (
+    strict_first as _strict_first,
 )
 from ._helpers import (
     time_since_stop as _time_since_stop,
@@ -181,6 +196,29 @@ def build_event_table(
     (``dot``) plus the session's ``env`` / ``trials`` / ``track_graph``
     and emits the event-level slice of the plan's canonical schema.
 
+    The table is composed from two passes over ``dot``:
+
+    - **Legacy aggregates** (timing, arms, patches, context flags, content
+      and posterior summaries, ``stop_id``) are computed over the filtered
+      sub-window — rows where the event label is set, the animal is
+      immobile, and the smoothed non-local posterior clears the threshold
+      (``_in_event_mask``). These columns, including ``event_start`` /
+      ``event_end`` / ``event_duration`` / ``event_midpoint_time``, are the
+      filtered-survivor window and are unchanged from prior versions.
+    - **SWR classification and additive full-window summaries** come from
+      :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
+      computed over the *full* event-label window (no immobility / prob
+      filter), and merged in on ``event_id``: ``is_swr`` (strict
+      positive-duration SWR overlap), ``overlap_class`` /
+      ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``,
+      the per-event speed summaries, ``peak_nonlocal_prob``, and the full
+      label-window boundary as ``label_event_*``.
+
+    The replay population is unchanged: an event appears here iff at least
+    one of its timebins survived ``_in_event_mask`` (the filtered subset is
+    a strict subset of the full label window, so every retained event has a
+    classified row).
+
     ``conditional_posterior`` is optional. When supplied (e.g., from
     :func:`posterior_io.load_conditional_posterior`), six additional
     columns are populated: ``posterior_mass_total``,
@@ -188,11 +226,10 @@ def build_event_table(
     ``posterior_hpd_width_{50,80,95}``. When not supplied those columns
     are ``NaN`` so the schema is stable across call sites.
 
-    Still deferred to later chunks (intentionally absent from the
-    current output): ``stop_id`` and the stop-level ``immobility_time``
-    aggregation (chunk 3, ``build_stop_table``); ``block_number`` and
-    ``trials_since_block_change`` (requires a contingency-block loader
-    not yet wired).
+    Intentionally absent from the current output: the stop-level
+    ``immobility_time`` aggregation (``build_stop_table``);
+    ``block_number`` and ``trials_since_block_change`` (requires a
+    contingency-block loader not yet wired).
 
     Parameters
     ----------
@@ -227,9 +264,12 @@ def build_event_table(
     -------
     Identifiers
         ``animal``, ``day``, ``epoch``, ``non_local_event``, ``event_id``
-    Timing
+    Timing (filtered survivor window)
         ``event_start``, ``event_end``, ``event_duration``,
         ``time_since_stop``
+    Timing (full label window, additive)
+        ``label_event_start``, ``label_event_end``,
+        ``label_event_duration``, ``label_event_midpoint_time``
     Arms (scalar per event)
         ``current_arm``, ``prev_arm``, ``next_arm`` (post-hoc),
         ``last_rewarded_arm``
@@ -239,8 +279,17 @@ def build_event_table(
         ``is_after_switch``, ``is_after_reward``, ``is_after_omission``,
         ``is_after_stay``, ``reward_outcome``
     Event-type
-        ``is_swr`` (any ``SWR_event > 0`` within event),
+        ``is_swr`` (strict positive-duration SWR overlap; see
+        :mod:`continuum_swr_replay.analysis.hippocampus.event_table`),
         ``is_mua`` (any ``MUA_event > 0`` within event)
+    SWR overlap (from the classified table)
+        ``overlap_class``, ``overlap_subclass``, ``n_swrs_overlapping``,
+        ``matched_swr_event``, ``matched_swr_start``, ``matched_swr_end``
+    Per-event speed / peak (full label window)
+        ``max_speed``, ``mean_speed``, ``start_speed``, ``end_speed``,
+        ``endpoints_speed_below_thresh``, ``peak_nonlocal_prob``
+    Stop linkage
+        ``stop_idx``, ``stop_id``
     Content summaries
         ``n_nonlocal_bins``, ``nonlocal_weight_sum``,
         ``n_junction_bins``, ``n_unique_arms``
@@ -338,21 +387,29 @@ def build_event_table(
             well_of_modal = arm_to_well(ts_modal, track_graph)
             if not np.isnan(well_of_modal):
                 current_arm = float(ts_modal)
+        # Trial-derived context columns are NaN at every dot timebin
+        # before the first trial start (see ``add_trial_context``).
+        # ``_safe_first`` would silently skip those leading NaNs and
+        # return the next trial's context, leaking future state into
+        # events whose first timebin had no trial active. The
+        # stop-table builder already uses the strict semantics for the
+        # same hazard — match it here so trial-derived event-level
+        # fields propagate NaN when the event begins before any trial.
         if np.isnan(current_arm):
             current_arm = _single_arm_from_well(
-                _safe_first(g["current_well"]), track_graph
+                _strict_first(g["current_well"]), track_graph
             )
 
-        prev_arm = _single_arm_from_well(_safe_first(g["prev_well"]), track_graph)
-        next_arm = _single_arm_from_well(_safe_first(g["next_well"]), track_graph)
+        prev_arm = _single_arm_from_well(_strict_first(g["prev_well"]), track_graph)
+        next_arm = _single_arm_from_well(_strict_first(g["next_well"]), track_graph)
         last_rewarded_arm = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _strict_first(g["last_rewarded_well"]), track_graph
         )
 
-        is_after_switch = _safe_first(g["is_after_switch"])
-        is_after_omission = _safe_first(g["is_after_omission"])
-        is_after_reward = _safe_first(g["is_after_reward"])
-        reward_outcome = _safe_first(g["reward_outcome"])
+        is_after_switch = _strict_first(g["is_after_switch"])
+        is_after_omission = _strict_first(g["is_after_omission"])
+        is_after_reward = _strict_first(g["is_after_reward"])
+        reward_outcome = _strict_first(g["reward_outcome"])
         is_after_stay = (
             1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
         )
@@ -363,7 +420,6 @@ def build_event_table(
                 "event_start": float(times[0]),
                 "event_end": float(times[-1]),
                 "event_duration": float(times[-1] - times[0]),
-                "is_swr": bool((g["SWR_event"] > 0).any()),
                 "is_mua": bool((g["MUA_event"] > 0).any())
                 if "MUA_event" in g.columns
                 else False,
@@ -389,14 +445,14 @@ def build_event_table(
                 "n_unique_arms": int(arms_real.nunique()),
                 "event_midpoint_time": float(times[len(times) // 2]),
                 "time_since_port_entry": float(
-                    times[len(times) // 2] - _safe_first(g["_goal_arrival_time"])
+                    times[len(times) // 2] - _strict_first(g["_goal_arrival_time"])
                 )
-                if not np.isnan(_safe_first(g["_goal_arrival_time"]))
+                if not np.isnan(_strict_first(g["_goal_arrival_time"]))
                 else np.nan,
                 "time_since_reward": float(
-                    times[len(times) // 2] - _safe_first(g["_last_reward_time"])
+                    times[len(times) // 2] - _strict_first(g["_last_reward_time"])
                 )
-                if not np.isnan(_safe_first(g["_last_reward_time"]))
+                if not np.isnan(_strict_first(g["_last_reward_time"]))
                 else np.nan,
             }
         )
@@ -487,6 +543,69 @@ def build_event_table(
         )
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
+
+    # --- 9. Attach SWR classification + additive full-window summaries ---
+    # The groupby in section 4 above produced the legacy
+    # filtered-survivor-window columns (timing + aggregates) unchanged.
+    # build_classified_nonlocal_event_table is the canonical classified
+    # table, computed over the *full* event-label window (no immobility /
+    # probability filter). Merge the two on ``event_id``: left-join from
+    # the filtered legacy population (sort=False preserves its row order
+    # and count) so the replay table keeps its existing ``event_id`` set,
+    # row count, and order. The filtered population is a strict subset of
+    # the full label window, so every legacy event must have a classified
+    # row — assert it.
+    classified = build_classified_nonlocal_event_table(
+        dot, speed_threshold=speed_threshold
+    )
+    classified = classified.rename(
+        columns={
+            "event_start": "label_event_start",
+            "event_end": "label_event_end",
+            "event_duration": "label_event_duration",
+            "event_midpoint_time": "label_event_midpoint_time",
+        }
+    )
+    classified_cols = [
+        "event_id",
+        "label_event_start",
+        "label_event_end",
+        "label_event_duration",
+        "label_event_midpoint_time",
+        "max_speed",
+        "mean_speed",
+        "start_speed",
+        "end_speed",
+        "endpoints_speed_below_thresh",
+        "peak_nonlocal_prob",
+        "is_swr",
+        "overlap_class",
+        "overlap_subclass",
+        "n_swrs_overlapping",
+        "matched_swr_event",
+        "matched_swr_start",
+        "matched_swr_end",
+    ]
+    per_event = per_event.merge(
+        classified[classified_cols],
+        on="event_id",
+        how="left",
+        sort=False,
+        validate="one_to_one",
+    )
+    # ``is_swr`` is a non-nullable bool in the classified table, so a NaN
+    # here can only mean an unmatched left key (a legacy event with no
+    # classified row). Correct *matching* relies on both passes hashing
+    # the same (animal, day, epoch, non_local_event) tuple via
+    # ``hash_event_id`` — this guard catches unmatched rows, not a
+    # hypothetical mismatch from changing the key in only one pass.
+    n_unclassified = int(per_event["is_swr"].isna().sum())
+    if n_unclassified > 0:
+        raise RuntimeError(
+            f"{n_unclassified}/{len(per_event)} replay events have no row in "
+            "the classified event table; the filtered replay population must "
+            "be a subset of the full event-label window."
+        )
 
     return per_event[column_order]
 
@@ -673,6 +792,9 @@ def build_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
+    per_bout["recent_trial_reward_rate"] = _recent_trial_reward_rate(
+        bout_starts, trials
+    )
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -715,9 +837,13 @@ def build_stop_table(
     per_bout["n_events"] = n_events_per_bout
 
     # Trial-context at bout start: first in-bout row's trial-derived
-    # values. For zero-event bouts these are still meaningful (the
-    # animal's behavioral state at the time of the stop).
-    first_row = grouped.first()
+    # values. ``skipna=False`` is critical — the default ``first()``
+    # silently skips NaNs and surfaces the first valid row anywhere
+    # in the bout, which leaks future trial context into stops whose
+    # actual bout start had no trial active yet (e.g. a bout
+    # spanning a trial boundary inherits the post-boundary trial's
+    # ``is_after_reward`` / ``reward_outcome``).
+    first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -738,9 +864,11 @@ def build_stop_table(
         else:
             per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields. ``current_arm`` uses the same modal-segment +
-    # trunk-fallback rule as event-level current_arm; at a well-stop
-    # the modal segment is a leaf arm.
+    # Arm / patch fields. ``current_arm`` uses the same modal-segment
+    # + trunk-fallback rule as event-level current_arm; at a well-stop
+    # the modal segment is a leaf arm. ``_strict_first`` keeps the
+    # first row's NaN-or-finite value as-is so a bout that started
+    # before any trial doesn't inherit the next trial's context.
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
@@ -755,16 +883,16 @@ def build_stop_table(
             if not np.isnan(well_of_modal):
                 ca = float(ts_modal)
         if np.isnan(ca):
-            ca = _single_arm_from_well(_safe_first(g["current_well"]), track_graph)
+            ca = _single_arm_from_well(_strict_first(g["current_well"]), track_graph)
         current_arm_vals[bi] = ca
         prev_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["prev_well"]), track_graph
+            _strict_first(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = _single_arm_from_well(
-            _safe_first(g["next_well"]), track_graph
+            _strict_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = _single_arm_from_well(
-            _safe_first(g["last_rewarded_well"]), track_graph
+            _strict_first(g["last_rewarded_well"]), track_graph
         )
 
     per_bout["current_arm"] = current_arm_vals
@@ -940,6 +1068,17 @@ def build_event_arm_table(
     long["is_last_rewarded"] = _eq_indicator(
         arm_arr, long["last_rewarded_arm"].to_numpy()
     )
+    # is_last_rewarded_elsewhere: the last-rewarded arm, but only on
+    # events where it is NOT the arm the animal currently occupies.
+    # ``is_last_rewarded`` is ~98% identical to ``is_current`` (the
+    # animal is usually rewarded where it now sits), so the two are
+    # near-collinear in a joint model. ``is_current`` (M1) already
+    # carries the rewarded-at-current-arm case; this indicator is the
+    # identifiable residual — reward memory at a non-current arm — and
+    # has disjoint support from ``is_current`` by construction.
+    long["is_last_rewarded_elsewhere"] = (
+        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
+    ).astype(int)
     long["arm_patch_id"] = np.array([_arm_to_patch(a) for a in arm_arr])
     long["is_same_patch"] = _eq_indicator(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
@@ -998,6 +1137,13 @@ def build_event_arm_table(
     long["dist_to_arm"] = dist_2d.flatten()
     long["arm_dist_rank"] = rank_2d.flatten()
     long["visit_recency"] = vr_2d.flatten()
+    # visit_recency with each arm's mean subtracted. Raw visit_recency
+    # has a large static per-arm component that the arm fixed effects
+    # absorb; the demeaned column is the part orthogonal to arm_fe and
+    # is what M4+ uses (see model_specs.py).
+    long["visit_recency_demeaned"] = long["visit_recency"] - long.groupby("arm")[
+        "visit_recency"
+    ].transform("mean")
     long["cumulative_reward"] = cr_2d.flatten()
     long["recent_reward_rate"] = rrr_2d.flatten()
     long["nominal_reward_prob"] = np.nan  # deferred; requires block loader
@@ -1021,6 +1167,18 @@ def build_event_arm_table(
     long["swr_x_prev"] = is_swr_i * ip
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
+    # M7 — SWR × value/memory interactions. Previously omitted: the
+    # raw swr_x_last_rewarded was r=1.0 with swr_x_current under the
+    # old is_last_rewarded predictor; the _elsewhere fix makes the
+    # reward-memory interaction identifiable. Sparse (~2% of events)
+    # but honest.
+    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_visit_recency_demeaned"] = (
+        is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_is_last_rewarded_elsewhere"] = (
+        is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
+    )
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -1054,18 +1212,48 @@ def build_event_patch_table(
     pd.DataFrame
         3 rows per event (one per patch), with columns:
         ``event_id``, ``patch``, ``patch_count_hard``,
-        ``is_current_patch``, ``is_last_rewarded_patch``,
-        ``cumulative_reward_patch``, ``visit_recency_patch``.
+        ``is_current_patch``, ``is_prev_patch``,
+        ``is_last_rewarded_patch``, ``is_last_rewarded_patch_elsewhere``,
+        ``cumulative_reward_patch``, ``visit_recency_patch``,
+        ``switch_x_current_patch``, ``swr_x_current_patch``,
+        ``swr_x_last_rewarded_patch_elsewhere``, ``swr_x_prev_patch``.
     """
+    # All groupbys / merges below key on ``event_id`` only. If a
+    # caller passes session-local IDs (event_id=1 in two sessions),
+    # the per-(event_id, patch) groupby silently fuses the two
+    # sessions' arm counts and the merges to ``event_table`` then
+    # produce a Cartesian product (a tiny two-session repro produced
+    # 48 rows instead of the expected 6 session-patch rows). Mirror
+    # the precondition already enforced in ``predict_arm_fractions``,
+    # ``build_choice_dataset``, and ``stop_patch_replay``.
+    from .choice_prediction import _require_session_unique_ids
+
+    _require_session_unique_ids(
+        event_arm_table, "event_id", helper_name="build_event_patch_table"
+    )
+    _require_session_unique_ids(
+        event_table, "event_id", helper_name="build_event_patch_table"
+    )
+
     eat = event_arm_table.copy()
     eat["patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
 
+    # ``cumulative_reward`` is sometimes NaN (no reward history known
+    # yet for a session). The default pandas sum has ``skipna=True``,
+    # which collapses an all-NaN group to ``0.0`` — turning unknown
+    # reward history into a real zero. ``min_count=1`` preserves NaN
+    # when no non-null observations exist in the group, which is what
+    # the downstream P3 patch model needs to drop those rows from its
+    # complete-case fit instead of conditioning on a fabricated zero.
     patch_eat = (
         eat.groupby(["event_id", "patch"])
         .agg(
             patch_count_hard=("arm_count_hard", "sum"),
             is_current_patch=("is_same_patch", "max"),
-            cumulative_reward_patch=("cumulative_reward", "sum"),
+            cumulative_reward_patch=(
+                "cumulative_reward",
+                lambda s: s.sum(min_count=1),
+            ),
             visit_recency_patch=("visit_recency", "min"),
         )
         .reset_index()
@@ -1088,6 +1276,17 @@ def build_event_patch_table(
     ).astype(int)
     patch_eat = patch_eat.drop(columns=["last_rewarded_patch"])
 
+    # is_last_rewarded_patch_elsewhere: the last-rewarded patch, but
+    # only where it is NOT the patch the animal currently occupies.
+    # ``is_last_rewarded_patch`` overlaps ``is_current_patch`` heavily
+    # (the animal is usually rewarded in its current patch); the patch
+    # hierarchy uses this disjoint-support residual at P2/P3, mirroring
+    # the arm-level ``is_last_rewarded_elsewhere``. See model_specs.py.
+    patch_eat["is_last_rewarded_patch_elsewhere"] = (
+        patch_eat["is_last_rewarded_patch"].to_numpy()
+        * (1 - patch_eat["is_current_patch"].to_numpy())
+    ).astype(int)
+
     # is_prev_patch: is this the patch the animal just came from?
     prev_p = event_table[["event_id", "prev_patch"]].copy()
     patch_eat = patch_eat.merge(prev_p, on="event_id", how="left")
@@ -1103,6 +1302,48 @@ def build_event_patch_table(
         patch_eat["is_after_switch"] * patch_eat["is_current_patch"]
     )
     patch_eat = patch_eat.drop(columns=["is_after_switch"])
+
+    # SWR × patch interactions (P4, PS3). is_swr is event-level — bring
+    # it in from event_table once and reuse for the three products. The
+    # column is RETAINED in the output so the patch-level fitter's
+    # ``--swr-subset`` filter (which gates on an ``is_swr`` column) works
+    # for ``--hierarchy patch`` as it does for arm fits.
+    # Tolerant of test fixtures that omit is_swr: default to all-False.
+    if "is_swr" in event_table.columns:
+        swr_col = event_table[["event_id", "is_swr"]].copy()
+        patch_eat = patch_eat.merge(swr_col, on="event_id", how="left")
+        # Every patch-table event_id comes from event_table, so the merge
+        # must be total. Fail loudly rather than fabricate is_swr=False for
+        # an unmatched id (which would silently mislabel SWR status).
+        n_unmatched = int(patch_eat["is_swr"].isna().sum())
+        if n_unmatched > 0:
+            raise ValueError(
+                f"build_event_patch_table: {n_unmatched} patch rows have an "
+                "event_id absent from event_table; is_swr cannot be assigned."
+            )
+        is_swr_i = patch_eat["is_swr"].astype(int).to_numpy()
+    else:
+        is_swr_i = np.zeros(len(patch_eat), dtype=int)
+    patch_eat["swr_x_current_patch"] = (
+        is_swr_i * patch_eat["is_current_patch"].to_numpy()
+    )
+    patch_eat["swr_x_last_rewarded_patch_elsewhere"] = (
+        is_swr_i * patch_eat["is_last_rewarded_patch_elsewhere"].to_numpy()
+    )
+    patch_eat["swr_x_prev_patch"] = is_swr_i * patch_eat["is_prev_patch"].to_numpy()
+
+    # Session keys are required by the patch-level fitter, which groups
+    # by ["animal", "day", "epoch"] before fitting per session. Without
+    # them, ``fit_replay_content_models.py --hierarchy patch`` raises
+    # KeyError before fitting; loading the joined table would otherwise
+    # silently mix events across sessions.
+    session_cols = ["animal", "day", "epoch"]
+    if all(col in event_table.columns for col in session_cols):
+        patch_eat = patch_eat.merge(
+            event_table[["event_id", *session_cols]],
+            on="event_id",
+            how="left",
+        )
 
     return patch_eat
 
@@ -1153,6 +1394,27 @@ def _event_table_columns() -> list[str]:
         "n_unique_arms",
         "stop_idx",
         "stop_id",
+        # Additive full-window timing + SWR classification from
+        # build_classified_nonlocal_event_table (full label window).
+        # Legacy event_start/end/duration/midpoint above remain the
+        # filtered survivor-window values; these label_event_* carry the
+        # full event-label boundary.
+        "label_event_start",
+        "label_event_end",
+        "label_event_duration",
+        "label_event_midpoint_time",
+        "max_speed",
+        "mean_speed",
+        "start_speed",
+        "end_speed",
+        "endpoints_speed_below_thresh",
+        "peak_nonlocal_prob",
+        "overlap_class",
+        "overlap_subclass",
+        "n_swrs_overlapping",
+        "matched_swr_event",
+        "matched_swr_start",
+        "matched_swr_end",
     ]
 
 
@@ -1167,6 +1429,7 @@ def _stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
+        "recent_trial_reward_rate",
         "is_swr_stop",
         "is_mua_stop",
         "has_replay",
@@ -1235,12 +1498,14 @@ def _event_arm_table_columns() -> list[str]:
         "is_prev",
         "is_next",
         "is_last_rewarded",
+        "is_last_rewarded_elsewhere",
         "is_same_patch",
         # Spatial
         "dist_to_arm",
         "arm_dist_rank",
         # Reward / value
         "visit_recency",
+        "visit_recency_demeaned",
         "cumulative_reward",
         "recent_reward_rate",
         "nominal_reward_prob",
@@ -1253,6 +1518,9 @@ def _event_arm_table_columns() -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
+        "swr_x_recent_reward_rate",
+        "swr_x_visit_recency_demeaned",
+        "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",

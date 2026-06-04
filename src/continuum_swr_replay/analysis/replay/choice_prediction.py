@@ -26,9 +26,63 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._helpers import strict_mean
+from .fitting import within_group_full_rank
+
 logger = logging.getLogger(__name__)
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
+
+# Leaf arms — the six arms that touch a well (one per well, since
+# every well in the bandit graph is degree-1). The animal can only
+# *choose* to visit a well, so these are the eligible alternatives in
+# the conditional-logit choice set. Trunk arms 6/7/8 connect patch
+# junctions and are transit-only — they can never be ``next_arm``,
+# they have no ``recent_reward_rate``, and ``arm_path_well_to_well``
+# already documents that trunk arms cannot be stop endpoints. The
+# learning-stage helpers use the same set under
+# ``StopSummaryConfig.well_arms`` for "best arm" lookups.
+WELL_ARMS: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
+
+_SESSION_COLS = ("animal", "day", "epoch")
+
+
+def _require_session_unique_ids(
+    df: pd.DataFrame, id_col: str, *, helper_name: str
+) -> None:
+    """Raise if ``id_col`` values are not unique across sessions.
+
+    The canonical hashed event_id / stop_id columns mix session keys
+    into the hash, so each ID maps to exactly one
+    ``(animal, day, epoch)`` tuple. Helpers that do per-ID groupbys
+    (softmax / mean / sum) silently produce wrong results — fractions
+    summing above 1, dropped stops, cross-session averages — when
+    that invariant is violated. This guard catches session-local IDs
+    early with a clear message instead.
+
+    No-op when the session columns aren't present (e.g. tests that
+    pass minimal frames without animal/day/epoch).
+    """
+    missing = [c for c in _SESSION_COLS if c not in df.columns]
+    if missing or id_col not in df.columns:
+        return
+    per_id_session_count = (
+        df.groupby(id_col)[list(_SESSION_COLS)]
+        .nunique()
+        .max(axis=1)
+    )
+    bad = per_id_session_count[per_id_session_count > 1]
+    if len(bad):
+        sample = bad.index[: min(3, len(bad))].tolist()
+        raise ValueError(
+            f"{helper_name}: {id_col!r} must be globally unique across "
+            f"sessions, but {len(bad)} value(s) appear in multiple "
+            f"(animal, day, epoch) tuples (e.g. {sample}). Use the "
+            "canonical hashed IDs from "
+            "``analysis.replay._helpers.hash_event_id`` / "
+            "``hash_stop_id`` (or the ContFrag equivalents) before "
+            "calling this helper."
+        )
 
 
 # ── Residualized replay ──
@@ -70,6 +124,23 @@ def predict_arm_fractions(
         ``residual_frac`` columns added.
     """
     eat = event_arm_table.copy()
+    _require_session_unique_ids(
+        eat, event_col, helper_name="predict_arm_fractions"
+    )
+
+    # Event-wise NaN filtering matches ``fit_conditional_poisson``:
+    # if any predictor (or the observed fraction) is NaN for any
+    # arm in an event, drop the entire event from the prediction so
+    # the softmax doesn't normalize over a partial choice set. The
+    # event's rows still appear in the output, but with
+    # ``predicted_frac`` and ``residual_frac`` set to NaN — that
+    # keeps row alignment intact for downstream merges while
+    # preventing residuals from being constructed against a
+    # contaminated softmax.
+    required_cols = list(predictors) + [fraction_col]
+    has_nan = eat[required_cols].isna().any(axis=1)
+    events_with_nan = eat.loc[has_nan, event_col].unique()
+    is_dropped = eat[event_col].isin(events_with_nan)
 
     params = np.array([fit_result[f"coef_{p}"] for p in predictors])
     X = eat[predictors].values.astype(float)
@@ -77,10 +148,16 @@ def predict_arm_fractions(
 
     # Numerically stable softmax within each event
     eat["_eta"] = eta
+    # Mask dropped events out of max/sum so the softmax of any
+    # surviving event is computed only over its valid rows. (This
+    # is equivalent to dropping events entirely; we keep them in
+    # the frame so callers don't have to re-key on event_id.)
+    eat.loc[is_dropped, "_eta"] = np.nan
     max_eta = eat.groupby(event_col)["_eta"].transform("max")
     eat["_shifted_exp"] = np.exp(eat["_eta"] - max_eta)
     sum_shifted = eat.groupby(event_col)["_shifted_exp"].transform("sum")
     eat["predicted_frac"] = eat["_shifted_exp"] / sum_shifted
+    eat.loc[is_dropped, "predicted_frac"] = np.nan
 
     eat["residual_frac"] = eat[fraction_col] - eat["predicted_frac"]
 
@@ -124,10 +201,17 @@ def build_residualized_choice_dataset(
         event_arm_table, content_fit, content_predictors, fraction_col=fraction_col
     )
 
-    # Aggregate residual_frac to stop × arm level.
+    # Aggregate residual_frac to stop × arm level. Use a NaN-aware
+    # mean (``skipna=False``) so a stop containing ANY event whose
+    # ``predict_arm_fractions`` dropped (NaN residual) propagates
+    # NaN through to the stop-level value. A bare ``mean()`` would
+    # silently average over the surviving events and reintroduce a
+    # partial-event aggregate — the same contamination
+    # ``predict_arm_fractions`` was just hardened against.
     stop_arm_resid = (
-        eat_resid.groupby(["stop_id", "arm"])
-        .agg(replay_frac_residual=("residual_frac", "mean"))
+        eat_resid.groupby(["stop_id", "arm"])["residual_frac"]
+        .apply(strict_mean)
+        .rename("replay_frac_residual")
         .reset_index()
     )
 
@@ -142,7 +226,14 @@ def build_residualized_choice_dataset(
         on=["stop_id", "arm"],
         how="left",
     )
-    choice_df["replay_frac_residual"] = choice_df["replay_frac_residual"].fillna(0.0)
+    # Do NOT ``fillna(0.0)`` — that fabricates a real zero from
+    # missing data and defeats the event-wise NaN filter in
+    # ``predict_arm_fractions``. Downstream ``fit_choice_model``
+    # already drops any stop with a NaN required predictor, so
+    # propagating NaN here is what makes the filter end-to-end.
+    # Stops whose events were ALL filtered will have NaN
+    # ``replay_frac_residual`` for every arm and be dropped at
+    # fit time.
 
     return choice_df
 
@@ -158,8 +249,14 @@ def build_choice_dataset(
 
     For each stop that has (a) at least one replay event and (b) a
     valid ``next_arm`` (known next destination), produces one row per
-    candidate arm. The current arm is excluded from the choice set
-    (consecutive pokes at the same port are never rewarded).
+    candidate arm. The choice set is the well arms (leaf arms 0-5,
+    one per well) minus ``current_arm`` — the animal can only choose
+    to visit a well, and consecutive pokes at the same port are never
+    rewarded. Trunk arms (6/7/8) are transit-only — they connect
+    patch junctions and can never be ``next_arm`` — so including them
+    in the conditional-logit denominator would treat impossible
+    destinations as unchosen alternatives, distorting the likelihood
+    and coefficient interpretation.
 
     Parameters
     ----------
@@ -187,10 +284,20 @@ def build_choice_dataset(
     """
     # Stops with replay, a valid next choice, and a defined current arm.
     # current_arm is required so the ``arm != current_arm`` exclusion
-    # below removes exactly one arm from the 9-arm candidate set; when
-    # current_arm is NaN the comparison evaluates True for every arm
-    # (IEEE 754), silently inflating the choice set to 9 arms for those
+    # below removes exactly one arm from the WELL_ARMS candidate set
+    # (5 alternatives after the well-arm filter); when current_arm is
+    # NaN the comparison evaluates True for every arm (IEEE 754),
+    # silently inflating the choice set to all 6 well arms for those
     # stops.
+    # Both inputs are aggregated by stop_id later, which produces
+    # session-mixing means / drops if stop_id repeats across sessions.
+    _require_session_unique_ids(
+        stop_table, "stop_id", helper_name="build_choice_dataset"
+    )
+    _require_session_unique_ids(
+        event_arm_table, "stop_id", helper_name="build_choice_dataset"
+    )
+
     has_replay = (
         stop_table["has_replay"]
         & stop_table["next_arm"].notna()
@@ -217,11 +324,15 @@ def build_choice_dataset(
         ]
     ].copy()
 
-    # Mean fraction per (stop, arm) across events in that stop.
+    # ``strict_mean`` keeps a stop with any NaN event-level
+    # ``arm_fraction`` surfaced as NaN — the default ``skipna=True``
+    # mean would silently emit the surviving event's value, and the
+    # chosen-arm sanity check below cannot recover the missingness
+    # once the NaN has been collapsed away.
     stop_arm = (
         eat.groupby(["stop_id", "arm"])
         .agg(
-            replay_frac=(fraction_col, "mean"),
+            replay_frac=(fraction_col, strict_mean),
             visit_recency=("visit_recency", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             recent_reward_rate=("recent_reward_rate", "last"),
@@ -230,6 +341,34 @@ def build_choice_dataset(
         )
         .reset_index()
     )
+
+    # SWR-overlap-conditional replay fractions per (stop, arm). Each is
+    # the mean ``arm_fraction`` restricted to events where ``is_swr`` is
+    # True (or False) within the stop. A (stop, arm) with no SWR-overlap
+    # events at all gets NaN for ``replay_frac_swr`` — different from
+    # "0 SWR replay on this arm despite SWR events," which would be 0;
+    # honest NaN lets the fitter drop those stops from any model using
+    # the split predictors.
+    if "is_swr" in event_arm_table.columns:
+        eat_swr = event_arm_table[
+            ["stop_id", "arm", fraction_col, "is_swr"]
+        ].copy()
+        swr_frac = (
+            eat_swr[eat_swr["is_swr"]]
+            .groupby(["stop_id", "arm"])[fraction_col]
+            .apply(strict_mean)
+            .rename("replay_frac_swr")
+            .reset_index()
+        )
+        non_swr_frac = (
+            eat_swr[~eat_swr["is_swr"]]
+            .groupby(["stop_id", "arm"])[fraction_col]
+            .apply(strict_mean)
+            .rename("replay_frac_non_swr")
+            .reset_index()
+        )
+        stop_arm = stop_arm.merge(swr_frac, on=["stop_id", "arm"], how="left")
+        stop_arm = stop_arm.merge(non_swr_frac, on=["stop_id", "arm"], how="left")
 
     # Join with stop-level info.
     stop_info = valid_stops[
@@ -249,10 +388,17 @@ def build_choice_dataset(
 
     choice_df = stop_arm.merge(stop_info, on="stop_id", how="inner")
 
-    # Exclude current arm from choice set.
-    choice_df = choice_df[choice_df["arm"] != choice_df["current_arm"]].reset_index(
-        drop=True
-    )
+    # Restrict the choice set to well arms (leaf arms 0-5) minus
+    # current_arm. Trunk arms 6/7/8 are transit-only and can never
+    # be ``next_arm``; including them as unchosen alternatives in
+    # the conditional logit would distort the likelihood. Filter on
+    # the canonical ``WELL_ARMS`` constant rather than slicing
+    # ``ALL_ARMS`` so a future track-graph change can extend the
+    # eligible-destination set in one place.
+    choice_df = choice_df[
+        choice_df["arm"].isin(WELL_ARMS)
+        & (choice_df["arm"] != choice_df["current_arm"])
+    ].reset_index(drop=True)
 
     # Response: did the animal choose this arm?
     choice_df["chosen"] = (choice_df["arm"] == choice_df["next_arm"]).astype(int)
@@ -302,7 +448,16 @@ def fit_choice_model(
         logger.error("Missing columns: %s", missing)
         return None
 
-    df = choice_df[required].dropna().copy()
+    # Drop the whole stop if any required column is NaN on any of its
+    # rows. A bare ``.dropna()`` would silently shrink the choice set
+    # for that stop (e.g. 9 candidate arms → 7), so the conditional
+    # logit's normalization runs over a partial set and "chosen" can
+    # be ambiguous (1 of 7 vs 1 of 9). Mirrors the event-wise NaN
+    # filtering in ``fit_conditional_poisson``.
+    df = choice_df[required].copy()
+    has_nan = df.isna().any(axis=1)
+    bad_stops = df.loc[has_nan, stop_col].unique()
+    df = df[~df[stop_col].isin(bad_stops)].reset_index(drop=True)
 
     # Drop stops where no arm is chosen (shouldn't happen after
     # build_choice_dataset, but defensive).
@@ -317,6 +472,18 @@ def fit_choice_model(
     y = df["chosen"].values.astype(float)
     X = df[predictors].values.astype(float)
     groups = df[stop_col].values
+
+    # Reject designs the conditional logit cannot identify: globally
+    # collinear predictors AND predictors constant within every stop (no
+    # within-group variation), which fit with finite-but-meaningless
+    # coefficients/SEs/AIC.
+    if not within_group_full_rank(X, groups):
+        logger.warning(
+            "choice ConditionalLogit: rank-deficient or within-group-constant "
+            "design; not fitting %s",
+            predictors,
+        )
+        return None
 
     try:
         model = ConditionalLogit(y, X, groups=groups)

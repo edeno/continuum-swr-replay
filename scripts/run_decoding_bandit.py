@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from _decoding_common import (
-    DecodingConfig,
+    NonLocalDecodingConfig,
     add_common_args,
     results_exist,
     run_batch,
@@ -89,7 +89,7 @@ DETECTOR_CLASSES = {
 def create_detector(
     brain_area: str,
     env: Environment,
-    config: DecodingConfig,
+    config: NonLocalDecodingConfig,
     discrete_transition_type,
 ) -> NonLocalClusterlessDetector | NonLocalSortedSpikesDetector:
     """Factory for creating the appropriate detector for a brain area."""
@@ -107,6 +107,7 @@ def create_detector(
         environments=env,
         **{param_key: params},
         discrete_transition_type=discrete_transition_type,
+        local_position_std=config.local_position_std,
     )
 
 
@@ -138,7 +139,7 @@ def perform_decoding(
             place_bin_size=PLACE_BIN_SIZE_2D,
         )
 
-    config = DecodingConfig()
+    config = NonLocalDecodingConfig()
 
     if non_stationary:
         discrete_transition_covariate_data = {
@@ -334,7 +335,13 @@ def run_decode(
 
         if results_exist(save_folder, epoch_identifier, overwrite):
             logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
-            results, detector, env = load_results(nwb_file_name, epoch_name, brain_area)
+            results, detector, env = load_results(
+                nwb_file_name,
+                epoch_name,
+                brain_area,
+                non_stationary=non_stationary,
+                ripple_detector_name=ripple_detector_name,
+            )
         else:
             is_training = get_training_timepoints(data, training_type=training_type)
 

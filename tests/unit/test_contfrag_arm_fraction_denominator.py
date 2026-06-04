@@ -1,0 +1,189 @@
+"""Regression test for ContFrag ``arm_fraction`` denominator.
+
+The non-local table divides ``arm_count_hard`` by the count of
+real-arm bins so per-event arm fractions sum to 1. The ContFrag
+table used to divide by ``n_timebins`` (all event bins, including
+junction / missing-arm bins) while the numerator only counted real
+arms — so the per-event sum dropped below 1 whenever any event bin
+landed on a junction. The fix uses ``n_timebins - n_junction_bins``
+so the convention matches.
+
+This exercises the production builder
+(:func:`build_contfrag_event_arm_table`) end-to-end so a regression
+that pivots back to dividing by ``n_timebins`` would actually fail.
+"""
+
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_event_arm_table,
+    build_contfrag_event_table,
+)
+
+
+class _EnvStub:
+    """Minimal ``Environment`` stand-in.
+
+    ``place_bin_centers_nodes_df_`` holds 2 bins per real arm (0-8)
+    plus 3 junction bins (edge_id = -1) so the ContFrag builder's
+    junction-bin filter has something to exclude.
+    """
+
+    class _Df:
+        _arm_lp = np.arange(18, dtype=float)
+        _arm_eid = np.repeat(np.arange(9), 2).astype(int)
+        _junc_lp = np.array([100.0, 101.0, 102.0])
+        _junc_eid = np.array([-1, -1, -1])
+        d = {
+            "linear_position": np.concatenate([_arm_lp, _junc_lp]),
+            "edge_id": np.concatenate([_arm_eid, _junc_eid]),
+        }
+
+        def __getitem__(self, k):
+            return self.d[k]
+
+    place_bin_centers_nodes_df_ = _Df()
+
+
+def _bandit_graph() -> nx.Graph:
+    g = nx.Graph()
+    for u, v, eid in (
+        (0, 6, 0), (1, 6, 1),
+        (2, 7, 2), (3, 7, 3),
+        (4, 8, 4), (5, 8, 5),
+        (6, 9, 6), (7, 9, 7), (8, 9, 8),
+    ):
+        g.add_edge(u, v, edge_id=eid, distance=1.0)
+    return g
+
+
+def _empty_trials() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "start_time", "end_time", "to_well", "from_well",
+            "from_patch", "to_patch", "is_reward", "is_patch_change",
+        ]
+    )
+
+
+def _build_dot(
+    leaf_bins: dict[int, int],
+    junction_bins: int,
+    *,
+    event_id: int = 1,
+) -> pd.DataFrame:
+    """Construct a ContFrag dot frame with one SWR event whose bin
+    composition is specified by ``leaf_bins`` (per-arm counts) and
+    ``junction_bins`` (count of junction-decoded bins).
+
+    Each arm-bin sets ``map_estimate`` to that arm's first place-bin
+    (``arm * 2``); junction bins set ``map_estimate`` to NaN —
+    ``map_estimate_to_arm`` returns NaN there, the builder's
+    ``decoded_arm`` series fails ``isin(ALL_ARMS)``, and those bins
+    are counted in ``n_junction_bins``. Continuous/Fragmented
+    probabilities are set to (0.5, 0.5) on every in-event bin so the
+    dominant-state machinery doesn't short-circuit. Outside the
+    event, all bins are mobile and SWR_event=0.
+    """
+    n_in_event = sum(leaf_bins.values()) + junction_bins
+    n_padding = 5  # mobile padding so the slice has clear edges
+    total = n_in_event + n_padding * 2
+    idx = pd.Index(np.arange(total, dtype=float) * 0.01, name="time")
+
+    dot = pd.DataFrame(
+        {
+            "animal": "test",
+            "day": 1,
+            "epoch": "02_r1",
+            "SWR_event": 0,
+            "MUA_event": 0,
+            "Continuous_prob": 0.5,
+            "Fragmented_prob": 0.5,
+            "map_estimate": np.nan,
+            "head_speed": 10.0,
+            "track_segment_id": np.nan,
+        },
+        index=idx,
+    )
+
+    # Build the in-event slice: arm bins first, then junction bins.
+    bin_order: list[float] = []
+    for arm, count in leaf_bins.items():
+        bin_order.extend([float(arm * 2)] * count)  # leaf place bin
+    bin_order.extend([float("nan")] * junction_bins)  # junction → NaN map_estimate
+
+    event_slice = slice(n_padding, n_padding + n_in_event)
+    rows = dot.index[event_slice]
+    dot.loc[rows, "SWR_event"] = event_id
+    dot.loc[rows, "head_speed"] = 1.0  # immobile
+    dot.loc[rows, "map_estimate"] = bin_order
+    # ``track_segment_id`` is the modal-position fallback for
+    # current_arm; setting it to a leaf arm keeps current_arm finite.
+    arm_with_most_bins = max(leaf_bins, key=leaf_bins.get) if leaf_bins else 0
+    dot.loc[rows, "track_segment_id"] = float(arm_with_most_bins)
+    return dot
+
+
+class TestContfragArmFractionDenominator:
+    """Production-builder regression for the ContFrag arm-fraction
+    denominator. The pre-fix builder divided by ``n_timebins`` (all
+    event bins, including junctions); the post-fix builder divides
+    by ``n_timebins - n_junction_bins`` so the per-arm fractions sum
+    to 1.0 over an event's real bins.
+    """
+
+    @pytest.fixture
+    def env(self):
+        return _EnvStub()
+
+    @pytest.fixture
+    def graph(self):
+        return _bandit_graph()
+
+    def test_per_event_fractions_sum_to_one_with_junction_bins(self, env, graph):
+        # 5 real bins (3 on arm 0, 2 on arm 1) + 5 junction bins.
+        # Pre-fix denominator was n_timebins=10 → fractions sum to
+        # (3+2)/10 = 0.5. Post-fix divides by 5 → fractions sum to 1.
+        dot = _build_dot({0: 3, 1: 2}, junction_bins=5)
+        ev = build_contfrag_event_table(
+            dot, env, _empty_trials(), graph, event_source="SWR",
+        )
+        assert len(ev) == 1, f"expected 1 event in fixture; got {len(ev)}"
+
+        eat = build_contfrag_event_arm_table(
+            ev, dot, env, _empty_trials(), graph, event_source="SWR",
+        )
+        # 9 arms × 1 event.
+        assert len(eat) == 9
+        total = float(eat["arm_fraction"].sum())
+        assert np.isclose(total, 1.0, atol=1e-12), (
+            f"per-event arm_fraction sum = {total} (expected 1.0). "
+            "If this drifted to 0.5, the builder is dividing by "
+            "n_timebins again instead of n_timebins - n_junction_bins."
+        )
+        # And the count split should match the input: arm 0 = 3/5,
+        # arm 1 = 2/5, others 0.
+        by_arm = eat.set_index("arm")["arm_fraction"]
+        assert np.isclose(by_arm.loc[0], 3 / 5)
+        assert np.isclose(by_arm.loc[1], 2 / 5)
+
+    def test_event_with_only_junction_bins_yields_nan_arm_fraction(self, env, graph):
+        # All 5 in-event bins land on a junction → no real arms →
+        # denominator is zero → every arm_fraction is NaN.
+        dot = _build_dot({}, junction_bins=5)
+        ev = build_contfrag_event_table(
+            dot, env, _empty_trials(), graph, event_source="SWR",
+        )
+        assert len(ev) == 1
+        eat = build_contfrag_event_arm_table(
+            ev, dot, env, _empty_trials(), graph, event_source="SWR",
+        )
+        assert eat["arm_fraction"].isna().all(), (
+            "every-junction event should propagate NaN arm_fraction; "
+            f"got {eat['arm_fraction'].tolist()}."
+        )

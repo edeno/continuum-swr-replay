@@ -100,7 +100,7 @@ def find_non_swr_example_event(data, results, window_sec=1.0):
 
     # Find events NOT overlapping with SWR
     ripple_times = data["ripple_times"]
-    _, non_swr_events = get_overlap_times(non_local_times, ripple_times, results)
+    _, non_swr_events = get_overlap_times(non_local_times, ripple_times)
 
     if len(non_swr_events) == 0:
         raise ValueError("No non-local events without SWR overlap found.")

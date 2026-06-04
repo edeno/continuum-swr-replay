@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_poisson,
@@ -133,6 +134,7 @@ class TestPooledSEUnderHeterogeneity:
     SE should therefore exceed the mean nominal ``bse``.
     """
 
+    @pytest.mark.slow
     def test_nominal_se_under_covers_with_random_animal_effects(self):
         rng = np.random.default_rng(0)
         n_replicates = 30

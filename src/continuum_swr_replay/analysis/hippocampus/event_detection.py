@@ -27,7 +27,7 @@ Find events that overlap with ripples:
 
 >>> from continuum_swr_replay.analysis.hippocampus import get_overlap_times
 >>> overlap_events, no_overlap_events = get_overlap_times(
-...     non_local_times, ripple_times, results
+...     non_local_times, ripple_times
 ... )
 >>> print(f"Non-local events with ripples: {len(overlap_events)}")
 >>> print(f"Non-local events without ripples: {len(no_overlap_events)}")
@@ -38,8 +38,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
-
-from continuum_swr_replay.data_loaders import get_labels
 
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
 # classify_swr_overlap_geometry when comparing an event's duration to
@@ -126,8 +124,85 @@ def get_confident_times(
     )
 
 
+def event_strict_overlap_keys(
+    data_over_time: pd.DataFrame,
+    primary_col: str,
+    other_col: str,
+    *,
+    session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
+    other_data: pd.DataFrame | None = None,
+) -> set[tuple]:
+    """Per-(session, primary_id) keys whose interval strictly overlaps any other event.
+
+    For each event of ``primary_col`` (id > 0) in each session, derive
+    its [first, last] timestamp interval from the timebin labels and
+    test strict positive-duration overlap against every event of
+    ``other_col`` in the same session. Returns the set of
+    ``(*session_cols, primary_id)`` tuples that pass the strict-overlap
+    test.
+
+    Pass ``other_data`` to draw ``other_col`` bounds from a different
+    frame than the primary (e.g. immobility-filtered ``a_data`` for
+    primary, raw ``data_over_time`` for other). Defaults to using
+    ``data_over_time`` for both sides.
+
+    Why this exists: the inclusive timebin labels written by
+    :func:`continuum_swr_replay.data_loaders.utils.get_labels` make a
+    boundary timestamp visible to BOTH events when their intervals
+    touch (event_a end == event_b start). The label-based
+    ``(g[other_col] > 0).any()`` overlap check then counts boundary
+    contact as overlap, conflicting with the strict positive-duration
+    semantics enforced by :func:`classify_swr_overlap` and
+    :func:`get_overlap_times`. This helper yields the strict-semantic
+    counterpart usable wherever per-event overlap with another
+    detector is needed.
+    """
+    sess = list(session_cols)
+
+    def _bounds(df: pd.DataFrame, ec: str) -> pd.DataFrame:
+        active = df[df[ec] > 0]
+        if len(active) == 0:
+            return pd.DataFrame(columns=[*sess, ec, "_start", "_end"])
+        return (
+            active.reset_index(names="_t")
+            .groupby([*sess, ec])
+            .agg(_start=("_t", "min"), _end=("_t", "max"))
+            .reset_index()
+        )
+
+    p_bounds = _bounds(data_over_time, primary_col)
+    o_source = data_over_time if other_data is None else other_data
+    o_bounds = _bounds(o_source, other_col)
+    keys: set[tuple] = set()
+    if p_bounds.empty or o_bounds.empty:
+        return keys
+
+    for sk, p_grp in p_bounds.groupby(sess, sort=False):
+        sk = sk if isinstance(sk, tuple) else (sk,)
+        mask = np.ones(len(o_bounds), dtype=bool)
+        for col, val in zip(sess, sk, strict=True):
+            mask &= o_bounds[col].to_numpy() == val
+        o_grp = o_bounds.loc[mask]
+        if o_grp.empty:
+            continue
+        p_starts = p_grp["_start"].to_numpy()
+        p_ends = p_grp["_end"].to_numpy()
+        o_starts = o_grp["_start"].to_numpy()
+        o_ends = o_grp["_end"].to_numpy()
+        ovl = (
+            (p_ends[:, None] > o_starts[None, :])
+            & (p_starts[:, None] < o_ends[None, :])
+        ).any(axis=1)
+        p_ids = p_grp[primary_col].to_numpy()
+        for i, hit in enumerate(ovl):
+            if hit:
+                keys.add((*sk, p_ids[i]))
+    return keys
+
+
 def get_overlap_times(
-    non_local_times: pd.DataFrame, ripple_times: pd.DataFrame, results: xr.Dataset
+    non_local_times: pd.DataFrame,
+    ripple_times: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Find non-local events that overlap with ripple events.
 
@@ -138,9 +213,6 @@ def get_overlap_times(
         ``duration``, ``max_speed`` columns. From ``get_confident_times``.
     ripple_times : pd.DataFrame
         Ripple event intervals with ``start_time`` and ``end_time`` columns.
-    results : xr.Dataset
-        Decoding results; only the ``time`` coordinate is used for
-        computing temporal overlap via ``get_labels``.
 
     Returns
     -------
@@ -151,24 +223,31 @@ def get_overlap_times(
         Subset of ``non_local_times`` that do not overlap with any ripple.
         Same columns as input.
 
+    Notes
+    -----
+    Boundary semantics: overlap requires positive-duration intersection.
+    A ripple ending exactly at the event's start (or starting exactly
+    at the event's end) shares zero duration with the event and is
+    classified as no-overlap. This matches
+    :func:`classify_swr_overlap` and avoids inflating SWR-coincident
+    counts on back-to-back intervals.
+
     """
-    non_local_labels = get_labels(non_local_times, results.time)
-    ripple_labels = get_labels(ripple_times, results.time)
+    swr_starts = ripple_times["start_time"].to_numpy()
+    swr_ends = ripple_times["end_time"].to_numpy()
+    ev_starts = non_local_times["start_time"].to_numpy()
+    ev_ends = non_local_times["end_time"].to_numpy()
 
-    overlap_non_local = non_local_labels.loc[
-        ripple_labels.event_number > 0
-    ].event_number.unique()
-    overlap_non_local = overlap_non_local[overlap_non_local > 0]
+    # For each non-local event, True if any ripple has a strict
+    # positive-duration intersection. Vectorized via broadcasting:
+    # shape (n_events, n_ripples).
+    has_overlap = (
+        (swr_ends[None, :] > ev_starts[:, None])
+        & (swr_starts[None, :] < ev_ends[:, None])
+    ).any(axis=1)
 
-    non_local_ind = np.arange(len(non_local_times))
-
-    overlap_non_local_times = non_local_times.iloc[
-        non_local_ind[np.isin(non_local_ind, overlap_non_local - 1)]
-    ]
-
-    no_overlap_non_local_times = non_local_times.iloc[
-        non_local_ind[~np.isin(non_local_ind, overlap_non_local - 1)]
-    ]
+    overlap_non_local_times = non_local_times.iloc[has_overlap]
+    no_overlap_non_local_times = non_local_times.iloc[~has_overlap]
 
     return overlap_non_local_times, no_overlap_non_local_times
 
@@ -217,20 +296,37 @@ def classify_swr_overlap(
     SWRs, it is labeled ``"swr_contained"`` as soon as any one SWR
     fully contains it; otherwise ``"swr_partial"``.
 
+    Boundary semantics: overlap requires *positive-duration* intersection.
+    A SWR ending exactly at the event's start time (or starting exactly
+    at the event's end time) shares zero positive duration with the event
+    and is treated as ``non_swr``. The previous form used inclusive
+    inequality (``>=`` / ``<=``) and silently labeled back-to-back
+    intervals as ``swr_partial``, inflating SWR-coincident counts.
+
     """
     classes: list[str] = []
     swr_starts = ripple_times["start_time"].to_numpy()
     swr_ends = ripple_times["end_time"].to_numpy()
 
     for ev in non_local_events.itertuples():
-        # Any SWR that overlaps this non-local event at all
-        overlap_mask = (swr_ends >= ev.start_time) & (
-            swr_starts <= ev.end_time
+        # A zero- (or negative-) duration event has no positive duration to
+        # overlap, so it is non-SWR under the strict convention even if an
+        # SWR spans its instant.
+        if ev.end_time <= ev.start_time:
+            classes.append("non_swr")
+            continue
+        # Strict positive-duration overlap. Boundary contact
+        # (swr_end == event.start or swr_start == event.end) shares
+        # zero duration with the event and is excluded.
+        overlap_mask = (swr_ends > ev.start_time) & (
+            swr_starts < ev.end_time
         )
         if not overlap_mask.any():
             classes.append("non_swr")
             continue
-        # Any SWR that fully contains this non-local event?
+        # Any SWR that fully contains this non-local event? Boundary
+        # equality is allowed for containment (an SWR exactly aligned
+        # with the event still "contains" it).
         contained_mask = (
             overlap_mask
             & (swr_starts <= ev.start_time)
@@ -338,7 +434,21 @@ def classify_swr_overlap_geometry(
     event_has_non_swr_time_arr = np.zeros(n_events, dtype=bool)
 
     for i, ev in enumerate(non_local_events.itertuples()):
-        overlap_mask = (swr_ends >= ev.start_time) & (swr_starts <= ev.end_time)
+        # A zero- (or negative-) duration event has no positive duration to
+        # overlap, so under the strict positive-duration convention it is
+        # non-SWR regardless of any SWR spanning its instant. Without this
+        # guard the open-interval ``overlap_mask`` below would treat a
+        # point strictly inside an SWR as contained.
+        if ev.end_time <= ev.start_time:
+            classes[i] = "non_swr"
+            subclasses[i] = "no_overlap"
+            event_has_non_swr_time_arr[i] = True
+            continue
+
+        # Strict positive-duration overlap (see ``classify_swr_overlap``
+        # for rationale): a SWR that only touches a boundary of the
+        # event shares zero duration and is not an overlap.
+        overlap_mask = (swr_ends > ev.start_time) & (swr_starts < ev.end_time)
         n_overlap = int(overlap_mask.sum())
         n_overlap_arr[i] = n_overlap
 
@@ -418,7 +528,7 @@ def classify_swr_overlap_geometry(
 
 def select_typical_event_by_class(
     classified_events: pd.DataFrame,
-    non_local_prob: xr.DataArray,
+    non_local_prob: xr.DataArray | None = None,
     peak_threshold: float = 0.9,
 ) -> dict[str, pd.Series]:
     """Pick one deterministic "typical" event per SWR-overlap class.
@@ -429,14 +539,25 @@ def select_typical_event_by_class(
     ``peak_threshold``. If no events in a class meet the peak threshold,
     the rule falls back to the full class.
 
+    Per-event peak non-local probability is obtained one of two ways:
+
+    - If ``classified_events`` already carries a ``peak_prob`` column
+      (precomputed upstream, e.g. ``peak_nonlocal_prob`` from
+      :func:`build_classified_nonlocal_event_table`), it is used directly
+      and ``non_local_prob`` may be ``None``.
+    - Otherwise ``non_local_prob`` must be supplied, and ``peak_prob`` is
+      computed per event from ``classified_events[["start_time",
+      "end_time"]]`` against that time series (the legacy path).
+
     Parameters
     ----------
     classified_events : pd.DataFrame
         Non-local event table with an ``overlap_class`` column (from
-        :func:`classify_swr_overlap`).
-    non_local_prob : xr.DataArray
-        Combined non-local state probability time series, used to
-        compute per-event peak probability.
+        :func:`classify_swr_overlap`), a ``duration`` column, and either a
+        ``peak_prob`` column or ``start_time``/``end_time`` columns.
+    non_local_prob : xr.DataArray, optional
+        Combined non-local state probability time series, used to compute
+        per-event peak probability when ``peak_prob`` is not precomputed.
     peak_threshold : float, default 0.9
         Minimum peak non-local probability for an event to count as
         "clean" for selection.
@@ -447,28 +568,42 @@ def select_typical_event_by_class(
         Mapping ``class -> pd.Series`` (one selected event per class).
         A class with no events is omitted from the dict.
 
-    """
-    time_vals = non_local_prob.time.to_numpy()
-    prob_vals = non_local_prob.to_numpy().squeeze()
+    Raises
+    ------
+    ValueError
+        If ``non_local_prob`` is None and ``classified_events`` has no
+        ``peak_prob`` column.
 
-    def peak_prob(start: float, end: float) -> float:
-        mask = (time_vals >= start) & (time_vals <= end)
-        if not mask.any():
-            return 0.0
-        return float(prob_vals[mask].max())
+    """
+    has_peak_col = "peak_prob" in classified_events.columns
+    if not has_peak_col and non_local_prob is None:
+        raise ValueError(
+            "select_typical_event_by_class requires either a 'peak_prob' "
+            "column in classified_events or a non_local_prob array to "
+            "compute it from."
+        )
+
+    if not has_peak_col:
+        assert non_local_prob is not None  # guaranteed by the check above
+        time_vals = non_local_prob.time.to_numpy()
+        prob_vals = non_local_prob.to_numpy().squeeze()
+
+        def peak_prob(start: float, end: float) -> float:
+            mask = (time_vals >= start) & (time_vals <= end)
+            if not mask.any():
+                return 0.0
+            return float(prob_vals[mask].max())
 
     chosen: dict[str, pd.Series] = {}
     for cls in ("swr_contained", "swr_partial", "non_swr"):
-        subset = classified_events[
-            classified_events["overlap_class"] == cls
-        ]
+        subset = classified_events[classified_events["overlap_class"] == cls]
         if len(subset) == 0:
             continue
         subset = subset.copy()
-        subset["peak_prob"] = [
-            peak_prob(ev.start_time, ev.end_time)
-            for ev in subset.itertuples()
-        ]
+        if not has_peak_col:
+            subset["peak_prob"] = [
+                peak_prob(ev.start_time, ev.end_time) for ev in subset.itertuples()
+            ]
         clean = subset[subset["peak_prob"] >= peak_threshold]
         if len(clean) == 0:
             clean = subset

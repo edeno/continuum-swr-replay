@@ -6,16 +6,23 @@ behavioral context, independently of replay CONTENT. The response is
 ``log(immobility_time)`` so that coefficients are interpretable as
 multiplicative changes in event rate per second of immobility.
 
-Model hierarchy:
+Model hierarchy (``MODEL_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``is_after_reward``, ``is_after_omission``,
-  ``is_after_switch`` — does behavioral context change event rate?
-- **R3**: R1 fitted separately for SWR-only, MUA-only, and neither
-  event types (``is_swr_stop`` / ``is_mua_stop``).
+- **R1**: + ``is_after_omission``, ``is_after_switch`` — does the
+  immediately preceding trial's context change event rate?
+  ``is_after_reward`` is intentionally excluded: it equals
+  ``1 - is_after_omission`` wherever both are defined, so including
+  it alongside the intercept is rank-deficient. The reward effect is
+  read off the sign of the ``is_after_omission`` coefficient.
+- **R2**: + ``recent_trial_reward_rate`` (rewarded fraction of the
+  last 10 trials) — does event rate track a deeper reward history,
+  beyond the single previous trial?
 
-R2 (+ ``trials_since_block_change``, ``block_number``) is deferred
-until the contingency-block loader is wired.
+A future R3 (+ ``trials_since_block_change``, ``block_number``) is
+deferred until the contingency-block loader is wired. Fitting R0-R2
+separately on SWR-only / MUA-only / neither stops is an analysis
+variant, not a separate model.
 
 ``exp(γ)`` = multiplicative change in events per second of
 immobility. ``exp(γ) = 1.5`` means 50% more events per second when
@@ -85,8 +92,35 @@ def fit_rate_model(
     offset = np.log(df[offset_col].values.astype(float))
 
     if predictors:
-        X = sm.add_constant(df[predictors].values.astype(float))
+        # Force ``add_constant`` to always prepend an intercept column,
+        # even if one of the predictors is itself constant within
+        # ``df``. With the default ``has_constant="skip"`` the call is
+        # a no-op for a constant predictor, the returned ``X`` has
+        # ``len(predictors)`` columns instead of
+        # ``len(predictors) + 1``, ``col_names`` claims an extra
+        # ``"intercept"`` slot, and the post-fit
+        # ``zip(col_names, result.params, strict=True)`` raises
+        # ValueError after the GLM has already run.
+        raw_X = df[predictors].to_numpy(dtype=float)
+        X = sm.add_constant(raw_X, has_constant="add")
         col_names = ["intercept"] + predictors
+
+        # Full-rank check rejects constant predictors, perfect
+        # collinearity, duplicated columns, and any other zero
+        # linear combination of design columns — statsmodels would
+        # otherwise pseudo-invert and emit finite coefficients /
+        # p-values for an unidentified model.
+        rank = int(np.linalg.matrix_rank(X))
+        if rank < X.shape[1]:
+            logger.warning(
+                "Poisson GLM not fit: design matrix [intercept, %s] is "
+                "rank-deficient (rank %d < %d) within the %d-stop subset.",
+                ", ".join(predictors),
+                rank,
+                X.shape[1],
+                len(df),
+            )
+            return None
     else:
         X = np.ones((len(df), 1))
         col_names = ["intercept"]
@@ -101,6 +135,8 @@ def fit_rate_model(
     coefs = dict(zip(col_names, result.params, strict=True))
     bse = dict(zip(col_names, result.bse, strict=True))
     pvals = dict(zip(col_names, result.pvalues, strict=True))
+    n_params = len(col_names)
+    bic_llf = n_params * np.log(len(df)) - 2 * float(result.llf)
 
     output = {
         **{f"coef_{k}": float(v) for k, v in coefs.items()},
@@ -109,10 +145,10 @@ def fit_rate_model(
         **{f"rr_{k}": float(np.exp(v)) for k, v in coefs.items()},
         "n_stops": len(df),
         "n_events_total": int(y.sum()),
-        "n_params": len(col_names),
+        "n_params": n_params,
         "llf": float(result.llf),
         "aic": float(result.aic),
-        "bic": float(result.bic),
+        "bic": float(bic_llf),
         "deviance": float(result.deviance),
         "pearson_chi2": float(result.pearson_chi2),
         "mean_rate": float(y.sum() / np.exp(offset).sum()),

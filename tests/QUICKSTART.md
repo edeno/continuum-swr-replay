@@ -1,155 +1,67 @@
 # Test Suite Quick Start
 
-## ✅ Working Tests (Ready to Run Now)
-
-I've created a runnable test suite that verifies critical functionality:
-
 ```bash
-# Run the basic tests (17 tests, all passing)
-uv run pytest tests/unit/test_basic.py -v
-```
-
-**Test Coverage:**
-- ✅ NumPy operations (concatenation, filtering, division by zero)
-- ✅ Pandas time-indexed DataFrames
-- ✅ NetworkX graph operations (shortest path, weighted graphs)
-- ✅ Mathematical invariants (normalization, triangle inequality)
-- ✅ Data integrity (NaN detection, monotonicity, non-negative values)
-
-## ⚠️ Dependency Issue (Needs Fix)
-
-The full test suite (including spike processing tests) can't run yet due to a Python 3.13 compatibility issue:
-
-**Error:**
-```
-ImportError: cannot import name 'template' from 're'
-```
-
-**Cause:** `spikeinterface` package is not compatible with Python 3.13 yet.
-
-### Option 1: Use Python 3.11 (Recommended)
-
-```bash
-# Install Python 3.11
-conda create -n continuum-py311 python=3.11
-conda activate continuum-py311
-
-# Reinstall dependencies
+# Install dev deps (pytest, hypothesis, ruff, mypy)
 uv sync --extra dev
-
-# Run all tests
-uv run pytest
 ```
 
-### Option 2: Wait for spikeinterface Update
+## Fast offline slice (no VPN, no DataJoint)
 
-Track the issue: https://github.com/SpikeInterface/spikeinterface/issues
-
-Once fixed, the full test suite will run with:
-```bash
-uv run pytest tests/unit/test_spikes.py
-```
-
-## Test Files Created
-
-### Currently Runnable
-- ✅ **tests/unit/test_basic.py** (17 tests) - NumPy/Pandas/NetworkX operations
-- ✅ **tests/integration/test_data_loading.py** - Data pipeline integration tests
-- ✅ **tests/conftest.py** - 17 reusable fixtures
-
-### Blocked by Dependencies
-- ⏸️ **tests/unit/test_spikes.py** - Spike processing tests (needs Python 3.11)
-
-### Removed (Too Complex for Initial Version)
-- ❌ tests/unit/test_lfp.py - Removed (referenced non-existent functions)
-- ❌ tests/unit/test_task_variables.py - Removed (required complex mock fixtures)
-- ❌ tests/property/test_mathematical_invariants.py - Removed (needs hypothesis + working imports)
-
-## What the Tests Cover
-
-### 1. Basic Computational Correctness ✅
-- Division by zero protection
-- Array sorting and filtering
-- Temporal slicing
-- Event duration calculations
-
-### 2. Graph Operations ✅
-- Shortest path computation
-- Weighted path finding
-- Graph connectivity checks
-
-### 3. Data Integrity ✅
-- No NaN in critical columns
-- Monotonic time ordering
-- Non-negative speeds
-- Positive durations
-
-### 4. Mathematical Properties ✅
-- Normalization bounds [0, 1]
-- Triangle inequality
-- Probability sums to 1
-
-## Running Integration Tests
+`test_basic.py` is dependency-free and finishes in well under a
+second. It is the right thing to run when reviewing a branch on a
+machine without the lab VPN:
 
 ```bash
-# These test the full data loading pipeline
-# Also blocked by dependency issue currently
-uv run pytest tests/integration/ -v
+uv run pytest tests/unit/test_basic.py
 ```
 
-## Next Steps
-
-1. **Switch to Python 3.11** to unlock full test suite
-2. **Run full tests:** `uv run pytest -v`
-3. **Generate coverage:** `uv run pytest --cov=src/continuum_swr_replay --cov-report=html`
-4. **Add more tests** as you develop new features
-
-## Test Organization
-
-```
-tests/
-├── QUICKSTART.md          ← You are here
-├── README.md              ← Complete testing guide
-├── conftest.py            ← Shared fixtures
-├── unit/
-│   ├── test_basic.py      ← ✅ WORKS NOW (17 tests)
-│   └── test_spikes.py     ← ⏸️ Needs Python 3.11
-└── integration/
-    └── test_data_loading.py  ← ⏸️ Needs Python 3.11
-```
-
-## Verifying Tests Work
+After the lazy-import work landed, the rest of the unit / property /
+visualization / analysis suites also collect and run without a
+working DataJoint connection — the package roots
+(`continuum_swr_replay/__init__.py`,
+`continuum_swr_replay/data_loaders/__init__.py`,
+`continuum_swr_replay/analysis/hippocampus/__init__.py`) re-export
+loader functions through PEP 562 ``__getattr__``, so importing a
+leaf submodule no longer pulls Spyglass at import time. The lazy
+contract is pinned by `tests/unit/test_lazy_imports.py`.
 
 ```bash
-# Should show 17 passing tests
-uv run pytest tests/unit/test_basic.py -v
-
-# Should see:
-# ======================== 17 passed in 3.66s =========================
+uv run pytest                              # full suite, offline-friendly
+uv run pytest tests/integration/           # mock-fixture tests, also offline
+uv run pytest tests/unit/test_replay_tables.py
 ```
 
-## When Tests Fail
+## When you DO need DataJoint
 
-```bash
-# Run with more detail
-uv run pytest -vv
+Only the loader functions themselves require the lab VPN:
+``load_data``, ``get_epoch_info``, ``get_training_timepoints``,
+``get_labels``, ``get_theta``, ``get_ripple``, ``get_hpc_marks``,
+``get_pfc_spike_times``, ``get_electrode_group_info``, and the
+``run_session`` driver in ``analysis/pfc/glm.py``. Tests that
+actually call them (none of the current `tests/` tree does) would
+need DataJoint reachable. The ``integration`` pytest marker is
+registered in ``pyproject.toml`` for future DB-gated tests but is
+not currently applied to any test.
 
-# Drop into debugger on failure
-uv run pytest --pdb
+## What's actually here
 
-# Run only failed tests
-uv run pytest --lf
+- `tests/unit/` — function-level tests (~30 files: spikes, LFP, task
+  variables, replay tables, fitting, decoding, ContFrag paths, hash
+  safety, etc.).
+- `tests/integration/test_mock_session_fixture.py` — exercises the
+  selective-load preset surface against a synthetic mock session
+  fixture. Does NOT call the real ``load_data``.
+- `tests/property/test_mathematical_invariants.py` — `hypothesis`-based
+  property tests. `hypothesis` is included in the `dev` extra.
 
-# Show local variables on failure
-uv run pytest -l
-```
+## What's not here
 
-## Summary
+- No coverage tooling — `pytest-cov` is not in `dev`. Add it
+  explicitly if you want coverage:
 
-**Current Status:**
-- ✅ 17 basic tests passing
-- ⏸️ 30+ spike tests waiting on Python 3.11
-- ⏸️ 25+ integration tests waiting on Python 3.11
-- 📝 Complete documentation and fixtures ready
+  ```bash
+  uv add --dev pytest-cov
+  uv run pytest --cov=src/continuum_swr_replay --cov-report=html
+  ```
 
-**To unlock full suite:** Use Python 3.11 instead of 3.13
+See [README.md](README.md) for fixture inventory and conventions.

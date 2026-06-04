@@ -10,6 +10,10 @@ Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
 
 - ``event_table.pkl`` — one row per non-local event
 - ``event_arm_table.pkl`` — one row per (event, arm)
+- ``event_patch_table.pkl`` — one row per (event, patch); collapsed from
+  ``event_arm_table`` via :func:`build_event_patch_table` so the
+  ``--hierarchy patch`` path of ``fit_replay_content_models.py`` has its
+  required input alongside the per-arm tables.
 - ``event_sequence_table.pkl`` — one row per in-event timebin
 - ``stop_table.pkl`` — one row per stopping period (incl. zero-event)
 
@@ -34,6 +38,7 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 )
 from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
+    build_event_patch_table,
     build_event_sequence_table,
     build_event_table,
     build_stop_table,
@@ -72,7 +77,12 @@ def find_sessions(max_per_animal: int | None = None):
         if not match:
             continue
         animal_date, epoch = match.group(1), match.group(2)
-        animal = re.match(r"([a-z]+)", animal_date).group(1)
+        # The outer regex enforces exactly 8 trailing digits (the date),
+        # so the animal id is everything before them. The previous
+        # ``re.match(r"([a-z]+)", animal_date)`` collapsed digit-bearing
+        # ids — e.g. ``j162021...`` matched only ``j``, merging j16
+        # sessions under ``j``.
+        animal = animal_date[:-8]
         session_id = f"{animal_date}_{epoch}_HPC"
         if session_id not in env_files:
             continue
@@ -106,9 +116,17 @@ def find_sessions(max_per_animal: int | None = None):
 def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
-    Returns ``None`` when the session cannot be loaded or the decoder
-    produced no non-local events. Callers concatenate the non-empty
-    returns into the global canonical tables.
+    Returns ``None`` only when the session cannot be loaded (missing
+    trials or track graph). Sessions whose decoder produced no
+    non-local events still return a dict — with empty
+    ``event_table`` / ``event_arm_table`` and a ``None``
+    ``event_sequence_table``, but a fully populated ``stop_table``
+    that records the session's immobility bouts. ``stop_table.pkl``
+    is documented to include zero-event bouts, and the rate model
+    fits ``n_events`` per stop over a denominator that must include
+    those rows. Callers concatenate every non-``None`` return into
+    the global canonical tables; ``pd.concat`` accepts the empty
+    per-event frames without complaint.
     """
     nwb = session["nwb_file_name"]
     epoch = session["epoch_name"]
@@ -134,13 +152,19 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
         except Exception as e:  # noqa: BLE001 - surface the reason and keep going
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
 
+    # Build the stop table first — it's a function of immobility
+    # bouts, not non-local events, and the documented
+    # ``stop_table.pkl`` contract (this script's own docstring; the
+    # builder's "**including zero-event bouts**" promise) keeps
+    # zero-event sessions in the dataset. Returning early on an
+    # empty event_table dropped those sessions silently and broke
+    # the downstream rate model, which models n_events per stop
+    # over a denominator that *must* include zero-event stops.
+    stop_table = build_stop_table(dot, trials, track_graph)
+
     event_table = build_event_table(
         dot, env, trials, track_graph, conditional_posterior=posterior
     )
-    if len(event_table) == 0:
-        return None
-
-    stop_table = build_stop_table(dot, trials, track_graph)
     event_arm_table = build_event_arm_table(
         event_table,
         dot,
@@ -151,7 +175,7 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
     )
     event_sequence_table = (
         build_event_sequence_table(dot, env, posterior)
-        if posterior is not None
+        if posterior is not None and len(event_table) > 0
         else None
     )
 
@@ -236,10 +260,34 @@ def main():
     event_table_all = pd.concat(all_event_tables, ignore_index=True)
     event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
     stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
-    event_sequence_table_all = (
-        pd.concat(all_event_sequence_tables, ignore_index=True)
-        if all_event_sequence_tables
-        else None
+    # Always materialize ``event_sequence_table.pkl`` — even when no
+    # session contributed any sequence rows. Stage 5B (the
+    # retrospective-alignment step) does
+    # ``pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")``
+    # unconditionally, so a missing file would crash a posterior-
+    # unavailable run with FileNotFoundError. The retrospective
+    # helpers already treat an empty sequence frame as a legitimate
+    # input, so writing an empty schema-complete frame is the right
+    # contract here.
+    if all_event_sequence_tables:
+        event_sequence_table_all = pd.concat(
+            all_event_sequence_tables, ignore_index=True
+        )
+    else:
+        from continuum_swr_replay.analysis.replay.tables import (
+            _event_sequence_table_columns,
+        )
+
+        event_sequence_table_all = pd.DataFrame(
+            columns=_event_sequence_table_columns()
+        )
+    # Patch table is a deterministic projection of the per-arm table
+    # (sums arm_count_hard within each patch and aggregates predictors
+    # to patch level). Save it alongside the others so the documented
+    # ``fit_replay_content_models.py --hierarchy patch`` path has its
+    # required input.
+    event_patch_table_all = build_event_patch_table(
+        event_table_all, event_arm_table_all
     )
 
     session_cols = ["animal", "day", "epoch"]
@@ -275,6 +323,7 @@ def main():
     for name, frame in (
         ("event_table", event_table_all),
         ("event_arm_table", event_arm_table_all),
+        ("event_patch_table", event_patch_table_all),
         ("stop_table", stop_table_all),
         ("event_sequence_table", event_sequence_table_all),
     ):

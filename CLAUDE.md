@@ -66,7 +66,7 @@ uv run pytest
 ```
 src/continuum_swr_replay/
 ├── data_loaders/          # Data loading from Spyglass/NWB
-│   └── load_data_bandit.py   # Main data loader for spatial bandit task
+│   └── bandit_task.py        # Main data loader for spatial bandit task
 ├── analysis/              # Analysis modules
 │   ├── hippocampus/      # Hippocampus-specific analysis
 │   └── pfc/              # Prefrontal cortex analysis
@@ -78,7 +78,7 @@ paper/                     # Paper materials (data, figures, manuscript)
 
 ## Key Architecture Concepts
 
-### Data Loading Pipeline (`load_data_bandit.py`)
+### Data Loading Pipeline (`bandit_task.py`)
 
 The main entry point is `load_data()` which orchestrates loading all data types for a given session and epoch:
 
@@ -167,6 +167,25 @@ When modifying data loading, respect the DataJoint query patterns and restrictio
 
 Spike times are organized as lists of arrays: `spike_times[brain_area][sort_group_index]`
 
+### Canonical per-event classification table
+
+The single source of truth for a non-local event's timing and its
+SWR-overlap classification is
+`analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`.
+It produces one row per non-local event over the *full* event-label
+window (no immobility/probability filter), deriving full-window timing,
+per-event speed summaries, peak non-local probability, the 3-way
+`overlap_class` (and 6-way `overlap_subclass`), and the matched SWR. SWR
+intervals are always taken from the `SWR_event` timebin labels; event-level
+`is_swr` means strict positive-duration overlap, not the old inclusive
+`any SWR_event > 0`. (The stop-level `is_swr_stop` flag in
+`build_stop_table` deliberately still uses the inclusive per-timebin rule —
+the two flags do not share a convention.) The replay-content
+`build_event_table` in `analysis/replay/tables.py` builds on top of this:
+it keeps its legacy filtered-survivor-window columns bit-identical and
+merges the classified columns in on `event_id`, carrying the full
+label-window boundary additively as `label_event_*`.
+
 ### Spatial Variables
 
 Position is tracked in multiple coordinate systems:
@@ -188,7 +207,7 @@ Task-relevant derived variables:
 ### Loading data for a session
 
 ```python
-from continuum_swr_replay.data_loaders.load_data_bandit import load_data, get_epoch_info
+from continuum_swr_replay.data_loaders import load_data, get_epoch_info
 
 # Get all available epochs
 epoch_info = get_epoch_info()
@@ -240,12 +259,17 @@ trial_task_vars = data["task_variables"].loc[trial.start_time:trial.end_time]
 
 ## Dependencies and JAX
 
-This project uses **JAX** for machine learning and requires CUDA 12 for GPU acceleration:
+This project uses **JAX** for machine learning. The base install is
+**CPU-only** so the package builds on every platform (including
+macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
-- JAX is installed with CUDA 12 support: `jax[cuda12]`
-- Consider using GPU-aware code when implementing new analyses
-- Dask is available for parallel processing across CPU cores
-- Optional: `dask-cuda` for GPU-based Dask operations
+- Default: `pip install` / `uv sync` resolves plain `jax`.
+- GPU: install the `cuda` extra to pull in `jax[cuda12]` —
+  ``uv sync --extra cuda``. Linux-only.
+- The legacy `gpu` extra also bundles `dask-cuda` and
+  `cuda-bindings` for GPU-aware Dask: ``uv sync --extra gpu``.
+- Consider using GPU-aware code when implementing new analyses.
+- Dask is available for parallel processing across CPU cores.
 
 ## Animal and Session Information
 

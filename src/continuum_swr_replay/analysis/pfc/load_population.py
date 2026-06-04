@@ -3,6 +3,7 @@
 Loads and filters the batch PFC GLM results for use by figure04 panel scripts.
 """
 
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,8 @@ import pandas as pd
 from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_animal(nwb_file_name: str) -> str:
@@ -56,15 +59,81 @@ def load_population_data(
     dfs = []
     swr_list, no_swr_list, nl_swr_list, nl_no_swr_list = [], [], [], []
 
-    for p in pkls:
-        df_sess = pd.read_pickle(p)
-        dfs.append(df_sess)
+    n_lag_times = len(lag_time)
 
+    for p in pkls:
         base = str(p).replace("_modulation.pkl", "_modulation")
-        swr_list.append(np.load(f"{base}.SWR_modulation.npy"))
-        no_swr_list.append(np.load(f"{base}.no_SWR_modulation.npy"))
-        nl_swr_list.append(np.load(f"{base}.non_local_SWR_modulation.npy"))
-        nl_no_swr_list.append(np.load(f"{base}.non_local_no_SWR_modulation.npy"))
+        sess_swr = np.load(f"{base}.SWR_modulation.npy")
+        sess_no_swr = np.load(f"{base}.no_SWR_modulation.npy")
+        sess_nl_swr = np.load(f"{base}.non_local_SWR_modulation.npy")
+        sess_nl_no_swr = np.load(f"{base}.non_local_no_SWR_modulation.npy")
+
+        # Sessions with no surviving neurons in this brain area save
+        # placeholder arrays of shape ``(0, 0)`` (see ``run_session``
+        # in analysis/pfc/glm.py). hstack would silently broadcast a
+        # ``(0, 0)`` array against the expected ``(n_lag_times, k)``,
+        # producing a 0-row population matrix and breaking every
+        # downstream consumer. Skip such sessions explicitly.
+        mod_arrays = (sess_swr, sess_no_swr, sess_nl_swr, sess_nl_no_swr)
+        if any(arr.ndim != 2 or arr.shape[0] != n_lag_times for arr in mod_arrays):
+            # Distinguish the legitimate no-neuron placeholder from an
+            # unexpected shape (corrupted file or a stale lag window from
+            # an older run): the latter is silently dropped from the
+            # population otherwise, biasing summaries.
+            if all(arr.shape == (0, 0) for arr in mod_arrays):
+                logger.debug(
+                    "load_population: skipping %s (no surviving neurons)", p.name
+                )
+            else:
+                logger.warning(
+                    "load_population: skipping %s — modulation array shapes %s do "
+                    "not match expected (%d, n); corrupted file or stale lag "
+                    "window?",
+                    p.name,
+                    [a.shape for a in mod_arrays],
+                    n_lag_times,
+                )
+            continue
+
+        # Cross-session alignment guard. The pickles and the
+        # modulation arrays are loaded independently, then
+        # ``pd.concat`` and ``np.hstack`` are used to assemble the
+        # population. If a single session has a different number of
+        # pickle rows than modulation columns (or its four arrays
+        # disagree on column count), every later session's neurons
+        # silently shift along the modulation axis: the second pickle
+        # row of session A ends up paired with session B's first
+        # modulation column. Validate per session before appending so
+        # the row↔column correspondence is always 1-to-1.
+        df_session = pd.read_pickle(p)
+        n_rows = len(df_session)
+        col_counts = {
+            "SWR_modulation": sess_swr.shape[1],
+            "no_SWR_modulation": sess_no_swr.shape[1],
+            "non_local_SWR_modulation": sess_nl_swr.shape[1],
+            "non_local_no_SWR_modulation": sess_nl_no_swr.shape[1],
+        }
+        if any(c != n_rows for c in col_counts.values()):
+            raise ValueError(
+                f"Per-session shape mismatch in {p.name}: pickle has "
+                f"{n_rows} rows but modulation column counts are "
+                f"{col_counts}. All four modulation arrays must have "
+                f"exactly {n_rows} columns; otherwise concatenation "
+                "across sessions silently misaligns neuron metadata "
+                "with modulation traces."
+            )
+
+        dfs.append(df_session)
+        swr_list.append(sess_swr)
+        no_swr_list.append(sess_no_swr)
+        nl_swr_list.append(sess_nl_swr)
+        nl_no_swr_list.append(sess_nl_no_swr)
+
+    if not dfs:
+        raise FileNotFoundError(
+            f"No usable mPFC modulation files in {data_dir} "
+            "(every session had empty / wrong-shape arrays)"
+        )
 
     df = pd.concat(dfs, ignore_index=True)
     df["animal"] = df["nwb_file_name"].map(_extract_animal)
@@ -75,11 +144,31 @@ def load_population_data(
     nl_no_swr_all = np.hstack(nl_no_swr_list)
 
     # Filter: GLM succeeded, firing rate threshold, no NaN modulation
-    has_fit = df["SWR vs. constant: pval"].notna().values
+    # in *any* of the four returned modulation arrays. The previous
+    # form only checked ``swr_all`` and ``no_swr_all``, so neurons
+    # with NaN entries in ``nl_swr_all`` / ``nl_no_swr_all`` slipped
+    # through and downstream consumers saw NaN-laced non-local
+    # modulation traces.
+    #
+    # If every neuron in a saved session had its GLM fail (the
+    # ``fit_neuron`` fallback writes only firing-rate columns), the
+    # primary p-value column may not even exist in that session's
+    # pickle. After ``pd.concat`` it'll exist with NaN for those
+    # rows IFF *some* other session succeeded; if EVERY session
+    # failed, the column is absent entirely and ``df["..."]`` raises
+    # KeyError. Default to all-False ``has_fit`` in that case so
+    # the failed neurons are dropped cleanly.
+    primary_pval_col = "SWR vs. constant: pval"
+    if primary_pval_col in df.columns:
+        has_fit = df[primary_pval_col].notna().values
+    else:
+        has_fit = np.zeros(len(df), dtype=bool)
     has_fr = (df["immobility_avg_firing_rate"] >= min_firing_rate).values
     no_nan_mod = (
         ~np.any(np.isnan(swr_all), axis=0)
         & ~np.any(np.isnan(no_swr_all), axis=0)
+        & ~np.any(np.isnan(nl_swr_all), axis=0)
+        & ~np.any(np.isnan(nl_no_swr_all), axis=0)
     )
     good = has_fit & has_fr & no_nan_mod
 
@@ -89,7 +178,14 @@ def load_population_data(
     nl_swr_all = nl_swr_all[:, good]
     nl_no_swr_all = nl_no_swr_all[:, good]
 
-    # FDR correction on key tests
+    # FDR correction on key tests. ``false_discovery_control`` raises
+    # ``ValueError: ps must include only numbers between 0 and 1`` if
+    # any input is NaN — and the upstream filter only checks the
+    # *primary* ``"SWR vs. constant: pval"`` column, so a neuron with
+    # NaN in any *secondary* test (e.g. ``non_local_no_SWR vs. constant``)
+    # passes ``good`` and then crashes the loader. Apply BH per-test
+    # to the finite p-values only and leave the NaN positions as NaN
+    # in the corresponding ``fdr_q`` column.
     fdr_tests = [
         "SWR vs. constant",
         "non_local vs. constant",
@@ -101,8 +197,20 @@ def load_population_data(
     for test in fdr_tests:
         pval_col = f"{test}: pval"
         fdr_col = f"{test}: fdr_q"
-        pvals = np.clip(df[pval_col].values, 1e-300, 1.0)
-        df[fdr_col] = false_discovery_control(pvals, method="bh")
+        if pval_col not in df.columns:
+            # Column absent because every session that ran this loader
+            # call had only failed-GLM neurons (the fallback path
+            # writes only firing-rate columns). Surface NaN rather
+            # than KeyError.
+            df[fdr_col] = np.full(len(df), np.nan)
+            continue
+        raw = df[pval_col].to_numpy(dtype=float)
+        ok = np.isfinite(raw)
+        fdr_q = np.full_like(raw, np.nan)
+        if ok.any():
+            pvals = np.clip(raw[ok], 1e-300, 1.0)
+            fdr_q[ok] = false_discovery_control(pvals, method="bh")
+        df[fdr_col] = fdr_q
 
     modulations = {
         "swr": swr_all,

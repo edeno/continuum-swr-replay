@@ -17,8 +17,12 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
-from scipy.stats import zscore
 
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    theta_power_zscore,
+    validate_required_session_data_keys,
+    validate_results_position_time_alignment,
+)
 from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
@@ -64,21 +68,18 @@ def get_contfrag_data_over_time(
     posterior : xr.DataArray
         Combined (Continuous + Fragmented) posterior distribution.
     """
-    required_keys = [
-        "position_info",
-        "ripple_times",
-        "hse_times",
-        "theta_phase",
-        "theta_power",
-        "zscored_ripple_consensus_trace",
-        "multiunit_rate_zscore",
-    ]
-    missing_keys = [k for k in required_keys if k not in data]
-    if missing_keys:
-        raise KeyError(
-            f"Missing required data keys: {missing_keys}. "
-            f"Ensure load_data() was called with DataLoadingPreset.DECODING or equivalent."
-        )
+    validate_required_session_data_keys(
+        data,
+        required_keys=[
+            "position_info",
+            "ripple_times",
+            "hse_times",
+            "theta_phase",
+            "theta_power",
+            "zscored_ripple_consensus_trace",
+            "multiunit_rate_zscore",
+        ],
+    )
 
     # Get combined posterior (both states decode position)
     posterior = get_contfrag_posterior(results, state="combined")
@@ -89,7 +90,7 @@ def get_contfrag_data_over_time(
 
     # SWR vs MUA overlap
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area], results
+        data["ripple_times"], data["hse_times"][brain_area]
     )
 
     # Posterior stats on the full posterior
@@ -109,7 +110,23 @@ def get_contfrag_data_over_time(
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
-        return series.reindex(results.time, method="nearest", tolerance=0.004)
+        # Return a positional ndarray; otherwise the Series — indexed
+        # by ``results.time`` — would be re-aligned against
+        # ``position_info.index`` when packed into the DataFrame
+        # below, silently introducing NaNs whenever the two axes
+        # differ by epsilon despite identical lengths.
+        return (
+            series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
+        )
+
+    # Length is necessary but not sufficient — same-length axes that
+    # are time-shifted would silently attach event labels to the wrong
+    # rows. The shared helper enforces the stricter drift check used
+    # in ``analysis.replay._helpers._align_posterior_to_dot``; routing
+    # both aggregators through it keeps the two paths in lockstep.
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
+    )
 
     data_over_time = pd.DataFrame(
         {
@@ -129,7 +146,7 @@ def get_contfrag_data_over_time(
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,
             "theta_phase": _nearest(data["theta_phase"]).squeeze(),
-            "theta_power_zscore": zscore(
+            "theta_power_zscore": theta_power_zscore(
                 _nearest(data["theta_power"].squeeze()).squeeze()
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
@@ -144,15 +161,9 @@ def get_contfrag_data_over_time(
             "day": day,
             "epoch": epoch_name,
             "nwb_file_name": nwb_file_name,
-        }
+        },
+        index=data["position_info"].index,
     )
-
-    if len(data_over_time) != len(data["position_info"]):
-        raise ValueError(
-            f"data_over_time ({len(data_over_time)}) and position_info "
-            f"({len(data['position_info'])}) have different lengths; "
-            "they must be aligned 1-to-1."
-        )
 
     return pd.concat((data_over_time, data["position_info"]), axis=1), posterior
 

@@ -255,6 +255,7 @@ class DataLoadingPreset:
             SessionDataKeys.THETA_PHASE,
             SessionDataKeys.THETA_POWER,
             SessionDataKeys.MULTIUNIT_FIRING_RATE,
+            SessionDataKeys.MULTIUNIT_RATE_ZSCORE,
             SessionDataKeys.HSE_TIMES,
         }
     )
