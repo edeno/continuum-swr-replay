@@ -438,3 +438,33 @@ def test_timing_offsets_empty_session():
     offsets = _timing_offsets(classified)
     assert offsets.empty
     assert list(offsets.columns) == ["animal", "day", "epoch", "start_diff", "end_diff"]
+
+
+def _load_generate_figure02():
+    """Import the figure-2 orchestrator module by path (it lives in scripts/)."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[3] / "scripts" / "generate_figure02.py"
+    spec = importlib.util.spec_from_file_location("generate_figure02", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_assert_drawn_matches_label_fires_on_boundary_mismatch():
+    gf2 = _load_generate_figure02()
+    # Column header says swr_contained, but the threshold-crossing ripple
+    # ends inside the event (-> only partial). The guard must raise.
+    chosen = {"swr_contained": pd.Series({"start_time": 1.0, "end_time": 2.0})}
+    ripple_times = pd.DataFrame({"start_time": [0.5], "end_time": [1.5]})
+    with pytest.raises(AssertionError, match="contradict"):
+        gf2._assert_drawn_matches_label(chosen, ripple_times)
+
+
+def test_assert_drawn_matches_label_passes_when_consistent():
+    gf2 = _load_generate_figure02()
+    # Ripple fully spans the event -> drawn class swr_contained == header.
+    chosen = {"swr_contained": pd.Series({"start_time": 1.0, "end_time": 2.0})}
+    ripple_times = pd.DataFrame({"start_time": [0.5], "end_time": [2.5]})
+    gf2._assert_drawn_matches_label(chosen, ripple_times)  # must not raise

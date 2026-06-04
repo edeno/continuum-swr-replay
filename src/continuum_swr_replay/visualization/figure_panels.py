@@ -939,11 +939,16 @@ def plot_event_timing_offsets(
 ) -> None:
     """Two side-by-side histograms of non-local/SWR timing offsets.
 
-    Takes the per-overlap ``start_diff`` and ``end_diff`` DataFrame from
-    :func:`compute_event_timing_offsets` and renders:
+    Takes a per-event ``start_diff`` / ``end_diff`` DataFrame and renders:
 
         - Left axis:  non-local-start minus SWR-start (ms)
         - Right axis: non-local-end   minus SWR-end   (ms)
+
+    The offsets are computed inline in ``generate_figure02.generate_figure``
+    by subtracting the matched SWR's ``matched_swr_start`` /
+    ``matched_swr_end`` from each event's ``event_start`` / ``event_end``
+    (columns of :func:`build_classified_nonlocal_event_table`), restricted
+    to immobile, SWR-overlapping events — one row per event.
 
     Positive left-axis / negative right-axis means non-local events
     are typically contained inside the SWR window. A long tail on
