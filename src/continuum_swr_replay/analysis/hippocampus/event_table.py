@@ -50,7 +50,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 
-from .event_detection import classify_swr_overlap_geometry
+from .event_detection import classify_swr_overlap, classify_swr_overlap_geometry
 
 # NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
 # ``analysis/replay/_helpers``. Importing them at module load would close a
@@ -363,3 +363,59 @@ def build_classified_nonlocal_event_table(
     validate_event_ids(out)
 
     return out[column_order]
+
+
+def assert_drawn_class_matches_ripples(
+    chosen: dict, ripple_times: pd.DataFrame
+) -> None:
+    """Raise if a chosen example's label-derived class disagrees with the
+    threshold-crossing ``ripple_times`` it would be drawn against.
+
+    Figure 2 panel a labels each example column by its label-derived
+    ``overlap_class`` (from the ``SWR_event`` timebin labels) but shades the
+    SWR span from the threshold-crossing ``ripple_times``. These are two
+    independent discretizations of the same ripples and can disagree by
+    ~one sample at a boundary; if they do for a chosen example, the drawn
+    span would contradict the column header.
+
+    Lives here (a DB-free module) rather than in the figure script so it is
+    importable and unit-testable without pulling in ``load_data`` /
+    DataJoint.
+
+    Parameters
+    ----------
+    chosen : dict
+        Mapping of expected overlap class -> an object indexable by
+        ``"start_time"`` / ``"end_time"`` (the per-class example rows).
+    ripple_times : pd.DataFrame
+        Threshold-crossing SWR intervals with ``start_time`` / ``end_time``.
+
+    Raises
+    ------
+    AssertionError
+        If any chosen example's drawn class differs from its expected class.
+    """
+    chosen_df = pd.DataFrame(
+        [
+            {
+                "start_time": ev["start_time"],
+                "end_time": ev["end_time"],
+                "expected_class": cls,
+            }
+            for cls, ev in chosen.items()
+        ]
+    )
+    drawn = classify_swr_overlap(chosen_df, ripple_times)
+    mismatch = drawn[drawn["overlap_class"] != drawn["expected_class"]]
+    if not mismatch.empty:
+        rows = mismatch[["expected_class", "overlap_class", "start_time", "end_time"]]
+        raise AssertionError(
+            "Panel-a example(s) classify differently against the threshold-"
+            "crossing ripple_times that panel a shades than the label-derived "
+            "column header:\n"
+            f"{rows.to_string(index=False)}\n"
+            "The drawn SWR span would contradict the column header. Pick a "
+            "different example for the affected class(es), or widen the "
+            "selection's peak/duration criteria so a non-boundary event is "
+            "chosen."
+        )

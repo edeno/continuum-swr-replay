@@ -90,6 +90,7 @@ _LAZY_EXPORTS = {
     "get_overlap_times": "event_detection",
     "select_typical_event_by_class": "event_detection",
     # event_table — canonical per-non-local-event classification table.
+    "assert_drawn_class_matches_ripples": "event_table",
     "build_classified_nonlocal_event_table": "event_table",
     "intervals_from_labels": "event_table",
     # hpc_raw_stats.
@@ -158,6 +159,7 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         select_typical_event_by_class,
     )
     from .event_table import (  # noqa: F401
+        assert_drawn_class_matches_ripples,
         build_classified_nonlocal_event_table,
         intervals_from_labels,
     )

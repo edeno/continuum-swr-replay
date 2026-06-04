@@ -62,8 +62,8 @@ from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.hippocampus import (
+    assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
-    classify_swr_overlap,
     compute_swr_overlap_class_counts,
     get_event_types,
     load_data_over_time,
@@ -143,44 +143,6 @@ def pick_example_events(
     return select_typical_event_by_class(session, peak_threshold=peak_threshold)
 
 
-def _assert_drawn_matches_label(chosen: dict, ripple_times: pd.DataFrame) -> None:
-    """Guard that each panel-a example's label-derived class matches the
-    threshold-crossing ``ripple_times`` that panel a actually shades.
-
-    The column header (SWR-contained / SWR-partial / non-SWR) comes from
-    the label-derived classification in the classified table, but panel a's
-    top row shades the SWR span from ``data["ripple_times"]`` (the
-    threshold-crossing intervals). These are two discretizations of the
-    same ripples and can disagree by ~one sample at a boundary; if they do
-    for a chosen example, the shaded span would contradict the column
-    label. Raise so a different (non-boundary) example is chosen instead.
-    """
-    chosen_df = pd.DataFrame(
-        [
-            {
-                "start_time": ev["start_time"],
-                "end_time": ev["end_time"],
-                "expected_class": cls,
-            }
-            for cls, ev in chosen.items()
-        ]
-    )
-    drawn = classify_swr_overlap(chosen_df, ripple_times)
-    mismatch = drawn[drawn["overlap_class"] != drawn["expected_class"]]
-    if not mismatch.empty:
-        rows = mismatch[["expected_class", "overlap_class", "start_time", "end_time"]]
-        raise AssertionError(
-            "Panel-a example(s) classify differently against the threshold-"
-            "crossing ripple_times that panel a shades than the label-derived "
-            "column header:\n"
-            f"{rows.to_string(index=False)}\n"
-            "The drawn SWR span would contradict the column header. Pick a "
-            "different example for the affected class(es), or widen the "
-            "selection's peak/duration criteria so a non-boundary event is "
-            "chosen."
-        )
-
-
 # ---------------------------------------------------------------------------
 # Main figure
 # ---------------------------------------------------------------------------
@@ -247,7 +209,7 @@ def generate_figure(
     # Guard: the column header is label-derived, but panel a shades the
     # threshold-crossing ripple_times. Fail if a chosen example would be
     # drawn with a SWR span that contradicts its column label.
-    _assert_drawn_matches_label(chosen, data["ripple_times"])
+    assert_drawn_class_matches_ripples(chosen, data["ripple_times"])
     # Cheap hash-collision guard: each chosen event_id must resolve to
     # exactly one classified row.
     for cls, ev in chosen.items():
