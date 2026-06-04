@@ -124,7 +124,6 @@ from .event_detection import (
     get_confident_times,
     get_overlap_times,
 )
-from .event_table import intervals_from_labels as _intervals_from_labels
 from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
 
 
@@ -539,35 +538,24 @@ def get_event_types(
 
 
 def compute_swr_overlap_class_counts(
-    data_over_time: pd.DataFrame,
-    event_col: str = "non_local_event",
-    overlap_col: str = "SWR_event",
+    classified_events: pd.DataFrame,
 ) -> dict[str, int]:
-    """Count immobile events by SWR-overlap class.
+    """Count immobile non-local events by SWR-overlap class.
 
-    Per-session: derives non-local-event and SWR intervals from the
-    timebin labels in ``data_over_time`` and delegates to
-    :func:`classify_swr_overlap` for per-event classification. Counts
-    are aggregated across all sessions.
-
-    Uses the event-level definition of "contained" (does any single
-    SWR fully span the event) so the counts match the example-panel
-    classification in Figure 2. The alternative timebin-level
-    definition (does every timebin overlap some SWR) labels events
-    tiled by two adjacent SWRs as ``swr_contained``, which the
-    event-level rule calls ``swr_partial``.
+    Operates on the output of
+    :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
+    restricted to immobile events (``endpoints_speed_below_thresh``), and
+    tallies the ``overlap_class`` column. The single overlap convention
+    (strict positive-duration overlap, "contained" = some single SWR spans
+    the event) lives in that builder, so this is a thin tally with no
+    classification logic of its own.
 
     Parameters
     ----------
-    data_over_time : pd.DataFrame
-        Aggregated data containing ``event_col``, ``overlap_col``,
-        ``head_speed``, ``animal``, ``day``, and ``epoch`` columns.
-        Time must be the DataFrame index (production) or present as a
-        column named ``"time"`` (tests).
-    event_col : str, optional
-        Primary event column, by default ``"non_local_event"``.
-    overlap_col : str, optional
-        Column to check overlap against, by default ``"SWR_event"``.
+    classified_events : pd.DataFrame
+        Per-non-local-event table with ``overlap_class`` and
+        ``endpoints_speed_below_thresh`` columns. May be the builder's
+        zero-row empty frame.
 
     Returns
     -------
@@ -576,38 +564,24 @@ def compute_swr_overlap_class_counts(
         "non_swr": n, "total": n}``.
 
     """
-    from .event_detection import classify_swr_overlap
-
-    immobile = get_immobile_events(
-        data_over_time,
-        event_col=event_col,
-        speed_col="head_speed",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        method="endpoints",
-    )
-
-    # Normalize time to a column called "time". Production has time as
-    # the DataFrame index; tests sometimes have it as a column.
-    if "time" not in immobile.columns:
-        immobile = immobile.copy()
-        immobile["time"] = immobile.index
-
-    counts = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0}
-
-    for _session_key, session_df in immobile.groupby(
-        ["animal", "day", "epoch"], sort=False
-    ):
-        event_intervals = _intervals_from_labels(session_df, event_col)
-        if len(event_intervals) == 0:
-            continue
-        swr_intervals = _intervals_from_labels(session_df, overlap_col)
-
-        classified = classify_swr_overlap(event_intervals, swr_intervals)
-        session_counts = classified["overlap_class"].value_counts()
-        for cls in counts:
-            counts[cls] += int(session_counts.get(cls, 0))
-
-    return {**counts, "total": sum(counts.values())}
+    zero = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0, "total": 0}
+    if classified_events.empty:
+        return zero
+    # ``.loc`` + ``astype(bool)`` so the builder's zero-row empty frame
+    # (where ``endpoints_speed_below_thresh`` is object-dtype) still indexes
+    # cleanly rather than raising on a non-boolean mask.
+    immobile = classified_events.loc[
+        classified_events["endpoints_speed_below_thresh"].astype(bool)
+    ]
+    if immobile.empty:
+        return zero
+    counts = immobile["overlap_class"].value_counts().to_dict()
+    return {
+        "swr_contained": int(counts.get("swr_contained", 0)),
+        "swr_partial": int(counts.get("swr_partial", 0)),
+        "non_swr": int(counts.get("non_swr", 0)),
+        "total": int(len(immobile)),
+    }
 
 
 def compute_swr_nl_event_counts(

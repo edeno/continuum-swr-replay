@@ -80,7 +80,6 @@ _LAZY_EXPORTS = {
     "get_event_types": "data_aggregation",
     "load_data_over_time": "data_aggregation",
     # event_analysis — pure pandas/numpy.
-    "compute_event_timing_offsets": "event_analysis",
     "get_event_durations_ms": "event_analysis",
     "get_event_start_end_times": "event_analysis",
     "get_immobile_events": "event_analysis",
@@ -147,7 +146,6 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         load_data_over_time,
     )
     from .event_analysis import (  # noqa: F401
-        compute_event_timing_offsets,
         get_event_durations_ms,
         get_event_start_end_times,
         get_immobile_events,

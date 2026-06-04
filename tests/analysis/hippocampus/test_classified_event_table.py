@@ -324,3 +324,117 @@ def test_missing_required_column_raises():
     frame = frame.drop(columns=["Non-Local_Fragmented_prob"])
     with pytest.raises(KeyError, match="Non-Local_Fragmented_prob"):
         build_classified_nonlocal_event_table(frame)
+
+
+# --- Phase 2 consumers: parity with get_event_types, table-driven counts,
+#     and the inline timing-offset column subtraction. ---
+
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
+    compute_swr_overlap_class_counts,
+    get_event_types,
+)
+
+
+def _key_set(frame: pd.DataFrame) -> set:
+    return set(
+        zip(
+            frame["animal"],
+            frame["day"],
+            frame["epoch"],
+            frame["non_local_event"],
+            strict=True,
+        )
+    )
+
+
+def test_event_types_matches_classified_overlap(dot):
+    """get_event_types' SWR-overlap split must equal the classified table's
+    is_swr split for immobile events (panel c vs panels a/b/d parity)."""
+    classified = build_classified_nonlocal_event_table(dot)
+    event_types = get_event_types(dot, event_col="non_local_event")
+
+    overlap_keys = _key_set(
+        event_types["non_local_event_immobile_overlap_SWR_event"].reset_index()
+    )
+    classified_overlap_keys = _key_set(
+        classified[
+            classified["endpoints_speed_below_thresh"]
+            & (classified["overlap_class"] != "non_swr")
+        ]
+    )
+    assert overlap_keys == classified_overlap_keys, (
+        f"Drift: event_types-only={overlap_keys - classified_overlap_keys}, "
+        f"classified-only={classified_overlap_keys - overlap_keys}"
+    )
+
+
+def test_compute_swr_overlap_class_counts(dot):
+    classified = build_classified_nonlocal_event_table(dot)
+    counts = compute_swr_overlap_class_counts(classified)
+    # session 1: ev1 contained; ev2/ev3/ev8 partial; ev4/5/6/7 non_swr.
+    # session 2: ev1 non_swr. All events are immobile in the fixture.
+    assert counts == {
+        "swr_contained": 1,
+        "swr_partial": 3,
+        "non_swr": 5,
+        "total": 9,
+    }
+
+
+def test_swr_overlap_class_counts_empty():
+    empty = build_classified_nonlocal_event_table(_blank_session("m", 1, "01_r1", n=20))
+    assert empty.empty
+    assert compute_swr_overlap_class_counts(empty) == {
+        "swr_contained": 0,
+        "swr_partial": 0,
+        "non_swr": 0,
+        "total": 0,
+    }
+
+
+def test_panel_b_full_swr_intervals_not_clipped_to_nl_rows():
+    # SWR [40,80] strictly spans event [50,60] and carries SWR-only timebins
+    # outside the event window. The classified table derives SWR intervals
+    # from the full session labels, so the event is swr_contained — a counter
+    # that clipped SWR bounds to NL-event rows could miss this.
+    frame = _blank_session("m", 1, "01_r1", n=200)
+    _label(frame, "non_local_event", {1: (50, 60)})
+    _label(frame, "SWR_event", {1: (40, 80)})
+    classified = build_classified_nonlocal_event_table(frame)
+    ev = _row(classified, "01_r1", 1)
+    assert ev["overlap_class"] == "swr_contained"
+    assert compute_swr_overlap_class_counts(classified)["swr_contained"] == 1
+
+
+def _timing_offsets(classified: pd.DataFrame) -> pd.DataFrame:
+    """Mirror the inline panel-d computation in generate_figure02."""
+    overlap = classified[
+        classified["endpoints_speed_below_thresh"]
+        & (classified["overlap_class"] != "non_swr")
+    ].copy()
+    overlap["start_diff"] = overlap["event_start"] - overlap["matched_swr_start"]
+    overlap["end_diff"] = overlap["event_end"] - overlap["matched_swr_end"]
+    return overlap[["animal", "day", "epoch", "start_diff", "end_diff"]]
+
+
+def test_timing_offsets_via_columns(dot):
+    classified = build_classified_nonlocal_event_table(dot)
+    # ev2 [200,220] partial with swr12 [210,230]: NL-minus-SWR offsets.
+    ev2 = _row(classified, "01_r1", 2)
+    assert ev2["event_start"] - ev2["matched_swr_start"] == pytest.approx(
+        (200 - 210) * DT
+    )
+    assert ev2["event_end"] - ev2["matched_swr_end"] == pytest.approx((220 - 230) * DT)
+    # One row per overlapping event (ev1, ev2, ev3, ev8 in session 1), not
+    # one row per (SWR, event) pair.
+    assert len(_timing_offsets(classified)) == 4
+
+
+def test_timing_offsets_empty_session():
+    # Events present, none overlap an SWR -> empty offsets with schema.
+    frame = _blank_session("m", 1, "01_r1", n=200)
+    _label(frame, "non_local_event", {1: (10, 20), 2: (50, 60)})
+    classified = build_classified_nonlocal_event_table(frame)
+    offsets = _timing_offsets(classified)
+    assert offsets.empty
+    assert list(offsets.columns) == ["animal", "day", "epoch", "start_diff", "end_diff"]
