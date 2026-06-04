@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from _decoding_common import (
-    DecodingConfig,
+    NonLocalDecodingConfig,
     add_common_args,
     results_exist,
     run_batch,
@@ -89,7 +89,7 @@ DETECTOR_CLASSES = {
 def create_detector(
     brain_area: str,
     env: Environment,
-    config: DecodingConfig,
+    config: NonLocalDecodingConfig,
     discrete_transition_type,
 ) -> NonLocalClusterlessDetector | NonLocalSortedSpikesDetector:
     """Factory for creating the appropriate detector for a brain area."""
@@ -139,7 +139,7 @@ def perform_decoding(
             place_bin_size=PLACE_BIN_SIZE_2D,
         )
 
-    config = DecodingConfig()
+    config = NonLocalDecodingConfig()
 
     if non_stationary:
         discrete_transition_covariate_data = {
