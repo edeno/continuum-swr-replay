@@ -5,9 +5,9 @@ This figure explains the non-local detector model to the reader in three rows:
 
     Row 1 (Model Structure):
         A: State transition diagram — 4 discrete states with transition arrows
-        B: Observation model schematic — two scenarios side-by-side
-           ("Local wins" and "Non-Local wins"), each showing the four
-           states' likelihoods under that scenario
+        B: Observation model schematic — three scenarios side-by-side
+           ("Local wins", "Non-Local wins", and "No-Spike wins"), each
+           showing the four states' likelihoods under that scenario
 
     Row 2 (Continuous Dynamics):
         C: Self-transition kernels for all four states — Local is uniform
@@ -636,10 +636,10 @@ def generate_figure(n_neurons=30, seed=42):
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──
-    # Panel B contains two scenarios (Local-wins, Non-Local-wins), each a
-    # 2x2 of state cells. width_ratios are tuned so Panel A renders at
-    # roughly the same width as one scenario block; aspect+anchor inside
-    # plot_state_diagram matches the height too.
+    # Panel B contains three scenarios (Local-wins, Non-Local-wins,
+    # No-Spike-wins), each a 2x2 of state cells. width_ratios are tuned so
+    # Panel A renders at roughly the same width as one scenario block;
+    # aspect+anchor inside plot_state_diagram matches the height too.
     gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.6])
 
     ax_a = fig.add_subplot(gs_row0[0])

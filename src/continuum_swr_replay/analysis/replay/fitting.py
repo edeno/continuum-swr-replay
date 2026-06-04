@@ -87,6 +87,13 @@ def fit_conditional_poisson(
     # model use the same |A_e| for every event.
     has_nan = df[required].isna().any(axis=1)
     events_with_nan = df.loc[has_nan, event_col].unique()
+    if len(events_with_nan) > 0:
+        logger.info(
+            "fit_conditional_poisson: dropping %d event(s) with NaN in a required "
+            "column before fitting %s",
+            len(events_with_nan),
+            predictors,
+        )
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
@@ -96,6 +103,12 @@ def fit_conditional_poisson(
 
     n_events = len(np.unique(groups))
     if n_events < 2 * len(predictors):
+        logger.info(
+            "fit_conditional_poisson: %d events < 2*%d predictors; not fitting %s",
+            n_events,
+            len(predictors),
+            predictors,
+        )
         return None
 
     X = df[predictors].values.astype(float)
@@ -104,7 +117,9 @@ def fit_conditional_poisson(
         model = ConditionalPoisson(y, X, groups=groups)
         result = model.fit(disp=0)
     except Exception:
-        logger.warning("ConditionalPoisson failed for predictors %s", predictors)
+        logger.warning(
+            "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
+        )
         return None
 
     coefs = dict(zip(predictors, result.params, strict=True))
@@ -246,16 +261,34 @@ def fit_conditional_logit(
     required = [event_col, response_col] + predictors
     missing = [c for c in required if c not in long_df.columns]
     if missing:
+        logger.warning("fit_conditional_logit missing columns: %s", missing)
         return None
 
-    arm_col = "arm" if "arm" in long_df.columns else "arm_id" if "arm_id" in long_df.columns else None
-    select_cols = required + ([arm_col] if arm_col is not None else [])
+    arm_col = (
+        "arm"
+        if "arm" in long_df.columns
+        else "arm_id"
+        if "arm_id" in long_df.columns
+        else None
+    )
+    # Guard against a duplicate column if the resolved arm column is also
+    # one of the predictors (would otherwise create a same-named column).
+    select_cols = required + (
+        [arm_col] if arm_col is not None and arm_col not in required else []
+    )
     df = long_df[select_cols].copy()
 
     # Event-wise NaN filtering: drop entire events if any row has NaN,
     # consistent with fit_conditional_poisson.
     has_nan = df[required].isna().any(axis=1)
     events_with_nan = df.loc[has_nan, event_col].unique()
+    if len(events_with_nan) > 0:
+        logger.info(
+            "fit_conditional_logit: dropping %d event(s) with NaN in a required "
+            "column before fitting %s",
+            len(events_with_nan),
+            predictors,
+        )
     df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
@@ -279,6 +312,12 @@ def fit_conditional_logit(
     groups = df[event_col].values
     n_events = len(np.unique(groups))
     if n_events < 2 * len(predictors):
+        logger.info(
+            "fit_conditional_logit: %d events < 2*%d predictors; not fitting %s",
+            n_events,
+            len(predictors),
+            predictors,
+        )
         return None
 
     X = df[predictors].values.astype(float)
@@ -287,6 +326,9 @@ def fit_conditional_logit(
         model = ConditionalLogit(y, X, groups=groups)
         result = model.fit(disp=0)
     except Exception:
+        logger.warning(
+            "ConditionalLogit failed for predictors %s", predictors, exc_info=True
+        )
         return None
 
     coefs = dict(zip(predictors, result.params, strict=True))

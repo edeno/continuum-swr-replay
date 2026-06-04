@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Fit the replay content model hierarchy (M0-M6) on pre-computed data.
+"""Fit the replay content model hierarchy (M0-M7) on pre-computed data.
 
 Primary model: Conditional Poisson regression (multinomial-count softmax).
 Robustness check: Conditional Logit on dominant arm.
@@ -271,7 +271,7 @@ def main():
         "--models",
         type=str,
         default=None,
-        help="Comma-separated model names (default: all M0-M6)",
+        help="Comma-separated model names (default: all M0-M7)",
     )
     parser.add_argument(
         "--cv",

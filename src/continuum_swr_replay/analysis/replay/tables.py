@@ -1304,13 +1304,24 @@ def build_event_patch_table(
     patch_eat = patch_eat.drop(columns=["is_after_switch"])
 
     # SWR × patch interactions (P4, PS3). is_swr is event-level — bring
-    # it in from event_table once and reuse for the three products.
+    # it in from event_table once and reuse for the three products. The
+    # column is RETAINED in the output so the patch-level fitter's
+    # ``--swr-subset`` filter (which gates on an ``is_swr`` column) works
+    # for ``--hierarchy patch`` as it does for arm fits.
     # Tolerant of test fixtures that omit is_swr: default to all-False.
     if "is_swr" in event_table.columns:
         swr_col = event_table[["event_id", "is_swr"]].copy()
         patch_eat = patch_eat.merge(swr_col, on="event_id", how="left")
-        is_swr_i = patch_eat["is_swr"].fillna(False).astype(int).to_numpy()
-        patch_eat = patch_eat.drop(columns=["is_swr"])
+        # Every patch-table event_id comes from event_table, so the merge
+        # must be total. Fail loudly rather than fabricate is_swr=False for
+        # an unmatched id (which would silently mislabel SWR status).
+        n_unmatched = int(patch_eat["is_swr"].isna().sum())
+        if n_unmatched > 0:
+            raise ValueError(
+                f"build_event_patch_table: {n_unmatched} patch rows have an "
+                "event_id absent from event_table; is_swr cannot be assigned."
+            )
+        is_swr_i = patch_eat["is_swr"].astype(int).to_numpy()
     else:
         is_swr_i = np.zeros(len(patch_eat), dtype=int)
     patch_eat["swr_x_current_patch"] = (

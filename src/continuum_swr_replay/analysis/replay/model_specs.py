@@ -76,8 +76,6 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   sparse to power.
 - MUA interactions are a separate analysis (split, not interaction)
   to avoid the same collinearity.
-- MUA interactions are a separate analysis (split, not interaction)
-  to avoid the same collinearity.
 """
 
 from __future__ import annotations
