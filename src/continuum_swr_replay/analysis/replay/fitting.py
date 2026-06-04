@@ -28,6 +28,36 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 logger = logging.getLogger(__name__)
 
 
+def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
+    """True iff the within-group-demeaned design is full column rank.
+
+    Conditional Poisson / Logit identify only **within-group** variation:
+    a predictor that is constant within every group (event/stop) is
+    absorbed by the conditioning and is unidentified — statsmodels still
+    returns a finite estimate with an exploding standard error rather than
+    failing. Demeaning each predictor within its group and checking the
+    rank catches that case *and* globally collinear predictors (a
+    duplicated predictor demeans to a collinear column too).
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, n_predictors)
+        Design matrix (no intercept; conditioned out).
+    groups : np.ndarray, shape (n_rows,)
+        Group label per row (the conditioning variable, e.g. event_id).
+
+    Returns
+    -------
+    bool
+        True when every predictor carries within-group variation and the
+        demeaned design is full rank; False if rank-deficient.
+    """
+    if X.shape[1] == 0:
+        return True
+    centered = X - pd.DataFrame(X).groupby(groups).transform("mean").to_numpy()
+    return int(np.linalg.matrix_rank(centered)) == X.shape[1]
+
+
 def fit_conditional_poisson(
     long_df: pd.DataFrame,
     predictors: list[str],
@@ -113,15 +143,14 @@ def fit_conditional_poisson(
 
     X = df[predictors].values.astype(float)
 
-    # Reject rank-deficient designs (e.g. a duplicated or perfectly
-    # collinear predictor). statsmodels would otherwise return a fit with
-    # huge standard errors and finite-but-meaningless p-values / AIC.
-    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+    # Reject designs the conditional model cannot identify: globally
+    # collinear predictors AND predictors with no within-group variation
+    # (constant within every event), which statsmodels would otherwise fit
+    # with finite-but-meaningless coefficients and exploding SEs.
+    if not within_group_full_rank(X, groups):
         logger.warning(
-            "fit_conditional_poisson: rank-deficient design (rank %d < %d "
-            "predictors); not fitting %s",
-            int(np.linalg.matrix_rank(X)),
-            X.shape[1],
+            "fit_conditional_poisson: rank-deficient or within-group-constant "
+            "design; not fitting %s",
             predictors,
         )
         return None
@@ -335,14 +364,13 @@ def fit_conditional_logit(
 
     X = df[predictors].values.astype(float)
 
-    # Reject rank-deficient designs (see fit_conditional_poisson) — a
-    # collinear design yields finite-but-meaningless coefficients/SEs.
-    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+    # Reject designs the conditional model cannot identify (see
+    # fit_conditional_poisson): globally collinear or within-group-constant
+    # predictors yield finite-but-meaningless coefficients/SEs.
+    if not within_group_full_rank(X, groups):
         logger.warning(
-            "fit_conditional_logit: rank-deficient design (rank %d < %d "
-            "predictors); not fitting %s",
-            int(np.linalg.matrix_rank(X)),
-            X.shape[1],
+            "fit_conditional_logit: rank-deficient or within-group-constant "
+            "design; not fitting %s",
             predictors,
         )
         return None

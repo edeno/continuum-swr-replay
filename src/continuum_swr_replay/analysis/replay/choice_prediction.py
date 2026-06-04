@@ -27,6 +27,7 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
 from ._helpers import strict_mean
+from .fitting import within_group_full_rank
 
 logger = logging.getLogger(__name__)
 
@@ -472,14 +473,14 @@ def fit_choice_model(
     X = df[predictors].values.astype(float)
     groups = df[stop_col].values
 
-    # Reject rank-deficient designs — a collinear choice design yields
-    # finite-but-meaningless coefficients/SEs/AIC.
-    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+    # Reject designs the conditional logit cannot identify: globally
+    # collinear predictors AND predictors constant within every stop (no
+    # within-group variation), which fit with finite-but-meaningless
+    # coefficients/SEs/AIC.
+    if not within_group_full_rank(X, groups):
         logger.warning(
-            "choice ConditionalLogit: rank-deficient design (rank %d < %d "
-            "predictors); not fitting %s",
-            int(np.linalg.matrix_rank(X)),
-            X.shape[1],
+            "choice ConditionalLogit: rank-deficient or within-group-constant "
+            "design; not fitting %s",
             predictors,
         )
         return None

@@ -5,7 +5,7 @@ Mirrors the non-local pipeline so non-local / ContFrag-SWR / ContFrag-MUA
 can be compared head-to-head. For a given event source it fits, per
 session:
 
-- Patch hierarchy P0-P3 (conditional Poisson on patch counts)
+- Patch hierarchy P0-P4 (conditional Poisson on patch counts)
 - Rate hierarchy R0/R1 (Poisson on n_events per stop, log-immobility offset)
 - MODEL_PATCH_SWITCH PS0-PS2 (patch conditional Poisson, switch events only)
 - Choice-prediction conditional logit (replay_frac vs behavioral baseline)
@@ -119,7 +119,7 @@ def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
 
 
 def fit_patch_hierarchy(patch_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Fit P0-P3 conditional Poisson per session on patch counts."""
+    """Fit the MODEL_PATCH conditional Poisson hierarchy (P0-P4) per session."""
     return _fit_per_session(patch_table, MODEL_PATCH, _fit_patch_conditional)
 
 
@@ -207,7 +207,10 @@ def main() -> None:
         )
         logger.info("%s [%s]: %s", analysis, src, n)
 
-    out_path = out_dir / f"{src}_comparison_fits.pkl"
+    # Include the brain area: ContFrag sources are per-brain-area, so
+    # SWR/HPC and SWR/mPFC must not overwrite each other. (non_local is
+    # HPC-only; its name is then non_local_HPC.)
+    out_path = out_dir / f"{src}_{args.brain_area}_comparison_fits.pkl"
     with open(out_path, "wb") as f:
         pickle.dump(results, f)
     logger.info("saved %s", out_path)

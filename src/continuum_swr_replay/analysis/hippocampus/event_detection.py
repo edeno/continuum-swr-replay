@@ -309,6 +309,12 @@ def classify_swr_overlap(
     swr_ends = ripple_times["end_time"].to_numpy()
 
     for ev in non_local_events.itertuples():
+        # A zero- (or negative-) duration event has no positive duration to
+        # overlap, so it is non-SWR under the strict convention even if an
+        # SWR spans its instant.
+        if ev.end_time <= ev.start_time:
+            classes.append("non_swr")
+            continue
         # Strict positive-duration overlap. Boundary contact
         # (swr_end == event.start or swr_start == event.end) shares
         # zero duration with the event and is excluded.
@@ -428,6 +434,17 @@ def classify_swr_overlap_geometry(
     event_has_non_swr_time_arr = np.zeros(n_events, dtype=bool)
 
     for i, ev in enumerate(non_local_events.itertuples()):
+        # A zero- (or negative-) duration event has no positive duration to
+        # overlap, so under the strict positive-duration convention it is
+        # non-SWR regardless of any SWR spanning its instant. Without this
+        # guard the open-interval ``overlap_mask`` below would treat a
+        # point strictly inside an SWR as contained.
+        if ev.end_time <= ev.start_time:
+            classes[i] = "non_swr"
+            subclasses[i] = "no_overlap"
+            event_has_non_swr_time_arr[i] = True
+            continue
+
         # Strict positive-duration overlap (see ``classify_swr_overlap``
         # for rationale): a SWR that only touches a boundary of the
         # event shares zero duration and is not an overlap.

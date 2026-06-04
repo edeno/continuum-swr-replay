@@ -471,3 +471,19 @@ def test_time_column_and_rangeindex_use_one_timebase():
     assert ev["overlap_class"] == "swr_contained"
     assert ev["event_start"] == pytest.approx(100 * DT)
     assert ev["matched_swr_start"] == pytest.approx(95 * DT)
+
+
+def test_zero_duration_event_inside_swr_is_non_swr():
+    # A point event [1.0, 1.0] strictly inside an SWR has no positive
+    # duration to overlap; the strict convention classifies it non_swr.
+    from continuum_swr_replay.analysis.hippocampus.event_detection import (
+        classify_swr_overlap,
+        classify_swr_overlap_geometry,
+    )
+
+    events = pd.DataFrame({"start_time": [1.0], "end_time": [1.0]})
+    swrs = pd.DataFrame({"start_time": [0.5], "end_time": [1.5]})
+    assert classify_swr_overlap(events, swrs)["overlap_class"].iloc[0] == "non_swr"
+    geo = classify_swr_overlap_geometry(events, swrs)
+    assert geo["overlap_class"].iloc[0] == "non_swr"
+    assert geo["overlap_subclass"].iloc[0] == "no_overlap"

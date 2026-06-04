@@ -178,3 +178,18 @@ def test_rank_deficient_design_is_rejected():
 
     # Sanity: the single non-duplicated predictor is full-rank and fits.
     assert fit_conditional_poisson(long_df, predictors=["is_prev"]) is not None
+
+
+def test_within_group_constant_predictor_is_rejected():
+    """A predictor that varies across events but is CONSTANT within every
+    event carries no within-group information for a conditional model;
+    statsmodels would fit it with an exploding SE. The within-group rank
+    check must reject it (a raw matrix_rank(X) would not, since the column
+    is globally full-rank)."""
+    long_df = _make_long_df([[3, 1, 1]] * 6)
+    # "ev_level" is constant within each event (all 3 arms share the event
+    # id) but varies across events -> full global rank, zero within-group.
+    long_df["ev_level"] = long_df["event_id"].astype(float)
+
+    assert fit_conditional_poisson(long_df, predictors=["ev_level"]) is None
+    assert fit_conditional_logit(long_df, predictors=["ev_level"]) is None
