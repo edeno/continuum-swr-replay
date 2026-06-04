@@ -472,6 +472,18 @@ def fit_choice_model(
     X = df[predictors].values.astype(float)
     groups = df[stop_col].values
 
+    # Reject rank-deficient designs — a collinear choice design yields
+    # finite-but-meaningless coefficients/SEs/AIC.
+    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+        logger.warning(
+            "choice ConditionalLogit: rank-deficient design (rank %d < %d "
+            "predictors); not fitting %s",
+            int(np.linalg.matrix_rank(X)),
+            X.shape[1],
+            predictors,
+        )
+        return None
+
     try:
         model = ConditionalLogit(y, X, groups=groups)
         result = model.fit(disp=0)

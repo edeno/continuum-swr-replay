@@ -468,3 +468,19 @@ def test_assert_drawn_matches_label_passes_when_consistent():
     chosen = {"swr_contained": pd.Series({"start_time": 1.0, "end_time": 2.0})}
     ripple_times = pd.DataFrame({"start_time": [0.5], "end_time": [2.5]})
     gf2._assert_drawn_matches_label(chosen, ripple_times)  # must not raise
+
+
+def test_time_column_and_rangeindex_use_one_timebase():
+    # A frame with a "time" COLUMN and a default RangeIndex must classify
+    # events against the same axis the SWR intervals use. Under the old
+    # bug (event timing from the index, SWR intervals from the "time"
+    # column) this event would be non_swr; unified, it is swr_contained.
+    frame = _blank_session("m", 1, "01_r1", n=400).reset_index()  # "time" column
+    assert "time" in frame.columns
+    _label(frame, "non_local_event", {1: (100, 110)})
+    _label(frame, "SWR_event", {1: (95, 120)})
+    table = build_classified_nonlocal_event_table(frame)
+    ev = _row(table, "01_r1", 1)
+    assert ev["overlap_class"] == "swr_contained"
+    assert ev["event_start"] == pytest.approx(100 * DT)
+    assert ev["matched_swr_start"] == pytest.approx(95 * DT)

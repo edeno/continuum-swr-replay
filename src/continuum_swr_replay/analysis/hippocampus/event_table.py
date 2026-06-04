@@ -259,6 +259,16 @@ def build_classified_nonlocal_event_table(
 
     column_order = _classified_event_table_columns()
 
+    # Single canonical time source. Event timing below reads ``g.index``
+    # while :func:`intervals_from_labels` prefers a ``"time"`` column when
+    # one is present. If a frame carried both a ``"time"`` column and a
+    # different index, the two reads would classify events against
+    # different timebases. Promote a ``"time"`` column to the index so
+    # both paths read the same axis (no-op for production data_over_time,
+    # which is already time-indexed with no ``"time"`` column).
+    if "time" in dot.columns:
+        dot = dot.set_index("time")
+
     if (dot["non_local_event"] > 0).sum() == 0:
         return pd.DataFrame(columns=column_order)
 

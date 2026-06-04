@@ -55,17 +55,29 @@ for noisy in (
 
 SESS = ["animal", "day", "epoch"]
 
-# event source -> (input directory, table-name suffix)
+# event source -> (input directory, table-name stem). ``None`` stem means
+# the non-local replay-content tables (HPC clusterless only, no suffix).
+# The ContFrag sources are per-brain-area; the brain area is appended at
+# load time so mPFC/OFC outputs aren't silently read as HPC.
 _SOURCES = {
-    "non_local": ("replay_content", ""),
-    "SWR": ("contfrag_replay_content", "_swr_HPC"),
-    "MUA": ("contfrag_replay_content", "_mua_HPC"),
+    "non_local": ("replay_content", None),
+    "SWR": ("contfrag_replay_content", "swr"),
+    "MUA": ("contfrag_replay_content", "mua"),
 }
 
 
-def _load_tables(event_source: str) -> dict[str, pd.DataFrame]:
+def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     """Load event / event_arm / stop tables for an event source."""
-    sub, suffix = _SOURCES[event_source]
+    sub, stem = _SOURCES[event_source]
+    if stem is None:
+        suffix = ""  # non-local replay content is HPC clusterless only
+        if brain_area != "HPC":
+            logger.warning(
+                "event-source 'non_local' is HPC-only; ignoring --brain-area %s",
+                brain_area,
+            )
+    else:
+        suffix = f"_{stem}_{brain_area}"
     d = PROCESSED_DATA_DIR / sub
     tables = {}
     for short, base in [
@@ -162,10 +174,16 @@ def main() -> None:
     parser.add_argument(
         "--event-source", choices=list(_SOURCES), default="non_local"
     )
+    parser.add_argument(
+        "--brain-area",
+        default="HPC",
+        help="Brain area for ContFrag sources (SWR/MUA); ignored for "
+        "non_local (HPC-only). Default: HPC.",
+    )
     args = parser.parse_args()
     src = args.event_source
 
-    tables = _load_tables(src)
+    tables = _load_tables(src, args.brain_area)
     out_dir = PROCESSED_DATA_DIR / "replay_content" / "event_source_comparison"
     out_dir.mkdir(parents=True, exist_ok=True)
 

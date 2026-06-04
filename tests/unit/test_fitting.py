@@ -5,6 +5,7 @@ Pins the behavior of the zero-total-count event filter: both
 events where every arm has zero count, because the conditional
 likelihood (and the logit's dominant-arm logic) is degenerate there.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -53,12 +54,12 @@ def test_fit_conditional_logit_filters_zero_count_events():
     enter the fit as spurious observations."""
     long_df = _make_long_df(
         event_arm_counts=[
-            [0, 0, 0],   # event 1: zero total — must be filtered out
-            [3, 1, 0],   # event 2
-            [0, 2, 1],   # event 3
-            [2, 0, 1],   # event 4
-            [1, 1, 2],   # event 5
-            [4, 1, 0],   # event 6
+            [0, 0, 0],  # event 1: zero total — must be filtered out
+            [3, 1, 0],  # event 2
+            [0, 2, 1],  # event 3
+            [2, 0, 1],  # event 4
+            [1, 1, 2],  # event 5
+            [4, 1, 0],  # event 6
         ]
     )
     result = fit_conditional_logit(long_df, predictors=["is_prev"])
@@ -159,3 +160,21 @@ def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
     # Event 1 rows are ordered arm 1, arm 0, arm 2. Lowest-arm tie-break
     # should therefore mark the second row, not the first.
     np.testing.assert_array_equal(event1_y, np.array([0, 1, 0]))
+
+
+def test_rank_deficient_design_is_rejected():
+    """A perfectly collinear (duplicated) predictor must be rejected, not
+    fit with finite-but-meaningless coefficients. Enough events so the
+    n_events >= 2*n_predictors gate passes and the rank check is what
+    triggers the None."""
+    # 6 events, 3 arms; arm 0 carries the count so the dominant-arm logit
+    # is well defined; all events non-zero count.
+    long_df = _make_long_df([[3, 1, 1]] * 6)
+    long_df["is_prev_dup"] = long_df["is_prev"]  # exact duplicate -> rank 1 of 2
+
+    preds = ["is_prev", "is_prev_dup"]
+    assert fit_conditional_poisson(long_df, predictors=preds) is None
+    assert fit_conditional_logit(long_df, predictors=preds) is None
+
+    # Sanity: the single non-duplicated predictor is full-rank and fits.
+    assert fit_conditional_poisson(long_df, predictors=["is_prev"]) is not None

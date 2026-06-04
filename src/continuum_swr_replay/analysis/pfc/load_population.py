@@ -3,6 +3,7 @@
 Loads and filters the batch PFC GLM results for use by figure04 panel scripts.
 """
 
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,8 @@ import pandas as pd
 from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_animal(nwb_file_name: str) -> str:
@@ -71,10 +74,25 @@ def load_population_data(
         # ``(0, 0)`` array against the expected ``(n_lag_times, k)``,
         # producing a 0-row population matrix and breaking every
         # downstream consumer. Skip such sessions explicitly.
-        if any(
-            arr.ndim != 2 or arr.shape[0] != n_lag_times
-            for arr in (sess_swr, sess_no_swr, sess_nl_swr, sess_nl_no_swr)
-        ):
+        mod_arrays = (sess_swr, sess_no_swr, sess_nl_swr, sess_nl_no_swr)
+        if any(arr.ndim != 2 or arr.shape[0] != n_lag_times for arr in mod_arrays):
+            # Distinguish the legitimate no-neuron placeholder from an
+            # unexpected shape (corrupted file or a stale lag window from
+            # an older run): the latter is silently dropped from the
+            # population otherwise, biasing summaries.
+            if all(arr.shape == (0, 0) for arr in mod_arrays):
+                logger.debug(
+                    "load_population: skipping %s (no surviving neurons)", p.name
+                )
+            else:
+                logger.warning(
+                    "load_population: skipping %s — modulation array shapes %s do "
+                    "not match expected (%d, n); corrupted file or stale lag "
+                    "window?",
+                    p.name,
+                    [a.shape for a in mod_arrays],
+                    n_lag_times,
+                )
             continue
 
         # Cross-session alignment guard. The pickles and the

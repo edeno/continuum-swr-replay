@@ -113,6 +113,19 @@ def fit_conditional_poisson(
 
     X = df[predictors].values.astype(float)
 
+    # Reject rank-deficient designs (e.g. a duplicated or perfectly
+    # collinear predictor). statsmodels would otherwise return a fit with
+    # huge standard errors and finite-but-meaningless p-values / AIC.
+    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+        logger.warning(
+            "fit_conditional_poisson: rank-deficient design (rank %d < %d "
+            "predictors); not fitting %s",
+            int(np.linalg.matrix_rank(X)),
+            X.shape[1],
+            predictors,
+        )
+        return None
+
     try:
         model = ConditionalPoisson(y, X, groups=groups)
         result = model.fit(disp=0)
@@ -321,6 +334,18 @@ def fit_conditional_logit(
         return None
 
     X = df[predictors].values.astype(float)
+
+    # Reject rank-deficient designs (see fit_conditional_poisson) — a
+    # collinear design yields finite-but-meaningless coefficients/SEs.
+    if X.shape[1] > 0 and np.linalg.matrix_rank(X) < X.shape[1]:
+        logger.warning(
+            "fit_conditional_logit: rank-deficient design (rank %d < %d "
+            "predictors); not fitting %s",
+            int(np.linalg.matrix_rank(X)),
+            X.shape[1],
+            predictors,
+        )
+        return None
 
     try:
         model = ConditionalLogit(y, X, groups=groups)
