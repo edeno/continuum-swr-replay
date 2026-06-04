@@ -706,18 +706,38 @@ def build_contfrag_stop_table(
     else:
         per_bout["is_mua_stop"] = False
 
-    # n_events: unique events within the bout during immobility
+    # n_events: assign each event to exactly ONE bout by its start time,
+    # mirroring build_contfrag_event_table's
+    # ``stop_idx = assign_bout(event_start)``. A plain nunique-per-bout
+    # double-counts an event whose immobile timebins straddle two bouts —
+    # possible here because SWR/MUA events come from external detectors and
+    # need not lie within a single immobility bout (unlike the
+    # immobility-defined non-local events of the replay pipeline). That
+    # double-count breaks the cross-table invariant
+    # ``Σ stop_table.n_events == len(event_table)``.
     event_mask = (
         (bout_rows[event_col] > 0) & (bout_rows["head_speed"] < speed_threshold)
     )
     event_rows = bout_rows.loc[event_mask]
-    n_events_per_bout = (
-        event_rows.groupby("_bout_idx")[event_col]
-        .nunique()
-        .reindex(np.arange(n_bouts), fill_value=0)
-        .astype(np.int64)
-        .to_numpy()
-    )
+    if len(event_rows) == 0:
+        n_events_per_bout = np.zeros(n_bouts, dtype=np.int64)
+    else:
+        # One representative start time per event = min in-event timebin
+        # (identical to build_contfrag_event_table's ``event_start``).
+        event_start_per_event = (
+            event_rows.reset_index(names="_event_time")
+            .groupby(event_col)["_event_time"]
+            .min()
+            .to_numpy()
+        )
+        event_bout = assign_bout(event_start_per_event, bout_starts, bout_ends)
+        n_events_per_bout = (
+            pd.Series(event_bout[event_bout >= 0])
+            .value_counts()
+            .reindex(np.arange(n_bouts), fill_value=0)
+            .astype(np.int64)
+            .to_numpy()
+        )
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_events"] = n_events_per_bout
 
