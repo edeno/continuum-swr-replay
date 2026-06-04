@@ -32,7 +32,9 @@ from .model_specs import (
     MODEL_CHOICE,
     MODEL_HIERARCHY,
     MODEL_PATCH,
+    MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
+    MODEL_PATCH_SWR,
     MODEL_RATE,
     ModelSpec,
 )
@@ -71,6 +73,8 @@ __all__ = [
     "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_PATCH",
+    "MODEL_PATCH_MUA",
+    "MODEL_PATCH_SWR",
     "MODEL_PATCH_SWITCH",
     "MODEL_RATE",
     "ModelSpec",

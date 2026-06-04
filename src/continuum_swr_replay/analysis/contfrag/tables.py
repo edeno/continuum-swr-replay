@@ -390,6 +390,8 @@ def build_contfrag_event_table(
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "day", day)
     per_event.insert(2, "epoch", epoch)
+    per_event["event_source"] = event_source
+    per_event["brain_area"] = brain_area
     per_event["event_id"] = _hash_contfrag_event_id(
         per_event, event_source, brain_area
     )
@@ -792,6 +794,8 @@ def build_contfrag_stop_table(
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "day", day)
     per_bout.insert(2, "epoch", epoch)
+    per_bout["event_source"] = event_source
+    per_bout["brain_area"] = brain_area
     per_bout["stop_id"] = hash_stop_id(
         animal,
         day,
@@ -814,6 +818,8 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
         "animal",
         "day",
         "epoch",
+        "event_source",
+        "brain_area",
         event_col,
         "event_id",
         "event_start",
@@ -861,6 +867,8 @@ def _contfrag_stop_table_columns() -> list[str]:
         "animal",
         "day",
         "epoch",
+        "event_source",
+        "brain_area",
         "stop_idx",
         "stop_id",
         "stop_start",
@@ -895,6 +903,8 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "animal",
         "day",
         "epoch",
+        "event_source",
+        "brain_area",
         event_col,
         "event_id",
         "stop_idx",

@@ -223,10 +223,11 @@ def _process_session(
         conditional_posterior=posterior,
     )
 
-    # Stamp brain_area onto every output row. The canonical event_id /
-    # stop_id hashes already incorporate brain_area + event_source so
-    # joins across brain areas would otherwise collide silently.
+    # Stamp provenance onto every output row. The canonical event_id /
+    # stop_id hashes already incorporate brain_area + event_source, but
+    # the columns keep saved tables self-describing.
     for tbl in (event_table, event_arm_table, stop_table):
+        tbl["event_source"] = event_source
         tbl["brain_area"] = brain_area
 
     return {
@@ -344,11 +345,12 @@ def main():
     # Collapse to the event-patch table for the patch-level hierarchy.
     # Built from the concatenated frames so event_id is globally unique
     # (the ContFrag hash already folds in brain_area + event_source),
-    # which build_event_patch_table requires. brain_area is re-stamped
+    # which build_event_patch_table requires. Provenance is re-stamped
     # because the helper only carries the animal/day/epoch session keys.
     event_patch_table_all = build_event_patch_table(
         event_table_all, event_arm_table_all
     )
+    event_patch_table_all["event_source"] = event_source
     event_patch_table_all["brain_area"] = args.brain_area
     logging.info(
         "event_patch rows: %d (= 3 × %d events)",

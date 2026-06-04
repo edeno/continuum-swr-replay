@@ -5,9 +5,12 @@ Mirrors the non-local pipeline so non-local / ContFrag-SWR / ContFrag-MUA
 can be compared head-to-head. For a given event source it fits, per
 session:
 
-- Patch hierarchy P0-P4 (conditional Poisson on patch counts)
-- Rate hierarchy R0/R1 (Poisson on n_events per stop, log-immobility offset)
-- MODEL_PATCH_SWITCH PS0-PS2 (patch conditional Poisson, switch events only)
+- Patch hierarchy P0-P4 for non-local events; P0-P3 for source-restricted
+  SWR/MUA events where SWR interaction terms are not identifiable
+- Rate hierarchy R0-R3, except SWR-source events stop at R2 because
+  ``is_swr_stop`` is tautological with an SWR-defined event count
+- MODEL_PATCH_SWITCH PS0-PS3 for non-local events; PS0-PS2 for
+  source-restricted SWR/MUA events
 - Choice-prediction conditional logit (replay_frac vs behavioral baseline)
 - Switch-aligned replay content (frac on/off current patch by lag)
 
@@ -26,13 +29,16 @@ from __future__ import annotations
 import argparse
 import logging
 import pickle
+from pathlib import Path
 
 import pandas as pd
 
 from continuum_swr_replay.analysis.replay import (
     MODEL_CHOICE,
     MODEL_PATCH,
+    MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
+    MODEL_PATCH_SWR,
     MODEL_RATE,
     build_choice_dataset,
     build_event_patch_table,
@@ -66,18 +72,77 @@ _SOURCES = {
 }
 
 
+def _effective_brain_area(event_source: str, brain_area: str) -> str:
+    """Return the data brain area actually used for this event source."""
+    if event_source == "non_local":
+        return "HPC"
+    return brain_area
+
+
+def _patch_models_for_source(event_source: str):
+    """Patch hierarchy valid for the event-source definition."""
+    if event_source == "SWR":
+        return MODEL_PATCH_SWR
+    if event_source == "MUA":
+        return MODEL_PATCH_MUA
+    return MODEL_PATCH
+
+
+def _patch_switch_models_for_source(event_source: str):
+    """Switch hierarchy valid for the event-source definition."""
+    if event_source in {"SWR", "MUA"}:
+        return {name: MODEL_PATCH_SWITCH[name] for name in ("PS0", "PS1", "PS2")}
+    return MODEL_PATCH_SWITCH
+
+
+def _rate_models_for_source(event_source: str):
+    """Rate hierarchy valid for the event-source definition."""
+    if event_source == "SWR":
+        return {name: MODEL_RATE[name] for name in ("R0", "R1", "R2")}
+    return MODEL_RATE
+
+
+def _comparison_metadata(event_source: str, brain_area: str) -> dict[str, object]:
+    """Provenance and interpretation metadata saved with comparison fits."""
+    effective_area = _effective_brain_area(event_source, brain_area)
+    return {
+        "event_source": event_source,
+        "brain_area": effective_area,
+        "requested_brain_area": brain_area,
+        "same_identified_events": False,
+        "comparison_kind": "event-definition head-to-head",
+        "event_definition_note": (
+            "Different event sources intentionally define different event sets; "
+            "head-to-head means the same analysis suite on each field-standard "
+            "event definition, not matched event identities across sources."
+        ),
+        "patch_models": tuple(_patch_models_for_source(event_source)),
+        "patch_switch_models": tuple(_patch_switch_models_for_source(event_source)),
+        "rate_models": tuple(_rate_models_for_source(event_source)),
+    }
+
+
+def _comparison_output_path(
+    out_dir: Path, event_source: str, brain_area: str
+) -> Path:
+    """Comparison pickle path keyed by the effective data source."""
+    effective_area = _effective_brain_area(event_source, brain_area)
+    return out_dir / f"{event_source}_{effective_area}_comparison_fits.pkl"
+
+
 def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     """Load event / event_arm / stop tables for an event source."""
     sub, stem = _SOURCES[event_source]
+    effective_area = _effective_brain_area(event_source, brain_area)
     if stem is None:
         suffix = ""  # non-local replay content is HPC clusterless only
-        if brain_area != "HPC":
+        if brain_area != effective_area:
             logger.warning(
                 "event-source 'non_local' is HPC-only; ignoring --brain-area %s",
                 brain_area,
             )
     else:
-        suffix = f"_{stem}_{brain_area}"
+        suffix = f"_{stem}_{effective_area}"
     d = PROCESSED_DATA_DIR / sub
     tables = {}
     for short, base in [
@@ -118,28 +183,38 @@ def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
     )
 
 
-def fit_patch_hierarchy(patch_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Fit the MODEL_PATCH conditional Poisson hierarchy (P0-P4) per session."""
-    return _fit_per_session(patch_table, MODEL_PATCH, _fit_patch_conditional)
+def fit_patch_hierarchy(
+    patch_table: pd.DataFrame, event_source: str
+) -> dict[str, pd.DataFrame]:
+    """Fit the source-appropriate patch hierarchy per session."""
+    return _fit_per_session(
+        patch_table, _patch_models_for_source(event_source), _fit_patch_conditional
+    )
 
 
 def fit_patch_switch(
-    patch_table: pd.DataFrame, event_arm_table: pd.DataFrame
+    patch_table: pd.DataFrame, event_arm_table: pd.DataFrame, event_source: str
 ) -> dict[str, pd.DataFrame]:
-    """Fit PS0-PS2 on switch events only (is_after_switch == 1)."""
+    """Fit source-appropriate switch patch models on switch events only."""
     sw = event_arm_table.groupby("event_id")["is_after_switch"].first()
     switch_patch = patch_table.merge(
         sw.rename("is_after_switch"), left_on="event_id", right_index=True, how="left"
     )
     switch_patch = switch_patch[switch_patch["is_after_switch"] == 1]
-    return _fit_per_session(switch_patch, MODEL_PATCH_SWITCH, _fit_patch_conditional)
+    return _fit_per_session(
+        switch_patch,
+        _patch_switch_models_for_source(event_source),
+        _fit_patch_conditional,
+    )
 
 
-def fit_rate_hierarchy(stop_table: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Fit the MODEL_RATE Poisson rate models (R0/R1) per session."""
+def fit_rate_hierarchy(
+    stop_table: pd.DataFrame, event_source: str
+) -> dict[str, pd.DataFrame]:
+    """Fit the source-appropriate Poisson rate hierarchy per session."""
     return _fit_per_session(
         stop_table,
-        MODEL_RATE,
+        _rate_models_for_source(event_source),
         lambda g, spec: fit_rate_model(g, list(spec.predictors), min_stops=20),
     )
 
@@ -193,13 +268,18 @@ def main() -> None:
     )
 
     results = {
-        "patch_hierarchy": fit_patch_hierarchy(patch_table),
-        "patch_switch": fit_patch_switch(patch_table, tables["event_arm_table"]),
-        "rate_hierarchy": fit_rate_hierarchy(tables["stop_table"]),
+        "metadata": _comparison_metadata(src, args.brain_area),
+        "patch_hierarchy": fit_patch_hierarchy(patch_table, src),
+        "patch_switch": fit_patch_switch(
+            patch_table, tables["event_arm_table"], src
+        ),
+        "rate_hierarchy": fit_rate_hierarchy(tables["stop_table"], src),
         "choice": fit_choice(tables),
         "switch_aligned": run_switch_aligned(tables),
     }
     for analysis, res in results.items():
+        if analysis == "metadata":
+            continue
         n = (
             len(res)
             if isinstance(res, pd.DataFrame)
@@ -210,7 +290,7 @@ def main() -> None:
     # Include the brain area: ContFrag sources are per-brain-area, so
     # SWR/HPC and SWR/mPFC must not overwrite each other. (non_local is
     # HPC-only; its name is then non_local_HPC.)
-    out_path = out_dir / f"{src}_{args.brain_area}_comparison_fits.pkl"
+    out_path = _comparison_output_path(out_dir, src, args.brain_area)
     with open(out_path, "wb") as f:
         pickle.dump(results, f)
     logger.info("saved %s", out_path)
