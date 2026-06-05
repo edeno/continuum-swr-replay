@@ -1,17 +1,19 @@
-"""Regression: ContFrag stop-table ``n_events`` must count each event once.
+"""Regression: ContFrag uses the all-immobile (max) event-inclusion rule.
 
 ContFrag events come from external detectors (SWR/MUA), so a single event
-label can span a brief mid-event movement that splits the surrounding
-immobility into two bouts. ``build_contfrag_stop_table`` used to count
-``n_events`` as ``nunique(event_col)`` per bout, double-counting such a
-straddling event, while ``build_contfrag_event_table`` emits it as one row
-(assigned to a single stop by ``event_start``). That broke the cross-table
-invariant ``Σ stop_table.n_events == len(event_table)`` and made
-``prepare_contfrag_replay_content_data.py`` refuse to write any output.
+label can span real movement (an immobile → run → immobile sequence; for
+MUA, up to ~23 s — see ``docs/known_issues/degenerate_mua_events.md``).
+Such an event's immobile timebins fall in two immobility bouts, which under
+the old per-timebin inclusion rule made the stop-table ``n_events``
+double-count it relative to the (atomic) event table — breaking
+``Σ stop_table.n_events == len(event_table)`` and making
+``prepare_contfrag_replay_content_data.py`` refuse to write output.
 
-The fix assigns each event to the single bout of its ``event_start`` when
-counting ``n_events`` — mirroring the event table — so a straddling event
-is counted exactly once.
+The builders now include an event only if *every* timebin is immobile
+(``_in_contfrag_event_mask``), so movement-spanning events are excluded
+entirely (matching the model-detected non-local events' effective gating
+and making the event-source comparison apples-to-apples). This removes the
+straddle by construction and keeps the cross-table invariant.
 """
 
 from __future__ import annotations
@@ -72,16 +74,22 @@ def _empty_trials() -> pd.DataFrame:
     )
 
 
-def _straddling_dot() -> pd.DataFrame:
-    """One SWR event (label 1) whose immobile timebins span two bouts.
+def _two_event_dot() -> pd.DataFrame:
+    """Two SWR events: one movement-spanning, one fully immobile.
 
-    Layout (per sample): 5 mobile pad | 8 immobile (block A) | 4 mobile
-    gap | 8 immobile (block B) | 5 mobile pad. ``SWR_event = 1`` over
-    A+gap+B, so the in-event (SWR>0 & immobile) rows are A ∪ B — two
-    distinct immobility bouts (the mobile gap splits them).
+    Layout (per sample): 5 mobile pad |
+      event 1: 6 immobile (A) | 4 mobile gap | 6 immobile (B) |
+      5 mobile pad |
+      event 2: 8 immobile |
+      5 mobile pad.
+
+    ``SWR_event = 1`` over A+gap+B (a single event spanning real movement —
+    the old "straddler"); ``SWR_event = 2`` over the fully-immobile block.
+    Under the all-immobile (max) rule, event 1 is excluded (it contains
+    mobile bins) and event 2 is included exactly once.
     """
-    pad, blockA, gap, blockB = 5, 8, 4, 8
-    total = pad + blockA + gap + blockB + pad
+    pad, a, gap, b, ev2 = 5, 6, 4, 6, 8
+    total = pad + a + gap + b + pad + ev2 + pad
     idx = pd.Index(np.arange(total, dtype=float) * 0.01, name="time")
 
     dot = pd.DataFrame(
@@ -99,41 +107,48 @@ def _straddling_dot() -> pd.DataFrame:
         },
         index=idx,
     )
+    swr = dot.columns.get_loc("SWR_event")
+    spd = dot.columns.get_loc("head_speed")
+    mp = dot.columns.get_loc("map_estimate")
+    ts = dot.columns.get_loc("track_segment_id")
 
-    a0, a1 = pad, pad + blockA
-    b0, b1 = a1 + gap, a1 + gap + blockB
+    a0, a1 = pad, pad + a
+    g1 = a1 + gap
+    b0, b1 = g1, g1 + b
+    e0, e1 = b1 + pad, b1 + pad + ev2
 
-    # SWR label spans both blocks AND the mobile gap (single event).
-    dot.iloc[a0:b1, dot.columns.get_loc("SWR_event")] = 1
-    # Immobile only in the two blocks; the gap stays mobile -> 2 bouts.
-    dot.iloc[a0:a1, dot.columns.get_loc("head_speed")] = 1.0
-    dot.iloc[b0:b1, dot.columns.get_loc("head_speed")] = 1.0
-    # Real-arm decoding on the in-event blocks (arm 0's first place bin).
-    dot.iloc[a0:a1, dot.columns.get_loc("map_estimate")] = 0.0
-    dot.iloc[b0:b1, dot.columns.get_loc("map_estimate")] = 0.0
-    dot.iloc[a0:a1, dot.columns.get_loc("track_segment_id")] = 0.0
-    dot.iloc[b0:b1, dot.columns.get_loc("track_segment_id")] = 0.0
+    # Event 1: spans A + mobile gap + B (movement-spanning).
+    dot.iloc[a0:b1, swr] = 1
+    dot.iloc[a0:a1, spd] = 1.0  # A immobile
+    dot.iloc[b0:b1, spd] = 1.0  # B immobile; gap stays mobile (10.0)
+    # Event 2: fully immobile block.
+    dot.iloc[e0:e1, swr] = 2
+    dot.iloc[e0:e1, spd] = 1.0
+    # Real-arm decoding on every SWR-labelled bin (arm 0's first place bin).
+    for lo, hi in ((a0, a1), (b0, b1), (e0, e1)):
+        dot.iloc[lo:hi, mp] = 0.0
+        dot.iloc[lo:hi, ts] = 0.0
     return dot
 
 
-def test_straddling_event_counted_once_cross_table_invariant():
-    dot = _straddling_dot()
+def test_movement_spanning_event_excluded_invariant_holds():
+    dot = _two_event_dot()
     env, graph, trials = _EnvStub(), _bandit_graph(), _empty_trials()
 
     ev = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
     stop = build_contfrag_stop_table(dot, trials, graph, event_source="SWR")
 
-    # Precondition: the fixture really straddles — the single SWR event's
-    # immobile timebins fall in two distinct immobility bouts.
-    assert len(ev) == 1, f"expected exactly one event; got {len(ev)}"
-    assert int(stop["is_swr_stop"].sum()) == 2, (
-        "fixture should place the SWR event's immobile bins in two bouts"
-    )
+    # Precondition: event 1 genuinely spans movement (has mobile SWR bins),
+    # so it is exactly the case the max rule must exclude.
+    swr1 = dot[dot["SWR_event"] == 1]
+    assert (swr1["head_speed"] >= 4.0).any(), "event 1 must contain a mobile bin"
 
-    # The invariant the prepare-script gate enforces.
+    # Under all-immobile: only the fully-immobile event 2 survives.
+    assert len(ev) == 1, f"expected only the immobile event; got {len(ev)}"
+    assert int(ev["SWR_event"].iloc[0]) == 2
+    assert 1 not in set(ev["SWR_event"]), "movement-spanning event 1 must be excluded"
+
+    # Cross-table invariant holds: the excluded event is counted nowhere.
     assert int(stop["n_events"].sum()) == len(ev) == 1, (
-        f"Σ stop.n_events={int(stop['n_events'].sum())} != "
-        f"len(event_table)={len(ev)} — straddling event double-counted."
+        f"Σ stop.n_events={int(stop['n_events'].sum())} != len(event_table)={len(ev)}"
     )
-    # The event is attributed to exactly one bout (the one with its start).
-    assert sorted(stop["n_events"].tolist()) == [0, 1]

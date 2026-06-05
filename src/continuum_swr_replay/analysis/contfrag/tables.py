@@ -94,11 +94,50 @@ def _in_contfrag_event_mask(
 ) -> pd.Series:
     """Boolean mask for in-event timebins using external event detectors.
 
-    A row is in-event iff the external detector flagged it (SWR_event > 0
-    or MUA_event > 0) AND the animal was immobile.
+    Immobility is evaluated at the **event level with the all-immobile
+    ("max") rule**: an externally-detected event (a contiguous run of
+    ``SWR_event`` / ``MUA_event``) is in-event iff *every* one of its
+    timebins is below ``speed_threshold``. All timebins of a qualifying
+    event are returned; events containing any mobile timebin are excluded
+    entirely.
+
+    Why all-immobile rather than per-timebin or endpoints:
+
+    - **Per-timebin** (``label > 0 & speed < thr``) keeps only the immobile
+      bins of an event and drops the mobile ones. When an event spans a
+      brief movement, its immobile bins land in two immobility bouts, so
+      the stop-table count and the (atomic) event table disagree —
+      breaking ``Σ stop.n_events == len(event_table)``.
+    - **Endpoints** (first & last bin immobile) admits movement-spanning
+      events as single atomic events — e.g. the degenerate multi-second
+      ``MUA_event`` labels (up to ~23 s) documented in
+      ``docs/known_issues/degenerate_mua_events.md``, which run through real
+      locomotion.
+    - **All-immobile** excludes exactly those movement-spanning events,
+      cannot straddle bouts by construction, and matches the effective
+      gating of the model-detected non-local events (which only exist
+      during immobility) — so the event-source comparison is
+      apples-to-apples.
+
+    Excluded fraction is small (~0.5% SWR, ~0.7% MUA across HPC sessions).
     """
     event_col = _resolve_event_col(event_source)
-    return (dot[event_col] > 0) & (dot["head_speed"] < speed_threshold)
+    label = dot[event_col].to_numpy()
+    speed = dot["head_speed"].to_numpy()
+    in_label = label > 0
+    mask = np.zeros(len(dot), dtype=bool)
+    if not in_label.any():
+        return pd.Series(mask, index=dot.index)
+    # Per-event (per label) max head-speed, broadcast back to the event's
+    # rows; the event qualifies iff that max is below threshold.
+    event_max_speed = (
+        pd.Series(speed[in_label], index=label[in_label])
+        .groupby(level=0)
+        .transform("max")
+        .to_numpy()
+    )
+    mask[in_label] = event_max_speed < speed_threshold
+    return pd.Series(mask, index=dot.index)
 
 
 def _hash_contfrag_event_id(
@@ -209,7 +248,9 @@ def build_contfrag_event_table(
         Continuous), ``continuous_fraction``.
     """
     if "animal" not in dot.columns:
-        raise KeyError("dot must carry 'animal' column (set by get_contfrag_data_over_time)")
+        raise KeyError(
+            "dot must carry 'animal' column (set by get_contfrag_data_over_time)"
+        )
     animal = str(dot["animal"].iloc[0])
     day = int(dot["day"].iloc[0])
     epoch = str(dot["epoch"].iloc[0])
@@ -322,8 +363,7 @@ def build_contfrag_event_table(
             "reward_outcome": reward_outcome,
             "is_stay": float(arm_to_patch(next_arm) == arm_to_patch(current_arm))
             if not (
-                np.isnan(arm_to_patch(next_arm))
-                or np.isnan(arm_to_patch(current_arm))
+                np.isnan(arm_to_patch(next_arm)) or np.isnan(arm_to_patch(current_arm))
             )
             else np.nan,
             "n_timebins": len(g),
@@ -392,9 +432,7 @@ def build_contfrag_event_table(
     per_event.insert(2, "epoch", epoch)
     per_event["event_source"] = event_source
     per_event["brain_area"] = brain_area
-    per_event["event_id"] = _hash_contfrag_event_id(
-        per_event, event_source, brain_area
-    )
+    per_event["event_id"] = _hash_contfrag_event_id(per_event, event_source, brain_area)
 
     # stop_id
     stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
@@ -500,9 +538,7 @@ def build_contfrag_event_arm_table(
     # also includes junction / missing-arm bins) silently shrinks the
     # fraction sum below 1 — the user verified a 5-real / 5-junction
     # event sums to 0.5.
-    n_real_long = (
-        long["n_timebins"].to_numpy() - long["n_junction_bins"].to_numpy()
-    )
+    n_real_long = long["n_timebins"].to_numpy() - long["n_junction_bins"].to_numpy()
     with np.errstate(divide="ignore", invalid="ignore"):
         frac = np.where(
             n_real_long > 0,
@@ -686,9 +722,7 @@ def build_contfrag_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
-    per_bout["recent_trial_reward_rate"] = recent_trial_reward_rate(
-        bout_starts, trials
-    )
+    per_bout["recent_trial_reward_rate"] = recent_trial_reward_rate(bout_starts, trials)
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -706,24 +740,18 @@ def build_contfrag_stop_table(
     else:
         per_bout["is_mua_stop"] = False
 
-    # n_events: assign each event to exactly ONE bout by its start time,
-    # mirroring build_contfrag_event_table's
-    # ``stop_idx = assign_bout(event_start)``. A plain nunique-per-bout
-    # double-counts an event whose immobile timebins straddle two bouts —
-    # possible here because SWR/MUA events come from external detectors and
-    # need not lie within a single immobility bout (unlike the
-    # immobility-defined non-local events of the replay pipeline). That
-    # double-count breaks the cross-table invariant
-    # ``Σ stop_table.n_events == len(event_table)``.
-    event_mask = (
-        (bout_rows[event_col] > 0) & (bout_rows["head_speed"] < speed_threshold)
-    )
-    event_rows = bout_rows.loc[event_mask]
+    # n_events: count each included event once, in the bout of its
+    # event_start — mirroring build_contfrag_event_table
+    # (``stop_idx = assign_bout(event_start)``) and using the SAME
+    # all-immobile inclusion mask, so the population matches the event
+    # table and ``Σ stop.n_events == len(event_table)`` holds by
+    # construction. (All-immobile events cannot straddle bouts, but
+    # counting by event_start keeps the two tables aligned regardless.)
+    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    event_rows = dot.loc[in_event]
     if len(event_rows) == 0:
         n_events_per_bout = np.zeros(n_bouts, dtype=np.int64)
     else:
-        # One representative start time per event = min in-event timebin
-        # (identical to build_contfrag_event_table's ``event_start``).
         event_start_per_event = (
             event_rows.reset_index(names="_event_time")
             .groupby(event_col)["_event_time"]
