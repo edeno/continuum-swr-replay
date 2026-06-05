@@ -417,7 +417,7 @@ def plot_observation_models(fig, gs_slot):
 
     # Keep the three observation scenarios visually grouped: the internal
     # spacing is tighter than the A/B panel separation in the outer grid.
-    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.08)
+    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.04)
 
     scenarios = [
         # (header, animal_pos, scenario_kind)
@@ -923,7 +923,7 @@ def generate_figure(n_neurons=30, seed=42):
     gs_main = GridSpec(
         3, 1, figure=fig,
         height_ratios=[0.70, 0.55, 1.50],
-        hspace=0.14,
+        hspace=0.16,
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──
