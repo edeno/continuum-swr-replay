@@ -415,10 +415,9 @@ def plot_observation_models(fig, gs_slot):
     likelihood_center = 0.4
     likelihood = np.exp(-0.5 * ((x - likelihood_center) / 0.10) ** 2)
 
-    # One row of three scenario plots. Titles are drawn directly on each
-    # plot via ``set_title`` so they sit close to the data rather than in a
-    # separate title axes above.
-    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.20)
+    # Keep the three observation scenarios visually grouped: the internal
+    # spacing is tighter than the A/B panel separation in the outer grid.
+    gs_outer = gs_slot.subgridspec(1, 3, wspace=0.08)
 
     scenarios = [
         # (header, animal_pos, scenario_kind)
@@ -935,7 +934,7 @@ def generate_figure(n_neurons=30, seed=42):
         2, 2,
         height_ratios=[0.12, 1.0],
         hspace=0.03,
-        wspace=0.10,
+        wspace=0.14,
         width_ratios=[1, 2.8],
     )
 
