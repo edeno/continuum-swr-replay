@@ -39,6 +39,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
+from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
@@ -71,6 +72,22 @@ STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
 NON_LOCAL_PROB_THRESHOLD = 0.8
+
+
+def add_panel_header(ax, title):
+    """Draw a centered panel-level header on a dedicated header axes."""
+    ax.axis("off")
+    ax.text(
+        0.5,
+        0.65,
+        title,
+        ha="center",
+        va="center",
+        fontsize=7,
+        fontweight="bold",
+        color="#222222",
+        transform=ax.transAxes,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -138,9 +155,9 @@ def plot_state_diagram(ax):
             (x2 - dx / dist * shrink, y2 - dy / dist * shrink),
             arrowstyle="<->,head_length=3,head_width=1.7",
             mutation_scale=1,
-            linewidth=0.65,
-            color="black",
-            alpha=0.28,
+            linewidth=0.8,
+            color="#555555",
+            alpha=0.55,
             zorder=4,
         )
         ax.add_patch(arrow)
@@ -282,11 +299,16 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
         nonlocal_curve = likelihood
         nospike_y = 0.10
     elif scenario_kind == "nospike":
-        # Empty bin: same Local/Non-Local relationship as above, scaled
-        # down so the No-Spike line sits clearly above their peaks.
+        # Empty bin schematic: make the position-dependent alternatives
+        # broad and low so the reader sees weak spatial evidence, with
+        # the bin-less No-Spike likelihood clearly winning.
         nospike_scale = 0.30
-        local_curve = likelihood * kernel * nospike_scale
-        nonlocal_curve = likelihood * nospike_scale
+        broad_nonlocal = np.exp(-0.5 * ((x - animal_pos) / 0.50) ** 2)
+        broad_local_kernel = 0.70 + 0.30 * np.exp(
+            -0.5 * ((x - animal_pos) / 0.40) ** 2
+        )
+        nonlocal_curve = nospike_scale * (0.82 + 0.18 * broad_nonlocal)
+        local_curve = nonlocal_curve * broad_local_kernel
         nospike_y = 0.70
     else:
         raise ValueError(f"Unknown scenario_kind: {scenario_kind!r}")
@@ -314,12 +336,16 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
 
     ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
                linestyle="-")
-    if scenario_kind == "local":
-        ax.text(
-            animal_pos + 0.035, 1.10, "animal\nposition",
-            color=ANIMAL_POS_COLOR, fontsize=5.5,
-            ha="left", va="center", linespacing=0.85,
-        )
+    animal_label_y = {
+        "local": 1.10,
+        "nonlocal": 0.98,
+        "nospike": 1.10,
+    }
+    ax.text(
+        animal_pos + 0.035, animal_label_y[scenario_kind], "Animal Position",
+        color=ANIMAL_POS_COLOR, fontsize=5.5,
+        ha="left", va="center",
+    )
 
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.05, 1.25)
@@ -435,7 +461,29 @@ def plot_transition_kernels(fig, gs_slot):
     - Non-Local Fragmented → Non-Local Fragmented: Uniform (jump to any
       position).
     """
-    gs_inner = gs_slot.subgridspec(1, 4, wspace=0.25)
+    side_margin = 0.45
+    group_left = side_margin / (4 + 2 * side_margin)
+    group_right = 1 - group_left
+    gs_inner = gs_slot.subgridspec(
+        2, 6,
+        height_ratios=[0.13, 1.0],
+        width_ratios=[side_margin, 1, 1, 1, 1, side_margin],
+        hspace=0.03,
+        wspace=0.06,
+    )
+
+    header_ax = fig.add_subplot(gs_inner[0, :])
+    add_panel_header(header_ax, "Continuous position transitions")
+    header_ax.text(
+        group_right,
+        0.65,
+        "Color = transition probability",
+        ha="right",
+        va="center",
+        fontsize=5.5,
+        color="#555555",
+        transform=header_ax.transAxes,
+    )
 
     n_bins = 50
     configs = [
@@ -467,9 +515,9 @@ def plot_transition_kernels(fig, gs_slot):
         },
     ]
 
-    axes = []
+    axes = [header_ax]
     for idx, config in enumerate(configs):
-        sub_ax = fig.add_subplot(gs_inner[idx])
+        sub_ax = fig.add_subplot(gs_inner[1, idx + 1])
         axes.append(sub_ax)
 
         if config["kind"] == "scalar":
@@ -516,7 +564,7 @@ def plot_transition_kernels(fig, gs_slot):
                 sub_ax.text(
                     2,
                     anchor_y + 2,
-                    "animal\nposition",
+                    "Animal\nPosition",
                     color=ANIMAL_POS_COLOR,
                     fontsize=5.3,
                     ha="left",
@@ -539,9 +587,13 @@ def plot_transition_kernels(fig, gs_slot):
                 interpolation="nearest", origin="lower",
             )
 
-        for spine in sub_ax.spines.values():
-            spine.set_edgecolor(config["color"])
-            spine.set_linewidth(1.5)
+        if config["kind"] == "scalar":
+            for spine in sub_ax.spines.values():
+                spine.set_visible(False)
+        else:
+            for spine in sub_ax.spines.values():
+                spine.set_edgecolor(config["color"])
+                spine.set_linewidth(1.5)
 
         sub_ax.set_xticks([])
         sub_ax.set_yticks([])
@@ -604,9 +656,23 @@ def shade_non_local_intervals(axes, intervals):
             ax.axvspan(
                 start, end,
                 color=COLORS["Non-Local"],
-                alpha=0.08,
+                alpha=0.14,
                 linewidth=0,
                 zorder=2.5,
+            )
+            ax.axvline(
+                start,
+                color=COLORS["Non-Local"],
+                alpha=0.25,
+                linewidth=0.45,
+                zorder=2.6,
+            )
+            ax.axvline(
+                end,
+                color=COLORS["Non-Local"],
+                alpha=0.25,
+                linewidth=0.45,
+                zorder=2.6,
             )
 
 
@@ -728,14 +794,37 @@ def plot_non_local_decision(
         fontsize=5.5,
         color="#555555",
     )
-    ax.text(
-        time[0] + 0.01 * (time[-1] - time[0]),
-        0.96,
-        "P(non-local) = P(continuous) + P(fragmented)",
-        ha="left",
-        va="top",
-        fontsize=5.5,
-        color=COLORS["Non-Local"],
+    equation_text = [
+        ("P(non-local) = ", COLORS["Non-Local"]),
+        ("P(continuous)", STATE_COLORS_SHORT[2]),
+        (" + ", COLORS["Non-Local"]),
+        ("P(fragmented)", STATE_COLORS_SHORT[3]),
+    ]
+    equation = HPacker(
+        children=[
+            TextArea(
+                text,
+                textprops={
+                    "fontsize": 5.5,
+                    "color": color,
+                },
+            )
+            for text, color in equation_text
+        ],
+        align="baseline",
+        pad=0,
+        sep=1.0,
+    )
+    ax.add_artist(
+        AnchoredOffsetbox(
+            loc="lower right",
+            child=equation,
+            pad=0.0,
+            frameon=False,
+            bbox_to_anchor=(0.985, 0.16),
+            bbox_transform=ax.transAxes,
+            borderpad=0.0,
+        )
     )
     ax.set_ylabel("Non-local\nprob.", fontsize=7, labelpad=4)
     ax.set_ylim(0, 1.05)
@@ -834,7 +923,7 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[0.78, 0.52, 1.45],
+        height_ratios=[0.70, 0.55, 1.50],
         hspace=0.14,
     )
 
@@ -842,12 +931,24 @@ def generate_figure(n_neurons=30, seed=42):
     # Panel B contains three scenarios (Local-wins, Non-Local-wins,
     # No-Spike-wins). width_ratios are tuned so Panel A can carry the
     # transition topology without crowding Panel B's likelihood scenarios.
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.10, width_ratios=[1, 2.8])
+    gs_row0 = gs_main[0].subgridspec(
+        2, 2,
+        height_ratios=[0.12, 1.0],
+        hspace=0.03,
+        wspace=0.10,
+        width_ratios=[1, 2.8],
+    )
 
-    ax_a = fig.add_subplot(gs_row0[0])
+    ax_a_header = fig.add_subplot(gs_row0[0, 0])
+    add_panel_header(ax_a_header, "Discrete states and transitions")
+
+    ax_a = fig.add_subplot(gs_row0[1, 0])
     plot_state_diagram(ax_a)
 
-    b_axes = plot_observation_models(fig, gs_row0[1])
+    ax_b_header = fig.add_subplot(gs_row0[0, 1])
+    add_panel_header(ax_b_header, "Observation likelihoods")
+
+    b_axes = plot_observation_models(fig, gs_row0[1, 1])
 
     # ── Row 1: Transition Kernels (c) ──
     kernel_axes = plot_transition_kernels(fig, gs_main[1])
@@ -875,15 +976,17 @@ def generate_figure(n_neurons=30, seed=42):
     panel_d_axes = [ax_raster, ax_posterior, ax_states, ax_nonlocal, ax_speed]
     for a in panel_d_axes:
         a.set_xlim(time[0], time[-1])
+
+    # Mark non-local events only on the neural/model rows. The speed row
+    # carries its own immobility threshold cue.
     shade_non_local_intervals(
-        panel_d_axes, non_local_intervals,
+        [ax_raster, ax_posterior, ax_states, ax_nonlocal],
+        non_local_intervals,
     )
 
     # ── Panel Labels ──
-    label_panels(
-        [ax_a, b_axes[0], kernel_axes[0], ax_raster],
-        labels=["a", "b", "c", "d"],
-    )
+    label_panels([ax_a_header, ax_b_header, ax_raster], labels=["a", "b", "d"])
+    label_panels([kernel_axes[0]], labels=["c"], xpos=-0.02)
 
     return fig
 
