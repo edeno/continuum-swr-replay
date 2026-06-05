@@ -6,8 +6,8 @@ This figure explains the non-local detector model to the reader in three rows:
     Row 1 (Model Structure):
         A: State transition diagram — 4 discrete states with transition arrows
         B: Observation model schematic — three scenarios side-by-side
-           ("Local wins", "Non-Local wins", and "No-Spike wins"), each
-           showing the four states' likelihoods under that scenario
+           ("Local wins", "Non-Local wins", and "No-Spike wins"), each showing
+           Local, No-Spike, and merged Non-Local observation likelihoods
 
     Row 2 (Continuous Dynamics):
         C: Self-transition kernels for all four states — Local is uniform
@@ -16,7 +16,8 @@ This figure explains the non-local detector model to the reader in three rows:
            Gaussian random walk, Fragmented is uniform.
 
     Row 3 (Simulated Example — single panel D):
-        Spike raster, non-local posterior, state probabilities, speed
+        Spike raster, non-local posterior, four state probabilities,
+        collapsed non-local probability with decision threshold, speed
 
 The narrative flow is: what are the states → how do they interpret spikes →
 how do their spatial dynamics differ → what does the output look like.
@@ -49,7 +50,11 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+from continuum_swr_replay.parameters import (
+    COLORS,
+    LOCAL_POSITION_STD,
+    MAX_SPEED_THRESHOLD_CM_PER_SEC,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -65,6 +70,7 @@ STATE_COLORS = {
 STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
+NON_LOCAL_PROB_THRESHOLD = 0.8
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -75,15 +81,14 @@ ANIMAL_POS_COLOR = "magenta"
 def plot_state_diagram(ax):
     """Draw 4-state diagram with transition arrows.
 
-    States arranged in a 2x2 grid. Self-loop probabilities annotated.
-    Key cross-state arrows shown with faint lines.
+    States arranged in a 2x2 grid. Self-loop probabilities are pulled
+    from the detector defaults, and all cross-state transitions are shown
+    as bidirectional connections.
 
-    The data limits and gridspec width_ratios are tuned so Panel A
-    renders at roughly the same width and height as one of Panel B's
-    scenario 2x2 blocks (~730 x 820 px at the configured DPI). Aspect
-    is locked equal, and the axes is anchored to the south edge of
-    its slot so the bottom of Panel A's circles aligns with the
-    bottom of Panel B's state cells.
+    The data limits and gridspec width ratios are tuned so Panel A
+    carries the transition topology at roughly the same visual scale as
+    a single Panel B likelihood scenario. Aspect is locked equal so the
+    state circles remain circular.
     """
     # Aspect locked equal so state circles render as circles. Anchor "N"
     # aligns Panel A's top with the top of the panel-B scenario plots (no
@@ -102,14 +107,43 @@ def plot_state_diagram(ax):
         "Non-Local\nFragmented": (0.75, 0.20),
     }
 
+    default_detector = NonLocalSortedSpikesDetector()
+    transition_matrix = np.asarray(default_detector.discrete_transition_type.values)
     self_probs = {
-        "Local": "0.99",
-        "No-Spike": "0.98",
-        "Non-Local\nContinuous": "0.98",
-        "Non-Local\nFragmented": "0.98",
+        state_name.replace("Non-Local ", "Non-Local\n"): f"{prob:.2f}"
+        for state_name, prob in zip(
+            default_detector.state_names, np.diag(transition_matrix), strict=True
+        )
     }
 
     radius = 0.18
+
+    # Cross-state arrows: one bidirectional connection per unordered state pair.
+    cross_transitions = [
+        ("Local", "No-Spike"),
+        ("Local", "Non-Local\nContinuous"),
+        ("Local", "Non-Local\nFragmented"),
+        ("No-Spike", "Non-Local\nContinuous"),
+        ("No-Spike", "Non-Local\nFragmented"),
+        ("Non-Local\nContinuous", "Non-Local\nFragmented"),
+    ]
+    for from_state, to_state in cross_transitions:
+        x1, y1 = positions[from_state]
+        x2, y2 = positions[to_state]
+        dx, dy = x2 - x1, y2 - y1
+        dist = np.sqrt(dx**2 + dy**2)
+        shrink = radius * 1.16
+        arrow = mpatches.FancyArrowPatch(
+            (x1 + dx / dist * shrink, y1 + dy / dist * shrink),
+            (x2 - dx / dist * shrink, y2 - dy / dist * shrink),
+            arrowstyle="<->,head_length=3,head_width=1.7",
+            mutation_scale=1,
+            linewidth=0.65,
+            color="black",
+            alpha=0.28,
+            zorder=4,
+        )
+        ax.add_patch(arrow)
 
     for state_name, (cx, cy) in positions.items():
         circle = mpatches.Circle(
@@ -124,55 +158,60 @@ def plot_state_diagram(ax):
         ax.add_patch(circle)
         ax.text(
             cx, cy, state_name,
-            ha="center", va="center", fontsize=6, fontweight="bold",
+            ha="center", va="center", fontsize=6.5, fontweight="bold",
             color="white", zorder=11, linespacing=0.9,
         )
 
-    # Self-loop arrows
-    loop_offsets = {
-        "Local": (-0.08, 0.12),
-        "No-Spike": (0.08, 0.12),
-        "Non-Local\nContinuous": (-0.08, -0.12),
-        "Non-Local\nFragmented": (0.08, -0.12),
+    # Self-loop arrows routed to the outside corners so they remain legible
+    # and do not collide with the bidirectional cross-state arrows.
+    loop_specs = {
+        "Local": {
+            "start": (-0.55, 0.75),
+            "end": (0.12, 1.06),
+            "rad": -0.75,
+            "label": (-0.92, 1.28),
+        },
+        "No-Spike": {
+            "start": (-0.12, 1.06),
+            "end": (0.55, 0.75),
+            "rad": -0.75,
+            "label": (0.92, 1.28),
+        },
+        "Non-Local\nContinuous": {
+            "start": (0.12, -1.06),
+            "end": (-0.55, -0.75),
+            "rad": -0.75,
+            "label": (-0.92, -1.28),
+        },
+        "Non-Local\nFragmented": {
+            "start": (0.55, -0.75),
+            "end": (-0.12, -1.06),
+            "rad": -0.75,
+            "label": (0.92, -1.28),
+        },
     }
     for state_name, (cx, cy) in positions.items():
-        ox, oy = loop_offsets[state_name]
+        spec = loop_specs[state_name]
+        start = (cx + radius * spec["start"][0], cy + radius * spec["start"][1])
+        end = (cx + radius * spec["end"][0], cy + radius * spec["end"][1])
         arrow = mpatches.FancyArrowPatch(
-            (cx + ox, cy + oy * 0.5), (cx + ox * 0.5, cy + oy),
-            arrowstyle="->,head_length=3,head_width=2",
-            connectionstyle="arc3,rad=0.4", mutation_scale=1,
-            linewidth=0.8, color="black", alpha=0.5, zorder=5,
+            start, end,
+            arrowstyle="->,head_length=3.5,head_width=2.2",
+            connectionstyle=f"arc3,rad={spec['rad']}",
+            mutation_scale=1,
+            linewidth=0.9,
+            color="black",
+            alpha=0.58,
+            zorder=12,
         )
         ax.add_patch(arrow)
+        lx = cx + radius * spec["label"][0]
+        ly = cy + radius * spec["label"][1]
         ax.text(
-            cx + ox * 1.5, cy + oy * 1.5, self_probs[state_name],
-            ha="center", va="center", fontsize=5, color="black", alpha=0.7,
+            lx, ly, self_probs[state_name],
+            ha="center", va="center", fontsize=5.5, color="black", alpha=0.8,
+            zorder=13,
         )
-
-    # Cross-state arrows
-    cross_transitions = [
-        ("Local", "No-Spike"),
-        ("Local", "Non-Local\nContinuous"),
-        ("Local", "Non-Local\nFragmented"),
-        ("No-Spike", "Non-Local\nContinuous"),
-        ("No-Spike", "Non-Local\nFragmented"),
-        ("Non-Local\nContinuous", "Local"),
-        ("Non-Local\nContinuous", "Non-Local\nFragmented"),
-        ("Non-Local\nFragmented", "Local"),
-    ]
-    for from_state, to_state in cross_transitions:
-        x1, y1 = positions[from_state]
-        x2, y2 = positions[to_state]
-        dx, dy = x2 - x1, y2 - y1
-        dist = np.sqrt(dx**2 + dy**2)
-        shrink = radius * 1.15
-        arrow = mpatches.FancyArrowPatch(
-            (x1 + dx / dist * shrink, y1 + dy / dist * shrink),
-            (x2 - dx / dist * shrink, y2 - dy / dist * shrink),
-            arrowstyle="->,head_length=3,head_width=1.5", mutation_scale=1,
-            linewidth=0.5, color="black", alpha=0.25, zorder=4,
-        )
-        ax.add_patch(arrow)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -193,7 +232,7 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
         The shared place-field curve λ(x), peaking at 1.0.
     animal_pos : float
         Animal's position in [0, 1]. Controls where the Local kernel
-        sits and where the magenta dashed line is drawn.
+        sits and where the magenta position line is drawn.
     scenario_kind : {"local", "nonlocal", "nospike"}
         Determines the relative heights of the three curves so the
         "winning" state's curve is visibly tallest. Also drives the
@@ -270,19 +309,17 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     ax.fill_between(x, local_curve, alpha=0.40, color=local_color)
 
     # Dashed to signal that No-Spike is a scalar likelihood (no position
-    # dependence), unlike the Local/Non-Local curves which are functions
-    # of x. Different orientation and color from the magenta animal line.
+    # dependence), unlike the Local/Non-Local curves which are functions of x.
     ax.axhline(nospike_y, color=nospike_color, linewidth=1.2, linestyle="--")
 
     ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
-               linestyle="--")
-    # Label the animal-position line just above the x-axis, to the right
-    # of the line so it doesn't obscure the curves at the line's x.
-    ax.text(
-        animal_pos + 0.03, 0.02, r"$x_{\mathrm{animal}}$",
-        color=ANIMAL_POS_COLOR, fontsize=6,
-        ha="left", va="bottom",
-    )
+               linestyle="-")
+    if scenario_kind == "local":
+        ax.text(
+            animal_pos + 0.035, 1.10, "animal\nposition",
+            color=ANIMAL_POS_COLOR, fontsize=5.5,
+            ha="left", va="center", linespacing=0.85,
+        )
 
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.05, 1.25)
@@ -295,10 +332,10 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
 
     # In-plot labels, one per curve, color-coded. Positions per scenario
     # are chosen to land in whitespace next to the relevant curve, avoiding
-    # overlap with other curves or the animal-position dashed line.
+    # overlap with other curves or the animal-position line.
     label_specs = {
         "local": [
-            ("Local",     0.40, 1.12, "center", local_color),
+            ("Local",     0.72, 0.82, "left",   local_color),
             ("Non-Local", 0.72, 0.55, "left",   nonlocal_continuous_color),
             ("No-Spike",  0.97, 0.18, "right",  nospike_color),
         ],
@@ -392,9 +429,7 @@ def plot_transition_kernels(fig, gs_slot):
     - Local → Local: Uniform. The Local state spans all bins; its next-step
       prior is uniform and the observation kernel re-anchors the posterior
       around the new animal position.
-    - No-Spike → No-Spike: Discrete (identity). No-Spike stays single-bin;
-      the auto-upgrade does not apply (neither source nor destination is
-      Local).
+    - No-Spike → No-Spike: Scalar self-transition with no spatial position.
     - Non-Local Continuous → Non-Local Continuous: Gaussian random walk
       (smooth replay trajectories).
     - Non-Local Fragmented → Non-Local Fragmented: Uniform (jump to any
@@ -406,15 +441,16 @@ def plot_transition_kernels(fig, gs_slot):
     configs = [
         {
             "name": "Local\n→ Local",
-            "subtitle": "Uniform (re-anchored)",
+            "subtitle": "Uniform; local kernel re-anchors",
             "color": STATE_COLORS_SHORT[0],
             "kind": "uniform",
+            "show_local_anchor": True,
         },
         {
             "name": "No-Spike\n→ No-Spike",
-            "subtitle": "Identity",
+            "subtitle": "No spatial position",
             "color": STATE_COLORS_SHORT[1],
-            "kind": "identity",
+            "kind": "scalar",
         },
         {
             "name": "Non-Local Continuous\n→ Non-Local Continuous",
@@ -436,10 +472,58 @@ def plot_transition_kernels(fig, gs_slot):
         sub_ax = fig.add_subplot(gs_inner[idx])
         axes.append(sub_ax)
 
-        if config["kind"] == "identity":
-            trans = np.eye(n_bins)
+        if config["kind"] == "scalar":
+            sub_ax.set_xlim(0, 1)
+            sub_ax.set_ylim(0, 1)
+            sub_ax.set_aspect("equal")
+            scalar_box = mpatches.Rectangle(
+                (0.24, 0.24),
+                0.52,
+                0.52,
+                facecolor=config["color"],
+                edgecolor="black",
+                linewidth=0.8,
+                alpha=0.75,
+            )
+            sub_ax.add_patch(scalar_box)
+            sub_ax.text(
+                0.5,
+                0.5,
+                "single\nstate",
+                ha="center",
+                va="center",
+                fontsize=6,
+                fontweight="bold",
+                color="white",
+                linespacing=0.9,
+            )
         elif config["kind"] == "uniform":
             trans = np.ones((n_bins, n_bins)) / n_bins
+            sub_ax.imshow(
+                trans, aspect="equal", cmap="magma",
+                vmin=0, vmax=0.15,
+                interpolation="nearest", origin="lower",
+            )
+            if config.get("show_local_anchor", False):
+                anchor_y = n_bins * 0.67
+                sub_ax.axhline(
+                    anchor_y,
+                    color=ANIMAL_POS_COLOR,
+                    linewidth=0.9,
+                    linestyle="-",
+                    zorder=5,
+                )
+                sub_ax.text(
+                    2,
+                    anchor_y + 2,
+                    "animal\nposition",
+                    color=ANIMAL_POS_COLOR,
+                    fontsize=5.3,
+                    ha="left",
+                    va="bottom",
+                    linespacing=0.85,
+                    zorder=6,
+                )
         else:  # gaussian
             trans = np.zeros((n_bins, n_bins))
             for i in range(n_bins):
@@ -447,15 +531,13 @@ def plot_transition_kernels(fig, gs_slot):
                     -0.5 * ((np.arange(n_bins) - i) / config["sigma"]) ** 2
                 )
                 trans[i, :] /= trans[i, :].sum()
-
-        # Shared vmax so the four kernels are visually comparable; identity's
-        # diagonal saturates, Gaussian band sits mid-range, uniform reads as a
-        # dim background — a clean gradient of spatial spread.
-        sub_ax.imshow(
-            trans, aspect="equal", cmap="magma",
-            vmin=0, vmax=0.15,
-            interpolation="nearest", origin="lower",
-        )
+            # Shared vmax so the uniform panels and Gaussian band are visually
+            # comparable while No-Spike remains visibly non-spatial.
+            sub_ax.imshow(
+                trans, aspect="equal", cmap="magma",
+                vmin=0, vmax=0.15,
+                interpolation="nearest", origin="lower",
+            )
 
         for spine in sub_ax.spines.values():
             spine.set_edgecolor(config["color"])
@@ -475,8 +557,9 @@ def plot_transition_kernels(fig, gs_slot):
             style="italic",
         )
 
-        sub_ax.set_xlabel("position$_t$", fontsize=5.5, labelpad=12)
-        if idx == 0:
+        if config["kind"] != "scalar" and not config.get("show_local_anchor", False):
+            sub_ax.set_xlabel("position$_t$", fontsize=5.5, labelpad=12)
+        if idx == 0 and not config.get("show_local_anchor", False):
             sub_ax.set_ylabel("position$_{t+1}$", fontsize=5.5, labelpad=2)
 
     return axes
@@ -485,6 +568,47 @@ def plot_transition_kernels(fig, gs_slot):
 # ═══════════════════════════════════════════════════════════════════════════
 # Panel D — Simulated Data + Decoding (single composite panel)
 # ═══════════════════════════════════════════════════════════════════════════
+
+def get_non_local_probability(results):
+    """Return P(Non-Local Continuous) + P(Non-Local Fragmented)."""
+    non_local_prob = results.acausal_state_probabilities.sel(
+        states=["Non-Local Continuous", "Non-Local Fragmented"]
+    ).sum("states")
+    return np.asarray(non_local_prob.values).squeeze()
+
+
+def get_threshold_crossing_intervals(time, mask):
+    """Convert a boolean time-bin mask to contiguous plotting intervals."""
+    time = np.asarray(time)
+    mask = np.asarray(mask, dtype=bool).squeeze()
+    if mask.size == 0 or not mask.any():
+        return []
+
+    changes = np.diff(mask.astype(int), prepend=0, append=0)
+    starts = np.flatnonzero(changes == 1)
+    stops = np.flatnonzero(changes == -1)
+    dt = float(np.nanmedian(np.diff(time))) if time.size > 1 else 0.0
+
+    intervals = []
+    for start, stop in zip(starts, stops, strict=True):
+        left = max(time[0], time[start] - dt / 2)
+        right = min(time[-1], time[stop - 1] + dt / 2)
+        intervals.append((left, right))
+    return intervals
+
+
+def shade_non_local_intervals(axes, intervals):
+    """Mark threshold-crossing non-local bins consistently across panel D."""
+    for ax in axes:
+        for start, end in intervals:
+            ax.axvspan(
+                start, end,
+                color=COLORS["Non-Local"],
+                alpha=0.08,
+                linewidth=0,
+                zorder=2.5,
+            )
+
 
 def sort_neurons_by_place_field(spike_times, detector):
     """Sort neurons by place field peak for ordered raster display."""
@@ -500,7 +624,7 @@ def plot_spike_raster(ax, spike_times, detector):
     sorted_spikes, _ = sort_neurons_by_place_field(spike_times, detector)
     ax.eventplot(
         sorted_spikes, lineoffsets=1, linelengths=0.8,
-        colors="black", linewidths=0.3,
+        colors="black", linewidths=0.3, zorder=4,
     )
     ax.set_ylabel("Neuron", fontsize=7, labelpad=4)
     ax.set_yticks([1, len(spike_times)])
@@ -520,45 +644,120 @@ def plot_posterior(ax, time, position, results):
     vmax = max(np.percentile(nl_pos[nl_pos > 0], 99), 1e-6)
     ax.pcolormesh(
         time, pos_coord, nl_pos.T,
-        cmap="bone_r", vmin=0, vmax=vmax, rasterized=True,
+        cmap="bone_r", vmin=0, vmax=vmax, rasterized=True, zorder=1,
     )
-    # Magenta for the animal's true position, consistent with the dashed line
+    # Magenta for the animal's true position, consistent with the position line
     # in panel B and avoiding collision with WONG[1] used for Continuous state.
-    ax.plot(time, position, color=ANIMAL_POS_COLOR, linewidth=0.8, alpha=0.9)
-    ax.set_ylabel("Non-local\nposterior\n(cm)", fontsize=7, labelpad=4)
+    ax.plot(
+        time, position, color=ANIMAL_POS_COLOR,
+        linewidth=0.8, alpha=0.9, zorder=4,
+    )
+    ax.set_ylabel("Decoded\nposition\n(cm)", fontsize=7, labelpad=4)
     ax.tick_params(labelsize=5.5, labelbottom=False)
 
 
-def plot_state_probabilities(ax, time, results, detector):
-    """State probabilities as line plots (raw, no smoothing)."""
+def plot_state_probabilities(ax, time, results):
+    """Plot the four raw HMM state probabilities."""
     state_probs = results["acausal_state_probabilities"].values
 
-    # Local/No-Spike in background, non-local on top
-    for i in [0, 1]:
+    for i, (name, color) in enumerate(zip(
+        STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True,
+    )):
         ax.plot(
-            time, state_probs[:, i], color=STATE_COLORS_SHORT[i],
-            label=STATE_NAMES_SHORT[i], linewidth=0.6, alpha=0.4,
+            time,
+            state_probs[:, i],
+            color=color,
+            label=name,
+            linewidth=0.75 if i < 2 else 0.95,
+            alpha=0.55 if i < 2 else 0.9,
+            zorder=4 if i >= 2 else 3,
         )
-    for i in [2, 3]:
-        ax.plot(
-            time, state_probs[:, i], color=STATE_COLORS_SHORT[i],
-            label=STATE_NAMES_SHORT[i], linewidth=1.0, alpha=0.9,
-        )
-    ax.set_ylabel("P(state)", fontsize=7, labelpad=4)
+    ax.set_ylabel("State\nprob.", fontsize=7, labelpad=4)
     ax.set_ylim(0, 1.05)
     ax.tick_params(labelsize=5.5, labelbottom=False)
     ax.legend(
-        fontsize=5.5, loc="upper right", ncol=4, frameon=False,
-        handlelength=1, columnspacing=0.5,
+        fontsize=5.5,
+        loc="lower right",
+        bbox_to_anchor=(1.0, 1.02),
+        ncol=4,
+        frameon=False,
+        handlelength=1,
+        columnspacing=0.5,
     )
+
+
+def plot_non_local_decision(
+    ax,
+    time,
+    non_local_prob,
+    threshold=NON_LOCAL_PROB_THRESHOLD,
+):
+    """Plot collapsed non-local probability and event threshold."""
+    ax.plot(
+        time,
+        non_local_prob,
+        color=COLORS["Non-Local"],
+        linewidth=1.15,
+        zorder=4,
+    )
+    ax.fill_between(
+        time,
+        0,
+        non_local_prob,
+        where=non_local_prob > threshold,
+        color=COLORS["Non-Local"],
+        alpha=0.22,
+        step="pre",
+        linewidth=0,
+        zorder=3,
+    )
+    ax.axhline(
+        threshold,
+        color="lightgrey",
+        linestyle="--",
+        linewidth=0.75,
+        alpha=0.8,
+        zorder=3,
+    )
+    ax.text(
+        time[-1],
+        threshold + 0.035,
+        f"P(non-local) > {threshold:.1f}",
+        ha="right",
+        va="bottom",
+        fontsize=5.5,
+        color="#555555",
+    )
+    ax.text(
+        time[0] + 0.01 * (time[-1] - time[0]),
+        0.96,
+        "P(non-local) = P(continuous) + P(fragmented)",
+        ha="left",
+        va="top",
+        fontsize=5.5,
+        color=COLORS["Non-Local"],
+    )
+    ax.set_ylabel("Non-local\nprob.", fontsize=7, labelpad=4)
+    ax.set_ylim(0, 1.05)
+    ax.tick_params(labelsize=5.5, labelbottom=False)
 
 
 def plot_speed(ax, time, speed):
     """Speed trace with immobility threshold."""
     ax.fill_between(time, speed, alpha=0.5, color="#888888", linewidth=0)
-    ax.axhline(4.0, color="black", linewidth=0.5, linestyle=":", alpha=0.4)
+    ax.axhline(
+        MAX_SPEED_THRESHOLD_CM_PER_SEC,
+        color="black",
+        linewidth=0.5,
+        linestyle=":",
+        alpha=0.4,
+    )
     ax.text(
-        time[-1], 4.5, "4 cm/s", ha="right", va="bottom",
+        time[-1],
+        MAX_SPEED_THRESHOLD_CM_PER_SEC + 0.5,
+        f"{MAX_SPEED_THRESHOLD_CM_PER_SEC:g} cm/s",
+        ha="right",
+        va="bottom",
         fontsize=5, alpha=0.7,
     )
     ax.set_ylabel("Speed\n(cm/s)", fontsize=7, labelpad=4)
@@ -611,19 +810,23 @@ def generate_figure(n_neurons=30, seed=42):
         time=time,
         is_training=~is_event,
     )
+    non_local_prob = get_non_local_probability(results)
+    non_local_intervals = get_threshold_crossing_intervals(
+        time, non_local_prob > NON_LOCAL_PROB_THRESHOLD,
+    )
 
     # --- Create figure ---
     set_figure_defaults(context="paper")
 
-    # fig_height + height_ratios are tuned so that rows 0 and 1 keep their
-    # current absolute heights (preserving the Panel A / Local-wins scenario
-    # block match) while row 2 (Panel D) shrinks: ratio 2.0 -> 1.7 reduces
-    # Panel D by ~15%, and fig_height drops to compensate so the upper rows
-    # are unchanged. Panel D's spike raster (30 neurons) was over-allocated
-    # at the prior height.
-    fig_height = min(TWO_COLUMN * 1.247, PAGE_HEIGHT)
+    # Keep the full-width manuscript format, but avoid over-allocating the
+    # simulated example. The model rows get enough height for readable labels,
+    # while panel D remains a compact worked example.
+    fig_height = min(TWO_COLUMN * 1.18, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
                      constrained_layout=True)
+    fig.set_constrained_layout_pads(
+        w_pad=0.02, h_pad=0.02, wspace=0.03, hspace=0.03,
+    )
 
     # 3 rows: model structure | transition kernels | simulated example.
     # Row 1 (panel C) is thinner than row 0 because two of its four
@@ -631,16 +834,15 @@ def generate_figure(n_neurons=30, seed=42):
     # large cells waste space.
     gs_main = GridSpec(
         3, 1, figure=fig,
-        height_ratios=[0.65, 0.55, 1.7],
-        hspace=0.20,
+        height_ratios=[0.78, 0.52, 1.45],
+        hspace=0.14,
     )
 
     # ── Row 0: State Diagram (a) + Observation Models (b) ──
     # Panel B contains three scenarios (Local-wins, Non-Local-wins,
-    # No-Spike-wins), each a 2x2 of state cells. width_ratios are tuned so
-    # Panel A renders at roughly the same width as one scenario block;
-    # aspect+anchor inside plot_state_diagram matches the height too.
-    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.15, width_ratios=[1, 2.6])
+    # No-Spike-wins). width_ratios are tuned so Panel A can carry the
+    # transition topology without crowding Panel B's likelihood scenarios.
+    gs_row0 = gs_main[0].subgridspec(1, 2, wspace=0.10, width_ratios=[1, 2.8])
 
     ax_a = fig.add_subplot(gs_row0[0])
     plot_state_diagram(ax_a)
@@ -650,9 +852,9 @@ def generate_figure(n_neurons=30, seed=42):
     # ── Row 1: Transition Kernels (c) ──
     kernel_axes = plot_transition_kernels(fig, gs_main[1])
 
-    # ── Row 2: Simulated Example (d) — single panel, 4 sub-rows ──
+    # ── Row 2: Simulated Example (d) — single panel, 5 sub-rows ──
     gs_row2 = gs_main[2].subgridspec(
-        4, 1, height_ratios=[0.8, 1.2, 0.8, 0.5], hspace=0.12,
+        5, 1, height_ratios=[0.65, 0.95, 0.58, 0.58, 0.38], hspace=0.10,
     )
 
     ax_raster = fig.add_subplot(gs_row2[0])
@@ -662,13 +864,20 @@ def generate_figure(n_neurons=30, seed=42):
     plot_posterior(ax_posterior, time, position, results)
 
     ax_states = fig.add_subplot(gs_row2[2], sharex=ax_raster)
-    plot_state_probabilities(ax_states, time, results, detector)
+    plot_state_probabilities(ax_states, time, results)
 
-    ax_speed = fig.add_subplot(gs_row2[3], sharex=ax_raster)
+    ax_nonlocal = fig.add_subplot(gs_row2[3], sharex=ax_raster)
+    plot_non_local_decision(ax_nonlocal, time, non_local_prob)
+
+    ax_speed = fig.add_subplot(gs_row2[4], sharex=ax_raster)
     plot_speed(ax_speed, time, speed)
 
-    for a in [ax_raster, ax_posterior, ax_states, ax_speed]:
+    panel_d_axes = [ax_raster, ax_posterior, ax_states, ax_nonlocal, ax_speed]
+    for a in panel_d_axes:
         a.set_xlim(time[0], time[-1])
+    shade_non_local_intervals(
+        panel_d_axes, non_local_intervals,
+    )
 
     # ── Panel Labels ──
     label_panels(
