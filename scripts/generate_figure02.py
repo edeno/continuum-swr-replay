@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate Figure 2: The model finds SWR-coincident replay (and more).
 
-Composite 6-panel figure with the following narrative:
+Composite 5-panel figure with the following narrative:
 
     a — Three example non-local events, one per SWR-overlap class
         (SWR-contained / SWR-partial / non-SWR), picked deterministically
@@ -23,10 +23,7 @@ Composite 6-panel figure with the following narrative:
         events overlap, non-local events typically sit inside the SWR
         window but with a long tail that extends beyond it.
 
-    e — State probability vs theta phase during movement. Positive
-        control that the decoder respects circuit-level structure.
-
-    f — Median decoding error during Local state across sessions.
+    e — Median decoding error during Local state across sessions.
         Positive control that Local-state decoding is accurate.
 
 Panels a, b, and d are driven by a single classification source:
@@ -40,8 +37,8 @@ same table) for its event-triggered windows.
 
 Remaining validation panels (non-local probability threshold,
 calibration curve, full four-signal triggered averages, moving-vs-
-immobile state fractions) live in the supplementary
-"Decoder validation" figure.
+immobile state fractions, state probability vs theta phase) live in the
+supplementary "Decoder validation" figure.
 
 Usage
 -----
@@ -83,7 +80,6 @@ from continuum_swr_replay.visualization.figure_panels import (
     plot_decoding_error_distribution,
     plot_event_example_stack,
     plot_event_timing_offsets,
-    plot_state_probability_by_theta_phase,
     plot_swr_overlap_class_bar,
     plot_triggered_averages,
 )
@@ -318,20 +314,17 @@ def generate_figure(
     ax_d_end.tick_params(labelleft=False)
     ax_d_end.set_ylabel("")
 
-    # ── Row 4: panel e (theta phase) + panel f (decoding error) ──
-    gs_ef = outer[3].subgridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.35)
-    ax_e = fig.add_subplot(gs_ef[0])
-    plot_state_probability_by_theta_phase(data_over_time, ax=ax_e)
-
-    ax_f = fig.add_subplot(gs_ef[1])
-    plot_decoding_error_distribution(data_over_time, ax=ax_f)
+    # ── Row 4: panel e (decoding error), centered at ~half width ──
+    gs_e = outer[3].subgridspec(1, 3, width_ratios=[0.5, 1.0, 0.5])
+    ax_e = fig.add_subplot(gs_e[1])
+    plot_decoding_error_distribution(data_over_time, ax=ax_e)
 
     # ── Panel labels ──
     # Larger font for readability in a two-column figure; push slightly
     # further outside the axes so they don't collide with plot content.
     label_panels(
-        [first_column_axes[0], ax_b, ax_c_top, ax_d_start, ax_e, ax_f],
-        labels=["a", "b", "c", "d", "e", "f"],
+        [first_column_axes[0], ax_b, ax_c_top, ax_d_start, ax_e],
+        labels=["a", "b", "c", "d", "e"],
         xpos=-0.08,
         ypos=1.15,
         fontsize=11,
