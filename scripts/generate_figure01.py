@@ -73,6 +73,19 @@ STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
 NON_LOCAL_PROB_THRESHOLD = 0.8
 
+# Stickiness from the real fitted detectors. The installed non_local_detector
+# default [1e6, 1e6, 300, 300] makes EM prune Local->No-Spike to ~0, hiding the
+# No-Spike state; this value keeps it alive and matches the real pipeline.
+REAL_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
+
+# Decode every Nth sample so the demo bin width (~2 ms) matches the real
+# pipeline; the simulator emits 1500 Hz, which starves the No-Spike evidence.
+DECODE_BIN_STRIDE = 3
+
+# Lengthen the simulator's 0.5 s no-spike event so the No-Spike state clears the
+# transition-driven edge ramps and reads at full strength in panel D.
+NO_SPIKE_EVENT_LEN = 0.75
+
 
 def add_panel_header(ax, title):
     """Draw a centered panel-level header on a dedicated header axes."""
@@ -134,6 +147,37 @@ def plot_state_diagram(ax):
     }
 
     radius = 0.18
+
+    # Group the two non-local states without erasing their distinct
+    # continuous/fragmented colors. This also links panel A to the collapsed
+    # non-local color used in panels B and D.
+    nonlocal_group_x = 0.04
+    nonlocal_group_y = -0.005
+    nonlocal_group_width = 0.92
+    nonlocal_group_height = 0.43
+    ax.add_patch(
+        mpatches.Rectangle(
+            (nonlocal_group_x, nonlocal_group_y),
+            nonlocal_group_width,
+            nonlocal_group_height,
+            facecolor=COLORS["Non-Local"],
+            edgecolor="none",
+            alpha=0.14,
+            zorder=1,
+        )
+    )
+    ax.add_patch(
+        mpatches.Rectangle(
+            (nonlocal_group_x, nonlocal_group_y),
+            nonlocal_group_width,
+            nonlocal_group_height,
+            facecolor="none",
+            edgecolor=COLORS["Non-Local"],
+            linewidth=0.8,
+            alpha=0.62,
+            zorder=2,
+        )
+    )
 
     # Cross-state arrows: one bidirectional connection per unordered state pair.
     cross_transitions = [
@@ -262,7 +306,7 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     Non-Local Fragmented have identical observation likelihoods; they
     only differ in the transition kernel, shown in panel c):
     - Local: blue, bump = λ(x)·N(x_animal, σ_L).
-    - Non-Local: orange, bump = λ(x), broader than Local.
+    - Non-Local: teal, bump = λ(x), broader than Local.
     - No-Spike: gray horizontal line at the No-Spike likelihood value.
 
     Each curve is labeled in-plot with colored text (no legend, no
@@ -271,13 +315,9 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     """
     local_color = STATE_COLORS_SHORT[0]    # blue
     nospike_color = STATE_COLORS_SHORT[1]  # gray
-    # Non-Local in panel (b) merges the Continuous and Fragmented states
-    # (they share an observation likelihood; only their transition kernels
-    # differ). Show this visually by filling the curve with the Continuous
-    # orange and overlaying diagonal Fragmented-vermillion stripes — the
-    # striped pattern signals "this represents both non-local states."
-    nonlocal_continuous_color = STATE_COLORS_SHORT[2]  # orange (WONG[1])
-    nonlocal_fragmented_color = STATE_COLORS_SHORT[3]  # vermillion (WONG[6])
+    # Non-Local in panel (b) merges the Continuous and Fragmented states;
+    # use the collapsed non-local color shared with panels A and D.
+    nonlocal_color = COLORS["Non-Local"]
 
     sigma_local = 0.05
     kernel = np.exp(-0.5 * ((x - animal_pos) / sigma_local) ** 2)
@@ -314,18 +354,13 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
         raise ValueError(f"Unknown scenario_kind: {scenario_kind!r}")
 
     # Non-Local drawn first so Local's fill sits on top where they overlap.
-    # The Non-Local fill uses Continuous orange as the background and
-    # Fragmented vermillion as the hatch color so the stripes visually
-    # convey "this curve represents both non-local states."
     ax.fill_between(
         x, nonlocal_curve,
-        facecolor=nonlocal_continuous_color,
-        edgecolor=nonlocal_fragmented_color,
-        hatch="///",
+        facecolor=nonlocal_color,
         linewidth=0.0,
-        alpha=0.45,
+        alpha=0.25,
     )
-    ax.plot(x, nonlocal_curve, color=nonlocal_continuous_color, linewidth=1.0)
+    ax.plot(x, nonlocal_curve, color=nonlocal_color, linewidth=1.0)
 
     ax.plot(x, local_curve, color=local_color, linewidth=1.0)
     ax.fill_between(x, local_curve, alpha=0.40, color=local_color)
@@ -362,17 +397,17 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     label_specs = {
         "local": [
             ("Local",     0.72, 0.82, "left",   local_color),
-            ("Non-Local", 0.72, 0.55, "left",   nonlocal_continuous_color),
+            ("Non-Local", 0.72, 0.55, "left",   nonlocal_color),
             ("No-Spike",  0.97, 0.18, "right",  nospike_color),
         ],
         "nonlocal": [
-            ("Non-Local", 0.40, 1.12, "center", nonlocal_continuous_color),
+            ("Non-Local", 0.40, 1.12, "center", nonlocal_color),
             ("Local",     0.72, 0.42, "left",   local_color),
             ("No-Spike",  0.97, 0.18, "right",  nospike_color),
         ],
         "nospike": [
             ("No-Spike",  0.97, 0.78, "right",  nospike_color),
-            ("Non-Local", 0.72, 0.30, "left",   nonlocal_continuous_color),
+            ("Non-Local", 0.72, 0.30, "left",   nonlocal_color),
             ("Local",     0.40, 0.50, "center", local_color),
         ],
     }
@@ -882,6 +917,20 @@ def generate_figure(n_neurons=30, seed=42):
         sampling_frequency, is_event, place_fields,
     ) = make_simulated_data(n_neurons=n_neurons)
 
+    # Extend the no-spike event (event index 3) to NO_SPIKE_EVENT_LEN by removing
+    # spikes over the longer window and holding it out of training.
+    ns_start = event_times[3, 0]
+    ns_end = ns_start + NO_SPIKE_EVENT_LEN
+    spike_times = [st[(st < ns_start) | (st > ns_end)] for st in spike_times]
+    event_times[3, 1] = ns_end
+    is_event = is_event | ((time >= ns_start) & (time <= ns_end))
+
+    # Stride the decode/behavior grids to ~2 ms; spike_times stay full-resolution.
+    time = time[::DECODE_BIN_STRIDE]
+    position = position[::DECODE_BIN_STRIDE]
+    speed = speed[::DECODE_BIN_STRIDE]
+    is_event = is_event[::DECODE_BIN_STRIDE]
+
     print("Fitting detector and estimating parameters (EM)...")
     detector = NonLocalSortedSpikesDetector(
         sorted_spikes_algorithm="sorted_spikes_kde",
@@ -890,6 +939,7 @@ def generate_figure(n_neurons=30, seed=42):
             "block_size": int(2**8),
         },
         local_position_std=LOCAL_POSITION_STD,
+        discrete_transition_stickiness=REAL_DISCRETE_TRANSITION_STICKINESS,
     )
     results = detector.estimate_parameters(
         position_time=time,
