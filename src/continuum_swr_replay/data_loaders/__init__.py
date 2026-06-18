@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 
 from .constants import (
     NWB_FILES,
-    TRACK_SEGMENT_TO_EDGE_ID,
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
@@ -31,7 +30,6 @@ _LAZY_EXPORTS = {
 
 __all__ = [
     "NWB_FILES",
-    "TRACK_SEGMENT_TO_EDGE_ID",
     "TRACK_SEGMENT_TO_PATCH",
     "WELL_PATCH_MAPPING",
     "get_epoch_info",

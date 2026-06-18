@@ -13,8 +13,6 @@ WELL_PATCH_MAPPING : dict of {int: int}
     Wells 0-1 are in patch 1, wells 2-3 in patch 2, wells 4-5 in patch 3.
 TRACK_SEGMENT_TO_PATCH : dict of {int: int}
     Maps track segment IDs to patch IDs (1-3).
-TRACK_SEGMENT_TO_EDGE_ID : dict of {int: int}
-    Maps track segment indices to edge IDs in the track graph.
 
 Notes
 -----
@@ -186,20 +184,3 @@ Segments 0, 1, 6 are in patch 1; segments 2, 3, 7 in patch 2;
 segments 4, 5, 8 in patch 3.
 """
 
-TRACK_SEGMENT_TO_EDGE_ID = {
-    0: 1,
-    1: 2,
-    2: 4,
-    3: 5,
-    4: 7,
-    5: 8,
-    6: 0,
-    7: 3,
-    8: 6,
-}
-"""Mapping from track segment indices to NetworkX graph edge IDs.
-
-This mapping translates between sequential segment indices (0-8) and
-the actual edge IDs used in the NetworkX track graph representation.
-Required for correctly indexing into graph edge attributes and positions.
-"""
