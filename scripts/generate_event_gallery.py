@@ -400,6 +400,32 @@ def _arm_colors(edge_order: list, arm_of_edge: dict) -> dict:
     return colors
 
 
+def _arm_strip_labels(track_graph, edge_order: list, env) -> list:
+    """(arm, linear_center_cm, color) for each arm, matching the 1D strip.
+
+    Derived from a single source so labels can't drift from the strip's
+    segments: the arm comes from node identities (``_arm_of_edge_map``), the
+    linear center from the edge's own ``edge_id`` graph attribute looked up in
+    ``env`` (junction bins, edge_id = -1, excluded), and the color from the
+    edge's position in ``edge_order`` — exactly the tab10 index the strip and
+    the content bars use. (The ``TRACK_SEGMENT_TO_EDGE_ID`` constant is *not*
+    used; it does not match this env's edge_id numbering.)
+    """
+    edge_colors = _track_edge_colors(len(edge_order))
+    arm_of_edge = _arm_of_edge_map()
+    df = env.place_bin_centers_nodes_df_
+    lp_by_eid = (
+        df[df["edge_id"] >= 0].groupby("edge_id")["linear_position"].mean().to_dict()
+    )
+    out = []
+    for i, (n1, n2) in enumerate(edge_order):
+        arm = arm_of_edge.get(frozenset((n1, n2)))
+        eid = track_graph.edges[n1, n2].get("edge_id")
+        if arm is not None and eid in lp_by_eid:
+            out.append((arm, lp_by_eid[eid], edge_colors[i]))
+    return out
+
+
 def _current_well(track_graph, x: float, y: float) -> int | None:
     """Nearest reward-well node (degree-1) to a 2D point, or None."""
     wells = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
@@ -1426,6 +1452,20 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         ax=ax_strip,
         max_position=max_position,
     )
+    # Label each arm (a0-a8) at its linear-position center on the strip, so the
+    # posterior's y-axis can be read as track arms (matching the content bars).
+    for arm, lp, color in _arm_strip_labels(
+        ctx["data"]["track_graph"], ctx["data"]["linear_edge_order"], ctx["env"]
+    ):
+        ax_strip.annotate(
+            f"a{arm}",
+            (-0.8, lp),
+            fontsize=4.2,
+            color=color,
+            ha="center",
+            va="center",
+            fontweight="bold",
+        )
     ax_post.set_ylabel("")
     ax_post.tick_params(labelleft=False)
 
