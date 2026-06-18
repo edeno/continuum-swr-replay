@@ -695,18 +695,20 @@ def _plot_arm_content_bar(
 
 
 def _plot_trial_history(ax, data: dict, center: float, n_trials: int = 20) -> None:
-    """Trial-by-trial well-visit and reward history (the raw behavioral input).
+    """Trial-by-trial reward history (the trial-level behavioral input).
 
     Grid of wells (rows W0-W5) × recent trials (columns, time → right). Each
-    trial's ``to_well`` is marked: a filled green circle if rewarded, an open
-    circle if an omission. A faint line links consecutive visits to show the
-    route sequence. This is exactly what ``visit_recency`` (horizontal gaps in
-    a row), ``recent_reward_rate`` (density of filled markers), and
-    ``last_rewarded_elsewhere`` (most recent filled marker off the current
-    row) are derived from. The current trial (the one at the event) is marked
-    in magenta.
+    trial's ``to_well`` is marked with the TRIAL-level reward (``is_reward`` =
+    any poke in that trial's stay was rewarded): filled green if rewarded,
+    open if an omission — the same trial-level label the regression uses
+    (``reward_outcome``), not the per-poke reward. A faint line links
+    consecutive trials to show the route sequence. This is exactly what
+    ``visit_recency`` (horizontal gaps in a row), ``recent_reward_rate``
+    (density of filled markers), and ``last_rewarded_elsewhere`` (most recent
+    filled marker off the current row) are derived from. The current trial
+    (the one at the event) is ringed in magenta.
     """
-    ax.set_title("well-visit & reward history (trials → event)", fontsize=7)
+    ax.set_title("trial reward history (regression-level, → event)", fontsize=7)
     ax.set_yticks(range(6))
     ax.set_yticklabels([f"W{w}" for w in range(6)], fontsize=5)
     ax.set_ylim(-0.6, 5.6)
@@ -716,8 +718,16 @@ def _plot_trial_history(ax, data: dict, center: float, n_trials: int = 20) -> No
 
     trials = data.get("trials")
     if trials is None or not len(trials):
-        ax.text(0.5, 0.5, "no trials", fontsize=6, ha="center", va="center",
-                color="gray", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "no trials",
+            fontsize=6,
+            ha="center",
+            va="center",
+            color="gray",
+            transform=ax.transAxes,
+        )
         return
     trials = trials.sort_values("start_time").reset_index(drop=True)
     started = trials.index[trials["start_time"] <= center]
@@ -731,24 +741,63 @@ def _plot_trial_history(ax, data: dict, center: float, n_trials: int = 20) -> No
     for x, (_, tr) in zip(xs, window.iterrows(), strict=True):
         well = int(tr["to_well"])
         if bool(tr["is_reward"]):
-            ax.scatter(x, well, s=55, marker="o", facecolor="green",
-                       edgecolor="black", linewidth=0.4, zorder=3)
+            ax.scatter(
+                x,
+                well,
+                s=55,
+                marker="o",
+                facecolor="green",
+                edgecolor="black",
+                linewidth=0.4,
+                zorder=3,
+            )
         else:
-            ax.scatter(x, well, s=55, marker="o", facecolor="none",
-                       edgecolor="dimgray", linewidth=1.0, zorder=3)
+            ax.scatter(
+                x,
+                well,
+                s=55,
+                marker="o",
+                facecolor="none",
+                edgecolor="dimgray",
+                linewidth=1.0,
+                zorder=3,
+            )
     # Current trial (the one containing the event) highlighted in magenta.
-    ax.scatter(xs[-1], wells[-1], s=140, marker="o", facecolor="none",
-               edgecolor="magenta", linewidth=1.6, zorder=4)
+    ax.scatter(
+        xs[-1],
+        wells[-1],
+        s=140,
+        marker="o",
+        facecolor="none",
+        edgecolor="magenta",
+        linewidth=1.6,
+        zorder=4,
+    )
     ax.set_xlim(-0.5, max(len(window) - 0.5, 0.5))
     ax.set_xticks(xs[:: max(1, len(xs) // 10)])
 
     # Compact legend.
-    ax.scatter([], [], s=40, marker="o", facecolor="green", edgecolor="black",
-               label="rewarded")
-    ax.scatter([], [], s=40, marker="o", facecolor="none", edgecolor="dimgray",
-               label="omission")
-    ax.legend(loc="upper left", fontsize=4.6, ncol=2, framealpha=0.6,
-              handletextpad=0.2, columnspacing=0.8, borderpad=0.2)
+    ax.scatter(
+        [], [], s=40, marker="o", facecolor="green", edgecolor="black", label="rewarded"
+    )
+    ax.scatter(
+        [],
+        [],
+        s=40,
+        marker="o",
+        facecolor="none",
+        edgecolor="dimgray",
+        label="omission",
+    )
+    ax.legend(
+        loc="upper left",
+        fontsize=4.6,
+        ncol=2,
+        framealpha=0.6,
+        handletextpad=0.2,
+        columnspacing=0.8,
+        borderpad=0.2,
+    )
 
 
 def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
@@ -881,50 +930,45 @@ def _plot_patch_content_bar(
                 )
 
 
-def _current_well_visit(data: dict, t: float) -> pd.Series | None:
-    """The immobility (poke) well visit the animal is in at time ``t``.
+def _current_trial(trials: pd.DataFrame, t: float) -> pd.Series | None:
+    """The trial the regression assigns to time ``t``: latest trial started.
 
-    ``well_visits`` interleaves runs (``is_run``) and pokes (the stationary
-    dwell at a well). The poke visit containing ``t`` is the current
-    immobility period; fall back to the most recent poke ending before ``t``.
+    Matches ``_add_trial_context`` (``searchsorted`` on trial start times), so
+    its ``is_reward`` is exactly the event's ``reward_outcome`` covariate.
     """
-    visits = data.get("well_visits")
-    if visits is None or not len(visits):
+    if trials is None or not len(trials):
         return None
-    pokes = visits[~visits["is_run"].astype(bool)]
-    if not len(pokes):
-        return None
-    containing = pokes[(pokes["start_time"] <= t) & (pokes["end_time"] >= t)]
-    if len(containing):
-        return containing.iloc[-1]
-    ended = pokes[pokes["end_time"] <= t].sort_values("end_time")
-    return ended.iloc[-1] if len(ended) else None
+    started = trials.sort_values("start_time")
+    started = started[started["start_time"] <= t]
+    return started.iloc[-1] if len(started) else None
 
 
 def _plot_reward_timeline(ax, data: dict, center: float) -> None:
-    """Reward timeline for the current well visit (this immobility period).
+    """Trial-level reward — exactly what the regression uses.
 
-    Anchored on the *current well visit* — the stationary dwell the animal is
-    in during the event, taken from ``well_visits`` (NOT a trial). Shows, on a
-    time axis relative to the event center: the dwell interval (grey band),
-    the event window (magenta), and every pump-DIO firing inside the dwell
-    (green ▼) — the raw reward deliveries that set the visit's ``is_reward``.
-    No pump in the dwell ⇒ omission.
+    The regression scores reward at the *trial* level: ``reward_outcome`` is
+    the current trial's ``is_reward`` (True if ANY poke in that trial's stay
+    delivered reward), and ``time_since_reward`` counts from the most recent
+    pump. A trial = one run + the whole stay at the destination well, so a
+    rewarded trial can contain many unrewarded pokes — this panel reflects the
+    trial label the model sees, not any single poke. Shows the trial reward
+    status and the most recent pump-DIO (green ▼) reaching back to the last
+    reward, relative to the event center.
     """
-    ax.set_title("reward: current well visit", fontsize=7)
+    ax.set_title("reward: trial-level (regression)", fontsize=7)
     ax.set_yticks([])
     ax.set_xlabel("Time from event center (s)", fontsize=6)
     ax.tick_params(axis="x", labelsize=5)
     ax.axhline(0, color="black", lw=0.5)
+    ax.axvspan(-WINDOW_SEC, WINDOW_SEC, color="magenta", alpha=0.18, zorder=2)
+    ax.axvline(0, color="magenta", lw=0.8, zorder=3)
 
-    visit = _current_well_visit(data, center)
-    if visit is None:
-        ax.axvspan(-0.2, 0.2, color="magenta", alpha=0.18)
-        ax.axvline(0, color="magenta", lw=0.8)
+    trial = _current_trial(data.get("trials"), center)
+    if trial is None:
         ax.text(
             0.5,
             0.5,
-            "no well visit",
+            "no trial",
             fontsize=6,
             ha="center",
             va="center",
@@ -933,57 +977,58 @@ def _plot_reward_timeline(ax, data: dict, center: float) -> None:
         )
         return
 
-    vs, ve = float(visit["start_time"]) - center, float(visit["end_time"]) - center
-    rewarded = bool(visit.get("is_reward", False))
-    to_well = int(visit["to_well"])
+    rewarded = bool(trial.get("is_reward", False))
+    fw, tw = int(trial["from_well"]), int(trial["to_well"])
 
-    # Dwell (immobility) interval and the event window.
-    ax.axvspan(vs, ve, color="0.85", zorder=1, label="well dwell")
-    ax.axvspan(-WINDOW_SEC, WINDOW_SEC, color="magenta", alpha=0.18, zorder=2)
-    ax.axvline(0, color="magenta", lw=0.8, zorder=3)
-
-    # Pump-DIO firings inside the dwell.
+    # Most recent pump-DIO before the event = the reward the regression's
+    # time_since_reward counts from.
     pumps = data["pump_events"]
-    in_visit = pumps[
-        (pumps["start_time"] <= visit["end_time"])
-        & (pumps["end_time"] >= visit["start_time"])
-    ]
-    pump_rel = (in_visit["start_time"].to_numpy() - center).tolist()
+    prior = pumps[pumps["start_time"] <= center]
+    last_pump_rel = float(prior["start_time"].max()) - center if len(prior) else None
 
-    lo = min(vs, -WINDOW_SEC) - 0.3
-    hi = max(ve, WINDOW_SEC, *(pump_rel or [0.0])) + 0.3
-    ax.set_xlim(lo, hi)
+    lo = min(last_pump_rel if last_pump_rel is not None else -WINDOW_SEC, -WINDOW_SEC)
+    ax.set_xlim(lo * 1.1 - 0.3, WINDOW_SEC + 0.3)
 
     status = "REWARDED" if rewarded else "OMISSION"
     status_color = "green" if rewarded else "red"
     ax.annotate(
-        f"W{to_well} · {status}",
+        f"trial W{fw}→W{tw}: {status}  (reward_outcome={int(rewarded)})",
         (0.5, 0.92),
-        fontsize=5.5,
+        fontsize=5.3,
         color=status_color,
         ha="center",
         va="top",
         xycoords="axes fraction",
     )
-    if pump_rel:
+    if last_pump_rel is not None:
         ax.scatter(
-            pump_rel,
-            [0] * len(pump_rel),
+            [last_pump_rel],
+            [0],
             marker="v",
-            s=40,
+            s=45,
             color="limegreen",
             edgecolor="black",
             linewidth=0.4,
             zorder=5,
         )
         ax.annotate(
-            "pump",
-            (pump_rel[0], 0.12),
+            f"last reward\n{-last_pump_rel:.0f}s ago",
+            (last_pump_rel, 0.12),
             fontsize=4.6,
             color="green",
             ha="center",
             va="bottom",
             xycoords=("data", "axes fraction"),
+        )
+    else:
+        ax.annotate(
+            "no prior reward",
+            (0.5, 0.5),
+            fontsize=6,
+            color="red",
+            ha="center",
+            va="center",
+            xycoords="axes fraction",
         )
 
 
