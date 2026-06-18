@@ -78,6 +78,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
     intervals_from_labels,
 )
+from continuum_swr_replay.analysis.replay._helpers import immobility_bout_intervals
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
@@ -87,7 +88,7 @@ from continuum_swr_replay.analysis.replay.tables import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
     plot_acausal_probabilities,
@@ -943,92 +944,133 @@ def _current_trial(trials: pd.DataFrame, t: float) -> pd.Series | None:
     return started.iloc[-1] if len(started) else None
 
 
-def _plot_reward_timeline(ax, data: dict, center: float) -> None:
-    """Trial-level reward — exactly what the regression uses.
+def _plot_behavioral_context(
+    ax, data: dict, center: float, row: pd.Series, imm_bouts: tuple
+) -> None:
+    """Behavioral timeline around the event: trial run/dwell, stop, the event.
 
-    The regression scores reward at the *trial* level: ``reward_outcome`` is
-    the current trial's ``is_reward`` (True if ANY poke in that trial's stay
-    delivered reward), and ``time_since_reward`` counts from the most recent
-    pump. A trial = one run + the whole stay at the destination well, so a
-    rewarded trial can contain many unrewarded pokes — this panel reflects the
-    trial label the model sees, not any single poke. Shows the trial reward
-    status and the most recent pump-DIO (green ▼) reaching back to the last
-    reward, relative to the event center.
+    Three lanes vs time-from-event-center:
+      - TRIAL: run segment [start→goal_arrival] (solid) + post-arrival dwell
+        [goal_arrival→end] (hatched) — the trial-level "stop" the reward
+        covariates use.
+      - STOP: the immobility bout containing the event (dark grey) + the
+        previous bout (light grey) — the bounded stop unit (time_since_stop).
+      - EVENT: the event's true extent, in the non-local (or SWR) color.
+
+    Showing the trial dwell and the immobility bout together makes the
+    degenerate-trial mismatch visible: in a disengagement tail the dwell bar
+    spans minutes while the stop bout stays short. The most recent reward pump
+    (green ▼) and the trial-level reward_outcome are annotated.
     """
-    ax.set_title("reward: trial-level (regression)", fontsize=7)
-    ax.set_yticks([])
+    cls = row["category"]
+    ev_color = COLORS["SWR"] if cls == "swr_not_nonlocal" else COLORS["Non-Local"]
+    lane_event, lane_stop, lane_trial = 0, 1, 2
+    ax.set_title("behavioral context (time from event center)", fontsize=7)
     ax.set_xlabel("Time from event center (s)", fontsize=6)
     ax.tick_params(axis="x", labelsize=5)
-    ax.axhline(0, color="black", lw=0.5)
-    ax.axvspan(-WINDOW_SEC, WINDOW_SEC, color="magenta", alpha=0.18, zorder=2)
-    ax.axvline(0, color="magenta", lw=0.8, zorder=3)
+    ax.set_yticks([0, 1, 2])
+    ax.set_yticklabels(["event", "stop", "trial"], fontsize=5.5)
+    ax.set_ylim(-0.6, 3.2)
+    ax.axvline(0, color="black", lw=0.6, zorder=1)
+    xs = [0.0]
 
     trial = _current_trial(data.get("trials"), center)
-    if trial is None:
-        ax.text(
-            0.5,
-            0.5,
-            "no trial",
-            fontsize=6,
-            ha="center",
-            va="center",
-            color="gray",
-            transform=ax.transAxes,
+    rewarded = None
+    if trial is not None:
+        ga = trial.get("goal_arrival_time")
+        if ga is None or (isinstance(ga, float) and np.isnan(ga)):
+            ga = trial["end_time"]
+        rs, gr, te = (
+            trial["start_time"] - center,
+            float(ga) - center,
+            trial["end_time"] - center,
         )
-        return
+        rewarded = bool(trial.get("is_reward", False))
+        ax.barh(lane_trial, gr - rs, left=rs, height=0.5, color="steelblue", zorder=3)
+        ax.barh(
+            lane_trial,
+            te - gr,
+            left=gr,
+            height=0.5,
+            facecolor="none",
+            edgecolor="steelblue",
+            hatch="////",
+            lw=0.4,
+            zorder=3,
+        )
+        ax.annotate(
+            f"run W{int(trial['from_well'])}→W{int(trial['to_well'])} | dwell",
+            (rs, lane_trial + 0.32),
+            fontsize=4.3,
+            color="steelblue",
+            va="bottom",
+        )
+        xs += [rs, te]
 
-    rewarded = bool(trial.get("is_reward", False))
-    fw, tw = int(trial["from_well"]), int(trial["to_well"])
+    starts, ends = np.asarray(imm_bouts[0]), np.asarray(imm_bouts[1])
+    if len(starts):
+        cont = np.where((starts <= center) & (ends >= center))[0]
+        if len(cont):
+            i = cont[-1]
+            ax.barh(
+                lane_stop,
+                ends[i] - starts[i],
+                left=starts[i] - center,
+                height=0.5,
+                color="0.55",
+                zorder=3,
+            )
+            xs += [starts[i] - center, ends[i] - center]
+        prev = np.where(ends <= center)[0]
+        if len(prev):
+            i = prev[-1]
+            ax.barh(
+                lane_stop,
+                ends[i] - starts[i],
+                left=starts[i] - center,
+                height=0.5,
+                color="0.82",
+                zorder=2,
+            )
+            xs += [starts[i] - center]
 
-    # Most recent pump-DIO before the event = the reward the regression's
-    # time_since_reward counts from.
+    es, ee = row["plot_start"] - center, row["plot_end"] - center
+    ax.barh(
+        lane_event, max(ee - es, 0.004), left=es, height=0.5, color=ev_color, zorder=4
+    )
+    xs += [es, ee]
+
     pumps = data["pump_events"]
     prior = pumps[pumps["start_time"] <= center]
-    last_pump_rel = float(prior["start_time"].max()) - center if len(prior) else None
-
-    lo = min(last_pump_rel if last_pump_rel is not None else -WINDOW_SEC, -WINDOW_SEC)
-    ax.set_xlim(lo * 1.1 - 0.3, WINDOW_SEC + 0.3)
-
-    status = "REWARDED" if rewarded else "OMISSION"
-    status_color = "green" if rewarded else "red"
-    ax.annotate(
-        f"trial W{fw}→W{tw}: {status}  (reward_outcome={int(rewarded)})",
-        (0.5, 0.92),
-        fontsize=5.3,
-        color=status_color,
-        ha="center",
-        va="top",
-        xycoords="axes fraction",
-    )
-    if last_pump_rel is not None:
+    if len(prior):
+        lp = float(prior["start_time"].max()) - center
         ax.scatter(
-            [last_pump_rel],
-            [0],
+            [lp],
+            [2.85],
             marker="v",
-            s=45,
+            s=40,
             color="limegreen",
             edgecolor="black",
             linewidth=0.4,
             zorder=5,
         )
         ax.annotate(
-            f"last reward\n{-last_pump_rel:.0f}s ago",
-            (last_pump_rel, 0.12),
-            fontsize=4.6,
-            color="green",
-            ha="center",
-            va="bottom",
-            xycoords=("data", "axes fraction"),
+            "reward", (lp, 2.95), fontsize=4.3, color="green", ha="center", va="bottom"
         )
-    else:
+        xs += [lp]
+
+    lo, hi = min(xs), max(xs)
+    pad = 0.05 * (hi - lo) + 0.3
+    ax.set_xlim(lo - pad, hi + pad)
+    if rewarded is not None:
         ax.annotate(
-            "no prior reward",
-            (0.5, 0.5),
-            fontsize=6,
-            color="red",
-            ha="center",
-            va="center",
+            "REWARDED" if rewarded else "OMISSION",
+            (0.99, 0.97),
             xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=5.5,
+            color="green" if rewarded else "red",
         )
 
 
@@ -1204,7 +1246,9 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     )
     _plot_arm_predictor_heatmap(fig.add_subplot(gs_left[3]), arm_rows)
     _plot_patch_content_bar(fig.add_subplot(gs_left[4]), arm_rows, et_row)
-    _plot_reward_timeline(fig.add_subplot(gs_left[5]), ctx["data"], center)
+    _plot_behavioral_context(
+        fig.add_subplot(gs_left[5]), ctx["data"], center, row, ctx["imm_bouts"]
+    )
 
     # Right column: 6-row decoding stack (SWR / MUA / raster / posterior /
     # state probs / speed).
@@ -1264,12 +1308,16 @@ def render_epoch(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
 
-    # Predictors + per-arm content for the footer and content bar (NL
-    # categories only).
+    # ``dot`` is always loaded: it is cheap relative to load_data and the
+    # immobility bouts (stop unit) it provides are used by every event's
+    # behavioral-context panel. Per-arm predictors/content additionally need
+    # the conditional posterior (NL categories only).
+    dot = pd.read_pickle(data_dir / f"{epoch_id}_HPC_80_data_over_time.pkl")
+    imm_bouts = immobility_bout_intervals(dot)
+
     event_table = None
     arm_table = None
     if (sel["category"] != "swr_not_nonlocal").any():
-        dot = pd.read_pickle(data_dir / f"{epoch_id}_HPC_80_data_over_time.pkl")
         posterior = load_conditional_posterior(
             PROCESSED_DATA_DIR / f"{epoch_id}_HPC_results.nc"
         )
@@ -1299,6 +1347,7 @@ def render_epoch(
         "arm_table": arm_table,
         "arm_of_edge": arm_of_edge,
         "arm_colors": _arm_colors(data["linear_edge_order"], arm_of_edge),
+        "imm_bouts": imm_bouts,
     }
     n_written = 0
     for _, row in sel.iterrows():
