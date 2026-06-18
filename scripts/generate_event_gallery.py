@@ -695,24 +695,29 @@ def _plot_arm_content_bar(
             )
 
 
-def _plot_trial_history(ax, data: dict, center: float, n_trials: int = 20) -> None:
-    """Trial-by-trial reward history (the trial-level behavioral input).
+def _plot_trial_history(
+    ax, data: dict, center: float, arm_rows: pd.DataFrame, n_trials: int = 20
+) -> None:
+    """Trial-by-trial reward history, marked up with the value covariates.
 
     Grid of wells (rows W0-W5) × recent trials (columns, time → right). Each
     trial's ``to_well`` is marked with the TRIAL-level reward (``is_reward`` =
     any poke in that trial's stay was rewarded): filled green if rewarded,
     open if an omission — the same trial-level label the regression uses
-    (``reward_outcome``), not the per-poke reward. A faint line links
-    consecutive trials to show the route sequence. This is exactly what
-    ``visit_recency`` (horizontal gaps in a row), ``recent_reward_rate``
-    (density of filled markers), and ``last_rewarded_elsewhere`` (most recent
-    filled marker off the current row) are derived from. The current trial
-    (the one at the event) is ringed in magenta.
+    (``reward_outcome``), not the per-poke reward. Current trial ringed magenta.
+
+    Marked up so the value covariates can be read directly:
+      - gold band over the **last 10 trials** = the ``cumulative_reward`` window.
+      - orange rings on each row's **last 5 visits** = the ``recent_reward_rate``
+        window (k=5 visits to that arm).
+      - right margin prints the per-arm pipeline values for this event:
+        ``vr`` (visit_recency, trials-ago), ``rr`` (recent_reward_rate),
+        ``cum`` (cumulative_reward over 10 trials).
     """
     ax.set_title("trial reward history (regression-level, → event)", fontsize=7)
     ax.set_yticks(range(6))
     ax.set_yticklabels([f"W{w}" for w in range(6)], fontsize=5)
-    ax.set_ylim(-0.6, 5.6)
+    ax.set_ylim(-0.6, 6.2)
     ax.tick_params(axis="x", labelsize=5)
     ax.set_xlabel("trial (recent history → event)", fontsize=6)
     ax.grid(axis="y", color="0.9", lw=0.5)
@@ -774,8 +779,79 @@ def _plot_trial_history(ax, data: dict, center: float, n_trials: int = 20) -> No
         linewidth=1.6,
         zorder=4,
     )
-    ax.set_xlim(-0.5, max(len(window) - 0.5, 0.5))
-    ax.set_xticks(xs[:: max(1, len(xs) // 10)])
+    n = len(window)
+
+    # cumulative_reward window: the last 10 trials (gold band).
+    band_lo = max(-0.5, n - 10 - 0.5)
+    ax.axvspan(band_lo, n - 0.5, color="gold", alpha=0.12, zorder=0)
+
+    # recent_reward_rate window: ring each row's last 5 visits (orange).
+    for w in range(6):
+        cols_w = [p for p in xs if wells[p] == w]
+        if cols_w:
+            last5 = cols_w[-5:]
+            ax.scatter(
+                last5,
+                [w] * len(last5),
+                s=130,
+                marker="o",
+                facecolor="none",
+                edgecolor="darkorange",
+                linewidth=1.0,
+                zorder=2,
+            )
+
+    # Right-margin per-arm covariate values (the exact pipeline values for this
+    # event). Header column names spelled out; a key below explains them.
+    if arm_rows is not None and len(arm_rows):
+        by_arm = arm_rows.set_index("arm")
+        xtext = n - 0.2
+        ax.set_xlim(-0.5, n - 0.5 + 0.42 * max(n, 1))
+        ax.annotate(
+            "vr / rr / cum",
+            (xtext, 5.9),
+            fontsize=6.5,
+            color="black",
+            ha="left",
+            va="bottom",
+            fontweight="bold",
+        )
+        for w in range(6):
+            if w not in by_arm.index:
+                continue
+            r = by_arm.loc[w]
+            vr = r.get("visit_recency")
+            rr = r.get("recent_reward_rate")
+            cum = r.get("cumulative_reward")
+            vr_s = "·" if pd.isna(vr) else f"{vr:.0f}"
+            rr_s = "·" if pd.isna(rr) else f"{rr:.2f}"
+            cum_s = "·" if pd.isna(cum) else f"{cum:.0f}"
+            ax.annotate(
+                f"{vr_s} / {rr_s} / {cum_s}",
+                (xtext, w),
+                fontsize=6.5,
+                color="black",
+                ha="left",
+                va="center",
+                family="monospace",
+            )
+    else:
+        ax.set_xlim(-0.5, max(n - 0.5, 0.5))
+    ax.set_xticks(list(range(n))[:: max(1, n // 10)])
+
+    # Plain-language key for the markup, below the x-axis.
+    ax.annotate(
+        "right column = vr / rr / cum:   "
+        "vr = visit_recency [trials since last visit]   ·   "
+        "rr = recent_reward_rate [last 5 visits = orange rings]   ·   "
+        "cum = cumulative_reward [last 10 trials = gold band]",
+        (0.5, -0.42),
+        xycoords="axes fraction",
+        ha="center",
+        va="top",
+        fontsize=5.6,
+        color="0.25",
+    )
 
     # Compact legend.
     ax.scatter(
@@ -1005,6 +1081,17 @@ def _plot_behavioral_context(
             color="steelblue",
             va="bottom",
         )
+        # goal arrival (well reached / reward site) — distinct from the
+        # speed-defined immobility onset (start of the grey stop bar).
+        ax.axvline(gr, color="darkorange", ls=":", lw=0.9, zorder=2)
+        ax.annotate(
+            "arrival",
+            (gr, 2.55),
+            fontsize=4.2,
+            color="darkorange",
+            ha="center",
+            va="bottom",
+        )
         xs += [rs, te]
 
     starts, ends = np.asarray(imm_bouts[0]), np.asarray(imm_bouts[1])
@@ -1062,6 +1149,63 @@ def _plot_behavioral_context(
     lo, hi = min(xs), max(xs)
     pad = 0.05 * (hi - lo) + 0.3
     ax.set_xlim(lo - pad, hi + pad)
+    win_lo, win_hi = center + lo - pad, center + hi + pad
+
+    # Poke (beam-break) marks — reward is poke-triggered, so these show when
+    # the animal actually poked the well. Use merged poke visits (is_run False).
+    visits = data.get("well_visits")
+    if visits is not None and len(visits):
+        pk = visits[
+            (~visits["is_run"].astype(bool))
+            & (visits["start_time"] >= win_lo)
+            & (visits["start_time"] <= win_hi)
+        ]
+        if len(pk):
+            ax.plot(
+                pk["start_time"].to_numpy() - center,
+                np.full(len(pk), -0.45),
+                marker="|",
+                ls="",
+                ms=5,
+                color="black",
+                zorder=5,
+            )
+            ax.annotate(
+                "pokes",
+                (lo - pad, -0.45),
+                fontsize=4.0,
+                color="black",
+                ha="left",
+                va="center",
+            )
+
+    # Speed trace over the window (secondary axis): shows the run, the
+    # deceleration, and the immobility-threshold crossing that defines the stop.
+    pos = data.get("position_info")
+    if pos is not None and "head_speed" in pos.columns:
+        seg = pos.loc[win_lo:win_hi]
+        if len(seg):
+            step = max(1, len(seg) // 2000)
+            ax2 = ax.twinx()
+            ax2.plot(
+                seg.index.to_numpy()[::step] - center,
+                seg["head_speed"].to_numpy()[::step],
+                color="0.45",
+                lw=0.5,
+                alpha=0.7,
+                zorder=0,
+            )
+            ax2.axhline(
+                DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+                color="red",
+                ls="--",
+                lw=0.5,
+                alpha=0.7,
+            )
+            ax2.set_ylim(0, max(20, float(seg["head_speed"].max())))
+            ax2.set_ylabel("speed (cm/s)", fontsize=5, color="0.4")
+            ax2.tick_params(axis="y", labelsize=4.5, colors="0.4")
+
     if rewarded is not None:
         ax.annotate(
             "REWARDED" if rewarded else "OMISSION",
@@ -1203,15 +1347,16 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ):
         arm_rows = ctx["arm_table"][ctx["arm_table"]["event_id"] == row["event_id"]]
 
-    fig = plt.figure(figsize=(9.0, 13.5), dpi=200)
+    fig = plt.figure(figsize=(9.0, 14.0), dpi=200)
     # Two outer rows: the panels (two columns) on top, a full-width
-    # well-visit/reward history strip at the bottom.
+    # trial reward-history strip at the bottom (taller, to fit the covariate
+    # key and per-arm values).
     outer = GridSpec(
         2,
         1,
         figure=fig,
-        height_ratios=[7.0, 1.0],
-        hspace=0.12,
+        height_ratios=[6.2, 1.7],
+        hspace=0.14,
         top=0.96,
         bottom=0.04,
         left=0.06,
@@ -1284,8 +1429,9 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ax_post.set_ylabel("")
     ax_post.tick_params(labelleft=False)
 
-    # Bottom: full-width well-visit / reward history grid.
-    _plot_trial_history(fig.add_subplot(outer[1]), ctx["data"], center)
+    # Bottom: full-width trial reward-history grid, marked up with the
+    # value covariates (visit_recency / recent_reward_rate / cumulative_reward).
+    _plot_trial_history(fig.add_subplot(outer[1]), ctx["data"], center, arm_rows)
 
     fig.savefig(out_path)
     plt.close(fig)
