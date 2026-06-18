@@ -14,7 +14,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.rate_model import fit_rate_model
+from continuum_swr_replay.analysis.replay.rate_model import (
+    cross_validate_rate_model,
+    fit_rate_model,
+)
 
 
 def _simulate_stops(
@@ -325,3 +328,34 @@ class TestEdgeCases:
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=5)
         fit = fit_rate_model(df, predictors=[])
         assert fit["n_events_total"] == int(df["n_events"].sum())
+
+
+# ── Cross-validation ──
+
+
+class TestCrossValidateRateModel:
+    def test_returns_cv_keys(self):
+        df = _simulate_stops(n_stops=300, log_intercept=0.0, seed=1)
+        cv = cross_validate_rate_model(df, predictors=[])
+        assert cv is not None
+        assert set(cv) >= {"cv_ll_per_stop_mean", "cv_ll_per_stop_std", "cv_n_folds"}
+        assert cv["cv_n_folds"] == 5
+        assert np.isfinite(cv["cv_ll_per_stop_mean"])
+
+    def test_informative_predictor_improves_held_out_ll(self):
+        # A strong true effect should give higher held-out LL than the null.
+        df = _simulate_stops(
+            n_stops=600, log_intercept=-1.0, coefs={"x": 1.5}, seed=2
+        )
+        null = cross_validate_rate_model(df, predictors=[])
+        full = cross_validate_rate_model(df, predictors=["x"])
+        assert null is not None and full is not None
+        assert full["cv_ll_per_stop_mean"] > null["cv_ll_per_stop_mean"]
+
+    def test_too_few_stops_returns_none(self):
+        df = _simulate_stops(n_stops=8, log_intercept=0.0, seed=3)
+        assert cross_validate_rate_model(df, predictors=[]) is None
+
+    def test_missing_column_returns_none(self):
+        df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=4)
+        assert cross_validate_rate_model(df, predictors=["not_a_column"]) is None

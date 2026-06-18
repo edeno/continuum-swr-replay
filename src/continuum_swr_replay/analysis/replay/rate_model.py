@@ -155,3 +155,68 @@ def fit_rate_model(
     }
 
     return output
+
+
+def cross_validate_rate_model(
+    stop_table: pd.DataFrame,
+    predictors: list[str],
+    response_col: str = "n_events",
+    offset_col: str = "immobility_time",
+    n_folds: int = 5,
+    min_stops: int = 20,
+    seed: int = 0,
+) -> dict | None:
+    """K-fold held-out log-likelihood for the per-stop rate Poisson.
+
+    Stop-based K-fold CV mirroring :func:`fit_rate_model`'s design (intercept +
+    predictors, ``log(offset_col)`` offset). For each fold the model is fit on
+    the training stops and the mean held-out per-stop Poisson log-likelihood is
+    evaluated on the test stops; the returned ``cv_ll_per_stop_mean`` is the
+    average across folds (higher = better predictive fit). This is the rate
+    analogue of :func:`model_checking.cross_validate_conditional_poisson`, which
+    only applies to the conditional (arm/patch) models.
+
+    Returns None if columns are missing, too few stops, or any fold's training
+    design is rank-deficient (matching ``fit_rate_model``'s identifiability
+    guard).
+    """
+    from scipy.stats import poisson
+    from sklearn.model_selection import KFold
+
+    required = [response_col, offset_col] + predictors
+    if any(c not in stop_table.columns for c in required):
+        return None
+    df = stop_table[required].dropna()
+    df = df[df[offset_col] > 0].reset_index(drop=True)
+    if len(df) < max(min_stops, n_folds * 2):
+        return None
+
+    y = df[response_col].to_numpy(dtype=float)
+    offset = np.log(df[offset_col].to_numpy(dtype=float))
+    if predictors:
+        X = sm.add_constant(df[predictors].to_numpy(dtype=float), has_constant="add")
+    else:
+        X = np.ones((len(df), 1))
+
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
+    fold_ll = []
+    for train, test in kf.split(X):
+        if np.linalg.matrix_rank(X[train]) < X.shape[1]:
+            return None
+        try:
+            res = sm.GLM(
+                y[train], X[train], family=sm.families.Poisson(), offset=offset[train]
+            ).fit(disp=0)
+        except Exception:
+            return None
+        mu = np.exp(np.clip(X[test] @ res.params + offset[test], -30, 30))
+        ll = poisson.logpmf(y[test], mu)
+        if not np.all(np.isfinite(ll)):
+            return None
+        fold_ll.append(float(np.mean(ll)))
+
+    return {
+        "cv_ll_per_stop_mean": float(np.mean(fold_ll)),
+        "cv_ll_per_stop_std": float(np.std(fold_ll)),
+        "cv_n_folds": n_folds,
+    }
