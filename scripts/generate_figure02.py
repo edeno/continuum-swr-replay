@@ -53,7 +53,9 @@ import logging
 import warnings
 from pathlib import Path
 
+import joblib
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
@@ -61,6 +63,7 @@ import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.hippocampus import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
+    compute_local_decoding_error,
     compute_swr_overlap_class_counts,
     get_event_types,
     load_data_over_time,
@@ -77,12 +80,21 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.figure_panels import (
+    compute_triggered_average_curves,
     plot_decoding_error_distribution,
     plot_event_example_stack,
     plot_event_timing_offsets,
     plot_swr_overlap_class_bar,
     plot_triggered_averages,
 )
+from continuum_swr_replay.visualization.plots import (
+    plot_linear_track_graph_strip,
+    plot_track_graph_2d,
+)
+
+# Signals shown in panel c (triggered averages). Theta/MUA live in the
+# supplementary decoder-validation figure.
+TRIGGERED_SIGNALS = ["Non-Local_prob", "SWR_zscore"]
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -144,12 +156,38 @@ def pick_example_events(
 # ---------------------------------------------------------------------------
 
 
-def generate_figure(
-    nwb_file_name: str = "wilbur20210329_.nwb",
-    epoch_name: str = "02_r1",
-    data_dir: Path = PROCESSED_DATA_DIR,
-    window_sec: float = 0.4,
-):
+def _figure02_cache_path(
+    nwb_file_name: str, epoch_name: str, data_dir: Path
+) -> Path:
+    """Path for the cached Figure-2 render inputs (joblib bundle).
+
+    A single joblib bundle is used rather than netCDF because the bundle
+    mixes a session ``data`` dict, an xarray ``results`` Dataset whose
+    ``state_bins`` MultiIndex netCDF cannot serialize, the fitted detector
+    and environment objects, and several small DataFrames; joblib (pickle)
+    preserves them all exactly.
+    """
+    animal, day = parse_nwb_filename(nwb_file_name)
+    return (
+        data_dir / "intermediates" / f"{animal}{day}_{epoch_name}_figure02_cache.joblib"
+    )
+
+
+def _compute_figure_inputs(
+    nwb_file_name: str,
+    epoch_name: str,
+    data_dir: Path,
+) -> dict:
+    """Run the expensive loads/derivations and return all render inputs.
+
+    Everything the figure needs is reduced here to a single dict that is
+    cheap to cache: the example session's ``data``/``results``/``detector``
+    /``env`` plus the chosen example events (panel a), and the small
+    aggregate products for panels b–e (overlap-class counts, NL/SWR timing
+    offsets, triggered-average curves, per-session decoding-error table).
+    The multi-GB ``data_over_time`` is consumed here and intentionally not
+    returned, so the cached bundle stays small.
+    """
     # ── Load data ──
     logging.info(f"Loading session {nwb_file_name} {epoch_name}...")
     data = load_data(nwb_file_name, epoch_name)
@@ -241,6 +279,74 @@ def generate_figure(
     offsets = overlap_pairs[["animal", "day", "epoch", "start_diff", "end_diff"]]
     logging.info(f"  {len(offsets):,} immobile SWR-overlapping NL events")
 
+    logging.info("Computing triggered-average curves (panel c)...")
+    triggered_curves = compute_triggered_average_curves(
+        data_over_time, event_types, TRIGGERED_SIGNALS, time_col="start_time",
+    )
+
+    logging.info("Computing per-session decoding error (panel e)...")
+    error_df = compute_local_decoding_error(data_over_time)
+
+    return {
+        "nwb_file_name": nwb_file_name,
+        "epoch_name": epoch_name,
+        "data": data,
+        "results": results,
+        "detector": detector,
+        "env": env,
+        "chosen": chosen,
+        "class_counts": class_counts,
+        "offsets": offsets,
+        "triggered_curves": triggered_curves,
+        "error_df": error_df,
+    }
+
+
+def generate_figure(
+    nwb_file_name: str = "wilbur20210329_.nwb",
+    epoch_name: str = "02_r1",
+    data_dir: Path = PROCESSED_DATA_DIR,
+    window_sec: float = 0.4,
+    use_cache: bool = True,
+):
+    """Build Figure 2, loading cached render inputs when available.
+
+    Parameters
+    ----------
+    use_cache : bool, default True
+        When True and a cached bundle exists under ``data_dir /
+        intermediates``, load it and skip the expensive session load
+        (~9 min) and aggregate processing (~11 min). When False
+        (``--force-recompute``), recompute and overwrite the cache.
+        Figure-only edits (layout, styling) reuse the cache.
+    """
+    cache_path = _figure02_cache_path(nwb_file_name, epoch_name, data_dir)
+    if use_cache and cache_path.exists():
+        logging.info(
+            f"Loading cached render inputs from {cache_path} "
+            "(use --force-recompute to rebuild)..."
+        )
+        inputs = joblib.load(cache_path)
+    else:
+        inputs = _compute_figure_inputs(nwb_file_name, epoch_name, data_dir)
+        logging.info(f"Caching render inputs to {cache_path}...")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(inputs, cache_path)
+
+    return _render_figure(inputs, window_sec=window_sec)
+
+
+def _render_figure(inputs: dict, window_sec: float = 0.4):
+    data = inputs["data"]
+    results = inputs["results"]
+    detector = inputs["detector"]
+    env = inputs["env"]
+    chosen = inputs["chosen"]
+    class_counts = inputs["class_counts"]
+    offsets = inputs["offsets"]
+    triggered_curves = inputs["triggered_curves"]
+    error_df = inputs["error_df"]
+
     # ── Layout ──
     fig_height = min(9.0, PAGE_HEIGHT)
     fig = plt.figure(
@@ -249,21 +355,39 @@ def generate_figure(
         constrained_layout=True,
     )
     outer = GridSpec(
-        4,
+        3,
         1,
         figure=fig,
-        height_ratios=[2.2, 0.5, 1.4, 1.2],
-        hspace=0.35,
+        height_ratios=[2.2, 0.5, 1.1],
+        hspace=0.3,
     )
 
-    # ── Row 1: panel a (3 example columns × 4 sub-rows) ──
-    gs_a = outer[0].subgridspec(
+    # ── Row 1: panel a ──
+    # Left: a shared 2D track + occupancy spatial key. Right: three example
+    # columns × 4 sub-rows. A 1D linearized track-graph strip is attached
+    # flush to the leftmost posterior as its spatial y-axis key.
+    gs_a_outer = outer[0].subgridspec(1, 2, width_ratios=[0.7, 5.0], wspace=0.02)
+
+    # 2D spatial key, vertically centred in the left region so it reads as
+    # roughly square next to the tall example stack.
+    gs_key = gs_a_outer[0].subgridspec(3, 1, height_ratios=[0.5, 2.0, 0.9])
+    ax_key2d = fig.add_subplot(gs_key[1])
+    plot_track_graph_2d(
+        data["track_graph"],
+        data["position_info"],
+        ax=ax_key2d,
+        edge_order=data["linear_edge_order"],
+    )
+
+    gs_a = gs_a_outer[1].subgridspec(
         4,
         3,
-        hspace=0.08,
-        wspace=0.25,
+        hspace=0.04,
+        wspace=0.12,
         height_ratios=[0.55, 0.9, 1.2, 0.75],
     )
+    max_position = float(np.ceil(data["position_info"].linear_position.max()))
+
     first_column_axes: list = []
     for col_i, cls in enumerate(CLASS_ORDER):
         axes_col = [fig.add_subplot(gs_a[row, col_i]) for row in range(4)]
@@ -288,47 +412,99 @@ def generate_figure(
             relative_time_center=center,
         )
 
+    # 1D linearized track-graph strip attached flush to the leftmost
+    # posterior as an inset, sharing its linear-position y-axis. It becomes
+    # the spatial y-key, so blank the posterior's own numeric y-axis.
+    ax_post_left = first_column_axes[2]
+    # Right edge of the inset sits at x=0 (the posterior's left edge) so the
+    # linearized track is flush against the posterior it keys.
+    ax_strip = ax_post_left.inset_axes([-0.12, 0.0, 0.12, 1.0])
+    plot_linear_track_graph_strip(
+        data["track_graph"],
+        data["linear_edge_order"],
+        data["linear_edge_spacing"],
+        ax=ax_strip,
+        max_position=max_position,
+    )
+    ax_post_left.set_ylabel("")
+    ax_post_left.tick_params(labelleft=False)
+
     # ── Row 2: panel b (wide overlap stacked bar) ──
     ax_b = fig.add_subplot(outer[1])
     plot_swr_overlap_class_bar(class_counts, ax=ax_b)
 
-    # ── Row 3: panel c (triggered averages, 2 signals) + panel d (timing) ──
-    gs_cd = outer[2].subgridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.35)
-
-    gs_c = gs_cd[0].subgridspec(2, 1, hspace=0.1)
-    ax_c_top = fig.add_subplot(gs_c[0])
-    ax_c_bot = fig.add_subplot(gs_c[1], sharex=ax_c_top)
-    ax_c_top.tick_params(labelbottom=False)
-    plot_triggered_averages(
-        data_over_time,
-        event_types,
-        time_col="start_time",
-        axes=[ax_c_top, ax_c_bot],
-        signals=["Non-Local_prob", "SWR_zscore"],
+    # ── Row 3: panels c (triggered averages), d (timing), e (error) ──
+    # One flat 2×4 grid so every panel shares the same two grid rows: c is
+    # a 2-row signal stack (col 0), while d's two histograms (cols 1-2) and
+    # e (col 3) each span both rows. Sharing the grid keeps their tops and
+    # bottoms aligned (a nested subgridspec for c would not align).
+    gs_cde = outer[2].subgridspec(
+        2,
+        4,
+        width_ratios=[1.35, 0.8, 0.8, 1.05],
+        hspace=0.05,
+        wspace=0.38,
     )
 
-    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.15)
-    ax_d_start = fig.add_subplot(gs_d[0])
-    ax_d_end = fig.add_subplot(gs_d[1], sharey=ax_d_start)
+    ax_c_top = fig.add_subplot(gs_cde[0, 0])
+    ax_c_bot = fig.add_subplot(gs_cde[1, 0], sharex=ax_c_top)
+    ax_c_top.tick_params(labelbottom=False)
+    plot_triggered_averages(
+        data_over_time=None,
+        event_types=None,
+        time_col="start_time",
+        axes=[ax_c_top, ax_c_bot],
+        signals=TRIGGERED_SIGNALS,
+        precomputed=triggered_curves,
+    )
+
+    ax_d_start = fig.add_subplot(gs_cde[:, 1])
+    ax_d_end = fig.add_subplot(gs_cde[:, 2], sharey=ax_d_start)
     plot_event_timing_offsets(offsets, axes=[ax_d_start, ax_d_end])
     ax_d_end.tick_params(labelleft=False)
     ax_d_end.set_ylabel("")
 
-    # ── Row 4: panel e (decoding error), centered at ~half width ──
-    gs_e = outer[3].subgridspec(1, 3, width_ratios=[0.5, 1.0, 0.5])
-    ax_e = fig.add_subplot(gs_e[1])
-    plot_decoding_error_distribution(data_over_time, ax=ax_e)
+    ax_e = fig.add_subplot(gs_cde[:, 3])
+    plot_decoding_error_distribution(ax=ax_e, error_df=error_df)
 
     # ── Panel labels ──
-    # Larger font for readability in a two-column figure; push slightly
-    # further outside the axes so they don't collide with plot content.
+    # d and e are placed relative to their own axes (right column / centered
+    # bottom). a, b, and c are placed at a shared figure-x so the label
+    # sits left of the 2D key (panel a) and b/c line up vertically — their
+    # axes boxes start at different x (panel b's long y-tick label pushes
+    # its box right), so a fixed per-axis offset would not align them.
     label_panels(
-        [first_column_axes[0], ax_b, ax_c_top, ax_d_start, ax_e],
-        labels=["a", "b", "c", "d", "e"],
+        [ax_d_start, ax_e],
+        labels=["d", "e"],
         xpos=-0.08,
         ypos=1.15,
         fontsize=11,
     )
+    # Finalize constrained_layout so axis positions are final before reading
+    # them, then label a/b/c at the common left edge of their content.
+    fig.canvas.draw()
+    x_label = (
+        min(
+            ax_key2d.get_position().x0,
+            ax_b.get_position().x0,
+            ax_c_top.get_position().x0,
+        )
+        - 0.006
+    )
+    for ax, letter in (
+        (first_column_axes[0], "a"),
+        (ax_b, "b"),
+        (ax_c_top, "c"),
+    ):
+        fig.text(
+            x_label,
+            ax.get_position().y1,
+            letter,
+            fontsize=11,
+            fontweight="bold",
+            va="bottom",
+            ha="right",
+        )
 
     return fig
 
@@ -347,6 +523,16 @@ def main() -> None:
     parser.add_argument("--epoch-name", type=str, default="02_r1")
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
     parser.add_argument("--window-sec", type=float, default=0.4)
+    parser.add_argument(
+        "--force-recompute",
+        action="store_true",
+        help=(
+            "Re-run the expensive loads/derivations instead of loading the "
+            "cached render inputs under data_dir/intermediates (overwrites "
+            "the cache). Use after changing any data/computation upstream of "
+            "the figure; figure-only edits can reuse the cache."
+        ),
+    )
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args()
@@ -357,6 +543,7 @@ def main() -> None:
         epoch_name=args.epoch_name,
         data_dir=args.data_dir,
         window_sec=args.window_sec,
+        use_cache=not args.force_recompute,
     )
 
     logging.info(f"Saving to {args.output_dir}...")

@@ -106,6 +106,92 @@ def plot_event_duration_distribution(
         plt.close(fig)
 
 
+def compute_triggered_average_curves(
+    data_over_time: pd.DataFrame,
+    event_types: dict,
+    signals: list[str],
+    time_col: str = "start_time",
+    window_sec: float = 2.0,
+) -> dict:
+    """Reduce ``data_over_time`` to event-triggered mean/SEM curves.
+
+    Splits the work that :func:`plot_triggered_averages` used to do inline
+    into a small, cacheable product: for each signal, the time axis and the
+    across-event mean and SEM for non-SWR (no-overlap) vs SWR-coincident
+    (overlap) immobile non-local events. The returned dict is a few KB,
+    letting callers cache it instead of the multi-GB ``data_over_time``.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Aggregated per-timebin dataset.
+    event_types : dict
+        Output of :func:`get_event_types`.
+    signals : list of str
+        Signal columns to reduce, in order.
+    time_col : str
+        Alignment column ('start_time' or 'end_time').
+    window_sec : float
+        Half-window around each event, in seconds.
+
+    Returns
+    -------
+    dict
+        ``{signal: {"time", "no_overlap_mean", "no_overlap_sem",
+        "overlap_mean", "overlap_sem"}}`` with numpy-array values.
+
+    """
+    signal_types = list(signals)
+    no_overlap_times = get_event_start_end_times(
+        event_types["non_local_event_immobile_no_overlap_SWR_event"],
+        event_col="non_local_event",
+    )
+    overlap_times = get_event_start_end_times(
+        event_types["non_local_event_immobile_overlap_SWR_event"],
+        event_col="non_local_event",
+    )
+    windows_no = get_signal_windows(
+        data=data_over_time,
+        event_times=no_overlap_times,
+        signal_cols=signal_types,
+        time_col=time_col,
+        window_sec=window_sec,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        event_id_col="non_local_event",
+    )
+    windows_ov = get_signal_windows(
+        data=data_over_time,
+        event_times=overlap_times,
+        signal_cols=signal_types,
+        time_col=time_col,
+        window_sec=window_sec,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        event_id_col="non_local_event",
+    )
+    no_mean_all = windows_no.mean(dim="event")
+    ov_mean_all = windows_ov.mean(dim="event")
+
+    curves: dict = {}
+    for signal_type in signal_types:
+        no_mean = no_mean_all.sel(signal=signal_type)
+        curves[signal_type] = {
+            "time": no_mean["time"].values,
+            "no_overlap_mean": no_mean.values,
+            "no_overlap_sem": sem(
+                windows_no.sel(signal=signal_type).values,
+                axis=0,
+                nan_policy="omit",
+            ),
+            "overlap_mean": ov_mean_all.sel(signal=signal_type).values,
+            "overlap_sem": sem(
+                windows_ov.sel(signal=signal_type).values,
+                axis=0,
+                nan_policy="omit",
+            ),
+        }
+    return curves
+
+
 def plot_triggered_averages(
     data_over_time: pd.DataFrame,
     event_types: dict,
@@ -116,6 +202,7 @@ def plot_triggered_averages(
     dpi: int = 300,
     axes: list[plt.Axes] | None = None,
     signals: list[str] | None = None,
+    precomputed: dict | None = None,
 ) -> None:
     """Plot event-triggered averages of physiological signals.
 
@@ -137,6 +224,12 @@ def plot_triggered_averages(
         to the full four-signal stack used in the original Figure 2
         design. For the current (reduced) Figure 2, pass
         ``["Non-Local_prob", "SWR_zscore"]``.
+    precomputed : dict, optional
+        Output of :func:`compute_triggered_average_curves`. When given,
+        the per-event windowing is skipped and the curves are plotted
+        directly from this dict (so ``data_over_time`` is unused). Lets a
+        caller cache the small reduced product instead of the full
+        dataset. Must cover every signal in ``signals``.
 
     """
     if signals is None:
@@ -149,31 +242,12 @@ def plot_triggered_averages(
     else:
         signal_types = list(signals)
 
-    non_local_start_end_time = get_event_start_end_times(
-        event_types["non_local_event_immobile_no_overlap_SWR_event"], event_col="non_local_event"
-    )
-    signal_windows = get_signal_windows(
-        data=data_over_time,
-        event_times=non_local_start_end_time,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=2.0,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
-
-    non_local_start_end_time_overlap = get_event_start_end_times(
-        event_types["non_local_event_immobile_overlap_SWR_event"], event_col="non_local_event"
-    )
-    signal_windows_overlap = get_signal_windows(
-        data=data_over_time,
-        event_times=non_local_start_end_time_overlap,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=2.0,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
+    if precomputed is None:
+        curves = compute_triggered_average_curves(
+            data_over_time, event_types, signal_types, time_col=time_col,
+        )
+    else:
+        curves = precomputed
 
     standalone = axes is None
     n_signals = len(signal_types)
@@ -187,44 +261,38 @@ def plot_triggered_averages(
         )
         axes = list(axes.flatten())
 
-    no_overlap_mean_all = signal_windows.mean(dim="event")
-    overlap_mean_all = signal_windows_overlap.mean(dim="event")
-
     for i, (ax, signal_type) in enumerate(zip(axes, signal_types, strict=True)):
-        no_overlap_mean = no_overlap_mean_all.sel(signal=signal_type)
-        overlap_mean = overlap_mean_all.sel(signal=signal_type)
-
-        no_overlap_data = signal_windows.sel(signal=signal_type)
-        overlap_data = signal_windows_overlap.sel(signal=signal_type)
-        no_overlap_sem = sem(no_overlap_data.values, axis=0, nan_policy="omit")
-        overlap_sem = sem(overlap_data.values, axis=0, nan_policy="omit")
-
-        time = no_overlap_mean["time"].values
+        curve = curves[signal_type]
+        time = curve["time"]
+        no_overlap_mean = curve["no_overlap_mean"]
+        overlap_mean = curve["overlap_mean"]
+        no_overlap_sem = curve["no_overlap_sem"]
+        overlap_sem = curve["overlap_sem"]
 
         ax.fill_between(
             time,
-            no_overlap_mean.values - no_overlap_sem,
-            no_overlap_mean.values + no_overlap_sem,
+            no_overlap_mean - no_overlap_sem,
+            no_overlap_mean + no_overlap_sem,
             color=COLORS["Non-Local"],
             alpha=0.3,
         )
         ax.fill_between(
             time,
-            overlap_mean.values - overlap_sem,
-            overlap_mean.values + overlap_sem,
+            overlap_mean - overlap_sem,
+            overlap_mean + overlap_sem,
             color=COLORS["SWR"],
             alpha=0.3,
         )
 
         ax.plot(
             time,
-            no_overlap_mean.values,
+            no_overlap_mean,
             label="non-SWR non-local",
             color=COLORS["Non-Local"],
         )
         ax.plot(
             time,
-            overlap_mean.values,
+            overlap_mean,
             label="SWR-coincident non-local",
             color=COLORS["SWR"],
         )
@@ -507,24 +575,37 @@ def plot_calibration_curve(
 
 
 def plot_decoding_error_distribution(
-    data_over_time: pd.DataFrame,
+    data_over_time: pd.DataFrame | None = None,
     ax: plt.Axes | None = None,
+    error_df: pd.DataFrame | None = None,
 ) -> None:
     """Plot distribution of decoding error during local state across sessions.
 
     Parameters
     ----------
-    data_over_time : pd.DataFrame
-        Aggregated ``data_over_time`` DataFrame.
+    data_over_time : pd.DataFrame, optional
+        Aggregated ``data_over_time`` DataFrame. Required unless
+        ``error_df`` is supplied.
     ax : matplotlib Axes, optional
         Axes to plot on. If None, creates standalone figure.
+    error_df : pd.DataFrame, optional
+        Precomputed output of :func:`compute_local_decoding_error` (one
+        row per session with ``median_error_cm``). When given,
+        ``data_over_time`` is not used, so a caller can cache this small
+        per-session table instead of the full dataset.
 
     """
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    error_df = compute_local_decoding_error(data_over_time)
+    if error_df is None:
+        if data_over_time is None:
+            raise ValueError(
+                "plot_decoding_error_distribution requires either "
+                "data_over_time or a precomputed error_df."
+            )
+        error_df = compute_local_decoding_error(data_over_time)
     errors = error_df["median_error_cm"].dropna()
 
     ax.hist(
@@ -822,16 +903,25 @@ def plot_event_example_stack(
         results, time_slice, ax_probs, plot_local=True,
     )
 
+    # Tighten the x-limits to the requested window. The four sub-row
+    # plotters each autoscale to their own data with default margins,
+    # which leaves the window loose and asymmetric about the event
+    # center; pin it to the exact slice so the displayed time is tight.
+    for ax in (ax_swr, ax_raster, ax_post, ax_probs):
+        ax.set_xlim(time_slice.start, time_slice.stop)
+
     # Hide x tick labels on every sub-row except the bottom one
     for ax in (ax_swr, ax_raster, ax_post):
         ax.tick_params(labelbottom=False)
 
     if relative_time_center is not None:
-        ticks = ax_probs.get_xticks()
-        ax_probs.set_xticks(ticks)
-        ax_probs.set_xticklabels(
-            [f"{t - relative_time_center:.2f}" for t in ticks]
-        )
+        # Place ticks at round offsets from the event center so the
+        # bottom row reads as clean ±s values within the tight window.
+        half = (time_slice.stop - time_slice.start) / 2.0
+        offsets = np.arange(-0.4, 0.4 + 1e-9, 0.2)
+        offsets = offsets[np.abs(offsets) <= half + 1e-9]
+        ax_probs.set_xticks(relative_time_center + offsets)
+        ax_probs.set_xticklabels([f"{o:.1f}" for o in offsets])
         ax_probs.set_xlabel("Time from event center (s)")
 
     if not show_ylabels:
@@ -1015,13 +1105,18 @@ def plot_event_timing_offsets(
         )
         ax.axvline(
             median_ms, color="black", linestyle="--", linewidth=1.0,
-            label=f"median {median_ms:+.0f} ms",
+        )
+        # Annotate the median as plain text in a top corner rather than a
+        # legend. The median line sits near zero (panel centre), so a
+        # corner placement keeps the text clear of the dashed line.
+        ax.text(
+            0.97, 0.97, f"median {median_ms:+.0f} ms",
+            transform=ax.transAxes, ha="right", va="top", fontsize=6,
         )
 
         ax.set_xlabel(xlabel)
         ax.set_xlim(xlim_ms)
         ax.set_title(title, fontsize=8, pad=4)
-        ax.legend(fontsize=6, frameon=False, loc="upper right")
         sns.despine(ax=ax)
 
     ax_start.set_ylabel("Density")

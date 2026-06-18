@@ -871,6 +871,153 @@ def plot_conditional_non_local_posterior(
     ax.set_ylabel("Position [cm]")
 
 
+def plot_linear_track_graph_strip(
+    track_graph: nx.Graph,
+    edge_order: list,
+    edge_spacing: Any,
+    ax: Axes,
+    max_position: float | None = None,
+    node_size: int = 14,
+) -> None:
+    """Draw the linearized track graph as a vertical key beside a posterior.
+
+    Wraps :func:`track_linearization.plot_graph_as_1D` with ``axis="y"``,
+    using the same ``edge_order`` / ``edge_spacing`` that produced the
+    decoder's linear position axis so the arm segments line up exactly with
+    the conditional-posterior y-axis (linear position in cm). Acts as a
+    spatial key: each line segment is one track arm, gaps are the junction
+    spacing, and node markers sit at well/junction boundaries.
+
+    Parameters
+    ----------
+    track_graph : nx.Graph
+        Track graph (``data["track_graph"]``).
+    edge_order : list of 2-tuples
+        Linearization edge order (``data["linear_edge_order"]``).
+    edge_spacing : float or sequence of float
+        Linearization edge spacing (``data["linear_edge_spacing"]``).
+    ax : matplotlib.axes.Axes
+        Axes to draw the vertical strip on.
+    max_position : float, optional
+        If given, the y-limit (cm) — match the adjacent posterior axis.
+    node_size : int, default 14
+        Marker size for reward-well node boundaries.
+
+    """
+    # ``plot_graph_as_1D`` (this module) already lays the linearized track
+    # along y at ``other_axis_start`` with per-arm tab10 colors, using the
+    # same cumulative coordinate as the decoder — so it aligns with the
+    # posterior's linear-position axis.
+    reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
+    plot_graph_as_1D(
+        track_graph,
+        ax=ax,
+        edge_order=edge_order,
+        edge_spacing=edge_spacing,
+        reward_well_nodes=reward_well_nodes,
+        other_axis_start=0.0,
+        reward_well_size=node_size,
+    )
+    # Put the colored track line (drawn at x=0) at the right edge of the
+    # axes so it sits flush against the posterior it keys.
+    ax.set_xlim(-1.6, 0.0)
+    if max_position is not None:
+        ax.set_ylim(0.0, max_position)
+        ax.set_yticks((0.0, max_position))
+    ax.set_xticks([])
+    for spine in ("top", "right", "bottom"):
+        ax.spines[spine].set_visible(False)
+    ax.set_ylabel("Position [cm]")
+
+
+def _track_edge_colors(n_edges: int) -> NDArray[np.floating]:
+    """tab10 per-edge colors, matching :func:`plot_graph_as_1D`'s default.
+
+    Both the 1D strip and the 2D key index this by position in
+    ``edge_order`` so an arm has the same color in both views.
+    """
+    cmap = matplotlib.colormaps.get_cmap("tab10")
+    colors = getattr(cmap, "colors", None)
+    if colors is not None:
+        return np.array(colors)
+    return np.array([cmap(i / 10) for i in range(10)])
+
+
+def plot_track_graph_2d(
+    track_graph: nx.Graph,
+    position_info: pd.DataFrame,
+    ax: Axes,
+    *,
+    edge_order: list | None = None,
+    occupancy_color: str = "lightgrey",
+    mark_wells: bool = True,
+    reward_well_size: int = 22,
+) -> None:
+    """Draw the 2D track graph over the animal's 2D occupancy.
+
+    Spatial key that connects the linearized posterior (panels in
+    Figure 2a) back to the physical track. Plots the faint 2D head-position
+    trajectory and the track-graph edges, coloring each arm with the same
+    per-edge tab10 color that :func:`plot_linear_track_graph_strip` uses, so
+    the 2D and 1D views share an arm color map. Degree-1 well nodes are
+    optionally marked in their arm's color.
+
+    Parameters
+    ----------
+    track_graph : nx.Graph
+        Track graph with ``pos`` node attributes (``data["track_graph"]``).
+    position_info : pd.DataFrame
+        Position table with ``head_position_x`` / ``head_position_y``
+        columns (``data["position_info"]``).
+    ax : matplotlib.axes.Axes
+        Axes to draw on.
+    edge_order : list of 2-tuples, optional
+        Linearization edge order (``data["linear_edge_order"]``). Edge
+        colors are assigned by position in this list to match the 1D
+        strip. Defaults to ``list(track_graph.edges)``.
+    occupancy_color : str, default "lightgrey"
+        Color of the faint 2D occupancy trajectory.
+    mark_wells : bool, default True
+        If True, mark degree-1 (well) nodes with filled circles in their
+        arm's color.
+    reward_well_size : int, default 22
+        Marker size for well nodes.
+
+    """
+    ax.plot(
+        position_info["head_position_x"].to_numpy(),
+        position_info["head_position_y"].to_numpy(),
+        color=occupancy_color,
+        linewidth=0.3,
+        alpha=0.6,
+        rasterized=True,
+        zorder=1,
+    )
+    if edge_order is None:
+        edge_order = list(track_graph.edges)
+    edge_colors = _track_edge_colors(len(edge_order))
+    reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
+    node_pos = {n: track_graph.nodes[n]["pos"] for n in track_graph.nodes}
+    for edge_ind, (n1, n2) in enumerate(edge_order):
+        xy = np.stack((node_pos[n1], node_pos[n2]))
+        ax.plot(xy[:, 0], xy[:, 1], color=edge_colors[edge_ind], linewidth=1.5, zorder=2)
+        if mark_wells:
+            for node in (n1, n2):
+                if node in reward_well_nodes:
+                    pos = node_pos[node]
+                    ax.scatter(
+                        pos[0],
+                        pos[1],
+                        s=reward_well_size,
+                        color=edge_colors[edge_ind],
+                        edgecolor="white",
+                        linewidth=0.5,
+                        zorder=3,
+                    )
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+
 def plot_speed(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
     """Plot animal speed.
 
