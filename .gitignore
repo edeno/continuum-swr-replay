@@ -206,3 +206,6 @@ paper/figures/qc_diagnosis/event_collapse_assumptions.csv
 # notebook scratchpads, etc. Not committed; keep the directory for
 # convenience but ignore its contents.
 scratch/
+
+# Per-event decoding gallery (validation QC plots) — not committed
+event_gallery/
