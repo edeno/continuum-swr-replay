@@ -1283,7 +1283,8 @@ def _plot_decoding_stack(
     if len(seg) and "ahead_behind_distance" in seg.columns:
         ax_replay.plot(seg.index, seg["ahead_behind_distance"], color="purple", lw=0.7)
         ax_replay.axhline(0, color="0.6", lw=0.5)
-        ax_replay.set_ylabel("ahead-\nbehind\n[cm]", fontsize=6)
+        # Two-line label (rotated) so it stays as narrow as the other y-labels.
+        ax_replay.set_ylabel("ahead-\nbehind", fontsize=6)
         ax_replay.tick_params(axis="y", labelsize=5)
 
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
@@ -1412,7 +1413,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ):
         arm_rows = ctx["arm_table"][ctx["arm_table"]["event_id"] == row["event_id"]]
 
-    fig = plt.figure(figsize=(10.0, 17.0), dpi=200)
+    fig = plt.figure(figsize=(10.0, 15.0), dpi=200)
     # Two outer rows: the panels (two columns) on top, a full-width
     # trial reward-history strip at the bottom (taller, to fit the covariate
     # key and per-arm values).
@@ -1427,9 +1428,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         left=0.06,
         right=0.97,
     )
-    # Wide inter-column gap so the right-stack y-labels (e.g. the ahead-behind
-    # row) and the posterior strip don't collide with the left column.
-    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.25, 1.4], wspace=0.42)
+    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.25, 1.4], wspace=0.22)
 
     # Left column: large 2D context, regression-scoring text, per-arm content
     # bar and regressor heatmap, per-patch content bar, behavioral-context
