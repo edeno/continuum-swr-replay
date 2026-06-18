@@ -1250,20 +1250,17 @@ def _plot_decoding_stack(
     results,
     detector,
     env,
-    dot: pd.DataFrame,
     time_slice: slice,
     center: float,
     column_title: str,
 ) -> None:
-    """Seven time-aligned rows: SWR, MUA, raster, posterior, replay dynamics,
-    state probs, speed.
+    """Six time-aligned rows: SWR, MUA, raster, posterior, state probs, speed.
 
-    Extends the Figure-2a four-row stack with a multiunit (MUA) row (``is_mua``
-    is a regression covariate), a replay-dynamics row (the decoded position's
-    ahead/behind distance and MAP/replay speed over time), and a speed row with
-    the immobility threshold (the endpoints-immobility inclusion filter).
+    Extends the Figure-2a four-row stack with a multiunit (MUA) row — since
+    ``is_mua`` is a regression covariate — and a speed row with the immobility
+    threshold, since the endpoints-immobility rule is a core inclusion filter.
     """
-    ax_swr, ax_mua, ax_raster, ax_post, ax_replay, ax_probs, ax_speed = axes
+    ax_swr, ax_mua, ax_raster, ax_post, ax_probs, ax_speed = axes
 
     plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
     plot_multiunit_firing(
@@ -1273,20 +1270,6 @@ def _plot_decoding_stack(
     plot_conditional_non_local_posterior(
         data, time_slice, results, env, detector, ax_post
     )
-
-    # Replay content over time: the decoded position's ahead/behind distance
-    # (signed cm; 0 = at the animal, − = behind). This is the clean
-    # replay-trajectory-over-time measure; MAP/replay *speed* is reported as a
-    # robust summary in the footer instead — its raw time series is dominated
-    # by single-bin MAP-jump artifacts (>10^4 cm/s) and is not interpretable.
-    seg = dot.loc[time_slice]
-    if len(seg) and "ahead_behind_distance" in seg.columns:
-        ax_replay.plot(seg.index, seg["ahead_behind_distance"], color="purple", lw=0.7)
-        ax_replay.axhline(0, color="0.6", lw=0.5)
-        # Two-line label (rotated) so it stays as narrow as the other y-labels.
-        ax_replay.set_ylabel("ahead-\nbehind", fontsize=6)
-        ax_replay.tick_params(axis="y", labelsize=5)
-
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
     plot_speed(data, time_slice, ax_speed)
     ax_speed.axhline(
@@ -1315,29 +1298,6 @@ def _arm_set(value) -> str:
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return "?"
     return str(int(value)) if not isinstance(value, str) else value
-
-
-def _replay_dynamics_line(dot: pd.DataFrame, start: float, end: float) -> str:
-    """One-line summary of replay dynamics over the event window.
-
-    ``map_speed`` is the speed of the decoded (MAP) position — i.e. how fast
-    the replayed trajectory sweeps the track — and ``ahead_behind_distance`` is
-    the signed decoded-minus-actual position (cm; + = ahead of the animal).
-    Both are per-timebin measures from ``data_over_time``.
-    """
-    if dot is None or not {"map_speed", "ahead_behind_distance"} <= set(dot.columns):
-        return "replay dynamics: n/a"
-    seg = dot.loc[start:end]
-    if not len(seg):
-        return "replay dynamics: n/a"
-    ms = seg["map_speed"]
-    ab = seg["ahead_behind_distance"]
-    # MAP speed has single-bin jump artifacts; report robust stats (median /
-    # p90), not the artifact-dominated raw max.
-    return (
-        f"replay dynamics: MAP speed med {ms.median():.0f} / p90 {ms.quantile(0.9):.0f}"
-        f" cm/s  ·  ahead-behind med {ab.median():+.0f} cm (|max| {ab.abs().max():.0f})"
-    )
 
 
 def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
@@ -1413,7 +1373,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ):
         arm_rows = ctx["arm_table"][ctx["arm_table"]["event_id"] == row["event_id"]]
 
-    fig = plt.figure(figsize=(10.0, 15.0), dpi=200)
+    fig = plt.figure(figsize=(9.0, 14.0), dpi=200)
     # Two outer rows: the panels (two columns) on top, a full-width
     # trial reward-history strip at the bottom (taller, to fit the covariate
     # key and per-arm values).
@@ -1421,20 +1381,20 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         2,
         1,
         figure=fig,
-        height_ratios=[6.6, 1.5],
+        height_ratios=[6.2, 1.7],
         hspace=0.14,
         top=0.96,
         bottom=0.04,
         left=0.06,
         right=0.97,
     )
-    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.25, 1.4], wspace=0.22)
+    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.3, 1.35], wspace=0.28)
 
-    # Left column: large 2D context, regression-scoring text, per-arm content
-    # bar and regressor heatmap, per-patch content bar, behavioral-context
-    # timeline. Roomy ratios so none of the six panels is squished.
+    # Left column packed to fill the full height: a large 2D context, the
+    # regression-scoring text, the per-arm content bar and regressor heatmap,
+    # the per-patch content bar, and the reward timeline.
     gs_left = gs_top[0].subgridspec(
-        6, 1, height_ratios=[3.0, 1.15, 1.3, 1.05, 1.3, 1.4], hspace=0.5
+        6, 1, height_ratios=[3.0, 0.95, 1.2, 0.85, 1.2, 1.05], hspace=0.32
     )
     ax_2d = fig.add_subplot(gs_left[0])
     _plot_2d_context(
@@ -1442,15 +1402,10 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     )
     ax_text = fig.add_subplot(gs_left[1])
     ax_text.axis("off")
-    footer = (
-        _regression_footer(row, et_row)
-        + "\n"
-        + _replay_dynamics_line(ctx.get("dot"), row["plot_start"], row["plot_end"])
-    )
     ax_text.text(
         0.0,
         1.0,
-        footer,
+        _regression_footer(row, et_row),
         fontsize=6.5,
         family="monospace",
         va="top",
@@ -1466,12 +1421,12 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         fig.add_subplot(gs_left[5]), ctx["data"], center, row, ctx["imm_bouts"]
     )
 
-    # Right column: 7-row decoding stack (SWR / MUA / raster / posterior /
-    # replay dynamics / state probs / speed).
+    # Right column: 6-row decoding stack (SWR / MUA / raster / posterior /
+    # state probs / speed).
     gs_stack = gs_top[1].subgridspec(
-        7, 1, height_ratios=[0.5, 0.5, 0.85, 1.15, 0.6, 0.7, 0.5], hspace=0.10
+        6, 1, height_ratios=[0.5, 0.5, 0.85, 1.15, 0.7, 0.5], hspace=0.10
     )
-    axes = [fig.add_subplot(gs_stack[r]) for r in range(7)]
+    axes = [fig.add_subplot(gs_stack[r]) for r in range(6)]
     for ax in axes[1:]:
         ax.sharex(axes[0])
     title = f"{cls} · {row['duration_ms']:.0f} ms"
@@ -1481,7 +1436,6 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         ctx["results"],
         ctx["detector"],
         ctx["env"],
-        ctx["dot"],
         time_slice,
         center,
         title,
@@ -1580,7 +1534,6 @@ def render_epoch(
         "arm_of_edge": arm_of_edge,
         "arm_colors": _arm_colors(data["linear_edge_order"], arm_of_edge),
         "imm_bouts": imm_bouts,
-        "dot": dot,
     }
     n_written = 0
     for _, row in sel.iterrows():
