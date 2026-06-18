@@ -1412,7 +1412,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ):
         arm_rows = ctx["arm_table"][ctx["arm_table"]["event_id"] == row["event_id"]]
 
-    fig = plt.figure(figsize=(9.0, 14.0), dpi=200)
+    fig = plt.figure(figsize=(10.0, 17.0), dpi=200)
     # Two outer rows: the panels (two columns) on top, a full-width
     # trial reward-history strip at the bottom (taller, to fit the covariate
     # key and per-arm values).
@@ -1420,20 +1420,22 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         2,
         1,
         figure=fig,
-        height_ratios=[6.2, 1.7],
+        height_ratios=[6.6, 1.5],
         hspace=0.14,
         top=0.96,
         bottom=0.04,
         left=0.06,
         right=0.97,
     )
-    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.3, 1.35], wspace=0.28)
+    # Wide inter-column gap so the right-stack y-labels (e.g. the ahead-behind
+    # row) and the posterior strip don't collide with the left column.
+    gs_top = outer[0].subgridspec(1, 2, width_ratios=[1.25, 1.4], wspace=0.42)
 
-    # Left column packed to fill the full height: a large 2D context, the
-    # regression-scoring text, the per-arm content bar and regressor heatmap,
-    # the per-patch content bar, and the reward timeline.
+    # Left column: large 2D context, regression-scoring text, per-arm content
+    # bar and regressor heatmap, per-patch content bar, behavioral-context
+    # timeline. Roomy ratios so none of the six panels is squished.
     gs_left = gs_top[0].subgridspec(
-        6, 1, height_ratios=[3.0, 0.95, 1.2, 0.85, 1.2, 1.05], hspace=0.32
+        6, 1, height_ratios=[3.0, 1.15, 1.3, 1.05, 1.3, 1.4], hspace=0.5
     )
     ax_2d = fig.add_subplot(gs_left[0])
     _plot_2d_context(
