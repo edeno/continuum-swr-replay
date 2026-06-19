@@ -49,13 +49,15 @@ def test_source_restricted_switch_models_drop_swr_interactions():
     assert "PS3" in compare._patch_switch_models_for_source("non_local")
 
 
-def test_swr_rate_models_drop_response_leaking_r3():
+def test_rate_models_drop_response_leaking_is_swr_stop():
+    # The is_swr_stop term (R3) is dropped from MODEL_RATE for every source:
+    # it is tautological with a per-stop event count that overlaps SWRs.
     compare = _load_compare_script()
 
-    assert tuple(compare._rate_models_for_source("SWR")) == ("R0", "R1", "R2")
-    assert "R3" not in compare._rate_models_for_source("SWR")
-    assert "R3" in compare._rate_models_for_source("MUA")
-    assert "R3" in compare._rate_models_for_source("non_local")
+    for source in ("SWR", "MUA", "non_local"):
+        models = compare._rate_models_for_source(source)
+        assert tuple(models) == ("R0", "R1", "R2")
+        assert "R3" not in models
 
 
 def test_choice_swr_split_is_separate_and_skipped_for_swr_source():

@@ -7,8 +7,8 @@ session:
 
 - Patch hierarchy P0-P4 for non-local events; P0-P3 for source-restricted
   SWR/MUA events where SWR interaction terms are not identifiable
-- Rate hierarchy R0-R3, except SWR-source events stop at R2 because
-  ``is_swr_stop`` is tautological with an SWR-defined event count
+- Rate hierarchy R0-R2 (the ``is_swr_stop`` term R3 was dropped: it is
+  tautological with the per-stop non-local/SWR event count)
 - MODEL_PATCH_SWITCH PS0-PS3 for non-local events; PS0-PS2 for
   source-restricted SWR/MUA events
 - Choice-prediction conditional logit (replay_frac vs behavioral baseline)
@@ -97,9 +97,12 @@ def _patch_switch_models_for_source(event_source: str):
 
 
 def _rate_models_for_source(event_source: str):
-    """Rate hierarchy valid for the event-source definition."""
-    if event_source == "SWR":
-        return {name: MODEL_RATE[name] for name in ("R0", "R1", "R2")}
+    """Rate hierarchy for the event-source definition (R0-R2 for all sources).
+
+    The ``is_swr_stop`` term (formerly R3) was removed from ``MODEL_RATE``: it
+    is tautological with a per-stop event count that overlaps SWRs by
+    construction, so it is dropped for every source, not just SWR.
+    """
     return MODEL_RATE
 
 

@@ -424,15 +424,15 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # a rate effect. ``visit_recency`` has no stop-level analog (every
 # trial visits some arm), so the rate hierarchy stops at R2.
 #
-# R3 adds ``is_swr_stop`` (1 if any timebin in the stop had an SWR).
-# Tests whether stops with SWR overlap have an elevated event rate
-# beyond the reward / switch / history context already in R2. Note
-# that is_swr_stop and n_events are partly mechanistically linked —
-# the question is how much R2's behavioural context already absorbs.
-# A future R4 (+ ``trials_since_block_change``, ``block_number``) is
-# deferred until the contingency-block loader is wired. The MUA
-# split (fit R0–R3 on SWR-only / MUA-only / neither stops) remains
-# an analysis variant, not a separate spec.
+# The hierarchy intentionally stops at R2. An ``is_swr_stop`` term
+# (1 if any timebin in the stop had an SWR) was dropped: ``n_events``
+# counts non-local events, which overlap SWRs heavily by construction,
+# so ``is_swr_stop`` is largely tautological with the response and says
+# little about whether SWRs *drive* replay occurrence. The SWR-vs-non-SWR
+# question is answered at the event level (the ``swr_x_*`` content
+# interactions / SWR-split fits), not via the per-stop rate. A future
+# R-level term (+ ``trials_since_block_change``, ``block_number``) is
+# deferred until the contingency-block loader is wired.
 
 MODEL_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
@@ -456,17 +456,6 @@ MODEL_RATE: dict[str, ModelSpec] = {
         ),
         description="+ recent reward history (rewarded fraction, last 10 trials)",
         parent="R1",
-    ),
-    "R3": ModelSpec(
-        name="R3",
-        predictors=(
-            "is_after_omission",
-            "is_after_switch",
-            "recent_trial_reward_rate",
-            "is_swr_stop",
-        ),
-        description="+ SWR-overlap stop indicator",
-        parent="R2",
     ),
 }
 
