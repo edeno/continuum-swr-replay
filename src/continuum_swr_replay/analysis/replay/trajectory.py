@@ -178,7 +178,10 @@ def ahead_behind_summary(
         "remote_fraction": grouped.apply(_remote, include_groups=False).to_numpy(),
         "ab_slope": grouped.apply(_slope, include_groups=False).to_numpy(),
     }
-    out["is_outbound"] = out["ab_slope"] > 0
+    # NaN (not False) where ab_slope is undefined (<2 finite points), so an
+    # event with unknown direction is not silently counted as inbound.
+    slope = out["ab_slope"]
+    out["is_outbound"] = np.where(np.isfinite(slope), (slope > 0).astype(float), np.nan)
     return np.array(list(grouped.groups.keys())), out
 
 

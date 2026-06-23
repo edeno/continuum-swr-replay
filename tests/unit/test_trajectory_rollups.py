@@ -100,6 +100,8 @@ def test_trajectory_dynamics_forward_and_outback():
     np.testing.assert_allclose(out["spatial_extent"], [20.0, 20.0])
     # patches: arms 0,1 -> patch 1 only; arms 6,8 -> patch1+patch3
     np.testing.assert_array_equal(out["n_patches_visited"], [1, 2])
+    # pause_fraction: step_distance <= place_bin_size (2.0); ev1 [0,10,10]->1/3
+    np.testing.assert_allclose(out["pause_fraction"], [1 / 3, 1 / 3])
     np.testing.assert_array_equal(out["crosses_trunk"], [False, True])
     # compression factor uses median map_speed / baseline
     np.testing.assert_allclose(out["compression_factor"], [5.0 / 50.0, 9.0 / 50.0])
@@ -158,6 +160,19 @@ def test_ahead_behind_direction_and_reach():
     np.testing.assert_allclose(out["remote_fraction"], [2 / 3, 0.0])
 
 
+def test_ahead_behind_is_outbound_nan_when_slope_undefined():
+    """A single-bin event has undefined slope -> is_outbound NaN, not False."""
+    ids, out = ahead_behind_summary(
+        event_id=np.array([1]),
+        ahead_behind_distance=np.array([3.0]),
+        decoded_arm=np.array([1.0]),
+        current_arm=np.array([0.0]),
+        time=np.array([0.0]),
+    )
+    assert np.isnan(out["ab_slope"][0])
+    assert np.isnan(out["is_outbound"][0])
+
+
 def test_uncertainty_extra_multimodal_and_hpd():
     # arms 0-1-2 chain: 0 and 2 are NOT adjacent
     adjacency = {0: {1}, 1: {0, 2}, 2: {1}}
@@ -177,3 +192,45 @@ def test_uncertainty_extra_multimodal_and_hpd():
     np.testing.assert_array_equal(ids, [1])
     np.testing.assert_allclose(out["hpd_coverage_cm"], [20.0])
     np.testing.assert_allclose(out["multimodal_fraction"], [1 / 3])
+
+
+def test_orchestrator_nospike_fraction_modal_state():
+    """nospike_fraction = fraction of bins whose modal state is No-Spike."""
+    env = _EnvStub()
+    n = 3
+    # bin 1 is No-Spike-modal; bins 0,2 are Local-modal
+    nl = pd.DataFrame(
+        {
+            "map_estimate": [0.0, 10.0, 20.0],
+            "step_distance": [0.0, 10.0, 10.0],
+            "map_speed": [5.0, 5.0, 5.0],
+            "decoded_arm": [0.0, 0.0, 1.0],
+            "run_speed_baseline": [50.0] * n,
+            "ahead_behind_distance": [1.0, 2.0, 3.0],
+            "hpd": [10.0, 10.0, 10.0],
+            "track_segment_id": [0.0, 0.0, 1.0],
+            "SWR_zscore": [0.0] * n,
+            "MUA_zscore": [0.0] * n,
+            "theta_power_zscore": [0.0] * n,
+            "Local_prob": [0.8, 0.05, 0.8],
+            "No-Spike_prob": [0.1, 0.9, 0.1],
+            "Non-Local_Continuous_prob": [0.05, 0.03, 0.05],
+            "Non-Local_Fragmented_prob": [0.05, 0.02, 0.05],
+        }
+    )
+    out = compute_trajectory_rollups(
+        nl=nl,
+        event_id=np.array([1, 1, 1]),
+        env=env,
+        track_graph=env.track_graph_with_bin_centers_edges_,
+        state_prob_cols=_NONLOCAL_STATE_COLS,
+        continuous_col="Non-Local_Continuous_prob",
+        fragmented_col="Non-Local_Fragmented_prob",
+        place_bin_size=2.0,
+        nonlocal_prob=np.array([0.1, 0.05, 0.1]),
+    )
+    np.testing.assert_allclose(out["nospike_fraction"], [1 / 3])
+    np.testing.assert_allclose(out["nospike_prob_mean"], [(0.1 + 0.9 + 0.1) / 3])
+    # arm_posterior not supplied -> multimodal NaN, hpd_coverage from hpd column
+    assert np.isnan(out["multimodal_fraction"][0])
+    np.testing.assert_allclose(out["hpd_coverage_cm"], [10.0])

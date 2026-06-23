@@ -653,3 +653,12 @@ class TestPrevArmMirror:
         # include_prev=False omits them
         out2 = compute_retrospective_metrics(ev, ea, es, include_prev=False)
         assert "ends_at_prev" not in out2.columns
+
+    def test_ends_at_prev_missing_sequence_records_false_bool(self):
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+        )
+        es = _make_event_sequence_table({2: [0, 1]})  # rows for event 2, not 1
+        out = ends_at_prev(ev, es).set_index("event_id")
+        assert out["ends_at_prev"].dtype == bool
+        assert bool(out.loc[1, "ends_at_prev"]) is False

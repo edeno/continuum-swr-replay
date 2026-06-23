@@ -144,7 +144,17 @@ def _map_node_ids(
         map_position_ind[has_valid_data] = np.nanargmax(
             posterior_array[has_valid_data], axis=1
         )
-    return place_bin_center_ind_to_node[map_position_ind], has_valid_data
+    node_ids = place_bin_center_ind_to_node[map_position_ind]
+    # Junction placeholder bins carry node_id == -1 (edge_id == -1 interpolation
+    # artifacts) and are not in the track graph. If the MAP ever lands on one,
+    # mark the bin invalid and swap in a real placeholder node so the downstream
+    # graph-distance lookup neither uses it nor raises (CLAUDE.md junction rule).
+    junction = node_ids == -1
+    if junction.any():
+        has_valid_data = has_valid_data & ~junction
+        real_nodes = place_bin_center_ind_to_node[place_bin_center_ind_to_node != -1]
+        node_ids = np.where(junction, real_nodes[0], node_ids)
+    return node_ids, has_valid_data
 
 
 def _forward_step_distances(
@@ -291,16 +301,26 @@ def map_estimate_to_map_nodes(
     Returns
     -------
     node_ids : np.ndarray, shape (n_time,)
-        MAP node id per timebin (a real placeholder node where invalid).
+        MAP node id per timebin (a real placeholder node where invalid). Never
+        a junction placeholder node (``node_id == -1``).
     has_valid_data : np.ndarray of bool, shape (n_time,)
         ``False`` where ``map_estimate`` was ``NaN``.
     """
-    bin_lin = np.asarray(place_bin_centers_nodes_df["linear_position"], dtype=float)
-    bin_node = np.asarray(place_bin_centers_nodes_df["node_id"])
+    # Exclude junction placeholder bins (node_id == -1, edge_id == -1
+    # interpolation artifacts) from the candidate set so the nearest-neighbour
+    # match never returns a node that is absent from the track graph
+    # (CLAUDE.md junction rule). The MAP itself never lands on these bins.
+    real = np.asarray(place_bin_centers_nodes_df["node_id"]) != -1
+    bin_lin = np.asarray(
+        place_bin_centers_nodes_df["linear_position"], dtype=float
+    )[real]
+    bin_node = np.asarray(place_bin_centers_nodes_df["node_id"])[real]
     order = np.argsort(bin_lin, kind="stable")
     sorted_lin = bin_lin[order]
 
-    me = np.asarray(map_estimate, dtype=float).squeeze()
+    # reshape(-1) (not squeeze) so a single-timebin input stays 1-D rather than
+    # collapsing to a 0-D scalar.
+    me = np.asarray(map_estimate, dtype=float).reshape(-1)
     has_valid = np.isfinite(me)
 
     node_ids = np.full(me.shape, bin_node[order[0]])

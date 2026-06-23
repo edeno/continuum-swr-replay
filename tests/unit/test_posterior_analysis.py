@@ -914,3 +914,32 @@ class TestMapEstimateToMapNodes:
             np.nan_to_num(cheap, nan=-1.0), np.nan_to_num(canonical, nan=-1.0)
         )
         assert np.isnan(cheap[2]) and np.isnan(cheap[3])
+
+
+class TestJunctionBinHandling:
+    """Junction placeholder bins (node_id == -1) must never reach a graph lookup."""
+
+    def test_map_estimate_excludes_junction_bins(self):
+        # 3 real bins (nodes 0,1,2 at lin 0/10/20) + 1 junction (node -1 at lin 11)
+        df = pd.DataFrame(
+            {"node_id": [0, 1, 2, -1], "linear_position": [0.0, 10.0, 20.0, 11.0]}
+        )
+        # map_estimate=11 is closest to the junction at lin 11, but that bin is
+        # excluded -> nearest REAL bin is lin 10 (node 1), never node -1.
+        node_ids, has_valid = map_estimate_to_map_nodes(np.array([11.0]), df)
+        assert node_ids[0] == 1
+        assert (node_ids != -1).all()
+        assert bool(has_valid[0]) is True
+
+    def test_get_map_step_distance_junction_argmax_does_not_crash(self):
+        # bin 2 is a junction (node -1); a row whose argmax is bin 2 must be
+        # masked, not raise NetworkXNoPath on a missing node.
+        graph = _linear_graph(n_nodes=3, edge_cm=10.0)
+        posterior = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+        place_bin_center_ind_to_node = np.array([0, 1, -1])
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        assert step.shape == (2,)
+        assert step[0] == 0.0
+        assert np.isnan(step[1])  # junction-argmax bin -> invalid, not a crash
