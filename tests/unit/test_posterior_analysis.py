@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 
@@ -15,6 +16,8 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_speed,
     get_map_step_distance,
+    map_estimate_to_map_nodes,
+    step_distance_from_nodes,
 )
 
 
@@ -806,3 +809,108 @@ class TestMapStepDistance:
         step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
 
         np.testing.assert_array_equal(step, [0.0])
+
+
+class TestStepDistanceFromNodes:
+    """Direct tests of the shared core consumed by the augment path."""
+
+    def test_nan_at_index_zero_masks_first_two(self):
+        """Invalid bin 0 -> step[0] NaN and step[1] (which touches it) NaN."""
+        graph = _linear_graph(n_nodes=3, edge_cm=10.0)
+        node_ids = np.array([0, 1, 2])
+        has_valid = np.array([False, True, True])
+
+        step = step_distance_from_nodes(node_ids, has_valid, graph)
+
+        assert np.isnan(step[0])
+        assert np.isnan(step[1])
+        np.testing.assert_allclose(step[2], 10.0, rtol=1e-9)
+
+    def test_all_invalid_returns_all_nan_without_graph_lookup(self):
+        """All-invalid sequence is fully NaN and never queries the graph.
+
+        The graph is disconnected, so any shortest-path lookup would raise —
+        the early return must avoid it.
+        """
+        graph = nx.Graph()
+        graph.add_node(0)
+        graph.add_node(1)  # no edge: disconnected
+        node_ids = np.array([0, 1, 0])
+        has_valid = np.array([False, False, False])
+
+        step = step_distance_from_nodes(node_ids, has_valid, graph)
+
+        assert np.all(np.isnan(step))
+
+    def test_single_invalid_bin_is_nan(self):
+        """A lone invalid bin returns NaN (vs 0.0 for a valid lone bin)."""
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
+        step = step_distance_from_nodes(np.array([0]), np.array([False]), graph)
+        assert np.isnan(step[0])
+
+    def test_placeholder_node_at_invalid_bin_is_ignored(self):
+        """Masking depends on has_valid, not on the placeholder node value."""
+        graph = _linear_graph(n_nodes=3, edge_cm=10.0)
+        # bin 1 invalid but carries a real (wrong) node id; must be masked out.
+        node_ids = np.array([0, 2, 0])
+        has_valid = np.array([True, False, True])
+
+        step = step_distance_from_nodes(node_ids, has_valid, graph)
+
+        assert step[0] == 0.0
+        assert np.isnan(step[1])  # arrives at invalid bin
+        assert np.isnan(step[2])  # departs from invalid bin
+
+
+class TestMapEstimateToMapNodes:
+    """The map_estimate-derived step distance must match the canonical path."""
+
+    @staticmethod
+    def _bin_df(n_bins: int, edge_cm: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "node_id": np.arange(n_bins),
+                "linear_position": np.arange(n_bins) * edge_cm,
+            }
+        )
+
+    def test_matches_canonical_on_walk(self):
+        """step_distance from map_estimate == get_map_step_distance(posterior)."""
+        n_bins, edge_cm = 5, 10.0
+        graph = _linear_graph(n_nodes=n_bins, edge_cm=edge_cm)
+        df = self._bin_df(n_bins, edge_cm)
+        bin_to_node = df["node_id"].to_numpy()
+
+        walk = np.array([0, 2, 1, 4, 4])  # bin index per timebin
+        posterior = np.eye(n_bins)[walk]
+        map_estimate = df["linear_position"].to_numpy()[walk]
+
+        canonical = get_map_step_distance(posterior, graph, bin_to_node)
+        node_ids, has_valid = map_estimate_to_map_nodes(map_estimate, df)
+        cheap = step_distance_from_nodes(node_ids, has_valid, graph)
+
+        np.testing.assert_array_equal(
+            np.nan_to_num(cheap, nan=-1.0), np.nan_to_num(canonical, nan=-1.0)
+        )
+        np.testing.assert_allclose(cheap, [0.0, 20.0, 10.0, 30.0, 0.0], rtol=1e-9)
+
+    def test_matches_canonical_with_nan(self):
+        """A NaN map_estimate masks the same bins as an all-NaN posterior row."""
+        n_bins, edge_cm = 4, 10.0
+        graph = _linear_graph(n_nodes=n_bins, edge_cm=edge_cm)
+        df = self._bin_df(n_bins, edge_cm)
+        bin_to_node = df["node_id"].to_numpy()
+
+        posterior = np.eye(n_bins)[[0, 1, 2, 3]].astype(float)
+        posterior[2] = np.nan  # undecoded bin
+        map_estimate = df["linear_position"].to_numpy()[[0, 1, 2, 3]].astype(float)
+        map_estimate[2] = np.nan
+
+        canonical = get_map_step_distance(posterior, graph, bin_to_node)
+        node_ids, has_valid = map_estimate_to_map_nodes(map_estimate, df)
+        cheap = step_distance_from_nodes(node_ids, has_valid, graph)
+
+        np.testing.assert_array_equal(
+            np.nan_to_num(cheap, nan=-1.0), np.nan_to_num(canonical, nan=-1.0)
+        )
+        assert np.isnan(cheap[2]) and np.isnan(cheap[3])

@@ -117,10 +117,13 @@ def get_contfrag_data_over_time(
         np.asarray(env.place_bin_centers_nodes_df_.node_id),
     )
     # Per-session "typical run speed" baseline (cm/s): robust, threshold-free
-    # 90th-percentile of head speed, used as the compression-factor denominator.
+    # 90th-percentile of head speed, a per-session speed normalizer for
+    # downstream replay-speed/compression measures.
     run_speed_baseline = float(
         np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
     )
+    if not np.isfinite(run_speed_baseline):
+        raise ValueError("run_speed_baseline is not finite (head_speed all-NaN?)")
 
     animal, day = parse_nwb_filename(nwb_file_name)
 
@@ -161,7 +164,7 @@ def get_contfrag_data_over_time(
             "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
             "mua_rate": _nearest(
                 data["multiunit_firing_rate"][brain_area].squeeze()
-            ),
+            ).squeeze(),
             "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
             "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,

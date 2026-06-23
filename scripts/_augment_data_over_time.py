@@ -32,13 +32,16 @@ Flags
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import time
+import traceback
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
@@ -47,10 +50,16 @@ from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
+    map_estimate_to_map_nodes,
     step_distance_from_nodes,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+# Raw signals are nearest-reindexed onto the saved decode axis; a handful of
+# unmatched edge bins is acceptable, but a large fraction signals a real axis
+# misalignment (e.g. a uniform offset or unit mismatch) that must fail loud.
+_MAX_REINDEX_NAN_FRAC = 0.005
 
 NEW_COLUMNS = (
     "step_distance",
@@ -68,37 +77,24 @@ _CONTFRAG_RE = re.compile(
 )
 
 
-def _map_estimate_to_nodes(
-    map_estimate: np.ndarray, env: Environment
-) -> tuple[np.ndarray, np.ndarray]:
-    """MAP node id per timebin from a stored ``map_estimate`` (cm).
+def _reindex(series: pd.Series, index: pd.Index, label: str) -> np.ndarray:
+    """Nearest-reindex a raw signal onto the decode axis, asserting coverage.
 
-    Maps each linear position to its nearest place-bin center (the bin centers
-    equal the decoder's ``map_estimate`` values exactly), then to that bin's
-    track-graph node. Invalid (NaN) timebins get a real placeholder node and
-    are flagged in the returned mask.
+    A small number of unmatched edge bins is tolerated; a large unmatched
+    fraction means the signal's time axis does not line up with the saved
+    decode axis (a uniform offset, a unit mismatch, or a coverage gap), which
+    would otherwise be persisted as a silently-NaN column.
     """
-    df = env.place_bin_centers_nodes_df_
-    bin_lin = np.asarray(df["linear_position"], dtype=float)
-    bin_node = np.asarray(df["node_id"])
-    order = np.argsort(bin_lin)
-    sorted_lin = bin_lin[order]
-
-    me = np.asarray(map_estimate, dtype=float).squeeze()
-    has_valid = np.isfinite(me)
-
-    node_ids = np.full(len(me), bin_node[order[0]])
-    if np.any(has_valid):
-        me_valid = me[has_valid]
-        pos = np.clip(np.searchsorted(sorted_lin, me_valid), 1, len(sorted_lin) - 1)
-        choose_left = (me_valid - sorted_lin[pos - 1]) <= (sorted_lin[pos] - me_valid)
-        nearest_sorted = np.where(choose_left, pos - 1, pos)
-        node_ids[has_valid] = bin_node[order[nearest_sorted]]
-    return node_ids, has_valid
-
-
-def _reindex(series: pd.Series, index: pd.Index) -> np.ndarray:
-    return series.reindex(index, method="nearest", tolerance=0.004).to_numpy()
+    out = series.reindex(index, method="nearest", tolerance=0.004)
+    nan_frac = float(out.isna().mean())
+    if nan_frac > _MAX_REINDEX_NAN_FRAC:
+        median_gap_ms = float(np.median(np.diff(series.index))) * 1e3
+        raise ValueError(
+            f"{label}: {nan_frac:.1%} of timebins had no sample within 4 ms "
+            f"(median source gap {median_gap_ms:.2f} ms) — axis misalignment; "
+            "refusing to write a silently-NaN column"
+        )
+    return out.to_numpy()
 
 
 def _augment_pkl(
@@ -107,49 +103,60 @@ def _augment_pkl(
 ) -> None:
     dot = pd.read_pickle(pkl)
 
-    node_ids, has_valid = _map_estimate_to_nodes(dot["map_estimate"].to_numpy(), env)
+    node_ids, has_valid = map_estimate_to_map_nodes(
+        dot["map_estimate"].to_numpy(), env.place_bin_centers_nodes_df_
+    )
     step_distance = step_distance_from_nodes(
         node_ids, has_valid, env.track_graph_with_bin_centers_edges_
     )
 
     if validate_step:
         suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
-        import xarray as xr
-
-        results = xr.open_dataset(
+        with xr.open_dataset(
             PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc", engine="h5netcdf"
-        )
-        state_bin_coords = list(results["state_bins"].coords)
-        results = results.set_index(state_bins=state_bin_coords)
-        if scenario.startswith("nonlocal"):
-            posterior = get_conditional_non_local_posterior(results)
-        else:
-            posterior = get_contfrag_posterior(results, state="combined")
-        canonical = get_map_step_distance(
-            posterior.values,
-            env.track_graph_with_bin_centers_edges_,
-            np.asarray(env.place_bin_centers_nodes_df_.node_id),
-        )
+        ) as results:
+            results = results.set_index(state_bins=list(results["state_bins"].coords))
+            if scenario.startswith("nonlocal"):
+                posterior = get_conditional_non_local_posterior(results)
+            else:
+                posterior = get_contfrag_posterior(results, state="combined")
+            canonical = get_map_step_distance(
+                posterior.values,
+                env.track_graph_with_bin_centers_edges_,
+                np.asarray(env.place_bin_centers_nodes_df_.node_id),
+            )
         np.testing.assert_array_equal(
             np.nan_to_num(step_distance, nan=-1.0),
             np.nan_to_num(canonical, nan=-1.0),
             err_msg=f"{pkl.name}: map_estimate step_distance != canonical",
         )
-        results.close()
         print(f"[{pkl.name}] validate-step OK (matches canonical)")
 
+    run_speed_baseline = float(np.nanpercentile(dot["head_speed"].to_numpy(), 90))
+    if not np.isfinite(run_speed_baseline):
+        raise ValueError(
+            f"{pkl.name}: run_speed_baseline is not finite (head_speed all-NaN?)"
+        )
+
+    def _onto_decode_axis(series: pd.Series, column: str) -> np.ndarray:
+        return _reindex(series, dot.index, f"{pkl.name}:{column}")
+
     dot["step_distance"] = step_distance
-    dot["run_speed_baseline"] = float(
-        np.nanpercentile(dot["head_speed"].to_numpy(), 90)
+    dot["run_speed_baseline"] = run_speed_baseline
+    dot["ripple_power"] = _onto_decode_axis(
+        data["ripple_consensus_trace"], "ripple_power"
     )
-    dot["ripple_power"] = _reindex(data["ripple_consensus_trace"], dot.index)
-    dot["mua_rate"] = _reindex(
-        data["multiunit_firing_rate"][brain_area].squeeze(), dot.index
+    dot["mua_rate"] = _onto_decode_axis(
+        data["multiunit_firing_rate"][brain_area].squeeze(), "mua_rate"
     )
-    dot["theta_power"] = _reindex(data["theta_power"].squeeze(), dot.index)
+    dot["theta_power"] = _onto_decode_axis(data["theta_power"].squeeze(), "theta_power")
 
     out = pkl.with_suffix(".pkl.new") if check_only else pkl
-    dot.to_pickle(out)
+    # Atomic write: a kill mid-write must not corrupt the (unrecreatable)
+    # original. Write a temp on the same filesystem, then rename.
+    tmp = out.with_suffix(out.suffix + ".tmp")
+    dot.to_pickle(tmp)
+    os.replace(tmp, out)
     print(f"[{pkl.name}] wrote {out.name} ({len(dot.columns)} columns)")
 
 
@@ -157,10 +164,15 @@ def _augment_epoch(
     animal: str, epoch_name: str, brain_area: str,
     scenarios: dict[str, Path], validate_step: bool, check_only: bool, force: bool,
 ) -> None:
-    pending = {
-        s: p for s, p in scenarios.items()
-        if force or not set(NEW_COLUMNS).issubset(pd.read_pickle(p).columns)
-    }
+    def _needs_augment(p: Path) -> bool:
+        if force:
+            return True
+        try:
+            return not set(NEW_COLUMNS).issubset(pd.read_pickle(p).columns)
+        except Exception as e:  # noqa: BLE001 - identify the unreadable file
+            raise RuntimeError(f"cannot read {p.name}: {e!r}") from e
+
+    pending = {s: p for s, p in scenarios.items() if _needs_augment(p)}
     if not pending:
         print(f"[{animal} {epoch_name} {brain_area}] already augmented; skip")
         return
@@ -224,9 +236,13 @@ def main() -> None:
                 epochs[(animal, epoch_name, brain_area)],
                 args.validate_step, args.check_only, args.force,
             )
+        except MemoryError:
+            # Don't keep launching more multi-GB loads after an OOM.
+            raise
         except Exception as e:  # noqa: BLE001 - batch: record and continue
             print(f"[{animal} {epoch_name} {brain_area}] FAILED: {e!r}")
-            failures.append((animal, epoch_name, brain_area))
+            traceback.print_exc()
+            failures.append((animal, epoch_name, brain_area, repr(e)))
 
     if failures:
         print(f"\n{len(failures)} failure(s): {failures}")

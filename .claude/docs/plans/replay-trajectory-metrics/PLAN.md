@@ -1,6 +1,9 @@
 # Replay Trajectory Metrics Implementation Plan
 
-**Status:** Not started.
+**Status:** Phase 1 code complete and committed (8e13682). Tier-1 builders +
+`step_distance` helper landed with tests. Full data_over_time augmentation
+running in tmux session `augment_dot` (log: `logs/augment_data_over_time.log`);
+~24 hr, idempotent/resumable. Phase 2 not started.
 
 Add ~30 per-event summary statistics that characterize replay trajectories —
 speed, displacement, path length, spatial extent, continuity, direction,

@@ -62,6 +62,7 @@ from typing import Literal
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import xarray as xr
 from non_local_detector.analysis import (
     get_ahead_behind_distance,
@@ -192,6 +193,11 @@ def get_map_step_distance(
     A step is ``NaN`` whenever either of its two endpoint bins had an all-NaN
     posterior; bin 0 is ``NaN`` only if its own posterior was invalid.
 
+    Note the backward alignment is *opposite* to :func:`get_map_speed`, which
+    is forward-aligned (``speed[t]`` spans ``node[t] -> node[t + 1]``). The two
+    are therefore offset by one bin: ``step_distance[t] != map_speed[t] * dt``
+    row-for-row.
+
     Parameters
     ----------
     posterior : xr.DataArray | np.ndarray, shape (n_time, n_positions)
@@ -243,7 +249,9 @@ def step_distance_from_nodes(
     """
     n_time = len(node_ids)
     step_distance = np.zeros(n_time)
-    if n_time < 2:
+    if n_time < 2 or not np.any(has_valid_data):
+        # No movement defined for a single bin, and an all-invalid sequence has
+        # no real nodes — skip the (potentially disconnected) graph lookups.
         step_distance[~has_valid_data] = np.nan
         return step_distance
 
@@ -256,6 +264,53 @@ def step_distance_from_nodes(
     if not has_valid_data[0]:
         step_distance[0] = np.nan
     return step_distance
+
+
+def map_estimate_to_map_nodes(
+    map_estimate: np.ndarray,
+    place_bin_centers_nodes_df: pd.DataFrame,
+) -> tuple[np.ndarray, np.ndarray]:
+    """MAP track-graph node id per timebin from a stored ``map_estimate`` (cm).
+
+    Recovers the decoder's argmax bin node from the *already stored* MAP linear
+    position by nearest-neighbour match against the place-bin centers (the bin
+    centers equal the decoder's ``map_estimate`` values exactly). This lets
+    callers compute :func:`step_distance_from_nodes` from a saved
+    ``map_estimate`` column without reloading the full posterior, and matches
+    the posterior-argmax derivation in ``_map_node_ids`` whenever bin-center
+    positions are distinct.
+
+    Parameters
+    ----------
+    map_estimate : np.ndarray, shape (n_time,)
+        MAP linear position (cm) per timebin; ``NaN`` where undecoded.
+    place_bin_centers_nodes_df : pd.DataFrame
+        ``env.place_bin_centers_nodes_df_`` with ``linear_position`` and
+        ``node_id`` columns, ordered by place-bin index.
+
+    Returns
+    -------
+    node_ids : np.ndarray, shape (n_time,)
+        MAP node id per timebin (a real placeholder node where invalid).
+    has_valid_data : np.ndarray of bool, shape (n_time,)
+        ``False`` where ``map_estimate`` was ``NaN``.
+    """
+    bin_lin = np.asarray(place_bin_centers_nodes_df["linear_position"], dtype=float)
+    bin_node = np.asarray(place_bin_centers_nodes_df["node_id"])
+    order = np.argsort(bin_lin, kind="stable")
+    sorted_lin = bin_lin[order]
+
+    me = np.asarray(map_estimate, dtype=float).squeeze()
+    has_valid = np.isfinite(me)
+
+    node_ids = np.full(me.shape, bin_node[order[0]])
+    if np.any(has_valid):
+        me_valid = me[has_valid]
+        pos = np.clip(np.searchsorted(sorted_lin, me_valid), 1, len(sorted_lin) - 1)
+        choose_left = (me_valid - sorted_lin[pos - 1]) <= (sorted_lin[pos] - me_valid)
+        nearest_sorted = np.where(choose_left, pos - 1, pos)
+        node_ids[has_valid] = bin_node[order[nearest_sorted]]
+    return node_ids, has_valid
 
 
 def get_map_speed(

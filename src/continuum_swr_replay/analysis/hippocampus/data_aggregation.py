@@ -254,8 +254,8 @@ def get_data_over_time(
         - State probabilities (Local_prob, No-Spike_prob, etc.)
         - Posterior statistics (map_estimate, map_speed, step_distance,
           ahead_behind_distance, hpd)
-        - Neural signals, z-scored (theta_phase, theta_power_zscore, SWR_zscore,
-          MUA_zscore) and raw (ripple_power, mua_rate, theta_power)
+        - Neural signals: theta_phase, plus z-scored (theta_power_zscore,
+          SWR_zscore, MUA_zscore) and raw (ripple_power, mua_rate, theta_power)
         - Per-session run-speed baseline (run_speed_baseline, cm/s)
         - Event counts (n_non_local, n_SWR, n_MUA, etc.)
         - Session metadata (animal, day, epoch, nwb_file_name)
@@ -324,11 +324,14 @@ def get_data_over_time(
         np.asarray(env.place_bin_centers_nodes_df_.node_id),
     )
     # Per-session "typical run speed" baseline (cm/s): a robust, threshold-free
-    # 90th-percentile of head speed, used downstream as the compression-factor
-    # denominator. Constant across the session.
+    # 90th-percentile of head speed, intended as a per-session speed normalizer
+    # for downstream replay-speed/compression measures. Constant across the
+    # session.
     run_speed_baseline = float(
         np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
     )
+    if not np.isfinite(run_speed_baseline):
+        raise ValueError("run_speed_baseline is not finite (head_speed all-NaN?)")
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
@@ -377,7 +380,7 @@ def get_data_over_time(
             "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
             "mua_rate": _nearest(
                 data["multiunit_firing_rate"][brain_area].squeeze()
-            ),
+            ).squeeze(),
             "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
             "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,
