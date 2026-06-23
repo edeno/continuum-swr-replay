@@ -1,40 +1,18 @@
 # Replay Trajectory Metrics Implementation Plan
 
-**Status:** Phase 1 complete + PR-reviewed + revised (8e13682, 7e3f0d8,
-e3fc792). data_over_time augmentation uses the **exact posterior** path for
-`step_distance` (Option B — cross-animal validation found the map_estimate
-reconstruction diverged by ≤1 place-bin on 2/5 animals). Full augmentation
-running in tmux `augment_dot` (log: `logs/augment_data_over_time.log`),
-idempotent/resumable, atomic in-place writes; the reindex guard now tolerates
-real LFP coverage gaps (a201f60). Phase 2 LARGELY DONE: `trajectory.py` has all
-4 rollup families + the `compute_trajectory_rollups` orchestrator, wired into
-BOTH `build_event_table` and `build_contfrag_event_table` (gated on the
-augmented columns), with `path_continuity` merged and a cross-scenario parity
-test (157b966, 27e103a, d55be8d, 0949748, a201f60). REMAINING: merge the
-existing retrospective metrics into the canonical event table + add the
-`prev_arm` mirror (`ends_at_prev` / `contains_path_from_prev` /
-`chosen_arm_fraction_prev`).
+**Status:** Phase 1 + Phase 2 code COMPLETE and committed. The augmentation
+was reworked to need no `load_data` (neural-signal rollups use the z-scores
+stored in each pkl; `step_distance` is exact from `results.nc`) after
+root-causing a `load_data` time-axis drift (e5a0def trims post-trial padding,
+post-dating the 2026-04-01 decodes — see the deferred milestone). Full
+augmentation running in tmux `augment_dot`, idempotent/resumable, atomic
+in-place writes. Phase 2: `trajectory.py` (4 rollup families +
+`compute_trajectory_rollups` orchestrator) wired into BOTH `build_event_table`
+and `build_contfrag_event_table` with `path_continuity` merged + cross-scenario
+parity test; retrospective metrics + `prev_arm` mirror merged into the canonical
+event table at assembly (`prepare_replay_content_data.py`). REMAINING: real-data
+validation of the event tables once the augmentation batch finishes.
 
-Add ~30 per-event summary statistics that characterize replay trajectories —
-speed, displacement, path length, spatial extent, continuity, direction,
-brain-state, and decode-uncertainty measures — to both the Non-Local and the
-ContFrag event tables using shared definitions, so the two scenarios are
-directly comparable. Per-timebin signals are computed once into
-`data_over_time`; per-event scalar rollups are merged into the event tables.
-
-The design rationale and full metric catalog live in the spec:
-[docs/superpowers/specs/2026-06-23-replay-trajectory-metrics-design.md](../../../../docs/superpowers/specs/2026-06-23-replay-trajectory-metrics-design.md).
-This plan covers *how* to build it.
-
-## Reading order
-
-For agent invocation, **load only the slice you need**:
-
-1. **Working a specific phase?** Open the matching phase file. Each is
-   self-contained: upstream files to read, designs it depends on, tasks,
-   validation slice, fixtures.
-2. **Need a per-component design?** [designs.md](designs.md).
-3. **Need broader scope / risks / metrics?** [overview.md](overview.md).
 
 ## Deferred milestone — full re-decode
 
