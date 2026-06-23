@@ -78,8 +78,6 @@ def get_contfrag_data_over_time(
             "theta_power",
             "zscored_ripple_consensus_trace",
             "multiunit_rate_zscore",
-            "ripple_consensus_trace",
-            "multiunit_firing_rate",
         ],
     )
 
@@ -161,11 +159,6 @@ def get_contfrag_data_over_time(
             "step_distance": step_distance.squeeze(),
             "ahead_behind_distance": ahead_behind_distance.squeeze(),
             "hpd": hpd.squeeze(),
-            "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
-            "mua_rate": _nearest(
-                data["multiunit_firing_rate"][brain_area].squeeze()
-            ).squeeze(),
-            "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
             "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,
             "max_distance": max_distance,

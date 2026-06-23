@@ -132,7 +132,7 @@ def test_contfrag_wired_path_and_dtype_parity():
             f"{col}: {nl[col].dtype} (NL) != {cf[col].dtype} (CF)"
         )
     # wiring carries real values through identically (same augmented constants)
-    np.testing.assert_allclose(cf["ripple_power"], 20.0)
-    np.testing.assert_allclose(nl["ripple_power"], 20.0)
+    np.testing.assert_allclose(cf["ripple_power_z"], 1.5)  # from SWR_zscore
+    np.testing.assert_allclose(nl["ripple_power_z"], 1.5)
     np.testing.assert_allclose(cf["compression_factor"], 0.1)
     np.testing.assert_allclose(nl["compression_factor"], 0.1)

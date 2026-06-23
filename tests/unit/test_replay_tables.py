@@ -593,10 +593,10 @@ class TestTrajectoryRollupWiring:
             assert col in et.columns, f"missing trajectory column: {col}"
 
         assert len(et) == 2
-        # constant per-bin signals -> per-event mean equals the constant
-        np.testing.assert_allclose(et["ripple_power"], 20.0)
-        np.testing.assert_allclose(et["mua_rate"], 100.0)
-        np.testing.assert_allclose(et["theta_z"], 0.5)
+        # constant per-bin z-scored signals -> per-event mean equals the constant
+        np.testing.assert_allclose(et["ripple_power_z"], 1.5)  # from SWR_zscore
+        np.testing.assert_allclose(et["mua_rate_z"], 2.0)  # from MUA_zscore
+        np.testing.assert_allclose(et["theta_z"], 0.5)  # from theta_power_zscore
         np.testing.assert_allclose(et["hpd_coverage_cm"], 12.0)
         # compression_factor = median(map_speed) / run_speed_baseline = 5/50
         np.testing.assert_allclose(et["replay_speed_median"], 5.0)
@@ -620,4 +620,4 @@ class TestTrajectoryRollupWiring:
         for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
             assert col in et.columns
         assert et["path_length"].isna().all()
-        assert et["ripple_power"].isna().all()
+        assert et["ripple_power_z"].isna().all()

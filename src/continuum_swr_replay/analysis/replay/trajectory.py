@@ -42,9 +42,10 @@ SHARED_TRAJECTORY_COLUMNS: tuple[str, ...] = (
     "hpd_coverage_cm", "multimodal_fraction",
     # path_continuity
     "path_continuity",
-    # neural signal means (raw + z)
-    "ripple_power", "ripple_power_z", "mua_rate", "mua_rate_z",
-    "theta_power", "theta_z",
+    # neural signal means (z-scored; the raw traces require re-loading data
+    # that has drifted from the decode axis, so the stored per-session
+    # z-scores are used directly)
+    "ripple_power_z", "mua_rate_z", "theta_z",
     # state means shared by both scenarios
     "continuous_prob_mean", "fragmented_prob_mean",
 )
@@ -54,14 +55,14 @@ NONLOCAL_ONLY_COLUMNS: tuple[str, ...] = (
     "local_prob_mean", "nospike_prob_mean", "nonlocal_fraction", "nospike_fraction",
 )
 
-#: data_over_time columns carrying the raw/z-scored neural signals (same in both
-#: scenarios), mapped to their per-event rollup column names.
+#: per-session z-scored neural signals already in data_over_time (both
+#: scenarios), mapped to their per-event rollup column names. Raw traces are
+#: not rolled up — re-loading them returns a time axis trimmed since the
+#: decodes (post-trial padding removed by ``get_position_info``), whereas the
+#: stored z-scores cover the full decode axis.
 _SIGNAL_COLUMNS: dict[str, str] = {
-    "ripple_power": "ripple_power",
     "ripple_power_z": "SWR_zscore",
-    "mua_rate": "mua_rate",
     "mua_rate_z": "MUA_zscore",
-    "theta_power": "theta_power",
     "theta_z": "theta_power_zscore",
 }
 

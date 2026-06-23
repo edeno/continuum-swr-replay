@@ -254,8 +254,8 @@ def get_data_over_time(
         - State probabilities (Local_prob, No-Spike_prob, etc.)
         - Posterior statistics (map_estimate, map_speed, step_distance,
           ahead_behind_distance, hpd)
-        - Neural signals: theta_phase, plus z-scored (theta_power_zscore,
-          SWR_zscore, MUA_zscore) and raw (ripple_power, mua_rate, theta_power)
+        - Neural signals (theta_phase, theta_power_zscore, SWR_zscore,
+          MUA_zscore)
         - Per-session run-speed baseline (run_speed_baseline, cm/s)
         - Event counts (n_non_local, n_SWR, n_MUA, etc.)
         - Session metadata (animal, day, epoch, nwb_file_name)
@@ -270,7 +270,6 @@ def get_data_over_time(
             "position_info", "ripple_times", "hse_times",
             "theta_phase", "theta_power",
             "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
-            "ripple_consensus_trace", "multiunit_firing_rate",
         ],
     )
 
@@ -377,11 +376,6 @@ def get_data_over_time(
             "step_distance": step_distance.squeeze(),
             "ahead_behind_distance": ahead_behind_distance.squeeze(),
             "hpd": hpd.squeeze(),
-            "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
-            "mua_rate": _nearest(
-                data["multiunit_firing_rate"][brain_area].squeeze()
-            ).squeeze(),
-            "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
             "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,
             "max_distance": max_distance,

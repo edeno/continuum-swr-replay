@@ -1,22 +1,19 @@
-"""Augment existing ``*_data_over_time.pkl`` with the new trajectory signals.
+"""Augment existing ``*_data_over_time.pkl`` with step_distance + run_speed_baseline.
 
-The saved decode results are locked to their original time axis, and a fresh
-``load_data`` no longer returns an exactly length-matched ``position_info``
-(it has drifted by a few samples), so rebuilding the table from scratch is not
-faithful. Instead we *append* the new per-timebin columns to the existing
-pickle, which is already on the correct axis:
+The decode results are locked to their original time axis, and a fresh
+``load_data`` no longer reproduces it: ``get_position_info`` trims post-trial
+padding (commit e5a0def) that post-dates the decodes, so reloaded position/LFP
+ends earlier than the decode axis. We therefore append only the two new columns
+that need no contemporaneous reload:
 
-- ``step_distance``      computed from the saved ``results.nc`` posterior via
-                         the decoder's MAP (posterior argmax) in
-                         ``get_map_step_distance`` — exact, not reconstructed
-                         from the stored ``map_estimate``.
-- ``run_speed_baseline`` p90 of the pickle's own ``head_speed`` (no load_data).
-- ``ripple_power`` /     raw LFP/MUA signals from ``load_data``, nearest-
-  ``mua_rate`` /         reindexed (4 ms tolerance) onto the pickle's index —
-  ``theta_power``        the same alignment the stored z-scored columns use.
+- ``step_distance``      from the saved ``results.nc`` posterior (decoder MAP
+                         via ``get_map_step_distance``), exact.
+- ``run_speed_baseline`` p90 of the pickle's own ``head_speed``.
 
-``load_data`` dominates per-epoch cost, so both scenarios of an epoch share a
-single ``load_data`` call.
+The neural-signal rollups use the per-session z-scored columns already stored
+in each pkl (``SWR_zscore`` / ``MUA_zscore`` / ``theta_power_zscore``), which
+cover the full decode axis — so no signal reload is needed and the trimming
+issue is sidestepped entirely.
 
 Flags
 -----
@@ -46,24 +43,9 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
 )
-from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-# Raw signals are nearest-reindexed onto the saved decode axis. A real LFP/MUA
-# coverage gap (dropped segment) leaves a few percent of bins unmatched —
-# acceptable, written as NaN (honest "no data here"), but logged so it is not
-# silent. A *large* unmatched fraction instead signals a gross axis
-# misalignment (uniform offset, unit mismatch) and must fail loud.
-_WARN_REINDEX_NAN_FRAC = 0.01
-_MAX_REINDEX_NAN_FRAC = 0.5
-
-NEW_COLUMNS = (
-    "step_distance",
-    "ripple_power",
-    "mua_rate",
-    "theta_power",
-    "run_speed_baseline",
-)
+NEW_COLUMNS = ("step_distance", "run_speed_baseline")
 
 _NONLOCAL_RE = re.compile(
     r"^(?P<animal>\w+?\d{8})_(?P<epoch>\d+_r\d+)_(?P<area>\w+?)_(?P<thr>\d+)_data_over_time\.pkl$"
@@ -73,39 +55,10 @@ _CONTFRAG_RE = re.compile(
 )
 
 
-def _reindex(series: pd.Series, index: pd.Index, label: str) -> np.ndarray:
-    """Nearest-reindex a raw signal onto the decode axis, asserting coverage.
-
-    A small number of unmatched edge bins is tolerated; a large unmatched
-    fraction means the signal's time axis does not line up with the saved
-    decode axis (a uniform offset, a unit mismatch, or a coverage gap), which
-    would otherwise be persisted as a silently-NaN column.
-    """
-    series = series.squeeze()  # 1-column frame -> Series; Series unchanged
-    out = series.reindex(index, method="nearest", tolerance=0.004)
-    nan_frac = float(out.isna().to_numpy().mean())
-    if nan_frac > _MAX_REINDEX_NAN_FRAC:
-        median_gap_ms = float(np.median(np.diff(series.index))) * 1e3
-        raise ValueError(
-            f"{label}: {nan_frac:.1%} of timebins had no sample within 4 ms "
-            f"(median source gap {median_gap_ms:.2f} ms) — gross axis "
-            "misalignment; refusing to write a mostly-NaN column"
-        )
-    if nan_frac > _WARN_REINDEX_NAN_FRAC:
-        print(f"  [warn] {label}: {nan_frac:.1%} unmatched within 4 ms "
-              "(LFP/MUA coverage gap, written as NaN)")
-    return out.to_numpy()
-
-
 def _step_distance_from_results(
     scenario: str, base: str, env: Environment, n_rows: int, pkl_name: str
 ) -> np.ndarray:
-    """Exact per-timebin step distance from the saved posterior (argmax MAP).
-
-    Loads the saved ``results.nc``, conditions it to the scenario's posterior,
-    and runs :func:`get_map_step_distance` — i.e. the decoder's own MAP
-    (posterior argmax), not a reconstruction from the stored ``map_estimate``.
-    """
+    """Exact per-timebin step distance from the saved posterior (argmax MAP)."""
     suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
     with xr.open_dataset(
         PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc", engine="h5netcdf"
@@ -128,34 +81,23 @@ def _step_distance_from_results(
     return step_distance
 
 
-def _augment_pkl(
-    pkl: Path, scenario: str, base: str, env: Environment, data: dict,
-    brain_area: str, check_only: bool,
-) -> None:
-    dot = pd.read_pickle(pkl)
+# Raw-signal columns written by an earlier augmentation revision; the rollups
+# now use the stored z-scores instead, so drop these stale columns on rewrite.
+_STALE_COLUMNS = ["ripple_power", "mua_rate", "theta_power"]
 
-    step_distance = _step_distance_from_results(
-        scenario, base, env, len(dot), pkl.name
-    )
+
+def _augment_pkl(pkl: Path, scenario: str, base: str, env: Environment, check_only: bool) -> None:
+    dot = pd.read_pickle(pkl)
+    dot = dot.drop(columns=_STALE_COLUMNS, errors="ignore")
+
+    step_distance = _step_distance_from_results(scenario, base, env, len(dot), pkl.name)
 
     run_speed_baseline = float(np.nanpercentile(dot["head_speed"].to_numpy(), 90))
     if not np.isfinite(run_speed_baseline):
-        raise ValueError(
-            f"{pkl.name}: run_speed_baseline is not finite (head_speed all-NaN?)"
-        )
-
-    def _onto_decode_axis(series: pd.Series, column: str) -> np.ndarray:
-        return _reindex(series, dot.index, f"{pkl.name}:{column}")
+        raise ValueError(f"{pkl.name}: run_speed_baseline is not finite (head_speed all-NaN?)")
 
     dot["step_distance"] = step_distance
     dot["run_speed_baseline"] = run_speed_baseline
-    dot["ripple_power"] = _onto_decode_axis(
-        data["ripple_consensus_trace"], "ripple_power"
-    )
-    dot["mua_rate"] = _onto_decode_axis(
-        data["multiunit_firing_rate"][brain_area].squeeze(), "mua_rate"
-    )
-    dot["theta_power"] = _onto_decode_axis(data["theta_power"].squeeze(), "theta_power")
 
     out = pkl.with_suffix(".pkl.new") if check_only else pkl
     # Atomic write: a kill mid-write must not corrupt the (unrecreatable)
@@ -174,30 +116,32 @@ def _augment_epoch(
         if force:
             return True
         try:
-            return not set(NEW_COLUMNS).issubset(pd.read_pickle(p).columns)
+            cols = set(pd.read_pickle(p).columns)
         except Exception as e:  # noqa: BLE001 - identify the unreadable file
             raise RuntimeError(f"cannot read {p.name}: {e!r}") from e
+        # Re-process if the new columns are missing OR a stale raw-signal column
+        # from a prior revision is still present (to drop it).
+        missing_new = not set(NEW_COLUMNS).issubset(cols)
+        has_stale = bool(set(_STALE_COLUMNS) & cols)
+        return missing_new or has_stale
 
     pending = {s: p for s, p in scenarios.items() if _needs_augment(p)}
     if not pending:
         print(f"[{animal} {epoch_name} {brain_area}] already augmented; skip")
         return
 
-    nwb_file_name = f"{animal}_.nwb"
     base = f"{animal}_{epoch_name}_{brain_area}"
     t0 = time.perf_counter()
-    data = load_data(nwb_file_name, epoch_name)
-    print(
-        f"[{animal} {epoch_name} {brain_area}] load_data="
-        f"{time.perf_counter() - t0:.1f}s; scenarios={list(pending)}"
-    )
-
     for scenario, pkl in pending.items():
         env_suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
         env = Environment.load_environment(
             str(PROCESSED_DATA_DIR / f"{base}{env_suffix}_environment.pkl")
         )
-        _augment_pkl(pkl, scenario, base, env, data, brain_area, check_only)
+        _augment_pkl(pkl, scenario, base, env, check_only)
+    print(
+        f"[{animal} {epoch_name} {brain_area}] done in "
+        f"{time.perf_counter() - t0:.1f}s; scenarios={list(pending)}"
+    )
 
 
 def _discover(files: list[Path]) -> dict[tuple[str, str, str], dict[str, Path]]:
@@ -240,7 +184,6 @@ def main() -> None:
                 args.check_only, args.force,
             )
         except MemoryError:
-            # Don't keep launching more multi-GB loads after an OOM.
             raise
         except Exception as e:  # noqa: BLE001 - batch: record and continue
             print(f"[{animal} {epoch_name} {brain_area}] FAILED: {e!r}")
