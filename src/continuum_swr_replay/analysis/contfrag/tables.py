@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 
+from ...parameters import PLACE_BIN_SIZE_1D
 from ..replay._helpers import (
     ALL_ARMS,
     add_trial_context,
@@ -48,10 +49,27 @@ from ..replay.summaries import (
     arm_posterior_mass,
     posterior_to_arm_marginal,
 )
+from ..replay.trajectory import (
+    SHARED_TRAJECTORY_COLUMNS,
+    compute_trajectory_rollups,
+)
 from ..replay.uncertainty import (
     posterior_entropy_mean,
     posterior_hpd_widths,
     posterior_peak_mean,
+)
+
+# ContFrag state-probability column mapping (2-state model).
+_CONTFRAG_STATE_COLS = {
+    "continuous_prob_mean": "Continuous_prob",
+    "fragmented_prob_mean": "Fragmented_prob",
+}
+# ``continuous_prob_mean`` / ``fragmented_prob_mean`` are produced by
+# ``_summarize_event_state`` (pre-augmentation-safe), so the orchestrator
+# supplies every shared column *except* those two.
+_CONTFRAG_TRAJECTORY_COLUMNS = tuple(
+    c for c in SHARED_TRAJECTORY_COLUMNS
+    if c not in ("continuous_prob_mean", "fragmented_prob_mean")
 )
 
 
@@ -217,6 +235,7 @@ def build_contfrag_event_table(
     brain_area: str = "HPC",
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    place_bin_size: float = PLACE_BIN_SIZE_1D,
 ) -> pd.DataFrame:
     """One row per externally-defined event with canonical event-level columns.
 
@@ -403,6 +422,7 @@ def build_contfrag_event_table(
         "posterior_hpd_width_80",
         "posterior_hpd_width_95",
     )
+    arm_posterior = None  # set below when conditional_posterior is supplied
     if conditional_posterior is None:
         for c in posterior_cols:
             per_event[c] = np.nan
@@ -425,6 +445,28 @@ def build_contfrag_event_table(
         per_event["posterior_hpd_width_50"] = hpd[0.5]
         per_event["posterior_hpd_width_80"] = hpd[0.8]
         per_event["posterior_hpd_width_95"] = hpd[0.95]
+
+    # Trajectory rollups (shared with the Non-Local table). Gated on the
+    # augmented data_over_time columns; continuous/fragmented_prob_mean come
+    # from ``_summarize_event_state`` above, so they are excluded here.
+    if "step_distance" in ev.columns:
+        rollups = compute_trajectory_rollups(
+            nl=ev,
+            event_id=event_id_series,
+            env=env,
+            track_graph=track_graph,
+            state_prob_cols=_CONTFRAG_STATE_COLS,
+            continuous_col="Continuous_prob",
+            fragmented_col="Fragmented_prob",
+            place_bin_size=place_bin_size,
+            nonlocal_prob=None,
+            arm_posterior=arm_posterior,
+        )
+        for col_name in _CONTFRAG_TRAJECTORY_COLUMNS:
+            per_event[col_name] = rollups[col_name]
+    else:
+        for col_name in _CONTFRAG_TRAJECTORY_COLUMNS:
+            per_event[col_name] = np.nan
 
     # Identifiers + stable hashes
     per_event.insert(0, "animal", animal)
@@ -906,6 +948,9 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
         "n_unique_arms",
         "stop_idx",
         "stop_id",
+        # Trajectory rollups shared with the Non-Local table (continuous /
+        # fragmented_prob_mean are above, from _summarize_event_state).
+        *_CONTFRAG_TRAJECTORY_COLUMNS,
     ]
 
 

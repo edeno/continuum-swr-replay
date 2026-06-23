@@ -10,16 +10,22 @@ TABLES_PATH = REPO_ROOT / "src/continuum_swr_replay/analysis/contfrag/tables.py"
 
 
 def _load_column_helpers() -> dict[str, object]:
+    from continuum_swr_replay.analysis.replay.trajectory import (
+        SHARED_TRAJECTORY_COLUMNS,
+    )
+
     src = TABLES_PATH.read_text()
     tree = ast.parse(src)
     names = {
         "_EVENT_SOURCE_TO_COL",
+        "_CONTFRAG_TRAJECTORY_COLUMNS",
         "_resolve_event_col",
         "_contfrag_event_table_columns",
         "_contfrag_stop_table_columns",
         "_contfrag_event_arm_table_columns",
     }
-    ns: dict[str, object] = {}
+    # Seed the dependency the trajectory-column constant is derived from.
+    ns: dict[str, object] = {"SHARED_TRAJECTORY_COLUMNS": SHARED_TRAJECTORY_COLUMNS}
 
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
