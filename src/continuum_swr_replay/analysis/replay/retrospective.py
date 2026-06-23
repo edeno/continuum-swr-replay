@@ -53,11 +53,14 @@ from .shuffles import next_arm_circular_shift
 __all__ = [
     "arm_path_well_to_well",
     "chosen_arm_fraction",
+    "chosen_arm_fraction_prev",
     "chosen_patch_fraction",
     "compute_retrospective_metrics",
+    "contains_path_from_prev",
     "contains_path_to_next",
     "ends_at_next",
     "ends_at_next_patch",
+    "ends_at_prev",
     "retrospective_alignment_with_shuffle",
 ]
 
@@ -137,11 +140,44 @@ def arm_path_well_to_well(current_arm: int, next_arm: int) -> set[int]:
 # ─────────────────────────────────────────────────────────────────────
 
 
+def _arm_fraction_at(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    *,
+    target_col: str,
+    out_col: str,
+) -> pd.DataFrame:
+    """Per-event ``arm_fraction`` at ``arm == event_table[target_col]``.
+
+    Events with ``target_col`` NaN are dropped. Shared core of
+    :func:`chosen_arm_fraction` (``target_col="next_arm"``, prospective) and
+    :func:`chosen_arm_fraction_prev` (``target_col="prev_arm"``, retrospective).
+    """
+    if event_table.empty:
+        return _empty_metric_frame(event_table, out_col)
+    ev = event_table.dropna(subset=[target_col]).copy()
+    ev[target_col] = ev[target_col].astype(int)
+
+    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
+    ea = event_arm_table[[*sess_keys, "event_id", "arm", "arm_fraction"]]
+
+    merged = ev.merge(
+        ea,
+        left_on=[*sess_keys, "event_id", target_col],
+        right_on=[*sess_keys, "event_id", "arm"],
+        how="left",
+    )
+    out_cols = [*sess_keys, "event_id"]
+    out = merged[out_cols].copy()
+    out[out_col] = merged["arm_fraction"].astype(float)
+    return out
+
+
 def chosen_arm_fraction(
     event_table: pd.DataFrame,
     event_arm_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-event ``arm_fraction`` at ``arm == next_arm``.
+    """Per-event ``arm_fraction`` at ``arm == next_arm`` (prospective).
 
     Events with ``next_arm`` NaN are dropped (the animal never left,
     or the session ended before another stop occurred).
@@ -153,53 +189,46 @@ def chosen_arm_fraction(
         columns (``animal``/``day``/``epoch``) are passed through if
         present in ``event_table``.
     """
-    if event_table.empty:
-        return _empty_metric_frame(event_table, "chosen_arm_fraction")
-    ev = event_table.dropna(subset=["next_arm"]).copy()
-    ev["next_arm"] = ev["next_arm"].astype(int)
-
-    # Join (event_id, next_arm) onto event_arm_table to pick the chosen
-    # arm's fraction. We keep `arm_fraction` only.
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
-    ea = event_arm_table[[*sess_keys, "event_id", "arm", "arm_fraction"]]
-
-    merged = ev.merge(
-        ea,
-        left_on=[*sess_keys, "event_id", "next_arm"],
-        right_on=[*sess_keys, "event_id", "arm"],
-        how="left",
+    return _arm_fraction_at(
+        event_table, event_arm_table,
+        target_col="next_arm", out_col="chosen_arm_fraction",
     )
-    out_cols = [*sess_keys, "event_id"]
-    out = merged[out_cols].copy()
-    out["chosen_arm_fraction"] = merged["arm_fraction"].astype(float)
-    return out
 
 
-def ends_at_next(
+def chosen_arm_fraction_prev(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+) -> pd.DataFrame:
+    """Per-event ``arm_fraction`` at ``arm == prev_arm`` (retrospective).
+
+    The ``prev_arm`` mirror of :func:`chosen_arm_fraction`: how much of the
+    replay content sits on the arm the animal just left.
+    """
+    return _arm_fraction_at(
+        event_table, event_arm_table,
+        target_col="prev_arm", out_col="chosen_arm_fraction_prev",
+    )
+
+
+def _ends_at_arm(
     event_table: pd.DataFrame,
     event_sequence_table: pd.DataFrame,
+    *,
+    target_col: str,
+    out_col: str,
 ) -> pd.DataFrame:
-    """Per-event boolean: last in-event MAP arm equals ``next_arm``.
+    """Per-event boolean: last in-event MAP arm equals ``target_col``.
 
-    The "last" bin is identified by the maximum ``t_in_event`` per
-    event. Events with NaN ``next_arm`` are dropped (no choice to
-    align to). Events with no in-event sequence row (the merge fills
-    NaN ``_last_arm``) — and bins whose final ``decoded_arm_map`` is
-    itself NaN (junction-bin artifact) — are recorded as ``False``,
-    not propagated as missing, so downstream
-    ``_per_session_metric_means``'s ``np.nanmean`` reduction counts
-    them in the denominator.
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns: ``event_id``, ``ends_at_next`` (bool). Session-key
-        columns are passed through if present.
+    The "last" bin is the maximum ``t_in_event`` per event. Events with NaN
+    ``target_col`` are dropped; events with no in-event sequence row, or a NaN
+    final ``decoded_arm_map`` (junction-bin artifact), record ``False`` so the
+    downstream ``np.nanmean`` counts them in the denominator. Shared core of
+    :func:`ends_at_next` and :func:`ends_at_prev`.
     """
     if event_table.empty:
-        return _empty_metric_frame(event_table, "ends_at_next")
-    ev = event_table.dropna(subset=["next_arm"]).copy()
-    ev["next_arm"] = ev["next_arm"].astype(int)
+        return _empty_metric_frame(event_table, out_col)
+    ev = event_table.dropna(subset=[target_col]).copy()
+    ev[target_col] = ev[target_col].astype(int)
 
     sess_keys = [
         c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
@@ -214,41 +243,66 @@ def ends_at_next(
     merged = ev.merge(last_bin, on=[*sess_keys, "event_id"], how="left")
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    # Match the arm-level contract to ``ends_at_next_patch``: an
-    # event with valid ``next_arm`` but no decoded sequence row (or
-    # whose final ``decoded_arm_map`` is NaN, e.g. junction-bin
-    # artifact) records as ``False`` rather than ``pd.NA``. Without
-    # this fillna the nullable equality leaks ``<NA>`` →
-    # ``np.nanmean`` drops the row from the denominator in
-    # ``_per_session_metric_means``, inflating the per-session mean.
-    eq = merged["_last_arm"].astype("Int64") == merged["next_arm"].astype("Int64")
-    out["ends_at_next"] = eq.fillna(False).astype(bool)
+    eq = merged["_last_arm"].astype("Int64") == merged[target_col].astype("Int64")
+    out[out_col] = eq.fillna(False).astype(bool)
     return out
 
 
-def contains_path_to_next(
+def ends_at_next(
     event_table: pd.DataFrame,
     event_sequence_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-event boolean: MAP-arm trace covers the geometric path
-    from ``current_arm`` to ``next_arm``.
-
-    "Covers" means every arm in
-    :func:`arm_path_well_to_well(current_arm, next_arm)` appears at
-    least once in the event's ``decoded_arm_map``. Events with NaN
-    ``current_arm`` or ``next_arm`` are dropped.
+    """Per-event boolean: last in-event MAP arm equals ``next_arm`` (prospective).
 
     Returns
     -------
     pd.DataFrame
-        Columns: ``event_id``, ``contains_path_to_next`` (bool).
-        Session-key columns are passed through if present.
+        Columns: ``event_id``, ``ends_at_next`` (bool). Session-key
+        columns are passed through if present.
+    """
+    return _ends_at_arm(
+        event_table, event_sequence_table,
+        target_col="next_arm", out_col="ends_at_next",
+    )
+
+
+def ends_at_prev(
+    event_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+) -> pd.DataFrame:
+    """Per-event boolean: last in-event MAP arm equals ``prev_arm`` (retrospective).
+
+    The ``prev_arm`` mirror of :func:`ends_at_next`: whether the replay
+    trajectory ends at the arm the animal just left.
+    """
+    return _ends_at_arm(
+        event_table, event_sequence_table,
+        target_col="prev_arm", out_col="ends_at_prev",
+    )
+
+
+def _contains_path(
+    event_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    *,
+    source_col: str,
+    target_col: str,
+    out_col: str,
+) -> pd.DataFrame:
+    """Per-event boolean: MAP-arm trace covers the path ``source_col`` → ``target_col``.
+
+    "Covers" means every arm in
+    :func:`arm_path_well_to_well(source, target)` appears at least once in the
+    event's ``decoded_arm_map``. Events with NaN ``source_col`` or
+    ``target_col`` are dropped. Shared core of :func:`contains_path_to_next`
+    (current→next, prospective) and :func:`contains_path_from_prev`
+    (prev→current, retrospective).
     """
     if event_table.empty:
-        return _empty_metric_frame(event_table, "contains_path_to_next")
-    ev = event_table.dropna(subset=["current_arm", "next_arm"]).copy()
-    ev["current_arm"] = ev["current_arm"].astype(int)
-    ev["next_arm"] = ev["next_arm"].astype(int)
+        return _empty_metric_frame(event_table, out_col)
+    ev = event_table.dropna(subset=[source_col, target_col]).copy()
+    ev[source_col] = ev[source_col].astype(int)
+    ev[target_col] = ev[target_col].astype(int)
 
     sess_keys = [
         c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
@@ -285,8 +339,8 @@ def contains_path_to_next(
                 else arm_path_well_to_well(int(c), int(n)).issubset(decoded)
             )
             for c, n, decoded in zip(
-                merged["current_arm"].to_numpy(),
-                merged["next_arm"].to_numpy(),
+                merged[source_col].to_numpy(),
+                merged[target_col].to_numpy(),
                 merged["_decoded_arm_set"].to_numpy(),
                 strict=True,
             )
@@ -295,8 +349,47 @@ def contains_path_to_next(
     )
     out_cols = [*sess_keys, "event_id"]
     out = merged[out_cols].copy()
-    out["contains_path_to_next"] = contains
+    out[out_col] = contains
     return out
+
+
+def contains_path_to_next(
+    event_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+) -> pd.DataFrame:
+    """Per-event boolean: MAP-arm trace covers ``current_arm`` → ``next_arm``.
+
+    "Covers" means every arm in ``arm_path_well_to_well(current_arm, next_arm)``
+    appears in the event's ``decoded_arm_map``. Events with NaN
+    ``current_arm``/``next_arm`` are dropped.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``event_id``, ``contains_path_to_next`` (bool).
+    """
+    return _contains_path(
+        event_table, event_sequence_table,
+        source_col="current_arm", target_col="next_arm",
+        out_col="contains_path_to_next",
+    )
+
+
+def contains_path_from_prev(
+    event_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+) -> pd.DataFrame:
+    """Per-event boolean: MAP-arm trace covers ``prev_arm`` → ``current_arm``.
+
+    The retrospective mirror of :func:`contains_path_to_next`: whether the
+    replay covers the route the animal just took (the just-left arm back to
+    where it currently is).
+    """
+    return _contains_path(
+        event_table, event_sequence_table,
+        source_col="prev_arm", target_col="current_arm",
+        out_col="contains_path_from_prev",
+    )
 
 
 def chosen_patch_fraction(
@@ -432,6 +525,7 @@ def compute_retrospective_metrics(
     event_sequence_table: pd.DataFrame,
     *,
     include_patch: bool = True,
+    include_prev: bool = True,
 ) -> pd.DataFrame:
     """Join the Stage 5B metrics into a single per-event table.
 
@@ -441,6 +535,10 @@ def compute_retrospective_metrics(
         Also compute ``chosen_patch_fraction`` and
         ``ends_at_next_patch``. Set False for the arm-only legacy
         behavior (matches the original three-metric API).
+    include_prev : bool, default True
+        Also compute the ``prev_arm`` retrospective mirror:
+        ``chosen_arm_fraction_prev``, ``ends_at_prev``,
+        ``contains_path_from_prev``. Requires a ``prev_arm`` column.
 
     Returns
     -------
@@ -449,7 +547,8 @@ def compute_retrospective_metrics(
         ``next_patch``. Always includes ``chosen_arm_fraction``,
         ``ends_at_next``, ``contains_path_to_next``. Adds
         ``chosen_patch_fraction``, ``ends_at_next_patch`` when
-        ``include_patch=True``.
+        ``include_patch=True``, and the ``prev_arm`` mirror when
+        ``include_prev=True``.
     """
     sess_keys = [c for c in ("animal", "day", "epoch") if c in event_table.columns]
     cf = chosen_arm_fraction(event_table, event_arm_table)
@@ -465,6 +564,14 @@ def compute_retrospective_metrics(
             out = out.merge(cpf, on=[*sess_keys, "event_id"], how="outer")
         if not enp.empty:
             out = out.merge(enp, on=[*sess_keys, "event_id"], how="outer")
+    if include_prev and "prev_arm" in event_table.columns:
+        for prev in (
+            chosen_arm_fraction_prev(event_table, event_arm_table),
+            ends_at_prev(event_table, event_sequence_table),
+            contains_path_from_prev(event_table, event_sequence_table),
+        ):
+            if not prev.empty:
+                out = out.merge(prev, on=[*sess_keys, "event_id"], how="outer")
     return out
 
 

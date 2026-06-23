@@ -30,11 +30,14 @@ import pytest
 from continuum_swr_replay.analysis.replay.retrospective import (
     arm_path_well_to_well,
     chosen_arm_fraction,
+    chosen_arm_fraction_prev,
     chosen_patch_fraction,
     compute_retrospective_metrics,
+    contains_path_from_prev,
     contains_path_to_next,
     ends_at_next,
     ends_at_next_patch,
+    ends_at_prev,
     retrospective_alignment_with_shuffle,
 )
 
@@ -578,3 +581,75 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert result["real_mean_chosen_arm_fraction"] > 0.5
         assert result["shuffled_mean_chosen_arm_fraction"] < 0.2
         assert result["real_minus_shuffled_chosen_arm_fraction"] > 0.3
+
+
+# ─────────────────────────────────────────────────────────────────────
+# prev_arm retrospective mirror
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestPrevArmMirror:
+    """The prev_arm mirror reuses the same cores, targeting prev/current."""
+
+    def test_chosen_arm_fraction_prev_picks_prev_arm(self):
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3},
+                {"event_id": 2, "current_arm": 0, "prev_arm": 3, "next_arm": 0},
+            ]
+        )
+        ea = _make_event_arm_table(
+            {
+                1: [0.40, 0, 0, 0.10, 0, 0, 0, 0, 0],  # arm 0 (prev) -> 0.40
+                2: [0.10, 0, 0, 0.30, 0, 0, 0, 0, 0],  # arm 3 (prev) -> 0.30
+            }
+        )
+        out = chosen_arm_fraction_prev(ev, ea).set_index("event_id")
+        assert out.loc[1, "chosen_arm_fraction_prev"] == pytest.approx(0.40)
+        assert out.loc[2, "chosen_arm_fraction_prev"] == pytest.approx(0.30)
+
+    def test_ends_at_prev_last_bin_matches_prev_arm(self):
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+        )
+        es = _make_event_sequence_table({1: [3, 7, 6, 0]})  # ends at arm 0 (prev)
+        out = ends_at_prev(ev, es).set_index("event_id")
+        assert bool(out.loc[1, "ends_at_prev"]) is True
+
+        es2 = _make_event_sequence_table({1: [3, 7, 6, 1]})  # ends at arm 1
+        out2 = ends_at_prev(ev, es2).set_index("event_id")
+        assert bool(out2.loc[1, "ends_at_prev"]) is False
+
+    def test_contains_path_from_prev_covers_prev_to_current(self):
+        # prev=0, current=3 -> cross-patch path {0,3,6,7} (leaves + trunks)
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+        )
+        path = sorted(arm_path_well_to_well(0, 3))
+        es_full = _make_event_sequence_table({1: path})
+        assert bool(
+            contains_path_from_prev(ev, es_full).set_index("event_id").loc[
+                1, "contains_path_from_prev"
+            ]
+        ) is True
+        es_partial = _make_event_sequence_table({1: [0, 3]})  # missing trunks
+        assert bool(
+            contains_path_from_prev(ev, es_partial).set_index("event_id").loc[
+                1, "contains_path_from_prev"
+            ]
+        ) is False
+
+    def test_compute_metrics_includes_prev_columns(self):
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3,
+              "next_patch": 2}]
+        )
+        ea = _make_event_arm_table({1: [0.4, 0, 0, 0.3, 0, 0, 0, 0, 0]})
+        es = _make_event_sequence_table({1: [3, 7, 6, 0]})
+        out = compute_retrospective_metrics(ev, ea, es)
+        for col in ("chosen_arm_fraction_prev", "ends_at_prev",
+                    "contains_path_from_prev"):
+            assert col in out.columns
+        # include_prev=False omits them
+        out2 = compute_retrospective_metrics(ev, ea, es, include_prev=False)
+        assert "ends_at_prev" not in out2.columns

@@ -36,6 +36,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
+from continuum_swr_replay.analysis.replay.retrospective import (
+    compute_retrospective_metrics,
+)
 from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
     build_event_patch_table,
@@ -178,6 +181,24 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
         if posterior is not None and len(event_table) > 0
         else None
     )
+
+    # Merge the prospective + retrospective alignment metrics into the
+    # canonical event table on event_id (left-join keeps every event; those
+    # without a valid next_arm/prev_arm get NaN). These need the arm and
+    # sequence tables, so they are joined here at the assembly level rather
+    # than inside build_event_table. This replaces the previously
+    # standalone Stage 5B post-hoc pass for the per-event columns.
+    if event_sequence_table is not None and len(event_table) > 0:
+        sess_keys = [
+            c for c in ("animal", "day", "epoch") if c in event_table.columns
+        ]
+        retro = compute_retrospective_metrics(
+            event_table, event_arm_table, event_sequence_table
+        )
+        if not retro.empty:
+            event_table = event_table.merge(
+                retro, on=[*sess_keys, "event_id"], how="left", validate="one_to_one"
+            )
 
     return {
         "event_table": event_table,
