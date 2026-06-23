@@ -36,6 +36,18 @@ For agent invocation, **load only the slice you need**:
 2. **Need a per-component design?** [designs.md](designs.md).
 3. **Need broader scope / risks / metrics?** [overview.md](overview.md).
 
+## Deferred milestone — full re-decode
+
+The saved decodes (2026-04-01) are stale relative to the current pipeline:
+`get_position_info` now trims post-trial padding (e5a0def, 2026-04-24) and the
+decoding params drifted, so reloading `load_data` no longer reproduces the
+decode axis (~76 s LFP tail for some epochs). The trajectory work sidesteps
+this (z-scored signals from the pkls; augmentation needs no `load_data`). A
+full re-decode on current code — to make position/LFP/decode-axis/signals
+mutually consistent — is deliberately deferred (days of GPU, would change the
+decodes and require regenerating all downstream figures/models). See memory
+`project-decode-data-drift-redecode`.
+
 ## Files
 
 - [overview.md](overview.md) — scope, integration points, risks, rollout, open questions
