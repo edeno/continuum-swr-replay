@@ -4,11 +4,16 @@
 e3fc792). data_over_time augmentation uses the **exact posterior** path for
 `step_distance` (Option B — cross-animal validation found the map_estimate
 reconstruction diverged by ≤1 place-bin on 2/5 animals). Full augmentation
-running in tmux `augment_dot` (log: `logs/augment_data_over_time.log`); ~40 hr,
-idempotent/resumable, atomic in-place writes. Phase 2 STARTED (157b966):
-`trajectory.py` has 3 tested rollup families; remaining = `uncertainty_extra`,
-wiring into both event tables, path_continuity/retrospective merge + prev_arm
-mirror, cross-scenario parity test.
+running in tmux `augment_dot` (log: `logs/augment_data_over_time.log`),
+idempotent/resumable, atomic in-place writes; the reindex guard now tolerates
+real LFP coverage gaps (a201f60). Phase 2 LARGELY DONE: `trajectory.py` has all
+4 rollup families + the `compute_trajectory_rollups` orchestrator, wired into
+BOTH `build_event_table` and `build_contfrag_event_table` (gated on the
+augmented columns), with `path_continuity` merged and a cross-scenario parity
+test (157b966, 27e103a, d55be8d, 0949748, a201f60). REMAINING: merge the
+existing retrospective metrics into the canonical event table + add the
+`prev_arm` mirror (`ends_at_prev` / `contains_path_from_prev` /
+`chosen_arm_fraction_prev`).
 
 Add ~30 per-event summary statistics that characterize replay trajectories —
 speed, displacement, path length, spatial extent, continuity, direction,
