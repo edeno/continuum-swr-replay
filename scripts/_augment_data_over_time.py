@@ -49,10 +49,13 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-# Raw signals are nearest-reindexed onto the saved decode axis; a handful of
-# unmatched edge bins is acceptable, but a large fraction signals a real axis
-# misalignment (e.g. a uniform offset or unit mismatch) that must fail loud.
-_MAX_REINDEX_NAN_FRAC = 0.005
+# Raw signals are nearest-reindexed onto the saved decode axis. A real LFP/MUA
+# coverage gap (dropped segment) leaves a few percent of bins unmatched —
+# acceptable, written as NaN (honest "no data here"), but logged so it is not
+# silent. A *large* unmatched fraction instead signals a gross axis
+# misalignment (uniform offset, unit mismatch) and must fail loud.
+_WARN_REINDEX_NAN_FRAC = 0.01
+_MAX_REINDEX_NAN_FRAC = 0.5
 
 NEW_COLUMNS = (
     "step_distance",
@@ -85,9 +88,12 @@ def _reindex(series: pd.Series, index: pd.Index, label: str) -> np.ndarray:
         median_gap_ms = float(np.median(np.diff(series.index))) * 1e3
         raise ValueError(
             f"{label}: {nan_frac:.1%} of timebins had no sample within 4 ms "
-            f"(median source gap {median_gap_ms:.2f} ms) — axis misalignment; "
-            "refusing to write a silently-NaN column"
+            f"(median source gap {median_gap_ms:.2f} ms) — gross axis "
+            "misalignment; refusing to write a mostly-NaN column"
         )
+    if nan_frac > _WARN_REINDEX_NAN_FRAC:
+        print(f"  [warn] {label}: {nan_frac:.1%} unmatched within 4 ms "
+              "(LFP/MUA coverage gap, written as NaN)")
     return out.to_numpy()
 
 

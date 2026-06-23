@@ -89,6 +89,19 @@ def test_brain_state_means_and_fraction():
     np.testing.assert_allclose(out["nonlocal_fraction"], [0.5, 1.0])
 
 
+def test_brain_state_means_skips_nan_signal_bins():
+    """A NaN signal bin (LFP coverage gap) is excluded from the event mean."""
+    event_id = np.array([1, 1, 2, 2])
+    extra = {"ripple_power": np.array([10.0, np.nan, np.nan, np.nan])}
+    ids, out = brain_state_means(
+        event_id=event_id, state_probs={}, extra_means=extra,
+    )
+    np.testing.assert_array_equal(ids, [1, 2])
+    # event1: mean of the one finite bin (10.0); event2: all NaN -> NaN
+    np.testing.assert_allclose(out["ripple_power"][0], 10.0)
+    assert np.isnan(out["ripple_power"][1])
+
+
 def test_ahead_behind_direction_and_reach():
     event_id = np.array([1, 1, 1, 2, 2, 2])
     # event1 outbound (increasing), event2 inbound (decreasing)

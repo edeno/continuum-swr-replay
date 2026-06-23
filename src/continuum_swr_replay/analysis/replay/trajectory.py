@@ -102,12 +102,17 @@ def brain_state_means(
         is supplied.
     """
     unique, inv, n_events = _group_by_event(event_id)
-    counts = np.bincount(inv, minlength=n_events).astype(float)
 
     def _mean(values: np.ndarray) -> np.ndarray:
-        total = np.bincount(inv, weights=np.asarray(values, float), minlength=n_events)
+        # NaN-aware per-event mean: a raw LFP/MUA signal can carry NaN where a
+        # coverage gap left a bin unmatched, so average only the finite bins
+        # per event (an event entirely in a gap returns NaN).
+        v = np.asarray(values, dtype=float)
+        finite = np.isfinite(v)
+        total = np.bincount(inv[finite], weights=v[finite], minlength=n_events)
+        cnt = np.bincount(inv[finite], minlength=n_events).astype(float)
         with np.errstate(divide="ignore", invalid="ignore"):
-            return np.where(counts > 0, total / counts, np.nan)
+            return np.where(cnt > 0, total / cnt, np.nan)
 
     out = {col: _mean(v) for col, v in {**state_probs, **extra_means}.items()}
 
