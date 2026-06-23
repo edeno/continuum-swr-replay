@@ -139,9 +139,20 @@ def mock_session_data_for_aggregation(mock_position_info, mock_time):
             index=mock_time,
             name="zscored_ripple_consensus_trace",
         ),
+        "ripple_consensus_trace": pd.Series(
+            np.abs(np.random.RandomState(45).randn(n)),
+            index=mock_time,
+            name="ripple_consensus_trace",
+        ),
         "multiunit_rate_zscore": {
             "HPC": pd.DataFrame(
                 {"firing_rate": np.random.RandomState(44).randn(n)},
+                index=mock_time,
+            )
+        },
+        "multiunit_firing_rate": {
+            "HPC": pd.DataFrame(
+                {"firing_rate": np.abs(np.random.RandomState(46).randn(n))},
                 index=mock_time,
             )
         },

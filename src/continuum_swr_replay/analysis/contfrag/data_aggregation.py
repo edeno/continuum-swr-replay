@@ -28,7 +28,7 @@ from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
 from ..hippocampus.event_detection import get_overlap_times
-from ..hippocampus.posterior_analysis import get_posterior_stats
+from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
 from .posterior_analysis import get_contfrag_posterior
 
 
@@ -78,6 +78,8 @@ def get_contfrag_data_over_time(
             "theta_power",
             "zscored_ripple_consensus_trace",
             "multiunit_rate_zscore",
+            "ripple_consensus_trace",
+            "multiunit_firing_rate",
         ],
     )
 
@@ -105,6 +107,19 @@ def get_contfrag_data_over_time(
         posterior,
     ) = get_posterior_stats(
         data, env, sampling_frequency=sampling_frequency, posterior=posterior
+    )
+    # Raw per-timebin track-graph displacement of the MAP position (cm),
+    # unsmoothed (cf. the smoothed ``map_speed``) so downstream summaries can
+    # sum it (path length) or take robust order statistics (jumpiness).
+    step_distance = get_map_step_distance(
+        posterior.values,
+        env.track_graph_with_bin_centers_edges_,
+        np.asarray(env.place_bin_centers_nodes_df_.node_id),
+    )
+    # Per-session "typical run speed" baseline (cm/s): robust, threshold-free
+    # 90th-percentile of head speed, used as the compression-factor denominator.
+    run_speed_baseline = float(
+        np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
     )
 
     animal, day = parse_nwb_filename(nwb_file_name)
@@ -140,8 +155,15 @@ def get_contfrag_data_over_time(
             ).acausal_state_probabilities.squeeze(),
             "map_estimate": map_estimate.squeeze(),
             "map_speed": map_speed.squeeze(),
+            "step_distance": step_distance.squeeze(),
             "ahead_behind_distance": ahead_behind_distance.squeeze(),
             "hpd": hpd.squeeze(),
+            "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
+            "mua_rate": _nearest(
+                data["multiunit_firing_rate"][brain_area].squeeze()
+            ),
+            "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
+            "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,

@@ -14,6 +14,7 @@ import xarray as xr
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_speed,
+    get_map_step_distance,
 )
 
 
@@ -731,3 +732,77 @@ class TestAllNaNRowHandlingFix:
 
             assert len(nan_warnings) == 0, \
                 f"Should not emit NaN warnings, got: {[str(w.message) for w in nan_warnings]}"
+
+
+class TestMapStepDistance:
+    """Test per-timebin track-graph step distance of the MAP position."""
+
+    def test_stationary_zero_after_first_bin(self):
+        """A stationary MAP gives zero step distance at every bin."""
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
+        posterior = np.tile([1.0, 0.0], (5, 1))
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        assert step.shape == (5,)
+        np.testing.assert_allclose(step, 0.0, atol=1e-12)
+
+    def test_known_move_equals_graph_distance(self):
+        """Each step equals the graph distance traversed; index 0 is 0."""
+        graph = _linear_graph(n_nodes=5, edge_cm=10.0)
+        posterior = np.eye(5)  # MAP walks node 0 -> 1 -> 2 -> 3 -> 4
+        place_bin_center_ind_to_node = np.arange(5)
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        np.testing.assert_allclose(step, [0.0, 10.0, 10.0, 10.0, 10.0], rtol=1e-9)
+        # path length is the sum of per-bin steps
+        np.testing.assert_allclose(np.nansum(step), 40.0, rtol=1e-9)
+
+    def test_jump_then_return(self):
+        """Backward-difference alignment: step[t] is the distance into bin t."""
+        graph = _linear_graph(n_nodes=3, edge_cm=10.0)
+        # MAP: node 0 -> node 2 -> node 0  (jump out 20cm, back 20cm)
+        posterior = np.array(
+            [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]
+        )
+        place_bin_center_ind_to_node = np.arange(3)
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        np.testing.assert_allclose(step, [0.0, 20.0, 20.0], rtol=1e-9)
+
+    def test_all_nan_is_nan_safe(self):
+        """All-NaN posteriors return NaN steps without raising."""
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
+        posterior = np.full((4, 2), np.nan)
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        assert step.shape == (4,)
+        assert np.all(np.isnan(step))
+
+    def test_interior_nan_frame_invalidates_adjacent_steps(self):
+        """A single all-NaN frame invalidates the steps touching it."""
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
+        # bins: node0, NaN, node0  -> steps arriving at bins 1 and 2 invalid
+        posterior = np.array([[1.0, 0.0], [np.nan, np.nan], [1.0, 0.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        assert step[0] == 0.0
+        assert np.isnan(step[1])
+        assert np.isnan(step[2])
+
+    def test_single_timebin_returns_zero(self):
+        """A single valid timebin has no movement defined; step is 0."""
+        graph = _linear_graph(n_nodes=2, edge_cm=10.0)
+        posterior = np.array([[1.0, 0.0]])
+        place_bin_center_ind_to_node = np.array([0, 1])
+
+        step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)
+
+        np.testing.assert_array_equal(step, [0.0])

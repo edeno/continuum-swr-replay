@@ -124,7 +124,11 @@ from .event_detection import (
     get_confident_times,
     get_overlap_times,
 )
-from .posterior_analysis import get_conditional_non_local_posterior, get_posterior_stats
+from .posterior_analysis import (
+    get_conditional_non_local_posterior,
+    get_map_step_distance,
+    get_posterior_stats,
+)
 
 
 def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
@@ -248,8 +252,11 @@ def get_data_over_time(
         Time-indexed DataFrame containing:
         - Event labels (non_local_event, SWR_event, MUA_event)
         - State probabilities (Local_prob, No-Spike_prob, etc.)
-        - Posterior statistics (map_estimate, map_speed, ahead_behind_distance, hpd)
-        - Neural signals (theta_phase, theta_power_zscore, SWR_zscore, MUA_zscore)
+        - Posterior statistics (map_estimate, map_speed, step_distance,
+          ahead_behind_distance, hpd)
+        - Neural signals, z-scored (theta_phase, theta_power_zscore, SWR_zscore,
+          MUA_zscore) and raw (ripple_power, mua_rate, theta_power)
+        - Per-session run-speed baseline (run_speed_baseline, cm/s)
         - Event counts (n_non_local, n_SWR, n_MUA, etc.)
         - Session metadata (animal, day, epoch, nwb_file_name)
         - Position and behavioral variables (from position_info)
@@ -263,6 +270,7 @@ def get_data_over_time(
             "position_info", "ripple_times", "hse_times",
             "theta_phase", "theta_power",
             "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+            "ripple_consensus_trace", "multiunit_firing_rate",
         ],
     )
 
@@ -307,6 +315,20 @@ def get_data_over_time(
     ) = get_posterior_stats(
         data, env, sampling_frequency=sampling_frequency, posterior=posterior
     )
+    # Raw per-timebin track-graph displacement of the MAP position (cm). Kept
+    # unsmoothed so downstream summaries can sum it (path length) or take
+    # robust order statistics (jumpiness); ``map_speed`` is the smoothed rate.
+    step_distance = get_map_step_distance(
+        posterior.values,
+        env.track_graph_with_bin_centers_edges_,
+        np.asarray(env.place_bin_centers_nodes_df_.node_id),
+    )
+    # Per-session "typical run speed" baseline (cm/s): a robust, threshold-free
+    # 90th-percentile of head speed, used downstream as the compression-factor
+    # denominator. Constant across the session.
+    run_speed_baseline = float(
+        np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
+    )
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):
@@ -349,8 +371,15 @@ def get_data_over_time(
             ).acausal_state_probabilities.squeeze(),
             "map_estimate": map_estimate.squeeze(),
             "map_speed": map_speed.squeeze(),
+            "step_distance": step_distance.squeeze(),
             "ahead_behind_distance": ahead_behind_distance.squeeze(),
             "hpd": hpd.squeeze(),
+            "ripple_power": _nearest(data["ripple_consensus_trace"]).squeeze(),
+            "mua_rate": _nearest(
+                data["multiunit_firing_rate"][brain_area].squeeze()
+            ),
+            "theta_power": _nearest(data["theta_power"].squeeze()).squeeze(),
+            "run_speed_baseline": run_speed_baseline,
             "max_coverage": max_coverage,
             "max_distance": max_distance,
             "max_linear_position": max_linear_position,

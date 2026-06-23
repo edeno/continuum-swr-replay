@@ -6,6 +6,14 @@
 
 Tier-1 (per-timebin, per-session `data_over_time`):
 
+- **Two Tier-1 builders, not one.** The Non-Local and ContFrag scenarios have
+  separate `data_over_time` builders (and separate `*_data_over_time.pkl`
+  outputs, ~218 each). New per-timebin columns must be added to **both**:
+  - `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py` —
+    `get_data_over_time` (Non-Local, 4 state probs).
+  - `src/continuum_swr_replay/analysis/contfrag/data_aggregation.py` —
+    `get_contfrag_data_over_time` (ContFrag, 2 state probs; mirrors the HPC
+    builder).
 - `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py:333-380` —
   `get_data_over_time` assembles the per-timebin DataFrame. New columns are
   added as keys in this dict. **Already present** (do not re-add):

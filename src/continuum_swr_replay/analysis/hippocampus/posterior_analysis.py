@@ -118,6 +118,146 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
     return conditional_posterior  # type: ignore[no-any-return]
 
 
+def _map_node_ids(
+    posterior_array: np.ndarray,
+    place_bin_center_ind_to_node: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """MAP track-graph node id per timebin, plus a validity mask.
+
+    All-NaN rows get a placeholder node (bin index 0) and are flagged
+    ``False`` in the returned mask; callers must mask those positions.
+
+    Parameters
+    ----------
+    posterior_array : np.ndarray, shape (n_time, n_positions)
+    place_bin_center_ind_to_node : np.ndarray, shape (n_positions,)
+
+    Returns
+    -------
+    node_ids : np.ndarray, shape (n_time,)
+    has_valid_data : np.ndarray of bool, shape (n_time,)
+    """
+    has_valid_data = ~np.all(np.isnan(posterior_array), axis=1)
+    map_position_ind = np.zeros(len(posterior_array), dtype=int)
+    if np.any(has_valid_data):
+        map_position_ind[has_valid_data] = np.nanargmax(
+            posterior_array[has_valid_data], axis=1
+        )
+    return place_bin_center_ind_to_node[map_position_ind], has_valid_data
+
+
+def _forward_step_distances(
+    node_ids: np.ndarray,
+    track_graph_with_bin_centers_edges: nx.Graph,
+) -> np.ndarray:
+    """Graph shortest-path distance (cm) between successive MAP nodes.
+
+    Returns an array of shape ``(n_time - 1,)`` where element ``i`` is the
+    distance ``node[i] -> node[i + 1]``.
+    """
+    shortest_path_lengths = dict(
+        nx.shortest_path_length(
+            track_graph_with_bin_centers_edges, weight="distance"
+        )
+    )
+    try:
+        return np.array(
+            [
+                shortest_path_lengths[node1][node2]
+                for node1, node2 in zip(node_ids[:-1], node_ids[1:], strict=True)
+            ]
+        )
+    except KeyError as e:
+        raise nx.NetworkXNoPath(
+            f"No path between successive MAP positions (node {e}). "
+            "The track graph may be disconnected."
+        ) from e
+
+
+def get_map_step_distance(
+    posterior: xr.DataArray | np.ndarray,
+    track_graph_with_bin_centers_edges: nx.Graph,
+    place_bin_center_ind_to_node: np.ndarray,
+) -> np.ndarray:
+    """Per-timebin track-graph distance traveled by the MAP decoded position.
+
+    Unsmoothed graph shortest-path distance (cm) between the MAP position at
+    consecutive timebins, aligned as a backward difference so
+    ``step_distance[t]`` is the distance arriving at bin ``t`` and
+    ``step_distance[0]`` is ``0``. This differs from :func:`get_map_speed`,
+    which divides by ``dt`` and Gaussian-smooths; here the raw per-bin
+    displacement is preserved so downstream summaries can sum it (path length)
+    or take robust order statistics (jumpiness).
+
+    A step is ``NaN`` whenever either of its two endpoint bins had an all-NaN
+    posterior; bin 0 is ``NaN`` only if its own posterior was invalid.
+
+    Parameters
+    ----------
+    posterior : xr.DataArray | np.ndarray, shape (n_time, n_positions)
+        Posterior probability distribution over position.
+    track_graph_with_bin_centers_edges : nx.Graph
+        Track graph with bin centers as nodes and ``distance`` edge weights.
+    place_bin_center_ind_to_node : np.ndarray, shape (n_positions,)
+        Mapping from place bin center index to node ID in the track graph.
+
+    Returns
+    -------
+    np.ndarray, shape (n_time,)
+        Track-graph distance (cm) arriving at each timebin; index 0 is 0.0.
+    """
+    posterior_array = np.asarray(posterior)
+    node_ids, has_valid_data = _map_node_ids(
+        posterior_array, place_bin_center_ind_to_node
+    )
+    return step_distance_from_nodes(
+        node_ids, has_valid_data, track_graph_with_bin_centers_edges
+    )
+
+
+def step_distance_from_nodes(
+    node_ids: np.ndarray,
+    has_valid_data: np.ndarray,
+    track_graph_with_bin_centers_edges: nx.Graph,
+) -> np.ndarray:
+    """Backward-difference per-bin graph step distance from a MAP node sequence.
+
+    Shared core of :func:`get_map_step_distance`; separated so callers that
+    already hold a MAP node sequence (e.g. derived from a stored
+    ``map_estimate`` rather than the full posterior) get bit-identical masking
+    and alignment.
+
+    Parameters
+    ----------
+    node_ids : np.ndarray, shape (n_time,)
+        MAP track-graph node id per timebin. Invalid bins may hold any
+        placeholder node; they are masked via ``has_valid_data``.
+    has_valid_data : np.ndarray of bool, shape (n_time,)
+        ``False`` where the bin had no valid MAP estimate.
+    track_graph_with_bin_centers_edges : nx.Graph
+
+    Returns
+    -------
+    np.ndarray, shape (n_time,)
+        Track-graph distance (cm) arriving at each timebin; index 0 is 0.0.
+    """
+    n_time = len(node_ids)
+    step_distance = np.zeros(n_time)
+    if n_time < 2:
+        step_distance[~has_valid_data] = np.nan
+        return step_distance
+
+    step_distance[1:] = _forward_step_distances(
+        node_ids, track_graph_with_bin_centers_edges
+    )
+    # A step is invalid if either endpoint bin had no valid MAP estimate.
+    invalid_step = ~(has_valid_data[:-1] & has_valid_data[1:])
+    step_distance[1:][invalid_step] = np.nan
+    if not has_valid_data[0]:
+        step_distance[0] = np.nan
+    return step_distance
+
+
 def get_map_speed(
     posterior: xr.DataArray | np.ndarray,
     track_graph_with_bin_centers_edges: nx.Graph,
@@ -165,48 +305,24 @@ def get_map_speed(
     posterior_array = np.asarray(posterior)
 
     # Handle all-NaN rows gracefully (np.nanargmax returns 0 with warning)
-    has_valid_data = ~np.all(np.isnan(posterior_array), axis=1)
+    node_ids, has_valid_data = _map_node_ids(
+        posterior_array, place_bin_center_ind_to_node
+    )
     if not np.any(has_valid_data):
         # All timepoints have NaN posteriors
         return np.full(len(posterior_array), np.nan)
 
-    # Compute argmax, using 0 as placeholder for invalid rows
-    map_position_ind = np.zeros(len(posterior_array), dtype=int)
-    map_position_ind[has_valid_data] = np.nanargmax(
-        posterior_array[has_valid_data], axis=1
-    )
-
-    node_ids = place_bin_center_ind_to_node[map_position_ind]
     n_time = len(node_ids)
-
     if n_time == 1:
         return np.asarray([np.nan])
-
-    # Precompute all-pairs shortest path distances
-    shortest_path_lengths = dict(
-        nx.shortest_path_length(
-            track_graph_with_bin_centers_edges, weight="distance"
-        )
-    )
 
     # Forward differences: speed[t] = dist(node[t], node[t+1]) / dt
     # This correctly captures speed at reversal points, unlike central
     # differences which compute dist(node[t-1], node[t+1]) and
     # underestimate when the trajectory changes direction.
-    try:
-        step_distances = np.array(
-            [
-                shortest_path_lengths[node1][node2]
-                for node1, node2 in zip(
-                    node_ids[:-1], node_ids[1:], strict=True
-                )
-            ]
-        )
-    except KeyError as e:
-        raise nx.NetworkXNoPath(
-            f"No path between successive MAP positions (node {e}). "
-            "The track graph may be disconnected."
-        ) from e
+    step_distances = _forward_step_distances(
+        node_ids, track_graph_with_bin_centers_edges
+    )
     speed = step_distances / dt
     # Last timepoint uses backward difference (same as its predecessor)
     speed = np.append(speed, speed[-1])

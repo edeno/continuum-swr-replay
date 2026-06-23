@@ -29,6 +29,13 @@ per-session scalar `run_speed_baseline`.
   `has_valid_data` mask at ~167-179). Do **not** divide by `dt` and do **not**
   smooth — this is raw per-bin displacement.
 - **Surface raw `ripple_power`, `mua_rate`, `theta_power` in `get_posterior_stats` or pass-through.** These come from the `data` dict, not the posterior, so add them directly in the `get_data_over_time` assembly dict (next task) via `_nearest` — no change to `get_posterior_stats` needed unless `step_distance` is returned there. Recommended: have `get_data_over_time` call `get_map_step_distance` itself (it already holds `env` and `posterior`).
+- **Apply the SAME additions to both Tier-1 builders.** There are two:
+  `get_data_over_time` (`hippocampus/data_aggregation.py`, Non-Local) and
+  `get_contfrag_data_over_time` (`contfrag/data_aggregation.py`, ContFrag).
+  Both mirror each other; add `step_distance` / raw `ripple_power` / `mua_rate`
+  / `theta_power` / `run_speed_baseline` to each, add the two new required keys
+  (`ripple_consensus_trace`, `multiunit_firing_rate`) to each validator, and
+  update each mock-data test fixture to carry them.
 - **Extend the `get_data_over_time` assembly dict** (`data_aggregation.py:333-380`) with:
   ```python
   "step_distance": step_distance.squeeze(),
