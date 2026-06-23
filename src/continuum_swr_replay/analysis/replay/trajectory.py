@@ -127,6 +127,78 @@ def ahead_behind_summary(
     return np.array(list(grouped.groups.keys())), out
 
 
+def _is_multimodal(arm_indices: np.ndarray, adjacency: dict[int, set[int]]) -> bool:
+    """True if the HPD arm set contains two non-graph-adjacent arms."""
+    arms = [int(a) for a in arm_indices]
+    for i, a in enumerate(arms):
+        for b in arms[i + 1 :]:
+            if b not in adjacency.get(a, set()):
+                return True
+    return False
+
+
+def uncertainty_extra(
+    *,
+    event_id: np.ndarray,
+    hpd: np.ndarray,
+    arm_posterior: np.ndarray,
+    arm_adjacency: dict[int, set[int]],
+    coverage: float = 0.95,
+) -> RollupResult:
+    """Per-event decode-uncertainty extras.
+
+    Columns:
+
+    - ``hpd_coverage_cm`` — per-event mean of the per-timebin spatial HPD
+      coverage column (cm) already in ``data_over_time``.
+    - ``multimodal_fraction`` — fraction of in-event timebins whose ``coverage``
+      HPD arm set spans **non-graph-adjacent** arms (threshold-free in the
+      sense that adjacency is binary track topology).
+
+    Parameters
+    ----------
+    arm_posterior : np.ndarray, shape (T, n_arms)
+        Arm-marginal posterior (rows sum to 1); columns ordered by arm id.
+    arm_adjacency : dict[int, set[int]]
+        Arm -> set of graph-adjacent arms, from ``spatial.arm_adjacency``.
+    """
+    import xarray as xr
+    from non_local_detector.model_checking.highest_posterior_density import (
+        get_highest_posterior_threshold,
+    )
+
+    unique, inv, n_events = _group_by_event(event_id)
+
+    hpd = np.asarray(hpd, dtype=float)
+    valid = np.isfinite(hpd)
+    num = np.bincount(inv[valid], weights=hpd[valid], minlength=n_events)
+    den = np.bincount(inv[valid], minlength=n_events).astype(float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        hpd_coverage_cm = np.where(den > 0, num / den, np.nan)
+
+    arm_posterior = np.asarray(arm_posterior, dtype=float)
+    arm_da = xr.DataArray(
+        arm_posterior,
+        dims=("time", "position"),
+        coords={"position": np.arange(arm_posterior.shape[1])},
+    )
+    threshold = get_highest_posterior_threshold(arm_da, coverage=coverage)
+    in_set = arm_posterior >= threshold[:, None]
+    multimodal = np.array(
+        [_is_multimodal(np.flatnonzero(row), arm_adjacency) for row in in_set],
+        dtype=float,
+    )
+    counts = np.bincount(inv, minlength=n_events).astype(float)
+    mm_total = np.bincount(inv, weights=multimodal, minlength=n_events)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        multimodal_fraction = np.where(counts > 0, mm_total / counts, np.nan)
+
+    return unique, {
+        "hpd_coverage_cm": hpd_coverage_cm,
+        "multimodal_fraction": multimodal_fraction,
+    }
+
+
 def trajectory_dynamics(
     *,
     event_id: np.ndarray,

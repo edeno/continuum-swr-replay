@@ -10,6 +10,7 @@ from continuum_swr_replay.analysis.replay.trajectory import (
     ahead_behind_summary,
     brain_state_means,
     trajectory_dynamics,
+    uncertainty_extra,
 )
 
 
@@ -107,3 +108,24 @@ def test_ahead_behind_direction_and_reach():
     np.testing.assert_allclose(out["max_behind"], [0.0, 0.0])
     # event1: decoded != current at 2/3 bins ; event2: all equal -> 0
     np.testing.assert_allclose(out["remote_fraction"], [2 / 3, 0.0])
+
+
+def test_uncertainty_extra_multimodal_and_hpd():
+    # arms 0-1-2 chain: 0 and 2 are NOT adjacent
+    adjacency = {0: {1}, 1: {0, 2}, 2: {1}}
+    event_id = np.array([1, 1, 1])
+    hpd = np.array([10.0, 20.0, 30.0])
+    arm_posterior = np.array(
+        [
+            [0.5, 0.0, 0.5],  # HPD set {0,2} -> non-adjacent -> multimodal
+            [0.6, 0.4, 0.0],  # HPD set {0,1} -> adjacent -> not
+            [1.0, 0.0, 0.0],  # HPD set {0} -> not
+        ]
+    )
+    ids, out = uncertainty_extra(
+        event_id=event_id, hpd=hpd, arm_posterior=arm_posterior,
+        arm_adjacency=adjacency, coverage=0.95,
+    )
+    np.testing.assert_array_equal(ids, [1])
+    np.testing.assert_allclose(out["hpd_coverage_cm"], [20.0])
+    np.testing.assert_allclose(out["multimodal_fraction"], [1 / 3])
