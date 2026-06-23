@@ -1,9 +1,14 @@
 # Replay Trajectory Metrics Implementation Plan
 
-**Status:** Phase 1 code complete and committed (8e13682). Tier-1 builders +
-`step_distance` helper landed with tests. Full data_over_time augmentation
-running in tmux session `augment_dot` (log: `logs/augment_data_over_time.log`);
-~24 hr, idempotent/resumable. Phase 2 not started.
+**Status:** Phase 1 complete + PR-reviewed + revised (8e13682, 7e3f0d8,
+e3fc792). data_over_time augmentation uses the **exact posterior** path for
+`step_distance` (Option B — cross-animal validation found the map_estimate
+reconstruction diverged by ≤1 place-bin on 2/5 animals). Full augmentation
+running in tmux `augment_dot` (log: `logs/augment_data_over_time.log`); ~40 hr,
+idempotent/resumable, atomic in-place writes. Phase 2 STARTED (157b966):
+`trajectory.py` has 3 tested rollup families; remaining = `uncertainty_extra`,
+wiring into both event tables, path_continuity/retrospective merge + prev_arm
+mirror, cross-scenario parity test.
 
 Add ~30 per-event summary statistics that characterize replay trajectories —
 speed, displacement, path length, spatial extent, continuity, direction,
