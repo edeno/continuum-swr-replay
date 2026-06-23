@@ -19,12 +19,51 @@ import pandas as pd
 
 from ...data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from ..hippocampus.posterior_analysis import map_estimate_to_map_nodes
+from .spatial import arm_adjacency, path_continuity
 from .summaries import _group_by_event
 
 RollupResult = tuple[np.ndarray, dict[str, np.ndarray]]
 
 #: trunk arms join the three patch junctions to the centre of the track
 _TRUNK_ARMS = frozenset({6, 7, 8})
+
+#: per-event columns produced identically for both scenarios (parity target).
+SHARED_TRAJECTORY_COLUMNS: tuple[str, ...] = (
+    # trajectory_dynamics
+    "start_position", "end_position", "start_arm", "end_arm", "net_displacement",
+    "path_length", "tortuosity", "replay_speed_median", "replay_speed_p90",
+    "replay_speed_continuous_median", "step_distance_median", "step_distance_p90",
+    "step_distance_max", "spatial_extent", "n_reversals", "pause_fraction",
+    "n_patches_visited", "crosses_trunk", "terminates_at_well", "compression_factor",
+    # ahead_behind_summary
+    "mean_abs_ahead_behind", "max_ahead", "max_behind", "max_abs_ahead_behind",
+    "remote_fraction", "ab_slope", "is_outbound",
+    # uncertainty_extra
+    "hpd_coverage_cm", "multimodal_fraction",
+    # path_continuity
+    "path_continuity",
+    # neural signal means (raw + z)
+    "ripple_power", "ripple_power_z", "mua_rate", "mua_rate_z",
+    "theta_power", "theta_z",
+    # state means shared by both scenarios
+    "continuous_prob_mean", "fragmented_prob_mean",
+)
+
+#: per-event columns specific to the 4-state Non-Local model.
+NONLOCAL_ONLY_COLUMNS: tuple[str, ...] = (
+    "local_prob_mean", "nospike_prob_mean", "nonlocal_fraction", "nospike_fraction",
+)
+
+#: data_over_time columns carrying the raw/z-scored neural signals (same in both
+#: scenarios), mapped to their per-event rollup column names.
+_SIGNAL_COLUMNS: dict[str, str] = {
+    "ripple_power": "ripple_power",
+    "ripple_power_z": "SWR_zscore",
+    "mua_rate": "mua_rate",
+    "mua_rate_z": "MUA_zscore",
+    "theta_power": "theta_power",
+    "theta_z": "theta_power_zscore",
+}
 
 
 def _graph_distance_lookup(track_graph: nx.Graph) -> dict:
@@ -35,9 +74,9 @@ def _graph_distance_lookup(track_graph: nx.Graph) -> dict:
 def brain_state_means(
     *,
     event_id: np.ndarray,
-    nonlocal_prob: np.ndarray,
     state_probs: dict[str, np.ndarray],
     extra_means: dict[str, np.ndarray],
+    nonlocal_prob: np.ndarray | None = None,
     non_local_threshold: float = 0.8,
 ) -> RollupResult:
     """Per-event means of state posteriors and raw/z-scored neural signals.
@@ -72,8 +111,10 @@ def brain_state_means(
 
     out = {col: _mean(v) for col, v in {**state_probs, **extra_means}.items()}
 
-    nonlocal_prob = np.asarray(nonlocal_prob, float)
-    out["nonlocal_fraction"] = _mean(nonlocal_prob > non_local_threshold)
+    # ``nonlocal_fraction`` only applies to the 4-state Non-Local model;
+    # the 2-state ContFrag model has no ``w_t`` (both states are non-local).
+    if nonlocal_prob is not None:
+        out["nonlocal_fraction"] = _mean(np.asarray(nonlocal_prob, float) > non_local_threshold)
     return unique, out
 
 
@@ -127,6 +168,17 @@ def ahead_behind_summary(
     return np.array(list(grouped.groups.keys())), out
 
 
+def _hpd_coverage_mean(event_id: np.ndarray, hpd: np.ndarray) -> np.ndarray:
+    """Per-event mean of the per-timebin spatial HPD coverage (NaN-aware)."""
+    unique, inv, n_events = _group_by_event(event_id)
+    hpd = np.asarray(hpd, dtype=float)
+    valid = np.isfinite(hpd)
+    num = np.bincount(inv[valid], weights=hpd[valid], minlength=n_events)
+    den = np.bincount(inv[valid], minlength=n_events).astype(float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(den > 0, num / den, np.nan)
+
+
 def _is_multimodal(arm_indices: np.ndarray, adjacency: dict[int, set[int]]) -> bool:
     """True if the HPD arm set contains two non-graph-adjacent arms."""
     arms = [int(a) for a in arm_indices]
@@ -168,13 +220,7 @@ def uncertainty_extra(
     )
 
     unique, inv, n_events = _group_by_event(event_id)
-
-    hpd = np.asarray(hpd, dtype=float)
-    valid = np.isfinite(hpd)
-    num = np.bincount(inv[valid], weights=hpd[valid], minlength=n_events)
-    den = np.bincount(inv[valid], minlength=n_events).astype(float)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        hpd_coverage_cm = np.where(den > 0, num / den, np.nan)
+    hpd_coverage_cm = _hpd_coverage_mean(event_id, hpd)
 
     arm_posterior = np.asarray(arm_posterior, dtype=float)
     arm_da = xr.DataArray(
@@ -344,3 +390,119 @@ def trajectory_dynamics(
             baseline > 0, out["replay_speed_median"] / baseline, np.nan
         )
     return ids, out
+
+
+def compute_trajectory_rollups(
+    *,
+    nl: pd.DataFrame,
+    event_id: np.ndarray,
+    env,
+    track_graph: nx.Graph,
+    state_prob_cols: dict[str, str],
+    continuous_col: str,
+    fragmented_col: str,
+    place_bin_size: float,
+    nonlocal_prob: np.ndarray | None = None,
+    arm_posterior: np.ndarray | None = None,
+    non_local_threshold: float = 0.8,
+) -> dict[str, np.ndarray]:
+    """Orchestrate all trajectory rollups into one ``{column: per_event_array}``.
+
+    Shared by both event-table builders. The truly-shared families
+    (``trajectory_dynamics``, ``ahead_behind_summary``, ``uncertainty_extra``,
+    ``path_continuity``, neural-signal means, continuous/fragmented state means)
+    produce :data:`SHARED_TRAJECTORY_COLUMNS` identically across scenarios; the
+    extra state means / fractions in :data:`NONLOCAL_ONLY_COLUMNS` are emitted
+    only when ``state_prob_cols`` includes the 4-state model's columns. All
+    arrays are keyed to ``np.unique(event_id)``.
+
+    Parameters
+    ----------
+    nl : pd.DataFrame
+        In-event timebins, time-indexed, carrying the augmented
+        ``data_over_time`` columns plus ``decoded_arm`` / ``track_segment_id``.
+    state_prob_cols : dict[str, str]
+        Output column name -> ``nl`` state-probability column.
+    continuous_col, fragmented_col : str
+        ``nl`` columns for the continuous / fragmented state probability.
+    nonlocal_prob : np.ndarray | None
+        Per-bin ``w_t`` for ``nonlocal_fraction`` (Non-Local only; ``None``
+        for ContFrag).
+    arm_posterior : np.ndarray | None
+        Arm-marginal posterior for ``multimodal_fraction``; when ``None`` the
+        HPD-set-based columns are ``NaN``.
+    """
+    def col(name: str) -> np.ndarray:
+        return nl[name].to_numpy()
+
+    out: dict[str, np.ndarray] = {}
+
+    _, dyn = trajectory_dynamics(
+        event_id=event_id,
+        map_estimate=col("map_estimate"),
+        step_distance=col("step_distance"),
+        map_speed=col("map_speed"),
+        decoded_arm=col("decoded_arm"),
+        continuous_prob=col(continuous_col),
+        fragmented_prob=col(fragmented_col),
+        run_speed_baseline=col("run_speed_baseline"),
+        env=env,
+        place_bin_size=place_bin_size,
+    )
+    out.update(dyn)
+
+    _, ab = ahead_behind_summary(
+        event_id=event_id,
+        ahead_behind_distance=col("ahead_behind_distance"),
+        decoded_arm=col("decoded_arm"),
+        current_arm=col("track_segment_id"),
+        time=nl.index.to_numpy(),
+    )
+    out.update(ab)
+
+    _, bs = brain_state_means(
+        event_id=event_id,
+        state_probs={o: col(c) for o, c in state_prob_cols.items()},
+        extra_means={o: col(c) for o, c in _SIGNAL_COLUMNS.items()},
+        nonlocal_prob=nonlocal_prob,
+        non_local_threshold=non_local_threshold,
+    )
+    out.update(bs)
+
+    # nospike_fraction: fraction of bins where No-Spike is the modal state
+    # (4-state Non-Local model only).
+    if "nospike_prob_mean" in state_prob_cols:
+        names = list(state_prob_cols.values())
+        stacked = np.column_stack([col(c) for c in names])
+        modal = np.asarray(names)[np.argmax(stacked, axis=1)]
+        is_nospike = (modal == state_prob_cols["nospike_prob_mean"]).astype(float)
+        unique, inv, n_events = _group_by_event(event_id)
+        counts = np.bincount(inv, minlength=n_events).astype(float)
+        out["nospike_fraction"] = (
+            np.bincount(inv, weights=is_nospike, minlength=n_events) / counts
+        )
+
+    if arm_posterior is not None:
+        _, unc = uncertainty_extra(
+            event_id=event_id,
+            hpd=col("hpd"),
+            arm_posterior=arm_posterior,
+            arm_adjacency=arm_adjacency(track_graph),
+        )
+        out.update(unc)
+    else:
+        # hpd_coverage_cm needs only the per-bin hpd column; multimodal_fraction
+        # needs the arm posterior, so it is NaN when the posterior is absent.
+        out["hpd_coverage_cm"] = _hpd_coverage_mean(event_id, col("hpd"))
+        out["multimodal_fraction"] = np.full(len(np.unique(event_id)), np.nan)
+
+    adj = arm_adjacency(track_graph)
+    pc = (
+        pd.DataFrame({"event_id": np.asarray(event_id), "decoded_arm": col("decoded_arm")})
+        .groupby("event_id", sort=True)["decoded_arm"]
+        .apply(lambda s: path_continuity(s.to_numpy(), adj))
+        .to_numpy()
+    )
+    out["path_continuity"] = pc
+
+    return out

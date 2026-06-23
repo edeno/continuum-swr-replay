@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 
 from ._helpers import (
     ALL_ARMS,
@@ -132,11 +133,25 @@ from .summaries import (
     posterior_mass_total,
     posterior_to_arm_marginal,
 )
+from .trajectory import (
+    NONLOCAL_ONLY_COLUMNS,
+    SHARED_TRAJECTORY_COLUMNS,
+    compute_trajectory_rollups,
+)
 from .uncertainty import (
     posterior_entropy_mean,
     posterior_hpd_widths,
     posterior_peak_mean,
 )
+
+# State-probability column mapping for the 4-state Non-Local model:
+# per-event rollup column -> data_over_time per-bin column.
+_NONLOCAL_STATE_COLS = {
+    "local_prob_mean": "Local_prob",
+    "nospike_prob_mean": "No-Spike_prob",
+    "continuous_prob_mean": "Non-Local_Continuous_prob",
+    "fragmented_prob_mean": "Non-Local_Fragmented_prob",
+}
 
 # ── Shared prep for the event / event-sequence builders ──
 
@@ -189,6 +204,7 @@ def build_event_table(
     conditional_posterior=None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+    place_bin_size: float = PLACE_BIN_SIZE_1D,
 ) -> pd.DataFrame:
     """One row per non-local event with canonical event-level columns.
 
@@ -496,6 +512,7 @@ def build_event_table(
         "posterior_hpd_width_80",
         "posterior_hpd_width_95",
     )
+    arm_posterior = None  # set below when conditional_posterior is supplied
     if conditional_posterior is None:
         for c in posterior_cols:
             per_event[c] = np.nan
@@ -525,6 +542,31 @@ def build_event_table(
         per_event["posterior_hpd_width_50"] = hpd[0.5]
         per_event["posterior_hpd_width_80"] = hpd[0.8]
         per_event["posterior_hpd_width_95"] = hpd[0.95]
+
+    # --- 7b. Trajectory rollups ---
+    # These require the augmented data_over_time columns (step_distance, raw
+    # ripple/MUA/theta, run_speed_baseline). When ``dot`` predates the
+    # augmentation, emit the columns as NaN so the schema stays stable.
+    trajectory_cols = (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS)
+    if "step_distance" in nl.columns:
+        rollups = compute_trajectory_rollups(
+            nl=nl,
+            event_id=event_id_series,
+            env=env,
+            track_graph=track_graph,
+            state_prob_cols=_NONLOCAL_STATE_COLS,
+            continuous_col="Non-Local_Continuous_prob",
+            fragmented_col="Non-Local_Fragmented_prob",
+            place_bin_size=place_bin_size,
+            nonlocal_prob=nonlocal_prob_arr,
+            arm_posterior=arm_posterior,
+            non_local_threshold=nonlocal_threshold,
+        )
+        for col_name in trajectory_cols:
+            per_event[col_name] = rollups[col_name]
+    else:
+        for col_name in trajectory_cols:
+            per_event[col_name] = np.nan
 
     # --- 8. Identifiers + stable hashes ---
     per_event.insert(0, "animal", animal)
@@ -1415,6 +1457,9 @@ def _event_table_columns() -> list[str]:
         "matched_swr_event",
         "matched_swr_start",
         "matched_swr_end",
+        # Trajectory rollups (shared with ContFrag) + Non-Local-only state means.
+        *SHARED_TRAJECTORY_COLUMNS,
+        *NONLOCAL_ONLY_COLUMNS,
     ]
 
 

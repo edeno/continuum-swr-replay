@@ -535,3 +535,89 @@ class TestCrossTable:
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         est = build_event_sequence_table(dot, env, post)
         assert set(et["event_id"]) == set(est["event_id"].unique())
+
+
+# ── Trajectory rollup wiring (Phase 2) ──
+
+from continuum_swr_replay.analysis.replay.trajectory import (  # noqa: E402
+    NONLOCAL_ONLY_COLUMNS,
+    SHARED_TRAJECTORY_COLUMNS,
+)
+
+
+def _traj_env():
+    """Env stub with node_id + a bin-centre chain graph for graph distances."""
+    env = _EnvStub()
+    lp = np.concatenate([np.arange(18, dtype=float), [100.0, 101.0, 102.0]])
+    eid = np.concatenate([np.repeat(np.arange(9), 2), [-1, -1, -1]]).astype(int)
+    node_id = np.arange(len(lp))
+    env.place_bin_centers_nodes_df_ = pd.DataFrame(
+        {"node_id": node_id, "linear_position": lp, "edge_id": eid}
+    )
+    g = nx.Graph()
+    for i in range(len(node_id) - 1):
+        g.add_edge(int(node_id[i]), int(node_id[i + 1]), distance=abs(lp[i + 1] - lp[i]))
+    env.track_graph_with_bin_centers_edges_ = g
+    return env
+
+
+def _augmented_dot():
+    """tiny dot + the augmented per-bin columns set to known constants."""
+    dot = _tiny_dot_with_two_events()
+    constants = {
+        "map_speed": 5.0, "step_distance": 1.0, "ahead_behind_distance": 3.0,
+        "hpd": 12.0, "Local_prob": 0.1, "No-Spike_prob": 0.0,
+        "run_speed_baseline": 50.0, "ripple_power": 20.0, "SWR_zscore": 1.5,
+        "mua_rate": 100.0, "MUA_zscore": 2.0, "theta_power": 0.3,
+        "theta_power_zscore": 0.5,
+    }
+    for col, val in constants.items():
+        dot[col] = val
+    return dot
+
+
+class TestTrajectoryRollupWiring:
+    def test_all_trajectory_columns_present_and_computed(self):
+        dot = _augmented_dot()
+        env = _traj_env()
+        trials = pd.DataFrame(
+            columns=["start_time", "end_time", "to_well", "from_well",
+                     "from_patch", "to_patch", "is_reward", "is_patch_change"]
+        )
+        graph = _bandit_graph()
+        post = _tiny_posterior(dot)
+
+        et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
+
+        for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
+            assert col in et.columns, f"missing trajectory column: {col}"
+
+        assert len(et) == 2
+        # constant per-bin signals -> per-event mean equals the constant
+        np.testing.assert_allclose(et["ripple_power"], 20.0)
+        np.testing.assert_allclose(et["mua_rate"], 100.0)
+        np.testing.assert_allclose(et["theta_z"], 0.5)
+        np.testing.assert_allclose(et["hpd_coverage_cm"], 12.0)
+        # compression_factor = median(map_speed) / run_speed_baseline = 5/50
+        np.testing.assert_allclose(et["replay_speed_median"], 5.0)
+        np.testing.assert_allclose(et["compression_factor"], 0.1)
+        # each event sits on a single leaf arm -> one patch, terminates at well
+        np.testing.assert_array_equal(et["n_patches_visited"], [1, 1])
+        np.testing.assert_array_equal(et["crosses_trunk"], [False, False])
+        np.testing.assert_array_equal(et["terminates_at_well"], [True, True])
+        # path_length is the sum of the (constant 1.0) step_distance over bins
+        assert (et["path_length"] > 0).all()
+
+    def test_unaugmented_dot_emits_nan_trajectory_columns(self):
+        """A pre-augmentation dot still yields the columns, as NaN."""
+        dot = _tiny_dot_with_two_events()  # no step_distance etc.
+        env = _traj_env()
+        trials = pd.DataFrame(
+            columns=["start_time", "end_time", "to_well", "from_well",
+                     "from_patch", "to_patch", "is_reward", "is_patch_change"]
+        )
+        et = build_event_table(dot, env, trials, _bandit_graph())
+        for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
+            assert col in et.columns
+        assert et["path_length"].isna().all()
+        assert et["ripple_power"].isna().all()
