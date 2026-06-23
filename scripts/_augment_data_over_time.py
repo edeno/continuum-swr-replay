@@ -4,12 +4,12 @@ The saved decode results are locked to their original time axis, and a fresh
 ``load_data`` no longer returns an exactly length-matched ``position_info``
 (it has drifted by a few samples), so rebuilding the table from scratch is not
 faithful. Instead we *append* the new per-timebin columns to the existing
-pickle, which is already on the correct axis and already carries ``head_speed``
-and ``map_estimate``:
+pickle, which is already on the correct axis:
 
-- ``step_distance``      recomputed from the stored ``map_estimate`` via the
-                         track-graph node mapping and the canonical
-                         ``step_distance_from_nodes`` (no multi-GB ``.nc`` load).
+- ``step_distance``      computed from the saved ``results.nc`` posterior via
+                         the decoder's MAP (posterior argmax) in
+                         ``get_map_step_distance`` — exact, not reconstructed
+                         from the stored ``map_estimate``.
 - ``run_speed_baseline`` p90 of the pickle's own ``head_speed`` (no load_data).
 - ``ripple_power`` /     raw LFP/MUA signals from ``load_data``, nearest-
   ``mua_rate`` /         reindexed (4 ms tolerance) onto the pickle's index —
@@ -20,11 +20,6 @@ single ``load_data`` call.
 
 Flags
 -----
---validate-step   additionally load the saved ``results.nc`` for each pkl,
-                  recompute ``step_distance`` from the full posterior via the
-                  canonical ``get_map_step_distance``, and assert it is
-                  bit-identical to the ``map_estimate``-derived value. Use on a
-                  smoke sample to confirm the cheap path before the full run.
 --check-only      write a ``.pkl.new`` sidecar instead of overwriting in place.
 --force           recompute even if the new columns are already present.
 """
@@ -50,8 +45,6 @@ from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
-    map_estimate_to_map_nodes,
-    step_distance_from_nodes,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -85,8 +78,9 @@ def _reindex(series: pd.Series, index: pd.Index, label: str) -> np.ndarray:
     decode axis (a uniform offset, a unit mismatch, or a coverage gap), which
     would otherwise be persisted as a silently-NaN column.
     """
+    series = series.squeeze()  # 1-column frame -> Series; Series unchanged
     out = series.reindex(index, method="nearest", tolerance=0.004)
-    nan_frac = float(out.isna().mean())
+    nan_frac = float(out.isna().to_numpy().mean())
     if nan_frac > _MAX_REINDEX_NAN_FRAC:
         median_gap_ms = float(np.median(np.diff(series.index))) * 1e3
         raise ValueError(
@@ -97,40 +91,46 @@ def _reindex(series: pd.Series, index: pd.Index, label: str) -> np.ndarray:
     return out.to_numpy()
 
 
+def _step_distance_from_results(
+    scenario: str, base: str, env: Environment, n_rows: int, pkl_name: str
+) -> np.ndarray:
+    """Exact per-timebin step distance from the saved posterior (argmax MAP).
+
+    Loads the saved ``results.nc``, conditions it to the scenario's posterior,
+    and runs :func:`get_map_step_distance` — i.e. the decoder's own MAP
+    (posterior argmax), not a reconstruction from the stored ``map_estimate``.
+    """
+    suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
+    with xr.open_dataset(
+        PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc", engine="h5netcdf"
+    ) as results:
+        results = results.set_index(state_bins=list(results["state_bins"].coords))
+        if scenario.startswith("nonlocal"):
+            posterior = get_conditional_non_local_posterior(results)
+        else:
+            posterior = get_contfrag_posterior(results, state="combined")
+        step_distance = get_map_step_distance(
+            posterior.values,
+            env.track_graph_with_bin_centers_edges_,
+            np.asarray(env.place_bin_centers_nodes_df_.node_id),
+        )
+    if len(step_distance) != n_rows:
+        raise ValueError(
+            f"{pkl_name}: results.nc time ({len(step_distance)}) != pkl rows "
+            f"({n_rows}); axes are not aligned"
+        )
+    return step_distance
+
+
 def _augment_pkl(
     pkl: Path, scenario: str, base: str, env: Environment, data: dict,
-    brain_area: str, validate_step: bool, check_only: bool,
+    brain_area: str, check_only: bool,
 ) -> None:
     dot = pd.read_pickle(pkl)
 
-    node_ids, has_valid = map_estimate_to_map_nodes(
-        dot["map_estimate"].to_numpy(), env.place_bin_centers_nodes_df_
+    step_distance = _step_distance_from_results(
+        scenario, base, env, len(dot), pkl.name
     )
-    step_distance = step_distance_from_nodes(
-        node_ids, has_valid, env.track_graph_with_bin_centers_edges_
-    )
-
-    if validate_step:
-        suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
-        with xr.open_dataset(
-            PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc", engine="h5netcdf"
-        ) as results:
-            results = results.set_index(state_bins=list(results["state_bins"].coords))
-            if scenario.startswith("nonlocal"):
-                posterior = get_conditional_non_local_posterior(results)
-            else:
-                posterior = get_contfrag_posterior(results, state="combined")
-            canonical = get_map_step_distance(
-                posterior.values,
-                env.track_graph_with_bin_centers_edges_,
-                np.asarray(env.place_bin_centers_nodes_df_.node_id),
-            )
-        np.testing.assert_array_equal(
-            np.nan_to_num(step_distance, nan=-1.0),
-            np.nan_to_num(canonical, nan=-1.0),
-            err_msg=f"{pkl.name}: map_estimate step_distance != canonical",
-        )
-        print(f"[{pkl.name}] validate-step OK (matches canonical)")
 
     run_speed_baseline = float(np.nanpercentile(dot["head_speed"].to_numpy(), 90))
     if not np.isfinite(run_speed_baseline):
@@ -162,7 +162,7 @@ def _augment_pkl(
 
 def _augment_epoch(
     animal: str, epoch_name: str, brain_area: str,
-    scenarios: dict[str, Path], validate_step: bool, check_only: bool, force: bool,
+    scenarios: dict[str, Path], check_only: bool, force: bool,
 ) -> None:
     def _needs_augment(p: Path) -> bool:
         if force:
@@ -191,9 +191,7 @@ def _augment_epoch(
         env = Environment.load_environment(
             str(PROCESSED_DATA_DIR / f"{base}{env_suffix}_environment.pkl")
         )
-        _augment_pkl(
-            pkl, scenario, base, env, data, brain_area, validate_step, check_only
-        )
+        _augment_pkl(pkl, scenario, base, env, data, brain_area, check_only)
 
 
 def _discover(files: list[Path]) -> dict[tuple[str, str, str], dict[str, Path]]:
@@ -216,7 +214,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pattern", default="*_data_over_time.pkl")
     parser.add_argument("--limit", type=int, default=None)
-    parser.add_argument("--validate-step", action="store_true")
     parser.add_argument("--check-only", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
@@ -234,7 +231,7 @@ def main() -> None:
             _augment_epoch(
                 animal, epoch_name, brain_area,
                 epochs[(animal, epoch_name, brain_area)],
-                args.validate_step, args.check_only, args.force,
+                args.check_only, args.force,
             )
         except MemoryError:
             # Don't keep launching more multi-GB loads after an OOM.
