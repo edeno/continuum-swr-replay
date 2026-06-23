@@ -5,13 +5,48 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.trajectory import (
+    _REQUIRED_DOT_COLUMNS,
+    _SIGNAL_COLUMNS,
     ahead_behind_summary,
     brain_state_means,
+    compute_trajectory_rollups,
     trajectory_dynamics,
     uncertainty_extra,
 )
+
+_NONLOCAL_STATE_COLS = {
+    "local_prob_mean": "Local_prob",
+    "nospike_prob_mean": "No-Spike_prob",
+    "continuous_prob_mean": "Non-Local_Continuous_prob",
+    "fragmented_prob_mean": "Non-Local_Fragmented_prob",
+}
+
+
+def test_compute_rollups_fails_loud_on_missing_column():
+    """A data_over_time schema that drifted from the rollups fails clearly."""
+    cols = {
+        c: np.zeros(2)
+        for c in (
+            *_REQUIRED_DOT_COLUMNS,
+            *_SIGNAL_COLUMNS.values(),
+            *_NONLOCAL_STATE_COLS.values(),
+        )
+    }
+    nl = pd.DataFrame(cols).drop(columns=["hpd"])  # simulate a builder dropping hpd
+    with pytest.raises(KeyError, match="hpd"):
+        compute_trajectory_rollups(
+            nl=nl,
+            event_id=np.array([1, 1]),
+            env=None,
+            track_graph=None,
+            state_prob_cols=_NONLOCAL_STATE_COLS,
+            continuous_col="Non-Local_Continuous_prob",
+            fragmented_col="Non-Local_Fragmented_prob",
+            place_bin_size=2.0,
+        )
 
 
 class _EnvStub:

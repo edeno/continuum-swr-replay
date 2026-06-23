@@ -55,6 +55,14 @@ NONLOCAL_ONLY_COLUMNS: tuple[str, ...] = (
     "local_prob_mean", "nospike_prob_mean", "nonlocal_fraction", "nospike_fraction",
 )
 
+#: non-state, non-signal data_over_time columns the rollup families read
+#: directly (``decoded_arm`` / ``track_segment_id`` are added by the table
+#: builder's ``_prepare_dot`` before the rollups run).
+_REQUIRED_DOT_COLUMNS: tuple[str, ...] = (
+    "map_estimate", "step_distance", "map_speed", "decoded_arm",
+    "run_speed_baseline", "ahead_behind_distance", "hpd", "track_segment_id",
+)
+
 #: per-session z-scored neural signals already in data_over_time (both
 #: scenarios), mapped to their per-event rollup column names. Raw traces are
 #: not rolled up — re-loading them returns a time axis trimmed since the
@@ -438,6 +446,23 @@ def compute_trajectory_rollups(
         Arm-marginal posterior for ``multimodal_fraction``; when ``None`` the
         HPD-set-based columns are ``NaN``.
     """
+    # Fail loud with the full missing set if the data_over_time schema and the
+    # rollups have drifted apart (e.g. after a re-decode that changes builder
+    # columns) — clearer than a KeyError deep inside one family.
+    required = {
+        *_REQUIRED_DOT_COLUMNS,
+        *_SIGNAL_COLUMNS.values(),
+        *state_prob_cols.values(),
+        continuous_col,
+        fragmented_col,
+    }
+    missing = sorted(required - set(nl.columns))
+    if missing:
+        raise KeyError(
+            "compute_trajectory_rollups: in-event frame is missing required "
+            f"data_over_time columns {missing}"
+        )
+
     def col(name: str) -> np.ndarray:
         return nl[name].to_numpy()
 
