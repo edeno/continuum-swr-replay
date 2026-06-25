@@ -234,3 +234,51 @@ def test_orchestrator_nospike_fraction_modal_state():
     # arm_posterior not supplied -> multimodal NaN, hpd_coverage from hpd column
     assert np.isnan(out["multimodal_fraction"][0])
     np.testing.assert_allclose(out["hpd_coverage_cm"], [10.0])
+
+
+_CONTFRAG_STATE_COLS = {
+    "continuous_prob_mean": "Continuous_prob",
+    "fragmented_prob_mean": "Fragmented_prob",
+}
+
+
+def test_orchestrator_contfrag_2state_omits_nonlocal_only_columns():
+    """ContFrag mapping (no nonlocal_prob, 2 states) must not emit 4-state cols."""
+    env = _EnvStub()
+    n = 3
+    nl = pd.DataFrame(
+        {
+            "map_estimate": [0.0, 10.0, 20.0],
+            "step_distance": [0.0, 10.0, 10.0],
+            "map_speed": [5.0, 5.0, 5.0],
+            "decoded_arm": [0.0, 0.0, 1.0],
+            "run_speed_baseline": [50.0] * n,
+            "ahead_behind_distance": [1.0, 2.0, 3.0],
+            "hpd": [10.0] * n,
+            "track_segment_id": [0.0, 0.0, 1.0],
+            "SWR_zscore": [0.0] * n,
+            "MUA_zscore": [0.0] * n,
+            "theta_power_zscore": [0.0] * n,
+            "Continuous_prob": [0.7, 0.6, 0.8],
+            "Fragmented_prob": [0.3, 0.4, 0.2],
+        }
+    )
+    out = compute_trajectory_rollups(
+        nl=nl,
+        event_id=np.array([1, 1, 1]),
+        env=env,
+        track_graph=env.track_graph_with_bin_centers_edges_,
+        state_prob_cols=_CONTFRAG_STATE_COLS,
+        continuous_col="Continuous_prob",
+        fragmented_col="Fragmented_prob",
+        place_bin_size=2.0,
+        nonlocal_prob=None,  # ContFrag: both states non-local
+    )
+    # 4-state-only columns must be absent
+    for col in ("nonlocal_fraction", "nospike_fraction", "local_prob_mean",
+                "nospike_prob_mean"):
+        assert col not in out, f"{col} must not be produced for ContFrag"
+    # continuous_prob_mean is produced and correct
+    np.testing.assert_allclose(out["continuous_prob_mean"], [(0.7 + 0.6 + 0.8) / 3])
+    # shared trajectory columns still present
+    assert "path_length" in out and "multimodal_fraction" in out

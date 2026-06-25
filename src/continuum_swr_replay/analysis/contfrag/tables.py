@@ -449,7 +449,7 @@ def build_contfrag_event_table(
     # Trajectory rollups (shared with the Non-Local table). Gated on the
     # augmented data_over_time columns; continuous/fragmented_prob_mean come
     # from ``_summarize_event_state`` above, so they are excluded here.
-    if "step_distance" in ev.columns:
+    if {"step_distance", "run_speed_baseline"}.issubset(ev.columns):
         rollups = compute_trajectory_rollups(
             nl=ev,
             event_id=event_id_series,

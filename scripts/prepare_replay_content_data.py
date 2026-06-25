@@ -32,6 +32,7 @@ import re
 import time
 
 import pandas as pd
+from pandas.errors import MergeError
 
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
@@ -245,6 +246,12 @@ def main():
 
         try:
             result = _process_session(session)
+        except MergeError:
+            # A one-to-one merge violation (duplicate event_id from the
+            # retrospective metrics) is an integrity bug, not a data gap.
+            # MergeError subclasses ValueError, so it must be re-raised here
+            # *before* the data-gap clause or it would be silently skipped.
+            raise
         except (FileNotFoundError, OSError, ValueError) as e:
             # Skip-and-continue is only appropriate for data-gap
             # errors (missing file, corrupt input, unexpected shape).

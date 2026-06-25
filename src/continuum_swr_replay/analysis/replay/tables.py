@@ -548,7 +548,7 @@ def build_event_table(
     # ripple/MUA/theta, run_speed_baseline). When ``dot`` predates the
     # augmentation, emit the columns as NaN so the schema stays stable.
     trajectory_cols = (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS)
-    if "step_distance" in nl.columns:
+    if {"step_distance", "run_speed_baseline"}.issubset(nl.columns):
         rollups = compute_trajectory_rollups(
             nl=nl,
             event_id=event_id_series,

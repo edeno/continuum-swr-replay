@@ -16,6 +16,7 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from ...data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from ..hippocampus.posterior_analysis import map_estimate_to_map_nodes
@@ -78,6 +79,25 @@ _SIGNAL_COLUMNS: dict[str, str] = {
 def _graph_distance_lookup(track_graph: nx.Graph) -> dict:
     """All-pairs shortest-path distance dict over the bin-centre track graph."""
     return dict(nx.shortest_path_length(track_graph, weight="distance"))
+
+
+def _p90(values: np.ndarray) -> float:
+    """90th percentile ignoring NaN."""
+    return float(np.nanpercentile(values, 90))
+
+
+def _nan_safe(col: str, reducer):
+    """Per-event reducer over ``g[col]`` that returns NaN on an all-NaN group.
+
+    Avoids the ``All-NaN slice`` RuntimeWarning that ``nanmedian``/``nanmax``/
+    ``nanpercentile`` emit for an event whose bins are all junction
+    placeholders (NaN ``step_distance``), matching the guarded speed stats.
+    """
+    def _fn(g: pd.DataFrame) -> float:
+        v = g[col].to_numpy()
+        return float(reducer(v)) if np.isfinite(v).any() else np.nan
+
+    return _fn
 
 
 def brain_state_means(
@@ -231,7 +251,6 @@ def uncertainty_extra(
     arm_adjacency : dict[int, set[int]]
         Arm -> set of graph-adjacent arms, from ``spatial.arm_adjacency``.
     """
-    import xarray as xr
     from non_local_detector.model_checking.highest_posterior_density import (
         get_highest_posterior_threshold,
     )
@@ -366,6 +385,17 @@ def trajectory_dynamics(
         v = g["map_speed"][mask]
         return float(np.nanmedian(v)) if np.isfinite(v).any() else np.nan
 
+    def _pause_fraction(g):
+        # NaN-aware: fraction of *valid* steps within one place bin (junction
+        # steps are NaN). An all-NaN event returns NaN, like the speed stats.
+        sd = g["step_distance"].to_numpy()
+        finite = np.isfinite(sd)
+        return float((sd[finite] <= place_bin_size).mean()) if finite.any() else np.nan
+
+    def _terminates_at_well(g):
+        a = _end_arm(g)
+        return bool(np.isfinite(a) and 0 <= a < 6)
+
     path_length = _per_event(lambda g: float(np.nansum(g["step_distance"])))
     net_disp = _per_event(_net_disp)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -379,27 +409,18 @@ def trajectory_dynamics(
         "net_displacement": net_disp,
         "path_length": path_length,
         "tortuosity": tortuosity,
-        "replay_speed_median": _per_event(lambda g: float(np.nanmedian(g["map_speed"]))),
-        "replay_speed_p90": _per_event(
-            lambda g: float(np.nanpercentile(g["map_speed"], 90))
-            if np.isfinite(g["map_speed"]).any() else np.nan
-        ),
+        "replay_speed_median": _per_event(_nan_safe("map_speed", np.nanmedian)),
+        "replay_speed_p90": _per_event(_nan_safe("map_speed", _p90)),
         "replay_speed_continuous_median": _per_event(_cont_speed_median),
-        "step_distance_median": _per_event(lambda g: float(np.nanmedian(g["step_distance"]))),
-        "step_distance_p90": _per_event(
-            lambda g: float(np.nanpercentile(g["step_distance"], 90))
-        ),
-        "step_distance_max": _per_event(lambda g: float(np.nanmax(g["step_distance"]))),
+        "step_distance_median": _per_event(_nan_safe("step_distance", np.nanmedian)),
+        "step_distance_p90": _per_event(_nan_safe("step_distance", _p90)),
+        "step_distance_max": _per_event(_nan_safe("step_distance", np.nanmax)),
         "spatial_extent": _per_event(_spatial_extent),
         "n_reversals": _per_event(_n_reversals),
-        "pause_fraction": _per_event(
-            lambda g: float((g["step_distance"] <= place_bin_size).mean())
-        ),
+        "pause_fraction": _per_event(_pause_fraction),
         "n_patches_visited": _per_event(_n_patches),
         "crosses_trunk": _per_event(_crosses_trunk),
-        "terminates_at_well": _per_event(
-            lambda g: bool(_end_arm(g) in range(6)) if np.isfinite(_end_arm(g)) else False
-        ),
+        "terminates_at_well": _per_event(_terminates_at_well),
     }
     baseline = _per_event(lambda g: float(g["run_speed_baseline"].iloc[0]))
     with np.errstate(divide="ignore", invalid="ignore"):
