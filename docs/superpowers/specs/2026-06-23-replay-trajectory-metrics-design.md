@@ -261,3 +261,19 @@ Recorded so their absence is a decision, not an oversight:
 - Naming convention to keep Non-Local and ContFrag columns identical.
 - Whether the `data_over_time` pkl regeneration is a separate migration step
   or folded into the metric build.
+
+## Known caveats (2026-06-24)
+
+- **`path_length` / `step_distance_max` / `_p90` include one event-boundary
+  step.** `step_distance` is the session-level per-bin MAP displacement, so the
+  first in-event bin's step crosses the event boundary (its predecessor lies
+  just before the event). Matches `path_length = Σ step_distance`; events are
+  mostly contiguous so it is one step out of ~10–25. Refinement (mask the first
+  in-event step, or re-derive distances strictly between consecutive in-event
+  bins) deferred.
+- **Canonical tables predate the `pause_fraction` NaN-aware fix.** The
+  `replay_content/*.pkl` regenerated 2026-06-24 carry the pre-fix
+  `pause_fraction` (NaN `step_distance` bins counted as not-paused). This only
+  differs for events with NaN in-event `step_distance` bins (rare — junctions
+  never win the MAP argmax inside confident events). Re-regenerate to pick up
+  the fix when convenient.

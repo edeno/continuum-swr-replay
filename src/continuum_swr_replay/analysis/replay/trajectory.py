@@ -396,6 +396,12 @@ def trajectory_dynamics(
         a = _end_arm(g)
         return bool(np.isfinite(a) and 0 <= a < 6)
 
+    # CAVEAT: ``step_distance`` is the session-level per-bin MAP displacement
+    # (distance into bin t from bin t-1). The first in-event bin's step
+    # therefore crosses the event boundary (its t-1 lies just *before* the
+    # event), so ``path_length`` and ``step_distance_max``/``_p90`` include one
+    # boundary step per event. Events are mostly contiguous so this is one step
+    # out of ~10-25; matches the design spec's ``path_length = Σ step_distance``.
     path_length = _per_event(lambda g: float(np.nansum(g["step_distance"])))
     net_disp = _per_event(_net_disp)
     with np.errstate(divide="ignore", invalid="ignore"):
