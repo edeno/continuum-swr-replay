@@ -844,6 +844,16 @@ def build_stop_table(
         .reindex(np.arange(n_bouts), fill_value=False)
         .to_numpy()
     )
+    # n_SWR: number of distinct detected ripples (SWR_event labels) in the
+    # bout — the raw-ripple analogue of n_non_local, for SWR-rate models.
+    # (is_swr_stop == n_SWR > 0.)
+    per_bout["n_SWR"] = (
+        grouped["SWR_event"]
+        .apply(lambda s: int(s[s > 0].nunique()))
+        .reindex(np.arange(n_bouts), fill_value=0)
+        .astype(np.int64)
+        .to_numpy()
+    )
     if "MUA_event" in dot.columns:
         per_bout["is_mua_stop"] = (
             grouped["MUA_event"]
@@ -851,8 +861,16 @@ def build_stop_table(
             .reindex(np.arange(n_bouts), fill_value=False)
             .to_numpy()
         )
+        per_bout["n_MUA"] = (
+            grouped["MUA_event"]
+            .apply(lambda s: int(s[s > 0].nunique()))
+            .reindex(np.arange(n_bouts), fill_value=0)
+            .astype(np.int64)
+            .to_numpy()
+        )
     else:
         per_bout["is_mua_stop"] = False
+        per_bout["n_MUA"] = 0
 
     # n_events: unique non_local_event > 0 within the bout AND with
     # nonlocal_prob above threshold AND speed below threshold — all
@@ -877,6 +895,9 @@ def build_stop_table(
     )
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_events"] = n_events_per_bout
+    # Canonical repo name (cf. data_aggregation.py's n_non_local / n_SWR / n_MUA);
+    # ``n_events`` retained as a temporary alias until the migration sweep.
+    per_bout["n_non_local"] = n_events_per_bout
 
     # Trial-context at bout start: first in-bout row's trial-derived
     # values. ``skipna=False`` is critical — the default ``first()``
@@ -960,6 +981,57 @@ def build_stop_table(
     )
 
     return per_bout[column_order]
+
+
+def add_nonlocal_swr_split(
+    stop_table: pd.DataFrame, event_table: pd.DataFrame
+) -> pd.DataFrame:
+    """Add per-stop ``n_non_local_SWR`` / ``n_non_local_no_SWR`` columns.
+
+    Splits each stop's non-local event count by the **canonical** event-level
+    ``is_swr`` (strict positive-duration SWR overlap, from ``event_table``)
+    aggregated on ``stop_id`` — so the split matches ``event_table`` exactly
+    rather than introducing a second inclusive-overlap convention. Stops with
+    no events get 0/0, and ``n_non_local_SWR + n_non_local_no_SWR`` equals
+    ``n_non_local`` for every stop.
+
+    This is an assembly-level join (like the retrospective-metrics merge): it
+    needs both canonical tables and so lives outside :func:`build_stop_table`,
+    which is deliberately event-table-independent.
+    """
+    out = stop_table.copy()
+    if (
+        len(event_table) == 0
+        or "stop_id" not in event_table.columns
+        or "is_swr" not in event_table.columns
+    ):
+        out["n_non_local_SWR"] = 0
+        out["n_non_local_no_SWR"] = out.get(
+            "n_non_local", out.get("n_events", 0)
+        ).astype(np.int64)
+        return out
+
+    ev = event_table.dropna(subset=["stop_id"]).copy()
+    ev["_swr"] = ev["is_swr"].astype(bool)
+    counts = (
+        ev.groupby(["stop_id", "_swr"])
+        .size()
+        .unstack("_swr", fill_value=0)
+        .rename(columns={True: "n_non_local_SWR", False: "n_non_local_no_SWR"})
+    )
+    for col in ("n_non_local_SWR", "n_non_local_no_SWR"):
+        if col not in counts.columns:
+            counts[col] = 0
+    out = out.merge(
+        counts[["n_non_local_SWR", "n_non_local_no_SWR"]],
+        left_on="stop_id",
+        right_index=True,
+        how="left",
+    )
+    out[["n_non_local_SWR", "n_non_local_no_SWR"]] = (
+        out[["n_non_local_SWR", "n_non_local_no_SWR"]].fillna(0).astype(np.int64)
+    )
+    return out
 
 
 def build_event_arm_table(
@@ -1476,9 +1548,12 @@ def _stop_table_columns() -> list[str]:
         "immobility_time",
         "recent_trial_reward_rate",
         "is_swr_stop",
+        "n_SWR",
         "is_mua_stop",
+        "n_MUA",
         "has_replay",
         "n_events",
+        "n_non_local",
         "is_after_switch",
         "is_after_omission",
         "is_after_reward",

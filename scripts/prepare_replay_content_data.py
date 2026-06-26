@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.replay.retrospective import (
     compute_retrospective_metrics,
 )
 from continuum_swr_replay.analysis.replay.tables import (
+    add_nonlocal_swr_split,
     build_event_arm_table,
     build_event_patch_table,
     build_event_sequence_table,
@@ -288,6 +289,10 @@ def main():
     event_table_all = pd.concat(all_event_tables, ignore_index=True)
     event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
     stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
+    # Add the canonical non-local SWR split (n_non_local_SWR / n_non_local_no_SWR)
+    # from event_table.is_swr — an assembly-level join, like the retrospective
+    # merge below, kept out of build_stop_table (which is event-table-independent).
+    stop_table_all = add_nonlocal_swr_split(stop_table_all, event_table_all)
     # Always materialize ``event_sequence_table.pkl`` — even when no
     # session contributed any sequence rows. Stage 5B (the
     # retrospective-alignment step) does
