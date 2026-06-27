@@ -194,13 +194,21 @@ tests/baselines/**/*.log
 # Dask scratch space
 .local_scratch/
 
-# Paper figures (generated artifacts)
+# Paper figures (generated artifacts) — ignore all outputs (images + data sidecars);
+# track only the final assembled deliverables via explicit negations, added per
+# figure as it is finalized.
 paper/figures/**/*.pdf
 paper/figures/**/*.png
+paper/figures/**/*.csv
+paper/figures/**/*.npz
+paper/figures/**/*.parquet
+paper/figures/**/*.svg
+# --- tracked deliverables (override the ignores above) ---
+!paper/figures/figure01/figure01.pdf
+!paper/figures/figure01/figure01.png
 
 # Pickle artifacts (detector models, environments, cached data)
 *.pkl
-paper/figures/qc_diagnosis/event_collapse_assumptions.csv
 
 # Scratch / exploratory outputs — figures from real-data sanity runs,
 # notebook scratchpads, etc. Not committed; keep the directory for
