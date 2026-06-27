@@ -16,10 +16,10 @@
 
 - Write `scripts/fit_timeresolved_models.py` mirroring `fit_rate_models.py`'s structure:
   - Load `stop_table.pkl`, `event_onset_table.pkl`, `event_table.pkl` once; `attach_is_swr_to_onsets` once.
-  - For each `outcome` in `POPULATIONS` × each `model` in `MODEL_TIMERESOLVED`: build the session designs via `aggregate_to_timebins(stop_table, POPULATIONS[outcome](onsets), bin_s=spec.bin_s, tmax=spec.tmax, reward_lags=spec.reward_lags, self_history_lags=spec.self_history_lags)`, then per session call `fit_timeresolved_model` (+ `cross_validate_timeresolved_model`), collecting one tidy row per `(outcome, model, animal, day, epoch)`.
-  - Build the design **per session** (group by SESSION_COLS) so all sessions' bins are never resident at once (memory: overview Risk row).
+  - For each `outcome` in `POPULATIONS`, **build the design ONCE per session** via `aggregate_to_timebins(stop_table, POPULATIONS[outcome](onsets), bin_s=BIN_S, tmax=TMAX, reward_lags=N_REWARD_LAGS, self_history_lags=N_HISTORY_LAGS)` — the full column set. Every model in `MODEL_TIMERESOLVED` is fit against that *same* design (its `formula()` selects its subset of `reward_lag*`/`onset_lag*`), so all of M0–M9 share identical bins and are AIC/CV/GOF-comparable. Per (session, model) call `fit_timeresolved_model` + `cross_validate_timeresolved_model` + `timeresolved_gof`, collecting one tidy row per `(outcome, model, animal, day, epoch)` with coef/CV/GOF columns.
+  - Build per session (group by SESSION_COLS) so all sessions' bins are never resident at once (memory: overview Risk row).
   - Save to `Processed-Data/replay_content/models_timeresolved/all_models.pkl`. Log rows/sessions/outcomes like `fit_rate_models.main`.
-- Note in the script docstring: `Thist` uses 15 ms bins (heavier); the design for `Thist` is rebuilt at its own `bin_s` (the loop keys aggregation off `spec.bin_s`, so cells and 15 ms bins coexist without special-casing).
+- Note in the script docstring: the **whole ladder runs at `BIN_S = 0.015`** (one design per session-population, 11 fits against it) — no per-model rebinning; this is what makes the nested comparison + GOF valid.
 - Add a `--max-per-animal` smoke flag (like `regenerate_stop_table.py`) for the smoke-test task below.
 
 ## Deliberately not in this phase
@@ -33,8 +33,8 @@
 | Test | Asserts |
 | --- | --- |
 | smoke: `uv run python scripts/fit_timeresolved_models.py --max-per-animal 1` (slow) | Completes on 5 sessions; prints per-session timing; produces rows for all 4 outcomes × 4 models; record wall-clock to extrapolate the full run (overview Metrics). |
-| `tests/test_fit_timeresolved_models.py::test_tidy_schema` | Output has columns `[outcome, model, animal, day, epoch, rr_reward_lag1, cv_ll_per_bin_mean, ...]`; `outcome` values ⊆ POPULATIONS keys; `model` values ⊆ MODEL_TIMERESOLVED keys. |
-| **PARITY** (slow, the core success test) | From the full `all_models.pkl`: per-session-median `rr_reward_lag1` for `Tlag` = **1.44 / 3.10 / 1.08** (swr / non_local_swr / non_local_no_swr) ±0.03; `Thist` self-history kernel reproduces refractory (RR≈0) <60 ms and bursty (RR>1) ~100 ms; paired SWR-vs-non_local_no_swr `reward_lag1` dissociation **p ≈ 6.5e-8**, 4/5 animals. Compare against `baselines/` from Phase 1. |
+| `tests/test_fit_timeresolved_models.py::test_tidy_schema` | Output has columns `[outcome, model, animal, day, epoch, rr_reward_lag1, cv_ll_per_bin_mean, cv_bits_per_event, dispersion, ks_statistic, ks_within_band, ...]`; `outcome` values ⊆ POPULATIONS keys; `model` values ⊆ MODEL_TIMERESOLVED keys (M0_const…M9). |
+| **QUALITATIVE REPRODUCTION** (slow, the core success test) | From the full `all_models.pkl` at the unified 15 ms bins: per-session-median `rr_reward_lag1` is **larger for SWR-coupled than for non_local_no_swr** (the dissociation ordering, not the old `1.44/3.10/1.08` values — those were at mixed binning); the self-history kernel is refractory (RR≈0) <60 ms and bursty (RR>1) ~100 ms; paired SWR-vs-non_local_no_swr `reward_lag1` dissociation holds with the same sign in **4/5 animals**. GOF: `M0_const` `ks_within_band` fraction ≪ `M7`'s; `dispersion` drops toward ~1 once the history block enters. A changed *conclusion* fails; a shifted absolute coefficient does not (overview Open Question 4 / Metrics). |
 
 ## Fixtures
 

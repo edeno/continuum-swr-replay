@@ -8,7 +8,8 @@ Index:
 - [POPULATIONS](#populations) — Phase 1 defines, Phases 1/3/4 use.
 - [TimeResolvedModelSpec + MODEL_TIMERESOLVED](#timeresolvedmodelspec) — Phase 2 defines, Phases 3/4 use.
 - [fit_timeresolved_model / cross_validate_timeresolved_model](#fit_timeresolved_model--cross_validate_timeresolved_model) — Phase 2 defines, Phase 3 uses.
-- [models_timeresolved/all_models.pkl schema](#tidy-output-schema) — Phase 3 produces, Phase 4 reads.
+- [timeresolved_gof (point-process goodness-of-fit)](#timeresolved_gof) — Phase 2 defines, Phase 5 uses.
+- [models_timeresolved/all_models.pkl schema](#tidy-output-schema) — Phase 3 produces, Phase 4/5 read.
 
 ---
 
@@ -90,7 +91,7 @@ POPULATIONS = {
     "non_local_no_swr": lambda o: o[(o.event_type == "non_local") & (o.is_swr == False)],  # noqa: E712
 }
 ```
-Names match the per-stop `RESPONSE_COLS` keys exactly so the two families' tidy outputs join on `outcome`.
+Names match the per-stop `RESPONSE_COLS` keys exactly so the two families' tidy outputs join on `outcome`. `non_local` (pooled) = `non_local_swr ∪ non_local_no_swr`; it is the **one-population null hypothesis**, not merely a foil — if the pooled model's coefficients/GOF match both subtypes, they are one event type; if pooling masks a difference (as the reward-gating result suggests), they are distinct. The ladder fits all four so this is tested directly.
 
 ---
 
@@ -98,32 +99,70 @@ Names match the per-stop `RESPONSE_COLS` keys exactly so the two families' tidy 
 
 Home: `model_specs.py`, appended after `MODEL_RATE`/`Rlag` (after line 484). A *parallel* dataclass to `ModelSpec` (do not modify `ModelSpec`).
 
+This is the **point-process GLM conditional-intensity ladder** (Truccolo–Eden–Brown
+2005): `log λ = baseline + f(time-since-stop) + g(self-history) + Σβ·covariates`.
+The models toggle the four blocks independently so each block's contribution is
+readable *with and without the time course*. **All models share one bin width**
+(`BIN_S = 0.015`) so the ladder is nested and AIC/CV/deviance/GOF are comparable —
+fine bins are required anyway for the self-history term and for time-rescaling GOF.
+
 ```python
+BIN_S = 0.015          # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms; GOF needs fine bins)
+TMAX = 4.0
+SPLINE_DF = 4
+N_HISTORY_LAGS = 10    # onset_lag1..10 = 150 ms self-history window
+
 @dataclass(frozen=True)
 class TimeResolvedModelSpec:
-    name: str                      # "T0","T1","Tlag","Thist"
-    reward_lags: int               # 0 (T0) | 1 (T1) | N_REWARD_LAGS (Tlag/Thist)
-    self_history_lags: int         # 0 except Thist
-    bin_s: float                   # 0.25 (T0/T1/Tlag) | 0.015 (Thist)
-    tmax: float                    # 4.0
-    spline_df: int                 # 4
+    name: str
+    time_spline: bool              # bs(tc, df=SPLINE_DF) — within-stop time course
+    reward_lags: int               # 0 | 1 | N_REWARD_LAGS  (reward_lag1..k, past outcomes; omission == 1-reward, same regressor)
+    reward_rate: bool              # recent_trial_reward_rate (continuous; ALT encoding of reward history)
+    self_history_lags: int         # 0 | N_HISTORY_LAGS  (onset_lag1..L, within-stop autoregressive)
+    switch: bool                   # is_after_switch
+    reward_time_interaction: bool  # reward_lag1 : bs(tc)  (does reward modulate the time course?)
     description: str
     parent: str | None
 
     def formula(self) -> str:
-        terms = [f"bs(tc, df={self.spline_df})"]
+        terms: list[str] = []
+        if self.time_spline:
+            terms.append(f"bs(tc, df={SPLINE_DF})")
         terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
+        if self.reward_rate:
+            terms.append("recent_trial_reward_rate")
         terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
-        return "count ~ " + " + ".join(terms)
+        if self.switch:
+            terms.append("is_after_switch")
+        if self.reward_time_interaction:
+            terms.append(f"reward_lag1:bs(tc, df={SPLINE_DF})")
+        return "count ~ " + (" + ".join(terms) if terms else "1")
 
+# (time, rewL, rate, hist, switch, interact)
+_N = N_REWARD_LAGS
 MODEL_TIMERESOLVED: dict[str, TimeResolvedModelSpec] = {
-    "T0":   TimeResolvedModelSpec("T0",   0,              0,  0.25, 4.0, 4, "quiescence time course (baseline)", None),
-    "T1":   TimeResolvedModelSpec("T1",   1,              0,  0.25, 4.0, 4, "+ immediate reward (reward_lag1)", "T0"),
-    "Tlag": TimeResolvedModelSpec("Tlag", N_REWARD_LAGS,  0,  0.25, 4.0, 4, "+ reward kernel (reward_lag1..10)", "T1"),
-    "Thist":TimeResolvedModelSpec("Thist",N_REWARD_LAGS, 10,  0.015,4.0, 4, "+ self-history (onset_lag1..10, 15ms)", "Tlag"),
+  "M0_const":         TimeResolvedModelSpec("M0_const",        False, 0,  False, 0, False, False, "homogeneous Poisson baseline", None),
+  "M1_rew1":          TimeResolvedModelSpec("M1_rew1",         False, 1,  False, 0, False, False, "+ previous reward (reward_lag1)", "M0_const"),
+  "M2_rewhist":       TimeResolvedModelSpec("M2_rewhist",      False, _N, False, 0, False, False, "+ reward history kernel (reward_lag1..10)", "M1_rew1"),
+  "M2r_rewrate":      TimeResolvedModelSpec("M2r_rewrate",     False, 0,  True,  0, False, False, "+ recent reward rate (continuous; alt to kernel)", "M0_const"),
+  "M3_hist":          TimeResolvedModelSpec("M3_hist",         False, 0,  False, N_HISTORY_LAGS, False, False, "+ self-history (autoregressive)", "M0_const"),
+  "M4_hist_rew":      TimeResolvedModelSpec("M4_hist_rew",     False, _N, False, N_HISTORY_LAGS, False, False, "+ self-history + reward history", "M3_hist"),
+  "M5_time":          TimeResolvedModelSpec("M5_time",         True,  0,  False, 0, False, False, "+ time-since-stop (spline)", "M0_const"),
+  "M6_time_hist":     TimeResolvedModelSpec("M6_time_hist",    True,  0,  False, N_HISTORY_LAGS, False, False, "+ time + self-history", "M5_time"),
+  "M7_time_hist_rew": TimeResolvedModelSpec("M7_time_hist_rew",True,  _N, False, N_HISTORY_LAGS, False, False, "+ time + self-history + reward history", "M6_time_hist"),
+  "M8_full_switch":   TimeResolvedModelSpec("M8_full_switch",  True,  _N, False, N_HISTORY_LAGS, True,  False, "+ switch (full additive)", "M7_time_hist_rew"),
+  "M9_rew_x_time":    TimeResolvedModelSpec("M9_rew_x_time",   True,  _N, False, N_HISTORY_LAGS, False, True,  "M7 + reward×time interaction", "M7_time_hist_rew"),
 }
 ```
-Notes: `Thist` uses 15 ms bins (refractoriness/burstiness) and 10 self-history lags = 150 ms; the others use 250 ms cells. `bin_s`/`reward_lags`/`self_history_lags` drive both `aggregate_to_timebins` and `formula()`, so spec is the single source of truth.
+This is your nine-model ladder plus two variants: **M2r_rewrate** (continuous
+`recent_trial_reward_rate` as an alternative reward encoding to the lag kernel) and
+**M9_rew_x_time** (the reward×time interaction). Deferred by decision: arm/well/patch
+identity (hard to interpret), slow session drift (→ the state-space model, not a fixed
+covariate here), and cross-/ensemble-history (stretch goal). `formula()` + `BIN_S`/
+`reward_lags`/`reward_rate`/`self_history_lags`/`switch`/`reward_time_interaction`
+drive both `aggregate_to_timebins` and the fit, so the spec is the single source of
+truth. Note `M0_const`'s formula is `count ~ 1` — with the partial-bin `exposure`
+offset, `exp(intercept)` is the per-bin rate (no per-stop dwell offset needed).
 
 ---
 
@@ -140,23 +179,63 @@ def fit_timeresolved_model(
     """Per-session Poisson GLM: spec.formula() with offset=log(exposure).
 
     Returns coef_{term}/bse_/pval_/rr_ for every fitted term, plus n_bins,
-    n_events, llf, aic, deviance. None if too few bins/events, <2 reward levels
-    (when reward terms present), or statsmodels raises (perfect separation at
-    short self-history lags is caught -> None for that session)."""
+    n_events, llf, aic, deviance, AND the per-bin fitted conditional intensity
+    (predicted_count -> the GOF input). `dispersion = deviance / df_resid` is
+    recorded for the overdispersion check (Poisson target ~1). None if too few
+    bins/events, <2 reward levels (when reward terms present), or statsmodels
+    raises (perfect separation at short self-history lags is caught -> None)."""
 ```
 - Fit via `smf.glm(spec.formula(), data=design, family=Poisson(), offset=np.log(design['exposure']))`.
 - `rr_{term} = exp(coef_{term})`. Patsy term names for `reward_lag{j}`/`onset_lag{j}` are the bare column names; the spline terms are `bs(tc, df=4)[k]` — record them but the scientific terms of interest are the reward/onset lags.
+- Expose `predicted` (per-bin fitted mean count, `= results.predict()`) so the GOF contract can build the conditional intensity without refitting.
 
 ```python
 def cross_validate_timeresolved_model(
-    design, spec, *, n_folds=5, min_bins=200, seed=0
+    design, spec, *, n_folds=10, min_bins=200, seed=0
 ) -> dict | None:
-    """K-fold over STOPS (not bins): hold out whole stops, fit on the rest,
-    score mean held-out per-bin Poisson log-likelihood. Returns
-    cv_ll_per_bin_mean/std/n_folds. Mirrors cross_validate_rate_model's
-    stop-based folds (rate_model.py:160) so events in a stop never split
-    across folds."""
+    """10-fold over STOPS (not bins): hold out whole stops, fit on the rest,
+    score held-out fit. Returns cv_ll_per_bin_mean/std, and cv_bits_per_event =
+    (LL_model - LL_M0_const) / (n_events * ln2) on held-out bins — the
+    interpretable point-process score ('bits/event better than constant rate').
+    Mirrors cross_validate_rate_model's stop-based folds (rate_model.py:160) so a
+    stop's bins never split across folds. n_folds default is 10 (decision)."""
 ```
+
+---
+
+## timeresolved_gof
+
+Home: `timeresolved_model.py`. **Reuses** `non_local_detector.model_checking.sorted_spikes`
+(verified present: `TimeRescaling`, `point_process_residuals`, `plot_ks`, `plot_qq`,
+`plot_rescaled_ISI_autocorrelation`) — do not re-implement time-rescaling. Treats the
+event train exactly as a spike train: `is_spike = count > 0` per bin, `trial_id = stop_id`.
+
+```python
+def timeresolved_gof(design: pd.DataFrame, fitted: dict, *,
+                     adjust_for_short_trials: bool = True) -> dict:
+    """Point-process goodness-of-fit via the time-rescaling theorem (Brown et al.
+    2002). `fitted['predicted']` is the per-bin conditional intensity. Returns
+    ks_statistic, ks_within_band (ks < 1.36/sqrt(n_events)), max_isi_autocorr,
+    dispersion (= deviance/df_resid), n_events. Plot helpers (KS / QQ / ISI-autocorr
+    / point_process_residuals-vs-covariate) are emitted for example sessions only."""
+    from non_local_detector.model_checking.sorted_spikes import TimeRescaling
+    tr = TimeRescaling(
+        conditional_intensity=fitted["predicted"],          # per-bin fitted mean count
+        is_spike=design["count"].to_numpy() > 0,
+        trial_id=design["stop_id"].to_numpy(),              # rescale within stop
+        adjust_for_short_trials=adjust_for_short_trials,    # Wiener 2003 — handles short/censored stops
+    )
+    ...
+```
+
+- **`adjust_for_short_trials=True` is required** — our stops are short and variable-length;
+  this is the censoring correction that makes time-rescaling valid here (the right-censoring
+  worry from the raster marginals is handled by this, not by us).
+- The **constant `M0_const` is expected to FAIL** the KS band (events are refractory+bursty,
+  non-Poisson) — that failure is the diagnostic that motivates the self-history block;
+  `M3_hist`/`M6_time_hist`/`Thist`-equivalents should walk the KS plot into the band.
+- Overdispersion: `dispersion > 1` for models lacking the history term signals the clustering
+  the autoregressive block should absorb.
 
 ---
 
@@ -164,6 +243,6 @@ def cross_validate_timeresolved_model(
 
 `Processed-Data/replay_content/models_timeresolved/all_models.pkl` — one row per `(outcome, model, animal, day, epoch)`, mirroring `models_rate/all_models.pkl` so the two families concatenate/compare on `[outcome, model, animal, day, epoch]`.
 
-Columns: `outcome` (one of POPULATIONS keys), `model` (T0/T1/Tlag/Thist), `animal, day, epoch`, then `coef_*`, `bse_*`, `pval_*`, `rr_*` for each fitted term, plus `n_bins, n_events, llf, aic, deviance`, and `cv_ll_per_bin_mean, cv_ll_per_bin_std, cv_n_folds`. Sessions that fail to fit contribute no row (same as `fit_rate_hierarchy`).
+Columns: `outcome` (one of POPULATIONS keys), `model` (one of the `MODEL_TIMERESOLVED` keys M0_const…M9_rew_x_time), `animal, day, epoch`, then `coef_*`, `bse_*`, `pval_*`, `rr_*` for each fitted term, plus `n_bins, n_events, llf, aic, deviance, dispersion`, the CV fields `cv_ll_per_bin_mean, cv_ll_per_bin_std, cv_bits_per_event, cv_n_folds`, and the GOF fields `ks_statistic, ks_within_band, max_isi_autocorr`. Sessions that fail to fit contribute no row (same as `fit_rate_hierarchy`).
 
 Within-animal aggregation is **not** baked into the file — it is computed at read time (per-session medians + `wilcoxon` paired tests), exactly as `fit_rate_models` leaves it. The plotters (Phase 4) do this.
