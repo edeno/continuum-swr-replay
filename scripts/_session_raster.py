@@ -31,11 +31,13 @@ SC = ["animal", "day", "epoch"]
 XMAX = 8.0
 
 
-def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str, title: str) -> None:
+def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
+         title: str, rate: bool = False) -> None:
     """Draw one chronological raster with marginals. populations = list of (label, df, color).
 
-    Top marginal: onset count vs time-since-stop-onset (the within-stop time course).
-    Right marginal: onset count vs stop number (the across-session/between-trial axis).
+    Marginals are onset COUNT by default, or exposure-corrected RATE (events/s) when
+    rate=True. Top marginal: vs time-since-stop-onset (within-stop time course).
+    Right marginal: vs stop number (across-session/between-trial axis).
     """
     def sel(df):
         s = df[df.stop_id.isin(row.index) & (df.t_since_stop_onset < XMAX)]
@@ -67,21 +69,41 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str, tit
     ax.plot([], [], marker="s", ls="", color="0.7", label="omitted stop")
     ax.barh(ss.row.to_numpy(), ss.immobility_time.clip(upper=XMAX).to_numpy(),
             left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
-    # event ticks (raster) + marginal histograms
+    # event ticks (raster) + marginals: raw count, or exposure-corrected rate.
+    # Rate divides each bin by its available immobile-seconds (top: the stop-window
+    # survival; right: total immobile time per stop-bin). The top rate is masked
+    # where <5 stops survive — the right-censored tail is noisy and a selected
+    # long/rewarded subpopulation (see the rate-vs-count caveat).
     tbins = np.arange(0, XMAX + 0.2, 0.2)
     rbins = np.arange(0, len(ss) + 15, 15)
+    durv = ss.immobility_time.to_numpy()
+    rowv = ss.row.to_numpy()
+    if rate:
+        top_expo = np.array([np.clip(durv - lo, 0, hi - lo).sum()
+                             for lo, hi in zip(tbins[:-1], tbins[1:], strict=False)])
+        surv = np.array([(durv > lo).sum() for lo in tbins[:-1]])
+        top_expo = np.where(surv >= 5, top_expo, np.nan)
+        right_expo = np.array([durv[(rowv >= lo) & (rowv < hi)].sum()
+                               for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)])
+        right_expo = np.where(right_expo > 0, right_expo, np.nan)
     for label, df, color in populations:
         x, y = sel(df)
         ax.vlines(x, y - 0.5, y + 0.5, color=color, lw=0.7, label=f"{label} ({len(x)})")
-        axtop.hist(x, bins=tbins, histtype="step", color=color, lw=1.3)
-        axright.hist(y, bins=rbins, histtype="step", color=color, lw=1.3, orientation="horizontal")
+        ct = np.histogram(x, bins=tbins)[0].astype(float)
+        cr = np.histogram(y, bins=rbins)[0].astype(float)
+        if rate:
+            ct = ct / top_expo
+            cr = cr / right_expo
+        axtop.stairs(ct, tbins, color=color, lw=1.3)
+        axright.stairs(cr, rbins, color=color, lw=1.3, orientation="horizontal")
     ax.set_xlim(-0.55, XMAX)
     ax.set_ylim(len(ss), -1)
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("stop number (chronological →)")
-    axtop.set_ylabel("onset count")
+    mlab = "onset rate (events/s)" if rate else "onset count"
+    axtop.set_ylabel(mlab)
     axtop.tick_params(labelbottom=False)
-    axright.set_xlabel("onset count")
+    axright.set_xlabel(mlab)
     axright.tick_params(labelleft=False)
     h, lab = ax.get_legend_handles_labels()
     axleg.legend(h, lab, loc="center", fontsize=8, frameon=False)
@@ -104,8 +126,10 @@ def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
 
     # pick session: most non-SWR onsets among sessions with 100-700 stops.
-    if len(sys.argv) > 1:
-        a, d, e = sys.argv[1].split(",")
+    rate = "--rate" in sys.argv
+    posargs = [x for x in sys.argv[1:] if not x.startswith("--")]
+    if posargs:
+        a, d, e = posargs[0].split(",")
         key = (a, int(d), e)
     else:
         nstops = st[st.immobility_time > 0].groupby(SC).size().rename("nstops")
@@ -125,12 +149,14 @@ def main() -> None:
     ss["row"] = np.arange(len(ss))
     row = ss.set_index("stop_id")["row"]
 
-    base = f"{a} {d} {e} · {len(ss)} stops"
+    suffix = "_rate" if rate else ""
+    base = f"{a} {d} {e} · {len(ss)} stops · marginals: {'rate' if rate else 'count'}"
     draw(ss, row, [("SWR", swr, "k"), ("non-SWR non-local", nl_no, "C0")],
-         "session_raster_swr.png", f"Single-session SWR raster (chronological): {base}")
+         f"session_raster_swr{suffix}.png",
+         f"Single-session SWR raster (chronological): {base}", rate)
     draw(ss, row, [("non-local w/ SWR", nl_swr, "C3"), ("non-local no-SWR", nl_no, "C0")],
-         "session_raster_nonlocal.png",
-         f"Single-session non-local raster (chronological): {base}")
+         f"session_raster_nonlocal{suffix}.png",
+         f"Single-session non-local raster (chronological): {base}", rate)
 
 
 if __name__ == "__main__":
