@@ -60,7 +60,6 @@ def main() -> None:
     ss["row"] = np.arange(len(ss))
     row = ss.set_index("stop_id")["row"]
     rew = ss.set_index("stop_id")["reward_lag1"]
-    dur = ss.set_index("stop_id")["immobility_time"]
 
     def sel(df):
         s = df[df.stop_id.isin(row.index) & (df.t_since_stop_onset < XMAX)]
@@ -82,9 +81,9 @@ def main() -> None:
     rcol = rew.reindex([row.index[row == r][0] for r in range(len(ss))])
     ax.scatter(np.full(len(ss), -0.18), np.arange(len(ss)),
                c=np.where(rcol.to_numpy() == 1, "C2", "0.7"), s=8, marker="s")
-    # stop-end (duration) markers
-    ax.scatter(dur.clip(upper=XMAX).to_numpy(), row.loc[dur.index].to_numpy(),
-               s=4, color="C3", alpha=0.5, marker=".", label="stop end")
+    # shade each stop's immobility window (0 -> stop end) = the available time
+    ax.barh(ss.row.to_numpy(), ss.immobility_time.clip(upper=XMAX).to_numpy(),
+            left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
     # event ticks
     x, y = sel(swr)
     ax.scatter(x, y, s=14, color="k", marker="|", label=f"SWR ({len(x)})")
@@ -96,7 +95,7 @@ def main() -> None:
     ax.set_ylabel("stop number (chronological →)")
     ax.set_title(f"Single-session raster (chronological): {a} {d} {e}\n"
                  f"{len(ss)} stops · left strip: green=rewarded, gray=omitted")
-    ax.legend(loc="upper right", fontsize=8, frameon=False)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, frameon=False)
     fig.tight_layout()
     out = P.parent / "paper" / "figures" / "session_raster_chronological.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
