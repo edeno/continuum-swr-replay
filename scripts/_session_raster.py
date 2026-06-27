@@ -31,8 +31,65 @@ SC = ["animal", "day", "epoch"]
 XMAX = 8.0
 
 
+def predict_marginals(x, y, durv, rl, tbins, rbins, n_folds=5):
+    """Per-session time-resolved Poisson GLM: count ~ bs(t_since_stop, df=4) + reward_lag1,
+    offset=log(bin exposure). Returns in-sample AND 5-fold-cross-validated (out-of-fold,
+    split by stop) predicted rate marginals, plus the CV Poisson deviance-explained vs a
+    null (intercept+offset) model. Marginals are exposure-weighted events/s, comparable to
+    the empirical rate marginals. x,y = onset times + stop-rows; durv,rl = per-stop dur+reward.
+    Returns (t_centers, top_is, right_is, top_cv, right_cv, cv_dev_explained).
+    """
+    import statsmodels.api as sm
+    from patsy import dmatrix
+
+    nb = len(tbins) - 1
+    binw = np.diff(tbins)
+    expo = np.clip(durv[:, None] - tbins[None, :-1], 0, binw[None, :])  # (n_stops, nb)
+    cnt = np.zeros((len(durv), nb))
+    jb = np.clip(np.digitize(x, tbins) - 1, 0, nb - 1)
+    np.add.at(cnt, (y.astype(int), jb), 1)
+    si, bi = np.where(expo > 1e-9)
+    yc, ee = cnt[si, bi], expo[si, bi]
+    logoff = np.log(ee)
+    tc = 0.5 * (tbins[:-1] + tbins[1:])
+    X = dmatrix("bs(t, df=4) + rl", {"t": tc[bi], "rl": rl[si]}, return_type="dataframe").to_numpy()
+    X0 = np.ones((len(si), 1))
+
+    lam_is = np.asarray(sm.GLM(yc, X, family=sm.families.Poisson(), offset=logoff).fit().predict(X))
+    fold = si % n_folds  # fold by stop -> all bins of a held-out stop predicted out-of-fold
+    lam_cv = np.full(len(si), np.nan)
+    lam0_cv = np.full(len(si), np.nan)
+    for f in range(n_folds):
+        tr, te = fold != f, fold == f
+        if not te.any():
+            continue
+        po = sm.families.Poisson()
+        lam_cv[te] = sm.GLM(yc[tr], X[tr], family=po, offset=logoff[tr]).fit().predict(X[te])
+        lam0_cv[te] = sm.GLM(yc[tr], X0[tr], family=po, offset=logoff[tr]).fit().predict(X0[te])
+
+    def _dev(mu):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            term = np.where(yc > 0, yc * np.log(yc / mu), 0.0)
+        return 2 * (term - (yc - mu)).sum()
+    d2 = 1 - _dev(lam_cv * ee) / _dev(lam0_cv * ee)
+
+    rowidx = np.arange(len(durv))
+    def _marg(lam):
+        top = np.array([(lam[bi == j] * ee[bi == j]).sum() / ee[bi == j].sum()
+                        if (bi == j).any() else np.nan for j in range(nb)])
+        pc = np.zeros(len(durv))
+        np.add.at(pc, si, lam * ee)
+        right = np.array([pc[(rowidx >= lo) & (rowidx < hi)].sum()
+                          / max(durv[(rowidx >= lo) & (rowidx < hi)].sum(), 1e-9)
+                          for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)])
+        return top, right
+    top_is, right_is = _marg(lam_is)
+    top_cv, right_cv = _marg(lam_cv)
+    return tc, top_is, right_is, top_cv, right_cv, d2
+
+
 def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
-         title: str, rate: bool = False) -> None:
+         title: str, rate: bool = False, model: bool = False) -> None:
     """Draw one chronological raster with marginals. populations = list of (label, df, color).
 
     Marginals are onset COUNT by default, or exposure-corrected RATE (events/s) when
@@ -76,7 +133,9 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     # long/rewarded subpopulation (see the rate-vs-count caveat).
     tbins = np.arange(0, XMAX + 0.2, 0.2)
     rbins = np.arange(0, len(ss) + 15, 15)
+    rcz = 0.5 * (rbins[:-1] + rbins[1:])
     durv = ss.immobility_time.to_numpy()
+    rl = ss.reward_lag1.fillna(0).to_numpy()
     rowv = ss.row.to_numpy()
     if rate:
         top_expo = np.array([np.clip(durv - lo, 0, hi - lo).sum()
@@ -86,6 +145,7 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
         right_expo = np.array([durv[(rowv >= lo) & (rowv < hi)].sum()
                                for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)])
         right_expo = np.where(right_expo > 0, right_expo, np.nan)
+    notes = []
     for label, df, color in populations:
         x, y = sel(df)
         ax.vlines(x, y - 0.5, y + 0.5, color=color, lw=0.7, label=f"{label} ({len(x)})")
@@ -96,6 +156,16 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
             cr = cr / right_expo
         axtop.stairs(ct, tbins, color=color, lw=1.3)
         axright.stairs(cr, rbins, color=color, lw=1.3, orientation="horizontal")
+        if model and rate:
+            try:
+                tc, t_is, r_is, t_cv, r_cv, d2 = predict_marginals(x, y, durv, rl, tbins, rbins)
+                axtop.plot(tc, t_is, color=color, lw=1.2, ls="--", alpha=0.45)
+                axtop.plot(tc, t_cv, color=color, lw=1.7, ls=":")
+                axright.plot(r_is, rcz, color=color, lw=1.2, ls="--", alpha=0.45)
+                axright.plot(r_cv, rcz, color=color, lw=1.7, ls=":")
+                notes.append(f"{label}: CV D²={d2:.2f}")
+            except Exception as exc:  # noqa: BLE001
+                notes.append(f"{label}: fit failed ({type(exc).__name__})")
     ax.set_xlim(-0.55, XMAX)
     ax.set_ylim(len(ss), -1)
     ax.set_xlabel("time since stop onset (s)")
@@ -107,7 +177,10 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     axright.tick_params(labelleft=False)
     h, lab = ax.get_legend_handles_labels()
     axleg.legend(h, lab, loc="center", fontsize=8, frameon=False)
-    fig.suptitle(title, x=0.5, y=0.995, fontsize=11)
+    if model and rate:
+        title += ("\nmodel bs(t,df4)+reward_lag1 — solid=empirical, dashed=in-sample, "
+                  "dotted=CV · " + " · ".join(notes))
+    fig.suptitle(title, x=0.5, y=0.998, fontsize=10)
     out = P.parent / "paper" / "figures" / out_name
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print("saved", out)
@@ -126,7 +199,8 @@ def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
 
     # pick session: most non-SWR onsets among sessions with 100-700 stops.
-    rate = "--rate" in sys.argv
+    model = "--model" in sys.argv
+    rate = "--rate" in sys.argv or model  # model overlays predicted rates
     posargs = [x for x in sys.argv[1:] if not x.startswith("--")]
     if posargs:
         a, d, e = posargs[0].split(",")
@@ -150,14 +224,14 @@ def main() -> None:
     row = ss.set_index("stop_id")["row"]
 
     sid = f"{a}{d}_{e}"
-    suffix = "_rate" if rate else ""
+    suffix = "_model" if model else ("_rate" if rate else "")
     base = f"{a} {d} {e} · {len(ss)} stops · marginals: {'rate' if rate else 'count'}"
     draw(ss, row, [("SWR", swr, "k"), ("non-SWR non-local", nl_no, "C0")],
          f"session_raster_{sid}_swr{suffix}.png",
-         f"Single-session SWR raster (chronological): {base}", rate)
+         f"Single-session SWR raster (chronological): {base}", rate, model)
     draw(ss, row, [("non-local w/ SWR", nl_swr, "C3"), ("non-local no-SWR", nl_no, "C0")],
          f"session_raster_{sid}_nonlocal{suffix}.png",
-         f"Single-session non-local raster (chronological): {base}", rate)
+         f"Single-session non-local raster (chronological): {base}", rate, model)
 
 
 if __name__ == "__main__":
