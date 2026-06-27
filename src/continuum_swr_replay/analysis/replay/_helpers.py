@@ -799,6 +799,156 @@ def lagged_trial_rewards(
     return out
 
 
+# ── Per-bin event-rate aggregation ──
+
+_SESSION_COLS = ["animal", "day", "epoch"]
+
+
+def attach_is_swr_to_onsets(
+    onset_df: pd.DataFrame, event_table: pd.DataFrame
+) -> pd.DataFrame:
+    """Add a canonical ``is_swr`` column to the non-local onset rows.
+
+    Matches each non-local onset to its ``event_table`` event by within-stop
+    time rank (both are ordered by time within a stop and are 1:1 -- the
+    non-local onset count equals the event-table row count). SWR/MUA onset
+    rows get ``is_swr = NaN``. Returns a copy; does not mutate the input.
+
+    Parameters
+    ----------
+    onset_df : pd.DataFrame
+        Event-onset rows. Must carry ``stop_id``, ``event_type``, and
+        ``onset_time``.
+    event_table : pd.DataFrame
+        Per-event table. Must carry ``stop_id``, ``event_start``, ``is_swr``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``onset_df`` with an added ``is_swr`` column (the matched
+        boolean for ``event_type == "non_local"`` rows, ``NaN`` elsewhere).
+    """
+    out = onset_df.copy()
+    # object dtype holds the matched booleans alongside NaN for SWR/MUA rows
+    # without the float coercion pandas now warns about.
+    out["is_swr"] = pd.Series(np.nan, index=out.index, dtype="object")
+    ev = event_table[["stop_id", "event_start", "is_swr"]].copy()
+    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
+    nl = out[out["event_type"] == "non_local"].copy()
+    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
+    merged = nl.merge(
+        ev[["stop_id", "rank", "is_swr"]],
+        on=["stop_id", "rank"],
+        how="left",
+        suffixes=("", "_ev"),
+    )
+    out.loc[nl.index, "is_swr"] = merged["is_swr_ev"].to_numpy()
+    return out
+
+
+def aggregate_to_timebins(
+    stop_table: pd.DataFrame,
+    onset_times: pd.DataFrame,
+    *,
+    bin_s: float,
+    tmax: float,
+    reward_lags: int = 0,
+    self_history_lags: int = 0,
+    stop_covariates: tuple[str, ...] = (),
+) -> pd.DataFrame:
+    """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
+
+    Builds the canonical (stop x bin) point-process design used by the per-bin
+    event-rate models. Bins are built from ``stop_table.immobility_time``
+    (continuous), independent of any dense 4 ms grid, so non-4-ms widths (e.g.
+    15 ms) are exact. The last bin's ``exposure`` is the partial remainder.
+
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        Per-stop table (unique ``stop_id``). Must carry ``animal``, ``day``,
+        ``epoch``, ``stop_id``, ``immobility_time``, plus any ``reward_lag{j}``
+        and ``stop_covariates`` columns requested.
+    onset_times : pd.DataFrame
+        Event-onset rows for ONE population (already filtered). Must carry
+        ``stop_id`` and ``t_since_stop_onset``.
+    bin_s : float
+        Bin width in seconds.
+    tmax : float
+        Right-truncation; bins beyond ``tmax`` are dropped.
+    reward_lags : int
+        Number of ``reward_lag{j}`` columns to carry from ``stop_table``.
+    self_history_lags : int
+        Number of ``onset_lag{j}`` self-history columns to build (same-
+        population onset counts ``j`` bins back, within stop, reset at the
+        stop boundary).
+    stop_covariates : tuple[str, ...]
+        Extra per-stop columns carried from ``stop_table`` by ``stop_id``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``animal``, ``day``, ``epoch``, ``stop_id``, ``binj``,
+        ``tc`` (bin-center s = time since stop onset), ``exposure`` (s of
+        immobility in the bin), ``reward_lag1..reward_lags``, each name in
+        ``stop_covariates``, ``count`` (population onsets in the bin), and
+        ``onset_lag1..self_history_lags``.
+    """
+    reward_cols = [f"reward_lag{j}" for j in range(1, reward_lags + 1)]
+    carry = reward_cols + list(stop_covariates)
+
+    s = stop_table[stop_table["immobility_time"] > 0]
+    nmax = int(tmax / bin_s)
+    nbin = np.minimum(
+        np.ceil(s["immobility_time"].to_numpy() / bin_s), nmax
+    ).astype(int)
+    idx = np.repeat(np.arange(len(s)), nbin)
+    binj = (
+        np.concatenate([np.arange(n) for n in nbin])
+        if len(s)
+        else np.empty(0, dtype=int)
+    )
+    cols = [*_SESSION_COLS, "stop_id", "immobility_time", *carry]
+    out = s.iloc[idx][cols].reset_index(drop=True)
+    out["binj"] = binj
+    out["tc"] = (binj + 0.5) * bin_s
+    out["exposure"] = np.minimum(bin_s, out["immobility_time"] - binj * bin_s)
+    out = out[out["exposure"] > 1e-4]
+
+    src = onset_times[onset_times["t_since_stop_onset"] < tmax]
+    src_binj = (src["t_since_stop_onset"].to_numpy() / bin_s).astype(int)
+    cnt = (
+        pd.DataFrame({"stop_id": src["stop_id"].to_numpy(), "binj": src_binj})
+        .groupby(["stop_id", "binj"])
+        .size()
+        .rename("count")
+    )
+    out = out.merge(cnt, on=["stop_id", "binj"], how="left")
+    out["count"] = out["count"].fillna(0)
+
+    if self_history_lags:
+        out = out.sort_values(["stop_id", "binj"])
+        grouped = out.groupby("stop_id")["count"]
+        for j in range(1, self_history_lags + 1):
+            out[f"onset_lag{j}"] = grouped.shift(j).fillna(0)
+
+    out = out.drop(columns=["immobility_time"])
+    return out.reset_index(drop=True)
+
+
+# given onset_df already passed through attach_is_swr_to_onsets:
+POPULATIONS = {
+    "swr": lambda o: o[o.event_type == "SWR"],
+    "non_local": lambda o: o[o.event_type == "non_local"],
+    "non_local_swr": lambda o: o[
+        (o.event_type == "non_local") & (o.is_swr == True)  # noqa: E712
+    ],
+    "non_local_no_swr": lambda o: o[
+        (o.event_type == "non_local") & (o.is_swr == False)  # noqa: E712
+    ],
+}
+
+
 # ── Scalar per-event wrappers (preserve existing API) ──
 
 

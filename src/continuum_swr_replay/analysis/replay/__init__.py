@@ -5,7 +5,12 @@ simulation utilities, and model comparison/checking helpers used across
 the replay content analysis pipeline.
 """
 
-from ._helpers import add_arm_fixed_effects
+from ._helpers import (
+    POPULATIONS,
+    add_arm_fixed_effects,
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+)
 from .choice_prediction import (
     build_choice_dataset,
     build_residualized_choice_dataset,
@@ -77,11 +82,14 @@ __all__ = [
     "MODEL_PATCH_SWR",
     "MODEL_PATCH_SWITCH",
     "MODEL_PER_STOP_RATE",
+    "POPULATIONS",
     "ModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",
+    "aggregate_to_timebins",
     "arm_dist_rank",
     "arm_path_well_to_well",
+    "attach_is_swr_to_onsets",
     "build_choice_dataset",
     "build_control_aligned_table",
     "build_event_arm_table",

@@ -25,6 +25,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
@@ -34,31 +38,14 @@ RLAGS = [f"reward_lag{j}" for j in range(1, K + 1)]
 HLAGS = [f"onset_lag{j}" for j in range(1, L + 1)]
 
 
-def build_bins(stops: pd.DataFrame) -> pd.DataFrame:
-    """One row per (stop, 15 ms bin) up to TMAX, with exposure + reward lags."""
-    s = stops[stops["immobility_time"] > 0].copy()
-    s["nbin"] = np.minimum(
-        np.ceil(s["immobility_time"] / BINW), int(TMAX / BINW)
-    ).astype(int)
-    idx = np.repeat(np.arange(len(s)), s["nbin"].to_numpy())
-    binj = np.concatenate([np.arange(n) for n in s["nbin"].to_numpy()])
-    out = s.iloc[idx][[*SC, "stop_id", "immobility_time", *RLAGS]].reset_index(drop=True)
-    out["binj"] = binj
-    out["tc"] = (binj + 0.5) * BINW
-    out["exposure"] = np.minimum(BINW, out["immobility_time"] - binj * BINW)
-    return out[out["exposure"] > 1e-4]
-
-
 def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
-    base = build_bins(st)
 
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
-    nl = onset[onset.event_type == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
-    nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
+    onset = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
+    nl = onset[onset.event_type == "non_local"]
     pops = {
         "SWR": onset[onset.event_type == "SWR"],
         "non-local (all)": onset[onset.event_type == "non_local"],
@@ -69,13 +56,9 @@ def main() -> None:
     formula = "count ~ bs(tc, df=4) + " + " + ".join(RLAGS + HLAGS)
     coefs = {}
     for name, src in pops.items():
-        src = src[src["t_since_stop_onset"] < TMAX].copy()
-        src["binj"] = (src["t_since_stop_onset"] / BINW).astype(int)
-        cnt = src.groupby(["stop_id", "binj"]).size().rename("count")
-        df = base.merge(cnt, on=["stop_id", "binj"], how="left").fillna({"count": 0})
-        df = df.sort_values(["stop_id", "binj"])
-        for j in range(1, L + 1):
-            df[f"onset_lag{j}"] = df.groupby("stop_id")["count"].shift(j).fillna(0)
+        df = aggregate_to_timebins(
+            st, src, bin_s=BINW, tmax=TMAX, reward_lags=K, self_history_lags=L
+        )
         rows = []
         for keys, g in df.groupby(SC, sort=False):
             g = g.dropna(subset=RLAGS)

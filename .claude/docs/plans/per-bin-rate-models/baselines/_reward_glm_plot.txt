@@ -1,0 +1,4 @@
+saved /cumulus/edeno/continuum-swr-replay/paper/figures/reward_glm_effects.png
+  detected SWR: median RR 1.37, n=218
+  non-local w/ SWR: median RR 2.69, n=218
+  non-local NO SWR: median RR 1.04, n=218
