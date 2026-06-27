@@ -23,6 +23,10 @@ import statsmodels.formula.api as smf
 from scipy.stats import wilcoxon
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
@@ -30,32 +34,14 @@ SC = ["animal", "day", "epoch"]
 TMAX, DT = 4.0, 0.25
 
 
-def cells(df: pd.DataFrame, rmap: pd.Series, value: str) -> pd.DataFrame:
-    df = df.copy()
-    df["reward"] = df["stop_id"].map(rmap)
-    df = df[(df["t_since_stop_onset"] < TMAX) & df["reward"].notna()]
-    df["tbin"] = (df["t_since_stop_onset"] / DT).astype(int)
-    g = df.groupby([*SC, "reward", "tbin"]).size().rename(value)
-    return g
-
-
 def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
-    rmap = st.set_index("stop_id")["reward_lag1"]
 
-    dense = pd.read_parquet(
-        RC / "stop_timebin_table.parquet",
-        columns=[*SC, "stop_id", "t_since_stop_onset"],
+    onset = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
     )
-    exposure = cells(dense, rmap, "exposure")
-    del dense
-
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
-    nl = onset[onset.event_type == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
-    nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
+    nl = onset[onset.event_type == "non_local"]
 
     pops = {
         "SWR": onset[onset.event_type == "SWR"],
@@ -65,11 +51,15 @@ def main() -> None:
 
     coefs: dict[str, pd.DataFrame] = {}
     for name, src in pops.items():
-        cnt = cells(src, rmap, "count")
+        # (session x reward x time-bin) cells: a groupby on the canonical
+        # (stop x bin) design, with reward_lag1 as the reward grouping column.
+        df = aggregate_to_timebins(st, src, bin_s=DT, tmax=TMAX, reward_lags=1)
         cell = (
-            exposure.to_frame().join(cnt).reset_index().fillna({"count": 0})
+            df.groupby([*SC, "reward_lag1", "binj"], as_index=False)
+            .agg(count=("count", "sum"), exposure=("exposure", "sum"))
+            .rename(columns={"reward_lag1": "reward"})
         )
-        cell["tc"] = (cell["tbin"] + 0.5) * DT
+        cell["tc"] = (cell["binj"] + 0.5) * DT
         rows = []
         for keys, g in cell.groupby(SC, sort=False):
             g = g[g["exposure"] > 0]

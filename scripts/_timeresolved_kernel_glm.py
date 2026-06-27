@@ -26,6 +26,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
@@ -35,19 +39,12 @@ K = 5
 LAGS = [f"reward_lag{j}" for j in range(1, K + 1)]
 
 
-def onset_cells(df: pd.DataFrame) -> pd.Series:
-    df = df[df["t_since_stop_onset"] < TMAX].copy()
-    df["tbin"] = (df["t_since_stop_onset"] / DT).astype(int)
-    return df.groupby(["stop_id", "tbin"]).size().rename("count")
-
-
-def fit_pop(base: pd.DataFrame, cnt: pd.Series, interaction: bool) -> pd.DataFrame:
-    cell = base.join(cnt).reset_index().fillna({"count": 0})
+def fit_pop(design: pd.DataFrame, interaction: bool) -> pd.DataFrame:
     formula = "count ~ bs(tc, df=4) + " + " + ".join(LAGS)
     if interaction:
         formula += " + reward_lag1:bs(tc, df=4)"
     rows = []
-    for keys, g in cell.groupby(SC, sort=False):
+    for keys, g in design.groupby(SC, sort=False):
         g = g.dropna(subset=LAGS)
         if len(g) < 40 or g["reward_lag1"].nunique() < 2:
             continue
@@ -65,31 +62,25 @@ def fit_pop(base: pd.DataFrame, cnt: pd.Series, interaction: bool) -> pd.DataFra
 
 def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
-    keep = ["stop_id", *SC, *LAGS]
-    stops = st[keep].drop_duplicates("stop_id").set_index("stop_id")
 
-    dense = pd.read_parquet(RC / "stop_timebin_table.parquet",
-                            columns=["stop_id", "t_since_stop_onset"])
-    dense = dense[dense["t_since_stop_onset"] < TMAX].copy()
-    dense["tbin"] = (dense["t_since_stop_onset"] / DT).astype(int)
-    exposure = dense.groupby(["stop_id", "tbin"]).size().rename("exposure")
-    del dense
-    base = exposure.to_frame().join(stops, on="stop_id")
-    base["tc"] = (base.index.get_level_values("tbin") + 0.5) * DT
-
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
-    nl = onset[onset.event_type == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
-    nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
+    onset = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
+    nl = onset[onset.event_type == "non_local"]
     pops = {
         "SWR": onset[onset.event_type == "SWR"],
         "NL w/ SWR": nl[nl.is_swr.eq(True)],
         "NL NO SWR": nl[nl.is_swr.eq(False)],
     }
 
-    coefs = {n: fit_pop(base, onset_cells(s), interaction=False) for n, s in pops.items()}
+    coefs = {
+        n: fit_pop(
+            aggregate_to_timebins(st, s, bin_s=DT, tmax=TMAX, reward_lags=K),
+            interaction=False,
+        )
+        for n, s in pops.items()
+    }
     print(f"=== reward kernel (RR=exp coef), per-session median, t<{TMAX}s, K={K} ===")
     print("(reward_lag1 = immediate/consummatory, controlled for time course + lags 2-5)\n")
     for n, d in coefs.items():

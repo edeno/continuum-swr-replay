@@ -17,33 +17,24 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
 SC = ["animal", "day", "epoch"]
-TMAX, DT, BIN_S = 4.0, 0.25, 0.004
+TMAX, DT = 4.0, 0.25
 
 
-def cells(df, rmap, value):
-    df = df.copy()
-    df["reward"] = df["stop_id"].map(rmap)
-    df = df[(df["t_since_stop_onset"] < TMAX) & df["reward"].notna()]
-    df["tbin"] = (df["t_since_stop_onset"] / DT).astype(int)
-    return df.groupby([*SC, "reward", "tbin"]).size().rename(value)
-
-
-def main():
+def main() -> None:
     st = pd.read_pickle(RC / "stop_table.pkl")
-    rmap = st.set_index("stop_id")["reward_lag1"]
-    dense = pd.read_parquet(RC / "stop_timebin_table.parquet", columns=[*SC, "stop_id", "t_since_stop_onset"])
-    exposure = cells(dense, rmap, "exposure")
-    del dense
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
-    nl = onset[onset.event_type == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
-    nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
+    onset = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
+    nl = onset[onset.event_type == "non_local"]
     pops = {
         "detected SWR": onset[onset.event_type == "SWR"],
         "non-local w/ SWR": nl[nl.is_swr.eq(True)],
@@ -54,23 +45,30 @@ def main():
     fig, axes = plt.subplots(2, 2, figsize=(11, 8))
     rr_session = {}
     for ax, (name, src) in zip(axes.flat[:3], pops.items(), strict=False):
-        cell = exposure.to_frame().join(cells(src, rmap, "count")).reset_index().fillna({"count": 0})
-        cell["tc"] = (cell["tbin"] + 0.5) * DT
+        # (session x reward x time-bin) cells from the canonical (stop x bin)
+        # design; exposure is in seconds, so count / exposure is events / s.
+        df = aggregate_to_timebins(st, src, bin_s=DT, tmax=TMAX, reward_lags=1)
+        cell = (
+            df.groupby([*SC, "reward_lag1", "binj"], as_index=False)
+            .agg(count=("count", "sum"), exposure=("exposure", "sum"))
+            .rename(columns={"reward_lag1": "reward"})
+        )
+        cell["tc"] = (cell["binj"] + 0.5) * DT
         cell = cell[cell["exposure"] > 0]
         # pooled fit for the fitted curves
-        pooled = cell.groupby(["reward", "tbin", "tc"], as_index=False).agg(count=("count", "sum"), exposure=("exposure", "sum"))
+        pooled = cell.groupby(["reward", "binj", "tc"], as_index=False).agg(count=("count", "sum"), exposure=("exposure", "sum"))
         m = smf.glm("count ~ bs(tc, df=4) + reward", data=pooled, family=sm.families.Poisson(),
                     offset=np.log(pooled["exposure"].to_numpy())).fit()
         for rew, ls, lab in [(1.0, "-", "rewarded"), (0.0, "--", "omitted")]:
             pred = pd.DataFrame({"tc": tc_grid, "reward": rew})
-            rate = m.predict(pred, offset=np.zeros(len(pred))) / BIN_S  # onsets / s
+            rate = m.predict(pred, offset=np.zeros(len(pred)))  # onsets / s
             ax.plot(tc_grid, rate, ls, color="C1" if rew else "C0", lw=2, label=f"fit: {lab}")
         for rew, mk in [(1.0, "o"), (0.0, "x")]:
             d = pooled[pooled.reward == rew]
-            ax.plot(d["tc"], d["count"] / d["exposure"] / BIN_S, mk, color="C1" if rew else "C0", ms=4, alpha=0.6)
+            ax.plot(d["tc"], d["count"] / d["exposure"], mk, color="C1" if rew else "C0", ms=4, alpha=0.6)
         # per-session RR
         rows = []
-        for keys, g in cell.groupby(SC, sort=False):
+        for _keys, g in cell.groupby(SC, sort=False):
             if g["reward"].nunique() < 2 or len(g) < 8:
                 continue
             try:

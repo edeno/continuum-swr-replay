@@ -26,6 +26,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
@@ -40,12 +41,11 @@ def main() -> None:
     exp_h, _ = np.histogram(dense.t_since_pump.dropna().to_numpy(), TBINS)
     sec = exp_h * BIN_S  # seconds of immobility exposure per t-bin
 
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
-    nl = onset[onset.event_type == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
-    nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
+    onset = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
+    nl = onset[onset.event_type == "non_local"]
 
     pops = {
         "detected SWR": onset.loc[onset.event_type == "SWR", "t_since_pump"],

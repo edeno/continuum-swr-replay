@@ -1,0 +1,20 @@
+fit SWR: 218 sessions
+fit non-local (all): 218 sessions
+fit NL NO SWR: 218 sessions
+fit NL w/ SWR: 218 sessions
+
+=== self-history kernel (RR per 15ms lag; <1 refractory, >1 bursty) ===
+  SWR        : 15ms=0.00 30ms=0.00 45ms=0.00 60ms=0.62 75ms=1.57 90ms=2.23 105ms=2.32 120ms=2.48 135ms=2.63 150ms=2.14
+  non-local (all): 15ms=0.00 30ms=0.00 45ms=0.21 60ms=0.69 75ms=1.18 90ms=1.61 105ms=2.08 120ms=1.99 135ms=1.88 150ms=1.72
+  NL NO SWR  : 15ms=0.00 30ms=0.00 45ms=0.00 60ms=0.00 75ms=0.76 90ms=1.36 105ms=1.50 120ms=1.50 135ms=1.69 150ms=0.67
+  NL w/ SWR  : 15ms=0.00 30ms=0.00 45ms=0.00 60ms=0.00 75ms=0.00 90ms=1.50 105ms=2.30 120ms=1.86 135ms=1.98 150ms=1.52
+
+=== reward lag1 RR (now controlled for clustering) ===
+  SWR        : RR=1.42 (171/218)
+  non-local (all): RR=1.41 (164/218)
+  NL NO SWR  : RR=1.08 (119/218)
+  NL w/ SWR  : RR=3.10 (202/218)
+
+lag1 reward dissociation (clustering-controlled): 66% of 218, p=6.5e-08
+
+saved /cumulus/edeno/continuum-swr-replay/paper/figures/selfhistory_autocorr.png
