@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Fit the per-stop replay-rate hierarchy (R0-R2) and persist it.
+"""Fit the per-stop replay-rate hierarchy (R0-R2 + Rlag) and persist it.
 
 The rate models are ordinary Poisson GLMs on per-stop event counts with a
 ``log(immobility_time)`` offset (see ``rate_model.fit_rate_model``) — a
 different model family from the conditional arm/patch hierarchies, so they
-live outside ``fit_replay_content_models.py``. This script fits R0-R2
+live outside ``fit_replay_content_models.py``. This script fits R0-R2 + Rlag
 per session from the saved ``stop_table.pkl``, adds K-fold cross-validated
 per-stop log-likelihood (``cross_validate_rate_model``), and saves a tidy
 one-row-per-(outcome, model, session) table mirroring the arm/patch
@@ -19,7 +19,7 @@ all read directly from the canonical ``stop_table`` columns:
 - ``non_local_swr``    -> ``n_non_local_SWR``    : non-local events overlapping a SWR.
 - ``non_local_no_swr`` -> ``n_non_local_no_SWR`` : non-local events without a SWR.
 
-Fitting R0-R2 on each is an outcome *variant* of the same ``MODEL_RATE`` specs,
+Fitting each MODEL_RATE model on each outcome is an outcome *variant* of the specs,
 not a new model. Replicates the canonical SWR-rate-vs-reward result (reward /
 omission, recent reward history) on detected ripples, then asks whether the
 non-SWR non-local events share those rate effects.
@@ -34,7 +34,7 @@ import logging
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.model_specs import MODEL_RATE
+from continuum_swr_replay.analysis.replay.model_specs import MODEL_RATE, N_REWARD_LAGS
 from continuum_swr_replay.analysis.replay.rate_model import (
     cross_validate_rate_model,
     fit_rate_model,
@@ -56,7 +56,7 @@ RESPONSE_COLS = {
 
 
 def fit_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -> pd.DataFrame:
-    """One row per (outcome, model, session): R0-R2 fit stats, coefficients, CV-LL."""
+    """One row per (outcome, model, session): R0-R2 + Rlag fit stats, coefs, CV-LL."""
     rows = []
     for keys, group in stop_table.groupby(SESSION_COLS, sort=False):
         for outcome, response_col in RESPONSE_COLS.items():
@@ -90,8 +90,15 @@ def main() -> None:
             f"stop_table missing outcome columns {missing}; "
             "regenerate it first (scripts/regenerate_stop_table.py)."
         )
+    lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
+    if any(c not in stop.columns for c in lag_cols):
+        logger.warning(
+            "stop_table lacks reward_lag columns — the Rlag model will be SKIPPED "
+            "(every session returns None). Regenerate the stop_table first."
+        )
     logger.info(
-        "Fitting rate hierarchy R0-R2 (+CV) x %s over %d sessions...",
+        "Fitting rate hierarchy %s (+CV) x %s over %d sessions...",
+        list(MODEL_RATE),
         list(RESPONSE_COLS),
         stop.groupby(SESSION_COLS).ngroups,
     )

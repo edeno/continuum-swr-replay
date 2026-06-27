@@ -469,6 +469,10 @@ MODEL_RATE: dict[str, ModelSpec] = {
 # kernel separates the dwell-confounded immediate effect (``reward_lag1`` sets
 # the current stop's duration) from the dwell-clean reward *memory* at
 # ``reward_lag>=2`` (earlier trials don't set the current stop's duration).
+# ``reward_lag1`` also uses the strict goal-arrival cutoff, so it is always
+# past-only — unlike R1's ``is_after_omission`` (built from trial start time),
+# which can encode the *future* reward outcome for a stop during the approach
+# phase. This is why the two disagree on ~15% of stops (inter-trial stops).
 N_REWARD_LAGS = 10
 
 MODEL_RATE["Rlag"] = ModelSpec(

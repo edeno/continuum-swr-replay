@@ -54,7 +54,8 @@ def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
 
 
 def validate(onset: pd.DataFrame, dense: pd.DataFrame) -> None:
-    # Dense onset totals reconstruct the sparse onset counts (same extraction).
+    # Dense onset totals reconstruct the sparse onset counts. Both derive from
+    # the same _event_onset_times + assign_bout, so they must agree exactly.
     for etype, col in [("SWR", "n_SWR"), ("non_local", "n_non_local"), ("MUA", "n_MUA")]:
         a = int((onset.event_type == etype).sum())
         b = int(dense[col].sum())

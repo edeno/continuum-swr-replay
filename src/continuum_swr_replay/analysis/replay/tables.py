@@ -1009,20 +1009,24 @@ def add_nonlocal_swr_split(
     needs both canonical tables and so lives outside :func:`build_stop_table`,
     which is deliberately event-table-independent.
     """
-    out = stop_table.copy()
+    # Idempotent: drop any prior split so re-calling never produces _x/_y dups.
+    out = stop_table.drop(
+        columns=["n_non_local_SWR", "n_non_local_no_SWR"], errors="ignore"
+    ).copy()
+    total = out.get("n_non_local", out.get("n_events"))
     if (
         len(event_table) == 0
         or "stop_id" not in event_table.columns
         or "is_swr" not in event_table.columns
     ):
         out["n_non_local_SWR"] = 0
-        out["n_non_local_no_SWR"] = out.get(
-            "n_non_local", out.get("n_events", 0)
+        out["n_non_local_no_SWR"] = (
+            pd.Series(0, index=out.index) if total is None else total
         ).astype(np.int64)
         return out
 
     ev = event_table.dropna(subset=["stop_id"]).copy()
-    ev["_swr"] = ev["is_swr"].astype(bool)
+    ev["_swr"] = ev["is_swr"].fillna(False).astype(bool)
     counts = (
         ev.groupby(["stop_id", "_swr"])
         .size()
