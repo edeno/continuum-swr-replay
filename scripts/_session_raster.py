@@ -59,13 +59,12 @@ def main() -> None:
     ss = ss.sort_values("stop_start").reset_index(drop=True)
     ss["row"] = np.arange(len(ss))
     row = ss.set_index("stop_id")["row"]
-    rew = ss.set_index("stop_id")["reward_lag1"]
 
     def sel(df):
         s = df[df.stop_id.isin(row.index) & (df.t_since_stop_onset < XMAX)]
         return s.t_since_stop_onset.to_numpy(), row.loc[s.stop_id].to_numpy()
 
-    fig, ax = plt.subplots(figsize=(8, 11))
+    fig, ax = plt.subplots(figsize=(8, 14))
     # patch-switch boundaries (where current_patch changes) segment the session
     # into patch-blocks; label each block with its patch. (is_after_switch marks
     # the multi-stop post-switch window, not the boundary — use the change point.)
@@ -77,24 +76,27 @@ def main() -> None:
     for lo, hi in zip(bnds[:-1], bnds[1:], strict=False):
         ax.text(-0.42, (lo + hi) / 2, f"P{int(cp[lo])}", va="center", ha="center",
                 fontsize=9, color="C1", weight="bold")
-    # reward strip (left margin)
-    rcol = rew.reindex([row.index[row == r][0] for r in range(len(ss))])
-    ax.scatter(np.full(len(ss), -0.18), np.arange(len(ss)),
-               c=np.where(rcol.to_numpy() == 1, "C2", "0.7"), s=8, marker="s")
+    # reward strip (left margin): one row-tall bar per stop, reward at THIS stop
+    # (reward_outcome = the direct per-stop reward, not the reward-kernel lag).
+    rcolors = np.where(ss.reward_outcome.to_numpy() == 1, "C2", "0.7")
+    ax.barh(ss.row.to_numpy(), 0.12, left=-0.30, height=1.0, color=rcolors, zorder=2)
+    ax.plot([], [], marker="s", ls="", color="C2", label="rewarded stop")
+    ax.plot([], [], marker="s", ls="", color="0.7", label="omitted stop")
     # shade each stop's immobility window (0 -> stop end) = the available time
     ax.barh(ss.row.to_numpy(), ss.immobility_time.clip(upper=XMAX).to_numpy(),
             left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
-    # event ticks
+    # event ticks — exactly one row tall (vlines, data units) so each event aligns
+    # 1:1 with its stop's shaded window; a scatter "|" marker would be a fixed
+    # point size (~4x the row height at this density).
     x, y = sel(swr)
-    ax.scatter(x, y, s=14, color="k", marker="|", label=f"SWR ({len(x)})")
+    ax.vlines(x, y - 0.5, y + 0.5, color="k", lw=0.7, label=f"SWR ({len(x)})")
     x, y = sel(nlno)
-    ax.scatter(x, y, s=14, color="C0", marker="|", label=f"non-SWR non-local ({len(x)})")
+    ax.vlines(x, y - 0.5, y + 0.5, color="C0", lw=0.7, label=f"non-SWR non-local ({len(x)})")
     ax.set_xlim(-0.55, XMAX)
     ax.set_ylim(len(ss), -1)
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("stop number (chronological →)")
-    ax.set_title(f"Single-session raster (chronological): {a} {d} {e}\n"
-                 f"{len(ss)} stops · left strip: green=rewarded, gray=omitted")
+    ax.set_title(f"Single-session event raster (chronological): {a} {d} {e} · {len(ss)} stops")
     ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, frameon=False)
     fig.tight_layout()
     out = P.parent / "paper" / "figures" / "session_raster_chronological.png"
