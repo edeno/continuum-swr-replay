@@ -149,13 +149,14 @@ def main() -> None:
     ss["row"] = np.arange(len(ss))
     row = ss.set_index("stop_id")["row"]
 
+    sid = f"{a}{d}_{e}"
     suffix = "_rate" if rate else ""
     base = f"{a} {d} {e} · {len(ss)} stops · marginals: {'rate' if rate else 'count'}"
     draw(ss, row, [("SWR", swr, "k"), ("non-SWR non-local", nl_no, "C0")],
-         f"session_raster_swr{suffix}.png",
+         f"session_raster_{sid}_swr{suffix}.png",
          f"Single-session SWR raster (chronological): {base}", rate)
     draw(ss, row, [("non-local w/ SWR", nl_swr, "C3"), ("non-local no-SWR", nl_no, "C0")],
-         f"session_raster_nonlocal{suffix}.png",
+         f"session_raster_{sid}_nonlocal{suffix}.png",
          f"Single-session non-local raster (chronological): {base}", rate)
 
 
