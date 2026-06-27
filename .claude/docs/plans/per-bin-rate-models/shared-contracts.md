@@ -6,10 +6,10 @@ Index:
 - [attach_is_swr_to_onsets](#attach_is_swr_to_onsets) — Phase 1 defines, Phases 1/3 use.
 - [aggregate_to_timebins](#aggregate_to_timebins) — Phase 1 defines, Phases 1/3 use.
 - [POPULATIONS](#populations) — Phase 1 defines, Phases 1/3/4 use.
-- [TimeResolvedModelSpec + MODEL_TIMERESOLVED](#timeresolvedmodelspec) — Phase 2 defines, Phases 3/4 use.
-- [fit_timeresolved_model / cross_validate_timeresolved_model](#fit_timeresolved_model--cross_validate_timeresolved_model) — Phase 2 defines, Phase 3 uses.
-- [timeresolved_gof (point-process goodness-of-fit)](#timeresolved_gof) — Phase 2 defines, Phase 5 uses.
-- [models_timeresolved/all_models.pkl schema](#tidy-output-schema) — Phase 3 produces, Phase 4/5 read.
+- [PerBinRateModelSpec + MODEL_PER_BIN_RATE](#perbinratemodelspec) — Phase 2 defines, Phases 3/4 use.
+- [fit_per_bin_rate_model / cross_validate_per_bin_rate_model](#fit_per_bin_rate_model--cross_validate_per_bin_rate_model) — Phase 2 defines, Phase 3 uses.
+- [per_bin_rate_gof (point-process goodness-of-fit)](#per_bin_rate_gof) — Phase 2 defines, Phase 5 uses.
+- [models_per_bin_rate/all_models.pkl schema](#tidy-output-schema) — Phase 3 produces, Phase 4/5 read.
 
 ---
 
@@ -80,13 +80,13 @@ Semantics nailed down:
 - `count`: `onset_times` (already filtered to one population) binned by `floor(t_since_stop_onset / bin_s)`, joined on `(stop_id, binj)`, fill 0.
 - `onset_lag{j} = groupby('stop_id')['count'].shift(j).fillna(0)` after sorting by `(stop_id, binj)` — within-stop only.
 - `reward_lag{j}`: carried from `stop_table` by `stop_id`.
-- `stop_covariates`: each named column carried from `stop_table` by `stop_id`, same as the reward lags. Phase 3 passes `("recent_trial_reward_rate", "is_after_switch")` so `M2r_rewrate` and `M8_full_switch` have their predictors; both columns are present in `stop_table.pkl`. Without this, those two models' `formula()` would reference absent columns and `fit_timeresolved_model` would return `None` for every session — silently dropping them.
+- `stop_covariates`: each named column carried from `stop_table` by `stop_id`, same as the reward lags. Phase 3 passes `("recent_trial_reward_rate", "is_after_switch")` so `M2r_rewrate` and `M8_full_switch` have their predictors; both columns are present in `stop_table.pkl`. Without this, those two models' `formula()` would reference absent columns and `fit_per_bin_rate_model` would return `None` for every session — silently dropping them.
 
 ---
 
 ## POPULATIONS
 
-Home: `_helpers.py` (a small selector) or `model_specs.py`. The four outcome tags, mirroring `fit_rate_models.RESPONSE_COLS`:
+Home: `_helpers.py` (a small selector) or `model_specs.py`. The four outcome tags, mirroring `fit_per_stop_rate_models.RESPONSE_COLS`:
 
 ```python
 # given onset_df already passed through attach_is_swr_to_onsets:
@@ -101,9 +101,9 @@ Names match the per-stop `RESPONSE_COLS` keys exactly so the two families' tidy 
 
 ---
 
-## TimeResolvedModelSpec
+## PerBinRateModelSpec
 
-Home: `model_specs.py`, appended after `MODEL_RATE`/`Rlag` (after line 484). A *parallel* dataclass to `ModelSpec` (do not modify `ModelSpec`).
+Home: `model_specs.py`, appended after `MODEL_PER_STOP_RATE`/`Rlag` (after line 484). A *parallel* dataclass to `ModelSpec` (do not modify `ModelSpec`).
 
 This is the **point-process GLM conditional-intensity ladder** (Truccolo–Eden–Brown
 2005): `log λ = baseline + f(time-since-stop) + g(self-history) + Σβ·covariates`.
@@ -119,7 +119,7 @@ SPLINE_DF = 4
 N_HISTORY_LAGS = 10    # onset_lag1..10 = 150 ms self-history window
 
 @dataclass(frozen=True)
-class TimeResolvedModelSpec:
+class PerBinRateModelSpec:
     name: str
     time_spline: bool              # bs(tc, df=SPLINE_DF) — within-stop time course
     reward_lags: int               # 0 | 1 | N_REWARD_LAGS  (reward_lag1..k, past outcomes; omission == 1-reward, same regressor)
@@ -146,18 +146,18 @@ class TimeResolvedModelSpec:
 
 # (time, rewL, rate, hist, switch, interact)
 _N = N_REWARD_LAGS
-MODEL_TIMERESOLVED: dict[str, TimeResolvedModelSpec] = {
-  "M0_const":         TimeResolvedModelSpec("M0_const",        False, 0,  False, 0, False, False, "homogeneous Poisson baseline", None),
-  "M1_rew1":          TimeResolvedModelSpec("M1_rew1",         False, 1,  False, 0, False, False, "+ previous reward (reward_lag1)", "M0_const"),
-  "M2_rewhist":       TimeResolvedModelSpec("M2_rewhist",      False, _N, False, 0, False, False, "+ reward history kernel (reward_lag1..10)", "M1_rew1"),
-  "M2r_rewrate":      TimeResolvedModelSpec("M2r_rewrate",     False, 0,  True,  0, False, False, "+ recent reward rate (continuous; alt to kernel)", "M0_const"),
-  "M3_hist":          TimeResolvedModelSpec("M3_hist",         False, 0,  False, N_HISTORY_LAGS, False, False, "+ self-history (autoregressive)", "M0_const"),
-  "M4_hist_rew":      TimeResolvedModelSpec("M4_hist_rew",     False, _N, False, N_HISTORY_LAGS, False, False, "+ self-history + reward history", "M3_hist"),
-  "M5_time":          TimeResolvedModelSpec("M5_time",         True,  0,  False, 0, False, False, "+ time-since-stop (spline)", "M0_const"),
-  "M6_time_hist":     TimeResolvedModelSpec("M6_time_hist",    True,  0,  False, N_HISTORY_LAGS, False, False, "+ time + self-history", "M5_time"),
-  "M7_time_hist_rew": TimeResolvedModelSpec("M7_time_hist_rew",True,  _N, False, N_HISTORY_LAGS, False, False, "+ time + self-history + reward history", "M6_time_hist"),
-  "M8_full_switch":   TimeResolvedModelSpec("M8_full_switch",  True,  _N, False, N_HISTORY_LAGS, True,  False, "+ switch (full additive)", "M7_time_hist_rew"),
-  "M9_rew_x_time":    TimeResolvedModelSpec("M9_rew_x_time",   True,  _N, False, N_HISTORY_LAGS, False, True,  "M7 + reward×time interaction", "M7_time_hist_rew"),
+MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
+  "M0_const":         PerBinRateModelSpec("M0_const",        False, 0,  False, 0, False, False, "homogeneous Poisson baseline", None),
+  "M1_rew1":          PerBinRateModelSpec("M1_rew1",         False, 1,  False, 0, False, False, "+ previous reward (reward_lag1)", "M0_const"),
+  "M2_rewhist":       PerBinRateModelSpec("M2_rewhist",      False, _N, False, 0, False, False, "+ reward history kernel (reward_lag1..10)", "M1_rew1"),
+  "M2r_rewrate":      PerBinRateModelSpec("M2r_rewrate",     False, 0,  True,  0, False, False, "+ recent reward rate (continuous; alt to kernel)", "M0_const"),
+  "M3_hist":          PerBinRateModelSpec("M3_hist",         False, 0,  False, N_HISTORY_LAGS, False, False, "+ self-history (autoregressive)", "M0_const"),
+  "M4_hist_rew":      PerBinRateModelSpec("M4_hist_rew",     False, _N, False, N_HISTORY_LAGS, False, False, "+ self-history + reward history", "M3_hist"),
+  "M5_time":          PerBinRateModelSpec("M5_time",         True,  0,  False, 0, False, False, "+ time-since-stop (spline)", "M0_const"),
+  "M6_time_hist":     PerBinRateModelSpec("M6_time_hist",    True,  0,  False, N_HISTORY_LAGS, False, False, "+ time + self-history", "M5_time"),
+  "M7_time_hist_rew": PerBinRateModelSpec("M7_time_hist_rew",True,  _N, False, N_HISTORY_LAGS, False, False, "+ time + self-history + reward history", "M6_time_hist"),
+  "M8_full_switch":   PerBinRateModelSpec("M8_full_switch",  True,  _N, False, N_HISTORY_LAGS, True,  False, "+ switch (full additive)", "M7_time_hist_rew"),
+  "M9_rew_x_time":    PerBinRateModelSpec("M9_rew_x_time",   True,  _N, False, N_HISTORY_LAGS, False, True,  "M7 + reward×time interaction", "M7_time_hist_rew"),
 }
 ```
 This is your nine-model ladder plus two variants: **M2r_rewrate** (continuous
@@ -172,14 +172,14 @@ offset, `exp(intercept)` is the per-bin rate (no per-stop dwell offset needed).
 
 ---
 
-## fit_timeresolved_model / cross_validate_timeresolved_model
+## fit_per_bin_rate_model / cross_validate_per_bin_rate_model
 
-Home: new `src/continuum_swr_replay/analysis/replay/timeresolved_model.py` (parallel to `rate_model.py`). Mirrors `fit_rate_model`'s return-dict shape (`coef_*`, `bse_*`, `pval_*`, `rr_*`, fit stats) so downstream code is uniform.
+Home: new `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py` (parallel to `per_stop_rate_model.py`). Mirrors `fit_per_stop_rate_model`'s return-dict shape (`coef_*`, `bse_*`, `pval_*`, `rr_*`, fit stats) so downstream code is uniform.
 
 ```python
-def fit_timeresolved_model(
+def fit_per_bin_rate_model(
     design: pd.DataFrame,        # one session's aggregate_to_timebins output
-    spec: TimeResolvedModelSpec,
+    spec: PerBinRateModelSpec,
     *, min_bins: int = 200, min_events: int = 20,
 ) -> dict | None:
     """Per-session Poisson GLM: spec.formula() with offset=log(exposure).
@@ -196,7 +196,7 @@ def fit_timeresolved_model(
 - Expose `predicted` (per-bin fitted mean count, `= results.predict()`) so the GOF contract can build the conditional intensity without refitting.
 
 ```python
-def cross_validate_timeresolved_model(
+def cross_validate_per_bin_rate_model(
     design, spec, *, n_folds=10, min_bins=200, seed=0
 ) -> dict | None:
     """10-fold over STOPS (not bins): hold out whole stops, fit on the rest,
@@ -206,21 +206,21 @@ def cross_validate_timeresolved_model(
     held-out bins, with M0_const refit on each train fold; units = bits per event
     ('bits/event better than constant rate'). (Mirroring Family A's per-stop *mean*
     LL here would be wrong by a factor of n_bins.)
-    Mirrors cross_validate_rate_model's stop-based folds (rate_model.py:160) so a
+    Mirrors cross_validate_per_stop_rate_model's stop-based folds (per_stop_rate_model.py:160) so a
     stop's bins never split across folds. n_folds default is 10 (decision)."""
 ```
 
 ---
 
-## timeresolved_gof
+## per_bin_rate_gof
 
-Home: `timeresolved_model.py`. **Reuses** `non_local_detector.model_checking.sorted_spikes`
+Home: `per_bin_rate_model.py`. **Reuses** `non_local_detector.model_checking.sorted_spikes`
 (verified present: `TimeRescaling`, `point_process_residuals`, `plot_ks`, `plot_qq`,
 `plot_rescaled_ISI_autocorrelation`) — do not re-implement time-rescaling. Treats the
 event train exactly as a spike train: `is_spike = count > 0` per bin, `trial_id = stop_id`.
 
 ```python
-def timeresolved_gof(design: pd.DataFrame, fitted: dict, *,
+def per_bin_rate_gof(design: pd.DataFrame, fitted: dict, *,
                      adjust_for_short_trials: bool = True) -> dict:
     """Point-process goodness-of-fit via the time-rescaling theorem (Brown et al.
     2002). `fitted['predicted']` is the per-bin conditional intensity. Returns
@@ -260,8 +260,8 @@ def timeresolved_gof(design: pd.DataFrame, fitted: dict, *,
 
 ## Tidy output schema
 
-`Processed-Data/replay_content/models_timeresolved/all_models.pkl` — one row per `(outcome, model, animal, day, epoch)`, mirroring `models_rate/all_models.pkl` so the two families concatenate/compare on `[outcome, model, animal, day, epoch]`.
+`Processed-Data/replay_content/models_per_bin_rate/all_models.pkl` — one row per `(outcome, model, animal, day, epoch)`, mirroring `models_per_stop_rate/all_models.pkl` so the two families concatenate/compare on `[outcome, model, animal, day, epoch]`.
 
-Columns: `outcome` (one of POPULATIONS keys), `model` (one of the `MODEL_TIMERESOLVED` keys M0_const…M9_rew_x_time), `animal, day, epoch`, then `coef_*`, `bse_*`, `pval_*`, `rr_*` for each fitted term, plus `n_bins, n_events, llf, aic, deviance, dispersion`, the CV fields `cv_ll_per_bin_mean, cv_ll_per_bin_std, cv_bits_per_event, cv_n_folds`, and the GOF fields `ks_statistic, ks_within_band, max_isi_autocorr`. Sessions that fail to fit contribute no row (same as `fit_rate_hierarchy`).
+Columns: `outcome` (one of POPULATIONS keys), `model` (one of the `MODEL_PER_BIN_RATE` keys M0_const…M9_rew_x_time), `animal, day, epoch`, then `coef_*`, `bse_*`, `pval_*`, `rr_*` for each fitted term, plus `n_bins, n_events, llf, aic, deviance, dispersion`, the CV fields `cv_ll_per_bin_mean, cv_ll_per_bin_std, cv_bits_per_event, cv_n_folds`, and the GOF fields `ks_statistic, ks_within_band, max_isi_autocorr`. Sessions that fail to fit contribute no row (same as `fit_per_stop_rate_hierarchy`).
 
-Within-animal aggregation is **not** baked into the file — it is computed at read time (per-session medians + `wilcoxon` paired tests), exactly as `fit_rate_models` leaves it. The plotters (Phase 4) do this.
+Within-animal aggregation is **not** baked into the file — it is computed at read time (per-session medians + `wilcoxon` paired tests), exactly as `fit_per_stop_rate_models` leaves it. The plotters (Phase 4) do this.

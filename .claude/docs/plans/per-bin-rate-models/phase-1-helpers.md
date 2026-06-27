@@ -18,23 +18,23 @@
 
 ## Tasks
 
-- **Capture baselines BEFORE touching anything.** Run each scratch script and save its printed numeric output to `.claude/docs/plans/timeresolved-rate-models/baselines/<script>.txt` (the lag kernels, the self-history kernel, the reward RRs, the dissociation p-values). These are the Phase-1 regression oracle — the refactor must reproduce them.
+- **Capture baselines BEFORE touching anything.** Run each scratch script and save its printed numeric output to `.claude/docs/plans/per_bin_rate-rate-models/baselines/<script>.txt` (the lag kernels, the self-history kernel, the reward RRs, the dissociation p-values). These are the Phase-1 regression oracle — the refactor must reproduce them.
 - Add `attach_is_swr_to_onsets`, `aggregate_to_timebins`, and `POPULATIONS` to `_helpers.py` per [shared-contracts.md](shared-contracts.md). Export `attach_is_swr_to_onsets` and `aggregate_to_timebins` from `analysis/replay/__init__.py` alongside the existing helper exports.
 - Refactor the five scratch scripts to call the new helpers instead of their inline copies, **changing no outputs**: `_reward_glm.py`, `_reward_glm_plot.py`, `_timeresolved_kernel_glm.py`, `_selfhistory_glm.py`, `_timeresolved_psth.py`. Each loses its private `cells`/`build_bins`/`onset_cells` and its rank-match block. For the reward-GLM per-(session, reward, tbin) view, derive it as a `groupby` on the `aggregate_to_timebins` (stop × bin) output (carry `reward_lag1` as the `reward` grouping column).
 - Keep the scripts' formulas, bin widths, `TMAX`, `K`, `L`, populations, and printed/plotted outputs identical — this phase is pure extraction.
 
 ## Deliberately not in this phase
 
-- No `MODEL_TIMERESOLVED` spec, no `fit_timeresolved_model`, no persisted `models_timeresolved/` output — that is Phase 2/3. The scripts still hand-roll their `smf.glm` calls here.
+- No `MODEL_PER_BIN_RATE` spec, no `fit_per_bin_rate_model`, no persisted `models_per_bin_rate/` output — that is Phase 2/3. The scripts still hand-roll their `smf.glm` calls here.
 - No reduction of the scripts to "plotters" — they keep fitting inline for now (Phase 4 strips that once the orchestrator exists).
-- Do not touch `MODEL_RATE` / `rate_model.py` / `fit_rate_models.py`.
+- Do not touch `MODEL_PER_STOP_RATE` / `per_stop_rate_model.py` / `fit_per_stop_rate_models.py`.
 
 ## Validation slice
 
 | Test | Asserts |
 | --- | --- |
-| `tests/test_timeresolved_helpers.py::test_attach_is_swr_match_rate` | On real `event_onset_table` + `event_table` (one cached session slice), `is_swr.notna()` ≥ 0.999 on non-local rows; counts of `is_swr==True/False` match `stop_table.n_non_local_SWR/_no_SWR` sums for that session. |
-| `tests/test_timeresolved_helpers.py::test_aggregate_exposure_and_lags` | On a synthesized 2-stop fixture: `exposure` sums to total immobility; `onset_lag1` equals `count` shifted one bin within stop and is 0 at each stop's first bin; bins capped at `tmax`. |
+| `tests/test_per_bin_rate_helpers.py::test_attach_is_swr_match_rate` | On real `event_onset_table` + `event_table` (one cached session slice), `is_swr.notna()` ≥ 0.999 on non-local rows; counts of `is_swr==True/False` match `stop_table.n_non_local_SWR/_no_SWR` sums for that session. |
+| `tests/test_per_bin_rate_helpers.py::test_aggregate_exposure_and_lags` | On a synthesized 2-stop fixture: `exposure` sums to total immobility; `onset_lag1` equals `count` shifted one bin within stop and is 0 at each stop's first bin; bins capped at `tmax`. |
 | `scripts/_selfhistory_glm.py` re-run (slow) | Printed self-history kernel + reward RRs + dissociation p match `baselines/_selfhistory_glm.txt` to ≥3 sig figs. Mark slow. |
 | `scripts/_timeresolved_kernel_glm.py` re-run (slow) | lag kernel + lag-1 dissociation match `baselines/_timeresolved_kernel_glm.txt`. Mark slow. |
 

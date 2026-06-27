@@ -1,7 +1,7 @@
 # Spec: State-space point-process model for non-local / SWR event trains
 
 Status: design (not yet implemented; extends Family B — see
-`.claude/docs/plans/timeresolved-rate-models/`)
+`.claude/docs/plans/per-bin-rate-models/`)
 Date: 2026-06-27
 Reference: Czanner, Eden, Wirth, Yanike, Suzuki & Brown (2008), "Analysis of
 between-trial and within-trial neural spiking dynamics," J Neurophysiol
@@ -70,11 +70,11 @@ Extensions beyond vanilla Czanner, optional:
 ## Relationship to Family B (what's new vs reused)
 
 - **Reused:** the onset extraction + `is_swr` split + 15 ms within-stop bins +
-  self-history lags are exactly the `Thist` design
-  (`aggregate_to_timebins`, [Family B plan](../../../.claude/docs/plans/timeresolved-rate-models/shared-contracts.md)).
+  self-history lags are exactly the `M7` design
+  (`aggregate_to_timebins`, [Family B plan](../../../.claude/docs/plans/per-bin-rate-models/shared-contracts.md)).
   The SS-GLM consumes the same per-(stop, bin) design.
-- **`Thist` = the SS-GLM with `Σ = 0`** (θ fixed across stops). So Family B is a
-  nested special case — fit `Thist` first; the SS-GLM asks whether relaxing the
+- **`M7` = the SS-GLM with `Σ = 0`** (θ fixed across stops). So Family B is a
+  nested special case — fit `M7` first; the SS-GLM asks whether relaxing the
   fixed-θ constraint (letting it drift) improves AIC/KS.
 - **The EM estimator is mostly already built** — in `/cumulus/edeno/state_space_practice`,
   a production, JAX, pytest-covered state-space library (importable). The
@@ -105,7 +105,7 @@ Dependency note: add `state_space_practice` as a dependency and set
 GPU optional (`state_space_practice[gpu]`), not needed at this data scale.
 
 So the real work is the **adapter + KS GOF + per-stop reset + validation against
-`Thist`** — substantially less than implementing the filter/smoother. The spec's
+`M7`** — substantially less than implementing the filter/smoother. The spec's
 heavy lifting is reuse, not rebuild.
 
 ## Raster plots — the visualization layer
@@ -166,22 +166,22 @@ triptych and are the natural figure for the model.
    gain on a fixed time-course shape) before a full drifting shape.
 3. **Sparsity + separation.** Events are sparse and self-history has perfect
    refractoriness at short lags (RR≈0) — the EM/filter must be numerically robust
-   to this (the `Thist` GLM already hits separation there; carry the same care).
+   to this (the `M7` GLM already hits separation there; carry the same care).
 4. **Cost.** EM over ~100–200 trials/session × per-bin point process × per
    population × 5 animals. Smoke-test one session first; the filter/smoother is
    O(trials × state² ) per EM iteration.
 5. **Does the latent state beat explicit predictors?** The honest test is AIC/KS:
-   `Thist` (fixed θ, with reward_lag) vs SS-GLM (drifting θ). If the random walk
+   `M7` (fixed θ, with reward_lag) vs SS-GLM (drifting θ). If the random walk
    doesn't improve fit, the explicit reward kernel already captures the slow
    dynamics and we report that (a clean negative is informative).
 
 ## Scope / sequencing
 
 This is the **tier above Family B**: implement and validate Family B
-(`T0/T1/Tlag/Thist`) first — `Thist` is the `Σ=0` baseline the SS-GLM must beat.
+(the `M0…M9` ladder) first — `M7` is the `Σ=0` baseline the SS-GLM must beat.
 The rasters (above) are independent and worth building now as the descriptive
 layer. With the EM machinery reused from `state_space_practice`, the SS-GLM
-shrinks to an adapter + KS GOF + per-stop reset + AIC/KS validation vs `Thist` —
+shrinks to an adapter + KS GOF + per-stop reset + AIC/KS validation vs `M7` —
 still its own plan, but a small one. Sequencing: (1) rasters now; (2) Family B
-`Thist`; (3) only if AIC/KS on `Thist` shows unexplained between-stop structure,
+`M7`; (3) only if AIC/KS on `M7` shows unexplained between-stop structure,
 the SS-GLM adapter over `state_space_practice`.
