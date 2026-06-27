@@ -32,40 +32,60 @@ XMAX = 8.0
 
 
 def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str, title: str) -> None:
-    """Draw one chronological raster. `populations` = list of (label, onset_df, color)."""
+    """Draw one chronological raster with marginals. populations = list of (label, df, color).
+
+    Top marginal: onset count vs time-since-stop-onset (the within-stop time course).
+    Right marginal: onset count vs stop number (the across-session/between-trial axis).
+    """
     def sel(df):
         s = df[df.stop_id.isin(row.index) & (df.t_since_stop_onset < XMAX)]
         return s.t_since_stop_onset.to_numpy(), row.loc[s.stop_id].to_numpy()
 
-    fig, ax = plt.subplots(figsize=(8, 14))
-    # patch-switch boundaries (current_patch change points) segment the session
+    fig = plt.figure(figsize=(10, 15))
+    gs = fig.add_gridspec(2, 2, width_ratios=[5, 1.1], height_ratios=[1.1, 8],
+                          hspace=0.03, wspace=0.03)
+    ax = fig.add_subplot(gs[1, 0])
+    axtop = fig.add_subplot(gs[0, 0], sharex=ax)
+    axright = fig.add_subplot(gs[1, 1], sharey=ax)
+    axleg = fig.add_subplot(gs[0, 1])
+    axleg.axis("off")
+
+    # patch-switch boundaries segment the session (on the raster + right marginal)
     cp = ss.current_patch.to_numpy()
     bnds = [0] + [i for i in range(1, len(cp)) if cp[i] != cp[i - 1]] + [len(cp)]
     for b in bnds[1:-1]:
         ax.axhline(b - 0.5, color="C1", lw=1.3, alpha=0.9, zorder=1)
+        axright.axhline(b - 0.5, color="C1", lw=1.0, alpha=0.5, zorder=1)
     ax.plot([], [], color="C1", lw=1.3, label="patch switch")
     for lo, hi in zip(bnds[:-1], bnds[1:], strict=False):
         ax.text(-0.42, (lo + hi) / 2, f"P{int(cp[lo])}", va="center", ha="center",
                 fontsize=9, color="C1", weight="bold")
-    # reward strip (left margin): one row-tall bar per stop, reward at THIS stop
+    # reward strip + shaded immobility window
     rcolors = np.where(ss.reward_outcome.to_numpy() == 1, "C2", "0.7")
     ax.barh(ss.row.to_numpy(), 0.12, left=-0.30, height=1.0, color=rcolors, zorder=2)
     ax.plot([], [], marker="s", ls="", color="C2", label="rewarded stop")
     ax.plot([], [], marker="s", ls="", color="0.7", label="omitted stop")
-    # shade each stop's immobility window (0 -> stop end) = the available time
     ax.barh(ss.row.to_numpy(), ss.immobility_time.clip(upper=XMAX).to_numpy(),
             left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
-    # event ticks — one data-row tall, aligned 1:1 with the shaded window
+    # event ticks (raster) + marginal histograms
+    tbins = np.arange(0, XMAX + 0.2, 0.2)
+    rbins = np.arange(0, len(ss) + 15, 15)
     for label, df, color in populations:
         x, y = sel(df)
         ax.vlines(x, y - 0.5, y + 0.5, color=color, lw=0.7, label=f"{label} ({len(x)})")
+        axtop.hist(x, bins=tbins, histtype="step", color=color, lw=1.3)
+        axright.hist(y, bins=rbins, histtype="step", color=color, lw=1.3, orientation="horizontal")
     ax.set_xlim(-0.55, XMAX)
     ax.set_ylim(len(ss), -1)
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("stop number (chronological →)")
-    ax.set_title(title)
-    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, frameon=False)
-    fig.tight_layout()
+    axtop.set_ylabel("onset count")
+    axtop.tick_params(labelbottom=False)
+    axright.set_xlabel("onset count")
+    axright.tick_params(labelleft=False)
+    h, lab = ax.get_legend_handles_labels()
+    axleg.legend(h, lab, loc="center", fontsize=8, frameon=False)
+    fig.suptitle(title, x=0.5, y=0.995, fontsize=11)
     out = P.parent / "paper" / "figures" / out_name
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print("saved", out)
