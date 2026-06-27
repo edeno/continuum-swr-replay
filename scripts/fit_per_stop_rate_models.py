@@ -2,11 +2,11 @@
 """Fit the per-stop replay-rate hierarchy (R0-R2 + Rlag) and persist it.
 
 The rate models are ordinary Poisson GLMs on per-stop event counts with a
-``log(immobility_time)`` offset (see ``rate_model.fit_rate_model``) — a
+``log(immobility_time)`` offset (see ``per_stop_rate_model.fit_per_stop_rate_model``) — a
 different model family from the conditional arm/patch hierarchies, so they
 live outside ``fit_replay_content_models.py``. This script fits R0-R2 + Rlag
 per session from the saved ``stop_table.pkl``, adds K-fold cross-validated
-per-stop log-likelihood (``cross_validate_rate_model``), and saves a tidy
+per-stop log-likelihood (``cross_validate_per_stop_rate_model``), and saves a tidy
 one-row-per-(outcome, model, session) table mirroring the arm/patch
 ``all_models.pkl``.
 
@@ -19,13 +19,13 @@ all read directly from the canonical ``stop_table`` columns:
 - ``non_local_swr``    -> ``n_non_local_SWR``    : non-local events overlapping a SWR.
 - ``non_local_no_swr`` -> ``n_non_local_no_SWR`` : non-local events without a SWR.
 
-Fitting each MODEL_RATE model on each outcome is an outcome *variant* of the specs,
+Fitting each MODEL_PER_STOP_RATE model on each outcome is an outcome *variant* of the specs,
 not a new model. Replicates the canonical SWR-rate-vs-reward result (reward /
 omission, recent reward history) on detected ripples, then asks whether the
 non-SWR non-local events share those rate effects.
 
 Usage:
-    uv run python scripts/fit_rate_models.py
+    uv run python scripts/fit_per_stop_rate_models.py
 """
 
 from __future__ import annotations
@@ -34,10 +34,13 @@ import logging
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.model_specs import MODEL_RATE, N_REWARD_LAGS
-from continuum_swr_replay.analysis.replay.rate_model import (
-    cross_validate_rate_model,
-    fit_rate_model,
+from continuum_swr_replay.analysis.replay.model_specs import (
+    MODEL_PER_STOP_RATE,
+    N_REWARD_LAGS,
+)
+from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
+    cross_validate_per_stop_rate_model,
+    fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -55,15 +58,15 @@ RESPONSE_COLS = {
 }
 
 
-def fit_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -> pd.DataFrame:
+def fit_per_stop_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -> pd.DataFrame:
     """One row per (outcome, model, session): R0-R2 + Rlag fit stats, coefs, CV-LL."""
     rows = []
     for keys, group in stop_table.groupby(SESSION_COLS, sort=False):
         for outcome, response_col in RESPONSE_COLS.items():
             if response_col not in group.columns:
                 continue
-            for name, spec in MODEL_RATE.items():
-                res = fit_rate_model(group, list(spec.predictors), response_col=response_col)
+            for name, spec in MODEL_PER_STOP_RATE.items():
+                res = fit_per_stop_rate_model(group, list(spec.predictors), response_col=response_col)
                 if res is None:
                     continue
                 row = {
@@ -73,7 +76,7 @@ def fit_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -> pd.Data
                     **res,
                 }
                 if run_cv:
-                    cv = cross_validate_rate_model(
+                    cv = cross_validate_per_stop_rate_model(
                         group, list(spec.predictors), response_col=response_col
                     )
                     if cv is not None:
@@ -98,13 +101,13 @@ def main() -> None:
         )
     logger.info(
         "Fitting rate hierarchy %s (+CV) x %s over %d sessions...",
-        list(MODEL_RATE),
+        list(MODEL_PER_STOP_RATE),
         list(RESPONSE_COLS),
         stop.groupby(SESSION_COLS).ngroups,
     )
-    rate = fit_rate_hierarchy(stop, run_cv=True)
+    rate = fit_per_stop_rate_hierarchy(stop, run_cv=True)
 
-    out_dir = RC / "models_rate"
+    out_dir = RC / "models_per_stop_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "all_models.pkl"
     rate.to_pickle(out)

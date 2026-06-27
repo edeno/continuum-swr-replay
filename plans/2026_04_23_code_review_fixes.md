@@ -922,7 +922,7 @@ Run: `uv run pytest tests/integration/ -v`
 
 ### Task 21: `tests/unit/test_rate_model.py`
 
-Seed-based tests verifying `fit_rate_model` recovers known rates with the `log(immobility_time)` offset, on simulated stop tables.
+Seed-based tests verifying `fit_per_stop_rate_model` recovers known rates with the `log(immobility_time)` offset, on simulated stop tables.
 
 ### Task 22: Extend `tests/unit/test_choice_prediction.py`
 

@@ -1,4 +1,4 @@
-"""Tests for analysis/replay/rate_model.py.
+"""Tests for analysis/replay/per_stop_rate_model.py.
 
 The Poisson rate model is the Stage 2 paper claim: do behavioral
 contexts change the NUMBER of replay events per stop, independently
@@ -14,9 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.rate_model import (
-    cross_validate_rate_model,
-    fit_rate_model,
+from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
+    cross_validate_per_stop_rate_model,
+    fit_per_stop_rate_model,
 )
 
 
@@ -74,7 +74,7 @@ class TestInterceptOnlyRecovery:
         df = _simulate_stops(
             n_stops=400, log_intercept=np.log(true_rate), seed=42
         )
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is not None
         recovered_rate = fit["rr_intercept"]
         z = (np.log(recovered_rate) - np.log(true_rate)) / fit["bse_intercept"]
@@ -85,7 +85,7 @@ class TestInterceptOnlyRecovery:
     def test_rr_equals_exp_coef(self):
         """``rr_*`` columns must literally be ``exp(coef_*)``."""
         df = _simulate_stops(n_stops=200, log_intercept=np.log(1.0), seed=0)
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit["rr_intercept"] == pytest.approx(
             np.exp(fit["coef_intercept"])
         )
@@ -93,7 +93,7 @@ class TestInterceptOnlyRecovery:
     def test_bic_uses_log_likelihood_formula(self):
         """BIC should be on the same LLF scale as AIC/model comparisons."""
         df = _simulate_stops(n_stops=100, log_intercept=np.log(1.0), seed=0)
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         expected = fit["n_params"] * np.log(fit["n_stops"]) - 2 * fit["llf"]
         assert fit["bic"] == pytest.approx(expected)
 
@@ -111,7 +111,7 @@ class TestPredictorCoefficientRecovery:
             coefs={"is_after_reward": np.log(2.0)},
             seed=11,
         )
-        fit = fit_rate_model(df, predictors=["is_after_reward"])
+        fit = fit_per_stop_rate_model(df, predictors=["is_after_reward"])
         assert fit is not None
         truth = np.log(2.0)
         z = (fit["coef_is_after_reward"] - truth) / fit["bse_is_after_reward"]
@@ -133,7 +133,7 @@ class TestPredictorCoefficientRecovery:
             coefs={"is_after_omission": 0.0},
             seed=23,
         )
-        fit = fit_rate_model(df, predictors=["is_after_omission"])
+        fit = fit_per_stop_rate_model(df, predictors=["is_after_omission"])
         assert fit is not None
         z = fit["coef_is_after_omission"] / fit["bse_is_after_omission"]
         assert abs(z) < 3, (
@@ -152,7 +152,7 @@ class TestPredictorCoefficientRecovery:
             },
             seed=7,
         )
-        fit = fit_rate_model(
+        fit = fit_per_stop_rate_model(
             df, predictors=["is_after_reward", "is_after_switch"]
         )
         assert fit is not None
@@ -188,8 +188,8 @@ class TestImmobilityTimeOffset:
             n_stops=400, log_intercept=np.log(true_rate),
             duration_range=(20.0, 20.0), seed=0,
         )
-        fit_a = fit_rate_model(df_a, predictors=[])
-        fit_b = fit_rate_model(df_b, predictors=[])
+        fit_a = fit_per_stop_rate_model(df_a, predictors=[])
+        fit_b = fit_per_stop_rate_model(df_b, predictors=[])
         # Both should recover ~true_rate within tolerance.
         for fit in (fit_a, fit_b):
             z = (np.log(fit["rr_intercept"]) - np.log(true_rate)) / fit["bse_intercept"]
@@ -200,7 +200,7 @@ class TestImmobilityTimeOffset:
         an offset and crash the GLM. They must be excluded silently."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         df.loc[:9, "immobility_time"] = 0.0  # 10 zero-duration stops
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is not None
         assert fit["n_stops"] == 90  # 100 - 10 zero-duration
 
@@ -208,7 +208,7 @@ class TestImmobilityTimeOffset:
         """Negative offsets are excluded by the same ``> 0`` filter."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         df.loc[:4, "immobility_time"] = -1.0
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit["n_stops"] == 95
 
 
@@ -218,12 +218,12 @@ class TestImmobilityTimeOffset:
 class TestEdgeCases:
     def test_returns_none_below_min_stops(self):
         df = _simulate_stops(n_stops=15, log_intercept=0.0, seed=0)
-        fit = fit_rate_model(df, predictors=[], min_stops=20)
+        fit = fit_per_stop_rate_model(df, predictors=[], min_stops=20)
         assert fit is None
 
     def test_missing_predictor_column_returns_none(self):
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
-        fit = fit_rate_model(df, predictors=["nonexistent_column"])
+        fit = fit_per_stop_rate_model(df, predictors=["nonexistent_column"])
         assert fit is None
 
     def test_constant_predictor_returns_none(self):
@@ -239,9 +239,9 @@ class TestEdgeCases:
         # Force the predictor to be constant within the stop subset
         # that survives the offset > 0 filter.
         df["is_after_reward"] = 1.0
-        fit = fit_rate_model(df, predictors=["is_after_reward"])
+        fit = fit_per_stop_rate_model(df, predictors=["is_after_reward"])
         assert fit is None, (
-            f"fit_rate_model returned {fit!r} on constant predictor; "
+            f"fit_per_stop_rate_model returned {fit!r} on constant predictor; "
             "should return None instead of crashing in zip(strict=True) "
             "after the GLM has already been fit."
         )
@@ -257,7 +257,7 @@ class TestEdgeCases:
             seed=0,
         )
         df["is_after_reward"] = 1.0
-        fit = fit_rate_model(
+        fit = fit_per_stop_rate_model(
             df, predictors=["is_after_reward", "is_after_omission"]
         )
         assert fit is None
@@ -272,9 +272,9 @@ class TestEdgeCases:
         rng = np.random.default_rng(1)
         df["x1"] = rng.integers(0, 2, len(df)).astype(float)
         df["x2"] = 1.0 - df["x1"].to_numpy()
-        fit = fit_rate_model(df, predictors=["x1", "x2"])
+        fit = fit_per_stop_rate_model(df, predictors=["x1", "x2"])
         assert fit is None, (
-            f"fit_rate_model returned {fit!r} on collinear "
+            f"fit_per_stop_rate_model returned {fit!r} on collinear "
             "predictors x1 + x2 = 1; the full-rank check should "
             "reject this before the GLM produces a non-unique "
             "solution."
@@ -287,7 +287,7 @@ class TestEdgeCases:
         rng = np.random.default_rng(2)
         df["a"] = rng.integers(0, 2, len(df)).astype(float)
         df["b"] = df["a"].to_numpy().copy()
-        fit = fit_rate_model(df, predictors=["a", "b"])
+        fit = fit_per_stop_rate_model(df, predictors=["a", "b"])
         assert fit is None
 
     def test_independent_predictors_still_fit(self):
@@ -299,7 +299,7 @@ class TestEdgeCases:
             coefs={"is_after_omission": 0.5, "is_after_reward": 0.3},
             seed=0,
         )
-        fit = fit_rate_model(
+        fit = fit_per_stop_rate_model(
             df, predictors=["is_after_omission", "is_after_reward"]
         )
         assert fit is not None
@@ -309,7 +309,7 @@ class TestEdgeCases:
     def test_missing_response_column_returns_none(self):
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         df = df.drop(columns=["n_events"])
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is None
 
     def test_nan_rows_dropped_before_fit(self):
@@ -320,13 +320,13 @@ class TestEdgeCases:
             coefs={"is_after_reward": 0.0}, seed=0,
         )
         df.loc[:9, "is_after_reward"] = np.nan
-        fit = fit_rate_model(df, predictors=["is_after_reward"])
+        fit = fit_per_stop_rate_model(df, predictors=["is_after_reward"])
         assert fit is not None
         assert fit["n_stops"] == 90
 
     def test_n_events_total_matches_input_after_filtering(self):
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=5)
-        fit = fit_rate_model(df, predictors=[])
+        fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit["n_events_total"] == int(df["n_events"].sum())
 
 
@@ -336,7 +336,7 @@ class TestEdgeCases:
 class TestCrossValidateRateModel:
     def test_returns_cv_keys(self):
         df = _simulate_stops(n_stops=300, log_intercept=0.0, seed=1)
-        cv = cross_validate_rate_model(df, predictors=[])
+        cv = cross_validate_per_stop_rate_model(df, predictors=[])
         assert cv is not None
         assert set(cv) >= {"cv_ll_per_stop_mean", "cv_ll_per_stop_std", "cv_n_folds"}
         assert cv["cv_n_folds"] == 5
@@ -347,15 +347,15 @@ class TestCrossValidateRateModel:
         df = _simulate_stops(
             n_stops=600, log_intercept=-1.0, coefs={"x": 1.5}, seed=2
         )
-        null = cross_validate_rate_model(df, predictors=[])
-        full = cross_validate_rate_model(df, predictors=["x"])
+        null = cross_validate_per_stop_rate_model(df, predictors=[])
+        full = cross_validate_per_stop_rate_model(df, predictors=["x"])
         assert null is not None and full is not None
         assert full["cv_ll_per_stop_mean"] > null["cv_ll_per_stop_mean"]
 
     def test_too_few_stops_returns_none(self):
         df = _simulate_stops(n_stops=8, log_intercept=0.0, seed=3)
-        assert cross_validate_rate_model(df, predictors=[]) is None
+        assert cross_validate_per_stop_rate_model(df, predictors=[]) is None
 
     def test_missing_column_returns_none(self):
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=4)
-        assert cross_validate_rate_model(df, predictors=["not_a_column"]) is None
+        assert cross_validate_per_stop_rate_model(df, predictors=["not_a_column"]) is None

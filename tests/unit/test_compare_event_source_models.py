@@ -50,7 +50,7 @@ def test_source_restricted_switch_models_drop_swr_interactions():
 
 
 def test_rate_models_drop_response_leaking_is_swr_stop():
-    # The is_swr_stop term (R3) is dropped from MODEL_RATE for every source:
+    # The is_swr_stop term (R3) is dropped from MODEL_PER_STOP_RATE for every source:
     # it is tautological with a per-stop event count that overlaps SWRs.
     compare = _load_compare_script()
 

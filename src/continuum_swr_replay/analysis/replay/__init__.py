@@ -35,10 +35,10 @@ from .model_specs import (
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
     MODEL_PATCH_SWR,
-    MODEL_RATE,
+    MODEL_PER_STOP_RATE,
     ModelSpec,
 )
-from .rate_model import fit_rate_model
+from .per_stop_rate_model import fit_per_stop_rate_model
 from .retrospective import (
     arm_path_well_to_well,
     chosen_arm_fraction,
@@ -76,7 +76,7 @@ __all__ = [
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWR",
     "MODEL_PATCH_SWITCH",
-    "MODEL_RATE",
+    "MODEL_PER_STOP_RATE",
     "ModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",
@@ -107,7 +107,7 @@ __all__ = [
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
     "fit_null_model_conditional",
-    "fit_rate_model",
+    "fit_per_stop_rate_model",
     "next_arm_circular_shift",
     "predict_arm_fractions",
     "retrospective_alignment_with_shuffle",

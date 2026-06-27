@@ -40,13 +40,13 @@ from continuum_swr_replay.analysis.replay import (
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
     MODEL_PATCH_SWR,
-    MODEL_RATE,
+    MODEL_PER_STOP_RATE,
     build_choice_dataset,
     build_event_patch_table,
     build_switch_aligned_table,
     fit_choice_model,
     fit_conditional_poisson,
-    fit_rate_model,
+    fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -54,7 +54,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefm
 logger = logging.getLogger("compare_event_source")
 # Silence the per-session rank-deficiency / convergence chatter.
 for noisy in (
-    "continuum_swr_replay.analysis.replay.rate_model",
+    "continuum_swr_replay.analysis.replay.per_stop_rate_model",
     "continuum_swr_replay.analysis.replay.fitting",
     "continuum_swr_replay.analysis.replay.choice_prediction",
 ):
@@ -99,11 +99,11 @@ def _patch_switch_models_for_source(event_source: str):
 def _rate_models_for_source(event_source: str):
     """Rate hierarchy for the event-source definition (R0-R2 for all sources).
 
-    The ``is_swr_stop`` term (formerly R3) was removed from ``MODEL_RATE``: it
+    The ``is_swr_stop`` term (formerly R3) was removed from ``MODEL_PER_STOP_RATE``: it
     is tautological with a per-stop event count that overlaps SWRs by
     construction, so it is dropped for every source, not just SWR.
     """
-    return MODEL_RATE
+    return MODEL_PER_STOP_RATE
 
 
 def _choice_models_for_source(event_source: str):  # noqa: ARG001
@@ -429,14 +429,14 @@ def fit_patch_switch(
     )
 
 
-def fit_rate_hierarchy(
+def fit_per_stop_rate_hierarchy(
     stop_table: pd.DataFrame, event_source: str
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Fit the source-appropriate Poisson rate hierarchy per session."""
     return _fit_per_session_common_cohort(
         stop_table,
         _rate_models_for_source(event_source),
-        lambda g, spec: fit_rate_model(g, list(spec.predictors), min_stops=20),
+        lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
         analysis="rate_hierarchy",
         unit_col="stop_id",
         required_base=["n_events", "immobility_time"],
@@ -524,7 +524,7 @@ def main() -> None:
     patch_switch, patch_switch_prov = fit_patch_switch(
         patch_table, tables["event_arm_table"], src
     )
-    rate_hierarchy, rate_hierarchy_prov = fit_rate_hierarchy(
+    rate_hierarchy, rate_hierarchy_prov = fit_per_stop_rate_hierarchy(
         tables["stop_table"], src
     )
     choice_blocks, choice_provenance = fit_choice_blocks(tables, src)

@@ -7,7 +7,7 @@ Single source of truth for the four model families, each a dict of
   hierarchy, conditional Poisson on per-arm timebin counts.
 - ``MODEL_PATCH`` (+ ``_SWR`` / ``_MUA`` / ``_SWITCH``) — patch-level
   conditional Poisson (9 arms collapsed to 3 patches).
-- ``MODEL_RATE`` — ordinary Poisson on per-stop event counts
+- ``MODEL_PER_STOP_RATE`` — ordinary Poisson on per-stop event counts
   (different estimator; see its section below).
 - ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
   choice (different estimator again).
@@ -17,7 +17,7 @@ patch** hierarchies. Their defining constraint: only arm-varying
 predictors are identifiable — event-level constants (time_since_stop,
 is_swr, etc.) cancel in the within-event normalization and appear
 only as interactions with arm-varying predictors. That rule does NOT
-apply to ``MODEL_RATE`` (ordinary Poisson, carries an intercept) or
+apply to ``MODEL_PER_STOP_RATE`` (ordinary Poisson, carries an intercept) or
 ``MODEL_CHOICE``; see their own sections.
 
 Design decisions informed by exploratory analysis on 7 j16 sessions:
@@ -92,7 +92,7 @@ __all__ = [
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWITCH",
     "MODEL_PATCH_SWR",
-    "MODEL_RATE",
+    "MODEL_PER_STOP_RATE",
     "ModelSpec",
 ]
 
@@ -405,7 +405,7 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 #
 # A DIFFERENT estimator from the arm/patch hierarchies: an ordinary
 # Poisson on the per-stop event count (``n_events``) with a
-# ``log(immobility_time)`` offset, fit by ``rate_model.fit_rate_model``.
+# ``log(immobility_time)`` offset, fit by ``per_stop_rate_model.fit_per_stop_rate_model``.
 # It carries an intercept, so — unlike the conditional Poisson —
 # stop-level constants do NOT cancel and ``is_after_*`` are valid
 # main effects.
@@ -434,7 +434,7 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # R-level term (+ ``trials_since_block_change``, ``block_number``) is
 # deferred until the contingency-block loader is wired.
 
-MODEL_RATE: dict[str, ModelSpec] = {
+MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
         name="R0",
         predictors=(),
@@ -475,7 +475,7 @@ MODEL_RATE: dict[str, ModelSpec] = {
 # phase. This is why the two disagree on ~15% of stops (inter-trial stops).
 N_REWARD_LAGS = 10
 
-MODEL_RATE["Rlag"] = ModelSpec(
+MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     name="Rlag",
     predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1))
     + ("is_after_switch",),

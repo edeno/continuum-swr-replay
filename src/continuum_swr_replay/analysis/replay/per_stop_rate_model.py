@@ -6,7 +6,7 @@ behavioral context, independently of replay CONTENT. The response is
 ``log(immobility_time)`` so that coefficients are interpretable as
 multiplicative changes in event rate per second of immobility.
 
-Model hierarchy (``MODEL_RATE`` in ``model_specs.py``):
+Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
 - **R1**: + ``is_after_omission``, ``is_after_switch`` — does the
@@ -40,7 +40,7 @@ import statsmodels.api as sm
 logger = logging.getLogger(__name__)
 
 
-def fit_rate_model(
+def fit_per_stop_rate_model(
     stop_table: pd.DataFrame,
     predictors: list[str],
     *,
@@ -157,7 +157,7 @@ def fit_rate_model(
     return output
 
 
-def cross_validate_rate_model(
+def cross_validate_per_stop_rate_model(
     stop_table: pd.DataFrame,
     predictors: list[str],
     response_col: str = "n_events",
@@ -168,7 +168,7 @@ def cross_validate_rate_model(
 ) -> dict | None:
     """K-fold held-out log-likelihood for the per-stop rate Poisson.
 
-    Stop-based K-fold CV mirroring :func:`fit_rate_model`'s design (intercept +
+    Stop-based K-fold CV mirroring :func:`fit_per_stop_rate_model`'s design (intercept +
     predictors, ``log(offset_col)`` offset). For each fold the model is fit on
     the training stops and the mean held-out per-stop Poisson log-likelihood is
     evaluated on the test stops; the returned ``cv_ll_per_stop_mean`` is the
@@ -177,7 +177,7 @@ def cross_validate_rate_model(
     only applies to the conditional (arm/patch) models.
 
     Returns None if columns are missing, too few stops, or any fold's training
-    design is rank-deficient (matching ``fit_rate_model``'s identifiability
+    design is rank-deficient (matching ``fit_per_stop_rate_model``'s identifiability
     guard).
     """
     from scipy.stats import poisson
