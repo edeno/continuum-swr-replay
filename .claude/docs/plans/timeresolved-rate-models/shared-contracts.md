@@ -56,17 +56,22 @@ def aggregate_to_timebins(
     tmax: float,
     reward_lags: int = 0,         # how many reward_lag{j} cols to carry from stop_table
     self_history_lags: int = 0,   # how many onset_lag{j} self-history cols to build
+    stop_covariates: tuple[str, ...] = (),  # extra per-stop cols carried from stop_table by stop_id
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
 
     Columns: animal, day, epoch, stop_id, binj, tc (=bin-center s, time-since-
     stop-onset), exposure (s of immobility in the bin), reward_lag1..reward_lags,
+    each name in ``stop_covariates`` (e.g. recent_trial_reward_rate, is_after_switch),
     count (population onsets in the bin), onset_lag1..self_history_lags
     (same-population onset counts j bins back, within stop, reset at boundary).
 
     Bins are built from ``stop_table.immobility_time`` (continuous), independent
     of the 4 ms dense grid, so non-4-ms widths (e.g. 15 ms) are exact.
-    ``exposure`` of the last bin is the partial remainder.
+    ``exposure`` of the last bin is the partial remainder. Asserts ``count.max()
+    <= 1`` at the chosen ``bin_s`` (events are pre-separated upstream; verified
+    lossless at 15 ms) so the point-process binarization is safe — or logs the
+    multi-event-bin fraction if a future re-binning breaks the assumption.
     """
 ```
 Semantics nailed down:
@@ -75,6 +80,7 @@ Semantics nailed down:
 - `count`: `onset_times` (already filtered to one population) binned by `floor(t_since_stop_onset / bin_s)`, joined on `(stop_id, binj)`, fill 0.
 - `onset_lag{j} = groupby('stop_id')['count'].shift(j).fillna(0)` after sorting by `(stop_id, binj)` — within-stop only.
 - `reward_lag{j}`: carried from `stop_table` by `stop_id`.
+- `stop_covariates`: each named column carried from `stop_table` by `stop_id`, same as the reward lags. Phase 3 passes `("recent_trial_reward_rate", "is_after_switch")` so `M2r_rewrate` and `M8_full_switch` have their predictors; both columns are present in `stop_table.pkl`. Without this, those two models' `formula()` would reference absent columns and `fit_timeresolved_model` would return `None` for every session — silently dropping them.
 
 ---
 
@@ -195,8 +201,11 @@ def cross_validate_timeresolved_model(
 ) -> dict | None:
     """10-fold over STOPS (not bins): hold out whole stops, fit on the rest,
     score held-out fit. Returns cv_ll_per_bin_mean/std, and cv_bits_per_event =
-    (LL_model - LL_M0_const) / (n_events * ln2) on held-out bins — the
-    interpretable point-process score ('bits/event better than constant rate').
+    SUM_heldout(ll_model - ll_M0_const) / (n_events * ln2) — the numerator is the
+    SUMMED (not mean) held-out per-bin log-likelihood difference over the same
+    held-out bins, with M0_const refit on each train fold; units = bits per event
+    ('bits/event better than constant rate'). (Mirroring Family A's per-stop *mean*
+    LL here would be wrong by a factor of n_bins.)
     Mirrors cross_validate_rate_model's stop-based folds (rate_model.py:160) so a
     stop's bins never split across folds. n_folds default is 10 (decision)."""
 ```
@@ -228,9 +237,19 @@ def timeresolved_gof(design: pd.DataFrame, fitted: dict, *,
     ...
 ```
 
+- **Units verified:** `TimeRescaling` integrates `conditional_intensity` with `cumulative_trapezoid`
+  at dx=1 (per sample), so the correct input is the per-bin **fitted mean count** (`results.predict()`),
+  NOT a rate in Hz (passing Hz gives KS≈0.95 on true-Poisson data; mean count gives KS≈0.02).
+- **Discretization precondition:** the trapezoid rescaling is only unbiased when per-bin mean count
+  ≪ 1. Real per-bin means here are ≈0.005 (SWR) / ≈0.009 (non-local), so this holds on average — but
+  in high-rate bins (immediately post-stop / bursty post-reward) local `mu` is larger, where the
+  trapezoid adds a KS bias. So the `M0_const` KS failure must be **cross-checked against `dispersion`
+  and the rescaled-ISI autocorrelation** (neither is discretization-sensitive); report mean AND **max**
+  per-bin predicted count alongside KS so a reader can rule out the artifact.
 - **`adjust_for_short_trials=True` is required** — our stops are short and variable-length;
-  this is the censoring correction that makes time-rescaling valid here (the right-censoring
-  worry from the raster marginals is handled by this, not by us).
+  this is the censoring correction that makes time-rescaling valid here. (It corrects stops *shorter*
+  than the window; it does NOT recover events beyond `TMAX` — the process is right-truncated at 4 s,
+  see overview.)
 - The **constant `M0_const` is expected to FAIL** the KS band (events are refractory+bursty,
   non-Poisson) — that failure is the diagnostic that motivates the self-history block;
   `M3_hist`/`M6_time_hist`/`Thist`-equivalents should walk the KS plot into the band.
