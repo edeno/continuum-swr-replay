@@ -101,6 +101,9 @@ from ._helpers import (
     immobility_bout_intervals as _immobility_bout_intervals,
 )
 from ._helpers import (
+    lagged_trial_rewards as _lagged_trial_rewards,
+)
+from ._helpers import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
@@ -121,6 +124,7 @@ from ._helpers import (
 from ._helpers import (
     visit_recency_all_events as _visit_recency_all_events,
 )
+from .model_specs import N_REWARD_LAGS
 from .spatial import arm_dist_rank, dist_to_arm_from_well
 from .spatial_mapping import arm_to_well, map_estimate_to_arm
 from .summaries import (
@@ -837,6 +841,12 @@ def build_stop_table(
     per_bout["recent_trial_reward_rate"] = _recent_trial_reward_rate(
         bout_starts, trials
     )
+    # Per-lag reward outcomes (reward_lag1..N): the immediate previous trial
+    # (lag1, dwell-confounded) through earlier trials (lag>=2, dwell-clean) —
+    # the kernel parameterization fit by the Rlag rate model.
+    lag_rewards = _lagged_trial_rewards(bout_starts, trials, N_REWARD_LAGS)
+    for j in range(N_REWARD_LAGS):
+        per_bout[f"reward_lag{j + 1}"] = lag_rewards[:, j]
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -1567,6 +1577,7 @@ def _stop_table_columns() -> list[str]:
         "current_patch",
         "prev_patch",
         "next_patch",
+        *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
     ]
 
 

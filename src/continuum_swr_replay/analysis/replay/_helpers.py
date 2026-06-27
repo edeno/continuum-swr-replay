@@ -754,6 +754,51 @@ def recent_trial_reward_rate(
     return rate
 
 
+def lagged_trial_rewards(
+    query_times: np.ndarray,
+    trials: pd.DataFrame,
+    k: int = 10,
+) -> np.ndarray:
+    """Reward outcome of each of the last ``k`` trials before each query time.
+
+    The per-lag companion to :func:`recent_trial_reward_rate` (which averages
+    the last ``k``): same trial-cutoff mapping, but returns the individual
+    outcomes so a rate model can estimate the reward *kernel* across trials —
+    ``reward_lag{j}`` = ``is_reward`` of the j-th most recent trial. ``lag1`` is
+    the immediate previous trial (the dwell-confounded one); ``lag>=2`` are
+    earlier trials and so do not set the current stop's duration (dwell-clean).
+
+    Parameters
+    ----------
+    query_times : np.ndarray, shape (n_query,)
+        Times (s) at which to evaluate — immobility-bout start times.
+    trials : pd.DataFrame
+        Must carry ``is_reward`` plus what :func:`_trial_cutoff_times` needs.
+    k : int
+        Number of lags.
+
+    Returns
+    -------
+    np.ndarray, shape (n_query, k)
+        Column ``j-1`` = reward (0/1) of the j-th most recent trial; ``NaN``
+        where fewer than ``j`` trials precede the query time.
+    """
+    query_times = np.asarray(query_times, dtype=float)
+    out = np.full((query_times.size, k), np.nan)
+    if len(trials) == 0:
+        return out
+    cutoff = _trial_cutoff_times(trials)
+    order = np.argsort(cutoff)
+    cutoff_sorted = cutoff[order]
+    is_reward = trials["is_reward"].to_numpy().astype(float)[order]
+    counts = np.searchsorted(cutoff_sorted, query_times, side="right")
+    for j in range(1, k + 1):
+        idx = counts - j
+        valid = idx >= 0
+        out[valid, j - 1] = is_reward[idx[valid]]
+    return out
+
+
 # ── Scalar per-event wrappers (preserve existing API) ──
 
 

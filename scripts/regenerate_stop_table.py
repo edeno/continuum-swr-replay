@@ -25,6 +25,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -67,15 +68,25 @@ def validate(stop: pd.DataFrame) -> None:
     assert (stop["is_swr_stop"] == (stop["n_SWR"] > 0)).all(), "is_swr_stop != n_SWR>0"
     assert (stop["is_mua_stop"] == (stop["n_MUA"] > 0)).all(), "is_mua_stop != n_MUA>0"
     assert (stop[["n_SWR", "n_MUA", "n_non_local_SWR"]] >= 0).all().all(), "negative count"
+    # Lagged reward columns present and binary; reward_lag1 (immediate previous
+    # trial) should agree with is_after_reward (independent trial-context path).
+    lag_cols = [c for c in stop.columns if c.startswith("reward_lag")]
+    assert lag_cols, "no reward_lag columns produced"
+    vals = stop[lag_cols].to_numpy()
+    assert np.isin(vals[~np.isnan(vals)], [0.0, 1.0]).all(), "reward_lag not 0/1/NaN"
+    both = stop["reward_lag1"].notna() & stop["is_after_reward"].notna()
+    agree = float((stop.loc[both, "reward_lag1"] == stop.loc[both, "is_after_reward"]).mean())
     logger.info(
         "validation OK | n_SWR>0 in %d/%d stops, total SWRs=%d, total non-local=%d "
-        "(SWR-overlap=%d, no-SWR=%d)",
+        "(SWR-overlap=%d, no-SWR=%d) | %d reward_lag cols, lag1 vs is_after_reward agree=%.3f",
         int((stop["n_SWR"] > 0).sum()),
         len(stop),
         int(stop["n_SWR"].sum()),
         int(stop["n_non_local"].sum()),
         int(stop["n_non_local_SWR"].sum()),
         int(stop["n_non_local_no_SWR"].sum()),
+        len(lag_cols),
+        agree,
     )
 
 

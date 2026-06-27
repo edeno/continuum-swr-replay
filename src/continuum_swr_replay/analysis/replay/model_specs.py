@@ -459,6 +459,26 @@ MODEL_RATE: dict[str, ModelSpec] = {
     ),
 }
 
+# ── Lagged reward-kernel rate model ──
+#
+# A non-nested reparameterization of R2: instead of one immediate-trial
+# indicator (``is_after_omission``) plus a smoothed window
+# (``recent_trial_reward_rate``) — which overlap (lag-1 sits inside the window)
+# and conflate two timescales — model the reward outcome at each of the last
+# ``N_REWARD_LAGS`` trials as its own predictor. Reading the per-lag rate-ratio
+# kernel separates the dwell-confounded immediate effect (``reward_lag1`` sets
+# the current stop's duration) from the dwell-clean reward *memory* at
+# ``reward_lag>=2`` (earlier trials don't set the current stop's duration).
+N_REWARD_LAGS = 10
+
+MODEL_RATE["Rlag"] = ModelSpec(
+    name="Rlag",
+    predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1))
+    + ("is_after_switch",),
+    description="Lagged reward kernel: per-trial reward at lags 1-10 + switch",
+    parent="R0",
+)
+
 
 # ── Choice-prediction models ──
 #
