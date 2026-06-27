@@ -34,14 +34,25 @@ from .model_checking import (
 )
 from .model_specs import (
     ARM_FE_PREDICTORS,
+    BIN_S,
     MODEL_CHOICE,
     MODEL_HIERARCHY,
     MODEL_PATCH,
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
     MODEL_PATCH_SWR,
+    MODEL_PER_BIN_RATE,
     MODEL_PER_STOP_RATE,
+    N_HISTORY_LAGS,
+    SPLINE_DF,
+    TMAX,
     ModelSpec,
+    PerBinRateModelSpec,
+)
+from .per_bin_rate_model import (
+    cross_validate_per_bin_rate_model,
+    fit_per_bin_rate_model,
+    per_bin_rate_gof,
 )
 from .per_stop_rate_model import fit_per_stop_rate_model
 from .retrospective import (
@@ -75,15 +86,21 @@ from .tables import (
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "BIN_S",
     "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_PATCH",
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWR",
     "MODEL_PATCH_SWITCH",
+    "MODEL_PER_BIN_RATE",
     "MODEL_PER_STOP_RATE",
+    "N_HISTORY_LAGS",
     "POPULATIONS",
+    "SPLINE_DF",
+    "TMAX",
     "ModelSpec",
+    "PerBinRateModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",
     "aggregate_to_timebins",
@@ -106,6 +123,7 @@ __all__ = [
     "compute_retrospective_metrics",
     "contains_path_to_next",
     "cross_validate_conditional_poisson",
+    "cross_validate_per_bin_rate_model",
     "dist_to_arm_from_well",
     "ends_at_next",
     "ends_at_next_patch",
@@ -115,8 +133,10 @@ __all__ = [
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
     "fit_null_model_conditional",
+    "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
     "next_arm_circular_shift",
+    "per_bin_rate_gof",
     "predict_arm_fractions",
     "retrospective_alignment_with_shuffle",
     "stop_label_shuffle",

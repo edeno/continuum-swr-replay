@@ -84,6 +84,7 @@ from dataclasses import dataclass
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "BIN_S",
     "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
@@ -92,8 +93,14 @@ __all__ = [
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWITCH",
     "MODEL_PATCH_SWR",
+    "MODEL_PER_BIN_RATE",
     "MODEL_PER_STOP_RATE",
     "ModelSpec",
+    "N_HISTORY_LAGS",
+    "N_REWARD_LAGS",
+    "PerBinRateModelSpec",
+    "SPLINE_DF",
+    "TMAX",
 ]
 
 
@@ -482,6 +489,133 @@ MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     description="Lagged reward kernel: per-trial reward at lags 1-10 + switch",
     parent="R0",
 )
+
+
+# ── Per-bin conditional-intensity ladder (Family B) ──
+#
+# A point-process GLM conditional-intensity ladder (Truccolo-Eden-Brown 2005):
+#
+#     log lambda = baseline + f(time-since-stop) + g(self-history)
+#                  + sum(beta * covariates)
+#
+# fit on the canonical (stop x bin) design from
+# :func:`_helpers.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
+# row per stop, ``log(immobility_time)`` dwell offset), every model here is one
+# row per (stop, ``BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
+# offset, so the within-stop time course is modelled explicitly by a spline
+# rather than averaged into a per-stop dwell correction.
+#
+# The four blocks (time-since-stop spline, self-history/autoregressive, reward
+# [lag-1 / kernel / continuous rate], switch) toggle independently so each
+# block's contribution is readable with and without the time course, plus the
+# reward x time interaction. ALL models share one bin width ``BIN_S`` so the
+# ladder is nested and AIC / CV / deviance / GOF are directly comparable (fine
+# bins are required anyway for the self-history term and time-rescaling GOF).
+BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
+TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
+SPLINE_DF = 4
+N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
+
+
+@dataclass(frozen=True)
+class PerBinRateModelSpec:
+    """One model in the per-bin conditional-intensity ladder.
+
+    Parallel to :class:`ModelSpec` (kept separate so the simpler arm/patch/
+    per-stop families are unaffected). The toggle fields drive both
+    :func:`_helpers.aggregate_to_timebins` (which columns to build) and
+    :meth:`formula` (the patsy formula), so the spec is the single source of
+    truth for each model.
+
+    Attributes
+    ----------
+    name : str
+        Short identifier (e.g. ``"M0_const"``).
+    time_spline : bool
+        Include ``bs(tc, df=SPLINE_DF)`` — the within-stop time course.
+    reward_lags : int
+        Number of ``reward_lag{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
+        trial outcomes; omission == ``1 - reward`` (same regressor).
+    reward_rate : bool
+        Include ``recent_trial_reward_rate`` (continuous; an alternative
+        encoding of reward history to the lag kernel).
+    self_history_lags : int
+        Number of ``onset_lag{j}`` terms (0 or ``N_HISTORY_LAGS``); the
+        within-stop autoregressive / refractoriness block.
+    switch : bool
+        Include ``is_after_switch``.
+    reward_time_interaction : bool
+        Include ``reward_lag1 : bs(tc, df=SPLINE_DF)`` — does reward modulate
+        the time course?
+    description : str
+        Human-readable description.
+    parent : str | None
+        Name of the parent model for nested comparison.
+    """
+
+    name: str
+    time_spline: bool
+    reward_lags: int
+    reward_rate: bool
+    self_history_lags: int
+    switch: bool
+    reward_time_interaction: bool
+    description: str
+    parent: str | None
+
+    def formula(self) -> str:
+        """patsy formula (response ``count``; the offset is applied at fit time)."""
+        terms: list[str] = []
+        if self.time_spline:
+            terms.append(f"bs(tc, df={SPLINE_DF})")
+        terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
+        if self.reward_rate:
+            terms.append("recent_trial_reward_rate")
+        terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
+        if self.switch:
+            terms.append("is_after_switch")
+        if self.reward_time_interaction:
+            terms.append(f"reward_lag1:bs(tc, df={SPLINE_DF})")
+        return "count ~ " + (" + ".join(terms) if terms else "1")
+
+
+# (time, rewL, rate, hist, switch, interact)
+_N = N_REWARD_LAGS
+MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
+    "M0_const": PerBinRateModelSpec(
+        "M0_const", False, 0, False, 0, False, False,
+        "homogeneous Poisson baseline", None),
+    "M1_rew1": PerBinRateModelSpec(
+        "M1_rew1", False, 1, False, 0, False, False,
+        "+ previous reward (reward_lag1)", "M0_const"),
+    "M2_rewhist": PerBinRateModelSpec(
+        "M2_rewhist", False, _N, False, 0, False, False,
+        "+ reward history kernel (reward_lag1..10)", "M1_rew1"),
+    "M2r_rewrate": PerBinRateModelSpec(
+        "M2r_rewrate", False, 0, True, 0, False, False,
+        "+ recent reward rate (continuous; alt to kernel)", "M0_const"),
+    "M3_hist": PerBinRateModelSpec(
+        "M3_hist", False, 0, False, N_HISTORY_LAGS, False, False,
+        "+ self-history (autoregressive)", "M0_const"),
+    "M4_hist_rew": PerBinRateModelSpec(
+        "M4_hist_rew", False, _N, False, N_HISTORY_LAGS, False, False,
+        "+ self-history + reward history", "M3_hist"),
+    "M5_time": PerBinRateModelSpec(
+        "M5_time", True, 0, False, 0, False, False,
+        "+ time-since-stop (spline)", "M0_const"),
+    "M6_time_hist": PerBinRateModelSpec(
+        "M6_time_hist", True, 0, False, N_HISTORY_LAGS, False, False,
+        "+ time + self-history", "M5_time"),
+    "M7_time_hist_rew": PerBinRateModelSpec(
+        "M7_time_hist_rew", True, _N, False, N_HISTORY_LAGS, False, False,
+        "+ time + self-history + reward history", "M6_time_hist"),
+    "M8_full_switch": PerBinRateModelSpec(
+        "M8_full_switch", True, _N, False, N_HISTORY_LAGS, True, False,
+        "+ switch (full additive)", "M7_time_hist_rew"),
+    "M9_rew_x_time": PerBinRateModelSpec(
+        "M9_rew_x_time", True, _N, False, N_HISTORY_LAGS, False, True,
+        "M7 + reward x time interaction", "M7_time_hist_rew"),
+}
 
 
 # ── Choice-prediction models ──
