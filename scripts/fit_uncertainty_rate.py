@@ -1,0 +1,250 @@
+#!/usr/bin/env python
+"""Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
+
+Tests whether non-local replay *rate* is differentially modulated by the
+animal's behavioral uncertainty and the task's nominal value structure across
+SWR-coupled vs non-SWR non-local events, controlling for the within-stop time
+course, raised-cosine self-history, the reward kernel, and the recent reward
+rate. Rate-only -- replay direction is out of scope.
+
+Per session: load ``stop_table``; add the model-free uncertainty covariates
+(:func:`add_uncertainty_covariates`); left-merge the
+``contingency_table.pkl`` nominal value columns on ``stop_id``; drop the first
+(exposure) session per animal; attach the canonical ``is_swr`` to the onsets.
+Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
+design (carrying the uncertainty + value covariates as ``stop_covariates``) and
+fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
+``MODEL_PER_BIN_RATE`` / ``all_models.pkl``). The spec is M7r (time spline +
+raised-cosine self-history + reward kernel + reward rate) plus the
+uncertainty/value block, so the block is tested *beyond* those confounds.
+
+Collect one tidy row per (session, population) with every covariate's
+``coef_`` / ``bse_`` / ``pval_`` / ``rr_`` ->
+``Processed-Data/replay_content/models_per_bin_rate/uncertainty_rate.pkl``.
+
+Usage::
+
+    uv run python scripts/fit_uncertainty_rate.py                    # full
+    uv run python scripts/fit_uncertainty_rate.py --max-per-animal 1 # smoke
+"""
+
+from __future__ import annotations
+
+import os
+
+# Pin BLAS to one thread BEFORE numpy import (matches the Family B orchestrator).
+for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
+
+import argparse  # noqa: E402
+import logging  # noqa: E402
+import time  # noqa: E402
+import warnings  # noqa: E402
+
+import pandas as pd  # noqa: E402
+
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    BIN_S,
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    N_REWARD_LAGS,
+    STOP_COVARIATES,
+    TMAX,
+    UNCERTAINTY_COVARIATES,
+    PerBinRateModelSpec,
+    add_uncertainty_covariates,
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+    fit_per_bin_rate_model,
+)
+from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+
+warnings.filterwarnings("ignore")  # separated history coefs legitimately overflow exp()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+logger = logging.getLogger(__name__)
+
+SESSION_COLS = ["animal", "day", "epoch"]
+RC = PROCESSED_DATA_DIR / "replay_content"
+
+# The nominal-value block from the contingency table (schema-bound; produced by
+# scripts/_statescript_contingency.py).
+VALUE_COVARIATES = (
+    "p_reward_current",
+    "rpe",
+    "value_diff_patch",
+    "trials_since_block_change",
+)
+
+# The three non-local-vs-SWR populations to dissociate (pooled non_local is the
+# null and is not fit here).
+POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
+
+# M7r + the uncertainty/value block, instantiated in the runner so the shipped
+# MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
+MU_UNCERTAINTY = PerBinRateModelSpec(
+    "MU_uncertainty",
+    True,  # time spline
+    N_REWARD_LAGS,  # reward kernel
+    True,  # recent reward rate
+    N_HISTORY_LAGS,
+    False,  # no switch term (recent_switch_rate carries the switch signal)
+    False,  # no reward x time interaction
+    "uncertainty/value beyond time/reward/history/reward-rate",
+    "M7r_time_histcos_rew",
+    self_history_basis=N_HISTORY_BASIS,
+    extra_covariates=(*UNCERTAINTY_COVARIATES, *VALUE_COVARIATES),
+)
+
+
+def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:
+    """Drop each animal's first (exposure) session by (day, epoch) order."""
+    first = (
+        stop_table[SESSION_COLS]
+        .drop_duplicates()
+        .sort_values(SESSION_COLS)
+        .groupby("animal", sort=False)
+        .head(1)
+    )
+    merged = stop_table.merge(first, on=SESSION_COLS, how="left", indicator=True)
+    return stop_table[merged["_merge"].to_numpy() == "left_only"]
+
+
+def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
+    keep = (
+        stop_table[SESSION_COLS]
+        .drop_duplicates()
+        .sort_values(SESSION_COLS)
+        .groupby("animal", sort=False)
+        .head(n)
+    )
+    return stop_table.merge(keep, on=SESSION_COLS)
+
+
+def fit_uncertainty_rate(
+    stop_table: pd.DataFrame,
+    onsets: pd.DataFrame,
+) -> pd.DataFrame:
+    """One row per (session, population): MU_uncertainty fit coefficients.
+
+    ``stop_table`` must already carry the uncertainty + value covariates and the
+    reward lags; ``onsets`` must already carry ``is_swr``.
+    """
+    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+    stop_covariates = (*STOP_COVARIATES, *UNCERTAINTY_COVARIATES, *VALUE_COVARIATES)
+
+    rows: list[dict] = []
+    for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
+        if keys not in onset_groups:
+            continue
+        onsets_g = onset_groups[keys]
+        for outcome in POPULATIONS_TO_FIT:
+            design = aggregate_to_timebins(
+                stops_g,
+                POPULATIONS[outcome](onsets_g),
+                bin_s=BIN_S,
+                tmax=TMAX,
+                reward_lags=N_REWARD_LAGS,
+                self_history_lags=N_HISTORY_LAGS,
+                self_history_basis=N_HISTORY_BASIS,
+                stop_covariates=stop_covariates,
+            )
+            fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
+            if fit is None:
+                logger.info("  %s / %s: unfit", "_".join(map(str, keys)), outcome)
+                continue
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "model": MU_UNCERTAINTY.name,
+                    **dict(zip(SESSION_COLS, keys, strict=True)),
+                    **{k: v for k, v in fit.items() if k != "predicted"},
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--max-per-animal",
+        type=int,
+        default=None,
+        help="Smoke mode: keep only the first N (post-exposure) sessions per animal.",
+    )
+    parser.add_argument(
+        "--switch-window", type=int, default=5, help="recent_switch_rate window."
+    )
+    parser.add_argument(
+        "--q-alpha", type=float, default=0.3, help="leaky_q_value_diff learning rate."
+    )
+    args = parser.parse_args()
+
+    t0 = time.perf_counter()
+    stop = pd.read_pickle(RC / "stop_table.pkl")
+    contingency = pd.read_pickle(RC / "contingency_table.pkl")
+    onsets = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
+
+    stop = add_uncertainty_covariates(
+        stop, switch_window=args.switch_window, q_alpha=args.q_alpha
+    )
+    value_cols = [
+        "stop_id",
+        *VALUE_COVARIATES,
+        "p_reward_best",
+        "is_best_patch",
+        "block_number",
+    ]
+    # Inner join: keep only stops with a parsed contingency row. Sessions the
+    # parser did not cover are dropped here explicitly, rather than feeding
+    # all-NaN value rows through aggregate + fit only to be listwise-dropped.
+    stop = stop.merge(
+        contingency[value_cols], on="stop_id", how="inner", validate="many_to_one"
+    )
+    stop = _drop_first_session_per_animal(stop)
+    if args.max_per_animal is not None:
+        stop = _subset_max_per_animal(stop, args.max_per_animal)
+
+    n_sessions = stop.groupby(SESSION_COLS).ngroups
+    logger.info(
+        "Fitting %s over %d sessions x %s populations (BIN_S=%.3f, "
+        "switch_window=%d, q_alpha=%.2f)...",
+        MU_UNCERTAINTY.name,
+        n_sessions,
+        list(POPULATIONS_TO_FIT),
+        BIN_S,
+        args.switch_window,
+        args.q_alpha,
+    )
+    models = fit_uncertainty_rate(stop, onsets)
+
+    out_dir = RC / "models_per_bin_rate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fname = (
+        "uncertainty_rate_smoke.pkl" if args.max_per_animal else "uncertainty_rate.pkl"
+    )
+    out = out_dir / fname
+    models.to_pickle(out)
+    logger.info(
+        "Saved %d rows (%d sessions, populations=%s) to %s in %.1fs",
+        len(models),
+        models.groupby(SESSION_COLS).ngroups if len(models) else 0,
+        sorted(models["outcome"].unique()) if len(models) else [],
+        out,
+        time.perf_counter() - t0,
+    )
+    if len(models):
+        for cov in (*UNCERTAINTY_COVARIATES, *VALUE_COVARIATES):
+            col = f"rr_{cov}"
+            if col not in models:
+                continue
+            summary = models.groupby("outcome")[col].median().to_dict()
+            logger.info("median RR  %-26s %s", cov, summary)
+
+
+if __name__ == "__main__":
+    main()
