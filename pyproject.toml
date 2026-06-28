@@ -21,6 +21,7 @@ dependencies = [
     # Statistical analysis
     "statsmodels>=0.14.0",
     "patsy>=0.5.3",
+    "scikit-learn>=1.3.0",  # KFold for rate-model cross-validation
     "joblib>=1.3.0",
     "networkx>=3.0",
 

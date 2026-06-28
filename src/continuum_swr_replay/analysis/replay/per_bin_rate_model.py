@@ -204,6 +204,9 @@ def cross_validate_per_bin_rate_model(
             return None
         off_tr = np.log(tr["exposure"].to_numpy(dtype=float))
         off_te = np.log(te["exposure"].to_numpy(dtype=float))
+        # predict is inside the try: a spline model whose held-out fold has tc
+        # outside the train fold's knots raises a patsy error -> CV None, not a
+        # crash (mirrors the fit guard).
         try:
             res = smf.glm(
                 formula, data=tr, family=sm.families.Poisson(), offset=off_tr
@@ -211,10 +214,10 @@ def cross_validate_per_bin_rate_model(
             res0 = smf.glm(
                 "count ~ 1", data=tr, family=sm.families.Poisson(), offset=off_tr
             ).fit()
+            mu = np.asarray(res.predict(te, offset=off_te), dtype=float)
+            mu0 = np.asarray(res0.predict(te, offset=off_te), dtype=float)
         except Exception:
             return None
-        mu = np.asarray(res.predict(te, offset=off_te), dtype=float)
-        mu0 = np.asarray(res0.predict(te, offset=off_te), dtype=float)
         y = te["count"].to_numpy(dtype=float)
         ll = poisson.logpmf(y, mu)
         ll0 = poisson.logpmf(y, mu0)
