@@ -97,18 +97,55 @@ gating, in **both** estimators:
 The agreement across two estimators with different confound structure is the
 robustness argument for `#19c` in [`../paper/claims_table.md`](../paper/claims_table.md).
 
-## Point-process model-checking (Family B)
+## Point-process model checking (Family B)
 
 Family B treats the event train as a point process and checks it as one via the
-time-rescaling theorem (`per_bin_rate_gof`, reusing
-`non_local_detector.model_checking.sorted_spikes` — KS, rescaled-ISI
-autocorrelation, point-process residuals). Adding the time + self-history blocks
-walks the KS statistic into the band (`ks_within_band` fraction ≈ 0.50 for
-`M0_const` → ≈ 0.91 for `M7`); the `M0_const` failure is the expected non-Poisson
-signature that motivates the history block. Per-bin mean count is ≈0.005–0.015,
-so the trapezoid rescaling is well-behaved on average; `mean_predicted` /
-`max_predicted` are reported so the high-rate-bin KS bias can be ruled out, and
-the KS read is cross-checked against the rescaled-ISI autocorrelation.
+**time-rescaling theorem** (Brown et al. 2002): if the fitted conditional
+intensity is correct, rescaling the inter-event intervals by the integrated
+intensity yields a unit-rate Poisson process, so the rescaled ISIs should be
+uniform (KS / Q-Q on the diagonal) and independent (flat rescaled-ISI
+autocorrelation). `per_bin_rate_gof` computes these by reusing
+`non_local_detector.model_checking.sorted_spikes` (`TimeRescaling`,
+`point_process_residuals`, `plot_ks`, `plot_qq`,
+`plot_rescaled_ISI_autocorrelation`) with `adjust_for_short_trials=True` (the
+Wiener 2003 censoring correction for short/variable-length stops) — the
+rescaling math is not re-implemented here. The per-fit scalars
+(`ks_statistic`, `ks_within_band`, `max_isi_autocorr`, `dispersion`,
+`mean_predicted`, `max_predicted`) are persisted for every fit in
+`all_models.pkl`; `scripts/plot_model_checking.py` reads them for the
+up-the-ladder story (`model_checking_ladder.png`) and re-fits a couple of
+example sessions inline for the KS / Q-Q / ISI-autocorrelation / cumulative-
+residual quartet (`model_checking_example_{rich,sparse}.png`).
+
+What the ladder actually shows (218 sessions):
+
+- **The within-stop time course is what calibrates the process.** `M0_const`
+  fails the KS band on ~half of sessions (`ks_within_band ≈ 0.50`, non-Poisson:
+  refractory + bursty), and the reward / self-history blocks *without* time
+  (`M1`–`M4`) do **not** fix it (`≈ 0.37–0.55`). Adding the `bs(tc)` spline
+  (`M5_time`) jumps `ks_within_band` to ≈ 0.83 and the full model `M7` to ≈ 0.91.
+  The dominant misfit of the constant model is the strong post-stop rate
+  transient, not the fine-timescale clustering.
+- **Dispersion stays well below 0.1 (underdispersed), not → 1.** At these sparse 15 ms
+  bins the Poisson deviance is not a calibrated dispersion estimate, so the
+  textbook "history block drives dispersion → 1" does not apply; read KS and the
+  rescaled-ISI autocorrelation (neither discretization-sensitive) instead. Mean
+  per-bin count is ≈ 0.005–0.015, so the trapezoid rescaling is well-behaved on
+  average; `mean_predicted` / `max_predicted` are reported so the high-rate-bin
+  KS bias can be ruled out.
+- **Held-out CV separates a generalizing block from an overfitting one.**
+  `cv_bits_per_event` is positive only for the time block (`M5_time ≈ +0.23`);
+  the self-history block **overfits** (`M3_hist ≈ −0.25`, and `M7`/`M8`/`M9`
+  increasingly negative) — it improves in-sample KS but the refractory near-
+  separation produces extreme per-session coefficients that do not generalize.
+  This is the empirical case for an L2-penalized (or Firth) self-history fit
+  (future work).
+- **Residual drift motivates the state-space layer.** The cumulative point-
+  process residual within a session is not flat — it makes slow excursions over
+  the session (e.g. a rich `chimi` session swings by tens of events before
+  returning toward zero). That is structure none of the within-stop covariates
+  captures; it is the empirical motivation for a **state-space / SS-GLM** model
+  with a slowly drifting baseline (a separate spec, not built here).
 
 ## Caveats and what each family can/can't tell you
 

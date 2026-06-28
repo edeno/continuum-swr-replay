@@ -56,6 +56,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
     POPULATIONS,
+    STOP_COVARIATES,
     TMAX,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
@@ -74,7 +75,6 @@ logger = logging.getLogger(__name__)
 
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
-STOP_COVARIATES = ("recent_trial_reward_rate", "is_after_switch")
 
 
 def _fit_one_session(
