@@ -7,7 +7,9 @@ the replay content analysis pipeline.
 
 from ._helpers import (
     POPULATIONS,
+    UNCERTAINTY_COVARIATES,
     add_arm_fixed_effects,
+    add_uncertainty_covariates,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     raised_cosine_history_basis,
@@ -106,10 +108,12 @@ __all__ = [
     "SPLINE_DF",
     "STOP_COVARIATES",
     "TMAX",
+    "UNCERTAINTY_COVARIATES",
     "ModelSpec",
     "PerBinRateModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",
+    "add_uncertainty_covariates",
     "aggregate_to_timebins",
     "arm_dist_rank",
     "arm_path_well_to_well",

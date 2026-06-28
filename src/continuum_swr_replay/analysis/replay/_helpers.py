@@ -799,9 +799,195 @@ def lagged_trial_rewards(
     return out
 
 
-# ── Per-bin event-rate aggregation ──
+# ── Model-free behavioral-uncertainty covariates ──
 
 _SESSION_COLS = ["animal", "day", "epoch"]
+
+UNCERTAINTY_COVARIATES = (
+    "omission_streak",
+    "recent_switch_rate",
+    "wsls_deviation",
+    "leaky_q_value_diff",
+)
+
+
+def _leaky_q_value_diff(
+    current_arm: np.ndarray,
+    reward_outcome: np.ndarray,
+    q_alpha: float,
+) -> np.ndarray:
+    """Per-stop experienced-value choice margin from a leaky per-arm Q.
+
+    For each arm ``a`` a leaky reward-rate is updated in stop order
+    ``Q_a <- (1 - q_alpha) Q_a + q_alpha * reward_outcome`` (init 0.5 for all
+    arms). The covariate at a stop is the gap between the best and second-best
+    arm value ``sort(Q)[-1] - sort(Q)[-2]`` evaluated **before** that stop's
+    update (so it is the experienced choice margin the animal faced going in).
+
+    Parameters
+    ----------
+    current_arm : np.ndarray, shape (n_stops,)
+        Arm 0..5 visited at each stop (in stop order). A ``NaN`` arm still
+        yields the current pre-update Q-spread margin (a real value -- the
+        choice margin does not depend on which arm is visited) but does not
+        update any arm's ``Q`` (the unknown arm cannot be credited).
+    reward_outcome : np.ndarray, shape (n_stops,)
+        Binary reward (0/1) at each stop.
+    q_alpha : float
+        Leaky-integration learning rate.
+
+    Returns
+    -------
+    np.ndarray, shape (n_stops,)
+        Pre-update best-minus-second-best arm value at each stop.
+    """
+    q = np.full(6, 0.5)
+    out = np.full(current_arm.size, np.nan)
+    for i in range(current_arm.size):
+        ordered = np.sort(q)
+        out[i] = ordered[-1] - ordered[-2]
+        arm = current_arm[i]
+        if not np.isnan(arm):
+            a = int(arm)
+            q[a] = (1.0 - q_alpha) * q[a] + q_alpha * reward_outcome[i]
+    return out
+
+
+def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
+    """Count leading consecutive omissions in ``reward_lag1, reward_lag2, ...``.
+
+    Parameters
+    ----------
+    reward_lag_matrix : np.ndarray, shape (n_stops, n_lags)
+        Column ``j`` is ``reward_lag{j+1}`` (1 = reward, 0 = omission, NaN =
+        no such prior trial).
+
+    Returns
+    -------
+    np.ndarray, shape (n_stops,)
+        Number of leading 0s before the first 1; a ``NaN`` lag terminates the
+        streak (counts the omissions seen before it).
+    """
+    n_stops = reward_lag_matrix.shape[0]
+    out = np.zeros(n_stops)
+    for i in range(n_stops):
+        streak = 0
+        for val in reward_lag_matrix[i]:
+            if np.isnan(val) or val == 1.0:
+                break
+            streak += 1
+        out[i] = streak
+    return out
+
+
+def add_uncertainty_covariates(
+    stop_table: pd.DataFrame,
+    *,
+    switch_window: int = 5,
+    q_alpha: float = 0.3,
+) -> pd.DataFrame:
+    """Add four model-free behavioral-uncertainty covariates per stop.
+
+    Computed from existing ``stop_table`` columns only (no new data), grouped by
+    session ``(animal, day, epoch)`` and ordered by ``stop_idx`` within each
+    session. These are the experienced/subjective complement to the nominal
+    contingency values; both enter the rate model so nominal and experienced
+    value are dissociable. The input is not mutated; the returned frame keeps
+    the input's index and row count.
+
+    The four covariates:
+
+    - ``omission_streak``: leading consecutive omissions = count of leading 0s
+      in ``reward_lag1, reward_lag2, ...`` (stop at the first 1; a ``NaN`` lag
+      terminates the streak).
+    - ``recent_switch_rate``: ``(1 - is_stay).shift(1).rolling(switch_window,
+      min_periods=1).mean()`` within session (prior stops only -> no leakage of
+      the current stop's choice).
+    - ``wsls_deviation``: 1.0 (deviated from win-stay/lose-shift) unless the stop
+      is ``(is_after_reward & is_stay)`` or ``(is_after_omission & ~is_stay)``,
+      in which case 0.0. ``NaN`` when neither ``is_after_reward`` nor
+      ``is_after_omission`` is set (no defined prior outcome, e.g. the first
+      stop of a session) -- such rows are dropped at fit time rather than
+      counted as a deviation.
+    - ``leaky_q_value_diff``: best-minus-second-best per-arm leaky reward-rate
+      (init 0.5, rate ``q_alpha``) evaluated **before** the stop's update -- the
+      experienced-value choice margin.
+
+    ``q_alpha`` and ``switch_window`` are free parameters (a fitted RL model
+    would learn them); defaults ``0.3`` / ``5``. Report sensitivity.
+
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        Per-stop table. Must carry ``animal``, ``day``, ``epoch``, ``stop_idx``,
+        ``is_stay``, ``is_after_reward``, ``is_after_omission``,
+        ``reward_outcome``, ``current_arm``, and ``reward_lag1..`` columns.
+    switch_window : int
+        Rolling window (in stops) for ``recent_switch_rate``.
+    q_alpha : float
+        Leaky-integration learning rate for ``leaky_q_value_diff``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``stop_table`` with the four covariate columns added.
+    """
+    out = stop_table.copy()
+    lag_cols = sorted(
+        (c for c in out.columns if c.startswith("reward_lag")),
+        key=lambda c: int(c.removeprefix("reward_lag")),
+    )
+
+    omission = pd.Series(np.nan, index=out.index, dtype=float)
+    switch_rate = pd.Series(np.nan, index=out.index, dtype=float)
+    wsls = pd.Series(np.nan, index=out.index, dtype=float)
+    leaky = pd.Series(np.nan, index=out.index, dtype=float)
+
+    for _, idx in out.groupby(_SESSION_COLS, sort=False).groups.items():
+        g = out.loc[idx].sort_values("stop_idx")
+        pos = g.index
+
+        if lag_cols:
+            omission.loc[pos] = _omission_streak(g[lag_cols].to_numpy(dtype=float))
+        else:
+            omission.loc[pos] = 0.0
+
+        is_switch = 1.0 - g["is_stay"].to_numpy(dtype=float)
+        switch_rate.loc[pos] = (
+            pd.Series(is_switch, index=pos)
+            .shift(1)
+            .rolling(switch_window, min_periods=1)
+            .mean()
+            .to_numpy()
+        )
+
+        after_reward = g["is_after_reward"].to_numpy(dtype=float)
+        after_omission = g["is_after_omission"].to_numpy(dtype=float)
+        stay = g["is_stay"].to_numpy(dtype=float)
+        win_stay = (after_reward == 1.0) & (stay == 1.0)
+        lose_shift = (after_omission == 1.0) & (stay == 0.0)
+        wsls_vals = np.where(win_stay | lose_shift, 0.0, 1.0)
+        # No defined prior outcome (neither after-reward nor after-omission set,
+        # e.g. the first stop of a session) -> NaN, so the row drops at fit time
+        # instead of being counted as a deviation.
+        no_prior = (after_reward != 1.0) & (after_omission != 1.0)
+        wsls_vals[no_prior] = np.nan
+        wsls.loc[pos] = wsls_vals
+
+        leaky.loc[pos] = _leaky_q_value_diff(
+            g["current_arm"].to_numpy(dtype=float),
+            g["reward_outcome"].to_numpy(dtype=float),
+            q_alpha,
+        )
+
+    out["omission_streak"] = omission
+    out["recent_switch_rate"] = switch_rate
+    out["wsls_deviation"] = wsls
+    out["leaky_q_value_diff"] = leaky
+    return out
+
+
+# ── Per-bin event-rate aggregation ──
 
 
 def attach_is_swr_to_onsets(

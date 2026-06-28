@@ -52,6 +52,7 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
         cols += [f"onset_lag{j}" for j in range(1, spec.self_history_lags + 1)]
     if spec.switch:
         cols.append("is_after_switch")
+    cols += list(spec.extra_covariates)
     return list(dict.fromkeys(cols))  # de-duplicate, preserve order
 
 

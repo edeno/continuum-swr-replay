@@ -576,6 +576,13 @@ class PerBinRateModelSpec:
     # refractory bins, so it generalizes where the dummies overfit. Default 0
     # keeps the dummy encoding (and the per-lag kernel-shape readout).
     self_history_basis: int = 0
+    # Extra per-stop covariates appended to the formula as plain linear terms
+    # (e.g. the uncertainty/value block instantiated in the runner). Default
+    # ``()`` so the shipped ``MODEL_PER_BIN_RATE`` ladder is byte-identical and
+    # the persisted ``all_models.pkl`` schema is unchanged. These names must be
+    # carried into the per-bin design via ``aggregate_to_timebins``'
+    # ``stop_covariates``.
+    extra_covariates: tuple[str, ...] = ()
 
     def formula(self) -> str:
         """patsy formula (response ``count``; the offset is applied at fit time)."""
@@ -593,6 +600,7 @@ class PerBinRateModelSpec:
             terms.append("is_after_switch")
         if self.reward_time_interaction:
             terms.append(f"reward_lag1:bs(tc, df={SPLINE_DF})")
+        terms += list(self.extra_covariates)
         return "count ~ " + (" + ".join(terms) if terms else "1")
 
 

@@ -86,6 +86,52 @@ def test_formula_strings():
     assert "onset_lag1" in m["M7_time_hist_rew"].formula()
 
 
+def test_extra_covariates_formula():
+    # extra_covariates append as plain linear terms to formula() and
+    # _design_columns; default () leaves the shipped ladder unchanged.
+    from continuum_swr_replay.analysis.replay.per_bin_rate_model import (
+        _design_columns,
+    )
+
+    base = MODEL_PER_BIN_RATE["M7r_time_histcos_rew"]
+    spec = PerBinRateModelSpec(
+        base.name,
+        base.time_spline,
+        base.reward_lags,
+        base.reward_rate,
+        base.self_history_lags,
+        base.switch,
+        base.reward_time_interaction,
+        base.description,
+        base.parent,
+        self_history_basis=base.self_history_basis,
+        extra_covariates=("a", "b"),
+    )
+    f = spec.formula()
+    assert f.endswith("+ a + b")
+    cols = _design_columns(spec)
+    assert "a" in cols and "b" in cols
+
+    # Default () => shipped specs are byte-identical (no trailing terms added).
+    for shipped in MODEL_PER_BIN_RATE.values():
+        assert shipped.extra_covariates == ()
+        assert not shipped.formula().rstrip().endswith("+ ")
+    # The empty-extra spec matches the shipped formula exactly.
+    same = PerBinRateModelSpec(
+        base.name,
+        base.time_spline,
+        base.reward_lags,
+        base.reward_rate,
+        base.self_history_lags,
+        base.switch,
+        base.reward_time_interaction,
+        base.description,
+        base.parent,
+        self_history_basis=base.self_history_basis,
+    )
+    assert same.formula() == base.formula()
+
+
 def test_recovers_known_reward_effect():
     design = make_per_bin_rate_design(reward_effect=2.0, base_rate=0.08, seed=1)
     fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE["M1_rew1"])
