@@ -60,8 +60,11 @@ def make_per_bin_rate_design(
 
 def test_formula_strings():
     m = MODEL_PER_BIN_RATE
+    # Fixed-knot spline: deterministic basis (reconstructable / cross-session
+    # comparable), so the term carries explicit knots + bounds, not df.
+    spline = "bs(tc, knots=(1.0, 2.0, 3.0), lower_bound=0.0, upper_bound=4.0)"
     assert m["M0_const"].formula() == "count ~ 1"
-    assert m["M5_time"].formula() == "count ~ bs(tc, df=4)"
+    assert m["M5_time"].formula() == f"count ~ {spline}"
 
     rewhist = m["M2_rewhist"].formula()
     assert "bs(tc" not in rewhist
@@ -69,19 +72,19 @@ def test_formula_strings():
         assert f"reward_lag{j}" in rewhist
 
     full = m["M7_time_hist_rew"].formula()
-    assert "bs(tc, df=4)" in full
+    assert spline in full
     for j in range(1, 11):
         assert f"reward_lag{j}" in full
         assert f"onset_lag{j}" in full
 
-    assert "reward_lag1:bs(tc, df=4)" in m["M9_rew_x_time"].formula()
+    assert f"reward_lag1:{spline}" in m["M9_rew_x_time"].formula()
 
     # Raised-cosine self-history variants use hist_rcos_*, not onset_lag dummies.
     m3r = m["M3r_histcos"].formula()
     assert "hist_rcos_0" in m3r and "onset_lag1" not in m3r
     m7r = m["M7r_time_histcos_rew"].formula()
     assert "hist_rcos_0" in m7r and "onset_lag1" not in m7r
-    assert "bs(tc, df=4)" in m7r and "reward_lag1" in m7r
+    assert spline in m7r and "reward_lag1" in m7r
     # The dummy models still use onset_lag (kernel-shape readout preserved).
     assert "onset_lag1" in m["M7_time_hist_rew"].formula()
 

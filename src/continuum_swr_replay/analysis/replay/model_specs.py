@@ -100,7 +100,7 @@ __all__ = [
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
     "PerBinRateModelSpec",
-    "SPLINE_DF",
+    "SPLINE_KNOTS",
     "STOP_COVARIATES",
     "TMAX",
 ]
@@ -515,7 +515,15 @@ MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
 # bins are required anyway for the self-history term and time-rescaling GOF).
 BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
 TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
-SPLINE_DF = 4
+# Fixed interior knots (seconds) for the within-stop time-course spline, with
+# boundary knots pinned to [0, TMAX]. Fixed (not data-driven quantile) knots make
+# the spline basis a deterministic function of tc: the fitted curve is
+# reconstructable from the saved coefficients (rebuild bs with these knots), the
+# spline coefficients are comparable across sessions (same basis everywhere), and
+# held-out CV never extrapolates beyond the training knots. Cubic bs over [0, 4]
+# with 3 interior knots -> 6 spline columns.
+SPLINE_KNOTS = (1.0, 2.0, 3.0)
+_SPLINE = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX})"
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
 N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
 # Per-stop covariates the ladder needs beyond the reward/self-history lags
@@ -540,7 +548,7 @@ class PerBinRateModelSpec:
     name : str
         Short identifier (e.g. ``"M0_const"``).
     time_spline : bool
-        Include ``bs(tc, df=SPLINE_DF)`` — the within-stop time course.
+        Include the fixed-knot ``bs(tc, ...)`` within-stop time-course spline.
     reward_lags : int
         Number of ``reward_lag{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
         trial outcomes; omission == ``1 - reward`` (same regressor).
@@ -553,7 +561,7 @@ class PerBinRateModelSpec:
     switch : bool
         Include ``is_after_switch``.
     reward_time_interaction : bool
-        Include ``reward_lag1 : bs(tc, df=SPLINE_DF)`` — does reward modulate
+        Include ``reward_lag1 : bs(tc, ...)`` — does reward modulate
         the time course?
     description : str
         Human-readable description.
@@ -588,7 +596,7 @@ class PerBinRateModelSpec:
         """patsy formula (response ``count``; the offset is applied at fit time)."""
         terms: list[str] = []
         if self.time_spline:
-            terms.append(f"bs(tc, df={SPLINE_DF})")
+            terms.append(_SPLINE)
         terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
         if self.reward_rate:
             terms.append("recent_trial_reward_rate")
@@ -599,7 +607,7 @@ class PerBinRateModelSpec:
         if self.switch:
             terms.append("is_after_switch")
         if self.reward_time_interaction:
-            terms.append(f"reward_lag1:bs(tc, df={SPLINE_DF})")
+            terms.append(f"reward_lag1:{_SPLINE}")
         terms += list(self.extra_covariates)
         return "count ~ " + (" + ".join(terms) if terms else "1")
 
