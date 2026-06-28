@@ -1,6 +1,7 @@
 # Per-Bin Rate Models (Family B) Implementation Plan
 
-**Status:** Not started.
+**Status:** Complete. All five phases implemented and merged to
+`replay-trajectory-metrics` (one branch + review per phase).
 
 Consolidate the scattered per-bin event-rate analyses (currently five
 scratch scripts that each re-implement the same loading, SWR-split, and binning logic)
