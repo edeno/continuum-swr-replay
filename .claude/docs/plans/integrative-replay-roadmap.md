@@ -49,9 +49,13 @@ couplings are real.
   history`. Effect = `exp(β)` rate ratio; the SWR dissociation = β differing
   across populations.
 - **Method:** per-bin rate ~ value/RPE/exploration covariates, per population
-  (the `nonswr-uncertainty-rate` plan). **Result:** SWR-coupled rate is
-  value/RPE-gated (RR 5–7×), non-SWR is value-independent; non-SWR rises with
-  exploration. ✅
+  (the `nonswr-uncertainty-rate` plan). **Result (fixed-knot run, 205–208
+  sessions):** SWR-coupled non-local rate is **value/RPE-gated** —
+  `p_reward_current` RR **6.6** (p 2e-12), `rpe` RR **5.2** (p 8e-13) — and
+  **switch-suppressed** (`recent_switch_rate` RR **0.66**, p 1e-7); the non-SWR
+  non-local rate is **flat to all of them** (`p_reward_current` 1.06,
+  `rpe` 1.21, `recent_switch_rate` 1.08; all n.s.). A clean value-tracking vs
+  value-blind dissociation. ✅
 - **Next:** the block-anchored / RL-model-fit refinements already noted there.
 
 ### 2. Rate × Duration — *planned*
