@@ -50,7 +50,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     N_REWARD_LAGS,
     STOP_COVARIATES,
     TMAX,
-    UNCERTAINTY_COVARIATES,
     PerBinRateModelSpec,
     add_uncertainty_covariates,
     aggregate_to_timebins,
@@ -77,24 +76,43 @@ VALUE_COVARIATES = (
     "trials_since_block_change",
 )
 
+# The curated covariate set the model actually fits: interpretable and mutually
+# near-orthogonal (all VIF <= 1.07, max |r| = 0.20, cond(corr) = 1.8). Two of the
+# eight original covariates are deliberately excluded for collinearity:
+#   - wsls_deviation   (r = -0.70 with rpe)
+#   - omission_streak  (r = -0.66 with the reward_lag1 base kernel)
+# leaky_q_value_diff / trials_since_block_change are kept (orthogonal, null but
+# interpretable) so the dissociation table reports them.
+CURATED_COVARIATES = (
+    "p_reward_current",
+    "rpe",
+    "value_diff_patch",
+    "recent_switch_rate",
+    "leaky_q_value_diff",
+    "trials_since_block_change",
+)
+
 # The three non-local-vs-SWR populations to dissociate (pooled non_local is the
 # null and is not fit here).
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
-# M7r + the uncertainty/value block, instantiated in the runner so the shipped
-# MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
+# M7r + the curated uncertainty/value block, instantiated in the runner so the
+# shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
+# reward_rate is OFF: recent_trial_reward_rate is exactly the mean of
+# reward_lag1..10 (corr 1.000, VIF inf), so including it with the reward kernel
+# makes the reward block rank-deficient; the kernel alone carries reward history.
 MU_UNCERTAINTY = PerBinRateModelSpec(
     "MU_uncertainty",
     True,  # time spline
     N_REWARD_LAGS,  # reward kernel
-    True,  # recent reward rate
+    False,  # recent reward rate OFF (perfectly collinear with the kernel)
     N_HISTORY_LAGS,
     False,  # no switch term (recent_switch_rate carries the switch signal)
     False,  # no reward x time interaction
-    "uncertainty/value beyond time/reward/history/reward-rate",
+    "curated uncertainty/value beyond time/reward/history",
     "M7r_time_histcos_rew",
     self_history_basis=N_HISTORY_BASIS,
-    extra_covariates=(*UNCERTAINTY_COVARIATES, *VALUE_COVARIATES),
+    extra_covariates=CURATED_COVARIATES,
 )
 
 
@@ -132,7 +150,7 @@ def fit_uncertainty_rate(
     reward lags; ``onsets`` must already carry ``is_swr``.
     """
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
-    stop_covariates = (*STOP_COVARIATES, *UNCERTAINTY_COVARIATES, *VALUE_COVARIATES)
+    stop_covariates = (*STOP_COVARIATES, *CURATED_COVARIATES)
 
     rows: list[dict] = []
     for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
@@ -238,7 +256,7 @@ def main() -> None:
         time.perf_counter() - t0,
     )
     if len(models):
-        for cov in (*UNCERTAINTY_COVARIATES, *VALUE_COVARIATES):
+        for cov in CURATED_COVARIATES:
             col = f"rr_{cov}"
             if col not in models:
                 continue
