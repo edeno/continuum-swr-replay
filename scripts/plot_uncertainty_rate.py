@@ -37,26 +37,22 @@ from scipy.stats import wilcoxon
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.replay import (  # noqa: E402
-    UNCERTAINTY_COVARIATES,
-)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
-# Single source of truth: the value-covariate set + populations are defined in
+# Single source of truth: the curated covariate set + populations are defined in
 # the fitter; import them so the plot axes match exactly what was fit.
 _FIT_SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate", Path(__file__).resolve().with_name("fit_uncertainty_rate.py")
 )
 _fit = importlib.util.module_from_spec(_FIT_SPEC)
 _FIT_SPEC.loader.exec_module(_fit)
-VALUE_COVARIATES = _fit.VALUE_COVARIATES
 POPULATIONS = _fit.POPULATIONS_TO_FIT
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 SESSION_COLS = ["animal", "day", "epoch"]
-COVARIATES = (*UNCERTAINTY_COVARIATES, *VALUE_COVARIATES)
+COVARIATES = _fit.CURATED_COVARIATES
 
 
 def _paired_wilcoxon(
