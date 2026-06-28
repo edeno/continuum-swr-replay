@@ -3,8 +3,11 @@
 Quantitative readout of the per-bin conditional-intensity ladder
 (`MODEL_PER_BIN_RATE`, see [rate_models.md](rate_models.md) for the methods),
 fit per session over **218 sessions** and persisted in
-`models_per_bin_rate/all_models.pkl` (13 models, 11,274 rows, `BIN_S = 0.015`,
-`TMAX = 4 s`). Regenerate this summary with
+`models_per_bin_rate/all_models.pkl` (13 models, `BIN_S = 0.015`, `TMAX = 4 s`).
+Numbers below are the **fixed-knot-spline** run (the time-course spline uses
+fixed shared knots so its coefficients are cross-session comparable and the
+fitted curve is reconstructable — see §1b); spline-model values shifted <2% from
+the earlier data-driven-knot run, conclusions unchanged. Regenerate with
 `uv run python scripts/summarize_per_bin_rate_models.py`.
 
 **Figures:** the six-panel visual companion is
@@ -39,6 +42,26 @@ non-local event (~63%), and ~45% of non-local events coincide with an SWR.
 (Detected-SWR vs non-local is a cross-modality comparison — LFP vs decoder — so
 read the within-non-local split as the clean contrast.)
 
+## 1b. Within-stop time course (M5/M7 spline)
+
+The dominant structure: replay rate rises over the first ~1.5–2 s of a stop then
+plateaus (panels A0/A1 of the summary figure). The spline uses **fixed shared
+knots** (`SPLINE_KNOTS=(1,2,3)`, bounds `[0,4]`), so the fitted `λ(tc)` curve is
+**reconstructable from the saved coefficients** (`exp(intercept + bs(tc)·β)`) and
+the spline coefficients are comparable across sessions — neither was true with
+the previous data-driven (per-session quantile) knots.
+
+**Duration caveat (important):** stop durations are very unequal and *endogenous*
+— rewarded stops are ~3.5× longer, so at large `tc` only the long (≈rewarded)
+stops survive. The exposure offset makes `λ(tc)` a proper rate, but the curve at
+large `tc` reflects a **selected subpopulation**, not the same stops over time.
+The figure marks this: a survival overlay (fraction of stops still immobile) and
+grey shading where <20% survive (~beyond 2 s). The fitted panel (A1) uses M7
+(reward/history controlled) so much of the rewarded-long-stop composition is
+removed, but the principled fix — modelling the stop *departure hazard* jointly
+with the rate — is the [joint-replay-departure](../.claude/docs/plans/joint-replay-departure/PLAN.md)
+plan.
+
 ## 2. Reward on the previous trial (lag-1)
 
 Both non-local subtypes are reward-responsive, and the effect is **much smaller
@@ -46,18 +69,18 @@ for non-SWR** — raw and after full control:
 
 | population | RR raw (M1) | RR controlled (M7) | animals (M7) |
 | --- | --- | --- | --- |
-| detected SWR | 2.58 | 1.45 | 5/5 |
+| detected SWR | 2.58 | 1.41 | 5/5 |
 | non-local (all) | 2.62 | 1.50 | 5/5 |
-| non-local, w/ SWR | **6.31** | **3.95** | 5/5 |
-| non-local, no SWR | **1.77** | **1.12** | 5/5 |
+| non-local, w/ SWR | **6.31** | **3.93** | 5/5 |
+| non-local, no SWR | **1.77** | **1.11** | 5/5 |
 
 Controlled = M7 (within-stop time spline + self-history + reward kernel). The
 paired NL-w/SWR > NL-no-SWR dissociation is **86% of sessions, 5/5 animals,
 p = 1.2e-28**. After full control the non-SWR lag-1 effect is barely above 1
-(1.12; significant across animals, p = 2.3e-3, but only 58% of sessions
+(1.11; significant across animals, p = 3.2e-3, but only 57% of sessions
 positive) — i.e. most of the apparent non-SWR reward response is absorbed by the
 within-stop time course / clustering, whereas the SWR-coupled response remains
-large (3.95).
+large (3.93).
 
 ## 3. Reward history kernel, lags 2–10 (M7)
 
@@ -115,16 +138,16 @@ are model-free behavioral proxies; the task-grounded value/RPE/block test is the
 | M2_rewhist | 2156 | +0.026 | 0.38 |
 | M3_hist (dummy) | 2312 | **−0.245** | 0.39 |
 | M3r_histcos | 2308 | +0.033 | 0.40 |
-| M5_time | 2246 | **+0.233** | 0.83 |
-| M7_time_hist_rew (dummy) | 2106 | −0.084 | 0.91 |
-| **M7r_time_histcos_rew** | **2101** | **+0.209** | 0.89 |
+| M5_time | 2249 | **+0.228** | 0.86 |
+| M7_time_hist_rew (dummy) | 2107 | −0.108 | 0.91 |
+| **M7r_time_histcos_rew** | **2105** | **+0.199** | 0.91 |
 | M8_full_switch | 2107 | −0.167 | 0.91 |
 | M9_rew_x_time | 2115 | −0.407 | 0.90 |
 
-- **The time spline calibrates the process** (KS-in-band jumps 0.50→0.83 at M5).
+- **The time spline calibrates the process** (KS-in-band jumps 0.50→0.86 at M5).
 - **The lag-dummy self-history overfits** (M3/M7 CV negative); **the raised-cosine
   basis fixes it** — `M7r` is the **best model: lowest AIC (2101) and positive CV
-  (+0.209)** vs M7-dummy's −0.084.
+  (+0.199)** vs M7-dummy's −0.108.
 - M8 (switch) and M9 (reward×time) add nothing on CV (and M9 separates on ~9% of
   sessions). See [rate_models.md](rate_models.md) for the GOF/dispersion caveats
   and the preliminary within-session drift.

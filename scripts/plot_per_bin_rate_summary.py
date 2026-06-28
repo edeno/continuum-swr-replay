@@ -16,10 +16,19 @@ from __future__ import annotations
 import matplotlib
 import numpy as np
 import pandas as pd
+from patsy import dmatrix
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    POPULATIONS,
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    SPLINE_KNOTS,
+    TMAX,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
@@ -41,6 +50,99 @@ SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
 
 def _coef(df, model, oc, coef):
     return df[(df.model == model) & (df.outcome == oc)][coef].dropna()
+
+
+def _timecourse(stop, onsets, oc, dt=0.1, tmax=4.0):
+    """Descriptive onset rate (events / s of immobility) vs time since stop onset.
+
+    Numerator = onset-count histogram over t_since_stop_onset; denominator =
+    immobility-seconds per t-bin (sum over stops of the bin's overlap with each
+    stop's immobility duration). The denominator already makes this a proper
+    rate despite varying stop durations; what changes with tc is the *support*
+    (fewer, longer, more-rewarded stops survive) — see the survival overlay.
+    """
+    t = POPULATIONS[oc](onsets)["t_since_stop_onset"].to_numpy()
+    t = t[(t >= 0) & (t < tmax)]
+    edges = np.arange(0, tmax + dt, dt)
+    num, _ = np.histogram(t, edges)
+    immob = stop["immobility_time"].to_numpy()
+    immob = immob[immob > 0]
+    denom = np.array([np.clip(immob - e, 0, dt).sum() for e in edges[:-1]])
+    rate = num / np.where(denom > 0, denom, np.nan)
+    return edges[:-1] + dt / 2, rate
+
+
+def _survival(stop, tmax=4.0, dt=0.1):
+    """Fraction of stops still immobile at each tc (the support of the curve)."""
+    immob = stop["immobility_time"].to_numpy()
+    immob = immob[immob > 0]
+    tc = np.arange(dt / 2, tmax, dt)
+    return tc, np.array([(immob > t).mean() for t in tc])
+
+
+def _shade_low_support(ax, stop, thresh=0.2, tmax=4.0):
+    """Grey the tc region where <thresh of stops survive (curve is a thin subset)."""
+    tc, surv = _survival(stop, tmax)
+    below = tc[surv < thresh]
+    if below.size:
+        ax.axvspan(below.min(), tmax, color="0.85", zorder=0)
+        ax.text(below.min(), ax.get_ylim()[1] * 0.97,
+                f" <{thresh:.0%} stops survive", fontsize=6, va="top", color="0.4")
+
+
+def _panel_timecourse(ax, stop, onsets):
+    for oc in POPS4:
+        tc, rate = _timecourse(stop, onsets, oc)
+        ax.plot(tc, rate, color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8)
+    ax.set_xlabel("time since stop onset (s)")
+    ax.set_ylabel("onset rate (events / s)")
+    ax.set_title("A0. Within-stop time course (descriptive)")
+    ax.set_xlim(0, 4)
+    ax.legend(frameon=False, fontsize=7, loc="lower right")
+    _shade_low_support(ax, stop)
+    ax2 = ax.twinx()
+    stc, surv = _survival(stop)
+    ax2.plot(stc, surv, color="0.5", ls="--", lw=1.0)
+    ax2.set_ylabel("fraction of stops still immobile", color="0.5", fontsize=8)
+    ax2.set_ylim(0, 1)
+    ax2.tick_params(axis="y", colors="0.5")
+
+
+def _spline_basis(tc_grid):
+    """Fixed-knot spline basis at tc_grid (same basis used in the fits)."""
+    f = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX}) - 1"
+    return np.asarray(dmatrix(f, {"tc": tc_grid}, return_type="dataframe"))
+
+
+def _panel_fitted_timecourse(ax, df, stop):
+    """Reconstructed M7 spline time course (reward/history at reference), per pop.
+
+    Now reconstructable because the spline knots are fixed (data-independent):
+    rate(tc) = exp(intercept + B(tc) @ spline_coef), averaged across sessions.
+    """
+    grid = np.linspace(0, TMAX, 81)
+    B = _spline_basis(grid)
+    scols = sorted(
+        c for c in df.columns
+        if c.startswith("coef_bs(tc, knots=") and c.endswith("]")
+        and "reward_lag1:" not in c
+    )
+    for oc in POPS4:
+        s = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
+        beta = s[scols].to_numpy(float)
+        b0 = s["coef_Intercept"].to_numpy(float)
+        ok = ~np.isnan(beta).any(axis=1) & ~np.isnan(b0)
+        if ok.sum() == 0:
+            continue
+        curves = np.exp(b0[ok, None] + beta[ok] @ B.T)  # (n_sess, n_grid)
+        ax.plot(grid, np.median(curves, axis=0), color=STYLE[oc][1],
+                label=STYLE[oc][0], lw=1.8)
+    ax.set_xlabel("time since stop onset (s)")
+    ax.set_ylabel("fitted rate (events / s)")
+    ax.set_title("A1. Fitted time course (M7 spline, reward/history at ref)")
+    ax.set_xlim(0, 4)
+    ax.legend(frameon=False, fontsize=7, loc="lower right")
+    _shade_low_support(ax, stop)
 
 
 def _panel_baseline(ax, df):
@@ -130,10 +232,18 @@ def _panel_covar(ax, df):
 
 def main() -> None:
     df = pd.read_pickle(RC / "models_per_bin_rate" / "all_models.pkl")
+    stop = pd.read_pickle(RC / "stop_table.pkl")
+    onsets = attach_is_swr_to_onsets(
+        pd.read_pickle(RC / "event_onset_table.pkl"),
+        pd.read_pickle(RC / "event_table.pkl"),
+    )
     FIGS.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplot_mosaic(
-        [["rate", "rew1", "ladder"], ["rewk", "hist", "covar"]], figsize=(17, 9)
+        [["time", "rate", "rew1", "ladder"],
+         ["timefit", "rewk", "hist", "covar"]], figsize=(21, 9)
     )
+    _panel_timecourse(ax["time"], stop, onsets)
+    _panel_fitted_timecourse(ax["timefit"], df, stop)
     _panel_baseline(ax["rate"], df)
     _panel_reward1(ax["rew1"], df)
     _panel_reward_kernel(ax["rewk"], df)
