@@ -44,6 +44,10 @@ couplings are real.
 
 ### 1. Rate × Behavior — *largely done*
 - **Q:** does value / RPE / uncertainty modulate replay rate, and differ by SWR?
+- **Model:** per-bin Poisson conditional intensity, per session × population:
+  `log λ_R(t) = log(exposure_t) + bs(tc) + Σ β·[value, RPE, uncertainty] +
+  history`. Effect = `exp(β)` rate ratio; the SWR dissociation = β differing
+  across populations.
 - **Method:** per-bin rate ~ value/RPE/exploration covariates, per population
   (the `nonswr-uncertainty-rate` plan). **Result:** SWR-coupled rate is
   value/RPE-gated (RR 5–7×), non-SWR is value-independent; non-SWR rises with
@@ -53,12 +57,23 @@ couplings are real.
 ### 2. Rate × Duration — *planned*
 - **Q:** is the within-stop time course real vs duration composition; do replay
   and dwell co-drive?
+- **Model:** two coupled point processes per stop — replay Poisson
+  `log λ_R(t) = log(exposure_t) + bs(tc) + βx` and departure discrete hazard
+  `cloglog h_L(t) = bs(tc) + γx`, optionally coupled by a per-stop frailty `u`
+  (`λ_R·u`, `h_L·u^ξ`, `u ~ Gamma(1/θ,1/θ)`; `θ=0` = independent). See the
+  [joint-departure shared-contracts](joint-replay-departure/shared-contracts.md).
 - **Method:** the [joint-replay-departure](joint-replay-departure/PLAN.md) plan
   (departure hazard + optional shared frailty). 📋
 
 ### 3. Content × Behavior — *the mediation rung*
 - **Q:** does replay **content** predict the next **choice** beyond a value
   baseline (replay as a decision variable), and does it differ by SWR?
+- **Model:** multinomial / conditional logit over the next-arm choice:
+  `P(choice = a) ∝ exp( α·V(a) + β·Content_a + δ·Spatial_a )`, where `V(a)` =
+  nominal/experienced value of arm `a`, `Content_a` = replay mass on `a` this
+  stop (split `Content_a^{SWR}` vs `^{non-SWR}`), `Spatial_a` = distance/
+  availability baseline. **Mediation test** = held-out log-likelihood gain of
+  `+Content` over the value-only model (replay as decision variable beyond value).
 - **Method:** conditional logit on the next-arm choice (`MODEL_CHOICE`
   framework): `P(next_arm) ~ value(arm) + content_replayed(arm) + spatial
   baseline`. Mediation: does `content_replayed` add predictive power beyond
@@ -76,6 +91,12 @@ couplings are real.
 - **Q:** does *what* is replayed relate to *how long* the animal stays — e.g.
   current/rewarded-arm (consummatory) content → longer dwell; alternative-arm
   content → shorter (about to leave)?
+- **Model:** (a) departure hazard with content covariates:
+  `cloglog h_L(t) = bs(tc) + γ_cur·CurrentArmContent(t) + γ_alt·AltContent(t) +
+  reward` (does alternative content raise the leave hazard?); (b) within-stop
+  content trajectory: per-bin multinomial over the represented arm
+  `P(repr = a | tc) = softmax_a( s_a(tc) )` — test a current→prospective shift in
+  `s_a(tc)` as `tc` grows (the pre-departure planning shift).
 - **Method:** (a) departure hazard ~ within-stop content summary (fraction
   current-arm vs alternative, posterior entropy) — does alternative content raise
   the leave hazard? (b) content *trajectory within the stop*: does the
@@ -90,6 +111,12 @@ couplings are real.
 - **Q:** do high-rate stops carry different content (more current-arm? more
   diverse/alternative?) — is the rate dissociation (SWR value-gated vs non-SWR
   exploratory) mirrored in content?
+- **Model:** marked point process — onsets at intensity `λ_R`, each with a
+  content mark `m ~ Categorical(π)`; test (i) whether `π` differs by SWR and
+  (ii) whether `λ_R` and `π` covary via a shared per-stop term (e.g. high-rate
+  SWR stops over-represent the current/rewarded arm; high-rate non-SWR stops
+  over-represent alternatives). Estimate rate and mark on **split-half / disjoint
+  event subsets** to avoid shared-noise correlation.
 - **Method:** per-stop, relate replay rate (Family B intensity or count) to a
   content-composition summary (current-arm fraction, arm entropy, value of
   represented arms). Test whether SWR-coupled high-rate stops over-represent the
@@ -103,6 +130,10 @@ couplings are real.
 - **Q:** does dwell relate to the upcoming **choice / value** — do longer stays
   precede staying (exploit) vs switching (explore); does the departure hazard
   carry choice information?
+- **Model:** two complementary fits — departure hazard with the upcoming choice:
+  `cloglog h_L(t) = bs(tc) + γ·V + η·will_stay`; and a stay/switch logit on dwell
+  beyond value: `P(stay) = σ( α·V + β·DurationResid )` where `DurationResid` is
+  the dwell residualized on value. β ≠ 0 = dwell carries choice info beyond value.
 - **Method:** departure hazard ~ value + `is_stay`/next-choice indicators; and
   next-choice ~ duration + value (does dwell predict the decision beyond value).
 - **Infra:** the departure hazard (Phase 2) + `MODEL_CHOICE` + value.
@@ -117,6 +148,20 @@ couplings are real.
   hazard**, and **predicts the next choice** — with replay as a candidate
   **mediator** from value to behavior, and SWR/non-SWR as distinct emission
   channels?
+- **Model (generative state-space):** a low-dim latent state `z_s` per stop `s`
+  evolving slowly (gap-aware in wall-clock): `z_s = A z_{s-1} + ε_s`. It **emits**
+  the four axes:
+  - rate: `log λ_R(t,s) = bs(tc) + b_R·z_s + βx`
+  - content: `P(repr arm = a | event in s) = softmax_a( c_a + d_a·z_s )`
+  - duration: `cloglog h_L(t,s) = bs(tc) + b_L·z_s + γx`
+  - behavior: `P(choice_s = a) = softmax_a( α·V(a) + λ·Replay_a(s) + e_a·z_s )`
+
+  with **SWR / non-SWR as separate emission channels** (own `λ_R`, `c_a`). Replay
+  is a **mediator** of value→behavior iff `λ ≠ 0` beyond `z_s` (replay carries
+  choice information the latent value state does not). `b_R = b_L = d_a = λ = 0`
+  collapses to the independent per-axis models — the nested null. Estimate by
+  EM / variational / particle methods (reuse the `state_space_practice`
+  point-process EM library).
 - **Method:** a **state-space / latent-variable model** generalizing the joint-
   departure per-stop frailty from a scalar to a (low-dim) latent `z_t` that
   evolves slowly (across stops / wall-clock, gap-aware) and **emits**: the replay
