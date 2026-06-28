@@ -198,7 +198,7 @@ def test_runner_smoke():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
     rc = PROCESSED_DATA_DIR / "replay_content"
-    contingency_path = rc / "contingency_table.pkl"
+    contingency_path = rc / "models_per_bin_rate" / "contingency_table.pkl"
     if not contingency_path.exists():
         pytest.skip(
             "contingency_table.pkl not present "

@@ -474,7 +474,9 @@ def main() -> None:
         return
 
     contingency_table = pd.concat(tables, ignore_index=True)
-    out = rc / "contingency_table.pkl"
+    out_dir = rc / "models_per_bin_rate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "contingency_table.pkl"
     contingency_table.to_pickle(out)
 
     port_cols = [f"p_reward_port{p}" for p in range(6)]

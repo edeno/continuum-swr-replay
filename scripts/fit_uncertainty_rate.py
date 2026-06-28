@@ -183,7 +183,7 @@ def main() -> None:
 
     t0 = time.perf_counter()
     stop = pd.read_pickle(RC / "stop_table.pkl")
-    contingency = pd.read_pickle(RC / "contingency_table.pkl")
+    contingency = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table.pkl")
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(RC / "event_onset_table.pkl"),
         pd.read_pickle(RC / "event_table.pkl"),
