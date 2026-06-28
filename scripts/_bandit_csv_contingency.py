@@ -29,6 +29,7 @@ import difflib
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -54,6 +55,33 @@ def _patch_value_diff(ports: np.ndarray) -> np.ndarray:
     return s[:, -1] - s[:, -2]
 
 
+def _q_chosen(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray, alpha: float,
+              init: float = 0.5) -> np.ndarray:
+    """Per-leaf delta-rule Q value of the chosen leaf, pre-update.
+
+    Q[a] += alpha*(reward - Q[a]); Q resets to ``init`` at each new group (session),
+    so within a session it updates continuously across contingency blocks -- the
+    within-block-updating subjective value the block-constant nominal value lacks.
+    """
+    qc = np.empty(len(arm))
+    Q, prev = None, None
+    for i in range(len(arm)):
+        if grp[i] != prev:
+            Q, prev = np.full(6, init), grp[i]
+        a = arm[i]
+        qc[i] = Q[a]
+        Q[a] += alpha * (reward[i] - Q[a])
+    return qc
+
+
+def _fit_alpha(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray) -> float:
+    """alpha (per animal) that makes q_chosen best predict reward (Bernoulli NLL)."""
+    def nll(a: float) -> float:
+        p = np.clip(_q_chosen(arm, reward, grp, a), 1e-4, 1 - 1e-4)
+        return -float(np.sum(reward * np.log(p) + (1 - reward) * np.log(1 - p)))
+    return float(minimize_scalar(nll, bounds=(0.01, 0.99), method="bounded").x)
+
+
 def _prep_csv(animal: str) -> pd.DataFrame:
     df = pd.read_csv(CSV_DIR / f"{animal}_clean_contingencies_only_parsed_data.csv", index_col=0)
     ports = _decode_contingency(df["contingency"])
@@ -77,7 +105,18 @@ def _prep_csv(animal: str) -> pd.DataFrame:
         g["block_number"] = block
         g["trials_since_block_change"] = g.groupby(block).cumcount().to_numpy()
         out.append(g)
-    return pd.concat(out, ignore_index=True)
+    df = pd.concat(out, ignore_index=True)
+
+    # subjective value: per-leaf delta-rule Q-learner, alpha fit per animal to
+    # best predict reward; q_chosen updates within a session across blocks.
+    grp = (df["date"].astype(str) + "_" + df["session"].astype(str)).to_numpy()
+    arm_a = df["arm"].to_numpy()
+    rew_a = df["reward"].to_numpy(dtype=float)
+    alpha = _fit_alpha(arm_a, rew_a, grp)
+    df["q_chosen"] = _q_chosen(arm_a, rew_a, grp, alpha)
+    df["q_rpe"] = rew_a - df["q_chosen"].to_numpy()
+    df.attrs["alpha"] = alpha
+    return df
 
 
 def _visits(arms: list) -> tuple[list, list[list[int]]]:
@@ -95,10 +134,19 @@ def _visits(arms: list) -> tuple[list, list[list[int]]]:
 
 def build_animal(animal: str) -> pd.DataFrame:
     csv = _prep_csv(animal)
+    # within-block variance check: nominal p_reward_current is block-constant,
+    # so its within-block std is ~0; q_chosen should vary within block.
+    wb = csv.groupby(["date", "session", "block_number"])
+    nom_sd = wb["p_reward_current"].std().mean()
+    q_sd = wb["q_chosen"].std().mean()
+    print(f"  [{animal}] alpha={csv.attrs['alpha']:.3f}  "
+          f"corr(q_chosen,p_reward_current)={csv['q_chosen'].corr(csv['p_reward_current']):.2f}  "
+          f"mean within-block sd: nominal={nom_sd:.3f} q_chosen={q_sd:.3f}")
     st = pd.read_pickle(RC / "stop_table.pkl")
     st = st[st.animal == animal]
     val_cols = ["arm", "p_reward_current", "p_reward_best", "is_best_patch", "rpe",
-                "value_diff_patch", "block_number", "trials_since_block_change"]
+                "value_diff_patch", "block_number", "trials_since_block_change",
+                "q_chosen", "q_rpe"]
     rows = []
     for day, st_day in st.groupby("day"):
         csv_day = csv[csv.date == day]
