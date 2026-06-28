@@ -7,6 +7,13 @@ fit per session over **218 sessions** and persisted in
 `TMAX = 4 s`). Regenerate this summary with
 `uv run python scripts/summarize_per_bin_rate_models.py`.
 
+**Figures:** the six-panel visual companion is
+`paper/figures/per_bin_rate_ladder_summary.png`
+(`scripts/plot_per_bin_rate_summary.py`); detailed kernel / GOF figures are
+`reward_kernel_per_bin_rate.png`, `selfhistory_autocorr.png`,
+`model_checking_ladder.png`, `model_checking_example_{rich,sparse}.png`
+(`scripts/plot_per_bin_rate_models.py`, `scripts/plot_model_checking.py`).
+
 Effects are reported **per event-type population**: detected SWR (LFP ripples,
 `n_SWR`), all non-local decoding events, and the non-local split by SWR overlap
 (`non_local_swr` / `non_local_no_swr`). "RR" = rate ratio = `exp(coef)`;
