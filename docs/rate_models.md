@@ -75,9 +75,17 @@ offset. Its limitation is exactly that offset — see below.
   dissociation**. In `M7`, the immediate (lag-1) reward rate ratio dissociates —
   `non_local_swr ≈ 3.95` ≫ `non_local_no_swr ≈ 1.12` (`swr ≈ 1.45`), paired
   `non_local_swr > non_local_no_swr` in **86 % of sessions, 5/5 animals,
-  p ≈ 1e-28** — while the slower reward-history (RPE) suppression at lags 2–10
-  is **shared**. The self-history kernel is **refractory** (<1) below 60 ms and
-  **bursty** (>1) at ~100 ms (events are non-Poisson).
+  p ≈ 1e-28** — while the slower **recent-reward suppression** at lags 2–10
+  (RR ~0.85–0.97 per lag, ~0.6× cumulative) is **shared**. So the reward kernel
+  is **boost-then-suppression**: the last trial's reward *raises* the current
+  rate (and that boost dissociates by SWR-coupling), while reward accumulated
+  over the preceding several trials *lowers* it (shared across populations). The
+  lag≥2 suppression is a recent-reward effect; it is *consistent with* an
+  RPE / relative-reward account (Kleinman & Foster 2024; Ambrose adaptive
+  coding) but this GLM does not measure a prediction error, so the mechanism
+  (RPE vs satiety vs reward-rate adaptation) is not established here. The
+  self-history kernel is **refractory** (<1) below 60 ms and **bursty** (>1) at
+  ~100 ms (events are non-Poisson).
 
   (These figures are from the most recent unified-15 ms-bin run; `#19c` in the
   claims table retains the original mixed-binning values — same dissociation,
@@ -133,30 +141,49 @@ What the ladder actually shows (218 sessions):
   per-bin count is ≈ 0.005–0.015, so the trapezoid rescaling is well-behaved on
   average; `mean_predicted` / `max_predicted` are reported so the high-rate-bin
   KS bias can be ruled out.
-- **Held-out CV separates a generalizing block from an overfitting one.**
-  `cv_bits_per_event` is positive only for the time block (`M5_time ≈ +0.23`);
-  the self-history block **overfits** (`M3_hist ≈ −0.25`, and `M7`/`M8`/`M9`
-  increasingly negative) — it improves in-sample KS but the refractory near-
-  separation produces extreme per-session coefficients that do not generalize.
-  This is the empirical case for an L2-penalized (or Firth) self-history fit
-  (future work).
-- **Residual drift motivates the state-space layer.** The cumulative point-
-  process residual within a session is not flat — it makes slow excursions over
-  the session (e.g. a rich `chimi` session swings by tens of events before
-  returning toward zero). That is structure none of the within-stop covariates
-  captures; it is the empirical motivation for a **state-space / SS-GLM** model
-  with a slowly drifting baseline (a separate spec, not built here).
+- **Held-out CV separates a generalizing block from an overfitting one — and
+  the overfit is a parameterization artifact, now fixed.** With the lag-dummy
+  history (`onset_lag1..10`), `cv_bits_per_event` is positive only for the time
+  block (`M5_time ≈ +0.23`); the self-history block **overfits**
+  (`M3_hist ≈ −0.25`, `M7` median ≈ −0.084, negative on 58% of sessions). The
+  cause is perfect separation: on the <45 ms refractory bins the unregularized
+  per-session MLE drives `onset_lag` coefficients to ≈ −25, so a held-out bin
+  that *does* fire shortly after another event is assigned ≈ 0 probability and
+  the log-likelihood blows up. **A smooth raised-cosine history basis fixes it**
+  — replacing the 10 collinear lag dummies with 4 log-spaced raised-cosine bumps
+  (the same 150 ms window) cannot separate, and lifts the median
+  `cv_bits_per_event` from **−0.084 to +0.212** (positive on 89% of sessions,
+  better than the dummy on 94%). The raised-cosine models (`M3r_histcos`,
+  `M7r_time_histcos_rew`) are in the ladder; the dummy `onset_lag` models are
+  kept for the refractory/bursty *kernel-shape* readout, which is interpretable
+  per-lag where the smooth basis is not.
+- **Residual drift is a real within-session non-stationarity (mechanism not
+  identified).** The cumulative point-process residual within a session is not
+  flat — it makes slow, idiosyncratic excursions (a rich `chimi` session swings
+  by ±100 events). At the population level the per-stop residual ramps from
+  ≈ −0.05 (first decile of the session) to ≈ +0.03 (last), with 73% of sessions
+  showing a positive residual-vs-position slope: **replay onsets rise over the
+  session** beyond what the within-stop model predicts. This drift is **not**
+  reward-rate (residual is flat across reward-rate quintiles, consistent with
+  `M2r_rewrate` adding nothing) and is not captured by any within-stop covariate.
+  Its mechanism is **unidentified** — candidate correlates (accumulating
+  experience, rising rest/quiescence, learning phase) are untested, and the
+  *increasing* direction argues against simple fatigue/disengagement. This is
+  the empirical motivation for a **state-space / SS-GLM** model with a slowly
+  drifting latent baseline (a separate spec, not built here); the latent
+  trajectory could then be correlated against task variables to identify it.
 
 ## Caveats and what each family can/can't tell you
 
 - **Cross-family CV is not comparable.** Family A scores 5-fold per-stop mean
   log-likelihood; Family B scores 10-fold (over stops) per-bin log-likelihood
   plus `cv_bits_per_event` vs `M0_const`. Compare CV **within** a family only.
-- **Self-history overfits out-of-sample.** In Family B the self-history block
-  improves the in-sample KS but *hurts* held-out `cv_bits_per_event`
-  (`M5_time ≈ +0.23` vs `M3_hist ≈ −0.25`): refractory near-separation produces
-  extreme per-session coefficients that don't generalize. An L2-penalized
-  (`fit_regularized`) or Firth history fit is the noted fallback (future work).
+- **Lag-dummy self-history overfits; use the raised-cosine variant for
+  prediction.** The `onset_lag` dummy history separates on the refractory bins
+  and hurts held-out CV (`M3_hist ≈ −0.25`); the raised-cosine models
+  (`M3r_histcos`, `M7r_time_histcos_rew`) fix this (median `cv_bits_per_event`
+  −0.084 → +0.212). Use the dummy models only to read the per-lag refractory/
+  bursty *kernel shape*; use the raised-cosine models for prediction / CV.
 - **Duration is a behavioral variable, not just exposure.** Stop durations are
   bimodal — reward creates the long consummatory mode — so the offset is not a
   nuisance to be divided out; the per-second / per-bin estimators isolate the
@@ -171,4 +198,7 @@ What the ladder actually shows (218 sessions):
   session drift belong in a **state-space model**, not as fixed covariates here.
 - Arm / well / patch identity covariates (hard to interpret in this rate view).
 - Cross-/ensemble-history between event types (SWR↔non-local).
-- An L2-penalized self-history fit to recover the over-fit history block.
+- The raised-cosine self-history basis (`M3r_histcos`, `M7r_time_histcos_rew`)
+  already recovers the over-fit history block; an L2-penalized / Firth fit of the
+  per-lag dummies remains an alternative if the per-lag kernel itself needs
+  regularizing.

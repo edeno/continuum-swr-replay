@@ -53,6 +53,7 @@ import pandas as pd  # noqa: E402
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     MODEL_PER_BIN_RATE,
+    N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
     POPULATIONS,
@@ -101,6 +102,7 @@ def _fit_one_session(
             tmax=TMAX,
             reward_lags=N_REWARD_LAGS,
             self_history_lags=N_HISTORY_LAGS,
+            self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
         )
         for name, spec in MODEL_PER_BIN_RATE.items():

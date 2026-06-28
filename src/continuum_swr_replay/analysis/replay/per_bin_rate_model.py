@@ -46,7 +46,10 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
         cols.append("reward_lag1")
     if spec.reward_rate:
         cols.append("recent_trial_reward_rate")
-    cols += [f"onset_lag{j}" for j in range(1, spec.self_history_lags + 1)]
+    if spec.self_history_basis:
+        cols += [f"hist_rcos_{k}" for k in range(spec.self_history_basis)]
+    else:
+        cols += [f"onset_lag{j}" for j in range(1, spec.self_history_lags + 1)]
     if spec.switch:
         cols.append("is_after_switch")
     return list(dict.fromkeys(cols))  # de-duplicate, preserve order

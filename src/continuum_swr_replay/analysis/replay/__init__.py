@@ -10,6 +10,7 @@ from ._helpers import (
     add_arm_fixed_effects,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
+    raised_cosine_history_basis,
 )
 from .choice_prediction import (
     build_choice_dataset,
@@ -43,6 +44,7 @@ from .model_specs import (
     MODEL_PATCH_SWR,
     MODEL_PER_BIN_RATE,
     MODEL_PER_STOP_RATE,
+    N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
     SPLINE_DF,
@@ -97,6 +99,7 @@ __all__ = [
     "MODEL_PATCH_SWITCH",
     "MODEL_PER_BIN_RATE",
     "MODEL_PER_STOP_RATE",
+    "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
     "POPULATIONS",
@@ -141,6 +144,7 @@ __all__ = [
     "fit_per_stop_rate_model",
     "next_arm_circular_shift",
     "per_bin_rate_gof",
+    "raised_cosine_history_basis",
     "predict_arm_fractions",
     "retrospective_alignment_with_shuffle",
     "stop_label_shuffle",

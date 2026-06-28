@@ -18,6 +18,7 @@ import pytest
 from continuum_swr_replay.analysis.replay import (
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
+    raised_cosine_history_basis,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -106,6 +107,48 @@ def test_aggregate_drops_zero_immobility():
     onsets = pd.DataFrame({"stop_id": [2], "t_since_stop_onset": [0.05]})
     df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
     assert set(df.stop_id) == {2}
+
+
+def test_raised_cosine_basis_shape_and_nonneg():
+    B = raised_cosine_history_basis(10, 4)
+    assert B.shape == (4, 10)
+    assert (B >= 0).all()
+    # Each bump peaks (==1) at its own log-spaced center; centers are distinct.
+    peak_lags = B.argmax(axis=1)
+    assert len(set(peak_lags.tolist())) == 4
+    assert peak_lags[0] < peak_lags[-1]  # first bump early, last bump late
+
+
+def test_aggregate_history_basis_is_projection():
+    """hist_rcos_k equals the onset_lag counts projected onto the basis."""
+    stops = pd.DataFrame({
+        "animal": ["x"], "day": [1], "epoch": ["02_r1"], "stop_id": [1],
+        "immobility_time": [0.5],
+    })
+    onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.05, 0.20]})
+    df = aggregate_to_timebins(
+        stops, onsets, bin_s=0.05, tmax=0.5,
+        self_history_lags=4, self_history_basis=3,
+    )
+    assert {"hist_rcos_0", "hist_rcos_1", "hist_rcos_2"} <= set(df.columns)
+    B = raised_cosine_history_basis(4, 3)
+    lag_cols = [f"onset_lag{j}" for j in range(1, 5)]
+    expected = df[lag_cols].to_numpy() @ B.T
+    np.testing.assert_allclose(
+        df[["hist_rcos_0", "hist_rcos_1", "hist_rcos_2"]].to_numpy(), expected
+    )
+
+
+def test_history_basis_requires_lags():
+    stops = pd.DataFrame({
+        "animal": ["x"], "day": [1], "epoch": ["02_r1"], "stop_id": [1],
+        "immobility_time": [0.5],
+    })
+    onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
+    with pytest.raises(ValueError, match="self_history_lags"):
+        aggregate_to_timebins(
+            stops, onsets, bin_s=0.05, tmax=0.5, self_history_basis=3
+        )
 
 
 def test_reward_groupby_drops_nan_reward():
