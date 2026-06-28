@@ -100,6 +100,7 @@ __all__ = [
     "N_REWARD_LAGS",
     "PerBinRateModelSpec",
     "SPLINE_DF",
+    "STOP_COVARIATES",
     "TMAX",
 ]
 
@@ -515,6 +516,11 @@ BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
 TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
 SPLINE_DF = 4
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
+# Per-stop covariates the ladder needs beyond the reward/self-history lags
+# (M2r's continuous reward rate, M8's switch term) — carried into the per-bin
+# design by aggregate_to_timebins. Shared by the fitter orchestrator and the
+# model-checking plotter so the inline refit matches the persisted fits.
+STOP_COVARIATES = ("recent_trial_reward_rate", "is_after_switch")
 
 
 @dataclass(frozen=True)
