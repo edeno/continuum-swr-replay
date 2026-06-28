@@ -76,6 +76,15 @@ def test_formula_strings():
 
     assert "reward_lag1:bs(tc, df=4)" in m["M9_rew_x_time"].formula()
 
+    # Raised-cosine self-history variants use hist_rcos_*, not onset_lag dummies.
+    m3r = m["M3r_histcos"].formula()
+    assert "hist_rcos_0" in m3r and "onset_lag1" not in m3r
+    m7r = m["M7r_time_histcos_rew"].formula()
+    assert "hist_rcos_0" in m7r and "onset_lag1" not in m7r
+    assert "bs(tc, df=4)" in m7r and "reward_lag1" in m7r
+    # The dummy models still use onset_lag (kernel-shape readout preserved).
+    assert "onset_lag1" in m["M7_time_hist_rew"].formula()
+
 
 def test_recovers_known_reward_effect():
     design = make_per_bin_rate_design(reward_effect=2.0, base_rate=0.08, seed=1)

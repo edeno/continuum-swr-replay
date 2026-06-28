@@ -96,6 +96,7 @@ __all__ = [
     "MODEL_PER_BIN_RATE",
     "MODEL_PER_STOP_RATE",
     "ModelSpec",
+    "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
     "PerBinRateModelSpec",
@@ -516,6 +517,7 @@ BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
 TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
 SPLINE_DF = 4
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
+N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
 # Per-stop covariates the ladder needs beyond the reward/self-history lags
 # (M2r's continuous reward rate, M8's switch term) — carried into the per-bin
 # design by aggregate_to_timebins. Shared by the fitter orchestrator and the
@@ -568,6 +570,12 @@ class PerBinRateModelSpec:
     reward_time_interaction: bool
     description: str
     parent: str | None
+    # If > 0, the self-history block uses a raised-cosine basis
+    # (``hist_rcos_0..k-1``) over the ``self_history_lags`` window instead of the
+    # per-lag ``onset_lag`` dummies -- the smooth basis cannot separate on the
+    # refractory bins, so it generalizes where the dummies overfit. Default 0
+    # keeps the dummy encoding (and the per-lag kernel-shape readout).
+    self_history_basis: int = 0
 
     def formula(self) -> str:
         """patsy formula (response ``count``; the offset is applied at fit time)."""
@@ -577,7 +585,10 @@ class PerBinRateModelSpec:
         terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
         if self.reward_rate:
             terms.append("recent_trial_reward_rate")
-        terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
+        if self.self_history_basis:
+            terms += [f"hist_rcos_{k}" for k in range(self.self_history_basis)]
+        else:
+            terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
         if self.switch:
             terms.append("is_after_switch")
         if self.reward_time_interaction:
@@ -621,6 +632,17 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M9_rew_x_time": PerBinRateModelSpec(
         "M9_rew_x_time", True, _N, False, N_HISTORY_LAGS, False, True,
         "M7 + reward x time interaction", "M7_time_hist_rew"),
+    # Raised-cosine self-history variants: smooth basis over the same window so
+    # the history block cannot separate on the refractory bins (lifts held-out
+    # cv_bits_per_event from negative to positive vs the onset_lag dummies).
+    "M3r_histcos": PerBinRateModelSpec(
+        "M3r_histcos", False, 0, False, N_HISTORY_LAGS, False, False,
+        "+ self-history (raised-cosine basis)", "M0_const",
+        self_history_basis=N_HISTORY_BASIS),
+    "M7r_time_histcos_rew": PerBinRateModelSpec(
+        "M7r_time_histcos_rew", True, _N, False, N_HISTORY_LAGS, False, False,
+        "+ time + raised-cosine self-history + reward history", "M5_time",
+        self_history_basis=N_HISTORY_BASIS),
 }
 
 

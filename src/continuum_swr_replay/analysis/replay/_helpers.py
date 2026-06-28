@@ -846,6 +846,37 @@ def attach_is_swr_to_onsets(
     return out
 
 
+def raised_cosine_history_basis(n_lags: int, n_basis: int) -> np.ndarray:
+    """Log-spaced raised-cosine self-history basis (Pillow et al. 2008).
+
+    Smooth, overlapping bumps over within-stop lags ``1..n_lags`` used to encode
+    the self-history block. Projecting the ``onset_lag{j}`` counts onto these
+    ``n_basis`` bumps replaces ``n_lags`` collinear lag dummies that otherwise
+    perfectly separate on the refractory bins (coefficients -> -inf) and wreck
+    held-out prediction.
+
+    Parameters
+    ----------
+    n_lags : int
+        Number of within-stop lags spanned (the history window in bins).
+    n_basis : int
+        Number of raised-cosine bumps.
+
+    Returns
+    -------
+    np.ndarray, shape (n_basis, n_lags)
+        ``B[k, j]`` is the weight of lag ``j+1`` in basis function ``k``.
+    """
+    x = np.log(np.arange(1, n_lags + 1))
+    centers = np.linspace(x.min(), x.max(), n_basis)
+    spacing = centers[1] - centers[0] if n_basis > 1 else 1.0
+    B = np.zeros((n_basis, n_lags))
+    for k, c in enumerate(centers):
+        arg = np.clip((x - c) * np.pi / (2 * spacing), -np.pi, np.pi)
+        B[k] = 0.5 * (1 + np.cos(arg))
+    return B
+
+
 def aggregate_to_timebins(
     stop_table: pd.DataFrame,
     onset_times: pd.DataFrame,
@@ -854,6 +885,7 @@ def aggregate_to_timebins(
     tmax: float,
     reward_lags: int = 0,
     self_history_lags: int = 0,
+    self_history_basis: int = 0,
     stop_covariates: tuple[str, ...] = (),
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
@@ -882,6 +914,12 @@ def aggregate_to_timebins(
         Number of ``onset_lag{j}`` self-history columns to build (same-
         population onset counts ``j`` bins back, within stop, reset at the
         stop boundary).
+    self_history_basis : int
+        If > 0, also add ``hist_rcos_0..self_history_basis-1`` columns: the
+        ``onset_lag`` counts projected onto a log-spaced raised-cosine basis
+        (see :func:`raised_cosine_history_basis`). Requires ``self_history_lags
+        > 0`` (the basis spans that window). Used by the ``*_histcos`` models,
+        which generalize where the lag dummies overfit the refractory bins.
     stop_covariates : tuple[str, ...]
         Extra per-stop columns carried from ``stop_table`` by ``stop_id``.
 
@@ -891,9 +929,12 @@ def aggregate_to_timebins(
         Columns: ``animal``, ``day``, ``epoch``, ``stop_id``, ``binj``,
         ``tc`` (bin-center s = time since stop onset), ``exposure`` (s of
         immobility in the bin), ``reward_lag1..reward_lags``, each name in
-        ``stop_covariates``, ``count`` (population onsets in the bin), and
-        ``onset_lag1..self_history_lags``.
+        ``stop_covariates``, ``count`` (population onsets in the bin),
+        ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
+        ``hist_rcos_0..self_history_basis-1``.
     """
+    if self_history_basis and not self_history_lags:
+        raise ValueError("self_history_basis requires self_history_lags > 0")
     reward_cols = [f"reward_lag{j}" for j in range(1, reward_lags + 1)]
     carry = reward_cols + list(stop_covariates)
 
@@ -931,6 +972,13 @@ def aggregate_to_timebins(
         grouped = out.groupby("stop_id")["count"]
         for j in range(1, self_history_lags + 1):
             out[f"onset_lag{j}"] = grouped.shift(j).fillna(0)
+
+    if self_history_basis:
+        B = raised_cosine_history_basis(self_history_lags, self_history_basis)
+        lag_cols = [f"onset_lag{j}" for j in range(1, self_history_lags + 1)]
+        proj = out[lag_cols].to_numpy() @ B.T
+        for k in range(self_history_basis):
+            out[f"hist_rcos_{k}"] = proj[:, k]
 
     out = out.drop(columns=["immobility_time"])
     return out.reset_index(drop=True)
