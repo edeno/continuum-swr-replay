@@ -204,6 +204,18 @@ Task-relevant derived variables:
 
 ## Common Data Analysis Patterns
 
+### Replay event-rate models (two families)
+
+Two parallel families estimate replay event *rate* (how often events occur):
+**Family A** (`MODEL_PER_STOP_RATE`, per-stop Poisson with a `log(immobility)`
+offset — the literature-comparable layer) and **Family B**
+(`MODEL_PER_BIN_RATE`, the per-bin conditional-intensity ladder with a spline
+time course + reward kernel + self-history — the confound-free layer). See
+[docs/rate_models.md](docs/rate_models.md) for which family to cite for what,
+the M0–M9 ladder, and the point-process model-checking. Runners:
+`scripts/fit_per_stop_rate_models.py`, `scripts/fit_per_bin_rate_models.py`;
+plotter: `scripts/plot_per_bin_rate_models.py`.
+
 ### Loading data for a session
 
 ```python
