@@ -30,3 +30,4 @@ For agent invocation, **load only the slice you need**:
 - Phases (each ships as a separable PR):
   - [phase-1-contingency-parser.md](phase-1-contingency-parser.md) — temporary StateScript→contingency parser (nominal `p(R)`, block index, change times), DIO-aligned, keyed by `stop_id`.
   - [phase-2-uncertainty-rate.md](phase-2-uncertainty-rate.md) — per-population per-bin rate fit with uncertainty/value covariates; SWR-vs-non-SWR dissociation + peri-block latency.
+  - [phase-3-continuum-test.md](phase-3-continuum-test.md) — follow-up: is non-SWR non-local a separate less-bursty mode or part of one bursty continuum with SWR? Cross-correlogram + cross-type ensemble-history GLM.
