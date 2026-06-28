@@ -157,21 +157,22 @@ What the ladder actually shows (218 sessions):
   `M7r_time_histcos_rew`) are in the ladder; the dummy `onset_lag` models are
   kept for the refractory/bursty *kernel-shape* readout, which is interpretable
   per-lag where the smooth basis is not.
-- **Residual drift is a real within-session non-stationarity (mechanism not
-  identified).** The cumulative point-process residual within a session is not
-  flat — it makes slow, idiosyncratic excursions (a rich `chimi` session swings
-  by ±100 events). At the population level the per-stop residual ramps from
-  ≈ −0.05 (first decile of the session) to ≈ +0.03 (last), with 73% of sessions
-  showing a positive residual-vs-position slope: **replay onsets rise over the
-  session** beyond what the within-stop model predicts. This drift is **not**
-  reward-rate (residual is flat across reward-rate quintiles, consistent with
-  `M2r_rewrate` adding nothing) and is not captured by any within-stop covariate.
-  Its mechanism is **unidentified** — candidate correlates (accumulating
-  experience, rising rest/quiescence, learning phase) are untested, and the
-  *increasing* direction argues against simple fatigue/disengagement. This is
-  the empirical motivation for a **state-space / SS-GLM** model with a slowly
-  drifting latent baseline (a separate spec, not built here); the latent
-  trajectory could then be correlated against task variables to identify it.
+- **Possible within-session non-stationarity (preliminary, not established).**
+  The cumulative point-process residual within a session makes slow excursions,
+  and a weak population tendency for replay to rise over the session was seen
+  (per-stop residual decile ramp ≈ −0.05 → +0.03; ~73% of sessions positive
+  slope; not reward-rate). **But this does not survive a proper null:** because
+  each per-session intercept pins the residual at both ends (a Brownian bridge),
+  the right test is the bridge sup statistic `max|Mₖ|/√n`, and the *median*
+  session sits at 0.83 — within the 1.36 5% band — with only ~14% of sessions
+  exceeding it (vs 5% expected). So the dramatic single-session excursions are
+  largely chance, and the drift is at most a weak aggregate bias, ~20% of which
+  is spatial composition (it shrinks under `current_arm`/`current_patch`
+  control). Treat it as **a preliminary signal, not a result.** If pursued, the
+  principled handling is a **state-space / SS-GLM** baseline drifting in
+  wall-clock time (gap-aware across the inter-stop runs), whose latent trajectory
+  could then be correlated against task variables — a separate spec, not built
+  here.
 
 ## Caveats and what each family can/can't tell you
 
