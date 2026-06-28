@@ -9,7 +9,7 @@ rate. Rate-only -- replay direction is out of scope.
 
 Per session: load ``stop_table``; add the model-free uncertainty covariates
 (:func:`add_uncertainty_covariates`); left-merge the
-``contingency_table.pkl`` nominal value columns on ``stop_id``; drop the first
+``contingency_table_csv.pkl`` nominal value columns on ``stop_id``; drop the first
 (exposure) session per animal; attach the canonical ``is_swr`` to the onsets.
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
@@ -201,7 +201,10 @@ def main() -> None:
 
     t0 = time.perf_counter()
     stop = pd.read_pickle(RC / "stop_table.pkl")
-    contingency = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table.pkl")
+    # Canonical nominal value: the LorenFrankLab/SpatialBanditTask parsed CSVs
+    # mapped to stop_id by scripts/_bandit_csv_contingency.py (96% agreement with
+    # the retired StateScript parse; the CSV is the cleaned lab source).
+    contingency = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(RC / "event_onset_table.pkl"),
         pd.read_pickle(RC / "event_table.pkl"),
