@@ -38,9 +38,13 @@ Canonical covariates are **columns in the canonical tables**, emitted by the bui
 The tables are **regenerated** by the builders (reusing existing decodes — no
 re-decode). Because the rollup is deterministic on fixed decodes:
 
-- the regenerated **response/posterior columns** (`arm_count_hard`, `arm_count_soft`,
-  `arm_posterior_mass`, offsets, `is_swr`, keys) must **reproduce** the pre-rebuild
-  tables → confirms the rebuild changed *only* covariates;
+- the regenerated **response/posterior columns** must **reproduce** the pre-rebuild
+  tables (the rollup has no RNG, so this is logically deterministic) → confirms the
+  rebuild changed *only* covariates. Tolerance: **exact equality** on integer/key
+  columns (`arm_count_hard`, offsets, `is_swr`, ids) and **`np.allclose` (atol=1e-9,
+  rtol=1e-6, equal NaN)** on the float reductions (`arm_count_soft`,
+  `arm_posterior_mass`) — to absorb summation-order/library drift across a months-later
+  re-run; any non-`allclose` column is a **hard failure to investigate**, not a pass;
 - the **covariate columns** are the new canonical ones;
 - keep a **backup** of the pre-rebuild tables for the parity check (phase 2).
 

@@ -15,7 +15,7 @@ reward rate (which moved 5→10) are re-verified. Then refresh the docs/claims n
 
 ## Tasks
 
-- **Confirm baseline exists** (tables + fit pickles backed up in phase 1) — the comparison set.
+- **Confirm baseline exists** — the **backed-up pre-rebuild tables** *and* the old fit pickles (phase 1). The parity script **re-assembles both design matrices** (old spec applied to the backup table, new spec to the regenerated table) rather than relying on the fit pickles, which persist only coefficients — the old-table backup makes this implementable.
 - **Re-fit all families** on the regenerated tables: per-bin rate ladder, MU uncertainty, per-stop rate, SWR-power, content arm `{all,T,F}` + patch `{all,T,F}`, contfrag SWR/MUA, choice (`compare_event_source_models.py`). Smoke one session per runner first (timing); long runs in tmux.
 - **Parity / verification script** `scripts/_verify_harmonization_parity.py`:
   - **design-matrix identity** — for the unchanged-definition covariates (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, `leaky_q_value_diff`, spatial, spline, self-history, and the rename-only `reward_rate_trial_k10`), assert the model design columns are **identical** to baseline; coefficients then match within the fitters' convergence tolerance (don't over-tighten to 1e-6).
