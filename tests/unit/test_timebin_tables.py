@@ -123,6 +123,45 @@ def test_missing_mua_column_tolerated(two_bout_dot):
     assert int(dense["n_non_local"].sum()) == 3
 
 
+def test_swr_inclusive_vs_nonlocal_prob_masked():
+    """SWR onsets are inclusive (any labelled bin); non_local onsets also require
+    Non-Local prob > 0.8. A low-prob labelled region co-located with an SWR
+    yields an SWR onset but no non_local onset, locking in that asymmetry.
+
+    (Within an immobility bout the speed mask is always satisfied, so the prob
+    mask is the discriminator; an onset outside any bout is dropped for every
+    type by the bout filter, so the gap is not the right place to test this.)
+    """
+    t = np.round(np.arange(20) * 0.01, 2)  # one immobile bout, t 0.00..0.19
+    swr = np.zeros(20, dtype=int)
+    nl = np.zeros(20, dtype=int)
+    nlprob = np.zeros(20)
+    # low-prob non_local co-located with an SWR -> non_local masked, SWR kept
+    nl[5:7] = 1
+    nlprob[5:7] = 0.5  # below the 0.8 non-local threshold
+    swr[5:7] = 1
+    # a separate high-prob non_local -> kept, so the mask is discriminating
+    nl[12:14] = 2
+    nlprob[12:14] = 0.9
+
+    dot = pd.DataFrame(
+        {
+            "animal": "x", "day": 1, "epoch": "02_r1",
+            "head_speed": np.full(20, 1.0),  # immobile throughout
+            "SWR_event": swr, "non_local_event": nl, "MUA_event": 0,
+            "Non-Local_Continuous_prob": nlprob, "Non-Local_Fragmented_prob": 0.0,
+        },
+        index=t,
+    )
+    onset = build_event_onset_table(dot, np.array([]))
+    counts = onset["event_type"].value_counts()
+    assert counts.get("SWR", 0) == 1  # inclusive: the low-prob region counts
+    assert counts.get("non_local", 0) == 1  # only the high-prob event (label 2)
+    # the surviving non_local onset is the high-prob one at t=0.12, not t=0.05.
+    nlrows = onset[onset.event_type == "non_local"]
+    assert nlrows["onset_time"].iloc[0] == pytest.approx(0.12)
+
+
 def test_empty_session_returns_schema(two_bout_dot):
     """No immobility -> empty tables with the documented columns (not a crash)."""
     dot, pumps = two_bout_dot
