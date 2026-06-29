@@ -225,8 +225,10 @@ def test_runner_smoke():
     models = fur.fit_uncertainty_rate(stop, onsets)
     assert len(models) > 0
     assert set(models["outcome"]).issubset(set(fur.POPULATIONS_TO_FIT))
-    # every uncertainty + value covariate has a fitted coefficient/RR column.
-    for cov in (*fur.UNCERTAINTY_COVARIATES, *fur.VALUE_COVARIATES):
+    # every curated uncertainty/value covariate the model fits has a
+    # coefficient/RR column (CURATED_COVARIATES is the set actually fit; it
+    # supersets VALUE_COVARIATES).
+    for cov in fur.CURATED_COVARIATES:
         assert f"coef_{cov}" in models.columns
         assert f"rr_{cov}" in models.columns
     # reward kernel is also present (the controlled-for block).

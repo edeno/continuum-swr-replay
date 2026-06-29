@@ -1026,6 +1026,18 @@ def add_nonlocal_swr_split(
         return out
 
     ev = event_table.dropna(subset=["stop_id"]).copy()
+    # A non-local event whose stop_id is absent from stop_table would be silently
+    # dropped by the left-merge below, leaving that stop a phantom 0/0 split. That
+    # only happens if the two tables were built from different decodes/passes --
+    # fail loud rather than corrupt the SWR split feeding the rate models.
+    missing_stops = set(ev["stop_id"].unique()) - set(out["stop_id"])
+    if missing_stops:
+        raise ValueError(
+            f"add_nonlocal_swr_split: {len(missing_stops)} stop_id(s) in "
+            "event_table are absent from stop_table (e.g. "
+            f"{next(iter(missing_stops))!r}); their non-local events would be "
+            "silently dropped. The two tables must be built from the same decodes."
+        )
     ev["_swr"] = ev["is_swr"].fillna(False).astype(bool)
     counts = (
         ev.groupby(["stop_id", "_swr"])

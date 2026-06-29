@@ -56,7 +56,9 @@ def test_rate_models_drop_response_leaking_is_swr_stop():
 
     for source in ("SWR", "MUA", "non_local"):
         models = compare._rate_models_for_source(source)
-        assert tuple(models) == ("R0", "R1", "R2")
+        # R0-R2 plus the lagged-reward kernel Rlag; the response-leaking
+        # is_swr_stop term (R3) stays dropped for every source.
+        assert tuple(models) == ("R0", "R1", "R2", "Rlag")
         assert "R3" not in models
 
 
@@ -90,7 +92,7 @@ def test_comparison_metadata_records_event_definition_semantics():
     assert metadata["event_source"] == "SWR"
     assert metadata["brain_area"] == "mPFC"
     assert metadata["same_identified_events"] is False
-    assert metadata["rate_models"] == ("R0", "R1", "R2")
+    assert metadata["rate_models"] == ("R0", "R1", "R2", "Rlag")
 
 
 def test_common_cohort_drops_whole_units_for_union_predictors_and_zero_response():

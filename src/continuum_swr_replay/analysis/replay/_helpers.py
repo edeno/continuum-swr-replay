@@ -1027,7 +1027,25 @@ def attach_is_swr_to_onsets(
         on=["stop_id", "rank"],
         how="left",
         suffixes=("", "_ev"),
+        # duplicate (stop_id, rank) keys would expand rows and misalign the
+        # positional assignment below; the cumcount ranks are unique by
+        # construction, so this is cheap insurance against that silent failure.
+        validate="one_to_one",
     )
+    # The rank-join only assigns the correct is_swr if the onset table and
+    # event_table carry the same per-stop non-local events. A handful of
+    # boundary onsets legitimately fail to match (~0.1%), but a gross mismatch
+    # means the two were built from divergent non-local/speed thresholds or
+    # decodes -- fail loud rather than silently mislabel is_swr downstream.
+    matched = merged["is_swr_ev"].notna()
+    if len(merged) and matched.mean() < 0.99:
+        raise ValueError(
+            "attach_is_swr_to_onsets: only "
+            f"{matched.mean():.1%} of non-local onsets matched an event_table "
+            "row by (stop_id, within-stop rank). The onset table and "
+            "event_table must be built from the same non-local/speed thresholds "
+            "and decodes."
+        )
     out.loc[nl.index, "is_swr"] = merged["is_swr_ev"].to_numpy()
     return out
 
@@ -1125,7 +1143,9 @@ def aggregate_to_timebins(
     carry = reward_cols + list(stop_covariates)
 
     s = stop_table[stop_table["immobility_time"] > 0]
-    nmax = int(tmax / bin_s)
+    # ceil, not int: when tmax is not a multiple of bin_s, int() drops the final
+    # partial window [floor(tmax/bin_s)*bin_s, tmax) so onsets there are lost.
+    nmax = int(np.ceil(tmax / bin_s))
     nbin = np.minimum(
         np.ceil(s["immobility_time"].to_numpy() / bin_s), nmax
     ).astype(int)
@@ -1139,11 +1159,20 @@ def aggregate_to_timebins(
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
-    out["exposure"] = np.minimum(bin_s, out["immobility_time"] - binj * bin_s)
+    # bin width, clipped by both the stop's immobility end and tmax (the final
+    # bin of a stop longer than tmax is exposed only up to tmax, not bin_s).
+    out["exposure"] = np.minimum(
+        bin_s, np.minimum(out["immobility_time"], tmax) - binj * bin_s
+    )
     out = out[out["exposure"] > 1e-4]
 
     src = onset_times[onset_times["t_since_stop_onset"] < tmax]
-    src_binj = (src["t_since_stop_onset"].to_numpy() / bin_s).astype(int)
+    # clip into the design's bin range so an onset in the final partial window
+    # [(_nmax-1)*bin_s, tmax) lands in the last bin rather than a phantom bin
+    # that the merge below would silently drop.
+    src_binj = np.clip(
+        (src["t_since_stop_onset"].to_numpy() / bin_s).astype(int), 0, nmax - 1
+    )
     cnt = (
         pd.DataFrame({"stop_id": src["stop_id"].to_numpy(), "binj": src_binj})
         .groupby(["stop_id", "binj"])

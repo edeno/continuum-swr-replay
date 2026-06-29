@@ -38,8 +38,12 @@ def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.nda
 
     Non-local events apply the same prob+speed mask as ``build_stop_table``'s
     ``n_non_local``; SWR/MUA are taken inclusively (any labelled bin), matching
-    ``n_SWR`` / ``n_MUA``.
+    ``n_SWR`` / ``n_MUA``. An absent event column (e.g. ``MUA_event`` on older
+    decodes) yields no onsets, mirroring ``build_stop_table``'s ``n_MUA = 0``
+    fallback; the dense builder then zero-fills that count.
     """
+    if col not in dot.columns:
+        return np.array([], dtype=float)
     labels = dot[col].to_numpy()
     keep = labels > 0
     if col == "non_local_event":

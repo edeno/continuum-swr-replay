@@ -109,6 +109,35 @@ def test_aggregate_drops_zero_immobility():
     assert set(df.stop_id) == {2}
 
 
+def test_aggregate_nondivisible_tmax_keeps_final_window():
+    """tmax not a multiple of bin_s: the final partial window still exists and
+    counts onsets, with its exposure clipped to tmax.
+
+    Regression: ``int(tmax / bin_s)`` used to drop bins in
+    ``[floor(tmax/bin_s)*bin_s, tmax)``, silently losing onsets there.
+    """
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "day": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_time": [1.0],  # longer than tmax
+        }
+    )
+    # onset in the final partial window [0.4, 0.45) -- dropped by the old path.
+    onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.42]})
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.45).sort_values("binj")
+    # ceil(0.45 / 0.1) = 5 bins (0..4), not int()'s 4.
+    assert list(df.binj) == [0, 1, 2, 3, 4]
+    # the onset is counted in the final bin rather than dropped.
+    assert df.loc[df.binj == 4, "count"].iloc[0] == 1
+    assert df["count"].sum() == 1
+    # final bin exposure is clipped to tmax (0.45 - 0.4 = 0.05), not a full bin.
+    assert df.loc[df.binj == 4, "exposure"].iloc[0] == pytest.approx(0.05)
+    assert df.loc[df.binj == 0, "exposure"].iloc[0] == pytest.approx(0.1)
+
+
 def test_raised_cosine_basis_shape_and_nonneg():
     B = raised_cosine_history_basis(10, 4)
     assert B.shape == (4, 10)
