@@ -4,77 +4,63 @@
 
 ## Current codebase integration points
 
-Covariate-computation layer (functions to reuse with canonical params):
-- `src/continuum_swr_replay/analysis/replay/_helpers.py:618` `recent_reward_rate_all_events` — per-arm reward rate; **call with k=10** (currently 5) for `reward_rate_arm_k10`.
-- `_helpers.py:704` `recent_trial_reward_rate` — all-arm 10-trial rate; reuse as-is for `reward_rate_trial_k10` (rename at the consumer).
-- `_helpers.py:814` `_leaky_q_value_diff`, `_helpers.py:883` `add_uncertainty_covariates` — `leaky_q_value_diff` emitted here; **stop emitting / stop consuming it**.
-- `scripts/_bandit_csv_contingency.py:58` `_q_chosen`, `:77` `_fit_alpha`, `:115` per-animal α fit — the fitted-α leaky-Q; **promote to the covariate layer and extend to per-arm `q_arm`** (currently only `q_chosen` for the current arm) and per-arm nominal `p_reward_arm` (from the contingency `p_reward_port{0..5}` already decoded there).
+Covariate-computation layer (extracted to `covariates.py` in phase-0; definitions changed in phase-1):
+- `_helpers.py:618` `recent_reward_rate_all_events` — per-arm reward rate (**timestamp-driven**: needs `event_times` + `trials` goal-arrival cutoffs); **call with k=10** for `reward_rate_arm_k10`.
+- `_helpers.py:704` `recent_trial_reward_rate` — all-arm 10-trial rate; reuse as-is for `reward_rate_trial_k10` (rename only — assert byte-identical in phase-2).
+- `_helpers.py:814` `_leaky_q_value_diff`, `:883` `add_uncertainty_covariates` — `leaky_q_value_diff` (per-stop margin); **kept** as a reported comparison (D3 revised).
+- `scripts/_bandit_csv_contingency.py:58` `_q_chosen`, `:77` `_fit_alpha` — fitted-α leaky-Q; **promote to `covariates.py` and extend to all-arm `q_arm`/`q_current`** (today only the chosen arm). Unify the existing `q_chosen` name → `q_current`.
 
-Per-arm covariate computation (the canonical home — updated here):
-- `src/.../tables.py:1247-1252` — `visit_recency` / `cumulative_reward` / `recent_reward_rate` batch in `build_event_arm_table`. The current 5-visit `recent_reward_rate` is computed here. This plan **updates the builder** to emit the canonical covariates (via the shared canonical function, k=10 + `p_reward_arm` + `q_arm`) so future regens are canonical, **and backfills the existing pickles in place** (recompute only the covariate columns from the CSV/contingency/Q — no `load_data`, no posterior re-rollup) so we get canonical tables now without the ~4.3 h regen. Builder and backfill call the **same** canonical function → no divergent computation.
+Per-arm covariate computation (the canonical home — updated, then **rebuilt**):
+- `tables.py:1247-1252` `build_event_arm_table` covariate batch, and `:1277` `nominal_reward_prob` (deferred NaN → **populated and renamed `p_reward_arm`**; update the `:1646` schema list + the viz registry). Update the builder to emit canonical covariates, then **regenerate the replay canonical tables**. (Rebuild chosen over in-place backfill: the per-arm rate is timestamp-driven and needs `load_data(trials)` regardless — `event_arm_table` does **not** store `event_midpoint_time` — so a rebuild is one clean code path / true single source.)
+- `analysis/contfrag/tables.py:36,638,657,680,767` — contfrag builds its **own** per-arm `recent_reward_rate` (5-visit) + `swr_x_recent_reward_rate` + `recent_trial_reward_rate`. **In scope (per decision):** apply the same canonical definitions and regenerate the contfrag tables, else contfrag silently stays 5-visit.
 
-Model specs / runners (consumers to update):
-- `model_specs.py:194` `_M3 = (*_M2, "recent_reward_rate")` and the M-ladder (`MODEL_HIERARCHY` `:205`), patch ladder (`MODEL_PATCH` `:310`), `MODEL_CHOICE` — rename `recent_reward_rate`→`reward_rate_arm_k10`; add the canonical value block (`p_reward_arm`, `q_arm`) per the dictionary's per-family matrix.
-- `scripts/fit_uncertainty_rate.py:86` `CURATED_COVARIATES` — swap `leaky_q_value_diff`→`q_current`; `:198` drop the `--q-alpha=0.3` knob (α now fit, not set).
-- `scripts/fit_swr_power_model.py:41` `PREDICTORS` — already canonical (`p_reward_current`, `recent_switch_rate`); add `q_current`.
-- `scripts/compare_event_source_models.py` + `choice_prediction.py` `build_choice_dataset` — rename + add `p_reward_arm`/`q_arm` to the choice dataset.
-- Untouched: `bs(tc)` spline, reward-lag kernel, `hist_rcos` self-history, spatial-role/`arm_fe`, `arm_dist_rank` — definitions unchanged.
+Other consumers to sweep (not just fit runners):
+- `model_specs.py:194` `_M3 = (*_M2, "recent_reward_rate")` + M-ladder (`:205`), patch (`:310`), `MODEL_CHOICE` — rename `recent_reward_rate`→`reward_rate_arm_k10`; add the value block (`p_reward_arm`, `q_arm`) as additive rungs.
+- `fit_uncertainty_rate.py:86` `CURATED_COVARIATES` — **add** `q_current`, **keep** `leaky_q_value_diff`; `:198` drop `--q-alpha` (α now fit).
+- `fit_swr_power_model.py:41` `PREDICTORS` — add `q_current`.
+- `compare_event_source_models.py` + `choice_prediction.py` — rename + add `p_reward_arm`/`q_arm`.
+- `simulation.py:62,142,144,298`, `learning.py:8,59,90,98,103`, `visualization/session_tables.py` (the `nominal_reward_prob` panel) — reference the renamed names; update or a re-export alias must cover them. Grep gate spans **all** of `src/`+`scripts/`.
+- Untouched definitions: `bs(tc)`, reward-lag kernel, `hist_rcos`, spatial-role/`arm_fe`, `arm_dist_rank`.
 
 ## Scope and dependency policy
 
 ### Goals
-- One canonical definition per construct, written into the canonical tables every family reads; coefficients comparable within an estimator class.
-- **Consolidate covariate definitions into one module** `src/.../analysis/replay/covariates.py` (extracted from the `_helpers.py` grab-bag + the Q-learner promoted from the scratch script), mirroring `docs/covariate_dictionary.md` 1:1 — done behavior-preservingly in **phase-0** (re-export shim keeps the ~16 importers working) before any definition changes.
-- Implement D1–D5 exactly (window 10; add `p_reward_arm`; `leaky_q`→fitted Q; `recent_switch_rate` canonical + `is_after_switch` kept; entry-rule contract).
-- Re-fit all families on current tables; prove unchanged-definition covariates reproduce.
+- One canonical definition per construct (per `docs/covariate_dictionary.md`), computed by the table **builders** and written into the canonical tables every family reads — single source.
+- Consolidate covariate code into `covariates.py` (phase-0, behavior-preserving; re-export shim keeps the ~16 importers working).
+- Implement D1–D5 as revised; **harmonize both the replay and contfrag tables**.
+- Re-fit all families; prove unchanged-definition covariates reproduce.
 
 ### Non-Goals
-- **No posterior re-rollup, no `load_data`** — only the behavioral covariate columns are recomputed (from the CSV/contingency/Q) and written into the canonical tables; the ~4.3 h decode-rollup that produced the response columns is not redone.
-- **No re-decode** — orthogonal (that's the reality-run/W3 workstream).
-- No new science questions — this is definitional harmonization only.
-- No change to the spline/self-history/spatial definitions.
+- **No re-decode** — orthogonal (the reality-run / W3 workstream). The rebuild reuses the existing decodes (re-rolls the posteriors from them; response columns must reproduce).
+- No new science questions — definitional harmonization only.
+- No change to spline / self-history / spatial / `arm_dist_rank` definitions.
 
 ### Dependency policy
 No new dependencies.
 
 ## Metrics
-- **Parity (the core check):** for every covariate whose definition is unchanged
-  (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`,
-  `is_after_switch`, spatial role, spline, self-history), the re-fit per-session
-  coefficients must match the pre-refactor fits to **floating-point tolerance**
-  (same data, same definition → effectively identical; tol e.g. |Δcoef| < 1e-6 median,
-  and the signed-rank verdicts unchanged).
-- **Changed covariates** (`reward_rate_arm_k10` vs old 5-visit; `q_*` vs `leaky_q`):
-  coefficients change by design — **report** old-vs-new, don't assert equality.
-- **Coverage:** every family fit on the same session set as before (no shrinkage from
-  the merge; coverage gaps surface as NaN→listwise-drop, counted and reported).
+- **Unchanged-definition covariates** (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, `leaky_q_value_diff`, spatial, spline, self-history, and the rename-only `reward_rate_trial_k10`): assert the **design-matrix columns are identical** to baseline (deterministic, the strong guarantee); coefficients then match within the fitters' convergence tolerance (looser than 1e-6 — don't over-tighten against BLAS/optimizer nondeterminism).
+- **Rebuild integrity:** the regenerated tables' **response/posterior columns** (`arm_count_*`, `arm_posterior_mass`, offsets, `is_swr`, keys) reproduce the pre-rebuild tables (the rollup is deterministic on fixed decodes) — confirms the rebuild changed *only* covariates.
+- **Changed covariates** (`reward_rate_arm_k10` vs old 5-visit; new `q_*`): coefficients change by design — **report** old→new.
+- **Coverage:** every family fit on the same session set as before (counted).
 
 ## Risks and Mitigations
 
 | Risk | Mitigation |
 | --- | --- |
-| In-place table rewrite corrupts the response/posterior columns | Recompute **only** the covariate columns; assert `arm_count_*` / `arm_posterior_mass` / offsets / keys are byte-identical pre/post; write to a temp, validate, then swap. Keep a backup copy. |
-| Builder path and backfill path diverge (compute the covariate two ways) | Both call the **same** canonical function on the **same** inputs (CSV-derived trial sequence + contingency + Q); a test asserts the backfill output equals what the updated builder produces on a sample session. |
-| Renames silently miss a consumer → model fits on a wrong/old column | Phase-1 grep for every old name across `src/` + `scripts/`; unit test that each spec's predictor list resolves to columns present in the canonical tables. |
-| Adding `p_reward_arm`/`q_arm` to content changes the model ladder | Add them as an explicit canonical **value block** (new rungs), not silently into M0–M7; the existing M0–M7 stay bit-identical so the re-verified content claims are preserved, and the value block is additive. |
+| Rebuild silently perturbs the response columns (not just covariates) | Assert the regenerated response/posterior columns reproduce the pre-rebuild tables (deterministic rollup on fixed decodes); diff covariate columns only. Keep a backup of the old tables. |
+| Rebuild cost (replay ~4.3 h + contfrag) | Long batch in tmux; smoke one session, measure, extrapolate before the full regen (it reuses existing decodes — no re-decode). |
+| contfrag left at 5-visit → reintroduces the inconsistency | contfrag in scope (this plan); grep gate spans `src/`+`scripts/` incl. contfrag/simulation/learning/viz. |
+| Renames silently miss a consumer | Grep gate over all of `src/`+`scripts/`; unit test that every spec predictor resolves to a present column; phase-0 re-export alias covers stragglers. |
+| **Content ladder M3–M7 move** (`recent_reward_rate` is inside `_M3`/M7) | Scope the "ladder unchanged" claim to **M0–M2 / rungs without the per-arm rate**; explicitly flag M3–M7 and the swr×reward interaction **will change at k=10** and re-verify the affected content claims (incl. the autocorrelation caveats in memory). The added `p_reward_arm`/`q_arm` value block is separately additive. |
+| `p_reward_arm` vs existing `nominal_reward_prob` duplicate | Populate + rename the existing `nominal_reward_prob` column (tables schema + viz registry); no parallel column. |
 
 ## Rollout Strategy
-Replace-in-place; internal covariates with no external consumers (per CLAUDE.md
-default). Old per-arm columns remain in the rollup table until the next regen but are
-unreferenced. No deprecation window.
+Replace-in-place; internal covariates, no external consumers. Tables regenerated (decodes reused). No deprecation window.
 
 ## Open Questions
-1. **Canonical behavioral input.** Standardize the per-arm visit/reward history on the
-   trial-level SpatialBanditTask CSV (already adopted for contingency) rather than
-   `load_data` trials, so the builder and the backfill share one cheap input and the
-   covariates are consistent with the contingency. Best answer: yes — but confirm the
-   CSV→event alignment (`_bandit_csv_contingency.py`) gives a per-arm visit sequence at
-   event granularity; if a gap, fall back to `load_data` trials for the recompute only.
-2. **Value block rungs for content/choice.** Exact rung names/order for the added
-   `p_reward_arm` + `q_arm` (e.g., a `Mv_*` value extension on M5). Deferred to
-   phase 1; must not perturb M0–M7.
+1. **Value block rungs for content/choice.** Exact rung names/order for the added `p_reward_arm` + `q_arm` (e.g., a `Mv_*` value extension on M5). Deferred to phase 1; must not perturb M0–M2.
+2. **`q_*` cross-animal comparability.** α is fit per animal, so `q_*` is on each animal's own learning timescale — report the per-animal α range and interpret `q_*` coefficients within-animal; a shared-α sensitivity fit is optional.
 
 ## Estimated Effort
-~250–400 LOC: a canonical-covariate module + precompute script (~150), spec/runner
-renames + value block (~100), tests (~100). Phase 2 is mostly running the existing
-runners + a parity-check script (~80).
+~300–450 LOC: `covariates.py` extraction (phase-0, mostly moves) + definition changes + builder updates (replay + contfrag) (~150), spec/runner renames + value block (~120), tests + parity script (~150). Plus the table regen wall-clock (batch, not LOC).

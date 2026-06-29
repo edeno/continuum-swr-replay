@@ -18,7 +18,11 @@ conditional/multinomial model, so it cannot be a main effect there. Hence:
 | **conditional (choice)** | next-arm logit | (cancel — omit) | **main effects** over the choice set |
 
 "Parallel" therefore means **same construct, same window and units**, entered in
-the form each estimator allows — *not* literally the same regressor everywhere.
+the form each estimator allows — *not* literally the same regressor everywhere. This
+makes coefficients **admissible and same-construct**, not numerically interchangeable:
+an absolute-rate main effect (log rate ratio) and a conditional-content interaction
+(arm-relative log-odds) are different estimands — **interpret within an estimator
+class**, compare *direction/consistency* across classes, not raw magnitudes.
 
 ## B. Canonical constructs
 
@@ -41,13 +45,19 @@ keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 | canonical name | definition | scope | source | enters |
 |---|---|---|---|---|
 | `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | contingency CSV | rate/coupling main effect |
-| `p_reward_arm` | nominal contingency p(reward) of **each** arm (**new**) | per-arm | contingency CSV | content/choice main effect; rate via `× is_current` |
-| `q_current` | fitted leaky-Q value of the current arm | scalar | Q-learner, **α fit per animal** (reward-prediction; ≈0.10) | rate/coupling main effect |
-| `q_arm` | fitted leaky-Q value of **each** arm (**new**) | per-arm | same Q-learner | content/choice main effect |
+| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | contingency CSV | content/choice main effect; rate via `× is_current` |
+| `q_current` | fitted leaky-Q **level** of the current arm (per-trial delta-rule `Q[a]+=α(r−Q[a])`, the chosen-arm value) | scalar | Q-learner, **α fit per animal** (reward-prediction; ≈0.10) | rate/coupling main effect |
+| `q_arm` | fitted leaky-Q **level** of **each** arm | per-arm | same Q-learner | content/choice main effect |
+| `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
-Change: **drop `leaky_q_value_diff` (α=0.3, null/non-predictive)**; the experienced-
-value term is the fitted-α leaky Q (`q_current` / `q_arm`). `value_diff_patch` and
-`rpe` (nominal, from the contingency CSV) remain as scalar rate/coupling covariates.
+Changes: `p_reward_arm` **populates the existing deferred `nominal_reward_prob`
+column** (rename `nominal_reward_prob`→`p_reward_arm` in `tables.py` schema + the viz
+registry, no orphan). `q_current`/`q_arm` are the new experienced-value covariate (a
+chosen-arm *level*); the old `q_chosen` name in the contingency table unifies to
+`q_current`. **`leaky_q_value_diff` is NOT dropped** — it is a *different* construct
+(per-stop margin vs per-trial level) and is kept as a reported comparison so the MU
+dissociation table is preserved. `value_diff_patch` and `rpe` (nominal) remain scalar
+rate/coupling covariates.
 
 ### 3. Exploration — canonical continuous + retained binary comparison
 
@@ -90,12 +100,19 @@ rate families; conditional models access within-stop time only as `tsc_x_current
 
 ## D. Decisions of record (2026-06-29)
 
-- **D1** — recent-reward-rate window standardized to **N = 10** in each natural unit:
-  `reward_rate_trial_k10` (10 trials, all-arm) and `reward_rate_arm_k10` (10 visits,
-  per-arm). Per-arm window changes 5→10.
-- **D2** — add **per-arm nominal value** `p_reward_arm` to the content/choice tables.
-- **D3** — **drop `leaky_q_value_diff` (α=0.3)**; experienced value = fitted-α leaky Q
-  (`q_current` / `q_arm`, α fit per animal by reward prediction, ≈0.10).
+- **D1** — recent-reward-rate window standardized to **N = 10** in each construct's
+  natural unit: `reward_rate_trial_k10` (10 trials, all-arm) and `reward_rate_arm_k10`
+  (10 visits, per-arm). Per-arm window changes 5→10. **Caveat:** "10" is not the same
+  *real-time* span (a single arm is visited far less often than trials elapse) — it is
+  10 in each construct's own unit, not 10 in time.
+- **D2** — add **per-arm nominal value** `p_reward_arm` to content/choice — by
+  **populating the existing deferred `nominal_reward_prob` column** (renamed), not a
+  new parallel column.
+- **D3** — **add** the fitted-α leaky-Q level (`q_current` / `q_arm`, α fit per animal
+  ≈0.10) as the canonical experienced-value covariate, and **keep
+  `leaky_q_value_diff`** (the per-stop margin, a different construct) as a *reported
+  comparison*. (Revised from "drop": the two are different algorithms, and the margin
+  is deliberately kept in the MU dissociation table.)
 - **D4** — exploration canonical = **`recent_switch_rate`**; **keep `is_after_switch`**
   as the immediate-binary comparison (not dropped).
 - **D5** — adopt the **entry-rule contract** (§A) as the standing rule.

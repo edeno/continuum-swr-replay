@@ -1,62 +1,48 @@
-# Phase 2 — Re-fit all families, verify parity, refresh docs
+# Phase 2 — Re-fit all families, verify, refresh docs
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
-Re-fit every model family on the current tables using the canonical covariates from
-phase 1, and **verify the refactor preserved everything it should**: covariates whose
-definition did not change must reproduce their pre-refactor coefficients to tolerance;
-the deliberately-changed ones (per-arm reward 5→10, `leaky_q`→`q`) are reported, not
-asserted. Then refresh the numbers in the docs/claims.
+Re-fit every family (replay **and** contfrag) on the regenerated canonical tables and
+**verify the harmonization preserved what it should**: unchanged-definition covariates
+reproduce (via design-matrix identity, the strong deterministic guarantee); the
+deliberately-changed ones are reported; the content rungs that contain the per-arm
+reward rate (which moved 5→10) are re-verified. Then refresh the docs/claims numbers.
 
 **Inputs to read first:**
-- [overview.md](overview.md#metrics) — the parity tolerance + coverage rules.
-- [shared-contracts.md](shared-contracts.md) — to confirm the consumed schema.
-- The runners: `fit_per_bin_rate_models.py`, `fit_uncertainty_rate.py`, `fit_replay_content_models.py` (arm `{all,T,F}` + patch), `fit_swr_power_model.py`, `compare_event_source_models.py`, `fit_per_stop_rate_model.py`.
-- Current fit outputs (the pre-refactor baseline to compare against): `Processed-Data/replay_content/models*/all_models.pkl`, `uncertainty_rate.pkl`, `swr_power_model.pkl`, `event_source_comparison/non_local_HPC_comparison_fits.pkl`.
+- [overview.md](overview.md#metrics) — the metrics (design-matrix identity, rebuild integrity, coverage).
+- The runners (replay + contfrag): `fit_per_bin_rate_models.py`, `fit_uncertainty_rate.py`, `fit_replay_content_models.py` (arm `{all,T,F}` + patch, **and** `--event-source SWR/MUA` for contfrag), `fit_swr_power_model.py`, `compare_event_source_models.py`, `fit_per_stop_rate_model.py`.
+- The pre-change baseline: the backed-up tables + fit pickles from phase 1.
 
 ## Tasks
 
-- **Baseline capture (before re-fitting).** Copy the current fit pickles to a baseline
-  dir (e.g. `…/_pre_harmonization/`). These are the comparison set for parity.
-- **Re-fit all families** on the current (2026-06-24) tables with canonical covariates:
-  per-bin rate ladder, MU uncertainty, per-stop rate, SWR-power, content arm `{all,T,F}`
-  + patch `{all,T,F}`, choice (`compare_event_source_models.py --event-source non_local`).
-  Long runs in tmux; smoke one session per runner first (timing) per the batch rule.
-- **Parity check script** `scripts/_verify_harmonization_parity.py`: for each family,
-  join baseline vs new per-session coefficients on the **unchanged-definition**
-  covariates and assert |median Δcoef| < tol (e.g. 1e-6) and unchanged signed-rank
-  verdicts; for the **changed** covariates (`reward_rate_arm_k10` vs old
-  `recent_reward_rate`; `q_*` vs `leaky_q_value_diff`) print an old→new comparison
-  table (no assert). Report per-family coverage (session counts unchanged).
-- **Refresh docs/claims with the changed numbers** (this is a task, not deferred):
-  - `docs/covariate_dictionary.md` — flip status to implemented; record per-animal α range and the per-arm-reward 5→10 effect on the headline content coefficients.
-  - `paper/claims_table.md` — update any content/choice numbers that moved (the per-arm reward window change touches M3+ content and the choice baseline); the M0–M7 ladder coefficients should be unchanged (value block is additive) — confirm and note.
-  - `docs/replay_rate_content_swr_synthesis.md` + `docs/per_bin_rate_results.md` — refresh any covariate numbers that changed (MU `q_current` replacing `leaky_q`; coupling `q_current` term).
+- **Confirm baseline exists** (tables + fit pickles backed up in phase 1) — the comparison set.
+- **Re-fit all families** on the regenerated tables: per-bin rate ladder, MU uncertainty, per-stop rate, SWR-power, content arm `{all,T,F}` + patch `{all,T,F}`, contfrag SWR/MUA, choice (`compare_event_source_models.py`). Smoke one session per runner first (timing); long runs in tmux.
+- **Parity / verification script** `scripts/_verify_harmonization_parity.py`:
+  - **design-matrix identity** — for the unchanged-definition covariates (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, `leaky_q_value_diff`, spatial, spline, self-history, and the rename-only `reward_rate_trial_k10`), assert the model design columns are **identical** to baseline; coefficients then match within the fitters' convergence tolerance (don't over-tighten to 1e-6).
+  - **rebuild integrity** — response/posterior columns of the regenerated tables reproduce the backup (already checked in phase 1; re-confirm at fit time).
+  - **changed covariates** — `reward_rate_arm_k10` (vs old 5-visit) and the new `q_*`: print old→new comparison (no assert).
+  - **coverage** — per-family session counts == baseline.
+- **Re-verify the content rungs that moved.** M3–M7 (arm) and the patch analogues + the contfrag content fits contain the per-arm reward rate, now k=10 → re-run the content verification (`_verify_content_models.py`) and check whether the re-verified claims (esp. the `recent_reward_rate`→`reward_rate_arm_k10` "not value-selective" result and `swr_x_*`) still hold at k=10; note any that shift, against the autocorrelation-invalidation caveats already in `claims_table.md`.
+- **Refresh docs/claims numbers** (a task, not deferred): `docs/covariate_dictionary.md` (status implemented + per-animal α range); `paper/claims_table.md` (any moved content/choice numbers; confirm M0–M2 unchanged); `docs/replay_rate_content_swr_synthesis.md` + `docs/per_bin_rate_results.md` (MU `q_current` term, coupling `q_current`, the k=10 content numbers).
 
 ## Deliberately not in this phase
-- No new covariate definitions or spec changes (all in phase 1).
-- No rollup-table regen; no re-decode; no reality re-run.
+- No new covariate definitions / spec changes (phase 1).
+- No re-decode; no reality re-run.
 - No new figures unless a refreshed number invalidates an existing one.
 
 ## Validation slice
 
 | Test | Asserts |
 | --- | --- |
-| `_verify_harmonization_parity` (unchanged block) | reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, spatial role, spline, self-history coefficients reproduce baseline to tol; signed-rank verdicts unchanged. |
-| `_verify_harmonization_parity` (changed block) | old→new comparison printed for `reward_rate_arm_k10` and `q_*`; finite, sensible; reported. |
-| coverage check | each family's session count == baseline (no merge-induced shrinkage; NaN-drops counted). |
-| M0–M7 / P0–P4 invariance | the shipped content ladder coefficients are unchanged vs the re-verified fits (value block additive). |
-| docs numbers | every coefficient quoted in the updated docs matches the new fit outputs (spot-check the headline rows). |
+| `_verify_harmonization_parity` (design-matrix) | unchanged-definition covariate columns identical to baseline; coefficients within fitter tolerance; signed-rank verdicts unchanged. |
+| `_verify_harmonization_parity` (rebuild integrity) | regenerated tables' response/posterior columns reproduce the backup. |
+| `_verify_harmonization_parity` (changed) | `reward_rate_arm_k10` and `q_*` old→new printed; finite/sensible; reported. |
+| coverage check | each family's session count == baseline. |
+| content re-verification | M0–M2 unchanged; M3–M7 / contfrag content re-checked at k=10; shifts reported against the autocorrelation caveats. |
+| docs numbers | every coefficient quoted in the updated docs matches the new fits (spot-check headline rows). |
 
 ## Fixtures
-Uses the real fit outputs (baseline copies + new). No synthetic fixtures; the parity
-check is the verification.
+Real fit outputs (baseline backups + new). No synthetic fixtures; the parity check is the verification.
 
 ## Review
-Dispatch `code-reviewer` against the diff. Confirm: parity holds for all
-unchanged-definition covariates (this is the core correctness gate — a failure means
-a rename silently changed a definition); changed covariates are reported with old→new;
-coverage unchanged; M0–M7/P0–P4 invariance verified; every doc number updated to match
-the new fits (no stale coefficients left in `covariate_dictionary.md` / `claims_table.md`
-/ the synthesis docs); no plan/phase references in code, test, or commit-message-bound
-artifacts.
+Dispatch `code-reviewer`. Confirm: design-matrix identity holds for all unchanged covariates (the core gate — a failure = a rename silently changed a definition); rebuild integrity confirmed; changed covariates reported old→new; coverage unchanged; **contfrag re-fit and re-verified** (not left at 5-visit); M3–M7 shifts surfaced and reconciled with the content claims; every doc number updated (no stale coefficients in `covariate_dictionary.md`/`claims_table.md`/synthesis docs); no plan/phase references in artifacts.

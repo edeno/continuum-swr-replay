@@ -1,58 +1,51 @@
-# Phase 1 — Canonical covariate layer + consume it everywhere
+# Phase 1 — Harmonize definitions, update builders, regenerate tables
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
-Build the single canonical covariate source and point every model family at it, with
-the renames/additions/removals from [shared-contracts.md](shared-contracts.md). No
-re-fitting of the full dataset here (that's phase 2) — this phase ends with the code
-coherent, unit tests green, and a one-session smoke fit per family showing the
-canonical covariates flow.
+Change the covariate definitions in `covariates.py` (created in phase-0) to canonical
+(D1–D5 as revised), update **both** table builders (replay + contfrag) to emit them,
+**regenerate** the canonical tables (reusing existing decodes — no re-decode), and
+point every model family at the canonical names. Ends with the code coherent, unit
+tests green, the regenerated tables passing the rebuild-integrity check, and a
+one-session smoke fit per family. (Re-fitting the full dataset + parity = phase 2.)
 
 **Inputs to read first:**
-- [docs/covariate_dictionary.md](../../../../docs/covariate_dictionary.md) — the spec (definitions, windows, entry-rule).
-- [shared-contracts.md](shared-contracts.md) — canonical names + `canonical_covariates*.pkl` schema.
-- `_helpers.py:618` `recent_reward_rate_all_events`, `:704` `recent_trial_reward_rate` — reuse with k=10.
-- `scripts/_bandit_csv_contingency.py:58-116` — the fitted-α leaky-Q (`_q_chosen`/`_fit_alpha`) + decoded per-port `p_reward`; extend to per-arm.
-- `model_specs.py:194,205,310` + `MODEL_CHOICE` — predictor lists to rename/extend.
-- `scripts/fit_uncertainty_rate.py:86,198`, `fit_swr_power_model.py:41`, `compare_event_source_models.py` + `choice_prediction.py` — consumers.
+- [docs/covariate_dictionary.md](../../../../docs/covariate_dictionary.md) — the spec.
+- [shared-contracts.md](shared-contracts.md) — names, where-they-live, rebuild-integrity contract, patch aggregator.
+- `tables.py:1247-1252` (replay covariate batch), `:1277` `nominal_reward_prob`, `:1646` schema list; `analysis/contfrag/tables.py:36,638,657,680,767` (contfrag covariates).
+- `model_specs.py:194,205,310` + `MODEL_CHOICE`; `fit_uncertainty_rate.py:86,198`; `fit_swr_power_model.py:41`; `compare_event_source_models.py`+`choice_prediction.py`; consumers `simulation.py`, `learning.py`, `visualization/session_tables.py`.
 
-**Contracts referenced:** [canonical-covariate-names](shared-contracts.md#canonical-covariate-names), [canonical-covariates-pkl](shared-contracts.md#canonical-covariates-pkl) — do not weaken (names/schema are what phase 2 consumes).
+**Contracts referenced:** [canonical-covariate-names](shared-contracts.md#canonical-covariate-names), [where-the-covariates-live](shared-contracts.md#where-the-covariates-live), [rebuild-integrity](shared-contracts.md#rebuild-integrity-contract-the-safety-rule).
 
 ## Tasks
 
-- **Change the definitions in `covariates.py` to canonical** (the module + the moved functions + the promoted Q-learner already exist from phase-0). Add one assembly function that, given a session's CSV-derived trial sequence (per-arm visit+reward) + parsed contingency (`p_reward_port{0..5}`) + Q-learner, returns the per-arm covariates (`reward_rate_arm_k10` via `recent_reward_rate_all_events(..., k=10)`; `p_reward_arm`; `q_arm`) keyed `(event_id, arm)` and the per-stop covariates (`reward_rate_trial_k10`, `q_current`) keyed `stop_id`, per [the schema](shared-contracts.md#where-the-covariates-live). **Extend the (already-promoted) Q rollout to return all-arm Q** (not just the chosen arm), one fit (α per animal, recorded).
-- **Update the table builders** to call this function so future regens are canonical: `tables.py:1247-1252` (`build_event_arm_table`) emits `reward_rate_arm_k10`/`p_reward_arm`/`q_arm` instead of the 5-visit `recent_reward_rate`; `build_event_patch_table` aggregates them; the stop-table builder emits `reward_rate_trial_k10`/`q_current`.
-- **Backfill the existing pickles in place** (no regen): `scripts/backfill_canonical_covariates.py` loads `event_arm_table.pkl` / `event_patch_table.pkl` / `stop_table.pkl`, recomputes **only** the covariate columns via the same function, **asserts the response/posterior columns and keys are byte-identical**, writes to a temp, validates, swaps (keep a backup). Cheap — CSV/contingency/Q inputs, no `load_data`, no posterior rollup; smoke on one session first, then all.
-- **Spec renames/additions** (`model_specs.py`): `recent_reward_rate` → `reward_rate_arm_k10` in `_M3` (`:194`) and everywhere it appears (incl. the `swr_x_recent_reward_rate` interaction → `swr_x_reward_rate_arm_k10`), patch analogues. Add a **canonical value block** as additive rungs (do **not** touch M0–M7 / P0–P4 coefficients): e.g. `Mv_value = M5 + (p_reward_arm, q_arm)` for the arm hierarchy and the patch analogue, so the value covariates are present without perturbing the re-verified ladder.
-- **Runner updates (now just read the updated tables — no sidecar merge):** `fit_uncertainty_rate.py` — `CURATED_COVARIATES` swap `leaky_q_value_diff`→`q_current` (`:86`), drop `--q-alpha` (`:198`); `q_current`/`reward_rate_trial_k10` now come from `stop_table`. `fit_swr_power_model.py:41` — add `q_current` to `PREDICTORS`. `compare_event_source_models.py`/`choice_prediction.py` — use canonical names; `p_reward_arm`/`q_arm`/`reward_rate_arm_k10` are in `event_arm_table`. Content runner (`fit_replay_content_models.py`) — use canonical names (columns already present).
-- **Stop emitting `leaky_q_value_diff`** from `add_uncertainty_covariates` (`_helpers.py:883`) — or leave the function but remove it from all consumers; name the removal here so no orphan consumer remains.
-- **Docstring/doc updates:** mark `docs/covariate_dictionary.md` §"implemented in code"; update the `fit_uncertainty_rate.py` module docstring (merge source + α-fit note).
+- **Change definitions in `covariates.py`:** `recent_reward_rate_all_events` callers use **k=10** (`reward_rate_arm_k10`); `recent_trial_reward_rate`→exposed as `reward_rate_trial_k10` (rename only); **extend the promoted Q rollout to all-arm** so `q_arm`/`q_current` come from one per-animal-α fit (record α to a **sidecar JSON**). Compute `p_reward_arm` (per-arm nominal value) from the contingency `p_reward_port{0..5}`. **Keep `_leaky_q_value_diff`** (retained comparison — do not remove).
+- **Update the replay builder** (`tables.py`): emit `reward_rate_arm_k10`, `q_arm`, and **populate + rename `nominal_reward_prob`→`p_reward_arm`** (`:1277`); update the schema list (`:1646`) and the viz registry (`session_tables.py` `nominal_reward_prob` panel) to `p_reward_arm`. Patch builder: aggregate per [the aggregator rule](shared-contracts.md#where-the-covariates-live) (mean for fractions/probs).
+- **Update the contfrag builder** (`analysis/contfrag/tables.py`): apply the same canonical definitions (`recent_reward_rate_per_arm`→k=10, `swr_x_recent_reward_rate`→`swr_x_reward_rate_arm_k10`, `recent_trial_reward_rate`→`reward_rate_trial_k10`, add `p_reward_arm`/`q_arm`).
+- **Regenerate the canonical tables** (replay + contfrag) via the prep scripts, reusing existing decodes. **Smoke one session first** (`nvidia-smi`/cores check, time it, extrapolate) before the full batch; run in **tmux**; document the session name. On completion, run the rebuild-integrity check (response/posterior columns reproduce the backup) before proceeding.
+- **Spec updates** (`model_specs.py`): rename `recent_reward_rate`→`reward_rate_arm_k10` in `_M3`/M-ladder/patch/`MODEL_CHOICE` and `swr_x_recent_reward_rate`→`swr_x_reward_rate_arm_k10`. Add a **value block** as additive rungs (e.g. `Mv = M5 + (p_reward_arm, q_arm)`, patch analogue) — **M0–M2 and any rung without the per-arm rate stay bit-identical**; M3–M7 change at k=10 by design (flagged for phase-2 re-verify).
+- **Runner updates:** `fit_uncertainty_rate.py` — **add** `q_current` to `CURATED_COVARIATES`, **keep** `leaky_q_value_diff`, drop `--q-alpha`. `fit_swr_power_model.py` — add `q_current`. `compare_event_source_models.py`/`choice_prediction.py` — canonical names + `p_reward_arm`/`q_arm`. Sweep `simulation.py`/`learning.py` for the renames.
+- **Docstrings/docs:** mark `docs/covariate_dictionary.md` as implemented-in-code; `covariates.py` module docstring points at it.
 
 ## Deliberately not in this phase
-- **No full-dataset re-fit / no parity check** — phase 2.
-- **No posterior re-rollup / no `load_data`** — the backfill recomputes *only* the behavioral covariate columns; the response/posterior columns are preserved byte-identical. (The old 5-visit `recent_reward_rate` column is *replaced* in place, not left stale.)
-- No spline/self-history/spatial changes.
+- **No re-decode** (decodes reused by the rebuild).
+- **No full-dataset re-fit / parity verification** — phase 2 (only one-session smoke fits here).
+- No spline / self-history / spatial / `arm_dist_rank` changes.
 
 ## Validation slice
 
 | Test | Asserts |
 | --- | --- |
-| `test_canonical::test_arm_reward_window` | On a synthetic trial sequence, `reward_rate_arm_k10` = rewarded fraction of the last 10 visits to that arm; trunk arms 0.0; never-visited NaN. |
-| `test_canonical::test_q_arm_matches_q_current` | `q_arm` at the current arm == `q_current` for that stop (same Q rollout); α recorded in attrs. |
-| `test_canonical::test_p_reward_arm` | `p_reward_arm` equals the decoded contingency port prob per arm; `p_reward_arm` at current arm == `p_reward_current`. |
-| `test_specs::test_predictors_resolve` | Every model spec's predictor list resolves to columns present in the canonical tables (no stale `recent_reward_rate`/`leaky_q_value_diff`). |
-| `test_backfill::test_response_preserved` | After backfill, `arm_count_hard/soft`, `arm_posterior_mass`, offsets, keys, `is_swr` are byte-identical to the pre-backfill table (only covariate columns changed). |
-| `test_backfill::test_builder_equals_backfill` | On a sample session, the updated `build_event_arm_table` covariate columns equal the backfill output (same function, same inputs → no divergence). |
-| grep gate (CI/manual) | No `recent_reward_rate`, `recent_trial_reward_rate`, `leaky_q_value_diff` references remain in `src/`+`scripts/` consumers (only the canonical names). |
-| smoke fit (slow) | One session per family fits with canonical covariates; coefficients finite; M0–M7 unchanged vs a one-session pre-refactor fit (the value block is additive). |
+| `test_covariates::test_arm_reward_window` | `reward_rate_arm_k10` = rewarded fraction of last 10 visits to that arm; trunk 0.0; never-visited NaN. |
+| `test_covariates::test_q_all_arm` | `q_arm` at current arm == `q_current`; per-animal α recorded to sidecar; one fit. |
+| `test_covariates::test_p_reward_arm` | `p_reward_arm` == decoded port prob per arm; == `p_reward_current` at current arm; the old `nominal_reward_prob` name is gone (renamed, no orphan). |
+| `test_specs::test_predictors_resolve` | every spec predictor resolves to a present canonical column (no stale `recent_reward_rate`/`nominal_reward_prob`/`q_chosen`). |
+| rebuild-integrity (slow) | regenerated replay+contfrag tables' response/posterior columns reproduce the backup; only covariate columns differ. |
+| grep gate | no `recent_reward_rate`/`recent_trial_reward_rate`/`nominal_reward_prob`/`q_chosen` left in `src/`+`scripts/` (incl. contfrag/simulation/learning/viz). |
+| smoke fit (slow) | one session per family (incl. contfrag) fits; M0–M2 / P-rungs-without-the-rate bit-identical vs a pre-change one-session fit; value block finite. |
 
 ## Fixtures
-Synthetic per-arm trial/visit sequences (known reward pattern) for the window/Q/value
-unit tests; one real session (`chimi20200213_02_r1_HPC`) for the smoke fits.
+Synthetic trial/visit sequences for the window/Q/value unit tests; one real session for the rebuild-integrity + smoke fits.
 
 ## Review
-Dispatch `code-reviewer` against the diff. Confirm: canonical names/schema match
-[shared-contracts.md](shared-contracts.md); M0–M7 / P0–P4 predictor lists are
-bit-identical (value covariates added only as new rungs); `leaky_q` has no remaining
-consumer; the grep gate is clean; α-per-animal recorded; tests exercise the window/Q/
-value definitions (not tautologies); no plan/phase references in code or test names.
+Dispatch `code-reviewer`. Confirm: canonical names/schema match [shared-contracts](shared-contracts.md); **both** builders updated (replay + contfrag); rebuild-integrity holds (response columns reproduced); `leaky_q_value_diff` retained; `nominal_reward_prob` populated+renamed with no orphan (viz + schema updated); M0–M2 invariant, M3–M7 change acknowledged; grep gate clean across all of `src/`+`scripts/`; α in a sidecar not `.attrs`; tests exercise definitions not tautologies; no plan/phase references in code/test names.
