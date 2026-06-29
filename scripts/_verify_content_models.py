@@ -31,7 +31,7 @@ CONFIGS = [
 EXPECT = {
     "is_current": "+ large (current-arm bias)",
     "is_last_rewarded_elsewhere": "- (avoid last-rewarded; ~-1.66, non-SWR)",
-    "recent_reward_rate": "~0 n.s. (NOT value-selective, non-SWR)",
+    "reward_rate_arm_k10": "~0 n.s. (NOT value-selective, non-SWR)",
     "is_prev": "context",
     "swr_x_current": "SWR x current (broadening)",
     "swr_x_prev": "SWR x prev",

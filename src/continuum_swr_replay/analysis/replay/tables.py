@@ -838,7 +838,7 @@ def build_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
-    per_bout["recent_trial_reward_rate"] = _recent_trial_reward_rate(
+    per_bout["reward_rate_trial_k10"] = _recent_trial_reward_rate(
         bout_starts, trials
     )
     # Per-lag reward outcomes (reward_lag1..N): the immediate previous trial
@@ -1068,6 +1068,7 @@ def build_event_arm_table(
     track_graph: nx.Graph,
     *,
     conditional_posterior=None,
+    contingency: pd.DataFrame | None = None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
@@ -1261,7 +1262,11 @@ def build_event_arm_table(
     if len(trials) > 0:
         vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)
         cr_2d = _cumulative_reward_all_events(event_times, trials, well_to_arm_map)
-        rrr_2d = _recent_reward_rate_all_events(event_times, trials, well_to_arm_map)
+        # canonical per-arm reward rate: rewarded fraction of the last 10 visits
+        # to that arm (covariate_dictionary.md D1; was 5-visit).
+        rrr_2d = _recent_reward_rate_all_events(
+            event_times, trials, well_to_arm_map, k=10
+        )
     else:
         vr_2d = np.full((n_events, n_arms), np.nan)
         cr_2d = np.full((n_events, n_arms), np.nan)
@@ -1285,8 +1290,33 @@ def build_event_arm_table(
         "visit_recency"
     ].transform("mean")
     long["cumulative_reward"] = cr_2d.flatten()
-    long["recent_reward_rate"] = rrr_2d.flatten()
-    long["nominal_reward_prob"] = np.nan  # deferred; requires block loader
+    long["reward_rate_arm_k10"] = rrr_2d.flatten()
+
+    # -- p_reward_arm / q_arm: per-arm nominal value + experienced leaky-Q level
+    # from the per-stop contingency artifact (covariate_dictionary.md D2/D3).
+    # Leaf arm j <- p_reward_port{j} / q_port{j}; trunk arms (6,7,8) are not
+    # reward sites -> structural 0.0 where the stop has contingency, else NaN
+    # (so a stop absent from the contingency map drops uniformly at fit time).
+    port_cols = [f"p_reward_port{i}" for i in range(6)]
+    q_cols = [f"q_port{i}" for i in range(6)]
+    if contingency is not None and {*port_cols, *q_cols}.issubset(contingency.columns):
+        cont = contingency.drop_duplicates("stop_id")[["stop_id", *port_cols, *q_cols]]
+        m = long[["stop_id", "arm"]].merge(cont, on="stop_id", how="left")
+        port_mat = m[port_cols].to_numpy(dtype=float)
+        q_mat = m[q_cols].to_numpy(dtype=float)
+        arm_i = long["arm"].to_numpy()
+        leaf = arm_i < 6
+        leaf_idx = np.clip(arm_i, 0, 5).astype(int)
+        row = np.arange(len(long))
+        present = ~np.isnan(port_mat[:, 0])  # stop_id had a contingency row
+        trunk_fill = np.where(present, 0.0, np.nan)
+        long["p_reward_arm"] = np.where(
+            leaf, port_mat[row, leaf_idx], trunk_fill
+        )
+        long["q_arm"] = np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
+    else:
+        long["p_reward_arm"] = np.nan
+        long["q_arm"] = np.nan
 
     # Interactions (plan §1.7). Event-level × arm-level products.
     tss = long["time_since_stop"].to_numpy()
@@ -1312,7 +1342,9 @@ def build_event_arm_table(
     # old is_last_rewarded predictor; the _elsewhere fix makes the
     # reward-memory interaction identifiable. Sparse (~2% of events)
     # but honest.
-    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_reward_rate_arm_k10"] = (
+        is_swr_i * long["reward_rate_arm_k10"].to_numpy()
+    )
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
@@ -1572,7 +1604,7 @@ def _stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
-        "recent_trial_reward_rate",
+        "reward_rate_trial_k10",
         "is_swr_stop",
         "n_SWR",
         "is_mua_stop",
@@ -1654,8 +1686,9 @@ def _event_arm_table_columns() -> list[str]:
         "visit_recency",
         "visit_recency_demeaned",
         "cumulative_reward",
-        "recent_reward_rate",
-        "nominal_reward_prob",
+        "reward_rate_arm_k10",
+        "p_reward_arm",
+        "q_arm",
         # Interactions (plan §1.7 + collinearity control)
         "current_x_last_rewarded",
         "time_x_current",
@@ -1665,7 +1698,7 @@ def _event_arm_table_columns() -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
-        "swr_x_recent_reward_rate",
+        "swr_x_reward_rate_arm_k10",
         "swr_x_visit_recency_demeaned",
         "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",

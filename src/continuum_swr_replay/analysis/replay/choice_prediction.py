@@ -318,7 +318,7 @@ def build_choice_dataset(
             fraction_col,
             "visit_recency",
             "cumulative_reward",
-            "recent_reward_rate",
+            "reward_rate_arm_k10",
             "dist_to_arm",
             "is_same_patch",
         ]
@@ -335,7 +335,7 @@ def build_choice_dataset(
             replay_frac=(fraction_col, strict_mean),
             visit_recency=("visit_recency", "last"),
             cumulative_reward=("cumulative_reward", "last"),
-            recent_reward_rate=("recent_reward_rate", "last"),
+            reward_rate_arm_k10=("reward_rate_arm_k10", "last"),
             dist_to_arm=("dist_to_arm", "last"),
             is_same_patch=("is_same_patch", "last"),
         )

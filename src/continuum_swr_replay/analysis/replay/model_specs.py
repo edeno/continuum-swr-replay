@@ -191,13 +191,13 @@ class ModelSpec:
 
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
-_M3 = (*_M2, "recent_reward_rate")
+_M3 = (*_M2, "reward_rate_arm_k10")
 _M4 = (*_M3, "visit_recency_demeaned")
 _M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
 _M7 = (
     *_M6,
-    "swr_x_recent_reward_rate",
+    "swr_x_reward_rate_arm_k10",
     "swr_x_visit_recency_demeaned",
     "swr_x_is_last_rewarded_elsewhere",
 )
@@ -461,7 +461,7 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
         predictors=(
             "is_after_omission",
             "is_after_switch",
-            "recent_trial_reward_rate",
+            "reward_rate_trial_k10",
         ),
         description="+ recent reward history (rewarded fraction, last 10 trials)",
         parent="R1",
@@ -530,7 +530,7 @@ N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos mo
 # (M2r's continuous reward rate, M8's switch term) — carried into the per-bin
 # design by aggregate_to_timebins. Shared by the fitter orchestrator and the
 # model-checking plotter so the inline refit matches the persisted fits.
-STOP_COVARIATES = ("recent_trial_reward_rate", "is_after_switch")
+STOP_COVARIATES = ("reward_rate_trial_k10", "is_after_switch")
 
 
 @dataclass(frozen=True)
@@ -599,7 +599,7 @@ class PerBinRateModelSpec:
             terms.append(_SPLINE)
         terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
         if self.reward_rate:
-            terms.append("recent_trial_reward_rate")
+            terms.append("reward_rate_trial_k10")
         if self.self_history_basis:
             terms += [f"hist_rcos_{k}" for k in range(self.self_history_basis)]
         else:
@@ -697,7 +697,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 _CHOICE_BEHAVIOR = (
     "visit_recency",
     "cumulative_reward",
-    "recent_reward_rate",
+    "reward_rate_arm_k10",
 )
 
 MODEL_CHOICE: dict[str, ModelSpec] = {

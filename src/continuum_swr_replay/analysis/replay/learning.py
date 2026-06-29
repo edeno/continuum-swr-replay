@@ -95,12 +95,12 @@ def _per_event_best_arm(
     sess_keys = ["animal", "day", "epoch"]
     well_only = event_arm_table[event_arm_table["arm"].isin(well_arms)]
     # Keep only events where at least one well arm has a non-NaN rate.
-    valid = well_only.dropna(subset=["recent_reward_rate"])
+    valid = well_only.dropna(subset=["reward_rate_arm_k10"])
     if valid.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "best_arm"])
     best = (
         valid.sort_values(
-            [*sess_keys, "event_id", "recent_reward_rate", "arm"],
+            [*sess_keys, "event_id", "reward_rate_arm_k10", "arm"],
             ascending=[True, True, True, True, False, True],
         )
         .groupby([*sess_keys, "event_id"], sort=False)

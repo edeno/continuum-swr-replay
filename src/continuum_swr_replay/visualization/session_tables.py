@@ -712,7 +712,7 @@ def _plot_cumulative_reward(ax: Axes, ctx: _PanelContext) -> None:
 
 def _plot_recent_reward_rate(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
-        ax, ctx, value_col="recent_reward_rate",
+        ax, ctx, value_col="reward_rate_arm_k10",
         cmap_name="RdYlGn", vmin=0.0, vmax=1.0,
         label="recent\nreward\nrate",
     )
@@ -1237,7 +1237,7 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "time_since_stop": _plot_time_since_stop,
     "visit_recency": _plot_visit_recency,
     "cumulative_reward": _plot_cumulative_reward,
-    "recent_reward_rate": _plot_recent_reward_rate,
+    "reward_rate_arm_k10": _plot_recent_reward_rate,
     "nominal_reward_prob": _plot_nominal_reward_prob,
     "dist_to_arm": _plot_dist_to_arm,
     "arm_dist_rank": _plot_arm_dist_rank,
@@ -1272,7 +1272,7 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "time_since_stop": 1.0,
     "visit_recency": 1.4,
     "cumulative_reward": 1.4,
-    "recent_reward_rate": 1.4,
+    "reward_rate_arm_k10": 1.4,
     "nominal_reward_prob": 1.4,
     "dist_to_arm": 1.4,
     "arm_dist_rank": 1.4,

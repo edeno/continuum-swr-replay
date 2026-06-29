@@ -46,7 +46,7 @@ def _toy_tables(n_stops_per_session: int = 24, seed: int = 0):
                 "immobility_time": immob,
                 **{f"reward_lag{j}": float(rng.integers(0, 2)) for j in range(1, 11)},
                 "reward_lag1": reward,
-                "recent_trial_reward_rate": float(rng.uniform(0, 1)),
+                "reward_rate_trial_k10": float(rng.uniform(0, 1)),
                 "is_after_switch": float(rng.integers(0, 2)),
             })
             # onset times within the stop; rewarded stops get more events.

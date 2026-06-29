@@ -654,7 +654,7 @@ def build_contfrag_event_arm_table(
         "visit_recency"
     ].transform("mean")
     long["cumulative_reward"] = cr_vals
-    long["recent_reward_rate"] = rrr_vals
+    long["reward_rate_arm_k10"] = rrr_vals
     long["nominal_reward_prob"] = np.nan
 
     # Interactions
@@ -677,7 +677,7 @@ def build_contfrag_event_arm_table(
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
     # M7 — SWR × value/memory interactions (mirrors replay/tables.py).
-    long["swr_x_recent_reward_rate"] = is_swr_i * long["recent_reward_rate"].to_numpy()
+    long["swr_x_reward_rate_arm_k10"] = is_swr_i * long["reward_rate_arm_k10"].to_numpy()
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
@@ -764,7 +764,7 @@ def build_contfrag_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
-    per_bout["recent_trial_reward_rate"] = recent_trial_reward_rate(bout_starts, trials)
+    per_bout["reward_rate_trial_k10"] = recent_trial_reward_rate(bout_starts, trials)
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -967,7 +967,7 @@ def _contfrag_stop_table_columns() -> list[str]:
         "stop_start",
         "stop_end",
         "immobility_time",
-        "recent_trial_reward_rate",
+        "reward_rate_trial_k10",
         "is_swr_stop",
         "is_mua_stop",
         "has_replay",
@@ -1051,7 +1051,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "visit_recency",
         "visit_recency_demeaned",
         "cumulative_reward",
-        "recent_reward_rate",
+        "reward_rate_arm_k10",
         "nominal_reward_prob",
         # Interactions
         "current_x_last_rewarded",
@@ -1062,7 +1062,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "swr_x_prev",
         "swr_x_next",
         "swr_x_last_rewarded",
-        "swr_x_recent_reward_rate",
+        "swr_x_reward_rate_arm_k10",
         "swr_x_visit_recency_demeaned",
         "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",

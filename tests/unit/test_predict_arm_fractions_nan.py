@@ -100,7 +100,7 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
                     "arm_fraction": 1.0 / 9,
                     "visit_recency": 0.0,
                     "cumulative_reward": 0.0,
-                    "recent_reward_rate": 0.0,
+                    "reward_rate_arm_k10": 0.0,
                     "dist_to_arm": 0.0,
                     "is_same_patch": 0,
                     "current_patch": 1,

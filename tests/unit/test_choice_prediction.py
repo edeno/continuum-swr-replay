@@ -92,7 +92,7 @@ def _make_minimal_tables(
                     "is_next": 0.0,
                     "visit_recency": 0.0,
                     "cumulative_reward": 0.0,
-                    "recent_reward_rate": 0.0,
+                    "reward_rate_arm_k10": 0.0,
                     "dist_to_arm": 1.0,
                     "is_same_patch": 0,
                 }
@@ -235,7 +235,7 @@ class TestBuildChoiceDataset:
                 "is_next": 0.0,
                 "visit_recency": 0.0,
                 "cumulative_reward": 0.0,
-                "recent_reward_rate": 0.0,
+                "reward_rate_arm_k10": 0.0,
                 "dist_to_arm": 1.0,
                 "is_same_patch": 0,
             })
@@ -288,7 +288,7 @@ class TestBuildChoiceDataset:
                 "is_next": 0.0,
                 "visit_recency": 0.0,
                 "cumulative_reward": 0.0,
-                "recent_reward_rate": 0.0,
+                "reward_rate_arm_k10": 0.0,
                 "dist_to_arm": 1.0,
                 "is_same_patch": 0,
             })

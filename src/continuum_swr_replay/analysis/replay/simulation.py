@@ -59,7 +59,7 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "swr_x_prev": ("is_prev", "is_swr"),
     "swr_x_next": ("is_next", "is_swr"),
     "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
-    "swr_x_recent_reward_rate": ("recent_reward_rate", "is_swr"),
+    "swr_x_reward_rate_arm_k10": ("reward_rate_arm_k10", "is_swr"),
     "swr_x_visit_recency_demeaned": ("visit_recency_demeaned", "is_swr"),
     "swr_x_is_last_rewarded_elsewhere": ("is_last_rewarded_elsewhere", "is_swr"),
     "mua_x_last_rewarded": ("is_last_rewarded", "is_mua"),
@@ -139,9 +139,9 @@ def sample_arm_design(
             feature_cols["visit_recency_demeaned"] = vr - vr.mean(axis=0, keepdims=True)
     if "cumulative_reward" in predictors:
         feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
-    if "recent_reward_rate" in predictors:
+    if "reward_rate_arm_k10" in predictors:
         # Rewarded fraction of recent visits — a rate in [0, 1].
-        feature_cols["recent_reward_rate"] = rng.uniform(0, 1, size=(n_events, n_arms))
+        feature_cols["reward_rate_arm_k10"] = rng.uniform(0, 1, size=(n_events, n_arms))
     if "dist_to_arm" in predictors:
         feature_cols["dist_to_arm"] = rng.uniform(0, 100, size=(n_events, n_arms))
 
@@ -295,7 +295,7 @@ def simulate_with_event_covariates(
         "is_last_rewarded": (arm_grid == rewarded[:, None]).astype(float),
         "visit_recency": rng.uniform(0, 10, size=(n_events, n_arms)),
         "cumulative_reward": rng.uniform(0, 5, size=(n_events, n_arms)),
-        "recent_reward_rate": rng.uniform(0, 1, size=(n_events, n_arms)),
+        "reward_rate_arm_k10": rng.uniform(0, 1, size=(n_events, n_arms)),
         "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
     # M5/M6 reward-memory predictor: last-rewarded arm where it is not

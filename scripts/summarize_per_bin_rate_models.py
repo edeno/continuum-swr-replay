@@ -165,7 +165,7 @@ def main():
     section_selfhistory("M7_time_hist_rew")
 
     section_coef("5. RECENT REWARD RATE", "M2r_rewrate",
-                 "coef_recent_trial_reward_rate")
+                 "coef_reward_rate_trial_k10")
     section_coef("5. PATCH SWITCH", "M8_full_switch", "coef_is_after_switch")
 
     section_ladder()

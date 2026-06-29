@@ -216,7 +216,7 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [("M2r_rewrate", "coef_recent_trial_reward_rate"),
+    blocks = [("M2r_rewrate", "coef_reward_rate_trial_k10"),
               ("M8_full_switch", "coef_is_after_switch")]
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):

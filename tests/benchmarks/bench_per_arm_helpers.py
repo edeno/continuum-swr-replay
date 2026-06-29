@@ -68,7 +68,7 @@ def main():
     funcs = [
         ("visit_recency", visit_recency_per_arm, visit_recency_all_events),
         ("cumulative_reward", cumulative_reward_per_arm, cumulative_reward_all_events),
-        ("recent_reward_rate", recent_reward_rate_per_arm, recent_reward_rate_all_events),
+        ("reward_rate_arm_k10", recent_reward_rate_per_arm, recent_reward_rate_all_events),
     ]
 
     for name, scalar_fn, batch_fn in funcs:

@@ -70,7 +70,7 @@ def _make_tables(
                 "event_id": e["event_id"],
                 "arm": arm,
                 "arm_fraction": e["arm_fracs"][arm],
-                "recent_reward_rate": e.get("rrr", [np.nan] * 9)[arm],
+                "reward_rate_arm_k10": e.get("rrr", [np.nan] * 9)[arm],
                 "is_swr": e.get("is_swr", False),
                 "is_mua": e.get("is_mua", False),
             }

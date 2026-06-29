@@ -847,7 +847,7 @@ def _plot_trial_history(
                 continue
             r = by_arm.loc[w]
             vr = r.get("visit_recency")
-            rr = r.get("recent_reward_rate")
+            rr = r.get("reward_rate_arm_k10")
             cum = r.get("cumulative_reward")
             vr_s = "·" if pd.isna(vr) else f"{vr:.0f}"
             rr_s = "·" if pd.isna(rr) else f"{rr:.2f}"
@@ -914,7 +914,7 @@ def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
     """
     preds = [
         ("visit_recency_demeaned", "visit_rec"),
-        ("recent_reward_rate", "rew_rate"),
+        ("reward_rate_arm_k10", "rew_rate"),
         ("is_last_rewarded_elsewhere", "lastR_elsw"),
     ]
     ax.set_title("per-arm regressors (M3–M5)", fontsize=7)

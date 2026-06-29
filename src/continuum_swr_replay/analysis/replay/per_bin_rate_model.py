@@ -61,7 +61,7 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     if spec.reward_time_interaction and spec.reward_lags == 0:
         cols.append("reward_lag1")
     if spec.reward_rate:
-        cols.append("recent_trial_reward_rate")
+        cols.append("reward_rate_trial_k10")
     if spec.self_history_basis:
         cols += [f"hist_rcos_{k}" for k in range(spec.self_history_basis)]
     else:

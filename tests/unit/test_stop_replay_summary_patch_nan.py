@@ -32,7 +32,7 @@ def _toy_inputs() -> dict[str, pd.DataFrame]:
                 # ``stop_replay_summary`` reads ``recent_reward_rate``
                 # to pick the per-event "best" arm; supply zeros so
                 # the helper finds *some* well arm with a finite rate.
-                "recent_reward_rate": 0.0,
+                "reward_rate_arm_k10": 0.0,
             }
             for arm in range(9)
         ]
