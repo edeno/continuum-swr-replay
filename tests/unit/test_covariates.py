@@ -9,6 +9,9 @@ public ones) off the package namespace.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import continuum_swr_replay.analysis.replay as replay_pkg
 from continuum_swr_replay.analysis.replay import _helpers, covariates
 
@@ -53,18 +56,25 @@ def test_q_learner_lives_in_covariates():
     assert callable(covariates._fit_alpha)
 
 
-def test_no_circular_import_either_order():
-    """Importing covariates first (before _helpers is cached) must not deadlock.
+def test_covariates_imports_standalone_no_deadlock():
+    """Importing ``covariates`` first in a *fresh* interpreter must not deadlock.
 
-    Re-imports are cached, but the names must still be present regardless of which
-    module a consumer reaches first; ``_helpers`` and ``covariates`` form a
-    re-export cycle, so this pins that it resolves.
+    ``_helpers`` and ``covariates`` form a re-export cycle (covariates imports
+    ``_trial_cutoff_times`` / ``build_well_to_arm_map`` back from ``_helpers``).
+    A subprocess is required to make ``covariates`` the entry import: within this
+    test process both modules are already cached, so an inline import would only
+    re-assert identity, not the load order. The shim resolves because importing
+    the submodule first runs the package ``__init__``, which loads ``_helpers``
+    before ``.covariates``.
     """
-    from continuum_swr_replay.analysis.replay._helpers import (  # noqa: F401
-        recent_reward_rate_all_events as via_helpers,
+    code = (
+        "from continuum_swr_replay.analysis.replay.covariates import "
+        "recent_reward_rate_all_events as a;"
+        "from continuum_swr_replay.analysis.replay._helpers import "
+        "recent_reward_rate_all_events as b;"
+        "assert a is b"
     )
-    from continuum_swr_replay.analysis.replay.covariates import (  # noqa: F401
-        recent_reward_rate_all_events,
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True
     )
-
-    assert recent_reward_rate_all_events is via_helpers
+    assert result.returncode == 0, result.stderr
