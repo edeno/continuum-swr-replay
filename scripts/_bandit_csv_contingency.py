@@ -26,11 +26,12 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import json
 
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariates import _fit_alpha, _q_chosen
+from continuum_swr_replay.analysis.replay.covariates import _fit_alpha, q_all_arm
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -67,6 +68,9 @@ def _prep_csv(animal: str) -> pd.DataFrame:
         p_reward_best=ports.max(axis=1),
         is_best_patch=(WELL_PATCH[arm] == best_patch),
         value_diff_patch=_patch_value_diff(ports),
+        # per-leaf nominal reward probability (the block schedule); p_reward_arm
+        # in the canonical tables maps leaf arm j <- p_reward_port{j}.
+        **{f"p_reward_port{i}": ports[:, i] for i in range(6)},
     )
     df["rpe"] = df["reward"].to_numpy() - df["p_reward_current"].to_numpy()
     # block = contingency-change index within (date, session); position within block
@@ -81,13 +85,18 @@ def _prep_csv(animal: str) -> pd.DataFrame:
     df = pd.concat(out, ignore_index=True)
 
     # subjective value: per-leaf delta-rule Q-learner, alpha fit per animal to
-    # best predict reward; q_chosen updates within a session across blocks.
+    # best predict reward; the Q level updates within a session across blocks.
+    # q_current is the chosen arm's level; q_port{j} the level of every arm
+    # (q_arm in the canonical tables maps leaf arm j <- q_port{j}).
     grp = (df["date"].astype(str) + "_" + df["session"].astype(str)).to_numpy()
     arm_a = df["arm"].to_numpy()
     rew_a = df["reward"].to_numpy(dtype=float)
     alpha = _fit_alpha(arm_a, rew_a, grp)
-    df["q_chosen"] = _q_chosen(arm_a, rew_a, grp, alpha)
-    df["q_rpe"] = rew_a - df["q_chosen"].to_numpy()
+    q_mat = q_all_arm(arm_a, rew_a, grp, alpha)  # (n_trials, 6)
+    df["q_current"] = q_mat[np.arange(len(df)), arm_a]
+    for i in range(6):
+        df[f"q_port{i}"] = q_mat[:, i]
+    df["q_rpe"] = rew_a - df["q_current"].to_numpy()
     df.attrs["alpha"] = alpha
     return df
 
@@ -108,18 +117,20 @@ def _visits(arms: list) -> tuple[list, list[list[int]]]:
 def build_animal(animal: str) -> pd.DataFrame:
     csv = _prep_csv(animal)
     # within-block variance check: nominal p_reward_current is block-constant,
-    # so its within-block std is ~0; q_chosen should vary within block.
+    # so its within-block std is ~0; q_current should vary within block.
     wb = csv.groupby(["date", "session", "block_number"])
     nom_sd = wb["p_reward_current"].std().mean()
-    q_sd = wb["q_chosen"].std().mean()
+    q_sd = wb["q_current"].std().mean()
     print(f"  [{animal}] alpha={csv.attrs['alpha']:.3f}  "
-          f"corr(q_chosen,p_reward_current)={csv['q_chosen'].corr(csv['p_reward_current']):.2f}  "
-          f"mean within-block sd: nominal={nom_sd:.3f} q_chosen={q_sd:.3f}")
+          f"corr(q_current,p_reward_current)={csv['q_current'].corr(csv['p_reward_current']):.2f}  "
+          f"mean within-block sd: nominal={nom_sd:.3f} q_current={q_sd:.3f}")
     st = pd.read_pickle(RC / "stop_table.pkl")
     st = st[st.animal == animal]
     val_cols = ["arm", "p_reward_current", "p_reward_best", "is_best_patch", "rpe",
                 "value_diff_patch", "block_number", "trials_since_block_change",
-                "q_chosen", "q_rpe"]
+                "q_current", "q_rpe",
+                *[f"p_reward_port{i}" for i in range(6)],
+                *[f"q_port{i}" for i in range(6)]]
     rows = []
     for day, st_day in st.groupby("day"):
         csv_day = csv[csv.date == day]
@@ -167,7 +178,9 @@ def build_animal(animal: str) -> pd.DataFrame:
                         "epoch": ep, "csv_session": best_s, "match_ratio": round(best_r, 3),
                         **{c: trow[c] for c in val_cols},
                     })
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    out.attrs["alpha"] = float(csv.attrs["alpha"])
+    return out
 
 
 def main() -> None:
@@ -178,14 +191,18 @@ def main() -> None:
     animals = [args.animal] if args.animal else list(ANIMALS)
 
     parts = []
+    alphas: dict[str, float] = {}
     for a in animals:
         t = build_animal(a)
+        alphas[a] = t.attrs["alpha"]
         st = pd.read_pickle(RC / "stop_table.pkl")
         n_stop = (st.animal == a).sum()
         print(f"{a:7s} mapped {len(t):5d}/{n_stop:5d} stops "
               f"({100*len(t)/n_stop:.0f}%)  median match_ratio={t['match_ratio'].median():.2f}")
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
+    print(f"\nper-animal fitted Q learning rate alpha: "
+          f"{ {a: round(v, 3) for a, v in alphas.items()} }")
 
     # cross-check vs StateScript parser
     old = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table.pkl")
@@ -204,7 +221,11 @@ def main() -> None:
     if args.write:
         out = RC / "models_per_bin_rate" / "contingency_table_csv.pkl"
         tab.to_pickle(out)
-        print(f"\nwrote {len(tab)} rows -> {out}")
+        # per-animal alpha to a sidecar JSON (pandas drops df.attrs on pickle, and
+        # q_arm/q_current must be interpreted within each animal's own timescale).
+        alpha_path = out.with_name("contingency_csv_alpha.json")
+        alpha_path.write_text(json.dumps(alphas, indent=2, sort_keys=True))
+        print(f"\nwrote {len(tab)} rows -> {out}\nwrote alpha sidecar -> {alpha_path}")
 
 
 if __name__ == "__main__":

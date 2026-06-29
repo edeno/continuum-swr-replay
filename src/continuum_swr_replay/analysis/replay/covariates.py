@@ -586,6 +586,51 @@ def _q_chosen(
     return qc
 
 
+def q_all_arm(
+    arm: np.ndarray,
+    reward: np.ndarray,
+    grp: np.ndarray,
+    alpha: float,
+    init: float = 0.5,
+) -> np.ndarray:
+    """Per-leaf delta-rule Q **level of every arm**, pre-update, for all trials.
+
+    The all-arm companion to :func:`_q_chosen`: same leaky delta-rule
+    (``Q[a] += alpha*(reward - Q[a])``, ``Q`` reset to ``init`` at each new group),
+    but snapshots the full 6-arm value vector *before* each trial's update rather
+    than only the chosen arm. ``q_all_arm(...)[i, arm[i]]`` equals
+    ``_q_chosen(...)[i]`` by construction, so ``q_current`` is the chosen-arm
+    column of this array and ``q_arm`` is the per-arm value.
+
+    Parameters
+    ----------
+    arm : np.ndarray, shape (n_trials,)
+        Chosen leaf arm 0..5 at each trial, in trial order within group.
+    reward : np.ndarray, shape (n_trials,)
+        Binary reward (0/1) at each trial.
+    grp : np.ndarray, shape (n_trials,)
+        Group label (session); ``Q`` resets to ``init`` at each new group.
+    alpha : float
+        Leaky delta-rule learning rate.
+    init : float
+        Initial Q for every arm at the start of each group.
+
+    Returns
+    -------
+    np.ndarray, shape (n_trials, 6)
+        Row ``i`` is the pre-update Q value of each of the 6 leaf arms at trial ``i``.
+    """
+    out = np.empty((len(arm), 6))
+    Q, prev = None, None
+    for i in range(len(arm)):
+        if grp[i] != prev:
+            Q, prev = np.full(6, init), grp[i]
+        out[i] = Q  # numpy row-assignment copies values, so the later in-place
+        a = arm[i]  # update of Q does not alias the stored snapshot
+        Q[a] += alpha * (reward[i] - Q[a])
+    return out
+
+
 def _fit_alpha(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray) -> float:
     """alpha (per animal) that makes q_chosen best predict reward (Bernoulli NLL)."""
 
