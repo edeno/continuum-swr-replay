@@ -23,7 +23,8 @@ Model specs / runners (consumers to update):
 ## Scope and dependency policy
 
 ### Goals
-- One canonical definition per construct, one source (`canonical_covariates*.pkl`) feeding every family; coefficients comparable within an estimator class.
+- One canonical definition per construct, written into the canonical tables every family reads; coefficients comparable within an estimator class.
+- **Consolidate covariate definitions into one module** `src/.../analysis/replay/covariates.py` (extracted from the `_helpers.py` grab-bag + the Q-learner promoted from the scratch script), mirroring `docs/covariate_dictionary.md` 1:1 — done behavior-preservingly in **phase-0** (re-export shim keeps the ~16 importers working) before any definition changes.
 - Implement D1–D5 exactly (window 10; add `p_reward_arm`; `leaky_q`→fitted Q; `recent_switch_rate` canonical + `is_after_switch` kept; entry-rule contract).
 - Re-fit all families on current tables; prove unchanged-definition covariates reproduce.
 

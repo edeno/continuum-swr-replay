@@ -24,5 +24,6 @@ comparison.
 - [overview.md](overview.md) — integration points, goals/non-goals, metrics, risks, the precompute-vs-regen decision.
 - [shared-contracts.md](shared-contracts.md) — the canonical covariate names + which canonical-table columns they live in (no sidecar) + the in-place-update safety contract.
 - Phases (each ships as a separable PR):
-  - [phase-1-canonical-covariate-layer.md](phase-1-canonical-covariate-layer.md) — build the canonical covariate source + update model specs/runners to consume it + tests + smoke fits.
+  - [phase-0-extract-covariates.md](phase-0-extract-covariates.md) — behavior-preserving: consolidate the covariate functions + promoted Q-learner into `covariates.py` with a re-export shim (no definition changes).
+  - [phase-1-canonical-covariate-layer.md](phase-1-canonical-covariate-layer.md) — change the definitions in `covariates.py` to canonical (D1–D5), update the table builders + backfill the tables in place + update model specs/runners + tests + smoke fits.
   - [phase-2-refit-verify.md](phase-2-refit-verify.md) — re-fit all families on current tables, verify parity for unchanged covariates, refresh docs/claims numbers.
