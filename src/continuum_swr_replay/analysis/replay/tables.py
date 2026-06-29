@@ -1417,19 +1417,29 @@ def build_event_patch_table(
     # when no non-null observations exist in the group, which is what
     # the downstream P3 patch model needs to drop those rows from its
     # complete-case fit instead of conditioning on a fabricated zero.
-    patch_eat = (
-        eat.groupby(["event_id", "patch"])
-        .agg(
-            patch_count_hard=("arm_count_hard", "sum"),
-            is_current_patch=("is_same_patch", "max"),
-            cumulative_reward_patch=(
-                "cumulative_reward",
-                lambda s: s.sum(min_count=1),
-            ),
-            visit_recency_patch=("visit_recency", "min"),
-        )
-        .reset_index()
-    )
+    agg_spec: dict = {
+        "patch_count_hard": ("arm_count_hard", "sum"),
+        "is_current_patch": ("is_same_patch", "max"),
+        "cumulative_reward_patch": (
+            "cumulative_reward",
+            lambda s: s.sum(min_count=1),
+        ),
+        "visit_recency_patch": ("visit_recency", "min"),
+    }
+    # Value aggregates: patch mean over the patch's LEAF arms only (trunk arms
+    # 6,7,8 are not reward sites) per the aggregator rule. Mask trunk to NaN so
+    # the skipna mean averages the leaves; a patch whose leaves are all NaN
+    # (unmapped stop / never-visited) stays NaN and drops at fit time.
+    leaf = eat["arm"] < 6
+    for col, out_col in (
+        ("reward_rate_arm_k10", "reward_rate_arm_k10_patch"),
+        ("p_reward_arm", "p_reward_arm_patch"),
+        ("q_arm", "q_arm_patch"),
+    ):
+        if col in eat.columns:
+            eat[f"_leaf_{col}"] = eat[col].where(leaf)
+            agg_spec[out_col] = (f"_leaf_{col}", "mean")
+    patch_eat = eat.groupby(["event_id", "patch"]).agg(**agg_spec).reset_index()
 
     # is_last_rewarded_patch: is the last-rewarded arm in this patch?
     last_rew = event_table[["event_id", "last_rewarded_arm"]].copy()

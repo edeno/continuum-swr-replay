@@ -501,6 +501,7 @@ def build_contfrag_event_arm_table(
     event_source: str = "SWR",
     brain_area: str = "HPC",  # noqa: ARG001 — passed for API symmetry; event_id is inherited
     conditional_posterior=None,
+    contingency: pd.DataFrame | None = None,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
     """One row per (event, arm) for externally-defined events.
@@ -635,7 +636,8 @@ def build_contfrag_event_arm_table(
         else:
             vr = visit_recency_per_arm(event_time, trials, track_graph)
             cr = cumulative_reward_per_arm(event_time, trials, track_graph)
-            rrr = recent_reward_rate_per_arm(event_time, trials, track_graph)
+            # canonical 10-visit per-arm reward rate (covariate_dictionary.md D1)
+            rrr = recent_reward_rate_per_arm(event_time, trials, track_graph, k=10)
 
         for j, a in enumerate(ALL_ARMS):
             idx = base + j
@@ -655,7 +657,32 @@ def build_contfrag_event_arm_table(
     ].transform("mean")
     long["cumulative_reward"] = cr_vals
     long["reward_rate_arm_k10"] = rrr_vals
-    long["nominal_reward_prob"] = np.nan
+
+    # p_reward_arm / q_arm from the per-stop contingency artifact (mirrors
+    # replay/tables.py): leaf arm j <- p_reward_port{j}/q_port{j}, trunk arms
+    # structural 0.0 where the stop is mapped, else NaN.
+    port_cols = [f"p_reward_port{i}" for i in range(6)]
+    q_cols = [f"q_port{i}" for i in range(6)]
+    if (
+        contingency is not None
+        and "stop_id" in long.columns
+        and {*port_cols, *q_cols}.issubset(contingency.columns)
+    ):
+        cont = contingency.drop_duplicates("stop_id")[["stop_id", *port_cols, *q_cols]]
+        m = long[["stop_id", "arm"]].merge(cont, on="stop_id", how="left")
+        port_mat = m[port_cols].to_numpy(dtype=float)
+        q_mat = m[q_cols].to_numpy(dtype=float)
+        arm_i = long["arm"].to_numpy()
+        is_leaf = arm_i < 6
+        leaf_idx = np.clip(arm_i, 0, 5).astype(int)
+        rowi = np.arange(len(long))
+        present = ~np.isnan(port_mat[:, 0])
+        trunk_fill = np.where(present, 0.0, np.nan)
+        long["p_reward_arm"] = np.where(is_leaf, port_mat[rowi, leaf_idx], trunk_fill)
+        long["q_arm"] = np.where(is_leaf, q_mat[rowi, leaf_idx], trunk_fill)
+    else:
+        long["p_reward_arm"] = np.nan
+        long["q_arm"] = np.nan
 
     # Interactions
     tss = long["time_since_stop"].to_numpy()
@@ -1052,7 +1079,8 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "visit_recency_demeaned",
         "cumulative_reward",
         "reward_rate_arm_k10",
-        "nominal_reward_prob",
+        "p_reward_arm",
+        "q_arm",
         # Interactions
         "current_x_last_rewarded",
         "time_x_current",
