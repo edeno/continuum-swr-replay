@@ -197,8 +197,14 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
 - **Circularity** (content from the same decoder that defines events): both the
   baseline current-arm claim *and* the new reward-driven off-current content
   clear the spike-evidence engine (post-reward off-current `dll_per_spike` 0.63,
-  99% > 0 vs baseline ≈ 0; 5 sessions). A full-dataset run is still the eventual
-  goal.
+  99% > 0 vs baseline ≈ 0; **5 sessions, in-principle validation**). The
+  **full-dataset** reality run is deliberately **gated on the planned full
+  re-decode**, not run now: (i) the re-decode persists `log_likelihood` to
+  `results.nc` so reality is a cheap direct read rather than a ~20 min/session
+  recompute; (ii) the current decodes are stale (the position-trim drift), so a
+  full run now would validate the wrong decodes; (iii) the close-event W3
+  (place-field-extent) worry needs the local-kernel re-decode regardless. See the
+  reality design spec (TODO §2, "gated on a first re-decoded session").
 
 ## Reproducibility (scripts & key commits)
 
