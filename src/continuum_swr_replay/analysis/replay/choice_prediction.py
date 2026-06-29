@@ -320,6 +320,7 @@ def build_choice_dataset(
             "cumulative_reward",
             "reward_rate_arm_k10",
             "dist_to_arm",
+            "arm_dist_rank",
             "is_same_patch",
         ]
     ].copy()
@@ -337,6 +338,7 @@ def build_choice_dataset(
             cumulative_reward=("cumulative_reward", "last"),
             reward_rate_arm_k10=("reward_rate_arm_k10", "last"),
             dist_to_arm=("dist_to_arm", "last"),
+            arm_dist_rank=("arm_dist_rank", "last"),
             is_same_patch=("is_same_patch", "last"),
         )
         .reset_index()

@@ -93,7 +93,7 @@ def _make_minimal_tables(
                     "visit_recency": 0.0,
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
-                    "dist_to_arm": 1.0,
+                    "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
                     "is_same_patch": 0,
                 }
             )
@@ -236,7 +236,7 @@ class TestBuildChoiceDataset:
                 "visit_recency": 0.0,
                 "cumulative_reward": 0.0,
                 "reward_rate_arm_k10": 0.0,
-                "dist_to_arm": 1.0,
+                "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
                 "is_same_patch": 0,
             })
         eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)
@@ -289,7 +289,7 @@ class TestBuildChoiceDataset:
                 "visit_recency": 0.0,
                 "cumulative_reward": 0.0,
                 "reward_rate_arm_k10": 0.0,
-                "dist_to_arm": 1.0,
+                "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
                 "is_same_patch": 0,
             })
         eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)

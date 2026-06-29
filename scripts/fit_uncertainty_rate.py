@@ -67,13 +67,15 @@ logger = logging.getLogger(__name__)
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 
-# The nominal-value block from the contingency table (schema-bound; produced by
-# scripts/_statescript_contingency.py).
+# The value block merged from the contingency table (schema-bound). q_current is
+# the fitted-alpha leaky-Q level of the chosen arm (per-animal alpha; the
+# experienced-value covariate, covariate_dictionary.md D3).
 VALUE_COVARIATES = (
     "p_reward_current",
     "rpe",
     "value_diff_patch",
     "trials_since_block_change",
+    "q_current",
 )
 
 # The curated covariate set the model actually fits: interpretable and mutually
@@ -89,6 +91,7 @@ CURATED_COVARIATES = (
     "value_diff_patch",
     "recent_switch_rate",
     "leaky_q_value_diff",
+    "q_current",
     "trials_since_block_change",
 )
 

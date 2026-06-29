@@ -6,6 +6,15 @@ choice / coupling**. Agreed decisions D1–D5 (2026-06-29) are recorded at the e
 This is the target the model specs and covariate-computation layer implement
 against; the harmonization refactor brings the code to this spec.
 
+**Status: implemented (2026-06-29, harmonization phase-1).** The covariate
+definitions live in `analysis/replay/covariates.py`; the per-arm value block
+(`reward_rate_arm_k10` at k=10, `p_reward_arm`, `q_arm`) is emitted by the event
+builders from the per-stop contingency artifact (`p_reward_port`/`q_port`,
+per-animal fitted α in `contingency_csv_alpha.json`); the value rungs are `Mv`
+(arm) / `Pv` (patch); `q_current` enters the MU/coupling runners; the choice
+baseline is `arm_dist_rank`. Coefficients are produced by the phase-2 re-fit on
+the regenerated canonical tables.
+
 ## A. Entry-rule contract (forced by estimator type)
 
 A covariate that is constant across arms within an event **cancels** in a

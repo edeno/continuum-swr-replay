@@ -201,6 +201,10 @@ _M7 = (
     "swr_x_visit_recency_demeaned",
     "swr_x_is_last_rewarded_elsewhere",
 )
+# Value block: per-arm nominal value (p_reward_arm) + experienced leaky-Q level
+# (q_arm) as conditional main effects on the M5 spatial/reward-memory base
+# (covariate_dictionary.md D2/D3). Additive to M5 -- M0-M7 are unchanged.
+_Mv = (*_M5, "p_reward_arm", "q_arm")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -256,6 +260,13 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         predictors=_M7,
         description="+ SWR × value/memory interactions",
         parent="M6",
+    ),
+    "Mv": ModelSpec(
+        name="Mv",
+        predictors=_Mv,
+        description="+ per-arm nominal value (p_reward_arm) + experienced "
+        "leaky-Q level (q_arm)",
+        parent="M5",
     ),
 }
 
@@ -346,6 +357,19 @@ MODEL_PATCH: dict[str, ModelSpec] = {
             "swr_x_last_rewarded_patch_elsewhere",
         ),
         description="+ SWR × patch interactions (spatial + memory)",
+        parent="P3",
+    ),
+    "Pv": ModelSpec(
+        name="Pv",
+        predictors=(
+            "is_current_patch",
+            "is_last_rewarded_patch_elsewhere",
+            "cumulative_reward_patch",
+            "p_reward_arm_patch",
+            "q_arm_patch",
+        ),
+        description="+ per-patch nominal value (p_reward_arm_patch) + "
+        "experienced leaky-Q level (q_arm_patch)",
         parent="P3",
     ),
 }
@@ -712,6 +736,8 @@ _CHOICE_BEHAVIOR = (
     "visit_recency",
     "cumulative_reward",
     "reward_rate_arm_k10",
+    "arm_dist_rank",  # ranked choice-set distance (identifiable; replaces the
+    # quasi-separating raw dist_to_arm as the geometric baseline, dictionary §4)
 )
 
 MODEL_CHOICE: dict[str, ModelSpec] = {

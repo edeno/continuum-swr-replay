@@ -39,7 +39,8 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 SC = ["animal", "day", "epoch"]
 POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
 PREDICTORS = ["reward_lag1", "p_reward_current", "rpe",
-              "recent_switch_rate", "value_diff_patch", "time_since_stop"]
+              "recent_switch_rate", "value_diff_patch", "q_current",
+              "time_since_stop"]
 
 
 def _bimodality_coef(x: np.ndarray) -> float:
@@ -57,8 +58,9 @@ def _assemble() -> pd.DataFrame:
     cont = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
     df = ev.merge(stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
                   on="stop_id", how="left")
-    df = df.merge(cont[["stop_id", "p_reward_current", "rpe", "value_diff_patch"]],
-                  on="stop_id", how="left")
+    df = df.merge(
+        cont[["stop_id", "p_reward_current", "rpe", "value_diff_patch", "q_current"]],
+        on="stop_id", how="left")
     return df
 
 
