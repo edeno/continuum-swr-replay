@@ -25,6 +25,7 @@ Usage: python scripts/_content_reward_interactions.py
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
@@ -58,6 +59,11 @@ def _assemble() -> pd.DataFrame:
     ev["rew_x_current"] = cur * ev["reward_lag1"].to_numpy(dtype=float)
     ev["value_x_current"] = cur * ev["p_reward_current"].to_numpy(dtype=float)
     ev["switch_x_current"] = cur * ev["recent_switch_rate"].to_numpy(dtype=float)
+    # duration control: within-stop time on the current arm (z(log1p), so the
+    # 0-105 s range and the long-stop outliers don't dominate the conditioning).
+    tsc = np.log1p(ev["time_since_stop"].to_numpy(dtype=float))
+    tsc = (tsc - tsc.mean()) / tsc.std()
+    ev["tsc_x_current"] = cur * tsc
     return ev
 
 
@@ -105,9 +111,13 @@ def main() -> None:
     ]:
         print(f"=== {label} ===")
         print(f"  {'term':<20}{'med coef':>10}{'%pos':>7}{'animals':>9}{'p':>10}")
-        _line(_fit(sub, base), "is_current")  # base M5 current-arm bias
+        # base M5 + within-stop-time control: gives is_current and the drift term
+        base_tsc = _fit(sub, [*base, "tsc_x_current"])
+        _line(base_tsc, "is_current")
+        _line(base_tsc, "tsc_x_current")  # within-stop content drift off current
+        # each behavioral interaction, CONTROLLED for within-stop time
         for inter in INTERACTIONS:
-            _line(_fit(sub, base + [inter]), inter)
+            _line(_fit(sub, [*base, "tsc_x_current", inter]), inter)
         print()
 
 
