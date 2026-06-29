@@ -587,6 +587,9 @@ def aggregate_to_timebins(
     reward_lags: int = 0,
     self_history_lags: int = 0,
     self_history_basis: int = 0,
+    cross_onset_times: pd.DataFrame | None = None,
+    cross_history_lags: int = 0,
+    cross_history_basis: int = 0,
     stop_covariates: tuple[str, ...] = (),
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
@@ -636,6 +639,10 @@ def aggregate_to_timebins(
     """
     if self_history_basis and not self_history_lags:
         raise ValueError("self_history_basis requires self_history_lags > 0")
+    if cross_history_basis and not cross_history_lags:
+        raise ValueError("cross_history_basis requires cross_history_lags > 0")
+    if cross_history_lags and cross_onset_times is None:
+        raise ValueError("cross_history_lags requires cross_onset_times")
     reward_cols = [f"reward_lag{j}" for j in range(1, reward_lags + 1)]
     carry = reward_cols + list(stop_covariates)
 
@@ -691,6 +698,36 @@ def aggregate_to_timebins(
         proj = out[lag_cols].to_numpy() @ B.T
         for k in range(self_history_basis):
             out[f"hist_rcos_{k}"] = proj[:, k]
+
+    # Cross-population history: lagged onset counts of a different event stream
+    # (e.g. with-SWR non-local onsets as predictors of the non-SWR rate). Binned
+    # on the SAME grid as the response, shifted within stop (lag >= 1 -> only the
+    # cross stream's past predicts the current bin), reset at the stop boundary.
+    if cross_history_lags:
+        out = out.sort_values(["stop_id", "binj"])
+        xsrc = cross_onset_times[cross_onset_times["t_since_stop_onset"] < tmax]
+        xbinj = np.clip(
+            (xsrc["t_since_stop_onset"].to_numpy() / bin_s).astype(int), 0, nmax - 1
+        )
+        xcnt = (
+            pd.DataFrame({"stop_id": xsrc["stop_id"].to_numpy(), "binj": xbinj})
+            .groupby(["stop_id", "binj"])
+            .size()
+            .rename("cross_count")
+        )
+        out = out.merge(xcnt, on=["stop_id", "binj"], how="left")
+        out["cross_count"] = out["cross_count"].fillna(0)
+        out = out.sort_values(["stop_id", "binj"])
+        xgrouped = out.groupby("stop_id")["cross_count"]
+        for j in range(1, cross_history_lags + 1):
+            out[f"cross_lag{j}"] = xgrouped.shift(j).fillna(0)
+        if cross_history_basis:
+            Bx = raised_cosine_history_basis(cross_history_lags, cross_history_basis)
+            xlag_cols = [f"cross_lag{j}" for j in range(1, cross_history_lags + 1)]
+            xproj = out[xlag_cols].to_numpy() @ Bx.T
+            for k in range(cross_history_basis):
+                out[f"cross_hist_rcos_{k}"] = xproj[:, k]
+        out = out.drop(columns=["cross_count"])
 
     out = out.drop(columns=["immobility_time"])
     return out.reset_index(drop=True)

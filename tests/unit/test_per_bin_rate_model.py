@@ -15,6 +15,7 @@ import pytest
 from continuum_swr_replay.analysis.replay import (
     MODEL_PER_BIN_RATE,
     PerBinRateModelSpec,
+    aggregate_to_timebins,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
     per_bin_rate_gof,
@@ -241,3 +242,51 @@ def test_gof_reuses_package():
     gof = per_bin_rate_gof(design, fit)
     assert {"ks_statistic", "ks_within_band", "dispersion"} <= set(gof)
     assert gof["ks_within_band"] is True
+
+
+def test_cross_history_recovers_planted_excitation():
+    """A planted cross-stream excitation (response onsets elevated 1-2 bins after
+    a cross onset) is recovered as positive cross_lag1/cross_lag2 coefficients.
+
+    This is the bivariate / Hawkes-style coupling: the response population's
+    conditional intensity depends on the recent history of a *different* onset
+    stream (e.g. non-SWR rate driven by recent with-SWR events).
+    """
+    rng = np.random.default_rng(0)
+    n_stops, nbin, bin_s = 300, 20, 0.1
+    stop_ids = np.arange(n_stops)
+    stops = pd.DataFrame(
+        {
+            "animal": "x", "day": 1, "epoch": "02_r1",
+            "stop_id": stop_ids, "immobility_time": nbin * bin_s,
+        }
+    )
+    cross_rows, resp_rows = [], []
+    for sid in stop_ids:
+        cross_bins = np.flatnonzero(rng.random(nbin) < 0.12)
+        cross_rows += [(sid, (b + 0.3) * bin_s) for b in cross_bins]
+        recent = np.zeros(nbin, dtype=bool)
+        for b in cross_bins:  # excitation in the 1-2 bins AFTER a cross onset
+            for lag in (1, 2):
+                if b + lag < nbin:
+                    recent[b + lag] = True
+        counts = rng.poisson(np.where(recent, 0.5, 0.05))  # 10x elevation
+        for b in range(nbin):
+            resp_rows += [(sid, (b + 0.3) * bin_s)] * int(counts[b])
+    cross = pd.DataFrame(cross_rows, columns=["stop_id", "t_since_stop_onset"])
+    resp = pd.DataFrame(resp_rows, columns=["stop_id", "t_since_stop_onset"])
+
+    design = aggregate_to_timebins(
+        stops, resp, bin_s=bin_s, tmax=nbin * bin_s,
+        cross_onset_times=cross, cross_history_lags=4,
+    )
+    spec = PerBinRateModelSpec(
+        "Mx", False, 0, False, 0, False, False, "", None, cross_history_lags=4,
+    )
+    fit = fit_per_bin_rate_model(design, spec, min_bins=50, min_events=20)
+    assert fit is not None
+    # planted excitation at lags 1-2 -> positive coefficients there
+    assert fit["coef_cross_lag1"] > 0
+    assert fit["coef_cross_lag2"] > 0
+    # and stronger than the un-planted later lag
+    assert fit["coef_cross_lag1"] > fit["coef_cross_lag4"]

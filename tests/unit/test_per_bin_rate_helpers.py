@@ -263,3 +263,48 @@ def test_attach_is_swr_does_not_mutate(session_slice):
     before = onset_s.copy()
     attach_is_swr_to_onsets(onset_s, event_s)
     pd.testing.assert_frame_equal(onset_s, before)
+
+
+def test_aggregate_cross_history_lags():
+    """cross_lag{j} = the OTHER stream's onset count j bins back, within stop.
+
+    Bivariate conditional intensity: the non-SWR response's design carries lagged
+    counts of the with-SWR (cross) onset stream, reset at the stop boundary.
+    """
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"], "day": [1], "epoch": ["02_r1"],
+            "stop_id": [1], "immobility_time": [1.0],
+        }
+    )
+    # response (non-SWR) onsets in bins 3, 4
+    resp = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.35, 0.45]})
+    # cross (with-SWR) onsets in bins 2, 5
+    cross = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.25, 0.55]})
+    df = aggregate_to_timebins(
+        stops, resp, bin_s=0.1, tmax=1.0,
+        self_history_lags=2, cross_onset_times=cross, cross_history_lags=2,
+    ).sort_values("binj").set_index("binj")
+    # response counts unaffected by the cross stream
+    assert df.loc[3, "count"] == 1 and df.loc[4, "count"] == 1
+    # cross_lag1 fires one bin after each cross onset (bins 2->3, 5->6)
+    assert df.loc[3, "cross_lag1"] == 1
+    assert df.loc[6, "cross_lag1"] == 1
+    # cross_lag2 fires two bins after (bins 2->4, 5->7)
+    assert df.loc[4, "cross_lag2"] == 1
+    assert df.loc[7, "cross_lag2"] == 1
+    # boundary reset: bin 0 has no prior bins in the stop
+    assert df.loc[0, "cross_lag1"] == 0
+    # the cross stream does not leak into the self-history (own count) lags
+    assert df.loc[3, "onset_lag1"] == 0  # no non-SWR onset in bin 2
+
+
+def test_aggregate_cross_history_requires_stream():
+    """cross_history_lags without cross_onset_times is a loud error."""
+    stops = pd.DataFrame(
+        {"animal": ["x"], "day": [1], "epoch": ["02_r1"],
+         "stop_id": [1], "immobility_time": [0.5]}
+    )
+    onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
+    with pytest.raises(ValueError, match="cross_onset_times"):
+        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, cross_history_lags=2)

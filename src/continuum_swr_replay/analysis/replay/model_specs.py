@@ -584,6 +584,16 @@ class PerBinRateModelSpec:
     # refractory bins, so it generalizes where the dummies overfit. Default 0
     # keeps the dummy encoding (and the per-lag kernel-shape readout).
     self_history_basis: int = 0
+    # Cross-population history: lagged onset counts of a *different* event stream
+    # (the ``cross_onset_times`` passed to ``aggregate_to_timebins``), so one
+    # population's conditional intensity can depend on another's recent past --
+    # e.g. does the non-SWR non-local rate depend on recent with-SWR non-local
+    # events (a bivariate/Hawkes coupling)? ``cross_history_lags`` adds
+    # ``cross_lag{j}`` dummies; ``cross_history_basis > 0`` instead uses the
+    # raised-cosine ``cross_hist_rcos_{k}`` projection over that window. Default 0
+    # leaves the shipped ladder unchanged.
+    cross_history_lags: int = 0
+    cross_history_basis: int = 0
     # Extra per-stop covariates appended to the formula as plain linear terms
     # (e.g. the uncertainty/value block instantiated in the runner). Default
     # ``()`` so the shipped ``MODEL_PER_BIN_RATE`` ladder is byte-identical and
@@ -604,6 +614,10 @@ class PerBinRateModelSpec:
             terms += [f"hist_rcos_{k}" for k in range(self.self_history_basis)]
         else:
             terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
+        if self.cross_history_basis:
+            terms += [f"cross_hist_rcos_{k}" for k in range(self.cross_history_basis)]
+        else:
+            terms += [f"cross_lag{j}" for j in range(1, self.cross_history_lags + 1)]
         if self.switch:
             terms.append("is_after_switch")
         if self.reward_time_interaction:

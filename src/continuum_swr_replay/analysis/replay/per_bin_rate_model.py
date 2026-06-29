@@ -66,6 +66,10 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
         cols += [f"hist_rcos_{k}" for k in range(spec.self_history_basis)]
     else:
         cols += [f"onset_lag{j}" for j in range(1, spec.self_history_lags + 1)]
+    if spec.cross_history_basis:
+        cols += [f"cross_hist_rcos_{k}" for k in range(spec.cross_history_basis)]
+    else:
+        cols += [f"cross_lag{j}" for j in range(1, spec.cross_history_lags + 1)]
     if spec.switch:
         cols.append("is_after_switch")
     cols += list(spec.extra_covariates)

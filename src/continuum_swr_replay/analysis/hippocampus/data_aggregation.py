@@ -212,6 +212,69 @@ def validate_results_position_time_alignment(
         )
 
 
+def validate_dot_event_contract(
+    dot: pd.DataFrame,
+    *,
+    event_cols: tuple[str, ...] = ("non_local_event", "SWR_event", "MUA_event"),
+) -> dict[str, int]:
+    """Check a ``data_over_time`` frame against the table-regen input contract.
+
+    The table builders assume each ``data_over_time`` (``dot``) frame holds a
+    single session, is in non-decreasing time order, and labels each event as one
+    contiguous run of timebins (``label > 0``; the builders take an event's span
+    from the first and last labelled bin). A violation silently corrupts the
+    regenerated tables — wrong bout assignment, an event split across a gap, or
+    rows attributed to the wrong session — so this **fails closed**.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        Time-indexed per-bin frame (``get_data_over_time`` output) carrying
+        ``animal`` / ``day`` / ``epoch`` and the event-label columns.
+    event_cols : tuple of str
+        Event-label columns to check for contiguity (absent columns are skipped).
+
+    Returns
+    -------
+    dict[str, int]
+        Violation counts (empty when clean). Always raises before returning if
+        any fatal violation is present.
+
+    Raises
+    ------
+    ValueError
+        If the frame spans multiple sessions, is not time-sorted, or any event
+        label is non-contiguous.
+    """
+    violations: dict[str, int] = {}
+    for col in ("animal", "day", "epoch"):
+        if col in dot.columns and dot[col].nunique(dropna=False) > 1:
+            violations[f"multiple_{col}"] = int(dot[col].nunique(dropna=False))
+
+    t = dot.index.to_numpy(dtype=float)
+    n_unsorted = int((np.diff(t) < 0).sum()) if t.size > 1 else 0
+    if n_unsorted:
+        violations["unsorted_time"] = n_unsorted
+
+    for col in event_cols:
+        if col not in dot.columns:
+            continue
+        lab = dot[col].to_numpy()
+        noncontig = 0
+        for label in np.unique(lab[lab > 0]):
+            idx = np.flatnonzero(lab == label)
+            if idx.size and (idx[-1] - idx[0] + 1) != idx.size:
+                noncontig += 1
+        if noncontig:
+            violations[f"noncontiguous_{col}"] = noncontig
+
+    if violations:
+        raise ValueError(
+            f"validate_dot_event_contract: input-contract violations {violations}"
+        )
+    return violations
+
+
 def get_data_over_time(
     data: SessionData,
     results: xr.Dataset,
