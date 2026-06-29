@@ -84,16 +84,21 @@ def _fit_one_session(
     onsets_g: pd.DataFrame,
     run_cv: bool,
     run_gof: bool,
-) -> tuple[tuple, list[dict], dict, float]:
+) -> tuple[tuple, list[dict], dict, dict, float]:
     """Fit all (outcome, model) cells for one session.
 
-    Returns ``(keys, rows, none_counts, elapsed)``. ``none_counts`` maps
-    ``(model, outcome) -> count`` of cells that failed to fit (the separation
-    survivorship guard). Top-level (picklable) so it can run in a worker process.
+    Returns ``(keys, rows, none_counts, cv_none_counts, elapsed)``.
+    ``none_counts`` maps ``(model, outcome) -> count`` of cells whose GLM fit
+    returned ``None`` (too little data / unidentified / numerical failure);
+    ``cv_none_counts`` maps the same key to cells that fit but whose
+    cross-validation returned ``None`` (a fold failed or the design was not
+    CV-able), which would otherwise drop the ``cv_*`` columns silently.
+    Top-level (picklable) so it can run in a worker process.
     """
     t0 = time.perf_counter()
     rows: list[dict] = []
     none_counts: dict = {}
+    cv_none_counts: dict = {}
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -128,8 +133,12 @@ def _fit_one_session(
                 cv = cross_validate_per_bin_rate_model(design, spec)
                 if cv is not None:
                     row.update(cv)
+                else:
+                    cv_none_counts[(name, outcome)] = (
+                        cv_none_counts.get((name, outcome), 0) + 1
+                    )
             rows.append(row)
-    return keys, rows, none_counts, time.perf_counter() - t0
+    return keys, rows, none_counts, cv_none_counts, time.perf_counter() - t0
 
 
 def fit_per_bin_rate_models(
@@ -155,10 +164,12 @@ def fit_per_bin_rate_models(
 
     rows: list[dict] = []
     none_counts: Counter = Counter()
+    cv_none_counts: Counter = Counter()
 
-    def _collect(keys, r, nc, elapsed):
+    def _collect(keys, r, nc, cvnc, elapsed):
         rows.extend(r)
         none_counts.update(nc)
+        cv_none_counts.update(cvnc)
         logger.info("  %s: %d fits in %.1fs", "_".join(map(str, keys)), len(r), elapsed)
 
     if workers > 1:
@@ -177,6 +188,11 @@ def fit_per_bin_rate_models(
         logger.info(
             "None (unfit) counts per (model, outcome): %s",
             {f"{m}/{o}": c for (m, o), c in sorted(none_counts.items())},
+        )
+    if cv_none_counts:
+        logger.info(
+            "CV-None (fit ok, CV dropped) counts per (model, outcome): %s",
+            {f"{m}/{o}": c for (m, o), c in sorted(cv_none_counts.items())},
         )
     return pd.DataFrame(rows)
 

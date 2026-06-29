@@ -283,3 +283,32 @@ class TestGetDataOverTimeValidation:
                 "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
             ],
         )
+
+
+# ============================================================================
+# Tests: Producer output columns (step_distance / run_speed_baseline)
+# ============================================================================
+
+
+class TestGetDataOverTimeOutputColumns:
+    """The aggregator's new per-session run-speed baseline must fail loud on
+    degenerate input rather than emit a NaN column.
+
+    (A full output-column assertion for ``step_distance`` / ``run_speed_baseline``
+    would need a richer ``Environment`` fixture than the minimal MagicMock used
+    here; ``step_distance`` is covered directly in ``test_posterior_analysis``.)
+    """
+
+    @pytest.mark.filterwarnings("ignore:All-NaN slice encountered:RuntimeWarning")
+    def test_run_speed_baseline_all_nan_head_speed_raises(
+        self, mock_session_data_for_aggregation, mock_results, mock_environment
+    ):
+        """All-NaN head speed must fail loud, not emit a NaN baseline column."""
+        data = dict(mock_session_data_for_aggregation)
+        pos = data["position_info"].copy()
+        pos["head_speed"] = np.nan
+        data["position_info"] = pos
+        with pytest.raises(ValueError, match="run_speed_baseline is not finite"):
+            get_data_over_time(
+                data, mock_results, mock_environment, "chimi20200212_.nwb", "02_r1"
+            )

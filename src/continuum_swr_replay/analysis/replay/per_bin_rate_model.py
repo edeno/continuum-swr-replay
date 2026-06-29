@@ -30,10 +30,26 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from patsy import PatsyError
+from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
 from .model_specs import PerBinRateModelSpec
 
 logger = logging.getLogger(__name__)
+
+# Numerical failures we expect from a per-session GLM fit/predict and treat as a
+# skipped cell (-> None): rank-deficient/ill-conditioned designs, spline knots
+# the held-out fold extrapolates past (patsy), perfect separation, optimizer
+# failures. Anything else (e.g. a NameError in a spec formula, an offset shape
+# mismatch) is a coding bug and is left to propagate rather than be swallowed as
+# "fit failed" for every session.
+_EXPECTED_FIT_ERRORS = (
+    np.linalg.LinAlgError,
+    ValueError,
+    RuntimeError,
+    PerfectSeparationError,
+    PatsyError,
+)
 
 
 def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
@@ -109,12 +125,18 @@ def fit_per_bin_rate_model(
 
     df = design[[*needed, "stop_id", "binj"]].dropna(subset=needed)
     df = df[df["exposure"] > 0]
-    if len(df) < min_bins or int((df["count"] > 0).sum()) < min_events:
+    n_events = int((df["count"] > 0).sum())
+    if len(df) < min_bins or n_events < min_events:
+        logger.debug(
+            "%s: too few data (%d bins, %d events; need %d/%d)",
+            spec.name, len(df), n_events, min_bins, min_events,
+        )
         return None
     # Reward coefficients are unidentified without contrast in reward_lag1.
     if (spec.reward_lags >= 1 or spec.reward_time_interaction) and (
         df["reward_lag1"].nunique() < 2
     ):
+        logger.debug("%s: <2 reward_lag1 levels, reward terms unidentified", spec.name)
         return None
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))
@@ -125,8 +147,8 @@ def fit_per_bin_rate_model(
             family=sm.families.Poisson(),
             offset=offset,
         ).fit()
-    except Exception:
-        logger.warning("Per-bin GLM failed for %s", spec.name)
+    except _EXPECTED_FIT_ERRORS as exc:
+        logger.warning("Per-bin GLM failed for %s: %r", spec.name, exc)
         return None
 
     params = result.params
@@ -140,7 +162,7 @@ def fit_per_bin_rate_model(
         **{f"pval_{k}": float(v) for k, v in pvals.items()},
         **{f"rr_{k}": float(np.exp(v)) for k, v in params.items()},
         "n_bins": int(len(df)),
-        "n_events": int((df["count"] > 0).sum()),
+        "n_events": n_events,
         "n_params": int(len(params)),
         "llf": float(result.llf),
         "aic": float(result.aic),
@@ -181,7 +203,9 @@ def cross_validate_per_bin_rate_model(
     from sklearn.model_selection import KFold
 
     needed = [*_design_columns(spec), "exposure", "stop_id", "binj"]
-    if any(c not in design.columns for c in needed):
+    missing = [c for c in needed if c not in design.columns]
+    if missing:
+        logger.debug("CV %s: missing columns %s", spec.name, missing)
         return None
     # binj is the integer bin index (never NaN from aggregate_to_timebins); it
     # is kept only to preserve temporal order, so it is excluded from the NaN
@@ -189,10 +213,14 @@ def cross_validate_per_bin_rate_model(
     df = design[needed].dropna(subset=[c for c in needed if c != "binj"])
     df = df[df["exposure"] > 0].reset_index(drop=True)
     if len(df) < min_bins:
+        logger.debug("CV %s: too few bins (%d < %d)", spec.name, len(df), min_bins)
         return None
 
     stops = df["stop_id"].unique()
     if len(stops) < n_folds * 2:
+        logger.debug(
+            "CV %s: too few stops (%d < %d)", spec.name, len(stops), n_folds * 2
+        )
         return None
 
     formula = spec.formula()
@@ -205,6 +233,8 @@ def cross_validate_per_bin_rate_model(
         is_train = df["stop_id"].isin(train_stops).to_numpy()
         tr, te = df[is_train], df[~is_train]
         if len(te) == 0 or int((tr["count"] > 0).sum()) < 1:
+            logger.debug("CV %s: degenerate fold (empty test or zero train events)",
+                         spec.name)
             return None
         off_tr = np.log(tr["exposure"].to_numpy(dtype=float))
         off_te = np.log(te["exposure"].to_numpy(dtype=float))
@@ -220,12 +250,14 @@ def cross_validate_per_bin_rate_model(
             ).fit()
             mu = np.asarray(res.predict(te, offset=off_te), dtype=float)
             mu0 = np.asarray(res0.predict(te, offset=off_te), dtype=float)
-        except Exception:
+        except _EXPECTED_FIT_ERRORS as exc:
+            logger.debug("CV %s: fold fit/predict failed: %r", spec.name, exc)
             return None
         y = te["count"].to_numpy(dtype=float)
         ll = poisson.logpmf(y, mu)
         ll0 = poisson.logpmf(y, mu0)
         if not (np.all(np.isfinite(ll)) and np.all(np.isfinite(ll0))):
+            logger.debug("CV %s: non-finite held-out log-likelihood", spec.name)
             return None
         fold_means.append(float(np.mean(ll)))
         sum_diff += float(np.sum(ll - ll0))
@@ -249,11 +281,22 @@ def per_bin_rate_gof(
     """Point-process goodness-of-fit via the time-rescaling theorem.
 
     Treats the event train as a spike train (``is_spike = count > 0`` per bin,
-    ``trial_id = stop_id``) and rescales the fitted conditional intensity
-    (``fitted['predicted']``, the per-bin fitted mean count) with the
-    time-rescaling theorem (Brown et al. 2002). Reuses
+    ``trial_id = stop_id``) and rescales the fitted conditional intensity with
+    the time-rescaling theorem (Brown et al. 2002). Reuses
     ``non_local_detector.model_checking.sorted_spikes`` -- the time-rescaling
     math is not re-implemented here.
+
+    The integrand passed to ``TimeRescaling`` is ``fitted['predicted']``, the
+    per-bin **expected count** ``mu = exp(X@beta) * exposure`` (statsmodels folds
+    the ``log(exposure)`` offset into ``fittedvalues``) -- *not* the rate
+    ``exp(X@beta)``. This is deliberate and required: ``TimeRescaling`` integrates
+    with ``cumulative_trapezoid(ci, dx=1)`` (unit spacing), so the integrand of
+    ``Lambda(t) = integral lambda du`` over a bin of width ``Delta_i`` must be
+    ``lambda_i * Delta_i`` -- the expected count -- which also correctly
+    down-weights each stop's short final bin (``exposure < bin_s``). Dividing by
+    ``exposure`` to "convert to a rate" would over-weight those partial bins and
+    break the KS test (empirically KS ~0.10 with the expected count vs ~0.99 with
+    the rate on a known-true homogeneous Poisson process).
 
     Parameters
     ----------
@@ -278,6 +321,9 @@ def per_bin_rate_gof(
 
     predicted = fitted["predicted"]
     sub = design.loc[predicted.index].sort_values(["stop_id", "binj"])
+    # per-bin expected count (lambda * exposure) -- the correct integrand for the
+    # unit-spacing integration in TimeRescaling; see the docstring. Do NOT divide
+    # by exposure here.
     ci = predicted.reindex(sub.index).to_numpy(dtype=float)
     is_spike = sub["count"].to_numpy() > 0
     trial_id = sub["stop_id"].to_numpy()
