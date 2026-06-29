@@ -148,6 +148,18 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
 6. **Reward/value push non-SWR content off the current arm** (duration-controlled,
    5/5); **exploration locks content onto current** (both types).
 7. **The double dissociation** (reward → with-SWR rate, non-SWR content).
+8. **The reward-driven off-current content is spike-supported, not a decode/
+   consummation artifact.** Reality engine (`analyze_event_spike_evidence.py`,
+   5 sessions): post-reward off-current (nonSWR-remote) `dll_per_spike` = 0.63,
+   **99% > 0** vs baseline ≈ 0; rewarded ≈ omitted (0.63 vs 0.65), so reward does
+   not degrade spike support. The off-current (remote) fraction of non-SWR events
+   rises 0.45 → 0.50 with reward (the `rew_x_current` shift, replicated).
+9. **Off-current content's destination is the "novel" patch.** On patch-switch
+   events the off-current content prefers the **third (other) patch over the
+   previous patch** (non-SWR 0.24 vs 0.19; with-SWR 0.23 vs 0.16) — and the
+   previous patch is avoided largely because it is often the **last-rewarded**
+   one (30%/20% vs 1–2% for the third patch). So replay samples the
+   non-recent, non-rewarded option, not where it came from.
 
 ## Hypotheses (suggestive; need a further test)
 
@@ -160,12 +172,6 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
 
 ## Unknown / pending
 
-- **Spike-evidence reality check on the reward-modulated content** — is the
-  post-reward off-current non-SWR content spike-supported, or a decode artifact
-  during consummation? (Same engine as the baseline current-arm claim; **not yet
-  run for the reward modulation.**)
-- **Where the off-current / broadened content goes** (prev arm? remote reward
-  wells?) — `is_prev` / remote-well interactions, per type. **Not yet run.**
 - **Full marked point process** (joint intensity + coupling + content; shared
   latent; power↔history independence). **Not built.**
 - **Content choice-mediation** (does rate × content predict the next choice). The
@@ -188,9 +194,11 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
   removed; value covariate set curated to VIF ≤ 1.07.
 - **Separation:** with-SWR `is_last_rewarded_elsewhere` magnitude is a sparse-
   subset artifact (the per-session `ValueError`s) — direction only.
-- **Circularity** (content from the same decoder that defines events): the
-  baseline current-arm claim clears the spike-evidence engine (5/5 smoke); the
-  new reward-modulation does not yet (see *pending*).
+- **Circularity** (content from the same decoder that defines events): both the
+  baseline current-arm claim *and* the new reward-driven off-current content
+  clear the spike-evidence engine (post-reward off-current `dll_per_spike` 0.63,
+  99% > 0 vs baseline ≈ 0; 5 sessions). A full-dataset run is still the eventual
+  goal.
 
 ## Reproducibility (scripts & key commits)
 
@@ -201,6 +209,9 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
   `scripts/_verify_content_models.py`; `scripts/_content_reward_interactions.py`.
 - Contingency: `scripts/fetch_spatial_bandit_behavior.sh`,
   `scripts/_bandit_csv_contingency.py`.
+- Reality check on reward-modulated content: `scripts/analyze_event_spike_evidence.py`
+  (now emits per-event `start_time`) + `scripts/_reality_reward_test.py`;
+  content destination: `scripts/_content_patch_destination.py`.
 - Commits: `6d63566` (collinearity fix), `b246e66` (canonical contingency),
   `6d9983c` (SWR-power model), `0dc2dfa` (content re-verify), `45dc147`
   (duration-controlled content interactions).

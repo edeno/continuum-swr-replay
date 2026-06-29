@@ -326,7 +326,9 @@ def analyze_session(
             L, n_spk, n_tet = event_likelihood(s, ev, t, lin, spike_times, waveform_features, encargs)
             m = event_metrics(s, ev, L, n_spk, mape, lin, env, pos, gpi_peak_pos)
             if m is not None:
-                m.update(group=group, n_tetrodes=n_tet, n_bins=int(r.n_bins), epoch_id=epoch_id, animal=animal)
+                m.update(group=group, n_tetrodes=n_tet, n_bins=int(r.n_bins),
+                         start_time=float(t[s]), end_time=float(t[ev]),
+                         epoch_id=epoch_id, animal=animal)
                 records.append(m)
 
     metrics_df = pd.DataFrame(records)
