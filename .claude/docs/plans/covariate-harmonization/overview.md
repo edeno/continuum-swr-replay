@@ -29,11 +29,14 @@ Other consumers to sweep (not just fit runners):
 - Consolidate covariate code into `covariates.py` (phase-0, behavior-preserving; re-export shim keeps the ~16 importers working).
 - Implement D1–D5 as revised; **harmonize both the replay and contfrag tables**.
 - Re-fit all families; prove unchanged-definition covariates reproduce.
+- **One event definition everywhere** (phase 3): the ancillary analyses consume the canonical `is_swr`, not private re-derivations.
+- **No exploratory findings as claims** (phase 4): the content interaction + patch-destination findings move into the audited pipeline with full diagnostics.
 
 ### Non-Goals
 - **No re-decode** — orthogonal (the reality-run / W3 workstream). The rebuild reuses the existing decodes (re-rolls the posteriors from them; response columns must reproduce).
-- No new science questions — definitional harmonization only.
+- No **new** science questions — phases 0–2 are definitional; phases 3–4 harden existing findings (consistency + diagnostics), they do not ask anything new.
 - No change to spline / self-history / spatial / `arm_dist_rank` definitions.
+- No full hierarchical/cluster-robust inference, no reality full-run, no PFC batch rerun (deferred backlog below).
 
 ### Dependency policy
 No new dependencies.
@@ -49,12 +52,13 @@ refactor; the rest is tracked as deferred so nothing is lost.
 - *03* — fix the **`TMAX=4.0`→3.99 s edge** (`aggregate_to_timebins` uses `int(tmax/bin_s)` dropping 169 onsets): use `ceil` + clip the final bin's exposure to `tmax`, with a non-divisible-`tmax` regression test (done alongside the phase-1 design change since phase-2 re-fits the rate ladder anyway).
 - *03/04* — **pre-existing red tests are ours to fix**: `test_uncertainty_covariates` (expects the removed `UNCERTAINTY_COVARIATES`) and `test_compare_event_source_models` (expects `R0/R1/R2`, source set now has `Rlag`). Get the baseline **green in phase-0** (precondition for "suite passes unchanged"); update the uncertainty-covariate test to the canonical set in phase-1.
 - *03* — refresh the **stale claim #19c per-bin numbers** (1.42/3.10/1.08 → current) in phase-2's docs pass.
+- *02/04/05* — make **ancillary scripts consume canonical `is_swr`** instead of re-deriving it (spike-evidence, occupancy, PFC) → **[phase 3](phase-3-canonical-is-swr-sweep.md)** (one adapter + divergence tests; the PFC *code* change here, its heavy batch rerun stays deferred below).
+- *04* — promote the **exploratory content scripts** (`_content_reward_interactions`, `_content_patch_destination`) into the audited pipeline with diagnostics (SE/p/centered-VIF/FDR/n_events/provenance) so #19f + patch-destination become non-exploratory → **[phase 4](phase-4-promote-content-models.md)**.
 
 **Deferred (NOT this plan — tracked backlog):**
-- Animal/session **hierarchical / cluster-robust inference** for the headline p-values (03 #4, 05) — a methodology change spanning all claims; do as its own workstream.
-- Promote the **exploratory content scripts** (`_content_reward_interactions`, `_content_patch_destination`) into the audited model pipeline with diagnostics (SE/p/VIF/FDR/n_events/provenance) so #19f + patch-destination become non-exploratory (04).
-- Make **ancillary scripts consume canonical `is_swr`** instead of re-deriving it (spike-evidence 02, occupancy 04, PFC 05).
-- Reality **full-dataset run** (gated on the re-decode) and **PFC matched-control + canonical split** (02, 05).
+- Animal/session **hierarchical / cluster-robust inference** for the headline p-values (03 #4, 05) — a methodology change spanning all claims; do as its own workstream. (Phase 4 reports session-level + per-animal sign consistency; it does **not** close this.)
+- Reality **full-dataset / all-events run** (gated on the re-decode) and the **matched non-event baseline** strengthening (02) — phase 3 only swaps the event/`is_swr` source, not the sampling or baseline.
+- **PFC matched-control + animal-level inference + the `run_pfc_analysis_bandit.py` batch rerun** (02, 05) — phase 3 ships the PFC code change + per-session verification; the Spyglass-backed rerun and the matched control are this separate workstream.
 
 ## Metrics
 - **Unchanged-definition covariates** (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, `leaky_q_value_diff`, spatial, spline, self-history, and the rename-only `reward_rate_trial_k10`): assert the **design-matrix columns are identical** to baseline (deterministic, the strong guarantee); coefficients then match within the fitters' convergence tolerance (looser than 1e-6 — don't over-tighten against BLAS/optimizer nondeterminism).
@@ -82,4 +86,8 @@ Replace-in-place; internal covariates, no external consumers. Tables regenerated
 2. **`q_*` cross-animal comparability.** α is fit per animal, so `q_*` is on each animal's own learning timescale — report the per-animal α range and interpret `q_*` coefficients within-animal; a shared-α sensitivity fit is optional.
 
 ## Estimated Effort
-~300–450 LOC: `covariates.py` extraction (phase-0, mostly moves) + definition changes + builder updates (replay + contfrag) (~150), spec/runner renames + value block (~120), tests + parity script (~150). Plus the table regen wall-clock (batch, not LOC).
+**Phases 0–2 (harmonization):** ~300–450 LOC: `covariates.py` extraction (phase-0, mostly moves) + definition changes + builder updates (replay + contfrag) (~150), spec/runner renames + value block (~120), tests + parity script (~150). Plus the table regen wall-clock (batch, not LOC).
+
+**Phase 3 (`is_swr` sweep):** ~120–180 LOC — one adapter in `event_table.py` + three consumer swaps + divergence tests; plus the 5-session reality repro (the PFC batch rerun is deferred, not counted). Independent of phases 0–2.
+
+**Phase 4 (promote content models):** ~200–300 LOC — interaction `ModelSpec` rungs + runner diagnostics + centered-VIF fix + patch-destination conditional model + tests; deletes two scratch scripts. Depends on phase 2.
