@@ -1,6 +1,6 @@
 # Covariate Harmonization Implementation Plan
 
-**Status:** Not started.
+**Status:** Not started (phases 0–4). Baseline merged to `master` at `f6c5585` (2026-06-29); the multi-agent pre-merge review cleanup landed in `5c2becf` (red tests greened → 978 passed; `TMAX` ceil/exposure fix; `attach_is_swr` / `add_nonlocal_swr_split` / `timebin_tables` join + missing-column guards). Phases 0–4 now execute against `master`; phase-0's red-test greening and phase-1's `TMAX` fix are already done (see those files).
 
 Give each behavioral covariate **one canonical definition** (per
 [docs/covariate_dictionary.md](../../../../docs/covariate_dictionary.md), decisions
