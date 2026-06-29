@@ -7,9 +7,7 @@ the replay content analysis pipeline.
 
 from ._helpers import (
     POPULATIONS,
-    UNCERTAINTY_COVARIATES,
     add_arm_fixed_effects,
-    add_uncertainty_covariates,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     raised_cosine_history_basis,
@@ -20,6 +18,7 @@ from .choice_prediction import (
     fit_choice_model,
     predict_arm_fractions,
 )
+from .covariates import UNCERTAINTY_COVARIATES, add_uncertainty_covariates
 from .fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,

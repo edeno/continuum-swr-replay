@@ -29,8 +29,8 @@ import difflib
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize_scalar
 
+from continuum_swr_replay.analysis.replay.covariates import _fit_alpha, _q_chosen
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -53,33 +53,6 @@ def _patch_value_diff(ports: np.ndarray) -> np.ndarray:
     )
     s = np.sort(patch_val, axis=1)
     return s[:, -1] - s[:, -2]
-
-
-def _q_chosen(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray, alpha: float,
-              init: float = 0.5) -> np.ndarray:
-    """Per-leaf delta-rule Q value of the chosen leaf, pre-update.
-
-    Q[a] += alpha*(reward - Q[a]); Q resets to ``init`` at each new group (session),
-    so within a session it updates continuously across contingency blocks -- the
-    within-block-updating subjective value the block-constant nominal value lacks.
-    """
-    qc = np.empty(len(arm))
-    Q, prev = None, None
-    for i in range(len(arm)):
-        if grp[i] != prev:
-            Q, prev = np.full(6, init), grp[i]
-        a = arm[i]
-        qc[i] = Q[a]
-        Q[a] += alpha * (reward[i] - Q[a])
-    return qc
-
-
-def _fit_alpha(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray) -> float:
-    """alpha (per animal) that makes q_chosen best predict reward (Bernoulli NLL)."""
-    def nll(a: float) -> float:
-        p = np.clip(_q_chosen(arm, reward, grp, a), 1e-4, 1 - 1e-4)
-        return -float(np.sum(reward * np.log(p) + (1 - reward) * np.log(1 - p)))
-    return float(minimize_scalar(nll, bounds=(0.01, 0.99), method="bounded").x)
 
 
 def _prep_csv(animal: str) -> pd.DataFrame:
