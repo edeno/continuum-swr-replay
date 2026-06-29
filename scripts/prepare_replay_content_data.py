@@ -118,7 +118,9 @@ def find_sessions(max_per_animal: int | None = None):
     return selected
 
 
-def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
+def _process_session(
+    session: dict, contingency: pd.DataFrame | None = None
+) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
     Returns ``None`` only when the session cannot be loaded (missing
@@ -177,6 +179,7 @@ def _process_session(session: dict) -> dict[str, pd.DataFrame] | None:
         trials,
         track_graph,
         conditional_posterior=posterior,
+        contingency=contingency,
     )
     event_sequence_table = (
         build_event_sequence_table(dot, env, posterior)
@@ -223,6 +226,25 @@ def main():
     sessions = find_sessions(max_per_animal=max_per_animal)
     logging.info("Found %d sessions", len(sessions))
 
+    # Per-stop contingency artifact (per-arm nominal value + leaky-Q level),
+    # keyed by stop_id. The event-arm builder maps p_reward_port/q_port -> the
+    # per-arm p_reward_arm / q_arm. Absent -> those columns stay NaN.
+    contingency_path = (
+        OUTPUT_DIR / "models_per_bin_rate" / "contingency_table_csv.pkl"
+    )
+    contingency = None
+    if contingency_path.exists():
+        contingency = pd.read_pickle(contingency_path)
+        logging.info(
+            "loaded contingency (%d stop rows) for p_reward_arm / q_arm",
+            len(contingency),
+        )
+    else:
+        logging.warning(
+            "no contingency at %s — p_reward_arm / q_arm will be NaN",
+            contingency_path,
+        )
+
     # Warn if the output directory still holds artifacts from the
     # legacy pipeline — silent coexistence lets downstream scripts
     # accidentally read stale pickles.
@@ -246,7 +268,7 @@ def main():
         epoch = session["epoch_name"]
 
         try:
-            result = _process_session(session)
+            result = _process_session(session, contingency=contingency)
         except MergeError:
             # A one-to-one merge violation (duplicate event_id from the
             # retrospective metrics) is an integrity bug, not a data gap.

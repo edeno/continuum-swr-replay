@@ -165,7 +165,7 @@ def _load_contfrag_posterior(results_file):
 
 
 def _process_session(
-    session: dict, event_source: str
+    session: dict, event_source: str, contingency: pd.DataFrame | None = None
 ) -> dict[str, pd.DataFrame] | None:
     """Run ContFrag table builders on one session."""
     nwb = session["nwb_file_name"]
@@ -221,6 +221,7 @@ def _process_session(
         event_source=event_source,
         brain_area=brain_area,
         conditional_posterior=posterior,
+        contingency=contingency,
     )
 
     # Stamp provenance onto every output row. The canonical event_id /
@@ -282,12 +283,26 @@ def main():
     all_event_arm_tables: list[pd.DataFrame] = []
     all_stop_tables: list[pd.DataFrame] = []
 
+    # Shared per-stop contingency artifact (built from the replay stop_table;
+    # stop_id is the same hash across pipelines) -> p_reward_arm / q_arm.
+    contingency_path = (
+        PROCESSED_DATA_DIR
+        / "replay_content"
+        / "models_per_bin_rate"
+        / "contingency_table_csv.pkl"
+    )
+    contingency = (
+        pd.read_pickle(contingency_path) if contingency_path.exists() else None
+    )
+    if contingency is None:
+        logging.warning("no contingency — contfrag p_reward_arm / q_arm will be NaN")
+
     for i, session in enumerate(sessions):
         nwb = session["nwb_file_name"]
         epoch = session["epoch_name"]
 
         try:
-            result = _process_session(session, event_source)
+            result = _process_session(session, event_source, contingency=contingency)
         except (FileNotFoundError, OSError, ValueError) as e:
             logging.warning("skip %s %s: %s", nwb, epoch, e)
             continue
