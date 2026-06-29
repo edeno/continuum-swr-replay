@@ -38,6 +38,24 @@ Other consumers to sweep (not just fit runners):
 ### Dependency policy
 No new dependencies.
 
+## Folded-in audit findings (`.claude/review/`)
+
+The independent pipeline audit (2026-06-29) is incorporated where it intersects this
+refactor; the rest is tracked as deferred so nothing is lost.
+
+**Incorporated (this plan):**
+- *04* — content/choice covariate drift from the dictionary **is** this plan; additionally the **choice runner switches `dist_to_arm`→`arm_dist_rank`** (dictionary §4; phase 1) since it's already a dictionary covariate and `build_choice_dataset` carries only `dist_to_arm`.
+- *01* — add a **`validate_dot_event_contract`** (monotonic time within session, single session, positive labels forming one contiguous run, non-negative durations) and **run it across every `data_over_time.pkl` before the phase-1 table regen** (the regen assumes these contracts).
+- *03* — fix the **`TMAX=4.0`→3.99 s edge** (`aggregate_to_timebins` uses `int(tmax/bin_s)` dropping 169 onsets): use `ceil` + clip the final bin's exposure to `tmax`, with a non-divisible-`tmax` regression test (done alongside the phase-1 design change since phase-2 re-fits the rate ladder anyway).
+- *03/04* — **pre-existing red tests are ours to fix**: `test_uncertainty_covariates` (expects the removed `UNCERTAINTY_COVARIATES`) and `test_compare_event_source_models` (expects `R0/R1/R2`, source set now has `Rlag`). Get the baseline **green in phase-0** (precondition for "suite passes unchanged"); update the uncertainty-covariate test to the canonical set in phase-1.
+- *03* — refresh the **stale claim #19c per-bin numbers** (1.42/3.10/1.08 → current) in phase-2's docs pass.
+
+**Deferred (NOT this plan — tracked backlog):**
+- Animal/session **hierarchical / cluster-robust inference** for the headline p-values (03 #4, 05) — a methodology change spanning all claims; do as its own workstream.
+- Promote the **exploratory content scripts** (`_content_reward_interactions`, `_content_patch_destination`) into the audited model pipeline with diagnostics (SE/p/VIF/FDR/n_events/provenance) so #19f + patch-destination become non-exploratory (04).
+- Make **ancillary scripts consume canonical `is_swr`** instead of re-deriving it (spike-evidence 02, occupancy 04, PFC 05).
+- Reality **full-dataset run** (gated on the re-decode) and **PFC matched-control + canonical split** (02, 05).
+
 ## Metrics
 - **Unchanged-definition covariates** (reward kernel, `p_reward_current`, `rpe`, `value_diff_patch`, `recent_switch_rate`, `is_after_switch`, `leaky_q_value_diff`, spatial, spline, self-history, and the rename-only `reward_rate_trial_k10`): assert the **design-matrix columns are identical** to baseline (deterministic, the strong guarantee); coefficients then match within the fitters' convergence tolerance (looser than 1e-6 — don't over-tighten against BLAS/optimizer nondeterminism).
 - **Rebuild integrity:** the regenerated tables' **response/posterior columns** (`arm_count_*`, `arm_posterior_mass`, offsets, `is_swr`, keys) reproduce the pre-rebuild tables (the rollup is deterministic on fixed decodes) — confirms the rebuild changed *only* covariates.

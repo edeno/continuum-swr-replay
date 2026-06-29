@@ -16,6 +16,7 @@ definition changes.
 
 ## Tasks
 
+- **Green the baseline first** (precondition for the "suite passes unchanged" gate): the audit found two pre-existing failures from our own recent drift — `test_uncertainty_covariates` (expects the removed `UNCERTAINTY_COVARIATES` in `fit_uncertainty_rate.py`) and `test_compare_event_source_models` (expects `R0/R1/R2`; the source set now includes `Rlag`). Fix the stale expectations so `uv run pytest` is green **before** the move. (The uncertainty-covariate test is further updated to the canonical set in phase 1.)
 - **Create `src/continuum_swr_replay/analysis/replay/covariates.py`** and **move** the covariate-definition functions listed above out of `_helpers.py` **verbatim** (no logic edits). Keep their signatures/docstrings exactly.
 - **Promote the Q-learner:** move `_q_chosen` and `_fit_alpha` from `scripts/_bandit_csv_contingency.py` into `covariates.py` verbatim; update `_bandit_csv_contingency.py` to import them from `covariates` (so the contingency builder keeps working).
 - **Re-export shim:** in `_helpers.py`, add `from .covariates import (<moved names>)  # re-export: covariates moved to covariates.py` so every existing `from ..._helpers import recent_reward_rate_all_events` etc. keeps resolving. Update `__init__.py` to import the public covariate names from `covariates` (keep the same exported surface).
