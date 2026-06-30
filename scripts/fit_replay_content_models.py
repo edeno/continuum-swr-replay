@@ -385,7 +385,14 @@ def main():
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
     else:
-        model_names = list(hierarchy.keys())
+        # Value-block rungs (Mv/Pv) require p_reward_arm/q_arm, which are NaN for
+        # stops absent from the contingency artifact. Including them in a default
+        # run would shrink the shared complete-case event set for the *whole*
+        # ladder (M0-M7/P0-P3 would then be fit on fewer events). Keep the base
+        # ladder as the default; request the value block explicitly to compare it
+        # against its own base (e.g. --models M5,Mv or --models P3,Pv).
+        value_rungs = {"Mv", "Pv"}
+        model_names = [m for m in hierarchy if m not in value_rungs]
 
     # Load the input table. For non_local arm fits, fall back to legacy naming.
     canonical_path = input_dir / f"{table_name}.pkl"

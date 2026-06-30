@@ -13,6 +13,7 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     get_data_over_time,
+    validate_dot_event_contract,
 )
 
 # ============================================================================
@@ -312,3 +313,47 @@ class TestGetDataOverTimeOutputColumns:
             get_data_over_time(
                 data, mock_results, mock_environment, "chimi20200212_.nwb", "02_r1"
             )
+
+
+# ============================================================================
+# validate_dot_event_contract — table-regen input-contract guard
+# ============================================================================
+
+
+def _clean_dot() -> pd.DataFrame:
+    """Single session, time-sorted, one contiguous run per event label."""
+    return pd.DataFrame(
+        {
+            "animal": ["chimi"] * 6,
+            "day": [20200212] * 6,
+            "epoch": ["02_r1"] * 6,
+            "non_local_event": [0, 1, 1, 0, 2, 2],  # two contiguous events
+        },
+        index=np.arange(6, dtype=float),
+    )
+
+
+def test_validate_dot_contract_clean_passes():
+    assert validate_dot_event_contract(_clean_dot()) == {}
+
+
+def test_validate_dot_contract_rejects_multiple_sessions():
+    dot = _clean_dot()
+    dot.loc[3:, "epoch"] = "04_r2"  # two epochs in one frame
+    with pytest.raises(ValueError, match="multiple_epoch|input-contract"):
+        validate_dot_event_contract(dot)
+
+
+def test_validate_dot_contract_rejects_unsorted_time():
+    dot = _clean_dot()
+    dot.index = [0.0, 1.0, 2.0, 1.5, 4.0, 5.0]  # time goes backwards once
+    with pytest.raises(ValueError, match="unsorted_time|input-contract"):
+        validate_dot_event_contract(dot)
+
+
+def test_validate_dot_contract_rejects_noncontiguous_label():
+    dot = _clean_dot()
+    # label 1 split by a gap (rows 1 and 3) -> non-contiguous event
+    dot["non_local_event"] = [0, 1, 0, 1, 2, 2]
+    with pytest.raises(ValueError, match="noncontiguous|input-contract"):
+        validate_dot_event_contract(dot)

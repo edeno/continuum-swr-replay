@@ -34,6 +34,9 @@ import time
 import pandas as pd
 from pandas.errors import MergeError
 
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_dot_event_contract,
+)
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
@@ -139,6 +142,9 @@ def _process_session(
     epoch = session["epoch_name"]
 
     dot = pd.read_pickle(session["dot_file"])
+    # Fail closed on input-contract violations (multi-session frame, unsorted
+    # time, non-contiguous event labels) before they silently corrupt the tables.
+    validate_dot_event_contract(dot)
     with open(session["env_file"], "rb") as f:
         env = pickle.load(f)
 

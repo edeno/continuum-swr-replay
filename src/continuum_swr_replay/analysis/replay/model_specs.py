@@ -203,7 +203,10 @@ _M7 = (
 )
 # Value block: per-arm nominal value (p_reward_arm) + experienced leaky-Q level
 # (q_arm) as conditional main effects on the M5 spatial/reward-memory base
-# (covariate_dictionary.md D2/D3). Additive to M5 -- M0-M7 are unchanged.
+# (covariate_dictionary.md D2/D3). Additive in *spec* — but because
+# p_reward_arm/q_arm are NaN for stops absent from the contingency, co-fitting Mv
+# in the same run restricts the shared complete-case event set, so it is excluded
+# from the default model list (request --models M5,Mv to compare it to its base).
 _Mv = (*_M5, "p_reward_arm", "q_arm")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {

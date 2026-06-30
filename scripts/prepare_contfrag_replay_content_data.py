@@ -50,6 +50,9 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_dot_event_contract,
+)
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
@@ -173,6 +176,9 @@ def _process_session(
     brain_area = session["brain_area"]
 
     dot = pd.read_pickle(session["dot_file"])
+    # Fail closed on input-contract violations before they silently corrupt the
+    # tables; a violation here is caught by the per-session skip+tally in main().
+    validate_dot_event_contract(dot)
     with open(session["env_file"], "rb") as f:
         env = pickle.load(f)
 
@@ -283,8 +289,9 @@ def main():
     all_event_arm_tables: list[pd.DataFrame] = []
     all_stop_tables: list[pd.DataFrame] = []
 
-    # Shared per-stop contingency artifact (built from the replay stop_table;
-    # stop_id is the same hash across pipelines) -> p_reward_arm / q_arm.
+    # Shared per-stop contingency artifact (built from the replay stop_table).
+    # ContFrag's own stop_id mixes in brain_area/event_source, so the builder
+    # recomputes the plain (animal,day,epoch,stop_idx) hash for the join.
     contingency_path = (
         PROCESSED_DATA_DIR
         / "replay_content"
@@ -297,6 +304,7 @@ def main():
     if contingency is None:
         logging.warning("no contingency — contfrag p_reward_arm / q_arm will be NaN")
 
+    skipped: list[tuple[str, str, str]] = []
     for i, session in enumerate(sessions):
         nwb = session["nwb_file_name"]
         epoch = session["epoch_name"]
@@ -305,6 +313,7 @@ def main():
             result = _process_session(session, event_source, contingency=contingency)
         except (FileNotFoundError, OSError, ValueError) as e:
             logging.warning("skip %s %s: %s", nwb, epoch, e)
+            skipped.append((nwb, epoch, str(e)))
             continue
 
         if result is None:
@@ -324,6 +333,15 @@ def main():
                 int(elapsed),
                 int(remaining),
             )
+
+    if skipped:
+        logging.error(
+            "SKIPPED %d/%d session(s) — value block / tables are MISSING these:",
+            len(skipped),
+            len(sessions),
+        )
+        for nwb, epoch, reason in skipped:
+            logging.error("  skipped %s %s: %s", nwb, epoch, reason)
 
     if not all_event_tables:
         logging.error("no sessions produced data")
