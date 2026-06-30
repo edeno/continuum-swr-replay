@@ -665,21 +665,17 @@ def build_contfrag_event_arm_table(
     # never collide on it; the contingency artifact, however, is keyed by the
     # plain NonLocal-pipeline hash of (animal, day, epoch, stop_idx) shared
     # across pipelines — so a join on ContFrag's stop_id matches nothing.
-    # Recompute the plain key from the natural keys for the merge.
-    key_cols = {"animal", "day", "epoch", "stop_idx"}
-    if key_cols.issubset(long.columns):
-        cont_key = hash_stop_id(
-            long["animal"].to_numpy(),
-            long["day"].to_numpy(),
-            long["epoch"].to_numpy(),
-            long["stop_idx"].to_numpy(),
-        )
-        long["p_reward_arm"], long["q_arm"] = attach_contingency_value_block(
-            long["arm"].to_numpy(), cont_key, contingency
-        )
-    else:
-        long["p_reward_arm"] = np.nan
-        long["q_arm"] = np.nan
+    # Recompute the plain key from the natural keys (always present on the
+    # broadcast event_table) for the merge.
+    cont_key = hash_stop_id(
+        long["animal"].to_numpy(),
+        long["day"].to_numpy(),
+        long["epoch"].to_numpy(),
+        long["stop_idx"].to_numpy(),
+    )
+    long["p_reward_arm"], long["q_arm"] = attach_contingency_value_block(
+        long["arm"].to_numpy(), cont_key, contingency
+    )
 
     # Interactions
     tss = long["time_since_stop"].to_numpy()

@@ -578,16 +578,11 @@ def _q_chosen(
     Q[a] += alpha*(reward - Q[a]); Q resets to ``init`` at each new group (session),
     so within a session it updates continuously across contingency blocks -- the
     within-block-updating subjective value the block-constant nominal value lacks.
+
+    The chosen-arm column of :func:`q_all_arm` by construction, so it delegates
+    rather than re-implement the delta-rule rollout.
     """
-    qc = np.empty(len(arm))
-    Q, prev = None, None
-    for i in range(len(arm)):
-        if grp[i] != prev:
-            Q, prev = np.full(6, init), grp[i]
-        a = arm[i]
-        qc[i] = Q[a]
-        Q[a] += alpha * (reward[i] - Q[a])
-    return qc
+    return q_all_arm(arm, reward, grp, alpha, init)[np.arange(len(arm)), arm]
 
 
 def q_all_arm(
@@ -599,12 +594,11 @@ def q_all_arm(
 ) -> np.ndarray:
     """Per-leaf delta-rule Q **level of every arm**, pre-update, for all trials.
 
-    The all-arm companion to :func:`_q_chosen`: same leaky delta-rule
-    (``Q[a] += alpha*(reward - Q[a])``, ``Q`` reset to ``init`` at each new group),
-    but snapshots the full 6-arm value vector *before* each trial's update rather
-    than only the chosen arm. ``q_all_arm(...)[i, arm[i]]`` equals
-    ``_q_chosen(...)[i]`` by construction, so ``q_current`` is the chosen-arm
-    column of this array and ``q_arm`` is the per-arm value.
+    The canonical leaky delta-rule rollout (``Q[a] += alpha*(reward - Q[a])``,
+    ``Q`` reset to ``init`` at each new group), snapshotting the full 6-arm value
+    vector *before* each trial's update. ``q_current`` is the chosen-arm column
+    (``[i, arm[i]]``, which :func:`_q_chosen` returns) and ``q_arm`` is the
+    per-arm value.
 
     Parameters
     ----------

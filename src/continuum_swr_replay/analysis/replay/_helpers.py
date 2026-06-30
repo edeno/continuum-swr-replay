@@ -704,7 +704,6 @@ def aggregate_to_timebins(
     # on the SAME grid as the response, shifted within stop (lag >= 1 -> only the
     # cross stream's past predicts the current bin), reset at the stop boundary.
     if cross_history_lags:
-        out = out.sort_values(["stop_id", "binj"])
         xsrc = cross_onset_times[cross_onset_times["t_since_stop_onset"] < tmax]
         xbinj = np.clip(
             (xsrc["t_since_stop_onset"].to_numpy() / bin_s).astype(int), 0, nmax - 1

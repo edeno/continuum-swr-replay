@@ -260,11 +260,16 @@ def validate_dot_event_contract(
         if col not in dot.columns:
             continue
         lab = dot[col].to_numpy()
-        noncontig = 0
-        for label in np.unique(lab[lab > 0]):
-            idx = np.flatnonzero(lab == label)
-            if idx.size and (idx[-1] - idx[0] + 1) != idx.size:
-                noncontig += 1
+        # One pass per column: group positions of labelled bins by label. The
+        # positions are ascending (flatnonzero), so per label first()/last() are
+        # its min/max bin index; a contiguous run has last - first + 1 == count.
+        pos = np.flatnonzero(lab > 0)
+        if pos.size:
+            grp = pd.Series(pos).groupby(lab[pos])
+            span = grp.last() - grp.first() + 1
+            noncontig = int((span.to_numpy() != grp.size().to_numpy()).sum())
+        else:
+            noncontig = 0
         if noncontig:
             violations[f"noncontiguous_{col}"] = noncontig
 

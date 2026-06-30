@@ -145,9 +145,12 @@ def _summary(models: pd.DataFrame) -> None:
     for direction, g in models.groupby("direction"):
         print(f"\n=== {direction}  (n={len(g)} sessions) ===")
         da = g["delta_aic"].dropna()
-        print(f"  self->+cross AIC drop: median {da.median():+.2f}  "
-              f"%improved {100 * (da > 0).mean():.0f}%  "
-              f"p={wilcoxon(da)[1]:.1e}" if len(da) >= 5 else "  (n<5)")
+        if len(da) >= 5:
+            print(f"  self->+cross AIC drop: median {da.median():+.2f}  "
+                  f"%improved {100 * (da > 0).mean():.0f}%  "
+                  f"p={wilcoxon(da)[1]:.1e}")
+        else:
+            print("  (n<5)")
         if "delta_cv_bits" in g:
             dc = g["delta_cv_bits"].dropna()
             if len(dc) >= 5:
