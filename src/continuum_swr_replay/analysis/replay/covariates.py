@@ -9,6 +9,8 @@ fitted-alpha leaky-Q learner. Implements the constructs specified in
 
 from __future__ import annotations
 
+import warnings
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -20,6 +22,8 @@ from ._helpers import _trial_cutoff_times, build_well_to_arm_map
 
 ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 _SESSION_COLS = ["animal", "day", "epoch"]
+_P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
+_Q_PORT_COLS = [f"q_port{i}" for i in range(6)]
 
 
 UNCERTAINTY_COVARIATES = (
@@ -639,3 +643,74 @@ def _fit_alpha(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray) -> float:
         return -float(np.sum(reward * np.log(p) + (1 - reward) * np.log(1 - p)))
 
     return float(minimize_scalar(nll, bounds=(0.01, 0.99), method="bounded").x)
+
+
+def attach_contingency_value_block(
+    arm: np.ndarray,
+    stop_id: np.ndarray,
+    contingency: pd.DataFrame | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-(event, arm) nominal value and leaky-Q level from the contingency.
+
+    Single source for the per-arm value block shared by the NonLocal
+    (``tables.py``) and ContFrag (``contfrag/tables.py``) event-arm builders
+    (``docs/covariate_dictionary.md`` D2/D3). Both builders previously inlined
+    this join, which let the join key silently diverge.
+
+    Parameters
+    ----------
+    arm : np.ndarray, shape (n_rows,)
+        Arm id (0-8) for each (event, arm) row.
+    stop_id : np.ndarray, shape (n_rows,)
+        Join key matching ``contingency["stop_id"]``. The caller supplies the
+        key that matches the artifact: the NonLocal pipeline passes the event-arm
+        table's own ``stop_id``; ContFrag passes the *plain*
+        ``hash_stop_id(animal, day, epoch, stop_idx)`` because its own
+        ``stop_id`` mixes in ``brain_area`` / ``event_source`` and so matches
+        nothing in the (NonLocal-keyed) contingency.
+    contingency : pd.DataFrame | None
+        Per-stop artifact with ``stop_id`` + ``p_reward_port{0..5}`` +
+        ``q_port{0..5}``. ``None`` (or missing those columns) yields all-NaN.
+
+    Returns
+    -------
+    p_reward_arm, q_arm : np.ndarray, each shape (n_rows,)
+        Leaf arm ``j`` takes ``p_reward_port{j}`` / ``q_port{j}``; trunk arms
+        (6-8) are not reward sites and take ``0.0`` where the stop is present in
+        the contingency, ``NaN`` where absent — so a stop with no contingency row
+        drops uniformly (all nine arms NaN) at fit time rather than contributing
+        a spurious 0.0.
+    """
+    arm = np.asarray(arm)
+    n_rows = len(arm)
+    have_cols = contingency is not None and {
+        *_P_REWARD_PORT_COLS,
+        *_Q_PORT_COLS,
+    }.issubset(contingency.columns)
+    if not have_cols:
+        return np.full(n_rows, np.nan), np.full(n_rows, np.nan)
+
+    n_unique = contingency["stop_id"].nunique()
+    if n_unique != len(contingency):
+        warnings.warn(
+            f"contingency has {len(contingency) - n_unique} duplicate stop_id "
+            "row(s); keeping the first occurrence per stop_id. If duplicate "
+            "rows carry different port/q values this silently picks one.",
+            stacklevel=2,
+        )
+    cont = contingency.drop_duplicates("stop_id")[
+        ["stop_id", *_P_REWARD_PORT_COLS, *_Q_PORT_COLS]
+    ]
+    merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
+        cont, on="stop_id", how="left"
+    )
+    port_mat = merged[_P_REWARD_PORT_COLS].to_numpy(dtype=float)
+    q_mat = merged[_Q_PORT_COLS].to_numpy(dtype=float)
+    leaf = arm < 6
+    leaf_idx = np.clip(arm, 0, 5).astype(int)
+    row = np.arange(n_rows)
+    present = ~np.isnan(port_mat[:, 0])  # stop_id had a contingency row
+    trunk_fill = np.where(present, 0.0, np.nan)
+    p_reward_arm = np.where(leaf, port_mat[row, leaf_idx], trunk_fill)
+    q_arm = np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
+    return p_reward_arm, q_arm

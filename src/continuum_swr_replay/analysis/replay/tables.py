@@ -83,6 +83,9 @@ from ._helpers import (
     assign_bout as _assign_bout,
 )
 from ._helpers import (
+    attach_contingency_value_block as _attach_contingency_value_block,
+)
+from ._helpers import (
     build_well_to_arm_map as _build_well_to_arm_map,
 )
 from ._helpers import (
@@ -1295,29 +1298,10 @@ def build_event_arm_table(
 
     # -- p_reward_arm / q_arm: per-arm nominal value + experienced leaky-Q level
     # from the per-stop contingency artifact (covariate_dictionary.md D2/D3).
-    # Leaf arm j <- p_reward_port{j} / q_port{j}; trunk arms (6,7,8) are not
-    # reward sites -> structural 0.0 where the stop has contingency, else NaN
-    # (so a stop absent from the contingency map drops uniformly at fit time).
-    port_cols = [f"p_reward_port{i}" for i in range(6)]
-    q_cols = [f"q_port{i}" for i in range(6)]
-    if contingency is not None and {*port_cols, *q_cols}.issubset(contingency.columns):
-        cont = contingency.drop_duplicates("stop_id")[["stop_id", *port_cols, *q_cols]]
-        m = long[["stop_id", "arm"]].merge(cont, on="stop_id", how="left")
-        port_mat = m[port_cols].to_numpy(dtype=float)
-        q_mat = m[q_cols].to_numpy(dtype=float)
-        arm_i = long["arm"].to_numpy()
-        leaf = arm_i < 6
-        leaf_idx = np.clip(arm_i, 0, 5).astype(int)
-        row = np.arange(len(long))
-        present = ~np.isnan(port_mat[:, 0])  # stop_id had a contingency row
-        trunk_fill = np.where(present, 0.0, np.nan)
-        long["p_reward_arm"] = np.where(
-            leaf, port_mat[row, leaf_idx], trunk_fill
-        )
-        long["q_arm"] = np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
-    else:
-        long["p_reward_arm"] = np.nan
-        long["q_arm"] = np.nan
+    # The NonLocal event-arm table's own stop_id matches the contingency key.
+    long["p_reward_arm"], long["q_arm"] = _attach_contingency_value_block(
+        long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
+    )
 
     # Interactions (plan §1.7). Event-level × arm-level products.
     tss = long["time_since_stop"].to_numpy()

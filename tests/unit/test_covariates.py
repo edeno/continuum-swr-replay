@@ -13,6 +13,8 @@ import subprocess
 import sys
 
 import numpy as np
+import pandas as pd
+import pytest
 
 import continuum_swr_replay.analysis.replay as replay_pkg
 from continuum_swr_replay.analysis.replay import _helpers, covariates
@@ -115,3 +117,59 @@ def test_q_all_arm_pre_update_and_group_reset():
     q2 = covariates.q_all_arm(np.array([0, 0]), np.array([1.0, 1.0]),
                               np.array([0, 1]), 0.5)
     np.testing.assert_allclose(q2[1], np.full(6, 0.5))  # second row is a fresh group
+
+
+# ── attach_contingency_value_block (shared per-arm value join) ──
+
+
+def _toy_contingency(stop_id):
+    """One contingency row: ports 0..5 = 0.0,0.2,0.4,0.6,0.8,1.0; q = p/2."""
+    row = {"stop_id": stop_id}
+    for i in range(6):
+        row[f"p_reward_port{i}"] = i * 0.2
+        row[f"q_port{i}"] = i * 0.1
+    return pd.DataFrame([row])
+
+
+def test_value_block_leaf_trunk_and_present():
+    """Leaf arm j <- port{j}; trunk arms (6-8) -> 0.0 for a mapped stop."""
+    arm = np.array([0, 1, 5, 6, 7, 8])
+    stop_id = np.full(6, 111, dtype=np.int64)
+    cont = _toy_contingency(111)
+    p, q = covariates.attach_contingency_value_block(arm, stop_id, cont)
+    np.testing.assert_allclose(p[:3], [0.0, 0.2, 1.0])  # leaves 0,1,5
+    np.testing.assert_allclose(q[:3], [0.0, 0.1, 0.5])
+    np.testing.assert_allclose(p[3:], [0.0, 0.0, 0.0])  # trunk arms, stop present
+    np.testing.assert_allclose(q[3:], [0.0, 0.0, 0.0])
+
+
+def test_value_block_absent_stop_all_nan():
+    """A stop_id with no contingency row -> NaN on every arm (leaf and trunk)."""
+    arm = np.array([0, 5, 6, 8])
+    stop_id = np.full(4, 999, dtype=np.int64)  # not in the contingency
+    cont = _toy_contingency(111)
+    p, q = covariates.attach_contingency_value_block(arm, stop_id, cont)
+    assert np.isnan(p).all()
+    assert np.isnan(q).all()
+
+
+def test_value_block_none_or_missing_cols_all_nan():
+    arm = np.array([0, 6])
+    sid = np.array([1, 2])
+    p, q = covariates.attach_contingency_value_block(arm, sid, None)
+    assert np.isnan(p).all() and np.isnan(q).all()
+    bad = pd.DataFrame({"stop_id": [1, 2]})  # no port/q cols
+    p2, q2 = covariates.attach_contingency_value_block(arm, sid, bad)
+    assert np.isnan(p2).all() and np.isnan(q2).all()
+
+
+def test_value_block_warns_on_duplicate_stop_id():
+    """Duplicate stop_id with differing values warns (silent-pick guard)."""
+    a = _toy_contingency(111)
+    b = _toy_contingency(111)
+    b.loc[0, "p_reward_port0"] = 0.9  # conflicting value for the same stop
+    cont = pd.concat([a, b], ignore_index=True)
+    with pytest.warns(UserWarning, match="duplicate stop_id"):
+        covariates.attach_contingency_value_block(
+            np.array([0]), np.array([111]), cont
+        )

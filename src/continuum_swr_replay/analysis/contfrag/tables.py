@@ -29,6 +29,7 @@ from ..replay._helpers import (
     align_posterior_to_dot,
     arm_to_patch,
     assign_bout,
+    attach_contingency_value_block,
     cumulative_reward_per_arm,
     eq_indicator,
     hash_stop_id,
@@ -658,43 +659,24 @@ def build_contfrag_event_arm_table(
     long["cumulative_reward"] = cr_vals
     long["reward_rate_arm_k10"] = rrr_vals
 
-    # p_reward_arm / q_arm from the per-stop contingency artifact (mirrors
-    # replay/tables.py): leaf arm j <- p_reward_port{j}/q_port{j}, trunk arms
-    # structural 0.0 where the stop is mapped, else NaN.
-    port_cols = [f"p_reward_port{i}" for i in range(6)]
-    q_cols = [f"q_port{i}" for i in range(6)]
+    # p_reward_arm / q_arm from the per-stop contingency artifact (shared with
+    # replay/tables.py via attach_contingency_value_block). ContFrag's own
+    # stop_id mixes in brain_area/event_source so SWR/MUA and per-area tables
+    # never collide on it; the contingency artifact, however, is keyed by the
+    # plain NonLocal-pipeline hash of (animal, day, epoch, stop_idx) shared
+    # across pipelines — so a join on ContFrag's stop_id matches nothing.
+    # Recompute the plain key from the natural keys for the merge.
     key_cols = {"animal", "day", "epoch", "stop_idx"}
-    if (
-        contingency is not None
-        and key_cols.issubset(long.columns)
-        and {*port_cols, *q_cols}.issubset(contingency.columns)
-    ):
-        cont = contingency.drop_duplicates("stop_id")[["stop_id", *port_cols, *q_cols]]
-        # ContFrag's own stop_id mixes in brain_area/event_source so SWR/MUA
-        # and per-area tables never collide on it. The contingency artifact,
-        # however, is keyed by the plain NonLocal-pipeline hash of
-        # (animal, day, epoch, stop_idx) — shared across pipelines — so a
-        # join on ContFrag's stop_id matches nothing. Recompute the plain
-        # key from the natural keys for the merge.
+    if key_cols.issubset(long.columns):
         cont_key = hash_stop_id(
             long["animal"].to_numpy(),
             long["day"].to_numpy(),
             long["epoch"].to_numpy(),
             long["stop_idx"].to_numpy(),
         )
-        m = pd.DataFrame(
-            {"stop_id": cont_key, "arm": long["arm"].to_numpy()}
-        ).merge(cont, on="stop_id", how="left")
-        port_mat = m[port_cols].to_numpy(dtype=float)
-        q_mat = m[q_cols].to_numpy(dtype=float)
-        arm_i = long["arm"].to_numpy()
-        is_leaf = arm_i < 6
-        leaf_idx = np.clip(arm_i, 0, 5).astype(int)
-        rowi = np.arange(len(long))
-        present = ~np.isnan(port_mat[:, 0])
-        trunk_fill = np.where(present, 0.0, np.nan)
-        long["p_reward_arm"] = np.where(is_leaf, port_mat[rowi, leaf_idx], trunk_fill)
-        long["q_arm"] = np.where(is_leaf, q_mat[rowi, leaf_idx], trunk_fill)
+        long["p_reward_arm"], long["q_arm"] = attach_contingency_value_block(
+            long["arm"].to_numpy(), cont_key, contingency
+        )
     else:
         long["p_reward_arm"] = np.nan
         long["q_arm"] = np.nan

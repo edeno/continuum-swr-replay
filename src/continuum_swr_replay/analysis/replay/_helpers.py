@@ -759,6 +759,7 @@ from .covariates import (  # noqa: E402,F401
     _leaky_q_value_diff,
     _omission_streak,
     add_uncertainty_covariates,
+    attach_contingency_value_block,
     cumulative_reward_all_events,
     cumulative_reward_per_arm,
     lagged_trial_rewards,
