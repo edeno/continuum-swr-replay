@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay._helpers import (
     add_trial_context,
@@ -333,3 +334,51 @@ class TestNoPastTrialsContract:
             event_times, empty_trials, _well_to_arm()
         )
         assert np.all(np.isnan(out))
+
+
+class TestRewardRateArmDefinition:
+    """Definition-level guards for the canonical reward_rate_arm_k10 column."""
+
+    def test_k_window_truncates_at_k(self):
+        """Only the last k visits count; k=10 and k=5 give different rates."""
+        n = 12
+        trials = pd.DataFrame(
+            {
+                "start_time": np.arange(n, dtype=float),
+                "end_time": np.arange(n, dtype=float) + 0.5,
+                "from_well": [1] * n,
+                "to_well": [0] * n,  # 12 visits, all to arm 0
+                # rewarded on visits 3-7 (1-indexed); omitted elsewhere
+                "is_reward": [False, False, True, True, True, True, True,
+                              False, False, False, False, False],
+                "is_patch_change": [False] * n,
+            }
+        )
+        event_times = np.array([n + 0.5])
+        w2a = _well_to_arm()
+        r10 = recent_reward_rate_all_events(event_times, trials, w2a, k=10)
+        r5 = recent_reward_rate_all_events(event_times, trials, w2a, k=5)
+        # last 10 visits (3..12): 5 rewarded -> 0.5; last 5 (8..12): 0 -> 0.0
+        assert r10[0, 0] == pytest.approx(0.5)
+        assert r5[0, 0] == pytest.approx(0.0)
+
+    def test_trunk_zero_vs_unvisited_leaf_nan(self):
+        """Trunk arms -> 0.0; never-visited leaf arms -> NaN (session w/ trials)."""
+        trials = pd.DataFrame(
+            {
+                "start_time": [0.0, 1.0],
+                "end_time": [0.5, 1.5],
+                "from_well": [1, 1],
+                "to_well": [0, 0],  # only arm 0 visited
+                "is_reward": [True, False],
+                "is_patch_change": [False, False],
+            }
+        )
+        out = recent_reward_rate_all_events(
+            np.array([2.5]), trials, _well_to_arm(), k=10
+        )
+        assert out.shape[1] == 9
+        assert out[0, 0] == pytest.approx(0.5)  # visited leaf: 1/2 rewarded
+        assert np.isnan(out[0, 1])  # never-visited leaf -> NaN
+        for trunk in (6, 7, 8):
+            assert out[0, trunk] == 0.0  # trunk arms structural 0.0

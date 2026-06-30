@@ -16,6 +16,7 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
+    build_event_patch_table,
     build_event_sequence_table,
     build_event_table,
     build_stop_table,
@@ -240,6 +241,51 @@ def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
         assert (
             eat_shifted[col].notna().sum() == eat_baseline[col].notna().sum()
         ), f"column {col} lost values when event_table had a non-zero-based index"
+
+
+def test_value_block_predictors_resolve_and_populate(tiny_session):
+    """Mv/Pv predictors resolve to builder columns, and the contingency
+    join populates them end-to-end.
+
+    Guards the central rename-desync risk of the harmonization PR: a model
+    spec naming a column the builders no longer emit, and the NonLocal
+    contingency join (build_event_arm_table(contingency=...)) producing values
+    rather than silently staying NaN.
+    """
+    from continuum_swr_replay.analysis.replay.model_specs import (
+        ARM_FE_PREDICTORS,
+        MODEL_HIERARCHY,
+        MODEL_PATCH,
+    )
+
+    dot, env, trials, graph = tiny_session
+    et = build_event_table(dot, env, trials, graph)
+    eat = build_event_arm_table(et, dot, env, trials, graph)
+
+    # value-block columns are emitted (present even without a contingency)
+    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm"):
+        assert col in eat.columns
+
+    # every Mv predictor (bar the fit-time arm fixed effects) resolves
+    arm_fe = set(ARM_FE_PREDICTORS)
+    mv = {p for p in MODEL_HIERARCHY["Mv"].predictors if p not in arm_fe}
+    assert mv <= set(eat.columns), f"Mv predictors absent: {mv - set(eat.columns)}"
+
+    # patch table emits the patch value aggregates; every Pv predictor resolves
+    ept = build_event_patch_table(et, eat)
+    pv = {p for p in MODEL_PATCH["Pv"].predictors if p not in arm_fe}
+    assert pv <= set(ept.columns), f"Pv predictors absent: {pv - set(ept.columns)}"
+
+    # contingency join populates leaf-arm value columns (not silently all-NaN)
+    stop_ids = eat["stop_id"].dropna().unique()
+    if len(stop_ids):
+        cont = pd.DataFrame({"stop_id": stop_ids})
+        for i in range(6):
+            cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
+            cont[f"q_port{i}"] = 0.05 * (i + 1)
+        eat_c = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
+        leaf_present = eat_c.loc[eat_c["arm"] < 6, "p_reward_arm"]
+        assert leaf_present.notna().any(), "contingency join left p_reward_arm all-NaN"
 
 
 # ── Schema / dtype tests ──

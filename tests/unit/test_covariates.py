@@ -173,3 +173,30 @@ def test_value_block_warns_on_duplicate_stop_id():
         covariates.attach_contingency_value_block(
             np.array([0]), np.array([111]), cont
         )
+
+
+def test_value_block_plain_key_populates_suffixed_key_misses():
+    """Regression for the contfrag join-key bug: the contingency is keyed by the
+    plain hash_stop_id(animal,day,epoch,stop_idx); joining on ContFrag's own
+    brain_area/event_source-suffixed stop_id matches nothing (all-NaN). This locks
+    the builder's choice to recompute the plain key."""
+    animal, day, epoch = "x", 1, "02_r1"
+    stop_idx = np.array([0, 0])
+    arm = np.array([0, 6])  # one leaf, one trunk
+    plain = _helpers.hash_stop_id(
+        np.array([animal, animal]), np.array([day, day]),
+        np.array([epoch, epoch]), stop_idx,
+    )
+    suffixed = _helpers.hash_stop_id(
+        np.array([animal, animal]), np.array([day, day]),
+        np.array([epoch, epoch]), stop_idx,
+        brain_area="HPC", event_source="SWR",
+    )
+    assert plain[0] != suffixed[0]  # the two keyings genuinely differ
+    cont = _toy_contingency(int(plain[0]))
+    # plain key -> leaf populated, trunk 0.0
+    p_plain, _ = covariates.attach_contingency_value_block(arm, plain, cont)
+    assert not np.isnan(p_plain[0]) and p_plain[1] == 0.0
+    # suffixed key (the bug) -> no match -> all NaN
+    p_suf, _ = covariates.attach_contingency_value_block(arm, suffixed, cont)
+    assert np.isnan(p_suf).all()
