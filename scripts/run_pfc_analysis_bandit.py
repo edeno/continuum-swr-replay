@@ -51,11 +51,11 @@ from pathlib import Path
 import dask
 import numpy as np
 import pandas as pd
-from _decoding_common import setup_logger
 from dask.distributed import Client, LocalCluster
 
 from continuum_swr_replay.analysis.pfc import run_session
 from continuum_swr_replay.data_loaders import get_epoch_info
+from continuum_swr_replay.decoding_common import setup_logger
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,

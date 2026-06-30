@@ -40,13 +40,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import xarray as xr
-from _decoding_common import (
-    DecodingConfig,
-    add_common_args,
-    results_exist,
-    run_batch,
-    setup_logger,
-)
 from non_local_detector import (
     ContFragClusterlessClassifier,
     ContFragSortedSpikesClassifier,
@@ -61,6 +54,13 @@ from continuum_swr_replay.analysis.contfrag import (
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
+)
+from continuum_swr_replay.decoding_common import (
+    DecodingConfig,
+    add_common_args,
+    results_exist,
+    run_batch,
+    setup_logger,
 )
 from continuum_swr_replay.parameters import (
     CONTFRAG_DETECTOR_CONFIG,

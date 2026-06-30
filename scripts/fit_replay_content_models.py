@@ -4,7 +4,7 @@
 Primary model: Conditional Poisson regression (multinomial-count softmax).
 Robustness check: Conditional Logit on dominant arm.
 
-Loads the master long-format dataset from prepare_replay_content_data.py,
+Loads the master long-format dataset from analysis/replay/prepare_data.py,
 fits per-session models for each model in the hierarchy, compares nested
 models via AIC (primary) and LRT, and saves results.
 

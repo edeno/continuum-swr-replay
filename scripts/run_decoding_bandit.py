@@ -43,13 +43,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import xarray as xr
-from _decoding_common import (
-    NonLocalDecodingConfig,
-    add_common_args,
-    results_exist,
-    run_batch,
-    setup_logger,
-)
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
 from non_local_detector.discrete_state_transitions import DiscreteNonStationaryDiagonal
 from non_local_detector.environment import Environment
@@ -58,6 +51,13 @@ from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_r
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
+)
+from continuum_swr_replay.decoding_common import (
+    NonLocalDecodingConfig,
+    add_common_args,
+    results_exist,
+    run_batch,
+    setup_logger,
 )
 from continuum_swr_replay.parameters import (
     DETECTOR_CONFIG,

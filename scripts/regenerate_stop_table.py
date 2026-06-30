@@ -21,17 +21,13 @@ from __future__ import annotations
 import argparse
 import logging
 import pickle
-import sys
 import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from prepare_replay_content_data import find_sessions  # noqa: E402
-
 from continuum_swr_replay.analysis.replay import build_stop_table  # noqa: E402
+from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.tables import (  # noqa: E402
     add_nonlocal_swr_split,
 )
