@@ -87,7 +87,7 @@ def _select_arm_fractions(
 def _per_event_best_arm(
     event_arm_table: pd.DataFrame, well_arms: tuple[int, ...]
 ) -> pd.DataFrame:
-    """Per-event arm with the highest ``recent_reward_rate``.
+    """Per-event arm with the highest ``reward_rate_arm_k10``.
 
     Only well arms are considered (trunk arms have no rate). Ties
     resolved by taking the lowest arm id.

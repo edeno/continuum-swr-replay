@@ -718,16 +718,14 @@ def _plot_recent_reward_rate(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_nominal_reward_prob(ax: Axes, ctx: _PanelContext) -> None:
-    """Programmed reward probability per arm.
+def _plot_p_reward_arm(ax: Axes, ctx: _PanelContext) -> None:
+    """Programmed (nominal) reward probability per arm.
 
-    Currently all NaN — the contingency-block loader that populates
-    this column was intentionally deferred in Phase B. The panel
-    still draws (as an empty heatmap) so the viz stays layout-stable
-    once the column is wired.
+    Populated from the contingency block (per-arm ``p_reward_port``);
+    equals ``p_reward_current`` at the current arm.
     """
     _draw_event_arm_heatmap(
-        ax, ctx, value_col="nominal_reward_prob",
+        ax, ctx, value_col="p_reward_arm",
         cmap_name="RdYlGn", vmin=0.0, vmax=1.0,
         label="nominal\np(R)",
     )
@@ -1238,7 +1236,7 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "visit_recency": _plot_visit_recency,
     "cumulative_reward": _plot_cumulative_reward,
     "reward_rate_arm_k10": _plot_recent_reward_rate,
-    "nominal_reward_prob": _plot_nominal_reward_prob,
+    "p_reward_arm": _plot_p_reward_arm,
     "dist_to_arm": _plot_dist_to_arm,
     "arm_dist_rank": _plot_arm_dist_rank,
     "arm_mass_stackplot": _plot_arm_mass_stackplot,
@@ -1273,7 +1271,7 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "visit_recency": 1.4,
     "cumulative_reward": 1.4,
     "reward_rate_arm_k10": 1.4,
-    "nominal_reward_prob": 1.4,
+    "p_reward_arm": 1.4,
     "dist_to_arm": 1.4,
     "arm_dist_rank": 1.4,
     "arm_mass_stackplot": 1.4,

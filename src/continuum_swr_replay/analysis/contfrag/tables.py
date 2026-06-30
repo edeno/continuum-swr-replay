@@ -663,13 +663,28 @@ def build_contfrag_event_arm_table(
     # structural 0.0 where the stop is mapped, else NaN.
     port_cols = [f"p_reward_port{i}" for i in range(6)]
     q_cols = [f"q_port{i}" for i in range(6)]
+    key_cols = {"animal", "day", "epoch", "stop_idx"}
     if (
         contingency is not None
-        and "stop_id" in long.columns
+        and key_cols.issubset(long.columns)
         and {*port_cols, *q_cols}.issubset(contingency.columns)
     ):
         cont = contingency.drop_duplicates("stop_id")[["stop_id", *port_cols, *q_cols]]
-        m = long[["stop_id", "arm"]].merge(cont, on="stop_id", how="left")
+        # ContFrag's own stop_id mixes in brain_area/event_source so SWR/MUA
+        # and per-area tables never collide on it. The contingency artifact,
+        # however, is keyed by the plain NonLocal-pipeline hash of
+        # (animal, day, epoch, stop_idx) — shared across pipelines — so a
+        # join on ContFrag's stop_id matches nothing. Recompute the plain
+        # key from the natural keys for the merge.
+        cont_key = hash_stop_id(
+            long["animal"].to_numpy(),
+            long["day"].to_numpy(),
+            long["epoch"].to_numpy(),
+            long["stop_idx"].to_numpy(),
+        )
+        m = pd.DataFrame(
+            {"stop_id": cont_key, "arm": long["arm"].to_numpy()}
+        ).merge(cont, on="stop_id", how="left")
         port_mat = m[port_cols].to_numpy(dtype=float)
         q_mat = m[q_cols].to_numpy(dtype=float)
         arm_i = long["arm"].to_numpy()

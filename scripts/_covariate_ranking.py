@@ -64,13 +64,13 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 # Value cols merged from the canonical CSV contingency table (incl. subjective Q).
 VALUE_COLS = ("p_reward_current", "rpe", "value_diff_patch",
-              "trials_since_block_change", "q_chosen", "q_rpe")
+              "trials_since_block_change", "q_current", "q_rpe")
 # Focused head-to-head: nominal (true current) vs subjective (learned/belief) value,
 # plus the robust exploration axis. leaky_q / trials_since_block dropped (null).
 CANDIDATES = (
     "p_reward_current",
     "rpe",
-    "q_chosen",
+    "q_current",
     "q_rpe",
     "recent_switch_rate",
     "value_diff_patch",

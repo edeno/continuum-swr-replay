@@ -496,7 +496,7 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 #
 # A non-nested reparameterization of R2: instead of one immediate-trial
 # indicator (``is_after_omission``) plus a smoothed window
-# (``recent_trial_reward_rate``) — which overlap (lag-1 sits inside the window)
+# (``reward_rate_trial_k10``) — which overlap (lag-1 sits inside the window)
 # and conflate two timescales — model the reward outcome at each of the last
 # ``N_REWARD_LAGS`` trials as its own predictor. Reading the per-lag rate-ratio
 # kernel separates the dwell-confounded immediate effect (``reward_lag1`` sets
@@ -577,7 +577,7 @@ class PerBinRateModelSpec:
         Number of ``reward_lag{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
         trial outcomes; omission == ``1 - reward`` (same regressor).
     reward_rate : bool
-        Include ``recent_trial_reward_rate`` (continuous; an alternative
+        Include ``reward_rate_trial_k10`` (continuous; an alternative
         encoding of reward history to the lag kernel).
     self_history_lags : int
         Number of ``onset_lag{j}`` terms (0 or ``N_HISTORY_LAGS``); the

@@ -187,7 +187,7 @@ def test_drop_first_session_per_animal():
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
 
-    Requires ``contingency_table.pkl`` to exist alongside the canonical
+    Requires ``contingency_table_csv.pkl`` to exist alongside the canonical
     tables. Writes ``uncertainty_rate_smoke.pkl`` and checks the tidy schema
     carries every uncertainty/value coefficient across the three populations.
     """
@@ -198,11 +198,11 @@ def test_runner_smoke():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
     rc = PROCESSED_DATA_DIR / "replay_content"
-    contingency_path = rc / "models_per_bin_rate" / "contingency_table.pkl"
+    contingency_path = rc / "models_per_bin_rate" / "contingency_table_csv.pkl"
     if not contingency_path.exists():
         pytest.skip(
-            "contingency_table.pkl not present "
-            "(run scripts/_statescript_contingency.py first)"
+            "contingency_table_csv.pkl not present "
+            "(run scripts/_bandit_csv_contingency.py first)"
         )
 
     stop = pd.read_pickle(rc / "stop_table.pkl")

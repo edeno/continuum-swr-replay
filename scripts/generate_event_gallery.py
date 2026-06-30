@@ -734,10 +734,10 @@ def _plot_trial_history(
 
     Marked up so the value covariates can be read directly:
       - gold band over the **last 10 trials** = the ``cumulative_reward`` window.
-      - orange rings on each row's **last 5 visits** = the ``recent_reward_rate``
-        window (k=5 visits to that arm).
+      - orange rings on each row's **last 10 visits** = the ``reward_rate_arm_k10``
+        window (k=10 visits to that arm).
       - right margin prints the per-arm pipeline values for this event:
-        ``vr`` (visit_recency, trials-ago), ``rr`` (recent_reward_rate),
+        ``vr`` (visit_recency, trials-ago), ``rr`` (reward_rate_arm_k10),
         ``cum`` (cumulative_reward over 10 trials).
     """
     ax.set_title("trial reward history (regression-level, → event)", fontsize=7)
@@ -811,14 +811,14 @@ def _plot_trial_history(
     band_lo = max(-0.5, n - 10 - 0.5)
     ax.axvspan(band_lo, n - 0.5, color="gold", alpha=0.12, zorder=0)
 
-    # recent_reward_rate window: ring each row's last 5 visits (orange).
+    # reward_rate_arm_k10 window: ring each row's last 10 visits (orange).
     for w in range(6):
         cols_w = [p for p in xs if wells[p] == w]
         if cols_w:
-            last5 = cols_w[-5:]
+            last_k = cols_w[-10:]
             ax.scatter(
-                last5,
-                [w] * len(last5),
+                last_k,
+                [w] * len(last_k),
                 s=130,
                 marker="o",
                 facecolor="none",
@@ -869,7 +869,7 @@ def _plot_trial_history(
     ax.annotate(
         "right column = vr / rr / cum:   "
         "vr = visit_recency [trials since last visit]   ·   "
-        "rr = recent_reward_rate [last 5 visits = orange rings]   ·   "
+        "rr = reward_rate_arm_k10 [last 10 visits = orange rings]   ·   "
         "cum = cumulative_reward [last 10 trials = gold band]",
         (0.5, -0.42),
         xycoords="axes fraction",
@@ -906,7 +906,7 @@ def _plot_trial_history(
 def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
     """Per-arm continuous/binary regressors the arm models use (M3-M5).
 
-    A 3×9 strip (rows = ``visit_recency_demeaned``, ``recent_reward_rate``,
+    A 3×9 strip (rows = ``visit_recency_demeaned``, ``reward_rate_arm_k10``,
     ``is_last_rewarded_elsewhere``; columns = arms 0-8). Each row is colored
     on its own scale (these regressors live on different units) with the
     actual value printed in each cell, so the arm design matrix is visible
@@ -1470,7 +1470,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ax_post.tick_params(labelleft=False)
 
     # Bottom: full-width trial reward-history grid, marked up with the
-    # value covariates (visit_recency / recent_reward_rate / cumulative_reward).
+    # value covariates (visit_recency / reward_rate_arm_k10 / cumulative_reward).
     _plot_trial_history(fig.add_subplot(outer[1]), ctx["data"], center, arm_rows)
 
     fig.savefig(out_path)

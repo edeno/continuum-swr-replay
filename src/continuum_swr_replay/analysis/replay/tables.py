@@ -1082,8 +1082,9 @@ def build_event_arm_table(
     arm indicators, spatial and reward predictors, and the interaction
     terms from plan §1.7.
 
-    ``nominal_reward_prob`` is emitted as NaN — it requires the
-    contingency-block loader that Phase B intentionally defers.
+    ``p_reward_arm`` (per-arm nominal reward probability) and ``q_arm``
+    (per-arm leaky-Q level) are populated from the contingency block when
+    one is supplied, and emitted as NaN otherwise.
 
     Parameters
     ----------
