@@ -467,7 +467,7 @@ def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
     post-arrival stop. Cutting at ``end_time`` makes a replay event
     during that stop see ``last_rewarded_well`` set to the just-
     completed well (because that uses ``goal_arrival_time``) while
-    ``visit_recency`` / ``cumulative_reward`` / ``recent_reward_rate``
+    ``visit_recency`` / ``cumulative_reward`` / ``reward_rate_arm_k10``
     haven't counted the same arrival yet — value history that lags
     the reward-context columns by the post-arrival window. Using
     ``goal_arrival_time`` uniformly aligns all four trial-derived

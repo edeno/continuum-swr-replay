@@ -1230,7 +1230,7 @@ def build_event_arm_table(
     )
 
     # Per-event per-arm predictors: dist_to_arm, arm_dist_rank,
-    # visit_recency, cumulative_reward, recent_reward_rate.
+    # visit_recency, cumulative_reward, reward_rate_arm_k10.
     # Vectorized: precompute well→arm map once, then batch all events.
     well_to_arm_map = _build_well_to_arm_map(track_graph)
 
@@ -1261,7 +1261,7 @@ def build_event_arm_table(
         ]
     )
 
-    # -- visit_recency, cumulative_reward, recent_reward_rate (batch) --
+    # -- visit_recency, cumulative_reward, reward_rate_arm_k10 (batch) --
     event_times = event_table["event_midpoint_time"].to_numpy()
     if len(trials) > 0:
         vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)

@@ -44,10 +44,10 @@ Named by **scope + window** so the same word never hides a different definition.
 | `reward_rate_trial_k10` | rewarded fraction of the last 10 **trials** | 10 trials | all-arm | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
 | `reward_rate_arm_k10` | rewarded fraction of the last 10 **visits to that arm** | 10 arm-visits | per-arm | fraction | content (main effect), choice (main effect); rate/coupling via `× is_current` |
 
-Change from current code: the per-arm rate is **5-visit** today (`recent_reward_rate`)
-→ becomes **10-visit** (`reward_rate_arm_k10`). The all-arm 10-trial rate already
-exists (`recent_trial_reward_rate`) → renamed `reward_rate_trial_k10`. Trunk arms
-keep the structural `0.0`; never-visited leaf arms keep `NaN`.
+Change from prior code (implemented): the per-arm rate was **5-visit**
+(`recent_reward_rate`) and is now **10-visit** (`reward_rate_arm_k10`). The all-arm
+10-trial rate (`recent_trial_reward_rate`) was renamed `reward_rate_trial_k10`. Trunk
+arms keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 
 ### 2. Value — both nominal and experienced, available to every family
 
@@ -59,11 +59,11 @@ keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 | `q_arm` | fitted leaky-Q **level** of **each** arm | per-arm | same Q-learner | content/choice main effect |
 | `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
-Changes: `p_reward_arm` **populates the existing deferred `nominal_reward_prob`
-column** (rename `nominal_reward_prob`→`p_reward_arm` in `tables.py` schema + the viz
-registry, no orphan). `q_current`/`q_arm` are the new experienced-value covariate (a
-chosen-arm *level*); the old `q_chosen` name in the contingency table unifies to
-`q_current`. **`leaky_q_value_diff` is NOT dropped** — it is a *different* construct
+Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
+`nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
+in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the new
+experienced-value covariate (a chosen-arm *level*); the old `q_chosen` name in the
+contingency table was unified to `q_current`. **`leaky_q_value_diff` is NOT dropped** — it is a *different* construct
 (per-stop margin vs per-trial level) and is kept as a reported comparison so the MU
 dissociation table is preserved. `value_diff_patch` and `rpe` (nominal) remain scalar
 rate/coupling covariates.
@@ -115,8 +115,8 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   *real-time* span (a single arm is visited far less often than trials elapse) — it is
   10 in each construct's own unit, not 10 in time.
 - **D2** — add **per-arm nominal value** `p_reward_arm` to content/choice — by
-  **populating the existing deferred `nominal_reward_prob` column** (renamed), not a
-  new parallel column.
+  **replacing the formerly-deferred `nominal_reward_prob` column** (renamed and now
+  populated), not a new parallel column.
 - **D3** — **add** the fitted-α leaky-Q level (`q_current` / `q_arm`, α fit per animal
   ≈0.10) as the canonical experienced-value covariate, and **keep
   `leaky_q_value_diff`** (the per-stop margin, a different construct) as a *reported

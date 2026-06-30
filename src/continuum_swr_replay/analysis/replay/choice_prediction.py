@@ -38,7 +38,7 @@ ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 # *choose* to visit a well, so these are the eligible alternatives in
 # the conditional-logit choice set. Trunk arms 6/7/8 connect patch
 # junctions and are transit-only — they can never be ``next_arm``,
-# they have no ``recent_reward_rate``, and ``arm_path_well_to_well``
+# they have no ``reward_rate_arm_k10``, and ``arm_path_well_to_well``
 # already documents that trunk arms cannot be stop endpoints. The
 # learning-stage helpers use the same set under
 # ``StopSummaryConfig.well_arms`` for "best arm" lookups.
@@ -276,7 +276,7 @@ def build_choice_dataset(
         - ``chosen`` — 1 if the animal chose this arm, 0 otherwise
         - ``replay_frac`` — mean fraction across events in this stop
         - ``visit_recency``, ``cumulative_reward``,
-          ``recent_reward_rate``, ``dist_to_arm``, ``is_same_patch``
+          ``reward_rate_arm_k10``, ``dist_to_arm``, ``is_same_patch``
           — behavioral baseline predictors (from the last event in
           the stop)
         - ``n_events`` — number of replay events in this stop

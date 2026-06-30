@@ -30,12 +30,12 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   inflated by it — important in camp-heavy sessions where the
   animal sits at one well and ``is_current`` then concentrates on a
   single arm. See :data:`ARM_FE_PREDICTORS`.
-- ``recent_reward_rate`` (rewarded fraction of the last 5 visits to
+- ``reward_rate_arm_k10`` (rewarded fraction of the last 10 visits to
   an arm) is used as the reward-history predictor at M3/M4 rather
   than ``cumulative_reward`` (a raw reward *count*). The count
   conflates value with visit frequency — a frequently-visited arm
   scores high even at a mediocre reward rate — so its M3 coefficient
-  partly re-encodes spatial recency. ``recent_reward_rate`` is a
+  partly re-encodes spatial recency. ``reward_rate_arm_k10`` is a
   true rate. Cost: it is undefined (NaN) for never-visited arms, so
   the M3+ complete-case event set is smaller than M0–M2's.
 - M4 uses ``visit_recency_demeaned`` — ``visit_recency`` with each
@@ -171,7 +171,7 @@ class ModelSpec:
 # SWR interactions enter at M6 / M7. M6 carries the *spatial* × SWR
 # interactions (swr_x_current, swr_x_prev) — does the local/previous
 # bias differ for SWR-overlapping events? M7 adds the *value/memory*
-# × SWR interactions (swr_x_recent_reward_rate,
+# × SWR interactions (swr_x_reward_rate_arm_k10,
 # swr_x_visit_recency_demeaned, swr_x_is_last_rewarded_elsewhere) —
 # does the reward/memory structure of replay differ on SWR events?
 # Splitting M6 from M7 lets the nested LR cleanly separate "spatial
@@ -448,9 +448,9 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # from R1: it equals ``1 - is_after_omission`` wherever both are
 # defined, so including it with the intercept is rank-deficient.
 #
-# R1 looks only one trial back. R2 adds ``recent_trial_reward_rate``
+# R1 looks only one trial back. R2 adds ``reward_rate_trial_k10``
 # (rewarded fraction of the last 10 trials) — the stop-level analog
-# of the content hierarchy's reward-history axis (``recent_reward_rate``
+# of the content hierarchy's reward-history axis (``reward_rate_arm_k10``
 # at M3). R2 vs R1 tests whether replay *occurrence* tracks a deeper
 # reward history, not just the immediately preceding trial; it is
 # also the confound check for whether an M3 content effect is partly

@@ -5,7 +5,7 @@ Two stop-level analyses:
 1. :func:`stop_replay_summary` — collapse per-event ``arm_fraction`` to
    one row per stop with the fraction that fell on each task-relevant
    role: current, previous, last-rewarded, and "best" (arm with highest
-   ``recent_reward_rate`` at event time). All four also have SWR-only
+   ``reward_rate_arm_k10`` at event time). All four also have SWR-only
    and MUA-only variants for the SWR/MUA-as-moderator analyses.
 2. :func:`fit_is_stay_logistic_per_session` — per-session logistic
    regression of ``is_stay`` on ``is_after_omission * frac_on_<role>``.
@@ -56,7 +56,7 @@ class StopSummaryConfig:
     ----------
     well_arms : tuple[int, ...]
         Arm IDs eligible for "best" lookup. Trunk arms are excluded
-        because they have no ``recent_reward_rate``.
+        because they have no ``reward_rate_arm_k10``.
     """
 
     well_arms: tuple[int, ...] = (0, 1, 2, 3, 4, 5)

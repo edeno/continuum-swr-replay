@@ -104,7 +104,7 @@ def sample_arm_design(
     returns leaf arms.
 
     Continuous predictors (``visit_recency``, ``cumulative_reward``,
-    ``recent_reward_rate``, ``dist_to_arm``) are sampled from plausible
+    ``reward_rate_arm_k10``, ``dist_to_arm``) are sampled from plausible
     ranges if requested. Arm fixed-effect dummies (``arm_fe_0`` …
     ``arm_fe_7``) are added when requested — constant across events.
     """
@@ -256,7 +256,7 @@ def simulate_with_event_covariates(
     Extends ``simulate_counts`` to support the full predictor vocabulary
     used by ``model_specs.MODEL_HIERARCHY`` — including the continuous
     arm-varying predictors (``visit_recency``, ``cumulative_reward``,
-    ``recent_reward_rate``, ``dist_to_arm``), the arm fixed-effect
+    ``reward_rate_arm_k10``, ``dist_to_arm``), the arm fixed-effect
     dummies (``arm_fe_0`` … ``arm_fe_7``), and the event×arm interaction
     columns (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``,
     ``time_x_*``).
