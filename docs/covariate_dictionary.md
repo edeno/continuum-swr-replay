@@ -135,3 +135,7 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   learning timescale; report the per-animal α range.
 - Everything stays **correlational**; this dictionary harmonizes *definitions*, not
   causal status.
+- The full SpatialBanditTask **behavioral-model** latent variables (Beta-Bernoulli
+  value, ΔV / Stay / Switch, value updates, Beta variance, HMM reward entropy) live
+  in a separate per-stop table; see
+  [`behavior_model_covariates.md`](behavior_model_covariates.md).

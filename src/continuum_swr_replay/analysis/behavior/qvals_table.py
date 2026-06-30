@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-Supersedes the difflib loader (`_bandit_csv_qvals.py`) and the big_df extraction
-(`_extract_bigdf_trial_times.py` / `_bandit_bigdf_qvals.py`). Sources everything
-from Alison's shared DataJoint schemas (read-only):
+Builds the per-stop behavioral-model covariate table (`qvals_table.pkl`),
+sourcing everything from Alison's shared DataJoint schemas (read-only):
 
   * VALUES: `alison_rlmodel.BehaviorModelResults` (the `beta_stable_withleaf`
     fit), read from its AnalysisNwbfile — the q_vals model output re-keyed to
@@ -17,17 +16,24 @@ from Alison's shared DataJoint schemas (read-only):
     i.e. trial = searchsorted(poke_out_ts, stop_time, side='right'); stops at or
     after the last poke_out are unassigned (her trailing-NaN drop).
 
+Beta values are enriched with the vendored decision-variable pipeline
+(`analysis.behavior._spatial_bandit_rl.make_full_beta_bernoulli_dv_df`: DeltaV,
+Stay/Switch value, value-update magnitudes, betadist_mu), HMM reward/state entropy
+(`default_hmm`) is merged on KEYS, and RPE is derived; the curated COVARIATES are
+broadcast to stops. See docs/behavior_model_covariates.md for the data dictionary.
+
 Virtual modules reflect the schema from the DB, so none of Alison's module code
 (julia / spyglass / os.chdir) is imported. Independent validation: mapped arm
 (leaf-1) vs position `current_arm`; mapped reward vs DIO `reward_outcome`.
 
-Usage: python scripts/_bandit_dj_qvals.py [--animal A] [--write]
+Usage: python -m continuum_swr_replay.analysis.behavior.qvals_table [--animal A] [--write]
 Output: Processed-Data/replay_content/models_per_bin_rate/qvals_table.pkl
 """
 
 from __future__ import annotations
 
 import argparse
+import warnings
 from typing import Any
 
 import datajoint as dj
@@ -38,6 +44,11 @@ from spyglass.utils.dj_helper_fn import fetch_nwb
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
+from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
+
+# the vendored DV pipeline inserts many columns one-by-one (Alison's style)
+warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
+
 RC = PROCESSED_DATA_DIR / "replay_content"
 ANIMALS = ("chimi", "j16", "peanut", "senor", "wilbur")
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
@@ -46,27 +57,70 @@ ANIMAL_SUBJECT = {"chimi": "chimi", "j16": "j16", "peanut": "peanut",
 MODEL_KEY = {"behavior_model_params_name": "beta_stable_withleaf",
              "trials_info_by_rat_params_name": "stable_default",
              "trials_info_csv_params_name": "original_csv_format"}
+# default_hmm fit on the same trials -> the paper's reward-state entropy covariate.
+HMM_KEY = {"behavior_model_params_name": "default_hmm",
+           "trials_info_by_rat_params_name": "stable_default",
+           "trials_info_csv_params_name": "original_csv_format"}
+HMM_COLS = ["state_entropy", "reward_entropy"]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
-# parse/id columns from the values df we do NOT broadcast as model covariates
-ID_COLS = {*KEYS, "leaf", "stem", "reward", "contingency", "date", "session",
-           "rewscaled", "stemchoice", "leafchoice", "daynum", "daysessionnum",
-           "stemswitch", "n_post_switch", "n_pre_switch", "cont_combo",
-           "contingency_base", "cont_base_combo", "sub"}
+# Beta value timing: row t holds PRE-outcome belief for trial t (vendored DV docs).
+
+# Curated per-stop covariate set (paper-aligned): the Comrie et al. theta-sequences decision
+# variables (computed by the vendored beta-bernoulli pipeline), HMM reward
+# entropy, RPE, and the raw value/uncertainty/choice columns.
+COVARIATES = [
+    "arm", "q_chosen", "rpe", "rpe_abs",
+    # expected value (per port / patch / belief mean)
+    *[f"Q{i}" for i in range(1, 7)], *[f"Qstem{i}" for i in range(1, 4)],
+    *[f"betadist_mu{i}" for i in range(1, 7)],
+    # decision variables: Stay / Switch / Relative (DeltaV)
+    "stay_sibling_mu_preoutcome_sess", "best_other_patch_mean_mu_preoutcome_sess",
+    "switch_advantage_mu_preoutcome_sess", "switch_advantage_preoutcome_sess_Qstem",
+    # absolute value-update magnitudes, 4 scopes (paper) + global signed
+    "global_mu_update_abs_postoutcome_sess", "chosen_leaf_mu_update_abs_postoutcome_sess",
+    "chosen_patch_mu_update_abs_postoutcome_sess", "unchosen_patches_mu_update_abs_postoutcome_sess",
+    "global_mu_update_signed_postoutcome_sess",
+    # uncertainty
+    *[f"betadist_var{i}" for i in range(1, 7)],
+    "global_leaf_var_sum_preoutcome_sess", "chosen_leaf_var_preoutcome_sess",
+    "prev_local_variance", "prev_global_variance", "upcoming_leaf_variance", "next_choice_variance",
+    # reward-state entropy (HMM)
+    "state_entropy", "reward_entropy",
+    # depletion / choice probabilities
+    *[f"depletion_leaf_{i}" for i in range(1, 7)],
+    *[f"depletion_mean_stem_{i}" for i in range(1, 4)],
+    "stem_choice_p", "leaf_choice_p", "stem_stay_p", *[f"stem_{i}_p" for i in range(1, 4)],
+]
+
+
+def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
+    """Read a BehaviorModelResults dataframe (per-trial, keyed by KEYS)."""
+    sel = rl.BehaviorModelResults & {"subject_id": subject, **key}
+    results = fetch_nwb(sel, (AnalysisNwbfile, "analysis_file_abs_path"))
+    if not results:
+        raise ValueError(f"no BehaviorModelResults for {subject!r} with {key}")
+    return results[0]["behavior_model_results"].reset_index(drop=True)
 
 
 def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]:
-    """Join model values to poke timestamps, one row per trial, keyed by KEYS."""
-    sel = rl.BehaviorModelResults & {"subject_id": ANIMAL_SUBJECT[animal], **MODEL_KEY}
-    results = fetch_nwb(sel, (AnalysisNwbfile, "analysis_file_abs_path"))
-    if not results:
-        raise ValueError(f"no BehaviorModelResults for {animal!r} with {MODEL_KEY}")
-    vals = results[0]["behavior_model_results"].reset_index(drop=True)
+    """Join enriched model covariates to poke timestamps, one row per trial.
+
+    Beta values are enriched with the vendored decision-variable pipeline
+    (DeltaV, value updates, etc.), HMM reward entropy is merged on KEYS, and
+    RPE/q_chosen/arm are derived; the curated COVARIATES are broadcast to stops.
+    """
+    subject = ANIMAL_SUBJECT[animal]
+    vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
+    hmm = _fetch_model_df(rl, subject, HMM_KEY)[[*KEYS, *HMM_COLS]]
+    vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
     qmat = vals[[f"Q{i}" for i in range(1, 7)]].to_numpy()
     vals["q_chosen"] = qmat[np.arange(len(vals)), vals["leaf"].to_numpy() - 1]
     vals["arm"] = vals["leaf"].to_numpy() - 1
-    model_cols = ["arm", "q_chosen",
-                  *[c for c in vals.columns if c not in ID_COLS and c not in ("arm", "q_chosen")]]
+    vals["rpe"] = vals["reward"].to_numpy() - vals["q_chosen"].to_numpy()
+    vals["rpe_abs"] = vals["rpe"].abs()
+    model_cols = [c for c in COVARIATES if c in vals.columns]
+    pt_attrs_entropy = float(vals["reward_entropy"].notna().mean())
 
     nwbs = vals["nwb_file_name"].unique().tolist()
     times = pd.DataFrame((beh.TrialsInfoByEpoch.ByTrial
@@ -80,6 +134,7 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     pt = times.merge(vals[[*KEYS, "leaf", "reward", *model_cols]], on=KEYS,
                      suffixes=("_time", "_val"), validate="one_to_one")
     pt.attrs["leaf_agree"] = float((pt["leaf_time"] == pt["leaf_val"]).mean())
+    pt.attrs["entropy_cov"] = pt_attrs_entropy
     return pt, model_cols
 
 
@@ -117,6 +172,7 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
             })
     out = pd.DataFrame(rows)
     out.attrs["leaf_agree"] = pt.attrs["leaf_agree"]
+    out.attrs["entropy_cov"] = pt.attrs["entropy_cov"]
     return out
 
 
@@ -141,7 +197,7 @@ def main() -> None:
         print(f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100*len(t)/len(st):.0f}%)  "
               f"in_poke={100*t['in_poke'].mean():.0f}%  "
               f"arm==current_arm {100*arm_ok:.1f}%  reward==reward_outcome {100*rew_ok:.1f}%  "
-              f"[times/values leaf {100*t.attrs['leaf_agree']:.1f}%]")
+              f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*t.attrs['entropy_cov']:.0f}%]")
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
     print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")
