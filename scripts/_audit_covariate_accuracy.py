@@ -26,12 +26,15 @@ Non-RL covariates (the models fit far more than the qvals block):
     + junction-bin / NaN integrity.
 Reward-kernel covariates are trial-referenced and covered by the invariant
 verifier + the #1a calibration (see _nonrl_checks docstring).
+  - reward_rate_arm_k10 independent reconstruction vs the stored column, gated
+    behind ``--reconstruct-arm-rate N`` (needs Spyglass trials; slow).
 
 Diagnostic (prints a report); does not exit non-zero.
 """
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 from pathlib import Path
 
@@ -58,7 +61,7 @@ def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:
     return df.assign(_k=key).groupby("_k")["stop_idx"].rank(pct=True)
 
 
-def main() -> None:
+def main(reconstruct_n: int = 0) -> None:
     q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     st = pd.read_pickle(RC / "stop_table.pkl")
     fur = _fur()
@@ -126,6 +129,63 @@ def main() -> None:
           f"(kept {d.loc[~anynan.values, 'pos'].mean():.2f})")
 
     _nonrl_checks(st)
+    if reconstruct_n:
+        _reconstruct_reward_rate_arm(reconstruct_n)
+
+
+def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
+    """Independently reconstruct reward_rate_arm_k10 vs the stored column (Spyglass).
+
+    The per-arm rolling reward rate is trial-referenced (rewarded fraction of the
+    last 10 visits to that arm), so a faithful check needs the trials table -- this
+    loads trials for a sample of sessions and reimplements the rolling-mean loop
+    (reusing only the topology/timing helpers, not the rate logic under test). Heavy
+    (Spyglass), so gated behind --reconstruct-arm-rate. Validated 100% on 2 sessions.
+    """
+    from continuum_swr_replay.analysis.replay._helpers import (
+        _trial_cutoff_times,
+        build_well_to_arm_map,
+    )
+    from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.types import SessionDataKeys
+
+    ea = pd.read_pickle(RC / "event_arm_table.pkl")
+    et = pd.read_pickle(RC / "event_table.pkl")
+    tcol = next(c for c in et.columns if "midpoint" in c and "time" in c)
+    ea = ea.merge(et[["event_id", tcol]].rename(columns={tcol: "t"}), on="event_id", how="left")
+    print(f"\n=== non-RL: reward_rate_arm_k10 independent reconstruction "
+          f"({n_sessions} session(s), Spyglass) ===")
+    for _, s in ea[["animal", "day", "epoch"]].drop_duplicates().head(n_sessions).iterrows():
+        sub = ea[(ea.animal == s.animal) & (ea.day == s.day) & (ea.epoch == s.epoch)]
+        d = load_data(f"{s.animal}{int(s.day)}_.nwb", s.epoch,
+                      include=frozenset({SessionDataKeys.TRIALS}))
+        w2a = build_well_to_arm_map(d["track_graph"])
+        tr = d["trials"].assign(_c=_trial_cutoff_times(d["trials"])).sort_values("_c")
+        cut = tr["_c"].to_numpy()
+        rew = tr["is_reward"].to_numpy().astype(float)
+        arm_of = np.array([w2a.get(int(w)) if not np.isnan(w) else -1
+                           for w in tr["to_well"].to_numpy()])
+        reach = set(w2a.values())
+        vis = {a: (cut[arm_of == a], rew[arm_of == a]) for a in range(9)}
+        got = sub["reward_rate_arm_k10"].to_numpy()
+        arms, ts = sub["arm"].to_numpy(), sub["t"].to_numpy()
+        exp = np.full(len(sub), np.nan)
+        for i in range(len(sub)):
+            a, t = int(arms[i]), ts[i]
+            if np.isnan(t):
+                continue
+            if a not in reach:
+                exp[i] = 0.0 if (cut < t).any() else np.nan
+                continue
+            vc, vr = vis[a]
+            m = vc < t
+            if m.any():
+                exp[i] = vr[m][-10:].mean()
+        both = ~np.isnan(got) & ~np.isnan(exp)
+        agree = np.isclose(got[both], exp[both], atol=1e-9).mean() if both.any() else float("nan")
+        nanm = (np.isnan(got) == np.isnan(exp)).mean()
+        print(f"  {s.animal} {int(s.day)} {s.epoch}: value-agree {100 * agree:.2f}% "
+              f"(n={both.sum()}), NaN-pattern {100 * nanm:.2f}%")
 
 
 def _nonrl_checks(st: pd.DataFrame) -> None:
@@ -162,4 +222,8 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--reconstruct-arm-rate", type=int, default=0, metavar="N",
+                    help="also reconstruct reward_rate_arm_k10 on N sessions (Spyglass; slow)")
+    args = ap.parse_args()
+    main(reconstruct_n=args.reconstruct_arm_rate)
