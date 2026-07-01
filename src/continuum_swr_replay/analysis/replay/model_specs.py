@@ -201,8 +201,8 @@ _M7 = (
     "swr_x_visit_recency_demeaned",
     "swr_x_is_last_rewarded_elsewhere",
 )
-# Value block: per-arm nominal value (p_reward_arm) + experienced leaky-Q level
-# (q_arm) as conditional main effects on the M5 spatial/reward-memory base
+# Value block: per-arm nominal value (p_reward_arm) + per-arm model value
+# (q_arm, Q) as conditional main effects on the M5 spatial/reward-memory base
 # (covariate_dictionary.md D2/D3). Additive in *spec* — but because
 # p_reward_arm/q_arm are NaN for stops absent from the contingency, co-fitting Mv
 # in the same run restricts the shared complete-case event set, so it is excluded
@@ -267,8 +267,8 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "Mv": ModelSpec(
         name="Mv",
         predictors=_Mv,
-        description="+ per-arm nominal value (p_reward_arm) + experienced "
-        "leaky-Q level (q_arm)",
+        description="+ per-arm nominal value (p_reward_arm) + per-arm "
+        "model value (q_arm, Q)",
         parent="M5",
     ),
 }
@@ -372,7 +372,7 @@ MODEL_PATCH: dict[str, ModelSpec] = {
             "q_arm_patch",
         ),
         description="+ per-patch nominal value (p_reward_arm_patch) + "
-        "experienced leaky-Q level (q_arm_patch)",
+        "per-patch model value (q_arm_patch, Q)",
         parent="P3",
     ),
 }

@@ -1,8 +1,12 @@
 """Behavioral covariate definitions for the replay rate / content / choice models.
 
 Single home for the per-event / per-stop / per-arm behavioral covariates (reward
-history, visit recency, leaky-Q value, model-free uncertainty) plus the
-fitted-alpha leaky-Q learner. Implements the constructs specified in
+history, visit recency, model-free uncertainty) plus the local fitted-alpha
+leaky-Q learner (``leaky_q_value_diff``). Note: the per-arm value block
+(``attach_contingency_value_block`` -> ``p_reward_arm`` / ``q_arm``) is sourced
+from ``qvals_table`` -- ``q_arm`` is the beta-model belief (Q), NOT leaky-Q; the
+only leaky-Q construct in this file is the local ``leaky_q_value_diff``.
+Implements the constructs specified in
 ``docs/covariate_dictionary.md``. These definitions are re-exported from
 ``_helpers`` (a shim) so existing call sites keep resolving.
 """
@@ -664,7 +668,10 @@ def attach_contingency_value_block(
         nothing in the (NonLocal-keyed) contingency.
     contingency : pd.DataFrame | None
         Per-stop artifact with ``stop_id`` + ``p_reward_port{0..5}`` +
-        ``q_port{0..5}``. ``None`` (or missing those columns) yields all-NaN.
+        ``q_port{0..5}``. ``None`` (no artifact supplied) yields all-NaN. A
+        supplied frame that is *missing* those columns raises ``ValueError``:
+        ``qvals_table`` is the sole source, so a stale/partial artifact must
+        fail loudly rather than silently blanking the whole value block.
 
     Returns
     -------
@@ -674,15 +681,26 @@ def attach_contingency_value_block(
         the contingency, ``NaN`` where absent — so a stop with no contingency row
         drops uniformly (all nine arms NaN) at fit time rather than contributing
         a spurious 0.0.
+
+    Raises
+    ------
+    ValueError
+        If ``contingency`` is supplied but lacks the ``p_reward_port{0..5}`` /
+        ``q_port{0..5}`` columns (e.g. an old artifact from before the per-arm
+        migration).
     """
     arm = np.asarray(arm)
     n_rows = len(arm)
-    have_cols = contingency is not None and {
-        *_P_REWARD_PORT_COLS,
-        *_Q_PORT_COLS,
-    }.issubset(contingency.columns)
-    if not have_cols:
+    if contingency is None:
         return np.full(n_rows, np.nan), np.full(n_rows, np.nan)
+    missing = {*_P_REWARD_PORT_COLS, *_Q_PORT_COLS} - set(contingency.columns)
+    if missing:
+        raise ValueError(
+            "contingency is missing per-arm value columns "
+            f"{sorted(missing)}; qvals_table is the sole source and must carry "
+            "p_reward_port{0..5} / q_port{0..5} (regenerate with "
+            "`python -m continuum_swr_replay.analysis.behavior.qvals_table --write`)"
+        )
 
     n_unique = contingency["stop_id"].nunique()
     if n_unique != len(contingency):

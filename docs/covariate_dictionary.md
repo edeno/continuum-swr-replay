@@ -53,24 +53,26 @@ arms keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 
 | canonical name | definition | scope | source | enters |
 |---|---|---|---|---|
-| `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | contingency CSV | rate/coupling main effect |
-| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | contingency CSV | content/choice main effect; rate via `× is_current` |
-| `q_current` | fitted leaky-Q **level** of the current arm (per-trial delta-rule `Q[a]+=α(r−Q[a])`, the chosen-arm value) | scalar | Q-learner, **α fit per animal** (reward-prediction; ≈0.10) | rate/coupling main effect |
-| `q_arm` | fitted leaky-Q **level** of **each** arm | per-arm | same Q-learner | content/choice main effect |
+| `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
+| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
+| `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
+| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | same behavior model | content/choice main effect |
 | `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
 `nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
-in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the new
-experienced-value covariate (a chosen-arm *level*); the old `q_chosen` name in the
-contingency table was unified to `q_current`. **`leaky_q_value_diff` is NOT dropped** — it is a *different* construct
-(per-stop margin vs per-trial level) and is kept as a reported comparison so the MU
-dissociation table is preserved. `value_diff_patch` and `rpe` (nominal) remain scalar
-rate/coupling covariates. **Note:** the MU-uncertainty runner substitutes the fitted
-behavioral-model RPE `rpe_model` (`trial_reward − q_chosen`, from `qvals_table.pkl`;
-see [behavior_model_covariates.md](behavior_model_covariates.md)) for the nominal `rpe`
-here (r≈0.71), so "rpe" in the MU dissociation table is `rpe_model`, not the contingency
-`rpe`.
+in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the
+experienced-value covariate — now the **beta-model belief** (`beta_stable_withleaf`),
+not a local leaky-Q learner: all value covariates were migrated to `qvals_table.pkl`
+(DataJoint, exact `poke_out` alignment; retires the difflib contingency CSV). The
+model's per-port `Q{i}` populate `q_port{i}` → `q_arm`, and `Q{leaf}` = `q_chosen` →
+`q_current`. **`leaky_q_value_diff` is NOT this** — it is a *different*, still-local
+construct (per-stop best-minus-second margin, α=0.3, computed in `covariates.py`), kept
+as a reported MU-only comparison. `value_diff_patch` (nominal) remains a scalar
+rate/coupling covariate. **`rpe` is now the model RPE everywhere** (`reward − q_chosen`,
+from `qvals_table.pkl`; see [behavior_model_covariates.md](behavior_model_covariates.md)) —
+after the migration every consumer (MU-uncertainty as `rpe_model`, plus `fit_swr_power`
+and `_covariate_ranking`) uses the model RPE, not a nominal one.
 
 ### 3. Exploration — canonical continuous + retained binary comparison
 
@@ -121,11 +123,11 @@ rate families; conditional models access within-stop time only as `tsc_x_current
 - **D2** — add **per-arm nominal value** `p_reward_arm` to content/choice — by
   **replacing the formerly-deferred `nominal_reward_prob` column** (renamed and now
   populated), not a new parallel column.
-- **D3** — **add** the fitted-α leaky-Q level (`q_current` / `q_arm`, α fit per animal
-  ≈0.10) as the canonical experienced-value covariate, and **keep
-  `leaky_q_value_diff`** (the per-stop margin, a different construct) as a *reported
-  comparison*. (Revised from "drop": the two are different algorithms, and the margin
-  is deliberately kept in the MU dissociation table.)
+- **D3** — **add** the experienced-value covariate `q_current` / `q_arm` (now the
+  **beta-model belief** from `qvals_table`, not a local leaky-Q learner) as canonical,
+  and **keep `leaky_q_value_diff`** (the per-stop margin, a different, still-local
+  construct) as a *reported comparison*. (Revised from "drop": the two are different
+  algorithms, and the margin is deliberately kept in the MU dissociation table.)
 - **D4** — exploration canonical = **`recent_switch_rate`**; **keep `is_after_switch`**
   as the immediate-binary comparison (not dropped).
 - **D5** — adopt the **entry-rule contract** (§A) as the standing rule.

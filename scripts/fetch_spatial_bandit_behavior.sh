@@ -2,8 +2,10 @@
 # Fetch the canonical parsed behavior CSVs for the spatial bandit task from
 # LorenFrankLab/SpatialBanditTask into Processed-Data/spatial_bandit_behavior/.
 # These per-trial CSVs (choice=leaf, patch=stem, reward, contingency, date,
-# session, trial) are the canonical nominal-value source; scripts/
-# _bandit_csv_contingency.py maps them to per-stop_id contingency/value.
+# session, trial) were the input to the (now-retired) difflib nominal-value
+# pipeline. The canonical per-stop value covariates now come from the
+# DataJoint-exact `qvals_table` (analysis/behavior/qvals_table.py); these CSVs
+# are kept only as a raw reference / cross-check of the behavior parse.
 #
 # The data is gitignored (lives under Processed-Data/); this script makes the
 # pull reproducible. Pinned to a commit for reproducibility.

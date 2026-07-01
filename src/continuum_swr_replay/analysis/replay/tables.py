@@ -1086,8 +1086,8 @@ def build_event_arm_table(
     terms from plan §1.7.
 
     ``p_reward_arm`` (per-arm nominal reward probability) and ``q_arm``
-    (per-arm leaky-Q level) are populated from the contingency block when
-    one is supplied, and emitted as NaN otherwise.
+    (per-arm model value / belief, Q) are populated from the contingency
+    block when one is supplied, and emitted as NaN otherwise.
 
     Parameters
     ----------
@@ -1296,7 +1296,7 @@ def build_event_arm_table(
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
 
-    # -- p_reward_arm / q_arm: per-arm nominal value + experienced leaky-Q level
+    # -- p_reward_arm / q_arm: per-arm nominal value + per-arm model value (Q)
     # from the per-stop contingency artifact (covariate_dictionary.md D2/D3).
     # The NonLocal event-arm table's own stop_id matches the contingency key.
     long["p_reward_arm"], long["q_arm"] = _attach_contingency_value_block(

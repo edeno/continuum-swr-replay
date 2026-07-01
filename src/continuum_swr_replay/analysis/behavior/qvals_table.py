@@ -39,8 +39,6 @@ from typing import Any
 import datajoint as dj
 import numpy as np
 import pandas as pd
-from spyglass.common import AnalysisNwbfile
-from spyglass.utils.dj_helper_fn import fetch_nwb
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -142,6 +140,12 @@ def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
 
 def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
     """Read a BehaviorModelResults dataframe (per-trial, keyed by KEYS)."""
+    # Deferred import: pulling spyglass at module top opens a DataJoint
+    # connection on import, which would make DB-free unit tests of the pure
+    # helpers (e.g. _add_nominal_contingency) require live DB access.
+    from spyglass.common import AnalysisNwbfile
+    from spyglass.utils.dj_helper_fn import fetch_nwb
+
     sel = rl.BehaviorModelResults & {"subject_id": subject, **key}
     results = fetch_nwb(sel, (AnalysisNwbfile, "analysis_file_abs_path"))
     if not results:
@@ -269,6 +273,16 @@ def main() -> None:
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
     print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")
+
+    # Fail loudly if the per-arm value block is incomplete: model_cols filters
+    # COVARIATES by presence, so an upstream BehaviorModelResults/schema change
+    # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
+    # make attach_contingency_value_block blank the whole value block downstream.
+    required = {"stop_id", "p_reward_current", "q_chosen", *[f"p_reward_port{i}" for i in range(6)],
+                *[f"q_port{i}" for i in range(6)]}
+    missing = required - set(tab.columns)
+    if missing:
+        raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
 
     if args.write:
         out = RC / "models_per_bin_rate" / "qvals_table.pkl"

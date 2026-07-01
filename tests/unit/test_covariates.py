@@ -153,14 +153,22 @@ def test_value_block_absent_stop_all_nan():
     assert np.isnan(q).all()
 
 
-def test_value_block_none_or_missing_cols_all_nan():
+def test_value_block_none_all_nan():
+    """No artifact supplied (None) -> legitimately all-NaN, no error."""
     arm = np.array([0, 6])
     sid = np.array([1, 2])
     p, q = covariates.attach_contingency_value_block(arm, sid, None)
     assert np.isnan(p).all() and np.isnan(q).all()
+
+
+def test_value_block_missing_cols_raises():
+    """A supplied-but-stale artifact (no per-port cols) must fail loudly, not
+    silently blank the whole value block: qvals_table is the sole source."""
+    arm = np.array([0, 6])
+    sid = np.array([1, 2])
     bad = pd.DataFrame({"stop_id": [1, 2]})  # no port/q cols
-    p2, q2 = covariates.attach_contingency_value_block(arm, sid, bad)
-    assert np.isnan(p2).all() and np.isnan(q2).all()
+    with pytest.raises(ValueError, match="missing per-arm value columns"):
+        covariates.attach_contingency_value_block(arm, sid, bad)
 
 
 def test_value_block_warns_on_duplicate_stop_id():
