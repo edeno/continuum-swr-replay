@@ -165,3 +165,68 @@ no leakage:** on rewarded stops, 0.0% of non-local/SWR/MUA events occur before t
 reward pump (min `t_since_pump` ≈ 1.0 s, median ≈ 3.8 s; `event_onset_table`), so
 the realized outcome is always known ≥ ~1 s before any modeled event. Re-check this
 exposure if the immobility/event-window definition changes.
+
+## G. Base covariate reference
+
+Definitions for the base (non-interaction) covariates on the canonical tables.
+Interactions (`swr_x_*`, `mua_x_*`, `time_x_*`, `switch_x_*`, `current_x_*`,
+`omission_x_*`) are products of a base covariate with a modifier (`is_swr`,
+`is_mua`, the time-course, `is_after_switch`, `is_current`, `is_after_omission`)
+and are not catalogued separately. `_patch` variants aggregate the per-arm column
+to the 3 patches. Value/RL covariates (`p_reward_*`, `q_*`, `rpe`, ΔV, entropy,
+Beta `*_mu`/`*_var`, `stem_*_p`) are in
+[`behavior_model_covariates.md`](behavior_model_covariates.md).
+
+**Spatial / trajectory** (per event-arm):
+- `is_current`, `is_prev`, `is_next` — arm equals the animal's current / previous-
+  trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
+  (the destination the animal will run to); used only where a spec includes it, and
+  interpreted as forward representation, not a causal predictor.
+- `is_same_patch` — arm shares a patch with `current_arm`.
+- `dist_to_arm` — track-graph distance from the animal's current position to the arm
+  (0 at the current arm); `arm_dist_rank` is its within-event min-rank.
+
+**Reward / value history** (per event-arm, from the trial sequence):
+- `cumulative_reward` — running count of rewards received at that arm up to the event.
+- `visit_recency` — time since the animal last visited that arm; `visit_recency_demeaned`
+  subtracts the per-arm mean (the part orthogonal to the arm fixed effects; M4+).
+- `reward_rate_arm_k10` — rewarded fraction of the last 10 visits to that arm
+  (trunk arms 0.0; leaf arm not yet visited → NaN). See §2.
+
+**Recent-trial context** (per stop, broadcast to the stop's events):
+- `is_after_reward` / `is_after_omission` — the previous trial was / was not rewarded
+  (exact complements).
+- `is_after_stay` / `is_after_switch` — the previous transition stayed in / switched
+  patch (exact complements).
+
+**Event / state indicators** (per event):
+- `is_swr` — event overlaps a sharp-wave ripple (strict positive-duration overlap;
+  see the classified-event-table contract in CLAUDE.md).
+- `is_mua` — event overlaps a multi-unit-activity population event.
+- `non_local_event` — the event is a non-local (replay) event.
+
+**Timing / exposure** (per event unless noted):
+- `immobility_time` — stop (immobility bout) duration; the **`log(immobility_time)`
+  exposure offset** in the rate models (per stop).
+- `time_since_stop` — time from the immobility-bout onset to the event.
+- `time_since_port_entry` — time from well/port entry (goal arrival) to the event.
+- `time_since_reward` — time from the last reward to the event.
+- `event_duration`, `event_start`, `event_end`, `event_midpoint_time` — the event's
+  span and boundary/mid timestamps.
+
+**Decode content** (per event-arm; the content-model response family):
+- `arm_fraction` — MAP-based: fraction of the event's real-arm timebins whose decoded
+  MAP arm is this arm (junction bins excluded; sums to 1 over the 9 arms).
+- `arm_fraction_posterior` — posterior-mass-based: this arm's summed posterior mass
+  over the total real-arm mass (also sums to 1).
+- `arm_posterior_mass` / `arm_count_soft` / `arm_count_hard` — unnormalized posterior
+  mass / soft (posterior-weighted) and hard (MAP) timebin counts per arm.
+- `replay_frac` — mean `arm_fraction` across the events in the stop (choice dataset);
+  `replay_frac_swr` / `replay_frac_non_swr` restrict to the stop's SWR / non-SWR events.
+
+**Self-history** (per-bin rate design; built at fit time, not stored):
+- `tc` — time (s) since stop onset for each bin; entered via a `bs(tc)` spline (the
+  time-course backbone of Family B).
+- `onset_lag{j}` — count of the event's own onsets `j` bins back (past-only, resets
+  per stop); `hist_rcos_k` projects those causal lags onto raised-cosine basis `k`.
+- `cross_hist_rcos_k` — the same raised-cosine history for the *other* event stream.

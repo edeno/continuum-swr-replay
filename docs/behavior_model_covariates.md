@@ -129,5 +129,10 @@ within-epoch shuffle): the model predicts the chosen stem at **89.5%** (chance
 +0.00). Internal: `betadist_var` matches the Beta formula, `Q∈[0,1]`, 0 duplicate
 `stop_id`.
 
+Additional exported (not all fitted) columns: `p_reward_best` — the maximum nominal
+p(reward) across the 6 ports (best available arm value; the nominal counterpart to
+`p_reward_current`); `stem_1_p` / `stem_2_p` / `stem_3_p` — the behavior model's
+P(choose stem i) for the 3 stems.
+
 See also [`covariate_dictionary.md`](covariate_dictionary.md) for the rate/content
 model-family covariates (a separate, smaller set).
