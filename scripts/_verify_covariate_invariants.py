@@ -166,6 +166,38 @@ def main() -> int:
         check("H", f"{c} finite", np.isfinite(v[~np.isnan(v)]).all(),
               f"[{np.nanmin(v):.2f},{np.nanmax(v):.2f}]")
 
+    # physical bounds (a value outside these = an upstream parse / alignment /
+    # sign error, even though it may still be finite and in a plausible range).
+    # nominal p(R) can only take the task-schedule levels; anything else is a parse bug.
+    SCHEDULE = {0.2, 0.5, 0.8, 1.0}
+    levels = set(np.round(np.unique(pv[~np.isnan(pv)]), 6))
+    check("H", "p_reward_port in task schedule {0.2,0.5,0.8,1.0}",
+          levels <= SCHEDULE, f"levels={sorted(levels)}")
+    # rpe = reward(0/1) - q_chosen(0..1)  ->  strictly in [-1, 1]
+    rpe = cont["rpe"].to_numpy()
+    check("H", "rpe in [-1,1]", in01((rpe[~np.isnan(rpe)] + 1) / 2),
+          f"[{np.nanmin(rpe):.2f},{np.nanmax(rpe):.2f}]")
+    # value_diff_patch = best-minus-second patch mean of p(R) in [0,1] -> [0, 0.8]
+    vdp = cont["value_diff_patch"].to_numpy()
+    check("H", "value_diff_patch in [0, 0.8]",
+          np.nanmin(vdp) >= 0 and np.nanmax(vdp) <= 0.8 + 1e-9,
+          f"[{np.nanmin(vdp):.2f},{np.nanmax(vdp):.2f}]")
+    # entropies (nats) are non-negative (universal); state_entropy is the HMM
+    # state posterior over 72 states (Comrie et al.) so is additionally bounded by
+    # log(72) -- verified the observed max equals log(72) exactly. reward_entropy
+    # is NOT a 2-state entropy (observed max ~6.05), so only its sign is asserted.
+    if "reward_entropy" in cont:
+        e = cont["reward_entropy"].to_numpy()
+        e = e[~np.isnan(e)]
+        check("H", "reward_entropy >= 0", e.min() >= -1e-9,
+              f"[{e.min():.2f},{e.max():.2f}]")
+    if "state_entropy" in cont:
+        e = cont["state_entropy"].to_numpy()
+        e = e[~np.isnan(e)]
+        check("H", "state_entropy in [0, log 72]",
+              e.min() >= -1e-9 and e.max() <= np.log(72) + 1e-6,
+              f"[{e.min():.2f},{e.max():.2f}]")
+
     hard = [ok for t, ok in res if t == "H"]
     ident = [ok for t, ok in res if t == "A"]
     soft = [ok for t, ok in res if t == "S"]

@@ -145,3 +145,23 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   value, ΔV / Stay / Switch, value updates, Beta variance, HMM reward entropy) live
   in a separate per-stop table; see
   [`behavior_model_covariates.md`](behavior_model_covariates.md).
+
+## F. Temporal causality (pre- vs post-outcome) — leakage audit
+
+Each stop-level covariate is broadcast to the non-local events within that stop.
+A covariate is safe iff its value is determined by information available **before**
+the event it predicts. Classification of the covariates fitted by the rate models:
+
+| covariate | class | available before event? |
+|---|---|---|
+| `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
+| `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
+| `recent_switch_rate` | rolling, **lag-1** | yes — by construction excludes the current stop |
+| `reward_entropy`, `state_entropy` | HMM belief entropy | yes (pre-outcome posterior) |
+| `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
+
+The three post-outcome covariates are the only leakage risk. **Empirically there is
+no leakage:** on rewarded stops, 0.0% of non-local/SWR/MUA events occur before the
+reward pump (min `t_since_pump` ≈ 1.0 s, median ≈ 3.8 s; `event_onset_table`), so
+the realized outcome is always known ≥ ~1 s before any modeled event. Re-check this
+exposure if the immobility/event-window definition changes.
