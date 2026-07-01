@@ -7,10 +7,11 @@ SWR-coupled vs non-SWR non-local events, controlling for the within-stop time
 course, raised-cosine self-history, the reward kernel, and the recent reward
 rate. Rate-only -- replay direction is out of scope.
 
-Per session: load ``stop_table``; add the model-free uncertainty covariates
-(:func:`add_uncertainty_covariates`); left-merge the
-``contingency_table_csv.pkl`` nominal value columns on ``stop_id``; drop the first
-(exposure) session per animal; attach the canonical ``is_swr`` to the onsets.
+Per session: load ``stop_table``; add ``recent_switch_rate``
+(:func:`add_uncertainty_covariates`); inner-merge the nominal value + real
+behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
+poke_out-aligned source -- no difflib CSV); drop the first (exposure) session per
+animal; attach the canonical ``is_swr`` to the onsets.
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
 fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
@@ -67,9 +68,9 @@ logger = logging.getLogger(__name__)
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 
-# Nominal value columns merged from the contingency table. The stand-ins the real
-# model replaces (nominal rpe -> rpe_model, leaky q_current -> DeltaV) are no
-# longer merged; only the columns the model fits are.
+# Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
+# p_rew_leaf/contingency_count, exactly poke_out-aligned) rather than the difflib
+# contingency_table_csv -- so every covariate the model fits shares one alignment.
 VALUE_COVARIATES = (
     "p_reward_current",
     "value_diff_patch",
@@ -233,52 +234,32 @@ def main() -> None:
 
     t0 = time.perf_counter()
     stop = pd.read_pickle(RC / "stop_table.pkl")
-    # Canonical nominal value: the LorenFrankLab/SpatialBanditTask parsed CSVs
-    # mapped to stop_id by scripts/_bandit_csv_contingency.py (96% agreement with
-    # the retired StateScript parse; the CSV is the cleaned lab source).
-    contingency = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(RC / "event_onset_table.pkl"),
         pd.read_pickle(RC / "event_table.pkl"),
     )
 
-    # add_uncertainty_covariates supplies recent_switch_rate (the only one still
-    # fit); its leaky_q_value_diff / omission_streak / wsls_deviation stand-ins are
-    # no longer used here.
+    # add_uncertainty_covariates supplies recent_switch_rate (the only model-free
+    # covariate still fit); its leaky_q_value_diff / omission_streak / wsls_deviation
+    # stand-ins are no longer used here.
     stop = add_uncertainty_covariates(stop, switch_window=args.switch_window)
-    value_cols = [
-        "stop_id",
-        *VALUE_COVARIATES,
-        "p_reward_best",
-        "is_best_patch",
-        "block_number",
-    ]
-    # Inner join: keep only stops with a parsed contingency row. Sessions the
-    # parser did not cover are dropped here explicitly, rather than feeding
-    # all-NaN value rows through aggregate + fit only to be listwise-dropped.
-    n_before = len(stop)
-    stop = stop.merge(
-        contingency[value_cols], on="stop_id", how="inner", validate="many_to_one"
-    )
-    logger.info(
-        "contingency inner-join: %d -> %d stops (%d dropped, no parsed contingency)",
-        n_before, len(stop), n_before - len(stop),
-    )
-    # Real behavioral-model covariates (qvals_table.pkl). Left join: stops not
-    # mapped to a trial (~1-3%, post-final-trial tails) and first-trial DVs stay
-    # NaN and are listwise-dropped at fit time. qvals' `rpe` (R - q_chosen) is
-    # renamed rpe_model to distinguish it from the contingency table's nominal rpe.
+    # Nominal schedule + real model covariates, ALL from qvals_table -- one
+    # exactly poke_out-aligned source (retires the difflib contingency_table_csv
+    # for this model). qvals' `rpe` (R - q_chosen) -> rpe_model. Inner join: keep
+    # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
+    # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
     qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    qcols = qvals[["stop_id", "rpe", *RL_COVARIATES]].rename(columns={"rpe": "rpe_model"})
-    stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
-    # validate= only checks cardinality, not overlap: a stale/mismatched qvals_table
-    # would left-join to all-NaN and silently void every RL covariate.
-    matched = stop["rpe_model"].notna().mean()
-    if matched < 0.5:
+    qcols = qvals[["stop_id", *VALUE_COVARIATES, "rpe", *RL_COVARIATES]].rename(
+        columns={"rpe": "rpe_model"}
+    )
+    n_before = len(stop)
+    stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
+    frac = len(stop) / n_before
+    if frac < 0.5:
         raise ValueError(
-            f"qvals_table matched only {matched:.1%} of stops -- check stop_id convention"
+            f"qvals join kept only {frac:.1%} of stops -- check qvals_table stop_id convention"
         )
-    logger.info("qvals covariates matched %.1f%% of stops", 100 * matched)
+    logger.info("qvals join: %d -> %d stops (%.0f%% kept)", n_before, len(stop), 100 * frac)
     stop = _drop_first_session_per_animal(stop)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)

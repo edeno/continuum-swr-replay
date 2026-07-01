@@ -93,6 +93,41 @@ COVARIATES = [
     "stem_choice_p", "leaf_choice_p", "stem_stay_p", *[f"stem_{i}_p" for i in range(1, 4)],
 ]
 
+# Nominal schedule covariates derived from TrialsInfoByEpoch (the same table read
+# for poke times, so aligned by the same poke_out rule -- no difflib/CSV). Source
+# is Alison's `p_rew_leaf1..6` (nominal p(R), percent) + `contingency_count`;
+# value_diff_patch / trials_since_block_change use this project's definitions
+# (Alison computes no nominal value-diff -- her decision variables are model-based).
+NOMINAL_COVARIATES = [
+    "p_reward_current", "p_reward_best", "value_diff_patch", "trials_since_block_change",
+]
+# leaf 1-6 (0-indexed arm) -> patch (WELL_PATCH_MAPPING); for the nominal patch value.
+WELL_PATCH = np.array([0, 0, 1, 1, 2, 2])
+
+
+def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
+    """Add nominal schedule covariates from p_rew_leaf1..6 (percent) + contingency_count.
+
+    p_reward_current / p_reward_best come straight from Alison's nominal p_rew_leaf.
+    value_diff_patch = best-minus-second patch mean (patch = the 2 leaves sharing a
+    stem); trials_since_block_change = position within the current contingency block
+    (this project's definitions, computed on the exactly-aligned per-trial rows).
+    """
+    times = times.sort_values(
+        ["nwb_file_name", "epoch", "trial_number_by_epoch"]
+    ).reset_index(drop=True)
+    ports = times[[f"p_rew_leaf{i}" for i in range(1, 7)]].to_numpy(dtype=float) / 100.0
+    arm = times["leaf"].to_numpy() - 1
+    times["p_reward_current"] = ports[np.arange(len(times)), arm]
+    times["p_reward_best"] = ports.max(axis=1)
+    patch_val = np.stack([ports[:, WELL_PATCH == p].mean(axis=1) for p in range(3)], axis=1)
+    srt = np.sort(patch_val, axis=1)
+    times["value_diff_patch"] = srt[:, -1] - srt[:, -2]
+    times["trials_since_block_change"] = times.groupby(
+        ["nwb_file_name", "epoch", "contingency_count"]
+    ).cumcount()
+    return times
+
 
 def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
     """Read a BehaviorModelResults dataframe (per-trial, keyed by KEYS)."""
@@ -129,17 +164,19 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     nwbs = vals["nwb_file_name"].unique().tolist()
     times = pd.DataFrame((beh.TrialsInfoByEpoch.ByTrial
                           & [{"nwb_file_name": n} for n in nwbs]).fetch())
-    times = times[[*KEYS, *TIME_COLS, "leaf", "reward"]]
     # epoch arrives as an int epoch-number from DataJoint; if it were a string the
     # epoch_number join below would silently drop every stop.
     if not pd.api.types.is_integer_dtype(times["epoch"].dtype):
         raise TypeError(f"expected integer epoch from DataJoint, got {times['epoch'].dtype}")
+    times = _add_nominal_contingency(times)
+    times = times[[*KEYS, *TIME_COLS, "leaf", "reward", *NOMINAL_COVARIATES]]
 
     pt = times.merge(vals[[*KEYS, "leaf", "reward", *model_cols]], on=KEYS,
                      suffixes=("_time", "_val"), validate="one_to_one")
     pt.attrs["leaf_agree"] = float((pt["leaf_time"] == pt["leaf_val"]).mean())
     pt.attrs["entropy_cov"] = pt_attrs_entropy
-    return pt, model_cols
+    # nominal block (from times) + model block (from vals) are both broadcast to stops
+    return pt, [*model_cols, *NOMINAL_COVARIATES]
 
 
 def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd.DataFrame:
