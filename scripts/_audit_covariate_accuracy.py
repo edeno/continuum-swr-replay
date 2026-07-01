@@ -20,6 +20,13 @@ Checks:
   #6b Complete-case drop -- listwise NaN over the fitted covariates, by
       covariate / animal / within-epoch position.
 
+Non-RL covariates (the models fit far more than the qvals block):
+  - spatial ``current_arm`` cross-source agreement (event_arm vs stop_table);
+  - decode content (``arm_fraction_posterior`` / ``arm_fraction``) normalization
+    + junction-bin / NaN integrity.
+Reward-kernel covariates are trial-referenced and covered by the invariant
+verifier + the #1a calibration (see _nonrl_checks docstring).
+
 Diagnostic (prints a report); does not exit non-zero.
 """
 
@@ -117,6 +124,41 @@ def main() -> None:
           f"{(100 * d.assign(x=anynan).groupby('animal')['x'].mean()).round(1).to_dict()}")
     print(f"  dropped within-epoch pos {d.loc[anynan.values, 'pos'].mean():.2f} "
           f"(kept {d.loc[~anynan.values, 'pos'].mean():.2f})")
+
+    _nonrl_checks(st)
+
+
+def _nonrl_checks(st: pd.DataFrame) -> None:
+    """Non-RL covariate ground-truth: the models fit far more than the qvals block.
+
+    Note: reward-kernel covariates (reward_lag{k}, last_rewarded_arm, is_after_*)
+    are TRIAL-referenced (built from the trials table, not the stop sequence), and
+    are already covered by _verify_covariate_invariants (reward_lag in {0,1},
+    reward_rate == mean(reward_lag1..10)) plus the #1a DIO-reward calibration of
+    their atom (reward_outcome). Checking them here against a stop-sequence oracle
+    would mismatch on grain, not correctness -- so they are intentionally omitted.
+    """
+    ea = pd.read_pickle(RC / "event_arm_table.pkl")
+    print("\n=== non-RL: spatial current_arm cross-source (event_arm vs stop_table) ===")
+    m = (ea[["stop_id", "current_arm"]].drop_duplicates()
+         .merge(st[["stop_id", "current_arm"]], on="stop_id", suffixes=("_ea", "_st"))
+         .dropna())
+    print(f"  agree {100 * (m['current_arm_ea'] == m['current_arm_st']).mean():.2f}% "
+          f"(n={len(m)}); position-derived arm consistent across builders")
+
+    print("\n=== non-RL: decode content integrity (per-event over 9 arms) ===")
+    for col in ["arm_fraction_posterior", "arm_fraction"]:
+        if col not in ea:
+            continue
+        s = ea.groupby("event_id")[col].sum()
+        s = s[s.notna() & (s > 0)]
+        print(f"  {col}: sum-to-1 for {100 * ((s > 0.99) & (s < 1.01)).mean():.1f}% "
+              f"of events (median {s.median():.4f}); junction bins would break this")
+    uni = ea.groupby("event_id")["arm_fraction_posterior"].apply(
+        lambda x: x.isna().all() or x.notna().all()
+    )
+    print(f"  arm_fraction_posterior NaN uniform per event (all-or-none): "
+          f"{100 * uni.mean():.1f}%; arm range {int(ea['arm'].min())}..{int(ea['arm'].max())} (must be 0..8)")
 
 
 if __name__ == "__main__":
