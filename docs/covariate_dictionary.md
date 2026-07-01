@@ -145,6 +145,8 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   value, ΔV / Stay / Switch, value updates, Beta variance, HMM reward entropy) live
   in a separate per-stop table; see
   [`behavior_model_covariates.md`](behavior_model_covariates.md).
+- Every regression model that consumes these covariates, in R formula notation (per
+  family, with the phase-2 changed/parity classification): [`models_table.md`](models_table.md).
 
 ## F. Temporal causality (pre- vs post-outcome) — leakage audit
 

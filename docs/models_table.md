@@ -1,0 +1,154 @@
+# Model reference — every regression model, in R formula notation
+
+The complete set of regression models across all families, written as R formulas.
+The **single source of truth is `model_specs.py`** (+ the per-family runners); this
+doc is a human-readable mirror — if a spec changes there, update here. Covariate
+definitions are in [covariate_dictionary.md](covariate_dictionary.md) and
+[behavior_model_covariates.md](behavior_model_covariates.md).
+
+## Conventions & shorthands
+
+Expanded once; used throughout:
+
+```
+BS_TC   := bs(tc, knots=c(1,2,3), Boundary.knots=c(0,4))         # within-stop time-course spline
+REWK    := reward_lag1 + reward_lag2 + ... + reward_lag10         # 10-trial reward kernel
+SELFLAG := onset_lag1 + ... + onset_lag10                         # raw self-history (autoregressive)
+HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosine self-history
+ARMFE   := arm_fe_0 + ... + arm_fe_7                              # 8 dummies for the 9 arms
+```
+
+Per-family fit conventions:
+
+| family | estimator | response | link | offset | grouping / replication |
+|---|---|---|---|---|---|
+| Per-bin rate (B) | Poisson GLM | `count` (onsets per 15 ms bin) | log | `log(exposure)` | per session × population {swr, non_local_swr, non_local_no_swr} |
+| MU uncertainty | Poisson GLM | `count` | log | `log(exposure)` | per session × 3 populations |
+| Per-stop rate (A) | Poisson GLM | `n_events` per stop | log | `log(immobility_time)` | per session |
+| Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | `arm_count_hard` | log | — | per session × is_swr split {all, T, F} |
+| Content patch | conditional Poisson over 3 patches/event | `patch_count_hard` | log | — | per session × {all, T, F} |
+| Choice | conditional logit over candidate arms/stop ≡ `clogit(…, strata(stop))` | `chosen` | logit | — | per event-source |
+| SWR power | OLS (`lm`) | `ripple_power_z` (event-level) | identity | — | per session; predictors z-scored |
+
+`M0`/`P0` are the null (intercept-only, no arm/patch terms); the `arm_fe` main
+effects first enter at `M0a`/`P1`. "conditional Poisson over arms within event" is fit
+as Poisson with per-event fixed effects — the multinomial/`clogit` equivalent.
+
+## Per-bin rate — Family B
+`fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`
+
+```r
+M0_const              count ~ 1
+M1_rew1               count ~ reward_lag1
+M2_rewhist            count ~ REWK
+M2r_rewrate           count ~ reward_rate_trial_k10
+M3_hist               count ~ SELFLAG
+M4_hist_rew           count ~ REWK + SELFLAG
+M5_time               count ~ BS_TC
+M6_time_hist          count ~ BS_TC + SELFLAG
+M7_time_hist_rew      count ~ BS_TC + REWK + SELFLAG
+M8_full_switch        count ~ BS_TC + REWK + SELFLAG + is_after_switch
+M9_rew_x_time         count ~ BS_TC + REWK + SELFLAG + reward_lag1:BS_TC
+M3r_histcos           count ~ HISTCOS
+M7r_time_histcos_rew  count ~ BS_TC + REWK + HISTCOS
+```
+
+## MU uncertainty — per-bin Poisson (M7r base + RL/value block)
+`fit_uncertainty_rate.py` → `models_per_bin_rate/uncertainty_rate.pkl`
+
+```r
+MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
+                        + p_reward_current + value_diff_patch + recent_switch_rate
+                        + trials_since_block_change + rpe_model
+                        + switch_advantage_mu_preoutcome_sess + reward_entropy
+                        + global_mu_update_abs_postoutcome_sess
+                        + unchosen_patches_mu_update_abs_postoutcome_sess
+```
+
+## Per-stop rate — Family A
+`fit_per_stop_rate_models.py`
+
+```r
+R0    n_events ~ 1
+R1    n_events ~ is_after_omission + is_after_switch
+R2    n_events ~ is_after_omission + is_after_switch + reward_rate_trial_k10
+Rlag  n_events ~ REWK + is_after_switch
+```
+
+## Content — arm
+`fit_replay_content_models.py --hierarchy arm` (per is_swr split {all, T, F})
+
+```r
+M0   arm_count ~ 1                        # null (uniform over arms) | strata(event_id)
+M0a  arm_count ~ ARMFE
+M1   arm_count ~ ARMFE + is_current
+M2   arm_count ~ ARMFE + is_current + is_prev
+M3   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10
+M4   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
+M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
+                 + is_last_rewarded_elsewhere
+M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
+M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
+                 + swr_x_is_last_rewarded_elsewhere
+Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
+```
+
+## Content — patch
+`fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
+
+```r
+P0   patch_count ~ 1                       # null | strata(event_id)
+P1   patch_count ~ is_current_patch
+P2   patch_count ~ is_current_patch + is_last_rewarded_patch_elsewhere
+P3   patch_count ~ is_current_patch + is_last_rewarded_patch_elsewhere + cumulative_reward_patch
+P4   patch_count ~ [P3 terms] + swr_x_current_patch + swr_x_last_rewarded_patch_elsewhere
+Pv   patch_count ~ [P3 terms] + p_reward_arm_patch + q_arm_patch
+```
+
+## Contfrag content (SWR / MUA event sources)
+`prepare_contfrag_replay_content_data.py` + content runner, `--event-source {SWR,MUA}`.
+Same conditional-Poisson forms on the contfrag tables, truncated ladders:
+`MODEL_HIERARCHY_SWR/MUA` = arm **M0–M5**; `MODEL_PATCH_SWR/MUA` = patch **P0–P3**.
+
+## Choice
+`compare_event_source_models.py` (`clogit(chosen ~ …, strata(stop))`)
+
+```r
+C_replay_only      chosen ~ replay_frac
+C_behavior         chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
+C_full             chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
+                            + replay_frac
+C_full_swr_split   chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
+                            + replay_frac_swr + replay_frac_non_swr
+```
+
+## SWR power
+`fit_swr_power_model.py` (per-session `lm`; predictors z-scored per session)
+
+```r
+ripple_power_z ~ scale(reward_lag1) + scale(p_reward_current) + scale(rpe)
+                 + scale(recent_switch_rate) + scale(value_diff_patch)
+                 + scale(q_current) + scale(time_since_stop)
+```
+
+## Phase-2 refit classification
+
+Which specs change under the phase-1/1.5 harmonization (→ coefficients move, true
+refit + report) vs are covariate-unchanged (→ **parity-only**: refit reproduces the
+design columns; verified by `_verify_harmonization_parity`, see
+[plan phase-2](../.claude/docs/plans/covariate-harmonization/phase-2-refit-verify.md)).
+
+| family | CHANGED (report old→new) | parity-only |
+|---|---|---|
+| MU uncertainty | MU_uncertainty (**done**) | — |
+| SWR power | ripple_power_z model (model `rpe`/`q_current`) | — |
+| Content arm | M3, M4, M5, M6, M7, Mv | M0, M0a, M1, M2 |
+| Content patch | Pv | P0–P4 |
+| Contfrag content | arm M3–M5 | arm M0–M2, patch P0–P3 |
+| Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
+| Per-bin rate (B) | — covariates unchanged; **verify** the 07-01 table regen / TMAX fix didn't move onset counts, else refit | all specs |
+| Per-stop rate (A) | — | R0, R1, R2, Rlag |
+
+Changed drivers: `reward_rate_arm_k10` (5→10 visits), the value block
+`p_reward_arm`/`q_arm` (now the beta-model belief from `qvals_table`), model
+`rpe`/`q_current`, and the choice `dist_to_arm`→`arm_dist_rank` swap.
