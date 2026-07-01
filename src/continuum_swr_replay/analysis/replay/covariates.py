@@ -644,7 +644,7 @@ def attach_contingency_value_block(
     stop_id: np.ndarray,
     contingency: pd.DataFrame | None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Per-(event, arm) nominal value and leaky-Q level from the contingency.
+    """Per-(event, arm) nominal p(R) and model value (Q) from the contingency.
 
     Single source for the per-arm value block shared by the NonLocal
     (``tables.py``) and ContFrag (``contfrag/tables.py``) event-arm builders
