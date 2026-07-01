@@ -78,22 +78,32 @@ VALUE_COVARIATES = (
     "q_current",
 )
 
-# The curated covariate set the model actually fits: interpretable and mutually
-# near-orthogonal (all VIF <= 1.07, max |r| = 0.20, cond(corr) = 1.8). Two of the
-# eight original covariates are deliberately excluded for collinearity:
-#   - wsls_deviation   (r = -0.70 with rpe)
-#   - omission_streak  (r = -0.66 with the reward_lag1 base kernel)
-# leaky_q_value_diff / trials_since_block_change are kept (orthogonal, null but
-# interpretable) so the dissociation table reports them.
+# The model-free curated block. Excluded for collinearity: wsls_deviation
+# (r=-0.70 with rpe), omission_streak (r=-0.66 with the reward_lag1 kernel).
+# value_diff_patch and leaky_q_value_diff are dropped here in favour of the real
+# behavioral-model DeltaV (switch_advantage, in RL_COVARIATES) they stood in for.
 CURATED_COVARIATES = (
     "p_reward_current",
     "rpe",
-    "value_diff_patch",
     "recent_switch_rate",
-    "leaky_q_value_diff",
     "q_current",
     "trials_since_block_change",
 )
+
+# Real SpatialBanditTask behavioral-model decision variables (qvals_table.pkl,
+# beta_stable_withleaf + HMM entropy; see docs/behavior_model_covariates.md). The
+# paper's covariates: DeltaV, reward-state entropy, and the absolute value-update
+# magnitudes. Added alongside the model-free block; review collinearity vs the
+# nominal stand-ins (value_diff_patch ~ DeltaV, leaky_q_value_diff) before pruning.
+RL_COVARIATES = (
+    "switch_advantage_mu_preoutcome_sess",  # DeltaV = Switch - Stay value
+    "reward_entropy",  # outcome uncertainty (HMM, upcoming/chosen port)
+    "global_mu_update_abs_postoutcome_sess",  # |value update| summed over all ports
+    "unchosen_patches_mu_update_abs_postoutcome_sess",  # |update| over alternative patches
+)
+
+# What the model actually fits + reports (model-free block + real RL DVs).
+FITTED_COVARIATES = (*CURATED_COVARIATES, *RL_COVARIATES)
 
 # The three non-local-vs-SWR populations to dissociate (pooled non_local is the
 # null and is not fit here).
@@ -115,7 +125,7 @@ MU_UNCERTAINTY = PerBinRateModelSpec(
     "curated uncertainty/value beyond time/reward/history",
     "M7r_time_histcos_rew",
     self_history_basis=N_HISTORY_BASIS,
-    extra_covariates=CURATED_COVARIATES,
+    extra_covariates=FITTED_COVARIATES,
 )
 
 
@@ -153,7 +163,7 @@ def fit_uncertainty_rate(
     reward lags; ``onsets`` must already carry ``is_swr``.
     """
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
-    stop_covariates = (*STOP_COVARIATES, *CURATED_COVARIATES)
+    stop_covariates = (*STOP_COVARIATES, *FITTED_COVARIATES)
 
     rows: list[dict] = []
     for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
@@ -229,6 +239,19 @@ def main() -> None:
     stop = stop.merge(
         contingency[value_cols], on="stop_id", how="inner", validate="many_to_one"
     )
+    # Real RL decision variables (qvals_table.pkl). Left join: stops not mapped to a
+    # trial (~1-3%, post-final-trial tails) and first-trial DVs stay NaN and are
+    # listwise-dropped at fit time.
+    qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = stop.merge(
+        qvals[["stop_id", *RL_COVARIATES]], on="stop_id", how="left",
+        validate="many_to_one",
+    )
+    # z-score the RL covariates (disparate scales: DeltaV ~0.2, value updates
+    # ~0.05) so their rate ratios are per-SD and comparable; the model-free block
+    # stays per-unit (its covariates are already O(1) and interpretable).
+    for c in RL_COVARIATES:
+        stop[c] = (stop[c] - stop[c].mean()) / stop[c].std()
     stop = _drop_first_session_per_animal(stop)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
@@ -262,7 +285,7 @@ def main() -> None:
         time.perf_counter() - t0,
     )
     if len(models):
-        for cov in CURATED_COVARIATES:
+        for cov in FITTED_COVARIATES:
             col = f"rr_{cov}"
             if col not in models:
                 continue
