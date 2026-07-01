@@ -187,9 +187,9 @@ def test_drop_first_session_per_animal():
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
 
-    Requires ``contingency_table_csv.pkl`` to exist alongside the canonical
-    tables. Writes ``uncertainty_rate_smoke.pkl`` and checks the tidy schema
-    carries every uncertainty/value coefficient across the three populations.
+    Requires ``contingency_table_csv.pkl`` and ``qvals_table.pkl`` alongside the
+    canonical tables. Writes ``uncertainty_rate_smoke.pkl`` and checks the tidy
+    schema carries every uncertainty/value coefficient across the three populations.
     """
     from continuum_swr_replay.analysis.replay import (
         N_REWARD_LAGS,
@@ -199,10 +199,16 @@ def test_runner_smoke():
 
     rc = PROCESSED_DATA_DIR / "replay_content"
     contingency_path = rc / "models_per_bin_rate" / "contingency_table_csv.pkl"
+    qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
     if not contingency_path.exists():
         pytest.skip(
             "contingency_table_csv.pkl not present "
             "(run scripts/_bandit_csv_contingency.py first)"
+        )
+    if not qvals_path.exists():
+        pytest.skip(
+            "qvals_table.pkl not present "
+            "(run continuum_swr_replay.analysis.behavior.qvals_table --write first)"
         )
 
     stop = pd.read_pickle(rc / "stop_table.pkl")
@@ -219,6 +225,14 @@ def test_runner_smoke():
         how="inner",  # restrict to the parsed sessions
         validate="many_to_one",
     )
+    # Behavioral-model covariates (rpe_model + RL decision variables) come from
+    # qvals_table.pkl, mirroring the runner's main(); without them the fit's
+    # FITTED_COVARIATES would be absent from the design.
+    qvals = pd.read_pickle(qvals_path)
+    qcols = qvals[["stop_id", "rpe", *fur.RL_COVARIATES]].rename(
+        columns={"rpe": "rpe_model"}
+    )
+    stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
     stop = fur._drop_first_session_per_animal(stop)
     stop = fur._subset_max_per_animal(stop, 1)
 

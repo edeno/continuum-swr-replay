@@ -96,6 +96,31 @@ offset. Its limitation is exactly that offset — see below.
   claims table retains the original mixed-binning values — same dissociation,
   slightly different absolute coefficients, as expected from the re-binning.)
 
+## MU — the uncertainty/value model (Family B extension)
+
+`MU_uncertainty` (runner: `scripts/fit_uncertainty_rate.py`, output
+`models_per_bin_rate/uncertainty_rate.pkl`) is an **out-of-ladder** Family-B spec
+that asks whether replay rate tracks the animal's *behavioral-model* value and
+uncertainty beyond the time/reward/history controls. It is the M7r base
+(time spline + reward kernel + raised-cosine self-history) plus a curated block:
+
+- **nominal (per-unit):** `p_reward_current`, `value_diff_patch`,
+  `recent_switch_rate`, `trials_since_block_change`.
+- **model value (per-unit):** `rpe_model` = `reward − q_chosen` from the fitted
+  RL model (`qvals_table.pkl`), used *instead of* the contingency-table nominal
+  `rpe` (r≈0.71).
+- **RL decision variables (z-scored → per-SD rate ratios):** `switch_advantage`
+  (ΔV = switch − stay value), `reward_entropy` (HMM outcome uncertainty), and the
+  absolute value-update magnitudes (`global`, `unchosen_patches`). See
+  [behavior_model_covariates.md](behavior_model_covariates.md).
+
+Collinearity is controlled: `q_chosen` is dropped (r≈0.90 with ΔV, VIF 6.4);
+`leaky_q_value_diff` and the leaky `q_current` stand-ins are dropped; nominal
+`rpe` is replaced by `rpe_model`; `value_diff_patch` is kept (r≈−0.04 with ΔV —
+independent nominal information). Final panel VIF ≤ 1.86, max |r| = 0.64. Fit
+over the three populations `swr` / `non_local_swr` / `non_local_no_swr` (the
+pooled `non_local` null is not fit here).
+
 ## The result holds across both families
 
 Reward increases replay rate, and the SWR-coupled subset carries the strong

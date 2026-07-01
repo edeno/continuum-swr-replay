@@ -100,7 +100,7 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 | `global_leaf_var_sum_preoutcome_sess` | Σ of the 6 port variances |
 | `chosen_leaf_var_preoutcome_sess` | variance of the chosen port |
 | `prev_local_variance`, `prev_global_variance` | pre-outcome uncertainty (chosen-leaf / global) |
-| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice |
+| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1`'s chosen leaf / post-outcome variance, so they are NOT contemporaneous with a replay event at trial `t`. Exported for offline use only; excluded from `COVARIATES` and never fitted as a stop-time covariate. |
 
 ### Reward-state entropy (HMM — the paper's outcome-uncertainty covariate)
 | Column | Meaning |
@@ -111,7 +111,7 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 ### Reward-prediction error
 | Column | Meaning |
 |---|---|
-| `rpe` | `trial_reward − q_chosen` |
+| `rpe` | `trial_reward − q_chosen` (same-trial model RPE; both terms from the fitted beta model). Merged into `fit_uncertainty_rate.py` and fit there under the alias **`rpe_model`** — it substitutes for the contingency-table nominal `rpe` (r≈0.71), which is dropped from the MU panel. |
 | `rpe_abs` | `|rpe|` (unsigned surprise) |
 
 ### Depletion / choice

@@ -196,15 +196,26 @@ def main() -> None:
         t = build_animal(a, beh, rl, st_all)
         st = st_all[st_all.animal == a]
         obs = st.set_index("stop_id")
-        arm_ok = np.mean(t["arm"].to_numpy() == obs["current_arm"].reindex(t["stop_id"]).to_numpy())
-        rew_ok = np.mean(t["trial_reward"].to_numpy() == obs["reward_outcome"].reindex(t["stop_id"]).to_numpy())
+        # arm / reward agreement is only meaningful at at-well (in_poke) stops:
+        # on transit stops the mapped trial's destination leaf (arm 0-5) need not
+        # equal the physical current_arm (which can be a trunk arm 6-8), so a
+        # whole-set figure understates agreement and would trip a spurious
+        # mapping-regression warning. Restrict the checks to in_poke stops.
+        poke = t["in_poke"].to_numpy()
+        cur = obs["current_arm"].reindex(t["stop_id"]).to_numpy()
+        rout = obs["reward_outcome"].reindex(t["stop_id"]).to_numpy()
+        arm_ok = np.mean(t["arm"].to_numpy()[poke] == cur[poke])
+        rew_ok = np.mean(t["trial_reward"].to_numpy()[poke] == rout[poke])
+        entropy_cov = t.attrs["entropy_cov"]
         print(f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100*len(t)/len(st):.0f}%)  "
               f"in_poke={100*t['in_poke'].mean():.0f}%  "
-              f"arm==current_arm {100*arm_ok:.1f}%  reward==reward_outcome {100*rew_ok:.1f}%  "
-              f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*t.attrs['entropy_cov']:.0f}%]")
-        if len(t) / len(st) < 0.90 or arm_ok < 0.95:
-            print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%) or "
-                  f"arm agreement {100*arm_ok:.1f}% (expect ~100%) -- possible mapping regression")
+              f"at-well arm=={100*arm_ok:.1f}%  at-well reward=={100*rew_ok:.1f}%  "
+              f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*entropy_cov:.0f}%]")
+        if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.5:
+            print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%), "
+                  f"at-well arm agreement {100*arm_ok:.1f}% (expect ~100%), or "
+                  f"reward_entropy coverage {100*entropy_cov:.0f}% (expect >=50%; a low "
+                  f"figure voids the RL entropy covariate) -- possible mapping/HMM regression")
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
     print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")

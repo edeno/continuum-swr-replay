@@ -140,8 +140,8 @@ def test_parse(filename, animal):
 
 ## Adding regression tests for un-importable scripts
 
-`scripts/prepare_replay_content_data.py` and similar prep scripts can't be
-unit-tested directly — they pull from Spyglass and run for hours. The pattern
+`scripts/prepare_contfrag_replay_content_data.py` and similar prep scripts can't
+be unit-tested directly — they pull from Spyglass and run for hours. The pattern
 used in [`test_prep_event_sequence_always_written.py`](unit/test_prep_event_sequence_always_written.py)
 and [`test_contfrag_event_source_dispatch.py`](unit/test_contfrag_event_source_dispatch.py)
 parses the script via `ast`, optionally `exec`s a single function definition

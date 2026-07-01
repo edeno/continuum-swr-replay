@@ -66,7 +66,11 @@ experienced-value covariate (a chosen-arm *level*); the old `q_chosen` name in t
 contingency table was unified to `q_current`. **`leaky_q_value_diff` is NOT dropped** — it is a *different* construct
 (per-stop margin vs per-trial level) and is kept as a reported comparison so the MU
 dissociation table is preserved. `value_diff_patch` and `rpe` (nominal) remain scalar
-rate/coupling covariates.
+rate/coupling covariates. **Note:** the MU-uncertainty runner substitutes the fitted
+behavioral-model RPE `rpe_model` (`trial_reward − q_chosen`, from `qvals_table.pkl`;
+see [behavior_model_covariates.md](behavior_model_covariates.md)) for the nominal `rpe`
+here (r≈0.71), so "rpe" in the MU dissociation table is `rpe_model`, not the contingency
+`rpe`.
 
 ### 3. Exploration — canonical continuous + retained binary comparison
 

@@ -286,6 +286,14 @@ def main() -> None:
     # is the SD of exactly the rows that get fit (disparate/tiny scale: DeltaV
     # ~0.2, updates ~0.05). The nominal block + rpe_model stay per-unit.
     for c in RL_COVARIATES:
+        frac_valid = stop[c].notna().mean()
+        if frac_valid < 0.7:
+            logger.warning(
+                "RL covariate %r is non-NaN on only %.0f%% of fitted rows; its SD "
+                "(hence the per-SD rate ratio) is set by that minority and rows with "
+                "NaN drop from every model listwise",
+                c, 100 * frac_valid,
+            )
         sd = stop[c].std()
         if pd.isna(sd) or sd == 0:
             raise ValueError(f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score")

@@ -17,10 +17,11 @@ Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
 - ``event_sequence_table.pkl`` — one row per in-event timebin
 - ``stop_table.pkl`` — one row per stopping period (incl. zero-event)
 
-Usage::
+Usage (this driver moved from ``scripts/`` into the package; run it as a
+module)::
 
-    uv run python scripts/prepare_replay_content_data.py           # full run
-    uv run python scripts/prepare_replay_content_data.py --test    # 2 per animal
+    uv run python -m continuum_swr_replay.analysis.replay.prepare_data         # full run
+    uv run python -m continuum_swr_replay.analysis.replay.prepare_data --test  # 2 per animal
 """
 
 from __future__ import annotations
