@@ -78,23 +78,34 @@ VALUE_COVARIATES = (
     "q_current",
 )
 
-# The model-free curated block. Excluded for collinearity: wsls_deviation
-# (r=-0.70 with rpe), omission_streak (r=-0.66 with the reward_lag1 kernel).
-# value_diff_patch and leaky_q_value_diff are dropped here in favour of the real
-# behavioral-model DeltaV (switch_advantage, in RL_COVARIATES) they stood in for.
+# Nominal / model-free block (per-unit; these covariates are O(1) and
+# interpretable). We prefer the real behavioral model over stand-ins, so the
+# leaky-Q q_current and the nominal rpe are replaced by q_chosen / rpe_model
+# below. value_diff_patch is KEPT: it is the nominal best-minus-second patch value
+# and is orthogonal to the model DeltaV (r=-0.04), so it carries independent
+# information (an earlier drop assuming redundancy was wrong). Excluded for
+# collinearity: wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with
+# the reward_lag1 kernel).
 CURATED_COVARIATES = (
     "p_reward_current",
-    "rpe",
+    "value_diff_patch",
     "recent_switch_rate",
-    "q_current",
     "trials_since_block_change",
 )
 
-# Real SpatialBanditTask behavioral-model decision variables (qvals_table.pkl,
-# beta_stable_withleaf + HMM entropy; see docs/behavior_model_covariates.md). The
-# paper's covariates: DeltaV, reward-state entropy, and the absolute value-update
-# magnitudes. Added alongside the model-free block; review collinearity vs the
-# nominal stand-ins (value_diff_patch ~ DeltaV, leaky_q_value_diff) before pruning.
+# Real behavioral-model reward-prediction error, used INSTEAD of the nominal rpe
+# stand-in (rpe_model vs old nominal rpe: r=0.71 -- the model version matters).
+# q_chosen (model chosen-port value) is deliberately NOT fit: it is r=0.90
+# collinear with the DeltaV decision variable (switch_advantage), which carries
+# the model's value signal here. O(1) scale, so per-unit like the nominal block.
+MODEL_VALUE_COVARIATES = (
+    "rpe_model",  # reward - q_chosen (model reward-prediction error)
+)
+
+# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf
+# + HMM entropy; see docs/behavior_model_covariates.md). The paper's covariates:
+# DeltaV, reward-state entropy, absolute value-update magnitudes. z-scored below
+# (disparate/tiny scale) -> per-SD rate ratios.
 RL_COVARIATES = (
     "switch_advantage_mu_preoutcome_sess",  # DeltaV = Switch - Stay value
     "reward_entropy",  # outcome uncertainty (HMM, upcoming/chosen port)
@@ -102,8 +113,8 @@ RL_COVARIATES = (
     "unchosen_patches_mu_update_abs_postoutcome_sess",  # |update| over alternative patches
 )
 
-# What the model actually fits + reports (model-free block + real RL DVs).
-FITTED_COVARIATES = (*CURATED_COVARIATES, *RL_COVARIATES)
+# What the model actually fits + reports (nominal + model value + RL DVs).
+FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATES)
 
 # The three non-local-vs-SWR populations to dissociate (pooled non_local is the
 # null and is not fit here).
@@ -239,17 +250,16 @@ def main() -> None:
     stop = stop.merge(
         contingency[value_cols], on="stop_id", how="inner", validate="many_to_one"
     )
-    # Real RL decision variables (qvals_table.pkl). Left join: stops not mapped to a
-    # trial (~1-3%, post-final-trial tails) and first-trial DVs stay NaN and are
-    # listwise-dropped at fit time.
+    # Real behavioral-model covariates (qvals_table.pkl). Left join: stops not
+    # mapped to a trial (~1-3%, post-final-trial tails) and first-trial DVs stay
+    # NaN and are listwise-dropped at fit time. qvals' `rpe` (R - q_chosen) is
+    # renamed rpe_model to distinguish it from the contingency table's nominal rpe.
     qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    stop = stop.merge(
-        qvals[["stop_id", *RL_COVARIATES]], on="stop_id", how="left",
-        validate="many_to_one",
-    )
-    # z-score the RL covariates (disparate scales: DeltaV ~0.2, value updates
-    # ~0.05) so their rate ratios are per-SD and comparable; the model-free block
-    # stays per-unit (its covariates are already O(1) and interpretable).
+    qcols = qvals[["stop_id", "rpe", *RL_COVARIATES]].rename(columns={"rpe": "rpe_model"})
+    stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
+    # z-score only the RL decision variables (disparate/tiny scale: DeltaV ~0.2,
+    # value updates ~0.05) so their rate ratios are per-SD and comparable. The
+    # nominal block and q_chosen / rpe_model are O(1) and stay per-unit.
     for c in RL_COVARIATES:
         stop[c] = (stop[c] - stop[c].mean()) / stop[c].std()
     stop = _drop_first_session_per_animal(stop)
