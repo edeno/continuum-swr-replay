@@ -9,6 +9,7 @@ public ones) off the package namespace.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 
@@ -169,6 +170,42 @@ def test_value_block_missing_cols_raises():
     bad = pd.DataFrame({"stop_id": [1, 2]})  # no port/q cols
     with pytest.raises(ValueError, match="missing per-arm value columns"):
         covariates.attach_contingency_value_block(arm, sid, bad)
+
+
+# ── load_contingency (shared value-artifact load seam) ──
+# Concept: qvals_table is the SOLE value source, so its absence must degrade
+# visibly (warning + None), not silently; presence returns the frame.
+
+
+def test_load_contingency_present_returns_frame(tmp_path, caplog):
+    df = pd.DataFrame({"stop_id": [1, 2, 3]})
+    path = tmp_path / "qvals_table.pkl"
+    df.to_pickle(path)
+    with caplog.at_level(logging.INFO):
+        out = covariates.load_contingency(path)
+    pd.testing.assert_frame_equal(out, df)
+    assert any("3 stop rows" in r.message for r in caplog.records)
+
+
+def test_load_contingency_absent_returns_none_and_warns(tmp_path, caplog):
+    missing = tmp_path / "does_not_exist.pkl"
+    with caplog.at_level(logging.WARNING):
+        out = covariates.load_contingency(missing)
+    assert out is None
+    assert any(
+        r.levelno == logging.WARNING and "no qvals_table" in r.message
+        for r in caplog.records
+    )
+
+
+def test_load_contingency_absent_yields_all_nan_value_block(tmp_path):
+    """End-to-end fallback contract: a missing artifact -> None -> the value
+    block is all-NaN (drops uniformly at fit time), never a spurious 0.0."""
+    cont = covariates.load_contingency(tmp_path / "nope.pkl")
+    p, q = covariates.attach_contingency_value_block(
+        np.array([0, 6]), np.array([1, 2]), cont
+    )
+    assert np.isnan(p).all() and np.isnan(q).all()
 
 
 def test_value_block_warns_on_duplicate_stop_id():

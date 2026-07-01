@@ -13,7 +13,9 @@ Implements the constructs specified in
 
 from __future__ import annotations
 
+import logging
 import warnings
+from pathlib import Path
 
 import networkx as nx
 import numpy as np
@@ -641,6 +643,28 @@ def _fit_alpha(arm: np.ndarray, reward: np.ndarray, grp: np.ndarray) -> float:
         return -float(np.sum(reward * np.log(p) + (1 - reward) * np.log(1 - p)))
 
     return float(minimize_scalar(nll, bounds=(0.01, 0.99), method="bounded").x)
+
+
+def load_contingency(path: Path) -> pd.DataFrame | None:
+    """Load the per-stop value artifact (``qvals_table``) for the value block.
+
+    Shared by the NonLocal (``prepare_data``) and ContFrag prep entry points.
+    ``qvals_table`` is the *sole* source for ``p_reward_arm`` / ``q_arm``, so its
+    absence must degrade visibly, not silently: present -> returns the frame and
+    logs the row count; absent -> returns ``None`` and logs a warning (the
+    builders then emit those columns as NaN, dropping uniformly at fit time).
+    """
+    path = Path(path)
+    if path.exists():
+        cont = pd.read_pickle(path)
+        logging.info(
+            "loaded qvals_table (%d stop rows) for p_reward_arm / q_arm", len(cont)
+        )
+        return cont
+    logging.warning(
+        "no qvals_table at %s — p_reward_arm / q_arm will be NaN", path
+    )
+    return None
 
 
 def attach_contingency_value_block(

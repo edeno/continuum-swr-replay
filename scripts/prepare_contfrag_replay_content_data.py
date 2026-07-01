@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
+from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -298,11 +299,7 @@ def main():
         / "models_per_bin_rate"
         / "qvals_table.pkl"
     )
-    contingency = (
-        pd.read_pickle(contingency_path) if contingency_path.exists() else None
-    )
-    if contingency is None:
-        logging.warning("no qvals_table — contfrag p_reward_arm / q_arm will be NaN")
+    contingency = load_contingency(contingency_path)
 
     skipped: list[tuple[str, str, str]] = []
     for i, session in enumerate(sessions):

@@ -38,6 +38,7 @@ from pandas.errors import MergeError
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
@@ -239,18 +240,7 @@ def main():
     # p_reward_arm / q_arm; q_port is now the beta-model belief per port (was
     # leaky-Q). Absent -> those columns stay NaN.
     contingency_path = OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
-    contingency = None
-    if contingency_path.exists():
-        contingency = pd.read_pickle(contingency_path)
-        logging.info(
-            "loaded qvals_table (%d stop rows) for p_reward_arm / q_arm",
-            len(contingency),
-        )
-    else:
-        logging.warning(
-            "no qvals_table at %s — p_reward_arm / q_arm will be NaN",
-            contingency_path,
-        )
+    contingency = load_contingency(contingency_path)
 
     # Warn if the output directory still holds artifacts from the
     # legacy pipeline — silent coexistence lets downstream scripts

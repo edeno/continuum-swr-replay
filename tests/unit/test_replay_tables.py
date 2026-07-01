@@ -276,7 +276,8 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     pv = {p for p in MODEL_PATCH["Pv"].predictors if p not in arm_fe}
     assert pv <= set(ept.columns), f"Pv predictors absent: {pv - set(ept.columns)}"
 
-    # contingency join populates leaf-arm value columns (not silently all-NaN)
+    # contingency join routes each leaf arm to ITS OWN port value (distinct per
+    # port -> catches a broadcast/transpose bug that `.notna().any()` would miss)
     stop_ids = eat["stop_id"].dropna().unique()
     if len(stop_ids):
         cont = pd.DataFrame({"stop_id": stop_ids})
@@ -284,8 +285,44 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
             cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
             cont[f"q_port{i}"] = 0.05 * (i + 1)
         eat_c = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
-        leaf_present = eat_c.loc[eat_c["arm"] < 6, "p_reward_arm"]
-        assert leaf_present.notna().any(), "contingency join left p_reward_arm all-NaN"
+        present = eat_c["stop_id"].isin(stop_ids)
+        leaf = present & (eat_c["arm"] < 6)
+        arm_j = eat_c.loc[leaf, "arm"].to_numpy()
+        np.testing.assert_allclose(
+            eat_c.loc[leaf, "p_reward_arm"].to_numpy(), 0.1 * (arm_j + 1)
+        )
+        np.testing.assert_allclose(
+            eat_c.loc[leaf, "q_arm"].to_numpy(), 0.05 * (arm_j + 1)
+        )
+        # trunk arms (6-8) are not reward sites -> structural 0.0 for a present stop
+        trunk = present & (eat_c["arm"] >= 6)
+        assert (eat_c.loc[trunk, "p_reward_arm"] == 0.0).all()
+        assert (eat_c.loc[trunk, "q_arm"] == 0.0).all()
+
+
+def test_value_block_absent_stop_drops_all_arms(tiny_session):
+    """A stop not in the contingency -> ALL nine arms NaN (uniform drop at fit
+    time), not a spurious 0.0; stops that ARE present still populate. Guards the
+    builder's stop_id keying through the real prepare_data call path."""
+    dot, env, trials, graph = tiny_session
+    et = build_event_table(dot, env, trials, graph)
+    eat0 = build_event_arm_table(et, dot, env, trials, graph)
+    stop_ids = eat0["stop_id"].dropna().unique()
+    if len(stop_ids) < 2:
+        pytest.skip("need >=2 stops to split present/absent")
+    covered = stop_ids[: max(1, len(stop_ids) // 2)]  # contingency covers only some
+    cont = pd.DataFrame({"stop_id": covered})
+    for i in range(6):
+        cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
+        cont[f"q_port{i}"] = 0.05 * (i + 1)
+    eat = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
+
+    absent = eat[eat["stop_id"].notna() & ~eat["stop_id"].isin(covered)]
+    assert len(absent), "fixture produced no absent-stop rows"
+    assert absent["p_reward_arm"].isna().all()  # uniform NaN, not 0.0
+    assert absent["q_arm"].isna().all()
+    present_leaf = eat[eat["stop_id"].isin(covered) & (eat["arm"] < 6)]
+    assert present_leaf["p_reward_arm"].notna().all()
 
 
 # ── Schema / dtype tests ──
