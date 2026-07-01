@@ -138,6 +138,55 @@ def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
     return times
 
 
+def add_experienced_value_columns(vals: pd.DataFrame) -> pd.DataFrame:
+    """Derive the experienced-value columns from a per-trial beta-model frame.
+
+    Adds ``q_chosen`` (model value of the chosen arm = ``Q{leaf}``), ``arm``
+    (``leaf - 1``, 0-indexed), ``q_port{0..5}`` (per-arm model value ``Q{i+1}``),
+    ``rpe`` (``reward - q_chosen``) and ``rpe_abs``. Mutates and returns ``vals``.
+
+    Requires columns ``Q1..Q6``, ``leaf`` (1..6) and ``reward``. Raises
+    ``ValueError`` if ``leaf`` is outside 1..6 -- the fancy-index below would
+    otherwise wrap (``leaf=0 -> Q6``) and silently mis-map every chosen value.
+    """
+    if not vals["leaf"].between(1, 6).all():
+        raise ValueError(f"leaf outside 1..6: {sorted(vals['leaf'].unique())}")
+    qmat = vals[[f"Q{i}" for i in range(1, 7)]].to_numpy()
+    arm = vals["leaf"].to_numpy() - 1
+    vals["q_chosen"] = qmat[np.arange(len(vals)), arm]
+    vals["arm"] = arm
+    for i in range(6):
+        vals[f"q_port{i}"] = qmat[:, i]  # per-port model value (Q{i+1}), for q_arm
+    vals["rpe"] = vals["reward"].to_numpy() - vals["q_chosen"].to_numpy()
+    vals["rpe_abs"] = vals["rpe"].abs()
+    return vals
+
+
+def assign_stops_to_trials(
+    poke_out_ts: np.ndarray, stop_mid: np.ndarray
+) -> np.ndarray:
+    """Assign each stop midpoint to a trial by poke-out interval.
+
+    Alison's rule: trial ``t`` spans ``[poke_out[t-1], poke_out[t])`` (with
+    ``poke_out[-1] = -inf``), reproduced by ``searchsorted(..., side="right")``.
+
+    Parameters
+    ----------
+    poke_out_ts : np.ndarray, shape (n_trials,)
+        Per-trial poke-out times, sorted ascending (temporal trial order).
+    stop_mid : np.ndarray, shape (n_stops,)
+        Stop midpoint times.
+
+    Returns
+    -------
+    np.ndarray, shape (n_stops,)
+        Trial index per stop, or ``-1`` for stops at or after the last poke-out
+        (no enclosing trial -> dropped by the caller).
+    """
+    ti = np.searchsorted(poke_out_ts, stop_mid, side="right")
+    return np.where(ti < len(poke_out_ts), ti, -1)
+
+
 def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
     """Read a BehaviorModelResults dataframe (per-trial, keyed by KEYS)."""
     # Deferred import: pulling spyglass at module top opens a DataJoint
@@ -164,17 +213,7 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
     hmm = _fetch_model_df(rl, subject, HMM_KEY)[[*KEYS, *HMM_COLS]]
     vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
-    # leaf must be 1..6: the fancy-index below would else wrap (leaf=0 -> Q6) or
-    # raise, silently mis-mapping q_chosen / arm.
-    if not vals["leaf"].between(1, 6).all():
-        raise ValueError(f"leaf outside 1..6 for {subject!r}: {sorted(vals['leaf'].unique())}")
-    qmat = vals[[f"Q{i}" for i in range(1, 7)]].to_numpy()
-    vals["q_chosen"] = qmat[np.arange(len(vals)), vals["leaf"].to_numpy() - 1]
-    vals["arm"] = vals["leaf"].to_numpy() - 1
-    for i in range(6):
-        vals[f"q_port{i}"] = qmat[:, i]  # per-port model value (Q{i+1}), for q_arm
-    vals["rpe"] = vals["reward"].to_numpy() - vals["q_chosen"].to_numpy()
-    vals["rpe_abs"] = vals["rpe"].abs()
+    vals = add_experienced_value_columns(vals)  # q_chosen / arm / q_port / rpe
     model_cols = [c for c in COVARIATES if c in vals.columns]
     pt_attrs_entropy = float(vals["reward_entropy"].notna().mean())
 
@@ -213,10 +252,10 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
         s_idx = np.where(((st["nwb_file_name"] == nwb) & (st["epoch_number"] == epnum)).to_numpy())[0]
         if len(s_idx) == 0:
             continue
-        # Alison's rule: trial t = [poke_out[t-1], poke_out[t]) (her between inclusive='left');
-        # searchsorted side='right' reproduces it. Stops past the last poke_out drop out.
-        ti = np.searchsorted(po, mid[s_idx], side="right")
-        valid = ti < len(g)
+        # trial t = [poke_out[t-1], poke_out[t]); stops past the last poke_out
+        # get -1 and drop out.
+        ti = assign_stops_to_trials(po, mid[s_idx])
+        valid = ti >= 0
         for k, se in zip(s_idx[valid], ti[valid], strict=True):
             trow = g.iloc[int(se)]
             rows.append({

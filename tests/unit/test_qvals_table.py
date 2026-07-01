@@ -14,6 +14,8 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
+    add_experienced_value_columns,
+    assign_stops_to_trials,
 )
 
 
@@ -75,3 +77,97 @@ def test_leaf_range_guard_raises(bad_leaf):
     t = _toy_times([bad_leaf], [[50] * 6])
     with pytest.raises(ValueError, match="leaf outside 1..6"):
         _add_nominal_contingency(t)
+
+
+# ── assign_stops_to_trials (stop -> trial by poke-out interval) ──
+# Concept: trial t spans [poke_out[t-1], poke_out[t]) (poke_out[-1] = -inf);
+# stops at/after the last poke_out have no enclosing trial (-> -1, dropped).
+
+
+@pytest.mark.parametrize(
+    "mid, expected",
+    [
+        (15, 1),   # interior of [10, 20)
+        (10, 1),   # left boundary == poke_out[0]: belongs to the STARTING trial 1
+        (20, 2),   # == poke_out[1]: rolls to trial 2, not trial 1
+        (5, 0),    # before the first poke_out -> trial 0
+        (30, -1),  # exactly the last poke_out -> no enclosing trial (dropped)
+        (99, -1),  # after the last poke_out -> dropped
+    ],
+)
+def test_assign_stop_boundaries(mid, expected):
+    po = np.array([10.0, 20.0, 30.0])
+    # oracle values are read off the interval definition by hand, not searchsorted
+    assert assign_stops_to_trials(po, np.array([mid]))[0] == expected
+
+
+def test_assign_stops_vectorized_matches_scalar():
+    po = np.array([10.0, 20.0, 30.0])
+    mids = np.array([5, 10, 15, 20, 25, 30, 99], dtype=float)
+    np.testing.assert_array_equal(
+        assign_stops_to_trials(po, mids), [0, 1, 1, 2, 2, -1, -1]
+    )
+
+
+def test_assign_stops_interval_invariant_property():
+    """For arbitrary (sorted) poke-outs and stops, the CONTRACT must hold:
+    a stop assigned to trial t satisfies poke_out[t-1] <= mid < poke_out[t]
+    (poke_out[-1] = -inf); a dropped stop (-1) sits at/after the last poke_out.
+    Validates the rule independent of the searchsorted mechanism."""
+    rng = np.random.default_rng(0)
+    for _ in range(400):
+        n = int(rng.integers(1, 8))
+        po = np.cumsum(rng.uniform(0.5, 3.0, size=n))  # strictly increasing
+        mids = rng.uniform(po[0] - 2, po[-1] + 2, size=20)
+        ti = assign_stops_to_trials(po, mids)
+        for m, t in zip(mids, ti, strict=True):
+            if t == -1:
+                assert m >= po[-1]
+            else:
+                lo = -np.inf if t == 0 else po[t - 1]
+                assert lo <= m < po[t]
+
+
+# ── add_experienced_value_columns (model belief of the chosen arm) ──
+# Concept: q_chosen is the model value for the arm the animal chose (Q{leaf}),
+# with correct 1-based-leaf -> 0-based-arm indexing; rpe = reward - q_chosen.
+
+
+def _toy_vals(leaves, rewards, q_rows):
+    df = {"leaf": list(leaves), "reward": list(rewards)}
+    q = np.asarray(q_rows, dtype=float)
+    for i in range(1, 7):
+        df[f"Q{i}"] = q[:, i - 1]
+    return pd.DataFrame(df)
+
+
+@pytest.mark.parametrize("reward, exp_rpe", [(1, 0.67), (0, -0.33)])
+def test_experienced_value_picks_chosen_arm(reward, exp_rpe):
+    # distinct Q per port so picking the wrong arm gives a different literal
+    q = [0.11, 0.22, 0.33, 0.44, 0.55, 0.66]
+    out = add_experienced_value_columns(_toy_vals([3], [reward], [q]))
+    assert out["arm"].iloc[0] == 2                       # leaf 3 -> arm 2
+    assert out["q_chosen"].iloc[0] == pytest.approx(0.33)  # Q3, not Q2/Q4
+    assert out["q_port0"].iloc[0] == pytest.approx(0.11)
+    assert out["q_port5"].iloc[0] == pytest.approx(0.66)
+    assert out["rpe"].iloc[0] == pytest.approx(exp_rpe)
+    assert out["rpe_abs"].iloc[0] == pytest.approx(abs(exp_rpe))
+
+
+def test_rpe_is_surprise_relative_to_model_belief():
+    """Directionality that a nominal implementation would NOT satisfy: for equal
+    reward, RPE is larger on a low-belief arm than on a high-belief arm."""
+    q = [0.1, 0.2, 0.3, 0.4, 0.5, 0.9]
+    out = add_experienced_value_columns(
+        _toy_vals(leaves=[1, 6], rewards=[1, 1], q_rows=[q, q])
+    )
+    rpe_low, rpe_high = out["rpe"].iloc[0], out["rpe"].iloc[1]  # arm0 q=.1, arm5 q=.9
+    assert rpe_low > rpe_high
+    assert rpe_low == pytest.approx(0.9) and rpe_high == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize("bad_leaf", [0, 7, -1])
+def test_experienced_value_leaf_guard_raises(bad_leaf):
+    v = _toy_vals([bad_leaf], [1], [[0.5] * 6])
+    with pytest.raises(ValueError, match="leaf outside 1..6"):
+        add_experienced_value_columns(v)
