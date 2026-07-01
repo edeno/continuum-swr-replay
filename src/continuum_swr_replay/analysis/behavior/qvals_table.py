@@ -114,6 +114,10 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
     hmm = _fetch_model_df(rl, subject, HMM_KEY)[[*KEYS, *HMM_COLS]]
     vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
+    # leaf must be 1..6: the fancy-index below would else wrap (leaf=0 -> Q6) or
+    # raise, silently mis-mapping q_chosen / arm.
+    if not vals["leaf"].between(1, 6).all():
+        raise ValueError(f"leaf outside 1..6 for {subject!r}: {sorted(vals['leaf'].unique())}")
     qmat = vals[[f"Q{i}" for i in range(1, 7)]].to_numpy()
     vals["q_chosen"] = qmat[np.arange(len(vals)), vals["leaf"].to_numpy() - 1]
     vals["arm"] = vals["leaf"].to_numpy() - 1
@@ -198,6 +202,9 @@ def main() -> None:
               f"in_poke={100*t['in_poke'].mean():.0f}%  "
               f"arm==current_arm {100*arm_ok:.1f}%  reward==reward_outcome {100*rew_ok:.1f}%  "
               f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*t.attrs['entropy_cov']:.0f}%]")
+        if len(t) / len(st) < 0.90 or arm_ok < 0.95:
+            print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%) or "
+                  f"arm agreement {100*arm_ok:.1f}% (expect ~100%) -- possible mapping regression")
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
     print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")

@@ -25,7 +25,9 @@ keyed by `stop_id` (joins to `stop_table.pkl`).
 | Poke / reward timestamps | `alison_behav.TrialsInfoByEpoch.ByTrial` |
 
 **Model note.** The *paper* uses the HMM (`default_hmm`): belief `α` over 72
-discrete contingency states, `Q = Σ αᵢφᵢ`, reward entropy `−Σ pᵢ log pᵢ`. This
+discrete contingency states, `Q = Σ αᵢφᵢ`, reward entropy `−Σ pᵢ log pᵢ` (Comrie
+et al. Methods, "Behavioral Hidden Markov Model"; the HMM fit lives in DataJoint,
+not this repo). This
 table uses the newer **Beta-Bernoulli** fit (`beta_stable_withleaf`) for the
 value/uncertainty columns (a project decision), and pulls the **HMM** reward/state
 entropy in separately so the entropy covariate matches the paper. The covariate

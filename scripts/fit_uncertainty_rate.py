@@ -120,7 +120,7 @@ POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
 # shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
-# reward_rate is OFF: recent_trial_reward_rate is exactly the mean of
+# reward_rate is OFF: reward_rate_trial_k10 (the reward_rate covariate) is exactly the mean of
 # reward_lag1..10 (corr 1.000, VIF inf), so including it with the reward kernel
 # makes the reward block rank-deficient; the kernel alone carries reward history.
 MU_UNCERTAINTY = PerBinRateModelSpec(
@@ -175,11 +175,14 @@ def fit_uncertainty_rate(
     stop_covariates = (*STOP_COVARIATES, *FITTED_COVARIATES)
 
     rows: list[dict] = []
+    attempted = dict.fromkeys(POPULATIONS_TO_FIT, 0)
+    n_unfit = dict.fromkeys(POPULATIONS_TO_FIT, 0)
     for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
         for outcome in POPULATIONS_TO_FIT:
+            attempted[outcome] += 1
             design = aggregate_to_timebins(
                 stops_g,
                 POPULATIONS[outcome](onsets_g),
@@ -192,6 +195,7 @@ def fit_uncertainty_rate(
             )
             fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
             if fit is None:
+                n_unfit[outcome] += 1
                 logger.info("  %s / %s: unfit", "_".join(map(str, keys)), outcome)
                 continue
             rows.append(
@@ -201,6 +205,15 @@ def fit_uncertainty_rate(
                     **dict(zip(SESSION_COLS, keys, strict=True)),
                     **{k: v for k, v in fit.items() if k != "predicted"},
                 }
+            )
+    # Surface survivor bias: if many (session x population) cells failed to fit,
+    # the median RRs for that population come from a biased survivor subset.
+    for outcome in POPULATIONS_TO_FIT:
+        att, bad = attempted[outcome], n_unfit[outcome]
+        if att and bad:
+            frac = bad / att
+            (logger.warning if frac > 0.2 else logger.info)(
+                "population %s: %d/%d session cells unfit (%.0f%%)", outcome, bad, att, 100 * frac
             )
     return pd.DataFrame(rows)
 
@@ -243,8 +256,13 @@ def main() -> None:
     # Inner join: keep only stops with a parsed contingency row. Sessions the
     # parser did not cover are dropped here explicitly, rather than feeding
     # all-NaN value rows through aggregate + fit only to be listwise-dropped.
+    n_before = len(stop)
     stop = stop.merge(
         contingency[value_cols], on="stop_id", how="inner", validate="many_to_one"
+    )
+    logger.info(
+        "contingency inner-join: %d -> %d stops (%d dropped, no parsed contingency)",
+        n_before, len(stop), n_before - len(stop),
     )
     # Real behavioral-model covariates (qvals_table.pkl). Left join: stops not
     # mapped to a trial (~1-3%, post-final-trial tails) and first-trial DVs stay
@@ -253,14 +271,25 @@ def main() -> None:
     qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = qvals[["stop_id", "rpe", *RL_COVARIATES]].rename(columns={"rpe": "rpe_model"})
     stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
-    # z-score only the RL decision variables (disparate/tiny scale: DeltaV ~0.2,
-    # value updates ~0.05) so their rate ratios are per-SD and comparable. The
-    # nominal block and rpe_model are O(1) and stay per-unit.
-    for c in RL_COVARIATES:
-        stop[c] = (stop[c] - stop[c].mean()) / stop[c].std()
+    # validate= only checks cardinality, not overlap: a stale/mismatched qvals_table
+    # would left-join to all-NaN and silently void every RL covariate.
+    matched = stop["rpe_model"].notna().mean()
+    if matched < 0.5:
+        raise ValueError(
+            f"qvals_table matched only {matched:.1%} of stops -- check stop_id convention"
+        )
+    logger.info("qvals covariates matched %.1f%% of stops", 100 * matched)
     stop = _drop_first_session_per_animal(stop)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
+    # z-score the RL decision variables AFTER the drop/subset so the per-SD scale
+    # is the SD of exactly the rows that get fit (disparate/tiny scale: DeltaV
+    # ~0.2, updates ~0.05). The nominal block + rpe_model stay per-unit.
+    for c in RL_COVARIATES:
+        sd = stop[c].std()
+        if pd.isna(sd) or sd == 0:
+            raise ValueError(f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score")
+        stop[c] = (stop[c] - stop[c].mean()) / sd
 
     n_sessions = stop.groupby(SESSION_COLS).ngroups
     logger.info(
