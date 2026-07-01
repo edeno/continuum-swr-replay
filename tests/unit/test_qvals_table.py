@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
     add_experienced_value_columns,
     assign_stops_to_trials,
+    peri_switch_index,
 )
 
 
@@ -37,6 +38,58 @@ def _toy_times(leaves, ports_pct, *, epoch="02_r1", block=0):
     for i in range(1, 7):
         df[f"p_rew_leaf{i}"] = ports_pct[:, i - 1]
     return pd.DataFrame(df)
+
+
+# ── peri_switch_index (signed trials-to-nearest-switch) ──
+# Concept: +k trials AFTER the nearest switch, -k BEFORE, 0 at a switch; the
+# switch is a between-trial patch change. Oracle values read off the definition.
+
+
+def test_peri_switch_index_hand():
+    # patches switch at index 3 (0->1) and 5 (1->0)
+    patch = np.array([0, 0, 0, 1, 1, 0, 0])
+    tss, isp = peri_switch_index(patch)
+    np.testing.assert_array_equal(tss, [-3, -2, -1, 0, 1, 0, 1])
+    np.testing.assert_array_equal(isp, [0, 0, 0, 1, 1, 1, 1])
+
+
+def test_peri_switch_index_no_switch_is_nan():
+    tss, isp = peri_switch_index(np.array([2, 2, 2, 2]))
+    assert np.isnan(tss).all() and np.isnan(isp).all()
+
+
+def test_peri_switch_index_clips():
+    patch = np.array([0] * 30 + [1])  # switch at idx 30; idx 0 is 30 trials before
+    tss, _ = peri_switch_index(patch, clip=20)
+    assert tss[0] == -20 and tss[30] == 0
+
+
+def test_peri_switch_invariant_property():
+    """CONTRACT for arbitrary patch sequences: at a switch tss==0; magnitude is the
+    trial-distance to the nearest switch; sign is + iff that switch is at/behind."""
+    rng = np.random.default_rng(0)
+    for _ in range(300):
+        patch = rng.integers(0, 3, size=int(rng.integers(2, 40)))
+        tss, isp = peri_switch_index(patch, clip=1000)
+        sw = np.where(np.r_[False, patch[1:] != patch[:-1]])[0]
+        if sw.size == 0:
+            assert np.isnan(tss).all()
+            continue
+        for i in range(len(patch)):
+            dist = np.abs(sw - i).min()
+            assert abs(tss[i]) == dist
+            behind = (sw <= i).any() and (i - sw[sw <= i].max()) <= dist
+            assert bool(isp[i]) == behind
+            if i in sw:
+                assert tss[i] == 0
+
+
+def test_add_nominal_contingency_adds_peri_switch():
+    # leaves 1,1,1,3,3,1,1 -> patches 0,0,0,1,1,0,0 (switch at trial 3 and 5)
+    t = _toy_times([1, 1, 1, 3, 3, 1, 1], [[50] * 6] * 7)
+    out = _add_nominal_contingency(t)
+    assert out["trials_since_switch"].tolist() == [-3, -2, -1, 0, 1, 0, 1]
+    assert out["is_post_switch"].tolist() == [0, 0, 0, 1, 1, 1, 1]
 
 
 def test_per_port_identities_and_patch_value():

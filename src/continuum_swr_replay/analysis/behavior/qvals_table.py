@@ -101,6 +101,9 @@ COVARIATES = [
 # (Alison computes no nominal value-diff -- her decision variables are model-based).
 NOMINAL_COVARIATES = [
     "p_reward_current", "p_reward_best", "value_diff_patch", "trials_since_block_change",
+    # peri-switch trial index (signed distance to the nearest patch switch) +
+    # post-switch indicator; the paper's "trials since switch" axis (Comrie et al Fig 2).
+    "trials_since_switch", "is_post_switch",
     # per-port nominal p(R); the content/contfrag builders map p_reward_port{arm}
     # -> p_reward_arm (attach_contingency_value_block).
     *[f"p_reward_port{i}" for i in range(6)],
@@ -109,13 +112,55 @@ NOMINAL_COVARIATES = [
 WELL_PATCH = np.array([0, 0, 1, 1, 2, 2])
 
 
+def peri_switch_index(patch: np.ndarray, clip: int = 20) -> tuple[np.ndarray, np.ndarray]:
+    """Signed trials-to-nearest-patch-switch + post-switch flag for one epoch.
+
+    A *switch* is a trial whose patch differs from the previous trial's. For each
+    trial, returns its signed distance to the **nearest** switch: ``+k`` if the
+    nearest switch is ``k`` trials behind (post-switch, departing), ``-k`` if it is
+    ``k`` trials ahead (pre-switch, approaching), ``0`` at a switch trial. This is
+    the paper's "trials since Switch trial" axis (Comrie et al. Fig 2), signed so a
+    piecewise-linear fit recovers the pre- and post-switch slopes.
+
+    Parameters
+    ----------
+    patch : np.ndarray, shape (n_trials,)
+        Patch id per trial, in temporal (trial) order.
+    clip : int
+        Clip magnitude to ``[-clip, clip]``.
+
+    Returns
+    -------
+    trials_since_switch, is_post_switch : np.ndarray, each shape (n_trials,)
+        Signed peri-switch index and the post/pre indicator (1 post, 0 pre). Both
+        ``NaN`` when the epoch has no switch (index undefined).
+    """
+    n = len(patch)
+    if n == 0:
+        return np.array([]), np.array([])
+    switch = np.zeros(n, dtype=bool)
+    switch[1:] = patch[1:] != patch[:-1]
+    pos = np.where(switch)[0]
+    if pos.size == 0:
+        return np.full(n, np.nan), np.full(n, np.nan)
+    idx = np.arange(n)
+    li = np.searchsorted(pos, idx, side="right") - 1        # last switch at/before idx
+    since = np.where(li >= 0, idx - pos[np.clip(li, 0, None)], np.inf)
+    ni = np.searchsorted(pos, idx, side="right")            # first switch after idx
+    until = np.where(ni < pos.size, pos[np.clip(ni, 0, pos.size - 1)] - idx, np.inf)
+    post = since <= until                                    # nearest switch is behind (ties -> post)
+    signed = np.clip(np.where(post, since, -until).astype(float), -clip, clip)
+    return signed, post.astype(float)
+
+
 def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
     """Add nominal schedule covariates from p_rew_leaf1..6 (percent) + contingency_count.
 
     p_reward_current / p_reward_best come straight from Alison's nominal p_rew_leaf.
     value_diff_patch = best-minus-second patch mean (patch = the 2 leaves sharing a
-    stem); trials_since_block_change = position within the current contingency block
-    (this project's definitions, computed on the exactly-aligned per-trial rows).
+    stem); trials_since_block_change = position within the current contingency block;
+    trials_since_switch / is_post_switch = signed peri-switch index (see
+    :func:`peri_switch_index`). All on the exactly-aligned per-trial rows.
     """
     times = times.sort_values(
         ["nwb_file_name", "epoch", "trial_number_by_epoch"]
@@ -135,6 +180,16 @@ def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
     times["trials_since_block_change"] = times.groupby(
         ["nwb_file_name", "epoch", "contingency_count"]
     ).cumcount()
+    # peri-switch index: patch = the stem the leaf sits on (WELL_PATCH); a switch is
+    # a between-trial patch change. Computed per epoch on the trial-ordered rows.
+    patch_all = WELL_PATCH[times["leaf"].to_numpy() - 1]
+    tss = np.full(len(times), np.nan)
+    isp = np.full(len(times), np.nan)
+    for _, g in times.groupby(["nwb_file_name", "epoch"], sort=False):
+        rows = g.index.to_numpy()
+        tss[rows], isp[rows] = peri_switch_index(patch_all[rows])
+    times["trials_since_switch"] = tss
+    times["is_post_switch"] = isp
     return times
 
 

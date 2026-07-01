@@ -131,6 +131,62 @@ ripple_power_z ~ scale(reward_lag1) + scale(p_reward_current) + scale(rpe)
                  + scale(q_current) + scale(time_since_stop)
 ```
 
+## Per-bin non-local rate — `is_swr` version (phase-2, first pass)
+
+The primary phase-2 analysis of the **non-local event rate** and its SWR-vs-non-SWR
+dissociation, per bin. Response `count` = non-local onset count per **15 ms bin**;
+`family = poisson(log)`, `offset = log(exposure)`; rows are (stop × bin) to
+`tmax = 4 s`. **Fit per session, aggregate coefficients across sessions** (signed-rank).
+Runner: `scripts/fit_swr_contrast_rate.py` (new).
+
+Shorthands / covariate blocks:
+```
+BASE      := bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4)) + reward_lag1 + REWK_prev + HISTCOS   # = M7r
+REWK_prev := reward_lag2 + ... + reward_lag10          # former trials (dwell-clean)
+HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
+PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch
+CONTEXT   := PERISWITCH + trials_since_block_change + recent_switch_rate
+VALUE     := q_chosen + p_reward_current               # expected value (current reward is in BASE)
+DECISION  := switch_advantage_mu_preoutcome_sess + I(-abs(switch_advantage_mu_preoutcome_sess))
+UNCERT    := reward_entropy + global_mu_update_abs_postoutcome_sess
+             + unchosen_patches_mu_update_abs_postoutcome_sess
+```
+
+### A. Stratified — each formula fit 3× to `NL_all`, `NL_swr`, `NL_noswr`
+Comparing a coefficient across the three populations = the descriptive dissociation.
+
+| model | formula (`count ~ … + offset(log exposure)`) | question |
+|---|---|---|
+| `G0_base` | `BASE` | Does the non-local rate have within-stop time structure, reward-history dependence, and self-history (refractoriness) — separately for all / SWR / non-SWR events? |
+| `G1_context` | `BASE + CONTEXT` | Beyond time/reward/history, does the rate ramp around patch switches (peri-switch) and shift across a contingency block (learning)? |
+| `G2_value` | `BASE + VALUE` | Is the rate modulated by expected value (current-arm belief `q_chosen`, nominal `p_reward_current`)? |
+| `G3_decision` | `BASE + DECISION` | Is the rate higher when switching is favorable (ΔV) or when Stay/Switch values are close (competition, `−|ΔV|`)? |
+| `G4_uncert` | `BASE + UNCERT` | Is the rate higher when reward-state entropy is high or when value is being updated (global / unchosen-patch update magnitude)? |
+| `G5_rl` | `BASE + VALUE + DECISION + UNCERT` | With value, decision, and uncertainty jointly, which task signals retain an association with the rate? |
+| `G6_full` | `BASE + CONTEXT + VALUE + DECISION + UNCERT` | With time/reward/history + context + all RL signals in one model, which task variables independently modulate the rate? |
+
+### B. `is_swr` contrast — pooled two non-local streams (design B)
+`is_swr:X` coefficients are the SWR-vs-non-SWR dissociation tests.
+
+| model | formula (`count ~ … + offset(log exposure)`) | question |
+|---|---|---|
+| `S0_rate` | `is_swr + BASE` | Do SWR-coincident non-local events occur at a different **overall rate** than non-SWR ones, holding the shared time/reward/history structure? |
+| `S1_rew1` | `BASE + is_swr + is_swr:reward_lag1` | Does the **current (consummatory) reward** gate the rate **differently** for SWR vs non-SWR events? (headline reward-gating dissociation) |
+| `S2_base` | `is_swr * BASE` | Do the time-course, reward-history, and self-history each modulate the rate differently by SWR status? |
+| `S3_dwell` | `is_swr * BASE + reward_lag1:bs(tc) + is_swr:reward_lag1:bs(tc)` | Is the current-reward gating a genuine rate effect vs a dwell/time-course-shape artifact, and does that differ by SWR? (robustness) |
+| `S4_context` | `is_swr * (BASE + CONTEXT)` | Does the peri-switch / block (context) modulation of rate differ by SWR? |
+| `S5_value` | `is_swr * (BASE + VALUE)` | Does expected-value modulation of rate differ by SWR? |
+| `S6_decision` | `is_swr * (BASE + DECISION)` | Does the ΔV / value-closeness modulation differ by SWR? |
+| `S7_uncert` | `is_swr * (BASE + UNCERT)` | Does the entropy / value-update modulation differ by SWR? |
+| `S8_full` | `is_swr * (BASE + CONTEXT + VALUE + DECISION + UNCERT)` | With everything in one model, which task modulations of rate are SWR-specific vs shared? |
+
+**Notes.** (1) **Collinearity guard:** `rpe_model = reward_lag1 − q_chosen`, so `rpe` is
+**not** co-fit with both the reward kernel and `q_chosen`; `VALUE` uses `q_chosen`, and an
+RPE variant instead *swaps* `reward_lag1 → rpe_model`. (2) The kernel is split
+`reward_lag1` (current, dwell-confounded) + `REWK_prev` (former, dwell-clean) so the
+current-vs-former gating contrast separates. (3) New covariates required:
+`trials_since_switch` / `is_post_switch` (built in `qvals_table`); all others exist.
+
 ## Phase-2 refit classification
 
 Which specs change under the phase-1/1.5 harmonization (→ coefficients move, true
