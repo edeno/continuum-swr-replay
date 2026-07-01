@@ -41,11 +41,12 @@ from continuum_swr_replay.analysis.replay.tables import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS_DIR = REPO_ROOT / "scripts"
+# The replay-content prep driver moved from scripts/ into the package (ee1eb51).
+PREPARE_DATA = REPO_ROOT / "src/continuum_swr_replay/analysis/replay/prepare_data.py"
 
 
 def _main_function_ast() -> ast.FunctionDef:
-    src = (SCRIPTS_DIR / "prepare_replay_content_data.py").read_text()
+    src = PREPARE_DATA.read_text()
     tree = ast.parse(src)
     return next(
         node

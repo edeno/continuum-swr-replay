@@ -27,12 +27,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
 def _load_function(rel_path: str, name: str) -> ast.FunctionDef:
-    """Return the AST FunctionDef for ``name`` defined in ``rel_path``."""
-    src = (SCRIPTS_DIR / rel_path).read_text()
+    """Return the AST FunctionDef for ``name`` defined in ``rel_path`` (repo-relative)."""
+    src = (REPO_ROOT / rel_path).read_text()
     tree = ast.parse(src)
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == name:
@@ -82,8 +81,14 @@ def _stop_call_index_and_event_return_index(
 @pytest.mark.parametrize(
     ("script", "stop_builder"),
     [
-        ("prepare_replay_content_data.py", "build_stop_table"),
-        ("prepare_contfrag_replay_content_data.py", "build_contfrag_stop_table"),
+        (
+            "src/continuum_swr_replay/analysis/replay/prepare_data.py",
+            "build_stop_table",
+        ),
+        (
+            "scripts/prepare_contfrag_replay_content_data.py",
+            "build_contfrag_stop_table",
+        ),
     ],
 )
 def test_stop_table_built_before_any_early_return_on_empty_event_table(
