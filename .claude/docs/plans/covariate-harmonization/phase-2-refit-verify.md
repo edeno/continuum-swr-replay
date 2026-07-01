@@ -2,6 +2,16 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **STATUS: PARTIAL.** Done: `uncertainty_rate` refit on the regenerated tables; the
+> covariate-accuracy audit + invariant-bounds verification layer landed in
+> [phase-1.5](phase-1.5-behavior-model-covariates.md) (calibration, leakage, coverage,
+> reconstruction, physical bounds) — that satisfies part of the "verify" scope.
+> **Remaining:** re-fit the other families (per-bin rate ladder, per-stop rate,
+> SWR-power, content arm/patch, contfrag SWR/MUA, choice) — their fit pickles are
+> **stale** vs the 2026-07-01 table regen; write `_verify_harmonization_parity.py`
+> (design-matrix identity for unchanged covariates — does not exist yet); refresh the
+> stale claim numbers in `paper/claims_table.md` + the synthesis docs.
+
 Re-fit every family (replay **and** contfrag) on the regenerated canonical tables and
 **verify the harmonization preserved what it should**: unchanged-definition covariates
 reproduce (via design-matrix identity, the strong deterministic guarantee); the

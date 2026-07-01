@@ -8,7 +8,7 @@ Covariate-computation layer (extracted to `covariates.py` in phase-0; definition
 - `_helpers.py:618` `recent_reward_rate_all_events` — per-arm reward rate (**timestamp-driven**: needs `event_times` + `trials` goal-arrival cutoffs); **call with k=10** for `reward_rate_arm_k10`.
 - `_helpers.py:704` `recent_trial_reward_rate` — all-arm 10-trial rate; reuse as-is for `reward_rate_trial_k10` (rename only — assert byte-identical in phase-2).
 - `_helpers.py:814` `_leaky_q_value_diff`, `:883` `add_uncertainty_covariates` — `leaky_q_value_diff` (per-stop margin); **kept** as a reported comparison (D3 revised).
-- `scripts/_bandit_csv_contingency.py:58` `_q_chosen`, `:77` `_fit_alpha` — fitted-α leaky-Q; **promote to `covariates.py` and extend to all-arm `q_arm`/`q_current`** (today only the chosen arm). Unify the existing `q_chosen` name → `q_current`.
+- ~~`scripts/_bandit_csv_contingency.py:58` `_q_chosen`, `:77` `_fit_alpha` — fitted-α leaky-Q; promote to `covariates.py` and extend to all-arm.~~ **SUPERSEDED by [phase-1.5](phase-1.5-behavior-model-covariates.md):** `q_current`/`q_arm` are now the external Beta-Bernoulli **model belief** from DataJoint `qvals_table`, not a promoted leaky-Q. `_bandit_csv_contingency.py` was **deleted** (the nominal block also moved to `qvals_table`). `q_chosen`→`q_current` unification still holds.
 
 Per-arm covariate computation (the canonical home — updated, then **rebuilt**):
 - `tables.py:1247-1252` `build_event_arm_table` covariate batch, and `:1277` `nominal_reward_prob` (deferred NaN → **populated and renamed `p_reward_arm`**; update the `:1646` schema list + the viz registry). Update the builder to emit canonical covariates, then **regenerate the replay canonical tables**. (Rebuild chosen over in-place backfill: the per-arm rate is timestamp-driven and needs `load_data(trials)` regardless — `event_arm_table` does **not** store `event_midpoint_time` — so a rebuild is one clean code path / true single source.)
@@ -28,6 +28,8 @@ Other consumers to sweep (not just fit runners):
 - One canonical definition per construct (per `docs/covariate_dictionary.md`), computed by the table **builders** and written into the canonical tables every family reads — single source.
 - Consolidate covariate code into `covariates.py` (phase-0, behavior-preserving; re-export shim keeps the ~16 importers working).
 - Implement D1–D5 as revised; **harmonize both the replay and contfrag tables**.
+  (D3 update: `q_current`/`q_arm` implemented as the external behavior-model belief
+  from DataJoint `qvals_table` — see [phase-1.5](phase-1.5-behavior-model-covariates.md).)
 - Re-fit all families; prove unchanged-definition covariates reproduce.
 - **One event definition everywhere** (phase 3): the ancillary analyses consume the canonical `is_swr`, not private re-derivations.
 - **No exploratory findings as claims** (phase 4): the content interaction + patch-destination findings move into the audited pipeline with full diagnostics.
@@ -39,7 +41,11 @@ Other consumers to sweep (not just fit runners):
 - No full hierarchical/cluster-robust inference, no reality full-run, no PFC batch rerun (deferred backlog below).
 
 ### Dependency policy
-No new dependencies.
+No new **package** dependencies. Phase-1.5 adds a **data/service dependency**:
+read-only access to Alison's DataJoint schemas (`alison_rlmodel`, `alison_behav`) on
+`lmf-db.cin.ucsf.edu` and the read-only precomputed fits under `/stelmo/alison/`
+(reflected via `dj.create_virtual_module`, so her julia/spyglass module code is not
+imported). **Never write** to `/stelmo/alison`, `/home/alison`, or Alison's schemas.
 
 ## Folded-in audit findings (`.claude/review/`)
 

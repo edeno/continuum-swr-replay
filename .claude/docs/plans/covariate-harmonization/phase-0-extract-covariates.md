@@ -2,6 +2,8 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **STATUS: COMPLETE, merged to `master` at `54e9ed7` (2026-06-29).**
+
 A pure **move**: consolidate the covariate-definition functions (today scattered in
 the 1,226-line `_helpers.py` grab-bag) and the Q-learner (today in a scratch script)
 into one purpose-named module `covariates.py`, with a re-export shim so nothing else

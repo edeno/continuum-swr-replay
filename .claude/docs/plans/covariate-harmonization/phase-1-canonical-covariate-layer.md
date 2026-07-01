@@ -2,6 +2,15 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **STATUS: COMPLETE** on branch `covar-harmon-phase1-definitions` (unmerged).
+> Canonical definitions + both builders + table regen + specs/runners/tests + smoke
+> fits all done. **D3 deviation:** `q_current`/`q_arm` were implemented as the external
+> behavior-model belief (DataJoint `qvals_table`), not a promoted fitted-α leaky-Q, and
+> the nominal block also moved there — see
+> [phase-1.5](phase-1.5-behavior-model-covariates.md). The task text below is the
+> original intent; where it says "fitted-α leaky-Q" / "promote `_bandit_csv_contingency`",
+> phase-1.5 is what actually shipped.
+
 Change the covariate definitions in `covariates.py` (created in phase-0) to canonical
 (D1–D5 as revised), update **both** table builders (replay + contfrag) to emit them,
 **regenerate** the canonical tables (reusing existing decodes — no re-decode), and

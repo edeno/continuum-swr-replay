@@ -2,6 +2,11 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **STATUS: NOT started.** Depends on phase-2 (the refit). Note: the content scripts
+> this phase promotes (`_content_reward_interactions.py`, `_covariate_ranking.py`) were
+> already migrated to `qvals_table` in phase-1.5, but still lack the audited diagnostics
+> (SE/p/VIF/FDR/provenance) this phase requires.
+
 Two of this session's content findings live in scratch scripts that fit per-session
 and save **only coefficient medians** — dropping `n_events`, standard errors,
 p-values, within-group-centered VIF/condition number, FDR across the family, and

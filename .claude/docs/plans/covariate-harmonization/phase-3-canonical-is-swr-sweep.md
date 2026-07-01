@@ -2,6 +2,9 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **STATUS: NOT started.** Independent of phases 0–2/1.5 (only swaps the event/`is_swr`
+> source in ancillary analyses); can proceed in parallel.
+
 Every paper claim should rest on **one** event definition. The canonical non-local
 event set and its SWR-overlap label come from
 `build_classified_nonlocal_event_table` — events over the full non-local label
