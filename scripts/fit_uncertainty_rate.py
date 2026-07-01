@@ -67,25 +67,23 @@ logger = logging.getLogger(__name__)
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 
-# The value block merged from the contingency table (schema-bound). q_current is
-# the fitted-alpha leaky-Q level of the chosen arm (per-animal alpha; the
-# experienced-value covariate, covariate_dictionary.md D3).
+# Nominal value columns merged from the contingency table. The stand-ins the real
+# model replaces (nominal rpe -> rpe_model, leaky q_current -> DeltaV) are no
+# longer merged; only the columns the model fits are.
 VALUE_COVARIATES = (
     "p_reward_current",
-    "rpe",
     "value_diff_patch",
     "trials_since_block_change",
-    "q_current",
 )
 
-# Nominal / model-free block (per-unit; these covariates are O(1) and
-# interpretable). We prefer the real behavioral model over stand-ins, so the
-# leaky-Q q_current and the nominal rpe are replaced by q_chosen / rpe_model
-# below. value_diff_patch is KEPT: it is the nominal best-minus-second patch value
-# and is orthogonal to the model DeltaV (r=-0.04), so it carries independent
-# information (an earlier drop assuming redundancy was wrong). Excluded for
-# collinearity: wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with
-# the reward_lag1 kernel).
+# Nominal / model-free block (per-unit; these covariates are O(1) and are the
+# task schedule + raw behavior, NOT the behavioral model). We prefer the real
+# model over stand-ins, so the leaky-Q q_current is replaced by the model DeltaV
+# (switch_advantage) and the nominal rpe by rpe_model below. value_diff_patch is
+# KEPT: it is the nominal best-minus-second patch value from the schedule and is
+# orthogonal to the model DeltaV (r=-0.04), so it carries independent information
+# (an earlier drop assuming redundancy was wrong). Excluded for collinearity:
+# wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with reward_lag1).
 CURATED_COVARIATES = (
     "p_reward_current",
     "value_diff_patch",
@@ -218,9 +216,6 @@ def main() -> None:
     parser.add_argument(
         "--switch-window", type=int, default=5, help="recent_switch_rate window."
     )
-    parser.add_argument(
-        "--q-alpha", type=float, default=0.3, help="leaky_q_value_diff learning rate."
-    )
     args = parser.parse_args()
 
     t0 = time.perf_counter()
@@ -234,9 +229,10 @@ def main() -> None:
         pd.read_pickle(RC / "event_table.pkl"),
     )
 
-    stop = add_uncertainty_covariates(
-        stop, switch_window=args.switch_window, q_alpha=args.q_alpha
-    )
+    # add_uncertainty_covariates supplies recent_switch_rate (the only one still
+    # fit); its leaky_q_value_diff / omission_streak / wsls_deviation stand-ins are
+    # no longer used here.
+    stop = add_uncertainty_covariates(stop, switch_window=args.switch_window)
     value_cols = [
         "stop_id",
         *VALUE_COVARIATES,
@@ -259,7 +255,7 @@ def main() -> None:
     stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
     # z-score only the RL decision variables (disparate/tiny scale: DeltaV ~0.2,
     # value updates ~0.05) so their rate ratios are per-SD and comparable. The
-    # nominal block and q_chosen / rpe_model are O(1) and stay per-unit.
+    # nominal block and rpe_model are O(1) and stay per-unit.
     for c in RL_COVARIATES:
         stop[c] = (stop[c] - stop[c].mean()) / stop[c].std()
     stop = _drop_first_session_per_animal(stop)
@@ -269,13 +265,12 @@ def main() -> None:
     n_sessions = stop.groupby(SESSION_COLS).ngroups
     logger.info(
         "Fitting %s over %d sessions x %s populations (BIN_S=%.3f, "
-        "switch_window=%d, q_alpha=%.2f)...",
+        "switch_window=%d)...",
         MU_UNCERTAINTY.name,
         n_sessions,
         list(POPULATIONS_TO_FIT),
         BIN_S,
         args.switch_window,
-        args.q_alpha,
     )
     models = fit_uncertainty_rate(stop, onsets)
 
