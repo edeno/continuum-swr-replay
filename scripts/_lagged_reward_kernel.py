@@ -22,10 +22,11 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
-from continuum_swr_replay.analysis.replay.rate_model import fit_rate_model  # noqa: E402
-
 from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
     _trial_cutoff_times,
+)
+from continuum_swr_replay.analysis.replay.per_stop_rate_model import (  # noqa: E402
+    fit_per_stop_rate_model,
 )
 from continuum_swr_replay.analysis.replay.prepare_data import (  # noqa: E402
     find_sessions,
@@ -84,7 +85,7 @@ def main() -> None:
         for j in range(K):
             grp[f"reward_lag{j + 1}"] = lags[:, j]
         for outcome, col in [("swr", "n_SWR"), ("non_local_no_swr", "n_non_local_no_SWR")]:
-            res = fit_rate_model(grp, preds, response_col=col)
+            res = fit_per_stop_rate_model(grp, preds, response_col=col)
             if res is not None:
                 rows.append({"outcome": outcome, "animal": animal, **res})
     df = pd.DataFrame(rows)
