@@ -187,9 +187,9 @@ def test_drop_first_session_per_animal():
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
 
-    Requires ``contingency_table_csv.pkl`` and ``qvals_table.pkl`` alongside the
-    canonical tables. Writes ``uncertainty_rate_smoke.pkl`` and checks the tidy
-    schema carries every uncertainty/value coefficient across the three populations.
+    Requires ``qvals_table.pkl`` alongside the canonical tables. Writes
+    ``uncertainty_rate_smoke.pkl`` and checks the tidy schema carries every
+    uncertainty/value coefficient across the three populations.
     """
     from continuum_swr_replay.analysis.replay import (
         N_REWARD_LAGS,
@@ -198,13 +198,7 @@ def test_runner_smoke():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
     rc = PROCESSED_DATA_DIR / "replay_content"
-    contingency_path = rc / "models_per_bin_rate" / "contingency_table_csv.pkl"
     qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
-    if not contingency_path.exists():
-        pytest.skip(
-            "contingency_table_csv.pkl not present "
-            "(run scripts/_bandit_csv_contingency.py first)"
-        )
     if not qvals_path.exists():
         pytest.skip(
             "qvals_table.pkl not present "
@@ -212,27 +206,21 @@ def test_runner_smoke():
         )
 
     stop = pd.read_pickle(rc / "stop_table.pkl")
-    contingency = pd.read_pickle(contingency_path)
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(rc / "event_onset_table.pkl"),
         pd.read_pickle(rc / "event_table.pkl"),
     )
 
     stop = add_uncertainty_covariates(stop)
-    stop = stop.merge(
-        contingency[["stop_id", *fur.VALUE_COVARIATES]],
-        on="stop_id",
-        how="inner",  # restrict to the parsed sessions
-        validate="many_to_one",
-    )
-    # Behavioral-model covariates (rpe_model + RL decision variables) come from
-    # qvals_table.pkl, mirroring the runner's main(); without them the fit's
-    # FITTED_COVARIATES would be absent from the design.
+    # Nominal schedule + real model covariates, all from qvals_table -- one
+    # exactly poke_out-aligned source, mirroring the runner's main().
     qvals = pd.read_pickle(qvals_path)
-    qcols = qvals[["stop_id", "rpe", *fur.RL_COVARIATES]].rename(
+    qcols = qvals[["stop_id", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]].rename(
         columns={"rpe": "rpe_model"}
     )
-    stop = stop.merge(qcols, on="stop_id", how="left", validate="many_to_one")
+    stop = stop.merge(
+        qcols, on="stop_id", how="inner", validate="many_to_one"
+    )
     stop = fur._drop_first_session_per_animal(stop)
     stop = fur._subset_max_per_animal(stop, 1)
 

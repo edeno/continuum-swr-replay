@@ -233,22 +233,22 @@ def main():
     sessions = find_sessions(max_per_animal=max_per_animal)
     logging.info("Found %d sessions", len(sessions))
 
-    # Per-stop contingency artifact (per-arm nominal value + leaky-Q level),
-    # keyed by stop_id. The event-arm builder maps p_reward_port/q_port -> the
-    # per-arm p_reward_arm / q_arm. Absent -> those columns stay NaN.
-    contingency_path = (
-        OUTPUT_DIR / "models_per_bin_rate" / "contingency_table_csv.pkl"
-    )
+    # Per-stop value artifact (per-arm nominal p(R) + per-arm model value),
+    # keyed by stop_id, from qvals_table (exact poke_out alignment -- no difflib).
+    # The event-arm builder maps p_reward_port/q_port -> the per-arm
+    # p_reward_arm / q_arm; q_port is now the beta-model belief per port (was
+    # leaky-Q). Absent -> those columns stay NaN.
+    contingency_path = OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
     contingency = None
     if contingency_path.exists():
         contingency = pd.read_pickle(contingency_path)
         logging.info(
-            "loaded contingency (%d stop rows) for p_reward_arm / q_arm",
+            "loaded qvals_table (%d stop rows) for p_reward_arm / q_arm",
             len(contingency),
         )
     else:
         logging.warning(
-            "no contingency at %s — p_reward_arm / q_arm will be NaN",
+            "no qvals_table at %s — p_reward_arm / q_arm will be NaN",
             contingency_path,
         )
 

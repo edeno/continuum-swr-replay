@@ -62,16 +62,17 @@ logger = logging.getLogger(__name__)
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
-# Value cols merged from the canonical CSV contingency table (incl. subjective Q).
+# Value cols merged from qvals_table (exact poke_out alignment). rpe/q_current
+# are the beta-model experienced value (rpe = R - q_chosen; q_current = q_chosen).
 VALUE_COLS = ("p_reward_current", "rpe", "value_diff_patch",
-              "trials_since_block_change", "q_current", "q_rpe")
-# Focused head-to-head: nominal (true current) vs subjective (learned/belief) value,
-# plus the robust exploration axis. leaky_q / trials_since_block dropped (null).
+              "trials_since_block_change", "q_current")
+# Focused head-to-head: nominal (true current) vs subjective (model belief) value,
+# plus the robust exploration axis. leaky_q / trials_since_block dropped (null);
+# q_rpe retired (leaky-Q artifact; model rpe already == R - q_chosen).
 CANDIDATES = (
     "p_reward_current",
     "rpe",
     "q_current",
-    "q_rpe",
     "recent_switch_rate",
     "value_diff_patch",
 )
@@ -125,7 +126,8 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
+    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = cont.rename(columns={"q_chosen": "q_current"})
     stop = stop.merge(
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
     )

@@ -74,6 +74,9 @@ COVARIATES = [
     # expected value (per port / patch / belief mean)
     *[f"Q{i}" for i in range(1, 7)], *[f"Qstem{i}" for i in range(1, 4)],
     *[f"betadist_mu{i}" for i in range(1, 7)],
+    # per-port model value (alias of Q1..6, 0-indexed) for the content/contfrag
+    # builders: q_port{arm} -> q_arm (attach_contingency_value_block).
+    *[f"q_port{i}" for i in range(6)],
     # decision variables: Stay / Switch / Relative (DeltaV)
     "stay_sibling_mu_preoutcome_sess", "best_other_patch_mean_mu_preoutcome_sess",
     "switch_advantage_mu_preoutcome_sess", "switch_advantage_preoutcome_sess_Qstem",
@@ -100,6 +103,9 @@ COVARIATES = [
 # (Alison computes no nominal value-diff -- her decision variables are model-based).
 NOMINAL_COVARIATES = [
     "p_reward_current", "p_reward_best", "value_diff_patch", "trials_since_block_change",
+    # per-port nominal p(R); the content/contfrag builders map p_reward_port{arm}
+    # -> p_reward_arm (attach_contingency_value_block).
+    *[f"p_reward_port{i}" for i in range(6)],
 ]
 # leaf 1-6 (0-indexed arm) -> patch (WELL_PATCH_MAPPING); for the nominal patch value.
 WELL_PATCH = np.array([0, 0, 1, 1, 2, 2])
@@ -116,10 +122,15 @@ def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
     times = times.sort_values(
         ["nwb_file_name", "epoch", "trial_number_by_epoch"]
     ).reset_index(drop=True)
+    # guard the fancy-index below (ports[arange, leaf-1]); leaf must be 1..6.
+    if not times["leaf"].between(1, 6).all():
+        raise ValueError(f"times leaf outside 1..6: {sorted(times['leaf'].unique())}")
     ports = times[[f"p_rew_leaf{i}" for i in range(1, 7)]].to_numpy(dtype=float) / 100.0
     arm = times["leaf"].to_numpy() - 1
     times["p_reward_current"] = ports[np.arange(len(times)), arm]
     times["p_reward_best"] = ports.max(axis=1)
+    for i in range(6):
+        times[f"p_reward_port{i}"] = ports[:, i]  # per-port nominal p(R)
     patch_val = np.stack([ports[:, WELL_PATCH == p].mean(axis=1) for p in range(3)], axis=1)
     srt = np.sort(patch_val, axis=1)
     times["value_diff_patch"] = srt[:, -1] - srt[:, -2]
@@ -156,6 +167,8 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     qmat = vals[[f"Q{i}" for i in range(1, 7)]].to_numpy()
     vals["q_chosen"] = qmat[np.arange(len(vals)), vals["leaf"].to_numpy() - 1]
     vals["arm"] = vals["leaf"].to_numpy() - 1
+    for i in range(6):
+        vals[f"q_port{i}"] = qmat[:, i]  # per-port model value (Q{i+1}), for q_arm
     vals["rpe"] = vals["reward"].to_numpy() - vals["q_chosen"].to_numpy()
     vals["rpe_abs"] = vals["rpe"].abs()
     model_cols = [c for c in COVARIATES if c in vals.columns]

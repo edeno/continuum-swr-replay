@@ -4,8 +4,9 @@
 Covers every covariate that enters a replay model family (content arm/patch,
 per-stop rate A, per-bin rate B, choice, MU) as it lives in the canonical
 tables: ``stop_table``, ``event_arm_table``, ``event_patch_table``, and the
-``contingency_table_csv`` value block. The behavioral-model (RL/qvals) block has
-its own checker, ``_verify_qvals_invariants.py``.
+``qvals_table`` value block (nominal p(R) + model Q per port). The
+behavioral-model (RL/qvals) block has its own checker,
+``_verify_qvals_invariants.py``.
 
 Tiers:
   HARD  — must hold exactly (ranges, NaN policy, per-event structure, dtypes).
@@ -146,18 +147,18 @@ def main() -> int:
     check("H", "cumulative_reward_patch >= 0", np.nanmin(ep["cumulative_reward_patch"]) >= 0, "")
     check("H", "patch_count_hard >= 0", (ep["patch_count_hard"].to_numpy() >= 0).all(), "")
 
-    # ================= contingency_table_csv =================
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
-    print("\n### contingency_table_csv (nominal + model value block) ###")
+    # ================= qvals_table value block =================
+    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    print("\n### qvals_table (nominal + model value block) ###")
     check("H", "stop_id unique", cont["stop_id"].is_unique,
           f"{cont['stop_id'].nunique()}/{len(cont)}")
     pv = cont[[f"p_reward_port{i}" for i in range(6)]].to_numpy()
     check("H", "p_reward_port in [0,1]", in01(pv),
           f"task probs={sorted(np.unique(pv[~np.isnan(pv)]))}")
     check("H", "p_reward_current in [0,1]", in01(cont["p_reward_current"].to_numpy()), "")
-    check("H", "q_port / q_current in [0,1]",
+    check("H", "q_port / q_chosen in [0,1]",
           in01(cont[[f"q_port{i}" for i in range(6)]].to_numpy())
-          and in01(cont["q_current"].to_numpy()), "")
+          and in01(cont["q_chosen"].to_numpy()), "")
     check("H", "trials_since_block_change >= 0",
           np.nanmin(cont["trials_since_block_change"]) >= 0, "")
     for c in ["rpe", "value_diff_patch"]:

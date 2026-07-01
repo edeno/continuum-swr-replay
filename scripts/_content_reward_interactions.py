@@ -48,7 +48,7 @@ def _assemble() -> pd.DataFrame:
     ev = pd.read_pickle(RC / "event_arm_table.pkl")
     add_arm_fixed_effects(ev)
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "contingency_table_csv.pkl")
+    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     ev = ev.merge(stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
                   on="stop_id", how="left")
     ev = ev.merge(cont[["stop_id", "p_reward_current"]], on="stop_id", how="left")

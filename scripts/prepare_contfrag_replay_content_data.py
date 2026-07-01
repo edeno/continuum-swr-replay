@@ -289,20 +289,20 @@ def main():
     all_event_arm_tables: list[pd.DataFrame] = []
     all_stop_tables: list[pd.DataFrame] = []
 
-    # Shared per-stop contingency artifact (built from the replay stop_table).
+    # Shared per-stop value artifact (qvals_table, exact poke_out alignment).
     # ContFrag's own stop_id mixes in brain_area/event_source, so the builder
     # recomputes the plain (animal,day,epoch,stop_idx) hash for the join.
     contingency_path = (
         PROCESSED_DATA_DIR
         / "replay_content"
         / "models_per_bin_rate"
-        / "contingency_table_csv.pkl"
+        / "qvals_table.pkl"
     )
     contingency = (
         pd.read_pickle(contingency_path) if contingency_path.exists() else None
     )
     if contingency is None:
-        logging.warning("no contingency — contfrag p_reward_arm / q_arm will be NaN")
+        logging.warning("no qvals_table — contfrag p_reward_arm / q_arm will be NaN")
 
     skipped: list[tuple[str, str, str]] = []
     for i, session in enumerate(sessions):
