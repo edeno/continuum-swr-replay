@@ -147,9 +147,9 @@ REWK_prev := reward_lag2 + ... + reward_lag10          # former trials (dwell-cl
 HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch
 CONTEXT   := PERISWITCH + trials_since_block_change + recent_switch_rate
-VALUE     := hmm_relative_value        # relative value ΔV (value+decision; q_chosen/ΔV are r=-0.89 -> one covariate)
-RPE       := hmm_rpe                    # reward - Q_current_leaf (HMM)
-UNCERT    := reward_entropy            # HMM reward-state entropy (outcome uncertainty)
+VALUE     := hmm_relative_value        # relative value ΔV (paper's single value+decision axis; see Note 2)
+RPE       := hmm_rpe                    # reward - Q_current_leaf (HMM; unscaled canonical RPE, see Note 6)
+UNCERT    := reward_entropy            # HMM native reward-state entropy; NOT the port-specific reward_entropy_current_leaf (see Note 4)
 UPDATE    := hmm_value_update          # global value update Σ_leaf|ΔQ| (HMM)
 ```
 
@@ -186,16 +186,24 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 paper's HMM (`default_hmm`) — `hmm_relative_value` / `hmm_rpe` / `hmm_value_update`
 (ported from Alison's `add_rpe_deltaq_to_hmm_plus` onto native HMM `Q`) + native
 `reward_entropy` — so we don't mix the beta model's ΔV with HMM entropy. (2) **Value
-and decision are one dimension:** `q_chosen` and ΔV are r=−0.89 collinear, so the
-single `hmm_relative_value` represents both (VALUE); `q_chosen` is a robustness
-re-param, not co-fit. (3) The reward kernel is split `reward_lag1` (current,
+and decision are one dimension:** the paper fits a single relative-value axis (ΔV),
+not separate value and decision covariates, so we follow it with the single
+`hmm_relative_value`. Empirically this is corroborated cross-model: the beta model's
+`q_chosen` and HMM ΔV are r=−0.67 collinear (measured on the production table, n≈103k;
+a cross-model correlation, not the paper's intra-model value/decision collinearity).
+`q_chosen` is a robustness re-param, not co-fit. (3) The reward kernel is split `reward_lag1` (current,
 dwell-confounded) + `REWK_prev` (former, dwell-clean) so the current-vs-former gating
-contrast separates. (4) `reward_entropy` is the HMM's reward-state entropy; the paper's
-port-specific `reward_entropy_current_leaf` is absent from the trials-aligned fit
-(a follow-up if the exact variant is wanted). (5) Per-session fit + across-session
-signed-rank (no random effects); the highest-dim `G6_all`/`G7_full`/`S8_all` are
-underpowered on low-event sessions and drop out (tallied), so read the single-dimension
-rungs as primary.
+contrast separates. (4) `reward_entropy` is the HMM's native reward-state entropy; the
+paper's port-specific `reward_entropy_current_leaf` is not in the trials-aligned fit and
+appears only in Alison's exploratory notebooks (not `rl_helpers.py`), so whether it is a
+clean reproducible column is unconfirmed — a follow-up if the exact variant is wanted.
+(5) Per-session fit + across-session signed-rank (no random effects); the highest-dim
+`G6_all`/`G7_full`/`S8_all` are underpowered on low-event sessions and drop out (tallied),
+so read the single-dimension rungs as primary. (6) **RPE is the unscaled canonical
+`reward − Q_leaf`.** Alison rescales Q before subtracting (`(Q+0.6)/1.25`, a cosmetic
+"get into 0–1 zone" transform), yielding `reward − 0.8·Q_leaf − 0.48` — *not* an affine
+transform of `reward − Q_leaf` (it reweights Q vs reward). We deliberately fit the
+textbook RPE, not the plotting-rescaled variant.
 
 ## Phase-2 refit classification
 

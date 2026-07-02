@@ -237,8 +237,13 @@ def add_hmm_decision_variables(hmm: pd.DataFrame) -> pd.DataFrame:
 
     - ``hmm_relative_value`` -- ΔV: mean of the other stems minus the initial
       (starting) stem value, ``(ΣQstem - Qstem_initial)/2 - Qstem_initial`` (Fig 1F).
-    - ``hmm_rpe`` -- ``reward - Q_current_leaf`` (Fig 5; Alison's extra affine
-      rescale of Q is a display convenience, irrelevant to a GLM coefficient).
+    - ``hmm_rpe`` -- the canonical RPE ``reward - Q_current_leaf`` (Fig 5).
+      Alison additionally rescales Q *before* the subtraction
+      (``(Q_leaf + 0.6) / 1.25``, her own "forced rescaling to get in zone of
+      0 to 1"), giving ``reward - 0.8*Q_leaf - 0.48``. That is a cosmetic
+      display transform, NOT an affine transform of ``reward - Q_leaf`` (it
+      reweights Q relative to reward), so we deliberately use the unscaled
+      textbook RPE here rather than reproduce the plotting rescale.
     - ``hmm_value_update`` -- global update ``Σ_leaf |Q_leaf(t+1) - Q_leaf(t)|``
       (``delta_Qglobal_t_abs``, Fig 5D-right); NaN on the last trial of an epoch.
 
@@ -246,9 +251,29 @@ def add_hmm_decision_variables(hmm: pd.DataFrame) -> pd.DataFrame:
     not computed here.) Requires ``default_hmm`` native cols (``Q1..6``, ``Qstem1..3``,
     ``leaf``, ``stemchoice``, ``reward``) + KEYS. Per-epoch (no cross-epoch bleed).
     """
+    required = [
+        *[f"Q{i}" for i in range(1, 7)],
+        *[f"Qstem{i}" for i in range(1, 4)],
+        "leaf",
+        "stemchoice",
+        "reward",
+    ]
+    missing = [c for c in required if c not in hmm.columns]
+    if missing:
+        raise ValueError(
+            f"HMM fit (default_hmm) missing native cols {missing}; wrong "
+            "BehaviorModelResults fit restriction?"
+        )
     d = hmm.sort_values(KEYS).reset_index(drop=True)
+    # leaf/stemchoice index into length-6/length-3 Q arrays as `x - 1`; an
+    # out-of-range value would silently wrap (0 -> -1 -> last column) or
+    # truncate a float, corrupting the value covariate with no error. Guard
+    # both, allowing the first-trial NaN that stemchoice.shift() introduces.
     if not d["leaf"].between(1, 6).all():
         raise ValueError(f"HMM leaf outside 1..6: {sorted(d['leaf'].unique())}")
+    sc = d["stemchoice"].dropna()
+    if not sc.between(1, 3).all():
+        raise ValueError(f"HMM stemchoice outside 1..3: {sorted(sc.unique())}")
     g = d.groupby(["nwb_file_name", "epoch"], sort=False)
     qmat = d[[f"Q{i}" for i in range(1, 7)]].to_numpy()
     leaf = d["leaf"].to_numpy().astype(int)

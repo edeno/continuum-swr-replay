@@ -11,14 +11,18 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
     per-bin designs are STACKED (identical (stop,bin) rows + covariates, differing
     only in `count`), tagged by `is_swr`, and `is_swr:X` interactions test whether a
     task effect differs by SWR status. Self-history (`hist_rcos_*`) is stream-specific
-    by construction; time/reward/task covariates are shared across the two rows of a
-    bin. The within-bin pairing is carried by the per-session fit + across-session
-    aggregation (no GLMM), matching the rest of Family B.
+    only in its raw per-stream values; it is still wrapped inside `is_swr * BASE`
+    (S2-S8), so `is_swr:hist_rcos_k` refractoriness-by-SWR interactions ARE fit.
+    Time/reward/task covariates are shared across the two rows of a bin. The within-bin
+    pairing is carried by the per-session fit + across-session aggregation (no GLMM),
+    matching the rest of Family B.
 
 Covariate blocks BASE/CONTEXT/VALUE/RPE/UNCERT/UPDATE are defined below. The task
 dimensions are the paper's (Comrie et al.), all from ONE model (`default_hmm`):
-relative value (`hmm_relative_value`; value+decision are r=-0.89 collinear, so one
-covariate), RPE, upcoming-port entropy, global value update; + CONTEXT (peri-switch/
+relative value (`hmm_relative_value`; the paper's single value+decision axis, cross-model
+corroborated by q_chosen/ΔV r=-0.67), RPE (unscaled `reward - Q_leaf`), HMM reward-state
+entropy (native `reward_entropy`, not the port-specific variant), global value update;
++ CONTEXT (peri-switch/
 block) from `qvals_table` and `recent_switch_rate` from `add_uncertainty_covariates`.
 One tidy row per (population, model, session); aggregate across sessions (signed-rank).
 
@@ -76,9 +80,9 @@ _REWK_PREV = " + ".join(f"reward_lag{j}" for j in range(2, N_REWARD_LAGS + 1))
 _HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
 
 # Canonical dimensions are the PAPER's variables, all from one model (default_hmm):
-# relative value (value+decision, collapsed -- q_chosen/ΔV are r=-0.89 collinear),
-# RPE, reward entropy, global value update (Comrie et al. Fig 1/5). Each is one
-# param (no collinearity), + BASE nuisance controls + CONTEXT (peri-switch/block).
+# relative value (the paper's single value+decision axis; cross-model q_chosen/ΔV
+# r=-0.67), RPE, native reward entropy, global value update (Comrie et al. Fig 1/5).
+# Each is one param (no collinearity), + BASE nuisance controls + CONTEXT (peri-switch/block).
 # block formula (patsy) + the raw columns it needs present (for NaN-drop)
 _BLOCK_F = {
     "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",

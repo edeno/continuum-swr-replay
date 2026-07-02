@@ -250,17 +250,63 @@ def test_hmm_decision_variables_hand():
     np.testing.assert_allclose(out["hmm_relative_value"].to_numpy(), [np.nan, 14.0, -14.0])
 
 
-def test_hmm_value_update_no_cross_epoch_bleed():
-    # two epochs; the last trial of each epoch -> NaN update (no diff into next epoch)
-    hmm = pd.DataFrame({
+def _hmm_two_epoch():
+    # two epochs, two trials each; Qstem constant so relative value is defined (0)
+    # on every non-first trial and its NaN-ness is driven purely by the shift.
+    return pd.DataFrame({
         "nwb_file_name": ["x_.nwb"] * 4, "epoch": [2, 2, 4, 4],
         "trial_number_by_epoch": [0, 1, 0, 1],
         **{f"Q{i}": [i, i + 1, i + 5, i + 5] for i in range(1, 7)},
         **{f"Qstem{i}": [1.0, 1.0, 1.0, 1.0] for i in range(1, 4)},
         "leaf": [1, 2, 3, 4], "stemchoice": [1, 2, 3, 1], "reward": [1, 0, 1, 0],
-        "reward_entropy_current_leaf": [0.1, 0.2, 0.3, 0.4],
     })
-    out = add_hmm_decision_variables(hmm)
+
+
+def test_hmm_value_update_no_cross_epoch_bleed():
+    # last trial of each epoch -> NaN update (no diff into the next epoch)
+    out = add_hmm_decision_variables(_hmm_two_epoch())
     u = out.sort_values(["epoch", "trial_number_by_epoch"])["hmm_value_update"].to_numpy()
     assert np.isnan(u[1]) and np.isnan(u[3])  # last trial of each epoch
     assert np.isfinite(u[0]) and np.isfinite(u[2])
+
+
+def test_hmm_relative_value_no_cross_epoch_bleed():
+    # relative value uses stemchoice.shift() *within* epoch -> the first trial of
+    # EACH epoch is NaN (the shift must reset at the epoch boundary, not carry
+    # epoch-2's last stemchoice into epoch-4's first trial).
+    out = add_hmm_decision_variables(_hmm_two_epoch())
+    rv = out.sort_values(["epoch", "trial_number_by_epoch"])["hmm_relative_value"].to_numpy()
+    assert np.isnan(rv[0]) and np.isnan(rv[2])  # first trial of each epoch
+    assert np.isfinite(rv[1]) and np.isfinite(rv[3])
+
+
+def test_hmm_sort_before_shift_is_order_invariant():
+    # add_hmm_decision_variables sorts by KEYS first, so a shuffled input must give
+    # the same per-row result as the sorted input (shift() would corrupt otherwise).
+    hmm = _hmm_two_epoch()
+    ref = add_hmm_decision_variables(hmm)
+    got = add_hmm_decision_variables(hmm.iloc[[3, 0, 2, 1]].reset_index(drop=True))
+    keys = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
+    merged = ref.merge(got, on=keys, suffixes=("_r", "_g"))
+    for c in ["hmm_rpe", "hmm_value_update", "hmm_relative_value"]:
+        np.testing.assert_allclose(merged[f"{c}_r"], merged[f"{c}_g"], equal_nan=True)
+
+
+def test_hmm_leaf_guard():
+    hmm = _hmm_two_epoch()
+    hmm.loc[0, "leaf"] = 0  # would wrap to Q6 without the guard
+    with pytest.raises(ValueError, match="leaf outside 1..6"):
+        add_hmm_decision_variables(hmm)
+
+
+def test_hmm_stemchoice_guard():
+    hmm = _hmm_two_epoch()
+    hmm.loc[1, "stemchoice"] = 0  # would negative-index-wrap to Qstem3 without the guard
+    with pytest.raises(ValueError, match="stemchoice outside 1..3"):
+        add_hmm_decision_variables(hmm)
+
+
+def test_hmm_missing_native_col_raises():
+    hmm = _hmm_two_epoch().drop(columns=["Qstem2"])
+    with pytest.raises(ValueError, match="missing native cols"):
+        add_hmm_decision_variables(hmm)
