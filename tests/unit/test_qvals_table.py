@@ -15,6 +15,7 @@ import pytest
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
     add_experienced_value_columns,
+    add_hmm_decision_variables,
     assign_stops_to_trials,
     peri_switch_index,
 )
@@ -224,3 +225,42 @@ def test_experienced_value_leaf_guard_raises(bad_leaf):
     v = _toy_vals([bad_leaf], [1], [[0.5] * 6])
     with pytest.raises(ValueError, match="leaf outside 1..6"):
         add_experienced_value_columns(v)
+
+
+# ── add_hmm_decision_variables (paper-faithful HMM DVs) ──
+# Concept: RPE = reward - Q[leaf]; value update = Σ|Q(t+1)-Q(t)|; relative value =
+# mean(other stems) - initial stem. Oracle values hand-computed.
+
+
+def test_hmm_decision_variables_hand():
+    hmm = pd.DataFrame({
+        "nwb_file_name": ["x_.nwb"] * 3, "epoch": [2] * 3, "trial_number_by_epoch": [0, 1, 2],
+        "Q1": [1, 1, 2], "Q2": [2, 2, 2], "Q3": [3, 3, 3], "Q4": [4, 4, 4],
+        "Q5": [5, 5, 5], "Q6": [6, 7, 7],
+        "Qstem1": [10, 11, 11], "Qstem2": [20, 20, 21], "Qstem3": [30, 30, 30],
+        "leaf": [2, 6, 1], "stemchoice": [1, 3, 2], "reward": [1, 0, 1],
+    })
+    out = add_hmm_decision_variables(hmm)
+    # RPE = reward - Q[leaf]
+    np.testing.assert_allclose(out["hmm_rpe"], [1 - 2, 0 - 7, 1 - 2])
+    # value update = Σ_i |Q_i(t+1) - Q_i(t)|; last trial NaN
+    np.testing.assert_allclose(out["hmm_value_update"].to_numpy(), [1.0, 1.0, np.nan])
+    # relative value = (ΣQstem - Qstem[prev stemchoice])/2 - Qstem[prev stemchoice]; t0 NaN
+    #   t1: prev stem=1 -> init=11; (61-11)/2-11 = 14 ; t2: prev stem=3 -> init=30; (62-30)/2-30 = -14
+    np.testing.assert_allclose(out["hmm_relative_value"].to_numpy(), [np.nan, 14.0, -14.0])
+
+
+def test_hmm_value_update_no_cross_epoch_bleed():
+    # two epochs; the last trial of each epoch -> NaN update (no diff into next epoch)
+    hmm = pd.DataFrame({
+        "nwb_file_name": ["x_.nwb"] * 4, "epoch": [2, 2, 4, 4],
+        "trial_number_by_epoch": [0, 1, 0, 1],
+        **{f"Q{i}": [i, i + 1, i + 5, i + 5] for i in range(1, 7)},
+        **{f"Qstem{i}": [1.0, 1.0, 1.0, 1.0] for i in range(1, 4)},
+        "leaf": [1, 2, 3, 4], "stemchoice": [1, 2, 3, 1], "reward": [1, 0, 1, 0],
+        "reward_entropy_current_leaf": [0.1, 0.2, 0.3, 0.4],
+    })
+    out = add_hmm_decision_variables(hmm)
+    u = out.sort_values(["epoch", "trial_number_by_epoch"])["hmm_value_update"].to_numpy()
+    assert np.isnan(u[1]) and np.isnan(u[3])  # last trial of each epoch
+    assert np.isfinite(u[0]) and np.isfinite(u[2])

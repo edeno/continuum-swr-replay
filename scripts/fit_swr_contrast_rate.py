@@ -15,13 +15,15 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
     bin. The within-bin pairing is carried by the per-session fit + across-session
     aggregation (no GLMM), matching the rest of Family B.
 
-Covariate blocks BASE/CONTEXT/VALUE/DECISION/UNCERT are defined below; task covariates
-come from `qvals_table` (peri-switch, block, RL) + `add_uncertainty_covariates`
-(recent_switch_rate). One tidy row per (population, model, session) with the fit
-coefficients. Aggregate across sessions downstream (signed-rank).
+Covariate blocks BASE/CONTEXT/VALUE/RPE/UNCERT/UPDATE are defined below. The task
+dimensions are the paper's (Comrie et al.), all from ONE model (`default_hmm`):
+relative value (`hmm_relative_value`; value+decision are r=-0.89 collinear, so one
+covariate), RPE, upcoming-port entropy, global value update; + CONTEXT (peri-switch/
+block) from `qvals_table` and `recent_switch_rate` from `add_uncertainty_covariates`.
+One tidy row per (population, model, session); aggregate across sessions (signed-rank).
 
 Usage:
-    uv run python scripts/fit_swr_contrast_rate.py --max-per-animal 1   # smoke
+    uv run python scripts/fit_swr_contrast_rate.py --max-per-animal 1   # smoke (~4 min)
     uv run python scripts/fit_swr_contrast_rate.py --workers 16         # full
 """
 
@@ -73,30 +75,33 @@ _SPLINE = "bs(tc, knots=(1.0, 2.0, 3.0), lower_bound=0.0, upper_bound=4.0)"
 _REWK_PREV = " + ".join(f"reward_lag{j}" for j in range(2, N_REWARD_LAGS + 1))
 _HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
 
+# Canonical dimensions are the PAPER's variables, all from one model (default_hmm):
+# relative value (value+decision, collapsed -- q_chosen/ΔV are r=-0.89 collinear),
+# RPE, reward entropy, global value update (Comrie et al. Fig 1/5). Each is one
+# param (no collinearity), + BASE nuisance controls + CONTEXT (peri-switch/block).
 # block formula (patsy) + the raw columns it needs present (for NaN-drop)
 _BLOCK_F = {
     "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",
     "CONTEXT": ("trials_since_switch + is_post_switch + trials_since_switch:is_post_switch"
                 " + trials_since_block_change + recent_switch_rate"),
-    "VALUE": "q_chosen + p_reward_current",
-    "DECISION": ("switch_advantage_mu_preoutcome_sess"
-                 " + I(-abs(switch_advantage_mu_preoutcome_sess))"),
-    "UNCERT": ("reward_entropy + global_mu_update_abs_postoutcome_sess"
-               " + unchosen_patches_mu_update_abs_postoutcome_sess"),
+    "VALUE": "hmm_relative_value",     # relative value ΔV (value + decision)
+    "RPE": "hmm_rpe",                  # reward prediction error (reward - Q_leaf)
+    "UNCERT": "reward_entropy",        # HMM reward-state entropy (outcome uncertainty)
+    "UPDATE": "hmm_value_update",      # global value-update magnitude (Σ|ΔQ|)
 }
 _BLOCK_COLS = {
     "BASE": ["tc", *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
              *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]],
     "CONTEXT": ["trials_since_switch", "is_post_switch", "trials_since_block_change",
                 "recent_switch_rate"],
-    "VALUE": ["q_chosen", "p_reward_current"],
-    "DECISION": ["switch_advantage_mu_preoutcome_sess"],
-    "UNCERT": ["reward_entropy", "global_mu_update_abs_postoutcome_sess",
-               "unchosen_patches_mu_update_abs_postoutcome_sess"],
+    "VALUE": ["hmm_relative_value"],
+    "RPE": ["hmm_rpe"],
+    "UNCERT": ["reward_entropy"],
+    "UPDATE": ["hmm_value_update"],
 }
 # task covariates broadcast per-bin (tc/reward_lag/hist are built by aggregate itself)
 STOP_COVARS = tuple(
-    c for b in ("CONTEXT", "VALUE", "DECISION", "UNCERT") for c in _BLOCK_COLS[b]
+    c for b in ("CONTEXT", "VALUE", "RPE", "UNCERT", "UPDATE") for c in _BLOCK_COLS[b]
 )
 
 
@@ -112,29 +117,29 @@ def _blocks_cols(blocks):
 def _g_specs():
     ladders = {
         "G0_base": ["BASE"], "G1_context": ["BASE", "CONTEXT"],
-        "G2_value": ["BASE", "VALUE"], "G3_decision": ["BASE", "DECISION"],
-        "G4_uncert": ["BASE", "UNCERT"],
-        "G5_rl": ["BASE", "VALUE", "DECISION", "UNCERT"],
-        "G6_full": ["BASE", "CONTEXT", "VALUE", "DECISION", "UNCERT"],
+        "G2_value": ["BASE", "VALUE"], "G3_rpe": ["BASE", "RPE"],
+        "G4_uncert": ["BASE", "UNCERT"], "G5_update": ["BASE", "UPDATE"],
+        "G6_all": ["BASE", "VALUE", "RPE", "UNCERT", "UPDATE"],
+        "G7_full": ["BASE", "CONTEXT", "VALUE", "RPE", "UNCERT", "UPDATE"],
     }
     return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
 
 
 def _s_specs():
     b = _BLOCK_F
-    base, ctx, val, dec, unc = b["BASE"], b["CONTEXT"], b["VALUE"], b["DECISION"], b["UNCERT"]
+    base, ctx = b["BASE"], b["CONTEXT"]
+    val, rpe, unc, upd = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"]
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
         "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
         "S2_base": (f"is_swr * ({base})", ["BASE"]),
-        "S3_dwell": (f"is_swr * ({base}) + reward_lag1:{_SPLINE} + is_swr:reward_lag1:{_SPLINE}",
-                     ["BASE"]),
-        "S4_context": (f"is_swr * ({base} + {ctx})", ["BASE", "CONTEXT"]),
-        "S5_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
-        "S6_decision": (f"is_swr * ({base} + {dec})", ["BASE", "DECISION"]),
-        "S7_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
-        "S8_full": (f"is_swr * ({base} + {ctx} + {val} + {dec} + {unc})",
-                    ["BASE", "CONTEXT", "VALUE", "DECISION", "UNCERT"]),
+        "S3_context": (f"is_swr * ({base} + {ctx})", ["BASE", "CONTEXT"]),
+        "S4_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
+        "S5_rpe": (f"is_swr * ({base} + {rpe})", ["BASE", "RPE"]),
+        "S6_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
+        "S7_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
+        "S8_all": (f"is_swr * ({base} + {val} + {rpe} + {unc} + {upd})",
+                   ["BASE", "VALUE", "RPE", "UNCERT", "UPDATE"]),
     }
     # convert block names -> the actual columns to NaN-drop on (like _g_specs)
     return {n: (f, _blocks_cols(bl)) for n, (f, bl) in raw.items()}
@@ -213,9 +218,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
     q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = ["stop_id", "trials_since_switch", "is_post_switch", "trials_since_block_change",
-             "q_chosen", "p_reward_current", "switch_advantage_mu_preoutcome_sess",
-             "reward_entropy", "global_mu_update_abs_postoutcome_sess",
-             "unchosen_patches_mu_update_abs_postoutcome_sess"]
+             "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update"]
     missing = [c for c in qcols if c not in q.columns]
     if missing:
         raise ValueError(f"qvals_table missing {missing}; regenerate it "

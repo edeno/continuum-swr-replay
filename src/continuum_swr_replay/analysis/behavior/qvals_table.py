@@ -55,11 +55,19 @@ ANIMAL_SUBJECT = {"chimi": "chimi", "j16": "j16", "peanut": "peanut",
 MODEL_KEY = {"behavior_model_params_name": "beta_stable_withleaf",
              "trials_info_by_rat_params_name": "stable_default",
              "trials_info_csv_params_name": "original_csv_format"}
-# default_hmm fit on the same trials -> the paper's reward-state entropy covariate.
+# default_hmm = the paper's "Global Model" (Comrie et al.). We derive the
+# paper-faithful decision variables from it (single-model, unlike the beta block):
+# see add_hmm_decision_variables. Fetch the native columns those formulas need.
 HMM_KEY = {"behavior_model_params_name": "default_hmm",
            "trials_info_by_rat_params_name": "stable_default",
            "trials_info_csv_params_name": "original_csv_format"}
 HMM_COLS = ["state_entropy", "reward_entropy"]
+# paper-faithful HMM decision variables (canonical dimensions for the is_swr rate
+# analysis): relative value (val_difference), RPE, global value update -- all from
+# default_hmm (single model, matches Comrie et al. Fig 1/5). The entropy dimension
+# uses the native HMM `reward_entropy` (in HMM_COLS); the paper's port-specific
+# `reward_entropy_current_leaf` is absent from this (HMM_KEY-aligned) fit.
+HMM_DV_COLS = ["hmm_relative_value", "hmm_rpe", "hmm_value_update"]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
 # Beta value timing: row t holds PRE-outcome belief for trial t (vendored DV docs).
@@ -88,6 +96,8 @@ COVARIATES = [
     "prev_local_variance", "prev_global_variance", "upcoming_leaf_variance", "next_choice_variance",
     # reward-state entropy (HMM)
     "state_entropy", "reward_entropy",
+    # paper-faithful HMM decision variables (single-model canonical set; Comrie et al.)
+    *HMM_DV_COLS,
     # depletion / choice probabilities
     *[f"depletion_leaf_{i}" for i in range(1, 7)],
     *[f"depletion_mean_stem_{i}" for i in range(1, 4)],
@@ -217,6 +227,44 @@ def add_experienced_value_columns(vals: pd.DataFrame) -> pd.DataFrame:
     return vals
 
 
+def add_hmm_decision_variables(hmm: pd.DataFrame) -> pd.DataFrame:
+    """Paper-faithful decision variables from the HMM ("Global Model", Comrie et al.).
+
+    Ports the value-relevant parts of Alison's ``rl_helpers`` HMM pipeline
+    (``add_rpe_deltaq_to_hmm_plus`` + ``create_hmm_plus``'s ``val_difference``)
+    directly onto ``default_hmm``'s native columns, so the value / RPE / update /
+    entropy covariates all come from **one** model (vs the beta block's mix). Adds:
+
+    - ``hmm_relative_value`` -- ΔV: mean of the other stems minus the initial
+      (starting) stem value, ``(ΣQstem - Qstem_initial)/2 - Qstem_initial`` (Fig 1F).
+    - ``hmm_rpe`` -- ``reward - Q_current_leaf`` (Fig 5; Alison's extra affine
+      rescale of Q is a display convenience, irrelevant to a GLM coefficient).
+    - ``hmm_value_update`` -- global update ``Σ_leaf |Q_leaf(t+1) - Q_leaf(t)|``
+      (``delta_Qglobal_t_abs``, Fig 5D-right); NaN on the last trial of an epoch.
+
+    (The entropy dimension uses the native ``reward_entropy`` carried via HMM_COLS,
+    not computed here.) Requires ``default_hmm`` native cols (``Q1..6``, ``Qstem1..3``,
+    ``leaf``, ``stemchoice``, ``reward``) + KEYS. Per-epoch (no cross-epoch bleed).
+    """
+    d = hmm.sort_values(KEYS).reset_index(drop=True)
+    if not d["leaf"].between(1, 6).all():
+        raise ValueError(f"HMM leaf outside 1..6: {sorted(d['leaf'].unique())}")
+    g = d.groupby(["nwb_file_name", "epoch"], sort=False)
+    qmat = d[[f"Q{i}" for i in range(1, 7)]].to_numpy()
+    leaf = d["leaf"].to_numpy().astype(int)
+    q_leaf_t = qmat[np.arange(len(d)), leaf - 1]
+    d["hmm_rpe"] = d["reward"].to_numpy() - q_leaf_t
+    nxt = np.column_stack([g[f"Q{i}"].shift(-1).to_numpy() for i in range(1, 7)])
+    d["hmm_value_update"] = np.abs(nxt - qmat).sum(axis=1)  # NaN at epoch's last trial
+    qstem = d[[f"Qstem{i}" for i in range(1, 4)]].to_numpy()
+    si = g["stemchoice"].shift().to_numpy()  # the *initial* (starting) stem this trial
+    q_init = np.full(len(d), np.nan)
+    ok = ~np.isnan(si)
+    q_init[ok] = qstem[np.where(ok)[0], si[ok].astype(int) - 1]
+    d["hmm_relative_value"] = (qstem.sum(axis=1) - q_init) / 2 - q_init
+    return d
+
+
 def assign_stops_to_trials(
     poke_out_ts: np.ndarray, stop_mid: np.ndarray
 ) -> np.ndarray:
@@ -266,7 +314,8 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     """
     subject = ANIMAL_SUBJECT[animal]
     vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
-    hmm = _fetch_model_df(rl, subject, HMM_KEY)[[*KEYS, *HMM_COLS]]
+    hmm = add_hmm_decision_variables(_fetch_model_df(rl, subject, HMM_KEY))
+    hmm = hmm[[*KEYS, *HMM_COLS, *HMM_DV_COLS]]
     vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
     vals = add_experienced_value_columns(vals)  # q_chosen / arm / q_port / rpe
     model_cols = [c for c in COVARIATES if c in vals.columns]
