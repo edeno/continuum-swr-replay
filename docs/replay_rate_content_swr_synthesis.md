@@ -56,6 +56,45 @@ self-history forecast the rate. A fitted within-block Q-value (`q_chosen`) does
 **not** predict better than nominal value (falsified). So the value-gating is a
 modest, detectable-by-pooling effect, not a strong driver.
 
+### Update 2026-07-02 — HMM-harmonized `is_swr`-contrast ladder (per-bin, LR-tested)
+
+Re-fit of the occurrence-rate dissociation with **paper-faithful HMM covariates**
+(`hmm_relative_value`/`hmm_rpe`/`reward_entropy`/`hmm_value_update`; single
+`default_hmm` model) on the per-bin **`is_swr`-contrast (Design B)** ladder —
+stratified `G0–G8` (×{all, SWR, non-SWR}) + stacked-contrast `S0–S10`.
+Runner `scripts/fit_swr_contrast_rate.py`; 218 sessions →
+`models_per_bin_rate/swr_contrast_rate.pkl`. Inference: per-session fit + **per-session
+likelihood-ratio tests** aggregated as *% sessions significant / binomial p* (the
+power-robust read; pooled χ² is over-powered by the per-bin n).
+
+- **Reward-gating dissociation confirmed and strongest by far.** `is_swr:reward_lag1`
+  significant in **53% of sessions (binom p=7e-78)**; direction **91–100% positive in
+  all 5 animals**. The ~50% per-session significance is a **power gradient**
+  (43/53/60% by event-count tertile), **not animal clustering** — the effect is
+  near-universal in sign; low-event sessions just can't clear p<0.05 individually.
+- **Headline magnitude is model-dependent:** the `is_swr:reward_lag1` effect is 5.1×
+  when the reward-history kernel is shared (`S1_rew1`) but **3.1× when `is_swr` is
+  crossed with the full kernel** (`S2_base`, history-controlled) — both p<1e-23.
+  The 3.1× matches the prior SWR reward-RR (3.10). *(Reporting choice deferred.)*
+- **Dissociation hierarchy** (`is_swr:X`, % sessions sig / binom p):
+  reward **53% / 7e-78** ≫ periswitch **21% / 1.5e-8** > rpe / switchrate / value
+  (~10–12% / 5e-3–2e-2) > block (marginal) > **update / uncert (null)**.
+- **Stratified pattern (G-ladder):** every task dimension modulates rate far more
+  consistently in **non-SWR** than SWR events (periswitch 25% vs 9%, rpe 25% vs 8%,
+  value 15% vs 4%; SWR at chance) → **SWR events narrowly reward-gated, non-SWR events
+  broadly task-modulated** (value / RPE / context).
+- **Dwell-shape is NULL.** `G8 rewxtime` (`reward_lag1 : bs(tc)` — does reward reshape
+  the within-stop rate *profile*?) is not consistently significant (8% / p=0.088).
+  **Reward shifts the rate LEVEL, not the profile SHAPE** — the reward-gating headline
+  is not a dwell-profile artifact (the per-bin offset already removes the pure
+  duration confound; rewarded stops are ~3.6× longer, 1.86 s vs 0.51 s).
+- **RPE caveat:** coefficient signed-rank leans SWR-specific, but the per-session LR
+  is *more consistent in non-SWR* (25% vs 8% of sessions) — direction-consistent vs
+  per-session-needed diverge; do **not** call RPE cleanly "SWR-specific".
+
+*(The `is_swr`-contrast ladder has no auto-generated results doc — `per_bin_rate_results.md`
+covers the separate M0–M9 ladder. These findings live here.)*
+
 ## Layer 2 — SWR-coupling (ripple power as a continuous mark)
 
 `ripple_power_z` (event-mean consensus ripple power — the signal the Kay detector
@@ -110,6 +149,41 @@ Note: the reward effect **strengthened** under the duration control (−0.32→�
 because the within-stop drift runs *toward* current (`tsc_x_current` > 0) and was
 masking it — so it is not a dwell artifact. The reward/value content effects are
 **non-SWR-specific**; exploration and within-stop deepening hold for both types.
+
+### Update 2026-07-02 — HMM-harmonized content ladder (arm + patch, `is_swr` split)
+
+Content analog of the rate `is_swr`-contrast ladder, with paper-faithful HMM
+covariates entered as `:is_current` interactions (event-scalars) or per-arm main
+effects. Runner `scripts/fit_swr_contrast_content.py`; 218 sessions →
+`models/swr_contrast_content_{arm,patch}.pkl`. Conditional Poisson over arms(9)/
+patches(3), per-session fit + across-session median / signed-rank / per-animal (n/5).
+**Exploratory** pending Phase-4 audited diagnostics (per-fit SE/p, family FDR,
+within-group-centered VIF, common cohort); `q_arm` is still the beta per-arm value
+(HMM harmonization deferred).
+
+- **Anchors reproduce at full power:** `is_current` +0.69 (5/5); SWR broadening
+  `swr_x_current` −0.81 (p=7e-35), `swr_x_prev` −0.93; SWR reward/value-avoidance
+  `swr_x_reward_rate_arm` −1.72 / `swr_x_q_arm` −2.45 / `swr_x_last_rewarded` −1.62
+  (all 0/5, p<1e-11). Net of autocorrelation controls (`C2_base`), the SWR current-
+  bias **vanishes** (−0.04 n.s.) while non-SWR persists (+0.67, p=3e-11).
+- **New — HMM state modulation of the current-bias:** relative value ΔV **sharpens
+  onto current** (`relval_x_current` +0.15, 5/5, p=2e-13; SWR +0.18); **RPE pushes
+  off current** (`rpe_x_current` −0.14, non-SWR, p=6e-8) — value and RPE oppose;
+  uncertainty sharpens onto current **SWR-specifically** (`entropy_x_current` +0.13,
+  p=4e-4).
+- **New — context/switch strongly modulate content:** **exploration locks content
+  onto current** (`switchrate_x_current` +0.23, 5/5, p=1e-17; SWR +0.34 — reproduces
+  the prior +0.53); later-in-block moves **off** current (`block_x_current` −0.19,
+  p=6e-12); near a switch → **broader/off-current** (`tss_x_current` +0.33, 5/5).
+- **Patch:** current-patch bias +1.05 (5/5); SWR broadens off-patch (`swr_x_current_patch`
+  −0.38, p=3e-18); avoids the abandoned patch (`swr_x_last_rewarded_patch` −1.49,
+  p=9e-5); exploration → current patch (+0.16). The switch-timing rungs (old-patch
+  decay `CP2`, new-patch growth `CP3`, `CPS3`) are **sparse/unstable** (n=43–62;
+  `CP2` magnitude unreliable) — the design-flagged rungs.
+- **Rate↔content asymmetry:** on *rate*, non-SWR events are the broadly task-modulated
+  ones; on *content*, several modulations (value, uncertainty, periswitch, switchrate)
+  are **SWR-equal-or-stronger** — SWR content is *broader* at baseline yet *more
+  retunable* by value/uncertainty/context.
 
 ## The intersection — what's new here
 
