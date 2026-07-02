@@ -4,20 +4,21 @@
 Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
 (15 ms bins, `log(exposure)` offset, Poisson), fit per session:
 
-  * STRATIFIED (G0-G6): each spec fit to `non_local`, `non_local_swr`,
+  * STRATIFIED (G0-G8): each spec fit to `non_local`, `non_local_swr`,
     `non_local_no_swr` separately. Comparing a coefficient across the three
     populations = the descriptive SWR-vs-non-SWR dissociation.
-  * is_swr CONTRAST (S0-S8, design B): the `non_local_swr` and `non_local_no_swr`
+  * is_swr CONTRAST (S0-S10, design B): the `non_local_swr` and `non_local_no_swr`
     per-bin designs are STACKED (identical (stop,bin) rows + covariates, differing
     only in `count`), tagged by `is_swr`, and `is_swr:X` interactions test whether a
     task effect differs by SWR status. Self-history (`hist_rcos_*`) is stream-specific
     only in its raw per-stream values; it is still wrapped inside `is_swr * BASE`
-    (S2-S8), so `is_swr:hist_rcos_k` refractoriness-by-SWR interactions ARE fit.
+    (S2-S10), so `is_swr:hist_rcos_k` refractoriness-by-SWR interactions ARE fit.
     Time/reward/task covariates are shared across the two rows of a bin. The within-bin
     pairing is carried by the per-session fit + across-session aggregation (no GLMM),
     matching the rest of Family B.
 
-Covariate blocks BASE/CONTEXT/VALUE/RPE/UNCERT/UPDATE are defined below. The task
+Covariate blocks BASE/PERISWITCH/BLOCK/SWITCHRATE/VALUE/RPE/UNCERT/UPDATE/REWXTIME
+are defined below. The task
 dimensions are the paper's (Comrie et al.), all from ONE model (`default_hmm`):
 relative value (`hmm_relative_value`; the paper's single value+decision axis, cross-model
 corroborated by q_chosen/ΔV r=-0.67), RPE (unscaled `reward - Q_leaf`), HMM reward-state
@@ -86,26 +87,39 @@ _HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
 # block formula (patsy) + the raw columns it needs present (for NaN-drop)
 _BLOCK_F = {
     "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",
-    "CONTEXT": ("trials_since_switch + is_post_switch + trials_since_switch:is_post_switch"
-                " + trials_since_block_change + recent_switch_rate"),
-    "VALUE": "hmm_relative_value",     # relative value ΔV (value + decision)
+    # CONTEXT split into 3 near-orthogonal rungs (VIF <=2.2) so each is tested
+    # individually; peri-switch's 3 terms stay together (the interaction needs
+    # its main effects -- they are the paper's broken-stick around a switch).
+    "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
+    "BLOCK": "trials_since_block_change",
+    "SWITCHRATE": "recent_switch_rate",
+    "VALUE": "hmm_relative_value",     # relative value ΔV (paper's value+decision axis)
     "RPE": "hmm_rpe",                  # reward prediction error (reward - Q_leaf)
     "UNCERT": "reward_entropy",        # HMM reward-state entropy (outcome uncertainty)
     "UPDATE": "hmm_value_update",      # global value-update magnitude (Σ|ΔQ|)
+    # reward x within-stop time course: does the current reward reshape the rate
+    # PROFILE, not just shift its level? BASE has only additive reward_lag1 +
+    # bs(tc), so this is the untested dwell-shape control (rewarded stops are
+    # ~3.6x longer and populate a different tc range than unrewarded).
+    "REWXTIME": f"reward_lag1:{_SPLINE}",
 }
 _BLOCK_COLS = {
     "BASE": ["tc", *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
              *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]],
-    "CONTEXT": ["trials_since_switch", "is_post_switch", "trials_since_block_change",
-                "recent_switch_rate"],
+    "PERISWITCH": ["trials_since_switch", "is_post_switch"],
+    "BLOCK": ["trials_since_block_change"],
+    "SWITCHRATE": ["recent_switch_rate"],
     "VALUE": ["hmm_relative_value"],
     "RPE": ["hmm_rpe"],
     "UNCERT": ["reward_entropy"],
     "UPDATE": ["hmm_value_update"],
+    "REWXTIME": ["reward_lag1", "tc"],  # both already built by aggregate (in BASE)
 }
-# task covariates broadcast per-bin (tc/reward_lag/hist are built by aggregate itself)
+# per-stop task covariates broadcast per-bin (tc/reward_lag/hist are built by the
+# aggregate itself, so BASE/REWXTIME contribute none of the carried columns).
 STOP_COVARS = tuple(
-    c for b in ("CONTEXT", "VALUE", "RPE", "UNCERT", "UPDATE") for c in _BLOCK_COLS[b]
+    c for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
+    for c in _BLOCK_COLS[b]
 )
 
 
@@ -120,30 +134,33 @@ def _blocks_cols(blocks):
 # name -> (formula RHS, blocks needed for NaN-drop)
 def _g_specs():
     ladders = {
-        "G0_base": ["BASE"], "G1_context": ["BASE", "CONTEXT"],
-        "G2_value": ["BASE", "VALUE"], "G3_rpe": ["BASE", "RPE"],
-        "G4_uncert": ["BASE", "UNCERT"], "G5_update": ["BASE", "UPDATE"],
-        "G6_all": ["BASE", "VALUE", "RPE", "UNCERT", "UPDATE"],
-        "G7_full": ["BASE", "CONTEXT", "VALUE", "RPE", "UNCERT", "UPDATE"],
+        "G0_base": ["BASE"],
+        "G1_periswitch": ["BASE", "PERISWITCH"],
+        "G2_block": ["BASE", "BLOCK"],
+        "G3_switchrate": ["BASE", "SWITCHRATE"],
+        "G4_value": ["BASE", "VALUE"], "G5_rpe": ["BASE", "RPE"],
+        "G6_uncert": ["BASE", "UNCERT"], "G7_update": ["BASE", "UPDATE"],
+        "G8_rewxtime": ["BASE", "REWXTIME"],
     }
     return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
 
 
 def _s_specs():
     b = _BLOCK_F
-    base, ctx = b["BASE"], b["CONTEXT"]
-    val, rpe, unc, upd = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"]
+    base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
+    val, rpe, unc, upd, rxt = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"], b["REWXTIME"]
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
         "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
         "S2_base": (f"is_swr * ({base})", ["BASE"]),
-        "S3_context": (f"is_swr * ({base} + {ctx})", ["BASE", "CONTEXT"]),
-        "S4_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
-        "S5_rpe": (f"is_swr * ({base} + {rpe})", ["BASE", "RPE"]),
-        "S6_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
-        "S7_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
-        "S8_all": (f"is_swr * ({base} + {val} + {rpe} + {unc} + {upd})",
-                   ["BASE", "VALUE", "RPE", "UNCERT", "UPDATE"]),
+        "S3_periswitch": (f"is_swr * ({base} + {peri})", ["BASE", "PERISWITCH"]),
+        "S4_block": (f"is_swr * ({base} + {blk})", ["BASE", "BLOCK"]),
+        "S5_switchrate": (f"is_swr * ({base} + {swr})", ["BASE", "SWITCHRATE"]),
+        "S6_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
+        "S7_rpe": (f"is_swr * ({base} + {rpe})", ["BASE", "RPE"]),
+        "S8_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
+        "S9_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
+        "S10_rewxtime": (f"is_swr * ({base} + {rxt})", ["BASE", "REWXTIME"]),
     }
     # convert block names -> the actual columns to NaN-drop on (like _g_specs)
     return {n: (f, _blocks_cols(bl)) for n, (f, bl) in raw.items()}
@@ -262,7 +279,7 @@ def main() -> None:
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
     items = [(k, s, onset_groups[k])
              for k, s in stop.groupby(SESSION_COLS, sort=False) if k in onset_groups]
-    logger.info("Fitting SWR-contrast per-bin models (G0-G6 x %s + S0-S8) over %d sessions "
+    logger.info("Fitting SWR-contrast per-bin models (G0-G8 x %s + S0-S10) over %d sessions "
                 "at BIN_S=%.3f with %d worker(s)...", list(STRATA), len(items), BIN_S, args.workers)
 
     t0 = time.perf_counter()

@@ -145,12 +145,14 @@ Shorthands / covariate blocks. The task dimensions are **the paper's variables
 BASE      := bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4)) + reward_lag1 + REWK_prev + HISTCOS   # = M7r nuisance base
 REWK_prev := reward_lag2 + ... + reward_lag10          # former trials (dwell-clean)
 HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
-PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch
-CONTEXT   := PERISWITCH + trials_since_block_change + recent_switch_rate
+PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch  # peri-switch broken-stick (one construct; see Note 1b)
+BLOCK     := trials_since_block_change  # learning across a contingency block
+SWITCHRATE:= recent_switch_rate         # local switch volatility
 VALUE     := hmm_relative_value        # relative value ΔV (paper's single value+decision axis; see Note 2)
 RPE       := hmm_rpe                    # reward - Q_current_leaf (HMM; unscaled canonical RPE, see Note 6)
 UNCERT    := reward_entropy            # HMM native reward-state entropy; NOT the port-specific reward_entropy_current_leaf (see Note 4)
 UPDATE    := hmm_value_update          # global value update Σ_leaf|ΔQ| (HMM)
+REWXTIME  := reward_lag1:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))  # reward × within-stop time course (dwell-shape test; see Note 7)
 ```
 
 ### A. Stratified — each formula fit 3× to `NL_all`, `NL_swr`, `NL_noswr`
@@ -159,13 +161,14 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | model | formula (`count ~ … + offset(log exposure)`) | question |
 |---|---|---|
 | `G0_base` | `BASE` | Does the non-local rate have within-stop time structure, reward-history dependence, and self-history (refractoriness) — separately for all / SWR / non-SWR events? |
-| `G1_context` | `BASE + CONTEXT` | Beyond time/reward/history, does the rate ramp around patch switches (peri-switch) and shift across a contingency block (learning)? |
-| `G2_value` | `BASE + VALUE` | Is the rate modulated by relative value (ΔV = Switch − Stay, the paper's decision variable)? |
-| `G3_rpe` | `BASE + RPE` | Is the rate modulated by reward prediction error (reward − expected value)? |
-| `G4_uncert` | `BASE + UNCERT` | Is the rate higher when reward-state entropy (outcome uncertainty) is high? |
-| `G5_update` | `BASE + UPDATE` | Is the rate higher when global value updating is large? |
-| `G6_all` | `BASE + VALUE + RPE + UNCERT + UPDATE` | With all four model variables jointly, which retain an association with the rate? |
-| `G7_full` | `BASE + CONTEXT + VALUE + RPE + UNCERT + UPDATE` | With context + all model variables in one model, which task variables independently modulate the rate? |
+| `G1_periswitch` | `BASE + PERISWITCH` | Does the rate ramp around patch switches (asymmetric before/after)? |
+| `G2_block` | `BASE + BLOCK` | Does the rate shift across a contingency block (learning)? |
+| `G3_switchrate` | `BASE + SWITCHRATE` | Is the rate modulated by recent local switch volatility? |
+| `G4_value` | `BASE + VALUE` | Is the rate modulated by relative value (ΔV = Switch − Stay, the paper's decision variable)? |
+| `G5_rpe` | `BASE + RPE` | Is the rate modulated by reward prediction error (reward − expected value)? |
+| `G6_uncert` | `BASE + UNCERT` | Is the rate higher when reward-state entropy (outcome uncertainty) is high? |
+| `G7_update` | `BASE + UPDATE` | Is the rate higher when global value updating is large? |
+| `G8_rewxtime` | `BASE + REWXTIME` | Does the current reward reshape the within-stop rate *profile* (not just shift its level)? — the dwell-shape control (rewarded stops are ~3.6× longer). |
 
 ### B. `is_swr` contrast — pooled two non-local streams (design B)
 `is_swr:X` coefficients are the SWR-vs-non-SWR dissociation tests.
@@ -175,17 +178,24 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | `S0_rate` | `is_swr + BASE` | Do SWR-coincident non-local events occur at a different **overall rate** than non-SWR ones, holding the shared time/reward/history structure? |
 | `S1_rew1` | `BASE + is_swr + is_swr:reward_lag1` | Does the **current (consummatory) reward** gate the rate **differently** for SWR vs non-SWR events? (headline reward-gating dissociation) |
 | `S2_base` | `is_swr * BASE` | Do the time-course, reward-history, and self-history each modulate the rate differently by SWR status? |
-| `S3_context` | `is_swr * (BASE + CONTEXT)` | Does the peri-switch / block (context) modulation of rate differ by SWR? |
-| `S4_value` | `is_swr * (BASE + VALUE)` | Does relative-value modulation of rate differ by SWR? |
-| `S5_rpe` | `is_swr * (BASE + RPE)` | Does RPE modulation of rate differ by SWR? |
-| `S6_uncert` | `is_swr * (BASE + UNCERT)` | Does entropy (uncertainty) modulation differ by SWR? |
-| `S7_update` | `is_swr * (BASE + UPDATE)` | Does value-update modulation differ by SWR? |
-| `S8_all` | `is_swr * (BASE + VALUE + RPE + UNCERT + UPDATE)` | With all model variables in one model, which task modulations of rate are SWR-specific vs shared? |
+| `S3_periswitch` | `is_swr * (BASE + PERISWITCH)` | Does the peri-switch ramp of rate differ by SWR? |
+| `S4_block` | `is_swr * (BASE + BLOCK)` | Does the across-block (learning) modulation differ by SWR? |
+| `S5_switchrate` | `is_swr * (BASE + SWITCHRATE)` | Does the switch-volatility modulation differ by SWR? |
+| `S6_value` | `is_swr * (BASE + VALUE)` | Does relative-value modulation of rate differ by SWR? |
+| `S7_rpe` | `is_swr * (BASE + RPE)` | Does RPE modulation of rate differ by SWR? |
+| `S8_uncert` | `is_swr * (BASE + UNCERT)` | Does entropy (uncertainty) modulation differ by SWR? |
+| `S9_update` | `is_swr * (BASE + UPDATE)` | Does value-update modulation differ by SWR? |
+| `S10_rewxtime` | `is_swr * (BASE + REWXTIME)` | Does the reward × within-stop-time-course (dwell-shape) effect differ by SWR? |
 
 **Notes.** (1) **Single-model provenance:** the task dimensions all come from the
 paper's HMM (`default_hmm`) — `hmm_relative_value` / `hmm_rpe` / `hmm_value_update`
 (ported from Alison's `add_rpe_deltaq_to_hmm_plus` onto native HMM `Q`) + native
-`reward_entropy` — so we don't mix the beta model's ΔV with HMM entropy. (2) **Value
+`reward_entropy` — so we don't mix the beta model's ΔV with HMM entropy. (1b) **CONTEXT
+is split into three near-orthogonal rungs** (`PERISWITCH`, `BLOCK`, `SWITCHRATE`; pairwise
+|r| ≤ 0.14, VIF ≈ 1 except within peri-switch), each tested individually rather than as one
+lumped block. Peri-switch's three terms (`trials_since_switch`, `is_post_switch`, their
+interaction; internal r ≈ 0.71) stay together — the interaction is meaningless without its
+main effects, and jointly they are the paper's broken-stick ramp around a switch. (2) **Value
 and decision are one dimension:** the paper fits a single relative-value axis (ΔV),
 not separate value and decision covariates, so we follow it with the single
 `hmm_relative_value`. Empirically this is corroborated cross-model: the beta model's
@@ -197,13 +207,18 @@ contrast separates. (4) `reward_entropy` is the HMM's native reward-state entrop
 paper's port-specific `reward_entropy_current_leaf` is not in the trials-aligned fit and
 appears only in Alison's exploratory notebooks (not `rl_helpers.py`), so whether it is a
 clean reproducible column is unconfirmed — a follow-up if the exact variant is wanted.
-(5) Per-session fit + across-session signed-rank (no random effects); the highest-dim
-`G6_all`/`G7_full`/`S8_all` are underpowered on low-event sessions and drop out (tallied),
-so read the single-dimension rungs as primary. (6) **RPE is the unscaled canonical
+(5) Per-session fit + across-session signed-rank (no random effects); every rung isolates
+one dimension (no joint `*_all` kitchen-sink specs — they were dropped as overparameterized
+on low-event sessions). (6) **RPE is the unscaled canonical
 `reward − Q_leaf`.** Alison rescales Q before subtracting (`(Q+0.6)/1.25`, a cosmetic
 "get into 0–1 zone" transform), yielding `reward − 0.8·Q_leaf − 0.48` — *not* an affine
 transform of `reward − Q_leaf` (it reweights Q vs reward). We deliberately fit the
-textbook RPE, not the plotting-rescaled variant.
+textbook RPE, not the plotting-rescaled variant. (7) **REWXTIME = `reward_lag1:bs(tc)`**
+tests whether the current reward changes the *shape* of the within-stop rate profile, not
+just its level. The per-bin design + `offset(log exposure)` already removes the pure
+*duration* confound (rewarded stops are ~3.6× longer → more bins, not a higher per-bin
+rate); BASE's additive `reward_lag1 + bs(tc)` still assumes a shared profile shape, and
+this rung is what tests that assumption directly.
 
 ## Phase-2 refit classification
 
