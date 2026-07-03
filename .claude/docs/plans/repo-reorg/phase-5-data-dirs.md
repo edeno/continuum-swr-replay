@@ -2,6 +2,18 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md#target-structure)
 
+> **DISCOVERED COMPLEXITY (2026-07-03, during execution) — this plan under-scoped the
+> content dirs.** The content-model output dir names are **dynamic**, built by the
+> unit-tested `resolve_contfrag_paths` (`fit_replay_content_models.py:91-123`): `models`,
+> `models_patch`, and for ContFrag sources `models_{swr,mua}_{brain_area}` (e.g.
+> `models_swr_HPC`). These **collide** in namespace with the is_swr-subset dirs appended at
+> `:378` (`models_swr_T`/`_F`) — same `models_swr_*` prefix, different meaning. Renaming the
+> content dirs therefore requires disambiguating the two families + rewriting
+> `resolve_contfrag_paths` + `test_contfrag_paths` + the suffix logic + every reader — a
+> dedicated redesign, NOT the mechanical 8-dir sweep this plan assumed. **Deferred pending a
+> decision.** The RATE dirs (`models_per_bin_rate`, `models_per_stop_rate`) are still a clean
+> uniform rename if wanted, but marginal benefit for ~26-file churn.
+
 The 8 output dirs under `Processed-Data/replay_content/` have opaque names
 (`models_swr_F`, `models_patch_swr_T`, …) and `models/` is a **mixed** dir (M0–M7
 content results *plus* the newer `swr_contrast_content_*.pkl`). Rename to descriptive

@@ -1,6 +1,10 @@
 # Repository Reorganization Implementation Plan
 
-**Status:** Not started.
+**Status:** Phases 1–4 done, committed, and independently reviewed. **Phase 5 (data-dir
+rename) DEFERRED** — during execution the content-model dir names proved to be a dynamic,
+unit-tested, name-colliding scheme (see phase-5 header), far larger/riskier than the plan
+assumed; deferred for marginal naming benefit on precious data paths. Phase 6 (doc capstone)
+optional.
 
 Reorganize the repo so every artifact type has exactly one home: published docs in
 `docs/`, design specs / plans / reviews under `.claude/docs/`, exploratory scratch
