@@ -1,8 +1,0 @@
-time-controlled reward effect (RR = exp(reward coef)), t<4.0s, 0.25s cells
-RR>1 = rewarded stops have a higher per-second rate at matched time-into-stop
-
-  SWR        : RR=1.37 (median coef +0.313), 166/218 sessions+ 
-  NL w/ SWR  : RR=2.69 (median coef +0.990), 200/218 sessions+ 
-  NL NO SWR  : RR=1.04 (median coef +0.041), 117/218 sessions+ 
-
-SWR reward effect > non-SWR (paired): 69% of 218 sessions, per-animal 4/5, p=5.8e-11

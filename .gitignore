@@ -221,3 +221,6 @@ event_gallery/
 # Session run logs and exploratory research figure outputs (scratch, regenerable)
 logs/
 .claude/research/*/
+
+# External reference materials (paper PDFs)
+references/
