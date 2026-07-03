@@ -65,10 +65,10 @@ None (documentation move).
 ## Review
 
 Before opening the PR for this phase, dispatch `code-reviewer` against the diff. Confirm:
-- All 4 design specs + `content_model_design.md` are under `.claude/docs/designs/`; the
+- All 4 design specs + `content_model_design.md` are under `docs/design/`; the
   historical figure01 plan is under `.claude/docs/plans/figure01-revision/PLAN.md`; all 5
   reviews are under `.claude/docs/reviews/`; old dirs removed.
 - No stale links to the moved paths in active docs; historical-plan exceptions are called out.
 - `docs/README.md` types every current `docs/*.md` file and carries the home table.
-- CLAUDE.md docs section reflects the new `.claude/docs/{plans,designs,reviews}` split.
+- CLAUDE.md docs section reflects the split: `docs/design/` + `.claude/docs/{plans,reviews}`.
 - Docstrings / module names don't reference this plan.

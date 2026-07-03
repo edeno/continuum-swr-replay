@@ -26,7 +26,7 @@ phase 3 but does not require it — the SWR split here reads the **already-canon
 - `scripts/_content_reward_interactions.py` (whole file): `:42-44` SCALARS/INTERACTIONS, `:59-66` the `is_current ×` terms + the z-scored-**linear** `tsc_x_current` duration control, `:70-83` `_fit` (saves only `coef_*` — the diagnostics gap), `:100-121` the one-at-a-time-on-M5 design.
 - `scripts/_content_patch_destination.py` (whole file): `:21-39` hard-count patch fractions / role means, descriptive only (no inference/uncertainty).
 - Audited pipeline to fold into: `analysis/replay/model_specs.py:122` `ModelSpec`, `:196` `_M5`, `:205` `MODEL_HIERARCHY`, the scalar→role-interaction rule `:171-188`; `analysis/replay/fitting.py:31`/`:114`/`:451` (within-group rank + complete-case guards), `:420` (condition-number/VIF on the **raw** matrix — to be centered); runner `scripts/fit_replay_content_models.py`; verifier `scripts/_verify_content_models.py`.
-- The audit findings this phase closes: [04 (#4 reward/value/switch interactions exploratory; #6 patch-destination descriptive; #7 centered VIF; Next Checks 3/6)](../../review/04_content_behavior_covariates_review.md).
+- The audit findings this phase closes: [04 (#4 reward/value/switch interactions exploratory; #6 patch-destination descriptive; #7 centered VIF; Next Checks 3/6)](../../reviews/04_content_behavior_covariates_review.md).
 
 ## Tasks
 

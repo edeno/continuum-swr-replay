@@ -25,7 +25,7 @@ quiesces them).
 - Reality: `scripts/analyze_event_spike_evidence.py:139-168` (`build_session_events` reconstructs events from thresholded prob + `MIN_EVENT_BINS=3` at `:63`), `:149` `swr = dot["SWR_event"] > 0`, `:159` `is_swr = bool(swr[sl].any())` (inclusive).
 - Occupancy: `scripts/analyze_content_occupancy.py:138` `is_swr = dot["SWR_event"] > 0` (raw timebin), `:179`/`:203` the split.
 - PFC: `analysis/pfc/glm.py:1003` `get_confident_times` (event reconstruction), `:1014` `max_speed < immobility`, `:1017` `get_overlap_times(non_local_times, data["ripple_times"])` (the non-canonical split), `:1042` `is_immobile = head_speed < immobility`; `scripts/generate_figure04.py:344` same `ripple_times` split, `:357` `head_speed <= immobility` (the `<=`/`<` mismatch vs the batch).
-- The audit findings this phase closes: [02 (#2, Next Checks 1; Test Gaps "is_swr agrees with canonical")](../../review/02_spike_evidence_reality_review.md), [04 (#3, Next Checks 4)](../../review/04_content_behavior_covariates_review.md), [05 (#2, Definition-Drift, Next Checks 1/2/5)](../../review/05_pfc_cross_area_review.md).
+- The audit findings this phase closes: [02 (#2, Next Checks 1; Test Gaps "is_swr agrees with canonical")](../../reviews/02_spike_evidence_reality_review.md), [04 (#3, Next Checks 4)](../../reviews/04_content_behavior_covariates_review.md), [05 (#2, Definition-Drift, Next Checks 1/2/5)](../../reviews/05_pfc_cross_area_review.md).
 
 ## Tasks
 
