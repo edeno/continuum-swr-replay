@@ -21,9 +21,14 @@ Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
   CS1..CS5 is_swr:feature contrasts (pooled, 2-way; the dissociation)
 Event-scalar dissociations (C6-C12) come from comparing the split, not a pooled 3-way.
 
-Aggregation: across-session median coef + Wilcoxon signed-rank + per-animal sign
-consistency (n/5), identical to the rate side. NOTE: ``q_arm`` here is the existing
-(beta-model) per-arm value; HMM per-arm value harmonization is a deferred follow-up.
+Aggregation is AUDITED: per-session conditional-Poisson coefficients carry SE and
+p-values; across sessions we report median coef, median SE, per-session significance
+rate, per-animal sign consistency (n/5), the Wilcoxon signed-rank p (session = unit),
+and a **Benjamini-Hochberg FDR q across the rung family per population** (the
+multiple-comparison correction). A provenance sidecar (git hash, params) is written.
+DEFERRED follow-ups (noted in the provenance): a common complete-case cohort across
+rungs, within-group-centered VIF (`fitting.py` uses the raw design), and HMM per-arm
+``q_arm`` (this runner still uses the beta-model per-arm value).
 
 Usage:
     uv run python scripts/content/fit_swr_contrast_content.py               # full
@@ -33,12 +38,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
+import json
 import logging
+import subprocess
 import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
+from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
@@ -205,8 +214,13 @@ def _run(
                         "model": name,
                         "population": pop,
                         **dict(zip(SC, keys, strict=True)),
-                        **{k: v for k, v in r.items() if k.startswith("coef_")},
+                        **{
+                            k: v
+                            for k, v in r.items()
+                            if k.startswith(("coef_", "bse_", "pval_"))
+                        },
                         "n_events": r["n_events"],
+                        "n_params": r["n_params"],
                     }
                 )
     return pd.DataFrame(rows)
@@ -238,6 +252,86 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
                 f"{name:18s}{pop:8s}{term:30s}{len(x):4d}{x.median():+9.3f}"
                 f"{100 * (x > 0).mean():5.0f}%{f'{nan}/5':>6}{p:14.2e} {star}"
             )
+
+
+def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> pd.DataFrame:
+    """Audited across-session aggregation: one row per (model, population, term).
+
+    Reports median coef, median SE, per-session significance rate, per-animal sign
+    consistency, the across-session Wilcoxon signed-rank p (session = exchangeable
+    unit), and a Benjamini-Hochberg FDR q-value computed **across the rung family
+    within each population** (the multiple-comparison correction). Sessions with a
+    quasi-separated coef (|coef| > 10) are excluded before aggregating.
+    """
+    rows = []
+    for name in ladder:
+        term = key_term.get(name)
+        if term is None:
+            continue
+        ccol, scol, pcol = f"coef_{term}", f"bse_{term}", f"pval_{term}"
+        scope = ladder[name][1]
+        for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
+            s = res[(res.model == name) & (res.population == pop)]
+            if ccol not in s.columns:
+                continue
+            ok = s[ccol].notna() & (s[ccol].abs() < 10)  # drop quasi-separated
+            s = s[ok]
+            if len(s) < 5:
+                continue
+            coef = s[ccol]
+            srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
+            rows.append(
+                {
+                    "level": level,
+                    "model": name,
+                    "population": pop,
+                    "term": term,
+                    "n_sessions": len(s),
+                    "median_coef": float(coef.median()),
+                    "median_se": float(s[scol].median()) if scol in s else np.nan,
+                    "pct_positive": float((coef > 0).mean()),
+                    "n_animals_pos": int((s.groupby("animal")[ccol].median() > 0).sum()),
+                    "pct_sig_session": (
+                        float((s[pcol] < 0.05).mean()) if pcol in s else np.nan
+                    ),
+                    "signed_rank_p": srp,
+                }
+            )
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["fdr_q"] = np.nan  # BH-FDR across the rung family, within each population
+    for _, g in df.groupby("population"):
+        v = g["signed_rank_p"].notna()
+        if v.sum():
+            df.loc[g.index[v], "fdr_q"] = multipletests(
+                g.loc[v, "signed_rank_p"], method="fdr_bh"
+            )[1]
+    return df
+
+
+def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
+    """Reproducibility record saved alongside the audited results."""
+    try:
+        git_hash = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
+        ).stdout.strip()
+    except Exception:  # noqa: BLE001
+        git_hash = "unknown"
+    return {
+        "git_hash": git_hash,
+        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+        "n_sessions": int(n_sessions),
+        "smoke_max_per_animal": args.max_per_animal,
+        "inference": "per-session conditional Poisson; across-session Wilcoxon "
+        "signed-rank (session = unit); BH-FDR across the rung family per population",
+        "q_arm_source": "beta-model per-arm value (HMM q_arm harmonization deferred)",
+        "deferred": [
+            "common complete-case cohort across rungs",
+            "within-group-centered VIF (fitting.py:420 uses the raw design)",
+            "HMM per-arm q_arm",
+        ],
+    }
 
 
 def main() -> None:
@@ -287,6 +381,31 @@ def main() -> None:
     _summ(arm, ARM_LADDER, ARM_KEY_TERM)
     print("\n########## PATCH ##########")
     _summ(patch, PATCH_LADDER, PATCH_KEY_TERM)
+
+    # Audited aggregation: SE, per-session significance, per-animal sign, signed-rank
+    # p, and BH-FDR across the rung family — plus a provenance sidecar.
+    agg = pd.concat(
+        [
+            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "arm"),
+            _aggregate(patch, PATCH_LADDER, PATCH_KEY_TERM, "patch"),
+        ],
+        ignore_index=True,
+    )
+    agg.to_pickle(RC / "models" / f"swr_contrast_content_audited{sfx}.pkl")
+    prov = _provenance(args, ev.groupby(SC).ngroups)
+    (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
+        json.dumps(prov, indent=2)
+    )
+    logger.info("saved audited table (%d rows) + provenance -> %s", len(agg), RC / "models")
+    print(
+        "\n########## AUDITED (median coef, SE, %sig sessions, n/5, signed-rank p, FDR-q) ##########"
+    )
+    cols = [
+        "level", "model", "population", "term", "n_sessions", "median_coef",
+        "median_se", "pct_sig_session", "n_animals_pos", "signed_rank_p", "fdr_q",
+    ]
+    with pd.option_context("display.max_rows", None, "display.width", 220):
+        print(agg[cols].round(4).to_string(index=False))
 
 
 if __name__ == "__main__":
