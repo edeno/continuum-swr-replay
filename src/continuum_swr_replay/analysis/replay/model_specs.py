@@ -887,7 +887,12 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
                         "tsspostsw_x_current"], "split"),
     "C11_block": ([*BASEc, _TSC, "block_x_current"], "split"),
     "C12_switchrate": ([*BASEc, _TSC, "switchrate_x_current"], "split"),
-    "CS1_current": ([*BASEc, "swr_x_current"], "pooled"),
+    # CS1 is time-controlled: tsc_x_current (within-stop-time duration) is included
+    # UNCONDITIONALLY so swr_x_current is the SWR-specific current-arm effect BEYOND
+    # the general time course (SWR and non-SWR events differ in stop-time). CS1nt is
+    # the uncontrolled sensitivity twin (both report the same swr_x_current key term).
+    "CS1_current": ([*BASEc, "tsc_x_current", "swr_x_current"], "pooled"),
+    "CS1nt_current": ([*BASEc, "swr_x_current"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_prev"], "pooled"),
     "CS3_lastrew": ([*BASEc, "is_last_rewarded_elsewhere",
                      "swr_x_is_last_rewarded_elsewhere"], "pooled"),
@@ -902,7 +907,8 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C7_value": "relval_x_current", "C8_uncert": "entropy_x_current",
     "C9_update": "update_x_current", "C10_periswitch": "tss_x_current",
     "C11_block": "block_x_current", "C12_switchrate": "switchrate_x_current",
-    "CS1_current": "swr_x_current", "CS2_prev": "swr_x_prev",
+    "CS1_current": "swr_x_current", "CS1nt_current": "swr_x_current",
+    "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
     "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm_hmm",
 }
@@ -914,7 +920,11 @@ SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP2_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss"], "split"),
     "CP3_newgrowth": ([*BASEc_PATCH, "currentpatch_x_tss"], "split"),
     "CP4_switchrate": ([*BASEc_PATCH, "currentpatch_x_switchrate"], "split"),
-    "CPS1_current": ([*BASEc_PATCH, "swr_x_current_patch"], "pooled"),
+    # Time-controlled (currentpatch_x_tsc, within-stop-time) + uncontrolled twin,
+    # mirroring the arm CS1/CS1nt pair.
+    "CPS1_current": ([*BASEc_PATCH, "currentpatch_x_tsc",
+                      "swr_x_current_patch"], "pooled"),
+    "CPS1nt_current": ([*BASEc_PATCH, "swr_x_current_patch"], "pooled"),
     "CPS2_lastrew": ([*BASEc_PATCH, _LR_PATCH,
                       "swr_x_last_rewarded_patch_elsewhere"], "pooled"),
     "CPS3_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss",
@@ -925,6 +935,7 @@ SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
     "CP2_olddecay": "lastrewpatch_x_tss", "CP3_newgrowth": "currentpatch_x_tss",
     "CP4_switchrate": "currentpatch_x_switchrate",
     "CPS1_current": "swr_x_current_patch",
+    "CPS1nt_current": "swr_x_current_patch",
     "CPS2_lastrew": "swr_x_last_rewarded_patch_elsewhere",
     "CPS3_olddecay": "swr_x_lastrewpatch_tss",
 }

@@ -152,6 +152,10 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
     e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
     pt = pt.merge(e2s, on="event_id", how="left")
+    # time_since_stop is event-level (constant across arms/patches within an event);
+    # carry it for the within-stop-time duration control (currentpatch_x_tsc).
+    e2t = arm_ev[["event_id", "time_since_stop"]].drop_duplicates("event_id")
+    pt = pt.merge(e2t, on="event_id", how="left")
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
     q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     pt = pt.merge(stop[["stop_id", "recent_switch_rate"]], on="stop_id", how="left")
@@ -162,6 +166,9 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     lr = pt["is_last_rewarded_patch_elsewhere"].to_numpy(float)
     swr = pt["is_swr"].to_numpy(float)
     pt["currentpatch_x_tss"] = cp * pt["trials_since_switch_z"]
+    # within-stop-time duration control (z(log1p t) : is_current_patch), the patch
+    # analog of the arm tsc_x_current — used to time-control the SWR patch contrast.
+    pt["currentpatch_x_tsc"] = cp * _z(np.log1p(pt["time_since_stop"].to_numpy(float)))
     pt["lastrewpatch_x_tss"] = lr * pt["trials_since_switch_z"]
     pt["currentpatch_x_switchrate"] = cp * pt["recent_switch_rate_z"]
     pt["swr_x_current_patch"] = swr * cp
