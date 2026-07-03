@@ -25,7 +25,9 @@ corroborated by q_chosen/ΔV r=-0.67), RPE (unscaled `reward - Q_leaf`), HMM rew
 entropy (native `reward_entropy`, not the port-specific variant), global value update;
 + CONTEXT (peri-switch/
 block) from `qvals_table` and `recent_switch_rate` from `add_uncertainty_covariates`.
-One tidy row per (population, model, session); aggregate across sessions (signed-rank).
+One tidy row per (population, model, session), each carrying per-term coef + SE
+(``bse_*``) + p-value (``pval_*``); aggregate across sessions downstream (per-animal
+sign consistency primary, session signed-rank descriptive — see the content runner).
 
 Usage:
     uv run python scripts/rate/fit_swr_contrast_rate.py --max-per-animal 1   # smoke (~4 min)
@@ -122,8 +124,14 @@ def _fit(
     except _EXPECTED as e:
         return None, type(e).__name__
     out = {f"coef_{k}": v for k, v in res.params.items()}
+    # Within-session coefficient uncertainty: carry SE + p per term so downstream
+    # aggregation can weight/annotate (mirrors the content contrast runner). These
+    # are model-based (non-robust) SEs; clustered/robust inference is a follow-up.
+    out.update({f"bse_{k}": v for k, v in res.bse.items()})
+    out.update({f"pval_{k}": v for k, v in res.pvalues.items()})
     out.update(
-        n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic)
+        n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic),
+        n_params=int(len(res.params)),
     )
     return out, None
 
