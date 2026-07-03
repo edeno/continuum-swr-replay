@@ -21,14 +21,18 @@ Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
   CS1..CS5 is_swr:feature contrasts (pooled, 2-way; the dissociation)
 Event-scalar dissociations (C6-C12) come from comparing the split, not a pooled 3-way.
 
-Aggregation is AUDITED: per-session conditional-Poisson coefficients carry SE and
-p-values; across sessions we report median coef, median SE, per-session significance
-rate, per-animal sign consistency (n/5), the Wilcoxon signed-rank p (session = unit),
-and a **Benjamini-Hochberg FDR q across the rung family per population** (the
-multiple-comparison correction). A provenance sidecar (git hash, params) is written.
-DEFERRED follow-ups (noted in the provenance): a common complete-case cohort across
-rungs, within-group-centered VIF (`fitting.py` uses the raw design), and HMM per-arm
-``q_arm`` (this runner still uses the beta-model per-arm value).
+Aggregation is AUDITED. Per-session conditional-Poisson coefficients carry SE and
+p-values. **Primary population evidence is at the animal level (n=5)**: the animal-
+balanced median coef and per-animal sign consistency (``n_animals_pos`` / ``n_animals``).
+The Wilcoxon signed-rank across sessions is reported as a **descriptive** consistency
+statistic ONLY — sessions within an animal are not independent, so it is not a valid
+population p-value — with a Benjamini-Hochberg FDR across the rung family per population.
+``typical_session_se`` is the median within-session SE, not the aggregate's uncertainty.
+A provenance sidecar (git hash, params) is written. DEFERRED follow-ups (in the
+provenance): the **hierarchical Poisson with animal random effects** that would replace
+the descriptive session signed-rank with rigorous population inference; a common
+complete-case cohort; within-group-centered VIF (`fitting.py` uses the raw design); and
+HMM per-arm ``q_arm`` (this runner still uses the beta-model per-arm value).
 
 Usage:
     uv run python scripts/content/fit_swr_contrast_content.py               # full
@@ -257,11 +261,23 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
 def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> pd.DataFrame:
     """Audited across-session aggregation: one row per (model, population, term).
 
-    Reports median coef, median SE, per-session significance rate, per-animal sign
-    consistency, the across-session Wilcoxon signed-rank p (session = exchangeable
-    unit), and a Benjamini-Hochberg FDR q-value computed **across the rung family
-    within each population** (the multiple-comparison correction). Sessions with a
-    quasi-separated coef (|coef| > 10) are excluded before aggregating.
+    PRIMARY population evidence is at the **animal** level (n=5): ``coef_animal_median``
+    (median of per-animal median coefficients — balanced so animals with more sessions
+    do not dominate) and ``n_animals_pos`` / ``n_animals`` (sign consistency). With only
+    5 animals a frequentist p is barely meaningful, so the sign consistency IS the claim.
+
+    ``session_signrank_p`` is a **descriptive** consistency statistic across sessions,
+    NOT a population p-value: sessions within an animal are not independent, so treating
+    ~200 sessions as exchangeable units over-states significance. It is retained (with a
+    BH-FDR across the rung family within each population, ``session_signrank_fdr_q``) as a
+    "were the per-session effects consistently one-signed" descriptor only. The rigorous
+    population inference — one hierarchical Poisson per rung with animal random effects —
+    is the deferred mixed-model follow-up recorded in the provenance.
+
+    ``typical_session_se`` is the median of the *per-session* SEs (typical within-session
+    precision) — it is NOT the uncertainty of the aggregate effect. Sessions with a
+    quasi-separated coef (|coef| > 10) or a NaN coef are excluded and counted in
+    ``n_dropped``.
     """
     rows = []
     for name in ladder:
@@ -271,14 +287,17 @@ def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> p
         ccol, scol, pcol = f"coef_{term}", f"bse_{term}", f"pval_{term}"
         scope = ladder[name][1]
         for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
-            s = res[(res.model == name) & (res.population == pop)]
-            if ccol not in s.columns:
+            s_all = res[(res.model == name) & (res.population == pop)]
+            if ccol not in s_all.columns:
                 continue
-            ok = s[ccol].notna() & (s[ccol].abs() < 10)  # drop quasi-separated
-            s = s[ok]
+            present = s_all[ccol].notna()
+            kept = present & (s_all[ccol].abs() < 10)  # drop quasi-separated
+            n_dropped = int((present & ~kept).sum())
+            s = s_all[kept]
             if len(s) < 5:
                 continue
             coef = s[ccol]
+            per_animal = s.groupby("animal")[ccol].median()
             srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
             rows.append(
                 {
@@ -287,25 +306,40 @@ def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> p
                     "population": pop,
                     "term": term,
                     "n_sessions": len(s),
-                    "median_coef": float(coef.median()),
-                    "median_se": float(s[scol].median()) if scol in s else np.nan,
-                    "pct_positive": float((coef > 0).mean()),
-                    "n_animals_pos": int((s.groupby("animal")[ccol].median() > 0).sum()),
+                    "n_animals": int(per_animal.size),
+                    "n_dropped": n_dropped,
+                    # animal-level = primary population evidence
+                    "coef_animal_median": float(per_animal.median()),
+                    "n_animals_pos": int((per_animal > 0).sum()),
+                    # session-level = descriptive support
+                    "coef_session_median": float(coef.median()),
+                    "typical_session_se": (
+                        float(s[scol].median()) if scol in s else np.nan
+                    ),
+                    "pct_positive_session": float((coef > 0).mean()),
                     "pct_sig_session": (
                         float((s[pcol] < 0.05).mean()) if pcol in s else np.nan
                     ),
-                    "signed_rank_p": srp,
+                    "session_signrank_p": srp,
                 }
             )
     df = pd.DataFrame(rows)
     if df.empty:
         return df
-    df["fdr_q"] = np.nan  # BH-FDR across the rung family, within each population
+    n_dropped_total = int(df["n_dropped"].sum())
+    if n_dropped_total:
+        logger.info(
+            "%s: dropped %d quasi-separated/NaN session-fits before aggregating",
+            level,
+            n_dropped_total,
+        )
+    # BH-FDR of the (descriptive) session signed-rank p, across the rung family per pop.
+    df["session_signrank_fdr_q"] = np.nan
     for _, g in df.groupby("population"):
-        v = g["signed_rank_p"].notna()
+        v = g["session_signrank_p"].notna()
         if v.sum():
-            df.loc[g.index[v], "fdr_q"] = multipletests(
-                g.loc[v, "signed_rank_p"], method="fdr_bh"
+            df.loc[g.index[v], "session_signrank_fdr_q"] = multipletests(
+                g.loc[v, "session_signrank_p"], method="fdr_bh"
             )[1]
     return df
 
@@ -324,9 +358,15 @@ def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
         "n_sessions": int(n_sessions),
         "smoke_max_per_animal": args.max_per_animal,
         "inference": "per-session conditional Poisson; across-session Wilcoxon "
-        "signed-rank (session = unit); BH-FDR across the rung family per population",
+        "signed-rank across sessions is DESCRIPTIVE only (sessions within an animal "
+        "are not independent); primary population evidence is per-animal sign "
+        "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
+        "per population is applied to the descriptive session signed-rank p.",
         "q_arm_source": "beta-model per-arm value (HMM q_arm harmonization deferred)",
         "deferred": [
+            "hierarchical Poisson per rung with animal random effects "
+            "(the rigorous population inference; supersedes the descriptive session "
+            "signed-rank p)",
             "common complete-case cohort across rungs",
             "within-group-centered VIF (fitting.py:420 uses the raw design)",
             "HMM per-arm q_arm",
@@ -398,11 +438,13 @@ def main() -> None:
     )
     logger.info("saved audited table (%d rows) + provenance -> %s", len(agg), RC / "models")
     print(
-        "\n########## AUDITED (median coef, SE, %sig sessions, n/5, signed-rank p, FDR-q) ##########"
+        "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"
     )
     cols = [
-        "level", "model", "population", "term", "n_sessions", "median_coef",
-        "median_se", "pct_sig_session", "n_animals_pos", "signed_rank_p", "fdr_q",
+        "level", "model", "population", "term", "n_sessions", "n_animals",
+        "coef_animal_median", "n_animals_pos", "coef_session_median",
+        "typical_session_se", "pct_sig_session", "session_signrank_p",
+        "session_signrank_fdr_q",
     ]
     with pd.option_context("display.max_rows", None, "display.width", 220):
         print(agg[cols].round(4).to_string(index=False))
