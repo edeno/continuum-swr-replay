@@ -163,10 +163,11 @@ the event it predicts. Classification of the covariates fitted by the rate model
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
 
 The three post-outcome covariates are the only leakage risk. **Empirically there is
-no leakage:** on rewarded stops, 0.0% of non-local/SWR/MUA events occur before the
-reward pump (min `t_since_pump` ≈ 1.0 s, median ≈ 3.8 s; `event_onset_table`), so
-the realized outcome is always known ≥ ~1 s before any modeled event. Re-check this
-exposure if the immobility/event-window definition changes.
+no leakage in the current cached tables:** on rewarded stops, 0.0% of
+non-local/SWR/MUA events occur before the reward pump (minimum finite
+`t_since_pump` is ≈0.03 s for non-local events, with median ≈4.07 s;
+`event_onset_table`), so the realized outcome is known before the modeled event.
+Re-check this exposure if the immobility/event-window definition changes.
 
 ## G. Base covariate reference
 

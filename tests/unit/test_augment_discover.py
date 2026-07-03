@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "_augment_data_over_time.py"
+_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "exploratory" / "_augment_data_over_time.py"
 _spec = importlib.util.spec_from_file_location("_augment_dot", _SCRIPT)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

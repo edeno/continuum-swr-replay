@@ -47,10 +47,10 @@ _load_script_module = _load_script_helper
 
 
 resolve_contfrag_paths = _load_script_module(
-    "fit_replay_content_models.py", "resolve_contfrag_paths"
+    "content/fit_replay_content_models.py", "resolve_contfrag_paths"
 )
 contfrag_table_basenames = _load_script_module(
-    "prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
+    "decoding/prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
 )
 
 

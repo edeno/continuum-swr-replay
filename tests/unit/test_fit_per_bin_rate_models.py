@@ -22,7 +22,7 @@ from continuum_swr_replay.analysis.replay import (
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_per_bin_rate_models",
-    Path(__file__).resolve().parents[2] / "scripts" / "fit_per_bin_rate_models.py",
+    Path(__file__).resolve().parents[2] / "scripts" / "rate" / "fit_per_bin_rate_models.py",
 )
 fprm = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(fprm)

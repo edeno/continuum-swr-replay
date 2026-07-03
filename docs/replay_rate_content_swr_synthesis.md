@@ -62,7 +62,7 @@ Re-fit of the occurrence-rate dissociation with **paper-faithful HMM covariates*
 (`hmm_relative_value`/`hmm_rpe`/`reward_entropy`/`hmm_value_update`; single
 `default_hmm` model) on the per-bin **`is_swr`-contrast (Design B)** ladder —
 stratified `G0–G8` (×{all, SWR, non-SWR}) + stacked-contrast `S0–S10`.
-Runner `scripts/fit_swr_contrast_rate.py`; 218 sessions →
+Runner `scripts/rate/fit_swr_contrast_rate.py`; 218 sessions →
 `models_per_bin_rate/swr_contrast_rate.pkl`. Inference: per-session fit + **per-session
 likelihood-ratio tests** aggregated as *% sessions significant / binomial p* (the
 power-robust read; pooled χ² is over-powered by the per-bin n).
@@ -99,7 +99,7 @@ covers the separate M0–M9 ladder. These findings live here.)*
 
 `ripple_power_z` (event-mean consensus ripple power — the signal the Kay detector
 thresholds, so `is_swr` is its thresholded version). Per-event regression
-(`scripts/fit_swr_power_model.py`):
+(`scripts/rate/fit_swr_power_model.py`):
 
 - **Distribution is ~unimodal** (Sarle bimodality 0.524; no gap at the detection
   threshold) → the SWR/non-SWR split looks like a **cut on a continuum**, not two
@@ -136,7 +136,7 @@ So **non-SWR content is value-neutral; with-SWR content is value-avoidant**
 
 **New — behavioral modulation of current-arm content** (`is_current`
 interactions, **duration-controlled** with `time_since_stop × is_current`;
-`scripts/_content_reward_interactions.py`):
+`scripts/exploratory/_content_reward_interactions.py`):
 
 | interaction | non-SWR | with-SWR | reading |
 | --- | --- | --- | --- |
@@ -154,7 +154,7 @@ masking it — so it is not a dwell artifact. The reward/value content effects a
 
 Content analog of the rate `is_swr`-contrast ladder, with paper-faithful HMM
 covariates entered as `:is_current` interactions (event-scalars) or per-arm main
-effects. Runner `scripts/fit_swr_contrast_content.py`; 218 sessions →
+effects. Runner `scripts/content/fit_swr_contrast_content.py`; 218 sessions →
 `models/swr_contrast_content_{arm,patch}.pkl`. Conditional Poisson over arms(9)/
 patches(3), per-session fit + across-session median / signed-rank / per-animal (n/5).
 **Exploratory** pending Phase-4 audited diagnostics (per-fit SE/p, family FDR,
@@ -264,7 +264,7 @@ within-group-centered VIF, common cohort); `q_arm` is still the beta per-arm val
   `time_since_stop × is_current`; the reward content effect *strengthened* under
   it (drift is toward current), so it is not a dwell artifact. Control is linear
   in `z(log1p t)` — a spline would be stricter.
-- **Collinearity:** `recent_trial_reward_rate` (= mean of the reward lags, VIF ∞)
+- **Collinearity:** `reward_rate_trial_k10` (= mean of the reward lags, VIF ∞)
   removed; value covariate set curated to VIF ≤ 1.07.
 - **Separation:** with-SWR `is_last_rewarded_elsewhere` magnitude is a sparse-
   subset artifact (the per-session `ValueError`s) — direction only.
@@ -282,16 +282,16 @@ within-group-centered VIF, common cohort); `q_arm` is still the beta per-arm val
 
 ## Reproducibility (scripts & key commits)
 
-- Rate: `scripts/fit_per_bin_rate_models.py`, `fit_uncertainty_rate.py` (canonical
+- Rate: `scripts/rate/fit_per_bin_rate_models.py`, `fit_uncertainty_rate.py` (canonical
   contingency, curated covariates).
-- Coupling: `scripts/fit_swr_power_model.py`.
-- Content: `scripts/fit_replay_content_models.py` (re-fit 6 configs);
-  `scripts/_verify_content_models.py`; `scripts/_content_reward_interactions.py`.
-- Contingency: `scripts/fetch_spatial_bandit_behavior.sh`,
+- Coupling: `scripts/rate/fit_swr_power_model.py`.
+- Content: `scripts/content/fit_replay_content_models.py` (re-fit 6 configs);
+  `scripts/exploratory/_verify_content_models.py`; `scripts/exploratory/_content_reward_interactions.py`.
+- Contingency: `scripts/behavior/fetch_spatial_bandit_behavior.sh`,
   `scripts/_bandit_csv_contingency.py`.
-- Reality check on reward-modulated content: `scripts/analyze_event_spike_evidence.py`
-  (now emits per-event `start_time`) + `scripts/_reality_reward_test.py`;
-  content destination: `scripts/_content_patch_destination.py`.
+- Reality check on reward-modulated content: `scripts/qa/analyze_event_spike_evidence.py`
+  (now emits per-event `start_time`) + `scripts/exploratory/_reality_reward_test.py`;
+  content destination: `scripts/exploratory/_content_patch_destination.py`.
 - Commits: `6d63566` (collinearity fix), `b246e66` (canonical contingency),
   `6d9983c` (SWR-power model), `0dc2dfa` (content re-verify), `45dc147`
   (duration-controlled content interactions).

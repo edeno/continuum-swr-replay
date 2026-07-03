@@ -1,7 +1,7 @@
 # Content models — proposed design (parallel to the is_swr per-bin RATE ladder)
 
 Working spec for review. The RATE ladder is built and run
-(`scripts/fit_swr_contrast_rate.py`, `docs/models_table.md` "is_swr version").
+(`scripts/rate/fit_swr_contrast_rate.py`, `docs/models_table.md` "is_swr version").
 The CONTENT ladder below is proposed, not yet implemented. The goal: ask the
 SAME task-dimension questions of replay *content* (what an event represents)
 that the rate ladder asks of replay *rate* (how often events occur), harmonized
@@ -151,7 +151,7 @@ CPS3 + is_swr:(is_last_rewarded_patch:trials_since_switch)   # is the old-patch 
   identical to the rate side.
 
 (This doc holds the content model DESIGN only. Model specifications live in
-`docs/models_table.md` (R notation) and the runner `scripts/fit_swr_contrast_rate.py`;
+`docs/models_table.md` (R notation) and the runner `scripts/rate/fit_swr_contrast_rate.py`;
 fitted rate output is `Processed-Data/replay_content/models_per_bin_rate/
 swr_contrast_rate.pkl`. Neither catalogs nor design docs hold analysis RESULTS.
 The only rate dependency here is the *decision* above that content is NOT pruned

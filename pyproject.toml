@@ -95,7 +95,7 @@ ignore = [
 # the file's ``from __future__ import annotations``.
 "src/continuum_swr_replay/data_loaders/bandit_task.py" = ["E402"]
 # Archived figure scripts retained for historical reference; not linted.
-"scripts/archive/**" = ["ALL"]
+"scripts/figures/archive/**" = ["ALL"]
 
 [tool.mypy]
 python_version = "3.11"

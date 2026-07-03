@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = REPO_ROOT / "scripts" / "compare_event_source_models.py"
+SCRIPT_PATH = REPO_ROOT / "scripts" / "content" / "compare_event_source_models.py"
 
 
 def _load_compare_script():

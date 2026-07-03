@@ -86,7 +86,7 @@ def _stop_call_index_and_event_return_index(
             "build_stop_table",
         ),
         (
-            "scripts/prepare_contfrag_replay_content_data.py",
+            "scripts/decoding/prepare_contfrag_replay_content_data.py",
             "build_contfrag_stop_table",
         ),
     ],

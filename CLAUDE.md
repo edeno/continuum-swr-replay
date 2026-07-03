@@ -72,7 +72,9 @@ src/continuum_swr_replay/
 │   └── pfc/              # Prefrontal cortex analysis
 └── visualization/         # Visualization utilities
 
-scripts/                   # Analysis scripts
+scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
+├── decoding/  rate/  content/  behavior/  figures/  qa/  pfc/
+└── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # Paper materials (data, figures, manuscript)
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
 ├── design/               #   scientific/methodological design specs (human-discoverable)
@@ -223,8 +225,8 @@ offset — the literature-comparable layer) and **Family B**
 time course + reward kernel + self-history — the confound-free layer). See
 [docs/rate_models.md](docs/rate_models.md) for which family to cite for what,
 the M0–M9 ladder, and the point-process model-checking. Runners:
-`scripts/fit_per_stop_rate_models.py`, `scripts/fit_per_bin_rate_models.py`;
-plotter: `scripts/plot_per_bin_rate_models.py`.
+`scripts/rate/fit_per_stop_rate_models.py`, `scripts/rate/fit_per_bin_rate_models.py`;
+plotter: `scripts/rate/plot_per_bin_rate_models.py`.
 
 ### Loading data for a session
 
@@ -309,7 +311,7 @@ Epoch counts are computed dynamically by `get_epoch_info()`, which queries Spygl
 
 ## Running Decoding Analysis
 
-The main analysis workflow is in `scripts/run_decoding_bandit.py`, which performs continuum decoding using non-local detection algorithms.
+The main analysis workflow is in `scripts/decoding/run_decoding_bandit.py`, which performs continuum decoding using non-local detection algorithms.
 
 ### Decoding Workflow
 
@@ -344,16 +346,16 @@ non_local_threshold = 0.8  # threshold for classifying non-local events
 
 ```bash
 # Decode all sessions for an animal
-uv run python scripts/run_decoding_bandit.py --animal chimi --brain_area HPC
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --brain_area HPC
 
 # Decode specific session
-uv run python scripts/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
 
 # With non-stationary model and figurl
-uv run python scripts/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
 
 # Overwrite existing results
-uv run python scripts/run_decoding_bandit.py --animal chimi --overwrite
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
 ```
 
 ### GPU and Distributed Computing

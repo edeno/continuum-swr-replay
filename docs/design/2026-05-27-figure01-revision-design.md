@@ -1,7 +1,7 @@
 # Figure 1 Revision — Design
 
 **Date:** 2026-05-27
-**File touched:** `scripts/generate_figure01.py`
+**File touched:** `scripts/figures/generate_figure01.py`
 **Output:** `paper/figures/figure01/figure01.{pdf,png}`
 
 ## Motivation

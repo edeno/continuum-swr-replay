@@ -16,7 +16,7 @@ import pytest
 
 _SPEC = importlib.util.spec_from_file_location(
     "_statescript_contingency",
-    Path(__file__).resolve().parents[2] / "scripts" / "_statescript_contingency.py",
+    Path(__file__).resolve().parents[2] / "scripts" / "exploratory" / "_statescript_contingency.py",
 )
 ssc = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(ssc)

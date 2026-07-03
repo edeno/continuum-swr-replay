@@ -139,7 +139,7 @@ dissociation, per bin. Response `count` = non-local onset count per **15 ms bin*
 `tmax = 4 s`. **Fit per session, aggregate coefficients across sessions** (signed-rank).
 Specs: `model_specs.py` (`SWR_CONTRAST_RATE_G_SPECS` / `_S_SPECS`; content ladders
 `SWR_CONTRAST_CONTENT_ARM_LADDER` / `_PATCH_LADDER`) — the single source of truth.
-Runners: `scripts/fit_swr_contrast_rate.py`, `scripts/fit_swr_contrast_content.py`
+Runners: `scripts/rate/fit_swr_contrast_rate.py`, `scripts/content/fit_swr_contrast_content.py`
 (import the specs; keep only data-assembly + fitting).
 
 Shorthands / covariate blocks. The task dimensions are **the paper's variables

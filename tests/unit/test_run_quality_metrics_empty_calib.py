@@ -54,7 +54,7 @@ def test_plot_calibration_curves_handles_empty_calib_frame(tmp_path):
         "pd": pd,
     }
     fn = _load_script_helper(
-        "run_quality_metrics.py", "_plot_calibration_curves", namespace
+        "qa/run_quality_metrics.py", "_plot_calibration_curves", namespace
     )
     # Must not raise.
     fn(pd.DataFrame(), tmp_path)

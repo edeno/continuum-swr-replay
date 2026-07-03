@@ -8,14 +8,14 @@ Numbers below are the **fixed-knot-spline** run (the time-course spline uses
 fixed shared knots so its coefficients are cross-session comparable and the
 fitted curve is reconstructable — see §1b); spline-model values shifted <2% from
 the earlier data-driven-knot run, conclusions unchanged. Regenerate with
-`uv run python scripts/summarize_per_bin_rate_models.py`.
+`uv run python scripts/rate/summarize_per_bin_rate_models.py`.
 
 **Figures:** the six-panel visual companion is
 `paper/figures/per_bin_rate_ladder_summary.png`
-(`scripts/plot_per_bin_rate_summary.py`); detailed kernel / GOF figures are
+(`scripts/rate/plot_per_bin_rate_summary.py`); detailed kernel / GOF figures are
 `reward_kernel_per_bin_rate.png`, `selfhistory_autocorr.png`,
 `model_checking_ladder.png`, `model_checking_example_{rich,sparse}.png`
-(`scripts/plot_per_bin_rate_models.py`, `scripts/plot_model_checking.py`).
+(`scripts/rate/plot_per_bin_rate_models.py`, `scripts/rate/plot_model_checking.py`).
 
 Effects are reported **per event-type population**: detected SWR (LFP ripples,
 `n_SWR`), all non-local decoding events, and the non-local split by SWR overlap

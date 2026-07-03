@@ -189,6 +189,6 @@ the all-events result waits on the (deferred) re-decode.
 ## Reusable script target
 
 Promote the prototype (`scratchpad/proto4.py`) into a documented script,
-e.g. `scripts/analyze_event_spike_evidence.py`, with the components above,
+e.g. `scripts/qa/analyze_event_spike_evidence.py`, with the components above,
 a `--session`/`--animal` CLI, cached marks, and the three figures written to
 `paper/figures/reality/`.

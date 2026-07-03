@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
-    Path(__file__).resolve().parents[2] / "scripts" / "fit_uncertainty_rate.py",
+    Path(__file__).resolve().parents[2] / "scripts" / "rate" / "fit_uncertainty_rate.py",
 )
 fur = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(fur)
