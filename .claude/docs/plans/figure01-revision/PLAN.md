@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.x, matplotlib (`gridspec`, `patches`), numpy, `non_local_detector` package (read-only — used to source the actual transition matrix diagonal).
 
-**Spec:** `docs/superpowers/specs/2026-05-27-figure01-revision-design.md`
+**Spec:** `docs/design/2026-05-27-figure01-revision-design.md`
 
 ---
 

@@ -95,7 +95,7 @@ likewise dropped — flat-vs-peaked likelihood handles them). **Decode-save /
 all-events:** the decode now persists `log_likelihood`; the full decode-pinned
 all-events run (reading it, no recompute) is **deferred to the re-decode** (the
 30-cap recompute sweep was killed). Spec:
-`docs/superpowers/specs/2026-06-25-non-swr-event-reality-design.md`.
+`docs/design/2026-06-25-non-swr-event-reality-design.md`.
 
 Open decision (B): headline claims cover **all** events or the **remote**
 subset? Default remote-clean; close is shown separately and clears the W2 part

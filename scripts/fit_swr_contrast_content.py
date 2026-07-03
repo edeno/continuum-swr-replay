@@ -5,7 +5,7 @@ The content analog of ``scripts/fit_swr_contrast_rate.py``. Where the rate ladde
 models HOW OFTEN non-local events occur (Poisson count per time bin), this models
 WHICH ARM / PATCH an event represents: a conditional Poisson over the 9 arms (or 3
 patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
-``.claude/research/content_model_design.md``.
+``docs/design/content_model_design.md``.
 
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,

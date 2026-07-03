@@ -8,7 +8,7 @@ columns the same way the posterior rollups in :mod:`uncertainty` do. The
 ``groupby(sort=True)`` order the table builders assert against.
 
 Definitions follow the design spec
-``docs/superpowers/specs/2026-06-23-replay-trajectory-metrics-design.md``.
+``docs/design/2026-06-23-replay-trajectory-metrics-design.md``.
 """
 
 from __future__ import annotations

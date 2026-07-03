@@ -74,7 +74,17 @@ src/continuum_swr_replay/
 
 scripts/                   # Analysis scripts
 paper/                     # Paper materials (data, figures, manuscript)
+docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
+├── design/               #   scientific/methodological design specs (human-discoverable)
+└── known_issues/
+.claude/docs/              # Agent-process docs (not scientific record)
+├── plans/                #   phased implementation plans
+└── reviews/              #   code/methods review reports
+.claude/research/          # Exploratory scratch analyses + *_outputs/ figures
 ```
+
+> Documentation homes are indexed in [docs/README.md](docs/README.md): published/scientific
+> docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
 
 ## Key Architecture Concepts
 
