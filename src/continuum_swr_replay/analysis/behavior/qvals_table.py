@@ -68,6 +68,11 @@ HMM_COLS = ["state_entropy", "reward_entropy"]
 # uses the native HMM `reward_entropy` (in HMM_COLS); the paper's port-specific
 # `reward_entropy_current_leaf` is absent from this (HMM_KEY-aligned) fit.
 HMM_DV_COLS = ["hmm_relative_value", "hmm_rpe", "hmm_value_update"]
+# Per-leaf HMM value (native Q1..6 of the Global Model), exposed 0-indexed as the
+# HMM analog of the beta ``q_port{0..5}`` block so the content/choice builders can
+# form a *single-model* per-arm value (``q_arm_hmm``) harmonized with the HMM value
+# covariates the is_swr rate ladder uses -- see attach_contingency_value_block.
+HMM_Q_PORT_COLS = [f"hmm_q_port{i}" for i in range(6)]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
 # Beta value timing: row t holds PRE-outcome belief for trial t (vendored DV docs).
@@ -98,6 +103,8 @@ COVARIATES = [
     "state_entropy", "reward_entropy",
     # paper-faithful HMM decision variables (single-model canonical set; Comrie et al.)
     *HMM_DV_COLS,
+    # per-leaf HMM value (Q1..6, 0-indexed) -> q_arm_hmm, the HMM per-arm value
+    *HMM_Q_PORT_COLS,
     # depletion / choice probabilities
     *[f"depletion_leaf_{i}" for i in range(1, 7)],
     *[f"depletion_mean_stem_{i}" for i in range(1, 4)],
@@ -276,6 +283,10 @@ def add_hmm_decision_variables(hmm: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"HMM stemchoice outside 1..3: {sorted(sc.unique())}")
     g = d.groupby(["nwb_file_name", "epoch"], sort=False)
     qmat = d[[f"Q{i}" for i in range(1, 7)]].to_numpy()
+    # Expose the per-leaf HMM value 0-indexed (hmm_q_port{i} = Q{i+1}), the HMM
+    # counterpart of the beta q_port block, for the per-arm value harmonization.
+    for i in range(6):
+        d[f"hmm_q_port{i}"] = qmat[:, i]
     leaf = d["leaf"].to_numpy().astype(int)
     q_leaf_t = qmat[np.arange(len(d)), leaf - 1]
     d["hmm_rpe"] = d["reward"].to_numpy() - q_leaf_t
@@ -340,7 +351,7 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     subject = ANIMAL_SUBJECT[animal]
     vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
     hmm = add_hmm_decision_variables(_fetch_model_df(rl, subject, HMM_KEY))
-    hmm = hmm[[*KEYS, *HMM_COLS, *HMM_DV_COLS]]
+    hmm = hmm[[*KEYS, *HMM_COLS, *HMM_DV_COLS, *HMM_Q_PORT_COLS]]
     vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
     vals = add_experienced_value_columns(vals)  # q_chosen / arm / q_port / rpe
     model_cols = [c for c in COVARIATES if c in vals.columns]
@@ -447,7 +458,7 @@ def main() -> None:
     # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
     # make attach_contingency_value_block blank the whole value block downstream.
     required = {"stop_id", "p_reward_current", "q_chosen", *[f"p_reward_port{i}" for i in range(6)],
-                *[f"q_port{i}" for i in range(6)]}
+                *[f"q_port{i}" for i in range(6)], *HMM_Q_PORT_COLS}
     missing = required - set(tab.columns)
     if missing:
         raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")

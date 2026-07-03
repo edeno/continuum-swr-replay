@@ -211,12 +211,15 @@ _M7 = (
     "swr_x_is_last_rewarded_elsewhere",
 )
 # Value block: per-arm nominal value (p_reward_arm) + per-arm model value
-# (q_arm, Q) as conditional main effects on the M5 spatial/reward-memory base
-# (covariate_dictionary.md D2/D3). Additive in *spec* — but because
-# p_reward_arm/q_arm are NaN for stops absent from the contingency, co-fitting Mv
-# in the same run restricts the shared complete-case event set, so it is excluded
-# from the default model list (request --models M5,Mv to compare it to its base).
-_Mv = (*_M5, "p_reward_arm", "q_arm")
+# (q_arm_hmm, the HMM Global-Model per-leaf Q) as conditional main effects on the
+# M5 spatial/reward-memory base (covariate_dictionary.md D2/D3). q_arm_hmm — not the
+# beta q_arm — is used so the content value construct is the same single model as the
+# is_swr rate ladder's HMM value covariates (the beta q_arm column is retained in the
+# table for a robustness check). Additive in *spec* — but because p_reward_arm/
+# q_arm_hmm are NaN for stops absent from the contingency, co-fitting Mv in the same
+# run restricts the shared complete-case event set, so it is excluded from the default
+# model list (request --models M5,Mv to compare it to its base).
+_Mv = (*_M5, "p_reward_arm", "q_arm_hmm")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -277,7 +280,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         name="Mv",
         predictors=_Mv,
         description="+ per-arm nominal value (p_reward_arm) + per-arm "
-        "model value (q_arm, Q)",
+        "HMM model value (q_arm_hmm, Q)",
         parent="M5",
     ),
 }
@@ -874,7 +877,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C1_current": ([*ARMFE, "is_current"], "split"),
     "C2_base": (BASEc, "split"),
     "C3_armreward": ([*BASEc, "reward_rate_arm_k10"], "split"),
-    "C4_armvalue": ([*BASEc, "q_arm"], "split"),
+    "C4_armvalue": ([*BASEc, "q_arm_hmm"], "split"),
     "C5_lastrew": ([*BASEc, "is_last_rewarded_elsewhere"], "split"),
     "C6_rpe": ([*BASEc, _TSC, "rpe_x_current"], "split"),
     "C7_value": ([*BASEc, _TSC, "relval_x_current"], "split"),
@@ -890,18 +893,18 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
                      "swr_x_is_last_rewarded_elsewhere"], "pooled"),
     "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
                        "swr_x_reward_rate_arm_k10"], "pooled"),
-    "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
+    "CS5_armvalue": ([*BASEc, "q_arm_hmm", "swr_x_q_arm_hmm"], "pooled"),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C1_current": "is_current", "C2_base": "is_current",
-    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm",
+    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm_hmm",
     "C5_lastrew": "is_last_rewarded_elsewhere", "C6_rpe": "rpe_x_current",
     "C7_value": "relval_x_current", "C8_uncert": "entropy_x_current",
     "C9_update": "update_x_current", "C10_periswitch": "tss_x_current",
     "C11_block": "block_x_current", "C12_switchrate": "switchrate_x_current",
     "CS1_current": "swr_x_current", "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
-    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm",
+    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm_hmm",
 }
 BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"

@@ -90,7 +90,7 @@ M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_rece
 M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
 M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
                  + swr_x_is_last_rewarded_elsewhere
-Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
+Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm_hmm
 ```
 
 ## Content — patch
@@ -242,5 +242,7 @@ design columns; verified by `_verify_harmonization_parity`, see
 | Per-stop rate (A) | — | R0, R1, R2, Rlag |
 
 Changed drivers: `reward_rate_arm_k10` (5→10 visits), the value block
-`p_reward_arm`/`q_arm` (now the beta-model belief from `qvals_table`), model
-`rpe`/`q_current`, and the choice `dist_to_arm`→`arm_dist_rank` swap.
+`p_reward_arm`/`q_arm_hmm` (the value rungs C4/CS5/Mv now use the HMM per-arm
+value `q_arm_hmm`, harmonized with the is_swr rate ladder; the beta `q_arm`
+column is retained for robustness), model `rpe`/`q_current`, and the choice
+`dist_to_arm`→`arm_dist_rank` swap.

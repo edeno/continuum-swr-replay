@@ -56,7 +56,8 @@ arms keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 | `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
 | `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
-| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | same behavior model | content/choice main effect |
+| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | same behavior model | robustness column (retained; superseded by `q_arm_hmm` in the value rungs) |
+| `q_arm_hmm` | **HMM** Global-Model per-leaf value of **each** arm (`hmm_q_port{i}` = HMM `Q{i+1}`) | per-arm | `default_hmm` (`qvals_table`) | content/choice value main effect — **the value construct used by C4/CS5/Mv**, harmonized with the is_swr rate ladder's `hmm_*` value covariates |
 | `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred

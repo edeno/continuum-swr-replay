@@ -86,6 +86,9 @@ from ._helpers import (
     attach_contingency_value_block as _attach_contingency_value_block,
 )
 from ._helpers import (
+    attach_hmm_arm_value as _attach_hmm_arm_value,
+)
+from ._helpers import (
     build_well_to_arm_map as _build_well_to_arm_map,
 )
 from ._helpers import (
@@ -1302,6 +1305,12 @@ def build_event_arm_table(
     long["p_reward_arm"], long["q_arm"] = _attach_contingency_value_block(
         long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
     )
+    # q_arm_hmm: the same per-arm value from the HMM (Global Model) rather than the
+    # beta block, so the content value covariate is the single-model construct
+    # harmonized with the is_swr rate ladder's HMM value covariates.
+    long["q_arm_hmm"] = _attach_hmm_arm_value(
+        long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
+    )
 
     # Interactions (plan §1.7). Event-level × arm-level products.
     tss = long["time_since_stop"].to_numpy()
@@ -1336,6 +1345,7 @@ def build_event_arm_table(
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
     )
+    long["swr_x_q_arm_hmm"] = is_swr_i * long["q_arm_hmm"].to_numpy()
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -1684,6 +1694,7 @@ def _event_arm_table_columns() -> list[str]:
         "reward_rate_arm_k10",
         "p_reward_arm",
         "q_arm",
+        "q_arm_hmm",
         # Interactions (plan §1.7 + collinearity control)
         "current_x_last_rewarded",
         "time_x_current",
@@ -1696,6 +1707,7 @@ def _event_arm_table_columns() -> list[str]:
         "swr_x_reward_rate_arm_k10",
         "swr_x_visit_recency_demeaned",
         "swr_x_is_last_rewarded_elsewhere",
+        "swr_x_q_arm_hmm",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",

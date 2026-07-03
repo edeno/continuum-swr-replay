@@ -30,6 +30,10 @@ ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 _SESSION_COLS = ["animal", "day", "epoch"]
 _P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
 _Q_PORT_COLS = [f"q_port{i}" for i in range(6)]
+# HMM Global-Model per-leaf value (qvals_table hmm_q_port{0..5}); the single-model
+# counterpart of _Q_PORT_COLS used to build q_arm_hmm harmonized with the HMM value
+# covariates the is_swr rate ladder uses.
+_Q_PORT_HMM_COLS = [f"hmm_q_port{i}" for i in range(6)]
 
 
 UNCERTAINTY_COVARIATES = (
@@ -750,3 +754,57 @@ def attach_contingency_value_block(
     p_reward_arm = np.where(leaf, port_mat[row, leaf_idx], trunk_fill)
     q_arm = np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
     return p_reward_arm, q_arm
+
+
+def attach_hmm_arm_value(
+    arm: np.ndarray,
+    stop_id: np.ndarray,
+    contingency: pd.DataFrame | None,
+) -> np.ndarray:
+    """Per-arm HMM value ``q_arm_hmm`` -- the HMM (Global-Model) counterpart of
+    ``q_arm``.
+
+    Built with the SAME leaf->arm mapping as :func:`attach_contingency_value_block`
+    but sourced from the HMM per-leaf value (``hmm_q_port{0..5}``) rather than the
+    beta ``q_port`` block, so the content/choice value covariate comes from the same
+    single model (default_hmm) as the ``hmm_*`` value covariates used by the is_swr
+    rate ladder. Leaf arm ``j`` takes ``hmm_q_port{j}``; trunk arms (6-8) take ``0.0``
+    where the stop has an HMM value row and ``NaN`` where absent, so a stop missing
+    the HMM value drops uniformly across all nine arms at fit time (matching q_arm).
+
+    Parameters
+    ----------
+    arm : np.ndarray, shape (n_rows,)
+        Arm id per row (0-5 leaf, 6-8 trunk).
+    stop_id : np.ndarray, shape (n_rows,)
+        Stop id per row, keyed into ``contingency``.
+    contingency : pd.DataFrame or None
+        ``qvals_table`` rows carrying ``hmm_q_port{0..5}``; ``None`` -> all NaN.
+
+    Returns
+    -------
+    q_arm_hmm : np.ndarray, shape (n_rows,)
+    """
+    arm = np.asarray(arm)
+    n_rows = len(arm)
+    if contingency is None:
+        return np.full(n_rows, np.nan)
+    missing = set(_Q_PORT_HMM_COLS) - set(contingency.columns)
+    if missing:
+        raise ValueError(
+            "contingency is missing per-arm HMM value columns "
+            f"{sorted(missing)}; regenerate qvals_table with `python -m "
+            "continuum_swr_replay.analysis.behavior.qvals_table --write` "
+            "(carries hmm_q_port{0..5})."
+        )
+    cont = contingency.drop_duplicates("stop_id")[["stop_id", *_Q_PORT_HMM_COLS]]
+    merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
+        cont, on="stop_id", how="left"
+    )
+    q_mat = merged[_Q_PORT_HMM_COLS].to_numpy(dtype=float)
+    leaf = arm < 6
+    leaf_idx = np.clip(arm, 0, 5).astype(int)
+    row = np.arange(n_rows)
+    present = ~np.isnan(q_mat[:, 0])  # stop_id had an HMM value row
+    trunk_fill = np.where(present, 0.0, np.nan)
+    return np.where(leaf, q_mat[row, leaf_idx], trunk_fill)

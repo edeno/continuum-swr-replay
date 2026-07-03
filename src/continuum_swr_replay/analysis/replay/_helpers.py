@@ -759,6 +759,7 @@ from .covariates import (  # noqa: E402,F401
     _omission_streak,
     add_uncertainty_covariates,
     attach_contingency_value_block,
+    attach_hmm_arm_value,
     cumulative_reward_all_events,
     cumulative_reward_per_arm,
     lagged_trial_rewards,
