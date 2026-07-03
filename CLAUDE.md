@@ -75,7 +75,7 @@ src/continuum_swr_replay/
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
 ├── decoding/  rate/  content/  behavior/  figures/  qa/  pfc/
 └── exploratory/           #   unsupported one-offs (_*.py)
-paper/                     # Paper materials (data, figures, manuscript)
+paper/figures/<topic>/     # Publication figures in topic subdirs (no loose files)
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
 ├── design/               #   scientific/methodological design specs (human-discoverable)
 └── known_issues/
@@ -87,6 +87,10 @@ docs/                      # Published reference — see docs/README.md for the 
 
 > Documentation homes are indexed in [docs/README.md](docs/README.md): published/scientific
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
+> **All model ladders (rate, content, is_swr-contrast) are defined in one place —
+> `src/continuum_swr_replay/analysis/replay/model_specs.py`** (the single source of truth;
+> `docs/models_table.md` mirrors it). Where fitted outputs / figures land is in
+> [docs/README.md](docs/README.md) ("Where results live" / "Figure outputs").
 
 ## Key Architecture Concepts
 
