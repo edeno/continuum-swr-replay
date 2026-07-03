@@ -23,16 +23,20 @@ Algorithm:
 3. Assert every fitted row either has `coef_<term>` for expected terms or has a
    recorded skip/unfit reason.
 4. Flag deprecated coefficient names, especially old reward-rate aliases.
-5. For any regenerated content design table sampled during audit, assert the
+5. Load the companion fit-availability table and verify every missing
+   key coefficient has an explained `(model, population, session)` availability
+   row.
+6. For any regenerated content design table sampled during audit, assert the
    retained rows per event equal 9 for arms and 3 for patches.
-6. Emit `content_artifact_audit.csv` and a concise markdown report.
+7. Emit `content_artifact_audit.csv`, `content_fit_availability.csv`, and a
+   concise markdown report.
 
 Hard failure conditions:
 
 - deprecated coefficient aliases in a claimed-current artifact;
 - missing current key terms with no skip reason;
 - evidence of row-wise category drops in content/choice candidate sets;
-- missing provenance after Phase 1.
+- missing provenance or availability tables after Phase 1.
 
 ## summary-builder-design
 
@@ -68,6 +72,8 @@ Rules:
 - Add one deterministic `artifact_hash` per source file.
 - Mark stale rows rather than dropping them; downstream headline scripts filter
   to `stale_flag == False`.
+- Join fit-availability rows so unavailable key terms are visible in the same
+  report surface as successful coefficients.
 
 ## rate-content-dissociation-design
 
@@ -91,6 +97,16 @@ Default inference:
 - per-animal sign consistency as a robustness summary;
 - bootstrap confidence intervals by animal for final figures.
 
+Support classification:
+
+- Use [shared-contracts.md](shared-contracts.md#support-classification-rule) for
+  `supported`, `supported_secondary`, `not_supported`, `underpowered`,
+  `blocked_stale`, and the derived `rate_only`/`content_only`/`both` labels.
+- Do not collapse `underpowered` into `not_supported`; these have different
+  scientific meanings.
+- Correct headline p-values within each pre-registered family of terms before
+  assigning support labels.
+
 ## continuous-swr-design
 
 Question: does a binary `is_swr` label capture the effect, or does content/rate
@@ -108,6 +124,9 @@ Implementation steps:
      interactions only if identified.
 4. Compare against binary `is_swr` using held-out likelihood/AIC and stability
    across animals.
+5. If a continuous-mark fit is promoted beyond sensitivity analysis, write it as
+   a normal audited artifact with provenance, fit-availability rows, summary
+   rows, stale flags, and tests under the same Phase 1/2 contracts.
 
 Gate:
 
@@ -115,6 +134,8 @@ Gate:
   `is_swr` in final figures and document the sensitivity.
 - If continuous marks improve fit and alter the conclusion, promote them to a
   primary figure panel and keep binary `is_swr` as a simplified descriptor.
+  Promotion requires the same audit/provenance/summary gates as binary-SWR
+  artifacts.
 
 ## choice-feature-design
 
@@ -134,6 +155,9 @@ Avoid leakage:
 - keep the candidate set to well arms minus current arm;
 - drop whole stops when any required candidate-row predictor is missing;
 - report the behavioral baseline before any replay coefficient.
+- For every nested choice comparison, refit the baseline and richer model on the
+  same retained-stop set. Report the retained-stop cohort and cohort shrinkage
+  before interpreting incremental likelihood.
 
 ## claim-ledger-design
 

@@ -26,12 +26,15 @@ on their own scales? Which key terms are available per session/population/model?
     and sample-size fields.
   - Add effect transformations and `effect_scale` labels.
   - Add stale/provenance columns from Phase 1 audit results.
+  - Join fit-availability rows so missing key coefficients have explicit
+    `fit_status` and `skip_reason`.
 - Add `scripts/qa/build_rate_content_summary_tables.py`.
   - Read audited rate artifacts, SWR-contrast rate artifacts, primary content
     artifacts, and SWR-contrast content artifacts.
   - Emit:
     - `Processed-Data/replay_content/model_summaries/rate_content_terms.pkl`;
     - `Processed-Data/replay_content/model_summaries/rate_content_terms.csv`;
+    - `Processed-Data/replay_content/model_summaries/rate_content_availability.csv`;
     - `Processed-Data/replay_content/model_summaries/key_term_report.md`.
 - Define a small key-term registry for the first pass:
   - rate: immediate reward, delayed reward-history kernel, SWR interactions;
@@ -43,6 +46,8 @@ on their own scales? Which key terms are available per session/population/model?
   - every non-stale key term has `effect_scale`;
   - no content row enters summary from a stale Phase 1 artifact unless
     `stale_flag=True`.
+  - every unavailable key term has a matching availability row with
+    `fit_status != "fit"` and a documented `skip_reason`.
 
 ## Gate
 
@@ -51,6 +56,8 @@ Proceed to Phase 3 only when:
 - the summary table is deterministic across two local runs;
 - all required key terms are present or explicitly marked unavailable;
 - stale artifacts remain visible but excluded from headline report rows;
+- missing key coefficients are explained by availability rows, not silent
+  absence;
 - downstream code can reproduce the coefficient readout from this table alone.
 
 ## Deliberately not in this phase
@@ -66,7 +73,8 @@ Proceed to Phase 3 only when:
 | `test_summarize_coefficients_extracts_terms` | Converts `coef_x`, `bse_x`, `pval_x` into long rows and `effect=exp(coef)`. |
 | `test_effect_scale_labels` | Rate/content/choice families receive the correct effect-scale label. |
 | `test_summary_deduplicates_keys` | Duplicate term/session rows are rejected. |
-| real smoke | Builder runs on existing audited artifacts and emits the three expected files. |
+| `test_missing_key_terms_require_availability` | A missing headline coefficient without a skip row fails summary validation. |
+| real smoke | Builder runs on existing audited artifacts and emits the expected terms, availability, and report files. |
 
 ## Fixtures
 

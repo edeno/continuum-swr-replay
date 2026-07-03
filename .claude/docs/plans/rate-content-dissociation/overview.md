@@ -126,7 +126,8 @@ Each phase ships as a separable PR and ends with a decision gate.
   consistency, paired SWR/non-SWR contrasts, and bootstrap or signed-rank
   uncertainty.
 - Choice report includes held-out improvement over `C_behavior`, replay-only
-  reference performance, and SWR/non-SWR split coefficients with unfit counts.
+  reference performance, SWR/non-SWR split coefficients with unfit counts, and
+  common retained-stop cohorts for each nested comparison.
 - Figure/doc generation fails if any source artifact is stale or lacks
   provenance.
 
@@ -140,6 +141,7 @@ Each phase ships as a separable PR and ends with a decision gate.
 | Sparse terms such as last-rewarded-elsewhere interactions overfit or vanish in many sessions | Report unfit counts, n events, n animals, and keep these terms secondary. |
 | Multiple testing across many task covariates | Define key terms up front and separate primary dissociation tests from exploratory tables. |
 | Choice prediction launders distance/current-location bias | Keep the behavioral baseline visible, report residualized replay-content fits, and preserve the existing distance-rank baseline. |
+| Nested choice comparisons use different retained stops after SWR/non-SWR split predictors introduce NaNs | Refit baseline and full models on an identical complete-case stop cohort for every comparison, and report cohort shrinkage. |
 
 ## Open questions
 

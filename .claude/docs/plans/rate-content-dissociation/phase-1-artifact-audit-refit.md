@@ -37,6 +37,22 @@ complete-case contract?
     `coef_swr_x_current_patch`.
   - Emit `Processed-Data/replay_content/model_audits/content_artifact_audit.csv`
     and a markdown summary.
+- Add safe staging controls before any full refit.
+  - Primary content runner: add `--max-per-animal` or equivalent session-slice
+    filtering for smoke runs.
+  - Primary content runner: add `--output-dir` or `--output-suffix` so smoke and
+    audited refits cannot overwrite canonical `models/` or `models_patch/`
+    outputs by accident.
+  - SWR-contrast content runner: support an explicit staged output directory or
+    suffix for both raw arm/patch artifacts and audited aggregate/provenance
+    outputs.
+  - Refuse to overwrite canonical artifact paths unless an explicit
+    `--promote-canonical`-style flag is passed after audit success.
+- Add fit-availability output to both content runners.
+  - Write one row per attempted `(model, population, animal, day, epoch)`.
+  - Record successful fits and skipped/failed fits with `skip_reason`,
+    pre/post complete-case counts, and model size.
+  - Use the shared [fit-availability contract](shared-contracts.md#fit-availability-contract).
 - Add provenance writing to content runners or a small wrapper that records
   command, script path, git state, input hashes, output hashes, row counts, and
   complete-case policy.
@@ -56,9 +72,11 @@ Proceed to Phase 2 only when:
 
 - primary arm/patch and SWR-contrast arm/patch content artifacts pass the audit;
 - all headline content terms are present or have explicit, quantified unfit
-  counts;
+  counts from the fit-availability table;
 - retained arm events have 9 rows and retained patch events have 3 rows;
-- each artifact has provenance metadata.
+- each artifact has provenance metadata;
+- staged/smoke outputs cannot overwrite canonical artifacts without an explicit
+  promotion flag.
 
 If the audit shows stale artifacts and the refit cannot complete, stop here and
 write the blocked reason. Do not interpret content coefficients downstream.
@@ -77,6 +95,8 @@ write the blocked reason. Do not interpret content coefficients downstream.
 | `test_content_artifact_audit_detects_alias` | A fixture artifact with `coef_recent_reward_rate` is flagged stale. |
 | `test_content_artifact_audit_current_terms` | A fixture artifact matching current specs passes. |
 | `test_complete_event_candidate_sets` | Audit rejects retained arm/patch events with partial candidate sets. |
+| `test_fit_availability_records_skips` | A failed or skipped session produces a row with a machine-readable reason. |
+| `test_refit_staging_no_canonical_overwrite` | Smoke/staged output flags write outside canonical artifact paths by default. |
 | smoke runner | `--max-per-animal 1` writes artifacts and provenance; audit passes on smoke outputs. |
 
 ## Fixtures

@@ -39,13 +39,17 @@ coefficients?
   - content task-state modulation: `rpe_x_current`, `switchrate_x_current`,
     `q_arm`, and their SWR contrasts where available;
   - rate/content classification per covariate: rate-only, content-only, both,
-    neither.
+    neither, underpowered, or unresolved using
+    [shared-contracts.md](shared-contracts.md#support-classification-rule).
 - Add continuous-SWR sensitivity:
   - audit event/ripple tables for continuous overlap/power marks;
   - fit a minimal selected set of continuous-mark rate/content models only if
     the mark is available and identified;
   - compare against binary `is_swr` with AIC or held-out likelihood when
     possible.
+  - If the continuous mark changes interpretation enough to promote, send its
+    artifacts through Phase 1/2-style provenance, fit-availability, stale-flag,
+    and summary-table generation before using it in headline outputs.
 - Emit:
   - `Processed-Data/replay_content/model_summaries/rate_content_dissociation.csv`;
   - `Processed-Data/replay_content/model_summaries/rate_content_dissociation.md`;
@@ -59,7 +63,8 @@ rate/content claims and the SWR representation to carry forward:
 - **Binary sufficient:** use existing `is_swr` split/interaction terms in Phase
   4 and final figures.
 - **Continuous mark needed:** add the continuous mark to the Phase 4 feature set
-  and document binary `is_swr` as a simplification.
+  and document binary `is_swr` as a simplification, but only after continuous
+  artifacts pass the same audit/provenance/summary gates as binary-SWR artifacts.
 - **Content unsupported/stale:** Phase 4 may still test rate or raw replay
   features, but final content claims remain blocked.
 
@@ -74,7 +79,9 @@ rate/content claims and the SWR representation to carry forward:
 | Test | Asserts |
 | --- | --- |
 | `test_pair_terms_by_session` | SWR/non-SWR paired deltas use only shared sessions. |
-| `test_classify_rate_content_effects` | Synthetic signed terms are classified as rate-only/content-only/both/neither. |
+| `test_classify_rate_content_effects` | Synthetic signed terms are classified as rate-only/content-only/both/neither/unresolved. |
+| `test_underpowered_not_not_supported` | Sparse synthetic terms are labeled `underpowered`, not `not_supported`. |
+| `test_continuous_swr_promotion_requires_audit` | Promoted continuous-SWR rows without provenance/availability are rejected. |
 | `test_stale_rows_excluded` | Headline tests reject rows with `stale_flag=True`. |
 | real smoke | Runner produces the dissociation report from Phase 2 summary outputs. |
 

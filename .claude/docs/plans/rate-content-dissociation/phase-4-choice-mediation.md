@@ -39,6 +39,15 @@ predict choice after removing current-location/value/task content structure?
   - `C_full_swr_split`;
   - optional residualized-content model, e.g. behavioral baseline plus
     `replay_frac_residual`.
+- For every nested comparison, build a common complete-case retained-stop cohort
+  first, then refit both baseline and richer models on that same cohort.
+  - `C_full` vs `C_behavior` gets its own common cohort.
+  - `C_full_swr_split` vs `C_behavior` gets its own common cohort because split
+    SWR/non-SWR predictors introduce additional NaNs.
+  - Residualized-content models get their own common cohort because residuals
+    propagate content-model missingness.
+  - Report `n_stops_before`, `n_stops_common`, and the dropped-stop fraction for
+    each comparison.
 - Add held-out or cross-session predictive scoring if not already available for
   these choice fits.
 - Report:
@@ -54,6 +63,8 @@ Proceed to Phase 5 with behavior claims only if:
 
 - replay terms improve prediction over `C_behavior` on held-out or
   cross-validated scoring;
+- baseline and replay models in each comparison were refit and scored on the
+  same retained-stop cohort;
 - the candidate set and stop-wise complete-case checks pass;
 - residualized replay-content results are consistent enough to argue the effect
   is not only current-location/value leakage.
@@ -75,6 +86,7 @@ show the rate/content dissociation, but should not claim behavioral mediation.
 | `test_choice_features_no_next_arm_leakage` | Predictors exclude `next_arm`, `is_next`, and post-choice reward. |
 | `test_choice_complete_stop_drop` | A NaN in any candidate row drops the whole stop. |
 | `test_residualized_choice_propagates_nan` | Residualized replay features do not convert missing residuals to zero. |
+| `test_choice_nested_models_common_cohort` | Baseline and richer models in a comparison receive identical retained stop IDs. |
 | real smoke | Runner fits at least `C_behavior` and `C_full` on one session/animal slice. |
 
 ## Fixtures

@@ -26,6 +26,8 @@ their own scales without overinterpretation?
   - Fail if any source artifact has `stale_flag=True`.
   - Fail if required provenance manifests are missing.
   - Read only Phase 2-4 summary/report tables, not raw model pickles.
+  - Treat promoted continuous-SWR outputs as valid only if they carry the same
+    provenance, availability, and stale-flag fields as the binary-SWR outputs.
 - Produce a compact multipanel figure:
   - rate reward gate: SWR-overlap vs non-SWR immediate reward and delayed
     reward-history kernel;
