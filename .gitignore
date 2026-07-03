@@ -220,4 +220,4 @@ event_gallery/
 
 # Session run logs and exploratory research figure outputs (scratch, regenerable)
 logs/
-.claude/research/*_outputs/
+.claude/research/*/
