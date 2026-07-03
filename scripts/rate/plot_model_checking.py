@@ -45,7 +45,8 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
-FIGS = P.parent / "paper" / "figures"
+FIGS = P.parent / "paper" / "figures" / "rate"
+FIGS.mkdir(parents=True, exist_ok=True)
 SC = ["animal", "day", "epoch"]
 LADDER = list(MODEL_PER_BIN_RATE)  # M0_const .. M9_rew_x_time, in ladder order
 FULL = "M7_time_hist_rew"

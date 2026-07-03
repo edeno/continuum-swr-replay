@@ -169,7 +169,8 @@ def main() -> None:
 
     report(models)
 
-    out_dir = Path(__file__).resolve().parents[2] / "paper" / "figures"
+    out_dir = Path(__file__).resolve().parents[2] / "paper" / "figures" / "rate"
+    out_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     plot(models, out_dir / "uncertainty_rate_by_population.png")
 

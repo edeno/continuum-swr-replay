@@ -95,7 +95,8 @@ def main() -> None:
 
     fig.suptitle("Event-train triptych: raster · PSTH · autocorrelogram", y=1.0)
     fig.tight_layout()
-    out = P.parent / "paper" / "figures" / "event_rasters_triptych.png"
+    out = P.parent / ".claude" / "research" / "event_raster_outputs" / "event_rasters_triptych.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print("saved", out)
     for name, src in pops.items():

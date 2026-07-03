@@ -181,7 +181,8 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
         title += ("\nmodel bs(t,df4)+reward_lag1 — solid=empirical, dashed=in-sample, "
                   "dotted=CV · " + " · ".join(notes))
     fig.suptitle(title, x=0.5, y=0.998, fontsize=10)
-    out = P.parent / "paper" / "figures" / out_name
+    out = P.parent / ".claude" / "research" / "session_raster_outputs" / out_name
+    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print("saved", out)
 

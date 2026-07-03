@@ -32,7 +32,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 
 RC = P / "replay_content"
-FIGS = P.parent / "paper" / "figures"
+FIGS = P.parent / "paper" / "figures" / "rate"
+FIGS.mkdir(parents=True, exist_ok=True)
 STYLE = {  # outcome -> (label, color)
     "swr": ("detected SWR", "k"),
     "non_local": ("non-local (all)", "C2"),

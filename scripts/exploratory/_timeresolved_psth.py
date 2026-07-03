@@ -71,7 +71,8 @@ def main() -> None:
     ax.legend(frameon=False, fontsize=9)
     ax.set_xlim(0, 10)
     fig.tight_layout()
-    out = P.parent / "paper" / "figures" / "rate_timecourse_vs_pump.png"
+    out = P.parent / ".claude" / "research" / "rate_psth_outputs" / "rate_timecourse_vs_pump.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150)
     print(f"\nsaved {out}")
