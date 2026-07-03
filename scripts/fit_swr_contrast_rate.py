@@ -64,6 +64,15 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    SWR_CONTRAST_RATE_S_SPECS as S_SPECS,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 warnings.filterwarnings("ignore")
@@ -74,102 +83,18 @@ SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
-_EXPECTED = (np.linalg.LinAlgError, ValueError, RuntimeError, PerfectSeparationError, PatsyError)
-
-_SPLINE = "bs(tc, knots=(1.0, 2.0, 3.0), lower_bound=0.0, upper_bound=4.0)"
-_REWK_PREV = " + ".join(f"reward_lag{j}" for j in range(2, N_REWARD_LAGS + 1))
-_HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
-
-# Canonical dimensions are the PAPER's variables, all from one model (default_hmm):
-# relative value (the paper's single value+decision axis; cross-model q_chosen/ΔV
-# r=-0.67), RPE, native reward entropy, global value update (Comrie et al. Fig 1/5).
-# Each is one param (no collinearity), + BASE nuisance controls + CONTEXT (peri-switch/block).
-# block formula (patsy) + the raw columns it needs present (for NaN-drop)
-_BLOCK_F = {
-    "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",
-    # CONTEXT split into 3 near-orthogonal rungs (VIF <=2.2) so each is tested
-    # individually; peri-switch's 3 terms stay together (the interaction needs
-    # its main effects -- they are the paper's broken-stick around a switch).
-    "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
-    "BLOCK": "trials_since_block_change",
-    "SWITCHRATE": "recent_switch_rate",
-    "VALUE": "hmm_relative_value",     # relative value ΔV (paper's value+decision axis)
-    "RPE": "hmm_rpe",                  # reward prediction error (reward - Q_leaf)
-    "UNCERT": "reward_entropy",        # HMM reward-state entropy (outcome uncertainty)
-    "UPDATE": "hmm_value_update",      # global value-update magnitude (Σ|ΔQ|)
-    # reward x within-stop time course: does the current reward reshape the rate
-    # PROFILE, not just shift its level? BASE has only additive reward_lag1 +
-    # bs(tc), so this is the untested dwell-shape control (rewarded stops are
-    # ~3.6x longer and populate a different tc range than unrewarded).
-    "REWXTIME": f"reward_lag1:{_SPLINE}",
-}
-_BLOCK_COLS = {
-    "BASE": ["tc", *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
-             *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]],
-    "PERISWITCH": ["trials_since_switch", "is_post_switch"],
-    "BLOCK": ["trials_since_block_change"],
-    "SWITCHRATE": ["recent_switch_rate"],
-    "VALUE": ["hmm_relative_value"],
-    "RPE": ["hmm_rpe"],
-    "UNCERT": ["reward_entropy"],
-    "UPDATE": ["hmm_value_update"],
-    "REWXTIME": ["reward_lag1", "tc"],  # both already built by aggregate (in BASE)
-}
-# per-stop task covariates broadcast per-bin (tc/reward_lag/hist are built by the
-# aggregate itself, so BASE/REWXTIME contribute none of the carried columns).
-STOP_COVARS = tuple(
-    c for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
-    for c in _BLOCK_COLS[b]
+_EXPECTED = (
+    np.linalg.LinAlgError,
+    ValueError,
+    RuntimeError,
+    PerfectSeparationError,
+    PatsyError,
 )
 
 
-def _blocks_formula(blocks):
-    return " + ".join(_BLOCK_F[b] for b in blocks)
-
-
-def _blocks_cols(blocks):
-    return [c for b in blocks for c in _BLOCK_COLS[b]]
-
-
-# name -> (formula RHS, blocks needed for NaN-drop)
-def _g_specs():
-    ladders = {
-        "G0_base": ["BASE"],
-        "G1_periswitch": ["BASE", "PERISWITCH"],
-        "G2_block": ["BASE", "BLOCK"],
-        "G3_switchrate": ["BASE", "SWITCHRATE"],
-        "G4_value": ["BASE", "VALUE"], "G5_rpe": ["BASE", "RPE"],
-        "G6_uncert": ["BASE", "UNCERT"], "G7_update": ["BASE", "UPDATE"],
-        "G8_rewxtime": ["BASE", "REWXTIME"],
-    }
-    return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
-
-
-def _s_specs():
-    b = _BLOCK_F
-    base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
-    val, rpe, unc, upd, rxt = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"], b["REWXTIME"]
-    raw = {
-        "S0_rate": (f"is_swr + {base}", ["BASE"]),
-        "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
-        "S2_base": (f"is_swr * ({base})", ["BASE"]),
-        "S3_periswitch": (f"is_swr * ({base} + {peri})", ["BASE", "PERISWITCH"]),
-        "S4_block": (f"is_swr * ({base} + {blk})", ["BASE", "BLOCK"]),
-        "S5_switchrate": (f"is_swr * ({base} + {swr})", ["BASE", "SWITCHRATE"]),
-        "S6_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
-        "S7_rpe": (f"is_swr * ({base} + {rpe})", ["BASE", "RPE"]),
-        "S8_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
-        "S9_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
-        "S10_rewxtime": (f"is_swr * ({base} + {rxt})", ["BASE", "REWXTIME"]),
-    }
-    # convert block names -> the actual columns to NaN-drop on (like _g_specs)
-    return {n: (f, _blocks_cols(bl)) for n, (f, bl) in raw.items()}
-
-
-G_SPECS, S_SPECS = _g_specs(), _s_specs()
-
-
-def _fit(design: pd.DataFrame, formula: str, need_cols: list[str]) -> tuple[dict | None, str | None]:
+def _fit(
+    design: pd.DataFrame, formula: str, need_cols: list[str]
+) -> tuple[dict | None, str | None]:
     """Poisson GLM `count ~ formula` with a log(exposure) offset. NaN-drop then
     offset (mirrors fit_per_bin_rate_model to keep the offset aligned).
 
@@ -191,12 +116,15 @@ def _fit(design: pd.DataFrame, formula: str, need_cols: list[str]) -> tuple[dict
         return None, "no_reward_contrast"  # reward terms unidentified without contrast
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
-        res = smf.glm(f"count ~ {formula}", data=df,
-                      family=sm.families.Poisson(), offset=offset).fit()
+        res = smf.glm(
+            f"count ~ {formula}", data=df, family=sm.families.Poisson(), offset=offset
+        ).fit()
     except _EXPECTED as e:
         return None, type(e).__name__
     out = {f"coef_{k}": v for k, v in res.params.items()}
-    out.update(n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic))
+    out.update(
+        n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic)
+    )
     return out, None
 
 
@@ -205,9 +133,14 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
     skips: dict = {}  # (model, population, reason) -> count
     designs = {
         pop: aggregate_to_timebins(
-            stops_g, POPULATIONS[pop](onsets_g), bin_s=BIN_S, tmax=TMAX,
-            reward_lags=N_REWARD_LAGS, self_history_lags=N_HISTORY_LAGS,
-            self_history_basis=N_HISTORY_BASIS, stop_covariates=STOP_COVARS,
+            stops_g,
+            POPULATIONS[pop](onsets_g),
+            bin_s=BIN_S,
+            tmax=TMAX,
+            reward_lags=N_REWARD_LAGS,
+            self_history_lags=N_HISTORY_LAGS,
+            self_history_basis=N_HISTORY_BASIS,
+            stop_covariates=STOP_COVARS,
         )
         for pop in STRATA
     }
@@ -222,8 +155,10 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
                 skips[(name, pop, reason)] = skips.get((name, pop, reason), 0) + 1
     # B. is_swr contrast: stack the two non-local streams
     stacked = pd.concat(
-        [designs["non_local_swr"].assign(is_swr=1.0),
-         designs["non_local_no_swr"].assign(is_swr=0.0)],
+        [
+            designs["non_local_swr"].assign(is_swr=1.0),
+            designs["non_local_no_swr"].assign(is_swr=0.0),
+        ],
         ignore_index=True,
     )
     for name, (formula, need) in S_SPECS.items():
@@ -231,19 +166,31 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
         if fit is not None:
             rows.append({"population": "contrast", "model": name, **base, **fit})
         else:
-            skips[(name, "contrast", reason)] = skips.get((name, "contrast", reason), 0) + 1
+            skips[(name, "contrast", reason)] = (
+                skips.get((name, "contrast", reason), 0) + 1
+            )
     return keys, rows, skips
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
     q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    qcols = ["stop_id", "trials_since_switch", "is_post_switch", "trials_since_block_change",
-             "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update"]
+    qcols = [
+        "stop_id",
+        "trials_since_switch",
+        "is_post_switch",
+        "trials_since_block_change",
+        "hmm_relative_value",
+        "hmm_rpe",
+        "reward_entropy",
+        "hmm_value_update",
+    ]
     missing = [c for c in qcols if c not in q.columns]
     if missing:
-        raise ValueError(f"qvals_table missing {missing}; regenerate it "
-                         "(python -m continuum_swr_replay.analysis.behavior.qvals_table --write)")
+        raise ValueError(
+            f"qvals_table missing {missing}; regenerate it "
+            "(python -m continuum_swr_replay.analysis.behavior.qvals_table --write)"
+        )
     n0 = len(stop)
     stop = stop.merge(q[qcols], on="stop_id", how="inner", validate="many_to_one")
     # fail loudly if a task covariate the specs need never made it onto the stop
@@ -251,9 +198,16 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     # every model using it would silently drop out of the output.
     missing_cov = [c for c in STOP_COVARS if c not in stop.columns]
     if missing_cov:
-        raise ValueError(f"stop table missing task covariates {missing_cov} "
-                         "(check add_uncertainty_covariates + the qvals merge)")
-    logger.info("stop x qvals join: %d -> %d stops (%.0f%% kept)", n0, len(stop), 100 * len(stop) / n0)
+        raise ValueError(
+            f"stop table missing task covariates {missing_cov} "
+            "(check add_uncertainty_covariates + the qvals merge)"
+        )
+    logger.info(
+        "stop x qvals join: %d -> %d stops (%.0f%% kept)",
+        n0,
+        len(stop),
+        100 * len(stop) / n0,
+    )
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(RC / "event_onset_table.pkl"),
         pd.read_pickle(RC / "event_table.pkl"),
@@ -268,8 +222,12 @@ def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--max-per-animal", type=int, default=None, help="smoke: N sessions/animal")
-    ap.add_argument("--workers", type=int, default=1, help="per-session process fan-out")
+    ap.add_argument(
+        "--max-per-animal", type=int, default=None, help="smoke: N sessions/animal"
+    )
+    ap.add_argument(
+        "--workers", type=int, default=1, help="per-session process fan-out"
+    )
     args = ap.parse_args()
 
     stop, onsets = _load()
@@ -277,10 +235,19 @@ def main() -> None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
-    items = [(k, s, onset_groups[k])
-             for k, s in stop.groupby(SESSION_COLS, sort=False) if k in onset_groups]
-    logger.info("Fitting SWR-contrast per-bin models (G0-G8 x %s + S0-S10) over %d sessions "
-                "at BIN_S=%.3f with %d worker(s)...", list(STRATA), len(items), BIN_S, args.workers)
+    items = [
+        (k, s, onset_groups[k])
+        for k, s in stop.groupby(SESSION_COLS, sort=False)
+        if k in onset_groups
+    ]
+    logger.info(
+        "Fitting SWR-contrast per-bin models (G0-G8 x %s + S0-S10) over %d sessions "
+        "at BIN_S=%.3f with %d worker(s)...",
+        list(STRATA),
+        len(items),
+        BIN_S,
+        args.workers,
+    )
 
     t0 = time.perf_counter()
     rows: list[dict] = []
@@ -302,22 +269,36 @@ def main() -> None:
     # log skipped (model, population, reason) cells so a silently-shrunk per-model
     # session count is visible before the downstream signed-rank aggregate.
     if skips:
-        cfg = {f"{m}/{p}": r for (m, p, r), _ in skips.items() if str(r).startswith("missing")}
+        cfg = {
+            f"{m}/{p}": r
+            for (m, p, r), _ in skips.items()
+            if str(r).startswith("missing")
+        }
         if cfg:
             logger.warning("MISSING-COLUMN skips (config/upstream bug): %s", cfg)
-        logger.info("skipped (model/pop -> reason: count): %s",
-                    {f"{m}/{p}:{r}": c for (m, p, r), c in sorted(skips.items())})
+        logger.info(
+            "skipped (model/pop -> reason: count): %s",
+            {f"{m}/{p}:{r}": c for (m, p, r), c in sorted(skips.items())},
+        )
 
     models = pd.DataFrame(rows)
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / ("swr_contrast_rate_smoke.pkl" if args.max_per_animal else "swr_contrast_rate.pkl")
+    out = out_dir / (
+        "swr_contrast_rate_smoke.pkl"
+        if args.max_per_animal
+        else "swr_contrast_rate.pkl"
+    )
     models.to_pickle(out)
-    logger.info("Saved %d rows (%d sessions, populations=%s, models=%s) to %s in %.1fs",
-                len(models), models.groupby(SESSION_COLS).ngroups if len(models) else 0,
-                sorted(models["population"].unique()) if len(models) else [],
-                sorted(models["model"].unique()) if len(models) else [],
-                out, time.perf_counter() - t0)
+    logger.info(
+        "Saved %d rows (%d sessions, populations=%s, models=%s) to %s in %.1fs",
+        len(models),
+        models.groupby(SESSION_COLS).ngroups if len(models) else 0,
+        sorted(models["population"].unique()) if len(models) else [],
+        sorted(models["model"].unique()) if len(models) else [],
+        out,
+        time.perf_counter() - t0,
+    )
 
 
 if __name__ == "__main__":

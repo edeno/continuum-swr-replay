@@ -137,7 +137,10 @@ The primary phase-2 analysis of the **non-local event rate** and its SWR-vs-non-
 dissociation, per bin. Response `count` = non-local onset count per **15 ms bin**;
 `family = poisson(log)`, `offset = log(exposure)`; rows are (stop × bin) to
 `tmax = 4 s`. **Fit per session, aggregate coefficients across sessions** (signed-rank).
-Runner: `scripts/fit_swr_contrast_rate.py` (new).
+Specs: `model_specs.py` (`SWR_CONTRAST_RATE_G_SPECS` / `_S_SPECS`; content ladders
+`SWR_CONTRAST_CONTENT_ARM_LADDER` / `_PATCH_LADDER`) — the single source of truth.
+Runners: `scripts/fit_swr_contrast_rate.py`, `scripts/fit_swr_contrast_content.py`
+(import the specs; keep only data-assembly + fitting).
 
 Shorthands / covariate blocks. The task dimensions are **the paper's variables
 (Comrie et al.), all from one model (`default_hmm`)** — see `qvals_table.add_hmm_decision_variables`:

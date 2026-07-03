@@ -102,6 +102,15 @@ __all__ = [
     "PerBinRateModelSpec",
     "SPLINE_KNOTS",
     "STOP_COVARIATES",
+    "SWR_CONTRAST_CONTENT_ARM_KEY_TERM",
+    "SWR_CONTRAST_CONTENT_ARM_LADDER",
+    "SWR_CONTRAST_CONTENT_BASEC",
+    "SWR_CONTRAST_CONTENT_BASEC_PATCH",
+    "SWR_CONTRAST_CONTENT_PATCH_KEY_TERM",
+    "SWR_CONTRAST_CONTENT_PATCH_LADDER",
+    "SWR_CONTRAST_RATE_G_SPECS",
+    "SWR_CONTRAST_RATE_S_SPECS",
+    "SWR_CONTRAST_RATE_STOP_COVARS",
     "TMAX",
 ]
 
@@ -771,3 +780,150 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
         parent="C_behavior",
     ),
 }
+
+
+# ── SWR-contrast ladders ────────────────────────────────────────────────────
+# Relocated from scripts/fit_swr_contrast_rate.py and fit_swr_contrast_content.py
+# so this module is the single source of truth for every model family. The runners
+# import the SWR_CONTRAST_* exports below and keep only their data-assembly/fit code.
+# Reuses the module-level _SPLINE / N_REWARD_LAGS / N_HISTORY_BASIS defined above.
+
+# --- Rate is_swr-contrast ladder (per-bin Poisson: G0-G8 stratified, S0-S10 contrast) ---
+_REWK_PREV = " + ".join(f"reward_lag{j}" for j in range(2, N_REWARD_LAGS + 1))
+_HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
+_BLOCK_F = {
+    "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",
+    "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
+    "BLOCK": "trials_since_block_change",
+    "SWITCHRATE": "recent_switch_rate",
+    "VALUE": "hmm_relative_value",      # relative value dV (paper's value+decision axis)
+    "RPE": "hmm_rpe",                   # reward prediction error (reward - Q_leaf)
+    "UNCERT": "reward_entropy",         # HMM reward-state entropy
+    "UPDATE": "hmm_value_update",       # global value-update magnitude
+    "REWXTIME": f"reward_lag1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
+}
+_BLOCK_COLS = {
+    "BASE": ["tc", *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+             *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]],
+    "PERISWITCH": ["trials_since_switch", "is_post_switch"],
+    "BLOCK": ["trials_since_block_change"],
+    "SWITCHRATE": ["recent_switch_rate"],
+    "VALUE": ["hmm_relative_value"],
+    "RPE": ["hmm_rpe"],
+    "UNCERT": ["reward_entropy"],
+    "UPDATE": ["hmm_value_update"],
+    "REWXTIME": ["reward_lag1", "tc"],
+}
+SWR_CONTRAST_RATE_STOP_COVARS = tuple(
+    c for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
+    for c in _BLOCK_COLS[b]
+)
+
+
+def _blocks_formula(blocks):
+    return " + ".join(_BLOCK_F[b] for b in blocks)
+
+
+def _blocks_cols(blocks):
+    return [c for b in blocks for c in _BLOCK_COLS[b]]
+
+
+def _g_specs():
+    ladders = {
+        "G0_base": ["BASE"],
+        "G1_periswitch": ["BASE", "PERISWITCH"],
+        "G2_block": ["BASE", "BLOCK"],
+        "G3_switchrate": ["BASE", "SWITCHRATE"],
+        "G4_value": ["BASE", "VALUE"], "G5_rpe": ["BASE", "RPE"],
+        "G6_uncert": ["BASE", "UNCERT"], "G7_update": ["BASE", "UPDATE"],
+        "G8_rewxtime": ["BASE", "REWXTIME"],
+    }
+    return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
+
+
+def _s_specs():
+    b = _BLOCK_F
+    base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
+    val, rpe, unc, upd, rxt = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"], b["REWXTIME"]
+    raw = {
+        "S0_rate": (f"is_swr + {base}", ["BASE"]),
+        "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
+        "S2_base": (f"is_swr * ({base})", ["BASE"]),
+        "S3_periswitch": (f"is_swr * ({base} + {peri})", ["BASE", "PERISWITCH"]),
+        "S4_block": (f"is_swr * ({base} + {blk})", ["BASE", "BLOCK"]),
+        "S5_switchrate": (f"is_swr * ({base} + {swr})", ["BASE", "SWITCHRATE"]),
+        "S6_value": (f"is_swr * ({base} + {val})", ["BASE", "VALUE"]),
+        "S7_rpe": (f"is_swr * ({base} + {rpe})", ["BASE", "RPE"]),
+        "S8_uncert": (f"is_swr * ({base} + {unc})", ["BASE", "UNCERT"]),
+        "S9_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
+        "S10_rewxtime": (f"is_swr * ({base} + {rxt})", ["BASE", "REWXTIME"]),
+    }
+    return {n: (f, _blocks_cols(bl)) for n, (f, bl) in raw.items()}
+
+
+SWR_CONTRAST_RATE_G_SPECS = _g_specs()
+SWR_CONTRAST_RATE_S_SPECS = _s_specs()
+
+# --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
+# name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)
+ARMFE = [f"arm_fe_{a}" for a in range(8)]
+BASEc = [*ARMFE, "is_current", "is_prev", "visit_recency_demeaned", "arm_dist_rank"]
+_TSC = "tsc_x_current"
+SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
+    "C0_armfe": (ARMFE, "split"),
+    "C1_current": ([*ARMFE, "is_current"], "split"),
+    "C2_base": (BASEc, "split"),
+    "C3_armreward": ([*BASEc, "reward_rate_arm_k10"], "split"),
+    "C4_armvalue": ([*BASEc, "q_arm"], "split"),
+    "C5_lastrew": ([*BASEc, "is_last_rewarded_elsewhere"], "split"),
+    "C6_rpe": ([*BASEc, _TSC, "rpe_x_current"], "split"),
+    "C7_value": ([*BASEc, _TSC, "relval_x_current"], "split"),
+    "C8_uncert": ([*BASEc, _TSC, "entropy_x_current"], "split"),
+    "C9_update": ([*BASEc, _TSC, "update_x_current"], "split"),
+    "C10_periswitch": ([*BASEc, _TSC, "tss_x_current", "postsw_x_current",
+                        "tsspostsw_x_current"], "split"),
+    "C11_block": ([*BASEc, _TSC, "block_x_current"], "split"),
+    "C12_switchrate": ([*BASEc, _TSC, "switchrate_x_current"], "split"),
+    "CS1_current": ([*BASEc, "swr_x_current"], "pooled"),
+    "CS2_prev": ([*BASEc, "swr_x_prev"], "pooled"),
+    "CS3_lastrew": ([*BASEc, "is_last_rewarded_elsewhere",
+                     "swr_x_is_last_rewarded_elsewhere"], "pooled"),
+    "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
+                       "swr_x_reward_rate_arm_k10"], "pooled"),
+    "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
+}
+SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
+    "C1_current": "is_current", "C2_base": "is_current",
+    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm",
+    "C5_lastrew": "is_last_rewarded_elsewhere", "C6_rpe": "rpe_x_current",
+    "C7_value": "relval_x_current", "C8_uncert": "entropy_x_current",
+    "C9_update": "update_x_current", "C10_periswitch": "tss_x_current",
+    "C11_block": "block_x_current", "C12_switchrate": "switchrate_x_current",
+    "CS1_current": "swr_x_current", "CS2_prev": "swr_x_prev",
+    "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
+    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm",
+}
+BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
+_LR_PATCH = "is_last_rewarded_patch_elsewhere"
+SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
+    "CP0_base": (BASEc_PATCH, "split"),
+    "CP1_lastrew": ([*BASEc_PATCH, _LR_PATCH], "split"),
+    "CP2_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss"], "split"),
+    "CP3_newgrowth": ([*BASEc_PATCH, "currentpatch_x_tss"], "split"),
+    "CP4_switchrate": ([*BASEc_PATCH, "currentpatch_x_switchrate"], "split"),
+    "CPS1_current": ([*BASEc_PATCH, "swr_x_current_patch"], "pooled"),
+    "CPS2_lastrew": ([*BASEc_PATCH, _LR_PATCH,
+                      "swr_x_last_rewarded_patch_elsewhere"], "pooled"),
+    "CPS3_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss",
+                       "swr_x_lastrewpatch_tss"], "pooled"),
+}
+SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
+    "CP0_base": "is_current_patch", "CP1_lastrew": _LR_PATCH,
+    "CP2_olddecay": "lastrewpatch_x_tss", "CP3_newgrowth": "currentpatch_x_tss",
+    "CP4_switchrate": "currentpatch_x_switchrate",
+    "CPS1_current": "swr_x_current_patch",
+    "CPS2_lastrew": "swr_x_last_rewarded_patch_elsewhere",
+    "CPS3_olddecay": "swr_x_lastrewpatch_tss",
+}
+SWR_CONTRAST_CONTENT_BASEC = BASEc
+SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
