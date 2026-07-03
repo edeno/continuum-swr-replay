@@ -13,7 +13,7 @@
 set -uo pipefail
 
 NJOBS="${1:-6}"
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 source .venv/bin/activate
 mkdir -p logs/event_gallery
 

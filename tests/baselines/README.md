@@ -25,10 +25,10 @@ Baseline-specific scripts were created to save PDFs instead of displaying intera
 
 ```bash
 # Figure 02 baselines (complete)
-uv run python scripts/generate_figure02_baseline.py
+uv run python scripts/figures/archive/generate_figure02_baseline.py
 
 # Figure 03 baselines (partial)
-uv run python scripts/generate_figure03_baseline.py
+uv run python scripts/figures/archive/generate_figure03_baseline.py
 ```
 
 ### Data Requirements
