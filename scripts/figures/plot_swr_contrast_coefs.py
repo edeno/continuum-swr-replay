@@ -62,7 +62,9 @@ RNG = np.random.default_rng(0)
 def std_factor(term):
     """SD to convert a raw coef to per-1-SD units; (factor, is_binary)."""
     BIN = {"is_current", "swr_x_current", "swr_x_prev",
-           "swr_x_is_last_rewarded_elsewhere", "reward_lag1"}
+           "swr_x_is_last_rewarded_elsewhere", "reward_lag1",
+           "is_current_patch", "is_last_rewarded_patch_elsewhere",
+           "swr_x_current_patch", "swr_x_last_rewarded_patch_elsewhere"}
     if term in BIN:
         return 1.0, True
     # per-arm / rate continuous covariates scaled by their global SD
@@ -177,11 +179,32 @@ con_rows = [
     ("swr × value hmm (CS5)", "CS5_armvalue", "all", "swr_x_q_arm_hmm"),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
-forest(axes[0], C, mod_rows, "Content — dimension effects (all events, standardized)")
-forest(axes[1], C, con_rows, "Content — SWR contrasts (swr_x_*, standardized)")
+forest(axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)")
+forest(axes[1], C, con_rows, "Content (arm) — SWR contrasts (swr_x_*, standardized)")
 axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
 fig.tight_layout()
 fig.savefig(OUT / "content_swr_contrast_coefs.png", dpi=150)
+
+# ---- CONTENT: PATCH ladder ----
+P = pd.read_pickle(RC / "models" / "swr_contrast_content_patch.pkl")
+patch_mod_rows = [
+    ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
+    ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_patch_elsewhere"),
+    ("lastrewpatch×tss (CP2)", "CP2_olddecay", "all", "lastrewpatch_x_tss"),
+    ("currentpatch×tss (CP3)", "CP3_newgrowth", "all", "currentpatch_x_tss"),
+    ("currentpatch×switchrate (CP4)", "CP4_switchrate", "all", "currentpatch_x_switchrate"),
+]
+patch_con_rows = [
+    ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_current_patch"),
+    ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_last_rewarded_patch_elsewhere"),
+    ("swr × lastrewpatch×tss (CPS3)", "CPS3_olddecay", "all", "swr_x_lastrewpatch_tss"),
+]
+fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
+forest(axes[0], P, patch_mod_rows, "Content (patch) — dimension effects (all events, standardized)")
+forest(axes[1], P, patch_con_rows, "Content (patch) — SWR contrasts (standardized)")
+axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
+fig.tight_layout()
+fig.savefig(OUT / "content_patch_swr_contrast_coefs.png", dpi=150)
 
 print("wrote:")
 for p in sorted(OUT.glob("*.png")):

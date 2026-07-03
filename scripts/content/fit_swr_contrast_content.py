@@ -265,7 +265,31 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
             )
 
 
-def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> pd.DataFrame:
+# Standardized effect sizes: a continuous-predictor coefficient is reported per 1 SD
+# of the predictor (std_coef = coef * SD, which is exact for these Poisson GLMs) so
+# effect sizes are comparable across predictors, value constructs, and the rate ladder.
+# Binary predictors are per-category (factor 1, unit "per_category"); content
+# state-modulation covariates are already z-scored at fit time (factor 1, "per_SD").
+_BINARY_TERMS = frozenset({
+    "is_current", "swr_x_current", "swr_x_prev", "swr_x_is_last_rewarded_elsewhere",
+    "is_current_patch", "is_last_rewarded_patch_elsewhere", "swr_x_current_patch",
+    "swr_x_last_rewarded_patch_elsewhere",
+})
+
+
+def _std_factor(term: str, sd: dict) -> tuple[float, str]:
+    """SD multiplier + unit label to convert a raw coef to standardized units."""
+    if term in _BINARY_TERMS:
+        return 1.0, "per_category"
+    for cov, s in sd.items():
+        if term in (cov, f"swr_x_{cov}"):
+            return (s, "per_SD") if s > 0 else (1.0, "per_SD")
+    return 1.0, "per_SD"  # already z-scored at fit time
+
+
+def _aggregate(
+    res: pd.DataFrame, ladder: dict, key_term: dict, level: str, sd: dict | None = None
+) -> pd.DataFrame:
     """Audited across-session aggregation: one row per (model, population, term).
 
     PRIMARY population evidence is at the **animal** level (n=5): ``coef_animal_median``
@@ -286,11 +310,13 @@ def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> p
     quasi-separated coef (|coef| > 10) or a NaN coef are excluded and counted in
     ``n_dropped``.
     """
+    sd = sd or {}
     rows = []
     for name in ladder:
         term = key_term.get(name)
         if term is None:
             continue
+        factor, unit = _std_factor(term, sd)
         ccol, scol, pcol = f"coef_{term}", f"bse_{term}", f"pval_{term}"
         scope = ladder[name][1]
         for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
@@ -322,6 +348,14 @@ def _aggregate(res: pd.DataFrame, ladder: dict, key_term: dict, level: str) -> p
                     "coef_session_median": float(coef.median()),
                     "typical_session_se": (
                         float(s[scol].median()) if scol in s else np.nan
+                    ),
+                    # standardized (per-1-SD for continuous; per-category for binary)
+                    "std_unit": unit,
+                    "std_factor": factor,
+                    "std_coef_animal_median": float(per_animal.median()) * factor,
+                    "std_coef_session_median": float(coef.median()) * factor,
+                    "std_typical_session_se": (
+                        float(s[scol].median()) * factor if scol in s else np.nan
                     ),
                     "pct_positive_session": float((coef > 0).mean()),
                     "pct_sig_session": (
@@ -433,11 +467,17 @@ def main() -> None:
     _summ(patch, PATCH_LADDER, PATCH_KEY_TERM)
 
     # Audited aggregation: SE, per-session significance, per-animal sign, signed-rank
-    # p, and BH-FDR across the rung family — plus a provenance sidecar.
+    # p, BH-FDR across the rung family, and standardized (per-SD) effect sizes — plus a
+    # provenance sidecar. SDs are the global (pooled) SD of the raw per-arm covariates.
+    sd_arm = {
+        c: float(np.nanstd(ev[c].to_numpy(dtype=float)))
+        for c in ("q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm")
+        if c in ev.columns
+    }
     agg = pd.concat(
         [
-            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "arm"),
-            _aggregate(patch, PATCH_LADDER, PATCH_KEY_TERM, "patch"),
+            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "arm", sd_arm),
+            _aggregate(patch, PATCH_LADDER, PATCH_KEY_TERM, "patch", {}),
         ],
         ignore_index=True,
     )
