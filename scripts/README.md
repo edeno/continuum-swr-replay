@@ -30,6 +30,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `figures/` — publication figures
 - `generate_figure01.py … generate_figure04.py`, `generate_all_figures.py` (orchestrator).
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
+- `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the is_swr
+  rate + content contrast ladders (standardized effect sizes, all sessions + animal 95% CI) → `paper/figures/swr_contrast/`.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
