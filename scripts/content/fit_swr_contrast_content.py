@@ -51,11 +51,14 @@ import warnings
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
     add_uncertainty_covariates,
+)
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    aggregate_contrast,
+    specs_from_ladder,
 )
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import (
@@ -265,124 +268,17 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
             )
 
 
-# Standardized effect sizes: a continuous-predictor coefficient is reported per 1 SD
-# of the predictor (std_coef = coef * SD, which is exact for these Poisson GLMs) so
-# effect sizes are comparable across predictors, value constructs, and the rate ladder.
-# Binary predictors are per-category (factor 1, unit "per_category"); content
-# state-modulation covariates are already z-scored at fit time (factor 1, "per_SD").
-_BINARY_TERMS = frozenset({
-    "is_current", "swr_x_current", "swr_x_prev", "swr_x_is_last_rewarded_elsewhere",
-    "is_current_patch", "is_last_rewarded_patch_elsewhere", "swr_x_current_patch",
-    "swr_x_last_rewarded_patch_elsewhere",
-})
-
-
-def _std_factor(term: str, sd: dict) -> tuple[float, str]:
-    """SD multiplier + unit label to convert a raw coef to standardized units."""
-    if term in _BINARY_TERMS:
-        return 1.0, "per_category"
-    for cov, s in sd.items():
-        if term in (cov, f"swr_x_{cov}"):
-            return (s, "per_SD") if s > 0 else (1.0, "per_SD")
-    return 1.0, "per_SD"  # already z-scored at fit time
-
-
 def _aggregate(
     res: pd.DataFrame, ladder: dict, key_term: dict, level: str, sd: dict | None = None
 ) -> pd.DataFrame:
-    """Audited across-session aggregation: one row per (model, population, term).
+    """Audited across-session aggregation (shared engine); one row per rung x pop.
 
-    PRIMARY population evidence is at the **animal** level (n=5): ``coef_animal_median``
-    (median of per-animal median coefficients — balanced so animals with more sessions
-    do not dominate) and ``n_animals_pos`` / ``n_animals`` (sign consistency). With only
-    5 animals a frequentist p is barely meaningful, so the sign consistency IS the claim.
-
-    ``session_signrank_p`` is a **descriptive** consistency statistic across sessions,
-    NOT a population p-value: sessions within an animal are not independent, so treating
-    ~200 sessions as exchangeable units over-states significance. It is retained (with a
-    BH-FDR across the rung family within each population, ``session_signrank_fdr_q``) as a
-    "were the per-session effects consistently one-signed" descriptor only. The rigorous
-    population inference — one hierarchical Poisson per rung with animal random effects —
-    is the deferred mixed-model follow-up recorded in the provenance.
-
-    ``typical_session_se`` is the median of the *per-session* SEs (typical within-session
-    precision) — it is NOT the uncertainty of the aggregate effect. Sessions with a
-    quasi-separated coef (|coef| > 10) or a NaN coef are excluded and counted in
-    ``n_dropped``.
+    See :mod:`continuum_swr_replay.analysis.replay.contrast_aggregation` for the
+    column semantics (animal-level primary, session signed-rank descriptive, BH-FDR,
+    standardized per-SD columns). This wrapper just expands the content ladder into
+    (model, population, term) specs so the content and rate ladders mirror.
     """
-    sd = sd or {}
-    rows = []
-    for name in ladder:
-        term = key_term.get(name)
-        if term is None:
-            continue
-        factor, unit = _std_factor(term, sd)
-        ccol, scol, pcol = f"coef_{term}", f"bse_{term}", f"pval_{term}"
-        scope = ladder[name][1]
-        for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
-            s_all = res[(res.model == name) & (res.population == pop)]
-            if ccol not in s_all.columns:
-                continue
-            present = s_all[ccol].notna()
-            kept = present & (s_all[ccol].abs() < 10)  # drop quasi-separated
-            n_dropped = int((present & ~kept).sum())
-            s = s_all[kept]
-            if len(s) < 5:
-                continue
-            coef = s[ccol]
-            per_animal = s.groupby("animal")[ccol].median()
-            srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
-            rows.append(
-                {
-                    "level": level,
-                    "model": name,
-                    "population": pop,
-                    "term": term,
-                    "n_sessions": len(s),
-                    "n_animals": int(per_animal.size),
-                    "n_dropped": n_dropped,
-                    # animal-level = primary population evidence
-                    "coef_animal_median": float(per_animal.median()),
-                    "n_animals_pos": int((per_animal > 0).sum()),
-                    # session-level = descriptive support
-                    "coef_session_median": float(coef.median()),
-                    "typical_session_se": (
-                        float(s[scol].median()) if scol in s else np.nan
-                    ),
-                    # standardized (per-1-SD for continuous; per-category for binary)
-                    "std_unit": unit,
-                    "std_factor": factor,
-                    "std_coef_animal_median": float(per_animal.median()) * factor,
-                    "std_coef_session_median": float(coef.median()) * factor,
-                    "std_typical_session_se": (
-                        float(s[scol].median()) * factor if scol in s else np.nan
-                    ),
-                    "pct_positive_session": float((coef > 0).mean()),
-                    "pct_sig_session": (
-                        float((s[pcol] < 0.05).mean()) if pcol in s else np.nan
-                    ),
-                    "session_signrank_p": srp,
-                }
-            )
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    n_dropped_total = int(df["n_dropped"].sum())
-    if n_dropped_total:
-        logger.info(
-            "%s: dropped %d quasi-separated/NaN session-fits before aggregating",
-            level,
-            n_dropped_total,
-        )
-    # BH-FDR of the (descriptive) session signed-rank p, across the rung family per pop.
-    df["session_signrank_fdr_q"] = np.nan
-    for _, g in df.groupby("population"):
-        v = g["session_signrank_p"].notna()
-        if v.sum():
-            df.loc[g.index[v], "session_signrank_fdr_q"] = multipletests(
-                g.loc[v, "session_signrank_p"], method="fdr_bh"
-            )[1]
-    return df
+    return aggregate_contrast(res, specs_from_ladder(ladder, key_term), level, sd)
 
 
 def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:

@@ -66,6 +66,9 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
+    aggregate_contrast,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
 )
@@ -82,6 +85,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 SESSION_COLS = ["animal", "day", "epoch"]
+
+# Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
+# dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
+_G_KEY = {
+    "G0_base": "reward_lag1", "G1_periswitch": "trials_since_switch",
+    "G2_block": "trials_since_block_change", "G3_switchrate": "recent_switch_rate",
+    "G4_value": "hmm_relative_value", "G5_rpe": "hmm_rpe",
+    "G6_uncert": "reward_entropy", "G7_update": "hmm_value_update",
+}
+_S_KEY = {
+    "S1_rew1": "is_swr:reward_lag1", "S3_periswitch": "is_swr:trials_since_switch",
+    "S4_block": "is_swr:trials_since_block_change",
+    "S5_switchrate": "is_swr:recent_switch_rate",
+    "S6_value": "is_swr:hmm_relative_value", "S7_rpe": "is_swr:hmm_rpe",
+    "S8_uncert": "is_swr:reward_entropy", "S9_update": "is_swr:hmm_value_update",
+}
+# raw fit population -> friendly label shared with the content table
+_POP_LABEL = {"non_local": "all", "non_local_swr": "SWR", "non_local_no_swr": "nonSWR"}
+_RATE_CONT_COVARS = [
+    "trials_since_switch", "trials_since_block_change", "recent_switch_rate",
+    "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update",
+]
 RC = PROCESSED_DATA_DIR / "replay_content"
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
@@ -307,6 +332,25 @@ def main() -> None:
         out,
         time.perf_counter() - t0,
     )
+
+    if len(models):
+        # Audited aggregation mirroring the content ladder (per-animal primary,
+        # session signed-rank, BH-FDR, standardized per-SD columns). G-rungs are
+        # relabeled non_local/_swr/_no_swr -> all/SWR/nonSWR to match the content table.
+        qv = pd.read_pickle(out_dir / "qvals_table.pkl")
+        st = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
+        sd = {}
+        for c in _RATE_CONT_COVARS:
+            src = qv if c in qv.columns else st if c in st.columns else None
+            if src is not None:
+                sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
+        specs = [(g, p, t) for g, t in _G_KEY.items() for p in _POP_LABEL]
+        specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
+        agg = aggregate_contrast(models, specs, "rate", sd)
+        agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
+        asfx = "_smoke" if args.max_per_animal else ""
+        agg.to_pickle(out_dir / f"swr_contrast_rate_audited{asfx}.pkl")
+        logger.info("Saved audited rate table (%d rows) -> %s", len(agg), out_dir)
 
 
 if __name__ == "__main__":
