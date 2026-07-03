@@ -364,9 +364,12 @@ def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
         "per population is applied to the descriptive session signed-rank p.",
         "q_arm_source": "beta-model per-arm value (HMM q_arm harmonization deferred)",
         "deferred": [
-            "hierarchical Poisson per rung with animal random effects "
-            "(the rigorous population inference; supersedes the descriptive session "
-            "signed-rank p)",
+            "mixed conditional logit with animal random effects (the rigorous "
+            "population inference; supersedes the descriptive session signed-rank p). "
+            "NOT available in statsmodels (ConditionalPoisson takes no random effects "
+            "or cluster-robust cov); realistic path is NumPyro (JAX already a dep). "
+            "Caveat: the animal random-effect variance is estimated from n=5 groups, "
+            "so this does honest bookkeeping, not a power upgrade.",
             "common complete-case cohort across rungs",
             "within-group-centered VIF (fitting.py:420 uses the raw design)",
             "HMM per-arm q_arm",
