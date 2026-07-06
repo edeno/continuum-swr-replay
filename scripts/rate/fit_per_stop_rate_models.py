@@ -34,6 +34,10 @@ import logging
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.cohort_audit import (
+    cohort_record,
+    write_cohort_audit,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
     N_REWARD_LAGS,
@@ -58,17 +62,48 @@ RESPONSE_COLS = {
 }
 
 
-def fit_per_stop_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -> pd.DataFrame:
-    """One row per (outcome, model, session): R0-R2 + Rlag fit stats, coefs, CV-LL."""
+def fit_per_stop_rate_hierarchy(
+    stop_table: pd.DataFrame, run_cv: bool = True
+) -> tuple[pd.DataFrame, list[dict]]:
+    """One row per (outcome, model, session): R0-R2 + Rlag fit stats, coefs, CV-LL.
+
+    Also returns one stop-grain cohort-audit record per (model, outcome): dropna /
+    immobility<=0 stops go to ``n_drop_own_predictor_missing``; a skipped session's
+    remaining stops (min_stops / rank gate) go to ``n_excluded_session``; the fitted
+    ``n_stops`` sum is ``n_modeled``. Reconciles by construction.
+    """
     rows = []
+    acc: dict = {}  # (model, outcome) -> counts
     for keys, group in stop_table.groupby(SESSION_COLS, sort=False):
         for outcome, response_col in RESPONSE_COLS.items():
             if response_col not in group.columns:
                 continue
             for name, spec in MODEL_PER_STOP_RATE.items():
-                res = fit_per_stop_rate_model(group, list(spec.predictors), response_col=response_col)
+                preds = list(spec.predictors)
+                a = acc.setdefault((name, outcome), {
+                    "n_in": 0, "n_own": 0, "n_modeled": 0,
+                    "sessions_in": 0, "sessions_modeled": 0,
+                    "animals": set(), "n_nonconv": 0, "n_sep": 0,
+                })
+                a["sessions_in"] += 1
+                a["n_in"] += len(group)
+                avail = [
+                    c for c in (response_col, "immobility_time", *preds)
+                    if c in group.columns
+                ]
+                bad = group[avail].isna().any(axis=1) if avail else pd.Series(False, index=group.index)
+                if "immobility_time" in group.columns:
+                    bad = bad | (group["immobility_time"] <= 0)
+                a["n_own"] += int(bad.sum())
+
+                res = fit_per_stop_rate_model(group, preds, response_col=response_col)
                 if res is None:
                     continue
+                a["n_modeled"] += int(res["n_stops"])
+                a["sessions_modeled"] += 1
+                a["animals"].add(keys[0])
+                a["n_nonconv"] += res.get("converged") is False
+                a["n_sep"] += bool(res.get("separated"))
                 row = {
                     "outcome": outcome,
                     "model": name,
@@ -77,12 +112,27 @@ def fit_per_stop_rate_hierarchy(stop_table: pd.DataFrame, run_cv: bool = True) -
                 }
                 if run_cv:
                     cv = cross_validate_per_stop_rate_model(
-                        group, list(spec.predictors), response_col=response_col
+                        group, preds, response_col=response_col
                     )
                     if cv is not None:
                         row.update(cv)
                 rows.append(row)
-    return pd.DataFrame(rows)
+
+    records = [
+        cohort_record(
+            name, outcome, "stop",
+            n_in=a["n_in"], n_modeled=a["n_modeled"],
+            sessions_in=a["sessions_in"], sessions_modeled=a["sessions_modeled"],
+            animals_modeled=len(a["animals"]),
+            drop_notes="dropna/immobility<=0 -> own; session gates -> excluded",
+            n_drop_own_predictor_missing=a["n_own"],
+            n_excluded_session=a["n_in"] - a["n_own"] - a["n_modeled"],
+            n_sessions_flagged_nonconverged=a["n_nonconv"],
+            n_sessions_flagged_separated=a["n_sep"],
+        )
+        for (name, outcome), a in acc.items()
+    ]
+    return pd.DataFrame(rows), records
 
 
 def main() -> None:
@@ -105,12 +155,13 @@ def main() -> None:
         list(RESPONSE_COLS),
         stop.groupby(SESSION_COLS).ngroups,
     )
-    rate = fit_per_stop_rate_hierarchy(stop, run_cv=True)
+    rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=True)
 
     out_dir = RC / "models_per_stop_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "all_models.pkl"
     rate.to_pickle(out)
+    write_cohort_audit(cohort_audits, out_dir / "all_models_cohort_audit.csv")
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",
         len(rate),

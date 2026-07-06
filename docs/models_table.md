@@ -40,6 +40,42 @@ aggregation surfaces per-(model, population) `n_sessions_flagged_nonconverged` /
 `n_sessions_flagged_separated`. These are diagnostics on the retained cohort — the only
 coefficient exclusion is the `|coef|>=10` quasi-separation filter.
 
+### Cohort-audit tables
+
+The **primary** fit runners emit a `<run>_cohort_audit.csv` next to their outputs: **one
+row per (model, population)** stating who entered the model and who was dropped, so
+complete-case filtering is visible rather than implied. Covered runners:
+`fit_replay_content_models.py` (content base ladder, common cohort),
+`fit_swr_contrast_content.py` and `fit_swr_contrast_rate.py` (the is_swr-contrast
+ladders), `fit_per_stop_rate_models.py` (Family A) and `fit_per_bin_rate_models.py`
+(Family B). The emitter is `analysis.replay.cohort_audit`. Counts are in the row's
+`grain` (`event` for content, `stop` for the rate families). Drops are **mutually
+exclusive**, assigned by priority:
+
+`n_drop_qvals_gap` (mechanism B — a value/HMM covariate is missing on the ~896-event /
+2056-stop tail) → `n_drop_own_predictor_missing` (this model's own predictor NaN, e.g.
+`reward_rate_arm_k10`'s early-session mechanism-A gap) → `n_drop_zero_response`
+(Σcount==0) → `n_drop_common_cohort_other` (union complete-case: dropped only for
+*another* rung's predictor) → `n_excluded_session` (data-level `min_*`/rank gates).
+
+**Reconciliation invariant (asserted, fail-loud):**
+`n_in − Σ n_drop_* == n_modeled`. Convergence/separation counts
+(`n_sessions_flagged_*`) and the `|coef|>=10` quasi-separation counts (the separate
+`<run>_term_diagnostics.csv`) are **session/term-level** and excluded from the
+reconciliation. `scripts/qa/summarize_cohort_audits.py` stacks every audit CSV and flags
+low-retention (`n_modeled/n_in < 0.9`) or biased (mechanism-A early / mechanism-B
+qvals-tail) drops.
+
+**Not (yet) on the standardized schema:** `compare_event_source_models.py` (content /
+patch / rate / **choice** comparison blocks) predates it and keeps its own richer
+per-cohort `_freeze_common_cohort` provenance (`n_missing`/`n_zero`/`n_invalid`/
+`n_units_after` per frozen cohort). The auxiliary/robustness rate runners
+`fit_uncertainty_rate.py`, `fit_cross_history_rate.py`, and `fit_swr_power_model.py`
+are **not** covered here — of these, `fit_uncertainty_rate.py` and
+`fit_swr_power_model.py` merge `qvals_table.pkl` and so incur the same mechanism-B
+qvals-tail drop (visible in their run logs, not yet a cohort CSV). Extending the
+standardized audit to these is a follow-up.
+
 ## Per-bin rate — Family B
 `fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`
 

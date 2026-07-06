@@ -65,6 +65,10 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     per_bin_rate_gof,
 )
+from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
+    cohort_record,
+    write_cohort_audit,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
@@ -209,6 +213,46 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     return stop_table.merge(keep, on=SESSION_COLS)
 
 
+def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
+    """Stop-grain cohort record per (model, population) for the per-bin ladder.
+
+    Family B has no qvals merge; the only drops are session-level (min_bins /
+    min_events / reward-contrast gates), so a fitted session contributes all its stops
+    to ``n_modeled`` and a skipped session's stops to ``n_excluded_session``.
+    """
+    stops_by_session = stop.groupby(SESSION_COLS, sort=False).size()
+    total = int(stops_by_session.sum())
+    candidate_keys = list(stops_by_session.index)
+    recs = []
+    for name in MODEL_PER_BIN_RATE:
+        for outcome in POPULATIONS:
+            sub = (
+                models[(models.model == name) & (models.outcome == outcome)]
+                if len(models) else models
+            )
+            fit_keys = (
+                {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+            )
+            n_modeled = int(sum(int(stops_by_session.get(k, 0)) for k in fit_keys))
+            recs.append(cohort_record(
+                name, outcome, "stop",
+                n_in=total, n_modeled=n_modeled,
+                sessions_in=len(candidate_keys), sessions_modeled=len(fit_keys),
+                animals_modeled=len({k[0] for k in fit_keys}),
+                drop_notes="min_bins/min_events/reward-contrast session gates -> excluded",
+                n_excluded_session=total - n_modeled,
+                n_sessions_flagged_nonconverged=(
+                    int((sub["converged"] == False).sum())  # noqa: E712
+                    if "converged" in sub else 0
+                ),
+                n_sessions_flagged_separated=(
+                    int((sub["separated"] == True).sum())  # noqa: E712
+                    if "separated" in sub else 0
+                ),
+            ))
+    return recs
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -257,6 +301,11 @@ def main() -> None:
     fname = "all_models_smoke.pkl" if args.max_per_animal else "all_models.pkl"
     out = out_dir / fname
     models.to_pickle(out)
+    csfx = "_smoke" if args.max_per_animal else ""
+    write_cohort_audit(
+        _cohort_records(models, stop),
+        out_dir / f"per_bin_rate_cohort_audit{csfx}.csv",
+    )
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s, models=%s) to %s in %.1fs",
         len(models),

@@ -71,6 +71,11 @@ from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E40
     count_fit_quality_warnings,
     fit_status,
 )
+from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
+    cohort_record,
+    term_diagnostics,
+    write_cohort_audit,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
@@ -217,7 +222,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
     return keys, rows, skips
 
 
-def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
     stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
     q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = [
@@ -257,12 +262,59 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
         pd.read_pickle(RC / "event_onset_table.pkl"),
         pd.read_pickle(RC / "event_table.pkl"),
     )
-    return stop, onsets
+    # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
+    # HMM/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
+    n_qvals_dropped = int(n0 - len(stop))
+    return stop, onsets, n_qvals_dropped
 
 
 def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
     keep = stop[SESSION_COLS].drop_duplicates().groupby("animal", sort=False).head(n)
     return stop.merge(keep, on=SESSION_COLS)
+
+
+def _cohort_records(
+    models: pd.DataFrame, items: list, stop: pd.DataFrame, n_qvals_dropped: int
+) -> list[dict]:
+    """One stop-grain cohort record per (model, population).
+
+    Grain is ``stop`` (the plan audits the rate family at stop grain — the timebin
+    design is aggregated per-session inside the fitter). ``n_in`` = candidate stops +
+    the qvals-join drop; a fit session contributes all its stops to ``n_modeled``, a
+    skipped session's stops to ``n_excluded_session``, and the inner-join drop to
+    ``n_drop_qvals_gap`` (mechanism B). Reconciles by construction.
+    """
+    stops_by_session = stop.groupby(SESSION_COLS, sort=False).size()
+    candidate_keys = [k for k, _, _ in items]
+    total_candidate = int(sum(int(stops_by_session.get(k, 0)) for k in candidate_keys))
+    pairs = [(m, p) for m in G_SPECS for p in STRATA]
+    pairs += [(m, "contrast") for m in S_SPECS]
+    records = []
+    for name, pop in pairs:
+        if len(models):
+            sub = models[(models.model == name) & (models.population == pop)]
+        else:
+            sub = models
+        fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+        n_modeled = int(sum(int(stops_by_session.get(k, 0)) for k in fit_keys))
+        n_excluded = total_candidate - n_modeled
+        n_nonconv = int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
+        n_sep = int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+        records.append(cohort_record(
+            name, _POP_LABEL.get(pop, pop), "stop",
+            n_in=total_candidate + int(n_qvals_dropped), n_modeled=n_modeled,
+            sessions_in=len(candidate_keys), sessions_modeled=len(fit_keys),
+            animals_modeled=len({k[0] for k in fit_keys}),
+            drop_notes=(
+                f"qvals-join drop (mechanism B) at stop grain; "
+                f"{len(candidate_keys) - len(fit_keys)} candidate session(s) skipped"
+            ),
+            n_drop_qvals_gap=int(n_qvals_dropped),
+            n_excluded_session=n_excluded,
+            n_sessions_flagged_nonconverged=n_nonconv,
+            n_sessions_flagged_separated=n_sep,
+        ))
+    return records
 
 
 def main() -> None:
@@ -275,7 +327,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    stop, onsets = _load()
+    stop, onsets, n_qvals_dropped = _load()
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 
@@ -335,6 +387,24 @@ def main() -> None:
         else "swr_contrast_rate.pkl"
     )
     models.to_pickle(out)
+
+    # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +
+    # term-level quasi-separation diagnostics, mirroring the content contrast runner.
+    csfx = "_smoke" if args.max_per_animal else ""
+    # The qvals-join drop is measured on the full stop table in _load(); in smoke mode
+    # the per-animal subset happens after, so attributing the full-data drop against a
+    # tiny subset n_in would be meaningless. Report 0 there (smoke is not a reported run).
+    audit_qvals_drop = 0 if args.max_per_animal else n_qvals_dropped
+    write_cohort_audit(
+        _cohort_records(models, items, stop, audit_qvals_drop),
+        out_dir / f"swr_contrast_rate_cohort_audit{csfx}.csv",
+    )
+    if len(models):
+        td_specs = [(g, p, t) for g, t in _G_KEY.items() for p in STRATA]
+        td_specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
+        term_diagnostics(models, td_specs).to_csv(
+            out_dir / f"swr_contrast_rate_term_diagnostics{csfx}.csv", index=False
+        )
     logger.info(
         "Saved %d rows (%d sessions, populations=%s, models=%s) to %s in %.1fs",
         len(models),
