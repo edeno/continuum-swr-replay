@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 """Exploratory: non-local bout covariate browser for one session.
 
-Columns = immobility non-local bouts (time-ordered; the analyzed window is
-immobile, speed < 4 cm/s). Rows = 9 arms (patch-grouped palette). The panels
+Columns = non-local events (time-ordered; immobility-associated, the analyzed
+window is immobile, speed < 4 cm/s). One column per non-local event — a single
+immobility period (stop) may contain several events, grouped by the shaded
+bands in the content panel. Rows = 9 arms (patch-grouped palette). The panels
 mirror the covariates in the fitted model ladders so decoded content can be
 eyeballed against the predictors:
 
   Rate models (per-bout tracks)
-    reward (reward_lag1), reward-lag kernel (reward_lag1..N, Rlag/M2/BASE),
+    reward = reward_outcome (this stop's own outcome; distinct from the
+    kernel's lag-1 = previous trial), reward-lag kernel (reward_lag1..N,
+    Rlag/M2/BASE),
     after switch / after omission (R1), reward rate trial k10 (R2), and the
     SWR-contrast value-state block (is_post_switch, trials_since_switch,
     trials_since_block_change, recent_switch_rate, hmm_relative_value, hmm_rpe,
@@ -48,6 +52,15 @@ from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_cova
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
+
+# Publication-friendly text: sans-serif with editable (Type-42) fonts so a PDF
+# export opens with selectable/editable text. Arial if available, else fallback.
+plt.rcParams.update({
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+})
 
 # Row order top->bottom: patch 1 (0,1,6), patch 2 (2,3,7), patch 3 (4,5,8).
 ARM_ROW_ORDER = [0, 1, 6, 2, 3, 7, 4, 5, 8]
@@ -113,12 +126,14 @@ def build_figure(
     y_of_arm = {arm: (n_arms - 1 - i) for i, arm in enumerate(ARM_ROW_ORDER)}
     sub["y"] = sub["arm"].map(y_of_arm)
 
-    # Per-bout covariates (constant across arms), in column order.
+    # Per-bout covariates (constant across arms), in column order. Binary tracks
+    # keep raw 0/1/NaN (not a bool mask) so missing values render distinctly
+    # rather than collapsing to "no".
     evo = sub.groupby("non_local_event").first().reindex(order.index)
-    rew_col = (evo["reward_outcome"] == 1).to_numpy()
-    swr_col = (evo["is_swr"] == 1).to_numpy()
-    switch_col = (evo["is_after_switch"] == 1).to_numpy()
-    omit_col = (evo["is_after_omission"] == 1).to_numpy()
+    rew_col = evo["reward_outcome"].to_numpy(dtype=float)
+    swr_col = evo["is_swr"].to_numpy(dtype=float)
+    switch_col = evo["is_after_switch"].to_numpy(dtype=float)
+    omit_col = evo["is_after_omission"].to_numpy(dtype=float)
     prev_arm_col = evo["prev_arm"].to_numpy(dtype=float)
     lastrew_arm_col = evo["last_rewarded_arm"].to_numpy(dtype=float)
 
@@ -139,7 +154,7 @@ def build_figure(
     def stop_scalar(col):
         return evo["stop_id"].map(sst.set_index("stop_id")[col]).to_numpy(dtype=float)
 
-    postsw_col = stop_scalar("is_post_switch") == 1
+    postsw_col = stop_scalar("is_post_switch")  # raw 0/1/NaN
     tss_col = stop_scalar("trials_since_switch")
     tsbc_col = stop_scalar("trials_since_block_change")
     rsr_col = stop_scalar("recent_switch_rate")
@@ -148,8 +163,10 @@ def build_figure(
     entropy_col = stop_scalar("reward_entropy")
     vupdate_col = stop_scalar("hmm_value_update")
 
-    # Immobility-bout (stop) membership -> alternating bands in content panel.
+    # Immobility-period (stop) membership -> alternating bands in content panel.
+    # Each column is one non-local event; several may share a stop.
     stop_col = evo["stop_id"].to_numpy()
+    n_stops = len(np.unique(stop_col))
     stop_group = np.zeros(n_bouts, dtype=int)
     stop_group[1:] = np.cumsum(stop_col[1:] != stop_col[:-1])
 
@@ -173,22 +190,22 @@ def build_figure(
         ("binary", postsw_col, "post switch", None),
         ("heatbout", tss_col, "trials since switch", ("RdBu_r", True)),
         ("heatbout", tsbc_col, "trials since block", ("viridis", False)),
-        ("heatbout", rsr_col, "recent switch rate", ("Oranges", False)),
-        ("heatbout", relval_col, "rel value (dV)", ("RdBu_r", True)),
-        ("heatbout", rpe_col, "RPE", ("RdBu_r", True)),
+        ("heatbout", rsr_col, "recent switch rate (frac)", ("Oranges", False)),
+        ("heatbout", relval_col, "rel value (ΔV)", ("RdBu_r", True)),
+        ("heatbout", rpe_col, "RPE (reward−Q)", ("RdBu_r", True)),
         ("heatbout", entropy_col, "reward entropy", ("cividis", False)),
-        ("heatbout", vupdate_col, "value update", ("magma", False)),
+        ("heatbout", vupdate_col, "value update (|ΔQ|)", ("magma", False)),
         ("armstrip", prev_arm_col, "prev arm", None),
         ("armstrip", lastrew_arm_col, "last rew arm", None),
         ("content", None, "non-local content", None),
-        ("cov", "q_arm_hmm", "HMM value", ("RdBu_r", True)),
-        ("cov", "q_arm", "belief value", ("viridis", False)),
-        ("cov", "reward_rate_arm_k10", "reward rate k10", ("plasma", False)),
+        ("cov", "q_arm_hmm", "HMM value (Q)", ("RdBu_r", True)),
+        ("cov", "q_arm", "belief value (P)", ("viridis", False)),
+        ("cov", "reward_rate_arm_k10", "reward rate k10 (frac)", ("plasma", False)),
         ("cov", "p_reward_arm", "P(reward)", ("cividis", False)),
-        ("cov", "cumulative_reward", "cumul reward", ("YlGn", False)),
-        ("cov", "visit_recency_demeaned", "visit recency", ("PuOr", True)),
+        ("cov", "cumulative_reward", "cumul reward (n)", ("YlGn", False)),
+        ("cov", "visit_recency_demeaned", "visit recency (dem)", ("PuOr", True)),
         ("cov", "visit_recency", "visit recency (raw)", ("Purples", False)),
-        ("cov", "arm_dist_rank", "arm dist rank", ("magma_r", False)),
+        ("cov", "arm_dist_rank", "arm dist rank (1=near)", ("magma_r", False)),
     ]
     hmap = {"binary": BINARY_H, "heatbout": HEAT_H, "kernel": KERNEL_H,
             "armstrip": STRIP_H, "content": CONTENT_H, "cov": COV_H}
@@ -226,11 +243,17 @@ def build_figure(
     for i, (kind, data, label, extra) in enumerate(panels):
         ax = axes[i]
         if kind == "binary":
-            mask = data
-            ax.scatter(cols[~mask], np.zeros((~mask).sum()), s=26, marker="s",
-                       c="0.85", edgecolors="0.6", linewidths=0.35, zorder=2)
-            ax.scatter(cols[mask], np.zeros(mask.sum()), s=26, marker="s",
-                       c="#222222", edgecolors="none", zorder=2)
+            v = np.asarray(data, dtype=float)
+            no, yes, missing = v == 0, v == 1, ~np.isfinite(v)
+            ax.scatter(cols[no], np.zeros(no.sum()), s=26, marker="s",
+                       c="0.85", edgecolors="0.6", linewidths=0.35, zorder=2,
+                       rasterized=True)
+            ax.scatter(cols[yes], np.zeros(yes.sum()), s=26, marker="s",
+                       c="#222222", edgecolors="none", zorder=2, rasterized=True)
+            if missing.any():  # missing -> grey x, distinct from a "no" square
+                ax.scatter(cols[missing], np.zeros(missing.sum()), s=16,
+                           marker="x", c="0.6", linewidths=0.6, zorder=3,
+                           rasterized=True)
             style_track(ax, label)
         elif kind == "heatbout":
             cmap_name, diverging = extra
@@ -240,7 +263,7 @@ def build_figure(
             vmin, vmax = _vlims(M, diverging)
             im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
                            extent=(-0.5, n_bouts - 0.5, 0.5, -0.5),
-                           interpolation="nearest", zorder=2)
+                           interpolation="nearest", zorder=2, rasterized=True)
             style_track(ax, label)
             cb = fig.colorbar(im, cax=fig.add_subplot(gs[i, 1]),
                               ticks=[vmin, vmax])
@@ -253,7 +276,7 @@ def build_figure(
             cmap.set_bad("0.9")
             im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=0, vmax=1,
                            extent=(-0.5, n_bouts - 0.5, n_lag - 0.5, -0.5),
-                           interpolation="nearest", zorder=2)
+                           interpolation="nearest", zorder=2, rasterized=True)
             ax.set_yticks(range(n_lag))
             ax.set_yticklabels([str(j + 1) for j in range(n_lag)], fontsize=5.5)
             ax.tick_params(axis="both", length=0)
@@ -267,7 +290,7 @@ def build_figure(
             facecols = np.array([palette[int(a)] if np.isfinite(a) else (1, 1, 1, 1)
                                  for a in data])
             ax.scatter(cols, np.zeros(n_bouts), s=26, marker="s", c=facecols,
-                       edgecolors="0.7", linewidths=0.3, zorder=2)
+                       edgecolors="0.7", linewidths=0.3, zorder=2, rasterized=True)
             style_track(ax, label)
         elif kind == "content":
             for g in range(stop_group.max() + 1):
@@ -279,10 +302,10 @@ def build_figure(
             cc = np.array([palette[a] for a in sub["arm"]], dtype=float)
             cc[:, 3] = frac
             ax.scatter(sub["col"], sub["y"], s=32, c=cc, edgecolors="none",
-                       zorder=2)
+                       zorder=2, rasterized=True)
             cur = sub[sub["is_current"] == 1]
             ax.scatter(cur["col"], cur["y"], s=46, facecolors="none",
-                       edgecolors="black", linewidths=0.9, zorder=3)
+                       edgecolors="black", linewidths=0.9, zorder=3, rasterized=True)
             for yb in (2.5, 5.5):
                 ax.axhline(yb, color="0.85", lw=0.7, zorder=1)
             ax.set_ylim(-0.5, n_arms - 0.5)
@@ -303,7 +326,7 @@ def build_figure(
             vmin, vmax = _vlims(M, diverging)
             im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
                            extent=(-0.5, n_bouts - 0.5, n_arms - 0.5, -0.5),
-                           interpolation="nearest", zorder=1)
+                           interpolation="nearest", zorder=1, rasterized=True)
             arm_yticks(ax, full=False)
             ax.set_ylabel(label, fontsize=8, rotation=0, ha="right",
                           va="center", labelpad=22)
@@ -316,27 +339,31 @@ def build_figure(
         ax.tick_params(labelbottom=False)
     axes[0].set_title(
         f"{title_stub}  —  non-local bout covariate browser  "
-        f"({n_bouts} immobility bouts, {int(rew_col.sum())} rewarded, "
-        f"{int(swr_col.sum())} SWR)", fontsize=11,
+        f"({n_bouts} non-local events in {n_stops} immobility periods, "
+        f"{int((rew_col == 1).sum())} rewarded, {int((swr_col == 1).sum())} SWR)",
+        fontsize=11,
     )
     axes[-1].set_xlim(-0.5, n_bouts - 0.5)
     axes[-1].set_xlabel(
-        "non-local bout (time-ordered; immobility, speed < 4 cm/s)  —  "
-        "content bands group bouts within one immobility period", fontsize=9,
+        "non-local event (time-ordered; immobility, speed < 4 cm/s)  —  one "
+        "column per event; bands group events within one immobility period",
+        fontsize=9,
     )
 
     legend = [
         Line2D([0], [0], marker="o", color="none", markerfacecolor="0.35",
-               markersize=8, label="content: alpha ∝ posterior fraction"),
+               markersize=8, label="content: opacity = posterior fraction"),
         Line2D([0], [0], marker="o", color="none", markerfacecolor="none",
                markeredgecolor="black", markersize=8, label="animal's current arm"),
         Line2D([0], [0], marker="s", color="none", markerfacecolor="#222222",
                markersize=7, label="binary track filled = yes"),
+        Line2D([0], [0], marker="x", color="0.6", linestyle="none",
+               markersize=7, label="missing covariate"),
         Line2D([0], [0], marker="s", color="none", markerfacecolor=palette[2],
                markersize=7, label="arm strip: color = arm identity"),
     ]
     axes[-1].legend(handles=legend, loc="upper left", bbox_to_anchor=(0, -0.55),
-                    frameon=False, fontsize=7.5, ncol=4)
+                    frameon=False, fontsize=7.5, ncol=5)
     return fig, n_bouts
 
 
@@ -348,6 +375,10 @@ def main() -> None:
     p.add_argument("--epoch", default="04_r2")
     p.add_argument("--out", default=None,
                    help="output PNG path (default: .claude/research/...)")
+    p.add_argument("--pdf", action="store_true",
+                   help="also write a vector PDF alongside the PNG")
+    p.add_argument("--dpi", type=int, default=150,
+                   help="raster DPI (heatmaps/scatter are rasterized)")
     args = p.parse_args()
 
     event_arm = pd.read_pickle(RC_DIR / "event_arm_table.pkl")
@@ -384,8 +415,13 @@ def main() -> None:
         os.makedirs(DEFAULT_OUT_DIR, exist_ok=True)
         out = str(DEFAULT_OUT_DIR
                   / f"{args.animal}{args.day}_{args.epoch}_nonlocal_bout_arms.png")
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    print(f"wrote {out} | bouts: {n_bouts}")
+    fig.savefig(out, dpi=args.dpi, bbox_inches="tight")
+    written = [out]
+    if args.pdf:
+        pdf = out[:-4] + ".pdf" if out.endswith(".png") else out + ".pdf"
+        fig.savefig(pdf, dpi=args.dpi, bbox_inches="tight")
+        written.append(pdf)
+    print(f"wrote {', '.join(written)} | events: {n_bouts}")
 
 
 if __name__ == "__main__":
