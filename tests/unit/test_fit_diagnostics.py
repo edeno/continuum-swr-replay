@@ -7,6 +7,7 @@ import warnings
 import numpy as np
 import pytest
 import statsmodels.api as sm
+from statsmodels.discrete.conditional_models import ConditionalPoisson
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
@@ -14,6 +15,22 @@ from continuum_swr_replay.analysis.replay._fit_diagnostics import (
     count_fit_quality_warnings,
     fit_status,
 )
+
+
+def _conditional_poisson_design(seed: int = 0):
+    """A well-posed conditional-Poisson design: one chosen arm per event group."""
+    rng = np.random.default_rng(seed)
+    n_events, n_arms = 60, 4
+    groups = np.repeat(np.arange(n_events), n_arms)
+    x = rng.normal(size=n_events * n_arms)
+    eta = 0.8 * x
+    y = np.zeros_like(eta)
+    for e in range(n_events):
+        idx = np.where(groups == e)[0]
+        p = np.exp(eta[idx])
+        p /= p.sum()
+        y[idx[rng.choice(len(idx), p=p)]] = 1.0
+    return y, x[:, None], groups
 
 
 @pytest.fixture
@@ -74,6 +91,39 @@ def test_mle_kind_reads_mle_retvals(separated_binary):
     # Perfectly separated logit does not converge and is flagged separated.
     assert status["converged"] is False
     assert status["separated"] is True
+
+
+def test_conditional_converged_not_falsely_flagged():
+    """Regression: ConditionalResultsWrapper exposes neither .converged nor
+    mle_retvals, so a naive kind='mle' read reports a *successful* conditional
+    fit as nonconverged. kind='conditional' must recover the true status from the
+    captured warnings and report converged=True for a well-posed fit."""
+    y, X, groups = _conditional_poisson_design()
+    with capture_fit_warnings() as caught:
+        res = ConditionalPoisson(y, X, groups=groups).fit(disp=0)
+    status = fit_status(res, "conditional", caught=caught)
+    assert status == {"converged": True, "separated": False}
+    # The naive path this replaced would have (wrongly) said False:
+    assert not hasattr(res, "converged") or res.converged is False
+    assert not hasattr(res, "mle_retvals")
+
+
+def test_conditional_nonconverged_flagged():
+    """A conditional fit stopped at maxiter=1 emits a ConvergenceWarning, which
+    kind='conditional' reads as converged=False."""
+    y, X, groups = _conditional_poisson_design()
+    with capture_fit_warnings() as caught:
+        res = ConditionalPoisson(y, X, groups=groups).fit(disp=0, maxiter=1)
+    assert fit_status(res, "conditional", caught=caught)["converged"] is False
+
+
+def test_conditional_unknown_without_caught():
+    """Without a captured-warnings list convergence is unknowable for a conditional
+    wrapper -> reported as None, not a false False."""
+    y, X, groups = _conditional_poisson_design()
+    with capture_fit_warnings():
+        res = ConditionalPoisson(y, X, groups=groups).fit(disp=0)
+    assert fit_status(res, "conditional")["converged"] is None
 
 
 def test_invalid_kind_raises(benign_poisson):

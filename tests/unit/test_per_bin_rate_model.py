@@ -200,6 +200,36 @@ def test_cv_folds_score_and_beat_constant():
     assert np.isfinite(cv["cv_ll_per_bin_mean"])
     # A real held-out reward effect must beat the constant-rate baseline.
     assert cv["cv_bits_per_event"] > 0
+    # A clean run reports zero bad folds.
+    assert cv["cv_n_nonconverged_folds"] == 0
+    assert cv["cv_n_separated_folds"] == 0
+
+
+def test_cv_one_bad_fold_invalidates_metric(monkeypatch):
+    """A single nonconverged fold (model OR baseline) invalidates the whole CV
+    metric to nan without dropping the fold; counts are reported alongside."""
+    import continuum_swr_replay.analysis.replay.per_bin_rate_model as pbm
+
+    calls = {"n": 0}
+    real = pbm.fit_status
+
+    def fake_fit_status(result, kind, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:  # first fold's model fit only
+            return {"converged": False, "separated": False}
+        return real(result, kind, **kwargs)
+
+    monkeypatch.setattr(pbm, "fit_status", fake_fit_status)
+    design = make_per_bin_rate_design(reward_effect=2.5, base_rate=0.08, seed=4)
+    cv = cross_validate_per_bin_rate_model(
+        design, MODEL_PER_BIN_RATE["M1_rew1"], n_folds=5
+    )
+    assert cv is not None  # fold NOT dropped
+    assert cv["cv_n_folds"] == 5
+    assert cv["cv_n_nonconverged_folds"] == 1
+    assert cv["cv_n_separated_folds"] == 0
+    assert np.isnan(cv["cv_ll_per_bin_mean"])
+    assert np.isnan(cv["cv_bits_per_event"])
 
 
 def test_cv_folds_split_on_stop():

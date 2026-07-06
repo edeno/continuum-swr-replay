@@ -33,30 +33,47 @@ _SEPARATION_BSE_ABS = 1e3
 FIT_QUALITY_WARNINGS = (ConvergenceWarning, PerfectSeparationWarning)
 
 
-def fit_status(result, kind: str) -> dict:
+def fit_status(result, kind: str, *, caught=None) -> dict:
     """Convergence + separation flags for a fitted statsmodels result.
 
     Parameters
     ----------
     result : statsmodels results object
         A fitted result with ``params`` and ``bse``.
-    kind : {"glm", "mle"}
+    kind : {"glm", "mle", "conditional"}
         ``"glm"`` for :class:`~statsmodels.genmod.GLMResults` (convergence read from
-        ``result.converged``); ``"mle"`` for discrete MLE results
-        (ConditionalPoisson/ConditionalLogit/Logit — convergence read from
-        ``result.mle_retvals["converged"]``).
+        ``result.converged``); ``"mle"`` for plain discrete MLE results (e.g.
+        ``sm.Logit`` — convergence read from ``result.mle_retvals["converged"]``);
+        ``"conditional"`` for ``ConditionalPoisson``/``ConditionalLogit``, whose
+        ``ConditionalResultsWrapper`` **discards** the optimizer's ``mle_retvals``
+        (statsmodels rebuilds a bare ``ConditionalResults`` and throws the raw fit
+        result away), so neither ``.converged`` nor ``.mle_retvals`` exists. For that
+        case convergence is recovered from ``caught``: a non-converged conditional fit
+        emits exactly one ``ConvergenceWarning`` (verified), so ``converged`` is
+        ``True`` when no ``ConvergenceWarning`` was captured, ``False`` when one was,
+        and ``None`` when the caller did not capture warnings (unknown).
+    caught : list, optional
+        The warnings list from :func:`capture_fit_warnings`. Required for
+        ``kind="conditional"`` to recover convergence; ignored otherwise.
 
     Returns
     -------
     dict
-        ``{"converged": bool, "separated": bool}``.
+        ``{"converged": bool | None, "separated": bool}``.
     """
     if kind == "glm":
         converged = bool(getattr(result, "converged", False))
     elif kind == "mle":
         converged = bool((getattr(result, "mle_retvals", {}) or {}).get("converged", False))
+    elif kind == "conditional":
+        if caught is None:
+            converged = None  # statsmodels does not expose it; caller didn't capture
+        else:
+            converged = not any(
+                issubclass(w.category, ConvergenceWarning) for w in caught
+            )
     else:
-        raise ValueError(f"kind must be 'glm' or 'mle', got {kind!r}")
+        raise ValueError(f"kind must be 'glm', 'mle', or 'conditional', got {kind!r}")
 
     params = np.asarray(result.params, dtype=float)
     bse = np.asarray(result.bse, dtype=float)

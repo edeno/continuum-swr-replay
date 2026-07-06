@@ -359,3 +359,28 @@ class TestCrossValidateRateModel:
     def test_missing_column_returns_none(self):
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=4)
         assert cross_validate_per_stop_rate_model(df, predictors=["not_a_column"]) is None
+
+    def test_one_bad_fold_invalidates_metric_without_dropping_fold(self, monkeypatch):
+        """A single nonconverged/separated fold must invalidate the whole CV metric
+        to nan (not drop the fold, which would change the held-out set), and the
+        fold counts must be reported alongside."""
+        import continuum_swr_replay.analysis.replay.per_stop_rate_model as psm
+
+        calls = {"n": 0}
+        real = psm.fit_status
+
+        def fake_fit_status(result, kind, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:  # only the first fold is "separated"
+                return {"converged": True, "separated": True}
+            return real(result, kind, **kwargs)
+
+        monkeypatch.setattr(psm, "fit_status", fake_fit_status)
+        df = _simulate_stops(n_stops=300, log_intercept=0.0, seed=1)
+        cv = cross_validate_per_stop_rate_model(df, predictors=[], n_folds=5)
+        assert cv is not None  # the fold is NOT dropped
+        assert cv["cv_n_folds"] == 5
+        assert cv["cv_n_separated_folds"] == 1
+        assert cv["cv_n_nonconverged_folds"] == 0
+        assert np.isnan(cv["cv_ll_per_stop_mean"])
+        assert np.isnan(cv["cv_ll_per_stop_std"])

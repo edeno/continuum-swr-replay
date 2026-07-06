@@ -170,7 +170,7 @@ def fit_conditional_poisson(
             "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
         )
         return None
-    status = fit_status(result, "mle")
+    status = fit_status(result, "conditional", caught=caught)
     n_fit_warnings = count_fit_quality_warnings(caught)
 
     coefs = dict(zip(predictors, result.params, strict=True))
@@ -396,7 +396,7 @@ def fit_conditional_logit(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
         return None
-    status = fit_status(result, "mle")
+    status = fit_status(result, "conditional", caught=caught)
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))

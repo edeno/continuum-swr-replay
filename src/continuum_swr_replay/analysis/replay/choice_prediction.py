@@ -499,7 +499,7 @@ def fit_choice_model(
     except Exception:
         logger.warning("ConditionalLogit failed for %s", predictors)
         return None
-    status = fit_status(result, "mle")
+    status = fit_status(result, "conditional", caught=caught)
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
