@@ -1,0 +1,50 @@
+covariate,role,source_root,source_input,builder_file_line,grain,level,used_in_models,time_availability,leak_severity,notes
+is_current,predictor,R1,current_arm (_helpers.py:92),tables.py:1213,event_arm,arm,content M0+;choice,available (trip destination chosen at start),clean,
+is_prev,predictor,R1,prev_arm (_helpers.py:91),tables.py:1214,event_arm,arm,content M0+,available,clean,
+is_next,excluded,R1,next_arm=to_well[idx+1] (_helpers.py:93),tables.py:1215,event_arm,arm,NONE (excluded),FUTURE choice,response-only,excluded from all predictor ladders model_specs.py:61
+is_last_rewarded,predictor,R1,last_rewarded_well backward searchsorted (_helpers.py:107),tables.py:1216,event_arm,arm,content M4+,available (backward),clean,
+is_last_rewarded_elsewhere,predictor,R1,is_last_rewarded*(1-is_current),tables.py:1227,event_arm,arm,content M5+,available,clean,identifiable residual
+is_same_patch,excluded,R1,arm_patch_id vs current_patch,tables.py:1231,event_arm,arm,NONE (VIF),available,clean,dropped for collinearity
+arm_count_hard,response,R2,decoded MAP-arm of nonlocal bins,tables.py:1140,event_arm,arm,content response,n/a,response,
+arm_count_soft,response,R2,posterior-weighted arm count,tables.py:1143,event_arm,arm,content response,n/a,response,
+arm_posterior_mass,response,R2,conditional posterior,tables.py:1160,event_arm,arm,content response,n/a,response,
+arm_fraction,response,R2,arm_count_hard/n_real_bins,tables.py:1191,event_arm,arm,content response;replay_frac,n/a,response,
+reward_rate_arm_k10,predictor,R1,trailing rewarded-fraction last 10 visits to arm (covariates.py:179),tables.py:1274,event_arm,arm,content M3+;choice,available (backward),clean,NaN on 11.6% events (leaf arms w/o visit history) -> non-random complete-case drop
+cumulative_reward,predictor,R1,trailing 10-trial reward count (covariates.py:122),tables.py,event_arm,arm,choice,available (backward),clean,
+visit_recency,predictor,R1,trials-ago last visited (covariates.py:47),tables.py,event_arm,arm,choice,available (backward),clean,
+visit_recency_demeaned,predictor,R1,visit_recency - per-arm session mean,tables.py:1296,event_arm,arm,content,available (centering uses session-global mean),low,within-session centering constant not outcome leak
+reward_rate_trial_k10,predictor,R1,trailing arm-agnostic trial reward rate (covariates.py:265),tables.py,stop,stop,rate R2;Family B,available (backward),clean,
+reward_lag1,predictor,R1,is_reward[counts-1] goal-arrival cutoff (covariates.py:318),tables.py,stop,stop,rate Rlag;Family B M1+,available (past reward at post-arrival stop),clean,causal alternative to is_after_reward
+reward_lag2_10,predictor,R1,lagged trial rewards backward,covariates.py:318,stop,stop,rate Rlag;Family B,available (backward),clean,
+p_reward_arm,predictor,R3,qvals.p_reward_port (nominal schedule),covariates.py:674,event_arm,arm,content Pv,available (block-constant schedule),clean,~2.1% CSV miscalibration noted in memory
+q_arm,predictor,R3,qvals.q_port (beta model Q),covariates.py:755,event_arm,arm,content (robustness),available (pre-outcome belief),clean,construct-dependence vs q_arm_hmm; retained for robustness only
+q_arm_hmm,predictor,R3,qvals.hmm_q_port (default_hmm Q),covariates.py:759,event_arm,arm,content C4/C5;value ladders,available (belief entering trial t),needs-check,canonical value predictor; NaN on 2056-stop tail
+hmm_relative_value,predictor,R3,Qstem delta using starting stem shift (qvals_table.py:300),qvals_table.py:300,stop,stop(trial),rate;content,available (pre-outcome),clean,
+hmm_rpe,predictor,R3,reward - Q_leaf(t) (qvals_table.py:292),qvals_table.py:292,stop,stop(trial),rate G5/S7;content C6,POST-outcome (needs current reward),plausible-leak,anti-causal for pre-reward events
+rpe,predictor,R3,reward - q_chosen beta (qvals_table.py:232),qvals_table.py:232,stop,stop(trial),choice leaky_q_value_diff,POST-outcome,plausible-leak,
+hmm_value_update,predictor,R3,sum|Q(t+1)-Q(t)| (qvals_table.py:293),qvals_table.py:293,stop,stop(trial),rate G7/S9;content C9,POST/NEXT-outcome (references t+1),plausible-leak,NaN on epoch last trial
+reward_entropy,predictor,R3,HMM belief-state posterior entropy,qvals_table.py:354,stop,stop(trial),rate;content,likely pre-outcome,needs-check,
+state_entropy,predictor,R3,HMM belief-state entropy,qvals_table.py:354,stop,stop(trial),rate;content,likely pre-outcome,needs-check,
+trials_since_switch,predictor,R3,signed peri-switch index (qvals_table.py:132),qvals_table.py:132,stop,stop(trial),rate G1/S3;content C10,SIGNED references future switch (negative=trials until next switch),plausible-leak,intentional for peri-switch alignment
+is_post_switch,predictor,R3,post-switch flag,qvals_table.py,stop,stop(trial),rate;content,available if post branch only,plausible-leak,
+trials_since_block_change,predictor,R3,cumcount within block (qvals_table.py:197),qvals_table.py:197,stop,stop(trial),rate;content,available (backward),clean,
+reward_outcome,predictor,R1,is_reward[current_idx] trip-in-progress (_helpers.py:124),_helpers.py:124,stop,stop/event,rate R1/R2;choice,FUTURE for approach-phase,confirmed-leak-mitigated,disagrees reward_lag1 on 10% stops; Family B avoids via reward_lag1
+is_after_reward,predictor,R1,reward of trip in progress,_helpers.py:126,stop,stop/event,rate R1/R2,FUTURE for approach-phase,confirmed-leak-mitigated,
+is_after_omission,predictor,R1,1-reward_outcome,_helpers.py:127,stop,stop/event,rate R1/R2,FUTURE for approach-phase,confirmed-leak-mitigated,per-bin ladder uses reward_lag1 instead
+is_after_switch,predictor,R1,is_patch_change[current_idx],_helpers.py:128,stop,stop/event,rate;content,available (dest chosen at departure),clean,
+tc_bs_spline,predictor,R2,bs(t_since_stop_onset knots 1/2/3),model_specs.py:565,timebin,stop-bin,Family B all,available (backward),clean,fixed knots
+t_since_pump,predictor,R1,pump/DIO time,timebin_tables.py,timebin,stop-bin,Family B controls,available (backward),clean,dwell/consummatory control
+log_exposure_offset,offset,R2,seconds immobility per bin,per_bin_rate_model.py:294,timebin,stop-bin,Family B,available,clean,true offset coef=1
+log_immobility_offset,offset,R2,log(immobility_time),per_stop_rate_model.py:129,stop,stop,Family A,available,clean,true offset coef=1
+onset_lag1_10,predictor,R2,prior onsets in same stop (self-history),timebin_tables.py,timebin,stop-bin,Family B history,available (backward),clean,reset at stop boundary; separation risk short lags
+hist_rcos,predictor,R2,raised-cosine self-history basis,timebin_tables.py,timebin,stop-bin,Family B history,available (backward),clean,
+replay_frac,predictor,R2,mean arm_fraction over stop events (choice_prediction.py:333),choice_prediction.py:333,stop-arm,arm,choice C_full,available (pre-choice during immobility),clean,may launder dist_to_arm
+arm_dist_rank,predictor,R1,distance rank of arm,tables.py,event_arm,arm,choice,available,clean,dist_to_arm dropped for quasi-separation
+next_arm,response,R1,to_well[current_idx+1],_helpers.py:93,stop,stop,choice TARGET only,FUTURE,response-only,gate+response only never predictor
+ends_at_next,response,R2,decoded content vs next_arm,tables.py,event,event,retrospective response,FUTURE,response-only,
+chosen_arm_fraction,response,R2,replay fraction to next-chosen arm,tables.py,event,event,retrospective response,FUTURE,response-only,
+contains_path_to_next,response,R2,replay path vs next choice,tables.py,event,event,retrospective response,FUTURE,response-only,
+q_arm_z,predictor,R3,pooled global z of q_arm,_add_standardized_cols.py:46,event_arm,arm,contrast content,available,low,GLOBAL pooled z; safe (no CV uses it); post-hoc in-place column
+q_arm_hmm_z,predictor,R3,pooled global z of q_arm_hmm,_add_standardized_cols.py:46,event_arm,arm,contrast content,available,low,GLOBAL pooled z; post-hoc
+reward_rate_arm_k10_z,predictor,R1,pooled global z,_add_standardized_cols.py:46,event_arm,arm,contrast content,available,low,GLOBAL pooled z; post-hoc
+hmm_rpe_z,predictor,R3,pooled global z of hmm_rpe,_add_standardized_cols.py:46,qvals/event,stop,contrast,POST-outcome (inherits hmm_rpe),plausible-leak,leak from hmm_rpe not from standardization
