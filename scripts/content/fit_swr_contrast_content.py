@@ -28,11 +28,12 @@ The Wilcoxon signed-rank across sessions is reported as a **descriptive** consis
 statistic ONLY — sessions within an animal are not independent, so it is not a valid
 population p-value — with a Benjamini-Hochberg FDR across the rung family per population.
 ``typical_session_se`` is the median within-session SE, not the aggregate's uncertainty.
-A provenance sidecar (git hash, params) is written. DEFERRED follow-ups (in the
-provenance): the **hierarchical Poisson with animal random effects** that would replace
-the descriptive session signed-rank with rigorous population inference; a common
-complete-case cohort; within-group-centered VIF (`fitting.py` uses the raw design); and
-HMM per-arm ``q_arm`` (this runner still uses the beta-model per-arm value).
+Per-arm value uses the **HMM Global-Model** construct (``q_arm_hmm``); the beta-model
+``q_arm`` is retained only as a robustness column. A provenance sidecar (git hash,
+params) is written. DEFERRED follow-ups (in the provenance): the **hierarchical Poisson
+with animal random effects** that would replace the descriptive session signed-rank with
+rigorous population inference; a common complete-case cohort; and within-group-centered
+VIF (`fitting.py` uses the raw design).
 
 Usage:
     uv run python scripts/content/fit_swr_contrast_content.py               # full
@@ -299,7 +300,8 @@ def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
         "are not independent); primary population evidence is per-animal sign "
         "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
         "per population is applied to the descriptive session signed-rank p.",
-        "q_arm_source": "beta-model per-arm value (HMM q_arm harmonization deferred)",
+        "q_arm_source": "HMM Global-Model per-arm value (q_arm_hmm); beta q_arm "
+        "retained as robustness column only",
         "deferred": [
             "mixed conditional logit with animal random effects (the rigorous "
             "population inference; supersedes the descriptive session signed-rank p). "
@@ -309,7 +311,6 @@ def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
             "so this does honest bookkeeping, not a power upgrade.",
             "common complete-case cohort across rungs",
             "within-group-centered VIF (fitting.py:420 uses the raw design)",
-            "HMM per-arm q_arm",
         ],
     }
 

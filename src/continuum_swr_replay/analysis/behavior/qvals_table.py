@@ -12,7 +12,7 @@ sourcing everything from Alison's shared DataJoint schemas (read-only):
     stored as MySQL blobs (complete for all 5 animals, incl. peanut).
   * JOIN: values x times on (nwb_file_name, epoch, trial_number_by_epoch).
   * STOP -> TRIAL: Alison's rule (alison_decoding.add_trial_info_to_clusterless_results):
-    within an epoch, trial t spans (poke_out_ts[t-1], poke_out_ts[t]];
+    within an epoch, trial t spans [poke_out_ts[t-1], poke_out_ts[t]);
     i.e. trial = searchsorted(poke_out_ts, stop_time, side='right'); stops at or
     after the last poke_out are unassigned (her trailing-NaN drop).
 

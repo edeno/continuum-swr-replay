@@ -132,12 +132,15 @@ the `_z` columns** until the standardization one-off is re-run. This is a silent
 
 **Two disjoint non-random drops (empirically confirmed, `both = 0.0000`):**
 
-1. **`reward_rate_arm_k10` NaN → 11.65% of events** dropped from the content M3+ ladder. NaN sits on
-   **leaf arms** (5–6% each; trunk 0.5%) because "reward rate over last 10 visits to *this* arm" is
-   undefined for arms with no prior visit history → biased toward **early-session / rarely-visited-arm
-   states**. Because the ladder uses a *union* complete-case set (to keep ΔAIC on identical events),
+1. **`reward_rate_arm_k10` NaN → 11.65% of events** dropped from the content M3+ ladder. The NaN is a
+   **documented deliberate** value (`covariates.py:189`–`:198`): a leaf arm with no prior visit history
+   has an *undefined* — not zero — reward rate, so it is left NaN by design (trunk arms are filled `0.0`).
+   It is not a silent/accidental drop. The subsequent complete-case exclusion sits on **leaf arms**
+   (5–6% each; trunk 0.5%) and is therefore biased toward **early-session / rarely-visited-arm states**.
+   Because the ladder uses a *union* complete-case set (to keep ΔAIC on identical events),
    **M0–M2 are also refit on the reduced set.** This is the single largest selection effect in the
-   content family and is *not* the qvals gap.
+   content family and is *not* the qvals gap. (Resolved: mechanism-A **encodes** this state —
+   `reward_rate_arm_k10=0` + `has_arm_history` indicator — retaining the events; see the phase-4 plan.)
 2. **2056-stop qvals tail → 1.9% of stops / 1.36% of events (896 events).** A per-epoch **trailing
    tail** (211/211 epochs; `min(missing idx) > max(present idx)` in every epoch), enriched for
    **late-session unrewarded** stops (86.6% unrewarded vs 47.4% baseline). This is exactly the

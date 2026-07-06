@@ -16,9 +16,9 @@ visit_recency_demeaned,predictor,R1,visit_recency - per-arm session mean,tables.
 reward_rate_trial_k10,predictor,R1,trailing arm-agnostic trial reward rate (covariates.py:265),tables.py,stop,stop,rate R2;Family B,available (backward),clean,
 reward_lag1,predictor,R1,is_reward[counts-1] goal-arrival cutoff (covariates.py:318),tables.py,stop,stop,rate Rlag;Family B M1+,available (past reward at post-arrival stop),clean,causal alternative to is_after_reward
 reward_lag2_10,predictor,R1,lagged trial rewards backward,covariates.py:318,stop,stop,rate Rlag;Family B,available (backward),clean,
-p_reward_arm,predictor,R3,qvals.p_reward_port (nominal schedule),covariates.py:674,event_arm,arm,content Pv,available (block-constant schedule),clean,~2.1% CSV miscalibration noted in memory
-q_arm,predictor,R3,qvals.q_port (beta model Q),covariates.py:755,event_arm,arm,content (robustness),available (pre-outcome belief),clean,construct-dependence vs q_arm_hmm; retained for robustness only
-q_arm_hmm,predictor,R3,qvals.hmm_q_port (default_hmm Q),covariates.py:759,event_arm,arm,content C4/C5;value ladders,available (belief entering trial t),needs-check,canonical value predictor; NaN on 2056-stop tail
+p_reward_arm,predictor,R3,qvals.p_reward_port (nominal schedule),covariates.py:674,event_arm,arm,content Pv,available (block-constant schedule),clean,~2.1% CSV miscalibration noted in memory; identical missingness with q_arm/q_arm_hmm (8064 rows/896 events verified) -- not a fuller cohort
+q_arm,predictor,R3,qvals.q_port (beta model Q),covariates.py:755,event_arm,arm,content (robustness),available (pre-outcome belief),clean,construct-dependence vs q_arm_hmm; retained for robustness only; identical missingness with q_arm_hmm/p_reward_arm (8064 rows/896 events; 0 beta-present-HMM-missing) -- beta is NOT a fuller-cohort proxy (F3)
+q_arm_hmm,predictor,R3,qvals.hmm_q_port (default_hmm Q),covariates.py:759,event_arm,arm,content C4/C5;value ladders,available (belief entering trial t),needs-check,canonical value predictor; NaN on the 2056-stop / 896-event tail; identical missingness with q_arm/p_reward_arm (8064 rows/896 events verified)
 hmm_relative_value,predictor,R3,Qstem delta using starting stem shift (qvals_table.py:300),qvals_table.py:300,stop,stop(trial),rate;content,available (pre-outcome),clean,
 hmm_rpe,predictor,R3,reward - Q_leaf(t) (qvals_table.py:292),qvals_table.py:292,stop,stop(trial),rate G5/S7;content C6,POST-outcome (needs current reward),plausible-leak,anti-causal for pre-reward events
 rpe,predictor,R3,reward - q_chosen beta (qvals_table.py:232),qvals_table.py:232,stop,stop(trial),choice leaky_q_value_diff,POST-outcome,plausible-leak,
@@ -26,7 +26,7 @@ hmm_value_update,predictor,R3,sum|Q(t+1)-Q(t)| (qvals_table.py:293),qvals_table.
 reward_entropy,predictor,R3,HMM belief-state posterior entropy,qvals_table.py:354,stop,stop(trial),rate;content,likely pre-outcome,needs-check,
 state_entropy,predictor,R3,HMM belief-state entropy,qvals_table.py:354,stop,stop(trial),rate;content,likely pre-outcome,needs-check,
 trials_since_switch,predictor,R3,signed peri-switch index (qvals_table.py:132),qvals_table.py:132,stop,stop(trial),rate G1/S3;content C10,SIGNED references future switch (negative=trials until next switch),plausible-leak,intentional for peri-switch alignment
-is_post_switch,predictor,R3,post-switch flag,qvals_table.py,stop,stop(trial),rate;content,available if post branch only,plausible-leak,
+is_post_switch,predictor,R3,post-switch flag,qvals_table.py,stop,stop(trial),rate;content,FUTURE-referencing (peri-switch alignment; in the FUTURE_REFERENCING set),plausible-leak,switch identified via full sequence; not predictive-safe by a within-stop gate
 trials_since_block_change,predictor,R3,cumcount within block (qvals_table.py:197),qvals_table.py:197,stop,stop(trial),rate;content,available (backward),clean,
 reward_outcome,predictor,R1,is_reward[current_idx] trip-in-progress (_helpers.py:124),_helpers.py:124,stop,stop/event,rate R1/R2;choice,FUTURE for approach-phase,confirmed-leak-mitigated,disagrees reward_lag1 on 10% stops; Family B avoids via reward_lag1
 is_after_reward,predictor,R1,reward of trip in progress,_helpers.py:126,stop,stop/event,rate R1/R2,FUTURE for approach-phase,confirmed-leak-mitigated,
@@ -48,3 +48,22 @@ q_arm_z,predictor,R3,pooled global z of q_arm,_add_standardized_cols.py:46,event
 q_arm_hmm_z,predictor,R3,pooled global z of q_arm_hmm,_add_standardized_cols.py:46,event_arm,arm,contrast content,available,low,GLOBAL pooled z; post-hoc
 reward_rate_arm_k10_z,predictor,R1,pooled global z,_add_standardized_cols.py:46,event_arm,arm,contrast content,available,low,GLOBAL pooled z; post-hoc
 hmm_rpe_z,predictor,R3,pooled global z of hmm_rpe,_add_standardized_cols.py:46,qvals/event,stop,contrast,POST-outcome (inherits hmm_rpe),plausible-leak,leak from hmm_rpe not from standardization
+rpe_x_current,derived-interaction,R3,is_current * hmm_rpe_z,fit_swr_contrast_content.py:134,event_arm,arm,content C6,POST-outcome (inherits hmm_rpe),plausible-leak,gate retrospective or descriptive per phase-4 timing
+relval_x_current,derived-interaction,R3,is_current * hmm_relative_value_z,fit_swr_contrast_content.py:135,event_arm,arm,content,available (inherits hmm_relative_value; pre-outcome),clean,
+entropy_x_current,derived-interaction,R3,is_current * reward_entropy_z,fit_swr_contrast_content.py:136,event_arm,arm,content,available (inherits reward_entropy; pre-outcome),needs-check,
+update_x_current,derived-interaction,R3,is_current * hmm_value_update_z,fit_swr_contrast_content.py:137,event_arm,arm,content C9,POST-outcome (inherits hmm_value_update; references t+1),plausible-leak,gate retrospective or descriptive
+tss_x_current,derived-interaction,R3,is_current * trials_since_switch_z,fit_swr_contrast_content.py:139,event_arm,arm,content C10,FUTURE-referencing (inherits trials_since_switch),plausible-leak,no within-stop gate fixes it; descriptive or trials_since_last_switch
+postsw_x_current,derived-interaction,R3,is_current * is_post_switch,fit_swr_contrast_content.py:140,event_arm,arm,content,FUTURE-referencing (inherits is_post_switch),plausible-leak,descriptive only
+tsspostsw_x_current,derived-interaction,R3,is_current * trials_since_switch_z * is_post_switch,fit_swr_contrast_content.py:141,event_arm,arm,content,FUTURE-referencing (inherits trials_since_switch/is_post_switch),plausible-leak,descriptive only
+block_x_current,derived-interaction,R3,is_current * trials_since_block_change_z,fit_swr_contrast_content.py:144,event_arm,arm,content,available (inherits trials_since_block_change; backward),clean,
+switchrate_x_current,derived-interaction,R3,is_current * recent_switch_rate_z,fit_swr_contrast_content.py:145,event_arm,arm,content,available (inherits recent_switch_rate; backward),clean,
+tsc_x_current,derived-interaction,R2,is_current * z(log1p time_since_stop),fit_swr_contrast_content.py:148,event_arm,arm,content duration-control,available (within-stop time; value-free),clean,
+swr_x_q_arm,derived-interaction,R3,is_swr * q_arm,fit_swr_contrast_content.py:150,event_arm,arm,content robustness,available (inherits q_arm; pre-outcome),clean,shares q_arm/q_arm_hmm identical missingness (8064 rows/896 events); qvals-tail drop -> n_drop_qvals_gap
+swr_x_current,derived-interaction,R1,is_swr * is_current,tables.py:1330,event_arm,arm,content CS1,available (inherits is_current),clean,
+swr_x_prev,derived-interaction,R1,is_swr * is_prev,tables.py:1331,event_arm,arm,content CS,available (inherits is_prev),clean,
+swr_x_next,derived-interaction,R1,is_swr * is_next,tables.py:1332,event_arm,arm,NONE (is_next response-only),FUTURE-referencing (inherits is_next),response-only,is_next excluded from all predictor ladders
+swr_x_last_rewarded,derived-interaction,R1,is_swr * is_last_rewarded,tables.py:1333,event_arm,arm,content CS,available (inherits is_last_rewarded; backward),clean,
+swr_x_is_last_rewarded_elsewhere,derived-interaction,R1,is_swr * is_last_rewarded_elsewhere,tables.py:1345,event_arm,arm,content CS,available (inherits is_last_rewarded_elsewhere),clean,
+swr_x_reward_rate_arm_k10,derived-interaction,R1,is_swr * reward_rate_arm_k10,tables.py:1339,event_arm,arm,content CS,available (inherits reward_rate_arm_k10; backward),clean,
+swr_x_visit_recency_demeaned,derived-interaction,R1,is_swr * visit_recency_demeaned,tables.py:1342,event_arm,arm,content CS,available (inherits visit_recency_demeaned),low,
+swr_x_q_arm_hmm,derived-interaction,R3,is_swr * q_arm_hmm,tables.py:1348,event_arm,arm,content CS5,available (inherits q_arm_hmm; pre-outcome),needs-check,shares q_arm/q_arm_hmm identical missingness (8064 rows/896 events); qvals-tail drop -> n_drop_qvals_gap
