@@ -7,17 +7,22 @@ mirror the covariates in the fitted model ladders so decoded content can be
 eyeballed against the predictors:
 
   Rate models (per-bout tracks)
-    reward (reward_lag1), after switch / after omission (R1),
-    reward rate trial k10 (R2)
+    reward (reward_lag1), reward-lag kernel (reward_lag1..N, Rlag/M2/BASE),
+    after switch / after omission (R1), reward rate trial k10 (R2), and the
+    SWR-contrast value-state block (is_post_switch, trials_since_switch,
+    trials_since_block_change, recent_switch_rate, hmm_relative_value, hmm_rpe,
+    reward_entropy, hmm_value_update).
   Content models (per-arm, cell-aligned to the content panel)
     is_current (ring), is_prev / is_last_rewarded_elsewhere (arm strips),
-    reward_rate_arm_k10, visit_recency_demeaned, p_reward_arm,
-    q_arm_hmm (HMM value), q_arm (belief value; robustness construct)
+    reward_rate_arm_k10, visit_recency_demeaned, visit_recency (raw),
+    cumulative_reward, p_reward_arm, arm_dist_rank, q_arm_hmm (HMM value),
+    q_arm (belief value; robustness construct).
 
 Content magnitude is encoded as circle *alpha* (posterior-mass fraction), never
-size. dist_to_arm / arm_dist_rank / is_next are intentionally absent: the
-primary content hierarchy (M0-Mv) uses no distance term, and is_next is dropped
-for alternation collinearity.
+size. arm_dist_rank is the identifiable geometric baseline used by the
+SWR-contrast (BASEc) and choice ladders; raw dist_to_arm and is_next are absent
+because the models drop them (quasi-separation / alternation collinearity), and
+the primary content hierarchy (M0-Mv) carries no distance term at all.
 
 Usage
 -----
@@ -52,8 +57,47 @@ RC_DIR = PROCESSED_DATA_DIR / "replay_content"
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_bout_arm_outputs"
 
 
-def build_figure(sub: pd.DataFrame, sst: pd.DataFrame, title_stub: str):
-    """Build the covariate-browser figure for one session's event-arm rows."""
+def _vlims(M: np.ndarray, diverging: bool) -> tuple[float, float]:
+    """Color limits for a heatmap; falls back to (0, 1) if all values are NaN.
+
+    A covariate can be entirely NaN for a session (e.g. a stop with no qvals
+    coverage under the ``how="left"`` merge); guarding avoids a ``nanmax`` over
+    a fully-masked array returning ``nan`` limits and a blank colorbar.
+    """
+    if not np.isfinite(M).any():
+        return 0.0, 1.0
+    if diverging:
+        v = float(np.nanmax(np.abs(M)))
+        return -v, v
+    return float(np.nanmin(M)), float(np.nanmax(M))
+
+
+def build_figure(
+    sub: pd.DataFrame, sst: pd.DataFrame, title_stub: str
+) -> tuple[plt.Figure, int]:
+    """Build the covariate-browser figure for one session.
+
+    Parameters
+    ----------
+    sub : pd.DataFrame
+        ``event_arm_table`` rows for one session (9 arms x n_bouts rows),
+        carrying ``non_local_event``, ``arm``, ``event_start``, ``stop_id``,
+        ``arm_fraction_posterior``, ``is_current`` and the per-arm covariate
+        columns.
+    sst : pd.DataFrame
+        ``stop_table`` rows for the same session with ``recent_switch_rate``
+        (from ``add_uncertainty_covariates``) and the qvals value-state block
+        already merged on ``stop_id``.
+    title_stub : str
+        Session label for the figure title, e.g. ``"chimi 20200227 04_r2"``.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The assembled multi-panel figure.
+    n_bouts : int
+        Number of non-local bouts (columns) drawn.
+    """
     palette = PALETTE
     n_arms = len(ARM_ROW_ORDER)
 
@@ -193,11 +237,7 @@ def build_figure(sub: pd.DataFrame, sst: pd.DataFrame, title_stub: str):
             M = np.ma.masked_invalid(data.reshape(1, -1))
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
-            if diverging:
-                v = np.nanmax(np.abs(M))
-                vmin, vmax = -v, v
-            else:
-                vmin, vmax = np.nanmin(M), np.nanmax(M)
+            vmin, vmax = _vlims(M, diverging)
             im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
                            extent=(-0.5, n_bouts - 0.5, 0.5, -0.5),
                            interpolation="nearest", zorder=2)
@@ -260,11 +300,7 @@ def build_figure(sub: pd.DataFrame, sst: pd.DataFrame, title_stub: str):
             M = np.ma.masked_invalid(cov_matrix(data))
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
-            if diverging:
-                v = np.nanmax(np.abs(M))
-                vmin, vmax = -v, v
-            else:
-                vmin, vmax = np.nanmin(M), np.nanmax(M)
+            vmin, vmax = _vlims(M, diverging)
             im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
                            extent=(-0.5, n_bouts - 0.5, n_arms - 0.5, -0.5),
                            interpolation="nearest", zorder=1)
@@ -315,9 +351,14 @@ def main() -> None:
     args = p.parse_args()
 
     event_arm = pd.read_pickle(RC_DIR / "event_arm_table.pkl")
-    # Stop table + RL value-state block, assembled exactly as the SWR-contrast
-    # runners do: recent_switch_rate via add_uncertainty_covariates, the rest
-    # merged from qvals_table on stop_id.
+    # Stop table + RL value-state block, assembled as the SWR-contrast runners
+    # do: recent_switch_rate via add_uncertainty_covariates (default
+    # switch_window=5), the rest merged from qvals_table on stop_id. Two
+    # deliberate differences from the *rate* runner, both fine for eyeballing:
+    # this uses how="left" (like the content runner) so bouts whose stop is
+    # absent from qvals are kept and shown masked, rather than dropped by the
+    # rate runner's inner join; and covariates are shown raw, not z-scored as
+    # the fitters standardize them.
     stops = add_uncertainty_covariates(pd.read_pickle(RC_DIR / "stop_table.pkl"))
     qvals = pd.read_pickle(RC_DIR / "models_per_bin_rate" / "qvals_table.pkl")
     value_state = ["trials_since_switch", "is_post_switch",
