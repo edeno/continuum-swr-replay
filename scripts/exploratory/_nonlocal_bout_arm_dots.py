@@ -29,6 +29,14 @@ SWR-contrast (BASEc) and choice ladders; raw dist_to_arm and is_next are absent
 because the models drop them (quasi-separation / alternation collinearity), and
 the primary content hierarchy (M0-Mv) carries no distance term at all.
 
+Granularity: the x-axis is one column per non-local *event*, but only the
+content panel (arm_fraction_posterior) and the SWR track (is_swr) actually vary
+event-to-event (verified: they differ within a stop for 100% / ~62% of
+multi-event stops). Every other covariate is a per-*stop* quantity — constant
+within an immobility period and therefore repeated across that stop's event
+columns (the shaded content bands mark those groups). Per-stop values are mapped
+onto events by stop_id, so the repetition is exact, not a fit artifact.
+
 Usage
 -----
     python scripts/exploratory/_nonlocal_bout_arm_dots.py \
@@ -360,7 +368,9 @@ def build_figure(
     axes[-1].set_xlim(-0.5, n_bouts - 0.5)
     axes[-1].set_xlabel(
         "non-local event (time-ordered; immobility, speed < 4 cm/s)  —  one "
-        "column per event; bands group events within one immobility period",
+        "column per event; bands group events within one immobility period\n"
+        "covariate rows are per-stop (repeat within a band); only the content "
+        "panel and the SWR track vary per event",
         fontsize=9,
     )
 
