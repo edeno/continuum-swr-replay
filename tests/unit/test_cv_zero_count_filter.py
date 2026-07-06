@@ -11,8 +11,10 @@ inconsistency.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay import model_checking
 from continuum_swr_replay.analysis.replay.model_checking import (
     cross_validate_conditional_poisson,
 )
@@ -73,3 +75,46 @@ class TestCvZeroCountFilter:
         assert out_a is not None and out_b is not None
         assert out_a["cv_ll_per_event_mean"] == out_b["cv_ll_per_event_mean"]
         assert out_a["cv_ll_per_timebin_mean"] == out_b["cv_ll_per_timebin_mean"]
+
+
+def _toy_long_df_with_predictor(n_events: int, n_arms: int = 9) -> pd.DataFrame:
+    rng = np.random.default_rng(1)
+    rows = []
+    for ei in range(n_events):
+        x = rng.normal(size=n_arms)
+        chosen = int(np.argmax(x + rng.normal(size=n_arms)))
+        for arm in range(n_arms):
+            rows.append({
+                "event_id": ei,
+                "arm": arm,
+                "arm_count_hard": float(arm == chosen),
+                "pred": float(x[arm]),
+            })
+    return pd.DataFrame(rows)
+
+
+class TestCvConditionalPoissonInvalidation:
+    def test_bad_fold_invalidates_metric_without_dropping(self, monkeypatch):
+        """A nonconverged/separated fold must invalidate the content CV metric to
+        nan (matching per_bin/per_stop) rather than being silently dropped and the
+        mean reported over surviving folds."""
+        calls = {"n": 0}
+        real = model_checking.fit_status
+
+        def fake_fit_status(result, kind, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"converged": True, "separated": True}
+            return real(result, kind, **kwargs)
+
+        monkeypatch.setattr(model_checking, "fit_status", fake_fit_status)
+        df = _toy_long_df_with_predictor(n_events=90)
+        out = cross_validate_conditional_poisson(
+            df, predictors=["pred"], event_col="event_id",
+            response_col="arm_count_hard", n_folds=5,
+        )
+        assert out is not None  # fold NOT dropped
+        assert out["cv_n_separated_folds"] == 1
+        assert out["cv_n_nonconverged_folds"] == 0
+        assert np.isnan(out["cv_ll_per_event_mean"])
+        assert np.isnan(out["cv_ll_per_timebin_mean"])

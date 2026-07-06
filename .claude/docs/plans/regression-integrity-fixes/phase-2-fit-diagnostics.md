@@ -10,7 +10,7 @@ warning suppression from hiding them. Rank guards already exist (`within_group_f
 **Inputs to read first:**
 
 - [src/continuum_swr_replay/analysis/replay/learning.py:475-482](../../../../src/continuum_swr_replay/analysis/replay/learning.py) — the one existing convergence check to copy: `sm.Logit(...).fit(disp=False, maxiter=200)` then `model.mle_retvals.get("converged", False)`.
-- [src/continuum_swr_replay/analysis/replay/fitting.py:150-170](../../../../src/continuum_swr_replay/analysis/replay/fitting.py) and [:370-385](../../../../src/continuum_swr_replay/analysis/replay/fitting.py) — conditional-Poisson / conditional-logit `.fit(disp=0)`; discrete-MLE results → convergence in `result.mle_retvals`.
+- [src/continuum_swr_replay/analysis/replay/fitting.py:150-170](../../../../src/continuum_swr_replay/analysis/replay/fitting.py) and [:370-385](../../../../src/continuum_swr_replay/analysis/replay/fitting.py) — conditional-Poisson / conditional-logit `.fit(disp=0)`. **NB (learned in execution):** `ConditionalPoisson`/`ConditionalLogit` return a `ConditionalResultsWrapper` that exposes **neither** `.converged` **nor** `mle_retvals` (statsmodels rebuilds a bare `ConditionalResults` and discards the optimizer result), so `mle_retvals` reads as missing → `converged=False` for *successful* fits. Use `kind="conditional"`, which recovers convergence from the captured `ConvergenceWarning` (0 warnings ⇒ converged; 1 ⇒ not). Only plain `sm.Logit`-style models use `kind="mle"`.
 - [src/continuum_swr_replay/analysis/replay/per_stop_rate_model.py:129-140](../../../../src/continuum_swr_replay/analysis/replay/per_stop_rate_model.py) — `sm.GLM(...).fit(disp=0)`; **GLM** results → convergence in `result.converged`.
 - [src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py:118-160](../../../../src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py) and [:245-256](../../../../src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py) — GLM `.fit()`; `:118` docstring: separation yields a large finite coef (not an error).
 - [src/continuum_swr_replay/analysis/replay/choice_prediction.py:482-495](../../../../src/continuum_swr_replay/analysis/replay/choice_prediction.py) — choice conditional-logit `.fit(disp=0)`.
@@ -57,10 +57,13 @@ warning suppression from hiding them. Rank guards already exist (`within_group_f
   DataFrame rows (`fitting.py:193`), so a nested `status={...}` object would break that flattening — use
   flat scalar columns, not a sub-dict. Do **not** drop the fit here — record the flags and let the
   existing aggregation policy decide (see the exclusion-policy note below):
-  - `fitting.py:160` (conditional Poisson) and `:380` (conditional logit): `kind="mle"`.
+  - `fitting.py:160` (conditional Poisson) and `:380` (conditional logit): `kind="conditional"`,
+    passing `caught=` (NOT `kind="mle"` — see the NB above; the wrapper hides `mle_retvals`).
   - `per_stop_rate_model.py:130`: `kind="glm"`.
   - `per_bin_rate_model.py:153` (the primary fit): `kind="glm"` → flat `converged`/`separated`.
-  - `choice_prediction.py:492`: `kind="mle"`.
+  - `choice_prediction.py:492`: `kind="conditional"`, passing `caught=` (conditional logit).
+  - `model_checking.py` `cross_validate_conditional_poisson` is ALSO a conditional CV fit — apply the
+    fold-level rule there too (`kind="conditional"`; do not `continue`-drop a bad fold).
   `fit_status` returns `{"converged": ..., "separated": ...}`; unpack those as flat keys and add
   `n_convergence_warnings` from the captured-warnings count.
 - **CV fits are multi-fit — use FOLD-LEVEL fields, not a single flat status (Medium, round 6).** The CV

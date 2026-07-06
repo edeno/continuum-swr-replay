@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
 
+from ._fit_diagnostics import capture_fit_warnings, fit_status
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +102,8 @@ def cross_validate_conditional_poisson(
 
     ll_per_event = []
     ll_per_timebin = []
+    n_nonconverged = 0
+    n_separated = 0
 
     for train_idx, test_idx in gkf.split(df, y, groups):
         y_train = y[train_idx]
@@ -118,11 +122,19 @@ def cross_validate_conditional_poisson(
             X_test = df.iloc[test_idx][predictors].values.astype(float)
             groups_train = groups[train_idx]
 
+            # A fold fit that raises is a hard failure -> the whole CV metric is
+            # undefined (matches per_bin/per_stop CV). Convergence/separation are
+            # SOFT: the fold is kept and scored, but any bad fold invalidates the
+            # metric below -- never drop a fold, which would change the held-out set.
             try:
-                model = ConditionalPoisson(y_train, X_train, groups=groups_train)
-                result = model.fit(disp=0)
+                with capture_fit_warnings() as caught:
+                    model = ConditionalPoisson(y_train, X_train, groups=groups_train)
+                    result = model.fit(disp=0)
             except Exception:
-                continue
+                return None
+            status = fit_status(result, "conditional", caught=caught)
+            n_nonconverged += status["converged"] is False
+            n_separated += status["separated"]
 
             # Compute held-out conditional LL
             fold_ll = _held_out_conditional_ll(
@@ -139,12 +151,17 @@ def cross_validate_conditional_poisson(
     if len(ll_per_event) < 2:
         return None
 
+    # Any nonconverged/separated fold invalidates the metric (nan) rather than
+    # dropping the fold; the counts are reported alongside.
+    invalid = (n_nonconverged > 0) or (n_separated > 0)
     return {
-        "cv_ll_per_event_mean": float(np.mean(ll_per_event)),
-        "cv_ll_per_event_std": float(np.std(ll_per_event)),
-        "cv_ll_per_timebin_mean": float(np.mean(ll_per_timebin)),
-        "cv_ll_per_timebin_std": float(np.std(ll_per_timebin)),
+        "cv_ll_per_event_mean": np.nan if invalid else float(np.mean(ll_per_event)),
+        "cv_ll_per_event_std": np.nan if invalid else float(np.std(ll_per_event)),
+        "cv_ll_per_timebin_mean": np.nan if invalid else float(np.mean(ll_per_timebin)),
+        "cv_ll_per_timebin_std": np.nan if invalid else float(np.std(ll_per_timebin)),
         "cv_n_folds": len(ll_per_event),
+        "cv_n_nonconverged_folds": int(n_nonconverged),
+        "cv_n_separated_folds": int(n_separated),
     }
 
 

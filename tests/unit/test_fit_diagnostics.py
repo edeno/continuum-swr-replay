@@ -7,7 +7,10 @@ import warnings
 import numpy as np
 import pytest
 import statsmodels.api as sm
-from statsmodels.discrete.conditional_models import ConditionalPoisson
+from statsmodels.discrete.conditional_models import (
+    ConditionalLogit,
+    ConditionalPoisson,
+)
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
@@ -124,6 +127,26 @@ def test_conditional_unknown_without_caught():
     with capture_fit_warnings():
         res = ConditionalPoisson(y, X, groups=groups).fit(disp=0)
     assert fit_status(res, "conditional")["converged"] is None
+
+
+def test_conditional_logit_converged_not_falsely_flagged():
+    """The same wrapper problem afflicts ConditionalLogit (used by the choice model),
+    so lock down that a well-posed conditional-logit fit reports converged=True."""
+    y, X, groups = _conditional_poisson_design()  # matched-set design fits either model
+    with capture_fit_warnings() as caught:
+        res = ConditionalLogit(y, X, groups=groups).fit(disp=0)
+    assert fit_status(res, "conditional", caught=caught) == {
+        "converged": True,
+        "separated": False,
+    }
+    assert not hasattr(res, "mle_retvals")
+
+
+def test_conditional_logit_nonconverged_flagged():
+    y, X, groups = _conditional_poisson_design()
+    with capture_fit_warnings() as caught:
+        res = ConditionalLogit(y, X, groups=groups).fit(disp=0, maxiter=1)
+    assert fit_status(res, "conditional", caught=caught)["converged"] is False
 
 
 def test_invalid_kind_raises(benign_poisson):
