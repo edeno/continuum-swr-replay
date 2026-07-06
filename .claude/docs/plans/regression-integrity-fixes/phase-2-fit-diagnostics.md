@@ -123,7 +123,11 @@ Synthesize in `conftest.py`: (a) a well-separated 2-class logistic dataset (guar
 ## Review
 
 Dispatch `code-reviewer` against the diff. Confirm:
-- `kind="glm"` vs `kind="mle"` is correct at each call site (GLM→`.converged`, discrete→`mle_retvals`) — reviewer re-reads each site.
-- No fit is *dropped* by the new code — status is additive; only aggregation counting changed.
+- The `kind` is correct at each call site: `kind="glm"` (GLM→`.converged`) for the GLM fitters;
+  `kind="conditional"` + `caught=` for `ConditionalPoisson`/`ConditionalLogit` (their wrapper hides
+  `mle_retvals`/`.converged`); `kind="mle"` only for plain `sm.Logit`-style results — reviewer re-reads each site.
+- No fit is *dropped* by the new code — status is additive; only aggregation counting changed. In the CV
+  loops (per_stop, per_bin, content `cross_validate_conditional_poisson`) a bad fold invalidates the
+  metric to `nan` but is **not** dropped (`cv_n_folds` unchanged).
 - Warning scoping does not re-suppress the diagnostics it is meant to surface.
 - Separation test actually triggers separation (not a tautology); shared setup is in fixtures.

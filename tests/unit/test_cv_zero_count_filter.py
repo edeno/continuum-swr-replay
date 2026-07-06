@@ -114,6 +114,7 @@ class TestCvConditionalPoissonInvalidation:
             response_col="arm_count_hard", n_folds=5,
         )
         assert out is not None  # fold NOT dropped
+        assert out["cv_n_folds"] == 5  # all folds scored, none silently averaged away
         assert out["cv_n_separated_folds"] == 1
         assert out["cv_n_nonconverged_folds"] == 0
         assert np.isnan(out["cv_ll_per_event_mean"])
