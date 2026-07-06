@@ -766,9 +766,10 @@ def attach_hmm_arm_value(
 
     Built with the SAME leaf->arm mapping as :func:`attach_contingency_value_block`
     but sourced from the HMM per-leaf value (``hmm_q_port{0..5}``) rather than the
-    beta ``q_port`` block, so the content/choice value covariate comes from the same
+    beta ``q_port`` block, so the content value covariate comes from the same
     single model (default_hmm) as the ``hmm_*`` value covariates used by the is_swr
-    rate ladder. Leaf arm ``j`` takes ``hmm_q_port{j}``; trunk arms (6-8) take ``0.0``
+    rate ladder. (The Stage-5A choice model carries no value covariate.) Leaf arm
+    ``j`` takes ``hmm_q_port{j}``; trunk arms (6-8) take ``0.0``
     where the stop has an HMM value row and ``NaN`` where absent, so a stop missing
     the HMM value drops uniformly across all nine arms at fit time (matching q_arm).
 

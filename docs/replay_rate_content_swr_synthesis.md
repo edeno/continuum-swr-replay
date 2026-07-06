@@ -157,9 +157,15 @@ covariates entered as `:is_current` interactions (event-scalars) or per-arm main
 effects. Runner `scripts/content/fit_swr_contrast_content.py`; 218 sessions →
 `models/swr_contrast_content_{arm,patch}.pkl`. Conditional Poisson over arms(9)/
 patches(3), per-session fit + across-session median / signed-rank / per-animal (n/5).
-**Exploratory** pending Phase-4 audited diagnostics (per-fit SE/p, family FDR,
-within-group-centered VIF, common cohort); `q_arm` is still the beta per-arm value
-(HMM harmonization deferred).
+**Exploratory** snapshot (2026-07-02), since superseded on the value construct:
+HMM harmonization **has landed** — the fitted ladder's per-arm value is now
+`q_arm_hmm` (HMM Global-Model; C4/CS5), with beta `q_arm` retained only as a
+robustness column. The `swr_x_q_arm −2.45` figure below is that **beta robustness
+column**; the SWR×value sign is construct-dependent (beta *avoids* high value −2.45;
+harmonized HMM `swr_x_q_arm_hmm` *prefers*, +1.06), so cite the HMM result and flag
+the construct-dependence. Audited per-fit SE/p and family FDR have since been added;
+within-group-centered VIF and a common complete-case cohort remain deferred (see the
+runner provenance).
 
 - **Anchors reproduce at full power:** `is_current` +0.69 (5/5); SWR broadening
   `swr_x_current` −0.81 (p=7e-35), `swr_x_prev` −0.93; SWR reward/value-avoidance

@@ -42,7 +42,7 @@ back onto row *t*.
 
 Each stop is assigned to a trial by Alison's convention
 (`alison_decoding.add_trial_info_to_clusterless_results`): within an epoch, trial
-*t* spans `(poke_out_ts[t-1], poke_out_ts[t]]`, i.e.
+*t* spans `[poke_out_ts[t-1], poke_out_ts[t])`, i.e.
 `trial = searchsorted(poke_out_ts, stop_midpoint, side="right")`. The trial's
 pre-outcome state is broadcast to every stop in that interval. Validated against
 signals the alignment never uses: at-well (`in_poke`) arm vs position `current_arm`

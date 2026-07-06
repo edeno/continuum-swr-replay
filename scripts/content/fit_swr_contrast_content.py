@@ -10,8 +10,8 @@ patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,
 is_swr) enter ONLY as interactions with arm-features (``:is_current``). Per-arm
-covariates (``reward_rate_arm_k10``, ``q_arm``, ``is_last_rewarded_elsewhere``) enter
-as main effects.
+covariates (``reward_rate_arm_k10``, ``q_arm_hmm``, ``is_last_rewarded_elsewhere``)
+enter as main effects (beta ``q_arm`` is retained as a robustness column only).
 
 Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
   C0..C2  spatial baseline (ARMFE -> is_current -> +autocorrelation controls)
