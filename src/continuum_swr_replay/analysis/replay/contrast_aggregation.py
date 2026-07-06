@@ -88,6 +88,18 @@ def aggregate_contrast(
         coef = s[ccol]
         per_animal = s.groupby("animal")[ccol].median()
         srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
+        # Session-level fit-diagnostics counts (informational; NOT drops). Counted over
+        # ALL modeled session-fits for this (model, population), independent of the
+        # term-level |coef|>=10 quasi-separation filter above. NaN/absent flags (older
+        # res without diagnostics) are treated as not-flagged.
+        n_nonconverged = (
+            int((s_all["converged"] == False).sum())  # noqa: E712 (NaN must not count)
+            if "converged" in s_all.columns else 0
+        )
+        n_separated = (
+            int((s_all["separated"] == True).sum())  # noqa: E712
+            if "separated" in s_all.columns else 0
+        )
         rows.append({
             "level": level,
             "model": model,
@@ -96,6 +108,8 @@ def aggregate_contrast(
             "n_sessions": len(s),
             "n_animals": int(per_animal.size),
             "n_dropped": n_dropped,
+            "n_sessions_flagged_nonconverged": n_nonconverged,
+            "n_sessions_flagged_separated": n_separated,
             "coef_animal_median": float(per_animal.median()),
             "n_animals_pos": int((per_animal > 0).sum()),
             "coef_session_median": float(coef.median()),

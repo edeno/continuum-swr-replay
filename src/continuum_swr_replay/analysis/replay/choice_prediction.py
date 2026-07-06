@@ -26,6 +26,11 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
+from ._fit_diagnostics import (
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+    fit_status,
+)
 from ._helpers import strict_mean
 from .fitting import within_group_full_rank
 
@@ -488,11 +493,13 @@ def fit_choice_model(
         return None
 
     try:
-        model = ConditionalLogit(y, X, groups=groups)
-        result = model.fit(disp=0)
+        with capture_fit_warnings() as caught:
+            model = ConditionalLogit(y, X, groups=groups)
+            result = model.fit(disp=0)
     except Exception:
         logger.warning("ConditionalLogit failed for %s", predictors)
         return None
+    status = fit_status(result, "mle")
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
@@ -506,4 +513,7 @@ def fit_choice_model(
         "n_rows": len(df),
         "n_params": len(predictors),
         "llf": float(result.llf),
+        "converged": status["converged"],
+        "separated": status["separated"],
+        "n_convergence_warnings": count_fit_quality_warnings(caught),
     }

@@ -155,6 +155,14 @@ up-the-ladder story (`model_checking_ladder.png`) and re-fits a couple of
 example sessions inline for the KS / Q-Q / ISI-autocorrelation / cumulative-
 residual quartet (`model_checking_example_{rich,sparse}.png`).
 
+Every rate/content/choice fit additionally carries `converged` / `separated`
+status flags and an `n_convergence_warnings` count (from
+`analysis.replay._fit_diagnostics`); CV metrics carry per-fold
+`cv_n_nonconverged_folds` / `cv_n_separated_folds`, and a CV metric is
+invalidated (`nan`) if any fold is nonconverged/separated rather than dropping
+the fold. These flags are diagnostics only — the sole exclusion remains the
+`|coef|>=10` quasi-separation filter in the aggregation.
+
 What the ladder actually shows (218 sessions):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`

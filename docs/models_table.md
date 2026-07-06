@@ -34,6 +34,12 @@ Per-family fit conventions:
 effects first enter at `M0a`/`P1`. "conditional Poisson over arms within event" is fit
 as Poisson with per-event fixed effects — the multinomial/`clogit` equivalent.
 
+Every per-session fit carries `converged` / `separated` status flags and an
+`n_convergence_warnings` count (`analysis.replay._fit_diagnostics`); the audited
+aggregation surfaces per-(model, population) `n_sessions_flagged_nonconverged` /
+`n_sessions_flagged_separated`. These are diagnostics on the retained cohort — the only
+coefficient exclusion is the `|coef|>=10` quasi-separation filter.
+
 ## Per-bin rate — Family B
 `fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`
 

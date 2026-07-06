@@ -66,6 +66,11 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E402
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+    fit_status,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
@@ -80,7 +85,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
-warnings.filterwarnings("ignore")
+# Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
+# is silenced. Convergence/separation are recorded per fit as flags inside _fit (see
+# analysis.replay._fit_diagnostics), not blanket-ignored.
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -143,11 +151,13 @@ def _fit(
         return None, "no_reward_contrast"  # reward terms unidentified without contrast
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
-        res = smf.glm(
-            f"count ~ {formula}", data=df, family=sm.families.Poisson(), offset=offset
-        ).fit()
+        with capture_fit_warnings() as caught:
+            res = smf.glm(
+                f"count ~ {formula}", data=df, family=sm.families.Poisson(), offset=offset
+            ).fit()
     except _EXPECTED as e:
         return None, type(e).__name__
+    status = fit_status(res, "glm")
     out = {f"coef_{k}": v for k, v in res.params.items()}
     # Within-session coefficient uncertainty: carry SE + p per term so downstream
     # aggregation can weight/annotate (mirrors the content contrast runner). These
@@ -157,6 +167,8 @@ def _fit(
     out.update(
         n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic),
         n_params=int(len(res.params)),
+        converged=status["converged"], separated=status["separated"],
+        n_convergence_warnings=count_fit_quality_warnings(caught),
     )
     return out, None
 

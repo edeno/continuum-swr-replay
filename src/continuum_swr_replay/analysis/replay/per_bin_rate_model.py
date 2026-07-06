@@ -33,6 +33,11 @@ import statsmodels.formula.api as smf
 from patsy import PatsyError
 from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
+from ._fit_diagnostics import (
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+    fit_status,
+)
 from .model_specs import PerBinRateModelSpec
 
 logger = logging.getLogger(__name__)
@@ -145,15 +150,17 @@ def fit_per_bin_rate_model(
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
-        result = smf.glm(
-            spec.formula(),
-            data=df,
-            family=sm.families.Poisson(),
-            offset=offset,
-        ).fit()
+        with capture_fit_warnings() as caught:
+            result = smf.glm(
+                spec.formula(),
+                data=df,
+                family=sm.families.Poisson(),
+                offset=offset,
+            ).fit()
     except _EXPECTED_FIT_ERRORS as exc:
         logger.warning("Per-bin GLM failed for %s: %r", spec.name, exc)
         return None
+    status = fit_status(result, "glm")
 
     params = result.params
     bse = result.bse
@@ -172,6 +179,9 @@ def fit_per_bin_rate_model(
         "aic": float(result.aic),
         "deviance": float(result.deviance),
         "dispersion": float(result.deviance / df_resid) if df_resid > 0 else np.nan,
+        "converged": status["converged"],
+        "separated": status["separated"],
+        "n_convergence_warnings": count_fit_quality_warnings(caught),
         # fitted mean count per bin, indexed by retained rows (GOF input).
         "predicted": result.fittedvalues,
     }
@@ -232,6 +242,8 @@ def cross_validate_per_bin_rate_model(
     fold_means: list[float] = []
     sum_diff = 0.0
     n_events_total = 0
+    n_nonconverged = 0
+    n_separated = 0
     for train_idx, _test_idx in kf.split(stops):
         train_stops = set(stops[train_idx])
         is_train = df["stop_id"].isin(train_stops).to_numpy()
@@ -257,6 +269,11 @@ def cross_validate_per_bin_rate_model(
         except _EXPECTED_FIT_ERRORS as exc:
             logger.debug("CV %s: fold fit/predict failed: %r", spec.name, exc)
             return None
+        # Fold counts as nonconverged/separated if EITHER the model or its baseline
+        # fails the check.
+        s_res, s_res0 = fit_status(res, "glm"), fit_status(res0, "glm")
+        n_nonconverged += (not s_res["converged"]) or (not s_res0["converged"])
+        n_separated += s_res["separated"] or s_res0["separated"]
         y = te["count"].to_numpy(dtype=float)
         ll = poisson.logpmf(y, mu)
         ll0 = poisson.logpmf(y, mu0)
@@ -267,12 +284,18 @@ def cross_validate_per_bin_rate_model(
         sum_diff += float(np.sum(ll - ll0))
         n_events_total += int((y > 0).sum())
 
+    # Any nonconverged/separated fold invalidates the whole CV metric (nan) rather
+    # than dropping the fold -- dropping a fold changes the held-out set and makes CV
+    # scores non-comparable across rungs. Counts are reported alongside.
+    invalid = (n_nonconverged > 0) or (n_separated > 0)
     bits = sum_diff / (n_events_total * np.log(2)) if n_events_total else np.nan
     return {
-        "cv_ll_per_bin_mean": float(np.mean(fold_means)),
-        "cv_ll_per_bin_std": float(np.std(fold_means)),
-        "cv_bits_per_event": float(bits),
+        "cv_ll_per_bin_mean": np.nan if invalid else float(np.mean(fold_means)),
+        "cv_ll_per_bin_std": np.nan if invalid else float(np.std(fold_means)),
+        "cv_bits_per_event": np.nan if invalid else float(bits),
         "cv_n_folds": n_folds,
+        "cv_n_nonconverged_folds": int(n_nonconverged),
+        "cv_n_separated_folds": int(n_separated),
     }
 
 

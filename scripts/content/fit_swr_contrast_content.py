@@ -76,7 +76,12 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-warnings.filterwarnings("ignore")
+# Quasi-separated coefficients legitimately overflow exp() when rate ratios are formed
+# outside the fit (RuntimeWarning). Convergence/perfect-separation warnings are recorded
+# per fit as converged/separated/n_convergence_warnings flags inside the fitters (see
+# analysis.replay._fit_diagnostics), so only the benign RuntimeWarning noise is silenced
+# here -- NOT a blanket ignore that would hide fit-quality signals.
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -236,6 +241,11 @@ def _run(
                         },
                         "n_events": r["n_events"],
                         "n_params": r["n_params"],
+                        # fit-diagnostics flags (additive; drive the aggregation's
+                        # session-level nonconverged/separated counts).
+                        "converged": r.get("converged"),
+                        "separated": r.get("separated"),
+                        "n_convergence_warnings": r.get("n_convergence_warnings"),
                     }
                 )
     return pd.DataFrame(rows)

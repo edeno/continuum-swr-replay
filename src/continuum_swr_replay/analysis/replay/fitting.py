@@ -25,6 +25,12 @@ from statsmodels.discrete.conditional_models import (
 )
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+from ._fit_diagnostics import (
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+    fit_status,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -156,13 +162,16 @@ def fit_conditional_poisson(
         return None
 
     try:
-        model = ConditionalPoisson(y, X, groups=groups)
-        result = model.fit(disp=0)
+        with capture_fit_warnings() as caught:
+            model = ConditionalPoisson(y, X, groups=groups)
+            result = model.fit(disp=0)
     except Exception:
         logger.warning(
             "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
         )
         return None
+    status = fit_status(result, "mle")
+    n_fit_warnings = count_fit_quality_warnings(caught)
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
@@ -202,6 +211,9 @@ def fit_conditional_poisson(
         "aic": float(aic),
         "bic": float(bic),
         "pseudo_r2": float(pseudo_r2),
+        "converged": status["converged"],
+        "separated": status["separated"],
+        "n_convergence_warnings": n_fit_warnings,
     }
 
     # Diagnostics
@@ -376,13 +388,15 @@ def fit_conditional_logit(
         return None
 
     try:
-        model = ConditionalLogit(y, X, groups=groups)
-        result = model.fit(disp=0)
+        with capture_fit_warnings() as caught:
+            model = ConditionalLogit(y, X, groups=groups)
+            result = model.fit(disp=0)
     except Exception:
         logger.warning(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
         return None
+    status = fit_status(result, "mle")
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
@@ -398,6 +412,9 @@ def fit_conditional_logit(
         "llf": float(result.llf),
         "aic": float(2 * len(predictors) - 2 * result.llf),
         "bic": float(len(predictors) * np.log(n_events) - 2 * result.llf),
+        "converged": status["converged"],
+        "separated": status["separated"],
+        "n_convergence_warnings": count_fit_quality_warnings(caught),
     }
 
 

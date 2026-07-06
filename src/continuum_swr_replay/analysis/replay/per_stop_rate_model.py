@@ -37,6 +37,12 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+from ._fit_diagnostics import (
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+    fit_status,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,11 +132,13 @@ def fit_per_stop_rate_model(
         col_names = ["intercept"]
 
     try:
-        model = sm.GLM(y, X, family=sm.families.Poisson(), offset=offset)
-        result = model.fit(disp=0)
+        with capture_fit_warnings() as caught:
+            model = sm.GLM(y, X, family=sm.families.Poisson(), offset=offset)
+            result = model.fit(disp=0)
     except Exception:
         logger.warning("Poisson GLM failed for predictors %s", predictors)
         return None
+    status = fit_status(result, "glm")
 
     coefs = dict(zip(col_names, result.params, strict=True))
     bse = dict(zip(col_names, result.bse, strict=True))
@@ -152,6 +160,9 @@ def fit_per_stop_rate_model(
         "deviance": float(result.deviance),
         "pearson_chi2": float(result.pearson_chi2),
         "mean_rate": float(y.sum() / np.exp(offset).sum()),
+        "converged": status["converged"],
+        "separated": status["separated"],
+        "n_convergence_warnings": count_fit_quality_warnings(caught),
     }
 
     return output
@@ -200,6 +211,8 @@ def cross_validate_per_stop_rate_model(
 
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
     fold_ll = []
+    n_nonconverged = 0
+    n_separated = 0
     for train, test in kf.split(X):
         if np.linalg.matrix_rank(X[train]) < X.shape[1]:
             return None
@@ -209,14 +222,24 @@ def cross_validate_per_stop_rate_model(
             ).fit(disp=0)
         except Exception:
             return None
+        status = fit_status(res, "glm")
+        n_nonconverged += not status["converged"]
+        n_separated += status["separated"]
         mu = np.exp(np.clip(X[test] @ res.params + offset[test], -30, 30))
         ll = poisson.logpmf(y[test], mu)
         if not np.all(np.isfinite(ll)):
             return None
         fold_ll.append(float(np.mean(ll)))
 
+    # Deterministic rule: any nonconverged/separated fold invalidates the whole CV
+    # metric (nan) rather than dropping the fold -- dropping a fold changes the
+    # held-out set and makes CV metrics non-comparable across rungs. The fold counts
+    # are reported alongside so the invalidation is visible.
+    invalid = (n_nonconverged > 0) or (n_separated > 0)
     return {
-        "cv_ll_per_stop_mean": float(np.mean(fold_ll)),
-        "cv_ll_per_stop_std": float(np.std(fold_ll)),
+        "cv_ll_per_stop_mean": np.nan if invalid else float(np.mean(fold_ll)),
+        "cv_ll_per_stop_std": np.nan if invalid else float(np.std(fold_ll)),
         "cv_n_folds": n_folds,
+        "cv_n_nonconverged_folds": int(n_nonconverged),
+        "cv_n_separated_folds": int(n_separated),
     }

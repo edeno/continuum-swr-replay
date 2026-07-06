@@ -60,7 +60,10 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
-warnings.filterwarnings("ignore")  # separated history coefs legitimately overflow exp()
+# separated history coefs legitimately overflow exp(); convergence/separation are
+# recorded per fit as flags in per_bin_rate_model (analysis.replay._fit_diagnostics),
+# so only the benign RuntimeWarning is silenced (not a blanket ignore).
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
