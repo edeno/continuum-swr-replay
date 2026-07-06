@@ -9,9 +9,10 @@ mirror the covariates in the fitted model ladders so decoded content can be
 eyeballed against the predictors:
 
   Rate models (per-bout tracks)
-    reward = reward_outcome (this stop's own outcome; distinct from the
-    kernel's lag-1 = previous trial), reward-lag kernel (reward_lag1..N,
-    Rlag/M2/BASE),
+    reward = reward_outcome (this stop's own outcome), reward-history kernel
+    (row k = reward outcome k stops back, built from the displayed stop
+    sequence so it is column-aligned; approximates the rate models' trials-back
+    reward_lag, which matches ~91% at lag 1),
     after switch / after omission (R1), reward rate trial k10 (R2), and the
     SWR-contrast value-state block (is_post_switch, trials_since_switch,
     trials_since_block_change, recent_switch_rate, hmm_relative_value, hmm_rpe,
@@ -141,12 +142,25 @@ def build_figure(
     stop_rrt = sst.set_index("stop_id")["reward_rate_trial_k10"]
     rrt_col = evo["stop_id"].map(stop_rrt).to_numpy(dtype=float)
 
-    # Reward-history kernel (rate models Rlag / M2 / BASE): reward outcome at
-    # each of the last N_REWARD_LAGS trials, one row per lag. Stop-level.
-    lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
-    stop_lags = sst.set_index("stop_id")[lag_cols]
-    kernel = np.vstack([evo["stop_id"].map(stop_lags[c]).to_numpy(dtype=float)
-                        for c in lag_cols])  # (N_REWARD_LAGS, n_bouts)
+    # Reward-history kernel, built from the displayed stop sequence so it is
+    # column-aligned: row k = the reward outcome k stops back. The rate models'
+    # reward_lag is trials-back; on this stop/event axis trials and stops drift
+    # apart past lag 1 (inter-trial stops), so a trials-back kernel cannot be
+    # read positionally. Stops-back is aligned by construction and matches the
+    # trials-back reward_lag1 ~91% of the time.
+    stop_seq = evo["stop_id"].to_numpy()          # per-event stop id, time order
+    uniq_stops = list(dict.fromkeys(stop_seq))    # ordered unique stops
+    pos_of = {s: i for i, s in enumerate(uniq_stops)}
+    ro_of = {}
+    for s, r in zip(stop_seq, rew_col, strict=True):
+        ro_of.setdefault(s, r)                    # reward_outcome is stop-constant
+    ro_by_pos = np.array([ro_of[s] for s in uniq_stops])
+    col_pos = np.array([pos_of[s] for s in stop_seq])
+    kernel = np.full((N_REWARD_LAGS, n_bouts), np.nan)
+    for k in range(1, N_REWARD_LAGS + 1):
+        src = col_pos - k
+        ok = src >= 0
+        kernel[k - 1, ok] = ro_by_pos[src[ok]]
 
     # RL value-state block (SWR-contrast rate G*/S* + content C6-C12). These
     # columns are merged onto `sst` in main() from qvals_table + the runtime
@@ -183,7 +197,7 @@ def build_figure(
     panels = [
         ("binary", rew_col, "reward", None),
         ("binary", swr_col, "SWR", None),
-        ("kernel", kernel, "reward kernel (lag)", ("Greys", False)),
+        ("kernel", kernel, "reward (stops back)", ("Greys", False)),
         ("heatbout", rrt_col, "reward rate trial", ("viridis", False)),
         ("binary", switch_col, "after switch", None),
         ("binary", omit_col, "after omission", None),
