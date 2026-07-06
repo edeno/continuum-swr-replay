@@ -57,6 +57,13 @@ from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
     add_uncertainty_covariates,
 )
+from continuum_swr_replay.analysis.replay.cohort_audit import (
+    QVALS_GAP_COLS,
+    cohort_record,
+    drop_profile,
+    term_diagnostics,
+    write_cohort_audit,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     specs_from_ladder,
@@ -185,50 +192,131 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     return pt
 
 
+# Event-level columns carried for the cohort-audit drop profile (mechanism A vs B).
+_PROFILE_COLS = ("time_since_stop", "reward_outcome", "q_arm_hmm", "hmm_relative_value")
+
+
 def _fit_session(
     g: pd.DataFrame, predictors: list[str], *, response_col: str, n_categories: int
-) -> dict | None:
+) -> tuple[dict | None, dict]:
+    """Fit one session's conditional Poisson and return ``(row_or_None, audit)``.
+
+    ``audit`` carries the event-level cohort counts (``n_in`` and the mutually
+    exclusive ``n_drop_qvals_gap`` / ``n_drop_own_predictor_missing`` /
+    ``n_drop_zero_response`` / ``n_excluded_session`` / ``n_modeled``), a skip
+    ``reason``, and a one-row-per-dropped-event ``dropped`` frame for the profile.
+    The reconciliation ``n_in - Σdrops == n_modeled`` holds by construction.
+
+    F4: a session missing a required predictor column is a clean, auditable skip
+    (``reason="missing:<cols>"`` → ``n_excluded_session``), never a
+    ``fit_conditional_poisson`` call with absent columns (which mirrors the rate
+    runner and avoids the fitter's error-log path).
+    """
+    n_in = int(g["event_id"].nunique()) if "event_id" in g.columns else 0
+    empty = g.iloc[0:0]
     required = [response_col, "event_id", *predictors]
     missing = [c for c in required if c not in g.columns]
     if missing:
-        return fit_conditional_poisson(
-            g,
-            predictors=predictors,
-            response_col=response_col,
-            event_col="event_id",
-            n_categories=n_categories,
+        return None, _audit(
+            n_in, 0, 0, 0, n_in, 0, f"missing:{','.join(missing)}", empty
         )
 
-    # Preserve the full candidate set within every retained event. Row-wise
-    # NaN drops can leave an event with fewer than 9 arms / 3 patches, changing
-    # the conditional likelihood while the null still assumes n_categories.
-    events_with_nan = g.loc[g[required].isna().any(axis=1), "event_id"].unique()
-    d = g[~g["event_id"].isin(events_with_nan)]
-    if d["event_id"].nunique() < MIN_EVENTS:
-        return None
-    return fit_conditional_poisson(
-        d,
-        predictors=predictors,
-        response_col=response_col,
-        event_col="event_id",
-        n_categories=n_categories,
+    # Split NaN-dropped events into the qvals gap (mechanism B) vs own-predictor
+    # missingness (mechanism A), qvals taking priority so the buckets stay disjoint.
+    qvals_preds = [c for c in predictors if c in QVALS_GAP_COLS]
+    other_cols = [c for c in (response_col, *predictors) if c not in QVALS_GAP_COLS]
+    qvals_nan = (
+        set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"]) if qvals_preds else set()
     )
+    other_nan = (
+        set(g.loc[g[other_cols].isna().any(axis=1), "event_id"]) if other_cols else set()
+    )
+    other_nan -= qvals_nan
+    n_qvals, n_own = len(qvals_nan), len(other_nan)
+    dropped_events = qvals_nan | other_nan
+
+    # Preserve the full candidate set within every retained event (row-wise NaN drops
+    # would shrink an event's arm/patch set and desync it from the null's n_categories).
+    surv = g[~g["event_id"].isin(dropped_events)]
+    totals = surv.groupby("event_id")[response_col].sum()
+    zero_events = set(totals[totals == 0].index)
+    n_zero = len(zero_events)
+    surv = surv[~surv["event_id"].isin(zero_events)]
+    n_surv = int(surv["event_id"].nunique())
+
+    dropped = _dropped_event_rows(g, dropped_events | zero_events)
+
+    if n_surv < MIN_EVENTS:
+        return None, _audit(n_in, n_qvals, n_own, n_zero, n_surv, 0, "too_few", dropped)
+
+    r = fit_conditional_poisson(
+        surv, predictors=predictors, response_col=response_col,
+        event_col="event_id", n_categories=n_categories,
+    )
+    n_modeled = int(r["n_events"]) if r is not None else 0
+    # Any survivor not modeled (the fitter's n<2·n_pred gate, or a failed fit) is a
+    # session/fit-level exclusion; this makes the record reconcile exactly.
+    n_excluded = n_surv - n_modeled
+    reason = "" if r is not None else "fit_none"
+    return r, _audit(n_in, n_qvals, n_own, n_zero, n_excluded, n_modeled, reason, dropped)
+
+
+def _audit(n_in, n_qvals, n_own, n_zero, n_excluded, n_modeled, reason, dropped):
+    return {
+        "n_in": n_in,
+        "n_drop_qvals_gap": n_qvals,
+        "n_drop_own_predictor_missing": n_own,
+        "n_drop_zero_response": n_zero,
+        "n_excluded_session": n_excluded,
+        "n_modeled": n_modeled,
+        "reason": reason,
+        "dropped": dropped,
+    }
+
+
+def _dropped_event_rows(g: pd.DataFrame, event_ids: set) -> pd.DataFrame:
+    """One row per dropped event, profile columns only (for drop_profile)."""
+    cols = [c for c in _PROFILE_COLS if c in g.columns]
+    sub = g[g["event_id"].isin(event_ids)]
+    return sub.drop_duplicates("event_id")[cols] if cols else g.iloc[0:0]
 
 
 def _run(
     ev: pd.DataFrame, ladder: dict, *, response_col: str, n_categories: int
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[dict]]:
+    """Fit the ladder per session and build one cohort-audit record per (model, pop).
+
+    Returns ``(results, cohort_records)``; the audit records reconcile
+    ``n_in - Σdrops == n_modeled`` (grain = event) via :func:`cohort_record`.
+    """
     rows = []
+    audits = []
     splits = {"all": ev, "SWR": ev[ev.is_swr], "nonSWR": ev[~ev.is_swr]}
     for name, (preds, scope) in ladder.items():
         pops = ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]
         for pop in pops:
+            acc = dict.fromkeys((
+                "n_in", "n_drop_qvals_gap", "n_drop_own_predictor_missing",
+                "n_drop_zero_response", "n_excluded_session", "n_modeled",
+            ), 0)
+            sessions_in = sessions_modeled = n_nonconv = n_sep = 0
+            animals_modeled: set = set()
+            dropped_frames = []
             for keys, g in splits[pop].groupby(SC, sort=False):
-                r = _fit_session(
+                sessions_in += 1
+                r, a = _fit_session(
                     g, preds, response_col=response_col, n_categories=n_categories
                 )
+                for k in acc:
+                    acc[k] += a[k]
+                if len(a["dropped"]):
+                    dropped_frames.append(a["dropped"])
                 if r is None:
                     continue
+                sessions_modeled += 1
+                animals_modeled.add(keys[SC.index("animal")])
+                n_nonconv += r.get("converged") is False
+                n_sep += bool(r.get("separated"))
                 rows.append(
                     {
                         "model": name,
@@ -248,7 +336,24 @@ def _run(
                         "n_convergence_warnings": r.get("n_convergence_warnings"),
                     }
                 )
-    return pd.DataFrame(rows)
+            dropped = (
+                pd.concat(dropped_frames, ignore_index=True) if dropped_frames
+                else pd.DataFrame()
+            )
+            notes = drop_profile(dropped)
+            audits.append(cohort_record(
+                name, pop, "event",
+                n_in=acc["n_in"], n_modeled=acc["n_modeled"],
+                sessions_in=sessions_in, sessions_modeled=sessions_modeled,
+                animals_modeled=len(animals_modeled), drop_notes=notes,
+                n_drop_qvals_gap=acc["n_drop_qvals_gap"],
+                n_drop_own_predictor_missing=acc["n_drop_own_predictor_missing"],
+                n_drop_zero_response=acc["n_drop_zero_response"],
+                n_excluded_session=acc["n_excluded_session"],
+                n_sessions_flagged_nonconverged=n_nonconv,
+                n_sessions_flagged_separated=n_sep,
+            ))
+    return pd.DataFrame(rows), audits
 
 
 def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
@@ -355,7 +460,7 @@ def main() -> None:
         ev["event_id"].nunique(),
         ev.groupby(SC).ngroups,
     )
-    arm = _run(ev, ARM_LADDER, response_col="arm_count_hard", n_categories=9)
+    arm, arm_audit = _run(ev, ARM_LADDER, response_col="arm_count_hard", n_categories=9)
     arm.to_pickle(RC / "models" / f"swr_contrast_content_arm{sfx}.pkl")
 
     logger.info(
@@ -364,8 +469,27 @@ def main() -> None:
         pt["event_id"].nunique(),
         pt.groupby(SC).ngroups,
     )
-    patch = _run(pt, PATCH_LADDER, response_col="patch_count_hard", n_categories=3)
+    patch, patch_audit = _run(
+        pt, PATCH_LADDER, response_col="patch_count_hard", n_categories=3
+    )
     patch.to_pickle(RC / "models" / f"swr_contrast_content_patch{sfx}.pkl")
+
+    # Cohort-audit table (one row per model x population; reconciles n_in - Σdrops =
+    # n_modeled at the event grain) + term-level quasi-separation diagnostics.
+    write_cohort_audit(
+        arm_audit + patch_audit,
+        RC / "models" / f"swr_contrast_content_cohort_audit{sfx}.csv",
+    )
+    term_diag = pd.concat(
+        [
+            term_diagnostics(arm, specs_from_ladder(ARM_LADDER, ARM_KEY_TERM)),
+            term_diagnostics(patch, specs_from_ladder(PATCH_LADDER, PATCH_KEY_TERM)),
+        ],
+        ignore_index=True,
+    )
+    term_diag.to_csv(
+        RC / "models" / f"swr_contrast_content_term_diagnostics{sfx}.csv", index=False
+    )
 
     logger.info("saved arm=%d patch=%d rows -> %s", len(arm), len(patch), RC / "models")
     print("\n########## ARM ##########")

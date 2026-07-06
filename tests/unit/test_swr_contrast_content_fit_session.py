@@ -26,7 +26,7 @@ def test_fit_session_drops_nan_events_not_rows(monkeypatch):
     monkeypatch.setattr(mod, "MIN_EVENTS", 1)
     monkeypatch.setattr(mod, "fit_conditional_poisson", fake_fit)
 
-    out = mod._fit_session(
+    out, audit = mod._fit_session(
         df,
         ["reward_rate_arm_k10"],
         response_col="arm_count_hard",
@@ -37,3 +37,14 @@ def test_fit_session_drops_nan_events_not_rows(monkeypatch):
     assert captured["kwargs"]["n_categories"] == 3
     assert captured["long_df"]["event_id"].unique().tolist() == [2]
     assert len(captured["long_df"]) == 3
+    # Event 1's NaN reward_rate_arm_k10 (mechanism A) is an own-predictor drop, not qvals.
+    assert audit["n_in"] == 2
+    assert audit["n_drop_own_predictor_missing"] == 1
+    assert audit["n_drop_qvals_gap"] == 0
+    assert audit["n_modeled"] == 1
+    # Reconciliation closes.
+    drops = (
+        audit["n_drop_qvals_gap"] + audit["n_drop_own_predictor_missing"]
+        + audit["n_drop_zero_response"] + audit["n_excluded_session"]
+    )
+    assert audit["n_in"] - drops == audit["n_modeled"]

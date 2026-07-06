@@ -24,6 +24,12 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
+from continuum_swr_replay.analysis.replay.cohort_audit import (
+    cohort_record,
+    drop_profile,
+    event_drop_buckets,
+    write_cohort_audit,
+)
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -492,7 +498,10 @@ def main():
 
     # Pre-filter to common complete-case event set: drop entire events
     # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
-    required_cols = [response_col, event_col] + sorted(all_predictors)
+    # Keep the pre-filter frame for the cohort audit (per-model drop attribution).
+    long_df_prefilter = long_df
+    union_predictors = sorted(all_predictors)
+    required_cols = [response_col, event_col] + union_predictors
     available_cols = [c for c in required_cols if c in long_df.columns]
     has_nan = long_df[available_cols].isna().any(axis=1)
     events_with_nan = long_df.loc[has_nan, event_col].unique()
@@ -537,6 +546,9 @@ def main():
     # Fit each model
     output_dir.mkdir(parents=True, exist_ok=True)
     all_results = []
+    cohort_audits: list[dict] = []
+    population = getattr(args, "swr_subset", None) or "all"
+    sessions_in = long_df_prefilter.groupby(SESSION_COLS).ngroups
 
     for model_name in valid_model_names:
         spec = hierarchy[model_name]
@@ -566,6 +578,43 @@ def main():
         elapsed = time.time() - t0
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
 
+        # Cohort-audit record (grain=event, common complete-case cohort). Attribute
+        # the union-filter drops to this rung's own vs the other rungs' predictors.
+        buckets = event_drop_buckets(
+            long_df_prefilter, event_col=event_col, response_col=response_col,
+            own_predictors=predictors, union_predictors=union_predictors,
+        )
+        n_modeled = int(mdf["n_events"].sum()) if len(mdf) else 0
+        n_drops = sum(
+            buckets[k] for k in (
+                "n_drop_qvals_gap", "n_drop_own_predictor_missing",
+                "n_drop_common_cohort_other", "n_drop_zero_response",
+            )
+        )
+        dropped = long_df_prefilter[
+            long_df_prefilter[event_col].isin(buckets["dropped_event_ids"])
+        ].drop_duplicates(event_col)
+        cohort_audits.append(cohort_record(
+            model_name, population, "event", cohort_mode="common",
+            n_in=n_before, n_modeled=n_modeled,
+            sessions_in=sessions_in, sessions_modeled=len(mdf),
+            animals_modeled=int(mdf["animal"].nunique()) if len(mdf) else 0,
+            drop_notes=drop_profile(dropped),
+            n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
+            n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
+            n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
+            n_drop_zero_response=buckets["n_drop_zero_response"],
+            n_excluded_session=n_before - n_drops - n_modeled,
+            n_sessions_flagged_nonconverged=(
+                int((mdf["converged"] == False).sum())  # noqa: E712
+                if "converged" in mdf.columns else 0
+            ),
+            n_sessions_flagged_separated=(
+                int((mdf["separated"] == True).sum())  # noqa: E712
+                if "separated" in mdf.columns else 0
+            ),
+        ))
+
         if len(mdf) > 0:
             model_path = output_dir / f"{model_name}.pkl"
             mdf.to_pickle(model_path)
@@ -573,6 +622,15 @@ def main():
 
             print_model_results(model_name, mdf, predictors, hierarchy)
             all_results.append(mdf)
+
+    # Cohort-audit table: one row per model (grain=event, common cohort); every row
+    # reconciles n_in - Σdrops == n_modeled (asserted by cohort_record).
+    if cohort_audits:
+        write_cohort_audit(cohort_audits, output_dir / "all_models_cohort_audit.csv")
+        logging.info(
+            "Saved cohort audit (%d rows) to %s",
+            len(cohort_audits), output_dir / "all_models_cohort_audit.csv",
+        )
 
     if not all_results:
         logging.error("No models produced results")
