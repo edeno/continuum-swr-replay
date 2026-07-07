@@ -390,6 +390,14 @@ def fit_is_stay_logistic_per_session(
 ) -> pd.DataFrame:
     """Per-session logistic: ``is_stay ~ outcome * content_col``.
 
+    Causal-hygiene note (phase 4): ``outcome_col`` defaults to
+    ``is_after_omission`` — a POST_OUTCOME covariate — but that is **valid here
+    and deliberately unchanged**: the modeled unit is the stay/leave *decision*,
+    which happens AFTER the current trial's outcome by construction (the animal
+    decides where to go next having already seen the reward/omission). So this is
+    a genuinely post-outcome regression, not a leak; the covariate-timing gate
+    that governs the *replay-rate/content* ladders does not apply to it.
+
     The interaction coefficient (``beta_inter``) is the headline
     statistic: positive ⇒ replay content on the role amplifies the
     omission effect on staying; negative ⇒ counteracts.

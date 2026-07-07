@@ -40,6 +40,31 @@ aggregation surfaces per-(model, population) `n_sessions_flagged_nonconverged` /
 `n_sessions_flagged_separated`. These are diagnostics on the retained cohort — the only
 coefficient exclusion is the `|coef|>=10` quasi-separation filter.
 
+### Covariate causal-hygiene (phase 4)
+
+Every ladder runner enforces covariate timing at model-build via
+`analysis.replay.covariate_timing.assert_predictor_timing`; a rung whose predictor is
+post-outcome or future-referencing must be **declared descriptive**, else the run fails.
+
+- **Per-stop R1/R2** now use `reward_lag1` (past-only) instead of `is_after_omission` — a
+  sign-flip reparameterization (see [rate_models.md](rate_models.md)).
+- **Descriptive rungs** (retained under an explicit *association* / *peri-switch
+  alignment* claim, NOT a forward prediction — `DESCRIPTIVE_CONTENT_RUNGS` /
+  `DESCRIPTIVE_RATE_RUNGS` in `model_specs.py`):
+  content `C6_rpe`, `C9_update` (RPE / value-update association), `C10_periswitch` +
+  patch `CP2`/`CP3`/`CPS3` (peri-switch alignment); rate `G5`/`G7`/`S7`/`S9`
+  (RPE/update association), `G1`/`S3` (peri-switch). `trials_since_switch` /
+  `is_post_switch` are future-referencing (sign toward the *next* switch) and can ONLY
+  be descriptive; `hmm_rpe` / `hmm_value_update` are post-outcome and were relabeled
+  descriptive here rather than gated.
+- **Mechanism-A encode:** an unvisited leaf's `reward_rate_arm_k10` is `0.0` (not NaN)
+  with a `has_arm_history` indicator, retaining the ~11.6% novel-arm events as a modeled
+  category (main effect from M3 / C3 / CS4). The base content ladder reports both encoded
+  and (once) on the old restricted cohort so the estimand change is measured.
+- Stage-6 `is_stay ~ outcome * content` legitimately uses the post-outcome
+  `is_after_omission`: its modeled unit (the stay/leave decision) is post-outcome by
+  construction, so the timing gate does not apply.
+
 ### Cohort-audit tables
 
 The **primary** fit runners emit a `<run>_cohort_audit.csv` next to their outputs: **one
