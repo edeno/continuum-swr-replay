@@ -10,7 +10,11 @@ and 9-arm grid:
   * the OBSERVED content response (the dot view from the browser, alpha =
     arm_fraction);
   * the model's PREDICTED per-arm allocation (softmax(Xbeta) within event);
-  * the RESIDUAL, observed - predicted (diverging), where the model misses.
+  * the per-(event,arm) RESIDUAL, observed - predicted (diverging);
+  * the per-arm CUMULATIVE (martingale) residual: since arm counts are
+    Multinomial(N, p) per event, each arm's running sum(obs - N*p) standardized
+    by its cumulative sd (N*p*(1-p)) shares a single +/-2 band; a line past +/-2
+    marks an arm the model systematically over/under-allocates content to.
 
 The model is a free parameter (``--content-model``); any MODEL_HIERARCHY rung
 works. Predicted/residual use ``arm_fraction`` (MAP-based), which is what the
@@ -135,10 +139,10 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
         if entry and entry[:2] not in seen:
             seen.add(entry[:2])
             panels.append(entry)
-    panels += [("content",), ("pred",), ("resid",)]
+    panels += [("content",), ("pred",), ("resid",), ("cumresid",)]
 
     H = {"swr": 0.55, "armstrip": 0.55, "cov": 4.2,
-         "content": 6.5, "pred": 4.2, "resid": 4.2}
+         "content": 6.5, "pred": 4.2, "resid": 4.2, "cumresid": 3.2}
     heights = [H[p[0]] for p in panels]
     fig = plt.figure(figsize=(max(11, n_bouts * 0.1), 0.16 * sum(heights) + 1.5),
                      constrained_layout=True)
@@ -255,6 +259,32 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
         elif kind == "resid":
             event_heatmap(ax, arm_matrix("residual_frac", per_event=True),
                           "RdBu_r", True, i, "RESIDUAL\nobs − pred")
+        elif kind == "cumresid":
+            # Per-arm cumulative (martingale) residual. Per event the arm counts
+            # are Multinomial(N, p): expected count = N*predicted_frac, marginal
+            # variance = N*p*(1-p). Standardize each arm's running sum by its
+            # cumulative sd so all 9 share a single ±2 band; a line past ±2 means
+            # the model systematically over/under-allocates content to that arm.
+            obs = arm_matrix("arm_count_hard", per_event=True)      # (9, n_bouts)
+            p = arm_matrix("predicted_frac", per_event=True)
+            n_event = np.nansum(obs, axis=0)                        # bins per event
+            res = obs - p * n_event[None, :]
+            var = p * (1.0 - p) * n_event[None, :]
+            bad = ~np.isfinite(res) | ~np.isfinite(var)
+            cumR = np.cumsum(np.where(bad, 0.0, res), axis=1)
+            cumV = np.cumsum(np.where(bad, 0.0, var), axis=1)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                z = np.where(cumV > 0, cumR / np.sqrt(cumV), np.nan)
+            for r, a in enumerate(ARM_ROW_ORDER):
+                ax.plot(cols, z[r], color=palette[a][:3], lw=1.0,
+                        label=f"arm {a}")
+            for yb in (2, -2):
+                ax.axhline(yb, color="0.6", lw=0.6, ls="--")
+            ax.axhline(0, color="0.5", lw=0.5)
+            ax.set_ylabel("cumulative residual\n(z, per arm)", fontsize=8)
+            ax.tick_params(labelsize=7)
+            for s in ("top", "right"):
+                ax.spines[s].set_visible(False)
 
     for ax in axes:
         ax.vlines(stop_edges[1:-1], 0, 1, transform=ax.get_xaxis_transform(),
