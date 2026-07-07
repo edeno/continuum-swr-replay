@@ -25,6 +25,7 @@ def test_z_formula():
     assert ref["a"]["std"] == np.nanstd(x)
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_zero_variance_is_nan():
     """A constant column has std==0 -> all-NaN _z (coefficient unidentified)."""
     df = pd.DataFrame({"c": [4.0, 4.0, 4.0]})
@@ -93,11 +94,22 @@ def test_assert_present_fires_on_partial_failure():
 
 
 def test_assert_present_allows_zero_variance_all_nan():
-    """A genuinely zero-variance source legitimately yields an all-NaN _z; allowed."""
+    """A genuinely zero-variance (finite constant) source yields an all-NaN _z; allowed."""
     df = pd.DataFrame({"c": [4.0, 4.0, 4.0]})  # constant -> std 0 -> _z all NaN
     attach_standardized(df, ["c"])
     assert df["c_z"].isna().all()
     assert_standardized_present(df, ["c"])  # no raise
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_assert_present_fires_on_all_nan_source():
+    """An entirely-NaN source (a failed upstream join) must NOT be waved through as if
+    it were a legitimate zero-variance column."""
+    df = pd.DataFrame({"q": [np.nan, np.nan, np.nan]})
+    attach_standardized(df, ["q"])
+    assert df["q_z"].isna().all()
+    with pytest.raises(RuntimeError, match="entirely NaN"):
+        assert_standardized_present(df, ["q"])
 
 
 def test_apply_missing_reference_column_raises():

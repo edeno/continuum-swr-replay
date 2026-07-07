@@ -86,12 +86,21 @@ def assert_standardized_present(df: pd.DataFrame, cols) -> None:
     missing = [f"{c}_z" for c in present_sources if f"{c}_z" not in df.columns]
     if missing:
         raise RuntimeError(f"standardized columns missing after build: {missing}")
-    wiped = []
+    bad_source = []  # source entirely NaN -> a failed upstream join, not zero-variance
+    wiped = []       # _z all-NaN while the source has real variance
     for c in present_sources:
         zc = f"{c}_z"
-        source_varies = float(np.nanstd(df[c].to_numpy(dtype=float))) > 0
-        if source_varies and not df[zc].notna().any():
+        col = df[c].to_numpy(dtype=float)
+        if not np.isfinite(col).any():
+            bad_source.append(c)
+            continue
+        if float(np.nanstd(col)) > 0 and not df[zc].notna().any():
             wiped.append(zc)
+    if bad_source:
+        raise RuntimeError(
+            f"standardization source columns are entirely NaN (failed upstream join?): "
+            f"{bad_source} -- a canonical standardized covariate must carry data"
+        )
     if wiped:
         raise RuntimeError(
             f"standardized columns are all-NaN despite a varying source: {wiped}"

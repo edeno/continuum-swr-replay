@@ -446,12 +446,15 @@ def main() -> None:
         agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
         asfx = "_smoke" if args.max_per_animal else ""
         agg.to_pickle(out_dir / f"swr_contrast_rate_audited{asfx}.pkl")
-        # Persist this run's OWN per-SD reference (the fit-time standardization used
-        # for the std_* columns) so the standardized coefficients are reproducible.
-        # This is the runner's cohort-scoped reference -- NOT the builder's table _z.
+        # Persist the exact per-SD factors this run used for the std_* columns so the
+        # standardized coefficients are reproducible. These SDs are computed over the
+        # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the
+        # two differ negligibly on full data (~0.2% for recent_switch_rate). This is the
+        # runner's own reference; it is NOT the builder's pooled-global table _z.
         (out_dir / f"swr_contrast_rate_meta{asfx}.json").write_text(json.dumps(
             {"fit_time_sd_reference": {k: float(v) for k, v in sd.items()},
-             "note": "per-SD reference over the rate cohort (std_factor = raw_coef * SD); "
+             "sd_scope": "full qvals_table + stop_table (std_factor = raw_coef * SD)",
+             "note": "the exact SD factors aggregate_contrast used for the std_* columns; "
                      "NOT the builder's pooled-global table _z"},
             indent=2, sort_keys=True,
         ))
