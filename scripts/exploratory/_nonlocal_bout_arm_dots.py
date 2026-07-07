@@ -408,7 +408,7 @@ def build_figure(
     # same value merge otherwise, hiding the boundary).
     for ax in axes:
         ax.vlines(stop_edges[1:-1], 0, 1, transform=ax.get_xaxis_transform(),
-                  colors="0.5", linewidths=0.3, alpha=0.35, zorder=4,
+                  colors="0.25", linewidths=0.5, alpha=0.6, zorder=4,
                   rasterized=True)
 
     for ax in axes[:-1]:
