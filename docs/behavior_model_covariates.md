@@ -135,4 +135,7 @@ p(reward) across the 6 ports (best available arm value; the nominal counterpart 
 P(choose stem i) for the 3 stems.
 
 See also [`covariate_dictionary.md`](covariate_dictionary.md) for the rate/content
-model-family covariates (a separate, smaller set).
+model-family covariates (a separate, smaller set), and
+[`behavior_models.md`](behavior_models.md) for the **generative models**
+(Beta-Bernoulli, HMM, Q-learners) that produce the columns above — their
+assumptions, update rules, and free parameters.
