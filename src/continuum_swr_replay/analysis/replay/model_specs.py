@@ -491,14 +491,20 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     ),
     "R1": ModelSpec(
         name="R1",
-        predictors=("is_after_omission", "is_after_switch"),
-        description="+ previous-trial reward / switch context",
+        # ``reward_lag1`` (past reward indicator, strict goal-arrival cutoff) replaces
+        # the former ``is_after_omission`` (built from trial-start time, which can encode
+        # the FUTURE reward outcome during a stop's approach phase). Since
+        # ``reward_lag1 ~= 1 - is_after_omission``, this is a sign-flip REPARAMETERIZATION:
+        # the coefficient flips sign and changes everywhere (see docs/rate_models.md), not
+        # only on the ~15% approach stops where the causal-vs-leaky values disagree.
+        predictors=("reward_lag1", "is_after_switch"),
+        description="+ previous-trial reward (reward_lag1, past-only) / switch context",
         parent="R0",
     ),
     "R2": ModelSpec(
         name="R2",
         predictors=(
-            "is_after_omission",
+            "reward_lag1",
             "is_after_switch",
             "reward_rate_trial_k10",
         ),

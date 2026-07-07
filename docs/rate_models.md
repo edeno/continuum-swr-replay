@@ -25,6 +25,20 @@ one-population null tested against its split.
   `R2` + recent reward rate, `Rlag` lagged reward kernel `reward_lag1..10` +
   `is_after_switch`) in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
+
+> **Causal-hygiene change (phase 4): R1/R2 now use `reward_lag1`, not
+> `is_after_omission`.** The old `is_after_omission` was built from the trial *start*
+> time, so on a stop's approach phase it could encode the trial's not-yet-delivered
+> reward outcome (a leak). `reward_lag1` (the previous trial's reward, strict
+> goal-arrival cutoff — the same past-only cutoff Family B uses) is always known before
+> the stop. Because `reward_lag1 ≈ 1 − is_after_omission`, **this is a sign-flip
+> reparameterization, not a re-cohorting**: the coefficient flips sign and its magnitude
+> shifts *everywhere* (the intercept absorbs the offset), not only on the ~15% approach
+> stops where the causal-vs-leaky values genuinely disagree. So the new `reward_lag1`
+> coefficient reads with the *opposite* sign of the old `is_after_omission` one — a
+> **positive** `reward_lag1` coefficient means the previous reward *raises* the rate,
+> equivalent to the old **negative** omission-suppression result. Do not compare the two
+> coefficients at face value.
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**

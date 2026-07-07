@@ -9,12 +9,16 @@ multiplicative changes in event rate per second of immobility.
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``is_after_omission``, ``is_after_switch`` — does the
-  immediately preceding trial's context change event rate?
-  ``is_after_reward`` is intentionally excluded: it equals
-  ``1 - is_after_omission`` wherever both are defined, so including
-  it alongside the intercept is rank-deficient. The reward effect is
-  read off the sign of the ``is_after_omission`` coefficient.
+- **R1**: + ``reward_lag1``, ``is_after_switch`` — does the immediately
+  preceding trial's context change event rate? ``reward_lag1`` (the
+  previous trial's reward, strict goal-arrival cutoff) is the past-only
+  predictor; it replaced ``is_after_omission`` (phase-4 causal hygiene),
+  which was built from trial-start time and could encode the not-yet-
+  delivered outcome on approach-phase stops. Since
+  ``reward_lag1 ≈ 1 − is_after_omission``, the coefficient reads with the
+  OPPOSITE sign of the old omission effect (sign-flip reparameterization;
+  a positive ``reward_lag1`` = previous reward raises the rate). See
+  ``docs/rate_models.md``.
 - **R2**: + ``recent_trial_reward_rate`` (rewarded fraction of the
   last 10 trials) — does event rate track a deeper reward history,
   beyond the single previous trial?
