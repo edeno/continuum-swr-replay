@@ -413,10 +413,13 @@ def build_figure(
 
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
+    # reward_outcome is a per-stop attribute (constant within an immobility period),
+    # so count rewarded PERIODS via to_stop; is_swr is genuinely per event.
     axes[0].set_title(
         f"{title_stub}  —  non-local bout covariate browser  "
-        f"({n_bouts} non-local events in {n_stops} immobility periods, "
-        f"{int((rew_col == 1).sum())} rewarded, {int((swr_col == 1).sum())} SWR)",
+        f"({n_bouts} non-local events in {n_stops} immobility periods; "
+        f"{int((to_stop(rew_col) == 1).sum())} rewarded periods, "
+        f"{int((swr_col == 1).sum())} SWR events)",
         fontsize=11,
     )
     axes[-1].set_xlim(-0.5, n_bouts - 0.5)
