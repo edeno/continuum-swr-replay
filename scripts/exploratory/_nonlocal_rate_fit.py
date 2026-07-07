@@ -10,7 +10,10 @@ session and shows, sharing the stop x-axis:
   * the exposure (immobility_time) and the model's own PREDICTORS, as per-stop
     tracks;
   * OBSERVED events/stop (bars) with the model's PREDICTED expected count (line);
-  * the RESIDUAL, observed - predicted, per stop.
+  * the CUMULATIVE residual (the point-process martingale) M(k) = sum(obs - pred)
+    over stops, with +/-2 sqrt(sum pred) Poisson bounds. Staying in the band is
+    consistent with the model; drift out marks where it is systematically misfit
+    (the correct point-process check, vs a noisy per-stop residual).
 
 Predicted count is reconstructed from the fitted coefficients:
 ``mu = exp(intercept + X beta) * immobility_time`` (the log-immobility offset).
@@ -105,9 +108,10 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
         elif p in RATE_PANEL and p not in seen:
             seen.add(p)
             panels.append(RATE_PANEL[p])
-    panels += [("counts", None, "events / stop"), ("resid", None, "residual\nobs − pred")]
+    panels += [("counts", None, "events / stop"),
+               ("cumresid", None, "cumulative\nresidual")]
 
-    H = {"heat": 0.5, "binary": 0.5, "kernel": 2.4, "counts": 3.2, "resid": 2.2}
+    H = {"heat": 0.5, "binary": 0.5, "kernel": 2.4, "counts": 3.2, "cumresid": 2.6}
     heights = [H[p[0]] for p in panels]
     fig = plt.figure(figsize=(max(11, n_stops * 0.035), 0.42 * sum(heights) + 1.4),
                      constrained_layout=True)
@@ -181,11 +185,19 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
             ax.tick_params(labelsize=7)
-        elif kind == "resid":
-            colors = np.where(resid >= 0, "#c0392b", "#2874a6")
-            ax.bar(x, resid, width=1.0, color=colors, zorder=1)
+        elif kind == "cumresid":
+            # Point-process martingale residual: cumulative (obs - pred) with
+            # +/-2 sqrt(cumulative Poisson variance = cumulative pred) bounds.
+            fin = np.isfinite(resid)
+            cum = np.cumsum(np.where(fin, resid, 0.0))
+            band = 2.0 * np.sqrt(np.cumsum(np.where(fin, pred, 0.0)))
+            ax.fill_between(x, -band, band, color="0.8", alpha=0.6, lw=0,
+                            label="±2σ (Poisson)", zorder=1)
+            ax.plot(x, cum, color="#8e44ad", lw=1.3,
+                    label="cumulative obs − pred", zorder=2)
             ax.axhline(0, color="0.5", lw=0.5)
-            ax.set_ylabel("residual\nobs − pred", fontsize=8)
+            ax.set_ylabel("cumulative\nresidual", fontsize=8)
+            ax.legend(loc="upper left", fontsize=7, frameon=False)
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
             ax.tick_params(labelsize=7)
