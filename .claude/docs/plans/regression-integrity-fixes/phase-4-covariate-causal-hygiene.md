@@ -12,6 +12,29 @@ implements mechanism A by **encoding** (decided — overview *Resolved decisions
 phase 3** (cohort tables) so every refit reports its cohort, and runs **after phase 6** (the builder
 must own `_z`/`q_arm_hmm` before this adds `has_arm_history` — see overview Rollout).
 
+> **Implementation deviations (as built, 2026-07-07).** Two decisions diverged from the
+> draft below:
+> 1. **Descriptive relabel, not gating.** All leaky rungs (POST_OUTCOME *and*
+>    FUTURE_REFERENCING) were **relabeled descriptive** via `DESCRIPTIVE_CONTENT_RUNGS` /
+>    `DESCRIPTIVE_RATE_RUNGS` allowlists — the outcome-gating path (`post_current_outcome`
+>    mask, retained-omission plumbing) was **not built**. Consequence: the Validation-slice
+>    rows for gating (`test_post_outcome_mask`, `test_retrospective_cohort_has_both_outcomes`,
+>    the `retrospective=True` refits) are **N/A** and were not written.
+> 2. **`has_arm_history` dropped — encode 0.0 only.** The unvisited-leaf indicator was
+>    implemented, measured (~11% of events, ~13% novel-arm effect), then **removed** (commit
+>    `649952b`); the `reward_rate_arm_k10` coefficient absorbs the modest novel-arm effect.
+>    So `test_recent_reward_rate.py` asserts the 0.0 encode / no-history NaN only (no
+>    `has_arm_history` column), and the phase-6-ordering rationale above ("before this adds
+>    `has_arm_history`") is moot.
+>
+> What *was* built and verified: the timing registry + enforcement, the R1/R2→`reward_lag1`
+> swap, the mechanism-A 0.0 encode (full 218-session regen; **+7.4k** modeled M3 events,
+> 215→218 sessions converge, `reward_rate_arm_k10` sign-stable), refreshed
+> standardization reference (`test_z_reference_refreshed.py`), and refits of every affected
+> ladder (`per_bin_rate` / `swr_contrast_rate` / base-patch confirmed byte-identical no-ops
+> and skipped). A `prepare_data --from-cache` fast path (skip the Spyglass fetch for
+> covariate-only rebuilds) was added alongside (`test_prepare_data_cache.py`).
+
 **Inputs to read first:**
 
 - [src/continuum_swr_replay/analysis/replay/_helpers.py:80-95](../../../../src/continuum_swr_replay/analysis/replay/_helpers.py) and [:122-130](../../../../src/continuum_swr_replay/analysis/replay/_helpers.py) — `reward_outcome`/`is_after_reward`/`is_after_omission` from the trip-in-progress trial.

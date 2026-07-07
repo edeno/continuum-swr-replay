@@ -22,6 +22,21 @@ module)::
 
     uv run python -m continuum_swr_replay.analysis.replay.prepare_data         # full run
     uv run python -m continuum_swr_replay.analysis.replay.prepare_data --test  # 2 per animal
+    uv run python -m continuum_swr_replay.analysis.replay.prepare_data --from-cache  # covariate-only rebuild
+
+**Skipping Spyglass for covariate-only changes** (``--from-cache``): the
+only per-session Spyglass fetch is ``trials`` + ``track_graph`` (the ~3 h
+cost of a full run). Every normal run pickles those to
+``replay_content/_session_cache/<session_id>.pkl``. With ``--from-cache``
+the driver reads them back instead of querying Spyglass and re-runs the
+*same* table builders — so a change that only touches covariate code
+(e.g. a new/re-encoded predictor, a re-standardization, a new
+interaction) rebuilds the canonical tables in minutes with byte-for-byte
+parity on everything else. Sessions missing from the cache transparently
+fall back to Spyglass and are cached for next time, so no session is ever
+dropped. Caveat: ``--from-cache`` freezes ``trials``/``track_graph`` at
+the last full run; to pick up genuine upstream Spyglass changes
+(re-curation, new intervals) run a normal pass, which refreshes the cache.
 """
 
 from __future__ import annotations
@@ -71,6 +86,9 @@ logging.basicConfig(
 )
 
 OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
+# Per-session cache of the only Spyglass-sourced inputs (trials + track_graph).
+# Populated on every full run; consumed by --from-cache to skip load_data.
+SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
 
 
 def find_sessions(max_per_animal: int | None = None):
@@ -113,6 +131,7 @@ def find_sessions(max_per_animal: int | None = None):
             {
                 "nwb_file_name": nwb_match[0],
                 "epoch_name": epoch,
+                "session_id": session_id,
                 "dot_file": f,
                 "env_file": env_files[session_id],
                 "results_file": results_path if results_path.exists() else None,
@@ -129,8 +148,55 @@ def find_sessions(max_per_animal: int | None = None):
     return selected
 
 
+def _load_trials_track_graph(
+    session: dict, *, from_cache: bool
+) -> tuple[pd.DataFrame | None, object | None, bool]:
+    """Return ``(trials, track_graph, hit_cache)``, caching the Spyglass fetch.
+
+    ``trials`` + ``track_graph`` are the only per-session inputs pulled from
+    Spyglass (the ~3 h cost of a full run). They are pickled to
+    :data:`SESSION_CACHE_DIR` keyed by ``session_id`` so a covariate-only
+    rebuild (``from_cache=True``) can skip ``load_data`` entirely.
+
+    ``from_cache=True`` reads the cache when present and otherwise falls back
+    to Spyglass (and refreshes the cache) so a session is never dropped for a
+    missing entry. ``from_cache=False`` always queries Spyglass and rewrites
+    the cache, keeping it fresh after every real regen. ``hit_cache`` reports
+    whether the values came from the cache (vs Spyglass). ``trials`` /
+    ``track_graph`` are ``None`` when the session cannot be loaded.
+
+    **Staleness is presence-only.** The cache is trusted whenever the pickle
+    exists — there is no schema/version tag. So ``--from-cache`` freezes not
+    just Spyglass-side data (re-curation, new intervals) but also
+    ``load_data``'s own trial-derivation *code*: if that logic changes, cached
+    trials keep the old derivation silently. Run a full (non-cache) pass to
+    refresh after any such change; ``--from-cache`` is for covariate-only work.
+    """
+    cache_path = SESSION_CACHE_DIR / f"{session['session_id']}.pkl"
+    if from_cache and cache_path.exists():
+        with open(cache_path, "rb") as f:
+            cached = pickle.load(f)
+        return cached["trials"], cached["track_graph"], True
+
+    data = load_data(
+        session["nwb_file_name"],
+        session["epoch_name"],
+        include=frozenset({SessionDataKeys.TRIALS}),
+    )
+    trials = data.get("trials")
+    track_graph = data.get("track_graph")
+    if trials is not None and track_graph is not None:
+        SESSION_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, "wb") as f:
+            pickle.dump({"trials": trials, "track_graph": track_graph}, f)
+    return trials, track_graph, False
+
+
 def _process_session(
-    session: dict, contingency: pd.DataFrame | None = None
+    session: dict,
+    contingency: pd.DataFrame | None = None,
+    *,
+    from_cache: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
@@ -156,12 +222,19 @@ def _process_session(
     with open(session["env_file"], "rb") as f:
         env = pickle.load(f)
 
-    # Trials + track_graph come from Spyglass (slow; ~30 s).
-    data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
-    trials = data.get("trials")
-    track_graph = data.get("track_graph")
+    # Trials + track_graph come from Spyglass (slow; the ~3 h/full-run cost),
+    # unless served from the per-session cache (--from-cache).
+    trials, track_graph, hit_cache = _load_trials_track_graph(
+        session, from_cache=from_cache
+    )
     if trials is None or track_graph is None:
         return None
+    logging.info(
+        "  %s %s: trials/track_graph from %s",
+        nwb,
+        epoch,
+        "cache" if hit_cache else "Spyglass",
+    )
 
     # Conditional posterior is optional — sessions without a saved
     # ``results.nc`` still emit the three tables whose posterior
@@ -234,11 +307,26 @@ def main():
     )
     parser.add_argument("--test", action="store_true", help="2 sessions per animal")
     parser.add_argument("--max-per-animal", type=int, default=None)
+    parser.add_argument(
+        "--from-cache",
+        action="store_true",
+        help=(
+            "Covariate-only rebuild: read trials/track_graph from the "
+            "per-session cache instead of Spyglass (falls back to Spyglass "
+            "for uncached sessions). Rebuilds all tables via the same "
+            "builders in minutes. Freezes upstream at the last full run — "
+            "run without this flag to refresh the cache."
+        ),
+    )
     args = parser.parse_args()
 
     max_per_animal = 2 if args.test else args.max_per_animal
     sessions = find_sessions(max_per_animal=max_per_animal)
-    logging.info("Found %d sessions", len(sessions))
+    logging.info(
+        "Found %d sessions (trials/track_graph source: %s)",
+        len(sessions),
+        "cache, Spyglass fallback" if args.from_cache else "Spyglass (refreshing cache)",
+    )
 
     # Per-stop value artifact (per-arm nominal p(R) + per-arm model value),
     # keyed by stop_id, from qvals_table (exact poke_out alignment -- no difflib).
@@ -271,7 +359,9 @@ def main():
         epoch = session["epoch_name"]
 
         try:
-            result = _process_session(session, contingency=contingency)
+            result = _process_session(
+                session, contingency=contingency, from_cache=args.from_cache
+            )
         except MergeError:
             # A one-to-one merge violation (duplicate event_id from the
             # retrospective metrics) is an integrity bug, not a data gap.

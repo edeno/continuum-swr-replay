@@ -362,8 +362,13 @@ class TestRewardRateArmDefinition:
         assert r10[0, 0] == pytest.approx(0.5)
         assert r5[0, 0] == pytest.approx(0.0)
 
-    def test_trunk_zero_vs_unvisited_leaf_nan(self):
-        """Trunk arms -> 0.0; never-visited leaf arms -> NaN (session w/ trials)."""
+    def test_trunk_zero_vs_unvisited_leaf_encoded(self):
+        """Trunk arms -> 0.0; never-visited leaf -> 0.0 too (mechanism-A encode).
+
+        Phase 4: an unvisited leaf *with prior trials* is encoded 0.0 (no rewards
+        observed on it yet), not NaN — only a no-trial-history event stays NaN. Here
+        two trials precede the event at t=2.5, so arm 1 (never visited) is 0.0.
+        """
         trials = pd.DataFrame(
             {
                 "start_time": [0.0, 1.0],
@@ -379,6 +384,6 @@ class TestRewardRateArmDefinition:
         )
         assert out.shape[1] == 9
         assert out[0, 0] == pytest.approx(0.5)  # visited leaf: 1/2 rewarded
-        assert np.isnan(out[0, 1])  # never-visited leaf -> NaN
+        assert out[0, 1] == 0.0  # never-visited leaf, prior trials -> encoded 0.0
         for trunk in (6, 7, 8):
             assert out[0, trunk] == 0.0  # trunk arms structural 0.0
