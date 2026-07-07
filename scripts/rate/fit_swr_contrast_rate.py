@@ -73,6 +73,7 @@ from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
+    stop_own_missing,
     term_diagnostics,
     write_cohort_audit,
 )
@@ -172,6 +173,8 @@ def _fit(
     out.update(
         n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic),
         n_params=int(len(res.params)),
+        # distinct stops that contributed >=1 retained bin -- the stop-grain modeled count.
+        n_stops=int(df["stop_id"].nunique()),
         converged=status["converged"], separated=status["separated"],
         n_convergence_warnings=count_fit_quality_warnings(caught),
     )
@@ -274,45 +277,55 @@ def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
 
 
 def _cohort_records(
-    models: pd.DataFrame, items: list, stop: pd.DataFrame, n_qvals_dropped: int
+    models: pd.DataFrame, stop: pd.DataFrame, n_qvals_dropped: int
 ) -> list[dict]:
     """One stop-grain cohort record per (model, population).
 
     Grain is ``stop`` (the plan audits the rate family at stop grain — the timebin
-    design is aggregated per-session inside the fitter). ``n_in`` = candidate stops +
-    the qvals-join drop; a fit session contributes all its stops to ``n_modeled``, a
-    skipped session's stops to ``n_excluded_session``, and the inner-join drop to
-    ``n_drop_qvals_gap`` (mechanism B). Reconciles by construction.
+    design is aggregated per-session inside the fitter). Buckets:
+    ``n_drop_qvals_gap`` = the inner qvals-join drop (mechanism B, stops with no fitted
+    value state, already removed in ``_load``); ``n_drop_own_predictor_missing`` =
+    post-join stops with ``immobility<=0`` or a NaN stop-level required predictor
+    (e.g. ``reward_lag1``, model-specific); ``n_modeled`` = the fitter's distinct
+    modeled-stop count (``n_stops``); the rest (bin-level drops, session gates) go to
+    ``n_excluded_session``. Reconciles by construction.
     """
-    stops_by_session = stop.groupby(SESSION_COLS, sort=False).size()
-    candidate_keys = [k for k, _, _ in items]
-    total_candidate = int(sum(int(stops_by_session.get(k, 0)) for k in candidate_keys))
+    total = int(len(stop))  # post-join stops
+    n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
+    need_by_model = {
+        **{m: need for m, (_f, need) in G_SPECS.items()},
+        **{m: need for m, (_f, need) in S_SPECS.items()},
+    }
     pairs = [(m, p) for m in G_SPECS for p in STRATA]
     pairs += [(m, "contrast") for m in S_SPECS]
     records = []
     for name, pop in pairs:
-        if len(models):
-            sub = models[(models.model == name) & (models.population == pop)]
-        else:
-            sub = models
+        sub = (
+            models[(models.model == name) & (models.population == pop)]
+            if len(models) else models
+        )
         fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
-        n_modeled = int(sum(int(stops_by_session.get(k, 0)) for k in fit_keys))
-        n_excluded = total_candidate - n_modeled
-        n_nonconv = int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
-        n_sep = int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+        n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
+        stop_level = [c for c in need_by_model.get(name, ()) if c in stop.columns]
+        n_own = int(stop_own_missing(stop, stop_level).sum())
         records.append(cohort_record(
             name, _POP_LABEL.get(pop, pop), "stop",
-            n_in=total_candidate + int(n_qvals_dropped), n_modeled=n_modeled,
-            sessions_in=len(candidate_keys), sessions_modeled=len(fit_keys),
+            n_in=total + int(n_qvals_dropped), n_modeled=n_modeled,
+            sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
             animals_modeled=len({k[0] for k in fit_keys}),
             drop_notes=(
-                f"qvals-join drop (mechanism B) at stop grain; "
-                f"{len(candidate_keys) - len(fit_keys)} candidate session(s) skipped"
+                "qvals-join drop -> qvals_gap (mechanism B); immobility<=0 / NaN "
+                "stop-level predictor -> own; bin-level + session gates -> excluded"
             ),
             n_drop_qvals_gap=int(n_qvals_dropped),
-            n_excluded_session=n_excluded,
-            n_sessions_flagged_nonconverged=n_nonconv,
-            n_sessions_flagged_separated=n_sep,
+            n_drop_own_predictor_missing=n_own,
+            n_excluded_session=total - n_own - n_modeled,
+            n_sessions_flagged_nonconverged=(
+                int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
+            ),
+            n_sessions_flagged_separated=(
+                int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+            ),
         ))
     return records
 
@@ -396,7 +409,7 @@ def main() -> None:
     # tiny subset n_in would be meaningless. Report 0 there (smoke is not a reported run).
     audit_qvals_drop = 0 if args.max_per_animal else n_qvals_dropped
     write_cohort_audit(
-        _cohort_records(models, items, stop, audit_qvals_drop),
+        _cohort_records(models, stop, audit_qvals_drop),
         out_dir / f"swr_contrast_rate_cohort_audit{csfx}.csv",
     )
     if len(models):

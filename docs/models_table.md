@@ -66,15 +66,16 @@ reconciliation. `scripts/qa/summarize_cohort_audits.py` stacks every audit CSV a
 low-retention (`n_modeled/n_in < 0.9`) or biased (mechanism-A early / mechanism-B
 qvals-tail) drops.
 
-**Not (yet) on the standardized schema:** `compare_event_source_models.py` (content /
-patch / rate / **choice** comparison blocks) predates it and keeps its own richer
-per-cohort `_freeze_common_cohort` provenance (`n_missing`/`n_zero`/`n_invalid`/
-`n_units_after` per frozen cohort). The auxiliary/robustness rate runners
-`fit_uncertainty_rate.py`, `fit_cross_history_rate.py`, and `fit_swr_power_model.py`
-are **not** covered here — of these, `fit_uncertainty_rate.py` and
-`fit_swr_power_model.py` merge `qvals_table.pkl` and so incur the same mechanism-B
-qvals-tail drop (visible in their run logs, not yet a cohort CSV). Extending the
-standardized audit to these is a follow-up.
+Also covered: `compare_event_source_models.py` maps its native `_freeze_common_cohort`
+provenance (the content / patch / rate / **choice** blocks) onto the standardized schema
+via `records_from_common_cohort_provenance`, writing `*_comparison_fits_cohort_audit.csv`
+(the block's up-front selection — e.g. choice's valid-replay-stop filter — is
+*definitional*, so `n_in` is the post-selection candidate count). The qvals-merging
+auxiliary runners `fit_uncertainty_rate.py` (inner join → `n_drop_qvals_gap`) and
+`fit_swr_power_model.py` (left join + per-session dropna on qvals-derived predictors →
+`n_drop_qvals_gap`) each emit their own cohort audit. `fit_cross_history_rate.py` (a
+bivariate self-/cross-history variant with no new qvals dependence) is **not** audited —
+documented, not silently dropped.
 
 ## Per-bin rate — Family B
 `fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`

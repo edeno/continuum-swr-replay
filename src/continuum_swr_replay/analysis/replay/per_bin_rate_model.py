@@ -179,6 +179,10 @@ def fit_per_bin_rate_model(
         "aic": float(result.aic),
         "deviance": float(result.deviance),
         "dispersion": float(result.deviance / df_resid) if df_resid > 0 else np.nan,
+        # distinct stops that actually contributed >=1 retained bin to the fit — the
+        # modeled-cohort count for the stop-grain audit (bins were already dropped for
+        # NaN predictors / exposure<=0 above, and immobility<=0 stops never entered).
+        "n_stops": int(df["stop_id"].nunique()),
         "converged": status["converged"],
         "separated": status["separated"],
         "n_convergence_warnings": count_fit_quality_warnings(caught),

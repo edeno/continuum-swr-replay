@@ -148,11 +148,14 @@ def event_drop_buckets(
     one bucket by the schema priority (qvals_gap → own_predictor_missing →
     common_cohort_other → zero_response):
 
-    - ``n_drop_qvals_gap`` — a qvals-tail covariate (:data:`QVALS_GAP_COLS`) is NaN;
+    - ``n_drop_qvals_gap`` — a qvals-tail covariate (:data:`QVALS_GAP_COLS`) that **this
+      rung itself uses** is NaN (0 for a rung with no value covariate, per Contract 1);
     - ``n_drop_own_predictor_missing`` — one of *this rung's* own (non-qvals) predictors
       is NaN;
     - ``n_drop_common_cohort_other`` — dropped only because *another* rung's predictor is
-      NaN (this rung's own predictors are all present) — the F4 common-cohort bucket;
+      NaN (this rung's own predictors are all present) — the F4 common-cohort bucket. A
+      qvals-tail event where the value covariate belongs to a *different* rung lands here,
+      NOT in ``n_drop_qvals_gap``.
     - ``n_drop_zero_response`` — survives complete-case but the response sums to zero.
 
     Returns the four counts plus ``dropped_event_ids`` (the union of all dropped events).
@@ -161,9 +164,12 @@ def event_drop_buckets(
     nan_by_col = {
         c: set(long_df.loc[long_df[c].isna(), event_col]) for c in present_union
     }
-    qvals_cols = [c for c in present_union if c in QVALS_GAP_COLS]
+    # qvals gap is attributed only when THIS rung's own value covariate is missing.
+    own_qvals_cols = [
+        c for c in own_predictors if c in QVALS_GAP_COLS and c in nan_by_col
+    ]
     qvals_events = (
-        set().union(*(nan_by_col[c] for c in qvals_cols)) if qvals_cols else set()
+        set().union(*(nan_by_col[c] for c in own_qvals_cols)) if own_qvals_cols else set()
     )
     own_cols = [
         c for c in own_predictors if c in nan_by_col and c not in QVALS_GAP_COLS
@@ -187,6 +193,25 @@ def event_drop_buckets(
     }
 
 
+def stop_own_missing(stop_df, required_cols, *, immobility_col="immobility_time"):
+    """Boolean mask over ``stop_df`` rows dropped for *own-predictor* reasons.
+
+    Mirrors what the rate fitters remove at the stop level BEFORE fitting: a stop with
+    ``immobility_time <= 0`` (never enters the timebin design) or with NaN in any of this
+    model's stop-level required predictors (all its bins are dropped by the fitter's
+    ``dropna(needed)``, since these columns are constant within a stop). Bin-level drops
+    (short self-history lags) are below this grain and fall into ``n_excluded_session``.
+    """
+    present = [c for c in required_cols if c in stop_df.columns]
+    mask = (
+        stop_df[present].isna().any(axis=1)
+        if present else pd.Series(False, index=stop_df.index)
+    )
+    if immobility_col in stop_df.columns:
+        mask = mask | (stop_df[immobility_col] <= 0)
+    return mask
+
+
 def drop_profile(dropped: pd.DataFrame) -> str:
     """Summarize WHO was dropped, to expose non-random drops (mechanism A vs B).
 
@@ -205,6 +230,52 @@ def drop_profile(dropped: pd.DataFrame) -> str:
         if vcol in dropped:
             parts.append(f"{vcol}_median={dropped[vcol].median():.3f}")
     return "; ".join(parts) if parts else f"n_dropped={len(dropped)}"
+
+
+def records_from_common_cohort_provenance(prov, model: str, population: str, *, grain="stop"):
+    """Standardized cohort record from a ``_freeze_common_cohort`` provenance frame.
+
+    ``compare_event_source_models.py`` fits its patch/rate/**choice** blocks on a frozen
+    per-session complete-case cohort and records rich per-session provenance
+    (``n_units_before``/``n_units_after``/``n_missing_units``/``n_invalid_choice_units``/
+    ``n_nonpositive_offset_units``/``n_zero_response_units``/``status``). This maps that
+    native provenance onto the standardized schema so the choice cohort is on the same
+    footing as the rate/content ladders. The block's up-front selection (e.g. the choice
+    model's valid-replay-stop filter) is *definitional* — ``n_in`` is the post-selection
+    candidate count. Returns ``None`` for an empty frame.
+    """
+    if prov is None or len(prov) == 0:
+        return None
+
+    def _col(c):
+        return prov[c] if c in prov.columns else 0
+
+    n_in = int(_col("n_units_before").sum())
+    n_own = int(
+        (_col("n_missing_units") + _col("n_invalid_choice_units")
+         + _col("n_nonpositive_offset_units")).sum()
+    )
+    n_zero = int(_col("n_zero_response_units").sum())
+    fit_mask = prov["status"] == "fit" if "status" in prov.columns else pd.Series(False, index=prov.index)
+    n_modeled = int(prov.loc[fit_mask, "n_units_after"].sum()) if fit_mask.any() else 0
+    animals = (
+        int(prov.loc[fit_mask, "animal"].nunique())
+        if fit_mask.any() and "animal" in prov.columns else 0
+    )
+    return cohort_record(
+        model, population, grain, cohort_mode="common",
+        n_in=n_in, n_modeled=n_modeled,
+        sessions_in=len(prov), sessions_modeled=int(fit_mask.sum()),
+        animals_modeled=animals,
+        drop_notes=(
+            "block common-cohort; up-front selection is definitional (n_in = "
+            "post-selection); dropna + invalid-choice + nonpositive-offset -> own; "
+            "size-gate / fit-failed sessions -> excluded"
+        ),
+        n_drop_own_predictor_missing=n_own,
+        n_drop_zero_response=n_zero,
+        n_excluded_session=n_in - n_own - n_zero - n_modeled,
+    )
 
 
 def write_cohort_audit(records: list[dict], path) -> pd.DataFrame:

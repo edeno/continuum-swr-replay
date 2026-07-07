@@ -33,6 +33,10 @@ import pandas as pd
 from scipy.stats import skew, wilcoxon
 
 from continuum_swr_replay.analysis.replay._helpers import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay.cohort_audit import (
+    cohort_record,
+    write_cohort_audit,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -84,6 +88,42 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# Predictors sourced (via left join) from qvals_table -- NaN on the mechanism-B tail.
+_QVALS_PREDICTORS = ("p_reward_current", "rpe", "value_diff_patch", "q_current")
+
+
+def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
+    """Event-grain cohort record. The per-session ``dropna`` over PREDICTORS silently
+    removed the qvals-tail events (qvals-derived predictors NaN on the left join); this
+    attributes them to ``n_drop_qvals_gap`` (mechanism B), the other predictor/response
+    NaNs to own, and the <30-event session gate to excluded."""
+    n_in = len(df)
+    qp = [c for c in _QVALS_PREDICTORS if c in df.columns]
+    op = [c for c in (*PREDICTORS, POWER_COL) if c not in qp and c in df.columns]
+    qmask = df[qp].isna().any(axis=1) if qp else pd.Series(False, index=df.index)
+    omask = (
+        df[op].isna().any(axis=1) if op else pd.Series(False, index=df.index)
+    ) & ~qmask
+    valid = df[~(qmask | omask)]
+    fit_keys = {tuple(r) for r in coefs[SC].to_numpy()} if len(coefs) else set()
+    vbs = valid.groupby(SC, sort=False).size()
+    n_modeled = int(sum(int(vbs.get(k, 0)) for k in fit_keys))
+    n_qvals, n_own = int(qmask.sum()), int(omask.sum())
+    return [cohort_record(
+        "swr_power", "all", "event",
+        n_in=n_in, n_modeled=n_modeled,
+        sessions_in=df.groupby(SC).ngroups, sessions_modeled=len(fit_keys),
+        animals_modeled=len({k[0] for k in fit_keys}),
+        drop_notes=(
+            "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
+            "other predictor/response NaN -> own; <30-event sessions -> excluded"
+        ),
+        n_drop_qvals_gap=n_qvals,
+        n_drop_own_predictor_missing=n_own,
+        n_excluded_session=n_in - n_qvals - n_own - n_modeled,
+    )]
+
+
 def main() -> None:
     df = _assemble()
     m = df[POWER_COL].to_numpy()
@@ -107,6 +147,10 @@ def main() -> None:
     coefs = fit_power_model(df)
     out = RC / "models_per_bin_rate" / "swr_power_model.pkl"
     coefs.to_pickle(out)
+    write_cohort_audit(
+        _cohort_records(df, coefs),
+        RC / "models_per_bin_rate" / "swr_power_cohort_audit.csv",
+    )
     print(f"\n=== power model: {POWER_COL} ~ standardized covariates (per session) ===")
     print(f"  {len(coefs)} sessions, {coefs.animal.nunique()} animals; saved -> {out}\n")
     print(f"  {'covariate':<22}{'med coef':>10}{'%pos':>7}{'animals':>9}{'p':>10}")

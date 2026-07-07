@@ -48,6 +48,10 @@ from continuum_swr_replay.analysis.replay import (
     fit_conditional_poisson,
     fit_per_stop_rate_model,
 )
+from continuum_swr_replay.analysis.replay.cohort_audit import (
+    records_from_common_cohort_provenance,
+    write_cohort_audit,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -561,6 +565,18 @@ def main() -> None:
     with open(out_path, "wb") as f:
         pickle.dump(results, f)
     logger.info("saved %s", out_path)
+
+    # Standardized cohort audit for every common-cohort block (patch / rate / choice),
+    # mapped from the native _freeze_common_cohort provenance. This puts the choice
+    # cohort on the same reconciling footing as the rate/content ladders.
+    audit_records = [
+        rec for label, prov in cohort_provenance.items()
+        if (rec := records_from_common_cohort_provenance(prov, label, "all")) is not None
+    ]
+    if audit_records:
+        audit_path = out_path.with_name(out_path.stem + "_cohort_audit.csv")
+        write_cohort_audit(audit_records, audit_path)
+        logger.info("saved cohort audit %s", audit_path)
 
 
 if __name__ == "__main__":

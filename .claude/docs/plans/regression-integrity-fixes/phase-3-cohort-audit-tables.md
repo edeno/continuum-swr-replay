@@ -115,6 +115,44 @@ This is reporting infrastructure — no fitted numbers change — and phases 4/5
 - **Document** the cohort-audit outputs in `docs/README.md` ("Where results live") and add a short
   subsection to `docs/models_table.md` explaining the schema and the reconciliation invariant.
 
+## Corrections (round 2 — post-implementation review)
+
+The first implementation (commits 957c207, 2331a43) shipped the emitter + content/rate
+instrumentation but three defects and two coverage gaps were found in review. These are
+required to complete phase 3 (all reporting-only; no fitted number changes):
+
+- **C1 (was High) — rate audits under-count `n_modeled` / under-report own-predictor
+  drops.** The Family-B (`fit_per_bin_rate_models.py`) and rate-contrast
+  (`fit_swr_contrast_rate.py`) audits counted **every stop of a fitting session** as
+  `n_modeled`, sending only fully-skipped sessions to `n_excluded_session`. But the
+  per-bin fitter drops bins with NaN required predictors / `exposure<=0`
+  (`per_bin_rate_model.py:135`) and `aggregate_to_timebins` drops stops with
+  `immobility_time<=0` (`_helpers.py:649`). In the live stop table that is `reward_lag1`
+  NaN in 871 stops, `reward_lag10` NaN in 6,996, `immobility<=0` in 20 — **model-specific**
+  (M0/G0 use no reward lags; M9/S rungs use all 10). Fix: `fit_per_bin_rate_model` /
+  the contrast `_fit` return `n_stops` (distinct modeled `stop_id`); the audit sums those
+  for `n_modeled` and attributes `immobility<=0` ∪ NaN-in-model's-stop-level-predictors to
+  `n_drop_own_predictor_missing` (per-model stop-level cols = `_design_columns(spec) ∩
+  stop.columns`). Family A already does this correctly.
+- **C2 (was Medium) — common-cohort `n_drop_qvals_gap` over-assigned.**
+  `cohort_audit.event_drop_buckets` computed the qvals bucket from the **union**
+  predictors, so a null/base rung reported `n_drop_qvals_gap>0` purely because a *later*
+  rung uses `q_arm_hmm`. Per Contract 1 the qvals bucket means **this model's own** value
+  covariate is missing (0 for models with no value covariate); such events belong in
+  `n_drop_common_cohort_other`. Fix: derive `qvals_cols` from `own_predictors`.
+- **C3 (was Medium) — rate audit records untested.** Add direct synthetic tests for the
+  per-bin, per-stop, and swr-contrast rate cohort records (a test would have caught C1).
+- **C4 (was High/Medium) — choice runner not audited.** The plan lists choice; the first
+  pass left it on `compare_event_source_models.py`'s native `_freeze_common_cohort`
+  provenance. Emit the standardized cohort audit for the choice cohort (valid-replay-stop
+  selection, choice-set validity, one-chosen, required-predictor dropna, size gate).
+- **C5 — auxiliary qvals-merging runners.** `fit_uncertainty_rate.py` (inner qvals join)
+  and `fit_swr_power_model.py` (left join + per-session dropna on qvals-derived predictors)
+  both incur the mechanism-B qvals-tail drop but emit no cohort audit. Add stop-grain
+  records (uncertainty mirrors the corrected Family B; swr_power mirrors Family A's
+  own-mask + OLS dropna). `fit_cross_history_rate.py` stays out (bivariate variant, no
+  new qvals dependence) — documented, not audited.
+
 ## Deliberately not in this phase
 
 - *Changing* any drop policy (encoding mechanism A, time-gating, common-cohort refits) — that is phases

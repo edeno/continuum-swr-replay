@@ -67,7 +67,11 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
+    stop_own_missing,
     write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
+    _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
@@ -216,15 +220,19 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
 def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
     """Stop-grain cohort record per (model, population) for the per-bin ladder.
 
-    Family B has no qvals merge; the only drops are session-level (min_bins /
-    min_events / reward-contrast gates), so a fitted session contributes all its stops
-    to ``n_modeled`` and a skipped session's stops to ``n_excluded_session``.
+    Family B has no qvals merge. A stop is dropped for **own-predictor** reasons when
+    ``immobility_time<=0`` or a stop-level required predictor is NaN (model-specific:
+    the reward-kernel rungs drop the ~7k stops missing ``reward_lag10``, the const rung
+    drops none). ``n_modeled`` is the fitter's actual distinct-modeled-stop count
+    (``n_stops``); remaining survivors of skipped / gated sessions and any bin-level
+    drops fall into ``n_excluded_session``. Reconciles by construction.
     """
-    stops_by_session = stop.groupby(SESSION_COLS, sort=False).size()
-    total = int(stops_by_session.sum())
-    candidate_keys = list(stops_by_session.index)
+    total = int(len(stop))
+    n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
     recs = []
-    for name in MODEL_PER_BIN_RATE:
+    for name, spec in MODEL_PER_BIN_RATE.items():
+        stop_level = [c for c in _design_columns(spec) if c in stop.columns]
+        n_own = int(stop_own_missing(stop, stop_level).sum())
         for outcome in POPULATIONS:
             sub = (
                 models[(models.model == name) & (models.outcome == outcome)]
@@ -233,14 +241,18 @@ def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
             fit_keys = (
                 {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
             )
-            n_modeled = int(sum(int(stops_by_session.get(k, 0)) for k in fit_keys))
+            n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
             recs.append(cohort_record(
                 name, outcome, "stop",
                 n_in=total, n_modeled=n_modeled,
-                sessions_in=len(candidate_keys), sessions_modeled=len(fit_keys),
+                sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
                 animals_modeled=len({k[0] for k in fit_keys}),
-                drop_notes="min_bins/min_events/reward-contrast session gates -> excluded",
-                n_excluded_session=total - n_modeled,
+                drop_notes=(
+                    "immobility<=0 / NaN stop-level predictor -> own; "
+                    "min_bins/min_events/reward-contrast gates + bin-level -> excluded"
+                ),
+                n_drop_own_predictor_missing=n_own,
+                n_excluded_session=total - n_own - n_modeled,
                 n_sessions_flagged_nonconverged=(
                     int((sub["converged"] == False).sum())  # noqa: E712
                     if "converged" in sub else 0
