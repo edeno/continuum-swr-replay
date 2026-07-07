@@ -952,3 +952,23 @@ SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
 }
 SWR_CONTRAST_CONTENT_BASEC = BASEc
 SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
+
+# ── Phase-4 causal-hygiene: descriptive-rung allowlists ──
+#
+# These rungs carry a POST_OUTCOME (RPE / value-update — embeds the current reward) or
+# FUTURE_REFERENCING (trials_since_switch / is_post_switch — signs toward the NEXT switch)
+# covariate that CANNOT be a forward predictor. Per the phase-4 decision they are RETAINED
+# under an explicit *descriptive* claim (a value/RPE *association*, or a *peri-switch
+# alignment*), NOT gated. The runners call ``assert_predictor_timing(descriptive=True)``
+# for exactly these names; a NEW rung that introduces a leaky covariate but is NOT listed
+# here fails the timing assertion (it is not silently promoted to a predictive claim).
+# See docs/models_table.md and analysis.replay.covariate_timing.
+DESCRIPTIVE_CONTENT_RUNGS = frozenset({
+    "C6_rpe", "C9_update",              # POST_OUTCOME: RPE / value-update association
+    "C10_periswitch",                    # FUTURE_REFERENCING: peri-switch alignment
+    "CP2_olddecay", "CP3_newgrowth", "CPS3_olddecay",  # patch peri-switch alignment
+})
+DESCRIPTIVE_RATE_RUNGS = frozenset({
+    "G5_rpe", "G7_update", "S7_rpe", "S9_update",      # POST_OUTCOME association
+    "G1_periswitch", "S3_periswitch",                  # FUTURE_REFERENCING peri-switch
+})

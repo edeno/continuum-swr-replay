@@ -30,6 +30,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     event_drop_buckets,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (
+    assert_predictor_timing,
+)
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -553,6 +556,10 @@ def main():
     for model_name in valid_model_names:
         spec = hierarchy[model_name]
         predictors = list(spec.predictors)
+        # Causal-hygiene gate (phase 4): the base content hierarchy carries no
+        # post/future-outcome covariates, so no descriptive exception is expected here;
+        # a future leak fails loud rather than becoming a silent predictive claim.
+        assert_predictor_timing(predictors)
 
         cv_label = " + CV" if args.cv else ""
         logging.info(

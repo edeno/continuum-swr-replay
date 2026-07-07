@@ -81,6 +81,12 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
+    assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    DESCRIPTIVE_RATE_RUNGS,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
 )
@@ -340,6 +346,15 @@ def main() -> None:
         "--workers", type=int, default=1, help="per-session process fan-out"
     )
     args = ap.parse_args()
+
+    # Causal-hygiene gate (phase 4): each rung's covariates must be pre-outcome, or the
+    # rung is an explicitly-declared descriptive rung (RPE/value association or peri-switch
+    # alignment). A NEW leaky covariate on an undeclared rung fails here. S-rungs carry
+    # is_swr as a gating modifier (a SAFE_MODIFIER), so asserting `need` covers the
+    # is_swr:<covariate> expansion.
+    for specs, descr in ((G_SPECS, DESCRIPTIVE_RATE_RUNGS), (S_SPECS, DESCRIPTIVE_RATE_RUNGS)):
+        for name, (_formula, need) in specs.items():
+            assert_predictor_timing(need, descriptive=(name in descr))
 
     stop, onsets, n_qvals_dropped = _load()
     if args.max_per_animal is not None:

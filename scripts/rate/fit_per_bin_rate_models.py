@@ -70,6 +70,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     stop_own_missing,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
+    assert_predictor_timing,
+)
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
@@ -282,6 +285,11 @@ def main() -> None:
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
     parser.add_argument("--no-gof", action="store_true", help="Skip goodness-of-fit.")
     args = parser.parse_args()
+
+    # Causal-hygiene gate (phase 4): the per-bin design basis (spline, reward kernel,
+    # self-/cross-history) is backward/within-stop safe; a future leak fails loud.
+    for spec in MODEL_PER_BIN_RATE.values():
+        assert_predictor_timing(c for c in _design_columns(spec) if c != "count")
 
     stop = pd.read_pickle(RC / "stop_table.pkl")
     onsets = attach_is_swr_to_onsets(

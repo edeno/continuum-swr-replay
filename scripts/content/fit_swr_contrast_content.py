@@ -68,7 +68,13 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     specs_from_ladder,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (
+    assert_predictor_timing,
+)
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay.model_specs import (
+    DESCRIPTIVE_CONTENT_RUNGS,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_KEY_TERM as ARM_KEY_TERM,
 )
@@ -483,6 +489,15 @@ def main() -> None:
         help="smoke: keep first N sessions per animal",
     )
     args = ap.parse_args()
+
+    # Causal-hygiene gate (phase 4): every rung's predictors must be pre-outcome, OR the
+    # rung must be an explicitly-declared descriptive rung (RPE/value association or
+    # peri-switch alignment). A NEW leaky covariate on an undeclared rung fails here.
+    for ladder in (ARM_LADDER, PATCH_LADDER):
+        for name, (preds, _scope) in ladder.items():
+            assert_predictor_timing(
+                preds, descriptive=(name in DESCRIPTIVE_CONTENT_RUNGS)
+            )
 
     sfx = "_smoke" if args.max_per_animal else ""
     (RC / "models").mkdir(parents=True, exist_ok=True)

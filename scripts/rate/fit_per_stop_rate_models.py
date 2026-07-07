@@ -38,6 +38,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (
+    assert_predictor_timing,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
     N_REWARD_LAGS,
@@ -136,6 +139,11 @@ def fit_per_stop_rate_hierarchy(
 
 
 def main() -> None:
+    # Causal-hygiene gate (phase 4): R1/R2 now use reward_lag1 (past-only), so the
+    # per-stop ladder is pre-outcome throughout; a future leak fails loud.
+    for spec in MODEL_PER_STOP_RATE.values():
+        assert_predictor_timing(spec.predictors)
+
     stop = pd.read_pickle(RC / "stop_table.pkl")
     missing = [c for c in RESPONSE_COLS.values() if c not in stop.columns]
     if missing:
