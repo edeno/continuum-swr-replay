@@ -762,6 +762,7 @@ from .covariates import (  # noqa: E402,F401
     attach_hmm_arm_value,
     cumulative_reward_all_events,
     cumulative_reward_per_arm,
+    has_arm_history_all_events,
     lagged_trial_rewards,
     recent_reward_rate_all_events,
     recent_reward_rate_per_arm,

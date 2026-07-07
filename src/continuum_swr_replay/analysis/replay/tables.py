@@ -98,6 +98,9 @@ from ._helpers import (
     eq_indicator as _eq_indicator,
 )
 from ._helpers import (
+    has_arm_history_all_events as _has_arm_history_all_events,
+)
+from ._helpers import (
     hash_event_id as _hash_event_id,
 )
 from ._helpers import (
@@ -1279,10 +1282,14 @@ def build_event_arm_table(
         rrr_2d = _recent_reward_rate_all_events(
             event_times, trials, well_to_arm_map, k=10
         )
+        # Mechanism-A indicator: 1 where the arm has >=1 prior visit (so a 0.0
+        # reward_rate means "visited, no rewards" vs "never visited yet").
+        hah_2d = _has_arm_history_all_events(event_times, trials, well_to_arm_map)
     else:
         vr_2d = np.full((n_events, n_arms), np.nan)
         cr_2d = np.full((n_events, n_arms), np.nan)
         rrr_2d = np.full((n_events, n_arms), np.nan)
+        hah_2d = np.full((n_events, n_arms), np.nan)
 
     # Events with NaN midpoint time get NaN for trial-derived columns
     nan_mask = np.isnan(event_times)
@@ -1290,6 +1297,7 @@ def build_event_arm_table(
         vr_2d[nan_mask] = np.nan
         cr_2d[nan_mask] = np.nan
         rrr_2d[nan_mask] = np.nan
+        hah_2d[nan_mask] = np.nan
 
     long["dist_to_arm"] = dist_2d.flatten()
     long["arm_dist_rank"] = rank_2d.flatten()
@@ -1303,6 +1311,7 @@ def build_event_arm_table(
     ].transform("mean")
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
+    long["has_arm_history"] = hah_2d.flatten()
 
     # -- p_reward_arm / q_arm: per-arm nominal value + per-arm model value (Q)
     # from the per-stop contingency artifact (covariate_dictionary.md D2/D3).
@@ -1703,6 +1712,7 @@ def _event_arm_table_columns() -> list[str]:
         "visit_recency_demeaned",
         "cumulative_reward",
         "reward_rate_arm_k10",
+        "has_arm_history",
         "p_reward_arm",
         "q_arm",
         "q_arm_hmm",

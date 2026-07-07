@@ -192,10 +192,15 @@ def recent_reward_rate_all_events(
     unknown. This matters because the conditional-Poisson fitter
     drops an entire event if *any* of its nine arm rows is NaN, and
     every event has three trunk-arm rows — leaving them NaN would
-    annihilate the M3+ event set. A leaf arm that simply has not been
-    visited yet in a session *with* prior trials stays ``NaN`` (a
-    genuine unknown); the no-trial-history rows stay ``NaN`` too,
-    matching the sibling helpers' contract.
+    annihilate the M3+ event set.
+
+    **Mechanism-A ENCODE (phase 4):** a leaf arm not yet visited in a
+    session *with* prior trials is filled ``0.0`` (no rewards observed
+    on it yet) and paired with the ``has_arm_history`` 0/1 indicator
+    (:func:`has_arm_history_all_events`), so the novel-arm / early-session
+    regime is a *modeled category* rather than a dropped event. Previously
+    this branch returned ``NaN`` and dropped ~11.6% of events. Only the
+    no-trial-history rows (no prior trials at all) stay ``NaN``.
     """
     n_arms = len(ALL_ARMS)
     n_events = len(event_times)
@@ -247,6 +252,9 @@ def recent_reward_rate_all_events(
         visits = arm_visits[j]
         rewards = arm_rewards[j]
         if visits.size == 0:
+            # ENCODE: leaf never visited in this session, but there ARE prior trials ->
+            # 0.0 (no rewards observed yet), not NaN. no_past rows stay NaN.
+            out[~no_past, j] = 0.0
             continue
         # n_vis_before[i] = number of visits to this arm before cutoff
         n_vis_before = np.searchsorted(visits, cutoffs, side="left")
@@ -255,10 +263,63 @@ def recent_reward_rate_all_events(
                 continue
             nv = n_vis_before[i]
             if nv == 0:
+                # ENCODE: leaf not yet visited BEFORE this event -> 0.0 (paired with
+                # has_arm_history==0), not a dropped NaN.
+                out[i, j] = 0.0
                 continue
             start = max(0, nv - k)
             out[i, j] = rewards[start:nv].mean()
 
+    return out
+
+
+def has_arm_history_all_events(
+    event_times: np.ndarray,
+    trials: pd.DataFrame,
+    well_to_arm: dict[int, int],
+) -> np.ndarray:
+    """0/1 indicator: does each arm have ≥1 prior visit before each event?
+
+    Returns ``(n_events, n_arms)``. The mechanism-A companion to
+    :func:`recent_reward_rate_all_events`: where that encodes an unvisited leaf's
+    reward rate as ``0.0``, this marks whether the arm has ANY visit history (so the
+    model can tell "no rewards yet because never visited" from "visited, zero rewards").
+    Trunk arms (never a trial destination) and not-yet-visited leaves → ``0``; a visited
+    leaf → ``1``. Rows with no prior trials at all → ``NaN`` (mirrors the reward-rate
+    NaN, so no NEW events drop).
+    """
+    n_arms = len(ALL_ARMS)
+    n_events = len(event_times)
+    if len(trials) == 0:
+        return np.full((n_events, n_arms), np.nan)
+
+    reachable_arms = set(well_to_arm.values())
+    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.sort_values("_cutoff").reset_index(drop=True)
+    cutoff_times = trials["_cutoff"].to_numpy()
+    to_wells = trials["to_well"].to_numpy()
+
+    arm_visits: list[np.ndarray] = []
+    for arm in ALL_ARMS:
+        vis_idx = [
+            ti for ti in range(len(trials))
+            if not np.isnan(to_wells[ti]) and well_to_arm.get(int(to_wells[ti])) == arm
+        ]
+        arm_visits.append(np.array(vis_idx, dtype=np.intp))
+
+    cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
+    no_past = cutoffs == 0
+    out = np.full((n_events, n_arms), np.nan)
+    for j in range(n_arms):
+        if ALL_ARMS[j] not in reachable_arms:
+            out[~no_past, j] = 0.0  # trunk: never a destination
+            continue
+        visits = arm_visits[j]
+        if visits.size == 0:
+            out[~no_past, j] = 0.0  # leaf never visited this session
+            continue
+        n_vis_before = np.searchsorted(visits, cutoffs, side="left")
+        out[~no_past, j] = (n_vis_before[~no_past] >= 1).astype(float)
     return out
 
 

@@ -200,7 +200,12 @@ class ModelSpec:
 
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
-_M3 = (*_M2, "reward_rate_arm_k10")
+# ``has_arm_history`` (mechanism-A indicator) enters WITH ``reward_rate_arm_k10`` from M3
+# on: under the encode, an unvisited leaf has ``reward_rate_arm_k10 == 0`` (not NaN), so
+# the indicator lets the model separate "novel arm, no rewards yet" from "visited, zero
+# rewards". Main effect only — a ``has_arm_history:reward_rate_arm_k10`` interaction would
+# be perfectly collinear (reward_rate is nonzero only where has_arm_history==1).
+_M3 = (*_M2, "reward_rate_arm_k10", "has_arm_history")
 _M4 = (*_M3, "visit_recency_demeaned")
 _M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
@@ -882,7 +887,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C0_armfe": (ARMFE, "split"),
     "C1_current": ([*ARMFE, "is_current"], "split"),
     "C2_base": (BASEc, "split"),
-    "C3_armreward": ([*BASEc, "reward_rate_arm_k10"], "split"),
+    "C3_armreward": ([*BASEc, "reward_rate_arm_k10", "has_arm_history"], "split"),
     "C4_armvalue": ([*BASEc, "q_arm_hmm"], "split"),
     "C5_lastrew": ([*BASEc, "is_last_rewarded_elsewhere"], "split"),
     "C6_rpe": ([*BASEc, _TSC, "rpe_x_current"], "split"),
@@ -902,7 +907,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "CS2_prev": ([*BASEc, "swr_x_prev"], "pooled"),
     "CS3_lastrew": ([*BASEc, "is_last_rewarded_elsewhere",
                      "swr_x_is_last_rewarded_elsewhere"], "pooled"),
-    "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
+    "CS4_armreward": ([*BASEc, "reward_rate_arm_k10", "has_arm_history",
                        "swr_x_reward_rate_arm_k10"], "pooled"),
     "CS5_armvalue": ([*BASEc, "q_arm_hmm", "swr_x_q_arm_hmm"], "pooled"),
 }
