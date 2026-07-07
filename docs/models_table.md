@@ -57,10 +57,11 @@ post-outcome or future-referencing must be **declared descriptive**, else the ru
   `is_post_switch` are future-referencing (sign toward the *next* switch) and can ONLY
   be descriptive; `hmm_rpe` / `hmm_value_update` are post-outcome and were relabeled
   descriptive here rather than gated.
-- **Mechanism-A encode:** an unvisited leaf's `reward_rate_arm_k10` is `0.0` (not NaN)
-  with a `has_arm_history` indicator, retaining the ~11.6% novel-arm events as a modeled
-  category (main effect from M3 / C3 / CS4). The base content ladder reports both encoded
-  and (once) on the old restricted cohort so the estimand change is measured.
+- **Mechanism-A encode:** an unvisited leaf's `reward_rate_arm_k10` is `0.0` (not NaN),
+  retaining the ~11.6% novel-arm events the old NaN dropped. A `has_arm_history` novelty
+  indicator was considered and **not** added (modest ~13% effect), so `reward_rate_arm_k10`
+  absorbs the novelty component. The base content ladder reports both encoded and (once)
+  on the old restricted cohort so the estimand change is measured.
 - Stage-6 `is_stay ~ outcome * content` legitimately uses the post-outcome
   `is_after_omission`: its modeled unit (the stay/leave decision) is post-outcome by
   construction, so the timing gate does not apply.

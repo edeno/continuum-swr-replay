@@ -37,7 +37,7 @@ PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-rewa
     "reward_lag1", "reward_lag2", "reward_rate_trial_k10", "reward_rate_arm_k10",
     "visit_recency", "visit_recency_demeaned", "visit_recency_patch", "cumulative_reward",
     "is_current", "is_prev", "is_last_rewarded", "is_last_rewarded_elsewhere",
-    "is_after_switch", "has_arm_history",
+    "is_after_switch",
     "hmm_relative_value", "q_arm", "q_arm_hmm", "p_reward_arm",
     "reward_entropy", "state_entropy",
 })
