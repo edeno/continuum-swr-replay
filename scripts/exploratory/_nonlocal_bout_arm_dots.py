@@ -403,6 +403,14 @@ def build_figure(
             row_ylabel(ax, label)
             cbar(i, mesh)
 
+    # Faint full-height separators at every immobility-period boundary, so a
+    # stop can be traced top-to-bottom across all panels (heatmap cells with the
+    # same value merge otherwise, hiding the boundary).
+    for ax in axes:
+        ax.vlines(stop_edges[1:-1], 0, 1, transform=ax.get_xaxis_transform(),
+                  colors="0.5", linewidths=0.3, alpha=0.35, zorder=4,
+                  rasterized=True)
+
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
     axes[0].set_title(
