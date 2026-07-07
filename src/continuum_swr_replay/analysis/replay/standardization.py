@@ -53,7 +53,16 @@ def attach_standardized(
         if c not in df.columns:
             continue
         x = df[c].to_numpy(dtype=float)
-        if reference is not None and c in reference:
+        if reference is not None:
+            # Apply mode: fail loud if the frozen reference lacks a requested column.
+            # Silently recomputing it would mix frozen and freshly-fit standardization
+            # (a partial/stale reference file), which is exactly the reproducibility
+            # hazard this reference exists to prevent.
+            if c not in reference:
+                raise KeyError(
+                    f"standardization reference is missing column {c!r}; a partial or "
+                    f"stale reference cannot be applied (have: {sorted(reference)})"
+                )
             mu = float(reference[c]["mean"])
             sd = float(reference[c]["std"])
         else:
@@ -65,21 +74,28 @@ def attach_standardized(
 
 
 def assert_standardized_present(df: pd.DataFrame, cols) -> None:
-    """Rebuild-completeness guard: raise if a ``<col>_z`` was dropped or wiped.
+    """Rebuild-completeness guard: raise if any ``<col>_z`` was dropped or wrongly wiped.
 
-    For every source covariate present in ``df``, its ``<col>_z`` must exist, and the
-    set must carry at least some non-NaN data — so a future refactor cannot silently
-    drop the standardized columns (the exact regression phase 6 fixes). A single
-    zero-variance covariate legitimately yields an all-NaN ``_z``; the guard only fails
-    if *every* standardized column is all-NaN.
+    Checked **per column** (the exact regression phase 6 fixes — a silently dropped or
+    all-NaN ``_z``): for every source covariate present in ``df``, its ``<col>_z`` must
+    exist, and it must carry real data **unless the source itself has no variance**
+    (a genuinely zero-variance or all-NaN source legitimately yields an all-NaN ``_z``).
+    An all-NaN ``_z`` whose source *does* vary is a failure.
     """
     present_sources = [c for c in cols if c in df.columns]
     missing = [f"{c}_z" for c in present_sources if f"{c}_z" not in df.columns]
     if missing:
         raise RuntimeError(f"standardized columns missing after build: {missing}")
-    z_cols = [f"{c}_z" for c in present_sources]
-    if z_cols and not any(df[zc].notna().any() for zc in z_cols):
-        raise RuntimeError(f"all standardized columns are all-NaN: {z_cols}")
+    wiped = []
+    for c in present_sources:
+        zc = f"{c}_z"
+        source_varies = float(np.nanstd(df[c].to_numpy(dtype=float))) > 0
+        if source_varies and not df[zc].notna().any():
+            wiped.append(zc)
+    if wiped:
+        raise RuntimeError(
+            f"standardized columns are all-NaN despite a varying source: {wiped}"
+        )
 
 
 def save_reference(reference: Reference, path) -> None:

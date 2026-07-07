@@ -33,8 +33,14 @@ event-level `is_swr` (strict positive-duration overlap) are deliberately differe
 
 ## The rule
 
-**Do not cross-substitute `n_SWR` / `n_MUA` between the stop-level and bin-level tables in
-an exposure/offset term.** A per-bin rate model's offset must use the bin-level onset
-count (or `exposure` seconds); a per-stop model's offset uses the stop-level count. Mixing
-them injects a ~0.2 %/0.75 % multiplicative bias into the rate. When a count must be shared
-across the two grains, use `n_non_local`, which is identical on both sides.
+`n_SWR` / `n_MUA` are event **counts** — they enter a rate model as the response
+(numerator), never as the offset. The offset/exposure is always a **time** term
+(`log(immobility_time)` per stop, `log(exposure)` seconds per bin), so this is not about
+substituting a count into an offset.
+
+**Do not cross-substitute the `n_SWR` / `n_MUA` count between the stop-level and bin-level
+tables** — e.g. do not use the stop-level `n_SWR` as the response for a bin-level model
+(or compare a stop-level count to a bin-level count as if they were the same quantity).
+The two differ by ~0.2 %/0.75 % (Δ82/Δ250) from boundary-straddling events, so mixing them
+biases the rate. When a count must be shared or compared across the two grains, use
+`n_non_local`, which is defined identically on both sides and matches exactly.

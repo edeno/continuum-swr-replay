@@ -198,8 +198,8 @@ intervals are always taken from the `SWR_event` timebin labels; event-level
 `build_stop_table` deliberately still uses the inclusive per-timebin rule —
 the two flags do not share a convention.) A consequence of that dual
 convention: the stop-level `n_SWR`/`n_MUA` totals slightly exceed the
-bin/onset counts (Δ82/Δ250; `n_non_local` matches exactly), so they must
-**not** be cross-substituted in an exposure/offset term — see
+bin/onset counts (Δ82/Δ250; `n_non_local` matches exactly), so the count
+must **not** be cross-substituted between the stop-level and bin-level tables — see
 [docs/known_issues/swr_mua_count_conventions.md](docs/known_issues/swr_mua_count_conventions.md).
 The replay-content
 `build_event_table` in `analysis/replay/tables.py` builds on top of this:

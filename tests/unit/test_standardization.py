@@ -75,12 +75,38 @@ def test_assert_present_fires_when_z_dropped():
         assert_standardized_present(df, ["a"])
 
 
-def test_assert_present_fires_when_all_nan():
-    """If every standardized column is all-NaN (e.g. a total wipeout), the guard fires."""
+def test_assert_present_fires_when_z_all_nan_but_source_varies():
+    """A wiped _z whose SOURCE has variance is a failure (per-column check)."""
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     df["a_z"] = np.nan
-    with pytest.raises(RuntimeError, match="all-NaN"):
+    with pytest.raises(RuntimeError, match="varying source"):
         assert_standardized_present(df, ["a"])
+
+
+def test_assert_present_fires_on_partial_failure():
+    """One valid _z must NOT mask a second column whose _z is wrongly all-NaN."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    attach_standardized(df, ["a", "b"])
+    df["b_z"] = np.nan  # b varies but its _z was wiped
+    with pytest.raises(RuntimeError, match="b_z"):
+        assert_standardized_present(df, ["a", "b"])
+
+
+def test_assert_present_allows_zero_variance_all_nan():
+    """A genuinely zero-variance source legitimately yields an all-NaN _z; allowed."""
+    df = pd.DataFrame({"c": [4.0, 4.0, 4.0]})  # constant -> std 0 -> _z all NaN
+    attach_standardized(df, ["c"])
+    assert df["c_z"].isna().all()
+    assert_standardized_present(df, ["c"])  # no raise
+
+
+def test_apply_missing_reference_column_raises():
+    """A partial/stale reference (missing a requested column) must fail loud, not
+    silently recompute that column's mean/SD."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    partial = {"a": {"mean": 2.0, "std": 1.0}}  # 'b' absent
+    with pytest.raises(KeyError, match="'b'"):
+        attach_standardized(df, ["a", "b"], reference=partial)
 
 
 def test_reference_applied_differs_from_recompute_on_subset():

@@ -33,7 +33,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [design/](design/) — *design specs*: per-analysis design documents.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues (incl.
   [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
-  cross-substitute stop-level vs bin-level `n_SWR`/`n_MUA` in offsets).
+  cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count).
 
 ## Figure outputs
 

@@ -19,14 +19,20 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZED_COLS
-from continuum_swr_replay.analysis.replay.standardization import attach_standardized
+from continuum_swr_replay.analysis.replay.standardization import (
+    attach_standardized,
+    load_reference,
+)
 from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 pytestmark = pytest.mark.slow
 
-_EVENT_ARM = PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.pkl"
-_QVALS = PROCESSED_DATA_DIR / "replay_content" / "models_per_bin_rate" / "qvals_table.pkl"
+_RC = PROCESSED_DATA_DIR / "replay_content"
+_EVENT_ARM = _RC / "event_arm_table.pkl"
+_EVENT_ARM_REF = _RC / "standardization_reference.json"
+_QVALS = _RC / "models_per_bin_rate" / "qvals_table.pkl"
+_QVALS_REF = _RC / "models_per_bin_rate" / "qvals_standardization_reference.json"
 
 
 def _require(path: Path):
@@ -40,6 +46,8 @@ def _require(path: Path):
     [(_EVENT_ARM, EVENT_ARM_STANDARDIZED_COLS), (_QVALS, QVALS_STANDARDIZED_COLS)],
 )
 def test_folded_standardization_reproduces_materialized_z(path, cols):
+    """Inertness of the FORMULA: recomputing the fold gives the materialized _z. (Not the
+    frozen-reference gate — that is the JSON test below.)"""
     df = _require(path)
     cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
     assert cols, f"no standardized columns to check in {path.name}"
@@ -53,15 +61,48 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
         )
 
 
+@pytest.mark.parametrize(
+    "table_path, ref_path, cols",
+    [
+        (_EVENT_ARM, _EVENT_ARM_REF, EVENT_ARM_STANDARDIZED_COLS),
+        (_QVALS, _QVALS_REF, QVALS_STANDARDIZED_COLS),
+    ],
+)
+def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, cols):
+    """F5 frozen-reference gate: apply the PERSISTED reference JSON to the materialized
+    raw columns and match the materialized _z within atol=1e-10. Skips (does not pass)
+    until the operational rebuild has written the reference — so an absent/stale
+    reference cannot silently pass."""
+    df = _require(table_path)
+    if not ref_path.exists():
+        pytest.skip(
+            f"reference not written yet: {ref_path} (run the full builder rebuild)"
+        )
+    reference = load_reference(ref_path)
+    cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
+    applied, _ = attach_standardized(df[cols].copy(), cols, reference=reference)
+    for c in cols:
+        np.testing.assert_allclose(
+            applied[f"{c}_z"].to_numpy(),
+            df[f"{c}_z"].to_numpy(),
+            atol=1e-10, equal_nan=True,
+            err_msg=f"persisted-reference _z mismatch for {c} in {table_path.name}",
+        )
+
+
 def test_frozen_reference_matches_on_one_session_slice():
-    """F5: apply a full-table reference to one session's raw columns and match the
-    materialized _z for those rows — a per-session recompute would NOT match."""
+    """F5: a full-table reference applied to ONE session's raw rows matches the
+    materialized _z for those rows — a per-session recompute would NOT (different
+    mean/SD). Uses the persisted reference when available, else the table-derived one."""
     df = _require(_EVENT_ARM)
     cols = [
         c for c in EVENT_ARM_STANDARDIZED_COLS
         if c in df.columns and f"{c}_z" in df.columns
     ]
-    _, reference = attach_standardized(df[cols].copy(), cols)  # full-table reference
+    if _EVENT_ARM_REF.exists():
+        reference = load_reference(_EVENT_ARM_REF)
+    else:
+        _, reference = attach_standardized(df[cols].copy(), cols)
 
     session_cols = ["animal", "day", "epoch"]
     first_key = df[session_cols].drop_duplicates().iloc[0]
