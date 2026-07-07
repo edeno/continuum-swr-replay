@@ -68,9 +68,12 @@ qvals-tail) drops.
 
 Also covered: `compare_event_source_models.py` maps its native `_freeze_common_cohort`
 provenance (the content / patch / rate / **choice** blocks) onto the standardized schema
-via `records_from_common_cohort_provenance`, writing `*_comparison_fits_cohort_audit.csv`
-(the block's up-front selection — e.g. choice's valid-replay-stop filter — is
-*definitional*, so `n_in` is the post-selection candidate count). The qvals-merging
+via `records_from_common_cohort_provenance`, writing `*_comparison_fits_cohort_audit.csv`.
+**This audit is block-grained, not per-rung:** every model in a block shares ONE frozen
+common cohort, so it emits one row per block with `model` = the block/analysis name
+(`choice`, `choice_swr_split`, `patch_hierarchy`, …) rather than duplicating identical
+counts per rung. The block's up-front selection — e.g. choice's valid-replay-stop filter
+— is *definitional*, so `n_in` is the post-selection candidate count. The qvals-merging
 auxiliary runners `fit_uncertainty_rate.py` (inner join → `n_drop_qvals_gap`) and
 `fit_swr_power_model.py` (left join + per-session dropna on qvals-derived predictors →
 `n_drop_qvals_gap`) each emit their own cohort audit. `fit_cross_history_rate.py` (a

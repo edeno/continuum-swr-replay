@@ -230,6 +230,55 @@ def fit_uncertainty_rate(
     return pd.DataFrame(rows)
 
 
+def _cohort_records(
+    models: pd.DataFrame,
+    stop_fitted: pd.DataFrame,
+    *,
+    n_postjoin: int,
+    n_sessions_postjoin: int,
+    qvals_gap: int,
+) -> list[dict]:
+    """Stop-grain cohort record per population for the MU-uncertainty ladder.
+
+    ``n_in = n_postjoin + qvals_gap`` (== pre-join stops on a full run); the inner
+    qvals-join drop is the mechanism-B ``n_drop_qvals_gap``; ``immobility<=0`` / NaN
+    stop-level predictors on ``stop_fitted`` are ``n_drop_own_predictor_missing``; the
+    first-session-per-animal drop, subset, and per-bin gates fall into
+    ``n_excluded_session``. ``sessions_in`` is the post-join (pre-first-drop) session
+    count so it matches ``n_in``'s stop population. Reconciles by construction.
+    """
+    stop_level = [c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns]
+    n_own = int(stop_own_missing(stop_fitted, stop_level).sum())
+    records = []
+    for outcome in POPULATIONS_TO_FIT:
+        sub = (
+            models[(models.model == MU_UNCERTAINTY.name) & (models.outcome == outcome)]
+            if len(models) else models
+        )
+        n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
+        fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+        records.append(cohort_record(
+            MU_UNCERTAINTY.name, outcome, "stop",
+            n_in=n_postjoin + int(qvals_gap), n_modeled=n_modeled,
+            sessions_in=n_sessions_postjoin, sessions_modeled=len(fit_keys),
+            animals_modeled=len({k[0] for k in fit_keys}),
+            drop_notes=(
+                "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
+                "stop-level predictor -> own; first-session/subset/gates -> excluded"
+            ),
+            n_drop_qvals_gap=int(qvals_gap),
+            n_drop_own_predictor_missing=n_own,
+            n_excluded_session=n_postjoin - n_own - n_modeled,
+            n_sessions_flagged_nonconverged=(
+                int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
+            ),
+            n_sessions_flagged_separated=(
+                int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+            ),
+        ))
+    return records
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -266,6 +315,10 @@ def main() -> None:
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
+    # Session count BEFORE the first-session-per-animal drop, so the audit's
+    # sessions_in matches n_in's stop population (n_in includes the first-session
+    # stops as excluded, not removed).
+    n_sessions_postjoin = stop.groupby(SESSION_COLS).ngroups
     frac = len(stop) / n_before
     if frac < 0.5:
         raise ValueError(
@@ -315,36 +368,12 @@ def main() -> None:
     # Cohort audit (stop grain). The inner qvals join is the mechanism-B qvals-gap;
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
     # first-session-per-animal drop, subset, and per-bin gates -> excluded.
-    qvals_gap = n_before - n_postjoin
-    stop_level = [c for c in _design_columns(MU_UNCERTAINTY) if c in stop.columns]
-    n_own = int(stop_own_missing(stop, stop_level).sum())
     csfx = "_smoke" if args.max_per_animal else ""
-    audit_qvals = 0 if args.max_per_animal else qvals_gap  # smoke subset: full drop N/A
-    audit_records = []
-    for outcome in POPULATIONS_TO_FIT:
-        sub = (
-            models[(models.model == MU_UNCERTAINTY.name) & (models.outcome == outcome)]
-            if len(models) else models
-        )
-        n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
-        fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
-        audit_records.append(cohort_record(
-            MU_UNCERTAINTY.name, outcome, "stop",
-            n_in=n_postjoin + audit_qvals, n_modeled=n_modeled,
-            sessions_in=stop.groupby(SESSION_COLS).ngroups,
-            sessions_modeled=len(fit_keys),
-            animals_modeled=len({k[0] for k in fit_keys}),
-            drop_notes="qvals inner-join -> qvals_gap (mechanism B); immobility/NaN -> own",
-            n_drop_qvals_gap=int(audit_qvals),
-            n_drop_own_predictor_missing=n_own,
-            n_excluded_session=n_postjoin - n_own - n_modeled,
-            n_sessions_flagged_nonconverged=(
-                int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
-            ),
-            n_sessions_flagged_separated=(
-                int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
-            ),
-        ))
+    audit_qvals = 0 if args.max_per_animal else (n_before - n_postjoin)  # smoke: N/A
+    audit_records = _cohort_records(
+        models, stop, n_postjoin=n_postjoin,
+        n_sessions_postjoin=n_sessions_postjoin, qvals_gap=audit_qvals,
+    )
     write_cohort_audit(audit_records, out_dir / f"uncertainty_rate_cohort_audit{csfx}.csv")
     logger.info(
         "Saved %d rows (%d sessions, populations=%s) to %s in %.1fs",

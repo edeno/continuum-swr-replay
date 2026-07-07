@@ -87,6 +87,64 @@ def test_contrast_records_attribute_qvals_and_own():
     assert g0["n_in"] == len(stop) + 7
 
 
+def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
+    """The uncertainty audit must report sessions_in for the post-join (pre-first-drop)
+    population so it matches n_in, and attribute the qvals-join drop to qvals_gap."""
+    from scripts.rate import fit_uncertainty_rate as mod
+
+    # Fitted frame = 2 sessions (one animal's first session already dropped upstream).
+    rng = np.random.default_rng(0)
+    stop_fitted = pd.concat([
+        pd.DataFrame({
+            "animal": a, "day": d, "epoch": "e",
+            "immobility_time": rng.uniform(5, 30, 15),
+            **{f"reward_lag{j}": rng.integers(0, 2, 15).astype(float) for j in range(1, 11)},
+        })
+        for a, d in [("a", 2), ("b", 3)]
+    ], ignore_index=True)
+    stop_fitted.loc[0:1, "immobility_time"] = 0.0  # 2 own-drops
+
+    models = pd.DataFrame([
+        {"model": mod.MU_UNCERTAINTY.name, "outcome": o, "animal": a, "day": d,
+         "epoch": "e", "n_stops": 10, "converged": True, "separated": False}
+        for o in mod.POPULATIONS_TO_FIT for a, d in [("a", 2), ("b", 3)]
+    ])
+    recs = mod._cohort_records(
+        models, stop_fitted, n_postjoin=100, n_sessions_postjoin=3, qvals_gap=8,
+    )
+    assert recs and all(_reconciles(r) for r in recs)
+    r0 = recs[0]
+    # sessions_in is the pre-first-drop count (3), NOT the fitted frame's 2.
+    assert r0["n_sessions_in"] == 3
+    assert r0["n_drop_qvals_gap"] == 8
+    assert r0["n_drop_own_predictor_missing"] == 2  # immobility<=0
+    assert r0["n_in"] == 108  # n_postjoin 100 + qvals_gap 8
+
+
+def test_swr_power_records_split_qvals_and_own():
+    from scripts.rate import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(0)
+    n = 200
+    df = pd.DataFrame({
+        "animal": np.repeat(["a", "b"], n // 2), "day": 1, "epoch": "e",
+        **{c: rng.normal(size=n) for c in mod.PREDICTORS},
+        mod.POWER_COL: rng.normal(size=n),
+    })
+    df.loc[0:9, "q_current"] = np.nan       # 10 qvals-derived NaN -> qvals_gap
+    df.loc[100:104, "reward_lag1"] = np.nan  # 5 own-predictor NaN -> own
+    coefs = pd.DataFrame([
+        {"animal": "a", "day": 1, "epoch": "e", "n_events": 85},
+        {"animal": "b", "day": 1, "epoch": "e", "n_events": 90},
+    ])
+    recs = mod._cohort_records(df, coefs)
+    assert all(_reconciles(r) for r in recs)
+    r = recs[0]
+    assert r["n_drop_qvals_gap"] == 10
+    assert r["n_drop_own_predictor_missing"] == 5
+    assert r["n_in"] == n
+
+
 def test_per_stop_hierarchy_records_reconcile():
     from scripts.rate import fit_per_stop_rate_models as mod
 
