@@ -10,6 +10,11 @@ session and shows, sharing the stop x-axis:
   * the exposure (immobility_time) and the model's own PREDICTORS, as per-stop
     tracks;
   * OBSERVED events/stop (bars) with the model's PREDICTED expected count (line);
+  * the INTENSITY, which disentangles rate from dwell: since the model is
+    count = lambda * immobility_time, this panel shows the predicted intensity
+    lambda = exp(X beta) (events/s) against a rolling empirical rate
+    (sum count / sum dwell over a centered window). A high-count stop with a flat
+    lambda but long dwell is exposure-driven, not rate-driven;
   * the CUMULATIVE residual (the point-process martingale) M(k) = sum(obs - pred)
     over stops, with +/-2 sqrt(sum pred) Poisson bounds. Staying in the band is
     consistent with the model; drift out marks where it is systematically misfit
@@ -109,9 +114,11 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
             seen.add(p)
             panels.append(RATE_PANEL[p])
     panels += [("counts", None, "events / stop"),
+               ("rate", None, "intensity (events/s)"),
                ("cumresid", None, "cumulative\nresidual")]
 
-    H = {"heat": 0.5, "binary": 0.5, "kernel": 2.4, "counts": 3.2, "cumresid": 2.6}
+    H = {"heat": 0.5, "binary": 0.5, "kernel": 2.4, "counts": 3.2, "rate": 2.6,
+         "cumresid": 2.6}
     heights = [H[p[0]] for p in panels]
     fig = plt.figure(figsize=(max(11, n_stops * 0.035), 0.42 * sum(heights) + 1.4),
                      constrained_layout=True)
@@ -181,6 +188,24 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
                     zorder=2)
             ax.set_ylabel("events / stop", fontsize=8)
             ax.set_ylim(0, max(np.nanmax(obs), np.nanmax(pred)) * 1.1)
+            ax.legend(loc="upper right", fontsize=7, frameon=False)
+            for s in ("top", "right"):
+                ax.spines[s].set_visible(False)
+            ax.tick_params(labelsize=7)
+        elif kind == "rate":
+            # Disentangle rate from dwell: predicted intensity lambda = pred/expo
+            # (= exp(X beta), events/s) vs a rolling empirical rate
+            # (sum obs / sum dwell over a centered window).
+            lam = pred / expo
+            w = 2 * max(5, n_stops // 30) + 1
+            num = pd.Series(obs).rolling(w, center=True, min_periods=1).sum()
+            den = pd.Series(expo).rolling(w, center=True, min_periods=1).sum()
+            roll_rate = (num / den).to_numpy()
+            ax.plot(x, roll_rate, color="0.45", lw=1.2,
+                    label=f"observed rate (rolling {w})", zorder=1)
+            ax.plot(x, lam, color="#117a3f", lw=1.2, label="predicted λ", zorder=2)
+            ax.set_ylabel("intensity\n(events/s)", fontsize=8)
+            ax.set_ylim(0, np.nanmax([np.nanmax(lam), np.nanmax(roll_rate)]) * 1.2)
             ax.legend(loc="upper right", fontsize=7, frameon=False)
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
