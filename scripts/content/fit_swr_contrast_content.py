@@ -397,7 +397,48 @@ def _aggregate(
     return aggregate_contrast(res, specs_from_ladder(ladder, key_term), level, sd)
 
 
-def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
+def _moment(x: np.ndarray) -> dict:
+    """Mean/SD of ``x`` matching :func:`_z`'s standardization."""
+    x = np.asarray(x, dtype=float)
+    return {"mean": float(np.nanmean(x)), "std": float(np.nanstd(x))}
+
+
+def _z_reference(frame: pd.DataFrame, cols: list[str]) -> dict:
+    """Per-column fit-time ``_z`` means/SDs (matching :func:`_z`) over ``frame``."""
+    return {c: _moment(frame[c].to_numpy(dtype=float)) for c in cols if c in frame.columns}
+
+
+def _fit_z_reference(ev: pd.DataFrame, pt: pd.DataFrame) -> dict:
+    """The run's COMPLETE fit-time ``_z`` reference, keyed by cohort scope.
+
+    Every standardization the runner computes has its mean/SD recorded so the run's
+    standardized coefficients are reproducible: the arm-cohort event scalars
+    (``_ZSCALARS``), the arm within-stop-time control (``tsc_x_current``), and the
+    *separate* patch cohort (``trials_since_switch`` / ``recent_switch_rate`` /
+    within-stop time — a different scope than the same-named arm-cohort entries). This
+    is the runner's OWN scope, distinct from the persisted-table pooled-global ``_z``,
+    and is persisted (not repointed) so no coefficient changes.
+    """
+    ref = {"arm_event_scalars": _z_reference(ev, _ZSCALARS)}
+    if "time_since_stop" in ev.columns:
+        ref["arm_within_stop_time"] = {
+            "log1p_time_since_stop": _moment(np.log1p(ev["time_since_stop"].to_numpy(float)))
+        }
+    patch = {}
+    for c in ("trials_since_switch", "recent_switch_rate"):
+        if c in pt.columns:
+            patch[c] = _moment(pt[c].to_numpy(dtype=float))
+    if "time_since_stop" in pt.columns:
+        patch["log1p_time_since_stop"] = _moment(
+            np.log1p(pt["time_since_stop"].to_numpy(float))
+        )
+    ref["patch_cohort"] = patch
+    return ref
+
+
+def _provenance(
+    args: argparse.Namespace, n_sessions: int, z_reference: dict | None = None
+) -> dict:
     """Reproducibility record saved alongside the audited results."""
     try:
         git_hash = subprocess.run(
@@ -407,6 +448,9 @@ def _provenance(args: argparse.Namespace, n_sessions: int) -> dict:
         git_hash = "unknown"
     return {
         "git_hash": git_hash,
+        # Fit-time _z reference (event-cohort mean/SD for the event scalars). This is
+        # the runner's OWN standardization -- NOT the builder's pooled-global table _z.
+        "fit_time_z_reference": z_reference or {},
         "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
         "n_sessions": int(n_sessions),
         "smoke_max_per_animal": args.max_per_animal,
@@ -444,6 +488,10 @@ def main() -> None:
     (RC / "models").mkdir(parents=True, exist_ok=True)
     ev = _assemble_arm()
     pt = _assemble_patch(ev)
+    # Capture the run's COMPLETE fit-time _z reference (arm event scalars + arm/patch
+    # within-stop-time + patch-cohort scalars) over the FULL cohorts, before any smoke
+    # subset, so every standardized coefficient is reproducible.
+    fit_z_reference = _fit_z_reference(ev, pt)
     if args.max_per_animal is not None:
         keep = (
             ev[SC]
@@ -513,7 +561,7 @@ def main() -> None:
         ignore_index=True,
     )
     agg.to_pickle(RC / "models" / f"swr_contrast_content_audited{sfx}.pkl")
-    prov = _provenance(args, ev.groupby(SC).ngroups)
+    prov = _provenance(args, ev.groupby(SC).ngroups, fit_z_reference)
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)
     )

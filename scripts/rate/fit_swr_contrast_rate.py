@@ -42,6 +42,7 @@ for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
 
 import argparse  # noqa: E402
+import json  # noqa: E402
 import logging  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
@@ -445,7 +446,16 @@ def main() -> None:
         agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
         asfx = "_smoke" if args.max_per_animal else ""
         agg.to_pickle(out_dir / f"swr_contrast_rate_audited{asfx}.pkl")
-        logger.info("Saved audited rate table (%d rows) -> %s", len(agg), out_dir)
+        # Persist this run's OWN per-SD reference (the fit-time standardization used
+        # for the std_* columns) so the standardized coefficients are reproducible.
+        # This is the runner's cohort-scoped reference -- NOT the builder's table _z.
+        (out_dir / f"swr_contrast_rate_meta{asfx}.json").write_text(json.dumps(
+            {"fit_time_sd_reference": {k: float(v) for k, v in sd.items()},
+             "note": "per-SD reference over the rate cohort (std_factor = raw_coef * SD); "
+                     "NOT the builder's pooled-global table _z"},
+            indent=2, sort_keys=True,
+        ))
+        logger.info("Saved audited rate table (%d rows) + meta -> %s", len(agg), out_dir)
 
 
 if __name__ == "__main__":

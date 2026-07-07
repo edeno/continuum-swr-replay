@@ -45,7 +45,13 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 from continuum_swr_replay.analysis.replay.retrospective import (
     compute_retrospective_metrics,
 )
+from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_present,
+    attach_standardized,
+    save_reference,
+)
 from continuum_swr_replay.analysis.replay.tables import (
+    EVENT_ARM_STANDARDIZED_COLS,
     add_nonlocal_swr_split,
     build_event_arm_table,
     build_event_patch_table,
@@ -372,6 +378,26 @@ def main():
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Pooled-GLOBAL standardization of the continuous per-arm covariates (<col>_z).
+    # This is the persisted-table _z (folded in from the retired _add_standardized_cols
+    # one-off); it MUST run here over the full concatenated table, not per session
+    # (a per-session z would use the wrong mean/SD). The reference (means/SDs) is
+    # persisted so the transform is reproducible and auditable. NB: this is NOT the
+    # fit-time _z the is_swr-contrast runners compute over their event/stop cohort —
+    # those are a different scope and are intentionally left untouched.
+    event_arm_table_all, z_reference = attach_standardized(
+        event_arm_table_all, EVENT_ARM_STANDARDIZED_COLS
+    )
+    save_reference(z_reference, OUTPUT_DIR / "standardization_reference.json")
+    # Rebuild-completeness guard: a future refactor must not silently drop the _z
+    # columns (the exact regression this phase fixes).
+    assert_standardized_present(event_arm_table_all, EVENT_ARM_STANDARDIZED_COLS)
+    logging.info(
+        "standardized event_arm _z columns: %s",
+        [f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
+    )
+
     for name, frame in (
         ("event_table", event_table_all),
         ("event_arm_table", event_arm_table_all),

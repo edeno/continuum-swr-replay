@@ -154,6 +154,11 @@ from .uncertainty import (
     posterior_peak_mean,
 )
 
+# Continuous per-arm covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``.
+# The build fills NaN placeholders per session; the real global z is computed once in
+# ``prepare_data.main`` after the all-session concat (see analysis.replay.standardization).
+EVENT_ARM_STANDARDIZED_COLS = ("q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm")
+
 # State-probability column mapping for the 4-state Non-Local model:
 # per-event rollup column -> data_over_time per-bin column.
 _NONLOCAL_STATE_COLS = {
@@ -1354,6 +1359,12 @@ def build_event_arm_table(
     long["switch_x_prev"] = is_after_switch * ip
     long["omission_x_last_rewarded"] = is_after_omission * ilr
 
+    # Standardized (<col>_z) placeholders: the real pooled-GLOBAL z is computed
+    # post-concat in prepare_data.main (a per-session build cannot know the global
+    # mean/SD). Fill NaN here so the canonical column order carries the names.
+    for c in EVENT_ARM_STANDARDIZED_COLS:
+        long[f"{c}_z"] = np.nan
+
     return long[column_order]
 
 
@@ -1715,6 +1726,9 @@ def _event_arm_table_columns() -> list[str]:
         "switch_x_current",
         "switch_x_prev",
         "omission_x_last_rewarded",
+        # Standardized (pooled-global) continuous covariates, filled post-concat in
+        # prepare_data.main (see EVENT_ARM_STANDARDIZED_COLS / analysis.replay.standardization).
+        *[f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
     ]
 
 

@@ -40,6 +40,11 @@ import datajoint as dj
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_present,
+    attach_standardized,
+    save_reference,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
@@ -73,6 +78,14 @@ HMM_DV_COLS = ["hmm_relative_value", "hmm_rpe", "hmm_value_update"]
 # form a *single-model* per-arm value (``q_arm_hmm``) harmonized with the HMM value
 # covariates the is_swr rate ladder uses -- see attach_contingency_value_block.
 HMM_Q_PORT_COLS = [f"hmm_q_port{i}" for i in range(6)]
+# Continuous stop-level covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``
+# by this builder (after the all-epoch concat). This is the qvals side of the persisted
+# _z that used to be stamped post-hoc by _add_standardized_cols; prepare_data only READS
+# this table and must not re-standardize it.
+QVALS_STANDARDIZED_COLS = [
+    "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update",
+    "state_entropy", "trials_since_switch", "trials_since_block_change",
+]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
 # Beta value timing: row t holds PRE-outcome belief for trial t (vendored DV docs).
@@ -463,10 +476,21 @@ def main() -> None:
     if missing:
         raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
 
+    # Pooled-GLOBAL standardization of the continuous stop-level covariates (<col>_z),
+    # owned by THIS builder (prepare_data reads qvals but must not re-standardize it).
+    # Computed over the full concatenated table; reference persisted for reproducibility.
+    tab, qv_reference = attach_standardized(tab, QVALS_STANDARDIZED_COLS)
+    assert_standardized_present(tab, QVALS_STANDARDIZED_COLS)
+    z_cols = [f"{c}_z" for c in QVALS_STANDARDIZED_COLS if c in tab.columns]
+
     if args.write:
         out = RC / "models_per_bin_rate" / "qvals_table.pkl"
         tab.to_pickle(out)
-        print(f"\nwrote {len(tab)} rows -> {out}")
+        save_reference(
+            qv_reference,
+            RC / "models_per_bin_rate" / "qvals_standardization_reference.json",
+        )
+        print(f"\nwrote {len(tab)} rows ({len(z_cols)} _z cols) -> {out}")
 
 
 if __name__ == "__main__":
