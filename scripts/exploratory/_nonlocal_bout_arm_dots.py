@@ -217,32 +217,43 @@ def build_figure(
     # per-event; every other covariate is per-stop.
     BINARY_H, STRIP_H, HEAT_H, KERNEL_H, CONTENT_H, COV_H = \
         0.55, 0.55, 0.8, 2.6, 7.0, 4.2
+    # Content-centered, themed order: per-stop context header at top (grouped
+    # reward-history / switch-state / RL-value-state), the per-event SWR track
+    # immediately above content, then the per-arm heatmaps below content grouped
+    # spatial -> reward -> value. Most-compared-to-content rows sit closest.
     panels = [
+        # per-stop context: reward history
         ("binary", rew_col, "reward", None, "stop"),
-        ("binary", swr_col, "SWR", None, "event"),
         ("kernel", kernel, "reward (stops back)", ("Greys", False), "stop"),
         ("heatbout", rrt_col, "reward rate trial", ("viridis", False), "stop"),
+        # per-stop context: switch / behavioural state
         ("binary", switch_col, "after switch", None, "stop"),
         ("binary", omit_col, "after omission", None, "stop"),
         ("binary", postsw_col, "post switch", None, "stop"),
         ("heatbout", tss_col, "trials since switch", ("RdBu_r", True), "stop"),
         ("heatbout", tsbc_col, "trials since block", ("viridis", False), "stop"),
         ("heatbout", rsr_col, "recent switch rate (frac)", ("Oranges", False), "stop"),
+        # per-stop context: RL value state
         ("heatbout", relval_col, "rel value (ΔV)", ("RdBu_r", True), "stop"),
         ("heatbout", rpe_col, "RPE (reward−Q)", ("RdBu_r", True), "stop"),
         ("heatbout", entropy_col, "reward entropy", ("cividis", False), "stop"),
         ("heatbout", vupdate_col, "value update (|ΔQ|)", ("magma", False), "stop"),
+        # per-event covariate + hero, adjacent
+        ("binary", swr_col, "SWR", None, "event"),
+        ("content", None, "non-local content", None, "event"),
+        # per-arm (content-aligned): spatial / arm structure
         ("armstrip", prev_arm_col, "prev arm", None, "stop"),
         ("armstrip", lastrew_arm_col, "last rew arm", None, "stop"),
-        ("content", None, "non-local content", None, "event"),
-        ("cov", "q_arm_hmm", "HMM value (Q)", ("RdBu_r", True), "stop"),
-        ("cov", "q_arm", "belief value (P)", ("viridis", False), "stop"),
-        ("cov", "reward_rate_arm_k10", "reward rate k10 (frac)", ("plasma", False), "stop"),
-        ("cov", "p_reward_arm", "P(reward)", ("cividis", False), "stop"),
-        ("cov", "cumulative_reward", "cumul reward (n)", ("YlGn", False), "stop"),
+        ("cov", "arm_dist_rank", "arm dist rank (1=near)", ("magma_r", False), "stop"),
         ("cov", "visit_recency_demeaned", "visit recency (dem)", ("PuOr", True), "stop"),
         ("cov", "visit_recency", "visit recency (raw)", ("Purples", False), "stop"),
-        ("cov", "arm_dist_rank", "arm dist rank (1=near)", ("magma_r", False), "stop"),
+        # per-arm: reward
+        ("cov", "reward_rate_arm_k10", "reward rate k10 (frac)", ("plasma", False), "stop"),
+        ("cov", "cumulative_reward", "cumul reward (n)", ("YlGn", False), "stop"),
+        ("cov", "p_reward_arm", "P(reward)", ("cividis", False), "stop"),
+        # per-arm: value
+        ("cov", "q_arm_hmm", "HMM value (Q)", ("RdBu_r", True), "stop"),
+        ("cov", "q_arm", "belief value (P)", ("viridis", False), "stop"),
     ]
     hmap = {"binary": BINARY_H, "heatbout": HEAT_H, "kernel": KERNEL_H,
             "armstrip": STRIP_H, "content": CONTENT_H, "cov": COV_H}
