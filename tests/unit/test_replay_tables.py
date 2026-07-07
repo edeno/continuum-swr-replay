@@ -15,6 +15,7 @@ import pytest
 import xarray as xr
 
 from continuum_swr_replay.analysis.replay.tables import (
+    EVENT_ARM_STANDARDIZED_COLS,
     build_event_arm_table,
     build_event_patch_table,
     build_event_sequence_table,
@@ -442,6 +443,23 @@ class TestEventArmTableInvariants:
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
         assert len(eat) == 9 * len(et)
+
+    def test_standardized_z_are_per_session_nan_placeholders(self, tiny_session):
+        """Phase-6 build contract: the per-session build carries the ``<col>_z``
+        columns (so the canonical order is stable) but leaves them all-NaN — the real
+        pooled-GLOBAL z is filled post-concat in ``prepare_data.main``. This proves the
+        per-session build adds only NaN placeholders (raw columns are built normally),
+        i.e. the standardization did not leak a wrong per-session z into the table."""
+        dot, env, trials, graph = tiny_session
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        for c in EVENT_ARM_STANDARDIZED_COLS:
+            zc = f"{c}_z"
+            assert zc in eat.columns, f"missing standardized placeholder {zc}"
+            assert eat[zc].isna().all(), (
+                f"{zc} must be an all-NaN placeholder in the per-session build "
+                "(global z is filled post-concat in prepare_data)"
+            )
 
     def test_sum_arm_count_hard_equals_n_bins_minus_junction(
         self, tiny_session_with_posterior

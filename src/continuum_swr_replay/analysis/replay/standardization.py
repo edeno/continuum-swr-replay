@@ -77,10 +77,12 @@ def assert_standardized_present(df: pd.DataFrame, cols) -> None:
     """Rebuild-completeness guard: raise if any ``<col>_z`` was dropped or wrongly wiped.
 
     Checked **per column** (the exact regression phase 6 fixes — a silently dropped or
-    all-NaN ``_z``): for every source covariate present in ``df``, its ``<col>_z`` must
-    exist, and it must carry real data **unless the source itself has no variance**
-    (a genuinely zero-variance or all-NaN source legitimately yields an all-NaN ``_z``).
-    An all-NaN ``_z`` whose source *does* vary is a failure.
+    wiped ``_z``): for every source covariate present in ``df``, its ``<col>_z`` must
+    exist, and it must carry real data **unless the source is a finite constant**
+    (a genuine zero-variance source legitimately yields an all-NaN ``_z``). Two failures:
+    an all-NaN ``_z`` whose source *does* vary, and a source that is *entirely NaN* (a
+    failed upstream join — a canonical standardized covariate must carry data, so this is
+    NOT waved through as if it were a legitimate zero-variance column).
     """
     present_sources = [c for c in cols if c in df.columns]
     missing = [f"{c}_z" for c in present_sources if f"{c}_z" not in df.columns]

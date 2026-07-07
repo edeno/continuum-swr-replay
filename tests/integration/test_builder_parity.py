@@ -8,6 +8,16 @@ slice, must match the materialized ``_z`` for that slice — a per-session *reco
 would not (that is why the parity gate must apply the frozen reference).
 
 Marked slow: reads the full materialized tables. Skips if they are absent.
+
+Scope note — the **raw (non-``_z``) column** one-session rebuild parity (rebuild one
+session's ``event_arm_table`` and diff its non-``_z`` columns against the materialized
+file) is NOT run here: it needs that session's decoder outputs, which are unavailable on
+this host while Spyglass/NWB access is down (see ``docs/cached_trials_for_testing.md``).
+It is the operational belt-and-suspenders check, run after the full rebuild. Phase 6
+leaves the raw columns unchanged *by construction* — ``build_event_arm_table`` only
+appends all-NaN ``_z`` placeholders before its existing ``long[column_order]`` return
+(verified by ``test_replay_tables.py::...test_standardized_z_are_per_session_nan_placeholders``),
+and the global ``_z`` fill happens post-concat in ``prepare_data``.
 """
 
 from __future__ import annotations
