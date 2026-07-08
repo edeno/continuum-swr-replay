@@ -242,6 +242,51 @@ hard-count response only, **no CV** (unlike the rate ladder). A `--cv` run over
 `M0a→M5,Mv,Mu,Mvu` (event-based per-session CV) is being added so the uncertainty rungs
 carry held-out `cv_bits` alongside the LR/AIC comparison.
 
+### Update 2026-07-08 (b) — spatial FORM of SWR vs non-SWR content: wells vs paths, and trajectory start/end
+
+**Correction to the "non-SWR is current-focused" framing.** The arm-model `is_current`
+coefficient is a *within-event relative* over-weighting (conditional Poisson conditions on
+each event's total, so event-constants cancel and coefficients are compositional, not
+absolute). The **content-occupancy** analysis (`scripts/content/analyze_content_occupancy.py`,
+218 sessions) gives the absolute picture: **non-SWR content is reward-well-dominated
+(~67% at wells: ~37% remote reward wells + ~30% own well; ~33% path); SWR content is
+path-dominated (~78% path vs 22% at-well)** — SWR-vs-non-SWR path fraction 0.78 vs 0.32,
+**p=1.6e-37, 5/5 animals**. So non-SWR represents **reward-well *locations*** (current *and
+remote*), SWR represents **paths**.
+
+- **How "at well" vs "path" is defined** (note the caveat): per non-local *immobile timebin*,
+  take the **MAP** decode; `d_well` = track-graph distance to the nearest reward well (well =
+  the animal's median immobile position on each leaf arm); **`d_well < 20 cm` = "at a well",
+  `≥ 20 cm` = "path"** (crossed with `d_animal`, 20 cm, for remote vs own). So **"path" means
+  ">20 cm from any reward port" — it includes mid-leaf-arm, NOT only trunk/inter-patch arms**,
+  and it is MAP-based (not posterior mass). The clean, artifact-immune part is `remote_path`
+  (far from animal *and* wells). The strict trunk-vs-leaf version is the separate
+  `swr_x_trunk` 3.55× enrichment.
+- **Retraction:** `arm_uncertainty` is **0 on all trunk arms** (a per-*leaf* quantity), so the
+  `C13`/`Mu` uncertainty effects are estimated **only on well/leaf arms** — we have **no
+  evidence** on whether SWR *path* content relates to uncertainty. The earlier "SWR extends
+  uncertainty to the paths toward those wells" was unsupported; testing it needs a path/trunk
+  uncertainty covariate (not built).
+
+**Trajectory start/end IS characterized** (per-event rollups from `analysis/replay/trajectory.py`,
+in `event_table`: `start_arm`/`end_arm`, `start_position`/`end_position`, `net_displacement`,
+`spatial_extent`, `step_distance_*`, `max_ahead`/`max_behind`/`ab_slope`, `n_reversals`,
+`ends_at_next`). A **quick SWR split (not yet a formal analysis)**:
+
+| metric (mean) | non-SWR | SWR |
+|---|---|---|
+| spatial_extent (cm) | 26 | **85** |
+| net_displacement (cm) | 17 | 48 |
+| step_distance_max | 20 | 67 |
+| n_reversals | 3.8 | 10.9 |
+| max_ahead / max_behind | 18 / 114 | 14 / 145 |
+| ends_at_next choice | 0.12 | 0.07 |
+
+→ **SWR content = extended, multi-reversal trajectories; non-SWR = localized at wells.** Both
+are **predominantly *behind* the animal** (max_behind ≫ max_ahead → retrospective), and content
+**rarely ends at the next chosen arm** (7–12%) — consistent with not-choice-predictive. A
+formal SWR-split trajectory characterization has **not** been run/reported yet.
+
 ## The intersection — what's new here
 
 **The covariate atlas** (duration-controlled where applicable; non-SWR | with-SWR):
