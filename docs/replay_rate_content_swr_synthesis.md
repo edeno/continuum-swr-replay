@@ -191,6 +191,56 @@ runner provenance).
   are **SWR-equal-or-stronger** — SWR content is *broader* at baseline yet *more
   retunable* by value/uncertainty/context.
 
+### Update 2026-07-08 — per-arm uncertainty (exploration); realized-gain test; CS6 caveat; prediction-model status
+
+New per-arm content covariate **`arm_uncertainty`** = the per-leaf beta belief
+variance (`betadist_var`, the variance counterpart of beta value `q_arm` from the
+SAME Beta posterior). Built into `event_arm_table` (leaf arm *j* → `betadist_var{j+1}`,
+trunk arms → 0.0, standardized `arm_uncertainty_z`); models `Mu`/`Mvu` (hierarchy)
+and `C13`/`CS6` (is_swr ladder). Commits `bfb0012` + `f3d1656`; generative-model
+assumptions in [behavior_models.md](behavior_models.md); memory
+`project_arm_uncertainty_content`.
+
+- **Content over-represents high-uncertainty arms** — `M5→Mu` ΔLR 371, p=1.7e-36;
+  `arm_uncertainty_z` **+0.83, 5/5, p=3e-32**. This is the exploration / gain axis
+  (Mattar-Daw) the value/reward/space ladder was missing.
+- **NOT a recency/reward confound.** VIF-decomposition: recency adds only **+1% R²**
+  beyond arm structure; the recency-*orthogonalized* effect **+0.110 (5/5)** survives.
+  The high raw **VIF 18 is a structural artifact** of the trunk=0 encoding against the
+  arm FE (arm FE alone explain **75%** of `arm_uncertainty`), not a scientific confound —
+  the effect is identified from within-leaf-arm variation.
+- **SWR separation — trust the split (`C13`), NOT the pooled (`CS6`).** Split: both
+  populations over-represent uncertain arms, **SWR +0.99 > non-SWR +0.60** (5/5 each) —
+  SWR weights uncertainty *more*. The pooled `CS6` interaction (`swr_x_arm_uncertainty_z`
+  **−0.41**, 0/5) is an **artifact**: the shared arm FE (75%-collinear with uncertainty)
+  differ by SWR population and the misfit leaks into the interaction. Neither
+  `swr_x_current` nor `swr_x_recency` rescues it; the **saturated `is_swr × ALL BASEc`
+  model recovers +0.39 = the split.** General lesson: **pooled `swr_x` contrasts are
+  unreliable for any covariate tied to arm identity** — report the split.
+- **Exploit-vs-explore (`Mvu`) is DEGENERATE** (VIF 19): beta mean & variance are
+  mechanically collinear (variance is a function of the mean), so beta value+uncertainty
+  cannot separate exploit from explore. Needs the **HMM-value + beta-uncertainty** pairing
+  (corr −0.10) — the low-collinearity model — **not yet built**.
+- **Realized-gain (the PE face of Mattar-Daw) does NOT drive content.** Per-arm
+  `|Δ hmm_q_port|` (value moved by the last outcome, pre-outcome-safe lag): `M5+gain`
+  **−0.064, 5/5, p=2e-11** — content *avoids* recently-updated arms (a large update sits
+  at the just-visited/rewarded arm, so this is the reward/recency-avoidance signal, not
+  gain-seeking). With uncertainty co-fit, uncertainty stays **+0.83** and gain → −0.03.
+  **So the gain axis of content is epistemic UNCERTAINTY, not realized value-update.**
+
+**Prediction models (Stage 5A — does content predict the next choice?).** The
+behavioral-relevance layer, and the weakest link. `replay_frac` over a behavioral
+baseline (conditional logit): non-SWR **+0.34 (p=0.019)**, SWR **null** (claims #19d),
+but the model **drops `dist_to_arm`** (quasi-separation — the animal picks the closest
+arm 95–99%), so it is **not distance-controlled** — the +0.34 may be current/nearest-arm
+bias. Content does **not** predict stay/leave (#19e, null across strata). So: replay
+content has, at best, a modest *uncontrolled* choice correlation and no stay/leave signal.
+
+**Cross-validation for content models** — the content hierarchy had been fit with the
+hard-count response only, **no CV** (unlike the rate ladder). A `--cv` run over
+`M0a→M5,Mv,Mu,Mvu` (event-based per-session CV) is being added so the uncertainty rungs
+carry held-out `cv_bits` alongside the LR/AIC comparison.
+
 ## The intersection — what's new here
 
 **The covariate atlas** (duration-controlled where applicable; non-SWR | with-SWR):
@@ -224,6 +274,11 @@ runner provenance).
 3. **Content current-arm bias** and **last-rewarded-elsewhere avoidance**
    (non-SWR), reproduced on current tables (+0.98 / −1.66).
 4. **Non-SWR content is value-neutral; with-SWR content is value-avoidant.**
+4b. **Content over-represents high-*uncertainty* arms** (`Mu` +0.83, 5/5, p=3e-32),
+   robust to the recency confound (VIF-decomposition: recency +1% R²; recency-
+   orthogonalized +0.110, 5/5). Present in both populations, **stronger in SWR** (split
+   `C13` +0.99 vs +0.60). The exploration/epistemic axis — *not* realized value-update
+   (per-arm gain is negative). See the 2026-07-08 update.
 5. **SWR broadening** of content off current/prev.
 6. **Reward/value push non-SWR content off the current arm** (duration-controlled,
    5/5); **exploration locks content onto current** (both types).
@@ -250,15 +305,33 @@ runner provenance).
 - **Value-gating of with-SWR rate is modest and not predictive** — report as a
   population inferential effect, not a forecaster.
 
-## Unknown / pending
+## Unknown / pending — including the models we DON'T have
 
+- **Clean exploit-vs-explore content model — NOT built.** `Mvu` (beta value + beta
+  uncertainty) is degenerate (VIF 19; mean & variance mechanically collinear). The only
+  low-collinearity pairing is **HMM value (`q_arm_hmm`) + beta uncertainty**
+  (corr −0.10) — set aside on construct-mixing grounds, but it is the single model that
+  would answer "value or uncertainty?" and it does not exist.
 - **Full marked point process** (joint intensity + coupling + content; shared
-  latent; power↔history independence). **Not built.**
+  latent; power↔history independence). **Not built.** The three layers are treated as
+  separable factors but never jointly fit.
+- **Need / successor (prospective) content — structurally UN-buildable here.** The task
+  cannot identify it: 84% alternation makes `is_next`/`is_prev` collinear (r=0.81). No
+  covariate separates prospective from retrospective on this track.
+- **Graded ripple-power content model — NOT a committed rung.** Graded
+  `ripple_power × current` beats binary SWR (97% sessions, −291 AIC) but lives only in
+  an exploratory script, not the ladder.
 - **Content choice-mediation** (does rate × content predict the next choice). The
-  prior choice correlation (#19d) is modest and **not distance-controlled**.
+  prior choice correlation (#19d) is modest and **not distance-controlled** (`dist_to_arm`
+  dropped for quasi-separation); stay/leave is null (#19e).
+- **Per-arm realized-gain: tested, negative.** `|Δ hmm value|` per arm *avoids* content
+  (−0.06, 5/5) — the gain axis of content is epistemic uncertainty, not realized
+  value-update (see the 2026-07-08 update). Not a driver to add.
+- **CS6-class pooled `swr_x` contrasts are unreliable** for arm-identity-tied covariates
+  (the `swr_x_arm_uncertainty` artifact) — a model to *distrust*, use the split.
 - **Other content responses** (soft-count, posterior-mass) and **CV /
-  model-comparison** for the content hierarchy — re-fit used the hard-count
-  response only.
+  model-comparison** for the content hierarchy — the base ladder used the hard-count
+  response only; a `--cv` run (M0a→M5,Mv,Mu,Mvu) is in progress (2026-07-08).
 
 ## Caveats & confounds (and how addressed)
 
