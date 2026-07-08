@@ -66,7 +66,13 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
     "swr_x_q_arm": ["q_arm"], "swr_x_q_arm_hmm": ["q_arm_hmm"],  # qvals-dependent
-    "swr_x_arm_uncertainty": ["arm_uncertainty"],  # qvals-dependent (beta belief variance)
+    # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):
+    # raw betadist_var has SD ~0.03 (12x smaller than q_arm_hmm), which makes the
+    # per-session covariance singular ("need covariance") — the content models use the
+    # _z form. The runner builds swr_x_arm_uncertainty_z = is_swr * arm_uncertainty_z.
+    "arm_uncertainty_z": ["arm_uncertainty"],
+    "swr_x_arm_uncertainty": ["arm_uncertainty"],
+    "swr_x_arm_uncertainty_z": ["arm_uncertainty"],
     # patch-cohort pre-materialized interactions (content patch ladder)
     "swr_x_current_patch": ["is_current_patch"],
     "swr_x_last_rewarded_patch_elsewhere": ["is_last_rewarded_patch_elsewhere"],

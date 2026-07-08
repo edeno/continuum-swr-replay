@@ -233,8 +233,11 @@ _Mv = (*_M5, "p_reward_arm", "q_arm_hmm")
 # its coefficient is the recency-independent effect (docs: beta variance is +0.54
 # correlated with visit_recency by construction, but the effect survives
 # orthogonalization). See docs/behavior_models.md.
-_Mu = (*_M5, "arm_uncertainty")
-_Mvu = (*_M5, "q_arm", "arm_uncertainty")
+# Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.03, ~12x smaller than
+# q_arm_hmm, which makes the per-session covariance singular; the _z form is well-scaled
+# (SD 1) and is what these rungs fit.
+_Mu = (*_M5, "arm_uncertainty_z")
+_Mvu = (*_M5, "q_arm", "arm_uncertainty_z")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -938,8 +941,8 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # beta/HMM mix). C13 (split): independent uncertainty coefficient on the SWR-only
     # and non-SWR-only subsets. CS6 (pooled): main = non-SWR effect, swr_x_ = the
     # formal SWR-vs-non-SWR difference. Mirrors the C4/CS5 value pair.
-    "C13_armuncert": ([*BASEc, "arm_uncertainty"], "split"),
-    "CS6_armuncert": ([*BASEc, "arm_uncertainty", "swr_x_arm_uncertainty"], "pooled"),
+    "C13_armuncert": ([*BASEc, "arm_uncertainty_z"], "split"),
+    "CS6_armuncert": ([*BASEc, "arm_uncertainty_z", "swr_x_arm_uncertainty_z"], "pooled"),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C1_current": "is_current", "C2_base": "is_current",
@@ -952,7 +955,7 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
     "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm_hmm",
-    "C13_armuncert": "arm_uncertainty", "CS6_armuncert": "swr_x_arm_uncertainty",
+    "C13_armuncert": "arm_uncertainty_z", "CS6_armuncert": "swr_x_arm_uncertainty_z",
 }
 BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"

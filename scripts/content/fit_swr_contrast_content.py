@@ -166,6 +166,9 @@ def _assemble_arm() -> pd.DataFrame:
     ev["tsc_x_current"] = cur * _z(tsc)
     # is_swr:q_arm contrast (the one swr_x_* not pre-materialized)
     ev["swr_x_q_arm"] = swr * ev["q_arm"].to_numpy(dtype=float)
+    # is_swr:arm_uncertainty contrast, on the standardized column (pooled-global
+    # arm_uncertainty_z from the table — raw betadist_var is too small-scale to fit).
+    ev["swr_x_arm_uncertainty_z"] = swr * ev["arm_uncertainty_z"].to_numpy(dtype=float)
     return ev
 
 
