@@ -34,6 +34,10 @@ _Q_PORT_COLS = [f"q_port{i}" for i in range(6)]
 # counterpart of _Q_PORT_COLS used to build q_arm_hmm harmonized with the HMM value
 # covariates the is_swr rate ladder uses.
 _Q_PORT_HMM_COLS = [f"hmm_q_port{i}" for i in range(6)]
+# Per-leaf beta-model posterior variance (qvals_table betadist_var{1..6}); the
+# variance counterpart of _Q_PORT_COLS (mean). betadist_var{i} indexes leaf port
+# i-1 (1-indexed columns), so leaf arm j -> _BETADIST_VAR_COLS[j] = betadist_var{j+1}.
+_BETADIST_VAR_COLS = [f"betadist_var{i}" for i in range(1, 7)]
 
 
 UNCERTAINTY_COVARIATES = (
@@ -819,3 +823,59 @@ def attach_hmm_arm_value(
     present = ~np.isnan(q_mat[:, 0])  # stop_id had an HMM value row
     trunk_fill = np.where(present, 0.0, np.nan)
     return np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
+
+
+def attach_arm_uncertainty(
+    arm: np.ndarray,
+    stop_id: np.ndarray,
+    contingency: pd.DataFrame | None,
+) -> np.ndarray:
+    """Per-arm beta-model belief uncertainty ``arm_uncertainty``.
+
+    The variance counterpart of the beta value ``q_arm``: both come from the SAME
+    Beta(alpha, beta) posterior (mean -> ``q_arm``, variance -> ``arm_uncertainty``),
+    so a value+uncertainty model stays construct-coherent (no beta/HMM mix). Built
+    with the SAME leaf->arm mapping as :func:`attach_contingency_value_block`,
+    sourced from ``betadist_var{1..6}`` (the per-leaf Beta posterior variance
+    ``alpha*beta / ((alpha+beta)^2 (alpha+beta+1))``). Leaf arm ``j`` takes
+    ``betadist_var{j+1}``; trunk arms (6-8) are not reward sites and take ``0.0``
+    where the stop is present in the contingency and ``NaN`` where absent, so a
+    stop missing the value block drops uniformly across all nine arms at fit time
+    (matching ``q_arm`` / ``q_arm_hmm``).
+
+    Parameters
+    ----------
+    arm : np.ndarray, shape (n_rows,)
+        Arm id per row (0-5 leaf, 6-8 trunk).
+    stop_id : np.ndarray, shape (n_rows,)
+        Stop id per row, keyed into ``contingency``.
+    contingency : pd.DataFrame or None
+        ``qvals_table`` rows carrying ``betadist_var{1..6}``; ``None`` -> all NaN.
+
+    Returns
+    -------
+    arm_uncertainty : np.ndarray, shape (n_rows,)
+    """
+    arm = np.asarray(arm)
+    n_rows = len(arm)
+    if contingency is None:
+        return np.full(n_rows, np.nan)
+    missing = set(_BETADIST_VAR_COLS) - set(contingency.columns)
+    if missing:
+        raise ValueError(
+            "contingency is missing per-leaf beta-variance columns "
+            f"{sorted(missing)}; regenerate qvals_table with `python -m "
+            "continuum_swr_replay.analysis.behavior.qvals_table --write` "
+            "(carries betadist_var{1..6})."
+        )
+    cont = contingency.drop_duplicates("stop_id")[["stop_id", *_BETADIST_VAR_COLS]]
+    merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
+        cont, on="stop_id", how="left"
+    )
+    var_mat = merged[_BETADIST_VAR_COLS].to_numpy(dtype=float)
+    leaf = arm < 6
+    leaf_idx = np.clip(arm, 0, 5).astype(int)
+    row = np.arange(n_rows)
+    present = ~np.isnan(var_mat[:, 0])  # stop_id had a value row
+    trunk_fill = np.where(present, 0.0, np.nan)
+    return np.where(leaf, var_mat[row, leaf_idx], trunk_fill)

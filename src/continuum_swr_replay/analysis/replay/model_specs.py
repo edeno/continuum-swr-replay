@@ -225,6 +225,17 @@ _M7 = (
 # model list (request --models M5,Mv to compare it to its base).
 _Mv = (*_M5, "p_reward_arm", "q_arm_hmm")
 
+# Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
+# betadist_var) added on the M5 spatial/reward base. Mvu pairs it with the beta
+# per-arm VALUE (q_arm, NOT q_arm_hmm) so value+uncertainty come from the SAME Beta
+# posterior — a construct-coherent exploit-vs-explore contrast (no beta/HMM mix; the
+# HMM-value story stays in Mv). arm_uncertainty is added AFTER visit_recency (M4) so
+# its coefficient is the recency-independent effect (docs: beta variance is +0.54
+# correlated with visit_recency by construction, but the effect survives
+# orthogonalization). See docs/behavior_models.md.
+_Mu = (*_M5, "arm_uncertainty")
+_Mvu = (*_M5, "q_arm", "arm_uncertainty")
+
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
         name="M0",
@@ -286,6 +297,19 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         description="+ per-arm nominal value (p_reward_arm) + per-arm "
         "HMM model value (q_arm_hmm, Q)",
         parent="M5",
+    ),
+    "Mu": ModelSpec(
+        name="Mu",
+        predictors=_Mu,
+        description="+ per-arm beta belief uncertainty (arm_uncertainty; exploration)",
+        parent="M5",
+    ),
+    "Mvu": ModelSpec(
+        name="Mvu",
+        predictors=_Mvu,
+        description="+ beta per-arm value (q_arm) AND belief uncertainty "
+        "(construct-coherent exploit-vs-explore)",
+        parent="Mu",
     ),
 }
 
@@ -909,6 +933,13 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
                        "swr_x_reward_rate_arm_k10"], "pooled"),
     "CS5_armvalue": ([*BASEc, "q_arm_hmm", "swr_x_q_arm_hmm"], "pooled"),
+    # Per-arm beta belief UNCERTAINTY (exploration). BASEc carries no value term, so
+    # these rungs are construct-clean (beta uncertainty on the spatial base — no
+    # beta/HMM mix). C13 (split): independent uncertainty coefficient on the SWR-only
+    # and non-SWR-only subsets. CS6 (pooled): main = non-SWR effect, swr_x_ = the
+    # formal SWR-vs-non-SWR difference. Mirrors the C4/CS5 value pair.
+    "C13_armuncert": ([*BASEc, "arm_uncertainty"], "split"),
+    "CS6_armuncert": ([*BASEc, "arm_uncertainty", "swr_x_arm_uncertainty"], "pooled"),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C1_current": "is_current", "C2_base": "is_current",
@@ -921,6 +952,7 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
     "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm_hmm",
+    "C13_armuncert": "arm_uncertainty", "CS6_armuncert": "swr_x_arm_uncertainty",
 }
 BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"

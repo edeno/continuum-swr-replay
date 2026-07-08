@@ -40,6 +40,7 @@ PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-rewa
     "is_after_switch",
     "hmm_relative_value", "q_arm", "q_arm_hmm", "p_reward_arm",
     "reward_entropy", "state_entropy",
+    "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
 })
 
 # Gating factors, not outcome-bearing -- dropped when resolving a patsy interaction.
@@ -65,6 +66,7 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
     "swr_x_q_arm": ["q_arm"], "swr_x_q_arm_hmm": ["q_arm_hmm"],  # qvals-dependent
+    "swr_x_arm_uncertainty": ["arm_uncertainty"],  # qvals-dependent (beta belief variance)
     # patch-cohort pre-materialized interactions (content patch ladder)
     "swr_x_current_patch": ["is_current_patch"],
     "swr_x_last_rewarded_patch_elsewhere": ["is_last_rewarded_patch_elsewhere"],

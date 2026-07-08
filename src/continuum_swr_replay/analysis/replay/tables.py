@@ -89,6 +89,9 @@ from ._helpers import (
     attach_hmm_arm_value as _attach_hmm_arm_value,
 )
 from ._helpers import (
+    attach_arm_uncertainty as _attach_arm_uncertainty,
+)
+from ._helpers import (
     build_well_to_arm_map as _build_well_to_arm_map,
 )
 from ._helpers import (
@@ -157,7 +160,9 @@ from .uncertainty import (
 # Continuous per-arm covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``.
 # The build fills NaN placeholders per session; the real global z is computed once in
 # ``prepare_data.main`` after the all-session concat (see analysis.replay.standardization).
-EVENT_ARM_STANDARDIZED_COLS = ("q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm")
+EVENT_ARM_STANDARDIZED_COLS = (
+    "q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm", "arm_uncertainty"
+)
 
 # State-probability column mapping for the 4-state Non-Local model:
 # per-event rollup column -> data_over_time per-bin column.
@@ -1316,6 +1321,12 @@ def build_event_arm_table(
     long["q_arm_hmm"] = _attach_hmm_arm_value(
         long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
     )
+    # arm_uncertainty: per-arm beta-model belief variance (betadist_var), the
+    # variance counterpart of the beta value q_arm from the SAME posterior — so a
+    # value+uncertainty model stays construct-coherent (no beta/HMM mix).
+    long["arm_uncertainty"] = _attach_arm_uncertainty(
+        long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
+    )
 
     # Interactions (plan §1.7). Event-level × arm-level products.
     tss = long["time_since_stop"].to_numpy()
@@ -1351,6 +1362,7 @@ def build_event_arm_table(
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
     )
     long["swr_x_q_arm_hmm"] = is_swr_i * long["q_arm_hmm"].to_numpy()
+    long["swr_x_arm_uncertainty"] = is_swr_i * long["arm_uncertainty"].to_numpy()
     long["mua_x_current"] = is_mua_i * ic
     long["mua_x_prev"] = is_mua_i * ip
     long["mua_x_next"] = is_mua_i * inx
@@ -1706,6 +1718,7 @@ def _event_arm_table_columns() -> list[str]:
         "p_reward_arm",
         "q_arm",
         "q_arm_hmm",
+        "arm_uncertainty",
         # Interactions (plan §1.7 + collinearity control)
         "current_x_last_rewarded",
         "time_x_current",
@@ -1719,6 +1732,7 @@ def _event_arm_table_columns() -> list[str]:
         "swr_x_visit_recency_demeaned",
         "swr_x_is_last_rewarded_elsewhere",
         "swr_x_q_arm_hmm",
+        "swr_x_arm_uncertainty",
         "mua_x_current",
         "mua_x_prev",
         "mua_x_next",
