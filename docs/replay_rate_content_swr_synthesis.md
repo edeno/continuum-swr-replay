@@ -205,7 +205,8 @@ assumptions in [behavior_models.md](behavior_models.md); memory
   `arm_uncertainty_z` **+0.83, 5/5, p=3e-32**. This is the exploration / gain axis
   (Mattar-Daw) the value/reward/space ladder was missing.
 - **NOT a recency/reward confound.** VIF-decomposition: recency adds only **+1% R²**
-  beyond arm structure; the recency-*orthogonalized* effect **+0.110 (5/5)** survives.
+  beyond arm structure; the recency-*orthogonalized* effect **+0.62 (5/5, retains
+  74% of the raw +0.83)** survives.
   The high raw **VIF 18 is a structural artifact** of the trunk=0 encoding against the
   arm FE (arm FE alone explain **75%** of `arm_uncertainty`), not a scientific confound —
   the effect is identified from within-leaf-arm variation.
@@ -276,7 +277,7 @@ carry held-out `cv_bits` alongside the LR/AIC comparison.
 4. **Non-SWR content is value-neutral; with-SWR content is value-avoidant.**
 4b. **Content over-represents high-*uncertainty* arms** (`Mu` +0.83, 5/5, p=3e-32),
    robust to the recency confound (VIF-decomposition: recency +1% R²; recency-
-   orthogonalized +0.110, 5/5). Present in both populations, **stronger in SWR** (split
+   orthogonalized +0.62 = 74% retained, 5/5). Present in both populations, **stronger in SWR** (split
    `C13` +0.99 vs +0.60). The exploration/epistemic axis — *not* realized value-update
    (per-arm gain is negative). See the 2026-07-08 update.
 5. **SWR broadening** of content off current/prev.
