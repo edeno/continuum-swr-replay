@@ -43,15 +43,16 @@ non-SWR**:
 | covariate | NL with-SWR | NL non-SWR | note |
 | --- | --- | --- | --- |
 | reward lag-1 (M7) | **3.93×** | 1.11× | |
-| `p_reward_current` | **2.01×** (p 4e-3) | 1.04 (n.s.) | de-inflated 6.6→3.1→2.0 after collinearity fix + canonical contingency |
-| `rpe` | **1.87×** (p 2e-3) | 1.10 (n.s.) | |
-| `recent_switch_rate` | **0.69×** (p 6e-7) | 1.16 (n.s.) | exploration suppression — robust, source-independent |
-| `value_diff_patch` | 0.52 (p 1e-3) | 0.77 (p 0.04) | shared-ish |
+| `p_reward_current` | **~1.0× (null, all p>0.47)** | ~1.0× (null) | no sign-consistency, ~zero rate information; *historical* de-inflation 6.6→3.1→2.0 (collinearity fix + canonical contingency) ended at null in the current MU |
+| `rpe` | **1.69×** (RR1.693, p 5e-4) | 1.10 (n.s.) | |
+| `recent_switch_rate` | **0.57×** (G3 stratified, p 5e-10) | 1.16 (n.s.) | exploration suppression — 0.55× (S5 contrast); near-null in the joint MU model (covariate competition) |
+| `value_diff_patch` | 0.52 (p 1e-3) | 0.77 (p 0.04) | **4/5 animals only** (j16 reverses), inference-only, **opposite sign in the power model** |
 
 **Inference ≠ prediction (important):** value/RPE are real *population-level*
 effects (consistent sign across animals) but **do not improve per-session
-prediction** — held-out `cv_bits` *drops* when the value block is added (−0.16,
-non-SWR); per-session ΔAIC sits at the null. Only time + reward kernel +
+prediction** — the **entire value/switch block fails held-out CV in every
+population and animal (0/5)** (ΔCV −0.075 non-SWR, −0.163 with-SWR, −0.043 SWR);
+per-session ΔAIC sits at the null. Only time + reward kernel +
 self-history forecast the rate. A fitted within-block Q-value (`q_chosen`) does
 **not** predict better than nominal value (falsified). So the value-gating is a
 modest, detectable-by-pooling effect, not a strong driver.
@@ -84,13 +85,16 @@ power-robust read; pooled χ² is over-powered by the per-bin n).
   value 15% vs 4%; SWR at chance) → **SWR events narrowly reward-gated, non-SWR events
   broadly task-modulated** (value / RPE / context).
 - **Dwell-shape is NULL.** `G8 rewxtime` (`reward_lag1 : bs(tc)` — does reward reshape
-  the within-stop rate *profile*?) is not consistently significant (8% / p=0.088).
-  **Reward shifts the rate LEVEL, not the profile SHAPE** — the reward-gating headline
+  the within-stop rate *profile*?) is not consistently significant (8% / p=0.088),
+  **numerically unstable** (205/218 fit, mean CV −9.6e+302) and **CV-harmful**
+  (M9−M7 −0.22, 5/5 neg). **Reward shifts the rate LEVEL, not the profile SHAPE** — the reward-gating headline
   is not a dwell-profile artifact (the per-bin offset already removes the pure
   duration confound; rewarded stops are ~3.6× longer, 1.86 s vs 0.51 s).
 - **RPE caveat:** coefficient signed-rank leans SWR-specific, but the per-session LR
   is *more consistent in non-SWR* (25% vs 8% of sessions) — direction-consistent vs
-  per-session-needed diverge; do **not** call RPE cleanly "SWR-specific".
+  per-session-needed diverge; do **not** call RPE cleanly "SWR-specific". Also,
+  SWR RPE is **reward-collinear** (`hmm_rpe = reward − Q`, kernel retained) —
+  largely reward-gating re-expressed, not independent RPE coding.
 
 *(The `is_swr`-contrast ladder has no auto-generated results doc — `per_bin_rate_results.md`
 covers the separate M0–M9 ladder. These findings live here.)*
@@ -106,11 +110,14 @@ thresholds, so `is_swr` is its thresholded version). Per-event regression
   modes. *Caveat:* event-mean smears any gap; the **peri-onset peak** (the
   detector's actual criterion) is the definitive test and is **not yet run**.
 - Not duration-confounded (`corr(power, duration)` = 0.04).
-- **Reward (+0.139/SD, 5/5, p 3e-17)** and **RPE (5/5)** raise SWR power;
+- **Reward (+0.141/SD, 5/5, p 5.5e-17)** and **RPE (5/5)** raise SWR power;
   **exploration lowers it (5/5)**. Combined with Layer 1 (occurrence reward
   effect only ~1.5×), reward acts on **coupling** more than on bare occurrence —
   i.e. the binary "with-SWR rate" dissociation is largely reward pushing events'
-  ripple power up across the threshold.
+  ripple power up across the threshold. *Caveat:* the power-model reward covariate
+  is the **current-well** reward (corr 0.799 with current `reward_outcome`,
+  dwell-confounded), so "reward raises coupling" may be partly a **consummatory
+  LFP artifact**, not a clean pre-event mark.
 - **Scope:** this is the *mark factor only*, by per-event OLS — **not** a full
   marked point process (no joint intensity, no test of power↔history independence,
   no shared latent).
@@ -126,13 +133,17 @@ only as **interactions with `is_current`** (the arm the animal is physically on)
 
 | finding | non-SWR (M5) | with-SWR (M5) |
 | --- | --- | --- |
-| current-arm bias (`is_current`) | **+0.98** (5/5, p 4e-28) | +0.70 (weaker → broadened) |
-| avoids last-rewarded-elsewhere | **−1.66** (5/5, p 2e-11) | strongly neg. (−13.76 = sparse-subset **separation artifact**; direction robust, magnitude not) |
-| drawn to high-value arms (`recent_reward_rate`) | **+0.00 (p 0.31, null)** | **−0.29 (p 2e-4)** — value-*suppressed* |
+| current-arm bias (`is_current`) | **+0.881** (RR2.41, 5/5, p 4e-28) | +0.509 (RR1.66, weaker → broadened) |
+| avoids last-rewarded-elsewhere | **−1.485** (5/5, p 2e-11) | strongly neg. (−11.73 = sparse-subset **separation artifact**, 89/169 separated; direction robust, magnitude not) |
+| raw arm reward-rate (`reward_rate_arm_k10`) | **+0.00 (p 0.31, null)** | **−0.065 (p 0.066, marginal)** — no consistent value main effect |
 | SWR broadening (arm-all M6) | — | `swr_x_current` −0.84, `swr_x_prev` −1.06 (5/5) |
 
 So **non-SWR content is value-neutral; with-SWR content is value-avoidant**
-(broadened off current/prev, avoids recently-rewarded). Patch-level mirrors arm.
+(broadened off current/prev, avoids recently-rewarded — the last-rewarded-elsewhere
+row, still strongly negative; the raw arm reward-rate main effect is only marginal).
+Patch-level mirrors arm. *(These older pooled-M5 rows are corrected in place but are
+superseded by the C-split in the 2026-07-02 update below; the SWR×value sign is
+construct-dependent — see that block.)*
 
 **New — behavioral modulation of current-arm content** (`is_current`
 interactions, **duration-controlled** with `time_since_stop × is_current`;
@@ -212,8 +223,10 @@ assumptions in [behavior_models.md](behavior_models.md); memory
   the effect is identified from within-leaf-arm variation.
 - **SWR separation — trust the split (`C13`), NOT the pooled (`CS6`).** Split: both
   populations over-represent uncertain arms, **SWR +0.99 > non-SWR +0.60** (5/5 each) —
-  SWR weights uncertainty *more*. The pooled `CS6` interaction (`swr_x_arm_uncertainty_z`
-  **−0.41**, 0/5) is an **artifact**: the shared arm FE (75%-collinear with uncertainty)
+  SWR weights uncertainty *more* (the SWR enhancement holds in **69% of sessions**;
+  chimi ≈ null). The pooled `CS6` interaction (`swr_x_arm_uncertainty_z`
+  **−0.41**, 0/5) is an **artifact** (its SWR *component* is still **+0.62**, positive —
+  not below baseline): the shared arm FE (75%-collinear with uncertainty)
   differ by SWR population and the misfit leaks into the interaction. Neither
   `swr_x_current` nor `swr_x_recency` rescues it; the **saturated `is_swr × ALL BASEc`
   model recovers +0.39 = the split.** General lesson: **pooled `swr_x` contrasts are
@@ -236,6 +249,9 @@ but the model **drops `dist_to_arm`** (quasi-separation — the animal picks the
 arm 95–99%), so it is **not distance-controlled** — the +0.34 may be current/nearest-arm
 bias. Content does **not** predict stay/leave (#19e, null across strata). So: replay
 content has, at best, a modest *uncontrolled* choice correlation and no stay/leave signal.
+**No held-out CV artifact exists** — `behavior_prediction.pkl` is absent, Figure 4 is not
+generated; all next-arm fits are **in-sample**. The non-SWR>SWR split is **underpowered**
+(n 214→183), not an established SWR dissociation.
 
 **Cross-validation for content models** — the content hierarchy had been fit with the
 hard-count response only, **no CV** (unlike the rate ladder). A `--cv` run over
@@ -293,7 +309,7 @@ formal SWR-split trajectory characterization has **not** been run/reported yet.
 
 | driver | RATE / coupling | CONTENT (current-arm) |
 | --- | --- | --- |
-| reward | non-SWR flat / **with-SWR ↑ rate & coupling** | **non-SWR ↓ current** / with-SWR n.s. |
+| reward | non-SWR small (~1.11×) but reliable / **with-SWR ↑ rate & coupling** | **non-SWR ↓ current** / with-SWR n.s. |
 | current value | with-SWR ↑ rate (modest) | **non-SWR ↓ current** / with-SWR n.s. |
 | exploration | **both ↓ SWR-coupled rate** | **both ↑ current** (with-SWR stronger) |
 | within-stop time | rate rise→plateau | **both deepen onto current** |
@@ -305,7 +321,8 @@ formal SWR-split trajectory characterization has **not** been run/reported yet.
 - **with-SWR:** reward/value/RPE gate **how much** (rate 3.9×, coupling); content
   is **broad and value-avoidant by default** and is **not** retuned by the
   immediate reward (`rew_x_current` n.s.).
-- **non-SWR:** reward/value do **not** gate how much (rate flat); content is
+- **non-SWR:** reward/value only weakly gate how much (rate ~1.11×, small but
+  reliable 5/5 — a ratio dissociation, not flat-vs-gated); content is
   **current-locked but dynamically pushed off-current** by immediate reward/value
   (`rew_x_current` −0.76).
 - **Shared:** exploration suppresses SWR-coupled rate yet **concentrates** content
@@ -315,10 +332,11 @@ formal SWR-split trajectory characterization has **not** been run/reported yet.
 
 1. Rate baseline ordering and the dominant time-course/reward-history/self-history
    structure (all populations).
-2. **Exploration suppression of SWR-coupled rate** (0.69×, p 6e-7; source-
-   independent — does not depend on the contingency parse).
+2. **Exploration suppression of SWR-coupled rate** (0.57× (G3), p 5e-10 —
+   model-fragile magnitude; source-independent — does not depend on the
+   contingency parse).
 3. **Content current-arm bias** and **last-rewarded-elsewhere avoidance**
-   (non-SWR), reproduced on current tables (+0.98 / −1.66).
+   (non-SWR), reproduced on current tables (+0.881 / −1.485).
 4. **Non-SWR content is value-neutral; with-SWR content is value-avoidant.**
 4b. **Content over-represents high-*uncertainty* arms** (`Mu` +0.83, 5/5, p=3e-32),
    robust to the recency confound (VIF-decomposition: recency +1% R²; recency-

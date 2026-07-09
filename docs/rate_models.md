@@ -141,8 +141,12 @@ Reward increases replay rate, and the SWR-coupled subset carries the strong
 gating, in **both** estimators:
 
 - **Family A (per-stop):** omission suppresses the non-local event rate in
-  **99 % of sessions, 5/5 animals** (`is_after_omission RR ≈ 0.40`; stronger for
-  `non_local_swr`, weaker for `non_local_no_swr`).
+  **85 % of sessions, 5/5 animals** (`is_after_omission RR ≈ 0.40`; stronger for
+  `non_local_swr`, weaker for `non_local_no_swr`). (The 98.6% figure is the
+  `is_swr_stop` result, not this one.) This magnitude is a leakage + dwell upper
+  bound — `is_after_omission` is built from the trial *start*, so it can encode
+  the not-yet-delivered outcome on approach stops; the current causal spec uses
+  the past-only `reward_lag1` instead (see the phase-4 causal-hygiene note above).
 - **Family B (per-bin):** the lag-1 reward dissociation above, controlling for
   dwell, the within-stop time course, reward history, and event clustering.
 
@@ -205,7 +209,15 @@ What the ladder actually shows (218 sessions):
   — replacing the 10 collinear lag dummies with 4 log-spaced raised-cosine bumps
   (the same 150 ms window) cannot separate, and lifts the median
   `cv_bits_per_event` from **−0.084 to +0.212** (positive on 89% of sessions,
-  better than the dummy on 94%). The raised-cosine models (`M3r_histcos`,
+  better than the dummy on 94%). But the raised-cosine fix only rescues the
+  history block from *actively hurting* CV — it does **not** make the full model
+  the best generalizer: the **time block alone (`M5_time`, CV +0.228) is the
+  best-generalizing rung** in the ladder, and the raised-cosine full model
+  (`M7r`, +0.199) has the **lowest AIC but does not beat `M5` on held-out CV**
+  (`M7r − M5 ≈ −0.010`, only ~46% of sessions improve). Reward + smooth
+  self-history add inferential signal but **negligible held-out bits** over the
+  within-stop time course; use `M5_time` as the parsimonious predictive model and
+  `M7r` for the full additive coefficient read. The raised-cosine models (`M3r_histcos`,
   `M7r_time_histcos_rew`) are in the ladder; the dummy `onset_lag` models are
   kept for the refractory/bursty *kernel-shape* readout, which is interpretable
   per-lag where the smooth basis is not.

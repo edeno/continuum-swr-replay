@@ -80,7 +80,7 @@ p = 1.2e-28**. After full control the non-SWR lag-1 effect is barely above 1
 (1.11; significant across animals, p = 3.2e-3, but only 57% of sessions
 positive) — i.e. most of the apparent non-SWR reward response is absorbed by the
 within-stop time course / clustering, whereas the SWR-coupled response remains
-large (3.93).
+large (3.93) — so non-SWR is *weakly reward-elevated*, not reward-independent.
 
 ## 3. Reward history kernel, lags 2–10 (M7)
 
@@ -146,8 +146,14 @@ are model-free behavioral proxies; the task-grounded value/RPE/block test is the
 
 - **The time spline calibrates the process** (KS-in-band jumps 0.50→0.86 at M5).
 - **The lag-dummy self-history overfits** (M3/M7 CV negative); **the raised-cosine
-  basis fixes it** — `M7r` is the **best model: lowest AIC (2101) and positive CV
-  (+0.199)** vs M7-dummy's −0.108.
+  basis fixes it** — `M7r` recovers a positive CV (+0.199 vs M7-dummy's −0.108) and
+  has the **lowest AIC (2105)** in the ladder.
+- **But M5_time is the best-generalizing model** (CV +0.228, the highest in the
+  ladder). `M7r` has the lowest AIC but does **not** beat M5 on held-out CV
+  (+0.199 < +0.228) — i.e. reward + raised-cosine history add inferential signal
+  but **negligible held-out bits** over the within-stop time course (M7r − M5 =
+  −0.010, only 46% of sessions improve). Use **M5_time as the parsimonious
+  predictive model**; **M7r for the full additive coefficient read**.
 - M8 (switch) and M9 (reward×time) add nothing on CV (and M9 separates on ~9% of
   sessions). See [rate_models.md](rate_models.md) for the GOF/dispersion caveats
   and the preliminary within-session drift.
