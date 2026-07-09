@@ -249,9 +249,15 @@ but the model **drops `dist_to_arm`** (quasi-separation — the animal picks the
 arm 95–99%), so it is **not distance-controlled** — the +0.34 may be current/nearest-arm
 bias. Content does **not** predict stay/leave (#19e, null across strata). So: replay
 content has, at best, a modest *uncontrolled* choice correlation and no stay/leave signal.
-**No held-out CV artifact exists** — `behavior_prediction.pkl` is absent, Figure 4 is not
-generated; all next-arm fits are **in-sample**. The non-SWR>SWR split is **underpowered**
-(n 214→183), not an established SWR dissociation.
+**The choice-prediction fits exist** (`event_source_comparison/*_comparison_fits.pkl`,
+`choice` / `choice_swr_split`) but are **in-sample only — no held-out CV**. Raw `replay_frac`
+is *negative* (−0.94, 5/5 — current-arm bias: the animal leaves the arm it most replays),
+flipping to **+0.38 over the behavior baseline** (4/5 animals, but only 13% of sessions
+individually significant; in-sample llf gain +0.32, 100% positive but that is guaranteed by
+adding a parameter). The positive signal is carried by **non-SWR content**
+(`replay_frac_non_swr` +0.335, 5/5) while **SWR content is null** (−0.14, n.s.); the split is
+**underpowered (n 214→183)**. So there is a weak, non-SWR-carried, sign-flips-on-control,
+**in-sample-only** choice correlation — not a cross-validated SWR prediction.
 
 **Cross-validation for content models** — the content hierarchy had been fit with the
 hard-count response only, **no CV** (unlike the rate ladder). A `--cv` run over
