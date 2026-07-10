@@ -14,6 +14,7 @@ def load_contfrag_results(
     load_detector: bool = True,
     non_stationary: bool = False,
     ripple_detector_name: str = "Kay",
+    training_type: str = "no_ripple",
 ) -> tuple[xr.Dataset, ContFragClusterlessClassifier | None, Environment | None]:
     """Load saved ContFrag decoding results and classifier model.
 
@@ -34,6 +35,10 @@ def load_contfrag_results(
     ripple_detector_name : str, optional
         Ripple detector used for the saved run. Non-Kay detectors append
         ``_{ripple_detector_name}`` to the filename.
+    training_type : str, optional
+        Training regime used for the saved run. Must match the value passed to
+        ``run_decoding_contfrag.py`` so the ``_{training_type}`` suffix is
+        reconstructed correctly. The default ``"no_ripple"`` appends no suffix.
 
     Returns
     -------
@@ -52,6 +57,8 @@ def load_contfrag_results(
         epoch_identifier += f"_{ripple_detector_name}"
     if non_stationary:
         epoch_identifier += "_non_stationary"
+    if training_type != "no_ripple":
+        epoch_identifier += f"_{training_type}"
 
     results = xr.open_dataset(
         PROCESSED_DATA_DIR / f"{epoch_identifier}_results.nc",

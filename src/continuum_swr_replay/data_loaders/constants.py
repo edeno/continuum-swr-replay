@@ -147,6 +147,12 @@ Epochs with missing Spyglass pipeline entries (fail during HPC decoding):
 - senor20201104_06_r3: missing LFPBandV1 entry (no ripple detection data)
 - senor20201104_08_r4: missing LFPBandV1 entry (no ripple detection data)
 - senor20201105_09_r4: missing TrackGraph entry (no linearized position data)
+- wilbur20210404 (all run epochs 02_r1, 04_r2, 06_r3, 08_r4, 10_r5): no CA1
+  RippleTimesV1 extraction — ripples exist only under group_name
+  "sb_wilbur_ripple", a different extraction than the CA1 one used for every
+  other session. get_ripple raises a clear error and these epochs are excluded
+  rather than mixing ripple definitions. See
+  docs/known_issues/wilbur20210404_missing_ca1_ripples.md.
 """
 
 WELL_PATCH_MAPPING = {

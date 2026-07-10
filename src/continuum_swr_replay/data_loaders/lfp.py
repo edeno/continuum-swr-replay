@@ -157,15 +157,19 @@ def get_ripple(
 
     # Ripples
     if ripple_detector_name == "Kay":
-        ripple_params = "default"
+        ripple_param_name = "default"
     else:
         raise ValueError("Invalid ripple detector name")
 
+    # NOTE: the primary-key field is `ripple_param_name`, not `ripple_params`.
+    # DataJoint silently drops dict keys absent from a table's heading, so the
+    # old `ripple_params` key left the parameter dimension unrestricted (it only
+    # worked because `fetch1_dataframe` requires a single matching row).
     ripple_key = {
         "nwb_file_name": nwb_file_name,
         "target_interval_list_name": epoch_name + " noPrePostTrialTimes",
         "group_name": "CA1",
-        "ripple_params": ripple_params,
+        "ripple_param_name": ripple_param_name,
         "filter_name": "ripple_150_250",
         "filter_sampling_rate": 1000,
     }
@@ -176,7 +180,36 @@ def get_ripple(
         "lfp_band_sampling_rate": ripple_key["filter_sampling_rate"],
     }
     lfp_band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
-    ripple_times = (RippleTimesV1 & ripple_key).fetch1_dataframe()
+
+    # Fail loudly and self-descriptively when a session has no matching CA1
+    # ripple extraction, rather than the opaque `fetch1` "0 tuples found" error.
+    # One project session (wilbur20210404) only has an `sb_wilbur_ripple`
+    # extraction and no CA1, so it is a documented exclusion — see
+    # docs/known_issues/wilbur20210404_missing_ca1_ripples.md.
+    ripple_query = RippleTimesV1 & ripple_key
+    if len(ripple_query) != 1:
+        available_group_names = sorted(
+            set(
+                (
+                    RippleTimesV1
+                    & {
+                        "nwb_file_name": nwb_file_name,
+                        "target_interval_list_name": ripple_key[
+                            "target_interval_list_name"
+                        ],
+                    }
+                ).fetch("group_name")
+            )
+        )
+        raise ValueError(
+            f"Expected exactly one RippleTimesV1 row for {nwb_file_name} "
+            f"{epoch_name} (group_name='CA1', "
+            f"ripple_param_name='{ripple_param_name}'), found {len(ripple_query)}. "
+            f"group_name(s) present for this session: {available_group_names}. "
+            "This session has no CA1 ripple extraction and is a documented "
+            "exclusion — see docs/known_issues/wilbur20210404_missing_ca1_ripples.md."
+        )
+    ripple_times = ripple_query.fetch1_dataframe()
     ripple_filtered_lfp = (LFPBandV1 & lfp_band_key).fetch1_dataframe()
     lfp_merge_id = (LFPBandSelection & ripple_key).fetch1("lfp_merge_id")
     lfp_df = (LFPOutput & {"merge_id": lfp_merge_id}).fetch1_dataframe()

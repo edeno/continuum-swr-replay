@@ -74,7 +74,6 @@ from continuum_swr_replay.analysis.replay.tables import (
     build_event_table,
     build_stop_table,
 )
-from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import SessionDataKeys
@@ -177,6 +176,11 @@ def _load_trials_track_graph(
         with open(cache_path, "rb") as f:
             cached = pickle.load(f)
         return cached["trials"], cached["track_graph"], True
+
+    # Imported lazily: `data_loaders` imports `spyglass.common` at module top
+    # level, which opens a DataJoint connection. Keeping this out of module
+    # scope lets --from-cache (with a warm cache), --help, and tests run offline.
+    from continuum_swr_replay.data_loaders import load_data
 
     data = load_data(
         session["nwb_file_name"],

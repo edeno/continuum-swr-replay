@@ -166,8 +166,11 @@ def perform_decoding(
         "discrete_transition_covariate_data": discrete_transition_covariate_data,
     }
 
+    # Apply the training mask (e.g. no_ripple) for every brain area — the
+    # sorted-spikes detectors (mPFC/OFC) accept `is_training` too and otherwise
+    # silently train on all bins, contrary to the logged training_type.
+    estimate_params["is_training"] = is_training
     if brain_area == "HPC":
-        estimate_params["is_training"] = is_training
         if spike_waveform_features is not None:
             estimate_params["spike_waveform_features"] = spike_waveform_features
         # Persist the per-timebin log-likelihood alongside the posterior so the
@@ -300,6 +303,8 @@ def run_decode(
         epoch_identifier += f"_{ripple_detector_name}"
     if non_stationary:
         epoch_identifier += "_non_stationary"
+    if training_type != "no_ripple":
+        epoch_identifier += f"_{training_type}"
 
     save_folder = PROCESSED_DATA_DIR
 
@@ -346,6 +351,7 @@ def run_decode(
                 brain_area,
                 non_stationary=non_stationary,
                 ripple_detector_name=ripple_detector_name,
+                training_type=training_type,
             )
         else:
             is_training = get_training_timepoints(data, training_type=training_type)

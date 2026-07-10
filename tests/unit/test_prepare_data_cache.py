@@ -13,6 +13,7 @@ import networkx as nx
 import pandas as pd
 import pytest
 
+import continuum_swr_replay.data_loaders as dl
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
 
 
@@ -44,7 +45,12 @@ def patched(tmp_path, monkeypatch, fake_payload):
         calls["n"] += 1
         return {"trials": trials, "track_graph": g}
 
-    monkeypatch.setattr(pdm, "load_data", _fake_load_data)
+    # `_load_trials_track_graph` imports `load_data` lazily from
+    # `data_loaders` (kept out of module scope so importing prepare_data
+    # doesn't open DataJoint). Patch the name in the `data_loaders` __dict__
+    # via setitem so we don't trigger its PEP-562 __getattr__ (which would
+    # import spyglass) while setting up the fake.
+    monkeypatch.setitem(dl.__dict__, "load_data", _fake_load_data)
     return calls, tmp_path
 
 
