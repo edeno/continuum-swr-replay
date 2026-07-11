@@ -126,6 +126,14 @@ spot-check ~20 flipped-label events per fix against the posterior.
 - **Reassess:** if the corrected count is fragile / non-significant, fall back to
   dropping `n_reversals` from claim 16b and leaning on `pause_fraction` (1.0 vs 0.93)
   and `max_step_distance` (2 vs 12 cm).
+- **DONE / sweep result (218 sessions, inclusive-SWR preview):** old linear metric
+  reproduces the reported numbers (median 2 vs 7, mean 3.75 vs 10.88). Raw ab at
+  delta=0 is jitter-dominated (3 vs 8). **Production delta = place_bin_size (2 cm):
+  median 0 vs 3, mean 1.38 vs 6.41, ratio 4.64x, 5/5 animals** — the dissociation
+  *sharpens* (old ratio 2.9x) and non-SWR reversals fall to a median of 0,
+  reinforcing the stationary-focal story. Monotone in delta (4.6x/6.2x/8.7x), 5/5 at
+  every setting. Metric KEPT. Authoritative strict-`is_swr` numbers to come from the
+  regen. **F7b well_radius default = 4 x place_bin_size (~8 cm).**
 
 ### F7a — multimodal: pairwise-adjacency → connectivity
 - **Change:** replace the all-pairs adjacency test in `_is_multimodal`

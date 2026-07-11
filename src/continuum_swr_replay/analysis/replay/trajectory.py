@@ -217,13 +217,97 @@ def _hpd_coverage_mean(event_id: np.ndarray, hpd: np.ndarray) -> np.ndarray:
 
 
 def _is_multimodal(arm_indices: np.ndarray, adjacency: dict[int, set[int]]) -> bool:
-    """True if the HPD arm set contains two non-graph-adjacent arms."""
-    arms = [int(a) for a in arm_indices]
-    for i, a in enumerate(arms):
-        for b in arms[i + 1 :]:
-            if b not in adjacency.get(a, set()):
-                return True
-    return False
+    """True if the HPD arm set spans more than one connected component.
+
+    Two occupied arms are in the same component when a path of pairwise
+    graph-adjacent *occupied* arms links them. A contiguous chain A-B-C (A and C
+    not directly adjacent but joined through the occupied arm B) is therefore one
+    component and **unimodal**; only genuinely separated arms are multimodal.
+
+    This replaces the old all-pairs adjacency test, which flagged any HPD set
+    with a non-directly-adjacent pair as multimodal and so mislabeled connected
+    chains.
+    """
+    arms = {int(a) for a in arm_indices}
+    if len(arms) <= 1:
+        return False
+    # Breadth-first over occupied, mutually adjacent arms from an arbitrary
+    # start; multimodal iff it cannot reach every occupied arm (>1 component).
+    start = next(iter(arms))
+    seen = {start}
+    stack = [start]
+    while stack:
+        a = stack.pop()
+        for b in adjacency.get(a, set()):
+            if b in arms and b not in seen:
+                seen.add(b)
+                stack.append(b)
+    return seen != arms
+
+
+def _count_ab_reversals(ahead_behind: np.ndarray, delta: float) -> int:
+    """Count direction reversals in a signed ahead/behind distance series.
+
+    A reversal is a change of travel direction along the track graph, measured
+    on the signed ahead/behind distance (``sign x graph-geodesic-distance`` from
+    the animal to the decoded position; positive ahead, negative behind). This
+    is branch-safe: moving outbound across a track junction does not create a
+    spurious reversal (geodesic distance keeps growing), and a trajectory that
+    passes *through* the animal (behind -> ahead) is monotone in the signed
+    coordinate, not a turn — unlike sign changes of the discontinuous
+    ``linear_position``, which fake a reversal at every branch crossing.
+
+    Reversals are counted with a hysteresis dead-band ``delta``: a direction
+    change registers only once the series retraces more than ``delta`` from its
+    running extreme since the last confirmed turn, so bin-to-bin decoder jitter
+    does not inflate the count. The first established direction is not a
+    reversal. ``delta = 0`` reduces to a strict sign-change count of the
+    increments (flat steps ignored).
+
+    Parameters
+    ----------
+    ahead_behind : np.ndarray, shape (n_time,)
+        Time-ordered signed ahead/behind distance (cm). NaN bins (junctions /
+        undefined) are dropped before counting.
+    delta : float
+        Dead-band amplitude in cm (``>= 0``).
+
+    Returns
+    -------
+    int
+        Number of direction reversals.
+    """
+    x = np.asarray(ahead_behind, dtype=float)
+    x = x[np.isfinite(x)]
+    if x.size < 3:
+        return 0
+    n_reversals = 0
+    direction = 0  # +1 rising, -1 falling, 0 not yet established
+    ref = float(x[0])  # running extreme since the last confirmed turn
+    for v in x[1:]:
+        v = float(v)
+        if direction == 1:
+            if v > ref:
+                ref = v
+            elif v < ref - delta:
+                n_reversals += 1
+                direction = -1
+                ref = v
+        elif direction == -1:
+            if v < ref:
+                ref = v
+            elif v > ref + delta:
+                n_reversals += 1
+                direction = 1
+                ref = v
+        else:  # direction not yet established
+            if v > ref + delta:
+                direction = 1
+                ref = v
+            elif v < ref - delta:
+                direction = -1
+                ref = v
+    return n_reversals
 
 
 def uncertainty_extra(
@@ -241,8 +325,9 @@ def uncertainty_extra(
     - ``hpd_coverage_cm`` — per-event mean of the per-timebin spatial HPD
       coverage column (cm) already in ``data_over_time``.
     - ``multimodal_fraction`` — fraction of in-event timebins whose ``coverage``
-      HPD arm set spans **non-graph-adjacent** arms (threshold-free in the
-      sense that adjacency is binary track topology).
+      HPD arm set spans **more than one connected component** on the track graph
+      (threshold-free in the sense that adjacency is binary track topology). A
+      contiguous chain of arms is one component (unimodal).
 
     Parameters
     ----------
@@ -291,8 +376,10 @@ def trajectory_dynamics(
     continuous_prob: np.ndarray,
     fragmented_prob: np.ndarray,
     run_speed_baseline: np.ndarray,
+    ahead_behind_distance: np.ndarray,
     env,
     place_bin_size: float,
+    well_radius_cm: float | None = None,
 ) -> RollupResult:
     """Trajectory shape/speed/extent rollups.
 
@@ -306,10 +393,12 @@ def trajectory_dynamics(
     """
     nodes_df = env.place_bin_centers_nodes_df_
     node_ids, has_valid = map_estimate_to_map_nodes(map_estimate, nodes_df)
-    dist = _graph_distance_lookup(env.track_graph_with_bin_centers_edges_)
-    node_lin = dict(
-        zip(nodes_df["node_id"].to_numpy(), nodes_df["linear_position"].to_numpy(), strict=True)
-    )
+    graph = env.track_graph_with_bin_centers_edges_
+    dist = _graph_distance_lookup(graph)
+    # Well nodes are the degree-1 terminals of the bin-centre track graph (the
+    # six well ends). ``well_radius`` defaults to four place bins.
+    well_nodes = [n for n, deg in graph.degree() if deg == 1]
+    well_radius = well_radius_cm if well_radius_cm is not None else 4.0 * place_bin_size
 
     df = pd.DataFrame(
         {
@@ -321,6 +410,7 @@ def trajectory_dynamics(
             "continuous_prob": np.asarray(continuous_prob, float),
             "fragmented_prob": np.asarray(fragmented_prob, float),
             "run_speed_baseline": np.asarray(run_speed_baseline, float),
+            "ahead_behind": np.asarray(ahead_behind_distance, float),
             "node": node_ids,
             "has_valid": has_valid,
         }
@@ -362,14 +452,13 @@ def trajectory_dynamics(
             return 0.0 if nodes else np.nan
         return float(max(dist[a][b] for a in nodes for b in nodes))
 
+    # Direction reversals are counted on the signed ahead/behind distance
+    # (graph-geodesic, branch-safe) rather than the discontinuous
+    # ``linear_position`` (whose branch crossings faked reversals). The
+    # hysteresis dead-band is one place bin — the same spatial scale
+    # ``pause_fraction`` uses — so decoder jitter within a bin is not a turn.
     def _n_reversals(g):
-        nodes = _valid_nodes(g)
-        if len(nodes) < 3:
-            return 0
-        lin = np.array([node_lin[n] for n in nodes])
-        signs = np.sign(np.diff(lin))
-        signs = signs[signs != 0]
-        return int(np.sum(np.diff(signs) != 0)) if len(signs) >= 2 else 0
+        return _count_ab_reversals(g["ahead_behind"].to_numpy(), place_bin_size)
 
     def _n_patches(g):
         arms = g["decoded_arm"][np.isfinite(g["decoded_arm"])]
@@ -392,9 +481,22 @@ def trajectory_dynamics(
         finite = np.isfinite(sd)
         return float((sd[finite] <= place_bin_size).mean()) if finite.any() else np.nan
 
+    # "Terminates at a well" requires the final decoded position to be within
+    # ``well_radius`` graph-cm of a degree-1 well node — not merely that the last
+    # decoded arm is a leaf arm (which also matches mid-arm / patch-junction-end
+    # endpoints).
     def _terminates_at_well(g):
         a = _end_arm(g)
-        return bool(np.isfinite(a) and 0 <= a < 6)
+        if not (np.isfinite(a) and 0 <= a < 6):
+            return False
+        nodes = _valid_nodes(g)
+        if not nodes:
+            return False
+        end_dist = dist.get(nodes[-1], {})
+        nearest_well = min(
+            (end_dist[w] for w in well_nodes if w in end_dist), default=np.inf
+        )
+        return bool(nearest_well <= well_radius)
 
     # CAVEAT: ``step_distance`` is the session-level per-bin MAP displacement
     # (distance into bin t from bin t-1). The first in-event bin's step
@@ -507,6 +609,7 @@ def compute_trajectory_rollups(
         continuous_prob=col(continuous_col),
         fragmented_prob=col(fragmented_col),
         run_speed_baseline=col("run_speed_baseline"),
+        ahead_behind_distance=col("ahead_behind_distance"),
         env=env,
         place_bin_size=place_bin_size,
     )
