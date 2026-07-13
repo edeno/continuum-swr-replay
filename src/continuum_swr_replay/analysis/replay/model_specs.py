@@ -214,27 +214,25 @@ _M7 = (
     "swr_x_visit_recency_demeaned",
     "swr_x_is_last_rewarded_elsewhere",
 )
-# Value block: per-arm nominal value (p_reward_arm) + per-arm model value
-# (q_arm_hmm, the HMM Global-Model per-leaf Q) as conditional main effects on the
-# M5 spatial/reward-memory base (covariate_dictionary.md D2/D3). q_arm_hmm — not the
-# beta q_arm — is used so the content value construct is the same single model as the
-# is_swr rate ladder's HMM value covariates (the beta q_arm column is retained in the
-# table for a robustness check). Additive in *spec* — but because p_reward_arm/
-# q_arm_hmm are NaN for stops absent from the contingency, co-fitting Mv in the same
+# Value block: per-arm nominal value (p_reward_arm) + per-arm beta-model value
+# (q_arm, the beta-bernoulli per-leaf belief mean) as conditional main effects on the
+# M5 spatial/reward-memory base (covariate_dictionary.md D2/D3). The beta q_arm is the
+# single value construct shared with the is_swr rate ladder's beta value covariates.
+# Additive in *spec* — but because p_reward_arm/
+# q_arm are NaN for stops absent from the contingency, co-fitting Mv in the same
 # run restricts the shared complete-case event set, so it is excluded from the default
 # model list (request --models M5,Mv to compare it to its base).
-_Mv = (*_M5, "p_reward_arm", "q_arm_hmm")
+_Mv = (*_M5, "p_reward_arm", "q_arm")
 
 # Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
 # betadist_var) added on the M5 spatial/reward base. Mvu pairs it with the beta
-# per-arm VALUE (q_arm, NOT q_arm_hmm) so value+uncertainty come from the SAME Beta
-# posterior — a construct-coherent exploit-vs-explore contrast (no beta/HMM mix; the
-# HMM-value story stays in Mv). arm_uncertainty is added AFTER visit_recency (M4) so
-# its coefficient is the recency-independent effect (docs: beta variance is +0.54
-# correlated with visit_recency by construction, but the effect survives
-# orthogonalization). See docs/behavior_models.md.
+# per-arm VALUE (q_arm) so value+uncertainty come from the SAME Beta posterior — a
+# construct-coherent exploit-vs-explore contrast. arm_uncertainty is added AFTER
+# visit_recency (M4) so its coefficient is the recency-independent effect (docs: beta
+# variance is +0.54 correlated with visit_recency by construction, but the effect
+# survives orthogonalization). See docs/behavior_models.md.
 # Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.03, ~12x smaller than
-# q_arm_hmm, which makes the per-session covariance singular; the _z form is well-scaled
+# q_arm, which makes the per-session covariance singular; the _z form is well-scaled
 # (SD 1) and is what these rungs fit.
 _Mu = (*_M5, "arm_uncertainty_z")
 _Mvu = (*_M5, "q_arm", "arm_uncertainty_z")
@@ -298,7 +296,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
         name="Mv",
         predictors=_Mv,
         description="+ per-arm nominal value (p_reward_arm) + per-arm "
-        "HMM model value (q_arm_hmm, Q)",
+        "beta model value (q_arm)",
         parent="M5",
     ),
     "Mu": ModelSpec(
@@ -836,10 +834,10 @@ _BLOCK_F = {
     "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
     "BLOCK": "trials_since_block_change",
     "SWITCHRATE": "recent_switch_rate",
-    "VALUE": "hmm_relative_value",      # relative value dV (paper's value+decision axis)
-    "RPE": "hmm_rpe",                   # reward prediction error (reward - Q_leaf)
-    "UNCERT": "reward_entropy",         # HMM reward-state entropy
-    "UPDATE": "hmm_value_update",       # global value-update magnitude
+    "VALUE": "switch_advantage_mu_preoutcome_sess",  # beta relative value (Stay-vs-Switch DeltaV)
+    "RPE": "rpe",                       # beta reward prediction error (reward - q_chosen)
+    "UNCERT": "beta_reward_entropy",    # beta belief entropy (per-leaf Beta differential entropy)
+    "UPDATE": "global_mu_update_abs_postoutcome_sess",  # beta value-update magnitude
     "REWXTIME": f"reward_lag1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
 }
 _BLOCK_COLS = {
@@ -848,10 +846,10 @@ _BLOCK_COLS = {
     "PERISWITCH": ["trials_since_switch", "is_post_switch"],
     "BLOCK": ["trials_since_block_change"],
     "SWITCHRATE": ["recent_switch_rate"],
-    "VALUE": ["hmm_relative_value"],
-    "RPE": ["hmm_rpe"],
-    "UNCERT": ["reward_entropy"],
-    "UPDATE": ["hmm_value_update"],
+    "VALUE": ["switch_advantage_mu_preoutcome_sess"],
+    "RPE": ["rpe"],
+    "UNCERT": ["beta_reward_entropy"],
+    "UPDATE": ["global_mu_update_abs_postoutcome_sess"],
     "REWXTIME": ["reward_lag1", "tc"],
 }
 SWR_CONTRAST_RATE_STOP_COVARS = tuple(
@@ -914,7 +912,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C1_current": ([*ARMFE, "is_current"], "split"),
     "C2_base": (BASEc, "split"),
     "C3_armreward": ([*BASEc, "reward_rate_arm_k10"], "split"),
-    "C4_armvalue": ([*BASEc, "q_arm_hmm"], "split"),
+    "C4_armvalue": ([*BASEc, "q_arm"], "split"),
     "C5_lastrew": ([*BASEc, "is_last_rewarded_elsewhere"], "split"),
     "C6_rpe": ([*BASEc, _TSC, "rpe_x_current"], "split"),
     "C7_value": ([*BASEc, _TSC, "relval_x_current"], "split"),
@@ -935,7 +933,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
                      "swr_x_is_last_rewarded_elsewhere"], "pooled"),
     "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
                        "swr_x_reward_rate_arm_k10"], "pooled"),
-    "CS5_armvalue": ([*BASEc, "q_arm_hmm", "swr_x_q_arm_hmm"], "pooled"),
+    "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
     # Per-arm beta belief UNCERTAINTY (exploration). BASEc carries no value term, so
     # these rungs are construct-clean (beta uncertainty on the spatial base — no
     # beta/HMM mix). C13 (split): independent uncertainty coefficient on the SWR-only
@@ -946,7 +944,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C1_current": "is_current", "C2_base": "is_current",
-    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm_hmm",
+    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm",
     "C5_lastrew": "is_last_rewarded_elsewhere", "C6_rpe": "rpe_x_current",
     "C7_value": "relval_x_current", "C8_uncert": "entropy_x_current",
     "C9_update": "update_x_current", "C10_periswitch": "tss_x_current",
@@ -954,7 +952,7 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "CS1_current": "swr_x_current", "CS1nt_current": "swr_x_current",
     "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
-    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm_hmm",
+    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm",
     "C13_armuncert": "arm_uncertainty_z", "CS6_armuncert": "swr_x_arm_uncertainty_z",
 }
 BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
