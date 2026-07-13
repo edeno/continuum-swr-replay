@@ -10,8 +10,8 @@ patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,
 is_swr) enter ONLY as interactions with arm-features (``:is_current``). Per-arm
-covariates (``reward_rate_arm_k10``, ``q_arm_hmm``, ``is_last_rewarded_elsewhere``)
-enter as main effects (beta ``q_arm`` is retained as a robustness column only).
+covariates (``reward_rate_arm_k10``, ``q_arm``, ``is_last_rewarded_elsewhere``)
+enter as main effects.
 
 Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
   C0..C2  spatial baseline (ARMFE -> is_current -> +autocorrelation controls)
@@ -28,8 +28,7 @@ The Wilcoxon signed-rank across sessions is reported as a **descriptive** consis
 statistic ONLY — sessions within an animal are not independent, so it is not a valid
 population p-value — with a Benjamini-Hochberg FDR across the rung family per population.
 ``typical_session_se`` is the median within-session SE, not the aggregate's uncertainty.
-Per-arm value uses the **HMM Global-Model** construct (``q_arm_hmm``); the beta-model
-``q_arm`` is retained only as a robustness column. A provenance sidecar (git hash,
+Per-arm value uses the beta-bernoulli construct (``q_arm``). A provenance sidecar (git hash,
 params) is written. DEFERRED follow-ups (in the provenance): the **hierarchical Poisson
 with animal random effects** that would replace the descriptive session signed-rank with
 rigorous population inference; a common complete-case cohort; and within-group-centered
@@ -105,10 +104,10 @@ MIN_EVENTS = 18
 
 # event-level scalars z-scored (so :is_current coefs are per-SD & comparable)
 _ZSCALARS = [
-    "hmm_rpe",
-    "hmm_relative_value",
-    "reward_entropy",
-    "hmm_value_update",
+    "rpe",
+    "switch_advantage_mu_preoutcome_sess",
+    "beta_reward_entropy",
+    "global_mu_update_abs_postoutcome_sess",
     "trials_since_switch",
     "trials_since_block_change",
     "recent_switch_rate",
@@ -132,10 +131,10 @@ def _assemble_arm() -> pd.DataFrame:
         q[
             [
                 "stop_id",
-                "hmm_rpe",
-                "hmm_relative_value",
-                "reward_entropy",
-                "hmm_value_update",
+                "rpe",
+                "switch_advantage_mu_preoutcome_sess",
+                "beta_reward_entropy",
+                "global_mu_update_abs_postoutcome_sess",
                 "trials_since_switch",
                 "is_post_switch",
                 "trials_since_block_change",
@@ -149,10 +148,10 @@ def _assemble_arm() -> pd.DataFrame:
     cur = ev["is_current"].to_numpy(dtype=float)
     swr = ev["is_swr"].to_numpy(dtype=float)
     # state-modulation interactions (event-scalar_z : is_current)
-    ev["rpe_x_current"] = cur * ev["hmm_rpe_z"]
-    ev["relval_x_current"] = cur * ev["hmm_relative_value_z"]
-    ev["entropy_x_current"] = cur * ev["reward_entropy_z"]
-    ev["update_x_current"] = cur * ev["hmm_value_update_z"]
+    ev["rpe_x_current"] = cur * ev["rpe_z"]
+    ev["relval_x_current"] = cur * ev["switch_advantage_mu_preoutcome_sess_z"]
+    ev["entropy_x_current"] = cur * ev["beta_reward_entropy_z"]
+    ev["update_x_current"] = cur * ev["global_mu_update_abs_postoutcome_sess_z"]
     # context interactions
     ev["tss_x_current"] = cur * ev["trials_since_switch_z"]
     ev["postsw_x_current"] = cur * ev["is_post_switch"].to_numpy(dtype=float)
@@ -202,7 +201,7 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
 
 
 # Event-level columns carried for the cohort-audit drop profile (mechanism A vs B).
-_PROFILE_COLS = ("time_since_stop", "reward_outcome", "q_arm_hmm", "hmm_relative_value")
+_PROFILE_COLS = ("time_since_stop", "reward_outcome", "q_arm", "switch_advantage_mu_preoutcome_sess")
 
 
 def _fit_session(
@@ -468,8 +467,7 @@ def _provenance(
         "are not independent); primary population evidence is per-animal sign "
         "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
         "per population is applied to the descriptive session signed-rank p.",
-        "q_arm_source": "HMM Global-Model per-arm value (q_arm_hmm); beta q_arm "
-        "retained as robustness column only",
+        "q_arm_source": "beta-bernoulli per-arm value (q_arm)",
         "deferred": [
             "mixed conditional logit with animal random effects (the rigorous "
             "population inference; supersedes the descriptive session signed-rank p). "
@@ -568,7 +566,7 @@ def main() -> None:
     # provenance sidecar. SDs are the global (pooled) SD of the raw per-arm covariates.
     sd_arm = {
         c: float(np.nanstd(ev[c].to_numpy(dtype=float)))
-        for c in ("q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm")
+        for c in ("q_arm", "reward_rate_arm_k10", "p_reward_arm")
         if c in ev.columns
     }
     agg = pd.concat(

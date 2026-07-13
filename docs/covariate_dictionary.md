@@ -56,8 +56,7 @@ arms keep the structural `0.0`; never-visited leaf arms keep `NaN`.
 | `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
 | `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
-| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | same behavior model | robustness column (retained; superseded by `q_arm_hmm` in the value rungs) |
-| `q_arm_hmm` | **HMM** Global-Model per-leaf value of **each** arm (`hmm_q_port{i}` = HMM `Q{i+1}`) | per-arm | `default_hmm` (`qvals_table`) | content value main effect — **the value construct used by C4/CS5/Mv**, harmonized with the is_swr rate ladder's `hmm_*` value covariates; **not** currently used in the Stage-5A choice model (choice carries replay_frac + visit-recency + cumulative-reward + reward-rate + distance/rank/same-patch, no value covariate) |
+| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect — **the value construct used by C4/CS5/Mv** (and the is_swr rate ladder's value covariates); **not** used in the Stage-5A choice model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13** when the paper standardized on the beta-bernoulli model.) |
 | `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
@@ -160,7 +159,7 @@ the event it predicts. Classification of the covariates fitted by the rate model
 | `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
 | `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
 | `recent_switch_rate` | rolling, **lag-1** | yes — by construction excludes the current stop |
-| `reward_entropy`, `state_entropy` | HMM belief entropy | yes (pre-outcome posterior) |
+| `beta_reward_entropy` | beta belief entropy (mean per-leaf Beta differential entropy) | yes (pre-outcome posterior) |
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
 
 The three post-outcome covariates are the only leakage risk. **Empirically there is
