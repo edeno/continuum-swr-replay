@@ -39,6 +39,7 @@ from typing import Any
 import datajoint as dj
 import numpy as np
 import pandas as pd
+from scipy.special import betaln, digamma
 
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_present,
@@ -60,31 +61,15 @@ ANIMAL_SUBJECT = {"chimi": "chimi", "j16": "j16", "peanut": "peanut",
 MODEL_KEY = {"behavior_model_params_name": "beta_stable_withleaf",
              "trials_info_by_rat_params_name": "stable_default",
              "trials_info_csv_params_name": "original_csv_format"}
-# default_hmm = the paper's "Global Model" (Comrie et al.). We derive the
-# paper-faithful decision variables from it (single-model, unlike the beta block):
-# see add_hmm_decision_variables. Fetch the native columns those formulas need.
-HMM_KEY = {"behavior_model_params_name": "default_hmm",
-           "trials_info_by_rat_params_name": "stable_default",
-           "trials_info_csv_params_name": "original_csv_format"}
-HMM_COLS = ["state_entropy", "reward_entropy"]
-# paper-faithful HMM decision variables (canonical dimensions for the is_swr rate
-# analysis): relative value (val_difference), RPE, global value update -- all from
-# default_hmm (single model, matches Comrie et al. Fig 1/5). The entropy dimension
-# uses the native HMM `reward_entropy` (in HMM_COLS); the paper's port-specific
-# `reward_entropy_current_leaf` is absent from this (HMM_KEY-aligned) fit.
-HMM_DV_COLS = ["hmm_relative_value", "hmm_rpe", "hmm_value_update"]
-# Per-leaf HMM value (native Q1..6 of the Global Model), exposed 0-indexed as the
-# HMM analog of the beta ``q_port{0..5}`` block so the content/choice builders can
-# form a *single-model* per-arm value (``q_arm_hmm``) harmonized with the HMM value
-# covariates the is_swr rate ladder uses -- see attach_contingency_value_block.
-HMM_Q_PORT_COLS = [f"hmm_q_port{i}" for i in range(6)]
 # Continuous stop-level covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``
 # by this builder (after the all-epoch concat). This is the qvals side of the persisted
 # _z that used to be stamped post-hoc by _add_standardized_cols; prepare_data only READS
 # this table and must not re-standardize it.
 QVALS_STANDARDIZED_COLS = [
-    "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update",
-    "state_entropy", "trials_since_switch", "trials_since_block_change",
+    "trials_since_switch", "trials_since_block_change",
+    # beta-bernoulli value / decision / uncertainty block:
+    "rpe", "switch_advantage_mu_preoutcome_sess",
+    "global_mu_update_abs_postoutcome_sess", "beta_reward_entropy",
 ]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
@@ -112,12 +97,8 @@ COVARIATES = [
     *[f"betadist_var{i}" for i in range(1, 7)],
     "global_leaf_var_sum_preoutcome_sess", "chosen_leaf_var_preoutcome_sess",
     "prev_local_variance", "prev_global_variance", "upcoming_leaf_variance", "next_choice_variance",
-    # reward-state entropy (HMM)
-    "state_entropy", "reward_entropy",
-    # paper-faithful HMM decision variables (single-model canonical set; Comrie et al.)
-    *HMM_DV_COLS,
-    # per-leaf HMM value (Q1..6, 0-indexed) -> q_arm_hmm, the HMM per-arm value
-    *HMM_Q_PORT_COLS,
+    # beta belief-entropy (mean per-leaf Beta differential entropy)
+    "beta_reward_entropy",
     # depletion / choice probabilities
     *[f"depletion_leaf_{i}" for i in range(1, 7)],
     *[f"depletion_mean_stem_{i}" for i in range(1, 4)],
@@ -247,71 +228,34 @@ def add_experienced_value_columns(vals: pd.DataFrame) -> pd.DataFrame:
     return vals
 
 
-def add_hmm_decision_variables(hmm: pd.DataFrame) -> pd.DataFrame:
-    """Paper-faithful decision variables from the HMM ("Global Model", Comrie et al.).
+def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
+    """Add ``beta_reward_entropy``: mean per-leaf Beta differential entropy.
 
-    Ports the value-relevant parts of Alison's ``rl_helpers`` HMM pipeline
-    (``add_rpe_deltaq_to_hmm_plus`` + ``create_hmm_plus``'s ``val_difference``)
-    directly onto ``default_hmm``'s native columns, so the value / RPE / update /
-    entropy covariates all come from **one** model (vs the beta block's mix). Adds:
+    The beta-bernoulli analog of the retired HMM reward-state entropy -- a per-trial scalar
+    summarizing how uncertain the reward-probability beliefs are across the six
+    leaves. For leaf ``i`` with posterior ``Beta(a_i, b_i)`` (the fit's native
+    ``betadist_α{i}`` / ``betadist_β{i}``, both >= 1), the differential entropy is
 
-    - ``hmm_relative_value`` -- ΔV: mean of the other stems minus the initial
-      (starting) stem value, ``(ΣQstem - Qstem_initial)/2 - Qstem_initial`` (Fig 1F).
-    - ``hmm_rpe`` -- the canonical RPE ``reward - Q_current_leaf`` (Fig 5).
-      Alison additionally rescales Q *before* the subtraction
-      (``(Q_leaf + 0.6) / 1.25``, her own "forced rescaling to get in zone of
-      0 to 1"), giving ``reward - 0.8*Q_leaf - 0.48``. That is a cosmetic
-      display transform, NOT an affine transform of ``reward - Q_leaf`` (it
-      reweights Q relative to reward), so we deliberately use the unscaled
-      textbook RPE here rather than reproduce the plotting rescale.
-    - ``hmm_value_update`` -- global update ``Σ_leaf |Q_leaf(t+1) - Q_leaf(t)|``
-      (``delta_Qglobal_t_abs``, Fig 5D-right); NaN on the last trial of an epoch.
+        H_i = betaln(a, b) - (a-1)ψ(a) - (b-1)ψ(b) + (a+b-2)ψ(a+b),
 
-    (The entropy dimension uses the native ``reward_entropy`` carried via HMM_COLS,
-    not computed here.) Requires ``default_hmm`` native cols (``Q1..6``, ``Qstem1..3``,
-    ``leaf``, ``stemchoice``, ``reward``) + KEYS. Per-epoch (no cross-epoch bleed).
+    averaged over the six leaves. Differential entropy can be negative (unlike the
+    HMM discrete Shannon entropy) -- expected; the covariate is used standardized.
+    Mutates and returns ``vals``. Raises if the posterior params are absent.
     """
-    required = [
-        *[f"Q{i}" for i in range(1, 7)],
-        *[f"Qstem{i}" for i in range(1, 4)],
-        "leaf",
-        "stemchoice",
-        "reward",
-    ]
-    missing = [c for c in required if c not in hmm.columns]
+    missing = [f"betadist_{g}{i}" for i in range(1, 7) for g in ("α", "β")
+               if f"betadist_{g}{i}" not in vals.columns]
     if missing:
         raise ValueError(
-            f"HMM fit (default_hmm) missing native cols {missing}; wrong "
-            "BehaviorModelResults fit restriction?"
+            f"beta posterior params missing {missing}; cannot build beta_reward_entropy"
         )
-    d = hmm.sort_values(KEYS).reset_index(drop=True)
-    # leaf/stemchoice index into length-6/length-3 Q arrays as `x - 1`; an
-    # out-of-range value would silently wrap (0 -> -1 -> last column) or
-    # truncate a float, corrupting the value covariate with no error. Guard
-    # both, allowing the first-trial NaN that stemchoice.shift() introduces.
-    if not d["leaf"].between(1, 6).all():
-        raise ValueError(f"HMM leaf outside 1..6: {sorted(d['leaf'].unique())}")
-    sc = d["stemchoice"].dropna()
-    if not sc.between(1, 3).all():
-        raise ValueError(f"HMM stemchoice outside 1..3: {sorted(sc.unique())}")
-    g = d.groupby(["nwb_file_name", "epoch"], sort=False)
-    qmat = d[[f"Q{i}" for i in range(1, 7)]].to_numpy()
-    # Expose the per-leaf HMM value 0-indexed (hmm_q_port{i} = Q{i+1}), the HMM
-    # counterpart of the beta q_port block, for the per-arm value harmonization.
-    for i in range(6):
-        d[f"hmm_q_port{i}"] = qmat[:, i]
-    leaf = d["leaf"].to_numpy().astype(int)
-    q_leaf_t = qmat[np.arange(len(d)), leaf - 1]
-    d["hmm_rpe"] = d["reward"].to_numpy() - q_leaf_t
-    nxt = np.column_stack([g[f"Q{i}"].shift(-1).to_numpy() for i in range(1, 7)])
-    d["hmm_value_update"] = np.abs(nxt - qmat).sum(axis=1)  # NaN at epoch's last trial
-    qstem = d[[f"Qstem{i}" for i in range(1, 4)]].to_numpy()
-    si = g["stemchoice"].shift().to_numpy()  # the *initial* (starting) stem this trial
-    q_init = np.full(len(d), np.nan)
-    ok = ~np.isnan(si)
-    q_init[ok] = qstem[np.where(ok)[0], si[ok].astype(int) - 1]
-    d["hmm_relative_value"] = (qstem.sum(axis=1) - q_init) / 2 - q_init
-    return d
+    ent = np.zeros(len(vals))
+    for i in range(1, 7):
+        a = vals[f"betadist_α{i}"].to_numpy(dtype=float)
+        b = vals[f"betadist_β{i}"].to_numpy(dtype=float)
+        ent += (betaln(a, b) - (a - 1) * digamma(a) - (b - 1) * digamma(b)
+                + (a + b - 2) * digamma(a + b))
+    vals["beta_reward_entropy"] = ent / 6.0
+    return vals
 
 
 def assign_stops_to_trials(
@@ -358,17 +302,15 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     """Join enriched model covariates to poke timestamps, one row per trial.
 
     Beta values are enriched with the vendored decision-variable pipeline
-    (DeltaV, value updates, etc.), HMM reward entropy is merged on KEYS, and
-    RPE/q_chosen/arm are derived; the curated COVARIATES are broadcast to stops.
+    (DeltaV, value updates, belief entropy, etc.) and RPE/q_chosen/arm are
+    derived; the curated COVARIATES are broadcast to stops.
     """
     subject = ANIMAL_SUBJECT[animal]
     vals = make_full_beta_bernoulli_dv_df(_fetch_model_df(rl, subject, MODEL_KEY))
-    hmm = add_hmm_decision_variables(_fetch_model_df(rl, subject, HMM_KEY))
-    hmm = hmm[[*KEYS, *HMM_COLS, *HMM_DV_COLS, *HMM_Q_PORT_COLS]]
-    vals = vals.merge(hmm, on=KEYS, how="left", validate="one_to_one")
     vals = add_experienced_value_columns(vals)  # q_chosen / arm / q_port / rpe
+    vals = add_beta_belief_entropy(vals)  # beta_reward_entropy (from betadist_α/β)
     model_cols = [c for c in COVARIATES if c in vals.columns]
-    pt_attrs_entropy = float(vals["reward_entropy"].notna().mean())
+    pt_attrs_entropy = float(vals["beta_reward_entropy"].notna().mean())
 
     nwbs = vals["nwb_file_name"].unique().tolist()
     times = pd.DataFrame((beh.TrialsInfoByEpoch.ByTrial
@@ -460,8 +402,8 @@ def main() -> None:
         if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.5:
             print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%), "
                   f"at-well arm agreement {100*arm_ok:.1f}% (expect ~100%), or "
-                  f"reward_entropy coverage {100*entropy_cov:.0f}% (expect >=50%; a low "
-                  f"figure voids the RL entropy covariate) -- possible mapping/HMM regression")
+                  f"beta_reward_entropy coverage {100*entropy_cov:.0f}% (expect ~100%; a low "
+                  f"figure voids the belief-entropy covariate) -- possible mapping/model regression")
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
     print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")
@@ -471,7 +413,7 @@ def main() -> None:
     # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
     # make attach_contingency_value_block blank the whole value block downstream.
     required = {"stop_id", "p_reward_current", "q_chosen", *[f"p_reward_port{i}" for i in range(6)],
-                *[f"q_port{i}" for i in range(6)], *HMM_Q_PORT_COLS}
+                *[f"q_port{i}" for i in range(6)], "beta_reward_entropy"}
     missing = required - set(tab.columns)
     if missing:
         raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
