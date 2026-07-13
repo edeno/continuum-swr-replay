@@ -1,5 +1,7 @@
 # Phase 3 — Per-model cohort / drop-profile audit tables
 
+> Historical baseline: cohort/drop accounting landed before the 2026-07-10 refresh. Exact identity/fold work is in Phases 9a/9b; do not execute this old phase.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 **Contracts referenced:** [cohort-audit-table schema](shared-contracts.md#cohort-audit-schema) — this

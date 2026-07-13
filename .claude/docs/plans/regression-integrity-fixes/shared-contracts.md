@@ -2,207 +2,174 @@
 
 [← back to PLAN.md](PLAN.md)
 
-Cross-phase contracts. Phase 3 *produces* the cohort-audit table; phases 4 and 5 *consume* it.
-Phase 4 *classifies* covariate timing; phase 5 relies on that classification for its sensitivity fits.
+- [Run artifact and promotion contract](#run-artifact-contract)
+- [Cohort audit schema](#cohort-audit-schema)
+- [Comparison identity contract](#comparison-identity)
+- [Fold assignment contract](#fold-assignment)
+- [Covariate timing contract](#covariate-timing)
+- [Decision-table contract](#decision-table)
+- [Fit-validity and diagnostics contract](#fit-validity)
+- [Term diagnostics](#term-diagnostics)
+- [Animal-balanced summary contract](#animal-summary)
 
-## Contract 1 — Cohort-audit table schema  {#cohort-audit-schema}
+## Run artifact and promotion contract {#run-artifact-contract}
 
-Every fit runner (content, rate, choice) emits one cohort-audit record per (model, population) fit,
-written next to the fit outputs as `<run>_cohort_audit.csv`. One row per fit. The `grain` column names
-the counting unit; **all `n_*` counts are in that unit** (a content record counts *events*, not
-event-arm rows). Drops are **mutually exclusive** — each dropped unit is assigned to exactly one bucket
-by the priority order below, so the reconciliation closes even when a unit fails several checks.
+Every canonical runner writes into `<analysis>/runs/<run_id>.staging/`, validates the run, atomically
+renames it to `<analysis>/runs/<run_id>/`, then atomically updates `<analysis>/CURRENT.json`. A run is
+invisible to canonical consumers until the pointer changes.
 
-| column | meaning |
-| --- | --- |
-| `model` | model/rung id (e.g. `M3_armreward`, `S7_rpe`, `C_full`) |
-| `population` | population/split id (e.g. `all`, `swr`, `non_swr`, `patch`) |
-| `grain` | counting unit for every `n_*`: `event` / `stop` / `stop_bin` |
-| `cohort_mode` | `per_rung` (default) or `common` (union complete-case across rungs) |
-| `n_in` | candidate units entering the runner for this (model, population) |
-| `n_drop_qvals_gap` | **[priority 1]** dropped because an HMM/value covariate this model uses is missing (mechanism B — the 2,056-stop tail). 0 for models with no value covariate. |
-| `n_drop_own_predictor_missing` | **[priority 2]** dropped for NaN in *this model's own* required predictor (excludes the qvals-gap rows already counted). Name the dominant covariate in `drop_notes`. |
-| `n_drop_zero_response` | **[priority 3]** dropped because all responses zero (content: `Σcount==0`) |
-| `n_drop_common_cohort_other` | **[priority 4]** `common` mode only: dropped *solely* because another rung's predictor is NaN while this model's own predictors are all present. 0 in `per_rung` mode. |
-| `n_excluded_session` | **[priority 5]** units in sessions failing the **data-level** gates `min_*`/rank/`n<2·n_pred`. Does **NOT** include the `|coef|>=10` quasi-separation filter — that is term-level and post-fit (see below). |
-| `n_modeled` | final units fit |
-| `n_sessions_flagged_nonconverged` | **informational, session-level, NOT a drop bucket** — number of *modeled session-fits* with `converged==False`. Counts fits, not units; excluded from reconciliation. |
-| `n_sessions_flagged_separated` | **informational, session-level, NOT a drop bucket** — number of modeled session-fits with `separated==True`. Counts fits, not units; excluded from reconciliation. |
-| `n_sessions_in` / `n_sessions_modeled` | session counts before/after |
-| `n_animals_modeled` | distinct animals surviving |
-| `drop_notes` | free text: dominant own-missing predictor + the drop profile summary below |
+`manifest.json` is written last and contains:
 
-Two consistency rules the emitter enforces (F1/F2):
-- **Grain:** every `n_drop_*`, `n_in`, `n_modeled` is in the row `grain` (event/stop/bin). The two
-  `n_sessions_flagged_*` are explicitly **session/fit** counts (named `n_sessions_*` to signal that),
-  informational, and excluded from reconciliation.
-- **Quasi-separation is NOT a cohort exclusion.** The pre-existing `|coef|>=10` filter
-  (`contrast_aggregation.py:83`) drops a *session's estimate for one term*, per (session, term) — the
-  session's data still entered the fit. A model-level cohort row cannot represent a term-specific
-  coefficient exclusion, so it is kept **out of cohort reconciliation** entirely and reported in a
-  separate **term-level diagnostics table** (Contract 3). Phase 2's convergence/separation flags are
-  likewise informational, never drop buckets, unless a separate explicit decision starts excluding on them.
-
-## Contract 3 — Term-level diagnostics table  {#term-diagnostics}
-
-Quasi-separation and convergence are properties of a *fitted coefficient*, not of the cohort, so they get
-their own table `<run>_term_diagnostics.csv` (one row per model × population × term):
-
-| column | meaning |
-| --- | --- |
-| `model` / `population` / `term` | the coefficient identified |
-| `n_sessions_fit` | sessions that produced an estimate for this term |
-| `n_sessions_quasiseparated` | sessions dropped for this term by the `|coef|>=10` filter (`contrast_aggregation.py:83`) |
-| `n_sessions_used` | sessions entering the per-animal/Wilcoxon aggregate for this term (`= n_sessions_fit − n_sessions_quasiseparated`) |
-| `n_animals_used` | distinct animals among `n_sessions_used` (the `>=5`/sign-consistency base) |
-
-Producer: the aggregation step (`contrast_aggregation.py` already logs these — surface them as a table).
-This is where term-specific exclusions live; the cohort-audit table (Contract 1) stays purely about which
-rows entered the fit.
-
-**Priority rule (mutual exclusivity):** classify each dropped unit by the first bucket it hits in the
-order qvals_gap → own_predictor_missing → zero_response → common_cohort_other → session. This keeps the
-`n_drop_qvals_gap` (mechanism B) and `n_drop_common_cohort_other` (F4 — M0–M2 dropped for a *later*
-rung's predictor) distinguishable from a model's own missingness, which is the whole point of the audit.
-
-**Reconciliation invariant (must hold):**
-`n_in − n_drop_qvals_gap − n_drop_own_predictor_missing − n_drop_zero_response − n_drop_common_cohort_other − n_excluded_session == n_modeled`.
-The emitter asserts this and fails loud if it does not close.
-
-**Drop profile (for non-random-drop detection):** alongside counts, `drop_notes` records, for the
-dropped rows, the median `time_since_stop`/trial-index quantile, the reward fraction, and (where value
-covariates apply) the value quantile — so a reviewer can see *whether* the drop is biased toward
-early-session (mechanism A) or late-session/low-value (mechanism B).
-
-Producer: [phase-3](phase-3-cohort-audit-tables.md). Consumers: phases 4, 5 attach these to every
-refit they run. **Do not** let a runner emit fit outputs without the matching cohort-audit record.
-
-## Contract 2 — Covariate pre/post-outcome timing reference  {#covariate-timing}
-
-The authoritative per-covariate timing classification lives in
-`.claude/docs/reviews/06_covariate_provenance.csv` (column `time_availability`). Phase 4 promotes the
-relevant flags into an in-code registry so fitters can assert timing at model-build:
-
-```python
-# analysis/replay/covariate_timing.py  (new, phase 4)
-POST_OUTCOME = frozenset({  # NOT available before the current trip's reward
-    "reward_outcome", "is_after_reward", "is_after_omission",
-    "hmm_rpe", "rpe", "hmm_value_update",
-})
-FUTURE_REFERENCING = frozenset({  # references a not-yet-occurred event
-    "next_arm", "is_next", "ends_at_next", "contains_path_to_next",
-    "chosen_arm_fraction", "trials_since_switch", "is_post_switch",
-})
-PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-reward
-    "reward_lag1", "reward_lag2", "reward_rate_trial_k10", "reward_rate_arm_k10",
-    "visit_recency", "visit_recency_demeaned", "cumulative_reward",
-    "is_current", "is_prev", "is_last_rewarded", "is_after_switch",
-    "hmm_relative_value", "q_arm", "q_arm_hmm", "reward_entropy", "state_entropy",
-})
-```
-
-**Derived/interaction covariates must map back to their source (F2).** The content ladder builds
-interaction columns whose names do **not** contain the source covariate, so a name-splitting heuristic
-(`_base_name("update_x_current") -> "update"`) silently fails to flag the leaky ones. Phase 4 ships an
-explicit map (verified against `fit_swr_contrast_content.py:133-150`), not a string heuristic:
-
-```python
-SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})  # gating factors, not outcome-bearing
-
-DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
-    # content `_x_current` interactions (source is the z-scalar's base covariate)
-    "rpe_x_current": ["hmm_rpe"], "rpe_x_current_z": ["hmm_rpe"],
-    "relval_x_current": ["hmm_relative_value"],
-    "entropy_x_current": ["reward_entropy"],
-    "update_x_current": ["hmm_value_update"],            # POST_OUTCOME
-    "tss_x_current": ["trials_since_switch"],             # FUTURE_REFERENCING
-    "postsw_x_current": ["is_post_switch"],               # FUTURE_REFERENCING
-    "tsspostsw_x_current": ["trials_since_switch", "is_post_switch"],
-    "block_x_current": ["trials_since_block_change"],     # safe (backward)
-    "switchrate_x_current": ["recent_switch_rate"],       # safe (backward)
-    "tsc_x_current": [],                                   # within-stop time, safe & value-free
-    # pre-materialized swr_x_* columns used directly in the CS-rungs (model_specs.py:894-901)
-    "swr_x_current": ["is_current"], "swr_x_prev": ["is_prev"],
-    "swr_x_next": ["is_next"],                            # FUTURE_REFERENCING
-    "swr_x_last_rewarded": ["is_last_rewarded"],
-    "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
-    "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
-    "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
-    "swr_x_q_arm": ["q_arm"], "swr_x_q_arm_hmm": ["q_arm_hmm"],   # value/qvals-dependent (drop → qvals_gap)
+```json
+{
+  "schema_version": 1,
+  "run_id": "<UTC>-<git8>-<spec8>-<input8>",
+  "analysis": "per_bin_rate",
+  "completed": true,
+  "started_utc": "...",
+  "completed_utc": "...",
+  "git_sha": "...",
+  "dirty": false,
+  "dirty_diff_sha256": null,
+  "argv": ["..."],
+  "software_versions": {"python": "...", "statsmodels": "..."},
+  "model_spec_sha256": "...",
+  "model_specs": {},
+  "inputs": [{"path": "...", "size": 0, "sha256": "..."}],
+  "comparison_sets": {},
+  "expected_cells": {},
+  "failed_cells": [],
+  "outputs": [{"path": "...", "size": 0, "sha256": "...", "columns": []}]
 }
-
-# Rate-design basis terms — safe backward/within-stop covariates. GENERATED from the same
-# constants the specs use (import them; do not hard-code the ranges):
-#   from .model_specs import N_REWARD_LAGS, N_HISTORY_LAGS, N_HISTORY_BASIS   # 10, 10, 4
-_DESIGN_BASIS = (
-    {"tc"}                                                             # bs(tc,...) spline argument
-    | {f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)}          # reward_lag1..10
-    | {f"onset_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)}          # onset_lag1..10 self-history
-    | {f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}               # raised-cosine history basis
-    | {f"cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}         # cross-history basis
-)
-
-# Universe every atom must fall in — the completeness test fails on anything unclassified.
-KNOWN_ATOMS = POST_OUTCOME | FUTURE_REFERENCING | PRE_OUTCOME_SAFE | _DESIGN_BASIS | frozenset({
-    "recent_switch_rate", "trials_since_block_change",  # backward-safe context
-    "arm_dist_rank", "is_same_patch", "dist_to_arm",    # spatial, value-free
-}) | {f"arm_fe_{i}" for i in range(8)}
-
-def timing_of(predictor):
-    """Resolve a predictor (plain, patsy interaction, or pre-materialized swr_x_*) to its source atoms.
-    Splits ALL ':' operands (not just the first), drops safe gating modifiers, and expands each
-    remaining operand through DERIVED_COVARIATE_SOURCES so post-outcome operands can't hide behind
-    a safe left operand (e.g. is_swr:hmm_rpe -> ['hmm_rpe'], not ['is_swr'])."""
-    if predictor in DERIVED_COVARIATE_SOURCES:
-        return list(DERIVED_COVARIATE_SOURCES[predictor])
-    atoms = []
-    for op in predictor.split(":"):
-        if op in SAFE_MODIFIERS:
-            continue
-        atoms.extend(DERIVED_COVARIATE_SOURCES.get(op, [op]))
-    return atoms
 ```
 
-**Rule the fitters enforce (phase 4) — two DIFFERENT remedies for two different leaks:**
+The strict loader requires `schema_version == 1`, `completed is true`, a matching run ID in every
+output, exact output hashes/schemas, all expected cells or explicit failure records, and the audit,
+identity, and fold tables declared by the manifest. There is no legacy fallback.
 
-```python
-def assert_predictor_timing(predictors, *, retrospective=False, descriptive=False):
-    """POST_OUTCOME leakage is fixable by restricting to post-current-outcome bins;
-    FUTURE_REFERENCING is NOT fixable by any within-stop gate — the covariate value
-    itself embeds a not-yet-occurred event regardless of which bin you evaluate it in."""
-    for p in predictors:
-        atoms = set(timing_of(p))
-        if atoms & FUTURE_REFERENCING and not descriptive:
-            raise ValueError(
-                f"{p} is future-referencing (e.g. trials_since_switch signs toward the NEXT "
-                f"switch); no temporal gate makes it predictive-safe. Use descriptive=True, or "
-                f"replace it with a strictly past-only covariate (e.g. trials_since_last_switch).")
-        if atoms & POST_OUTCOME and not (retrospective or descriptive):
-            raise ValueError(
-                f"{p} is post-outcome; gate the fit to post-current-outcome bins "
-                f"(retrospective=True) or set descriptive=True.")
-```
+## Cohort-audit table schema {#cohort-audit-schema}
 
-So: `retrospective=True` whitelists **only** `POST_OUTCOME` (current-reward covariates, valid once the
-reward is delivered — `hmm_rpe`, `hmm_value_update`, `is_after_reward`). `FUTURE_REFERENCING`
-(`trials_since_switch`, `is_post_switch`, `next_arm`, `swr_x_next`) is **never** predictive-safe — a
-post-reward bin still carries a `trials_since_switch` that counts toward a switch that hasn't happened
-(`qvals_table.py:169`, the `-until` branch). Such a rung must be `descriptive=True` **or** swap in a
-strictly past-only switch covariate (`trials_since_last_switch` = the `since` component only). This also
-catches the rate `is_swr * (... + hmm_rpe/hmm_value_update/trials_since_switch)` S-rungs
-(`model_specs.py:851-861`), whose patsy expansion yields `is_swr:hmm_rpe`/`is_swr:trials_since_switch`.
-`is_after_switch` is pre-outcome-safe (destination chosen at departure).
+The landed row-drop fields remain, with exact identity added. One record is emitted per
+`(run_id, fit_purpose, comparison_set, model, population)`:
 
-**Completeness rule (F1/F2/F4):** phase 4 tests that for **every** predictor of **every** rung in
-`SWR_CONTRAST_CONTENT_ARM_LADDER`, the rate `_s_specs`/`_g_specs` ladders, and the per-stop/per-bin
-ladders, `timing_of(pred) ⊆ KNOWN_ATOMS`. **Resolve rate designs through the specs' declared column
-lists, not raw patsy strings** — the per-bin formula contains `bs(tc, knots=..., ...)` and
-`reward_lag1:bs(tc, ...)` (`model_specs.py:565,663`) which do not tokenize on `:`; iterate the block
-provenance (`_blocks_cols` / `ModelSpec.predictors` / the `_HistorySpec.formula` term list at
-`model_specs.py:648-663`) so each design term maps to a `_DESIGN_BASIS` atom (`tc`, `reward_lag{j}`,
-`onset_lag{j}`, `hist_rcos_{k}`, `cross_hist_rcos_{k}`). An unmapped interaction (or a new `swr_x_*`)
-resolving to an unknown atom **fails the test** rather than silently passing as its own name. This same
-atom resolution drives cohort drop-classification: a rung using `swr_x_q_arm_hmm` inherits `q_arm_hmm`'s
-qvals-dependence, so its qvals-tail drops are attributed to `n_drop_qvals_gap`, not own-predictor.
+| Column | Meaning |
+| --- | --- |
+| `schema_version`, `run_id` | artifact contract identity |
+| `fit_purpose` | `estimation` or `selection` |
+| `comparison_set` | declared set ID; empty only for standalone estimation |
+| `model`, `population`, `grain` | fit cell and counting unit |
+| `n_in`, mutually exclusive `n_drop_*`, `n_modeled` | existing reconciled row/group accounting |
+| `n_rows_modeled`, `n_groups_modeled` | exact likelihood rows and conditioning/block groups |
+| `row_key_columns`, `group_key_columns` | typed keys used to construct hashes |
+| `cohort_hash`, `group_hash` | exact canonical typed hashes |
+| `fold_hash` | selection CV assignment hash; null only when CV is not run |
+| `n_sessions_*`, `n_animals_modeled`, `drop_notes` | existing coverage/profile fields |
 
-Consumers: phase 4 (enforcement), phase 5 (labels which sensitivity fits are retrospective).
+The invariant remains `n_in - sum(mutually exclusive drop buckets) == n_modeled`. Schema-versioned
+writes reject absent identity fields rather than filling them with NaN.
+
+## Comparison identity contract {#comparison-identity}
+
+Selection results may be compared only when all of these match: `run_id`, `fit_purpose=selection`,
+`comparison_set`, response, estimator/family, link, offset/exposure semantics, grain, category-set
+semantics, `cohort_hash`, and `group_hash`. CV also requires equal `fold_hash`.
+
+Declared sets:
+
+| Analysis | Row key | Group/block | Selection sets |
+| --- | --- | --- | --- |
+| Per-stop rate | `stop_id` | chronological stop/decision | `R0-R1-R2`, `R0-Rlag` |
+| Per-bin rate | `(stop_id, binj)` | whole stop | explicit parent-child sets plus one prespecified paper-ranking set |
+| Arm content | `(event_id, arm)` | whole stop | base `M0-M4`; sparse-memory `M4-M5`; value `M4-Mv`; uncertainty sensitivities |
+| Patch content | `(event_id, patch)` | whole stop | base `P0-P4`; value `P3-Pv` |
+| SWR contrasts | native likelihood key | whole stop | separate `predictive`, `retrospective`, and `descriptive` sets |
+| Decision choice | `(decision_id, arm)` | whole decision | behavior/value baseline versus +replay; split replay separately |
+
+AIC/BIC require the same likelihood and rows. LRT additionally requires a declared strict parent,
+positive parameter difference, and child log likelihood no smaller than the parent beyond numerical
+tolerance. Invalid input raises `ComparisonContractError`; it is never clipped or converted to a
+plausible p-value.
+
+## Fold assignment contract {#fold-assignment}
+
+`folds.parquet` contains one row per block group:
+
+| Column | Meaning |
+| --- | --- |
+| `run_id`, `comparison_set`, `session_id` | owner |
+| `group_id` | stop or decision ID; all descendant rows inherit its fold |
+| `order_time` | canonical start time used for ordering |
+| `fold_id` | contiguous balanced test block `0..K-1` |
+
+Assignments are deterministic and invariant to input row order: sort by `(order_time, group_id)`,
+split unique groups into contiguous balanced blocks, and score every group exactly once. The typed
+hash of `(session_id, group_id, fold_id)` is `fold_hash`. Missing order time, duplicated group IDs, or
+an unassigned group raises. Forward-chaining, if used, is a separately named scheme and is never
+silently substituted for blocked interpolation.
+
+## Covariate pre/post-outcome timing contract {#covariate-timing}
+
+The existing `PRE_OUTCOME_SAFE`, `POST_OUTCOME`, and `FUTURE_REFERENCING` registry remains the
+authoritative model-build gate. Phase 8 changes two details:
+
+- Replace `recent_switch_rate` with `recent_completed_switch_rate_k5`, computed at response/query time
+  from completed trials.
+- A `POST_OUTCOME` predictor is accepted only when the fitted row carries
+  `response_time >= outcome_known_time`; setting `descriptive=True` without a physical gate is not a
+  substitute for a post-outcome analysis.
+
+Future-referencing peri-switch predictors remain descriptive; no within-stop timing gate makes them
+predictive-safe.
+
+## Decision-table contract {#decision-table}
+
+`decision_arm_table` has exactly six rows per eligible decision, keyed by `(decision_id, arm)` with
+arms `0..5` and exactly one `chosen == 1`. `decision_id` is the stable session/trial identifier for the
+target trial. Decisions with the same chosen and current arm and decisions with no replay are retained.
+
+Required decision-level fields include target/current trial indices and arms, previous outcome,
+`window_start`, `window_end`, duration, session/animal keys, and behavior-model coverage. Arm-varying
+fields include pre-outcome Q/value, nominal probability, visit/reward history, `has_arm_history`,
+distance rank, and hard/soft replay mass for all/SWR/non-SWR events. Replay mass is zero—not NaN—when
+a decision window contains no event of that type.
+
+`decision_summary_table` contains one row per decision for Stage 6, derived from the same arm table and
+window. No stop-grain response is allowed in either canonical model.
+
+## Fit-validity and diagnostics contract {#fit-validity}
+
+Every attempted cell produces a row, including failures. Required fields:
+
+| Field | Rule |
+| --- | --- |
+| `fit_status` | `ok`, `rank_deficient`, `nonconverged`, `separated`, `insufficient_data`, or `fit_error` |
+| `failure_reason` | non-empty unless `ok` |
+| `design_rank`, `n_design_columns` | computed on the actual fitted design |
+| `condition_number_scaled`, singular-value fields | computed after centering appropriate to estimator and unit-RMS scaling |
+| `vif_centered_*` | conditional estimators use within-group-centered design |
+| `n_clusters`, `covariance_type` | actual uncertainty unit/method |
+| `converged`, `separated` | explicit booleans |
+
+Rank-deficient or nonconverged fits invalidate all inference/comparison. Separated fits retain raw
+diagnostics but invalidate affected-term inference and all likelihood comparisons. Only `fit_status=ok`
+enters headline aggregation. A penalized sensitivity is labeled as a different estimator and is never
+used in an ordinary LRT/AIC comparison.
+
+## Term-level diagnostics table {#term-diagnostics}
+
+The existing table is extended with `fit_status`, scaled term coefficient, estimability, robust-SE
+availability, and exclusion reason. The old universal raw `abs(coef) < 10` rule is removed; scale-free
+fit validity and explicit warnings own exclusion.
+
+## Animal-balanced summary contract {#animal-summary}
+
+For each estimand/term, first aggregate valid session estimates within animal, then report:
+
+- all five per-animal effects and contributing session counts;
+- median of animal effects;
+- `n_animals_positive / n_animals_used`;
+- fixed-seed animal-block bootstrap interval and leave-one-animal-out range where meaningful;
+- an incomplete-animal warning when `n_animals_used < 5`.
+
+Session signed-rank p-values may be retained only under names ending `_descriptive`. Neuron-level PFC
+effects first aggregate to session and then animal under the dedicated PFC plan.

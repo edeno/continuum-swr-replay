@@ -1,5 +1,7 @@
 # Phase 6 — Reproducibility: fold `_z`/`q_arm_hmm` into the builder; document count convention
 
+> Historical baseline: canonical standardization/rebuild plumbing landed before the 2026-07-10 refresh. Phase 7 adds run-level provenance; do not execute this old phase.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 Close the reproducibility hazard where a clean `prepare_data.py` rebuild silently drops the `_z`
@@ -12,7 +14,7 @@ regenerated once from a builder that already owns `_z`/`q_arm_hmm`, before phase
 
 **Inputs to read first:**
 
-- [scripts/exploratory/_add_standardized_cols.py:1-50](../../../../scripts/exploratory/_add_standardized_cols.py) — the in-place `_z` stamping (`ARM_CONT` list `:27`, `add_z` `:34`, formula `:46`) to fold into the builder and then delete.
+- Historical deleted path `scripts/exploratory/_add_standardized_cols.py:1-50` — the in-place `_z` stamping that this completed phase folded into the builder and removed.
 - [src/continuum_swr_replay/analysis/replay/tables.py:1116](../../../../src/continuum_swr_replay/analysis/replay/tables.py) (`_event_arm_table_columns`) and [:1296-1345](../../../../src/continuum_swr_replay/analysis/replay/tables.py) — where continuous covariates are attached; the `_z` columns must be appended to the canonical column order.
 - [src/continuum_swr_replay/analysis/replay/prepare_data.py](../../../../src/continuum_swr_replay/analysis/replay/prepare_data.py) — the assembly driver; per-session loop at `:263`, all-session `pd.concat` at `:308-310`, `to_pickle` at `:386`. Owns the **event_arm-side** `_z` (add after concat). `q_arm_hmm` already emitted natively (`tables.py` `_attach_hmm_arm_value`).
 - [src/continuum_swr_replay/analysis/behavior/qvals_table.py:416-468](../../../../src/continuum_swr_replay/analysis/behavior/qvals_table.py) — the qvals builder `main()`: all-epoch `pd.concat` at `:453`, required-column guard, `to_pickle` at `:468`. Owns the **qvals-side** `_z` (add after concat, before write) — `prepare_data` only *reads* qvals (`:242`) and must **not** standardize it (F3).

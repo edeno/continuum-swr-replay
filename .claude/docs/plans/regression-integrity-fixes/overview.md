@@ -2,113 +2,101 @@
 
 [← back to PLAN.md](PLAN.md)
 
-Source audit: `.claude/docs/reviews/06_data_provenance_regression_audit.md` +
-`06_covariate_provenance.csv`. Read those for the evidence behind each fix.
+Source audit: [07_comprehensive_regression_model_statistical_audit.md](../../reviews/07_comprehensive_regression_model_statistical_audit.md).
 
 ## Current codebase integration points
 
-Verified against the tree at plan time (read the line before editing — see each phase's *Inputs*).
-
-- `scripts/content/fit_swr_contrast_content.py:78` — blanket `warnings.filterwarnings("ignore")`; phase 2 narrows it.
-- `scripts/content/fit_swr_contrast_content.py:302` — saved `q_arm_source`/`deferred` provenance JSON is **stale** (says beta/HMM-deferred while C4 uses `q_arm_hmm`); phase 1 corrects.
-- `src/continuum_swr_replay/analysis/replay/model_specs.py:880` — `C4_armvalue` uses `q_arm_hmm`; `:873` `BASEc`; `:485`–`:532` `MODEL_PER_STOP_RATE` R0/R1/R2/Rlag; `:840`–`:859` rate value/RPE rungs (G4/G5/S7…); `:876`–`:901` content value/RPE/update rungs (C4/C6/C9/C10). Phases 1/4 touch.
-- `src/continuum_swr_replay/analysis/replay/tables.py:1300` — `reward_rate_arm_k10` attached per (event,arm); `:1296` `visit_recency_demeaned`; `:1116`/`_event_arm_table_columns` canonical column order. Phases 4/6 touch.
-- `src/continuum_swr_replay/analysis/replay/covariates.py:179`–`:198` — `recent_reward_rate_all_events`: **deliberately** returns NaN for unvisited leaf arms (trunk arms → `0.0`). Phase 4 **replaces this with encoding** (unvisited leaf → `0.0` + `has_arm_history` indicator) per the resolved mechanism-A decision below.
-- `src/continuum_swr_replay/analysis/replay/_helpers.py:124`–`:128` — `reward_outcome`/`is_after_reward`/`is_after_omission` assigned from the **trip-in-progress** trial (indexed by trial-start time, `:83`). Not strictly pre-outcome for approach-phase stops. Phase 4 addresses.
-- `src/continuum_swr_replay/analysis/behavior/qvals_table.py:292`–`:294` — `hmm_rpe` (uses current reward), `hmm_value_update` (uses next-trial Q). Post-outcome; phase 4 gates their consuming rungs. `:14` module docstring interval bug (phase 1).
-- `src/continuum_swr_replay/analysis/replay/fitting.py:160`,`:380` — conditional-Poisson / conditional-logit `.fit(disp=0)` with **no convergence check** (rank guard exists at `:150`/`:370`). Phase 2 adds convergence.
-- `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py:153`,`:250`–`:254` — per-bin GLM `.fit()`; `:118` documents that separation yields a large finite coef. Phase 2 flags it.
-- `src/continuum_swr_replay/analysis/replay/per_stop_rate_model.py:130` — per-stop GLM `.fit(disp=0)` (rank guard `:113`). Phase 2 adds convergence.
-- `src/continuum_swr_replay/analysis/replay/choice_prediction.py:492` — choice conditional-logit `.fit(disp=0)` (rank guard `:482`); `:313`–`:340` choice predictor set (no value covariate — phase 1 doc fix / phase 5 value-controlled model, **required if the choice model is paper-facing**).
-- `src/continuum_swr_replay/analysis/replay/contrast_aggregation.py:89`–`:113` — per-animal median + n=5 sign consistency. Phase 5 reuses this for the base ladders.
-- `scripts/content/fit_replay_content_models.py:241`–`:251` (session Wilcoxon), `:502`–`:510` (union complete-case cohort). Phase 5 promotes per-animal; phase 3 instruments the drops.
-- `learning.py:481` — the one existing `mle_retvals["converged"]` check; phase 2 copies this pattern. Stage-6 `is_stay` uses `is_after_omission` (`:173`) but the modeled unit is post-outcome — phase 4 annotates, does not change.
-- `scripts/exploratory/_add_standardized_cols.py:27`,`:46` — the in-place `_z` stamping phase 6 retires into the canonical builder.
+- [`analysis/replay/covariates.py:456-548`](../../../../src/continuum_swr_replay/analysis/replay/covariates.py#L456) — `add_uncertainty_covariates` currently rolls `is_stay` over stop rows; Phase 8 removes that path.
+- [`analysis/replay/tables.py:777-1009`](../../../../src/continuum_swr_replay/analysis/replay/tables.py#L777) — canonical stop builder; Phase 8 adds stable trial/decision context and stop-start history.
+- [`analysis/behavior/qvals_table.py:380-430`](../../../../src/continuum_swr_replay/analysis/behavior/qvals_table.py#L380) — exact poke/reward timestamps and stop-to-trial mapping; Phase 8 also emits the canonical per-trial decision-covariate table.
+- [`analysis/replay/cohort_audit.py:25-118`](../../../../src/continuum_swr_replay/analysis/replay/cohort_audit.py#L25) — landed drop-accounting infrastructure; Phase 9a extends it with exact identity fields.
+- [`scripts/content/compare_event_source_models.py:198-383`](../../../../scripts/content/compare_event_source_models.py#L198) — useful script-local cohort hashing/freezing implementation moved to shared code in Phase 9a.
+- [`analysis/replay/model_checking.py:21-164`](../../../../src/continuum_swr_replay/analysis/replay/model_checking.py#L21) — content CV currently blocks by event rather than stop; Phase 9b replaces its fold construction.
+- [`analysis/replay/per_bin_rate_model.py:129-302`](../../../../src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py#L129) — model-specific row dropping, random stop folds, and no Patsy-design rank gate; Phases 9a, 9b, and 10a modify distinct parts.
+- [`analysis/replay/model_comparison.py:20-157`](../../../../src/continuum_swr_replay/analysis/replay/model_comparison.py#L20) — comparison helper checks counts rather than identities and clips invalid LR inputs; Phase 9b replaces that contract.
+- [`analysis/replay/fitting.py:37-64`](../../../../src/continuum_swr_replay/analysis/replay/fitting.py#L37) and [`:437-454`](../../../../src/continuum_swr_replay/analysis/replay/fitting.py#L437) — conditional rank uses within-group centering, but VIF/condition diagnostics do not; Phase 10a unifies them.
+- [`analysis/replay/choice_prediction.py:246-418`](../../../../src/continuum_swr_replay/analysis/replay/choice_prediction.py#L246) — stop-grain, replay-selected, non-current-arm choice-set construction deleted in Phase 11.
+- [`analysis/replay/learning.py:383-643`](../../../../src/continuum_swr_replay/analysis/replay/learning.py#L383) — stop-grain Stage-6 Logit/GEE deleted in Phase 11.
+- [`scripts/rate/fit_swr_power_model.py:45-161`](../../../../scripts/rate/fit_swr_power_model.py#L45) — unidentified OLS and session-Wilcoxon reporting replaced in Phase 12.
+- [`analysis/replay/contrast_aggregation.py:57-135`](../../../../src/continuum_swr_replay/analysis/replay/contrast_aggregation.py#L57) — current animal-balanced pattern and term-only coefficient filter; Phase 10b generalizes aggregation after Phase 10a defines fit validity.
+- [`analysis/pfc/glm.py:930-1060`](../../../../src/continuum_swr_replay/analysis/pfc/glm.py#L930) — PFC event construction and GLMs are owned by the dedicated PFC plan, not duplicated here.
 
 ## Scope and dependency policy
 
 ### Goals
 
-- Every saved result carries accurate provenance and an accurate retained-N / drop profile.
-- Fit diagnostics (convergence, separation, rank) applied uniformly across content, rate, and choice fitters; no blanket warning suppression hiding them.
-- Covariates used as predictors are pre-outcome relative to the modeled unit, or the model is explicitly labeled retrospective.
-- Population claims for the base content/rate ladders rest on animal-level (n=5) evidence, not session-level Wilcoxon.
-- A clean `prepare_data.py` rebuild reproduces the fitted tables exactly (incl. `_z` and `q_arm_hmm`), with no exploratory-script post-processing required.
+- Every promoted result is traceable to one complete run, exact inputs/specifications, exact likelihood rows, and exact folds.
+- Every likelihood-based comparison either proves row/fold compatibility or fails with a reason; no plausible-looking invalid AIC/LRT/CV values are emitted.
+- All fitted covariates have accurate names, trial grain, and time availability relative to their response.
+- Core content/rate estimates have design-rank gates, dependence-aware uncertainty, and animal-balanced summaries.
+- Choice and Stage-6 operate on one observation per actual behavioral decision and include zero-replay and same-arm decisions.
+- SWR-power coefficients come from algebraically identified specifications with residual/rank/uncertainty diagnostics.
+- One clean refit replaces all stale/mixed-generation results and regenerates model tables, figures, and claims.
 
 ### Non-Goals
 
-- **No re-decoding.** The detector outputs (`*_data_over_time.pkl`, posteriors) are unchanged.
-- **No change to the relational spine, cardinality logic, or the response-only quarantine** of `next_arm`/`is_next`/`ends_at_next` — the audit confirmed these correct.
-- **No full hierarchical (NumPyro) mixed model in this plan.** Phase 5 delivers per-animal aggregation as primary; the mixed conditional-logit with animal random effects stays a documented follow-up (Open Question 2).
-- No changes to the `contfrag` sibling pipeline.
+- No re-decoding or detector change; canonical event labels and posterior outputs are inputs.
+- No causal mediation claim for Stage 6. It remains a post-outcome behavioral association.
+- No claim that five animals provide high-powered population inference; the plan improves the unit of analysis, not sample size.
+- No attempt to infer value for the trailing trials without fitted behavior-model state; those rows remain an explicit definitional exclusion.
+- No duplicate PFC implementation here. Canonical events, controls, GLM mechanics, dependence-aware inference, and Figure 4 remain in [the PFC plan](../pfc-fig4-recut/PLAN.md).
+- No backward-compatible readers, aliases, old column names, or legacy artifact fallback. The user explicitly chose replacement in place.
 
 ### Dependency policy
 
-No new runtime dependencies. Phase 5's optional NumPyro follow-up is out of scope; if pursued later, JAX is already a dependency.
+No new runtime dependency is required. Use NumPy, pandas, Patsy/statsmodels, SciPy, and scikit-learn already in the environment. Bootstrap/permutation routines are local, seeded implementations. PFC work follows its existing plan and can proceed in parallel until Phase 13's promotion gate.
+
+## Locked decisions
+
+1. **Artifact cutover:** versioned run directories plus an atomic `CURRENT.json`; fixed-path legacy outputs are never read by canonical consumers.
+2. **Fit purposes:** `estimation` uses the scientifically appropriate maximal cohort; `selection` uses a declared exact common cohort/folds. Only `selection` outputs support AIC/BIC/LRT/CV ranking.
+3. **Timing:** post-outcome RPE/update analyses are physically gated after the recorded outcome-known timestamp. Future-referencing peri-switch variables remain descriptive only.
+4. **Switch history:** compute over completed trials at the query timestamp, never over stop rows; rename it `recent_completed_switch_rate_k5`.
+5. **Reward history:** rename `cumulative_reward` to `reward_count_arm_k10`; add `has_arm_history` so unvisited and observed-zero arms are distinct.
+6. **Content primary:** the stable arm M4-style spatial/reward-history specification is primary; sparse last-rewarded and value/uncertainty terms are prespecified sensitivities. Mvu is not a headline exploit-versus-explore model.
+7. **Content response:** soft posterior mass is the primary robustness target alongside the existing hard-count estimate; agreement is required for a content claim.
+8. **Decision window:** for target trial `t`, aggregate replay in `[outcome_known_time(t-1), poke_out_time(t-1))`; use trial `t`'s pre-outcome value vector and all six leaf arms. Decisions with no replay stay in the dataset.
+9. **Population summary:** all five animal effects and an animal-balanced center/interval are primary; session/neuron signed-rank summaries are descriptive.
+10. **SWR power:** primary decomposition is realized reward + pre-outcome Q. RPE-alone is a separate sensitivity; reward, Q, and RPE are never co-fit.
 
 ## Metrics
 
-- **Phase 1:** grep of saved `*_meta.json` / provenance strings shows zero "harmonization deferred" / "beta-model per-arm value" for runs that use `q_arm_hmm`; docs match `model_specs.py`.
-- **Phase 2:** every fitter returns a `converged` (and `separated`) status; a synthetic separated design is flagged, not silently returned; aggregation drop counts logged.
-- **Phase 3:** each fit run writes a cohort table whose `n_in − Σ drops = n_modeled` reconciles exactly; drop profile reports session-time / reward / value-quantile of dropped rows.
-- **Phase 4:** rate R1/R2 refit on `reward_lag1` is a sign-flip reparameterization (`≈ 1 − is_after_omission`) — coefficient changes everywhere, causal-vs-leaky *values* disagree only on the ~10% approach stops; value/RPE/update rungs gated to post-current-outcome bins or relabeled descriptive; mechanism-A **encode** implemented (unvisited-leaf `reward_rate_arm_k10=0` + `has_arm_history`), retaining the ~11.6% of events.
-- **Phase 5:** base content/rate headline coefficients reported with per-animal `n_animals_pos/n_animals_used` (with a headline warning when `n_animals_used < 5`); common-cohort refits (content **and** rate) show whether cross-rung ΔAIC shifts are cohort-driven; `swr_x_value` reported as two separate checks — construct sensitivity (beta vs HMM) on the *shared* qvals-present cohort, plus a *descriptive* missing-tail profile (the tail is **not** value-imputed; beta cannot restore it — F3).
-- **Phase 6:** a one-session rebuild reproduces the current materialized tables' **non-`_z`** columns within `atol=1e-10`, and reproduces the **`_z`** columns within `atol=1e-10` **only when applied via the persisted frozen references** (event_arm: `standardization_reference.json`; qvals: `qvals_standardization_reference.json`) — a per-session recompute of global `_z` cannot and should not match (F5). `_add_standardized_cols.py` deleted; both builders own their standardization.
+- No canonical consumer can load a missing, incomplete, stale-schema, mixed-run, or hash-mismatched artifact.
+- Every selection comparison has identical `cohort_hash`, `group_hash`, and, for CV, `fold_hash`; mismatches raise.
+- Same-N/different-ID, partial candidate-set, duplicate-key, nonnested-LRT, negative-LR, and mixed-run fixtures all fail closed.
+- `recent_completed_switch_rate_k5` is unchanged by adding duplicate stops to a trial and depends only on trials completed by the query time.
+- Every post-outcome fitted row satisfies `response_time >= outcome_known_time`; every pre-outcome row fails the gate.
+- Conditional diagnostics are invariant to event-level offsets and predictor rescaling; all fitted designs report rank and scaled condition diagnostics.
+- Rank-deficient/nonconverged fits never enter comparisons or headline summaries; excluded cells remain explicitly represented with failure reasons.
+- Dependence-aware simulation intervals improve nominal coverage over model-based intervals under the repository's autocorrelated trajectory fixtures.
+- Decision tables contain one row per `(decision_id, arm)`, six arms and exactly one chosen arm per decision, including same-arm and zero-replay decisions.
+- SWR-power deterministic-identity fixtures are rejected and planted identified effects are recovered within stated Monte Carlo tolerance.
+- The production promotion audit reports complete expected model/population/session coverage and all five animals before updating `CURRENT.json`.
 
 ## Risks and Mitigations
 
 | Risk | Mitigation |
 | --- | --- |
-| Mechanism-A encoding changes the content estimand (novel-arm regime enters the model) | **Decided: encode.** Phase 4 reports base rungs both encoded and (once, for comparison) on the old restricted cohort, so the estimand change is measured, not silent; `has_arm_history` lets the novel-arm state be a modeled category rather than a hidden exclusion. |
-| Time-gating value/RPE rungs shrinks their N further | Phase 3 cohort tables make the shrink explicit; phase 5 sensitivity confirms sign stability. |
-| `swr_x_value` sign is cohort- or construct-driven (known construct-dependence) | Phase 5 reports beta `q_arm` vs HMM `q_arm_hmm` on the *shared* qvals-present cohort (construct sensitivity) and separately characterizes the missing tail descriptively — no value-imputed "restored tail" claim (beta shares HMM's missingness, F3). Restoring the tail needs upstream fit coverage, which is **not pursued** (resolved decision #2 — drop the tail). |
-| Builder consolidation (phase 6) drifts table contents | Phase 6 validation refits one session end-to-end and diffs against the current materialized table within float tolerance. |
-| Per-animal aggregation with n=5 is low-powered | Documented honestly as bookkeeping, not a power upgrade (mirrors `contrast_aggregation.py` wording); it is the correct unit, not a stronger test. |
+| Common cohorts shrink high-dimensional ladders and change apparent winners. | Keep maximal-cohort estimation separate; rank only declared selection sets and report retention/hash. |
+| The trial/decision rebuild changes many headline numbers. | Save pre-change descriptive baselines, smoke one animal, and publish before/after deltas without requiring direction preservation. |
+| Stop/block bootstrap is computationally expensive. | Fixed-seed small-bootstrap CI tests in CI; smoke one session with timing/memory, then choose the production replicate count before the full run. |
+| Five-animal intervals remain wide. | Show all five effects and leave-one-animal-out sensitivity; do not substitute session p-values. |
+| Penalized sparse-term sensitivity cannot use ordinary AIC/LRT. | Label it `estimation` only and compare by shared-fold predictive score; never mix it with unpenalized likelihood tests. |
+| Atomic-run migration touches many plotting scripts. | Centralize resolution/validation first, migrate consumers in Phase 7, and test interrupted promotion before any number-changing phase. |
+| PFC work drifts from regression promotion. | Phase 12 records an explicit PFC completion contract; Phase 13 refuses to promote cross-area claims until the dedicated plan's manifest passes. |
 
 ## Rollout Strategy
 
-Replace-in-place; no parallel v1/v2 code paths. **Execution order: 1 → 2 → 3 → 6 → 4 → 5.** Phases 1–3
-are non-destructive to fitted numbers (labels, diagnostics, reporting) and can merge in any order among
-themselves. Then phase 6 (builder consolidation) **before** phase 4 (mechanism-A encoding), because both
-regenerate `event_arm_table` and phase 4's `has_arm_history` must land on a builder that already owns
-`_z`/`q_arm_hmm` — so the table is regenerated once from the clean builder, then again with the
-`reward_rate_arm_k10=0` + `has_arm_history` encoding. **Phase 5 runs last (F4): it depends on both phase 3
-(cohort/term-diagnostics tables) and phase 4 (its paper-facing aggregation and `swr_x_value` sensitivity
-must fit the phase-4-cleaned designs, not the pre-cleanup covariates).** Each number-changing phase
-re-runs the affected ladders with the phase-3 cohort tables attached.
+Replace in place with no compatibility layer. Execute in order:
 
-## Resolved decisions
+`7 → 8 → 9a → 9b → 10a → 10b → 11 → 12 → 13`.
 
-1. **Mechanism A — DECIDED (2026-07-04): ENCODE.** For an unvisited leaf arm, set
-   `reward_rate_arm_k10 = 0.0` and add a `has_arm_history` 0/1 indicator (**main effect only** from M3
-   onward — no `has_arm_history:reward_rate_arm_k10` interaction; under this encoding it is perfectly
-   collinear with the `reward_rate_arm_k10` main effect, see phase 4). This retains the ~11.6% of events (the
-   early-session / novel-arm regime this project studies) instead of dropping them. It changes the
-   current deliberate NaN-drop behavior at `covariates.py:189`–`:198` and the `event_arm_table` schema,
-   so the table is regenerated. Phase 4 reports base rungs both **encoded** and (once, for comparison) on
-   the old restricted cohort so the estimand change is measured, not silent. *Restrict was rejected.*
-2. **Mechanism B — DECIDED (2026-07-04): DROP THE UNFITTED TAIL (definitional population).** The
-   2,056-stop / 896-event tail with no fitted HMM state is **not** value-imputed and the upstream fit is
-   **not** extended. Value models are defined on "trials with a fitted HMM state"; the drop is reported
-   per-model (phase 3 `n_drop_qvals_gap`) and characterized descriptively (phase 5) so the exclusion is
-   visible and shown not to distort. Confirmed empirically that no in-table proxy can restore it (beta
-   `q_arm`/`q_arm_hmm`/`p_reward_arm` share identical missingness; 0 beta-present-HMM-missing rows).
+The dedicated PFC plan may run in parallel after Phase 7 establishes the shared manifest fields, but must finish before Phase 13 promotes Figure-4/cross-area claims. Each number-changing phase smoke-tests synthetic data first and then one real session/animal. Only Phase 13 runs the full canonical analysis and atomically advances `CURRENT.json`.
 
 ## Open Questions
 
-1. **Content outcome-timing merge scope (phase 4).** Gating the *content* value/RPE/update rungs to
-   post-current-outcome events requires merging each event's current-trial outcome-known time (pump if
-   rewarded, else goal-arrival) onto events (they carry only
-   `time_since_stop`). If that merge is judged too invasive, the fallback is to relabel those content
-   rungs *descriptive* rather than predictive. Rate rungs are unaffected (their per-bin design already
-   has bout timing). Decide during phase-4 execution.
-2. **Full hierarchical model.** Deferred — mixed conditional-logit with animal random effects
-   (`fit_swr_contrast_content.py:302` already lists it as deferred; needs NumPyro). Not in this plan;
-   per-animal aggregation is the phase-5 deliverable.
+None. The scientific and compatibility choices needed to execute these phases are locked above. Unexpected empirical failures are reported as failed validation gates, not resolved by silently changing the estimand.
 
 ## Estimated Effort
 
-- Phase 1: ~40 LOC across 3 files + doc edits. Phase 2: ~120 LOC (a shared diagnostics helper + call-site
-  wiring). Phase 3: ~150 LOC (audit-table emitter + wiring). Phase 4: ~200 LOC + table regen (schema
-  change: encode). Phase 5: ~200 LOC (aggregation reuse + sensitivity runners) + refits. Phase 6:
-  ~120 LOC into the builder + delete `_add_standardized_cols.py` + one-session regen validation.
+Approximately 1,400-2,000 changed LOC plus tests across the nine active PRs, excluding the separately planned PFC implementation and production compute. The largest diffs are Phase 7 consumer migration, Phase 10b bootstrap/aggregation, and Phase 11 decision-table replacement.

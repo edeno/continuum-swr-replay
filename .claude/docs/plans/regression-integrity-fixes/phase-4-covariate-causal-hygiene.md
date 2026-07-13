@@ -1,5 +1,7 @@
 # Phase 4 — Covariate causal hygiene (pre/post-outcome; mechanism-A encoding)
 
+> Historical baseline: the timing registry and past-only reward swap landed, but the newer production audit found remaining materialization errors. Phase 8 supersedes this file; do not execute it.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 **Contracts referenced:** [covariate pre/post-outcome timing](shared-contracts.md#covariate-timing) — this

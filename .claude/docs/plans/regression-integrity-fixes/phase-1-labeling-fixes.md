@@ -1,5 +1,7 @@
 # Phase 1 — Correct stale result labels and docstrings
 
+> Historical baseline: this work landed before the 2026-07-10 plan refresh. Retained for audit trail; do not execute as an active phase.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 Pure labeling/doc correctness. No fitted numbers change. Ships first so mislabeled provenance stops

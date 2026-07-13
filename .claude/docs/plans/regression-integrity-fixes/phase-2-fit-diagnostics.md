@@ -1,5 +1,7 @@
 # Phase 2 — Uniform fit diagnostics (convergence, separation, scoped warnings)
 
+> Historical baseline: core convergence/warning plumbing landed before the 2026-07-10 refresh. Remaining estimability work is in Phases 10a/10b; do not execute this old phase.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 Make convergence and separation first-class, checked outputs across all fitters, and stop blanket

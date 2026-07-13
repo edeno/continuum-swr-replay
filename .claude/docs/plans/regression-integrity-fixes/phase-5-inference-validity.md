@@ -1,5 +1,7 @@
 # Phase 5 — Inference validity (animal-level primary; cohort/construct sensitivity)
 
+> Superseded by the 2026-07-10 refresh. Execute Phases 9a, 9b, 10a, 10b, 11, and 13 instead; retain this file only as decision history.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 **Contracts referenced:** [cohort-audit schema](shared-contracts.md#cohort-audit-schema) — attach to every
