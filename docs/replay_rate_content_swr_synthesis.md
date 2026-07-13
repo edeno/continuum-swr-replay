@@ -57,11 +57,11 @@ self-history forecast the rate. A fitted within-block Q-value (`q_chosen`) does
 **not** predict better than nominal value (falsified). So the value-gating is a
 modest, detectable-by-pooling effect, not a strong driver.
 
-### Update 2026-07-02 — HMM-harmonized `is_swr`-contrast ladder (per-bin, LR-tested)
+### Update 2026-07-02 — `is_swr`-contrast ladder (per-bin, LR-tested)
 
-Re-fit of the occurrence-rate dissociation with **paper-faithful HMM covariates**
-(`hmm_relative_value`/`hmm_rpe`/`reward_entropy`/`hmm_value_update`; single
-`default_hmm` model) on the per-bin **`is_swr`-contrast (Design B)** ladder —
+Re-fit of the occurrence-rate dissociation with the **beta-bernoulli covariates**
+(`switch_advantage_mu_preoutcome_sess`/`rpe`/`beta_reward_entropy`/`global_mu_update_abs_postoutcome_sess`;
+refit 2026-07-13, HMM retired) on the per-bin **`is_swr`-contrast (Design B)** ladder —
 stratified `G0–G8` (×{all, SWR, non-SWR}) + stacked-contrast `S0–S10`.
 Runner `scripts/rate/fit_swr_contrast_rate.py`; 218 sessions →
 `models_per_bin_rate/swr_contrast_rate.pkl`. Inference: per-session fit + **per-session
@@ -93,7 +93,7 @@ power-robust read; pooled χ² is over-powered by the per-bin n).
 - **RPE caveat:** coefficient signed-rank leans SWR-specific, but the per-session LR
   is *more consistent in non-SWR* (25% vs 8% of sessions) — direction-consistent vs
   per-session-needed diverge; do **not** call RPE cleanly "SWR-specific". Also,
-  SWR RPE is **reward-collinear** (`hmm_rpe = reward − Q`, kernel retained) —
+  SWR RPE is **reward-collinear** (`rpe = reward − q_chosen`, kernel retained) —
   largely reward-gating re-expressed, not independent RPE coding.
 
 *(The `is_swr`-contrast ladder has no auto-generated results doc — `per_bin_rate_results.md`
@@ -142,8 +142,8 @@ So **non-SWR content is value-neutral; with-SWR content is value-avoidant**
 (broadened off current/prev, avoids recently-rewarded — the last-rewarded-elsewhere
 row, still strongly negative; the raw arm reward-rate main effect is only marginal).
 Patch-level mirrors arm. *(These older pooled-M5 rows are corrected in place but are
-superseded by the C-split in the 2026-07-02 update below; the SWR×value sign is
-construct-dependent — see that block.)*
+superseded by the C-split in the 2026-07-02 update below; the SWR×value result
+(content *avoids* high beta value, `swr_x_q_arm −2.45`) is in that block.)*
 
 **New — behavioral modulation of current-arm content** (`is_current`
 interactions, **duration-controlled** with `time_since_stop × is_current`;
@@ -161,20 +161,20 @@ because the within-stop drift runs *toward* current (`tsc_x_current` > 0) and wa
 masking it — so it is not a dwell artifact. The reward/value content effects are
 **non-SWR-specific**; exploration and within-stop deepening hold for both types.
 
-### Update 2026-07-02 — HMM-harmonized content ladder (arm + patch, `is_swr` split)
+### Update 2026-07-02 — content `is_swr`-contrast ladder (arm + patch, `is_swr` split)
 
-Content analog of the rate `is_swr`-contrast ladder, with paper-faithful HMM
+Content analog of the rate `is_swr`-contrast ladder, with the beta-bernoulli
 covariates entered as `:is_current` interactions (event-scalars) or per-arm main
 effects. Runner `scripts/content/fit_swr_contrast_content.py`; 218 sessions →
 `models/swr_contrast_content_{arm,patch}.pkl`. Conditional Poisson over arms(9)/
 patches(3), per-session fit + across-session median / signed-rank / per-animal (n/5).
-**Exploratory** snapshot (2026-07-02), since superseded on the value construct:
-HMM harmonization **has landed** — the fitted ladder's per-arm value is now
-`q_arm_hmm` (HMM Global-Model; C4/CS5), with beta `q_arm` retained only as a
-robustness column. The `swr_x_q_arm −2.45` figure below is that **beta robustness
-column**; the SWR×value sign is construct-dependent (beta *avoids* high value −2.45;
-harmonized HMM `swr_x_q_arm_hmm` *prefers*, +1.06), so cite the HMM result and flag
-the construct-dependence. Audited per-fit SE/p and family FDR have since been added;
+**Value construct: beta-bernoulli `q_arm` (the single behavioral model since the
+2026-07-13 HMM retirement).** The value–content result is that **content *avoids*
+high beta-value arms** — `swr_x_q_arm −2.45, 5/5, p=2e-36` (refit 2026-07-13). The
+earlier "construct-dependence" caveat is **moot**: there is one construct now (the
+retired HMM `q_arm_hmm` had shown the opposite `+1.06` sign, but it is gone). The
+beta value-avoidance reinforces the exploration reading — uncertainty↑ and value↓
+both point to under-explored arms. Audited per-fit SE/p and family FDR are in place;
 within-group-centered VIF and a common complete-case cohort remain deferred (see the
 runner provenance).
 
@@ -183,11 +183,14 @@ runner provenance).
   `swr_x_reward_rate_arm` −1.72 / `swr_x_q_arm` −2.45 / `swr_x_last_rewarded` −1.62
   (all 0/5, p<1e-11). Net of autocorrelation controls (`C2_base`), the SWR current-
   bias **vanishes** (−0.04 n.s.) while non-SWR persists (+0.67, p=3e-11).
-- **New — HMM state modulation of the current-bias:** relative value ΔV **sharpens
-  onto current** (`relval_x_current` +0.15, 5/5, p=2e-13; SWR +0.18); **RPE pushes
-  off current** (`rpe_x_current` −0.14, non-SWR, p=6e-8) — value and RPE oppose;
-  uncertainty sharpens onto current **SWR-specifically** (`entropy_x_current` +0.13,
-  p=4e-4).
+- **Beta state modulation of the current-bias** (refit 2026-07-13, beta covariates):
+  relative value ΔV **sharpens onto current** (`relval_x_current` +0.16, 4/5, p=9e-15;
+  SWR +0.16 5/5); **RPE pushes off current** (`rpe_x_current` −0.24, 5/5, p=2e-11;
+  non-SWR −0.20) — value and RPE oppose; value-update **sharpens onto current**
+  (`update_x_current` +0.28, 5/5, p=3e-20; SWR +0.34). The scalar **belief-entropy
+  interaction is null** (`entropy_x_current` −0.00 n.s.) — the beta-entropy scalar
+  does not modulate current-arm focus (the per-arm uncertainty *main effect* is the
+  content-uncertainty result, C13 below; do not conflate).
 - **New — context/switch strongly modulate content:** **exploration locks content
   onto current** (`switchrate_x_current` +0.23, 5/5, p=1e-17; SWR +0.34 — reproduces
   the prior +0.53); later-in-block moves **off** current (`block_x_current` −0.19,
@@ -231,16 +234,22 @@ assumptions in [behavior_models.md](behavior_models.md); memory
   `swr_x_current` nor `swr_x_recency` rescues it; the **saturated `is_swr × ALL BASEc`
   model recovers +0.39 = the split.** General lesson: **pooled `swr_x` contrasts are
   unreliable for any covariate tied to arm identity** — report the split.
-- **Exploit-vs-explore (`Mvu`) is DEGENERATE** (VIF 19): beta mean & variance are
-  mechanically collinear (variance is a function of the mean), so beta value+uncertainty
-  cannot separate exploit from explore. Needs the **HMM-value + beta-uncertainty** pairing
-  (corr −0.10) — the low-collinearity model — **not yet built**.
-- **Realized-gain (the PE face of Mattar-Daw) does NOT drive content.** Per-arm
-  `|Δ hmm_q_port|` (value moved by the last outcome, pre-outcome-safe lag): `M5+gain`
-  **−0.064, 5/5, p=2e-11** — content *avoids* recently-updated arms (a large update sits
-  at the just-visited/rewarded arm, so this is the reward/recency-avoidance signal, not
-  gain-seeking). With uncertainty co-fit, uncertainty stays **+0.83** and gain → −0.03.
-  **So the gain axis of content is epistemic UNCERTAINTY, not realized value-update.**
+- **Exploit-vs-explore: the `Mvu` arm-FE degeneracy (VIF 19) is a parameterization
+  artifact, not a real collinearity.** Within-arm (arm-demeaned, non-current-leaf),
+  beta value `q_arm` and beta uncertainty `arm_uncertainty` separate cleanly
+  (condition number ≈ 3.4, corr ≈ 0.16) — so the beta-only exploit/explore model **is
+  identifiable** in that frame (no HMM value needed; HMM is retired). The within-arm
+  horse-race shows content tracks **uncertainty (+0.06, 5/5)** while beta value is
+  ~null and distance flips negative — the explore axis, ~orthogonal to exploit. See
+  the Phase 5 uncertainty_content extension.
+- **Realized-gain (the PE face of Mattar-Daw) does NOT drive content.** The per-arm
+  realized-gain test used the retired HMM per-leaf update `|Δ hmm_q_port|` and found
+  `M5+gain` **−0.064, 5/5, p=2e-11** (content *avoids* recently-updated arms — the
+  update sits at the just-visited/rewarded arm, a reward/recency-avoidance signal, not
+  gain-seeking); with uncertainty co-fit, uncertainty stayed **+0.83** and gain → −0.03.
+  **The gain axis of content is epistemic UNCERTAINTY, not realized value-update.**
+  *(HMM-era number; the beta per-arm value-update re-run is a Phase-5 to-do — the beta
+  scalar `global_mu_update_abs × current` is +0.28, a different estimand.)*
 
 **Prediction models (Stage 5A — does content predict the next choice?).** The
 behavioral-relevance layer, and the weakest link. `replay_frac` over a behavioral
@@ -377,11 +386,13 @@ formal SWR-split trajectory characterization has **not** been run/reported yet.
 
 ## Unknown / pending — including the models we DON'T have
 
-- **Clean exploit-vs-explore content model — NOT built.** `Mvu` (beta value + beta
-  uncertainty) is degenerate (VIF 19; mean & variance mechanically collinear). The only
-  low-collinearity pairing is **HMM value (`q_arm_hmm`) + beta uncertainty**
-  (corr −0.10) — set aside on construct-mixing grounds, but it is the single model that
-  would answer "value or uncertainty?" and it does not exist.
+- **Clean exploit-vs-explore content model — identifiable within-arm, being built
+  (Phase 5).** The `Mvu` arm-FE degeneracy (VIF 19) was a parameterization artifact:
+  within-arm (arm-demeaned, non-current-leaf) beta value `q_arm` and beta uncertainty
+  `arm_uncertainty` separate cleanly (cond ≈ 3.4, corr ≈ 0.16). No HMM value needed
+  (HMM retired). The within-arm horse-race already shows the answer — content tracks
+  **uncertainty** (+0.06, 5/5), value ~null — being folded into the
+  `uncertainty_content` feature.
 - **Full marked point process** (joint intensity + coupling + content; shared
   latent; power↔history independence). **Not built.** The three layers are treated as
   separable factors but never jointly fit.
@@ -394,9 +405,10 @@ formal SWR-split trajectory characterization has **not** been run/reported yet.
 - **Content choice-mediation** (does rate × content predict the next choice). The
   prior choice correlation (#19d) is modest and **not distance-controlled** (`dist_to_arm`
   dropped for quasi-separation); stay/leave is null (#19e).
-- **Per-arm realized-gain: tested, negative.** `|Δ hmm value|` per arm *avoids* content
-  (−0.06, 5/5) — the gain axis of content is epistemic uncertainty, not realized
-  value-update (see the 2026-07-08 update). Not a driver to add.
+- **Per-arm realized-gain: tested (HMM-era), negative.** `|Δ hmm value|` per arm
+  *avoids* content (−0.06, 5/5) — the gain axis of content is epistemic uncertainty,
+  not realized value-update (see the 2026-07-08 update). Not a driver to add; the beta
+  per-arm value-update re-run is a Phase-5 to-do.
 - **CS6-class pooled `swr_x` contrasts are unreliable** for arm-identity-tied covariates
   (the `swr_x_arm_uncertainty` artifact) — a model to *distrust*, use the split.
 - **Other content responses** (soft-count, posterior-mass) and **CV /
