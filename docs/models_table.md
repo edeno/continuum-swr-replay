@@ -55,7 +55,7 @@ post-outcome or future-referencing must be **declared descriptive**, else the ru
   patch `CP2`/`CP3`/`CPS3` (peri-switch alignment); rate `G5`/`G7`/`S7`/`S9`
   (RPE/update association), `G1`/`S3` (peri-switch). `trials_since_switch` /
   `is_post_switch` are future-referencing (sign toward the *next* switch) and can ONLY
-  be descriptive; `hmm_rpe` / `hmm_value_update` are post-outcome and were relabeled
+  be descriptive; `rpe` / `global_mu_update_abs_postoutcome_sess` are post-outcome and were relabeled
   descriptive here rather than gated.
 - **Mechanism-A encode:** an unvisited leaf's `reward_rate_arm_k10` is `0.0` (not NaN),
   retaining the ~11.6% novel-arm events the old NaN dropped. A `has_arm_history` novelty
@@ -132,7 +132,7 @@ M7r_time_histcos_rew  count ~ BS_TC + REWK + HISTCOS
 MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
                         + p_reward_current + value_diff_patch + recent_switch_rate
                         + trials_since_block_change + rpe_model
-                        + switch_advantage_mu_preoutcome_sess + reward_entropy
+                        + switch_advantage_mu_preoutcome_sess + beta_reward_entropy
                         + global_mu_update_abs_postoutcome_sess
                         + unchosen_patches_mu_update_abs_postoutcome_sess
 ```
@@ -162,7 +162,7 @@ M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_rece
 M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
 M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
                  + swr_x_is_last_rewarded_elsewhere
-Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm_hmm
+Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
 ```
 
 ## Content — patch
@@ -223,10 +223,10 @@ HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch  # peri-switch broken-stick (one construct; see Note 1b)
 BLOCK     := trials_since_block_change  # learning across a contingency block
 SWITCHRATE:= recent_switch_rate         # local switch volatility
-VALUE     := hmm_relative_value        # relative value ΔV (paper's single value+decision axis; see Note 2)
-RPE       := hmm_rpe                    # reward - Q_current_leaf (HMM; unscaled canonical RPE, see Note 6)
-UNCERT    := reward_entropy            # HMM native reward-state entropy; NOT the port-specific reward_entropy_current_leaf (see Note 4)
-UPDATE    := hmm_value_update          # global value update Σ_leaf|ΔQ| (HMM)
+VALUE     := switch_advantage_mu_preoutcome_sess  # beta relative value ΔV (Stay-vs-Switch)
+RPE       := rpe                        # reward - q_chosen (beta)
+UNCERT    := beta_reward_entropy        # mean per-leaf Beta differential entropy (derived)
+UPDATE    := global_mu_update_abs_postoutcome_sess  # beta global value update Σ_leaf|Δμ|
 REWXTIME  := reward_lag1:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))  # reward × within-stop time course (dwell-shape test; see Note 7)
 ```
 
@@ -314,7 +314,6 @@ design columns; verified by `_verify_harmonization_parity`, see
 | Per-stop rate (A) | — | R0, R1, R2, Rlag |
 
 Changed drivers: `reward_rate_arm_k10` (5→10 visits), the value block
-`p_reward_arm`/`q_arm_hmm` (the value rungs C4/CS5/Mv now use the HMM per-arm
-value `q_arm_hmm`, harmonized with the is_swr rate ladder; the beta `q_arm`
-column is retained for robustness), model `rpe`/`q_current`, and the choice
+`p_reward_arm`/`q_arm` (the value rungs C4/CS5/Mv use the beta-bernoulli per-arm
+value `q_arm`, the single value construct since the 2026-07-13 HMM retirement), model `rpe`/`q_current`, and the choice
 `dist_to_arm`→`arm_dist_rank` swap.
