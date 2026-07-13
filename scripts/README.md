@@ -23,12 +23,16 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
 - `analyze_content_occupancy.py`, `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
+- `analyze_uncertainty_content.py` — trial×well reward-belief uncertainty profiles,
+  absolute content rates, response sensitivities, and cohort audit tables.
 
 ## `behavior/`
 - `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
 
 ## `figures/` — publication figures
 - `generate_figure01.py … generate_figure04.py`, `generate_all_figures.py` (orchestrator).
+- `generate_uncertainty_content_figure.py` — ground-up uncertainty/content story
+  and diagnostic figures from the supported content-analysis artifacts.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the is_swr
   rate + content contrast ladders (standardized effect sizes, all sessions + animal 95% CI) → `paper/figures/swr_contrast/`.
