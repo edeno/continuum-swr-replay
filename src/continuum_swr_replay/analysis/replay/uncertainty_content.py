@@ -621,8 +621,155 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
     return {"session": sessions, "animal": animal_summary, "overall": overall}
 
 
+HORSERACE_PREDICTORS: tuple[str, ...] = (
+    "arm_uncertainty_z",  # per-leaf Beta belief variance (pre-standardized in the table)
+    "q_arm",  # beta belief value (z-scored here)
+    "dist_to_arm",  # geometry parallel (z-scored here)
+    "visit_recency",  # recency parallel (z-scored here)
+)
+
+
+def within_arm_horserace(
+    event_arm: pd.DataFrame,
+    *,
+    predictors: tuple[str, ...] = HORSERACE_PREDICTORS,
+    response: str = "arm_fraction",
+    min_rows: int = 60,
+) -> pd.DataFrame:
+    """Within-arm (arm fixed-effects) horse-race for off-current replay content.
+
+    Asks whether the content an event places on a **non-current** arm tracks that
+    arm's belief *uncertainty* rather than its value, distance, or visit recency.
+    This is the exploit-vs-explore extension to the quartile-profile estimands
+    above; it operates on the **event x arm** table (one row per non-local event x
+    arm), NOT the trial-leaf grain of the rest of this module.
+
+    For each session x SWR population the routine restricts to non-current leaf
+    arms, standardizes each continuous predictor (a name already ending in ``_z``
+    is taken as pre-standardized so its coefficient is per 1 SD), within-(session,
+    arm) demeans the response and predictors (the arm fixed-effects transform),
+    and fits OLS. The demeaning removes arm identity and geometry, so the
+    uncertainty coefficient is identified from *within-arm* variation over the
+    session — the confound-free frame in which beta value and beta uncertainty
+    separate cleanly (they are collinear only against the arm dummies).
+
+    Parameters
+    ----------
+    event_arm : pd.DataFrame
+        Event x arm rows with ``animal``/``day``/``epoch``, ``event_id``, ``arm``
+        (0-5 leaf, 6-8 trunk), ``is_current``, ``is_swr``, the ``response`` column,
+        and each ``predictors`` column.
+    predictors : tuple of str
+        Continuous predictors entered together (z-scored). Default: beta
+        uncertainty vs beta value vs distance vs recency.
+    response : str
+        Per-event per-arm content weight (default ``arm_fraction``).
+    min_rows : int
+        Minimum non-current-leaf rows required to fit a session.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per (``animal``, ``session_id``, ``population``) with
+        ``coef_<z-name>`` for each predictor, ``cond_number`` (design condition
+        number = identifiability evidence), and ``n_rows``. Correlational.
+    """
+    needed = {"animal", "day", "epoch", "event_id", "arm", "is_current", "is_swr",
+              response, *predictors}
+    _require_columns(event_arm, needed, "event-arm table")
+    frame = event_arm[(event_arm["arm"] <= 5) & (event_arm["is_current"] == 0)].copy()
+    frame["session_id"] = _session_id(frame)
+
+    design_cols: list[str] = []
+    for predictor in predictors:
+        if predictor.endswith("_z"):
+            design_cols.append(predictor)
+            continue
+        z_name = f"{predictor}_z"
+        values = frame[predictor].astype(float)
+        sd = values.std()
+        frame[z_name] = (values - values.mean()) / sd if sd > 0 else 0.0
+        design_cols.append(z_name)
+
+    populations = {
+        "all": np.ones(len(frame), dtype=bool),
+        "SWR": frame["is_swr"].to_numpy(dtype=bool),
+        "non_SWR": ~frame["is_swr"].to_numpy(dtype=bool),
+    }
+    rows = []
+    for population, mask in populations.items():
+        subset = frame[mask]
+        for (animal, session_id), group in subset.groupby(
+            ["animal", "session_id"], observed=True, sort=False
+        ):
+            fit = group[["arm", response, *design_cols]].dropna()
+            if fit["arm"].nunique() < 2 or len(fit) < min_rows:
+                continue
+            demeaned = fit[[response, *design_cols]] - fit.groupby(fit["arm"])[
+                [response, *design_cols]
+            ].transform("mean")
+            design = demeaned[design_cols].to_numpy()
+            if np.linalg.matrix_rank(design) < design.shape[1]:
+                continue
+            beta, *_ = np.linalg.lstsq(design, demeaned[response].to_numpy(), rcond=None)
+            rows.append(
+                {
+                    "animal": animal,
+                    "session_id": session_id,
+                    "population": population,
+                    "n_rows": int(len(fit)),
+                    "cond_number": float(np.linalg.cond(design)),
+                    **{f"coef_{col}": float(b) for col, b in zip(design_cols, beta)},
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
+    """Animal-balanced across-session summary of :func:`within_arm_horserace`.
+
+    For each (population, predictor): the across-session median coefficient, the
+    number of animals whose own median matches the overall sign (sign consistency,
+    of those present), the median per-session design condition number, and the
+    Wilcoxon signed-rank p. The Wilcoxon is **descriptive** — sessions within an
+    animal are not independent — so read the animal sign-consistency as the
+    population evidence.
+    """
+    from scipy.stats import wilcoxon
+
+    coef_cols = [c for c in coefficients.columns if c.startswith("coef_")]
+    rows = []
+    for population, pop_df in coefficients.groupby("population", observed=True):
+        for coef_col in coef_cols:
+            values = pop_df[coef_col].dropna()
+            if len(values) < 2:
+                continue
+            median = float(values.median())
+            per_animal = pop_df.groupby("animal", observed=True)[coef_col].median()
+            try:
+                pvalue = float(wilcoxon(values).pvalue)
+            except ValueError:
+                pvalue = float("nan")
+            rows.append(
+                {
+                    "population": population,
+                    "predictor": coef_col[len("coef_"):],
+                    "median": median,
+                    "n_animals_consistent": int(
+                        (np.sign(per_animal) == np.sign(median)).sum()
+                    ),
+                    "n_animals": int(per_animal.notna().sum()),
+                    "median_cond_number": float(pop_df["cond_number"].median()),
+                    "wilcoxon_p": pvalue,
+                    "n_sessions": int(len(values)),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 __all__ = [
     "EVENT_SHARE_COLUMNS",
+    "HORSERACE_PREDICTORS",
     "LEAF_ARMS",
     "LEAF_FRACTION_COLUMNS",
     "RESPONSE_COLUMNS",
@@ -632,5 +779,7 @@ __all__ = [
     "build_trial_leaf_table",
     "hierarchical_quartile_profile",
     "paired_quartile_contrasts",
+    "summarize_horserace",
     "summarize_mu_coefficients",
+    "within_arm_horserace",
 ]

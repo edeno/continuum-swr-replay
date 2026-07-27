@@ -26,7 +26,9 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     build_trial_leaf_table,
     hierarchical_quartile_profile,
     paired_quartile_contrasts,
+    summarize_horserace,
     summarize_mu_coefficients,
+    within_arm_horserace,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -245,9 +247,15 @@ def main() -> None:
     LOGGER.info("Building trial x reward-well table")
     trial_leaf, audit = build_trial_leaf_table(event_arm, stops, qvals)
     mu_summary = summarize_mu_coefficients(mu)
+
+    LOGGER.info("Within-arm value x uncertainty horse-race (exploit vs explore)")
+    horserace = within_arm_horserace(event_arm)
+
     if args.cohort == "mu":
         valid_sessions = set(mu_summary["session"]["session_id"])
         trial_leaf = trial_leaf[trial_leaf["session_id"].isin(valid_sessions)].copy()
+        horserace = horserace[horserace["session_id"].isin(valid_sessions)].copy()
+    horserace_summary = summarize_horserace(horserace)
 
     audit.update(
         {
@@ -389,6 +397,12 @@ def main() -> None:
     )
     mu_summary["overall"].to_csv(
         args.output_dir / "mu_overall_coefficients.csv", index=False
+    )
+    horserace.to_csv(
+        args.output_dir / "horserace_session_coefficients.csv", index=False
+    )
+    horserace_summary.to_csv(
+        args.output_dir / "horserace_summary.csv", index=False
     )
     (args.output_dir / "cohort_audit.json").write_text(
         json.dumps(audit, indent=2, sort_keys=True)

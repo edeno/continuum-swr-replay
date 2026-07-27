@@ -11,8 +11,87 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     build_trial_leaf_table,
     hierarchical_quartile_profile,
     paired_quartile_contrasts,
+    summarize_horserace,
     summarize_mu_coefficients,
+    within_arm_horserace,
 )
+
+
+def _horserace_frame(uncertainty_slope: float, *, animal: str = "rat") -> pd.DataFrame:
+    """Event x arm frame where non-current-leaf content tracks uncertainty within arm.
+
+    Content on the five non-current leaf arms is ``0.2 + slope * arm_uncertainty_z``;
+    the current arm (0) and trunk arms (6-8) carry unrelated content that the
+    estimator must exclude. Three control predictors (value / distance / recency)
+    vary independently of uncertainty, so a correct within-arm fit recovers ``slope``
+    on uncertainty and ~0 on the controls.
+    """
+    rows = []
+    for event in range(20):
+        uncertainty = float(event)
+        value = float(event % 5)
+        distance = float((event * 7) % 11)
+        recency = float((event * 3) % 13)
+        for arm in range(9):
+            is_current = int(arm == 0)
+            if arm > 5:  # trunk — must be excluded
+                fraction = 0.9
+            elif is_current:  # current leaf — must be excluded
+                fraction = 0.9
+            else:
+                fraction = 0.2 + uncertainty_slope * uncertainty
+            rows.append(
+                {
+                    "animal": animal,
+                    "day": 1,
+                    "epoch": "e1",
+                    "event_id": 100 + event,
+                    "arm": arm,
+                    "is_current": is_current,
+                    "is_swr": False,
+                    "arm_fraction": fraction,
+                    "arm_uncertainty_z": uncertainty,
+                    "q_arm": value,
+                    "dist_to_arm": distance,
+                    "visit_recency": recency,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_within_arm_horserace_recovers_uncertainty_and_excludes_current_trunk():
+    coefs = within_arm_horserace(_horserace_frame(0.1), min_rows=10)
+
+    # only the 'all' and 'non_SWR' populations fit (is_swr is all False)
+    fit_all = coefs[coefs["population"] == "all"]
+    assert len(fit_all) == 1
+    # 20 events x 5 non-current leaf arms; current (arm 0) and trunk (6-8) dropped
+    assert int(fit_all["n_rows"].iloc[0]) == 100
+    row = fit_all.iloc[0]
+    assert row["coef_arm_uncertainty_z"] == pytest.approx(0.1, abs=1e-6)
+    assert row["coef_q_arm_z"] == pytest.approx(0.0, abs=1e-6)
+    assert row["coef_dist_to_arm_z"] == pytest.approx(0.0, abs=1e-6)
+    assert row["coef_visit_recency_z"] == pytest.approx(0.0, abs=1e-6)
+    assert np.isfinite(row["cond_number"])
+
+
+def test_summarize_horserace_is_animal_balanced_and_signs_uncertainty_positive():
+    coefs = pd.concat(
+        [
+            within_arm_horserace(_horserace_frame(0.1, animal="a"), min_rows=10),
+            within_arm_horserace(_horserace_frame(0.08, animal="b"), min_rows=10),
+        ],
+        ignore_index=True,
+    )
+    summary = summarize_horserace(coefs)
+    unc = summary[
+        (summary["population"] == "all")
+        & (summary["predictor"] == "arm_uncertainty_z")
+    ].iloc[0]
+    assert unc["median"] > 0
+    assert unc["n_animals"] == 2
+    assert unc["n_animals_consistent"] == 2
+    assert unc["median_cond_number"] > 0
 
 
 def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

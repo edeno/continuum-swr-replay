@@ -121,6 +121,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
         "mu_sessions": results_dir / "mu_session_coefficients.csv",
         "mu_animals": results_dir / "mu_animal_coefficients.csv",
         "mu_overall": results_dir / "mu_overall_coefficients.csv",
+        "horserace_summary": results_dir / "horserace_summary.csv",
         "audit": results_dir / "cohort_audit.json",
     }
     missing = [str(path) for path in paths.values() if not path.exists()]
@@ -136,6 +137,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
         "mu_sessions": pd.read_csv(paths["mu_sessions"]),
         "mu_animals": pd.read_csv(paths["mu_animals"]),
         "mu_overall": pd.read_csv(paths["mu_overall"]),
+        "horserace_summary": pd.read_csv(paths["horserace_summary"]),
         "audit": json.loads(paths["audit"].read_text()),
     }
 
@@ -770,12 +772,70 @@ def _add_diagnostic_curve_legend(ax: plt.Axes) -> None:
     )
 
 
+def _plot_horserace(ax: plt.Axes, horserace_summary: pd.DataFrame) -> None:
+    """Within-arm horse-race: off-current content is driven by belief uncertainty,
+    not by its parallels (distance, recency) or by value.
+
+    Per-predictor across-session median coefficient (per 1 SD) for the pooled
+    population, arm fixed-effects, non-current leaf arms. Uncertainty dominates and
+    is positive; distance flips negative, value/recency are ~null — the confound
+    defense for the Mu uncertainty effect.
+    """
+    order = ["arm_uncertainty_z", "q_arm_z", "dist_to_arm_z", "visit_recency_z"]
+    labels = {
+        "arm_uncertainty_z": "belief\nuncertainty",
+        "q_arm_z": "beta value",
+        "dist_to_arm_z": "distance",
+        "visit_recency_z": "visit recency",
+    }
+    table = horserace_summary[horserace_summary["population"] == "all"].set_index(
+        "predictor"
+    )
+    y = np.arange(len(order))[::-1]
+    label_transform = ax.get_yaxis_transform()  # x in axes fraction, y in data
+    for yi, predictor in zip(y, order, strict=True):
+        if predictor not in table.index:
+            continue
+        row = table.loc[predictor]
+        color = "#CC6677" if predictor == "arm_uncertainty_z" else "#999999"
+        ax.barh(yi, row["median"], color=color, height=0.62, zorder=2)
+        stars = (
+            "***"
+            if row["wilcoxon_p"] < 1e-3
+            else "*"
+            if row["wilcoxon_p"] < 0.05
+            else "n.s."
+        )
+        # significance / animal-consistency at the right margin (avoids bar/label overlap)
+        ax.text(
+            0.99,
+            yi,
+            f"{stars} {int(row['n_animals_consistent'])}/{int(row['n_animals'])}",
+            transform=label_transform,
+            va="center",
+            ha="right",
+            fontsize=6,
+        )
+    ax.axvline(0, color="black", linewidth=0.7)
+    ax.set_yticks(y, [labels[p] for p in order])
+    ax.set_xlabel("within-arm content coefficient (per 1 SD)", labelpad=6)
+    ax.set_title(
+        "Horse-race: uncertainty, not value / distance / recency", loc="left", pad=4
+    )
+    ax.spines[["top", "right"]].set_visible(False)
+
+
 def make_diagnostic_figure(results: dict, output_dir: Path) -> plt.Figure:
-    layout = [["A", "A", "B", "B", "LS"], ["C", "C", "D", "D", "LC"]]
+    layout = [
+        ["A", "A", "B", "B", "LS"],
+        ["C", "C", "D", "D", "LC"],
+        ["E", "E", "E", "E", "."],
+    ]
     fig, axes = plt.subplot_mosaic(
         layout,
-        figsize=(7.0, 4.2),
+        figsize=(7.0, 6.0),
         width_ratios=[1, 1, 1, 1, 0.88],
+        height_ratios=[1, 1, 0.85],
         dpi=450,
         constrained_layout=True,
     )
@@ -853,10 +913,12 @@ def make_diagnostic_figure(results: dict, output_dir: Path) -> plt.Figure:
     axes["D"].set_title("Adjusted effect survives fit exclusions", loc="left", pad=4)
     axes["D"].spines[["top", "right"]].set_visible(False)
 
+    _plot_horserace(axes["E"], results["horserace_summary"])
+
     _add_scope_legend(axes["LS"])
     _add_diagnostic_curve_legend(axes["LC"])
     LABEL_PANELS(
-        [axes[label] for label in ["A", "B", "C", "D"]],
+        [axes[label] for label in ["A", "B", "C", "D", "E"]],
         xpos=-0.08,
         ypos=1.06,
         fontsize=8,
