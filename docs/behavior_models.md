@@ -30,12 +30,14 @@ parameters — so the covariates can be interpreted correctly.
   manuscript); _[paper]_ items are from the PDF Methods. The five items originally
   flagged for verification are now **resolved** — see
   [Resolution of open items](#resolution-of-open-items).
-- **Which fits we actually consume** (from
-  [`behavior_model_covariates.md`](behavior_model_covariates.md)): the
-  value/uncertainty/RPE/value-update columns come from the **Beta-Bernoulli** fit
-  `beta_stable_withleaf`; the reward/state **entropy** columns come from the
-  **HMM** fit `default_hmm`. Both fits are stored in DataJoint
-  (`alison_rlmodel.BehaviorModelResults`), not re-fit in this repo.
+- **Which fit we actually consume** (from
+  [`behavior_model_covariates.md`](behavior_model_covariates.md)): **all** behavioral
+  covariates — value / uncertainty / RPE / value-update **and** the belief entropy
+  (`beta_reward_entropy`, derived in-repo from the Beta posterior `α/β`) — come from
+  the single **Beta-Bernoulli** fit `beta_stable_withleaf`, stored in DataJoint
+  (`alison_rlmodel.BehaviorModelResults`), not re-fit in this repo. (The HMM
+  `default_hmm` was **retired 2026-07-13**; its value/RPE/entropy covariates were
+  replaced with beta equivalents — see §Model 2.)
 
 ## The shared decision architecture (belief core is the *only* difference)
 
