@@ -36,13 +36,26 @@ them. It combines spatial memory with probabilistic decision-making.
 - Each port delivers 100 μL of liquid food reward (evaporated milk with
   5% sucrose) via syringe pump, gated by an infrared beam break at the
   port.
-- Reward is **probabilistic**. Each port is assigned a nominal
-  probability of reward p(R) ∈ {0.2, 0.5, 0.8}.
-- One of the three patches has a higher average p(R) than the other two
-  (the "best patch"). Within a patch, the two ports may have the same or
-  different p(R), but the best-patch combination is always (0.5, 0.8),
-  never (0.8, 0.8) — this encourages visits to lower-value ports near
-  high-value ones, sampling a full range of values.
+- Reward is **probabilistic**. In the **canonical main protocol** each port's
+  nominal p(R) ∈ {0.2, 0.5, 0.8}, one patch has a higher *average* p(R) than the
+  other two (the "best patch"), and the best patch's two ports are (0.5, 0.8).
+- **The one hard, always-enforced constraint is that no single patch is (0.8, 0.8).**
+  It is *not* true that only the best patch contains an 0.8 port: **non-best patches
+  frequently hold an 0.8** (e.g. a (0.2, 0.8) patch, average 0.5) — "best patch =
+  (0.5, 0.8)" means the *highest-average* patch, not the only 0.8-bearing one.
+  (Verified from the rig-side per-session Python control files that set `leafProbs`,
+  `/stelmo/alison/<animal>/<animal>_py_done/*.py`: across 352 contingencies, `(0.2,0.8)`
+  patches occur 188× and `(0.8,0.8)` occurs 0×.)
+- **Dataset caveat (matters for value/contingency covariates).** The recorded and
+  ingested epochs are **not** all canonical-protocol sessions. **~37% of contingencies
+  (chimi+peanut ground-truth; ~35% of stops in `qvals_table`) do not follow the
+  canonical rule** — they are **shaping** (all-ports p=1.0 then all-0.5, the first run
+  session), **early-training** sessions (configs with no 0.8 anywhere, e.g.
+  [0.5,0.5,0.5,0.2,0.5,0.2]), and **special sessions** using probabilities outside
+  {0.2,0.5,0.8} (e.g. {0.1,0.3,0.4,0.6,0.9}). So `q_arm`/`p_reward_arm`/`value_diff_patch`
+  are computed over a mix of canonical and non-canonical contingencies unless sessions
+  are explicitly filtered (they are **not** currently — only technical exclusions apply;
+  see `data_loaders/constants.py`).
 - **Consecutive pokes at the same port are never rewarded** — animals
   must alternate between ports to receive reward.
 - p(R) assignments are uncued; animals can only infer them through
