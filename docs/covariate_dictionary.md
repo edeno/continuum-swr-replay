@@ -142,7 +142,7 @@ rate families; conditional models access within-stop time only as `tsc_x_current
 - Everything stays **correlational**; this dictionary harmonizes *definitions*, not
   causal status.
 - The full SpatialBanditTask **behavioral-model** latent variables (Beta-Bernoulli
-  value, ΔV / Stay / Switch, value updates, Beta variance, HMM reward entropy) live
+  value, ΔV / Stay / Switch, value updates, Beta variance, beta belief entropy) live
   in a separate per-stop table; see
   [`behavior_model_covariates.md`](behavior_model_covariates.md).
 - Every regression model that consumes these covariates, in R formula notation (per
