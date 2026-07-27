@@ -30,10 +30,6 @@ ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 _SESSION_COLS = ["animal", "day", "epoch"]
 _P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
 _Q_PORT_COLS = [f"q_port{i}" for i in range(6)]
-# HMM Global-Model per-leaf value (qvals_table hmm_q_port{0..5}); the single-model
-# counterpart of _Q_PORT_COLS used to build q_arm_hmm harmonized with the HMM value
-# covariates the is_swr rate ladder uses.
-_Q_PORT_HMM_COLS = [f"hmm_q_port{i}" for i in range(6)]
 # Per-leaf beta-model posterior variance (qvals_table betadist_var{1..6}); the
 # variance counterpart of _Q_PORT_COLS (mean). betadist_var{i} indexes leaf port
 # i-1 (1-indexed columns), so leaf arm j -> _BETADIST_VAR_COLS[j] = betadist_var{j+1}.
@@ -770,61 +766,6 @@ def attach_contingency_value_block(
     return p_reward_arm, q_arm
 
 
-def attach_hmm_arm_value(
-    arm: np.ndarray,
-    stop_id: np.ndarray,
-    contingency: pd.DataFrame | None,
-) -> np.ndarray:
-    """Per-arm HMM value ``q_arm_hmm`` -- the HMM (Global-Model) counterpart of
-    ``q_arm``.
-
-    Built with the SAME leaf->arm mapping as :func:`attach_contingency_value_block`
-    but sourced from the HMM per-leaf value (``hmm_q_port{0..5}``) rather than the
-    beta ``q_port`` block, so the content value covariate comes from the same
-    single model (default_hmm) as the ``hmm_*`` value covariates used by the is_swr
-    rate ladder. (The Stage-5A choice model carries no value covariate.) Leaf arm
-    ``j`` takes ``hmm_q_port{j}``; trunk arms (6-8) take ``0.0``
-    where the stop has an HMM value row and ``NaN`` where absent, so a stop missing
-    the HMM value drops uniformly across all nine arms at fit time (matching q_arm).
-
-    Parameters
-    ----------
-    arm : np.ndarray, shape (n_rows,)
-        Arm id per row (0-5 leaf, 6-8 trunk).
-    stop_id : np.ndarray, shape (n_rows,)
-        Stop id per row, keyed into ``contingency``.
-    contingency : pd.DataFrame or None
-        ``qvals_table`` rows carrying ``hmm_q_port{0..5}``; ``None`` -> all NaN.
-
-    Returns
-    -------
-    q_arm_hmm : np.ndarray, shape (n_rows,)
-    """
-    arm = np.asarray(arm)
-    n_rows = len(arm)
-    if contingency is None:
-        return np.full(n_rows, np.nan)
-    missing = set(_Q_PORT_HMM_COLS) - set(contingency.columns)
-    if missing:
-        raise ValueError(
-            "contingency is missing per-arm HMM value columns "
-            f"{sorted(missing)}; regenerate qvals_table with `python -m "
-            "continuum_swr_replay.analysis.behavior.qvals_table --write` "
-            "(carries hmm_q_port{0..5})."
-        )
-    cont = contingency.drop_duplicates("stop_id")[["stop_id", *_Q_PORT_HMM_COLS]]
-    merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
-        cont, on="stop_id", how="left"
-    )
-    q_mat = merged[_Q_PORT_HMM_COLS].to_numpy(dtype=float)
-    leaf = arm < 6
-    leaf_idx = np.clip(arm, 0, 5).astype(int)
-    row = np.arange(n_rows)
-    present = ~np.isnan(q_mat[:, 0])  # stop_id had an HMM value row
-    trunk_fill = np.where(present, 0.0, np.nan)
-    return np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
-
-
 def attach_arm_uncertainty(
     arm: np.ndarray,
     stop_id: np.ndarray,
@@ -834,14 +775,14 @@ def attach_arm_uncertainty(
 
     The variance counterpart of the beta value ``q_arm``: both come from the SAME
     Beta(alpha, beta) posterior (mean -> ``q_arm``, variance -> ``arm_uncertainty``),
-    so a value+uncertainty model stays construct-coherent (no beta/HMM mix). Built
+    so a value+uncertainty model stays construct-coherent. Built
     with the SAME leaf->arm mapping as :func:`attach_contingency_value_block`,
     sourced from ``betadist_var{1..6}`` (the per-leaf Beta posterior variance
     ``alpha*beta / ((alpha+beta)^2 (alpha+beta+1))``). Leaf arm ``j`` takes
     ``betadist_var{j+1}``; trunk arms (6-8) are not reward sites and take ``0.0``
     where the stop is present in the contingency and ``NaN`` where absent, so a
     stop missing the value block drops uniformly across all nine arms at fit time
-    (matching ``q_arm`` / ``q_arm_hmm``).
+    (matching ``q_arm``).
 
     Parameters
     ----------

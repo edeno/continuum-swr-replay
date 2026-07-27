@@ -1,19 +1,19 @@
-# Content models — proposed design (parallel to the is_swr per-bin RATE ladder)
+# Content models — design spec (parallel to the is_swr per-bin RATE ladder)
 
-Working spec for review. The RATE ladder is built and run
-(`scripts/rate/fit_swr_contrast_rate.py`, `docs/models_table.md` "is_swr version").
-The CONTENT ladder below is proposed, not yet implemented. The goal: ask the
-SAME task-dimension questions of replay *content* (what an event represents)
-that the rate ladder asks of replay *rate* (how often events occur), harmonized
-to the paper-faithful HMM covariates.
+Design spec for the content ladder, now **implemented** in
+`scripts/content/fit_swr_contrast_content.py` (the RATE ladder is
+`scripts/rate/fit_swr_contrast_rate.py`; see `docs/models_table.md` "is_swr version").
+The goal: ask the SAME task-dimension questions of replay *content* (what an event
+represents) that the rate ladder asks of replay *rate* (how often events occur),
+using the beta-bernoulli covariates (the HMM was retired 2026-07-13).
 
 ## Covariate dictionary (shared with the rate ladder)
-Task dimensions, all from ONE model (`default_hmm`), per event/stop scalars:
+Task dimensions, all from the beta-bernoulli model, per event/stop scalars:
 - `reward_lag1` — current (consummatory) reward at this stop.
-- `hmm_relative_value` (ΔV) — relative value (paper's single value+decision axis).
-- `hmm_rpe` — reward prediction error (reward − Q_current_leaf).
-- `reward_entropy` — HMM reward-state entropy (outcome uncertainty).
-- `hmm_value_update` — global value update Σ|ΔQ|.
+- `switch_advantage_mu_preoutcome_sess` (ΔV) — beta relative value (Stay-vs-Switch).
+- `rpe` — beta reward prediction error (reward − q_chosen).
+- `beta_reward_entropy` — beta belief entropy (mean per-leaf Beta differential entropy).
+- `global_mu_update_abs_postoutcome_sess` — beta global value update Σ|Δμ|.
 - CONTEXT split (near-orthogonal, VIF≈1): `PERISWITCH` = trials_since_switch +
   is_post_switch + their interaction; `BLOCK` = trials_since_block_change;
   `SWITCHRATE` = recent_switch_rate.
@@ -27,7 +27,7 @@ Arm-/patch-level features (vary WITHIN an event → real main effects):
 - `visit_recency` / `patch_visit_recency` — recency of visiting each arm/patch.
 - `arm_dist_rank` — distance ordering from current position.
 - `reward_rate_arm_k10` — per-arm reward memory (last 10 visits).
-- `q_arm` — per-arm value (TO HARMONIZE: derive from HMM Q1..6, currently beta).
+- `q_arm` — per-arm beta value (`q_port{i}` = `Q{i+1}`); the single value construct.
 - `ARMFE` — arm fixed effects (8 dummies).
 
 ## Structural fact that shapes everything
@@ -70,10 +70,10 @@ C5   + is_last_rewarded_elsewhere # represents the last-rewarded arm?
 ```
 State modulation of the current-bias (event-scalar : is_current; rate-ladder analogs):
 ```
-C6   + hmm_rpe:is_current             # does RPE pull content toward/off current?   (~G5_rpe)
-C7   + hmm_relative_value:is_current  # does ΔV shift the bias?                       (~G4_value)
-C8   + reward_entropy:is_current      # does uncertainty BROADEN off-current?         (~G6_uncert)
-C9   + hmm_value_update:is_current    # does updating shift content?                  (~G7_update)
+C6   + rpe:is_current                          # does RPE pull content toward/off current?  (~G5_rpe)
+C7   + switch_advantage_mu:is_current          # does ΔV shift the bias?                     (~G4_value)
+C8   + beta_reward_entropy:is_current          # does belief entropy BROADEN off-current?    (~G6_uncert)
+C9   + global_mu_update_abs:is_current         # does updating shift content?                (~G7_update)
 ```
 CONTEXT split (event-scalar : is_current; parallels rate G1/G2/G3):
 ```
@@ -141,8 +141,8 @@ CPS3 + is_swr:(is_last_rewarded_patch:trials_since_switch)   # is the old-patch 
 - **`C4`/`CS5` complete-case shrinkage:** `q_arm`/`p_reward_arm` are NaN on
   absent-contingency stops (the documented `Mv` problem) — co-fitting restricts
   the shared event set. State the retained-n up front.
-- **`C8`/`C9` collinearity:** `reward_entropy`↔`hmm_value_update` r=0.42 (rpe↔value
-  is fine at r=0.14) — VIF/rank smoke-test C8/C9 before trusting them as separate.
+- **`C8`/`C9` collinearity:** smoke-test VIF/rank for `beta_reward_entropy`↔`global_mu_update_abs`
+  before trusting C8/C9 as separate (the HMM-era pair was r=0.42).
 - G-ladder cross-split comparisons are INFORMAL (two independent fits, different
   residual structure); only the pooled `is_swr:feature` interactions carry a valid
   SE on the *difference*. State which is authoritative when they disagree.

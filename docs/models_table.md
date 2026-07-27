@@ -55,7 +55,7 @@ post-outcome or future-referencing must be **declared descriptive**, else the ru
   patch `CP2`/`CP3`/`CPS3` (peri-switch alignment); rate `G5`/`G7`/`S7`/`S9`
   (RPE/update association), `G1`/`S3` (peri-switch). `trials_since_switch` /
   `is_post_switch` are future-referencing (sign toward the *next* switch) and can ONLY
-  be descriptive; `hmm_rpe` / `hmm_value_update` are post-outcome and were relabeled
+  be descriptive; `rpe` / `global_mu_update_abs_postoutcome_sess` are post-outcome and were relabeled
   descriptive here rather than gated.
 - **Mechanism-A encode:** an unvisited leaf's `reward_rate_arm_k10` is `0.0` (not NaN),
   retaining the ~11.6% novel-arm events the old NaN dropped. A `has_arm_history` novelty
@@ -78,7 +78,7 @@ ladders), `fit_per_stop_rate_models.py` (Family A) and `fit_per_bin_rate_models.
 `grain` (`event` for content, `stop` for the rate families). Drops are **mutually
 exclusive**, assigned by priority:
 
-`n_drop_qvals_gap` (mechanism B — a value/HMM covariate is missing on the ~896-event /
+`n_drop_qvals_gap` (mechanism B — a value covariate is missing on the ~896-event /
 2056-stop tail) → `n_drop_own_predictor_missing` (this model's own predictor NaN, e.g.
 `reward_rate_arm_k10`'s early-session mechanism-A gap) → `n_drop_zero_response`
 (Σcount==0) → `n_drop_common_cohort_other` (union complete-case: dropped only for
@@ -132,7 +132,7 @@ M7r_time_histcos_rew  count ~ BS_TC + REWK + HISTCOS
 MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
                         + p_reward_current + value_diff_patch + recent_switch_rate
                         + trials_since_block_change + rpe_model
-                        + switch_advantage_mu_preoutcome_sess + reward_entropy
+                        + switch_advantage_mu_preoutcome_sess + beta_reward_entropy
                         + global_mu_update_abs_postoutcome_sess
                         + unchosen_patches_mu_update_abs_postoutcome_sess
 ```
@@ -162,7 +162,7 @@ M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_rece
 M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
 M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
                  + swr_x_is_last_rewarded_elsewhere
-Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm_hmm
+Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
 ```
 
 ## Content — patch
@@ -215,7 +215,7 @@ Runners: `scripts/rate/fit_swr_contrast_rate.py`, `scripts/content/fit_swr_contr
 (import the specs; keep only data-assembly + fitting).
 
 Shorthands / covariate blocks. The task dimensions are **the paper's variables
-(Comrie et al.), all from one model (`default_hmm`)** — see `qvals_table.add_hmm_decision_variables`:
+(Comrie et al.), all from the **beta-bernoulli** model (HMM retired 2026-07-13):
 ```
 BASE      := bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4)) + reward_lag1 + REWK_prev + HISTCOS   # = M7r nuisance base
 REWK_prev := reward_lag2 + ... + reward_lag10          # former trials (dwell-clean)
@@ -223,10 +223,10 @@ HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch  # peri-switch broken-stick (one construct; see Note 1b)
 BLOCK     := trials_since_block_change  # learning across a contingency block
 SWITCHRATE:= recent_switch_rate         # local switch volatility
-VALUE     := hmm_relative_value        # relative value ΔV (paper's single value+decision axis; see Note 2)
-RPE       := hmm_rpe                    # reward - Q_current_leaf (HMM; unscaled canonical RPE, see Note 6)
-UNCERT    := reward_entropy            # HMM native reward-state entropy; NOT the port-specific reward_entropy_current_leaf (see Note 4)
-UPDATE    := hmm_value_update          # global value update Σ_leaf|ΔQ| (HMM)
+VALUE     := switch_advantage_mu_preoutcome_sess  # beta relative value ΔV (Stay-vs-Switch)
+RPE       := rpe                        # reward - q_chosen (beta)
+UNCERT    := beta_reward_entropy        # mean per-leaf Beta differential entropy (derived)
+UPDATE    := global_mu_update_abs_postoutcome_sess  # beta global value update Σ_leaf|Δμ|
 REWXTIME  := reward_lag1:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))  # reward × within-stop time course (dwell-shape test; see Note 7)
 ```
 
@@ -241,7 +241,7 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | `G3_switchrate` | `BASE + SWITCHRATE` | Is the rate modulated by recent local switch volatility? |
 | `G4_value` | `BASE + VALUE` | Is the rate modulated by relative value (ΔV = Switch − Stay, the paper's decision variable)? |
 | `G5_rpe` | `BASE + RPE` | Is the rate modulated by reward prediction error (reward − expected value)? |
-| `G6_uncert` | `BASE + UNCERT` | Is the rate higher when reward-state entropy (outcome uncertainty) is high? |
+| `G6_uncert` | `BASE + UNCERT` | Is the rate higher when belief entropy (outcome uncertainty) is high? |
 | `G7_update` | `BASE + UPDATE` | Is the rate higher when global value updating is large? |
 | `G8_rewxtime` | `BASE + REWXTIME` | Does the current reward reshape the within-stop rate *profile* (not just shift its level)? — the dwell-shape control (rewarded stops are ~3.6× longer). |
 
@@ -258,30 +258,28 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | `S5_switchrate` | `is_swr * (BASE + SWITCHRATE)` | Does the switch-volatility modulation differ by SWR? |
 | `S6_value` | `is_swr * (BASE + VALUE)` | Does relative-value modulation of rate differ by SWR? |
 | `S7_rpe` | `is_swr * (BASE + RPE)` | Does RPE modulation of rate differ by SWR? |
-| `S8_uncert` | `is_swr * (BASE + UNCERT)` | Does entropy (uncertainty) modulation differ by SWR? |
+| `S8_uncert` | `is_swr * (BASE + UNCERT)` | Does belief-entropy (uncertainty) modulation differ by SWR? |
 | `S9_update` | `is_swr * (BASE + UPDATE)` | Does value-update modulation differ by SWR? |
 | `S10_rewxtime` | `is_swr * (BASE + REWXTIME)` | Does the reward × within-stop-time-course (dwell-shape) effect differ by SWR? |
 
 **Notes.** (1) **Single-model provenance:** the task dimensions all come from the
-paper's HMM (`default_hmm`) — `hmm_relative_value` / `hmm_rpe` / `hmm_value_update`
-(ported from Alison's `add_rpe_deltaq_to_hmm_plus` onto native HMM `Q`) + native
-`reward_entropy` — so we don't mix the beta model's ΔV with HMM entropy. (1b) **CONTEXT
+**beta-bernoulli** model — `switch_advantage_mu_preoutcome_sess` (ΔV) / `rpe` /
+`global_mu_update_abs_postoutcome_sess` + the derived `beta_reward_entropy` (the HMM
+was retired 2026-07-13; there is one model now). (1b) **CONTEXT
 is split into three near-orthogonal rungs** (`PERISWITCH`, `BLOCK`, `SWITCHRATE`; pairwise
 |r| ≤ 0.14, VIF ≈ 1 except within peri-switch), each tested individually rather than as one
 lumped block. Peri-switch's three terms (`trials_since_switch`, `is_post_switch`, their
 interaction; internal r ≈ 0.71) stay together — the interaction is meaningless without its
 main effects, and jointly they are the paper's broken-stick ramp around a switch. (2) **Value
 and decision are one dimension:** the paper fits a single relative-value axis (ΔV),
-not separate value and decision covariates, so we follow it with the single
-`hmm_relative_value`. Empirically this is corroborated cross-model: the beta model's
-`q_chosen` and HMM ΔV are r=−0.67 collinear (measured on the production table, n≈103k;
-a cross-model correlation, not the paper's intra-model value/decision collinearity).
-`q_chosen` is a robustness re-param, not co-fit. (3) The reward kernel is split `reward_lag1` (current,
+not separate value and decision covariates, so we follow it with the single beta
+`switch_advantage_mu_preoutcome_sess` (Stay-vs-Switch). `q_chosen`/`q_arm` (belief
+mean) is a per-arm robustness re-param, not co-fit on the rate ladder. (3) The reward kernel is split `reward_lag1` (current,
 dwell-confounded) + `REWK_prev` (former, dwell-clean) so the current-vs-former gating
-contrast separates. (4) `reward_entropy` is the HMM's native reward-state entropy; the
-paper's port-specific `reward_entropy_current_leaf` is not in the trials-aligned fit and
-appears only in Alison's exploratory notebooks (not `rl_helpers.py`), so whether it is a
-clean reproducible column is unconfirmed — a follow-up if the exact variant is wanted.
+contrast separates. (4) `beta_reward_entropy` is the mean per-leaf **Beta** differential entropy (from
+`betadist_α/β`, `qvals_table.add_beta_belief_entropy`) — the beta analog of the retired
+HMM `reward_entropy`; the per-arm belief *variance* `arm_uncertainty` is the separate
+content-uncertainty covariate (see the content ladder).
 (5) Per-session fit + across-session signed-rank (no random effects); every rung isolates
 one dimension (no joint `*_all` kitchen-sink specs — they were dropped as overparameterized
 on low-event sessions). (6) **RPE is the unscaled canonical
@@ -314,7 +312,6 @@ design columns; verified by `_verify_harmonization_parity`, see
 | Per-stop rate (A) | — | R0, R1, R2, Rlag |
 
 Changed drivers: `reward_rate_arm_k10` (5→10 visits), the value block
-`p_reward_arm`/`q_arm_hmm` (the value rungs C4/CS5/Mv now use the HMM per-arm
-value `q_arm_hmm`, harmonized with the is_swr rate ladder; the beta `q_arm`
-column is retained for robustness), model `rpe`/`q_current`, and the choice
+`p_reward_arm`/`q_arm` (the value rungs C4/CS5/Mv use the beta-bernoulli per-arm
+value `q_arm`, the single value construct since the 2026-07-13 HMM retirement), model `rpe`/`q_current`, and the choice
 `dist_to_arm`→`arm_dist_rank` swap.

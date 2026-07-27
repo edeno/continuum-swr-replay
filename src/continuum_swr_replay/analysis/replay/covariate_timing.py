@@ -6,17 +6,17 @@ promoting the ``time_availability`` column of
 assert against. Two distinct leaks get two distinct remedies (see
 :func:`assert_predictor_timing`):
 
-- **POST_OUTCOME** — carries the current trip's reward (``hmm_rpe``/``rpe``,
-  ``hmm_value_update``, ``is_after_reward``/``is_after_omission``/``reward_outcome``).
+- **POST_OUTCOME** — carries the current trip's reward (``rpe``,
+  ``global_mu_update_abs_postoutcome_sess``, ``is_after_reward``/``is_after_omission``/``reward_outcome``).
   Fixable by restricting the fit to **post-current-outcome** bins (``retrospective=True``).
 - **FUTURE_REFERENCING** — the value itself embeds a not-yet-occurred event
   (``trials_since_switch`` signs toward the *next* switch; ``next_arm``/``is_next``).
   **No temporal gate makes it predictive-safe** — only ``descriptive=True`` (peri-switch
   alignment) or a strictly past-only replacement (e.g. ``trials_since_last_switch``).
 
-Derived/interaction columns (``update_x_current``, ``is_swr:hmm_rpe``, ``swr_x_q_arm_hmm``)
+Derived/interaction columns (``update_x_current``, ``is_swr:rpe``, ``swr_x_q_arm``)
 resolve to their **source atoms** through :data:`DERIVED_COVARIATE_SOURCES` — a name-split
-heuristic silently fails (``update_x_current`` does not contain ``hmm_value_update``), so
+heuristic silently fails (``update_x_current`` does not contain ``global_mu_update_abs_postoutcome_sess``), so
 the mapping is explicit and a completeness test asserts every ladder predictor resolves
 into :data:`KNOWN_ATOMS`.
 """
@@ -27,7 +27,8 @@ from .model_specs import N_HISTORY_BASIS, N_HISTORY_LAGS, N_REWARD_LAGS
 
 POST_OUTCOME = frozenset({  # NOT available before the current trip's reward
     "reward_outcome", "is_after_reward", "is_after_omission",
-    "hmm_rpe", "rpe", "hmm_value_update",
+    "rpe",  # beta reward prediction error (reward - q_chosen)
+    "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
 })
 FUTURE_REFERENCING = frozenset({  # references a not-yet-occurred event
     "next_arm", "is_next", "ends_at_next", "contains_path_to_next",
@@ -38,9 +39,10 @@ PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-rewa
     "visit_recency", "visit_recency_demeaned", "visit_recency_patch", "cumulative_reward",
     "is_current", "is_prev", "is_last_rewarded", "is_last_rewarded_elsewhere",
     "is_after_switch",
-    "hmm_relative_value", "q_arm", "q_arm_hmm", "p_reward_arm",
-    "reward_entropy", "state_entropy",
+    "q_arm", "p_reward_arm",
     "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
+    # beta-bernoulli value/decision block (pre-outcome by name): relative value + belief entropy
+    "switch_advantage_mu_preoutcome_sess", "beta_reward_entropy",
 })
 
 # Gating factors, not outcome-bearing -- dropped when resolving a patsy interaction.
@@ -48,10 +50,10 @@ SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})
 
 DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
     # content `_x_current` interactions (source is the z-scalar's base covariate)
-    "rpe_x_current": ["hmm_rpe"], "rpe_x_current_z": ["hmm_rpe"],
-    "relval_x_current": ["hmm_relative_value"],
-    "entropy_x_current": ["reward_entropy"],
-    "update_x_current": ["hmm_value_update"],            # POST_OUTCOME
+    "rpe_x_current": ["rpe"], "rpe_x_current_z": ["rpe"],
+    "relval_x_current": ["switch_advantage_mu_preoutcome_sess"],
+    "entropy_x_current": ["beta_reward_entropy"],
+    "update_x_current": ["global_mu_update_abs_postoutcome_sess"],  # POST_OUTCOME
     "tss_x_current": ["trials_since_switch"],             # FUTURE_REFERENCING
     "postsw_x_current": ["is_post_switch"],               # FUTURE_REFERENCING
     "tsspostsw_x_current": ["trials_since_switch", "is_post_switch"],
@@ -65,9 +67,9 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
-    "swr_x_q_arm": ["q_arm"], "swr_x_q_arm_hmm": ["q_arm_hmm"],  # qvals-dependent
+    "swr_x_q_arm": ["q_arm"],  # qvals-dependent
     # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):
-    # raw betadist_var has SD ~0.03 (12x smaller than q_arm_hmm), which makes the
+    # raw betadist_var has SD ~0.02 (~5-6x smaller than q_arm), which makes the
     # per-session covariance singular ("need covariance") — the content models use the
     # _z form. The runner builds swr_x_arm_uncertainty_z = is_swr * arm_uncertainty_z.
     "arm_uncertainty_z": ["arm_uncertainty"],
@@ -111,7 +113,7 @@ def timing_of(predictor: str) -> list[str]:
     Splits ALL ``:`` operands (not just the first), drops safe gating modifiers, and
     expands each remaining operand through :data:`DERIVED_COVARIATE_SOURCES` so a
     post-outcome operand can't hide behind a safe left operand
-    (``is_swr:hmm_rpe -> ['hmm_rpe']``, not ``['is_swr']``).
+    (``is_swr:rpe -> ['rpe']``, not ``['is_swr']``).
     """
     if predictor in DERIVED_COVARIATE_SOURCES:
         return list(DERIVED_COVARIATE_SOURCES[predictor])

@@ -19,10 +19,10 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
 
 Covariate blocks BASE/PERISWITCH/BLOCK/SWITCHRATE/VALUE/RPE/UNCERT/UPDATE/REWXTIME
 are defined below. The task
-dimensions are the paper's (Comrie et al.), all from ONE model (`default_hmm`):
-relative value (`hmm_relative_value`; the paper's single value+decision axis, cross-model
-corroborated by q_chosen/ΔV r=-0.67), RPE (unscaled `reward - Q_leaf`), HMM reward-state
-entropy (native `reward_entropy`, not the port-specific variant), global value update;
+dimensions are the paper's (Comrie et al.), all from the beta-bernoulli model:
+relative value (`switch_advantage_mu_preoutcome_sess`; Stay-vs-Switch ΔV), RPE
+(`rpe` = `reward - q_chosen`), belief entropy (`beta_reward_entropy`, mean per-leaf
+Beta differential entropy), global value update (`global_mu_update_abs_postoutcome_sess`);
 + CONTEXT (peri-switch/
 block) from `qvals_table` and `recent_switch_rate` from `add_uncertainty_covariates`.
 One tidy row per (population, model, session), each carrying per-term coef + SE
@@ -112,21 +112,23 @@ SESSION_COLS = ["animal", "day", "epoch"]
 _G_KEY = {
     "G0_base": "reward_lag1", "G1_periswitch": "trials_since_switch",
     "G2_block": "trials_since_block_change", "G3_switchrate": "recent_switch_rate",
-    "G4_value": "hmm_relative_value", "G5_rpe": "hmm_rpe",
-    "G6_uncert": "reward_entropy", "G7_update": "hmm_value_update",
+    "G4_value": "switch_advantage_mu_preoutcome_sess", "G5_rpe": "rpe",
+    "G6_uncert": "beta_reward_entropy", "G7_update": "global_mu_update_abs_postoutcome_sess",
 }
 _S_KEY = {
     "S1_rew1": "is_swr:reward_lag1", "S3_periswitch": "is_swr:trials_since_switch",
     "S4_block": "is_swr:trials_since_block_change",
     "S5_switchrate": "is_swr:recent_switch_rate",
-    "S6_value": "is_swr:hmm_relative_value", "S7_rpe": "is_swr:hmm_rpe",
-    "S8_uncert": "is_swr:reward_entropy", "S9_update": "is_swr:hmm_value_update",
+    "S6_value": "is_swr:switch_advantage_mu_preoutcome_sess", "S7_rpe": "is_swr:rpe",
+    "S8_uncert": "is_swr:beta_reward_entropy",
+    "S9_update": "is_swr:global_mu_update_abs_postoutcome_sess",
 }
 # raw fit population -> friendly label shared with the content table
 _POP_LABEL = {"non_local": "all", "non_local_swr": "SWR", "non_local_no_swr": "nonSWR"}
 _RATE_CONT_COVARS = [
     "trials_since_switch", "trials_since_block_change", "recent_switch_rate",
-    "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update",
+    "switch_advantage_mu_preoutcome_sess", "rpe", "beta_reward_entropy",
+    "global_mu_update_abs_postoutcome_sess",
 ]
 RC = PROCESSED_DATA_DIR / "replay_content"
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
@@ -240,10 +242,10 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         "trials_since_switch",
         "is_post_switch",
         "trials_since_block_change",
-        "hmm_relative_value",
-        "hmm_rpe",
-        "reward_entropy",
-        "hmm_value_update",
+        "switch_advantage_mu_preoutcome_sess",
+        "rpe",
+        "beta_reward_entropy",
+        "global_mu_update_abs_postoutcome_sess",
     ]
     missing = [c for c in qcols if c not in q.columns]
     if missing:
@@ -273,7 +275,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         pd.read_pickle(RC / "event_table.pkl"),
     )
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
-    # HMM/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
+    # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
     n_qvals_dropped = int(n0 - len(stop))
     return stop, onsets, n_qvals_dropped
 

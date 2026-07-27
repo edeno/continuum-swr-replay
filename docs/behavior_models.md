@@ -113,10 +113,18 @@ is **built into `beta_decay`**, not incidental. Empirically
 [`replay_rate_content_swr_synthesis.md`](replay_rate_content_swr_synthesis.md) /
 the content-model uncertainty work).
 
-## Model 2 — HMM (`default_hmm`): reward/state-entropy source
+## Model 2 — HMM (`default_hmm`)
 
-Joint latent-state belief over reward contingencies. **This is the fit that
-supplies `reward_entropy` and `state_entropy`.**
+> **RETIRED from the analysis (2026-07-13).** The paper standardized on the
+> Beta-Bernoulli model (§Model 1); the HMM value/RPE/update/entropy covariates
+> (`q_arm_hmm`, `hmm_*`, `reward_entropy`, `state_entropy`) were dropped from every
+> model ladder and replaced with beta equivalents (belief entropy → the derived
+> `beta_reward_entropy`). This section is retained as **background** — it documents
+> a model that still lives in Alison's `hmm.jl`, not a covariate source the current
+> analysis uses.
+
+Joint latent-state belief over reward contingencies. (Historically supplied
+`reward_entropy` and `state_entropy`.)
 
 **Assumptions** _[source]_:
 

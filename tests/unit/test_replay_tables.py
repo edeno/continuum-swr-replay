@@ -264,7 +264,7 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     eat = build_event_arm_table(et, dot, env, trials, graph)
 
     # value-block columns are emitted (present even without a contingency)
-    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm", "q_arm_hmm",
+    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm",
                 "arm_uncertainty"):
         assert col in eat.columns
 
@@ -286,7 +286,6 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
         for i in range(6):
             cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
             cont[f"q_port{i}"] = 0.05 * (i + 1)
-            cont[f"hmm_q_port{i}"] = 0.07 * (i + 1)  # distinct from beta q_port
             cont[f"betadist_var{i + 1}"] = 0.01 * (i + 1)  # beta variance (1-indexed)
         eat_c = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
         present = eat_c["stop_id"].isin(stop_ids)
@@ -298,10 +297,6 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
         np.testing.assert_allclose(
             eat_c.loc[leaf, "q_arm"].to_numpy(), 0.05 * (arm_j + 1)
         )
-        # q_arm_hmm routes each leaf to its OWN HMM port value, distinct from beta q_arm
-        np.testing.assert_allclose(
-            eat_c.loc[leaf, "q_arm_hmm"].to_numpy(), 0.07 * (arm_j + 1)
-        )
         # arm_uncertainty routes leaf arm j to betadist_var{j+1} (variance counterpart)
         np.testing.assert_allclose(
             eat_c.loc[leaf, "arm_uncertainty"].to_numpy(), 0.01 * (arm_j + 1)
@@ -310,7 +305,6 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
         trunk = present & (eat_c["arm"] >= 6)
         assert (eat_c.loc[trunk, "p_reward_arm"] == 0.0).all()
         assert (eat_c.loc[trunk, "q_arm"] == 0.0).all()
-        assert (eat_c.loc[trunk, "q_arm_hmm"] == 0.0).all()
         assert (eat_c.loc[trunk, "arm_uncertainty"] == 0.0).all()
 
 
@@ -329,7 +323,6 @@ def test_value_block_absent_stop_drops_all_arms(tiny_session):
     for i in range(6):
         cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
         cont[f"q_port{i}"] = 0.05 * (i + 1)
-        cont[f"hmm_q_port{i}"] = 0.07 * (i + 1)
         cont[f"betadist_var{i + 1}"] = 0.01 * (i + 1)
     eat = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
 
@@ -337,7 +330,6 @@ def test_value_block_absent_stop_drops_all_arms(tiny_session):
     assert len(absent), "fixture produced no absent-stop rows"
     assert absent["p_reward_arm"].isna().all()  # uniform NaN, not 0.0
     assert absent["q_arm"].isna().all()
-    assert absent["q_arm_hmm"].isna().all()
     assert absent["arm_uncertainty"].isna().all()
     present_leaf = eat[eat["stop_id"].isin(covered) & (eat["arm"] < 6)]
     assert present_leaf["p_reward_arm"].notna().all()

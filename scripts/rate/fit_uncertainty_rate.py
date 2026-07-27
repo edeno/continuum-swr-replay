@@ -112,13 +112,13 @@ MODEL_VALUE_COVARIATES = (
     "rpe_model",  # reward - q_chosen (model reward-prediction error)
 )
 
-# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf
-# + HMM entropy; see docs/behavior_model_covariates.md). The paper's covariates:
-# DeltaV, reward-state entropy, absolute value-update magnitudes. z-scored below
-# (disparate/tiny scale) -> per-SD rate ratios.
+# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf;
+# see docs/behavior_model_covariates.md). The paper's covariates: DeltaV, belief
+# entropy, absolute value-update magnitudes. z-scored below (disparate/tiny scale)
+# -> per-SD rate ratios.
 RL_COVARIATES = (
     "switch_advantage_mu_preoutcome_sess",  # DeltaV = Switch - Stay value
-    "reward_entropy",  # outcome uncertainty (HMM, upcoming/chosen port)
+    "beta_reward_entropy",  # belief uncertainty (mean per-leaf Beta differential entropy)
     "global_mu_update_abs_postoutcome_sess",  # |value update| summed over all ports
     "unchosen_patches_mu_update_abs_postoutcome_sess",  # |update| over alternative patches
 )

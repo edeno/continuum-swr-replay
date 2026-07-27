@@ -25,7 +25,7 @@ import pandas as pd
 # attributed to exactly the first bucket it hits, so the reconciliation closes even
 # when a unit fails several checks.
 DROP_FIELDS = (
-    "n_drop_qvals_gap",  # [1] value/HMM covariate missing (mechanism B — the qvals tail)
+    "n_drop_qvals_gap",  # [1] value covariate missing (mechanism B — the qvals tail)
     "n_drop_own_predictor_missing",  # [2] this model's own required predictor is NaN
     "n_drop_zero_response",  # [3] all responses zero (content: Σcount==0)
     "n_drop_common_cohort_other",  # [4] common mode: dropped only for ANOTHER rung's NaN
@@ -52,20 +52,20 @@ TERM_DIAGNOSTICS_COLUMNS = (
 _QUASI_SEP_ABS = 10.0
 
 # Covariates that are NaN on the trailing "qvals gap" (mechanism B): the ~896-event /
-# 2056-stop tail with no fitted HMM/beta value state. When one of these is a model's
+# 2056-stop tail with no fitted beta value state. When one of these is a model's
 # required predictor, an event/stop it drops is attributed to ``n_drop_qvals_gap`` (with
 # priority over generic own-predictor missingness), keeping mechanism B distinguishable
 # from mechanism A (e.g. ``reward_rate_arm_k10``'s early-session NaN). The beta ``q_arm``,
-# HMM ``q_arm_hmm`` and nominal ``p_reward_arm`` share one identical missingness mask
-# (verified: 8064 event-arm rows / 896 events); the stop-level ``hmm_*`` scalars and their
+# beta ``q_arm`` and nominal ``p_reward_arm`` share one identical missingness mask
+# (verified: 8064 event-arm rows / 896 events); the stop-level beta scalars and their
 # ``_x_current`` interactions come off the same qvals table and share the tail.
 QVALS_GAP_COLS = frozenset({
     # per-arm value / contingency (identical missingness)
-    "q_arm", "q_arm_hmm", "p_reward_arm",
-    "swr_x_q_arm", "swr_x_q_arm_hmm",
-    # stop-level HMM/beta scalars from qvals_table (same trailing tail)
-    "hmm_rpe", "rpe", "hmm_relative_value", "hmm_value_update",
-    "reward_entropy", "state_entropy",
+    "q_arm", "p_reward_arm",
+    "swr_x_q_arm",
+    # stop-level beta scalars from qvals_table (same trailing tail)
+    "rpe", "switch_advantage_mu_preoutcome_sess", "beta_reward_entropy",
+    "global_mu_update_abs_postoutcome_sess",
     # content _x_current interactions built from those scalars
     "rpe_x_current", "relval_x_current", "entropy_x_current", "update_x_current",
 })
@@ -226,7 +226,7 @@ def drop_profile(dropped: pd.DataFrame) -> str:
         parts.append(f"median_tss={dropped['time_since_stop'].median():.2f}")
     if "reward_outcome" in dropped:
         parts.append(f"rewarded_frac={dropped['reward_outcome'].mean():.3f}")
-    for vcol in ("q_arm_hmm", "hmm_relative_value"):
+    for vcol in ("q_arm", "switch_advantage_mu_preoutcome_sess"):
         if vcol in dropped:
             parts.append(f"{vcol}_median={dropped[vcol].median():.3f}")
     return "; ".join(parts) if parts else f"n_dropped={len(dropped)}"

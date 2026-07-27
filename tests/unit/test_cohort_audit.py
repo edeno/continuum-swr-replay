@@ -144,26 +144,26 @@ def _long(events_cols: dict, n_arms: int = 3) -> pd.DataFrame:
 
 def test_event_drop_buckets_common_cohort_and_qvals():
     # event 1: own predictor 'own' NaN -> own_predictor_missing
-    # event 2: a value covariate q_arm_hmm NaN -> qvals_gap (priority over own/common)
+    # event 2: a value covariate q_arm NaN -> qvals_gap (priority over own/common)
     # event 3: only the OTHER rung's predictor 'other' NaN -> common_cohort_other
     # event 4: complete but response all zero -> zero_response
     # event 5: clean -> modeled
     df = _long({
         1: {"y": [1, 0, 0], "own": [float("nan"), 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm_hmm": [0.1, 0.2, 0.3]},
+            "q_arm": [0.1, 0.2, 0.3]},
         2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm_hmm": [float("nan"), 0.2, 0.3]},
+            "q_arm": [float("nan"), 0.2, 0.3]},
         3: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [float("nan"), 1, 1],
-            "q_arm_hmm": [0.1, 0.2, 0.3]},
+            "q_arm": [0.1, 0.2, 0.3]},
         4: {"y": [0, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm_hmm": [0.1, 0.2, 0.3]},
+            "q_arm": [0.1, 0.2, 0.3]},
         5: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm_hmm": [0.1, 0.2, 0.3]},
+            "q_arm": [0.1, 0.2, 0.3]},
     })
     buckets = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own", "q_arm_hmm"],  # this rung uses own + value
-        union_predictors=["own", "other", "q_arm_hmm"],
+        own_predictors=["own", "q_arm"],  # this rung uses own + value
+        union_predictors=["own", "other", "q_arm"],
     )
     assert buckets["n_drop_qvals_gap"] == 1  # event 2
     assert buckets["n_drop_own_predictor_missing"] == 1  # event 1
@@ -198,24 +198,24 @@ def test_event_drop_buckets_null_rung_uses_common_bucket():
 
 
 def test_event_drop_buckets_qvals_gap_only_for_own_value_covariate():
-    """C2 regression: a base rung that does NOT use q_arm_hmm must NOT report a
-    qvals_gap when a *later* rung's q_arm_hmm is the NaN cause — it is common-cohort."""
+    """C2 regression: a base rung that does NOT use q_arm must NOT report a
+    qvals_gap when a *later* rung's q_arm is the NaN cause — it is common-cohort."""
     df = _long({
-        1: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm_hmm": [float("nan"), 0.2, 0.3]},
-        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm_hmm": [0.1, 0.2, 0.3]},
+        1: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm": [float("nan"), 0.2, 0.3]},
+        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm": [0.1, 0.2, 0.3]},
     })
-    # Base rung uses only 'own'; q_arm_hmm belongs to another rung in the union.
+    # Base rung uses only 'own'; q_arm belongs to another rung in the union.
     base = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own"], union_predictors=["own", "q_arm_hmm"],
+        own_predictors=["own"], union_predictors=["own", "q_arm"],
     )
     assert base["n_drop_qvals_gap"] == 0  # not this rung's value covariate
     assert base["n_drop_common_cohort_other"] == 1  # event 1, dropped for the value rung
 
-    # The value rung that DOES use q_arm_hmm attributes the same event to qvals_gap.
+    # The value rung that DOES use q_arm attributes the same event to qvals_gap.
     value = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own", "q_arm_hmm"], union_predictors=["own", "q_arm_hmm"],
+        own_predictors=["own", "q_arm"], union_predictors=["own", "q_arm"],
     )
     assert value["n_drop_qvals_gap"] == 1
     assert value["n_drop_common_cohort_other"] == 0

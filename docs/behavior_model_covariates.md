@@ -21,17 +21,16 @@ keyed by `stop_id` (joins to `stop_table.pkl`).
 |---|---|
 | Value / belief columns | `alison_rlmodel.BehaviorModelResults`, fit `beta_stable_withleaf` (Beta-Bernoulli, stable task, with-leaf) |
 | Decision variables (ΔV, V_stay/V_switch, value updates, betadist_mu) | computed locally by the vendored `make_full_beta_bernoulli_dv_df` on the above |
-| Reward / state entropy | `alison_rlmodel.BehaviorModelResults`, fit `default_hmm` (the paper's HMM), merged on `(nwb_file_name, epoch, trial_number_by_epoch)` |
+| Belief entropy | `beta_reward_entropy` — computed locally from the Beta posterior (`betadist_α/β`) by `qvals_table.add_beta_belief_entropy` |
 | Poke / reward timestamps | `alison_behav.TrialsInfoByEpoch.ByTrial` |
 
-**Model note.** The *paper* uses the HMM (`default_hmm`): belief `α` over 72
-discrete contingency states, `Q = Σ αᵢφᵢ`, reward entropy `−Σ pᵢ log pᵢ` (Comrie
-et al. Methods, "Behavioral Hidden Markov Model"; the HMM fit lives in DataJoint,
-not this repo). This
-table uses the newer **Beta-Bernoulli** fit (`beta_stable_withleaf`) for the
-value/uncertainty columns (a project decision), and pulls the **HMM** reward/state
-entropy in separately so the entropy covariate matches the paper. The covariate
-*structure* (Q, patch value, ΔV, value updates) is identical across the two models.
+**Model note.** The analysis uses the **Beta-Bernoulli** fit
+(`beta_stable_withleaf`) as the single behavioral model — value (`q_arm` = belief
+mean), uncertainty (`arm_uncertainty` = belief variance), ΔV, RPE, value updates,
+and belief entropy (`beta_reward_entropy`) all come from it. The HMM (`default_hmm`)
+was **retired from the analysis 2026-07-13**; its `hmm_*`/`reward_entropy` columns
+are no longer fitted (see [`behavior_models.md`](behavior_models.md) for the HMM's
+description as a generative model).
 
 **Timing convention** (from the vendored docstrings): row *t* holds the
 **pre-outcome** belief state for trial *t*; trial *t*'s outcome is incorporated on
@@ -102,11 +101,10 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 | `prev_local_variance`, `prev_global_variance` | pre-outcome uncertainty (chosen-leaf / global) |
 | `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.pkl`) but are **never fitted** (not in `fit_uncertainty_rate.RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
 
-### Reward-state entropy (HMM — the paper's outcome-uncertainty covariate)
+### Belief entropy (beta — the outcome-uncertainty covariate)
 | Column | Meaning |
 |---|---|
-| `reward_entropy` | `−Σ pᵢ log pᵢ` over reward states at the upcoming/chosen port (Fig 5D) |
-| `state_entropy` | entropy over the HMM contingency-state belief |
+| `beta_reward_entropy` | mean per-leaf **Beta** differential entropy (from `betadist_α/β`); the beta analog of the retired HMM `reward_entropy` |
 
 ### Reward-prediction error
 | Column | Meaning |

@@ -50,8 +50,9 @@ def _global_sd(covariates):
 
 
 SD = _global_sd([
-    "q_arm", "q_arm_hmm", "reward_rate_arm_k10", "p_reward_arm",
-    "hmm_relative_value", "hmm_rpe", "reward_entropy", "hmm_value_update",
+    "q_arm", "reward_rate_arm_k10", "p_reward_arm",
+    "switch_advantage_mu_preoutcome_sess", "rpe", "beta_reward_entropy",
+    "global_mu_update_abs_postoutcome_sess",
     "trials_since_switch", "trials_since_block_change", "recent_switch_rate",
 ])
 ANIM = ["chimi", "j16", "peanut", "senor", "wilbur"]
@@ -60,7 +61,12 @@ RNG = np.random.default_rng(0)
 
 
 def std_factor(term):
-    """SD to convert a raw coef to per-1-SD units; (factor, is_binary)."""
+    """SD to convert a raw coef to per-1-SD units; (factor, is_binary).
+
+    Raises on an unresolved continuous term so a covariate rename can't silently
+    render at raw scale under a "per 1 SD" axis (the migration renamed every rate/
+    content term; this asserts each still resolves).
+    """
     BIN = {"is_current", "swr_x_current", "swr_x_prev",
            "swr_x_is_last_rewarded_elsewhere", "reward_lag1",
            "is_current_patch", "is_last_rewarded_patch_elsewhere",
@@ -71,15 +77,28 @@ def std_factor(term):
     for cov, s in SD.items():
         if term == cov or term == f"swr_x_{cov}":
             return s, False
-    # content state-modulation interactions are already z-scored at fit time
-    return 1.0, False
+    # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
+    # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
+    # must be in SD — so a renamed main effect (not an interaction) raises here rather
+    # than silently plotting at raw scale under a "per 1 SD" axis.
+    if "_x_" in term:
+        return 1.0, False
+    raise KeyError(
+        f"plot term {term!r} resolves to no SD entry and is not a binary or a "
+        f"z-scored-at-fit interaction (`*_x_*`) — a main-effect rename would silently "
+        f"mis-scale it. Add it to the SD (_global_sd) list."
+    )
 
 
 def sessions(df, mod, pop, term):
     g = df[(df.model == mod) & (df.population == pop)]
     c = f"coef_{term}"
-    if c not in g:
-        return {}
+    if c not in g.columns:
+        raise KeyError(
+            f"coef column {c!r} absent from fitted pickle for {mod}/{pop} — the row "
+            f"spec references a term the fit did not produce (likely a rename). "
+            f"Row would render blank."
+        )
     g = g.dropna(subset=[c])
     g = g[g[c].abs() < 10]
     f, _ = std_factor(term)
@@ -140,14 +159,14 @@ SWR, NON = "non_local_swr", "non_local_no_swr"
 rate_rows = [
     ("reward lag-1 · SWR", "G0_base", SWR, "reward_lag1"),
     ("reward lag-1 · nonSWR", "G0_base", NON, "reward_lag1"),
-    ("RPE · SWR", "G5_rpe", SWR, "hmm_rpe"),
-    ("RPE · nonSWR", "G5_rpe", NON, "hmm_rpe"),
-    ("rel. value · SWR", "G4_value", SWR, "hmm_relative_value"),
-    ("rel. value · nonSWR", "G4_value", NON, "hmm_relative_value"),
-    ("reward-entropy · SWR", "G6_uncert", SWR, "reward_entropy"),
-    ("reward-entropy · nonSWR", "G6_uncert", NON, "reward_entropy"),
-    ("value-update · SWR", "G7_update", SWR, "hmm_value_update"),
-    ("value-update · nonSWR", "G7_update", NON, "hmm_value_update"),
+    ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe"),
+    ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe"),
+    ("rel. value (beta) · SWR", "G4_value", SWR, "switch_advantage_mu_preoutcome_sess"),
+    ("rel. value (beta) · nonSWR", "G4_value", NON, "switch_advantage_mu_preoutcome_sess"),
+    ("belief-entropy (beta) · SWR", "G6_uncert", SWR, "beta_reward_entropy"),
+    ("belief-entropy (beta) · nonSWR", "G6_uncert", NON, "beta_reward_entropy"),
+    ("value-update (beta) · SWR", "G7_update", SWR, "global_mu_update_abs_postoutcome_sess"),
+    ("value-update (beta) · nonSWR", "G7_update", NON, "global_mu_update_abs_postoutcome_sess"),
     ("switch-rate · SWR", "G3_switchrate", SWR, "recent_switch_rate"),
     ("switch-rate · nonSWR", "G3_switchrate", NON, "recent_switch_rate"),
 ]
@@ -162,7 +181,7 @@ C = pd.read_pickle(RC / "models" / "swr_contrast_content_arm.pkl")
 mod_rows = [
     ("current-arm (C1)", "C1_current", "all", "is_current"),
     ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_rate_arm_k10"),
-    ("value q_arm_hmm (C4)", "C4_armvalue", "all", "q_arm_hmm"),
+    ("value q_arm (C4)", "C4_armvalue", "all", "q_arm"),
     ("RPE×current (C6)", "C6_rpe", "all", "rpe_x_current"),
     ("rel.value×current (C7)", "C7_value", "all", "relval_x_current"),
     ("entropy×current (C8)", "C8_uncert", "all", "entropy_x_current"),
@@ -176,7 +195,7 @@ con_rows = [
     ("swr × prev (CS2)", "CS2_prev", "all", "swr_x_prev"),
     ("swr × last-rewarded (CS3)", "CS3_lastrew", "all", "swr_x_is_last_rewarded_elsewhere"),
     ("swr × reward_rate (CS4)", "CS4_armreward", "all", "swr_x_reward_rate_arm_k10"),
-    ("swr × value hmm (CS5)", "CS5_armvalue", "all", "swr_x_q_arm_hmm"),
+    ("swr × value (beta) (CS5)", "CS5_armvalue", "all", "swr_x_q_arm"),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
 forest(axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)")
