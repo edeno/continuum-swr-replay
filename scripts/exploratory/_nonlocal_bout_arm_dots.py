@@ -20,7 +20,7 @@ eyeballed against the predictors:
   Content models (per-arm, cell-aligned to the content panel)
     is_current (ring), is_prev / is_last_rewarded_elsewhere (arm strips),
     reward_rate_arm_k10, visit_recency_demeaned, visit_recency (raw),
-    cumulative_reward, p_reward_arm, arm_dist_rank, q_arm_hmm (HMM value),
+    cumulative_reward, p_reward_arm, arm_dist_rank, q_arm (beta value),
     q_arm (belief value; robustness construct).
 
 Content magnitude is encoded as circle *alpha* (posterior-mass fraction), never
@@ -252,7 +252,6 @@ def build_figure(
         ("cov", "cumulative_reward", "cumul reward (n)", ("YlGn", False), "stop"),
         ("cov", "p_reward_arm", "P(reward)", ("cividis", False), "stop"),
         # per-arm: value
-        ("cov", "q_arm_hmm", "HMM value (Q)", ("RdBu_r", True), "stop"),
         ("cov", "q_arm", "belief value (P)", ("viridis", False), "stop"),
     ]
     hmap = {"binary": BINARY_H, "heatbout": HEAT_H, "kernel": KERNEL_H,

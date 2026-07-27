@@ -69,7 +69,7 @@ COV_PANEL = {
     "reward_rate_arm_k10": ("cov", "reward_rate_arm_k10", "reward rate k10", ("plasma", False)),
     "visit_recency_demeaned": ("cov", "visit_recency_demeaned", "visit recency", ("PuOr", True)),
     "p_reward_arm": ("cov", "p_reward_arm", "P(reward)", ("cividis", False)),
-    "q_arm_hmm": ("cov", "q_arm_hmm", "HMM value", ("RdBu_r", True)),
+    "q_arm": ("cov", "q_arm", "beta value", ("RdBu_r", True)),
 }
 
 

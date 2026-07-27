@@ -1,6 +1,9 @@
 # HMM → beta-bernoulli covariate migration
 
-**Status:** Not started.
+**Status:** Complete (2026-07-13). Phases 1–5A + doc reconciliation + PR-review
+hardening executed and merged into `covar-harmon-phase1-definitions` (merge
+`82cdabf`). All HMM behavioral covariates dropped, beta equivalents fitted (218
+sessions), full test suite green (948 passed).
 
 The behavioral model has switched from the HMM to the beta-bernoulli fit, and the
 paper now uses the beta-bernoulli belief. This plan removes every HMM-derived
