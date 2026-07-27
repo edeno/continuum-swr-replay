@@ -275,7 +275,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         pd.read_pickle(RC / "event_table.pkl"),
     )
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
-    # HMM/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
+    # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
     n_qvals_dropped = int(n0 - len(stop))
     return stop, onsets, n_qvals_dropped
 

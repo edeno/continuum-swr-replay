@@ -30,13 +30,13 @@ def test_missing_predictor_is_clean_skip(monkeypatch):
     monkeypatch.setattr(mod, "fit_conditional_poisson", fake_fit)
 
     out, audit = mod._fit_session(
-        df, ["q_arm_hmm"], response_col="arm_count_hard", n_categories=9
+        df, ["q_arm"], response_col="arm_count_hard", n_categories=9
     )
 
     assert out is None
     assert called["fit"] is False  # fitter NOT called with absent columns
     assert audit["reason"].startswith("missing:")
-    assert "q_arm_hmm" in audit["reason"]
+    assert "q_arm" in audit["reason"]
     # The whole session's events land in n_excluded_session and the record reconciles.
     assert audit["n_in"] == 2
     assert audit["n_excluded_session"] == 2
@@ -44,20 +44,20 @@ def test_missing_predictor_is_clean_skip(monkeypatch):
 
 
 def test_qvals_gap_drop_is_bucketed_separately(monkeypatch):
-    """An event whose q_arm_hmm (a qvals-tail covariate) is NaN drops into
+    """An event whose q_arm (a qvals-tail covariate) is NaN drops into
     n_drop_qvals_gap, distinct from mechanism-A own-predictor missingness."""
     df = pd.DataFrame(
         {
             "event_id": [1, 1, 1, 2, 2, 2],
             "arm_count_hard": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            "q_arm_hmm": [float("nan"), 0.2, 0.3, 0.1, 0.4, 0.5],
+            "q_arm": [float("nan"), 0.2, 0.3, 0.1, 0.4, 0.5],
         }
     )
     monkeypatch.setattr(mod, "MIN_EVENTS", 1)
     monkeypatch.setattr(mod, "fit_conditional_poisson", lambda *a, **k: {"n_events": 1})
 
     out, audit = mod._fit_session(
-        df, ["q_arm_hmm"], response_col="arm_count_hard", n_categories=9
+        df, ["q_arm"], response_col="arm_count_hard", n_categories=9
     )
     assert out is not None
     assert audit["n_drop_qvals_gap"] == 1  # event 1

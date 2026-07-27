@@ -23,11 +23,14 @@ one trial x physical-well row before uncertainty quantiles are assigned.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Literal
 
 import numpy as np
 import pandas as pd
+
+LOGGER = logging.getLogger(__name__)
 
 LEAF_ARMS: tuple[int, ...] = tuple(range(6))
 SESSION_COLUMNS: tuple[str, ...] = ("animal", "day", "epoch")
@@ -644,14 +647,18 @@ def within_arm_horserace(
     above; it operates on the **event x arm** table (one row per non-local event x
     arm), NOT the trial-leaf grain of the rest of this module.
 
-    For each session x SWR population the routine restricts to non-current leaf
-    arms, standardizes each continuous predictor (a name already ending in ``_z``
-    is taken as pre-standardized so its coefficient is per 1 SD), within-(session,
-    arm) demeans the response and predictors (the arm fixed-effects transform),
-    and fits OLS. The demeaning removes arm identity and geometry, so the
-    uncertainty coefficient is identified from *within-arm* variation over the
-    session — the confound-free frame in which beta value and beta uncertainty
-    separate cleanly (they are collinear only against the arm dummies).
+    The routine restricts to non-current leaf arms and standardizes each
+    continuous predictor **once, globally** over that pooled subset (a name already
+    ending in ``_z`` is taken as pre-standardized) — so coefficients are per 1
+    *global* SD, comparable across predictors. Then, **per session x SWR
+    population**, it within-(session, arm) demeans the response and predictors (the
+    arm fixed-effects transform) and fits OLS. The demeaning removes arm identity
+    and geometry, so the uncertainty coefficient is identified from *within-arm*
+    variation over the session — the confound-free frame in which beta value and
+    beta uncertainty separate cleanly (they are collinear only against the arm
+    dummies). NB: ``arm_uncertainty_z`` is pre-standardized over *all* arms (table
+    ``EVENT_ARM_STANDARDIZED_COLS``) while the others are standardized over this
+    non-current-leaf subset, so the "_z" SD populations differ slightly.
 
     Parameters
     ----------
@@ -699,18 +706,26 @@ def within_arm_horserace(
     rows = []
     for population, mask in populations.items():
         subset = frame[mask]
+        # Count why sessions drop out so a biased exclusion is visible, not silent:
+        # rank-deficiency correlates with low within-arm exploration — exactly the
+        # sessions whose loss could skew the exploit-vs-explore read.
+        n_seen = n_too_few = n_rank_deficient = n_fit = 0
         for (animal, session_id), group in subset.groupby(
             ["animal", "session_id"], observed=True, sort=False
         ):
+            n_seen += 1
             fit = group[["arm", response, *design_cols]].dropna()
             if fit["arm"].nunique() < 2 or len(fit) < min_rows:
+                n_too_few += 1
                 continue
             demeaned = fit[[response, *design_cols]] - fit.groupby(fit["arm"])[
                 [response, *design_cols]
             ].transform("mean")
             design = demeaned[design_cols].to_numpy()
             if np.linalg.matrix_rank(design) < design.shape[1]:
+                n_rank_deficient += 1
                 continue
+            n_fit += 1
             beta, *_ = np.linalg.lstsq(design, demeaned[response].to_numpy(), rcond=None)
             rows.append(
                 {
@@ -722,6 +737,11 @@ def within_arm_horserace(
                     **{f"coef_{col}": float(b) for col, b in zip(design_cols, beta)},
                 }
             )
+        LOGGER.info(
+            "within_arm_horserace[%s]: fit %d/%d sessions (%d < min_rows/arms, "
+            "%d rank-deficient)",
+            population, n_fit, n_seen, n_too_few, n_rank_deficient,
+        )
     return pd.DataFrame(rows)
 
 

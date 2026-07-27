@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Fit the HMM-harmonized replay-CONTENT ladder (arm + patch), is_swr version.
+"""Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
 
 The content analog of ``scripts/rate/fit_swr_contrast_rate.py``. Where the rate ladder
 models HOW OFTEN non-local events occur (Poisson count per time bin), this models

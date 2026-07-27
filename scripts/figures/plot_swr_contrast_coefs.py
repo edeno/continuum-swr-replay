@@ -61,7 +61,12 @@ RNG = np.random.default_rng(0)
 
 
 def std_factor(term):
-    """SD to convert a raw coef to per-1-SD units; (factor, is_binary)."""
+    """SD to convert a raw coef to per-1-SD units; (factor, is_binary).
+
+    Raises on an unresolved continuous term so a covariate rename can't silently
+    render at raw scale under a "per 1 SD" axis (the migration renamed every rate/
+    content term; this asserts each still resolves).
+    """
     BIN = {"is_current", "swr_x_current", "swr_x_prev",
            "swr_x_is_last_rewarded_elsewhere", "reward_lag1",
            "is_current_patch", "is_last_rewarded_patch_elsewhere",
@@ -72,15 +77,28 @@ def std_factor(term):
     for cov, s in SD.items():
         if term == cov or term == f"swr_x_{cov}":
             return s, False
-    # content state-modulation interactions are already z-scored at fit time
-    return 1.0, False
+    # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
+    # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
+    # must be in SD — so a renamed main effect (not an interaction) raises here rather
+    # than silently plotting at raw scale under a "per 1 SD" axis.
+    if "_x_" in term:
+        return 1.0, False
+    raise KeyError(
+        f"plot term {term!r} resolves to no SD entry and is not a binary or a "
+        f"z-scored-at-fit interaction (`*_x_*`) — a main-effect rename would silently "
+        f"mis-scale it. Add it to the SD (_global_sd) list."
+    )
 
 
 def sessions(df, mod, pop, term):
     g = df[(df.model == mod) & (df.population == pop)]
     c = f"coef_{term}"
-    if c not in g:
-        return {}
+    if c not in g.columns:
+        raise KeyError(
+            f"coef column {c!r} absent from fitted pickle for {mod}/{pop} — the row "
+            f"spec references a term the fit did not produce (likely a rename). "
+            f"Row would render blank."
+        )
     g = g.dropna(subset=[c])
     g = g[g[c].abs() < 10]
     f, _ = std_factor(term)

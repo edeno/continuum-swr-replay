@@ -18,9 +18,9 @@ sourcing everything from Alison's shared DataJoint schemas (read-only):
 
 Beta values are enriched with the vendored decision-variable pipeline
 (`analysis.behavior._spatial_bandit_rl.make_full_beta_bernoulli_dv_df`: DeltaV,
-Stay/Switch value, value-update magnitudes, betadist_mu), HMM reward/state entropy
-(`default_hmm`) is merged on KEYS, and RPE is derived; the curated COVARIATES are
-broadcast to stops. See docs/behavior_model_covariates.md for the data dictionary.
+Stay/Switch value, value-update magnitudes, betadist_mu), the belief entropy
+`beta_reward_entropy` is derived from the Beta posterior (`betadist_α/β`), and RPE
+is derived; the curated COVARIATES are broadcast to stops. See docs/behavior_model_covariates.md for the data dictionary.
 
 Virtual modules reflect the schema from the DB, so none of Alison's module code
 (julia / spyglass / os.chdir) is imported. Independent validation: mapped arm
@@ -76,8 +76,8 @@ TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
 # Beta value timing: row t holds PRE-outcome belief for trial t (vendored DV docs).
 
 # Curated per-stop covariate set (paper-aligned): the Comrie et al. theta-sequences decision
-# variables (computed by the vendored beta-bernoulli pipeline), HMM reward
-# entropy, RPE, and the raw value/uncertainty/choice columns.
+# variables (computed by the vendored beta-bernoulli pipeline), the derived beta
+# belief entropy, RPE, and the raw value/uncertainty/choice columns.
 COVARIATES = [
     "arm", "q_chosen", "rpe", "rpe_abs",
     # expected value (per port / patch / belief mean)
@@ -254,7 +254,17 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
         b = vals[f"betadist_β{i}"].to_numpy(dtype=float)
         ent += (betaln(a, b) - (a - 1) * digamma(a) - (b - 1) * digamma(b)
                 + (a + b - 2) * digamma(a + b))
-    vals["beta_reward_entropy"] = ent / 6.0
+    result = ent / 6.0
+    # Guard the "α,β ≥ 1 → finite" assumption: a NaN/±inf here would otherwise flow
+    # into the pooled-SD standardization and silently blank EVERY beta_reward_entropy_z
+    # (and its downstream rate/content coefficients). Fail loud instead.
+    if not np.isfinite(result).all():
+        n_bad = int((~np.isfinite(result)).sum())
+        raise ValueError(
+            f"beta_reward_entropy has {n_bad} non-finite values; check betadist_α/β "
+            "for NaN or non-positive (≤0) posterior params"
+        )
+    vals["beta_reward_entropy"] = result
     return vals
 
 
@@ -399,7 +409,10 @@ def main() -> None:
               f"in_poke={100*t['in_poke'].mean():.0f}%  "
               f"at-well arm=={100*arm_ok:.1f}%  at-well reward=={100*rew_ok:.1f}%  "
               f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*entropy_cov:.0f}%]")
-        if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.5:
+        # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
+        # pull as q_port), so coverage should be ~100% — anything materially below flags
+        # a partial-fit/join regression (the old 0.5 HMM-merge floor is too loose now).
+        if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.95:
             print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%), "
                   f"at-well arm agreement {100*arm_ok:.1f}% (expect ~100%), or "
                   f"beta_reward_entropy coverage {100*entropy_cov:.0f}% (expect ~100%; a low "

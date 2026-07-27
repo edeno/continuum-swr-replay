@@ -75,6 +75,47 @@ def test_within_arm_horserace_recovers_uncertainty_and_excludes_current_trunk():
     assert np.isfinite(row["cond_number"])
 
 
+def test_within_arm_horserace_skips_rank_deficient_session_without_crashing():
+    # Make two predictors perfectly collinear (distance == value) so the within-arm
+    # design is rank-deficient; the session must be dropped, not crash or emit garbage.
+    frame = _horserace_frame(0.1)
+    frame["dist_to_arm"] = frame["q_arm"]
+    coefs = within_arm_horserace(frame, min_rows=10)
+    assert coefs.empty  # every (session, population) design is rank-deficient -> skipped
+
+
+def test_within_arm_horserace_recovers_per_population_slopes_on_mixed_swr():
+    # SWR and non-SWR events carry DIFFERENT within-arm uncertainty slopes; each
+    # population must recover its own, and row counts must partition (SWR+nonSWR=all).
+    rows = []
+    for event in range(40):
+        is_swr = event >= 20
+        slope = 0.2 if is_swr else 0.05
+        uncertainty = float(event)
+        for arm in range(9):
+            is_current = int(arm == 0)
+            fraction = 0.9 if (arm > 5 or is_current) else 0.2 + slope * uncertainty
+            rows.append(
+                {
+                    "animal": "rat", "day": 1, "epoch": "e1", "event_id": 100 + event,
+                    "arm": arm, "is_current": is_current, "is_swr": bool(is_swr),
+                    "arm_fraction": fraction, "arm_uncertainty_z": uncertainty,
+                    "q_arm": float(event % 5), "dist_to_arm": float((event * 7) % 11),
+                    "visit_recency": float((event * 3) % 13),
+                }
+            )
+    coefs = within_arm_horserace(pd.DataFrame(rows), min_rows=10)
+
+    def _coef(pop):
+        return coefs[coefs["population"] == pop]["coef_arm_uncertainty_z"].iloc[0]
+
+    assert _coef("SWR") == pytest.approx(0.2, abs=1e-6)
+    assert _coef("non_SWR") == pytest.approx(0.05, abs=1e-6)
+    # 20 events x 5 non-current leaf arms per population; all = SWR + non_SWR
+    n = {p: int(coefs[coefs.population == p]["n_rows"].iloc[0]) for p in ("all", "SWR", "non_SWR")}
+    assert n["SWR"] == 100 and n["non_SWR"] == 100 and n["all"] == 200
+
+
 def test_summarize_horserace_is_animal_balanced_and_signs_uncertainty_positive():
     coefs = pd.concat(
         [

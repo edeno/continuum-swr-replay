@@ -26,7 +26,7 @@ N_ARMS = 9
 
 def _synthetic_arm_events(n_sessions=3, n_events=12, qvals_gap_events=2, seed=0):
     """Long arm frame: one chosen arm per event, is_current marks an arm, is_swr split,
-    and the first ``qvals_gap_events`` events per session have NaN q_arm_hmm (the tail)."""
+    and the first ``qvals_gap_events`` events per session have NaN q_arm (the tail)."""
     rng = np.random.default_rng(seed)
     rows = []
     eid = 0
@@ -43,7 +43,7 @@ def _synthetic_arm_events(n_sessions=3, n_events=12, qvals_gap_events=2, seed=0)
                     "event_id": eid, "arm": arm,
                     "arm_count_hard": float(arm == chosen),
                     "is_current": float(arm == current),
-                    "q_arm_hmm": np.nan if qhmm_nan else float(rng.normal()),
+                    "q_arm": np.nan if qhmm_nan else float(rng.normal()),
                     "is_swr": is_swr,
                     "time_since_stop": float(rng.uniform(0, 3)),
                 })
@@ -56,7 +56,7 @@ def test_run_emits_reconciling_cohort_audit(tmp_path, monkeypatch):
     ev = _synthetic_arm_events()
     ladder = {
         "C0_base": (["is_current"], "split"),          # no value covariate
-        "C4_value": (["is_current", "q_arm_hmm"], "split"),  # value rung -> qvals gap
+        "C4_value": (["is_current", "q_arm"], "split"),  # value rung -> qvals gap
     }
     results, audits = mod._run(
         ev, ladder, response_col="arm_count_hard", n_categories=N_ARMS

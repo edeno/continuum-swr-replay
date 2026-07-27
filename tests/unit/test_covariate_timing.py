@@ -17,9 +17,9 @@ def test_rejects_derived_post_outcome():
     """A derived interaction whose source is post-outcome must be caught (the name does
     not contain the source scalar, so a string heuristic would miss it)."""
     with pytest.raises(ValueError, match="post-outcome"):
-        assert_predictor_timing(["update_x_current"])  # source hmm_value_update
+        assert_predictor_timing(["update_x_current"])  # source global_mu_update_abs_postoutcome_sess
     # ...but only when the source really is post-outcome; relval is safe.
-    assert_predictor_timing(["relval_x_current"])  # hmm_relative_value -> no raise
+    assert_predictor_timing(["relval_x_current"])  # switch_advantage_mu_preoutcome_sess -> no raise
 
 
 def test_rejects_derived_future_referencing():
@@ -31,9 +31,9 @@ def test_rejects_derived_future_referencing():
 def test_rate_swr_interaction_caught():
     """The patsy expansion of the S7/S9 is_swr*(...+rpe/update) rungs must resolve the
     post-outcome operand, not hide behind the is_swr gating factor."""
-    assert timing_of("is_swr:hmm_rpe") == ["hmm_rpe"]
+    assert timing_of("is_swr:rpe") == ["rpe"]
     with pytest.raises(ValueError, match="post-outcome"):
-        assert_predictor_timing(["is_swr:hmm_rpe"])
+        assert_predictor_timing(["is_swr:rpe"])
     assert timing_of("is_swr:trials_since_switch") == ["trials_since_switch"]
     with pytest.raises(ValueError, match="future-referencing"):
         assert_predictor_timing(["is_swr:trials_since_switch"])
@@ -41,7 +41,7 @@ def test_rate_swr_interaction_caught():
 
 def test_post_outcome_fixable_by_retrospective_but_future_is_not():
     # POST_OUTCOME clears with retrospective gating...
-    assert_predictor_timing(["hmm_rpe"], retrospective=True)  # no raise
+    assert_predictor_timing(["rpe"], retrospective=True)  # no raise
     assert_predictor_timing(["update_x_current"], retrospective=True)  # no raise
     # ...FUTURE_REFERENCING does NOT — a temporal gate can't fix it.
     with pytest.raises(ValueError, match="future-referencing"):
@@ -60,7 +60,7 @@ def test_is_after_switch_is_safe():
 
 def test_descriptive_whitelists_both_leak_types():
     assert_predictor_timing(
-        ["hmm_rpe", "trials_since_switch", "update_x_current"], descriptive=True
+        ["rpe", "trials_since_switch", "update_x_current"], descriptive=True
     )  # no raise
 
 

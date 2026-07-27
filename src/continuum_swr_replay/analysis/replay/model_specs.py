@@ -227,11 +227,11 @@ _Mv = (*_M5, "p_reward_arm", "q_arm")
 # Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
 # betadist_var) added on the M5 spatial/reward base. Mvu pairs it with the beta
 # per-arm VALUE (q_arm) so value+uncertainty come from the SAME Beta posterior — a
-# construct-coherent exploit-vs-explore contrast. arm_uncertainty is added AFTER
+# construct-coherent exploit-vs-explore contrast (one behavioral model). arm_uncertainty is added AFTER
 # visit_recency (M4) so its coefficient is the recency-independent effect (docs: beta
 # variance is +0.54 correlated with visit_recency by construction, but the effect
 # survives orthogonalization). See docs/behavior_models.md.
-# Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.03, ~12x smaller than
+# Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.02, ~5-6x smaller than
 # q_arm, which makes the per-session covariance singular; the _z form is well-scaled
 # (SD 1) and is what these rungs fit.
 _Mu = (*_M5, "arm_uncertainty_z")
@@ -935,8 +935,8 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
                        "swr_x_reward_rate_arm_k10"], "pooled"),
     "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
     # Per-arm beta belief UNCERTAINTY (exploration). BASEc carries no value term, so
-    # these rungs are construct-clean (beta uncertainty on the spatial base — no
-    # beta/HMM mix). C13 (split): independent uncertainty coefficient on the SWR-only
+    # these rungs are construct-clean (beta uncertainty on the spatial base).
+    # C13 (split): independent uncertainty coefficient on the SWR-only
     # and non-SWR-only subsets. CS6 (pooled): main = non-SWR effect, swr_x_ = the
     # formal SWR-vs-non-SWR difference. Mirrors the C4/CS5 value pair.
     "C13_armuncert": ([*BASEc, "arm_uncertainty_z"], "split"),

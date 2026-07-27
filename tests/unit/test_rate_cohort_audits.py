@@ -68,9 +68,9 @@ def test_contrast_records_attribute_qvals_and_own():
     from scripts.rate import fit_swr_contrast_rate as mod
 
     stop = _stop_table()
-    # Post-join stop table carries hmm_* (non-NaN after the inner join).
-    stop["hmm_relative_value"] = 0.1
-    stop["hmm_rpe"] = 0.0
+    # Post-join stop table carries the beta value scalars (non-NaN after the inner join).
+    stop["switch_advantage_mu_preoutcome_sess"] = 0.1
+    stop["rpe"] = 0.0
     models = pd.DataFrame([
         {"model": "G0_base", "population": "non_local", "animal": a, "day": d,
          "epoch": "e", "n_stops": 12, "converged": True, "separated": False}

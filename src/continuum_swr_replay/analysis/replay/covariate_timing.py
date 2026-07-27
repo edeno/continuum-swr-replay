@@ -69,7 +69,7 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
     "swr_x_q_arm": ["q_arm"],  # qvals-dependent
     # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):
-    # raw betadist_var has SD ~0.03 (12x smaller than q_arm), which makes the
+    # raw betadist_var has SD ~0.02 (~5-6x smaller than q_arm), which makes the
     # per-session covariance singular ("need covariance") — the content models use the
     # _z form. The runner builds swr_x_arm_uncertainty_z = is_swr * arm_uncertainty_z.
     "arm_uncertainty_z": ["arm_uncertainty"],

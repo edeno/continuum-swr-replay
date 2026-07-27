@@ -1314,7 +1314,7 @@ def build_event_arm_table(
     )
     # arm_uncertainty: per-arm beta-model belief variance (betadist_var), the
     # variance counterpart of the beta value q_arm from the SAME posterior — so a
-    # value+uncertainty model stays construct-coherent (no beta/HMM mix).
+    # value+uncertainty model stays construct-coherent (one behavioral model).
     long["arm_uncertainty"] = _attach_arm_uncertainty(
         long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
     )
