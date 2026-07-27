@@ -33,6 +33,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [task_description.md](task_description.md) — *reference*: behavioral task / recording setup.
 - [cached_trials_for_testing.md](cached_trials_for_testing.md) — *reference*: test-fixture trial cache.
 - [design/](design/) — *design specs*: per-analysis design documents.
+  - [design/2026-07-13-content-rate-uncertainty-model-ladders.md](design/2026-07-13-content-rate-uncertainty-model-ladders.md)
+    — proposed Aim-1 content-allocation, replay-occurrence, event-size, and
+    marginal-content ladders in R formula notation.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues (incl.
   [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
   cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count).
@@ -73,4 +76,3 @@ Three tiers:
    vs `replay_rate_content_swr_synthesis.md` (hand-maintained living note).
 
 3. **Figures**: `paper/figures/<topic>/` (publication) vs `.claude/research/*_outputs/` (exploratory) — see above.
-
