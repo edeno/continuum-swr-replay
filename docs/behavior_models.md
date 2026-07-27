@@ -52,7 +52,11 @@ core supplies it — §Beta / §HMM below). Choice is a softmax over these value
   go/stay stem decision and the leaf decision.
 - **Depletion (satiety)** `Qdep = Q · depletion`, where `depletion` *decreases* with
   repeated choices of the same port (a within-session satiety/adaptation term),
-  governed by `depletion_factor`.
+  governed by `depletion_factor`. **INACTIVE in the consumed `beta_stable_withleaf`
+  fit:** the `depletion_leaf_*`/`depletion_mean_stem_*` columns are all exactly `1.0`
+  across every stop (this task subset has no depletion), so `Qdep = Q` and the no-reward
+  update reduces to the standard `β += 1` (with `d=1`, `target=0`). Depletion only
+  matters for the other task variant that has it.
 - **Within-stem leaf weighting** `γ2`: the value of staying in a patch is
   `(1−γ2)·Qdep[other leaf] + γ2·Qdep[current leaf]`.
 - **Choice biases**: `stay_bias`, `turn_bias`, `leaf_turn_bias`,
