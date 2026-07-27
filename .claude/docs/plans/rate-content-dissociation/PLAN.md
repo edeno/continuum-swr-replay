@@ -1,6 +1,35 @@
 # Rate-content dissociation implementation plan
 
-**Status:** Not started.
+**Status: SUPERSEDED (2026-07-13).** The scientific spine was delivered by work
+that post-dates this plan; one residual extracted to
+[`rate-content-followups`](../rate-content-followups/PLAN.md). Phase files below are
+retained as the historical record.
+
+**Reconciliation (what actually happened):**
+
+- **Phase 1 (content refit + audit tooling) — DONE (refit) / obsolete (audit harness).**
+  Content models were re-fit 2026-06-28 and again 2026-07-13 (HMM→beta); the
+  `recent_reward_rate`→`reward_rate_arm_k10` alias is migrated. The formal
+  `audit_replay_content_artifacts.py` QA harness was never built and is now low-value
+  (the refits already happened; the synthesis interprets the current fits).
+- **Phase 3 (joint double dissociation + continuous-SWR) — DONE.** This is the
+  synthesis headline and claim **#19f** ("reward acts on with-SWR *occurrence* but
+  non-SWR *content*"); the continuous-SWR question is answered by `fit_swr_power_model.py`
+  (`ripple_power_z` unimodal → "cut on a continuum"; graded > binary but binary retained).
+- **Phase 5 (synthesis doc + claim ledger) — DONE.** `docs/replay_rate_content_swr_synthesis.md`
+  and `paper/claims_table.md` (claims 19a–g). Machine-readable hashed-artifact ledger unbuilt (low value).
+- **Phases 2 & 5 formal tables (summary/support-classification/provenance manifests) —
+  REMAIN but low value.** The synthesis "covariate atlas" already serves as the
+  human-readable cross-family summary.
+- **Phase 4 (choice prediction / mediation) — the RESIDUAL worth doing.** Fits exist
+  (`compare_event_source_models.py`, claims #19d/#19e) but are **in-sample-only (no
+  held-out CV)** and **not distance-controlled** (`dist_to_arm` dropped for
+  quasi-separation). → moved to `rate-content-followups` phase-1.
+- **HMM-era falsehoods in this plan's `overview.md`/`designs.md`:** `entropy_x_current`
+  is now **null** and `q_arm`'s content effect is *avoidance* (`swr_x_q_arm −2.45`), not
+  the ambiguous "per-arm value contrast" the overview assumes.
+
+---
 
 The current coefficient readout points to a strong rate/content split: reward
 appears to gate **how often** SWR-overlapping non-local events occur, while the

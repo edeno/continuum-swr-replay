@@ -1,6 +1,29 @@
 # Non-local replay rate vs uncertainty/value (SWR vs non-SWR) Implementation Plan
 
-**Status:** Not started.
+**Status: SUPERSEDED (2026-07-13).** Delivered by work that post-dates this plan;
+one residual extracted to [`rate-content-followups`](../rate-content-followups/PLAN.md).
+The phase files below are retained as the historical record of what was planned.
+
+**Reconciliation (what actually happened):**
+
+- **Phase 1 (StateScript contingency parser) — OBSOLETE.** The StateScript adapter
+  was built and then *retired* in favor of the canonical LorenFrankLab/SpatialBanditTask
+  parsed CSVs (commit `96dfed1`, ~96% agreement), mapped to `stop_id`. The deliverable
+  table exists: `Processed-Data/replay_content/models_per_bin_rate/contingency_table.pkl`.
+- **Phase 2 (per-population uncertainty/value rate fit + dissociation hypothesis) — DONE,
+  and the hypothesis is answered.** `scripts/rate/fit_uncertainty_rate.py` + the
+  `is_swr`-contrast G/S ladder (`fit_swr_contrast_rate.py`) deliver it. Result:
+  non-SWR events are broadly task-modulated, SWR narrowly reward-gated — but
+  **"uncertainty gates rate" is NULL**: the HMM→beta migration re-fit belief entropy
+  (`beta_reward_entropy`) on the rate at RR≈1.2, p>0.08. The model-free `leaky_q`/nominal-p(R)
+  proxies and the pre-beta motivating numbers in this plan's prose are HMM-era and no
+  longer the framing (headline is reward-gating RR 3.09).
+- **Phase 3 (cross-type ensemble-history GLM + onset cross-correlogram) — the RESIDUAL.**
+  `scripts/rate/fit_cross_history_rate.py` exists but was never *run/documented* (no
+  continuum verdict), and the peri-onset-peak cross-correlogram is unbuilt. → moved to
+  `rate-content-followups` phase-2.
+
+---
 
 Test whether the *rate* of non-local replay is differentially modulated by the
 animal's behavioral uncertainty and the task's value structure across
