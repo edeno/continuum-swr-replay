@@ -1,8 +1,14 @@
-# Overview — the two rate/content residuals
+# Overview — the surviving rate/content residual
 
 [← back to PLAN.md](PLAN.md)
 
-## Why these two survive
+> **Ownership reconciliation (2026-07-29):** the choice/CV material below is
+> historical and superseded by
+> [`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md).
+> Phase 13 owns the cross-history refit. Only the onset cross-correlogram and
+> continuum interpretation remain executable from this plan.
+
+## Historical context and surviving work
 
 Both parent plans (`nonswr-uncertainty-rate`, `rate-content-dissociation`) are
 SUPERSEDED — see their retired `PLAN.md` reconciliations. What's delivered: the
@@ -17,41 +23,37 @@ were left genuinely un-done, each currently a **hedged** conclusion:
    (quasi-separation: the animal picks the closest arm ~95–99%). So the reported
    `replay_frac_non_swr +0.34` may partly reflect nearest-arm bias.
 2. **The SWR/non-SWR continuum verdict is unwritten.** `fit_cross_history_rate.py`
-   (does one non-local stream's history drive the other's rate?) was built but never
-   run/documented, and the definitive **peri-onset cross-correlogram / peak** test is
+   (does one non-local stream's history drive the other's rate?) is rebuilt and run
+   under regression-integrity Phase 13; this plan consumes that valid output. The
+   definitive **peri-onset cross-correlogram / peak** test remains unbuilt and is
    flagged "not yet run" (synthesis Layer 2).
 
-These are unrelated (behavioral relevance vs process identity) — hence one router,
-two independent phases.
+The behavioral-relevance item and process-identity item were unrelated. The former
+now has a newer owner; this router retains only the latter's downstream work.
 
 ## Current codebase integration points
 
-- `scripts/content/compare_event_source_models.py:453` (`_fit_choice_block`), `:113`
-  / `:121` (`_choice_models_for_source` / `_choice_swr_split_models_for_source`),
-  `:220`/`:314` (`_freeze_common_cohort` / `_fit_per_session_common_cohort` — the
-  common-cohort infra already exists). **Phase 1** extends this; currently in-sample.
-- `src/continuum_swr_replay/analysis/replay/choice_prediction.py:96`
-  (`predict_arm_fractions`), `:172` (`build_residualized_choice_dataset` → the
-  `replay_frac_residual` column already exists). **Phase 1** uses these.
-- `src/continuum_swr_replay/analysis/replay/model_specs.py:66,768-777` — the
-  documented rationale for excluding `dist_to_arm` (quasi-separation) and using
-  `arm_dist_rank` as the choice baseline. **Phase 1** must respect/re-test this.
+- The former `compare_event_source_models.py`/`choice_prediction.py` stop-grain
+  integration is historical; regression-integrity Phase 11 replaces rather than
+  extends it.
 - `scripts/rate/fit_cross_history_rate.py:129` (`fit_cross_history`), `:172`
-  (`main`/`--write` → `models_per_bin_rate/cross_history_models.pkl` at `:195`),
-  `:144` (`_summary`), `:123` (`delta_cv_bits`). **Phase 2** runs + interprets this.
-- `Processed-Data/replay_content/event_onset_table.pkl` + `event_table.pkl` — per-event
-  onset times + `is_swr`; the substrate for the **Phase 2** cross-correlogram.
+  (`main`/legacy `--write`), `:144` (`_summary`), `:123` (`delta_cv_bits`).
+  **Regression-integrity Phase 13** owns the canonical refit; **Phase 2** consumes
+  its promoted result and interprets it.
+- Phase-13 promoted `event_onset_table` + `event_table` — per-event onset times + `is_swr`;
+  the manifest-validated substrate for the **Phase 2** cross-correlogram. Fixed
+  `Processed-Data/replay_content/*.pkl` paths are historical and forbidden.
 - `docs/per_bin_rate_results.md` (§4 cross-history note) and
   `docs/replay_rate_content_swr_synthesis.md` (Layer 2) — where the Phase-2 verdict lands.
-- `paper/claims_table.md` claim **#19d** — Phase 1 updates it (firm up or retire).
+- `paper/claims_table.md` claim **#19d** — regression-integrity Phase 11/13 owns its
+  replacement and final adjudication.
 
 ## Scope and non-goals
 
 ### Goals
-- Phase 1: a **held-out / cross-session CV** replay→choice test with a **distance
-  control that avoids quasi-separation**, on a common complete-case cohort — then
-  restate claim 19d as either a controlled effect or a retired one.
-- Phase 2: a documented **SWR↔non-SWR continuum verdict** (cross-history GLM) + the
+- Phase 1: **superseded**; regression-integrity Phase 11 owns the replacement
+  decision-grain choice analysis.
+- Phase 2: a documented **SWR↔non-SWR continuum verdict** (promoted cross-history GLM) + the
   **peri-onset cross-correlogram / peak** figure.
 
 ### Non-goals
@@ -65,17 +67,15 @@ two independent phases.
 
 | Risk | Mitigation |
 | --- | --- |
-| A distance control re-introduces the quasi-separation that got `dist_to_arm` dropped | Use `arm_dist_rank` (ordinal, already the choice baseline) or a distance-stratified fit; verify convergence per session before trusting coefficients (Phase 1). |
-| Cross-history GLM is underpowered / null per session | Report `delta_cv_bits` with per-animal aggregation (the script already does this); a null is a valid continuum-consistent result — state it, don't chase significance. |
-| Held-out CV on per-session clogit is unstable (few choices/session) | Cross-**session** (leave-session-out within animal) rather than within-session folds; report per-animal. |
+| Cross-history GLM is underpowered / null per session | Report `delta_cv_bits` with per-animal aggregation; a null is inconclusive about shared versus distinct mechanisms and cannot be counted as continuum support. |
+| Apparent onset coupling is driven by slow rate modulation or edge effects. | Use a per-session jitter/shuffle null that preserves event counts and immobility support; report the full lag curve and animal-balanced summaries. |
 
 ## Open Questions
-1. **Distance control form** — `arm_dist_rank` vs distance-stratified vs `is_same_patch`.
-   Best answer: `arm_dist_rank` (already the identifiable baseline). Decide in Phase 1
-   from convergence.
-2. **CV grain** — leave-session-out (recommended) vs k-fold within session. Phase 2 / 1
-   pick from stability.
+
+None for the surviving slice. Choice controls/folds are locked in regression-integrity
+Phase 11; Phase 2 consumes the promoted cross-history result and owns only the
+prespecified onset analysis.
 
 ## Estimated Effort
-Phase 1 ~150 LOC (CV wrapper + distance-control refit + claim update). Phase 2 ~120 LOC
-(run existing fit + a new ~80-LOC cross-correlogram script/figure + doc verdicts).
+Phase 2 ~80-120 LOC for the cross-correlogram script/figure, manifest input gate, and
+continuum verdict. Superseded Phase-1 effort is excluded.

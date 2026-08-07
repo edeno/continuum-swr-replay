@@ -21,10 +21,15 @@ Phases 0 and 2b.
    dependence-aware inference, animal-level inference, and Fig 4 regen.
 2. **Matched control: time-shifted onsets** — draw control onsets from the same
    immobility bouts, offset from real events, matching count and duration.
-3. **Inference: per-animal-then-combine** — report per-animal fractions/effects
-   and a simple animal-level test; no mixed model, no cluster bootstrap.
+3. **Inference: neuron → session → animal** — summarize neurons within session, combine sessions
+   equally within animal, report all five animal effects, and use the prespecified one-sided exact
+   sign test for positive matched-control engagement; no mixed model or cluster bootstrap.
 4. **Claim framing: engagement only** — drop equivalence/"regardless". No powered
    TOST. Fig 4 is retitled to an engagement claim.
+5. **Source generation: regression-owned** — production PFC artifacts consume the
+   frozen staged canonical-table/session-input generation created during
+   `regression-integrity-fixes` Phase 13. PFC never treats pre-refresh decoder or
+   fixed table presence as proof of validity.
 
 ## Current codebase integration points
 
@@ -44,8 +49,14 @@ Phases 0 and 2b.
 ### Goals
 
 - Fig 4 / claim #20 rest on the canonical `is_swr` split, a matched non-event
+  immobility control, dependence-aware inference, and all-five-animal summaries.
 - Per-neuron event effects control spike history/slow drift and use temporal nulls/held-out scores rather than treating adjacent 2-ms bins as independent.
-- Every consumed artifact is traceable to a code version and event-definition tag.
+- Every consumed artifact is traceable to one frozen canonical-table generation,
+  its exact session-input manifest, a code version, and an event-definition tag.
+- Phase 4 emits one atomic `pfc_completion.json` inside an immutable PFC run directory only after the
+  complete rerun, population inference, staged Figure-4/adjudication smoke, and fit audit pass. It creates no
+  PFC-specific current pointer; regression Phase 13 is the sole authority that makes the component
+  current.
 
 ### Non-Goals
 
@@ -53,7 +64,9 @@ Phases 0 and 2b.
   mPFC-only. Extending `load_population` and the figure to OFC is out of scope.
 - **Powered equivalence / TOST.** Dropped per decision 4.
 - Changing the Poisson family or lag window. Theta mechanics are corrected in Phase 0; event GLMs gain nuisance terms and calibrated inference in Phase 2b.
-- **Re-decoding HPC.** This plan consumes existing HPC decoding results.
+- **Re-decoding HPC.** Regression-integrity Phase 13 owns source refresh and any
+  required HPC re-decode. This plan consumes only its frozen staged generation and
+  reruns any PFC session whose recorded source hash changes.
 - **The two misfiled replay/behavior scripts** (`run_stage5b_retrospective.py`,
   `run_stage6_learning.py`) under `scripts/pfc/` — they import `analysis.replay`,
   not `analysis.pfc`. Not touched here.
@@ -62,6 +75,15 @@ Phases 0 and 2b.
 
 No new dependencies. Matched-control randomness uses a seeded
 `numpy.random.default_rng` (seed passed explicitly, per repo reproducibility rule).
+All code-bearing work in Phases 0–2b, Phase-3 runner/provenance glue, and Phase-4
+loader/finalizer/figure code may proceed once regression Phase 7 establishes the common manifest
+fields. Those changes and synthetic tests land before the shared clean production-code freeze. The
+Phase-3 and Phase-4 files each have two explicit deliverables: a pre-freeze implementation PR and a
+post-freeze production execution/reporting record with no source/config changes. The
+production Phase-3 batch must wait until regression Phase 13 has completed all
+source/table/model runs and frozen its release-candidate manifest plus per-session input manifests.
+The candidate is immutable while PFC Phases 3–4 execute their production work. Phase 4 completes
+before Phase 13 attaches the validated PFC run to the global regression release.
 
 ## Metrics
 
@@ -69,7 +91,12 @@ No new dependencies. Matched-control randomness uses a seeded
   `is_swr` class under the canonical definition and the resulting shift in the
   non-SWR modulation coefficient. No silent denominator change.
 - **Provenance:** every regenerated artifact has a sidecar recording event counts,
-  thresholds, `is_swr` definition tag, git hash (see [shared-contracts.md](shared-contracts.md)).
+  thresholds, `is_swr` definition tag, git hash, canonical-table-generation hash,
+  and per-session source-manifest hash (see [shared-contracts.md](shared-contracts.md)).
+- **Completion:** the atomic completion manifest covers every expected session
+  exactly once, all five animals, accounts for every attempted neuron/model fit with explicit
+  rank/convergence status, hashes every consumed/output artifact, and is
+  absent whenever any production validation remains incomplete.
 - **Inference:** Fig 4d reports per-animal fractions (5 values) plus a combined
   animal-level statistic, not a single pooled percentage.
 - **Calibration:** fixed-seed autocorrelated null simulations control false positives within the prespecified tolerance; planted post-event effects are recovered.
@@ -86,24 +113,34 @@ No new dependencies. Matched-control randomness uses a seeded
 | Per-animal aggregation over 5 heavily-imbalanced animals is underpowered. | Report per-animal values transparently (5/5-style) rather than a single p-value; document imbalance in the figure caption. |
 | Stale artifacts silently consumed by the figure. | Phase 4 loader guard raises if a consumed pickle lacks the provenance sidecar or carries removed non-nested LR columns. |
 | Spike autocorrelation and drift generate optimistic chi-square tests. | Phase 2b uses spike-history/drift nuisance terms, circular/block nulls, and contiguous held-out deviance. |
+| PFC finishes against a source generation that Phase 13 later refreshes. | Phase 3 requires the frozen staged generation hash in every sidecar; any changed session/table hash invalidates and reruns that PFC session before Phase 4 can complete. |
+| An interrupted rerun looks current or damages the previous PFC output. | Phase 3 writes only to a new `<pfc_root>/runs/<pfc_run_id>.staging/`; Phase 4 writes the completion file last and atomically finalizes that directory. No PFC current pointer exists. |
+| A staged Figure 4 or claims edit mutates after PFC completion. | Figure files and `claim_20_adjudication.json` are hashed in the global release-output staging tree; shared Markdown is composed once by Phase 13 and the whole tree is immutable before `CURRENT.json` advances. |
 
 ## Rollout Strategy
 
-Replace-in-place, in order `0 → 1 → 2 → 2b → 3 → 4`. New artifact files (matched-control `.npy`, provenance sidecar)
-are additive; the four existing `*_modulation.npy` files keep their names but are
-overwritten by Phase 3's rerun. No feature flag — the old non-canonical event
-construction is deleted in Phase 1, not run in parallel. Fig 4 outputs overwrite
-`paper/figures/figure04/`.
+Land implementation PRs in order `0 → 1 → 2 → 2b → 3-code → 4-code` with synthetic fixtures, then
+include them in the shared clean analysis-code freeze. Wait for regression Phase 13 to freeze the
+source-valid release candidate; execute `3-production → 4-production` against that exact generation
+without changing source or config. New artifact files (matched-control `.npy`,
+provenance sidecar) and the existing modulation basenames all live under the new
+`<pfc_root>/runs/<pfc_run_id>.staging/`; legacy files are read-only inputs and are never
+overwritten. No feature flag — the old non-canonical event construction is deleted in Phase 1, not
+run in parallel. Figure 4 and `claim_20_adjudication.json` are written beneath the shared
+`<regression_root>/release_outputs/<release_id>.staging/` using repository-relative paths and are
+hashed by both PFC completion and the global release; live paper paths are untouched. Phase 4 writes
+`pfc_completion.json` last, validates it, and atomically renames the staging directory to
+`<pfc_root>/runs/<pfc_run_id>/`. Regression Phase 13 then validates and records the immutable
+run/path hash as the optional PFC component, composes shared claims documents from the adjudication,
+and promotes the one global release. The post-promotion PFC publisher resolves
+`components.pfc` through global `CURRENT.json` and copies only the already-hashed Figure-4/claim bytes
+to repository destinations; it does not rerun, reimplement, or independently point at PFC analysis.
 
-## Open Questions
+## Resolved implementation details
 
-1. **Immobility inequality — settle on `<` or `<=`?** Current best answer: adopt
-   `<` (the batch `glm.py` convention) everywhere and delete the figure's `<=`.
-   Resolved in Phase 1; flagged here only because it changes a boundary bin.
-2. **Matched-control offset distribution** — fixed offset vs. random within-bout?
-   Best answer: random offset drawn per event within its immobility bout, seeded.
-   Specified in [shared-contracts.md](shared-contracts.md); revisit only if the
-   diagnostic shows the control rate structure doesn't match real events.
+1. **Immobility inequality:** use `<` everywhere and delete the figure's `<=`.
+2. **Matched-control offset distribution:** draw a seeded random offset per event within its
+   immobility bout, exactly as specified in [shared-contracts.md](shared-contracts.md).
 
 ## Estimated Effort
 

@@ -2,6 +2,11 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **SUPERSEDED (2026-07-29):** do not execute this stop-grain/cross-session design.
+> [`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md)
+> owns the replacement six-arm, one-row-per-decision analysis and uses the shared
+> cohort/fold contracts from Phases 9a/9b. The material below is audit history.
+
 Firm up or retire claim **#19d** ("non-SWR content modestly predicts the upcoming
 choice"). It is currently the weakest link: fit **in-sample only** and **not
 distance-controlled** (`dist_to_arm` was dropped for quasi-separation — the animal

@@ -2,6 +2,13 @@
 
 [← back to PLAN.md](PLAN.md)
 
+> **Execution prerequisite (2026-07-29):** do not run any phase against fixed
+> `Processed-Data` paths or pre-remediation tables. This plan starts only after
+> [`regression-integrity-fixes` Phase 13](../regression-integrity-fixes/phase-13-refit-reporting.md)
+> promotes a current release. Every phase consumes that release through the
+> [post-Phase-13 input adapter](shared-contracts.md#post-phase-13-input-adapter)
+> and records its release/manifest identity.
+
 ## Motivation
 
 The per-bin replay-rate model (Family B, [docs/rate_models.md](../../../../docs/rate_models.md))
@@ -25,6 +32,10 @@ warranted, **jointly** with the replay intensity (a recurrent-events +
 terminal-event model, optionally with a shared per-stop frailty). But that is a
 heavy model; this plan **builds up to it with decision gates** so we never fit
 the full joint/frailty model unless the simpler steps show it is needed.
+
+This plan owns only replay-onset **intensity** and terminal **departure
+hazard**. Replay direction, represented arm/patch, posterior content marks, and
+rate×content models remain separate downstream scientific questions.
 
 ## Questions this plan can answer
 
@@ -75,21 +86,26 @@ next, more complex phase is justified. Stop early if a gate fails.
 - `src/.../model_specs.py` `BIN_S`, `TMAX`, `SPLINE_KNOTS`, `STOP_COVARIATES` —
   shared bin width, truncation, fixed spline knots (so the hazard and intensity
   splines share a reconstructable basis).
-- `Processed-Data/replay_content/stop_table.pkl` — `immobility_time` (the
-  survival time `T`), `reward_outcome`, `recent_trial_reward_rate`,
-  `is_after_switch`, `current_arm`, `stop_idx`; read-only.
+- The Phase-13 current release supplies source-valid stop/per-bin inputs,
+  source manifests, exact cohort keys, and Phase-9b fold infrastructure. The
+  shared adapter resolves those artifacts, rejects legacy fixed paths, and joins
+  `reward_rate_trial_k10`, `previous_completed_trial_is_switch`,
+  `recent_completed_switch_rate_k5`, `outcome_known_time`, and stable
+  stop/decision IDs without re-deriving covariates.
 - `non_local_detector.model_checking.sorted_spikes.TimeRescaling` — GOF for both
   the replay and (rescaled) departure processes.
 
 ## Non-Goals
 
-- **Not Family B's replacement.** Family A/B stay as-is; this is an additive
-  successor analysis. No change to `MODEL_PER_BIN_RATE` / `all_models.pkl`.
+- **Not the promoted rate ladder's replacement.** The Phase-13 rate results
+  remain canonical; this is an additive downstream analysis with its own
+  versioned run linked to the source release.
 - **No continuous-time Cox / external survival packages** — discrete-time
   per-bin hazard reusing the existing binned design (no new heavy deps).
 - **No cross-/ensemble spike modelling** — event-onset and departure processes
   only.
-- **Replay direction** stays out (content question); rate/timing only.
+- **No replay content/direction model.** This plan does not use represented
+  arm/patch or posterior content as a mark; it owns rate/timing only.
 
 ## Metrics
 - Phase 1: does the duration-conditioned time course retain a positive
@@ -97,12 +113,17 @@ next, more complex phase is justified. Stop early if a gate fails.
   fixed threshold).
 - Phase 2: departure-hazard model calibration — predicted vs empirical survival
   `S(tc)` within tolerance; reward-on-hazard sign + per-animal consistency.
+  Current-outcome effects use only bins at or after `outcome_known_time`.
 - Phase 3: a pre-registered residual-coupling test (replay-history coefficient
   in the hazard; duration coefficient in the intensity) with per-animal n/5 and
-  a paired/signed-rank p — the gate to Phase 4.
+  a paired/signed-rank p — the gate to Phase 4. Both processes use one frozen
+  cohort and fold assignment.
 - Phase 4: held-out improvement of the joint (frailty) model over independent
   (per-bin/`cv_bits`-style + departure log-likelihood), and whether the time
   course / SWR-vs-non-SWR conclusions change.
+- Every attempted fit remains represented by a structured success/failure row
+  carrying source-release, cohort, and fold hashes; no `None` disappearance or
+  fixed-path result is allowed.
 
 ## Risks and Mitigations
 
@@ -112,6 +133,7 @@ next, more complex phase is justified. Stop early if a gate fails.
 | Building the frailty model when it isn't needed | The Phase-3 residual-coupling gate must pass before Phase 4; if independent models fit, stop. |
 | Discrete-time hazard separation (few/zero departures in early bins) | cloglog link + the fixed-knot spline (bounded, no extrapolation); pool short sessions; report unfit counts. |
 | Frailty estimation cost / non-convergence | Per-session random effect via Laplace/EM; smoke-test timing on a few sessions before any full run; fall back to a fixed-effect duration covariate if the frailty won't identify. |
+| A stale table or private fold recreates the pre-remediation analysis | Resolve only the Phase-13 current release, validate manifest/cohort hashes, and pass one persisted fold table to every replay/departure fit. |
 
 ## Open Questions
 1. **Hazard link** — cloglog (grouped continuous-time hazard) vs logistic;

@@ -1,5 +1,11 @@
 # Shared contracts
 
+> **SUPERSEDED — DO NOT EXECUTE (2026-07-29).** This file is retained only as
+> historical design context. Canonical corrective work is owned by
+> [`regression-integrity-fixes`](../regression-integrity-fixes/PLAN.md); the only
+> surviving downstream rate/content task is
+> [`rate-content-followups` Phase 2](../rate-content-followups/phase-2-swr-continuum.md).
+
 [<- back to PLAN.md](PLAN.md)
 
 This plan joins three model families without collapsing them into a single

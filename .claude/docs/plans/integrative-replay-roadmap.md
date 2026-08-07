@@ -5,6 +5,13 @@ when picked up. The concrete next step already written is the
 [joint-replay-departure](joint-replay-departure/PLAN.md) plan (the rate×duration
 rung).
 
+> **Routing update (2026-07-29):** the numerical results and implementation sketches below are
+> historical context, not executable ownership. Regression/covariate corrections, the coherent
+> refit, and decision-grain choice are owned by
+> [`regression-integrity-fixes`](regression-integrity-fixes/PLAN.md). The joint-departure plan starts
+> only from that plan's promoted release. The other pairwise/capstone sketches remain unplanned and
+> must not be folded into either active plan without a separate scope decision.
+
 This maps the larger object behind the per-bin rate work: a stop is not just a
 replay-rate process but the intersection of **four axes**, and the scientific
 payoff is in their couplings. The governing principle (same as the joint-

@@ -2,6 +2,12 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
+> **SUPERSEDED FOR REMAINING WORK (2026-07-29):** do not execute the full-refit,
+> parity, or claims-refresh tasks below. They are historical context; the coherent
+> rebuild and cutover are owned by
+> [`regression-integrity-fixes` Phase 13](../regression-integrity-fixes/phase-13-refit-reporting.md),
+> after Phase 8 corrects the switch/recency/reward-history contracts.
+
 > **STATUS: PARTIAL.** Done: `uncertainty_rate` refit on the regenerated tables; the
 > covariate-accuracy audit + invariant-bounds verification layer landed in
 > [phase-1.5](phase-1.5-behavior-model-covariates.md) (calibration, leakage, coverage,

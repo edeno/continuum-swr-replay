@@ -21,10 +21,13 @@ retained as the historical record.
 - **Phases 2 & 5 formal tables (summary/support-classification/provenance manifests) —
   REMAIN but low value.** The synthesis "covariate atlas" already serves as the
   human-readable cross-family summary.
-- **Phase 4 (choice prediction / mediation) — the RESIDUAL worth doing.** Fits exist
+- **Phase 4 (choice prediction / mediation) — SUPERSEDED.** Fits exist
   (`compare_event_source_models.py`, claims #19d/#19e) but are **in-sample-only (no
   held-out CV)** and **not distance-controlled** (`dist_to_arm` dropped for
-  quasi-separation). → moved to `rate-content-followups` phase-1.
+  quasi-separation). The residual first moved to `rate-content-followups` phase-1 and
+  is now replaced by
+  [`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md).
+  Do not execute either historical choice phase.
 - **HMM-era falsehoods in this plan's `overview.md`/`designs.md`:** `entropy_x_current`
   is now **null** and `q_arm`'s content effect is *avoidance* (`swr_x_q_arm −2.45`), not
   the ambiguous "per-arm value contrast" the overview assumes.

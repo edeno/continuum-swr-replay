@@ -2,9 +2,12 @@
 
 [← back to PLAN.md](PLAN.md)
 
-Two contracts span multiple phases. Each is defined once here; phases link in.
+The following contracts span multiple phases. Each is defined once here; phases link in.
 
 - [Provenance sidecar schema](#provenance-sidecar-schema) — written by Phase 1 (`run_session`), populated at scale by Phase 3 (batch runner), consumed by Phase 4 (loader guard).
+- [PFC completion manifest](#pfc-completion-manifest) — Phase 3 supplies the
+  source-bound batch evidence; Phase 4 is the sole producer after every output and
+  validation gate passes.
 - [Matched-control interface](#matched-control-interface) — defined by Phase 2, consumed by Phase 3's rerun.
 - [PFC fit-validity contract](#pfc-fit-validity) — defined by Phase 0, consumed by Phases 2b–4.
 - [Temporal-null and blocked-score contract](#pfc-temporal-inference) — defined by Phase 2b, consumed by Phases 3–4.
@@ -25,9 +28,15 @@ tag is not `"canonical_event_table"`.
 
 ```python
 {
+    "pfc_run_id": str,                  # identical across the production batch
     "nwb_file_name": str,              # e.g. "wilbur20210329_.nwb"
     "epoch_name": str,                 # e.g. "02_r1"
     "brain_area": str,                 # "mPFC"
+    "canonical_table_generation_sha256": str,
+    "session_input_manifest_path": str,
+    "session_input_manifest_sha256": str,
+    "canonical_event_table_path": str,
+    "canonical_event_table_sha256": str,
     "is_swr_definition": str,          # MUST be "canonical_event_table"
     "immobility_threshold": float,     # cm/s
     "immobility_inequality": str,      # MUST be "<" (see Open Question 1)
@@ -47,7 +56,143 @@ tag is not `"canonical_event_table"`.
 
 Written with `json.dump(..., indent=2)`. The counts come from the canonical
 event table restricted to immobility (Phase 1); `n_matched_control` is filled
-once Phase 2 lands (0 in Phase 1's sidecar).
+once Phase 2 lands (0 in Phase 1's sidecar). Production sidecars must bind to
+the frozen staged canonical-table generation and per-session input manifests
+created by regression-integrity Phase 13. A sidecar whose source hash differs
+from that generation is stale even when its artifact files are present.
+
+---
+
+## PFC completion manifest {#pfc-completion-manifest}
+
+`pfc_completion.json` is the single cross-plan gate consumed by
+`regression-integrity-fixes` Phases 12–13. Phase 3 never writes this file: it
+produces the source-bound artifacts and batch-audit evidence. Phase 4 is the sole
+producer and may emit it only after the population loader, all inference checks,
+the staged Figure-4/adjudication smoke test, and the full completion
+audit succeed.
+
+**Immutable path:** `<pfc_root>/runs/<pfc_run_id>/pfc_completion.json`. Phase 3 writes every
+artifact beneath `<pfc_root>/runs/<pfc_run_id>.staging/`; Phase 4 writes the completion file there
+last and atomically renames the whole directory to its final path. The regression release gate is
+given that exact path and hash. Recursive search, newest-file fallback, mutation of a finalized run,
+and a PFC-specific `CURRENT`/canonical pointer are forbidden.
+
+**Schema:**
+
+```python
+{
+    "schema_version": 1,
+    "completed": True,
+    "pfc_run_id": str,
+    "created_at_utc": str,
+    "git_sha": str,
+    "dirty_diff_sha256": str | None,
+    "canonical_table_generation": {
+        "manifest_path": str,
+        "sha256": str,
+        "state": "frozen_staged",
+    },
+    "coverage": {
+        "expected_session_ids": list[str],
+        "completed_session_ids": list[str],
+        "excluded_sessions": list[dict],  # session_id + reviewed reason
+        "expected_animals": list[str],
+        "observed_animals": list[str],
+    },
+    "sessions": [
+        {
+            "session_id": str,
+            "animal": str,
+            "session_input_manifest_path": str,
+            "session_input_manifest_sha256": str,
+            "canonical_event_table_sha256": str,
+            "provenance_path": str,
+            "provenance_sha256": str,
+        }
+    ],
+    "contracts": {
+        "is_swr_definition": "canonical_event_table",
+        "immobility_inequality": "<",
+        "fit_schema_version": int,
+        "spike_bin_edges": "half_open_with_final_right_edge",
+        "matched_control": True,
+        "nuisance_basis_sha256": str,
+        "temporal_null_method": str,
+        "blocked_score_hashes": list[str],
+        "population_unit": "neuron_to_session_to_animal",
+    },
+    "outputs": [
+        {
+            "root": str,  # "pfc_run" or "release_output"
+            "path": str,  # normalized path relative to that root
+            "size": int,
+            "sha256": str,
+        }
+    ],
+    "validation": {
+        "batch_audit_path": str,
+        "batch_audit_sha256": str,
+        "missing_required_artifacts": 0,
+        "source_hash_mismatches": 0,
+        "forbidden_stale_lr_columns": 0,
+        "fit_diagnostics_path": str,
+        "fit_diagnostics_sha256": str,
+        "expected_fit_cells": int,
+        "accounted_fit_cells": int,
+        "fit_status_counts": {
+            "ok": int,
+            "rank_deficient": int,
+            "nonconverged": int,
+            "separated": int,
+            "insufficient_data": int,
+            "fit_error": int,
+        },
+        "missing_fit_status": 0,
+        "headline_invalid_fit_cells": 0,
+        "all_attempted_cells_accounted": True,
+        "five_animal_coverage": True,
+        "loader_smoke_passed": True,
+        "figure_smoke_passed": True,
+        "targeted_tests_passed": True,
+    },
+    "claim_20_adjudication": {
+        "status": str,  # "supported", "not_supported", or "unavailable"
+        "estimand": "non-SWR replay engagement beyond matched immobile control",
+    },
+}
+```
+
+All PFC-scoped rows in the Phase-13 `expected_sessions.parquet` snapshot must appear exactly once in
+either `completed_session_ids` or `excluded_sessions`; exclusions must resolve to a pre-run,
+PFC-scoped reviewed entry in the shared `config/regression_session_exclusions.yaml`, not a private
+PFC allowlist. Every completed session must have a unique session record whose
+source/event/provenance hashes match both its sidecar and the frozen Phase-13
+generation. The completion `git_sha` and every session-sidecar `git_hash` must equal the clean,
+frozen analysis-code/config commit recorded by the Phase-13 candidate, and
+`dirty_diff_sha256` must be null. Generated figures, reports, and claim-text outputs are hashed
+separately and do not authorize a different analysis-code identity. `observed_animals` must equal
+the declared five-animal set. A null
+engagement result may still produce `completed=true` with
+`claim_20_adjudication.status="not_supported"`; completion records validity, not
+statistical significance.
+
+The completion manifest never hashes mutable live-repository files. Figure-4 PDF/PNG and the
+machine-readable `claim_20_adjudication.json` are written to the global release-output staging tree
+under repository-relative paths and recorded with `root="release_output"`; PFC population/session
+artifacts use `root="pfc_run"`. Shared Markdown claims documents are deliberately excluded because
+Phase 13 composes them later from all row-scoped adjudications. The global release validator rechecks
+the PFC-declared release-output bytes before finalizing that tree.
+
+The producer is `scripts/qa/finalize_pfc_completion.py`, added in Phase 4. It
+constructs the manifest only from freshly re-read files, writes canonical
+sorted-key JSON plus a trailing newline to a uniquely named temporary sibling
+inside the staging run, flushes and `fsync`s it, re-reads and validates the complete schema and
+hashes, then atomically renames the staging run directory to its immutable final path and `fsync`s
+the runs directory. Any exception removes only the temporary completion sibling and leaves the
+staging run incomplete/non-resolvable; it never changes a finalized run or global pointer. The
+script must not accept `--allow-incomplete`, synthesize missing evidence, or reuse another run's
+completion file.
 
 ---
 

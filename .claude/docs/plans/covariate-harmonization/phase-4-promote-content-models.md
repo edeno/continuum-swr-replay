@@ -1,11 +1,15 @@
 # Phase 4 — Promote exploratory content models into the audited pipeline
 
+> **SUPERSEDED (2026-07-29):** do not execute this phase. Its generic
+> cohort/diagnostic/refit work and content-model promotion are owned by
+> [`regression-integrity-fixes`](../regression-integrity-fixes/PLAN.md), principally
+> Phases 8–10 and 13. Retain this file only as historical rationale; reconsider a
+> still-novel destination estimand as a new downstream question after Phase 13.
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
-> **STATUS: NOT started.** Depends on phase-2 (the refit). Note: the content scripts
-> this phase promotes (`_content_reward_interactions.py`, `_covariate_ranking.py`) were
-> already migrated to `qvals_table` in phase-1.5, but still lack the audited diagnostics
-> (SE/p/VIF/FDR/provenance) this phase requires.
+> **HISTORICAL STATUS:** it was not started before being superseded. The content
+> scripts named below are not an active implementation queue.
 
 Two of this session's content findings live in scratch scripts that fit per-session
 and save **only coefficient medians** — dropping `n_events`, standard errors,

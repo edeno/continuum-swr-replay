@@ -25,26 +25,39 @@ formulas and exact cohorts from earlier phases.
 
 ## Tasks
 
-- Make stop-cluster sandwich covariance primary for per-bin and stacked SWR-rate GLMs. Cluster on
+- Implement the exact `alpha=0.05`, SHA-256-derived seed, CR1 correction, cluster minimum, reference
+  distribution, bootstrap counts/success gate, animal aggregation, sign-flip tests, and BH rules in
+  [the dependence design](designs.md#dependence). These are schema constants, not runner options.
+- Make stop-cluster CR1 covariance primary for per-bin and stacked SWR-rate GLMs. Cluster on
   `stop_id` so temporal bins and paired event-type rows share a cluster. Save naive covariance only as
-  explicit diagnostics (`bse_model_*`, `pval_model_*`). Record cluster count and covariance method.
-- For per-stop Poisson, cluster on Phase-8 decision/trial ID. Retain Pearson/deviance dispersion and add
-  negative-binomial or quasi-Poisson sensitivity when overdispersion is material; compare point effects
-  and interval width on identical rows, not AIC across different likelihoods.
-- Add seeded stop-block bootstrap for conditional content: sample whole stops within session, carry all
-  events/category rows, assign fresh event group IDs, refit, and report coefficient interval plus
-  successful replicate fraction. Wire both hard-count and soft-posterior-mass responses.
+  explicit diagnostics (`bse_model_*`, `pval_model_*`). Record cluster count, correction, degrees of
+  freedom, and covariance method.
+- For per-stop Poisson, cluster on Phase-8 decision/trial ID. Retain Pearson/deviance dispersion and
+  add only the locked quasi-Poisson sensitivity when the Pearson threshold is met; do not implement an
+  outcome-selected negative-binomial alternative or compare AIC across likelihood types.
+- Add the deterministic 2,000-attempt stop-block bootstrap for conditional content: sample whole stops
+  within session, carry all events/category rows, assign fresh event group IDs, refit, and report the
+  percentile interval, replicate covariance, and successful fraction. Wire both hard-count and
+  soft-posterior-mass responses; fewer than 1,800 joint-valid replicates fails robust inference.
 - Add a dependence-calibration simulation using the existing trajectory autocorrelation generator.
-  Report coverage for model-based versus block-aware intervals over a fixed seed grid; set an explicit
-  tolerance robust to Monte Carlo variation. A regression that restores anti-conservative coverage fails.
+  Run the locked 400-replicate grid and require the stated 90% coverage / five-percentage-point
+  improvement gates. A regression that restores anti-conservative coverage fails.
 - Extract `aggregate_session_effects` from `contrast_aggregation.py` under the animal-summary contract.
   Migrate base content, per-stop/per-bin, uncertainty, cross-history, SWR power consumers, and Stage-6
   reporting. Require all five animals or an incomplete-animal warning. Relabel every session signed-rank
   field `_descriptive`.
 - Implement paired animal aggregation for formal SWR interactions and model-score deltas. Separate fits
   remain descriptive; summary code cannot infer a difference by comparing significance labels.
-- Define one confirmatory multiplicity family in the generated analysis metadata. Apply FDR/joint tests
-  to prespecified terms/constructs; multi-df splines/reward histories/peri-switch blocks use joint tests.
+- Add the schema loader/validator for the checked-in
+  `analysis/replay/confirmatory_hypotheses.json` contract. Validate every entry against exact
+  model/set/population/term identities, construct declared joint tests, apply one BH-FDR family across
+  all entries, and hash the canonical registry bytes into run/release metadata. Initialize the file as
+  `registry_status="locked"` with an empty `entries` array unless the analysis authors approve a
+  non-empty reviewed commit before any corrected production fit. The safe default is therefore no
+  confirmatory labels—not an executor-invented hypothesis or a family chosen after results.
+- Construct confirmatory term/joint raw p-values only from the exact five-animal sign-flip procedures,
+  then apply the locked single-family BH rule. Reject joint directional alternatives, missing animals,
+  zero-RMS joint terms, or any attempt to feed session-level Wald/bootstrap p-values into FDR.
 - Update reporting docs to state covariance/bootstrap unit, cluster count, bootstrap success, five animal
   effects, and the limitation of n=5. Remove language calling a session-cluster GEE population-valid.
 
@@ -60,11 +73,16 @@ formulas and exact cohorts from earlier phases.
 | --- | --- |
 | `test_per_bin_cluster_groups_include_all_stop_rows` | bins and SWR/non-SWR pairs share stop cluster |
 | `test_clustered_and_naive_fields_are_not_confused` | primary/diagnostic columns have explicit names/methods |
+| `test_cr1_cluster_threshold_and_df_are_locked` | correction, G-1 reference df, and fewer-than-20-cluster failure follow the exact contract |
 | `test_content_bootstrap_resamples_stops_and_rekeys_events` | no group collision or partial-stop resample |
+| `test_content_bootstrap_attempts_seed_and_success_gate` | production uses 2,000 deterministic attempts, percentile endpoints, and fails below 1,800 valid vectors |
 | `test_dependence_coverage_improves` | fixed-seed block interval coverage exceeds nominal model-based coverage within tolerance |
+| `test_overdispersion_triggers_only_quasipoisson_sensitivity` | the 1.5/30-cluster boundary is exact and no NB/AIC branch exists |
 | `test_animal_summary_balances_unbalanced_sessions` | duplicating sessions for one animal does not change across-animal center |
 | `test_missing_animal_warns_and_blocks_headline` | 4-animal result cannot masquerade as 5-animal evidence |
 | `test_paired_effects_aggregate_within_animal_first` | pairing/order and denominator are correct |
+| `test_confirmatory_registry_resolves_and_hashes_exactly` | unknown set/model/population/term, draft status, hash drift, or a second family fails; a locked empty registry yields no confirmatory labels |
+| `test_confirmatory_signflip_and_bh_are_exact` | all 32 synchronized animal sign patterns, alternatives, joint statistic, p-value ties, and q=0.05 BH output match hand calculations |
 | one-session bootstrap smoke (slow) | records timing, memory, successful fraction, and stable interval at production-like event count |
 
 ## Fixtures

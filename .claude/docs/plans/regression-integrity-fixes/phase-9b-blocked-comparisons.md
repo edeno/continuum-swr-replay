@@ -31,12 +31,21 @@ change coefficient uncertainty.
 - Construct folds once per `(run_id, comparison_set, session)` and pass the immutable table into content,
   per-bin, and per-stop CV. Content blocks all events from a stop together. Preserve the rule that any
   failed/nonconverged/separated training fold invalidates the whole metric without dropping that fold.
+- Fit every data-dependent transform (mean/SD, centering reference, spline state when not fixed, or
+  other preprocessing) on the training rows of each fold and apply it unchanged to test rows. Persist
+  fold-level transform parameters or their stable hash; never reuse pooled table `_z` columns for a
+  held-out score.
+- For recency specifically, consume only raw `visit_recency_trials`, apply the fixed `log1p` map,
+  then estimate mean/SD on the estimation cohort or current training fold. Record
+  `{input_column, transform="log1p", mean, sd, fit_row_hash}`. Apply the training parameters unchanged
+  to test rows; never consume the removed full-session `visit_recency_demeaned` field.
 - Add explicit `blocked_interpolation` and optional `forward_chaining` scheme names. Paper-facing
   “future prediction” language requires the latter; otherwise report held-out blocked association.
 - Rewrite `compare_nested_models` around a `ComparisonContractError`. Validate exact session sets,
   unique cells, run/purpose/set, estimator/response/link/offset/grain/category semantics, row/group hash,
   fold hash for CV, declared nesting, positive df, and monotone nested LL before computing metrics.
-  Remove LR/df clipping and inner-merge disappearance.
+  Implement the shared scale-aware `ll_tol` boundary exactly; remove all other LR/df clipping and
+  inner-merge disappearance.
 - Produce paired per-session `delta_aic`, `delta_bic`, and held-out `delta_log_score`, then aggregate
   within animal before across-animal reporting. Remove Wilcoxon-on-delta-AIC as a model-selection test;
   retain session distributions only under descriptive names.
@@ -61,10 +70,13 @@ change coefficient uncertainty.
 | `test_fold_assignment_is_input_order_invariant` | shuffle leaves assignments/hash unchanged |
 | `test_every_group_scored_once` | folds form an exact partition with no omissions/duplicates |
 | `test_models_share_fold_hash` | every member of a selection set receives the same assignment |
+| `test_fold_transform_is_train_only` | perturbing held-out/future values cannot change training means, SDs, or transformed training rows |
 | `test_comparison_rejects_same_n_different_ids_or_folds` | exact identity, not counts, governs validity |
 | `test_comparison_rejects_session_mismatch_and_duplicate_cells` | inner-drop behavior is gone |
 | `test_lrt_rejects_nonnesting_nonpositive_df_and_negative_lr` | invalid inputs raise rather than clip |
+| `test_lrt_tolerance_boundary_is_exact` | below `-ll_tol` raises; within tolerance emits the declared zero statistic/flag; positive values compute normally |
 | `test_exact_contract_computes_expected_deltas` | known valid nested fixture returns correct values |
+| `test_pb_ranking_is_animal_balanced_and_deterministic` | complete-session intersection, five-animal requirement, 1e-6 tie tolerance, complexity tie break, and name fallback match hand calculation |
 
 ## Fixtures
 
@@ -76,6 +88,7 @@ existing bad-fold fixtures instead of replacing their coverage.
 
 Before opening the PR, dispatch `scientific-code-reviewer` against the diff. Confirm:
 - No fitter constructs private random folds after a shared fold table is supplied.
+- No held-out path consumes a pooled/full-session standardization reference.
 - Content CV cannot place events from one stop in train and test.
 - Comparison mismatch paths raise or report unavailable without computing numbers.
 - No absolute-AIC cross-session ranking or session-Wilcoxon model-selection claim remains.

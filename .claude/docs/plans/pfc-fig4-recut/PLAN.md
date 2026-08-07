@@ -9,6 +9,12 @@ control, accounts for spike history/drift and temporal dependence, performs
 animal-level inference, and regenerates Fig 4 with an engagement—not
 equivalence—claim. Scope comes from reviews 05 and 07.
 
+**Integration boundary:** this plan alone owns PFC mechanics, rerun, Figure 4, claim 20, and the
+immutable `pfc_completion.json` producer. Production Phases 3–4 wait for the frozen release candidate
+from `regression-integrity-fixes` Phase 13; they create no PFC-specific current pointer. Phase 13 only
+validates/attaches the completion (or an unavailable reason) and mechanically composes shared staged
+documents from its adjudication; it does not implement or rerun PFC analysis.
+
 ## Reading order
 
 For agent invocation, **load only the slice you need**:
@@ -21,10 +27,11 @@ For agent invocation, **load only the slice you need**:
 
 - [overview.md](overview.md) — goals, integration points, risks, rollout, open questions.
 - [shared-contracts.md](shared-contracts.md) — provenance, matched-control, fit-validity, and temporal-inference contracts.
-- Phases (each ships as a separable PR):
+- Phases (0–2b each ship as a separable PR; Phases 3–4 each declare a pre-freeze code PR and a
+  post-freeze, no-code production record):
   - [phase-0-glm-mechanics.md](phase-0-glm-mechanics.md) — fix spike-bin edges, rank/convergence, and theta fitting.
   - [phase-1-canonical-events.md](phase-1-canonical-events.md) — swap in canonical `is_swr`, fix `<=`/`<`, write provenance, old-vs-new diagnostic.
   - [phase-2-matched-control.md](phase-2-matched-control.md) — time-shifted-onset matched non-event control model + wiring.
   - [phase-2b-dependence-inference.md](phase-2b-dependence-inference.md) — spike-history/drift controls, autocorrelation-preserving nulls, and blocked scores.
-  - [phase-3-batch-rerun.md](phase-3-batch-rerun.md) — smoke-test then full Dask rerun; regenerate artifacts with provenance.
-  - [phase-4-inference-figure.md](phase-4-inference-figure.md) — per-animal inference, Fig 4 regen (engagement framing), claim/doc reconciliation.
+  - [phase-3-batch-rerun.md](phase-3-batch-rerun.md) — pre-freeze runner/audit plumbing, then post-freeze smoke and full Dask rerun.
+  - [phase-4-inference-figure.md](phase-4-inference-figure.md) — pre-freeze loader/finalizer/Fig-4 code, then post-freeze inference, staged outputs, and completion.

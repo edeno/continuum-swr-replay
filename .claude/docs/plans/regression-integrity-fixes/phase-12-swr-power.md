@@ -9,7 +9,7 @@ make the independently planned PFC recut an explicit prerequisite for cross-area
 
 - [scripts/rate/fit_swr_power_model.py:45-87](../../../../scripts/rate/fit_swr_power_model.py#L45) — reward/RPE/Q co-fit and unchecked `lstsq` to delete.
 - [scripts/rate/fit_swr_power_model.py:127-161](../../../../scripts/rate/fit_swr_power_model.py#L127) — marginal duration check and session-Wilcoxon report to replace.
-- [src/continuum_swr_replay/analysis/behavior/qvals_table.py:230-260](../../../../src/continuum_swr_replay/analysis/behavior/qvals_table.py#L230) — exact RPE identity/value construction.
+- [src/continuum_swr_replay/analysis/behavior/qvals_table.py:207-228](../../../../src/continuum_swr_replay/analysis/behavior/qvals_table.py#L207) — exact Q/RPE identity and construction.
 - [src/continuum_swr_replay/analysis/replay/tables.py](../../../../src/continuum_swr_replay/analysis/replay/tables.py) — event duration, time, stop, and power columns.
 - [PFC Fig-4 recut plan](../pfc-fig4-recut/PLAN.md) — separate canonical-event/control/population plan whose completion manifest Phase 13 requires.
 - [src/continuum_swr_replay/analysis/pfc/glm.py:167-245](../../../../src/continuum_swr_replay/analysis/pfc/glm.py#L167) and [:347-480](../../../../src/continuum_swr_replay/analysis/pfc/glm.py#L347) — PFC mechanical/inferential gaps that must be covered by that plan before promotion.
@@ -29,6 +29,11 @@ make the independently planned PFC recut an explicit prerequisite for cross-area
 - Implement P0-P3 exactly as designed. Use aligned `trial_reward` and `q_current`; never substitute
   `reward_lag1` for current outcome and never co-fit deterministic reward/Q/RPE components. Gate all
   outcome-dependent models after `outcome_known_time`.
+- Register row key `event_id`, dependence/fold group `stop_id`, and two exact selection sets:
+  `POWER_REWARD_Q = {P0, P1, P3}` with declared LRT edges `P0→P1→P3`, and
+  `POWER_RPE_SENS = {P0, P2}` with edge `P0→P2`. Refit each set's P0 on that set's frozen
+  common cohort. Never compare P1 with P2 by LRT/AIC, and never move P2 into the primary set after
+  seeing results.
 - Include `log(event_duration)` in every non-null design. Save R-squared/adjusted R-squared, robust
   intervals, residual normality/heteroskedasticity flags, leverage/Cook's-distance summary, cluster count,
   condition/rank fields, and held-out score. Model event occurrence separately; this response is a mark
@@ -42,9 +47,15 @@ make the independently planned PFC recut an explicit prerequisite for cross-area
   canonical event labels, spike-bin edge contract, rank/convergence, spike history/slow drift, matched
   immobile control, autocorrelation-preserving null/blocked score, and neuron→session→animal aggregation.
   Verify those fields here rather than duplicating PFC code.
-- Define `pfc_completion.json` validation in Phase-7 schema: required PFC plan outputs, manifest fields,
-  five-animal coverage, and forbidden stale LR columns. Phase 13 may promote non-PFC analyses while
-  marking cross-area claims unavailable, but it cannot regenerate/promote Figure 4 without this gate.
+- Implement validation of the `pfc_completion.json` schema owned and produced only by
+  [`pfc-fig4-recut` Phase 4](../pfc-fig4-recut/phase-4-inference-figure.md): require its frozen
+  source/table-generation hashes, the same clean frozen code/config git identity as the candidate,
+  null dirty-diff hash, output hashes, complete expected-session accounting, five-animal coverage,
+  event/control/fold/null fields, the fit-diagnostics path/hash, exact expected-versus-accounted
+  cell counts, complete status counts, zero missing statuses, zero headline-invalid
+  rank/nonconvergence cells, and the forbidden stale LR-column check. Phase 13 may
+  promote non-PFC analyses while marking cross-area claims unavailable, but it cannot
+  regenerate/promote Figure 4 without this gate.
 - Update `docs/models_table.md` with the identified power formulas and clarify event-mark versus
   occurrence questions. Remove prior coefficient claims until Phase 13 refits.
 
@@ -63,8 +74,9 @@ make the independently planned PFC recut an explicit prerequisite for cross-area
 | `test_planted_reward_and_q_effects_recovered` | identified P1 recovers simulation effects within tolerance |
 | `test_duration_adjustment_removes_planted_confound` | duration coefficient/effect behaves as expected |
 | `test_power_rows_are_post_outcome` | outcome-dependent fit contains no pre-outcome event |
+| `test_power_selection_sets_and_rows_are_exact` | P0/P1/P3 and P0/P2 use their set-specific identical event/group/fold hashes; P1-vs-P2 comparison is rejected |
 | `test_cluster_covariance_and_blocked_cv_metadata` | cluster/fold hashes and robust fields are complete |
-| `test_pfc_completion_gate_rejects_stale_or_incomplete_run` | missing control/rank/animal fields or stale LR column blocks Figure-4 promotion |
+| `test_pfc_completion_gate_rejects_stale_or_incomplete_run` | missing control/animal evidence, fit-table hash/count/status drift, headline rank/nonconvergence, or stale LR column blocks Figure-4 promotion |
 | one-session power smoke (slow) | fit/residual/manifest outputs are finite, auditable, and current-schema |
 
 ## Fixtures

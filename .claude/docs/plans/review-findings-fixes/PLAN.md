@@ -1,5 +1,13 @@
 # Review-findings fix plan
 
+> **Ownership reconciliation (2026-07-29):** this file remains the historical
+> owner of its decoder-identifier, ripple-query, and trajectory findings. F6's
+> switch-conditional choice decision is superseded by
+> [`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md),
+> which retains same-arm and zero-replay decisions at decision grain. F4b/PFC
+> regeneration is owned by [`pfc-fig4-recut`](../pfc-fig4-recut/PLAN.md). Do not
+> implement either item from this file in parallel.
+
 Fixes for the verified findings from the branch review (findings 1, 2, 4b, 5, 6, 7a,
 7b, 8, 9). Finding 3 (per-sorting `curation_id`) is **out of scope** by decision.
 
@@ -11,14 +19,14 @@ below records the concrete change, the blast radius, and a verification step.
   already correct and carries the central claims).
 - **F5 (`n_reversals`):** rebuild on the existing graph-based `ahead_behind_distance`
   column (see F5 detail); recompute the 16b "2 vs 7" and reassess.
-- **F6 (choice model):** keep the switch-conditional model; **relabel + report N**
-  excluded stays (no model restructure).
+- **F6 (choice model): SUPERSEDED** by regression-integrity Phase 11; retain this
+  older decision only as audit history.
 - **F9:** fix line-77 eager import; **skip** the line-361 exclusion-audit item.
 
 ## Verification discipline (applies to every finding)
 Capture the affected reported numbers **before** editing, recompute **after**, diff.
 F2, F8, and the F1 default path must show **zero** numeric change (correctness/
-robustness only). F5/F7a/F7b/F6 will move numbers — report the deltas against
+robustness only). F5/F7a/F7b will move numbers — report the deltas against
 `paper/claims_table.md`, do not assert improvement.
 
 ---
@@ -152,34 +160,23 @@ spot-check ~20 flipped-label events per fix against the posterior.
 
 ---
 
-## Batch 3 — claims + PFC pickles
+## Retired Batch 3 findings — historical context only
 
-### F6 — choice model excludes stays (relabel, don't restructure)
-- **Root cause:** `choice_prediction.py:405` removes the current arm as a candidate,
-  then drops stops with no chosen candidate → every stay is silently excluded, so the
-  model estimates choice **conditional on switching**, not general upcoming choice.
-- **Change (no model change):**
-  1. Relabel **claim 19d** (`paper/claims_table.md:54`) as choice **among switch
-     destinations** (conditional on switching).
-  2. Report the number of excluded stays (reviewer: ~1,378 of 23,610 — confirm the
-     exact count from the run).
-  - Rationale for keeping switch-only: removing the current arm is methodologically
-    motivated (the animal is physically there); including stays would mostly recover a
-    proximity confound and worsen the quasi-separation that already forced dropping
-    `dist_to_arm`. Claim 19d is already a hedged Supp correlation.
+### F6 — choice model excludes stays
+
+`choice_prediction.py:405` removed the current arm as a candidate and dropped
+stays, so the historical model estimated choice conditional on switching. Do
+not relabel or extend that model here. Its replacement, claim adjudication, and
+same-arm/zero-replay accounting are owned by
+[`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md).
 
 ### F4b — stale PFC pickles + no schema guard
-- **Context:** commit `c86a240` removed an invalid non-nested LR comparison
-  (`SWR + non_local_no_SWR` vs `non_local`) from `analysis/pfc/glm.py`; the 71
-  materialized pickles may still carry that column, and
-  `analysis/pfc/load_population.py:55` has no version/commit guard.
-- **Steps:**
-  1. Grep whether any consumer actually reads the removed LR/p-value column — sizes
-     urgency (inert if unread).
-  2. Regenerate the 71 PFC pickles from current code (PFC-spike GLMs, affordable — no
-     GPU decode).
-  3. Add a `schema_version` / git-commit stamp into each pickle + a check in
-     `load_population` so this drift fails loudly next time.
+
+Commit `c86a240` removed an invalid non-nested LR comparison while old PFC
+pickles could retain it. Do not inspect, regenerate, stamp, or load-guard those
+artifacts from this plan. Canonical regeneration, provenance, stale-column
+rejection, and Figure-4 cutover are owned by
+[`pfc-fig4-recut`](../pfc-fig4-recut/PLAN.md).
 
 ---
 
@@ -201,4 +198,5 @@ a different ripple definition). Implemented:
 ## Suggested order
 1. Batch 1 (F2, F1-code, F8, F9-line77) — no reported number moves; validates workflow.
 2. Batch 2 (F5, F7a, F7b) — one trajectory recompute; check 16b/17 survival.
-3. Batch 3 (F6 relabel, F4b regen) — grep-then-regen for F4b.
+3. Stop. F6 and F4b are historical routing notes with separate owners; no Batch 3
+   work remains in this plan.

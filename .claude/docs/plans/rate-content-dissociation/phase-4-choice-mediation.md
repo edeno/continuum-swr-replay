@@ -2,6 +2,11 @@
 
 [<- back to PLAN.md](PLAN.md) . [overview](overview.md) . [shared contracts](shared-contracts.md)
 
+> **SUPERSEDED (2026-07-29):** do not execute this stop-grain design. The canonical
+> replacement is
+> [`regression-integrity-fixes` Phase 11](../regression-integrity-fixes/phase-11-decision-models.md).
+> Retain the remainder only as historical rationale.
+
 After rate/content dissociation is audited, test whether replay content predicts
 future behavior. This phase asks a predictive question, not a causal one:
 does replay content during a stop improve next-arm prediction beyond measured

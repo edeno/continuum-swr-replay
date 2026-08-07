@@ -1,5 +1,11 @@
 # Phase 2 — Non-local rate vs uncertainty/value (SWR vs non-SWR)
 
+> **SUPERSEDED — DO NOT EXECUTE (2026-07-29).** This phase is retained only as
+> historical design context. Covariate correction and the coherent refit are
+> owned by [`regression-integrity-fixes`](../regression-integrity-fixes/PLAN.md);
+> the only surviving downstream continuum task is
+> [`rate-content-followups` Phase 2](../rate-content-followups/phase-2-swr-continuum.md).
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 Fit the Family B per-bin rate model **per population** (`swr` /

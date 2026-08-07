@@ -1,5 +1,11 @@
 # Phase 3 — SWR / non-SWR continuum test (cross-type ensemble history)
 
+> **SUPERSEDED — DO NOT EXECUTE (2026-07-29).** This phase is retained only as
+> historical design context. Covariate correction and the coherent refit are
+> owned by [`regression-integrity-fixes`](../regression-integrity-fixes/PLAN.md);
+> the only surviving downstream continuum task is
+> [`rate-content-followups` Phase 2](../rate-content-followups/phase-2-swr-continuum.md).
+
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
 Follow-up motivated by the self-history result in

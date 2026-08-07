@@ -18,24 +18,33 @@
   moved to `qvals_table`. Adds the accuracy-audit + invariant-bounds verification layer
   and the base-covariate catalog. Multi-agent reviewed; tests green.
 - **Phase-2 — PARTIAL.** Only `uncertainty_rate` refit; the full refit of the other
-  families + the design-matrix parity script + claim-number refresh remain (the
-  downstream fit pickles are stale vs the regenerated tables).
-- **Phase-3, Phase-4 — NOT started.**
+  families + claim-number refresh were not completed here. **The remaining refit,
+  verification, and claims cutover are superseded by**
+  [`regression-integrity-fixes` Phase 13](../regression-integrity-fixes/phase-13-refit-reporting.md);
+  do not execute this phase independently. Its stop-grain switch and unseen-arm
+  assumptions are corrected by that plan's Phase 8.
+- **Phase-3 — NARROWED / NOT started.** Only the non-PFC ancillary reality/occupancy
+  `is_swr` adapters remain separate, after regression Phase 13. PFC event plumbing is
+  owned by [`pfc-fig4-recut`](../pfc-fig4-recut/PLAN.md).
+- **Phase-4 — SUPERSEDED.** Its generic diagnostics/cohort/refit work and proposed
+  content-model promotion are now owned by regression-integrity Phases 8–10 and 13.
+  Do not execute the old phase file; reconsider any still-novel exploratory
+  destination estimand only after the corrected canonical run exists.
 
-**Next:** decide the merge point for phase-1+1.5, then finish [phase-2](phase-2-refit-verify.md).
+**Ownership refresh (2026-07-29):** this plan remains the historical owner of the
+landed covariate extraction/harmonization. The comprehensive
+[`regression-integrity-fixes`](../regression-integrity-fixes/PLAN.md) plan is the
+sole owner of corrective covariate definitions and the coherent final refit.
+The narrowed Phase 3 remains a separate optional analysis and must consume its
+promoted outputs. Phase 4 is retained only as historical design context.
 
-Give each behavioral covariate **one canonical definition** (per
-[docs/covariate_dictionary.md](../../../../docs/covariate_dictionary.md), decisions
-D1–D5) computed by the table **builders** and written into the canonical tables every
-model family reads — so the same construct is entered the same way across rate /
-content / choice / coupling (interpret *within* an estimator class; see the dictionary
-§A). Net behavioral changes: per-arm recent reward 5→10 visits (`reward_rate_arm_k10`);
-add per-arm nominal value `p_reward_arm` (populating the deferred `nominal_reward_prob`);
-**add** a fitted-α leaky-Q level (`q_current`/`q_arm`) **and keep** `leaky_q_value_diff`
-(the per-stop margin) as a comparison; `recent_switch_rate` canonical with
-`is_after_switch` kept as a comparison. Implemented by **rebuilding the canonical tables**
-(replay **and** contfrag, reusing existing decodes — no re-decode), then re-fitting all
-families and verifying unchanged-definition covariates via design-matrix identity.
+This plan originally set out to give each behavioral covariate one builder-owned
+definition shared across rate/content/choice/coupling. The completed Phase 1/1.5
+result uses the external Beta-Bernoulli `qvals_table` belief for `q_current`/`q_arm`
+(not the superseded fitted-α leaky-Q proposal) and rebuilt the replay and ContFrag
+canonical tables without re-decoding. Its historical `recent_switch_rate` /
+`is_after_switch` decisions and its unfinished refit/parity work are not the final
+contract; regression-integrity Phases 8 and 13 replace them.
 
 ## Reading order
 
@@ -52,5 +61,5 @@ families and verifying unchanged-definition covariates via design-matrix identit
   - [phase-1-canonical-covariate-layer.md](phase-1-canonical-covariate-layer.md) — change the definitions in `covariates.py` to canonical (D1–D5), update **both** table builders (replay + contfrag) + regenerate the tables + update model specs/runners + tests + smoke fits. **(COMPLETE, unmerged.)**
   - [phase-1.5-behavior-model-covariates.md](phase-1.5-behavior-model-covariates.md) — behavior-model (RL) covariate integration from DataJoint `qvals_table`; **supersedes D3's leaky-Q** for `q_current`/`q_arm`; adds the accuracy-audit / invariant-bounds layer + base-covariate catalog. **(COMPLETE, unmerged.)**
   - [phase-2-refit-verify.md](phase-2-refit-verify.md) — re-fit all families on current tables, verify parity for unchanged covariates, refresh docs/claims numbers. **(PARTIAL — only `uncertainty_rate` refit.)**
-  - [phase-3-canonical-is-swr-sweep.md](phase-3-canonical-is-swr-sweep.md) — point the ancillary analyses (reality, occupancy, PFC) at the canonical event table's `is_swr` via one adapter + divergence tests, so every claim rests on one event definition. (Independent of phases 0–2.)
-  - [phase-4-promote-content-models.md](phase-4-promote-content-models.md) — promote the exploratory content scripts (`_content_reward_interactions`, `_content_patch_destination`) into the audited pipeline with full diagnostics, so claim #19f + patch-destination become non-exploratory. (Depends on phase 2.)
+  - [phase-3-canonical-is-swr-sweep.md](phase-3-canonical-is-swr-sweep.md) — **narrowed:** only non-PFC ancillary reality/occupancy adapters remain; PFC is owned by its dedicated plan.
+  - [phase-4-promote-content-models.md](phase-4-promote-content-models.md) — **superseded historical design; do not execute.**

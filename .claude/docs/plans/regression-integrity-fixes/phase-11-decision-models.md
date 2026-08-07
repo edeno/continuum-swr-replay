@@ -29,13 +29,19 @@ geometry controls, exact common cohorts, and blocked held-out scores.
 - Add `analysis/replay/decision_tables.py` building `decision_arm_table` and
   `decision_summary_table` from the Phase-8 behavior trial table and canonical event/arm tables. Enforce
   the risk window, six candidate arms, one chosen arm, stable `decision_id`, and zero-filled absent replay
-  mass. Aggregate soft posterior mass as primary; carry hard-count equivalents and all/SWR/non-SWR mass.
+  mass. Include an event only when
+  `event_start_time >= outcome_known_time[t-1]` and
+  `event_end_time <= poke_out_ts[t-1]`; retain exact-boundary equality, require positive duration, and
+  drop events that straddle either boundary. Aggregate soft posterior mass as primary; carry hard-count
+  equivalents and all/SWR/non-SWR mass.
 - Include every eligible decision, not only replay-containing stops. Report exclusions by reason:
   missing behavior-model state, invalid timestamps, first/no-prior trial, or incomplete candidate
   covariates. Same-arm choices are ordinary retained outcomes.
-- Replace `MODEL_CHOICE` with D0/D1/D2 specs from the design. Include `q_arm_hmm` and distance rank in
-  the primary baseline; standardize on training data within each fold. Add nominal-Q and hard-mass
-  sensitivity specs without co-fitting mechanically redundant value constructs.
+- Replace `MODEL_CHOICE` with D0/D1/D2 specs from the design. Include Beta-model `q_arm` and distance rank in
+  the primary baseline, plus raw-recency's fit-time `log1p` transform,
+  `reward_rate_arm_visits_k10`, `visit_count_arm_visits_k10`, and `has_arm_history`; standardize
+  continuous terms on training data within each fold. Add nominal-Q and hard-mass sensitivity specs
+  without co-fitting mechanically redundant value constructs.
 - Generalize `fit_choice_model` to `decision_id`, Phase-10a diagnostics, structured failure rows, robust
   metadata, and held-out conditional log likelihood using Phase-9b fold assignments. Fit D0/D1 on an
   exact common cohort; formally test the two split replay coefficients against each other rather than
@@ -66,7 +72,7 @@ geometry controls, exact common cohorts, and blocked held-out scores.
 | `test_decision_table_has_six_arms_one_choice` | exact key/cardinality contract for every retained decision |
 | `test_same_arm_and_zero_replay_decisions_retained` | both original selection failures remain valid rows |
 | `test_repeated_stops_collapse_to_one_decision` | adding 1 or 236 stops cannot duplicate the response |
-| `test_replay_window_excludes_preoutcome_and_postdeparture_events` | half-open temporal boundaries are exact |
+| `test_replay_window_requires_full_event_containment` | exact-boundary events retain; pre-outcome, postdeparture, and either-boundary-straddling events drop |
 | `test_choice_uses_target_trial_preoutcome_values` | value vector is trial `t`, not stale trial `t-1` or future outcome |
 | `test_choice_cv_common_rows_folds_and_calibration` | D0/D1 exact hashes match and held-out score/calibration are produced |
 | `test_split_replay_difference_is_formal_contrast` | equality contrast is computed from one fitted model |
@@ -76,8 +82,9 @@ geometry controls, exact common cohorts, and blocked held-out scores.
 ## Fixtures
 
 Synthetic trial sequence includes same-arm repeat, patch stay/switch, reward and omission, two stops for
-one decision, no-replay window, SWR-only and non-SWR-only windows, a boundary event, and missing Q on the
-final trial. The slow fixture uses one animal's behavior and canonical event tables.
+one decision, no-replay window, SWR-only and non-SWR-only windows, exact-start/exact-end events,
+pre-outcome and postdeparture straddlers, and missing Q on the final trial. The slow fixture uses one
+animal's behavior and canonical event tables.
 
 ## Review
 

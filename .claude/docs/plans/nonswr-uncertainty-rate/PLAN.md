@@ -4,6 +4,12 @@
 one residual extracted to [`rate-content-followups`](../rate-content-followups/PLAN.md).
 The phase files below are retained as the historical record of what was planned.
 
+**Validity update (2026-07-29):** the delivered `recent_switch_rate` definition was
+invalidated because it lagged stop rows rather than completed decisions. Its sole
+corrective owner is
+[`regression-integrity-fixes` Phase 8](../regression-integrity-fixes/phase-8-covariate-timebase.md);
+do not revive or patch this superseded plan.
+
 **Reconciliation (what actually happened):**
 
 - **Phase 1 (StateScript contingency parser) — OBSOLETE.** The StateScript adapter

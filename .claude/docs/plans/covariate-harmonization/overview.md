@@ -2,6 +2,14 @@
 
 [← back to PLAN.md](PLAN.md)
 
+> **Execution routing (2026-07-29):** this overview records the historical Phase 0–2 design and is
+> not the final covariate contract. First merge/base on completed-but-unmerged Phases 1/1.5, then use
+> [`regression-integrity-fixes` Phases 7–13](../regression-integrity-fixes/PLAN.md) for all corrective
+> definitions, timing, rebuilds, model comparisons, and promotion. Only this plan's narrowed,
+> post-Phase-13 non-PFC Phase 3 remains executable. In particular, the switch, recency,
+> reward-history, fixed-path rebuild, and refit instructions below are historical and must not be
+> combined with the active plan.
+
 ## Current codebase integration points
 
 Covariate-computation layer (extracted to `covariates.py` in phase-0; definitions changed in phase-1):

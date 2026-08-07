@@ -2,6 +2,12 @@
 
 **Status:** Not started.
 
+**Dependency/ownership (2026-07-29):** this plan owns only the new
+duration/departure estimand. It starts from the corrected rate inputs promoted by
+[`regression-integrity-fixes` Phase 13](../regression-integrity-fixes/phase-13-refit-reporting.md)
+and must reuse that plan's covariate, cohort, fold, fit-validity, and artifact
+contracts. It does not reopen or independently refit those repairs.
+
 A stop is two interleaved processes — recurrent **replay onsets** and a single
 terminal **departure** (the animal leaves the well). Family B models only the
 replay process and treats stop duration as fixed exposure, but duration is

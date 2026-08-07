@@ -2,6 +2,13 @@
 
 [← back to PLAN.md](PLAN.md)
 
+> **Historical contract:** these names describe the completed-but-unmerged Phase 1/1.5 prerequisite
+> and are retained to merge that work. They are not the release contract. The corrective
+> switch/recency/reward-window names, source timing, table generation, and promotion rules are owned
+> solely by
+> [`regression-integrity-fixes/shared-contracts.md`](../regression-integrity-fixes/shared-contracts.md)
+> and Phase 8. Do not implement or regenerate final outputs from this file.
+
 Canonical covariate **names** and **where they live**. Definitions/windows/units are
 in [docs/covariate_dictionary.md](../../../../docs/covariate_dictionary.md) (the spec);
 this file fixes column names and the rule that they are **columns in the canonical
