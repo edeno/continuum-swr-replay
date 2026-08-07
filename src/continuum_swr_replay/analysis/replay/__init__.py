@@ -8,9 +8,13 @@ the replay content analysis pipeline.
 from ._helpers import (
     POPULATIONS,
     add_arm_fixed_effects,
+    add_trial_context,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     raised_cosine_history_basis,
+    single_arm_from_well,
+    trial_context_at_times,
+    trial_cutoff_times,
 )
 from .choice_prediction import (
     build_choice_dataset,
@@ -18,6 +22,7 @@ from .choice_prediction import (
     fit_choice_model,
     predict_arm_fractions,
 )
+from .cohort_selection import freeze_common_cohort
 from .covariates import UNCERTAINTY_COVARIATES, add_uncertainty_covariates
 from .fitting import (
     fit_conditional_logit,
@@ -36,6 +41,7 @@ from .model_checking import (
 )
 from .model_specs import (
     ARM_FE_PREDICTORS,
+    BELIEF_DEPENDENT_CONTENT_MODELS,
     BIN_S,
     MODEL_CHOICE,
     MODEL_HIERARCHY,
@@ -53,13 +59,14 @@ from .model_specs import (
     TMAX,
     ModelSpec,
     PerBinRateModelSpec,
+    default_content_model_names,
 )
 from .per_bin_rate_model import (
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
     per_bin_rate_gof,
 )
-from .per_stop_rate_model import fit_per_stop_rate_model
+from .per_stop_rate_model import PER_STOP_RATE_OUTCOMES, fit_per_stop_rate_model
 from .retrospective import (
     arm_path_well_to_well,
     chosen_arm_fraction,
@@ -91,6 +98,7 @@ from .tables import (
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "BELIEF_DEPENDENT_CONTENT_MODELS",
     "BIN_S",
     "MODEL_CHOICE",
     "MODEL_HIERARCHY",
@@ -103,6 +111,7 @@ __all__ = [
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
+    "PER_STOP_RATE_OUTCOMES",
     "POPULATIONS",
     "SPLINE_KNOTS",
     "STOP_COVARIATES",
@@ -112,6 +121,7 @@ __all__ = [
     "PerBinRateModelSpec",
     "StopSummaryConfig",
     "add_arm_fixed_effects",
+    "add_trial_context",
     "add_uncertainty_covariates",
     "aggregate_to_timebins",
     "arm_dist_rank",
@@ -135,6 +145,7 @@ __all__ = [
     "cross_validate_conditional_poisson",
     "cross_validate_per_bin_rate_model",
     "dist_to_arm_from_well",
+    "default_content_model_names",
     "ends_at_next",
     "ends_at_next_patch",
     "fit_choice_model",
@@ -145,12 +156,16 @@ __all__ = [
     "fit_null_model_conditional",
     "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
+    "freeze_common_cohort",
     "next_arm_circular_shift",
     "per_bin_rate_gof",
     "raised_cosine_history_basis",
+    "single_arm_from_well",
     "predict_arm_fractions",
     "retrospective_alignment_with_shuffle",
     "stop_label_shuffle",
     "stop_patch_replay",
     "stop_replay_summary",
+    "trial_context_at_times",
+    "trial_cutoff_times",
 ]

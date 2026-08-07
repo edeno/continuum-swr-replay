@@ -19,7 +19,7 @@ Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
   OPPOSITE sign of the old omission effect (sign-flip reparameterization;
   a positive ``reward_lag1`` = previous reward raises the rate). See
   ``docs/rate_models.md``.
-- **R2**: + ``recent_trial_reward_rate`` (rewarded fraction of the
+- **R2**: + ``reward_rate_trial_k10`` (rewarded fraction of the
   last 10 trials) — does event rate track a deeper reward history,
   beyond the single previous trial?
 
@@ -48,6 +48,16 @@ from ._fit_diagnostics import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Canonical per-stop count outcomes used by the production hierarchy runner.
+# Keeping this beside the fitter lets notebooks and scripts share one mapping
+# instead of independently spelling the stop-table column names.
+PER_STOP_RATE_OUTCOMES: dict[str, str] = {
+    "swr": "n_SWR",
+    "non_local": "n_non_local",
+    "non_local_swr": "n_non_local_SWR",
+    "non_local_no_swr": "n_non_local_no_SWR",
+}
 
 
 def fit_per_stop_rate_model(

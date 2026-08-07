@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     N_REWARD_LAGS,
 )
 from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
+    PER_STOP_RATE_OUTCOMES,
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
@@ -57,12 +58,7 @@ logger = logging.getLogger(__name__)
 SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
-RESPONSE_COLS = {
-    "swr": "n_SWR",
-    "non_local": "n_non_local",
-    "non_local_swr": "n_non_local_SWR",
-    "non_local_no_swr": "n_non_local_no_SWR",
-}
+RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 
 
 def fit_per_stop_rate_hierarchy(
@@ -83,18 +79,31 @@ def fit_per_stop_rate_hierarchy(
                 continue
             for name, spec in MODEL_PER_STOP_RATE.items():
                 preds = list(spec.predictors)
-                a = acc.setdefault((name, outcome), {
-                    "n_in": 0, "n_own": 0, "n_modeled": 0,
-                    "sessions_in": 0, "sessions_modeled": 0,
-                    "animals": set(), "n_nonconv": 0, "n_sep": 0,
-                })
+                a = acc.setdefault(
+                    (name, outcome),
+                    {
+                        "n_in": 0,
+                        "n_own": 0,
+                        "n_modeled": 0,
+                        "sessions_in": 0,
+                        "sessions_modeled": 0,
+                        "animals": set(),
+                        "n_nonconv": 0,
+                        "n_sep": 0,
+                    },
+                )
                 a["sessions_in"] += 1
                 a["n_in"] += len(group)
                 avail = [
-                    c for c in (response_col, "immobility_time", *preds)
+                    c
+                    for c in (response_col, "immobility_time", *preds)
                     if c in group.columns
                 ]
-                bad = group[avail].isna().any(axis=1) if avail else pd.Series(False, index=group.index)
+                bad = (
+                    group[avail].isna().any(axis=1)
+                    if avail
+                    else pd.Series(False, index=group.index)
+                )
                 if "immobility_time" in group.columns:
                     bad = bad | (group["immobility_time"] <= 0)
                 a["n_own"] += int(bad.sum())
@@ -123,9 +132,13 @@ def fit_per_stop_rate_hierarchy(
 
     records = [
         cohort_record(
-            name, outcome, "stop",
-            n_in=a["n_in"], n_modeled=a["n_modeled"],
-            sessions_in=a["sessions_in"], sessions_modeled=a["sessions_modeled"],
+            name,
+            outcome,
+            "stop",
+            n_in=a["n_in"],
+            n_modeled=a["n_modeled"],
+            sessions_in=a["sessions_in"],
+            sessions_modeled=a["sessions_modeled"],
             animals_modeled=len(a["animals"]),
             drop_notes="dropna/immobility<=0 -> own; session gates -> excluded",
             n_drop_own_predictor_missing=a["n_own"],

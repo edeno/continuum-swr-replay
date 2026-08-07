@@ -132,6 +132,39 @@ def add_trial_context(
     return dot
 
 
+def trial_context_at_times(
+    times: np.ndarray,
+    trials: pd.DataFrame,
+) -> pd.DataFrame:
+    """Evaluate the canonical trial context at arbitrary timestamps.
+
+    This is the read-only, timestamp-oriented entry point for consumers that
+    need the exact same boundary, sorting, and missing-value semantics as
+    :func:`add_trial_context` without constructing a decoder-sized ``dot``
+    frame.  The returned frame is newly allocated; ``trials`` is not mutated.
+
+    Parameters
+    ----------
+    times : array-like
+        Timestamps at which to sample trial context.
+    trials : pandas.DataFrame
+        Canonical trial table accepted by :func:`add_trial_context`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per input timestamp, indexed by time, with the columns written
+        by :func:`add_trial_context`.
+    """
+    sample_times = np.asarray(times, dtype=float)
+    if sample_times.ndim != 1:
+        raise ValueError("times must be a one-dimensional sequence")
+    if not np.isfinite(sample_times).all():
+        raise ValueError("times must contain only finite timestamps")
+    sampled = pd.DataFrame(index=pd.Index(sample_times, name="time"))
+    return add_trial_context(sampled, trials)
+
+
 # ── Immobility-bout helpers ──
 
 
@@ -479,6 +512,18 @@ def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
         missing = ~np.isfinite(cutoff)
         return np.where(missing, end, cutoff)
     return trials["end_time"].to_numpy(dtype=float)
+
+
+def trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
+    """Return the canonical goal-arrival cutoff for each trial.
+
+    Production reward and visit-history covariates use
+    ``goal_arrival_time`` when finite and fall back to ``end_time`` on a
+    per-row basis.  This public wrapper exposes that same calculation to
+    visualization and audit code while retaining the established private
+    helper for backwards compatibility.
+    """
+    return _trial_cutoff_times(trials)
 
 
 _SESSION_COLS = ["animal", "day", "epoch"]
