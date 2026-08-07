@@ -190,11 +190,16 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   (0 at the current arm); `arm_dist_rank` is its within-event min-rank.
 
 **Reward / value history** (per event-arm, from the trial sequence):
-- `cumulative_reward` — running count of rewards received at that arm up to the event.
-- `visit_recency` — time since the animal last visited that arm; `visit_recency_demeaned`
-  subtracts the per-arm mean (the part orthogonal to the arm fixed effects; M4+).
+- `cumulative_reward` — number of rewards received at that arm among the prior
+  (up to) 10 completed trials; this is a finite-window count, not a
+  session-to-date cumulative total.
+- `visit_recency` — **trials-ago** since the animal last visited that arm (a discrete
+  trial count, not elapsed time); an arm never visited in the session takes the
+  sentinel `len(trials) + 1`. `visit_recency_demeaned` subtracts the per-arm mean
+  (the part orthogonal to the arm fixed effects; M4+).
 - `reward_rate_arm_k10` — rewarded fraction of the last 10 visits to that arm
-  (trunk arms 0.0; leaf arm not yet visited → NaN). See §2.
+  (trunk arms 0.0; a leaf arm not yet visited is also encoded 0.0, *not* NaN —
+  only rows with no prior trials at all stay NaN). See §2.
 
 **Recent-trial context** (per stop, broadcast to the stop's events):
 - `is_after_reward` / `is_after_omission` — the previous trial was / was not rewarded
