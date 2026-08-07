@@ -19,6 +19,10 @@ from pathlib import Path
 
 import pytest
 
+from continuum_swr_replay.analysis.replay.model_specs import (
+    default_content_model_names,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
@@ -92,6 +96,15 @@ class TestResolveContfragPaths:
         _, hpc_dir = resolve_contfrag_paths("SWR", "HPC", "arm")
         _, mpfc_dir = resolve_contfrag_paths("SWR", "mPFC", "arm")
         assert hpc_dir != mpfc_dir
+
+
+def test_default_content_ladder_excludes_every_belief_dependent_rung():
+    hierarchy = {name: object() for name in ("M0", "M5", "M6", "M7", "Mv", "Mu", "Mvu")}
+
+    assert default_content_model_names(hierarchy) == ("M0", "M5", "M6", "M7")
+    assert default_content_model_names(
+        {"P0": object(), "P4": object(), "Pv": object()}
+    ) == ("P0", "P4")
 
 
 class TestPrepFitterContract:

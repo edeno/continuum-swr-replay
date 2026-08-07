@@ -9,8 +9,9 @@ fits per-session models for each model in the hierarchy, compares nested
 models via AIC (primary) and LRT, and saves results.
 
 Usage:
-    uv run python scripts/content/fit_replay_content_models.py                # fit all
+    uv run python scripts/content/fit_replay_content_models.py                # base ladder
     uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2
+    uv run python scripts/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
     uv run python scripts/content/fit_replay_content_models.py --cv           # + CV
     uv run python scripts/content/fit_replay_content_models.py --logit        # + logit robustness
 """
@@ -29,6 +30,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     drop_profile,
     event_drop_buckets,
     write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay.cohort_selection import (
+    freeze_common_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
@@ -50,6 +54,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PATCH,
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWR,
+    default_content_model_names,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -387,21 +392,21 @@ def main():
         output_dir = input_dir / f"{output_subdir}_swr_{args.swr_subset}"
         logging.info(
             "SWR subset = %s: hierarchy narrowed to %s, output -> %s",
-            args.swr_subset, list(hierarchy.keys()), output_dir,
+            args.swr_subset,
+            list(hierarchy.keys()),
+            output_dir,
         )
 
     # Determine which models to fit
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
     else:
-        # Value-block rungs (Mv/Pv) require p_reward_arm/q_arm, which are NaN for
-        # stops absent from the contingency artifact. Including them in a default
-        # run would shrink the shared complete-case event set for the *whole*
-        # ladder (M0-M7/P0-P3 would then be fit on fewer events). Keep the base
-        # ladder as the default; request the value block explicitly to compare it
-        # against its own base (e.g. --models M5,Mv or --models P3,Pv).
-        value_rungs = {"Mv", "Pv"}
-        model_names = [m for m in hierarchy if m not in value_rungs]
+        # Belief-dependent rungs require contingency/qvals columns, which are NaN
+        # for unmapped stops. Including Mv/Mu/Mvu/Pv in a default run would shrink
+        # the shared complete-case set for the whole base ladder. Request them
+        # explicitly on their own matched cohort (e.g. --models M5,Mv,Mu,Mvu or
+        # --models P3,Pv).
+        model_names = list(default_content_model_names(hierarchy))
 
     # Load the input table. For non_local arm fits, fall back to legacy naming.
     canonical_path = input_dir / f"{table_name}.pkl"
@@ -450,7 +455,9 @@ def main():
         long_df = long_df.loc[keep].reset_index(drop=True)
         logging.info(
             "SWR subset filter (%s): %d -> %d rows",
-            args.swr_subset, n_before_rows, len(long_df),
+            args.swr_subset,
+            n_before_rows,
+            len(long_df),
         )
 
     # Arm fixed effects are derived at fit time rather than stored in
@@ -505,22 +512,30 @@ def main():
     long_df_prefilter = long_df
     union_predictors = sorted(all_predictors)
     required_cols = [response_col, event_col] + union_predictors
-    available_cols = [c for c in required_cols if c in long_df.columns]
-    has_nan = long_df[available_cols].isna().any(axis=1)
-    events_with_nan = long_df.loc[has_nan, event_col].unique()
-    n_before = long_df[event_col].nunique()
-    long_df = long_df[~long_df[event_col].isin(events_with_nan)].reset_index(drop=True)
-    n_after = long_df[event_col].nunique()
-    if n_before != n_after:
+    long_df, cohort_selection = freeze_common_cohort(
+        long_df,
+        unit_col=event_col,
+        required_cols=required_cols,
+        response_col=response_col,
+        drop_zero_response=True,
+    )
+    n_before = cohort_selection["n_units_before"]
+    n_complete_case = n_before - cohort_selection["n_missing_units"]
+    if n_before != n_complete_case:
         logging.info(
             "Filtered to common complete-case events: %d → %d events "
             "(%d dropped due to NaN in %s)",
             n_before,
-            n_after,
-            n_before - n_after,
+            n_complete_case,
+            cohort_selection["n_missing_units"],
             sorted(all_predictors),
         )
-    if n_after == 0:
+    if cohort_selection["n_zero_response_units"]:
+        logging.info(
+            "Removed %d complete-case events with zero total response",
+            cohort_selection["n_zero_response_units"],
+        )
+    if n_complete_case == 0:
         # A predictor that is structurally NaN on some arm of every
         # event (e.g. a stale ``recent_reward_rate`` column predating
         # the trunk-arm 0.0 fix) wipes out the whole event set under
@@ -534,10 +549,13 @@ def main():
             sorted(all_predictors),
         )
         return
-
-    # Also drop zero-count events
-    event_totals = long_df.groupby(event_col)[response_col].transform("sum")
-    long_df = long_df[event_totals > 0].reset_index(drop=True)
+    if cohort_selection["n_units_after"] == 0:
+        logging.error(
+            "Common-cohort filtering removed all %d events because every "
+            "complete-case event had zero total response.",
+            n_before,
+        )
+        return
 
     logging.info(
         "Fitting on %d rows, %d sessions, %d events",
@@ -588,39 +606,54 @@ def main():
         # Cohort-audit record (grain=event, common complete-case cohort). Attribute
         # the union-filter drops to this rung's own vs the other rungs' predictors.
         buckets = event_drop_buckets(
-            long_df_prefilter, event_col=event_col, response_col=response_col,
-            own_predictors=predictors, union_predictors=union_predictors,
+            long_df_prefilter,
+            event_col=event_col,
+            response_col=response_col,
+            own_predictors=predictors,
+            union_predictors=union_predictors,
         )
         n_modeled = int(mdf["n_events"].sum()) if len(mdf) else 0
         n_drops = sum(
-            buckets[k] for k in (
-                "n_drop_qvals_gap", "n_drop_own_predictor_missing",
-                "n_drop_common_cohort_other", "n_drop_zero_response",
+            buckets[k]
+            for k in (
+                "n_drop_qvals_gap",
+                "n_drop_own_predictor_missing",
+                "n_drop_common_cohort_other",
+                "n_drop_zero_response",
             )
         )
         dropped = long_df_prefilter[
             long_df_prefilter[event_col].isin(buckets["dropped_event_ids"])
         ].drop_duplicates(event_col)
-        cohort_audits.append(cohort_record(
-            model_name, population, "event", cohort_mode="common",
-            n_in=n_before, n_modeled=n_modeled,
-            sessions_in=sessions_in, sessions_modeled=len(mdf),
-            animals_modeled=int(mdf["animal"].nunique()) if len(mdf) else 0,
-            drop_notes=drop_profile(dropped),
-            n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
-            n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
-            n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
-            n_drop_zero_response=buckets["n_drop_zero_response"],
-            n_excluded_session=n_before - n_drops - n_modeled,
-            n_sessions_flagged_nonconverged=(
-                int((mdf["converged"] == False).sum())  # noqa: E712
-                if "converged" in mdf.columns else 0
-            ),
-            n_sessions_flagged_separated=(
-                int((mdf["separated"] == True).sum())  # noqa: E712
-                if "separated" in mdf.columns else 0
-            ),
-        ))
+        cohort_audits.append(
+            cohort_record(
+                model_name,
+                population,
+                "event",
+                cohort_mode="common",
+                n_in=n_before,
+                n_modeled=n_modeled,
+                sessions_in=sessions_in,
+                sessions_modeled=len(mdf),
+                animals_modeled=int(mdf["animal"].nunique()) if len(mdf) else 0,
+                drop_notes=drop_profile(dropped),
+                n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
+                n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
+                n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
+                n_drop_zero_response=buckets["n_drop_zero_response"],
+                n_excluded_session=n_before - n_drops - n_modeled,
+                n_sessions_flagged_nonconverged=(
+                    int((mdf["converged"] == False).sum())  # noqa: E712
+                    if "converged" in mdf.columns
+                    else 0
+                ),
+                n_sessions_flagged_separated=(
+                    int((mdf["separated"] == True).sum())  # noqa: E712
+                    if "separated" in mdf.columns
+                    else 0
+                ),
+            )
+        )
 
         if len(mdf) > 0:
             model_path = output_dir / f"{model_name}.pkl"
@@ -636,7 +669,8 @@ def main():
         write_cohort_audit(cohort_audits, output_dir / "all_models_cohort_audit.csv")
         logging.info(
             "Saved cohort audit (%d rows) to %s",
-            len(cohort_audits), output_dir / "all_models_cohort_audit.csv",
+            len(cohort_audits),
+            output_dir / "all_models_cohort_audit.csv",
         )
 
     if not all_results:

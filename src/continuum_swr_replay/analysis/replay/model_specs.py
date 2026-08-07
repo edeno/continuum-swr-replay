@@ -80,11 +80,13 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 __all__ = [
     "ARM_FE_PREDICTORS",
     "BIN_S",
+    "BELIEF_DEPENDENT_CONTENT_MODELS",
     "MODEL_CHOICE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
@@ -112,6 +114,7 @@ __all__ = [
     "SWR_CONTRAST_RATE_S_SPECS",
     "SWR_CONTRAST_RATE_STOP_COVARS",
     "TMAX",
+    "default_content_model_names",
 ]
 
 
@@ -148,6 +151,22 @@ class ModelSpec:
     predictors: tuple[str, ...]
     description: str
     parent: str | None
+
+
+# These rungs depend on the external contingency/qvals artifact. They must not
+# enter the default base-ladder union because unmapped stops would then shrink
+# otherwise qvals-independent M0-M7/P0-P4 fits. Explicit belief comparisons use
+# their own matched cohort instead.
+BELIEF_DEPENDENT_CONTENT_MODELS = frozenset({"Mv", "Mu", "Mvu", "Pv"})
+
+
+def default_content_model_names(
+    hierarchy: Mapping[str, ModelSpec],
+) -> tuple[str, ...]:
+    """Canonical qvals-independent model names for a default content fit."""
+    return tuple(
+        name for name in hierarchy if name not in BELIEF_DEPENDENT_CONTENT_MODELS
+    )
 
 
 # ── Primary arm-level hierarchy ──
@@ -221,7 +240,9 @@ _M7 = (
 # Additive in *spec* — but because p_reward_arm/
 # q_arm are NaN for stops absent from the contingency, co-fitting Mv in the same
 # run restricts the shared complete-case event set, so it is excluded from the default
-# model list (request --models M5,Mv to compare it to its base).
+# model list along with the other belief-dependent rungs (see
+# BELIEF_DEPENDENT_CONTENT_MODELS). Request them explicitly on their own matched
+# cohort: --models M5,Mv,Mu,Mvu (arm) or --models P3,Pv (patch).
 _Mv = (*_M5, "p_reward_arm", "q_arm")
 
 # Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
@@ -354,8 +375,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # tables are built and the cross-modality variability is verified.
 
 _M0_TO_M5 = {
-    name: MODEL_HIERARCHY[name]
-    for name in ("M0", "M0a", "M1", "M2", "M3", "M4", "M5")
+    name: MODEL_HIERARCHY[name] for name in ("M0", "M0a", "M1", "M2", "M3", "M4", "M5")
 }
 
 MODEL_HIERARCHY_SWR: dict[str, ModelSpec] = dict(_M0_TO_M5)
@@ -704,49 +724,153 @@ class PerBinRateModelSpec:
 _N = N_REWARD_LAGS
 MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M0_const": PerBinRateModelSpec(
-        "M0_const", False, 0, False, 0, False, False,
-        "homogeneous Poisson baseline", None),
+        "M0_const",
+        False,
+        0,
+        False,
+        0,
+        False,
+        False,
+        "homogeneous Poisson baseline",
+        None,
+    ),
     "M1_rew1": PerBinRateModelSpec(
-        "M1_rew1", False, 1, False, 0, False, False,
-        "+ previous reward (reward_lag1)", "M0_const"),
+        "M1_rew1",
+        False,
+        1,
+        False,
+        0,
+        False,
+        False,
+        "+ previous reward (reward_lag1)",
+        "M0_const",
+    ),
     "M2_rewhist": PerBinRateModelSpec(
-        "M2_rewhist", False, _N, False, 0, False, False,
-        "+ reward history kernel (reward_lag1..10)", "M1_rew1"),
+        "M2_rewhist",
+        False,
+        _N,
+        False,
+        0,
+        False,
+        False,
+        "+ reward history kernel (reward_lag1..10)",
+        "M1_rew1",
+    ),
     "M2r_rewrate": PerBinRateModelSpec(
-        "M2r_rewrate", False, 0, True, 0, False, False,
-        "+ recent reward rate (continuous; alt to kernel)", "M0_const"),
+        "M2r_rewrate",
+        False,
+        0,
+        True,
+        0,
+        False,
+        False,
+        "+ recent reward rate (continuous; alt to kernel)",
+        "M0_const",
+    ),
     "M3_hist": PerBinRateModelSpec(
-        "M3_hist", False, 0, False, N_HISTORY_LAGS, False, False,
-        "+ self-history (autoregressive)", "M0_const"),
+        "M3_hist",
+        False,
+        0,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ self-history (autoregressive)",
+        "M0_const",
+    ),
     "M4_hist_rew": PerBinRateModelSpec(
-        "M4_hist_rew", False, _N, False, N_HISTORY_LAGS, False, False,
-        "+ self-history + reward history", "M3_hist"),
+        "M4_hist_rew",
+        False,
+        _N,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ self-history + reward history",
+        "M3_hist",
+    ),
     "M5_time": PerBinRateModelSpec(
-        "M5_time", True, 0, False, 0, False, False,
-        "+ time-since-stop (spline)", "M0_const"),
+        "M5_time",
+        True,
+        0,
+        False,
+        0,
+        False,
+        False,
+        "+ time-since-stop (spline)",
+        "M0_const",
+    ),
     "M6_time_hist": PerBinRateModelSpec(
-        "M6_time_hist", True, 0, False, N_HISTORY_LAGS, False, False,
-        "+ time + self-history", "M5_time"),
+        "M6_time_hist",
+        True,
+        0,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ time + self-history",
+        "M5_time",
+    ),
     "M7_time_hist_rew": PerBinRateModelSpec(
-        "M7_time_hist_rew", True, _N, False, N_HISTORY_LAGS, False, False,
-        "+ time + self-history + reward history", "M6_time_hist"),
+        "M7_time_hist_rew",
+        True,
+        _N,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ time + self-history + reward history",
+        "M6_time_hist",
+    ),
     "M8_full_switch": PerBinRateModelSpec(
-        "M8_full_switch", True, _N, False, N_HISTORY_LAGS, True, False,
-        "+ switch (full additive)", "M7_time_hist_rew"),
+        "M8_full_switch",
+        True,
+        _N,
+        False,
+        N_HISTORY_LAGS,
+        True,
+        False,
+        "+ switch (full additive)",
+        "M7_time_hist_rew",
+    ),
     "M9_rew_x_time": PerBinRateModelSpec(
-        "M9_rew_x_time", True, _N, False, N_HISTORY_LAGS, False, True,
-        "M7 + reward x time interaction", "M7_time_hist_rew"),
+        "M9_rew_x_time",
+        True,
+        _N,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        True,
+        "M7 + reward x time interaction",
+        "M7_time_hist_rew",
+    ),
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
     "M3r_histcos": PerBinRateModelSpec(
-        "M3r_histcos", False, 0, False, N_HISTORY_LAGS, False, False,
-        "+ self-history (raised-cosine basis)", "M0_const",
-        self_history_basis=N_HISTORY_BASIS),
+        "M3r_histcos",
+        False,
+        0,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ self-history (raised-cosine basis)",
+        "M0_const",
+        self_history_basis=N_HISTORY_BASIS,
+    ),
     "M7r_time_histcos_rew": PerBinRateModelSpec(
-        "M7r_time_histcos_rew", True, _N, False, N_HISTORY_LAGS, False, False,
-        "+ time + raised-cosine self-history + reward history", "M5_time",
-        self_history_basis=N_HISTORY_BASIS),
+        "M7r_time_histcos_rew",
+        True,
+        _N,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "+ time + raised-cosine self-history + reward history",
+        "M5_time",
+        self_history_basis=N_HISTORY_BASIS,
+    ),
 }
 
 
@@ -835,14 +959,17 @@ _BLOCK_F = {
     "BLOCK": "trials_since_block_change",
     "SWITCHRATE": "recent_switch_rate",
     "VALUE": "switch_advantage_mu_preoutcome_sess",  # beta relative value (Stay-vs-Switch DeltaV)
-    "RPE": "rpe",                       # beta reward prediction error (reward - q_chosen)
-    "UNCERT": "beta_reward_entropy",    # beta belief entropy (per-leaf Beta differential entropy)
+    "RPE": "rpe",  # beta reward prediction error (reward - q_chosen)
+    "UNCERT": "beta_reward_entropy",  # beta belief entropy (per-leaf Beta differential entropy)
     "UPDATE": "global_mu_update_abs_postoutcome_sess",  # beta value-update magnitude
     "REWXTIME": f"reward_lag1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
 }
 _BLOCK_COLS = {
-    "BASE": ["tc", *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
-             *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]],
+    "BASE": [
+        "tc",
+        *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+        *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)],
+    ],
     "PERISWITCH": ["trials_since_switch", "is_post_switch"],
     "BLOCK": ["trials_since_block_change"],
     "SWITCHRATE": ["recent_switch_rate"],
@@ -853,7 +980,8 @@ _BLOCK_COLS = {
     "REWXTIME": ["reward_lag1", "tc"],
 }
 SWR_CONTRAST_RATE_STOP_COVARS = tuple(
-    c for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
+    c
+    for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
     for c in _BLOCK_COLS[b]
 )
 
@@ -872,8 +1000,10 @@ def _g_specs():
         "G1_periswitch": ["BASE", "PERISWITCH"],
         "G2_block": ["BASE", "BLOCK"],
         "G3_switchrate": ["BASE", "SWITCHRATE"],
-        "G4_value": ["BASE", "VALUE"], "G5_rpe": ["BASE", "RPE"],
-        "G6_uncert": ["BASE", "UNCERT"], "G7_update": ["BASE", "UPDATE"],
+        "G4_value": ["BASE", "VALUE"],
+        "G5_rpe": ["BASE", "RPE"],
+        "G6_uncert": ["BASE", "UNCERT"],
+        "G7_update": ["BASE", "UPDATE"],
         "G8_rewxtime": ["BASE", "REWXTIME"],
     }
     return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
@@ -882,7 +1012,13 @@ def _g_specs():
 def _s_specs():
     b = _BLOCK_F
     base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
-    val, rpe, unc, upd, rxt = b["VALUE"], b["RPE"], b["UNCERT"], b["UPDATE"], b["REWXTIME"]
+    val, rpe, unc, upd, rxt = (
+        b["VALUE"],
+        b["RPE"],
+        b["UNCERT"],
+        b["UPDATE"],
+        b["REWXTIME"],
+    )
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
         "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
@@ -918,8 +1054,10 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C7_value": ([*BASEc, _TSC, "relval_x_current"], "split"),
     "C8_uncert": ([*BASEc, _TSC, "entropy_x_current"], "split"),
     "C9_update": ([*BASEc, _TSC, "update_x_current"], "split"),
-    "C10_periswitch": ([*BASEc, _TSC, "tss_x_current", "postsw_x_current",
-                        "tsspostsw_x_current"], "split"),
+    "C10_periswitch": (
+        [*BASEc, _TSC, "tss_x_current", "postsw_x_current", "tsspostsw_x_current"],
+        "split",
+    ),
     "C11_block": ([*BASEc, _TSC, "block_x_current"], "split"),
     "C12_switchrate": ([*BASEc, _TSC, "switchrate_x_current"], "split"),
     # CS1 is time-controlled: tsc_x_current (within-stop-time duration) is included
@@ -929,31 +1067,64 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "CS1_current": ([*BASEc, "tsc_x_current", "swr_x_current"], "pooled"),
     "CS1nt_current": ([*BASEc, "swr_x_current"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_prev"], "pooled"),
-    "CS3_lastrew": ([*BASEc, "is_last_rewarded_elsewhere",
-                     "swr_x_is_last_rewarded_elsewhere"], "pooled"),
-    "CS4_armreward": ([*BASEc, "reward_rate_arm_k10",
-                       "swr_x_reward_rate_arm_k10"], "pooled"),
+    "CS3_lastrew": (
+        [*BASEc, "is_last_rewarded_elsewhere", "swr_x_is_last_rewarded_elsewhere"],
+        "pooled",
+    ),
+    "CS4_armreward": (
+        [*BASEc, "reward_rate_arm_k10", "swr_x_reward_rate_arm_k10"],
+        "pooled",
+    ),
     "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
+    # Discriminant vs Gillespie et al. 2021 (Neuron): their previous-goal
+    # enrichment (Fig 8) is the reduction the graded-value avoidance must survive.
+    # CS5b adds the previous-goal analog (is_last_rewarded_elsewhere + its SWR
+    # interaction) on top of CS5, so the swr_x_q_arm key term is read as the
+    # value effect net of previous-goal. Fitted values are reported in
+    # paper/claims_table.md (row 19f) — do not duplicate numbers here.
+    "CS5b_valuevsprevgoal": (
+        [
+            *BASEc,
+            "q_arm",
+            "swr_x_q_arm",
+            "is_last_rewarded_elsewhere",
+            "swr_x_is_last_rewarded_elsewhere",
+        ],
+        "pooled",
+    ),
     # Per-arm beta belief UNCERTAINTY (exploration). BASEc carries no value term, so
     # these rungs are construct-clean (beta uncertainty on the spatial base).
     # C13 (split): independent uncertainty coefficient on the SWR-only
     # and non-SWR-only subsets. CS6 (pooled): main = non-SWR effect, swr_x_ = the
     # formal SWR-vs-non-SWR difference. Mirrors the C4/CS5 value pair.
     "C13_armuncert": ([*BASEc, "arm_uncertainty_z"], "split"),
-    "CS6_armuncert": ([*BASEc, "arm_uncertainty_z", "swr_x_arm_uncertainty_z"], "pooled"),
+    "CS6_armuncert": (
+        [*BASEc, "arm_uncertainty_z", "swr_x_arm_uncertainty_z"],
+        "pooled",
+    ),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
-    "C1_current": "is_current", "C2_base": "is_current",
-    "C3_armreward": "reward_rate_arm_k10", "C4_armvalue": "q_arm",
-    "C5_lastrew": "is_last_rewarded_elsewhere", "C6_rpe": "rpe_x_current",
-    "C7_value": "relval_x_current", "C8_uncert": "entropy_x_current",
-    "C9_update": "update_x_current", "C10_periswitch": "tss_x_current",
-    "C11_block": "block_x_current", "C12_switchrate": "switchrate_x_current",
-    "CS1_current": "swr_x_current", "CS1nt_current": "swr_x_current",
+    "C1_current": "is_current",
+    "C2_base": "is_current",
+    "C3_armreward": "reward_rate_arm_k10",
+    "C4_armvalue": "q_arm",
+    "C5_lastrew": "is_last_rewarded_elsewhere",
+    "C6_rpe": "rpe_x_current",
+    "C7_value": "relval_x_current",
+    "C8_uncert": "entropy_x_current",
+    "C9_update": "update_x_current",
+    "C10_periswitch": "tss_x_current",
+    "C11_block": "block_x_current",
+    "C12_switchrate": "switchrate_x_current",
+    "CS1_current": "swr_x_current",
+    "CS1nt_current": "swr_x_current",
     "CS2_prev": "swr_x_prev",
     "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
-    "CS4_armreward": "swr_x_reward_rate_arm_k10", "CS5_armvalue": "swr_x_q_arm",
-    "C13_armuncert": "arm_uncertainty_z", "CS6_armuncert": "swr_x_arm_uncertainty_z",
+    "CS4_armreward": "swr_x_reward_rate_arm_k10",
+    "CS5_armvalue": "swr_x_q_arm",
+    "CS5b_valuevsprevgoal": "swr_x_q_arm",
+    "C13_armuncert": "arm_uncertainty_z",
+    "CS6_armuncert": "swr_x_arm_uncertainty_z",
 }
 BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"
@@ -965,17 +1136,25 @@ SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP4_switchrate": ([*BASEc_PATCH, "currentpatch_x_switchrate"], "split"),
     # Time-controlled (currentpatch_x_tsc, within-stop-time) + uncontrolled twin,
     # mirroring the arm CS1/CS1nt pair.
-    "CPS1_current": ([*BASEc_PATCH, "currentpatch_x_tsc",
-                      "swr_x_current_patch"], "pooled"),
+    "CPS1_current": (
+        [*BASEc_PATCH, "currentpatch_x_tsc", "swr_x_current_patch"],
+        "pooled",
+    ),
     "CPS1nt_current": ([*BASEc_PATCH, "swr_x_current_patch"], "pooled"),
-    "CPS2_lastrew": ([*BASEc_PATCH, _LR_PATCH,
-                      "swr_x_last_rewarded_patch_elsewhere"], "pooled"),
-    "CPS3_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss",
-                       "swr_x_lastrewpatch_tss"], "pooled"),
+    "CPS2_lastrew": (
+        [*BASEc_PATCH, _LR_PATCH, "swr_x_last_rewarded_patch_elsewhere"],
+        "pooled",
+    ),
+    "CPS3_olddecay": (
+        [*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss", "swr_x_lastrewpatch_tss"],
+        "pooled",
+    ),
 }
 SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
-    "CP0_base": "is_current_patch", "CP1_lastrew": _LR_PATCH,
-    "CP2_olddecay": "lastrewpatch_x_tss", "CP3_newgrowth": "currentpatch_x_tss",
+    "CP0_base": "is_current_patch",
+    "CP1_lastrew": _LR_PATCH,
+    "CP2_olddecay": "lastrewpatch_x_tss",
+    "CP3_newgrowth": "currentpatch_x_tss",
     "CP4_switchrate": "currentpatch_x_switchrate",
     "CPS1_current": "swr_x_current_patch",
     "CPS1nt_current": "swr_x_current_patch",
@@ -995,12 +1174,23 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 # for exactly these names; a NEW rung that introduces a leaky covariate but is NOT listed
 # here fails the timing assertion (it is not silently promoted to a predictive claim).
 # See docs/models_table.md and analysis.replay.covariate_timing.
-DESCRIPTIVE_CONTENT_RUNGS = frozenset({
-    "C6_rpe", "C9_update",              # POST_OUTCOME: RPE / value-update association
-    "C10_periswitch",                    # FUTURE_REFERENCING: peri-switch alignment
-    "CP2_olddecay", "CP3_newgrowth", "CPS3_olddecay",  # patch peri-switch alignment
-})
-DESCRIPTIVE_RATE_RUNGS = frozenset({
-    "G5_rpe", "G7_update", "S7_rpe", "S9_update",      # POST_OUTCOME association
-    "G1_periswitch", "S3_periswitch",                  # FUTURE_REFERENCING peri-switch
-})
+DESCRIPTIVE_CONTENT_RUNGS = frozenset(
+    {
+        "C6_rpe",
+        "C9_update",  # POST_OUTCOME: RPE / value-update association
+        "C10_periswitch",  # FUTURE_REFERENCING: peri-switch alignment
+        "CP2_olddecay",
+        "CP3_newgrowth",
+        "CPS3_olddecay",  # patch peri-switch alignment
+    }
+)
+DESCRIPTIVE_RATE_RUNGS = frozenset(
+    {
+        "G5_rpe",
+        "G7_update",
+        "S7_rpe",
+        "S9_update",  # POST_OUTCOME association
+        "G1_periswitch",
+        "S3_periswitch",  # FUTURE_REFERENCING peri-switch
+    }
+)

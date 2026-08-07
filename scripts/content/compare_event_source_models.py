@@ -52,9 +52,14 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     records_from_common_cohort_provenance,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import (
+    freeze_common_cohort,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
+)
 logger = logging.getLogger("compare_event_source")
 # Silence the per-session rank-deficiency / convergence chatter.
 for noisy in (
@@ -113,8 +118,7 @@ def _rate_models_for_source(event_source: str):
 def _choice_models_for_source(event_source: str):  # noqa: ARG001
     """Primary choice models fit on one common stop cohort."""
     return {
-        name: MODEL_CHOICE[name]
-        for name in ("C_replay_only", "C_behavior", "C_full")
+        name: MODEL_CHOICE[name] for name in ("C_replay_only", "C_behavior", "C_full")
     }
 
 
@@ -122,10 +126,7 @@ def _choice_swr_split_models_for_source(event_source: str):
     """SWR-split choice variant, skipped when SWR defines every event."""
     if event_source == "SWR":
         return {}
-    return {
-        name: MODEL_CHOICE[name]
-        for name in ("C_behavior", "C_full_swr_split")
-    }
+    return {name: MODEL_CHOICE[name] for name in ("C_behavior", "C_full_swr_split")}
 
 
 def _comparison_metadata(event_source: str, brain_area: str) -> dict[str, object]:
@@ -152,9 +153,7 @@ def _comparison_metadata(event_source: str, brain_area: str) -> dict[str, object
     }
 
 
-def _comparison_output_path(
-    out_dir: Path, event_source: str, brain_area: str
-) -> Path:
+def _comparison_output_path(out_dir: Path, event_source: str, brain_area: str) -> Path:
     """Comparison pickle path keyed by the effective data source."""
     effective_area = _effective_brain_area(event_source, brain_area)
     return out_dir / f"{event_source}_{effective_area}_comparison_fits.pkl"
@@ -189,9 +188,7 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
 def _predictor_union(models) -> tuple[str, ...]:
     """Sorted union of predictors used by a model block."""
     return tuple(
-        sorted(
-            {predictor for spec in models.values() for predictor in spec.predictors}
-        )
+        sorted({predictor for spec in models.values() for predictor in spec.predictors})
     )
 
 
@@ -237,9 +234,7 @@ def _freeze_common_cohort(
     predictors = _predictor_union(models)
     required_cols = list(dict.fromkeys([unit_col, *required_base, *predictors]))
     missing_cols = [col for col in required_cols if col not in group.columns]
-    ids_before = (
-        _sorted_unit_ids(group[unit_col]) if unit_col in group.columns else ()
-    )
+    ids_before = _sorted_unit_ids(group[unit_col]) if unit_col in group.columns else ()
 
     provenance = {
         **session,
@@ -268,44 +263,27 @@ def _freeze_common_cohort(
         provenance["status"] = "missing_columns"
         return group.iloc[0:0].copy(), provenance
 
-    cohort = group.copy()
-
-    has_nan = cohort[required_cols].isna().any(axis=1)
-    missing_ids = _sorted_unit_ids(cohort.loc[has_nan, unit_col])
-    if missing_ids:
-        cohort = cohort[~cohort[unit_col].isin(missing_ids)].copy()
-    provenance["n_missing_units"] = len(missing_ids)
-
-    if offset_col is not None:
-        nonpositive = cohort[offset_col] <= 0
-        nonpositive_ids = _sorted_unit_ids(cohort.loc[nonpositive, unit_col])
-        if nonpositive_ids:
-            cohort = cohort[~cohort[unit_col].isin(nonpositive_ids)].copy()
-        provenance["n_nonpositive_offset_units"] = len(nonpositive_ids)
-
-    if drop_zero_response:
-        if response_col is None:
-            raise ValueError("response_col is required when drop_zero_response=True")
-        response_sum = cohort.groupby(unit_col)[response_col].sum()
-        zero_ids = _sorted_unit_ids(response_sum[response_sum <= 0].index)
-        if zero_ids:
-            cohort = cohort[~cohort[unit_col].isin(zero_ids)].copy()
-        provenance["n_zero_response_units"] = len(zero_ids)
-
-    if choice_response_col is not None and len(cohort):
-        chosen_per_unit = cohort.groupby(unit_col)[choice_response_col].sum()
-        invalid_ids = _sorted_unit_ids(chosen_per_unit[chosen_per_unit != 1].index)
-        if invalid_ids:
-            cohort = cohort[~cohort[unit_col].isin(invalid_ids)].copy()
-        provenance["n_invalid_choice_units"] = len(invalid_ids)
-
-    cohort = cohort.reset_index(drop=True)
-    ids_after = _sorted_unit_ids(cohort[unit_col])
-    provenance["n_rows_after"] = len(cohort)
-    provenance["n_units_after"] = len(ids_after)
-    provenance["included_ids"] = ids_after
-    provenance["included_ids_hash"] = _hash_unit_ids(ids_after)
-    if len(ids_after) < min_units:
+    cohort, selection = freeze_common_cohort(
+        group,
+        unit_col=unit_col,
+        required_cols=required_cols,
+        response_col=response_col,
+        drop_zero_response=drop_zero_response,
+        offset_col=offset_col,
+        choice_response_col=choice_response_col,
+    )
+    for field in (
+        "n_rows_after",
+        "n_units_after",
+        "n_missing_units",
+        "n_nonpositive_offset_units",
+        "n_zero_response_units",
+        "n_invalid_choice_units",
+        "included_ids",
+    ):
+        provenance[field] = selection[field]
+    provenance["included_ids_hash"] = _hash_unit_ids(selection["included_ids"])
+    if selection["n_units_after"] < min_units:
         provenance["status"] = "too_few_units"
 
     return cohort, provenance
@@ -388,8 +366,11 @@ def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
     if g["event_id"].nunique() < 10:
         return None
     return fit_conditional_poisson(
-        g, list(spec.predictors), response_col="patch_count_hard",
-        event_col="event_id", n_categories=3,
+        g,
+        list(spec.predictors),
+        response_col="patch_count_hard",
+        event_col="event_id",
+        n_categories=3,
     )
 
 
@@ -484,9 +465,7 @@ def fit_choice_blocks(
 
     split_models = _choice_swr_split_models_for_source(event_source)
     if split_models:
-        split, split_prov = _fit_choice_block(
-            choice, split_models, "choice_swr_split"
-        )
+        split, split_prov = _fit_choice_block(choice, split_models, "choice_swr_split")
         blocks["choice_swr_split"] = split
         provenance["choice_swr_split"] = split_prov
 
@@ -496,16 +475,16 @@ def fit_choice_blocks(
 def run_switch_aligned(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Switch-aligned replay content by lag."""
     return build_switch_aligned_table(
-        tables["stop_table"], tables["event_table"],
-        tables["event_arm_table"], max_lag=10,
+        tables["stop_table"],
+        tables["event_table"],
+        tables["event_arm_table"],
+        max_lag=10,
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--event-source", choices=list(_SOURCES), default="non_local"
-    )
+    parser.add_argument("--event-source", choices=list(_SOURCES), default="non_local")
     parser.add_argument(
         "--brain-area",
         default="HPC",
@@ -570,8 +549,10 @@ def main() -> None:
     # mapped from the native _freeze_common_cohort provenance. This puts the choice
     # cohort on the same reconciling footing as the rate/content ladders.
     audit_records = [
-        rec for label, prov in cohort_provenance.items()
-        if (rec := records_from_common_cohort_provenance(prov, label, "all")) is not None
+        rec
+        for label, prov in cohort_provenance.items()
+        if (rec := records_from_common_cohort_provenance(prov, label, "all"))
+        is not None
     ]
     if audit_records:
         audit_path = out_path.with_name(out_path.stem + "_cohort_audit.csv")
