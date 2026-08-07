@@ -318,6 +318,47 @@ are **predominantly *behind* the animal** (max_behind ≫ max_ahead → retrospe
 **rarely ends at the next chosen arm** (7–12%) — consistent with not-choice-predictive. A
 formal SWR-split trajectory characterization has **not** been run/reported yet.
 
+### Update 2026-07-27 — distinction from Gillespie et al. 2021 (Neuron)
+
+Gillespie et al. 2021 (same lab, same clusterless decoder, predecessor spatial task)
+is the key replication risk for the content layer. Much of our **spatial** content
+ladder *recovers* their results (a pipeline validation, to be framed as replicate +
+extend, not as new): current-arm bias (their Fig 8), immediate-past suppression,
+the **future/choice null** (#19d ↔ their Fig 5), and reward-history dependence
+(their Fig 3/6).
+
+**Open — previous-goal sign disagrees.** Gillespie report previous-goal
+*enrichment* (their Fig 8); every estimate in this document goes the other way
+(`is_last_rewarded_elsewhere` −1.485, 5/5, p 2e-11 at the arm grain; SWR-split
+`swr_x_last_rewarded` −1.62; patch-grain −1.49). This is a **divergence to
+explain, not a replication** — resolve before framing the spatial ladder as
+"replicate + extend".
+
+Two headline claims are **not** reducible to Gillespie:
+
+- **Graded-value avoidance is not the previous-goal effect (their Fig 8).** Refitting
+  `CS5` with the previous-goal analog added (`CS5b_valuevsprevgoal` =
+  `+ is_last_rewarded_elsewhere + swr_x_is_last_rewarded_elsewhere`), `swr_x_q_arm`
+  is **unmoved: −2.45 → −2.43, 5/5 animals, p=8e-28**; the added SWR-by-previous-goal
+  interaction (`swr_x_is_last_rewarded_elsewhere`) is itself significant at −0.79,
+  p=5e-8 — i.e. the two effects coexist, both as avoidance. Their binary-goal task
+  structurally cannot yield a graded-value coefficient; this is genuinely new.
+  *Provenance:* these values came from an exploratory refit that has since been
+  removed; `CS5b_valuevsprevgoal` is now a permanent rung of
+  `SWR_CONTRAST_CONTENT_ARM_LADDER`, so **re-derive them from a standard
+  `fit_swr_contrast_content.py` run** before citing.
+- **Uncertainty→content is not their visit-recency bias (their Fig 7).** In the
+  within-arm frame (arm identity demeaned out), recency's coefficient is ≈0 while
+  uncertainty's is +0.06 (5/5) — the tested `within_arm_horserace` estimand. The
+  global `corr(uncertainty, recency)=0.54` is a **between-arm**
+  artifact. Caveat: this is a *within-arm* estimand (cleaner but different from their
+  *between-arm* binned recency) — the claim is "uncertainty dominates recency in the
+  frame that isolates state from arm identity, which Fig 7 could not separate," not a
+  refutation of Fig 7.
+
+The remaining structurally-novel axes (no Gillespie analog): the **SWR/non-SWR
+dissociation** and the **rate/intensity models** (they modeled content only).
+
 ## The intersection — what's new here
 
 **The covariate atlas** (duration-controlled where applicable; non-SWR | with-SWR):
