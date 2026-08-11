@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
     classify_swr_overlap_geometry,
     get_confident_times,
     get_overlap_times,
+    merged_interval_duration,
 )
 
 
@@ -726,3 +727,37 @@ class TestClassifySwrOverlapGeometry:
         assert out["overlap_subclass"] == "single_swr_partial"
         coarse = classify_swr_overlap(ev, swr).iloc[0]
         assert coarse["overlap_class"] == "swr_partial"
+
+
+class TestMergedIntervalDuration:
+    """Direct coverage for the interval union behind ``event_has_non_swr_time``.
+
+    This logic was inline in ``classify_swr_overlap_geometry``'s per-event loop
+    and reachable only through the multi-SWR overlap branch, so breaking the
+    merge (never merging, always merging) left the whole suite green.
+    """
+
+    def test_single_interval_is_its_own_duration(self):
+        assert merged_interval_duration(np.array([1.0]), np.array([3.0])) == 3.0 - 1.0
+
+    def test_disjoint_intervals_add(self):
+        got = merged_interval_duration(np.array([0.0, 5.0]), np.array([1.0, 7.0]))
+        assert got == pytest.approx(1.0 + 2.0)
+
+    def test_overlapping_intervals_count_the_overlap_once(self):
+        # [0, 3] and [2, 4] cover [0, 4]; summing raw durations would give 5.
+        got = merged_interval_duration(np.array([0.0, 2.0]), np.array([3.0, 4.0]))
+        assert got == pytest.approx(4.0)
+
+    def test_touching_intervals_merge(self):
+        # A contiguous train leaves no gap, so the union is the full span.
+        got = merged_interval_duration(np.array([0.0, 1.0]), np.array([1.0, 2.0]))
+        assert got == pytest.approx(2.0)
+
+    def test_fully_contained_interval_adds_nothing(self):
+        got = merged_interval_duration(np.array([0.0, 1.0]), np.array([9.0, 2.0]))
+        assert got == pytest.approx(9.0)
+
+    def test_unsorted_input_is_sorted_first(self):
+        got = merged_interval_duration(np.array([5.0, 0.0]), np.array([7.0, 1.0]))
+        assert got == pytest.approx(3.0)

@@ -342,6 +342,40 @@ def classify_swr_overlap(
     return out
 
 
+def merged_interval_duration(starts: np.ndarray, ends: np.ndarray) -> float:
+    """Total duration covered by a set of intervals, counting overlap once.
+
+    Sorts by start, merges any interval that begins at or before the running
+    maximum end, and sums the merged spans. Touching intervals (``start ==
+    previous end``) merge, so a contiguous train contributes its full span with
+    no double count.
+
+    Parameters
+    ----------
+    starts, ends : np.ndarray, shape (n_intervals,)
+        Interval bounds. Must be non-empty and the same length.
+
+    Returns
+    -------
+    float
+        Duration of the union.
+    """
+    order = np.argsort(starts)
+    sorted_starts = np.asarray(starts, dtype=float)[order]
+    sorted_ends = np.asarray(ends, dtype=float)[order]
+    merged_starts = [float(sorted_starts[0])]
+    merged_ends = [float(sorted_ends[0])]
+    for j in range(1, len(sorted_starts)):
+        if sorted_starts[j] <= merged_ends[-1]:
+            merged_ends[-1] = max(merged_ends[-1], float(sorted_ends[j]))
+        else:
+            merged_starts.append(float(sorted_starts[j]))
+            merged_ends.append(float(sorted_ends[j]))
+    return sum(
+        end - start for start, end in zip(merged_starts, merged_ends, strict=True)
+    )
+
+
 def classify_swr_overlap_geometry(
     non_local_events: pd.DataFrame,
     ripple_times: pd.DataFrame,
@@ -484,22 +518,9 @@ def classify_swr_overlap_geometry(
         # Does the event have any timebins outside every SWR?
         # Clip each overlapping SWR to [ev.start, ev.end], merge, and
         # compare total merged duration to event duration.
-        clipped_starts = np.maximum(overlapping_starts, ev.start_time)
-        clipped_ends = np.minimum(overlapping_ends, ev.end_time)
-        sort_idx = np.argsort(clipped_starts)
-        sorted_starts = clipped_starts[sort_idx]
-        sorted_ends = clipped_ends[sort_idx]
-        merged_starts = [float(sorted_starts[0])]
-        merged_ends = [float(sorted_ends[0])]
-        for j in range(1, len(sorted_starts)):
-            if sorted_starts[j] <= merged_ends[-1]:
-                merged_ends[-1] = max(merged_ends[-1], float(sorted_ends[j]))
-            else:
-                merged_starts.append(float(sorted_starts[j]))
-                merged_ends.append(float(sorted_ends[j]))
-        union_duration = sum(
-            end - start
-            for start, end in zip(merged_starts, merged_ends, strict=True)
+        union_duration = merged_interval_duration(
+            np.maximum(overlapping_starts, ev.start_time),
+            np.minimum(overlapping_ends, ev.end_time),
         )
         event_duration = ev.end_time - ev.start_time
         event_has_non_swr_time = (
