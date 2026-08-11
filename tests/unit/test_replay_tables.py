@@ -620,6 +620,24 @@ class TestCrossTable:
         st = build_stop_table(dot, trials, graph)
         assert int(st["n_events"].sum()) == len(et)
 
+    def test_n_non_local_is_identical_to_n_events(self, tiny_session):
+        """The two stop-level count columns must never diverge.
+
+        ``n_events`` is the response column the per-stop rate models fit and
+        the only count name the ContFrag stop table carries; ``n_non_local``
+        is the newer repo-wide name. Both are written from the same array,
+        and consumers pick whichever they know
+        (``tables.py`` reads ``out.get("n_non_local", out.get("n_events"))``),
+        so a divergence would silently change which count a model saw. Only
+        ``n_events`` was pinned, so setting ``n_non_local`` to something else
+        passed the whole suite.
+        """
+        dot, env, trials, graph = tiny_session
+        st = build_stop_table(dot, trials, graph)
+        pd.testing.assert_series_equal(
+            st["n_non_local"], st["n_events"], check_names=False
+        )
+
     def test_event_sequence_row_count_equals_sum_n_nonlocal_bins(
         self, tiny_session_with_posterior
     ):
@@ -647,7 +665,7 @@ class TestCrossTable:
         assert set(et["event_id"]) == set(est["event_id"].unique())
 
 
-# ── Trajectory rollup wiring (Phase 2) ──
+# ── Trajectory rollup wiring ──
 
 from continuum_swr_replay.analysis.replay.trajectory import (  # noqa: E402
     NONLOCAL_ONLY_COLUMNS,

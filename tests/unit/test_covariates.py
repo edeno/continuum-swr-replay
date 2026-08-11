@@ -245,3 +245,92 @@ def test_value_block_plain_key_populates_suffixed_key_misses():
     # suffixed key (the bug) -> no match -> all NaN
     p_suf, _ = covariates.attach_contingency_value_block(arm, suffixed, cont)
     assert np.isnan(p_suf).all()
+
+
+def _single_arm_trials(n_trials: int, rewarded_indices: set[int]) -> pd.DataFrame:
+    """``n_trials`` consecutive trips that all end at well 0 (leaf arm 0)."""
+    return pd.DataFrame(
+        {
+            "start_time": np.arange(n_trials, dtype=float) * 10.0,
+            "end_time": np.arange(n_trials, dtype=float) * 10.0 + 9.0,
+            "goal_arrival_time": np.arange(n_trials, dtype=float) * 10.0 + 8.0,
+            "from_well": 1,
+            "to_well": 0,
+            "is_reward": [i in rewarded_indices for i in range(n_trials)],
+            "is_patch_change": False,
+        }
+    )
+
+
+def test_cumulative_reward_counts_only_the_last_ten_trials():
+    """``cumulative_reward_all_events`` is a rolling k=10 window, not a total.
+
+    The name says "cumulative" but the helper subtracts the cumsum 10 trials
+    back, so a reward older than that must not be counted. Nothing pinned the
+    window: changing it from 10 to 5 left the whole suite green, because the
+    builder fixture's ``trials`` frame is empty and every trial-derived column
+    comes out NaN.
+
+    Twelve completed trips, all to well 0, rewarded on trips 0 and 2. At an
+    event after all twelve, the window covers trips 2-11, so trip 0's reward
+    is outside it and the count is 1 -- not 2 (a true cumulative total) and
+    not 0 (a 5-trial window).
+    """
+    trials = _single_arm_trials(12, rewarded_indices={0, 2})
+    event_times = np.array([200.0])  # after every trip
+
+    out = covariates.cumulative_reward_all_events(
+        event_times, trials, well_to_arm={0: 0, 1: 1}
+    )
+
+    assert out[0, 0] == 1.0, (
+        f"arm 0 should count only the reward inside the 10-trial window, got "
+        f"{out[0, 0]}"
+    )
+
+
+def test_cumulative_reward_window_is_ten_not_a_running_total():
+    """A reward far outside the window contributes nothing, however old."""
+    trials = _single_arm_trials(30, rewarded_indices={0, 1, 2})
+    out = covariates.cumulative_reward_all_events(
+        np.array([400.0]), trials, well_to_arm={0: 0, 1: 1}
+    )
+    assert out[0, 0] == 0.0, (
+        f"all three rewards are >10 trials back, so the window is empty; got "
+        f"{out[0, 0]}"
+    )
+
+
+class TestAlignCountMatrix:
+    """Direct coverage for the reindex + fill behind the arm-count responses.
+
+    The fill fires only for an event whose every in-event timebin failed to
+    attribute to a real arm -- 0 of 65,913 events on the shipped corpus -- so
+    it was reachable only through two builder-level tests and the fill value
+    itself was never asserted. It is dtype-dependent, which is easy to break
+    silently.
+    """
+
+    def test_reindexes_rows_to_target_order(self):
+        counts = np.array([[1, 2], [3, 4]], dtype=np.int64)
+        out = _helpers.align_count_matrix(
+            counts, np.array([10, 20]), np.array([20, 10]), n_arms=2
+        )
+        np.testing.assert_array_equal(out, np.array([[3, 4], [1, 2]]))
+
+    def test_missing_event_fills_zero_for_integer_counts(self):
+        """A hard count genuinely observed zero real-arm bins."""
+        counts = np.array([[1, 2]], dtype=np.int64)
+        out = _helpers.align_count_matrix(
+            counts, np.array([10]), np.array([10, 99]), n_arms=2
+        )
+        np.testing.assert_array_equal(out[1], np.array([0, 0]))
+        assert out.dtype == np.int64
+
+    def test_missing_event_fills_nan_for_float_counts(self):
+        """A fraction's 0/0 must stay undefined, not become 0 or +inf."""
+        counts = np.array([[1.0, 2.0]], dtype=float)
+        out = _helpers.align_count_matrix(
+            counts, np.array([10]), np.array([10, 99]), n_arms=2
+        )
+        assert np.isnan(out[1]).all()
