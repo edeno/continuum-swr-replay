@@ -36,9 +36,15 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [design/2026-07-13-content-rate-uncertainty-model-ladders.md](design/2026-07-13-content-rate-uncertainty-model-ladders.md)
     — proposed Aim-1 content-allocation, replay-occurrence, event-size, and
     marginal-content ladders in R formula notation.
-- [known_issues/](known_issues/) — *reference*: documented data/pipeline issues (incl.
-  [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
-  cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count).
+- [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
+  - [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
+    cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count.
+  - [current_arm_trunk_fallback.md](known_issues/current_arm_trunk_fallback.md) —
+    `current_arm` can name an arm the animal has not reached yet (0.94 % of events
+    corpus-wide; 40.8 % in `wilbur20210329_16_r8`).
+  - [contains_path_length_confound.md](known_issues/contains_path_length_confound.md) —
+    `contains_path_to_next` is 2.8× harder for cross-patch than within-patch trips
+    by construction; don't pool across trip types.
 
 ## Figure outputs
 
