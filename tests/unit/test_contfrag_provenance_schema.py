@@ -69,3 +69,46 @@ def test_contfrag_table_schemas_include_source_and_area_provenance():
         "event_source",
         "brain_area",
     ]
+
+
+def test_contfrag_stop_table_schema_is_pinned_exactly():
+    """The full ContFrag stop-table column list, pinned in order.
+
+    The prefix assertion above only covers the five provenance columns, so a
+    dropped or reordered column anywhere after them is invisible: deleting
+    ``immobility_time`` — the exposure offset every rate model divides by —
+    leaves the whole contfrag suite green. Pin the entire list in order so any
+    schema edit has to be deliberate.
+    """
+    stop_cols = _load_column_helpers()["_contfrag_stop_table_columns"]()
+
+    assert list(stop_cols) == [
+        "animal",
+        "day",
+        "epoch",
+        "event_source",
+        "brain_area",
+        "stop_idx",
+        "stop_id",
+        "stop_start",
+        "stop_end",
+        "immobility_time",
+        "reward_rate_trial_k10",
+        "is_swr_stop",
+        "is_mua_stop",
+        "has_replay",
+        "n_events",
+        "is_after_switch",
+        "is_after_omission",
+        "is_after_reward",
+        "is_after_stay",
+        "reward_outcome",
+        "is_stay",
+        "current_arm",
+        "prev_arm",
+        "next_arm",
+        "last_rewarded_arm",
+        "current_patch",
+        "prev_patch",
+        "next_patch",
+    ]
