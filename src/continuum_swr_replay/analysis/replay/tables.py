@@ -323,7 +323,12 @@ def build_event_table(
         ``stop_idx``, ``stop_id``
     Content summaries
         ``n_nonlocal_bins``, ``nonlocal_weight_sum``,
-        ``n_junction_bins``, ``n_unique_arms``
+        ``n_junction_bins``, ``n_unique_arms``. Despite the name,
+        ``n_junction_bins`` counts in-event timebins whose ``decoded_arm``
+        is not a real arm. ``map_estimate_to_arm`` excludes junction bins
+        from its lookup and returns NaN only where ``map_estimate`` is
+        NaN, so this is an *undecoded*-bin count, not a count of MAPs
+        that landed on a junction.
 
     Notes
     -----
@@ -396,6 +401,12 @@ def build_event_table(
         arm_series = g["decoded_arm"]
         real_arm_mask = arm_series.isin(ALL_ARMS)
         arms_real = arm_series[real_arm_mask]
+        # ``n_junction_bins`` is a misnomer kept for schema stability: it
+        # counts bins whose ``decoded_arm`` is not a real arm, and
+        # ``map_estimate_to_arm`` excludes junction bins from its
+        # nearest-neighbour lookup, returning NaN only where
+        # ``map_estimate`` itself is NaN. So this is an *undecoded*-bin
+        # count, not a count of MAPs that landed on a junction.
         n_junction = int((~real_arm_mask).sum())
 
         # current_arm: modal track_segment_id (the arm the animal is
@@ -914,8 +925,12 @@ def build_stop_table(
     )
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_events"] = n_events_per_bout
-    # Canonical repo name (cf. data_aggregation.py's n_non_local / n_SWR / n_MUA);
-    # ``n_events`` retained as a temporary alias until the migration sweep.
+    # Same count under the repo-wide name (cf. data_aggregation.py's
+    # n_non_local / n_SWR / n_MUA). Both names ship: ``n_events`` is the
+    # response column the per-stop rate models fit and the only count name
+    # the ContFrag stop table carries, so it cannot simply be dropped.
+    # Renaming is a ~50-site migration across src, tests and scripts, not a
+    # cleanup; until then a test pins the two columns identical.
     per_bout["n_non_local"] = n_events_per_bout
 
     # Trial-context at bout start: first in-bout row's trial-derived
@@ -925,7 +940,7 @@ def build_stop_table(
     # actual bout start had no trial active yet (e.g. a bout
     # spanning a trial boundary inherits the post-boundary trial's
     # ``is_after_reward`` / ``reward_outcome``).
-    first_row = grouped.first(skipna=False)
+    bout_first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -936,15 +951,15 @@ def build_stop_table(
         if col == "is_after_stay":
             # Not produced by _add_trial_context; derive from is_after_switch.
             stay = np.where(
-                np.isnan(first_row["is_after_switch"].to_numpy()),
+                np.isnan(bout_first_row["is_after_switch"].to_numpy()),
                 np.nan,
-                1.0 - first_row["is_after_switch"].to_numpy(),
+                1.0 - bout_first_row["is_after_switch"].to_numpy(),
             )
             per_bout["is_after_stay"] = (
                 pd.Series(stay).reindex(np.arange(n_bouts)).to_numpy()
             )
         else:
-            per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+            per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
     # Arm / patch fields. ``current_arm`` uses the same modal-segment
     # + trunk-fallback rule as event-level current_arm; at a well-stop

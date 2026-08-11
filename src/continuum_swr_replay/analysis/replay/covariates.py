@@ -126,6 +126,16 @@ def cumulative_reward_all_events(
 ) -> np.ndarray:
     """Reward count per arm over the last ``window`` trials, for all events.
 
+    Despite the name (and the ``cumulative_reward`` column it fills) this is a
+    **rolling k=10 window**, not a running total: the count is
+    ``cumsum[t] - cumsum[t - window]``, so a reward more than ``window`` trials
+    back contributes nothing. The name is kept because the column ships in
+    ``event_arm_table.pkl`` and is named in ``model_specs``; renaming it is an
+    artifact-invalidating migration, not a cleanup.
+
+    ``NaN`` where no trial has completed yet -- unknown history, not zero
+    reward.
+
     Returns ``(n_events, n_arms)`` array.
     """
     n_arms = len(ALL_ARMS)
@@ -193,7 +203,7 @@ def recent_reward_rate_all_events(
     every event has three trunk-arm rows — leaving them NaN would
     annihilate the M3+ event set.
 
-    **Mechanism-A ENCODE (phase 4):** a leaf arm not yet visited in a
+    **Mechanism-A ENCODE:** a leaf arm not yet visited in a
     session *with* prior trials is filled ``0.0`` (no rewards observed
     on it yet), retaining the ~11.6% of events the old ``NaN`` branch
     dropped (the novel-arm / early-session regime). Only the

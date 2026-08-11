@@ -387,6 +387,9 @@ def build_contfrag_event_table(
             )
             else np.nan,
             "n_timebins": len(g),
+            # Counts bins with no real-arm ``decoded_arm``; since
+            # ``map_estimate_to_arm`` never returns a junction, that means
+            # undecoded (NaN ``map_estimate``) bins, not junction MAPs.
             "n_junction_bins": n_junction,
             "n_unique_arms": int(arms_real.nunique()),
             "event_midpoint_time": float(times[len(times) // 2]),
@@ -837,7 +840,7 @@ def build_contfrag_stop_table(
     # that span a trial boundary (the post-boundary trial's
     # ``is_after_reward`` / ``reward_outcome`` would attach to a
     # bout whose actual start had no trial active).
-    first_row = grouped.first(skipna=False)
+    bout_first_row = grouped.first(skipna=False)
     for col in (
         "is_after_switch",
         "is_after_omission",
@@ -847,15 +850,15 @@ def build_contfrag_stop_table(
     ):
         if col == "is_after_stay":
             stay = np.where(
-                np.isnan(first_row["is_after_switch"].to_numpy()),
+                np.isnan(bout_first_row["is_after_switch"].to_numpy()),
                 np.nan,
-                1.0 - first_row["is_after_switch"].to_numpy(),
+                1.0 - bout_first_row["is_after_switch"].to_numpy(),
             )
             per_bout["is_after_stay"] = (
                 pd.Series(stay).reindex(np.arange(n_bouts)).to_numpy()
             )
         else:
-            per_bout[col] = first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+            per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
     # Arm / patch fields. ``strict_first`` keeps the first row's
     # NaN-or-finite value as-is so a bout that started before any

@@ -411,7 +411,21 @@ def align_count_matrix(
     target_ids: np.ndarray,
     n_arms: int,
 ) -> np.ndarray:
-    """Reindex a ``(n_events_src, n_arms)`` count matrix to ``target_ids``."""
+    """Reindex a ``(n_events_src, n_arms)`` count matrix to ``target_ids``.
+
+    An id in ``target_ids`` with no row in ``ids_sorted`` is an event that
+    contributed no counted rows -- every one of its in-event timebins failed to
+    attribute to a real arm. Its output row is filled, and **the fill value
+    depends on the input dtype**: integer counts fill ``0`` (a real count of
+    zero) and float counts fill ``NaN`` (unknown). That is deliberate --
+    ``arm_count_hard`` genuinely observed zero real-arm bins, while
+    ``arm_fraction``'s 0/0 must stay undefined rather than become 0 or +inf --
+    but it is subtle enough to be worth stating, since the two paths differ
+    only by ``counts.dtype``.
+
+    On the shipped corpus no event triggers the fill (``n_junction_bins`` is 0
+    for all 65,913), so this path is exercised only by tests.
+    """
     mapping = {int(i): k for k, i in enumerate(ids_sorted)}
     fill = np.nan if np.issubdtype(counts.dtype, np.floating) else 0
     out = np.full((target_ids.size, n_arms), fill, dtype=counts.dtype)
