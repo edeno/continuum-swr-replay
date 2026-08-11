@@ -25,11 +25,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from continuum_swr_replay.data_loaders.constants import (
+    ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
 
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 _LEAF_ARMS = set(WELL_PATCH_MAPPING.keys())  # arms touching a well: 0-5
 
 

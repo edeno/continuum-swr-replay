@@ -4,7 +4,7 @@ Three response variables for the conditional Poisson content model, plus
 their companion length measures:
 
 ==============================  =============================  ======================
-Response                        Length measure                 Plan name
+Response                        Length measure                 Role
 ==============================  =============================  ======================
 ``arm_count_hard`` (int)        ``n_nonlocal_bins`` (int)      primary analysis
 ``arm_count_soft`` (float)      ``nonlocal_weight_sum``        robustness
@@ -35,9 +35,9 @@ nearest-neighbor-over-real-bins convention used by
 ``posterior_mass_total_e == nonlocal_weight_sum_e`` for every event by
 construction.
 
-The analysis plan's Section 1.2 shows ``posterior_mass_total_e ≤
-nonlocal_weight_sum_e`` with a strict ≤, reflecting the alternative
-convention where junction mass is "lost" rather than redistributed. We
+The alternative convention — treating junction mass as "lost" rather
+than redistributed — would give ``posterior_mass_total_e ≤
+nonlocal_weight_sum_e`` with a strict ≤. We
 deliberately chose renormalization here for internal consistency with
 the MAP collapse; ``posterior_mass_total`` is therefore identically
 equal to ``nonlocal_weight_sum`` and is retained as a separate symbol
@@ -85,8 +85,9 @@ def posterior_to_arm_marginal(
         Shape ``(n_timebins, n_arms)``; each row sums to 1 up to
         floating-point tolerance for timebins with any real-arm mass.
         Timebins whose posterior is entirely on junction bins (which
-        should never happen given the canonical handling — see CLAUDE.md)
-        return a uniform ``1/n_arms`` row.
+        should never happen, since junction bins are excluded before any
+        MAP-to-arm or posterior-to-arm step) return a uniform ``1/n_arms``
+        row.
     """
     conditional_posterior = np.asarray(conditional_posterior, dtype=float)
     edge_id = np.asarray(edge_id, dtype=int)
@@ -211,9 +212,9 @@ def posterior_mass_total(
     """Per-event total posterior mass, for the ``arm_posterior_mass`` offset.
 
     Under the renormalization convention in ``posterior_to_arm_marginal``,
-    this is identically equal to ``nonlocal_weight_sum``. The analysis
-    plan (Section 1.2) notes ``posterior_mass_total_e ≤ nonlocal_weight_sum_e``
-    assuming the unnormalized "junction mass is lost" convention;
+    this is identically equal to ``nonlocal_weight_sum``. Under the
+    unnormalized "junction mass is lost" convention one would instead get
+    ``posterior_mass_total_e ≤ nonlocal_weight_sum_e``;
     because we renormalize instead, equality holds and the distinction
     collapses. Exposed as a separate function so downstream code can
     address the ``arm_posterior_mass`` offset by name.

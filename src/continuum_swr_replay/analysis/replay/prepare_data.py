@@ -283,7 +283,7 @@ def _process_session(
     # without a valid next_arm/prev_arm get NaN). These need the arm and
     # sequence tables, so they are joined here at the assembly level rather
     # than inside build_event_table. This replaces the previously
-    # standalone Stage 5B post-hoc pass for the per-event columns.
+    # standalone post-hoc pass for the per-event columns.
     if event_sequence_table is not None and len(event_table) > 0:
         sess_keys = [
             c for c in ("animal", "day", "epoch") if c in event_table.columns
@@ -413,7 +413,7 @@ def main():
     # merge below, kept out of build_stop_table (which is event-table-independent).
     stop_table_all = add_nonlocal_swr_split(stop_table_all, event_table_all)
     # Always materialize ``event_sequence_table.pkl`` — even when no
-    # session contributed any sequence rows. Stage 5B (the
+    # session contributed any sequence rows. The retrospective pass (the
     # retrospective-alignment step) does
     # ``pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")``
     # unconditionally, so a missing file would crash a posterior-
@@ -427,11 +427,11 @@ def main():
         )
     else:
         from continuum_swr_replay.analysis.replay.tables import (
-            _event_sequence_table_columns,
+            _EVENT_SEQUENCE_TABLE_COLUMNS,
         )
 
         event_sequence_table_all = pd.DataFrame(
-            columns=_event_sequence_table_columns()
+            columns=list(_EVENT_SEQUENCE_TABLE_COLUMNS)
         )
     # Patch table is a deterministic projection of the per-arm table
     # (sums arm_count_hard within each patch and aggregates predictors

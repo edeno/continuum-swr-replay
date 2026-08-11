@@ -34,13 +34,11 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
-
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 
 DEFAULT_PREDICTORS: tuple[str, ...] = (
     "is_current",

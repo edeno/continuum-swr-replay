@@ -1,9 +1,9 @@
-"""Stage 5B: retrospective alignment of replay content with the next choice.
+"""Retrospective alignment of replay content with the next choice.
 
-Where Stage 5A asked whether replay content predicts the next choice
-(adding `arm_fraction` to a behavior-only baseline), Stage 5B asks the
-weaker, post-hoc question: does the replay content during a stop align
-with whichever arm the animal actually visited next?
+Where the prospective choice models ask whether replay content predicts
+the next choice (adding `arm_fraction` to a behavior-only baseline), these
+metrics ask the weaker, post-hoc question: does the replay content during
+a stop align with whichever arm the animal actually visited next?
 
 Three event-level metrics are computed:
 
@@ -76,9 +76,8 @@ _PATCH_TO_ARM_SET: dict[int, frozenset[int]] = {
 
 # Patch (1/2/3) → trunk arm id. Each patch junction connects to the
 # center node via exactly one trunk arm, and the trunk-arm IDs are 5
-# offsets above the patch IDs by construction (CLAUDE.md "Spatial
-# Bandit Task Structure"). This is the only place a magic offset
-# appears; everything else routes through this mapping.
+# offsets above the patch IDs by construction. This is the only place a
+# magic offset appears; everything else routes through this mapping.
 _PATCH_TO_TRUNK_ARM: dict[int, int] = {1: 6, 2: 7, 3: 8}
 
 # Wells are arms 0–5 (degree-1 leaves of the track graph).
@@ -307,14 +306,14 @@ def _contains_path(
     sess_keys = [
         c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
     ]
-    # Empty ``event_sequence_table`` is a legitimate Stage 5B input
+    # Empty ``event_sequence_table`` is a legitimate input
     # (sessions can have events but no in-event timebins yet, e.g.
     # before posterior reconstruction lands). The previous chained
     # ``Series.groupby(...).agg(...).rename(columns=...)`` produced
     # a Series for an empty input, and ``Series.rename`` rejects the
     # ``columns=`` kwarg with TypeError — which the runner script
     # then swallows under a broad except, silently dropping the whole
-    # session from Stage 5B. Use named aggregation so the result is
+    # session. Use named aggregation so the result is
     # always a DataFrame, even when empty.
     if event_sequence_table.empty:
         arm_sets = pd.DataFrame(
@@ -527,7 +526,7 @@ def compute_retrospective_metrics(
     include_patch: bool = True,
     include_prev: bool = True,
 ) -> pd.DataFrame:
-    """Join the Stage 5B metrics into a single per-event table.
+    """Join the retrospective metrics into a single per-event table.
 
     Parameters
     ----------
@@ -591,7 +590,7 @@ _DEFAULT_METRICS = (
 
 def _per_session_metric_means(metrics_df: pd.DataFrame) -> dict[str, float]:
     """Reduce per-event metrics to the session-level statistics
-    Stage 5B reports."""
+    these metrics report."""
     out: dict[str, float] = {}
     for col in _DEFAULT_METRICS:
         if col in metrics_df.columns:

@@ -1,4 +1,4 @@
-"""Stage 5A: does replay content predict the next choice?
+"""Does replay content predict the next choice?
 
 Builds a stop × arm choice dataset from the canonical tables, then
 fits conditional logistic regression (or conditional Poisson with
@@ -14,7 +14,7 @@ during immobility, before the next trip begins).
 
 ``is_next`` / ``next_arm`` do NOT enter as predictors — they're the
 response variable. The model is strictly predictive, not
-retrospective (Stage 5B handles the retrospective alignment).
+retrospective (:mod:`retrospective` handles the retrospective alignment).
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
 from ._fit_diagnostics import (
     capture_fit_warnings,
@@ -36,7 +34,6 @@ from .fitting import within_group_full_rank
 
 logger = logging.getLogger(__name__)
 
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 
 # Leaf arms — the six arms that touch a well (one per well, since
 # every well in the bandit graph is degree-1). The animal can only
@@ -250,7 +247,7 @@ def build_choice_dataset(
     *,
     fraction_col: str = "arm_fraction",
 ) -> pd.DataFrame:
-    """Build a stop × arm choice dataset for Stage 5A.
+    """Build a stop × arm choice dataset for the choice models.
 
     For each stop that has (a) at least one replay event and (b) a
     valid ``next_arm`` (known next destination), produces one row per
@@ -399,8 +396,8 @@ def build_choice_dataset(
     # current_arm. Trunk arms 6/7/8 are transit-only and can never
     # be ``next_arm``; including them as unchosen alternatives in
     # the conditional logit would distort the likelihood. Filter on
-    # the canonical ``WELL_ARMS`` constant rather than slicing
-    # ``ALL_ARMS`` so a future track-graph change can extend the
+    # the canonical ``WELL_ARMS`` constant rather than slicing the full
+    # arm axis, so a future track-graph change can extend the
     # eligible-destination set in one place.
     choice_df = choice_df[
         choice_df["arm"].isin(WELL_ARMS)

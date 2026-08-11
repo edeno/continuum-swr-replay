@@ -11,7 +11,7 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
 )
 from continuum_swr_replay.analysis.replay.tables import (
-    _event_table_columns,
+    _EVENT_TABLE_COLUMNS,
     build_event_table,
 )
 from continuum_swr_replay.analysis.replay.trajectory import (
@@ -44,6 +44,16 @@ class _EnvStub:
         for i in range(len(lp) - 1):
             g.add_edge(i, i + 1, distance=abs(lp[i + 1] - lp[i]))
         return g
+
+    @property
+    def distance_between_nodes_(self):
+        # Mirrors how ``Environment`` populates this at fit time
+        # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+        return dict(
+            nx.all_pairs_dijkstra_path_length(
+                self.track_graph_with_bin_centers_edges_, weight="distance"
+            )
+        )
 
 
 def _bandit_graph() -> nx.Graph:
@@ -110,7 +120,7 @@ def _contfrag_dot() -> pd.DataFrame:
 
 
 def test_shared_columns_in_both_table_schemas():
-    nl_cols = set(_event_table_columns())
+    nl_cols = set(_EVENT_TABLE_COLUMNS)
     for col in SHARED_TRAJECTORY_COLUMNS:
         assert col in nl_cols, f"shared col {col} missing from Non-Local schema"
     for col in _CONTFRAG_TRAJECTORY_COLUMNS:

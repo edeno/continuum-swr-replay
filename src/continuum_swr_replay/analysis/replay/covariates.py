@@ -22,11 +22,10 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
 
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 
 from ._helpers import _trial_cutoff_times, build_well_to_arm_map
 
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
 _SESSION_COLS = ["animal", "day", "epoch"]
 _P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
 _Q_PORT_COLS = [f"q_port{i}" for i in range(6)]

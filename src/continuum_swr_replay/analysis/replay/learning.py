@@ -1,4 +1,4 @@
-"""Stage 6: replay content × reward outcome → behavioral change.
+"""Replay content × reward outcome → behavioral change.
 
 Two stop-level analyses:
 

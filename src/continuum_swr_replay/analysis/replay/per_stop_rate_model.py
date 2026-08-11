@@ -1,4 +1,4 @@
-"""Poisson rate model for replay event occurrence (Stage 2).
+"""Poisson rate model for replay event occurrence.
 
 Tests whether the NUMBER of replay events per stop depends on
 behavioral context, independently of replay CONTENT. The response is

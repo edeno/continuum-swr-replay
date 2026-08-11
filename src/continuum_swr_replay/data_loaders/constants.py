@@ -190,3 +190,12 @@ Segments 0, 1, 6 are in patch 1; segments 2, 3, 7 in patch 2;
 segments 4, 5, 8 in patch 3.
 """
 
+ALL_ARMS: tuple[int, ...] = tuple(sorted(TRACK_SEGMENT_TO_PATCH.keys()))
+"""Every arm (track segment) id, ascending: six leaf arms then three trunk arms.
+
+The canonical arm axis. Per-arm tables carry one row per entry in this
+order, and per-arm matrices are indexed by position in it, so analysis and
+visualization must share a single definition — reordering it silently
+reinterprets every per-arm coefficient.
+"""
+

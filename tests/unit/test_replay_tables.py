@@ -1,6 +1,6 @@
 """Tests for :mod:`continuum_swr_replay.analysis.replay.tables`.
 
-Covers the Phase B §8 invariant list on a small synthetic session —
+Covers the table invariant list on a small synthetic session —
 schema, within-event sum invariants, range invariants, cross-table ID
 joins. Also contains one regression test for a known bug
 (:func:`test_event_arm_table_respects_non_default_event_table_index`).
@@ -172,7 +172,7 @@ def test_trunk_arm_triggers_current_well_fallback():
     modal ``track_segment_id`` is a trunk arm (6/7/8 — no well
     attached), ``build_event_table`` must re-derive ``current_arm`` by
     reading the renamed intermediate column ``current_well`` (was
-    ``prev_trial_to_well`` before Phase B4). A misspelling of that
+    ``prev_trial_to_well``). A misspelling of that
     column name would silently produce ``current_arm = NaN`` for every
     trunk event; a real crash would instead surface as ``KeyError``.
     """
@@ -374,7 +374,7 @@ class TestEventTableSchema:
         assert "stop_id" in et.columns
 
 
-# ── Within-event sum invariants (plan §8) ──
+# ── Within-event sum invariants ──
 
 
 class TestEventTableInvariants:
@@ -395,7 +395,7 @@ class TestEventTableInvariants:
         )
 
     def test_nonlocal_prob_within_unit_interval(self, tiny_session):
-        # Plan §8: ``nonlocal_prob`` values in [0, 1]. Exposed here via
+        # ``nonlocal_prob`` values in [0, 1]. Exposed here via
         # ``nonlocal_weight_sum`` / ``n_nonlocal_bins``, which must be
         # between 0 and 1 when averaged.
         dot, env, trials, graph = tiny_session
@@ -465,7 +465,7 @@ class TestEventArmTableInvariants:
     def test_sum_arm_count_hard_equals_n_bins_minus_junction(
         self, tiny_session_with_posterior
     ):
-        """Plan §8: ``sum(arm_count_hard) == n_nonlocal_bins``.
+        """``sum(arm_count_hard) == n_nonlocal_bins``.
 
         Correct only when ``n_junction_bins == 0``; on the general
         definition the sum is ``n_nonlocal_bins − n_junction_bins``.
@@ -668,6 +668,11 @@ def _traj_env():
     for i in range(len(node_id) - 1):
         g.add_edge(int(node_id[i]), int(node_id[i + 1]), distance=abs(lp[i + 1] - lp[i]))
     env.track_graph_with_bin_centers_edges_ = g
+    # Mirrors how ``Environment`` populates this at fit time
+    # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+    env.distance_between_nodes_ = dict(
+        nx.all_pairs_dijkstra_path_length(g, weight="distance")
+    )
     return env
 
 

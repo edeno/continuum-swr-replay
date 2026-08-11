@@ -6,9 +6,6 @@ in-event rows and grouped by ``event_id``. Every family returns
 columns the same way the posterior rollups in :mod:`uncertainty` do. The
 ``unique_sorted_event_ids`` equals ``np.unique(event_id)``, matching the
 ``groupby(sort=True)`` order the table builders assert against.
-
-Definitions follow the design spec
-``docs/design/2026-06-23-replay-trajectory-metrics-design.md``.
 """
 
 from __future__ import annotations
@@ -74,11 +71,6 @@ _SIGNAL_COLUMNS: dict[str, str] = {
     "mua_rate_z": "MUA_zscore",
     "theta_z": "theta_power_zscore",
 }
-
-
-def _graph_distance_lookup(track_graph: nx.Graph) -> dict:
-    """All-pairs shortest-path distance dict over the bin-centre track graph."""
-    return dict(nx.shortest_path_length(track_graph, weight="distance"))
 
 
 def _p90(values: np.ndarray) -> float:
@@ -394,7 +386,12 @@ def trajectory_dynamics(
     nodes_df = env.place_bin_centers_nodes_df_
     node_ids, has_valid = map_estimate_to_map_nodes(map_estimate, nodes_df)
     graph = env.track_graph_with_bin_centers_edges_
-    dist = _graph_distance_lookup(graph)
+    # All-pairs shortest-path distances over the bin-centre graph,
+    # precomputed by the environment at fit time. Recomputing them here
+    # would be the same Dijkstra over the same graph, per session, with a
+    # chance of drifting from the distances every other consumer of
+    # ``env`` sees.
+    dist = env.distance_between_nodes_
     # Well nodes are the degree-1 terminals of the bin-centre track graph (the
     # six well ends). ``well_radius`` defaults to four place bins.
     well_nodes = [n for n, deg in graph.degree() if deg == 1]
@@ -503,7 +500,7 @@ def trajectory_dynamics(
     # therefore crosses the event boundary (its t-1 lies just *before* the
     # event), so ``path_length`` and ``step_distance_max``/``_p90`` include one
     # boundary step per event. Events are mostly contiguous so this is one step
-    # out of ~10-25; matches the design spec's ``path_length = Σ step_distance``.
+    # out of ~10-25; ``path_length`` is defined as Σ step_distance.
     path_length = _per_event(lambda g: float(np.nansum(g["step_distance"])))
     net_disp = _per_event(_net_disp)
     with np.errstate(divide="ignore", invalid="ignore"):

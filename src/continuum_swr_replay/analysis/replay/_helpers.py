@@ -20,9 +20,6 @@ from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
 
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
-
-
 # ── Trial-derived context ──
 
 

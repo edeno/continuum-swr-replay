@@ -21,9 +21,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 
+from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
 from ..replay._helpers import (
-    ALL_ARMS,
     add_trial_context,
     align_count_matrix,
     align_posterior_to_dot,

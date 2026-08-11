@@ -6,7 +6,7 @@
 - :func:`arm_adjacency` — which arms share a graph node (for
   ``path_continuity``).
 - :func:`path_continuity` — per-event fraction of consecutive
-  decoded-arm pairs that are graph-adjacent (Stage 0 QC metric).
+  decoded-arm pairs that are graph-adjacent (a QC metric).
 """
 
 from __future__ import annotations
@@ -15,9 +15,7 @@ import networkx as nx
 import numpy as np
 from scipy.stats import rankdata as _scipy_rankdata
 
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-
-ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 
 
 def dist_to_arm_from_well(
@@ -157,7 +155,7 @@ def path_continuity(
 ) -> float:
     """Fraction of consecutive decoded-arm pairs that are graph-adjacent.
 
-    Plan §1.4: ``path_continuity_e = (1/(T_e - 1)) Σ 1[arm_{t+1} ∈
+    ``path_continuity_e = (1/(T_e - 1)) Σ 1[arm_{t+1} ∈
     neighbors(arm_t)]``. Self-transitions (same arm on consecutive
     timebins) count as adjacent. Returns ``NaN`` for sequences shorter
     than 2 valid consecutive pairs.

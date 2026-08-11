@@ -16,6 +16,7 @@ import importlib
 from typing import TYPE_CHECKING
 
 from .constants import (
+    ALL_ARMS,
     NWB_FILES,
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
@@ -29,6 +30,7 @@ _LAZY_EXPORTS = {
 }
 
 __all__ = [
+    "ALL_ARMS",
     "NWB_FILES",
     "TRACK_SEGMENT_TO_PATCH",
     "WELL_PATCH_MAPPING",

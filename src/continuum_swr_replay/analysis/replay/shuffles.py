@@ -1,6 +1,6 @@
 """Null-distribution generators for replay content QC.
 
-Three shuffles specified in plan §Stage 0:
+Three shuffles:
 
 1. :func:`circular_time_shuffle` — permute timebin order within each
    event, preserving the marginal arm distribution. Primary null for
@@ -10,7 +10,7 @@ Three shuffles specified in plan §Stage 0:
    Null for replay–behavior alignment analyses (Stages 5–6).
 3. :func:`next_arm_circular_shift` — circularly shift ``next_arm``
    (and associated post-hoc columns) across stops within a session.
-   Null for Stage 5B retrospective alignment, guarding against patch
+   Null for the retrospective alignment metrics, guarding against patch
    geometry or block-drift correlations.
 
 All three return a NEW DataFrame (or array) — the input is never
@@ -157,7 +157,7 @@ def next_arm_circular_shift(
     but breaks the event-specific alignment between replay content
     and what the animal actually did next.
 
-    Designed specifically as the null for Stage 5B retrospective
+    Designed specifically as the null for the retrospective
     alignment, where the concern is that patch geometry or block-drift
     correlations inflate alignment metrics.
 

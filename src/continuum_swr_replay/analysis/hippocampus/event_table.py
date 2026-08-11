@@ -116,32 +116,31 @@ def intervals_from_labels(session_df: pd.DataFrame, label_col: str) -> pd.DataFr
     )
 
 
-def _classified_event_table_columns() -> list[str]:
-    """Canonical column order for the classified non-local event table."""
-    return [
-        "animal",
-        "day",
-        "epoch",
-        "non_local_event",
-        "event_id",
-        "event_start",
-        "event_end",
-        "event_duration",
-        "event_midpoint_time",
-        "max_speed",
-        "mean_speed",
-        "start_speed",
-        "end_speed",
-        "endpoints_speed_below_thresh",
-        "peak_nonlocal_prob",
-        "is_swr",
-        "overlap_class",
-        "overlap_subclass",
-        "n_swrs_overlapping",
-        "matched_swr_event",
-        "matched_swr_start",
-        "matched_swr_end",
-    ]
+#: Canonical column order for the classified non-local event table.
+_CLASSIFIED_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
+    "animal",
+    "day",
+    "epoch",
+    "non_local_event",
+    "event_id",
+    "event_start",
+    "event_end",
+    "event_duration",
+    "event_midpoint_time",
+    "max_speed",
+    "mean_speed",
+    "start_speed",
+    "end_speed",
+    "endpoints_speed_below_thresh",
+    "peak_nonlocal_prob",
+    "is_swr",
+    "overlap_class",
+    "overlap_subclass",
+    "n_swrs_overlapping",
+    "matched_swr_event",
+    "matched_swr_start",
+    "matched_swr_end",
+)
 
 
 def _match_swr(
@@ -257,7 +256,7 @@ def build_classified_nonlocal_event_table(
             f"get_data_over_time()."
         )
 
-    column_order = _classified_event_table_columns()
+    column_order = list(_CLASSIFIED_EVENT_TABLE_COLUMNS)
 
     # Single canonical time source. Event timing below reads ``g.index``
     # while :func:`intervals_from_labels` prefers a ``"time"`` column when

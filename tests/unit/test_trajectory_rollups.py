@@ -116,6 +116,11 @@ class _EnvStub:
         graph.add_edges_from((i, i + 1) for i in range(n_bins - 1))
         nx.set_edge_attributes(graph, edge_cm, "distance")
         self.track_graph_with_bin_centers_edges_ = graph
+        # Mirrors how ``Environment`` populates this at fit time
+        # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+        self.distance_between_nodes_ = dict(
+            nx.all_pairs_dijkstra_path_length(graph, weight="distance")
+        )
         self.place_bin_centers_nodes_df_ = pd.DataFrame(
             {
                 "node_id": np.arange(n_bins),

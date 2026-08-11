@@ -1,7 +1,6 @@
 """Canonical per-session tables for replay content analysis.
 
-This module produces the four canonical tables specified in
-``plans/2026_04_14_replay_content_analysis_plan.md`` Section 2:
+This module produces the four canonical per-session tables:
 
 - ``event_table`` — one row per non-local event
   (:func:`build_event_table`)
@@ -12,14 +11,13 @@ This module produces the four canonical tables specified in
 - ``stop_table`` — one row per stopping period, including zero-event
   stops (:func:`build_stop_table`)
 
-Canonical column names follow the plan's Section 1. Intermediate
-columns added by ``_add_trial_context`` (``prev_well``,
+Intermediate columns added by ``_add_trial_context`` (``prev_well``,
 ``current_well``, ``next_well``, ``last_rewarded_well``) use short
 well-suffixed names; per-arm scalars in the canonical tables
 (``prev_arm``, ``current_arm``, ``next_arm``, ``last_rewarded_arm``)
 come from ``_single_arm_from_well(well_id, track_graph)``.
 
-Three symbols are intentionally exempt from the Phase B canonical
+Three symbols are intentionally exempt from the canonical
 rename's grep-zero rule:
 
 - ``SWR_event`` and ``MUA_event`` — integer event-label columns
@@ -61,12 +59,12 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.constants import (
+    ALL_ARMS,
+    TRACK_SEGMENT_TO_PATCH,
+)
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 
-from ._helpers import (
-    ALL_ARMS,
-)
 from ._helpers import (
     add_trial_context as _add_trial_context,
 )
@@ -83,10 +81,10 @@ from ._helpers import (
     assign_bout as _assign_bout,
 )
 from ._helpers import (
-    attach_contingency_value_block as _attach_contingency_value_block,
+    attach_arm_uncertainty as _attach_arm_uncertainty,
 )
 from ._helpers import (
-    attach_arm_uncertainty as _attach_arm_uncertainty,
+    attach_contingency_value_block as _attach_contingency_value_block,
 )
 from ._helpers import (
     build_well_to_arm_map as _build_well_to_arm_map,
@@ -227,7 +225,7 @@ def build_event_table(
 
     Consumes the pre-saved ``{epoch}_HPC_{thr}_data_over_time.pkl`` frame
     (``dot``) plus the session's ``env`` / ``trials`` / ``track_graph``
-    and emits the event-level slice of the plan's canonical schema.
+    and emits the event-level slice of the canonical schema.
 
     The table is composed from two passes over ``dot``:
 
@@ -368,7 +366,7 @@ def build_event_table(
 
     # Empty-output short-circuit — return a correctly-typed empty frame
     # so downstream concat does not blow up on column mismatch.
-    column_order = _event_table_columns()
+    column_order = list(_EVENT_TABLE_COLUMNS)
     if len(nl) == 0:
         return pd.DataFrame(columns=column_order)
 
@@ -679,9 +677,8 @@ def build_event_sequence_table(
 ) -> pd.DataFrame:
     """One row per in-event timebin with the arm-marginal posterior.
 
-    This is the plan's Section 2.3 table — the per-timebin canonical
-    view of what the decoder said each timebin represented, inside
-    non-local events. Its ``event_id`` hash matches
+    The per-timebin canonical view of what the decoder said each timebin
+    represented, inside non-local events. Its ``event_id`` hash matches
     :func:`build_event_table` row-for-row, so the two can be joined on
     ``event_id`` without loss.
 
@@ -733,7 +730,7 @@ def build_event_sequence_table(
     dot = _prepare_dot(dot, env)
     in_event_mask = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
 
-    column_order = _event_sequence_table_columns()
+    column_order = list(_EVENT_SEQUENCE_TABLE_COLUMNS)
     if not in_event_mask.any():
         return pd.DataFrame(columns=column_order)
 
@@ -781,11 +778,10 @@ def build_stop_table(
 ) -> pd.DataFrame:
     """One row per immobility bout, **including zero-event bouts**.
 
-    This is the plan's Section 2.4 table — the stop-level canonical
-    view of the session. Every contiguous immobility bout (defined by
-    ``head_speed < speed_threshold``) becomes a row, regardless of
-    whether any non-local event fired during it. Stage 4 Part 1
-    (hurdle occurrence model) requires the zero-event rows.
+    The stop-level canonical view of the session. Every contiguous
+    immobility bout (defined by ``head_speed < speed_threshold``) becomes a
+    row, regardless of whether any non-local event fired during it. The
+    hurdle occurrence model requires the zero-event rows.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -802,7 +798,7 @@ def build_stop_table(
     threshold for exactly one timebin — yield ``immobility_time == 0``
     rows. They are kept as-is here; ``stop_table`` is the raw
     canonical frame and downstream consumers decide whether to filter
-    them (e.g., Stage 4's hurdle logistic, which uses
+    them (e.g., the hurdle logistic, which uses
     ``log(immobility_time)``, will need to exclude or clip them).
 
 
@@ -816,7 +812,7 @@ def build_stop_table(
     Returns
     -------
     pd.DataFrame
-        Columns: see :func:`_stop_table_columns`.
+        Columns: see :data:`_STOP_TABLE_COLUMNS`.
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
@@ -834,7 +830,7 @@ def build_stop_table(
     bout_starts, bout_ends = _immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
     )
-    column_order = _stop_table_columns()
+    column_order = list(_STOP_TABLE_COLUMNS)
     if bout_starts.size == 0:
         return pd.DataFrame(columns=column_order)
 
@@ -1085,7 +1081,7 @@ def build_event_arm_table(
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
-    """Plan Section 2.2: one row per (event, arm) — nine rows per event.
+    """One row per (event, arm) — nine rows per event.
 
     Assumes ``event_table`` was produced by :func:`build_event_table`
     on the same ``dot`` / ``trials`` / ``track_graph``. Broadcasts
@@ -1093,7 +1089,7 @@ def build_event_arm_table(
     event-level posterior columns) across arms and augments each
     (event, arm) row with the three arm-count responses, the binary
     arm indicators, spatial and reward predictors, and the interaction
-    terms from plan §1.7.
+    terms.
 
     ``p_reward_arm`` (per-arm nominal reward probability) and ``q_arm``
     (per-arm model value / belief, Q) are populated from the contingency
@@ -1117,10 +1113,10 @@ def build_event_arm_table(
     Returns
     -------
     pd.DataFrame
-        Columns: see :func:`_event_arm_table_columns`. Empty (correct
+        Columns: see :data:`_EVENT_ARM_TABLE_COLUMNS`. Empty (correct
         schema) if ``event_table`` is empty.
     """
-    column_order = _event_arm_table_columns()
+    column_order = list(_EVENT_ARM_TABLE_COLUMNS)
     if len(event_table) == 0:
         return pd.DataFrame(columns=column_order)
 
@@ -1319,7 +1315,7 @@ def build_event_arm_table(
         long["arm"].to_numpy(), long["stop_id"].to_numpy(), contingency
     )
 
-    # Interactions (plan §1.7). Event-level × arm-level products.
+    # Interactions: event-level × arm-level products.
     tss = long["time_since_stop"].to_numpy()
     is_swr_i = long["is_swr"].astype(int).to_numpy()
     is_mua_i = long["is_mua"].astype(int).to_numpy()
@@ -1538,214 +1534,208 @@ def build_event_patch_table(
     return patch_eat
 
 
-def _event_table_columns() -> list[str]:
-    """Canonical column order for ``event_table``.
-
-    Kept central so the empty-session short-circuit returns the right
-    shape and so downstream consumers can rely on column order.
-    """
-    return [
-        "animal",
-        "day",
-        "epoch",
-        "non_local_event",
-        "event_id",
-        "event_start",
-        "event_end",
-        "event_duration",
-        "event_midpoint_time",
-        "time_since_stop",
-        "time_since_port_entry",
-        "time_since_reward",
-        "is_swr",
-        "is_mua",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
-        "is_stay",
-        "current_arm",
-        "prev_arm",
-        "next_arm",
-        "last_rewarded_arm",
-        "current_patch",
-        "prev_patch",
-        "next_patch",
-        "n_nonlocal_bins",
-        "nonlocal_weight_sum",
-        "posterior_mass_total",
-        "posterior_peak_mean",
-        "posterior_entropy_mean",
-        "posterior_hpd_width_50",
-        "posterior_hpd_width_80",
-        "posterior_hpd_width_95",
-        "n_junction_bins",
-        "n_unique_arms",
-        "stop_idx",
-        "stop_id",
-        # Additive full-window timing + SWR classification from
-        # build_classified_nonlocal_event_table (full label window).
-        # Legacy event_start/end/duration/midpoint above remain the
-        # filtered survivor-window values; these label_event_* carry the
-        # full event-label boundary.
-        "label_event_start",
-        "label_event_end",
-        "label_event_duration",
-        "label_event_midpoint_time",
-        "max_speed",
-        "mean_speed",
-        "start_speed",
-        "end_speed",
-        "endpoints_speed_below_thresh",
-        "peak_nonlocal_prob",
-        "overlap_class",
-        "overlap_subclass",
-        "n_swrs_overlapping",
-        "matched_swr_event",
-        "matched_swr_start",
-        "matched_swr_end",
-        # Trajectory rollups (shared with ContFrag) + Non-Local-only state means.
-        *SHARED_TRAJECTORY_COLUMNS,
-        *NONLOCAL_ONLY_COLUMNS,
-    ]
+#: Canonical column order for ``event_table``.
+#:
+#: Kept central so the empty-session short-circuit returns the right shape and
+#: so downstream consumers can rely on column order.
+_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
+    "animal",
+    "day",
+    "epoch",
+    "non_local_event",
+    "event_id",
+    "event_start",
+    "event_end",
+    "event_duration",
+    "event_midpoint_time",
+    "time_since_stop",
+    "time_since_port_entry",
+    "time_since_reward",
+    "is_swr",
+    "is_mua",
+    "is_after_switch",
+    "is_after_omission",
+    "is_after_reward",
+    "is_after_stay",
+    "reward_outcome",
+    "is_stay",
+    "current_arm",
+    "prev_arm",
+    "next_arm",
+    "last_rewarded_arm",
+    "current_patch",
+    "prev_patch",
+    "next_patch",
+    "n_nonlocal_bins",
+    "nonlocal_weight_sum",
+    "posterior_mass_total",
+    "posterior_peak_mean",
+    "posterior_entropy_mean",
+    "posterior_hpd_width_50",
+    "posterior_hpd_width_80",
+    "posterior_hpd_width_95",
+    "n_junction_bins",
+    "n_unique_arms",
+    "stop_idx",
+    "stop_id",
+    # Additive full-window timing + SWR classification from
+    # build_classified_nonlocal_event_table (full label window).
+    # Legacy event_start/end/duration/midpoint above remain the
+    # filtered survivor-window values; these label_event_* carry the
+    # full event-label boundary.
+    "label_event_start",
+    "label_event_end",
+    "label_event_duration",
+    "label_event_midpoint_time",
+    "max_speed",
+    "mean_speed",
+    "start_speed",
+    "end_speed",
+    "endpoints_speed_below_thresh",
+    "peak_nonlocal_prob",
+    "overlap_class",
+    "overlap_subclass",
+    "n_swrs_overlapping",
+    "matched_swr_event",
+    "matched_swr_start",
+    "matched_swr_end",
+    # Trajectory rollups (shared with ContFrag) + Non-Local-only state means.
+    *SHARED_TRAJECTORY_COLUMNS,
+    *NONLOCAL_ONLY_COLUMNS,
+)
 
 
-def _stop_table_columns() -> list[str]:
-    """Canonical column order for ``stop_table``."""
-    return [
-        "animal",
-        "day",
-        "epoch",
-        "stop_idx",
-        "stop_id",
-        "stop_start",
-        "stop_end",
-        "immobility_time",
-        "reward_rate_trial_k10",
-        "is_swr_stop",
-        "n_SWR",
-        "is_mua_stop",
-        "n_MUA",
-        "has_replay",
-        "n_events",
-        "n_non_local",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
-        "is_stay",
-        "current_arm",
-        "prev_arm",
-        "next_arm",
-        "last_rewarded_arm",
-        "current_patch",
-        "prev_patch",
-        "next_patch",
-        *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
-    ]
+#: Canonical column order for ``stop_table``.
+_STOP_TABLE_COLUMNS: tuple[str, ...] = (
+    "animal",
+    "day",
+    "epoch",
+    "stop_idx",
+    "stop_id",
+    "stop_start",
+    "stop_end",
+    "immobility_time",
+    "reward_rate_trial_k10",
+    "is_swr_stop",
+    "n_SWR",
+    "is_mua_stop",
+    "n_MUA",
+    "has_replay",
+    "n_events",
+    "n_non_local",
+    "is_after_switch",
+    "is_after_omission",
+    "is_after_reward",
+    "is_after_stay",
+    "reward_outcome",
+    "is_stay",
+    "current_arm",
+    "prev_arm",
+    "next_arm",
+    "last_rewarded_arm",
+    "current_patch",
+    "prev_patch",
+    "next_patch",
+    *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+)
 
 
-def _event_arm_table_columns() -> list[str]:
-    """Canonical column order for ``event_arm_table``."""
-    return [
-        # Identifiers (broadcast from event_table)
-        "animal",
-        "day",
-        "epoch",
-        "non_local_event",
-        "event_id",
-        "stop_idx",
-        "stop_id",
-        # Event-level context (broadcast)
-        "event_start",
-        "event_end",
-        "event_duration",
-        "time_since_stop",
-        "time_since_port_entry",
-        "time_since_reward",
-        "is_swr",
-        "is_mua",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
-        "is_stay",
-        "current_arm",
-        "prev_arm",
-        "next_arm",
-        "last_rewarded_arm",
-        "current_patch",
-        "prev_patch",
-        "next_patch",
-        "n_nonlocal_bins",
-        # Per-arm identity
-        "arm",
-        "arm_patch_id",
-        # Content responses
-        "arm_count_hard",
-        "arm_count_soft",
-        "arm_posterior_mass",
-        "arm_fraction",
-        "arm_fraction_posterior",
-        # Binary indicators
-        "is_current",
-        "is_prev",
-        "is_next",
-        "is_last_rewarded",
-        "is_last_rewarded_elsewhere",
-        "is_same_patch",
-        # Spatial
-        "dist_to_arm",
-        "arm_dist_rank",
-        # Reward / value
-        "visit_recency",
-        "visit_recency_demeaned",
-        "cumulative_reward",
-        "reward_rate_arm_k10",
-        "p_reward_arm",
-        "q_arm",
-        "arm_uncertainty",
-        # Interactions (plan §1.7 + collinearity control)
-        "current_x_last_rewarded",
-        "time_x_current",
-        "time_x_prev",
-        "time_x_next",
-        "swr_x_current",
-        "swr_x_prev",
-        "swr_x_next",
-        "swr_x_last_rewarded",
-        "swr_x_reward_rate_arm_k10",
-        "swr_x_visit_recency_demeaned",
-        "swr_x_is_last_rewarded_elsewhere",
-        "swr_x_arm_uncertainty",
-        "mua_x_current",
-        "mua_x_prev",
-        "mua_x_next",
-        "mua_x_last_rewarded",
-        "switch_x_current",
-        "switch_x_prev",
-        "omission_x_last_rewarded",
-        # Standardized (pooled-global) continuous covariates, filled post-concat in
-        # prepare_data.main (see EVENT_ARM_STANDARDIZED_COLS / analysis.replay.standardization).
-        *[f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
-    ]
+#: Canonical column order for ``event_arm_table``.
+_EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
+    # Identifiers (broadcast from event_table)
+    "animal",
+    "day",
+    "epoch",
+    "non_local_event",
+    "event_id",
+    "stop_idx",
+    "stop_id",
+    # Event-level context (broadcast)
+    "event_start",
+    "event_end",
+    "event_duration",
+    "time_since_stop",
+    "time_since_port_entry",
+    "time_since_reward",
+    "is_swr",
+    "is_mua",
+    "is_after_switch",
+    "is_after_omission",
+    "is_after_reward",
+    "is_after_stay",
+    "reward_outcome",
+    "is_stay",
+    "current_arm",
+    "prev_arm",
+    "next_arm",
+    "last_rewarded_arm",
+    "current_patch",
+    "prev_patch",
+    "next_patch",
+    "n_nonlocal_bins",
+    # Per-arm identity
+    "arm",
+    "arm_patch_id",
+    # Content responses
+    "arm_count_hard",
+    "arm_count_soft",
+    "arm_posterior_mass",
+    "arm_fraction",
+    "arm_fraction_posterior",
+    # Binary indicators
+    "is_current",
+    "is_prev",
+    "is_next",
+    "is_last_rewarded",
+    "is_last_rewarded_elsewhere",
+    "is_same_patch",
+    # Spatial
+    "dist_to_arm",
+    "arm_dist_rank",
+    # Reward / value
+    "visit_recency",
+    "visit_recency_demeaned",
+    "cumulative_reward",
+    "reward_rate_arm_k10",
+    "p_reward_arm",
+    "q_arm",
+    "arm_uncertainty",
+    # Interactions (+ collinearity control)
+    "current_x_last_rewarded",
+    "time_x_current",
+    "time_x_prev",
+    "time_x_next",
+    "swr_x_current",
+    "swr_x_prev",
+    "swr_x_next",
+    "swr_x_last_rewarded",
+    "swr_x_reward_rate_arm_k10",
+    "swr_x_visit_recency_demeaned",
+    "swr_x_is_last_rewarded_elsewhere",
+    "swr_x_arm_uncertainty",
+    "mua_x_current",
+    "mua_x_prev",
+    "mua_x_next",
+    "mua_x_last_rewarded",
+    "switch_x_current",
+    "switch_x_prev",
+    "omission_x_last_rewarded",
+    # Standardized (pooled-global) continuous covariates, filled post-concat in
+    # prepare_data.main (see EVENT_ARM_STANDARDIZED_COLS / analysis.replay.standardization).
+    *[f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
+)
 
 
-def _event_sequence_table_columns() -> list[str]:
-    """Canonical column order for ``event_sequence_table``."""
-    cols = [
-        "animal",
-        "day",
-        "epoch",
-        "non_local_event",
-        "event_id",
-        "t_in_event",
-        "time",
-        "nonlocal_prob",
-        "decoded_arm_map",
-    ]
-    cols.extend(f"arm_posterior_{a}" for a in ALL_ARMS)
-    return cols
+#: Canonical column order for ``event_sequence_table``.
+_EVENT_SEQUENCE_TABLE_COLUMNS: tuple[str, ...] = (
+    "animal",
+    "day",
+    "epoch",
+    "non_local_event",
+    "event_id",
+    "t_in_event",
+    "time",
+    "nonlocal_prob",
+    "decoded_arm_map",
+    *(f"arm_posterior_{a}" for a in ALL_ARMS),
+)

@@ -37,8 +37,8 @@ def _make_trials(n_trials: int, rng: np.random.Generator) -> pd.DataFrame:
 
 def _run_scalar(func, event_times, trials, track_graph):
     """Run the scalar (per-event) version, collect results as 2D array."""
-    from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-    ALL_ARMS = sorted(TRACK_SEGMENT_TO_PATCH.keys())
+    from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+
     n_arms = len(ALL_ARMS)
     out = np.full((len(event_times), n_arms), np.nan)
     for i, t in enumerate(event_times):

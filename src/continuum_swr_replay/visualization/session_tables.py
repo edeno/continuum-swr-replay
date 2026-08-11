@@ -7,9 +7,6 @@ analog of :func:`plot_detector`: same layout conventions, a superset
 of the core panels, plus overlays and optional rows that expose each
 step of the derivation chain.
 
-See ``plans/2026_04_15_session_tables_viz_plan.md`` for the original
-design.
-
 Panels fall into four groups, dispatched by name through the ``panels``
 argument. :data:`DEFAULT_PANELS` is a deliberately small
 ``plot_detector``-style overview; **every covariate panel is opt-in**, so
@@ -86,7 +83,9 @@ from continuum_swr_replay.analysis.replay import (
 )
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.data_loaders.constants import (
-    TRACK_SEGMENT_TO_PATCH,
+    ALL_ARMS as _ALL_ARMS,
+)
+from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
 from continuum_swr_replay.parameters import COLORS
@@ -101,7 +100,6 @@ from .plots import (
     plot_spike_times,
 )
 
-_ALL_ARMS: tuple[int, ...] = tuple(sorted(TRACK_SEGMENT_TO_PATCH.keys()))
 _LEAF_ARMS: frozenset[int] = frozenset(range(6))
 _TRUNK_ARMS: frozenset[int] = frozenset(set(_ALL_ARMS) - _LEAF_ARMS)
 _COLLECTION_THRESHOLD = 128
@@ -1070,7 +1068,7 @@ def _draw_event_arm_heatmap(
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     # ``event_arm_table`` already carries the broadcast
-    # ``event_start`` / ``event_end`` per row (from Phase B4 canonical
+    # ``event_start`` / ``event_end`` per row (canonical
     # schema), so no merge with ``event_table`` is needed.
     eat = ctx.event_arm_table
     _require_columns(
@@ -1654,7 +1652,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
     "how much replay went to the future destination vs. where the
     animal came from vs. where it is now?"
 
-    This is the per-event analog of the plan's Stage 1 descriptive
+    This is the per-event analog of the descriptive
     variables (``replay_frac_current`` / ``replay_frac_next`` /
     ``replay_frac_prev`` / ``replay_frac_last_rewarded``).
     """
