@@ -94,9 +94,9 @@ def find_sessions(max_per_animal: int | None = None):
     """Yield every session that has ``data_over_time.pkl`` and ``environment.pkl`` on disk.
 
     ``results.nc`` absence is recorded here as ``results_file=None`` and
-    acted on in :func:`_process_session`, which refuses the session unless
-    ``--allow-missing-posterior`` is passed — without a posterior there is no
-    ``event_sequence_table`` and no retrospective metrics.
+    acted on in :func:`_process_session`, which refuses the session — without
+    a posterior there is no ``event_sequence_table`` and no retrospective
+    metrics.
     """
     dot_files = sorted(PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl"))
     env_files = {
@@ -201,7 +201,6 @@ def _process_session(
     contingency: pd.DataFrame | None = None,
     *,
     from_cache: bool = False,
-    allow_missing_posterior: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
@@ -222,12 +221,11 @@ def _process_session(
 
     # Gate before any loading: a ~1M-row dot pickle is not worth reading for a
     # session we are about to refuse.
-    if session["results_file"] is None and not allow_missing_posterior:
+    if session["results_file"] is None:
         raise ValueError(
             f"no results.nc for {nwb} {epoch}: refusing to build a session "
             "without a conditional posterior (no event_sequence_table, no "
-            "retrospective metrics, all posterior_* columns NaN). Pass "
-            "--allow-missing-posterior to include it anyway."
+            "retrospective metrics, all posterior_* columns NaN)."
         )
 
     dot = pd.read_pickle(session["dot_file"])
@@ -254,42 +252,20 @@ def _process_session(
     # Conditional posterior is optional — sessions without a saved
     # ``results.nc`` still emit the three tables whose posterior
     # columns degrade to NaN.
-    posterior = None
-    if session["results_file"] is not None:
-        try:
-            posterior = load_conditional_posterior(session["results_file"])
-        except Exception as e:  # noqa: BLE001 - surface the reason
-            # A results.nc that exists but will not load leaves us in exactly
-            # the state the gate above refuses: no event_sequence_table, no
-            # retrospective metrics, every posterior_* column NaN. Warning and
-            # continuing here reopened the hole the gate closes -- and a
-            # truncated or corrupt file is likelier than a missing one, since
-            # find_sessions only records None when the path is absent.
-            if not allow_missing_posterior:
-                raise ValueError(
-                    f"results.nc for {nwb} {epoch} exists but could not be "
-                    f"loaded ({e}); refusing to build the session without a "
-                    "conditional posterior. Pass --allow-missing-posterior "
-                    "to include it anyway."
-                ) from e
-            logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
-    else:
-        # Only reachable with --allow-missing-posterior; the gate at the top of
-        # this function refuses the session otherwise. Without a posterior
-        # ``build_event_sequence_table`` returns nothing, so the per-timebin
-        # table is absent and with it every retrospective metric
-        # (chosen_arm_fraction, ends_at_next, contains_path_to_next and the
-        # prev-arm mirrors, merged only when that table exists). The corpus
-        # then has a session whose column completeness differs from all others,
-        # and the invariant Sum(n_nonlocal_bins) == len(event_sequence_table)
-        # no longer holds -- nothing downstream checks it.
-        logging.warning(
-            "no results.nc for %s %s — building anyway "
-            "(--allow-missing-posterior): no event_sequence_table, no "
-            "retrospective metrics, posterior-derived columns NaN",
-            nwb,
-            epoch,
-        )
+    # results_file is guaranteed non-None by the gate at the top of this
+    # function, so there is no missing-posterior branch left here.
+    try:
+        posterior = load_conditional_posterior(session["results_file"])
+    except Exception as e:  # noqa: BLE001 - surface the reason
+        # A results.nc that exists but will not load leaves us in exactly the
+        # state the gate refuses. A truncated or corrupt file is likelier than
+        # a missing one, since find_sessions only records None when the path
+        # is absent.
+        raise ValueError(
+            f"results.nc for {nwb} {epoch} exists but could not be loaded "
+            f"({e}); refusing to build the session without a conditional "
+            "posterior."
+        ) from e
 
     # Build the stop table first — it's a function of immobility
     # bouts, not non-local events, and the documented
@@ -363,15 +339,6 @@ def main():
             "run without this flag to refresh the cache."
         ),
     )
-    parser.add_argument(
-        "--allow-missing-posterior",
-        action="store_true",
-        help=(
-            "Include sessions with no results.nc. They ship without an "
-            "event_sequence_table and without the retrospective metrics, so "
-            "the corpus becomes column-inhomogeneous; off by default."
-        ),
-    )
     args = parser.parse_args()
 
     max_per_animal = 2 if args.test else args.max_per_animal
@@ -414,10 +381,7 @@ def main():
 
         try:
             result = _process_session(
-                session,
-                contingency=contingency,
-                from_cache=args.from_cache,
-                allow_missing_posterior=args.allow_missing_posterior,
+                session, contingency=contingency, from_cache=args.from_cache
             )
         except MergeError:
             # A one-to-one merge violation (duplicate event_id from the
