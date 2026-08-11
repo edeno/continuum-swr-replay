@@ -80,7 +80,14 @@ def test_no_lazy_import_loads_spyglass():
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
-        timeout=30,
+        # Guards against a hang, not against slowness. The import chain costs
+        # ~46 s on this machine, dominated by third-party packages pulled in
+        # through the package __init__: non_local_detector (~22 s) and
+        # statsmodels.api (~8 s), measured with `python -X importtime`. The
+        # old 30 s budget failed whenever the filesystem cache was cold, which
+        # reads as a broken lazy-import contract when the contract is fine
+        # (the subprocess exits 0 and prints OK).
+        timeout=180,
     )
     assert result.returncode == 0, (
         f"lazy-import contract broken.\n"

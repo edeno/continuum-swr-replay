@@ -169,12 +169,26 @@ def _load_contfrag_posterior(results_file):
 
 
 def _process_session(
-    session: dict, event_source: str, contingency: pd.DataFrame | None = None
+    session: dict,
+    event_source: str,
+    contingency: pd.DataFrame | None = None,
+    *,
+    allow_missing_posterior: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     """Run ContFrag table builders on one session."""
     nwb = session["nwb_file_name"]
     epoch = session["epoch_name"]
     brain_area = session["brain_area"]
+
+    # Gate before any loading, matching the replay driver: the dot pickle and
+    # the Spyglass trials query are not worth paying for a session we refuse.
+    if session["results_file"] is None and not allow_missing_posterior:
+        raise ValueError(
+            f"no results.nc for {nwb} {epoch}: refusing to build a ContFrag "
+            "session without a conditional posterior (posterior_*, "
+            "arm_posterior_mass and arm_fraction_posterior would all be NaN). "
+            "Pass --allow-missing-posterior to include it anyway."
+        )
 
     dot = pd.read_pickle(session["dot_file"])
     # Fail closed on input-contract violations before they silently corrupt the
@@ -194,19 +208,23 @@ def _process_session(
         try:
             posterior = _load_contfrag_posterior(session["results_file"])
         except Exception as e:  # noqa: BLE001
+            # Exists but will not load -> same degraded state the gate refuses.
+            if not allow_missing_posterior:
+                raise ValueError(
+                    f"results.nc for {nwb} {epoch} exists but could not be "
+                    f"loaded ({e}); refusing to build the ContFrag session "
+                    "without a conditional posterior. Pass "
+                    "--allow-missing-posterior to include it anyway."
+                ) from e
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
     else:
-        # Same gate as the replay driver. ContFrag builds no sequence table, so
-        # it does not lose the retrospective metrics, but the session would
-        # still ship with every posterior_* column, arm_posterior_mass and
-        # arm_fraction_posterior NaN while every other session has them -- a
-        # column-inhomogeneous corpus that no downstream check would notice. A
-        # missing results.nc usually means the decode failed or never ran.
-        # 0 of 218 sessions hit this today.
-        raise ValueError(
-            f"no results.nc for {nwb} {epoch}: refusing to build a ContFrag "
-            "session without a conditional posterior (posterior_*, "
-            "arm_posterior_mass and arm_fraction_posterior would all be NaN)."
+        # Only reachable with --allow-missing-posterior; the gate at the top of
+        # this function refuses the session otherwise.
+        logging.warning(
+            "no results.nc for %s %s — building anyway "
+            "(--allow-missing-posterior): posterior-derived columns will be NaN",
+            nwb,
+            epoch,
         )
 
     # Build the stop table first so zero-event sessions still
@@ -284,6 +302,16 @@ def main():
             "would corrupt downstream joins."
         ),
     )
+    parser.add_argument(
+        "--allow-missing-posterior",
+        action="store_true",
+        help=(
+            "Include sessions whose results.nc is absent or unreadable. Their "
+            "posterior_*, arm_posterior_mass and arm_fraction_posterior "
+            "columns are all NaN, making the corpus column-inhomogeneous; "
+            "off by default."
+        ),
+    )
     args = parser.parse_args()
 
     max_per_animal = 2 if args.test else args.max_per_animal
@@ -320,7 +348,12 @@ def main():
         epoch = session["epoch_name"]
 
         try:
-            result = _process_session(session, event_source, contingency=contingency)
+            result = _process_session(
+                session,
+                event_source,
+                contingency=contingency,
+                allow_missing_posterior=args.allow_missing_posterior,
+            )
         except (FileNotFoundError, OSError, ValueError) as e:
             logging.warning("skip %s %s: %s", nwb, epoch, e)
             skipped.append((nwb, epoch, str(e)))

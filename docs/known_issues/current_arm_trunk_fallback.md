@@ -2,7 +2,7 @@
 
 **Status:** confirmed defect, measured, not fixed
 **Found:** 2026-08-10, following the replay-tables review
-**Severity:** negligible pooled (0.94 % of events); material per-animal for wilbur
+**Severity:** negligible pooled (0.93 % of events); material per-animal for wilbur
 (3.9 %) and disqualifying for one session (`wilbur20210329_16_r8`, 40.8 %)
 
 ## What
@@ -35,7 +35,8 @@ This is the same root cause as the `is_after_switch` timing defect (C1 in the
 The fallback never fires for a NaN modal segment, so every case is the transit
 situation described above.
 
-**It is not uniformly distributed.** 68 of 218 sessions are affected at all:
+**It is not uniformly distributed.** 69 of 218 sessions see the fallback fire at
+all, 68 of them with the trip still in progress:
 
 | animal | leaking events | share of that animal's events |
 | --- | --- | --- |
@@ -45,24 +46,33 @@ situation described above.
 | senor | 45 | 0.25 % |
 | peanut | 1 | 0.02 % |
 
-A 160× spread across animals. Per-session share: median 0 %, max **40.75 %**.
+A 165× spread across animals. Per-session share: median 0 %, max **40.75 %**.
 
 ## The one session that matters: `wilbur20210329_16_r8`
 
 218 of its 535 events (40.8 %) get a lookahead `current_arm`. Diagnosis:
 
-- 26.0 % of its **immobile** timebins are on a trunk arm, versus 0.1–1.1 % in
-  every comparison session checked (two other wilbur sessions, chimi, peanut,
-  senor) — 25–250× elevated.
+- 26.0 % of its **immobile** timebins are on a trunk arm. Across all 218
+  sessions that statistic has median 0.25 % and p90 1.4 %; the next-highest
+  session is `j1620210707_06_r3` at 10.4 %, and five sessions exceed 4 %. So
+  this session is ~106× the corpus median but only 2.5× the runner-up — it is
+  the extreme of a continuum, not a lone anomaly.
 - The leak is concentrated at the end: **96 % of the 218 events fall in the last
-  two deciles** of the session, 78 % in the final decile.
+  two deciles**, 78 % in the final decile — where deciles divide the span from
+  the first to the last event midpoint. Dividing the full recording instead
+  gives 94 % and 77 %; dividing into equal-count event deciles gives 49 % and
+  24 %.
 - The arm assigned is one the animal reaches a **median 46 s later** (p90 103 s,
   max 146 s). 89 % are assigned more than 10 s before arrival.
 - The behavior is real, not a tracking artifact: during the longest pause the
   linear position varies over **0.9 cm** across 136 s at a median speed of
-  0.63 cm/s. Position is genuinely stationary, mid-trunk. (Frozen-sample rate is
-  identical for leaking and non-leaking events — 9.7 % vs 10.0 % — so the
-  `position.py` frozen-tail artifact is *not* the cause.)
+  0.63 cm/s. Position is genuinely stationary, mid-trunk. Frozen-sample rate —
+  defined as raw `head_position_x` *and* `head_position_y` both unchanged from
+  the previous sample — is 9.7 % for leaking events versus 10.0 % for the rest,
+  so frozen tracking does not explain which events leak. (Under
+  `linear_position` instead the two are 10.0 % and 72.1 %, which points the same
+  way even more strongly; the definition matters, so state it when quoting the
+  number.)
 
 So the animal made one very slow, heavily paused final approach; non-local events
 fired during the pauses; and each was labelled with the destination it would reach
@@ -75,7 +85,7 @@ pipeline kept producing events.**
 
 ## What to do
 
-- **Pooled estimates are safe.** 0.94 % of events with a mislabelled `is_current`
+- **Pooled estimates are safe.** 0.93 % of events with a mislabelled `is_current`
   cannot move an effect of the size `is_current` carries.
 - **Sensitivity-check wilbur** if per-animal estimates are quoted.
 - **Exclude `wilbur20210329_16_r8`** from per-session analyses, or report it with

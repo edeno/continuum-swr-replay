@@ -53,7 +53,10 @@ class TestPosteriorToArmMarginal:
         posterior sitting entirely on them means the decode is unusable for that
         bin and should say so.
 
-        Fires on 0 of 65,811 in-event bins in the shipped corpus.
+        Fires on 0 of the shipped corpus's 2,971,614 in-event bins
+        (``len(event_sequence_table)`` == the sum of ``n_nonlocal_bins``).
+        The 65,811 quoted in the 2026-08-08 audit report is one session's bin
+        count, not the corpus total.
         """
         edge_id = np.array([0, 0, 1, 1, -1, -1])
         posterior = np.zeros((2, 6))

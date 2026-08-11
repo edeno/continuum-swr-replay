@@ -1,9 +1,9 @@
 # `contains_path_to_next` is confounded with route length and event length
 
-**Status:** confirmed confound, measured, latent (no current consumer)
+**Status:** confirmed confound, measured; one consumer, mitigated by its null
 **Found:** 2026-08-10, following the replay-tables review
 **Severity:** would be severe if the raw rate were compared across trip types;
-harmless today because nothing reads the column
+partially mitigated in the one consumer, which uses a shuffle null
 
 ## What
 
@@ -31,11 +31,15 @@ much as it measures replay content.
 | 2 (within-patch) | 55,251 | 87.3 % | **10.3 %** |
 | 4 (cross-patch) | 4,838 | 7.6 % | **4.3 %** |
 
-Within-patch 12.0 % versus cross-patch 4.3 % — a **2.8× difference produced by
-the criterion alone**.
+Pooling the 1- and 2-arm rows gives 12.0 % versus 4.3 % cross-patch — a **2.76×
+difference produced by the criterion alone**. Comparing the table's own
+within-patch row (2 arms, 10.3 %) against cross-patch gives **2.4×**. Either
+way the gap is geometry, not content.
 
-It also interacts strongly with event length. Contains rate by quartile of
-`n_nonlocal_bins`:
+It also interacts strongly with event length. Contains rate by **global**
+quartile of `n_nonlocal_bins` (quartiles taken over all events, not within
+each path length — computing them within-length shifts a couple of cells by
+under a point):
 
 | event-length quartile | 1 arm | 2 arms | 4 arms |
 | --- | --- | --- | --- |
@@ -44,7 +48,7 @@ It also interacts strongly with event length. Contains rate by quartile of
 | Q3 | 40.9 % | 11.9 % | 3.2 % |
 | Q4 (longest) | 46.9 % | 21.6 % | 11.7 % |
 
-A 9.4× swing across event length for 2-arm paths and **29× for 4-arm paths**,
+A 9.3× swing across event length for 2-arm paths and **30.7× for 4-arm paths**,
 versus only 1.3× when a single arm is required. The metric is close to its floor
 for most events: the **median event covers 1 unique arm** (mean 2.16, p90 5),
 while the criterion demands 2 or 4.
@@ -57,18 +61,35 @@ The same applies to comparisons across conditions that differ in event duration 
 SWR versus non-SWR events, for instance, differ in length, so they would differ
 in contains rate with identical content.
 
-`contains_path_from_prev` has the same structure and the same exposure.
+`contains_path_from_prev` has the same structure (40.3 % / 10.2 % / 3.1 % by
+1 / 2 / 4 required arms) but *less* exposure: it is not in
+`retrospective._DEFAULT_METRICS`, so the consumer below does not report it.
 
 ## Current exposure
 
-**None.** The column is exported from `analysis.replay` and listed as
-response-only in `covariate_timing.py`, but no script, model spec, or figure
-reads it. Nothing published depends on it. This is recorded so it stays that way,
-or is used correctly if it is picked up.
+**One consumer, and it ships outputs.** `scripts/pfc/run_stage5b_retrospective.py`
+computes `contains_path_to_next` for every session — it is one of
+`retrospective._DEFAULT_METRICS` — and its results are on disk as
+`replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl`, 218 rows
+each, carrying `real_mean_`, `shuffled_mean_` and
+`real_minus_shuffled_contains_path_to_next` (real mean 0.116, real − shuffled
+−0.028).
+
+That consumer is **not** the naive comparison this document warns against: it
+scores each session against a `next_arm` shuffle null, which reproduces the
+marginal distribution of required-path lengths, so the geometric advantage
+largely cancels in the difference. What the shuffle does not remove is the
+*floor effect*: an event too short to cover 2 or 4 arms scores 0 in both the
+real and shuffled arms, so those events attenuate the contrast rather than
+bias it. The reported difference is therefore conservative in magnitude but
+not directionally suspect.
+
+No model spec or figure reads the `event_table` column itself.
 
 ## If you use it
 
-- Stratify by required-path length, or restrict to one trip type. Never pool.
+- Stratify by required-path length, or restrict to one trip type. Never pool a
+  raw rate across trip types; the stage-5B shuffle null is the minimum bar.
 - Condition on event length (`n_nonlocal_bins`) as well.
 - Prefer a graded alternative to the all-or-nothing rule — the fraction of
   required arms covered — which is far less floor-bound and much weaker in its
@@ -81,4 +102,6 @@ or is used correctly if it is picked up.
 Reads the shipped `replay_content/event_table.pkl` only; no Spyglass access and
 no rebuild. Recompute the required-arm count per event with
 `arm_path_well_to_well(current_arm, next_arm)` and cross-tabulate against
-`contains_path_to_next` and quartiles of `n_nonlocal_bins`.
+`contains_path_to_next` and **global** quartiles of `n_nonlocal_bins` (taken
+over all events, then crossed with path length — not quartiles computed
+within each path length).

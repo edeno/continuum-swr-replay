@@ -82,12 +82,15 @@ def posterior_to_arm_marginal(
     Returns
     -------
     np.ndarray
-        Shape ``(n_timebins, n_arms)``; each row sums to 1 up to
-        floating-point tolerance for timebins with any real-arm mass.
-        Timebins whose posterior is entirely on junction bins (which
-        should never happen, since junction bins are excluded before any
-        MAP-to-arm or posterior-to-arm step) return a uniform ``1/n_arms``
-        row.
+        Shape ``(n_timebins, n_arms)``; every row sums to 1 up to
+        floating-point tolerance.
+
+    Raises
+    ------
+    ValueError
+        If any timebin's posterior lies entirely on junction bins. Such a
+        timebin carries no arm information, and filling it (uniform or
+        otherwise) would manufacture one -- see the guard below.
     """
     conditional_posterior = np.asarray(conditional_posterior, dtype=float)
     edge_id = np.asarray(edge_id, dtype=int)

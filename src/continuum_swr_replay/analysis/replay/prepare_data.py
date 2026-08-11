@@ -93,10 +93,10 @@ SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
 def find_sessions(max_per_animal: int | None = None):
     """Yield every session that has ``data_over_time.pkl`` and ``environment.pkl`` on disk.
 
-    ``results.nc`` absence is not a hard skip here — that's inspected
-    per session in :func:`main` so sessions without the conditional
-    posterior still contribute the event / event-arm / stop tables
-    (with ``posterior_*`` columns as NaN).
+    ``results.nc`` absence is recorded here as ``results_file=None`` and
+    acted on in :func:`_process_session`, which refuses the session unless
+    ``--allow-missing-posterior`` is passed — without a posterior there is no
+    ``event_sequence_table`` and no retrospective metrics.
     """
     dot_files = sorted(PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl"))
     env_files = {
@@ -258,7 +258,20 @@ def _process_session(
     if session["results_file"] is not None:
         try:
             posterior = load_conditional_posterior(session["results_file"])
-        except Exception as e:  # noqa: BLE001 - surface the reason and keep going
+        except Exception as e:  # noqa: BLE001 - surface the reason
+            # A results.nc that exists but will not load leaves us in exactly
+            # the state the gate above refuses: no event_sequence_table, no
+            # retrospective metrics, every posterior_* column NaN. Warning and
+            # continuing here reopened the hole the gate closes -- and a
+            # truncated or corrupt file is likelier than a missing one, since
+            # find_sessions only records None when the path is absent.
+            if not allow_missing_posterior:
+                raise ValueError(
+                    f"results.nc for {nwb} {epoch} exists but could not be "
+                    f"loaded ({e}); refusing to build the session without a "
+                    "conditional posterior. Pass --allow-missing-posterior "
+                    "to include it anyway."
+                ) from e
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
     else:
         # Only reachable with --allow-missing-posterior; the gate at the top of
