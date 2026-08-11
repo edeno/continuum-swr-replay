@@ -328,13 +328,36 @@ def uncertainty_extra(
     arm_adjacency : dict[int, set[int]]
         Arm -> set of graph-adjacent arms, from ``spatial.arm_adjacency``.
     """
+    return _group_by_event(event_id)[0], {
+        "hpd_coverage_cm": _hpd_coverage_mean(event_id, hpd),
+        "multimodal_fraction": _multimodal_fraction(
+            event_id=event_id,
+            arm_posterior=arm_posterior,
+            arm_adjacency=arm_adjacency,
+            coverage=coverage,
+        ),
+    }
+
+
+def _multimodal_fraction(
+    *,
+    event_id: np.ndarray,
+    arm_posterior: np.ndarray,
+    arm_adjacency: dict[int, set[int]],
+    coverage: float = 0.95,
+) -> np.ndarray:
+    """Per-event fraction of timebins whose HPD arm set spans >1 component.
+
+    Split out from :func:`uncertainty_extra` because it is the *only* rollup
+    that needs the arm posterior -- ``hpd_coverage_cm`` reads the per-bin
+    ``hpd`` column alone. Keeping them fused forced every caller without a
+    posterior into a parallel branch that recomputed ``hpd_coverage_cm``.
+    """
     from non_local_detector.model_checking.highest_posterior_density import (
         get_highest_posterior_threshold,
     )
 
-    unique, inv, n_events = _group_by_event(event_id)
-    hpd_coverage_cm = _hpd_coverage_mean(event_id, hpd)
-
+    _, inv, n_events = _group_by_event(event_id)
     arm_posterior = np.asarray(arm_posterior, dtype=float)
     arm_da = xr.DataArray(
         arm_posterior,
@@ -350,12 +373,7 @@ def uncertainty_extra(
     counts = np.bincount(inv, minlength=n_events).astype(float)
     mm_total = np.bincount(inv, weights=multimodal, minlength=n_events)
     with np.errstate(divide="ignore", invalid="ignore"):
-        multimodal_fraction = np.where(counts > 0, mm_total / counts, np.nan)
-
-    return unique, {
-        "hpd_coverage_cm": hpd_coverage_cm,
-        "multimodal_fraction": multimodal_fraction,
-    }
+        return np.where(counts > 0, mm_total / counts, np.nan)
 
 
 def trajectory_dynamics(
@@ -643,19 +661,20 @@ def compute_trajectory_rollups(
             np.bincount(inv, weights=is_nospike, minlength=n_events) / counts
         )
 
-    if arm_posterior is not None:
-        _, unc = uncertainty_extra(
+    # hpd_coverage_cm reads the per-bin ``hpd`` column and nothing else, so it is
+    # computed unconditionally. multimodal_fraction is the only rollup that needs
+    # the arm posterior, and is NaN when the caller has none (the builders accept
+    # conditional_posterior=None and promise a stable schema).
+    out["hpd_coverage_cm"] = _hpd_coverage_mean(event_id, col("hpd"))
+    out["multimodal_fraction"] = (
+        _multimodal_fraction(
             event_id=event_id,
-            hpd=col("hpd"),
             arm_posterior=arm_posterior,
             arm_adjacency=arm_adjacency(track_graph),
         )
-        out.update(unc)
-    else:
-        # hpd_coverage_cm needs only the per-bin hpd column; multimodal_fraction
-        # needs the arm posterior, so it is NaN when the posterior is absent.
-        out["hpd_coverage_cm"] = _hpd_coverage_mean(event_id, col("hpd"))
-        out["multimodal_fraction"] = np.full(len(np.unique(event_id)), np.nan)
+        if arm_posterior is not None
+        else np.full(len(np.unique(event_id)), np.nan)
+    )
 
     adj = arm_adjacency(track_graph)
     pc = (
