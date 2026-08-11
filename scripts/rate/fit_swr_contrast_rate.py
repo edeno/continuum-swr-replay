@@ -349,7 +349,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    # Causal-hygiene gate (phase 4): each rung's covariates must be pre-outcome, or the
+    # Causal-hygiene gate: each rung's covariates must be pre-outcome, or the
     # rung is an explicitly-declared descriptive rung (RPE/value association or peri-switch
     # alignment). A NEW leaky covariate on an undeclared rung fails here. S-rungs carry
     # is_swr as a gating modifier (a SAFE_MODIFIER), so asserting `need` covers the

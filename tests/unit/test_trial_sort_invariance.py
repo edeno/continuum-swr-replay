@@ -365,7 +365,7 @@ class TestRewardRateArmDefinition:
     def test_trunk_zero_vs_unvisited_leaf_encoded(self):
         """Trunk arms -> 0.0; never-visited leaf -> 0.0 too (mechanism-A encode).
 
-        Phase 4: an unvisited leaf *with prior trials* is encoded 0.0 (no rewards
+        An unvisited leaf *with prior trials* is encoded 0.0 (no rewards
         observed on it yet), not NaN — only a no-trial-history event stays NaN. Here
         two trials precede the event at t=2.5, so arm 1 (never visited) is 0.0.
         """

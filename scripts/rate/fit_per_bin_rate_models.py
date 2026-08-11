@@ -286,7 +286,7 @@ def main() -> None:
     parser.add_argument("--no-gof", action="store_true", help="Skip goodness-of-fit.")
     args = parser.parse_args()
 
-    # Causal-hygiene gate (phase 4): the per-bin design basis (spline, reward kernel,
+    # Causal-hygiene gate: the per-bin design basis (spline, reward kernel,
     # self-/cross-history) is backward/within-stop safe; a future leak fails loud.
     for spec in MODEL_PER_BIN_RATE.values():
         assert_predictor_timing(c for c in _design_columns(spec) if c != "count")

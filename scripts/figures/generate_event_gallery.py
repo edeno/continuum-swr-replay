@@ -374,7 +374,7 @@ def _arm_of_edge_map() -> dict:
 
     Leaf arm ``w`` (0-5) joins well ``w`` to junction ``6 + w // 2``; trunk
     arms 6/7/8 join junction 6/7/8 to the center node 9 (the track-graph
-    convention documented in CLAUDE.md). Used to label arms with the same id
+    convention). Used to label arms with the same id
     the regression's ``current/prev/next_arm`` predictors carry.
     """
     arm_of_edge = {}

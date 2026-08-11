@@ -5,7 +5,6 @@ The content analog of ``scripts/rate/fit_swr_contrast_rate.py``. Where the rate 
 models HOW OFTEN non-local events occur (Poisson count per time bin), this models
 WHICH ARM / PATCH an event represents: a conditional Poisson over the 9 arms (or 3
 patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
-``docs/design/content_model_design.md``.
 
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,
@@ -491,7 +490,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    # Causal-hygiene gate (phase 4): every rung's predictors must be pre-outcome, OR the
+    # Causal-hygiene gate: every rung's predictors must be pre-outcome, OR the
     # rung must be an explicitly-declared descriptive rung (RPE/value association or
     # peri-switch alignment). A NEW leaky covariate on an undeclared rung fails here.
     for ladder in (ARM_LADDER, PATCH_LADDER):

@@ -38,7 +38,7 @@ def simplified_star_track() -> nx.Graph:
     center node (6) via six 20cm edges.
 
     NOT the real bandit topology — the production task is a 10-node, 9-edge
-    spider with patch junctions between wells and center (see CLAUDE.md).
+    spider with patch junctions between wells and center.
     Tests that depend on the real topology (multi-segment paths, trunk-arm
     semantics, patch junctions) should construct their own graph; this
     fixture is a minimal substrate for tests where only the well-to-center

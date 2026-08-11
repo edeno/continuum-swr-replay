@@ -152,7 +152,7 @@ def fit_per_stop_rate_hierarchy(
 
 
 def main() -> None:
-    # Causal-hygiene gate (phase 4): R1/R2 now use reward_lag1 (past-only), so the
+    # Causal-hygiene gate: R1/R2 now use reward_lag1 (past-only), so the
     # per-stop ladder is pre-outcome throughout; a future leak fails loud.
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)

@@ -1,6 +1,6 @@
 """Tests for analysis/replay/learning.py.
 
-Stage 6 asks whether replay content modulates the stay/leave decision
+These models ask whether replay content modulates the stay/leave decision
 after reward vs. omission. Two pieces:
 
 - :func:`stop_replay_summary` collapses per-event arm-fractions to one

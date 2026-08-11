@@ -5,7 +5,6 @@ Stop-onset-aligned rasters (rows = stops sorted by immobility duration, x =
 time-since-stop-onset, one tick per event onset), the column-mean rate (PSTH,
 survival-corrected exposure), and the within-stop inter-onset-interval histogram
 (autocorrelogram view: refractoriness + burstiness). For SWR vs non-SWR non-local.
-See docs/design/2026-06-27-state-space-point-process-event-model.md.
 """
 
 from __future__ import annotations

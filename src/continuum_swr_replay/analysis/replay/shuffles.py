@@ -7,7 +7,7 @@ Three shuffles:
    ``path_continuity`` and sequence metrics.
 2. :func:`stop_label_shuffle` — randomly permute behavioral labels
    across stops within a session, preserving events-per-stop counts.
-   Null for replay–behavior alignment analyses (Stages 5–6).
+   Null for replay–behavior alignment analyses.
 3. :func:`next_arm_circular_shift` — circularly shift ``next_arm``
    (and associated post-hoc columns) across stops within a session.
    Null for the retrospective alignment metrics, guarding against patch

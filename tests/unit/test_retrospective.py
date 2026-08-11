@@ -1,6 +1,6 @@
 """Tests for analysis/replay/retrospective.py.
 
-Stage 5B asks (post hoc) whether replay content during a stop aligns
+The retrospective metrics ask (post hoc) whether replay content during a stop aligns
 with the arm the animal will visit next. The metrics are:
 
 - ``chosen_arm_fraction``: per-event ``arm_fraction`` at ``arm == next_arm``.
@@ -86,7 +86,7 @@ class TestArmPathWellToWell:
 
 
 def _make_event_table(events: list[dict]) -> pd.DataFrame:
-    """Build a minimal event_table with the columns Stage 5B needs."""
+    """Build a minimal event_table with the columns the metrics need."""
     df = pd.DataFrame(events)
     # Fill columns retrospective.py expects but tests don't always set
     for col, default in {

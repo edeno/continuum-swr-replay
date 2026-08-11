@@ -390,7 +390,7 @@ def fit_is_stay_logistic_per_session(
 ) -> pd.DataFrame:
     """Per-session logistic: ``is_stay ~ outcome * content_col``.
 
-    Causal-hygiene note (phase 4): ``outcome_col`` defaults to
+    Causal-hygiene note: ``outcome_col`` defaults to
     ``is_after_omission`` — a POST_OUTCOME covariate — but that is **valid here
     and deliberately unchanged**: the modeled unit is the stay/leave *decision*,
     which happens AFTER the current trial's outcome by construction (the animal

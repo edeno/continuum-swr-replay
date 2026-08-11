@@ -25,8 +25,7 @@ Per-event metrics (all bin lookups use native track-graph distance):
   specificity).
 
 The matched non-event immobility baseline is the null (its dll_animal and
-dll_per_spike sit at ~0). See the design spec:
-``docs/design/2026-06-25-non-swr-event-reality-design.md``.
+dll_per_spike sit at ~0).
 
 Usage
 -----

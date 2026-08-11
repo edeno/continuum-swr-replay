@@ -6,8 +6,6 @@ why (the mutually-exclusive ``n_drop_*`` buckets), who was fit (``n_modeled``), 
 whether the drop looks biased (``drop_notes`` profile). This is reporting
 infrastructure — it changes no fitted number.
 
-Schema and the reconciliation invariant are defined in
-``.claude/docs/plans/regression-integrity-fixes/shared-contracts.md`` (Contract 1).
 The single hard rule: the drop buckets are **mutually exclusive** and
 ``n_in - Σ n_drop_* == n_modeled`` must hold, or :func:`cohort_record` raises.
 

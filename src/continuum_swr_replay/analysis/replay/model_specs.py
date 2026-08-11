@@ -219,7 +219,7 @@ def default_content_model_names(
 
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
-# Mechanism-A (phase 4): an unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not
+# Mechanism-A: an unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not
 # NaN) so its event is retained. A ``has_arm_history`` novelty indicator was considered
 # but deliberately NOT added (the novel-arm effect is modest, ~13% less replay); the
 # ``reward_rate_arm_k10`` coefficient therefore absorbs that novelty component.
@@ -1168,7 +1168,7 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 #
 # These rungs carry a POST_OUTCOME (RPE / value-update — embeds the current reward) or
 # FUTURE_REFERENCING (trials_since_switch / is_post_switch — signs toward the NEXT switch)
-# covariate that CANNOT be a forward predictor. Per the phase-4 decision they are RETAINED
+# covariate that CANNOT be a forward predictor. They are RETAINED
 # under an explicit *descriptive* claim (a value/RPE *association*, or a *peri-switch
 # alignment*), NOT gated. The runners call ``assert_predictor_timing(descriptive=True)``
 # for exactly these names; a NEW rung that introduces a leaky covariate but is NOT listed

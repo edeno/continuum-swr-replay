@@ -1,6 +1,6 @@
 """Tests for analysis/replay/choice_prediction.py.
 
-Stage 5A asks whether replay content predicts the next choice. The
+The choice models ask whether replay content predicts the next choice. The
 data pipeline (``build_choice_dataset`` →
 ``build_residualized_choice_dataset``) and the conditional-logistic
 fit (``fit_choice_model``) all live in this module. Pin the

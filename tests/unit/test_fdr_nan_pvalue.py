@@ -1,4 +1,4 @@
-"""Regression test: Stage 6 cross-session FDR must not be poisoned
+"""Regression test: cross-session FDR must not be poisoned
 by a NaN p-value from a single role.
 
 ``run_stage6_learning.py`` builds a list of role-level Wilcoxon

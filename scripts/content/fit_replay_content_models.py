@@ -574,7 +574,7 @@ def main():
     for model_name in valid_model_names:
         spec = hierarchy[model_name]
         predictors = list(spec.predictors)
-        # Causal-hygiene gate (phase 4): the base content hierarchy carries no
+        # Causal-hygiene gate: the base content hierarchy carries no
         # post/future-outcome covariates, so no descriptive exception is expected here;
         # a future leak fails loud rather than becoming a silent predictive claim.
         assert_predictor_timing(predictors)

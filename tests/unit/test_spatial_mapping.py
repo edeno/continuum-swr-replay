@@ -1,7 +1,6 @@
 """Tests for analysis/replay/spatial_mapping.py.
 
-CLAUDE.md flags this module as the canonical pattern for the
-junction-bin exclusion. The fix that makes this work is the
+This module is the canonical pattern for junction-bin exclusion. The fix that makes this work is the
 ``real_mask = ei >= 0`` filter at line 47/87. Pin every aspect:
 
 - junction-bin MAPs are routed to the nearest real-arm bin (never NaN
@@ -91,7 +90,7 @@ class TestMapEstimateToArm:
         np.testing.assert_array_equal(out, [0.0, 2.0, 8.0])
 
     def test_junction_bin_position_routes_to_nearest_real_arm(self):
-        """CLAUDE.md gotcha: a MAP estimate that happens to fall at a
+        """A MAP estimate that happens to fall at a
         junction-bin linear_position (edge_id = -1) must NOT return
         edge_id=-1 or NaN. The nearest-neighbor lookup excludes
         junction bins, so the result is the closest real arm."""
@@ -223,7 +222,7 @@ class TestWellToArmSet:
         (0, {0}), (1, {1}), (2, {2}), (3, {3}), (4, {4}), (5, {5}),
     ])
     def test_each_well_has_exactly_one_arm_on_real_graph(self, well, expected_arms):
-        """CLAUDE.md invariant: each well is degree-1 on the real
+        """Each well is degree-1 on the real
         bandit graph, so well_to_arm_set returns a set of size 1.
         This is what makes is_prev / is_next / is_last_rewarded each
         mark exactly one of the nine arms per event."""

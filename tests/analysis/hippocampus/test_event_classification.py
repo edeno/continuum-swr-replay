@@ -178,7 +178,7 @@ class TestGetEventTypes:
 
 
 class TestSelectTypicalEventByClass:
-    """select_typical_event_by_class precomputed-peak_prob path (phase 2)."""
+    """select_typical_event_by_class precomputed-peak_prob path."""
 
     @staticmethod
     def _events_frame() -> pd.DataFrame:

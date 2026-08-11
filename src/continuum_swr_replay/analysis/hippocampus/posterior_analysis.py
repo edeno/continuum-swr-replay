@@ -148,7 +148,7 @@ def _map_node_ids(
     # Junction placeholder bins carry node_id == -1 (edge_id == -1 interpolation
     # artifacts) and are not in the track graph. If the MAP ever lands on one,
     # mark the bin invalid and swap in a real placeholder node so the downstream
-    # graph-distance lookup neither uses it nor raises (CLAUDE.md junction rule).
+    # graph-distance lookup neither uses it nor raises (junction-bin rule).
     junction = node_ids == -1
     if junction.any():
         has_valid_data = has_valid_data & ~junction
@@ -309,7 +309,7 @@ def map_estimate_to_map_nodes(
     # Exclude junction placeholder bins (node_id == -1, edge_id == -1
     # interpolation artifacts) from the candidate set so the nearest-neighbour
     # match never returns a node that is absent from the track graph
-    # (CLAUDE.md junction rule). The MAP itself never lands on these bins.
+    # (junction-bin rule). The MAP itself never lands on these bins.
     real = np.asarray(place_bin_centers_nodes_df["node_id"]) != -1
     bin_lin = np.asarray(
         place_bin_centers_nodes_df["linear_position"], dtype=float

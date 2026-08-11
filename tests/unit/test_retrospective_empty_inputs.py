@@ -3,9 +3,9 @@
 The previous chained
 ``Series.groupby(...).agg(...).rename(columns=...)`` raised
 ``TypeError: Series.rename() got an unexpected keyword argument
-'columns'`` when ``event_sequence_table`` was empty. The Stage 5B
+'columns'`` when ``event_sequence_table`` was empty. The retrospective
 runner caught any exception and silently dropped the whole session,
-which made an entire session of valid Stage 5B events disappear
+which made an entire session of valid retrospective events disappear
 just because its sequence table happened to be empty.
 
 The fix uses named aggregation (and a no-op short-circuit on empty

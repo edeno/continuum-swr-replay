@@ -2,7 +2,7 @@
 
 The is_swr-contrast content runner standardizes its event scalars over the *event
 cohort* at fit time (its own scope, distinct from the builder's pooled-global table
-_z). Phase 6 does NOT repoint the runner at the builder _z; instead it persists the
+_z). The runner is NOT repointed at the builder _z; instead it persists the
 run's own means/SDs into the provenance so the standardized coefficients are
 reproducible. This locks that in.
 """

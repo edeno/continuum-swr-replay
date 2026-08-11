@@ -327,7 +327,7 @@ def test_missing_required_column_raises():
         build_classified_nonlocal_event_table(frame)
 
 
-# --- Phase 2 consumers: parity with get_event_types, table-driven counts,
+# --- Downstream consumers: parity with get_event_types, table-driven counts,
 #     and the inline timing-offset column subtraction. ---
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402

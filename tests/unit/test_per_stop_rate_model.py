@@ -1,6 +1,6 @@
 """Tests for analysis/replay/per_stop_rate_model.py.
 
-The Poisson rate model is the Stage 2 paper claim: do behavioral
+The Poisson rate model carries a paper claim: do behavioral
 contexts change the NUMBER of replay events per stop, independently
 of replay content. A sign error in the ``log(immobility_time)``
 offset, a botched Poisson fit, or a silent inclusion of zero-duration

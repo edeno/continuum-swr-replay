@@ -9,7 +9,7 @@ This is the **persisted-table** `_z` (means/SDs over the *full* materialized tab
 folded into the owning builders (event_arm side in ``prepare_data``, qvals side in
 ``qvals_table``) so a clean rebuild carries them. It is deliberately NOT the fit-time
 `_z` the is_swr-contrast runners compute over their event/stop cohort — those are a
-different scope and must not be repointed here (see the phase-6 plan, F2).
+different scope and must not be repointed here.
 
 The reference (``{col: {"mean": ..., "std": ...}}``) is persisted next to each table so
 the transform is reproducible and auditable; re-applying it reproduces the `_z` exactly.
@@ -76,8 +76,7 @@ def attach_standardized(
 def assert_standardized_present(df: pd.DataFrame, cols) -> None:
     """Rebuild-completeness guard: raise if any ``<col>_z`` was dropped or wrongly wiped.
 
-    Checked **per column** (the exact regression phase 6 fixes — a silently dropped or
-    wiped ``_z``): for every source covariate present in ``df``, its ``<col>_z`` must
+    Checked **per column** (catching a silently dropped or wiped ``_z``): for every source covariate present in ``df``, its ``<col>_z`` must
     exist, and it must carry real data **unless the source is a finite constant**
     (a genuine zero-variance source legitimately yields an all-NaN ``_z``). Two failures:
     an all-NaN ``_z`` whose source *does* vary, and a source that is *entirely NaN* (a
