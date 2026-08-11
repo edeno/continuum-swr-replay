@@ -39,13 +39,38 @@ class TestPosteriorToArmMarginal:
         assert arm_post.shape == (5, 3)
         np.testing.assert_allclose(arm_post.sum(axis=1), 1.0)
 
-    def test_junction_bins_contribute_zero(self):
-        # All mass on junction bins → fall-back to uniform.
+    def test_all_junction_timebin_raises(self):
+        """A timebin with no real-arm mass carries no arm information.
+
+        This previously filled the row with a uniform ``1/n_arms`` and the test
+        asserted that fill. The assertion described the implementation rather
+        than specifying anything: uniform claims *equal evidence for every arm*
+        where the truth is *no evidence*, and it does not stay contained --
+        ``arm_map_from_posterior`` argmaxes the row and returns arm 0 (ties
+        break low), giving the bin a confident and systematically biased arm,
+        while the row credits ``1/n_arms`` of a real bin's mass to every arm in
+        the content sums. Junction bins are interpolation placeholders, so a
+        posterior sitting entirely on them means the decode is unusable for that
+        bin and should say so.
+
+        Fires on 0 of 65,811 in-event bins in the shipped corpus.
+        """
         edge_id = np.array([0, 0, 1, 1, -1, -1])
         posterior = np.zeros((2, 6))
         posterior[:, 4:] = 0.5  # all mass on junction bins
+        with pytest.raises(ValueError, match="entire conditional posterior"):
+            posterior_to_arm_marginal(posterior, edge_id, n_arms=2)
+
+    def test_junction_bins_contribute_zero_when_real_mass_exists(self):
+        """Junction mass is dropped and the row renormalizes over real arms."""
+        edge_id = np.array([0, 0, 1, 1, -1, -1])
+        posterior = np.zeros((2, 6))
+        posterior[:, 0] = 0.25  # arm 0
+        posterior[:, 2] = 0.25  # arm 1
+        posterior[:, 4:] = 0.25  # junction, must be discarded
         arm_post = posterior_to_arm_marginal(posterior, edge_id, n_arms=2)
         np.testing.assert_allclose(arm_post, 0.5)
+        np.testing.assert_allclose(arm_post.sum(axis=1), 1.0)
 
     def test_single_bin_per_arm(self):
         edge_id = np.array([0, 1, 2])

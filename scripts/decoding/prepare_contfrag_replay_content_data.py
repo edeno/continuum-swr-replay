@@ -195,6 +195,19 @@ def _process_session(
             posterior = _load_contfrag_posterior(session["results_file"])
         except Exception as e:  # noqa: BLE001
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
+    else:
+        # Same gate as the replay driver. ContFrag builds no sequence table, so
+        # it does not lose the retrospective metrics, but the session would
+        # still ship with every posterior_* column, arm_posterior_mass and
+        # arm_fraction_posterior NaN while every other session has them -- a
+        # column-inhomogeneous corpus that no downstream check would notice. A
+        # missing results.nc usually means the decode failed or never ran.
+        # 0 of 218 sessions hit this today.
+        raise ValueError(
+            f"no results.nc for {nwb} {epoch}: refusing to build a ContFrag "
+            "session without a conditional posterior (posterior_*, "
+            "arm_posterior_mass and arm_fraction_posterior would all be NaN)."
+        )
 
     # Build the stop table first so zero-event sessions still
     # contribute their immobility bouts. Returning early on an empty

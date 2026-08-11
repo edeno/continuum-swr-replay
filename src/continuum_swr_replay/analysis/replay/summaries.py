@@ -127,13 +127,26 @@ def posterior_to_arm_marginal(
 
     row_sum = arm_posterior.sum(axis=1, keepdims=True)
     zero_rows = row_sum.squeeze(1) == 0
-    # Avoid divide-by-zero for entirely-junction rows; leave as zeros, fix below.
-    safe_sum = np.where(row_sum == 0, 1.0, row_sum)
-    arm_posterior = arm_posterior / safe_sum
     if zero_rows.any():
-        arm_posterior[zero_rows, :] = 1.0 / n_arms
-
-    return arm_posterior
+        # A timebin whose entire posterior sits on junction bins has no arm
+        # information at all. The former behavior filled the row with a uniform
+        # 1/n_arms, which asserts *equal evidence for every arm* where the truth
+        # is *no evidence* -- and it does not stay contained: arm_map_from_posterior
+        # argmaxes that row and returns arm 0 (ties break to the lowest index), so
+        # the bin acquires a confident, systematically biased arm assignment; and
+        # the row contributes 1/n_arms of a real bin's mass to every arm in the
+        # content sums, diluting real content and crediting arms the replay never
+        # visited. Junction bins are interpolation placeholders, not positions, so
+        # a posterior concentrated entirely on them is a decode-integrity signal.
+        # This mirrors the guard above for an environment with no real bins.
+        raise ValueError(
+            f"{int(zero_rows.sum())} of {n_timebins} timebin(s) have their "
+            "entire conditional posterior on junction bins (edge_id == -1), "
+            "so they carry no arm information. Junction bins are "
+            "interpolation placeholders, not positions -- check the decode "
+            "and the environment rather than assigning these bins an arm."
+        )
+    return arm_posterior / row_sum
 
 
 def arm_map_from_posterior(arm_posterior: np.ndarray) -> np.ndarray:
