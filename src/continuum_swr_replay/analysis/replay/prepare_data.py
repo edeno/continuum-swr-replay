@@ -201,6 +201,7 @@ def _process_session(
     contingency: pd.DataFrame | None = None,
     *,
     from_cache: bool = False,
+    allow_missing_posterior: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     """Run all four builders on one session; return the four frames or ``None``.
 
@@ -218,6 +219,16 @@ def _process_session(
     """
     nwb = session["nwb_file_name"]
     epoch = session["epoch_name"]
+
+    # Gate before any loading: a ~1M-row dot pickle is not worth reading for a
+    # session we are about to refuse.
+    if session["results_file"] is None and not allow_missing_posterior:
+        raise ValueError(
+            f"no results.nc for {nwb} {epoch}: refusing to build a session "
+            "without a conditional posterior (no event_sequence_table, no "
+            "retrospective metrics, all posterior_* columns NaN). Pass "
+            "--allow-missing-posterior to include it anyway."
+        )
 
     dot = pd.read_pickle(session["dot_file"])
     # Fail closed on input-contract violations (multi-session frame, unsorted
@@ -249,6 +260,23 @@ def _process_session(
             posterior = load_conditional_posterior(session["results_file"])
         except Exception as e:  # noqa: BLE001 - surface the reason and keep going
             logging.warning("posterior load failed for %s %s: %s", nwb, epoch, e)
+    else:
+        # Only reachable with --allow-missing-posterior; the gate at the top of
+        # this function refuses the session otherwise. Without a posterior
+        # ``build_event_sequence_table`` returns nothing, so the per-timebin
+        # table is absent and with it every retrospective metric
+        # (chosen_arm_fraction, ends_at_next, contains_path_to_next and the
+        # prev-arm mirrors, merged only when that table exists). The corpus
+        # then has a session whose column completeness differs from all others,
+        # and the invariant Sum(n_nonlocal_bins) == len(event_sequence_table)
+        # no longer holds -- nothing downstream checks it.
+        logging.warning(
+            "no results.nc for %s %s — building anyway "
+            "(--allow-missing-posterior): no event_sequence_table, no "
+            "retrospective metrics, posterior-derived columns NaN",
+            nwb,
+            epoch,
+        )
 
     # Build the stop table first — it's a function of immobility
     # bouts, not non-local events, and the documented
@@ -322,6 +350,15 @@ def main():
             "run without this flag to refresh the cache."
         ),
     )
+    parser.add_argument(
+        "--allow-missing-posterior",
+        action="store_true",
+        help=(
+            "Include sessions with no results.nc. They ship without an "
+            "event_sequence_table and without the retrospective metrics, so "
+            "the corpus becomes column-inhomogeneous; off by default."
+        ),
+    )
     args = parser.parse_args()
 
     max_per_animal = 2 if args.test else args.max_per_animal
@@ -364,7 +401,10 @@ def main():
 
         try:
             result = _process_session(
-                session, contingency=contingency, from_cache=args.from_cache
+                session,
+                contingency=contingency,
+                from_cache=args.from_cache,
+                allow_missing_posterior=args.allow_missing_posterior,
             )
         except MergeError:
             # A one-to-one merge violation (duplicate event_id from the
