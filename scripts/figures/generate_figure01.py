@@ -997,7 +997,7 @@ def generate_figure(n_neurons=30, seed=42):
     ax_b_header = fig.add_subplot(gs_row0[0, 1])
     add_panel_header(ax_b_header, "Observation likelihoods")
 
-    b_axes = plot_observation_models(fig, gs_row0[1, 1])
+    plot_observation_models(fig, gs_row0[1, 1])
 
     # ── Row 1: Transition Kernels (c) ──
     kernel_axes = plot_transition_kernels(fig, gs_main[1])

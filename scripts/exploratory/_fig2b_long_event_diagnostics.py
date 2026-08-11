@@ -89,7 +89,8 @@ def main() -> None:
 
     lines = []
     def emit(x=""):
-        lines.append(x); print(x)
+        lines.append(x)
+        print(x)
 
     emit("=" * 92)
     emit("LONG NON-SWR EVENTS: real vs model-spec artifact — per-event posterior diagnostics")
@@ -101,7 +102,7 @@ def main() -> None:
     emit("-" * len(header))
     for col, lbl in metrics:
         row = f"{lbl:16s}"
-        for k, v in groups.items():
+        for v in groups.values():
             row += f"{v[col].median():>20.3f}"
         emit(row + "   (median)")
     emit("")
@@ -119,7 +120,7 @@ def main() -> None:
     swr = groups["SWR-overlap (all)"]
     def frac(df, mask):
         return float(mask.mean()) if len(df) else np.nan
-    emit("Diagnostic flags on the >1s non-SWR events (n=%d):" % len(long1))
+    emit(f"Diagnostic flags on the >1s non-SWR events (n={len(long1)}):")
     emit(f"  MUA z_mean < 0 (below-baseline spiking): "
          f"{frac(long1, long1['mua_z_mean'] < 0):.0%}  "
          f"(short non-SWR: {frac(short, short['mua_z_mean'] < 0):.0%}, "

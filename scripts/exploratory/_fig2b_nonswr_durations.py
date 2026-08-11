@@ -39,7 +39,8 @@ def main() -> None:
 
     lines = []
     def emit(x=""):
-        lines.append(x); print(x)
+        lines.append(x)
+        print(x)
 
     emit("=" * 84)
     emit("DURATION OF NON-SWR NON-LOCAL EVENTS, PER ANIMAL (immobile)")
@@ -57,9 +58,9 @@ def main() -> None:
     # per-animal duration summary for non-SWR
     rows = []
     for animal, g in nonswr.groupby("animal"):
-        r = dict(animal=animal, n_nonswr=len(g),
-                 median_s=g[d].median(), p90_s=g[d].quantile(.9),
-                 p99_s=g[d].quantile(.99), max_s=g[d].max())
+        r = {"animal": animal, "n_nonswr": len(g),
+             "median_s": g[d].median(), "p90_s": g[d].quantile(.9),
+             "p99_s": g[d].quantile(.99), "max_s": g[d].max()}
         for t in THRESHOLDS:
             n = int((g[d] > t).sum())
             r[f"n_gt_{t}s"] = n

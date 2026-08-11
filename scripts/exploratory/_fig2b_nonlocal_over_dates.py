@@ -70,8 +70,9 @@ def main() -> None:
         swr_labels = g["SWR_event"].to_numpy()
         n_swr = int(np.unique(swr_labels[swr_labels > 0]).size)
         recs.append(
-            dict(animal=animal, day=day, epoch=epoch, total_min=total_min,
-                 immobile_min=immobile_min, n_swr=n_swr)
+            {"animal": animal, "day": day, "epoch": epoch,
+             "total_min": total_min, "immobile_min": immobile_min,
+             "n_swr": n_swr}
         )
     dur = pd.DataFrame(recs)
 
@@ -83,7 +84,8 @@ def main() -> None:
 
     lines = []
     def emit(x=""):
-        lines.append(x); print(x)
+        lines.append(x)
+        print(x)
 
     emit("=" * 76)
     emit("NON-LOCAL AMOUNT vs DATE, PER ANIMAL")

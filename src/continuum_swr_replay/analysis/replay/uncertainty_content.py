@@ -734,7 +734,10 @@ def within_arm_horserace(
                     "population": population,
                     "n_rows": int(len(fit)),
                     "cond_number": float(np.linalg.cond(design)),
-                    **{f"coef_{col}": float(b) for col, b in zip(design_cols, beta)},
+                    **{
+                        f"coef_{col}": float(b)
+                        for col, b in zip(design_cols, beta, strict=True)
+                    },
                 }
             )
         LOGGER.info(

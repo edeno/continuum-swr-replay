@@ -109,11 +109,11 @@ def main():
                     we_sp_mua = spearmanr(df["zm_d"], df["tk_d"]).statistic
 
         per_session.append(
-            dict(animal=a, day=d, epoch=e, n_timebins=len(is_trunk),
-                 trunk_rate=float(is_trunk.mean()),
-                 spearman_swr=sp_swr, spearman_mua=sp_mua,
-                 we_spearman_swr=we_sp_swr, we_spearman_mua=we_sp_mua,
-                 n_we_events=n_we_events)
+            {"animal": a, "day": d, "epoch": e, "n_timebins": len(is_trunk),
+             "trunk_rate": float(is_trunk.mean()),
+             "spearman_swr": sp_swr, "spearman_mua": sp_mua,
+             "we_spearman_swr": we_sp_swr, "we_spearman_mua": we_sp_mua,
+             "n_we_events": n_we_events}
         )
         if (i + 1) % 25 == 0:
             print(f"  {i+1}/{len(sessions)} sessions, {time.time()-t0:.0f}s",
@@ -121,8 +121,9 @@ def main():
 
     centers = 0.5 * (BIN_EDGES[:-1] + BIN_EDGES[1:])
     binned = pd.DataFrame(
-        dict(z_center=centers, swr_n=acc["swr_n"], swr_trunk=acc["swr_trunk"],
-             mua_n=acc["mua_n"], mua_trunk=acc["mua_trunk"])
+        {"z_center": centers, "swr_n": acc["swr_n"],
+         "swr_trunk": acc["swr_trunk"], "mua_n": acc["mua_n"],
+         "mua_trunk": acc["mua_trunk"]}
     )
     ps = pd.DataFrame(per_session)
     binned.to_pickle(PD / "replay_content" / "_trunk_zscore_timebin_binned.pkl")

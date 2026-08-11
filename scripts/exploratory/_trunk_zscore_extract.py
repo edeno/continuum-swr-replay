@@ -57,13 +57,14 @@ def main():
             if hi <= lo:
                 continue
             rows.append(
-                dict(
-                    event_id=r.event_id, animal=a, day=d, epoch=e,
-                    is_swr=bool(r.is_swr), is_mua=bool(r.is_mua),
-                    trunk_share=r.trunk_share, n_arms_with_mass=r.n_arms_with_mass,
-                    swr_z=float(np.nanmax(sw[lo:hi])),
-                    mua_z=float(np.nanmax(mu[lo:hi])),
-                )
+                {
+                    "event_id": r.event_id, "animal": a, "day": d, "epoch": e,
+                    "is_swr": bool(r.is_swr), "is_mua": bool(r.is_mua),
+                    "trunk_share": r.trunk_share,
+                    "n_arms_with_mass": r.n_arms_with_mass,
+                    "swr_z": float(np.nanmax(sw[lo:hi])),
+                    "mua_z": float(np.nanmax(mu[lo:hi])),
+                }
             )
         if (i + 1) % 25 == 0:
             print(f"  {i+1}/{len(sessions)} sessions, {len(rows)} events, "
