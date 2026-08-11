@@ -752,7 +752,7 @@ def build_contfrag_stop_table(
     Returns
     -------
     pd.DataFrame
-        Columns: see ``_contfrag_stop_table_columns()``.
+        Columns: see ``_CONTFRAG_STOP_TABLE_COLUMNS``.
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column")
@@ -768,7 +768,7 @@ def build_contfrag_stop_table(
     bout_starts, bout_ends = immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
     )
-    column_order = _contfrag_stop_table_columns()
+    column_order = list(_CONTFRAG_STOP_TABLE_COLUMNS)
     if bout_starts.size == 0:
         return pd.DataFrame(columns=column_order)
 
@@ -974,38 +974,37 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
     ]
 
 
-def _contfrag_stop_table_columns() -> list[str]:
-    """Canonical column order for ContFrag stop table."""
-    return [
-        "animal",
-        "day",
-        "epoch",
-        "event_source",
-        "brain_area",
-        "stop_idx",
-        "stop_id",
-        "stop_start",
-        "stop_end",
-        "immobility_time",
-        "reward_rate_trial_k10",
-        "is_swr_stop",
-        "is_mua_stop",
-        "has_replay",
-        "n_events",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
-        "is_stay",
-        "current_arm",
-        "prev_arm",
-        "next_arm",
-        "last_rewarded_arm",
-        "current_patch",
-        "prev_patch",
-        "next_patch",
-    ]
+#: Canonical column order for ContFrag stop table.
+_CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
+    "animal",
+    "day",
+    "epoch",
+    "event_source",
+    "brain_area",
+    "stop_idx",
+    "stop_id",
+    "stop_start",
+    "stop_end",
+    "immobility_time",
+    "reward_rate_trial_k10",
+    "is_swr_stop",
+    "is_mua_stop",
+    "has_replay",
+    "n_events",
+    "is_after_switch",
+    "is_after_omission",
+    "is_after_reward",
+    "is_after_stay",
+    "reward_outcome",
+    "is_stay",
+    "current_arm",
+    "prev_arm",
+    "next_arm",
+    "last_rewarded_arm",
+    "current_patch",
+    "prev_patch",
+    "next_patch",
+)
 
 
 def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:

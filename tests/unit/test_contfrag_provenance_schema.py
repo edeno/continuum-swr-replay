@@ -21,16 +21,22 @@ def _load_column_helpers() -> dict[str, object]:
         "_CONTFRAG_TRAJECTORY_COLUMNS",
         "_resolve_event_col",
         "_contfrag_event_table_columns",
-        "_contfrag_stop_table_columns",
+        "_CONTFRAG_STOP_TABLE_COLUMNS",
         "_contfrag_event_arm_table_columns",
     }
     # Seed the dependency the trajectory-column constant is derived from.
     ns: dict[str, object] = {"SHARED_TRAJECTORY_COLUMNS": SHARED_TRAJECTORY_COLUMNS}
 
     for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id in names for t in node.targets
-        ):
+        # ``x = ...`` and the annotated ``x: T = ...`` are different AST nodes;
+        # a schema constant declared with a type annotation would otherwise be
+        # skipped silently and surface as a KeyError far from the cause.
+        targets = []
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+        if any(isinstance(t, ast.Name) and t.id in names for t in targets):
             wrapper = ast.Module(body=[node], type_ignores=[])
             ast.fix_missing_locations(wrapper)
             exec(compile(wrapper, "tables.py", "exec"), ns)  # noqa: S102
@@ -45,7 +51,7 @@ def test_contfrag_table_schemas_include_source_and_area_provenance():
     helpers = _load_column_helpers()
 
     event_cols = helpers["_contfrag_event_table_columns"]("SWR")
-    stop_cols = helpers["_contfrag_stop_table_columns"]()
+    stop_cols = helpers["_CONTFRAG_STOP_TABLE_COLUMNS"]
     event_arm_cols = helpers["_contfrag_event_arm_table_columns"]("MUA")
 
     assert event_cols[:5] == [
@@ -55,7 +61,7 @@ def test_contfrag_table_schemas_include_source_and_area_provenance():
         "event_source",
         "brain_area",
     ]
-    assert stop_cols[:5] == [
+    assert list(stop_cols[:5]) == [
         "animal",
         "day",
         "epoch",
@@ -80,7 +86,7 @@ def test_contfrag_stop_table_schema_is_pinned_exactly():
     leaves the whole contfrag suite green. Pin the entire list in order so any
     schema edit has to be deliberate.
     """
-    stop_cols = _load_column_helpers()["_contfrag_stop_table_columns"]()
+    stop_cols = _load_column_helpers()["_CONTFRAG_STOP_TABLE_COLUMNS"]
 
     assert list(stop_cols) == [
         "animal",
