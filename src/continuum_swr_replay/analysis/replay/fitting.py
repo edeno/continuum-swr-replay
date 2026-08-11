@@ -429,9 +429,25 @@ def _drop_zero_count_events(
     The conditional likelihood is undefined (0/0) for such events;
     fit_conditional_logit's idxmax would silently pick an arbitrary
     "dominant" arm otherwise.
+
+    An all-zero response is what an event that decoded nowhere looks like --
+    every in-event timebin failed to attribute to a real arm, so
+    ``align_count_matrix`` filled the row with zeros. Callers that go through
+    ``freeze_common_cohort(drop_zero_response=True)`` have already recorded
+    those units by ID in ``zero_response_unit_ids``, so this is a backstop; a
+    caller that skips the cohort freeze would otherwise lose the events here
+    with no trace, unlike the NaN drop in the fitters, which logs.
     """
     event_totals = df.groupby(event_col)[response_col].transform("sum")
-    return df[event_totals > 0].reset_index(drop=True)
+    kept = df[event_totals > 0].reset_index(drop=True)
+    n_dropped = df[event_col].nunique() - kept[event_col].nunique()
+    if n_dropped:
+        logger.info(
+            "dropping %d event(s) whose %s sums to 0 (decoded nowhere)",
+            n_dropped,
+            response_col,
+        )
+    return kept
 
 
 def _compute_conditional_diagnostics(
