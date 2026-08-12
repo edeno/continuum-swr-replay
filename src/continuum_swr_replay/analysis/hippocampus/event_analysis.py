@@ -9,7 +9,14 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
+import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+
+from .event_immobility import event_speeds_are_immobile
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +25,8 @@ def get_immobile_events(
     data: pd.DataFrame,
     event_col: str,
     speed_col: str = "head_speed",
-    speed_threshold: float = 4.0,
-    method: Literal["endpoints", "max", "mean"] = "endpoints",
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    method: Literal["endpoints", "max", "mean"] = "max",
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Filter events to only include those during low-speed periods.
@@ -37,8 +44,9 @@ def get_immobile_events(
         threshold are considered mobile (uses strict < comparison).
     method : {"endpoints", "max", "mean"}
         How to evaluate speed during event:
-        - "endpoints": Both start and end must be below threshold (default, most restrictive)
-        - "max": Maximum speed during event must be below threshold
+        - "endpoints": Both start and end must be below threshold
+        - "max": Every speed during the event must be finite and below the
+          threshold (default; canonical event-cohort rule)
         - "mean": Mean speed during event must be below threshold
     group_cols : list[str] | None
         Grouping columns (default: ["animal", "day", "epoch"])
@@ -55,9 +63,9 @@ def get_immobile_events(
 
     Notes
     -----
-    The "endpoints" method matches existing patterns in generate_figure02.py
-    and is appropriate for ensuring immobility at event boundaries (relevant
-    for replay analysis where animal should be still).
+    The default ``"max"`` method is the canonical cohort rule shared by
+    Non-Local, SWR, and MUA events. The endpoint and mean modes remain for
+    descriptive backward compatibility and should not define model cohorts.
 
     Examples
     --------
@@ -65,7 +73,7 @@ def get_immobile_events(
     ...     data_over_time,
     ...     event_col="non_local_event",
     ...     speed_threshold=4.0,
-    ...     method="endpoints"
+    ...     method="max"
     ... )
 
     """
@@ -74,8 +82,10 @@ def get_immobile_events(
         group_cols = ["animal", "day", "epoch"]
 
     # Validate inputs
-    if speed_threshold <= 0:
-        raise ValueError(f"speed_threshold must be positive, got {speed_threshold}")
+    if not np.isfinite(speed_threshold) or speed_threshold <= 0:
+        raise ValueError(
+            f"speed_threshold must be positive and finite, got {speed_threshold}"
+        )
     if method not in ["endpoints", "max", "mean"]:
         raise ValueError(f"method must be 'endpoints', 'max', or 'mean', got {method}")
 
@@ -90,19 +100,21 @@ def get_immobile_events(
             logger.warning("Empty group encountered in speed filtering")
             return False
 
-        if len(group) == 1:
-            # Single timepoint: treat as immobile if below threshold
-            return bool(group[speed_col].iloc[0] < speed_threshold)
+        speed = group[speed_col].to_numpy(dtype=float)
+        if not np.isfinite(speed).all():
+            return False
 
         if method == "endpoints":
             return bool(
-                (group[speed_col].iloc[0] < speed_threshold)
-                and (group[speed_col].iloc[-1] < speed_threshold)
+                (speed[0] < speed_threshold)
+                and (speed[-1] < speed_threshold)
             )
         elif method == "max":
-            return bool(group[speed_col].max() < speed_threshold)
+            return event_speeds_are_immobile(
+                speed, speed_threshold=speed_threshold
+            )
         elif method == "mean":
-            return bool(group[speed_col].mean() < speed_threshold)
+            return bool(speed.mean() < speed_threshold)
         return False
 
     return (

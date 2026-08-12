@@ -42,7 +42,7 @@ def _build_data_over_time(
     :func:`build_classified_nonlocal_event_table`: a ``time`` index,
     ``non_local_event`` (0 outside events, 1..N inside), ``SWR_event``
     (0 outside SWRs, 1..M inside), ``head_speed`` (all zeros so every
-    event passes the endpoints immobility filter), the two non-local
+    event passes the whole-event immobility filter), the two non-local
     probability columns, and the ``animal`` / ``day`` / ``epoch``
     grouping columns.
     """

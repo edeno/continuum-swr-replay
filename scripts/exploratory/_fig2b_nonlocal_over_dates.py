@@ -27,6 +27,9 @@ from continuum_swr_replay.analysis.hippocampus import (
     build_classified_nonlocal_event_table,
     load_data_over_time,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    filter_event_labels_by_speed,
+)
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as SPEED_THR,
 )
@@ -47,7 +50,7 @@ def main() -> None:
 
     logging.info("Building classified event table ...")
     tbl = build_classified_nonlocal_event_table(dot)
-    immob = tbl[tbl["endpoints_speed_below_thresh"].astype(bool)]
+    immob = tbl[tbl["whole_event_speed_eligible"].astype(bool)]
 
     # per-session non-local immobile counts + non_swr fraction
     nl = (
@@ -62,8 +65,13 @@ def main() -> None:
 
     # per-session durations + SWR counts straight from data_over_time
     logging.info("Per-session durations and SWR counts ...")
+    swr_eligible_dot = filter_event_labels_by_speed(
+        dot,
+        ["SWR_event"],
+        speed_threshold=SPEED_THR,
+    )
     recs = []
-    for (animal, day, epoch), g in dot.groupby(SESSION, sort=False):
+    for (animal, day, epoch), g in swr_eligible_dot.groupby(SESSION, sort=False):
         immobile_min = float((g["head_speed"] < SPEED_THR).sum()) * dt / 60.0
         total_min = float(len(g)) * dt / 60.0
         # distinct SWRs = unique nonzero SWR_event labels in this session

@@ -23,11 +23,11 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_required_session_data_keys,
     validate_results_position_time_alignment,
 )
-from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
 from ..hippocampus.event_detection import get_overlap_times
+from ..hippocampus.event_immobility import build_speed_eligible_event_cohort
 from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
 from .posterior_analysis import get_contfrag_posterior
 
@@ -81,16 +81,33 @@ def get_contfrag_data_over_time(
         ],
     )
 
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
+    )
+    position_time = data["position_info"].index
+    head_speed = data["position_info"].head_speed.to_numpy()
+
     # Get combined posterior (both states decode position)
     posterior = get_contfrag_posterior(results, state="combined")
 
-    # Event labels from external detectors
-    swr_labels = get_labels(data["ripple_times"], results.time)
-    mua_labels = get_labels(data["hse_times"][brain_area], results.time)
+    # External detector intervals become analysis events only when every
+    # sampled head-speed value in the complete interval is finite and < 4 cm/s.
+    swr_times, swr_labels = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=head_speed,
+        time=position_time,
+        event_col="SWR_event",
+    )
+    mua_times, mua_labels = build_speed_eligible_event_cohort(
+        data["hse_times"][brain_area],
+        speed=head_speed,
+        time=position_time,
+        event_col="MUA_event",
+    )
 
     # SWR vs MUA overlap
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area]
+        swr_times, mua_times
     )
 
     # Posterior stats on the full posterior
@@ -135,19 +152,10 @@ def get_contfrag_data_over_time(
             series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
         )
 
-    # Length is necessary but not sufficient — same-length axes that
-    # are time-shifted would silently attach event labels to the wrong
-    # rows. The shared helper enforces the stricter drift check used
-    # in ``analysis.replay._helpers._align_posterior_to_dot``; routing
-    # both aggregators through it keeps the two paths in lockstep.
-    validate_results_position_time_alignment(
-        np.asarray(results.time.values), data["position_info"].index
-    )
-
     data_over_time = pd.DataFrame(
         {
-            "SWR_event": swr_labels.squeeze(),
-            "MUA_event": mua_labels.squeeze(),
+            "SWR_event": swr_labels.to_numpy(),
+            "MUA_event": mua_labels.to_numpy(),
             "Continuous_prob": results.sel(
                 states="Continuous"
             ).acausal_state_probabilities.squeeze(),
@@ -171,8 +179,8 @@ def get_contfrag_data_over_time(
             "MUA_zscore": _nearest(
                 data["multiunit_rate_zscore"][brain_area].squeeze()
             ),
-            "n_SWR": len(data["ripple_times"]),
-            "n_MUA": len(data["hse_times"][brain_area]),
+            "n_SWR": len(swr_times),
+            "n_MUA": len(mua_times),
             "n_SWR_MUA": len(swr_mua_times),
             "n_SWR_no_MUA": len(swr_no_mua_times),
             "animal": animal,

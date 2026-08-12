@@ -76,6 +76,15 @@ import pandas as pd
 from scipy import stats
 from scipy.ndimage import label
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+
+from .event_immobility import (
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+)
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_GROUP_COLS = ["animal", "day", "epoch"]
@@ -135,7 +144,7 @@ def compute_local_decoding_error(
 
 def compute_state_fraction_during_movement(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
     sampling_frequency: float = 500.0,
     group_cols: list[str] | None = None,
@@ -231,7 +240,7 @@ def compute_state_fraction_during_movement(
 
 def compute_non_local_during_movement(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     non_local_threshold: float = 0.8,
     sampling_frequency: float = 500.0,
     group_cols: list[str] | None = None,
@@ -336,7 +345,7 @@ def compute_non_local_during_movement(
 
 def compute_behavior_state_breakdown(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Per-session breakdown of time spent running vs. immobile and in each state.
@@ -432,7 +441,7 @@ def compute_behavior_state_breakdown(
 
 def compute_bout_nonlocal_dominance(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     min_bout_duration_sec: float = 0.5,
     bout_nonlocal_threshold: float = 0.5,
     sampling_frequency: float = 500.0,
@@ -549,7 +558,7 @@ def compute_bout_nonlocal_dominance(
 
 def compute_running_error_tail(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
@@ -743,7 +752,8 @@ def compute_non_local_event_context(
     """Classify events by neural context (SWR, theta, neither).
 
     Each event is classified as:
-    - **SWR-associated**: overlaps with a sharp-wave ripple (``SWR_event > 0``)
+    - **SWR-associated**: strict positive-duration overlap with a
+      whole-event-speed-eligible sharp-wave ripple
     - **Theta-associated**: high theta power (no SWR overlap)
     - **Neither**: no SWR, low theta power
 
@@ -772,9 +782,15 @@ def compute_non_local_event_context(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
+    if event_col == "non_local_event":
+        validate_nonlocal_event_probability_contract(data)
     event_group_cols = group_cols + [event_col]
+    event_cols = [event_col]
+    if "SWR_event" in data.columns and "SWR_event" not in event_cols:
+        event_cols.append("SWR_event")
+    eligible_data = filter_event_labels_by_speed(data, event_cols)
 
-    non_local = data.loc[data[event_col] > 0]
+    non_local = eligible_data.loc[eligible_data[event_col] > 0]
 
     if non_local.empty:
         return pd.DataFrame(
@@ -818,9 +834,12 @@ def compute_non_local_event_context(
 
     swr_overlap_keys = (
         event_strict_overlap_keys(
-            data, event_col, "SWR_event", session_cols=tuple(group_cols)
+            eligible_data,
+            event_col,
+            "SWR_event",
+            session_cols=tuple(group_cols),
         )
-        if "SWR_event" in data.columns
+        if "SWR_event" in eligible_data.columns
         else set()
     )
     if swr_overlap_keys:
@@ -880,7 +899,7 @@ def compute_non_local_event_context(
 
 def compute_local_state_collapse_details(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
     sampling_frequency: float = 500.0,
     group_cols: list[str] | None = None,
@@ -1088,7 +1107,7 @@ def compute_calibration_curve(
 
 def compute_session_quality_summary(
     data: pd.DataFrame,
-    speed_threshold: float = 4.0,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
     non_local_threshold: float = 0.8,
     theta_power_threshold: float = 2.0,

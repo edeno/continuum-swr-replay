@@ -40,7 +40,7 @@ def main() -> None:
 
     logging.info("Building classified table ...")
     tbl = build_classified_nonlocal_event_table(dot)
-    immob = tbl[tbl["endpoints_speed_below_thresh"].astype(bool)].copy()
+    immob = tbl[tbl["whole_event_speed_eligible"].astype(bool)].copy()
 
     # ── per-event posterior diagnostics straight from the event bins ──
     logging.info("Aggregating per-event posterior diagnostics ...")

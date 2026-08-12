@@ -14,6 +14,9 @@ import pandas as pd
 import pytest
 import xarray as xr
 
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.replay.tables import (
     EVENT_ARM_STANDARDIZED_COLS,
     build_event_arm_table,
@@ -347,6 +350,7 @@ class TestEventTableSchema:
             "stop_idx", "stop_id",
             "event_start", "event_end", "event_duration",
             "time_since_stop", "is_swr", "is_mua",
+            "whole_event_speed_eligible",
             "current_arm", "prev_arm", "next_arm", "last_rewarded_arm",
             "n_nonlocal_bins", "nonlocal_weight_sum",
             "posterior_mass_total", "posterior_peak_mean",
@@ -362,6 +366,8 @@ class TestEventTableSchema:
         et = build_event_table(dot, env, trials, graph)
         assert et["is_swr"].dtype == bool
         assert et["is_mua"].dtype == bool
+        assert et["whole_event_speed_eligible"].dtype == bool
+        assert et["whole_event_speed_eligible"].all()
 
     def test_empty_session_returns_empty_frame_with_schema(self, tiny_session):
         dot, env, trials, graph = tiny_session
@@ -378,6 +384,161 @@ class TestEventTableSchema:
 
 
 class TestEventTableInvariants:
+    def test_custom_nonlocal_threshold_reaches_classified_table(
+        self, tiny_session_with_posterior
+    ):
+        """Every stage validates labeled probabilities against one threshold."""
+        dot, env, trials, graph, posterior = tiny_session_with_posterior
+        custom = dot.copy()
+        event_one = custom["non_local_event"].to_numpy() == 1
+        custom.loc[event_one, "Non-Local_Continuous_prob"] = 0.75
+        custom.loc[event_one, "Non-Local_Fragmented_prob"] = 0.0
+
+        table = build_event_table(
+            custom,
+            env,
+            trials,
+            graph,
+            conditional_posterior=posterior,
+            nonlocal_threshold=0.7,
+        )
+
+        assert 1 in table["non_local_event"].to_numpy()
+
+    def test_probability_contract_is_reported_before_speed_contract(
+        self, tiny_session_with_posterior
+    ):
+        """A doubly invalid label reports the upstream detector violation."""
+        dot, env, trials, graph, posterior = tiny_session_with_posterior
+        invalid = dot.copy()
+        event_rows = np.flatnonzero(invalid["non_local_event"].to_numpy() == 1)
+        middle = event_rows[len(event_rows) // 2]
+        invalid.iloc[middle, invalid.columns.get_loc("head_speed")] = 10.0
+        invalid.iloc[
+            middle,
+            invalid.columns.get_loc("Non-Local_Continuous_prob"),
+        ] = 0.5
+        invalid.iloc[
+            middle,
+            invalid.columns.get_loc("Non-Local_Fragmented_prob"),
+        ] = 0.0
+
+        with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+            build_event_table(
+                invalid,
+                env,
+                trials,
+                graph,
+                conditional_posterior=posterior,
+            )
+
+    @pytest.mark.parametrize("bad_speed", [4.0, np.nan, np.inf, -np.inf, 10.0])
+    def test_nonlocal_event_speed_contract_fails_atomically(
+        self, tiny_session_with_posterior, bad_speed
+    ):
+        """Legacy labels with one bad bin fail instead of being truncated."""
+        dot, env, trials, graph, posterior = tiny_session_with_posterior
+        clean_event_table = build_event_table(
+            dot, env, trials, graph, conditional_posterior=posterior
+        )
+        invalid = dot.copy()
+        event_rows = np.flatnonzero(invalid["non_local_event"].to_numpy() == 1)
+        invalid.iloc[
+            event_rows[len(event_rows) // 2],
+            invalid.columns.get_loc("head_speed"),
+        ] = bad_speed
+
+        match = "whole-event immobility contract"
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_table(
+                invalid,
+                env,
+                trials,
+                graph,
+                conditional_posterior=posterior,
+            )
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_sequence_table(invalid, env, posterior)
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_arm_table(
+                clean_event_table,
+                invalid,
+                env,
+                trials,
+                graph,
+                conditional_posterior=posterior,
+            )
+        with pytest.raises(EventDefinitionError, match=match):
+            build_stop_table(invalid, trials, graph)
+
+    @pytest.mark.parametrize(
+        "bad_probability", [0.8, 0.5, np.nan, np.inf, -np.inf]
+    )
+    def test_nonlocal_probability_contract_fails_atomically(
+        self, tiny_session_with_posterior, bad_probability
+    ):
+        """A bad interior probability rejects stale labels without clipping."""
+        dot, env, trials, graph, posterior = tiny_session_with_posterior
+        clean_event_table = build_event_table(
+            dot, env, trials, graph, conditional_posterior=posterior
+        )
+        invalid = dot.copy()
+        event_rows = np.flatnonzero(invalid["non_local_event"].to_numpy() == 1)
+        middle = event_rows[len(event_rows) // 2]
+        invalid.iloc[
+            middle,
+            invalid.columns.get_loc("Non-Local_Continuous_prob"),
+        ] = bad_probability
+        invalid.iloc[
+            middle,
+            invalid.columns.get_loc("Non-Local_Fragmented_prob"),
+        ] = 0.0
+
+        match = "probability-threshold contract"
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_table(
+                invalid,
+                env,
+                trials,
+                graph,
+                conditional_posterior=posterior,
+            )
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_sequence_table(invalid, env, posterior)
+        with pytest.raises(EventDefinitionError, match=match):
+            build_event_arm_table(
+                clean_event_table,
+                invalid,
+                env,
+                trials,
+                graph,
+                conditional_posterior=posterior,
+            )
+        with pytest.raises(EventDefinitionError, match=match):
+            build_stop_table(invalid, trials, graph)
+
+    @pytest.mark.parametrize(
+        ("mua_start_offset", "expected_is_mua"),
+        [(0, False), (-1, True)],
+    )
+    def test_mua_uses_strict_event_level_overlap(
+        self, tiny_session, mua_start_offset, expected_is_mua
+    ):
+        """Boundary contact is not overlap; positive duration marks all bins."""
+        dot, env, trials, graph = tiny_session
+        dot = dot.copy()
+        dot["MUA_event"] = 0
+        event_rows = np.flatnonzero(dot["non_local_event"].to_numpy() == 1)
+        start = event_rows[-1] + mua_start_offset
+        stop = event_rows[-1] + 4
+        dot.iloc[start:stop, dot.columns.get_loc("MUA_event")] = 7
+        dot.iloc[start:stop, dot.columns.get_loc("head_speed")] = 1.0
+
+        event = build_event_table(dot, env, trials, graph)
+        event_1 = event.loc[event["non_local_event"] == 1].iloc[0]
+
+        assert bool(event_1["is_mua"]) is expected_is_mua
+
     def test_n_nonlocal_bins_matches_groupby_size(self, tiny_session):
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
@@ -393,6 +554,18 @@ class TestEventTableInvariants:
         np.testing.assert_allclose(
             et["nonlocal_weight_sum"].to_numpy(), [9.0, 9.0]
         )
+
+    def test_legacy_and_label_timing_share_one_atomic_window(self, tiny_session):
+        dot, env, trials, graph = tiny_session
+        event = build_event_table(dot, env, trials, graph)
+
+        for canonical, alias in (
+            ("event_start", "label_event_start"),
+            ("event_end", "label_event_end"),
+            ("event_duration", "label_event_duration"),
+            ("event_midpoint_time", "label_event_midpoint_time"),
+        ):
+            np.testing.assert_array_equal(event[canonical], event[alias])
 
     def test_nonlocal_prob_within_unit_interval(self, tiny_session):
         # ``nonlocal_prob`` values in [0, 1]. Exposed here via

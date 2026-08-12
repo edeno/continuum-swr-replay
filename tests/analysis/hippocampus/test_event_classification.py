@@ -44,6 +44,11 @@ def _make_data_over_time(
     for i, start in enumerate(event_starts[:n_non_local]):
         df.loc[start : start + 20, "non_local_event"] = i + 1
 
+    df["Non-Local_Continuous_prob"] = np.where(
+        df["non_local_event"] > 0, 0.9, 0.1
+    )
+    df["Non-Local_Fragmented_prob"] = 0.0
+
     # Place SWR events (overlapping with first non-local)
     if n_swr > 0:
         if overlap_nl_swr:
@@ -160,6 +165,8 @@ class TestGetEventTypes:
                 "SWR_event": [0, 0, 2, 2, 2],
                 "MUA_event": [0, 0, 0, 0, 0],
                 "head_speed": [0.0] * 5,
+                "Non-Local_Continuous_prob": [0.9, 0.9, 0.9, 0.1, 0.1],
+                "Non-Local_Fragmented_prob": [0.0] * 5,
             },
             index=[0.0, 0.5, 1.0, 1.5, 2.0],
         )
@@ -175,6 +182,14 @@ class TestGetEventTypes:
         assert 2 in (
             result["SWR_event_events_no_non_local_event"]["SWR_event"].unique()
         )
+
+    def test_invalid_saved_nonlocal_probability_fails_loud(self):
+        df = _make_data_over_time()
+        bad_row = df.index[df["non_local_event"] == 1][5]
+        df.loc[bad_row, "Non-Local_Continuous_prob"] = 0.5
+
+        with pytest.raises(ValueError, match="probability-threshold contract"):
+            get_event_types(df)
 
 
 class TestSelectTypicalEventByClass:

@@ -555,7 +555,7 @@ def process_neuron(
     from replay-specific modulation:
 
     - ``constant``: intercept only (baseline)
-    - ``SWR``: all detected ripples
+    - ``SWR``: all whole-event-speed-eligible detected ripples
     - ``non_local``: all replay events regardless of SWR overlap
     - ``SWR + non_local_no_SWR``: ripples + non-SWR replay (key model;
       isolates replay-specific effects after controlling for SWR)
@@ -646,7 +646,7 @@ def process_neuron(
         (``SWR + non_local_no_SWR``). Shape (n_lag_times,).
     no_swr_modulation : NDArray
         Non-SWR replay modulation from SWR-controlled model, controlling
-        for all detected ripples. Shape (n_lag_times,).
+        for all whole-event-speed-eligible ripples. Shape (n_lag_times,).
     non_local_swr_modulation : NDArray
         SWR-coincident replay modulation from replay-split model
         (``non_local_SWR + non_local_no_SWR``). Shape (n_lag_times,).
@@ -839,7 +839,7 @@ def process_neuron(
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
 
         # SWR-controlled model: SWR and non-SWR replay modulation
-        # controlling for all detected ripples
+        # controlling for all whole-event-speed-eligible ripples
         if "SWR + non_local_no_SWR" in non_estimable_models:
             swr_modulation = nan_modulation
             no_swr_modulation = nan_modulation
@@ -966,7 +966,7 @@ def run_session(
         Shape (n_lag_times, n_neurons).
     no_swr_modulation : NDArray
         Non-SWR replay modulation from SWR-controlled model, controlling
-        for all detected ripples. Shape (n_lag_times, n_neurons).
+        for all whole-event-speed-eligible ripples. Shape (n_lag_times, n_neurons).
     non_local_swr_modulation : NDArray
         SWR-coincident replay modulation from replay-split model.
         Shape (n_lag_times, n_neurons).
@@ -985,6 +985,12 @@ def run_session(
         get_overlap_times,
         load_results,
     )
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        validate_results_position_time_alignment,
+    )
+    from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+        build_speed_eligible_event_cohort,
+    )
     from continuum_swr_replay.data_loaders import load_data
 
     logger = logging.getLogger(
@@ -1000,45 +1006,61 @@ def run_session(
     data = load_data(nwb_file_name, epoch_name)
 
     logger.info("Identifying non-local events...")
+    position_time = data["position_info"].index
+    speed = data["position_info"].head_speed.to_numpy()
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), position_time
+    )
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_prob = non_local_prob.assign_coords(
+        time=position_time.to_numpy(dtype=float)
+    )
 
-    non_local_times = get_confident_times(
+    detected_non_local_times = get_confident_times(
         non_local_prob,
-        data["position_info"].head_speed.to_numpy(),
-        data["position_info"].index.to_numpy(),
+        speed,
+        position_time.to_numpy(dtype=float),
         non_local_threshold,
     )
-    non_local_times = non_local_times[
-        non_local_times.max_speed < immobility_threshold
-    ]
+    non_local_times, _ = build_speed_eligible_event_cohort(
+        detected_non_local_times,
+        speed=speed,
+        time=position_time,
+        event_col="non_local_event",
+        speed_threshold=immobility_threshold,
+    )
+    ripple_times, _ = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=speed,
+        time=position_time,
+        event_col="SWR_event",
+        speed_threshold=immobility_threshold,
+    )
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"]
+        non_local_times, ripple_times
     )
     logger.info(
         "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",
         len(non_local_times),
         len(non_local_swr_times),
         len(non_local_no_swr_times),
-        len(data["ripple_times"]),
+        len(ripple_times),
     )
 
-    # Non-local events are filtered to immobility (line above) because
-    # non-local classification during running is unreliable. SWR times are
-    # intentionally NOT filtered: SWR detection already constrains to
-    # low-movement periods, and the full ripple set is needed so the SWR
-    # convolution kernel properly controls for ripple-related responses
-    # in the SWR-controlled decomposition.
+    # Both populations use the same whole-event immobility definition, so the
+    # SWR-controlled decomposition cannot reintroduce a movement-spanning SWR
+    # as a secondary event source.
     event_times = {
         "non_local_no_SWR": non_local_no_swr_times,
         "non_local_SWR": non_local_swr_times,
         "non_local": non_local_times,
-        "SWR": data["ripple_times"],
+        "SWR": ripple_times,
     }
 
-    time = data["position_info"].index.to_numpy()
+    time = position_time.to_numpy(dtype=float)
     is_immobile = data["position_info"].head_speed < immobility_threshold
     logger.info(
         "Immobility fraction: %.3f (%d/%d time bins)",

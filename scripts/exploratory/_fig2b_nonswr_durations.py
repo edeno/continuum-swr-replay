@@ -32,7 +32,7 @@ def main() -> None:
     logging.info("Loading data_over_time ...")
     dot = load_data_over_time(PROCESSED_DATA_DIR)
     tbl = build_classified_nonlocal_event_table(dot)
-    immob = tbl[tbl["endpoints_speed_below_thresh"].astype(bool)].copy()
+    immob = tbl[tbl["whole_event_speed_eligible"].astype(bool)].copy()
     nonswr = immob[immob["overlap_class"] == "non_swr"].copy()
     swr = immob[immob["overlap_class"] != "non_swr"].copy()
     d = "event_duration"

@@ -41,6 +41,12 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_data_over_time,
     load_results,
 )
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_results_position_time_alignment,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    build_speed_eligible_event_cohort,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -89,17 +95,36 @@ def find_non_swr_example_event(data, results, window_sec=1.0):
     )
     position_info = data["position_info"]
     speed = position_info.head_speed.to_numpy()
-    time = position_info.index.to_numpy()
-
-    non_local_times = get_confident_times(
-        non_local_prob, speed, time, DEFAULT_NON_LOCAL_THRESHOLD,
+    position_time = position_info.index
+    validate_results_position_time_alignment(
+        results.time.values, position_time
     )
-    non_local_times = non_local_times[
-        non_local_times.max_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ]
+    non_local_prob = non_local_prob.assign_coords(
+        time=position_time.to_numpy(dtype=float)
+    )
+
+    detected_non_local_times = get_confident_times(
+        non_local_prob,
+        speed,
+        position_time.to_numpy(dtype=float),
+        DEFAULT_NON_LOCAL_THRESHOLD,
+    )
+    non_local_times, _ = build_speed_eligible_event_cohort(
+        detected_non_local_times,
+        speed=speed,
+        time=position_time,
+        event_col="non_local_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    ripple_times, _ = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=speed,
+        time=position_time,
+        event_col="SWR_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
 
     # Find events NOT overlapping with SWR
-    ripple_times = data["ripple_times"]
     _, non_swr_events = get_overlap_times(non_local_times, ripple_times)
 
     if len(non_swr_events) == 0:

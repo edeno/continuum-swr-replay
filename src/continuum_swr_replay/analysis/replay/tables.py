@@ -22,9 +22,9 @@ rename's grep-zero rule:
 
 - ``SWR_event`` and ``MUA_event`` — integer event-label columns
   written into ``data_over_time.pkl`` by the decoder. They carry
-  more information than the booleans derived from them (``is_mua`` =
-  any ``MUA_event > 0`` within the event; ``SWR_event`` likewise feeds
-  the classified table's strict-overlap ``is_swr`` — see below) and are
+  more information than the booleans derived from them. Both labels are
+  first restricted by the canonical whole-event speed rule, then feed
+  strict positive-duration event-level overlap flags (see below), and are
   consumed by ``quality_metrics`` / ``event_analysis`` via
   groupby-by-ripple aggregation. Renaming would force a decoder re-run
   across all session pickles.
@@ -39,11 +39,10 @@ rule. It now means strict positive-duration overlap with any SWR, taken
 together with the full ``overlap_class`` / ``overlap_subclass`` /
 ``matched_swr_*`` / ``label_event_*`` / per-event speed / peak-probability
 columns from the canonical classified event table in
-:mod:`continuum_swr_replay.analysis.hippocampus.event_table`. The legacy
-``event_start`` / ``event_end`` / ``event_duration`` /
-``event_midpoint_time`` columns remain the immobile-high-prob filtered
-survivor window; the full label-window boundary is carried additively as
-``label_event_*``.
+:mod:`continuum_swr_replay.analysis.hippocampus.event_table`. Atomic contract
+validation means no labeled bins are clipped: ``event_*`` and
+``label_event_*`` timing now describe the same complete event window, with the
+latter retained as compatibility aliases.
 """
 
 from __future__ import annotations
@@ -55,6 +54,15 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.event_detection import (
+    event_strict_overlap_keys,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+    whole_event_immobility_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
@@ -193,17 +201,59 @@ def _in_event_mask(
     speed_threshold: float,
     nonlocal_threshold: float,
 ) -> pd.Series:
-    """Boolean mask over ``dot`` for in-event timebins.
+    """Return complete bins of Non-Local labels that satisfy their contract.
 
-    A row is in-event iff the decoder assigned a non-local event label,
-    the animal was immobile, and the smoothed non-local posterior
-    cleared the threshold. Matches the legacy ``prepare_session``
-    filter.
+    Event labels are created upstream from probability-thresholded intervals
+    and whole-event immobility. This function validates that contract and then
+    returns complete labeled events. It never clips individual bins, because
+    doing so can split one event across stops and silently alter its duration.
     """
-    return (
-        (dot["non_local_event"] > 0)
-        & (dot["head_speed"] < speed_threshold)
-        & (dot["nonlocal_prob"] > nonlocal_threshold)
+    active = dot["non_local_event"].to_numpy() > 0
+    if not active.any():
+        return pd.Series(False, index=dot.index)
+
+    # Validate the detector-definition contract first. A stale label can
+    # violate both probability and speed; reporting the upstream probability
+    # violation consistently across replay and time-bin builders makes the
+    # regeneration cause unambiguous.
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_cols=("nonlocal_prob",),
+        probability_threshold=nonlocal_threshold,
+    )
+
+    immobile = whole_event_immobility_mask(
+        dot,
+        "non_local_event",
+        speed_threshold=speed_threshold,
+    ).to_numpy()
+    invalid_speed = active & ~immobile
+    if invalid_speed.any():
+        invalid_ids = sorted(
+            pd.unique(dot.loc[invalid_speed, "non_local_event"]).tolist()
+        )
+        raise EventDefinitionError(
+            "non_local_event labels violate the whole-event immobility "
+            f"contract (all speeds finite and < {speed_threshold:g} cm/s); "
+            f"invalid event labels: {invalid_ids[:10]}. Regenerate the "
+            "data-over-time file with the unified event definition."
+        )
+
+    return pd.Series(active, index=dot.index)
+
+
+def _filter_external_event_labels(
+    dot: pd.DataFrame,
+    speed_threshold: float,
+) -> pd.DataFrame:
+    """Apply the shared atomic speed rule to SWR/MUA labels when present."""
+    event_cols = [column for column in ("SWR_event", "MUA_event") if column in dot]
+    if not event_cols:
+        return dot
+    return filter_event_labels_by_speed(
+        dot,
+        event_cols,
+        speed_threshold=speed_threshold,
     )
 
 
@@ -227,28 +277,23 @@ def build_event_table(
     (``dot``) plus the session's ``env`` / ``trials`` / ``track_graph``
     and emits the event-level slice of the canonical schema.
 
-    The table is composed from two passes over ``dot``:
+    The table is composed from two passes over the same complete, validated
+    event-label window:
 
-    - **Legacy aggregates** (timing, arms, patches, context flags, content
-      and posterior summaries, ``stop_id``) are computed over the filtered
-      sub-window — rows where the event label is set, the animal is
-      immobile, and the smoothed non-local posterior clears the threshold
-      (``_in_event_mask``). These columns, including ``event_start`` /
-      ``event_end`` / ``event_duration`` / ``event_midpoint_time``, are the
-      filtered-survivor window and are unchanged from prior versions.
-    - **SWR classification and additive full-window summaries** come from
+    - **Event aggregates** (timing, arms, patches, context flags, content,
+      posterior summaries, ``stop_id``) use every bin in an accepted label.
+      ``_in_event_mask`` validates that all bins meet the saved speed and
+      probability contracts; it never clips individual bins.
+    - **SWR classification and compatibility timing aliases** come from
       :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
-      computed over the *full* event-label window (no immobility / prob
-      filter), and merged in on ``event_id``: ``is_swr`` (strict
+      and are merged on ``event_id``: ``is_swr`` (strict
       positive-duration SWR overlap), ``overlap_class`` /
       ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``,
-      the per-event speed summaries, ``peak_nonlocal_prob``, and the full
-      label-window boundary as ``label_event_*``.
+      speed summaries, ``peak_nonlocal_prob``, and ``label_event_*``.
 
-    The replay population is unchanged: an event appears here iff at least
-    one of its timebins survived ``_in_event_mask`` (the filtered subset is
-    a strict subset of the full label window, so every retained event has a
-    classified row).
+    ``event_*`` and ``label_event_*`` timing are therefore identical for newly
+    generated data. The latter names remain as compatibility aliases while
+    downstream consumers migrate to the single canonical window.
 
     ``conditional_posterior`` is optional. When supplied (e.g., from
     :func:`posterior_io.load_conditional_posterior`), six additional
@@ -295,10 +340,10 @@ def build_event_table(
     -------
     Identifiers
         ``animal``, ``day``, ``epoch``, ``non_local_event``, ``event_id``
-    Timing (filtered survivor window)
+    Timing (canonical complete event window)
         ``event_start``, ``event_end``, ``event_duration``,
         ``time_since_stop``
-    Timing (full label window, additive)
+    Timing (compatibility aliases of the same window)
         ``label_event_start``, ``label_event_end``,
         ``label_event_duration``, ``label_event_midpoint_time``
     Arms (scalar per event)
@@ -312,13 +357,14 @@ def build_event_table(
     Event-type
         ``is_swr`` (strict positive-duration SWR overlap; see
         :mod:`continuum_swr_replay.analysis.hippocampus.event_table`),
-        ``is_mua`` (any ``MUA_event > 0`` within event)
+        ``is_mua`` (strict positive-duration MUA overlap)
     SWR overlap (from the classified table)
         ``overlap_class``, ``overlap_subclass``, ``n_swrs_overlapping``,
         ``matched_swr_event``, ``matched_swr_start``, ``matched_swr_end``
     Per-event speed / peak (full label window)
         ``max_speed``, ``mean_speed``, ``start_speed``, ``end_speed``,
-        ``endpoints_speed_below_thresh``, ``peak_nonlocal_prob``
+        ``whole_event_speed_eligible``, the legacy endpoint diagnostic,
+        ``peak_nonlocal_prob``
     Stop linkage
         ``stop_idx``, ``stop_id``
     Content summaries
@@ -355,6 +401,12 @@ def build_event_table(
     epoch = str(dot["epoch"].iloc[0])
 
     dot = _prepare_dot(dot, env)
+    dot = _filter_external_event_labels(dot, speed_threshold)
+    mua_overlap_keys = (
+        event_strict_overlap_keys(dot, "non_local_event", "MUA_event")
+        if "MUA_event" in dot.columns
+        else set()
+    )
     dot = _add_trial_context(dot, trials)
 
     # Per-session immobility bouts — computed from the full frame so
@@ -462,9 +514,7 @@ def build_event_table(
                 "event_start": float(times[0]),
                 "event_end": float(times[-1]),
                 "event_duration": float(times[-1] - times[0]),
-                "is_mua": bool((g["MUA_event"] > 0).any())
-                if "MUA_event" in g.columns
-                else False,
+                "is_mua": (animal, day, epoch, int(ev_id)) in mua_overlap_keys,
                 "current_arm": current_arm,
                 "prev_arm": prev_arm,
                 "next_arm": next_arm,
@@ -612,19 +662,14 @@ def build_event_table(
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = _hash_stop_id(animal, day, epoch, stop_idx)
 
-    # --- 9. Attach SWR classification + additive full-window summaries ---
-    # The groupby in section 4 above produced the legacy
-    # filtered-survivor-window columns (timing + aggregates) unchanged.
-    # build_classified_nonlocal_event_table is the canonical classified
-    # table, computed over the *full* event-label window (no immobility /
-    # probability filter). Merge the two on ``event_id``: left-join from
-    # the filtered legacy population (sort=False preserves its row order
-    # and count) so the replay table keeps its existing ``event_id`` set,
-    # row count, and order. The filtered population is a strict subset of
-    # the full label window, so every legacy event must have a classified
-    # row — assert it.
+    # --- 9. Attach SWR classification + compatibility timing aliases ---
+    # Both passes use the same complete event label because section 2 validates
+    # the speed/probability contract without clipping. Merge on ``event_id``;
+    # every model-cohort event must have exactly one classified row.
     classified = build_classified_nonlocal_event_table(
-        dot, speed_threshold=speed_threshold
+        dot,
+        speed_threshold=speed_threshold,
+        nonlocal_threshold=nonlocal_threshold,
     )
     classified = classified.rename(
         columns={
@@ -644,6 +689,7 @@ def build_event_table(
         "mean_speed",
         "start_speed",
         "end_speed",
+        "whole_event_speed_eligible",
         "endpoints_speed_below_thresh",
         "peak_nonlocal_prob",
         "is_swr",
@@ -836,6 +882,10 @@ def build_stop_table(
         dot["Non-Local_Continuous_prob"].to_numpy()
         + dot["Non-Local_Fragmented_prob"].to_numpy()
     )
+    dot = _filter_external_event_labels(dot, speed_threshold)
+    nonlocal_event_mask = _in_event_mask(
+        dot, speed_threshold, nonlocal_threshold
+    ).to_numpy()
     dot = _add_trial_context(dot, trials)
 
     bout_starts, bout_ends = _immobility_bout_intervals(
@@ -874,8 +924,8 @@ def build_stop_table(
         .reindex(np.arange(n_bouts), fill_value=False)
         .to_numpy()
     )
-    # n_SWR: number of distinct detected ripples (SWR_event labels) in the
-    # bout — the raw-ripple analogue of n_non_local, for SWR-rate models.
+    # n_SWR: number of distinct whole-event-speed-eligible ripple labels in
+    # the bout — the SWR analogue of n_non_local, for SWR-rate models.
     # (is_swr_stop == n_SWR > 0.)
     per_bout["n_SWR"] = (
         grouped["SWR_event"]
@@ -902,20 +952,10 @@ def build_stop_table(
         per_bout["is_mua_stop"] = False
         per_bout["n_MUA"] = 0
 
-    # n_events: unique non_local_event > 0 within the bout AND with
-    # nonlocal_prob above threshold AND speed below threshold — all
-    # three clauses of ``_in_event_mask``. The speed clause is
-    # typically redundant (bout membership already implies low speed)
-    # but kept for consistency with ``build_event_table`` so
-    # ``n_events`` in ``stop_table`` exactly equals the number of
-    # events in ``event_table`` for that stop, even when a single
-    # noisy sample pushes speed above threshold mid-bout.
-    event_mask = (
-        (bout_rows["non_local_event"] > 0)
-        & (bout_rows["head_speed"] < speed_threshold)
-        & (bout_rows["nonlocal_prob"] > nonlocal_threshold)
-    )
-    event_rows = bout_rows.loc[event_mask]
+    # ``_in_event_mask`` validates complete labels before any bout slicing,
+    # so a Non-Local event is counted atomically and can never be clipped into
+    # multiple apparent events by a mobile interior sample.
+    event_rows = bout_rows.loc[nonlocal_event_mask[in_bout]]
     n_events_per_bout = (
         event_rows.groupby("_bout_idx")["non_local_event"]
         .nunique()
@@ -1593,11 +1633,9 @@ _EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "n_unique_arms",
     "stop_idx",
     "stop_id",
-    # Additive full-window timing + SWR classification from
-    # build_classified_nonlocal_event_table (full label window).
-    # Legacy event_start/end/duration/midpoint above remain the
-    # filtered survivor-window values; these label_event_* carry the
-    # full event-label boundary.
+    # Compatibility timing aliases + SWR classification from
+    # build_classified_nonlocal_event_table. Atomic label validation makes
+    # these timings identical to event_start/end/duration/midpoint above.
     "label_event_start",
     "label_event_end",
     "label_event_duration",
@@ -1606,6 +1644,7 @@ _EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "mean_speed",
     "start_speed",
     "end_speed",
+    "whole_event_speed_eligible",
     "endpoints_speed_below_thresh",
     "peak_nonlocal_prob",
     "overlap_class",

@@ -36,7 +36,7 @@ STEPS = [
     },
     {
         "title": "3. Filter to non-local immobile",
-        "shape": "T_nl rows  (head_speed < 4, Non-Local_prob > 0.8)",
+        "shape": "T_nl rows  (accepted labels: every bin speed < 4 and prob > 0.8)",
         "assumption": "Thresholds cleanly separate non-local from local; immobility is required.",
     },
     {

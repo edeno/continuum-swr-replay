@@ -50,12 +50,27 @@ import pandas as pd
 for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
 
+from continuum_swr_replay.analysis.constants import (  # noqa: E402
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
+    validate_dot_event_contract,
+)
+from continuum_swr_replay.analysis.hippocampus.event_detection import (  # noqa: E402
+    event_strict_overlap_mask,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa: E402
+    EventDefinitionError,
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
-NON_LOCAL_THRESHOLD = 0.8  # combined Continuous+Fragmented prob to call non-local
+NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_EVENT_THRESHOLD = 0.2  # non-local prob below this = clearly local (baseline)
-IMMOBILITY_CM_PER_S = 4.0
+IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 CLOSE_CM = 40.0  # mean |ahead-behind| below this = "close" subset
 REMOTE_CM = 100.0  # above this = "remote" subset
 GPI_REMOTE_CM = 100.0  # random-reference bins must be this far from the animal
@@ -143,19 +158,34 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
         One row per window: ``s, e`` (bin indices), ``mean_abs_ab``, ``is_swr``,
         ``n_bins``, ``group``.
     """
+    # Business-logic boundary: direct callers get the same fail-closed input
+    # contract as the file-loading entry point.
+    validate_dot_event_contract(dot)
     nlp = (dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]).to_numpy()
     immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
-    swr = dot["SWR_event"].to_numpy() > 0
     ab = dot["ahead_behind_distance"].to_numpy()
+    validate_nonlocal_event_probability_contract(dot)
+    eligible = filter_event_labels_by_speed(
+        dot, ["non_local_event", "SWR_event"]
+    )
+    nonlocal_labels = eligible["non_local_event"].to_numpy()
+    is_swr_event = event_strict_overlap_mask(
+        eligible, "non_local_event", "SWR_event"
+    ).to_numpy()
 
     rows = []
-    for s, e in _contiguous_spans((nlp > NON_LOCAL_THRESHOLD) & immobile):
-        n_bins = e - s + 1
+    for event_label in pd.unique(nonlocal_labels[nonlocal_labels > 0]):
+        event_bins = np.flatnonzero(nonlocal_labels == event_label)
+        n_bins = len(event_bins)
         if n_bins < MIN_EVENT_BINS:
             continue
-        sl = slice(s, e + 1)
-        mab = float(np.nanmean(np.abs(ab[sl])))
-        is_swr = bool(swr[sl].any())
+        if n_bins > 1 and not (np.diff(event_bins) == 1).all():
+            raise ValueError(
+                f"non_local_event {event_label} is not one contiguous run"
+            )
+        s, e = int(event_bins[0]), int(event_bins[-1])
+        mab = float(np.nanmean(np.abs(ab[event_bins])))
+        is_swr = bool(is_swr_event[event_bins[0]])
         if is_swr and mab > REMOTE_CM:
             group = "SWR-remote"
         elif not is_swr and mab > REMOTE_CM:
@@ -164,13 +194,31 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
             group = "nonSWR-close"
         else:
             continue  # 40-100 cm middle band, or SWR-close: excluded for clarity
-        rows.append({"s": s, "e": e, "mean_abs_ab": mab, "is_swr": is_swr, "n_bins": n_bins, "group": group})
+        rows.append(
+            {
+                "s": s,
+                "e": e,
+                "mean_abs_ab": mab,
+                "is_swr": is_swr,
+                "n_bins": n_bins,
+                "group": group,
+            }
+        )
 
     for s, e in _contiguous_spans((nlp < NON_EVENT_THRESHOLD) & immobile):
         n_bins = e - s + 1
         if n_bins < MIN_EVENT_BINS or n_bins > MAX_BASELINE_BINS:
             continue
-        rows.append({"s": s, "e": e, "mean_abs_ab": 0.0, "is_swr": False, "n_bins": n_bins, "group": "baseline"})
+        rows.append(
+            {
+                "s": s,
+                "e": e,
+                "mean_abs_ab": 0.0,
+                "is_swr": False,
+                "n_bins": n_bins,
+                "group": "baseline",
+            }
+        )
 
     return pd.DataFrame(rows)
 
@@ -303,6 +351,10 @@ def analyze_session(
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
     dot = pd.read_pickle(PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl")
+    # Validate before loading encoding data so a missing/corrupt auxiliary
+    # artifact cannot mask malformed event labels as an ordinary session skip.
+    validate_dot_event_contract(dot)
+    validate_nonlocal_event_probability_contract(dot)
     enc = load_encoding(epoch_id)
     env, encargs, pos, gpi = enc["env"], enc["encargs"], enc["pos"], enc["gpi"]
     gpi_peak_pos = float(pos[np.argmax(gpi)])
@@ -475,6 +527,11 @@ def main() -> None:
     for epoch_id in sessions:
         try:
             metrics_df, context = analyze_session(epoch_id, args.cache_dir, args.n_sample)
+        except EventDefinitionError:
+            # A malformed saved event cohort invalidates the multi-session
+            # comparison. Abort instead of writing a selectively incomplete
+            # QA result.
+            raise
         except Exception as exc:  # noqa: BLE001 - log and continue the sweep
             print(f"  {epoch_id}: FAILED ({type(exc).__name__}: {exc})")
             continue

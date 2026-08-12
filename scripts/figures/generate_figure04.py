@@ -50,6 +50,12 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_overlap_times,
     load_results,
 )
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_results_position_time_alignment,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    build_speed_eligible_event_cohort,
+)
 from continuum_swr_replay.analysis.pfc import (
     fit_immobility_models,
     make_design_matrices,
@@ -327,34 +333,53 @@ def generate_figure(
     )
     data = load_data(nwb_file_name, epoch_name)
 
+    position_time = data["position_info"].index
+    speed = data["position_info"].head_speed.to_numpy()
+    validate_results_position_time_alignment(
+        results_hpc.time.values, position_time
+    )
     non_local_prob = (
         results_hpc.acausal_state_probabilities.sel(states="Non-Local Continuous")
         + results_hpc.acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    )
+    ).assign_coords(time=position_time.to_numpy(dtype=float))
 
-    non_local_times = get_confident_times(
+    detected_non_local_times = get_confident_times(
         non_local_prob,
-        data["position_info"].head_speed.to_numpy(),
-        data["position_info"].index.to_numpy(),
+        speed,
+        position_time.to_numpy(dtype=float),
         DEFAULT_NON_LOCAL_THRESHOLD,
     )
-    non_local_times = non_local_times[
-        non_local_times.max_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ]
+    non_local_times, _ = build_speed_eligible_event_cohort(
+        detected_non_local_times,
+        speed=speed,
+        time=position_time,
+        event_col="non_local_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    ripple_times, _ = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=speed,
+        time=position_time,
+        event_col="SWR_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
     non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
-        non_local_times, data["ripple_times"]
+        non_local_times, ripple_times
     )
 
     event_times = {
         "non_local_no_SWR": non_local_no_SWR_times,
         "non_local_SWR": non_local_SWR_times,
         "non_local": non_local_times,
-        "SWR": data["ripple_times"],
+        "SWR": ripple_times,
     }
 
     # Design matrices
-    time = data["position_info"].index.to_numpy()
-    is_immobile = data["position_info"].head_speed <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    time = position_time.to_numpy(dtype=float)
+    is_immobile = (
+        data["position_info"].head_speed
+        < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    )
 
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
         event_times, data["position_info"],

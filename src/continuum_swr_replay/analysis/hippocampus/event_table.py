@@ -12,9 +12,9 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
   ``event_midpoint_time`` over the *full* set of timebins carrying the
   event label.
 - **Per-event speed summaries** — ``max_speed``, ``mean_speed``,
-  ``start_speed``, ``end_speed`` and the immobility flag
-  ``endpoints_speed_below_thresh`` (start- and end-bin speed both below
-  ``speed_threshold``).
+  ``start_speed``, ``end_speed``, the canonical
+  ``whole_event_speed_eligible`` flag, and the legacy endpoint diagnostic
+  ``endpoints_speed_below_thresh``.
 - **Peak content** — ``peak_nonlocal_prob`` (max of the summed
   continuous + fragmented non-local posterior within the event).
 - **SWR overlap** — ``overlap_class`` (3-way:
@@ -29,16 +29,15 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
 - **Identifiers** — ``animal``, ``day``, ``epoch``, ``non_local_event``,
   and the stable hash ``event_id``.
 
-SWR intervals are *always* derived from the ``SWR_event`` timebin labels
-in the input frame via :func:`intervals_from_labels`. This is the same
-label source used by the Figure 2 bar / triggered-average / timing panels
-and by the replay-content tables, so a single overlap convention governs
-the whole figure. The threshold-crossing ``ripple_times`` produced by
-``load_data`` is not used for classification anywhere — only for plotting.
+SWR intervals are derived from ``SWR_event`` timebin labels after applying
+the same whole-event speed criterion used for Non-Local and MUA populations.
+This is the same label source used by the Figure 2 bar / triggered-average /
+timing panels and by the replay-content tables, so a single population and
+overlap convention governs the whole figure.
 
 The replay-content tables in ``analysis/replay/tables.py`` build on top of
-this table: ``build_event_table`` composes its legacy filtered-window
-aggregates with the classification columns produced here.
+this table: ``build_event_table`` computes aggregates over this same complete,
+atomically validated label window and merges the classification columns here.
 """
 
 from __future__ import annotations
@@ -48,9 +47,20 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 
-from .event_detection import classify_swr_overlap, classify_swr_overlap_geometry
+from .event_detection import (
+    classify_swr_overlap,
+    classify_swr_overlap_geometry,
+    positive_duration_interval_mask,
+)
+from .event_immobility import (
+    event_speeds_are_immobile,
+    filter_event_labels_by_speed,
+    intervals_from_labels,
+    validate_nonlocal_event_probability_contract,
+)
 
 # NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
 # ``analysis/replay/_helpers``. Importing them at module load would close a
@@ -74,48 +84,6 @@ _REQUIRED_DOT_COLUMNS = (
 )
 
 
-def intervals_from_labels(session_df: pd.DataFrame, label_col: str) -> pd.DataFrame:
-    """Return ``[label_col, start_time, end_time]`` for positive labels.
-
-    Converts per-timebin integer labels (0 = background, positive ints =
-    distinct events) into one interval per label, taking the earliest and
-    latest timebin time (seconds) carrying each label. The label id is
-    retained in the output so callers can recover, e.g., the matched
-    SWR's id.
-
-    Parameters
-    ----------
-    session_df : pd.DataFrame
-        Single-session frame carrying ``label_col``. Time is taken from a
-        ``"time"`` column when present (test frames), otherwise from the
-        (named or unnamed) index (production ``data_over_time`` frames).
-    label_col : str
-        Integer label column (e.g. ``"non_local_event"`` or
-        ``"SWR_event"``).
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns ``[label_col, "start_time", "end_time"]``, one row per
-        positive label. Empty input (no positive labels) returns a
-        schema-complete zero-row frame.
-    """
-    if "time" in session_df.columns:
-        df = session_df
-    else:
-        df = session_df.reset_index(names="time")
-
-    active = df.loc[df[label_col] > 0]
-    if len(active) == 0:
-        return pd.DataFrame(columns=[label_col, "start_time", "end_time"])
-
-    return (
-        active.groupby(label_col)["time"]
-        .agg(start_time="min", end_time="max")
-        .reset_index()
-    )
-
-
 #: Canonical column order for the classified non-local event table.
 _CLASSIFIED_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "animal",
@@ -131,6 +99,7 @@ _CLASSIFIED_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "mean_speed",
     "start_speed",
     "end_speed",
+    "whole_event_speed_eligible",
     "endpoints_speed_below_thresh",
     "peak_nonlocal_prob",
     "is_swr",
@@ -172,7 +141,11 @@ def _match_swr(
     # intervals. swr_contained additionally requires a single containing
     # SWR (boundary equality allowed), matching the classifier's
     # containment test.
-    overlap_mask = (swr_ends > event_start) & (swr_starts < event_end)
+    overlap_mask = (
+        positive_duration_interval_mask(swr_starts, swr_ends)
+        & (swr_ends > event_start)
+        & (swr_starts < event_end)
+    )
     if overlap_class == "swr_contained":
         candidate_mask = (
             overlap_mask & (swr_starts <= event_start) & (swr_ends >= event_end)
@@ -206,6 +179,7 @@ def build_classified_nonlocal_event_table(
     dot: pd.DataFrame,
     *,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One row per non-local event with timing, overlap class, and per-event summaries.
 
@@ -217,8 +191,12 @@ def build_classified_nonlocal_event_table(
         ``SWR_event``, ``head_speed``, ``Non-Local_Continuous_prob``,
         ``Non-Local_Fragmented_prob``.
     speed_threshold : float
-        Immobility threshold (cm/s) used to populate
-        ``endpoints_speed_below_thresh``.
+        Immobility threshold (cm/s) used for the canonical whole-event flag
+        and the legacy endpoint diagnostic.
+    nonlocal_threshold : float
+        Minimum combined Non-Local posterior required at every labeled bin.
+        This must match the threshold used to create or validate the primary
+        Non-Local event cohort.
 
     Returns
     -------
@@ -226,16 +204,18 @@ def build_classified_nonlocal_event_table(
         Columns: ``animal, day, epoch, non_local_event, event_id,
         event_start, event_end, event_duration, event_midpoint_time,
         max_speed, mean_speed, start_speed, end_speed,
-        endpoints_speed_below_thresh, peak_nonlocal_prob, is_swr,
+        whole_event_speed_eligible, endpoints_speed_below_thresh,
+        peak_nonlocal_prob, is_swr,
         overlap_class, overlap_subclass, n_swrs_overlapping,
         matched_swr_event, matched_swr_start, matched_swr_end``.
         Empty frame (correct columns, zero rows) if no events.
 
     Notes
     -----
-    Events are built over the *full* set of timebins carrying each event
-    label — no immobility or probability filter is applied. SWR intervals
-    are derived from ``dot["SWR_event"]`` labels via
+    Events are built over the *full* set of timebins carrying each Non-Local
+    label so their speed eligibility remains directly inspectable. SWR
+    intervals are restricted atomically by the canonical whole-event speed
+    rule and then derived from ``dot["SWR_event"]`` labels via
     :func:`intervals_from_labels` and are session-scoped, so cross-session
     leakage is impossible by construction.
 
@@ -256,6 +236,11 @@ def build_classified_nonlocal_event_table(
             f"get_data_over_time()."
         )
 
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_threshold=nonlocal_threshold,
+    )
+
     column_order = list(_CLASSIFIED_EVENT_TABLE_COLUMNS)
 
     # Single canonical time source. Event timing below reads ``g.index``
@@ -267,6 +252,15 @@ def build_classified_nonlocal_event_table(
     # which is already time-indexed with no ``"time"`` column).
     if "time" in dot.columns:
         dot = dot.set_index("time")
+
+    # SWR coincidence uses the same globally qualified SWR population as its
+    # own event tables. Preserve Non-Local rows here so this diagnostic table
+    # can report their eligibility flag; model builders validate that flag.
+    overlap_dot = filter_event_labels_by_speed(
+        dot,
+        ["SWR_event"],
+        speed_threshold=speed_threshold,
+    )
 
     if (dot["non_local_event"] > 0).sum() == 0:
         return pd.DataFrame(columns=column_order)
@@ -302,6 +296,10 @@ def build_classified_nonlocal_event_table(
                     "mean_speed": float(speed.mean()),
                     "start_speed": start_speed,
                     "end_speed": end_speed,
+                    "whole_event_speed_eligible": event_speeds_are_immobile(
+                        speed.to_numpy(dtype=float),
+                        speed_threshold=speed_threshold,
+                    ),
                     "endpoints_speed_below_thresh": bool(
                         (start_speed < speed_threshold) & (end_speed < speed_threshold)
                     ),
@@ -312,7 +310,14 @@ def build_classified_nonlocal_event_table(
         events_df = pd.DataFrame.from_records(records)
 
         # --- SWR overlap classification (single canonical rule) ---
-        swr_intervals = intervals_from_labels(session_dot, "SWR_event")
+        # Select by session keys rather than the time index: concatenated
+        # sessions routinely reuse the same timestamps.
+        session_overlap_dot = overlap_dot.loc[
+            (overlap_dot["animal"] == animal)
+            & (overlap_dot["day"] == day)
+            & (overlap_dot["epoch"] == epoch)
+        ]
+        swr_intervals = intervals_from_labels(session_overlap_dot, "SWR_event")
         classifier_events = events_df.rename(
             columns={"event_start": "start_time", "event_end": "end_time"}
         )

@@ -19,11 +19,9 @@ Two views:
 
     remote reward well | own well (near animal) | remote path | near, off-well
 
-Result (all 218 sessions, track distance): non-SWR content is **well-dominated**
-(~72% at wells: ~42% *remote* reward well + ~30% own well; ~27% paths); SWR is
-**path-dominated** (~76% paths, ~17% at wells). The **remote reward well** is
-the clean, artifact-immune part (far from the animal → cannot be place-field
-extent); the **own-well close subset** is conditional on the W3 gate.
+The analysis reports the well/path fractions for the current canonical event
+cohort. Previously rendered percentages must be regenerated after any event
+definition change; they are intentionally not hard-coded here.
 
 The analysis is deterministic (no sampling — all non-local timebins) and
 re-decode-agnostic (reads whatever ``data_over_time``/``environment`` exist).
@@ -48,11 +46,26 @@ import pandas as pd
 for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
 
+from continuum_swr_replay.analysis.constants import (  # noqa: E402
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
+    validate_dot_event_contract,
+)
+from continuum_swr_replay.analysis.hippocampus.event_detection import (  # noqa: E402
+    event_strict_overlap_mask,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa: E402
+    EventDefinitionError,
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
-NON_LOCAL_THRESHOLD = 0.8  # combined Continuous+Fragmented prob to call non-local
-IMMOBILITY_CM_PER_S = 4.0
+NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
+IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 FAR_CM = 20.0  # content track-distance from animal above this = "far/remote"
 AT_WELL_CM = 20.0  # content track-distance to nearest well below this = "at a well"
 N_LEAF_ARMS = 6  # arms 0-5 terminate at reward wells; 6-8 are trunk
@@ -115,6 +128,10 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
     dot = pd.read_pickle(PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl")
+    # Validate the persisted cohort before any auxiliary load or early-return
+    # path can turn corruption into an ordinary missing-data skip.
+    validate_dot_event_contract(dot)
+    validate_nonlocal_event_probability_contract(dot)
     env = joblib.load(PROCESSED_DATA_DIR / f"{epoch_id}_environment.pkl")
     # The fit flag is not persisted, but the grid + track graph are intact.
     env._is_fitted = True
@@ -133,9 +150,19 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     well_bins = [int(np.argmin(np.abs(pos - wl))) for wl in well_lin]
     nearest_well_dist = dist_matrix[:, well_bins].min(1)  # (n_interior,)
 
-    nlp = (dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]).to_numpy()
-    event = (nlp > NON_LOCAL_THRESHOLD) & immobile
-    is_swr = dot["SWR_event"].to_numpy() > 0
+    # Retain validation at the business-logic boundary as defense in depth for
+    # direct callers that may later refactor the entry path above.
+    validate_nonlocal_event_probability_contract(dot)
+    eligible_dot = filter_event_labels_by_speed(
+        dot, ["non_local_event", "SWR_event"]
+    )
+    event = eligible_dot["non_local_event"].to_numpy() > 0
+    # Assign every bin of a Non-Local event to one group using the canonical
+    # strict event-level overlap rule. A raw per-bin SWR mask would split a
+    # partially overlapping event between both groups.
+    is_swr = event_strict_overlap_mask(
+        eligible_dot, "non_local_event", "SWR_event"
+    ).to_numpy()
     map_estimate = dot["map_estimate"].to_numpy()
     d_animal = np.abs(dot["ahead_behind_distance"].to_numpy())
     content_bin = np.argmin(np.abs(pos[None, :] - map_estimate[:, None]), axis=1)
@@ -191,6 +218,10 @@ def analyze(sessions: list[str]) -> tuple[pd.DataFrame, dict[str, np.ndarray], d
     for epoch_id in sessions:
         try:
             result = session_content_distances(epoch_id)
+        except EventDefinitionError:
+            # Contract failures invalidate the requested cross-session
+            # cohort; do not publish a plausible-looking partial aggregate.
+            raise
         except Exception as exc:  # noqa: BLE001 - log and continue the sweep
             print(f"  {epoch_id}: FAILED ({type(exc).__name__}: {exc})")
             continue

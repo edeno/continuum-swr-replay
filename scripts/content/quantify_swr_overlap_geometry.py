@@ -28,6 +28,12 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_confident_times,
     load_results,
 )
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_results_position_time_alignment,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    build_speed_eligible_event_cohort,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -73,24 +79,41 @@ def quantify_session(
         load_detector=False,
     )
 
+    position_time = data["position_info"].index
+    speed = data["position_info"].head_speed.to_numpy()
+    validate_results_position_time_alignment(
+        results.time.values, position_time
+    )
     non_local_prob = (
         results.acausal_state_probabilities.sel(states="Non-Local Continuous")
         + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    )
+    ).assign_coords(time=position_time.to_numpy(dtype=float))
 
-    speed = data["position_info"].head_speed.to_numpy()
-    time = data["position_info"].index.to_numpy()
-
-    nl_events = get_confident_times(
-        non_local_prob, speed, time, DEFAULT_NON_LOCAL_THRESHOLD,
+    detected_nl_events = get_confident_times(
+        non_local_prob,
+        speed,
+        position_time.to_numpy(dtype=float),
+        DEFAULT_NON_LOCAL_THRESHOLD,
     )
-    nl_events = nl_events[
-        nl_events.max_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ].reset_index(drop=True)
+    nl_events, _ = build_speed_eligible_event_cohort(
+        detected_nl_events,
+        speed=speed,
+        time=position_time,
+        event_col="non_local_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    nl_events = nl_events.reset_index(drop=True)
+    swr_events, _ = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=speed,
+        time=position_time,
+        event_col="SWR_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
     logger.info(f"  {len(nl_events)} immobile non-local events detected")
-    logger.info(f"  {len(data['ripple_times'])} SWR events")
+    logger.info(f"  {len(swr_events)} whole-event-immobile SWR events")
 
-    geom = classify_swr_overlap_geometry(nl_events, data["ripple_times"])
+    geom = classify_swr_overlap_geometry(nl_events, swr_events)
     geom["nwb_file_name"] = nwb_file_name
     geom["epoch_name"] = epoch_name
     return geom

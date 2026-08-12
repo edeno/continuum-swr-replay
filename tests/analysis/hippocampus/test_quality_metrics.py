@@ -27,6 +27,15 @@ N_BINS = 1000
 SAMPLING_FREQUENCY = 500.0
 
 
+def _with_valid_nonlocal_probabilities(data: pd.DataFrame) -> pd.DataFrame:
+    """Attach the decoder-probability invariant required by saved NL labels."""
+    data = data.copy()
+    active = data["non_local_event"].to_numpy() > 0
+    data["Non-Local_Continuous_prob"] = np.where(active, 0.9, 0.1)
+    data["Non-Local_Fragmented_prob"] = 0.0
+    return data
+
+
 @pytest.fixture
 def perfect_session() -> pd.DataFrame:
     """Session with perfect local decoding: Local_prob=1, error=0."""
@@ -368,11 +377,12 @@ class TestComputeNonLocalEventContext:
                         "epoch": "e1",
                         "non_local_event": ev_id,
                         "SWR_event": 0,
+                        "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": phase,
                     }
                 )
-        df = pd.DataFrame(rows)
+        df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
         result = compute_non_local_event_context(
             df,
             event_col="non_local_event",
@@ -405,6 +415,7 @@ class TestComputeNonLocalEventContext:
                     "epoch": "e1",
                     "non_local_event": 1,
                     "SWR_event": 0,
+                    "head_speed": 0.0,
                     "theta_power_zscore": 1.5,
                     "theta_phase": phase,
                 }
@@ -420,11 +431,12 @@ class TestComputeNonLocalEventContext:
                         "epoch": "e1",
                         "non_local_event": ev_id,
                         "SWR_event": 0,
+                        "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": 0.55,
                     }
                 )
-        df = pd.DataFrame(rows)
+        df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
         result = compute_non_local_event_context(
             df,
             event_col="non_local_event",
@@ -445,7 +457,7 @@ class TestComputeNonLocalEventContext:
         positive-duration semantics must classify it as theta- or
         neither-associated, not SWR-associated."""
         # NL labels [0.0, 1.0]; SWR labels [1.0, 2.0]; share t=1.0.
-        df = pd.DataFrame(
+        df = _with_valid_nonlocal_probabilities(pd.DataFrame(
             {
                 "animal": ["a"] * 5,
                 "day": [1] * 5,
@@ -458,12 +470,33 @@ class TestComputeNonLocalEventContext:
                 "theta_power_zscore": [0.0] * 5,
             },
             index=[0.0, 0.5, 1.0, 1.5, 2.0],
-        )
+        ))
         out = compute_non_local_event_context(df)
         assert out["frac_swr"].iloc[0] == 0.0, (
             f"frac_swr={out['frac_swr'].iloc[0]} — boundary-touch SWR "
             "must not be classified as SWR-associated."
         )
+
+    def test_movement_spanning_swr_does_not_enter_event_context(self):
+        """An overlapping SWR is absent when any of its own bins is mobile."""
+        df = _with_valid_nonlocal_probabilities(pd.DataFrame(
+            {
+                "animal": ["a"] * 4,
+                "day": [1] * 4,
+                "epoch": ["e1"] * 4,
+                "non_local_event": [0, 1, 1, 1],
+                "SWR_event": [2, 2, 2, 2],
+                "head_speed": [5.0, 0.0, 0.0, 0.0],
+                "theta_phase": [np.nan] * 4,
+                "theta_power_zscore": [0.0] * 4,
+            },
+            index=[0.0, 0.5, 1.0, 1.5],
+        ))
+
+        out = compute_non_local_event_context(df)
+
+        assert out["n_events"].iloc[0] == 1
+        assert out["frac_swr"].iloc[0] == 0.0
 
     def test_all_nan_theta_phases_yield_nan_session_stats(self):
         """Sanity: if every theta event has only NaN phase samples,
@@ -479,11 +512,12 @@ class TestComputeNonLocalEventContext:
                         "epoch": "e1",
                         "non_local_event": ev_id,
                         "SWR_event": 0,
+                        "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": np.nan,
                     }
                 )
-        df = pd.DataFrame(rows)
+        df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
         result = compute_non_local_event_context(
             df,
             event_col="non_local_event",

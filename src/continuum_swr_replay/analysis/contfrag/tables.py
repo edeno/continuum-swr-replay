@@ -20,6 +20,13 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.hippocampus.event_detection import (
+    event_strict_overlap_keys,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    filter_event_labels_by_speed,
+    whole_event_immobility_mask,
+)
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
@@ -141,22 +148,24 @@ def _in_contfrag_event_mask(
     Excluded fraction is small (~0.5% SWR, ~0.7% MUA across HPC sessions).
     """
     event_col = _resolve_event_col(event_source)
-    label = dot[event_col].to_numpy()
-    speed = dot["head_speed"].to_numpy()
-    in_label = label > 0
-    mask = np.zeros(len(dot), dtype=bool)
-    if not in_label.any():
-        return pd.Series(mask, index=dot.index)
-    # Per-event (per label) max head-speed, broadcast back to the event's
-    # rows; the event qualifies iff that max is below threshold.
-    event_max_speed = (
-        pd.Series(speed[in_label], index=label[in_label])
-        .groupby(level=0)
-        .transform("max")
-        .to_numpy()
+    return whole_event_immobility_mask(
+        dot,
+        event_col,
+        speed_threshold=speed_threshold,
     )
-    mask[in_label] = event_max_speed < speed_threshold
-    return pd.Series(mask, index=dot.index)
+
+
+def _filter_contfrag_event_labels(
+    dot: pd.DataFrame,
+    speed_threshold: float,
+) -> pd.DataFrame:
+    """Apply the same whole-event rule to both external detector labels."""
+    event_cols = [column for column in ("SWR_event", "MUA_event") if column in dot]
+    return filter_event_labels_by_speed(
+        dot,
+        event_cols,
+        speed_threshold=speed_threshold,
+    )
 
 
 def _hash_contfrag_event_id(
@@ -278,6 +287,13 @@ def build_contfrag_event_table(
     event_col = _resolve_event_col(event_source)
 
     dot = _prepare_contfrag_dot(dot, env)
+    dot = _filter_contfrag_event_labels(dot, speed_threshold)
+    other_event_col = "MUA_event" if event_col == "SWR_event" else "SWR_event"
+    other_overlap_keys = (
+        event_strict_overlap_keys(dot, event_col, other_event_col)
+        if other_event_col in dot.columns
+        else set()
+    )
     dot = add_trial_context(dot, trials)
 
     bout_starts, bout_ends = immobility_bout_intervals(
@@ -361,10 +377,10 @@ def build_contfrag_event_table(
             "event_start": float(times[0]),
             "event_end": float(times[-1]),
             "event_duration": float(times[-1] - times[0]),
-            "is_swr": bool((g["SWR_event"] > 0).any()),
-            "is_mua": bool((g["MUA_event"] > 0).any())
-            if "MUA_event" in g.columns
-            else False,
+            "is_swr": event_col == "SWR_event"
+            or (animal, day, epoch, int(ev_id)) in other_overlap_keys,
+            "is_mua": event_col == "MUA_event"
+            or (animal, day, epoch, int(ev_id)) in other_overlap_keys,
             "continuous_prob_mean": cont_mean,
             "fragmented_prob_mean": frag_mean,
             "dominant_state": dominant,
@@ -537,6 +553,7 @@ def build_contfrag_event_arm_table(
     n_events = len(event_table)
 
     dot = _prepare_contfrag_dot(dot, env)
+    dot = _filter_contfrag_event_labels(dot, speed_threshold)
     in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
     ev = dot.loc[in_event]
 
@@ -765,7 +782,7 @@ def build_contfrag_stop_table(
 
     event_col = _resolve_event_col(event_source)
 
-    dot = dot.copy()
+    dot = _filter_contfrag_event_labels(dot, speed_threshold)
     dot = add_trial_context(dot, trials)
 
     bout_starts, bout_ends = immobility_bout_intervals(

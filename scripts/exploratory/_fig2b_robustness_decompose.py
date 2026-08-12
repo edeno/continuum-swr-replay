@@ -69,7 +69,7 @@ def main() -> None:
     n_dup = int(tbl["event_id"].duplicated().sum())
     logging.info("event_id duplicates: %d (expect 0)", n_dup)
 
-    immobile = tbl.loc[tbl["endpoints_speed_below_thresh"].astype(bool)].copy()
+    immobile = tbl.loc[tbl["whole_event_speed_eligible"].astype(bool)].copy()
 
     # ── 0. Reproduce pooled panel-b counts ──
     pooled = compute_swr_overlap_class_counts(tbl)

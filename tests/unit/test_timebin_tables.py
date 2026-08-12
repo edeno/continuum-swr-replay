@@ -17,13 +17,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_event_onset_table,
     build_stop_timebin_table,
 )
 
-# Non-local onsets require Non-Local prob > 0.8 and head_speed < 4 cm/s (the
-# immobility threshold); SWR/MUA are taken inclusively at any labelled bin.
+# All sources require whole-event head speed to be finite and < 4 cm/s.
+# Non-Local onsets additionally require every event bin's probability > 0.8.
 
 
 @pytest.fixture
@@ -123,15 +126,8 @@ def test_missing_mua_column_tolerated(two_bout_dot):
     assert int(dense["n_non_local"].sum()) == 3
 
 
-def test_swr_inclusive_vs_nonlocal_prob_masked():
-    """SWR onsets are inclusive (any labelled bin); non_local onsets also require
-    Non-Local prob > 0.8. A low-prob labelled region co-located with an SWR
-    yields an SWR onset but no non_local onset, locking in that asymmetry.
-
-    (Within an immobility bout the speed mask is always satisfied, so the prob
-    mask is the discriminator; an onset outside any bout is dropped for every
-    type by the bout filter, so the gap is not the right place to test this.)
-    """
+def test_invalid_nonlocal_probability_labels_fail_loud():
+    """Timebin tables must not silently drop stale Non-Local labels."""
     t = np.round(np.arange(20) * 0.01, 2)  # one immobile bout, t 0.00..0.19
     swr = np.zeros(20, dtype=int)
     nl = np.zeros(20, dtype=int)
@@ -144,22 +140,57 @@ def test_swr_inclusive_vs_nonlocal_prob_masked():
     nl[12:14] = 2
     nlprob[12:14] = 0.9
 
+    speed = np.full(20, 1.0)
+    speed[5] = 10.0  # probability validation must happen before speed filtering
     dot = pd.DataFrame(
         {
             "animal": "x", "day": 1, "epoch": "02_r1",
-            "head_speed": np.full(20, 1.0),  # immobile throughout
+            "head_speed": speed,
             "SWR_event": swr, "non_local_event": nl, "MUA_event": 0,
             "Non-Local_Continuous_prob": nlprob, "Non-Local_Fragmented_prob": 0.0,
         },
         index=t,
     )
+    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+        build_event_onset_table(dot, np.array([]))
+    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+        build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
+
+
+def test_all_sources_exclude_a_movement_spanning_event_atomically():
+    """One fast interior bin removes the same event from sparse and dense rates."""
+    t = np.round(np.arange(40) * 0.01, 2)
+    speed = np.full(40, 1.0)
+    speed[6] = 10.0
+    labels = np.zeros(40, dtype=int)
+    labels[4:9] = 1  # invalid event spanning the mobile sample
+    labels[20:23] = 2  # valid event
+    probability = np.where(labels > 0, 0.9, 0.0)
+    dot = pd.DataFrame(
+        {
+            "animal": "x",
+            "day": 1,
+            "epoch": "02_r1",
+            "head_speed": speed,
+            "SWR_event": labels,
+            "non_local_event": labels,
+            "MUA_event": labels,
+            "Non-Local_Continuous_prob": probability,
+            "Non-Local_Fragmented_prob": 0.0,
+        },
+        index=t,
+    )
+
     onset = build_event_onset_table(dot, np.array([]))
-    counts = onset["event_type"].value_counts()
-    assert counts.get("SWR", 0) == 1  # inclusive: the low-prob region counts
-    assert counts.get("non_local", 0) == 1  # only the high-prob event (label 2)
-    # the surviving non_local onset is the high-prob one at t=0.12, not t=0.05.
-    nlrows = onset[onset.event_type == "non_local"]
-    assert nlrows["onset_time"].iloc[0] == pytest.approx(0.12)
+    dense = build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
+
+    for event_type, count_col in (
+        ("SWR", "n_SWR"),
+        ("non_local", "n_non_local"),
+        ("MUA", "n_MUA"),
+    ):
+        assert int((onset["event_type"] == event_type).sum()) == 1
+        assert int(dense[count_col].sum()) == 1
 
 
 def test_empty_session_returns_schema(two_bout_dot):

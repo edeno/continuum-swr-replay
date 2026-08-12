@@ -50,7 +50,7 @@ Neural signals (z-scored or phase):
     - MUA_zscore: Z-scored multiunit firing rate
 
 Event counts (session-level):
-    - n_non_local, n_SWR, n_MUA: Total event counts
+    - n_non_local, n_SWR, n_MUA: Whole-event-speed-eligible event counts
     - n_non_local_SWR, n_non_local_no_SWR: Non-local overlaps with/without SWR
     - n_non_local_MUA, n_non_local_no_MUA: Non-local overlaps with/without MUA
     - n_SWR_MUA, n_SWR_no_MUA: SWR overlaps with/without MUA
@@ -66,7 +66,8 @@ Position and behavioral data:
 
 Filtering and Processing
 -------------------------
-- Events exceeding max speed threshold are filtered out
+- Non-Local, SWR, and MUA cohorts require every event speed sample to be
+  finite and strictly below 4 cm/s; an ineligible event is removed atomically
 - Missing values are handled via nearest-neighbor reindexing with tolerance
 - Z-scoring is applied to relevant continuous variables
 - Event overlap detection uses interval-based logic
@@ -113,16 +114,19 @@ from scipy.stats import zscore
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.data_loaders import get_labels
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
 
 from ...types import SessionData
-from .event_analysis import get_immobile_events
 from .event_detection import (
     event_strict_overlap_keys,
     get_confident_times,
     get_overlap_times,
+)
+from .event_immobility import (
+    EventDefinitionError,
+    build_speed_eligible_event_cohort,
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
 )
 from .posterior_analysis import (
     get_conditional_non_local_posterior,
@@ -220,7 +224,7 @@ def validate_dot_event_contract(
     """Check a ``data_over_time`` frame against the table-regen input contract.
 
     The table builders assume each ``data_over_time`` (``dot``) frame holds a
-    single session, is in non-decreasing time order, and labels each event as one
+    single session, has a finite strictly increasing time axis, and labels each event as one
     contiguous run of timebins (``label > 0``; the builders take an event's span
     from the first and last labelled bin). A violation silently corrupts the
     regenerated tables — wrong bout assignment, an event split across a gap, or
@@ -242,9 +246,9 @@ def validate_dot_event_contract(
 
     Raises
     ------
-    ValueError
-        If the frame spans multiple sessions, is not time-sorted, or any event
-        label is non-contiguous.
+    EventDefinitionError
+        If the frame spans multiple sessions, has a non-finite/non-increasing
+        time axis, or any event label is non-contiguous.
     """
     violations: dict[str, int] = {}
     for col in ("animal", "day", "epoch"):
@@ -252,7 +256,13 @@ def validate_dot_event_contract(
             violations[f"multiple_{col}"] = int(dot[col].nunique(dropna=False))
 
     t = dot.index.to_numpy(dtype=float)
-    n_unsorted = int((np.diff(t) < 0).sum()) if t.size > 1 else 0
+    n_nonfinite = int((~np.isfinite(t)).sum())
+    if n_nonfinite:
+        violations["nonfinite_time"] = n_nonfinite
+    # Keep the established ``unsorted_time`` diagnostic key, but include equal
+    # adjacent timestamps: duplicate samples are just as unsafe as reversals
+    # because builders would double-count their content and event rows.
+    n_unsorted = int((np.diff(t) <= 0).sum()) if t.size > 1 else 0
     if n_unsorted:
         violations["unsorted_time"] = n_unsorted
 
@@ -274,7 +284,7 @@ def validate_dot_event_contract(
             violations[f"noncontiguous_{col}"] = noncontig
 
     if violations:
-        raise ValueError(
+        raise EventDefinitionError(
             f"validate_dot_event_contract: input-contract violations {violations}"
         )
     return violations
@@ -341,34 +351,61 @@ def get_data_over_time(
         ],
     )
 
+    # Decoder values and position samples are paired row-for-row. Validate that
+    # relationship, then use the position axis for detection, speed gating,
+    # label writing, and the final data-over-time index. One canonical axis
+    # prevents sub-tolerance drift from changing endpoint membership between
+    # those operations.
+    validate_results_position_time_alignment(
+        np.asarray(results.time.values), data["position_info"].index
+    )
+    position_time = data["position_info"].index
+    head_speed = data["position_info"].head_speed.to_numpy()
+
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_prob = non_local_prob.assign_coords(
+        time=position_time.to_numpy(dtype=float)
+    )
 
     posterior = get_conditional_non_local_posterior(results)
 
-    non_local_times = get_confident_times(
+    detected_non_local_times = get_confident_times(
         non_local_prob,
-        data["position_info"].head_speed.to_numpy(),
-        data["position_info"].index.to_numpy(),
+        head_speed,
+        position_time.to_numpy(dtype=float),
         non_local_threshold,
     )
-    non_local_times = non_local_times[
-        non_local_times.max_speed < MAX_SPEED_THRESHOLD_CM_PER_SEC
-    ]
-    non_local_labels = get_labels(non_local_times, results.time)
-    swr_labels = get_labels(data["ripple_times"], results.time)
-    mua_labels = get_labels(data["hse_times"][brain_area], results.time)
+    non_local_times, non_local_labels = build_speed_eligible_event_cohort(
+        detected_non_local_times,
+        speed=head_speed,
+        time=position_time,
+        event_col="non_local_event",
+        preserve_source_ids=False,
+    )
+    swr_times, swr_labels = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=head_speed,
+        time=position_time,
+        event_col="SWR_event",
+    )
+    mua_times, mua_labels = build_speed_eligible_event_cohort(
+        data["hse_times"][brain_area],
+        speed=head_speed,
+        time=position_time,
+        event_col="MUA_event",
+    )
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, data["ripple_times"]
+        non_local_times, swr_times
     )
     non_local_mua_times, non_local_no_mua_times = get_overlap_times(
-        non_local_times, data["hse_times"][brain_area]
+        non_local_times, mua_times
     )
 
     swr_mua_times, swr_no_mua_times = get_overlap_times(
-        data["ripple_times"], data["hse_times"][brain_area]
+        swr_times, mua_times
     )
     (
         map_estimate,
@@ -413,20 +450,11 @@ def get_data_over_time(
             series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
         )
 
-    # Build with the position_info time index so axis=1 concat aligns
-    # by time instead of falling back to a default RangeIndex (which
-    # would produce a 2N-row frame full of NaNs against the time-
-    # indexed position frame). The helper enforces the stricter drift
-    # check that mirrors ``analysis.replay._helpers._align_posterior_to_dot``.
-    validate_results_position_time_alignment(
-        np.asarray(results.time.values), data["position_info"].index
-    )
-
     data_over_time = pd.DataFrame(
         {
-            "non_local_event": non_local_labels.squeeze(),
-            "SWR_event": swr_labels.squeeze(),
-            "MUA_event": mua_labels.squeeze(),
+            "non_local_event": non_local_labels.to_numpy(),
+            "SWR_event": swr_labels.to_numpy(),
+            "MUA_event": mua_labels.to_numpy(),
             "Local_prob": results.sel(
                 states="Local"
             ).acausal_state_probabilities.squeeze(),
@@ -457,8 +485,8 @@ def get_data_over_time(
                 data["multiunit_rate_zscore"][brain_area].squeeze()
             ),
             "n_non_local": len(non_local_times),
-            "n_SWR": len(data["ripple_times"]),
-            "n_MUA": len(data["hse_times"][brain_area]),
+            "n_SWR": len(swr_times),
+            "n_MUA": len(mua_times),
             "n_non_local_SWR": len(non_local_swr_times),
             "n_non_local_no_SWR": len(non_local_no_swr_times),
             "n_non_local_MUA": len(non_local_mua_times),
@@ -547,23 +575,25 @@ def get_event_types(
         )
     other_cols = sorted(all_event_cols - {event_col})
 
-    immobile = get_immobile_events(
+    if "non_local_event" in data_over_time.columns:
+        validate_nonlocal_event_probability_contract(data_over_time)
+    present_event_cols = sorted(all_event_cols.intersection(data_over_time.columns))
+    eligible_data = filter_event_labels_by_speed(
         data_over_time,
-        event_col=event_col,
-        speed_col="head_speed",
+        present_event_cols,
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        method="endpoints",
     )
+    immobile = eligible_data.loc[eligible_data[event_col] > 0]
 
     result: dict[str, pd.DataFrame] = {
         f"{event_col}_immobile": immobile,
     }
 
-    # Raw events for each "other" detector
+    # Canonically eligible events for each "other" detector.
     for oc in other_cols:
         if oc in data_over_time.columns:
-            result[f"{oc}_events"] = data_over_time.loc[
-                data_over_time[oc] > 0
+            result[f"{oc}_events"] = eligible_data.loc[
+                eligible_data[oc] > 0
             ]
 
     # Overlap / no-overlap with each "other" detector. Use strict
@@ -574,7 +604,7 @@ def get_event_types(
     # semantics used by ``classify_swr_overlap`` /
     # ``get_overlap_times``.
     def _strict_overlap_mask(df: pd.DataFrame, primary: str, other: str) -> np.ndarray:
-        keys = event_strict_overlap_keys(data_over_time, primary, other)
+        keys = event_strict_overlap_keys(eligible_data, primary, other)
         if not keys:
             return np.zeros(len(df), dtype=bool)
         return np.array(
@@ -608,11 +638,11 @@ def get_event_types(
     for oc in other_cols:
         if oc not in data_over_time.columns:
             continue
-        oc_events = data_over_time.loc[data_over_time[oc] > 0]
+        oc_events = eligible_data.loc[eligible_data[oc] > 0]
         if len(oc_events) == 0:
             result[f"{oc}_events_no_{event_col}"] = oc_events
             continue
-        overlap_keys = event_strict_overlap_keys(data_over_time, oc, event_col)
+        overlap_keys = event_strict_overlap_keys(eligible_data, oc, event_col)
         if not overlap_keys:
             result[f"{oc}_events_no_{event_col}"] = oc_events
             continue
@@ -638,7 +668,7 @@ def compute_swr_overlap_class_counts(
 
     Operates on the output of
     :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
-    restricted to immobile events (``endpoints_speed_below_thresh``), and
+    restricted to immobile events (``whole_event_speed_eligible``), and
     tallies the ``overlap_class`` column. The single overlap convention
     (strict positive-duration overlap, "contained" = some single SWR spans
     the event) lives in that builder, so this is a thin tally with no
@@ -648,7 +678,7 @@ def compute_swr_overlap_class_counts(
     ----------
     classified_events : pd.DataFrame
         Per-non-local-event table with ``overlap_class`` and
-        ``endpoints_speed_below_thresh`` columns. May be the builder's
+        ``whole_event_speed_eligible`` columns. May be the builder's
         zero-row empty frame.
 
     Returns
@@ -662,10 +692,10 @@ def compute_swr_overlap_class_counts(
     if classified_events.empty:
         return zero
     # ``.loc`` + ``astype(bool)`` so the builder's zero-row empty frame
-    # (where ``endpoints_speed_below_thresh`` is object-dtype) still indexes
+    # (where ``whole_event_speed_eligible`` is object-dtype) still indexes
     # cleanly rather than raising on a non-boolean mask.
     immobile = classified_events.loc[
-        classified_events["endpoints_speed_below_thresh"].astype(bool)
+        classified_events["whole_event_speed_eligible"].astype(bool)
     ]
     if immobile.empty:
         return zero
@@ -697,15 +727,12 @@ def compute_swr_nl_event_counts(
         Aggregated data with both event columns, ``head_speed``, and
         session group columns.
     event_col_a : str, optional
-        First event column (immobility-filtered if ``immobile_col_a``),
-        by default ``"non_local_event"``.
+        First event column, by default ``"non_local_event"``.
     event_col_b : str, optional
-        Second event column (not speed-filtered), by default ``"SWR_event"``.
+        Second event column, by default ``"SWR_event"``.
     immobile_col_a : bool, optional
-        Whether to apply immobility filter to event_col_a, by default True.
-        Set to True for model-detected events (non_local_event) where
-        immobility filtering is standard. Set to False for externally-
-        detected events (SWR_event, MUA_event) that are not speed-gated.
+        Deprecated compatibility argument. It must remain ``True`` because all
+        event sources now share the canonical whole-event speed criterion.
 
     Returns
     -------
@@ -713,17 +740,20 @@ def compute_swr_nl_event_counts(
         Keys: ``n_a``, ``n_a_with_b``, ``n_b``, ``n_b_with_a``.
 
     """
-    # Event A (optionally immobility-filtered)
-    if immobile_col_a:
-        a_data = get_immobile_events(
-            data_over_time,
-            event_col=event_col_a,
-            speed_col="head_speed",
-            speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-            method="endpoints",
+    if not immobile_col_a:
+        raise ValueError(
+            "immobile_col_a=False is incompatible with the unified event "
+            "definition; Non-Local, SWR, and MUA events all require whole-event "
+            "speed < 4 cm/s"
         )
-    else:
-        a_data = data_over_time.loc[data_over_time[event_col_a] > 0]
+
+    if "non_local_event" in (event_col_a, event_col_b):
+        validate_nonlocal_event_probability_contract(data_over_time)
+    eligible_data = filter_event_labels_by_speed(
+        data_over_time,
+        [event_col_a, event_col_b],
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
 
     sess_cols = ["animal", "day", "epoch"]
 
@@ -735,20 +765,16 @@ def compute_swr_nl_event_counts(
     # the strict semantics enforced by ``classify_swr_overlap`` and
     # ``get_overlap_times``.
     #
-    # ``n_a`` is the immobility-filtered per-event count of column A;
-    # ``n_b`` is the unfiltered per-event count of column B. For
-    # ``n_*_with_*``, A-bounds come from the filtered ``a_data`` so a
-    # B event whose only A overlap was excluded by the immobility
-    # filter cannot resurrect it; B-bounds come from raw
-    # ``data_over_time`` to keep the ``n_b`` total consistent with
-    # the existing contract (Venn-diagram totals).
-    a_active = a_data.loc[a_data[event_col_a] > 0]
+    # Both totals and both overlap directions use the same globally eligible
+    # populations; an ineligible event cannot reappear as the secondary
+    # detector in the reverse overlap calculation.
+    a_active = eligible_data.loc[eligible_data[event_col_a] > 0]
     n_a = (
         int(a_active.groupby([*sess_cols, event_col_a], sort=False).ngroups)
         if len(a_active)
         else 0
     )
-    b_active = data_over_time.loc[data_over_time[event_col_b] > 0]
+    b_active = eligible_data.loc[eligible_data[event_col_b] > 0]
     n_b = (
         int(b_active.groupby([*sess_cols, event_col_b], sort=False).ngroups)
         if len(b_active)
@@ -758,22 +784,13 @@ def compute_swr_nl_event_counts(
     if n_a == 0 or n_b == 0:
         return {"n_a": n_a, "n_a_with_b": 0, "n_b": n_b, "n_b_with_a": 0}
 
-    # A-with-B: A bounds from a_data (filtered), B bounds from a_data
-    # too — only B intervals visible to the filtered A frame count
-    # toward this overlap. (The boundary-touch issue applies to B
-    # bounds derived from a_data exactly as it would from raw, so the
-    # source choice doesn't affect strict overlap; what matters is
-    # that B intervals reflect the filtered A-row coverage.)
-    a_with_b_keys = event_strict_overlap_keys(a_data, event_col_a, event_col_b)
+    a_with_b_keys = event_strict_overlap_keys(
+        eligible_data, event_col_a, event_col_b
+    )
     n_a_with_b = len(a_with_b_keys)
 
-    # B-with-A: B bounds from raw ``data_over_time`` so we can match
-    # them up to the unfiltered ``n_b`` total. A bounds STILL come
-    # from ``a_data`` — keep the existing contract that B events
-    # whose only A overlap was excluded by the immobility filter
-    # don't get counted as overlapping.
     b_with_a_keys = event_strict_overlap_keys(
-        data_over_time, event_col_b, event_col_a, other_data=a_data,
+        eligible_data, event_col_b, event_col_a
     )
     n_b_with_a = len(b_with_a_keys)
 

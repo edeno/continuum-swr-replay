@@ -28,6 +28,10 @@ from ..constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from ..hippocampus.event_immobility import (
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+)
 from ._helpers import assign_bout, hash_stop_id, immobility_bout_intervals
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
@@ -36,26 +40,15 @@ EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_e
 def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.ndarray:
     """Sorted onset time (first labelled bin) of each event in ``col``.
 
-    Non-local events apply the same prob+speed mask as ``build_stop_table``'s
-    ``n_non_local``; SWR/MUA are taken inclusively (any labelled bin), matching
-    ``n_SWR`` / ``n_MUA``. An absent event column (e.g. ``MUA_event`` on older
-    decodes) yields no onsets, mirroring ``build_stop_table``'s ``n_MUA = 0``
-    fallback; the dense builder then zero-fills that count.
+    All three sources arrive after the same atomic whole-event speed filter.
+    Non-Local labels additionally require every event bin to clear the saved
+    probability threshold. An absent event column (e.g. ``MUA_event`` on older
+    decodes) yields no onsets; the dense builder then zero-fills that count.
     """
     if col not in dot.columns:
         return np.array([], dtype=float)
     labels = dot[col].to_numpy()
     keep = labels > 0
-    if col == "non_local_event":
-        nlprob = (
-            dot["Non-Local_Continuous_prob"].to_numpy()
-            + dot["Non-Local_Fragmented_prob"].to_numpy()
-        )
-        keep = (
-            keep
-            & (nlprob > DEFAULT_NON_LOCAL_THRESHOLD)
-            & (dot["head_speed"].to_numpy() < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
-        )
     if not keep.any():
         return np.array([], dtype=float)
     df = pd.DataFrame({"t": times[keep], "lab": labels[keep]})
@@ -94,6 +87,17 @@ def build_event_onset_table(
     dot: pd.DataFrame, pump_times: np.ndarray
 ) -> pd.DataFrame:
     """Sparse per-onset table (one row per SWR / non-local / MUA onset in a stop)."""
+    if "non_local_event" in dot:
+        validate_nonlocal_event_probability_contract(
+            dot,
+            probability_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        )
+    event_cols = [column for column in EVENT_TYPES.values() if column in dot]
+    dot = filter_event_labels_by_speed(
+        dot,
+        event_cols,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
     animal, day, epoch = _session_keys(dot)
     times = dot.index.to_numpy()
     bout_starts, bout_ends = immobility_bout_intervals(dot)
@@ -141,6 +145,17 @@ def build_stop_timebin_table(
     dot: pd.DataFrame, pump_times: np.ndarray, *, bin_s: float = 0.004
 ) -> pd.DataFrame:
     """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms)."""
+    if "non_local_event" in dot:
+        validate_nonlocal_event_probability_contract(
+            dot,
+            probability_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        )
+    event_cols = [column for column in EVENT_TYPES.values() if column in dot]
+    dot = filter_event_labels_by_speed(
+        dot,
+        event_cols,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
     animal, day, epoch = _session_keys(dot)
     times = dot.index.to_numpy()
     speed = dot["head_speed"].to_numpy()

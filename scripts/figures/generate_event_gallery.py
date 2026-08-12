@@ -74,9 +74,15 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
+from continuum_swr_replay.analysis.hippocampus.event_detection import (
+    positive_duration_interval_mask,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    filter_event_labels_by_speed,
+    intervals_from_labels,
+)
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
-    intervals_from_labels,
 )
 from continuum_swr_replay.analysis.replay._helpers import immobility_bout_intervals
 from continuum_swr_replay.analysis.replay.posterior_io import (
@@ -86,7 +92,6 @@ from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
     build_event_table,
 )
-from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
@@ -100,6 +105,14 @@ from continuum_swr_replay.visualization.plots import (
     plot_spike_times,
     plot_track_graph_2d,
 )
+
+
+def load_data(*args, **kwargs):
+    """Import the Spyglass-backed loader only for the render phase."""
+    from continuum_swr_replay.data_loaders import load_data as _load_data
+
+    return _load_data(*args, **kwargs)
+
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -157,13 +170,19 @@ def _intervals_overlap_any(
     Half-open overlap test ``s < oe and os < e`` over all pairs. Sizes are
     small per session (hundreds), so the dense broadcast is fine.
     """
-    if len(other_starts) == 0:
+    starts = np.asarray(starts, dtype=float)
+    ends = np.asarray(ends, dtype=float)
+    other_starts = np.asarray(other_starts, dtype=float)
+    other_ends = np.asarray(other_ends, dtype=float)
+    valid = positive_duration_interval_mask(starts, ends)
+    valid_other = positive_duration_interval_mask(other_starts, other_ends)
+    if not valid_other.any():
         return np.zeros(len(starts), dtype=bool)
     s = starts[:, None]
     e = ends[:, None]
-    os = other_starts[None, :]
-    oe = other_ends[None, :]
-    return ((s < oe) & (os < e)).any(axis=1)
+    os = other_starts[valid_other][None, :]
+    oe = other_ends[valid_other][None, :]
+    return valid & ((s < oe) & (os < e)).any(axis=1)
 
 
 def _min_gap_to_intervals(
@@ -207,6 +226,14 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
     dot["Non-Local_prob"] = (
         dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
     )
+    eligible_dot = filter_event_labels_by_speed(
+        dot,
+        [
+            column
+            for column in ("non_local_event", "SWR_event", "MUA_event")
+            if column in dot
+        ],
+    )
 
     ct = build_classified_nonlocal_event_table(dot)
     rows: list[dict] = []
@@ -215,10 +242,10 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
         animal = ct["animal"].iloc[0]
         day = int(ct["day"].iloc[0])
         # Immobile only (matches the regression analysis population).
-        ct = ct[ct["endpoints_speed_below_thresh"]].copy()
+        ct = ct[ct["whole_event_speed_eligible"]].copy()
         ev_dur = (ct["event_end"] - ct["event_start"]).to_numpy()
 
-        swr_intervals = intervals_from_labels(dot, "SWR_event")
+        swr_intervals = intervals_from_labels(eligible_dot, "SWR_event")
         swr_starts = swr_intervals["start_time"].to_numpy()
         swr_ends = swr_intervals["end_time"].to_numpy()
 
@@ -264,7 +291,7 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
             rows.append(common)
 
         # swr_not_nonlocal: SWR intervals overlapping no non-local event.
-        nl_intervals = intervals_from_labels(dot, "non_local_event")
+        nl_intervals = intervals_from_labels(eligible_dot, "non_local_event")
         nl_starts = nl_intervals["start_time"].to_numpy()
         nl_ends = nl_intervals["end_time"].to_numpy()
         if len(swr_intervals):
@@ -1258,7 +1285,7 @@ def _plot_decoding_stack(
 
     Extends the Figure-2a four-row stack with a multiunit (MUA) row — since
     ``is_mua`` is a regression covariate — and a speed row with the immobility
-    threshold, since the endpoints-immobility rule is a core inclusion filter.
+    threshold, since whole-event immobility is a core inclusion filter.
     """
     ax_swr, ax_mua, ax_raster, ax_post, ax_probs, ax_speed = axes
 

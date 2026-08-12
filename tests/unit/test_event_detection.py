@@ -14,6 +14,7 @@ import xarray as xr
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
+    event_strict_overlap_keys,
     get_confident_times,
     get_overlap_times,
     merged_interval_duration,
@@ -375,6 +376,33 @@ class TestGetOverlapTimes:
         assert len(overlap) == 0
         assert len(no_overlap) == 1
 
+    @pytest.mark.parametrize("point_is_primary", [True, False])
+    def test_zero_duration_interval_is_not_positive_duration_overlap(
+        self, point_is_primary
+    ):
+        """A point interval contributes no overlap duration on either side."""
+        event_bounds = (1.0, 1.0) if point_is_primary else (0.0, 2.0)
+        swr_bounds = (0.0, 2.0) if point_is_primary else (1.0, 1.0)
+        non_local_times = pd.DataFrame(
+            {
+                "start_time": [event_bounds[0]],
+                "end_time": [event_bounds[1]],
+                "duration": [event_bounds[1] - event_bounds[0]],
+            }
+        )
+        ripple_times = pd.DataFrame(
+            {
+                "start_time": [swr_bounds[0]],
+                "end_time": [swr_bounds[1]],
+                "duration": [swr_bounds[1] - swr_bounds[0]],
+            }
+        )
+
+        overlap, no_overlap = get_overlap_times(non_local_times, ripple_times)
+
+        assert overlap.empty
+        assert len(no_overlap) == 1
+
     def test_empty_ripple_times(self):
         """All events are non-overlapping when no ripples."""
 
@@ -727,6 +755,50 @@ class TestClassifySwrOverlapGeometry:
         assert out["overlap_subclass"] == "single_swr_partial"
         coarse = classify_swr_overlap(ev, swr).iloc[0]
         assert coarse["overlap_class"] == "swr_partial"
+
+    def test_zero_duration_swr_is_not_counted_by_either_classifier(self):
+        """A point SWR inside an event has zero intersection duration."""
+        ev = _event(0.0, 2.0)
+        swr = _swrs([(1.0, 1.0)])
+
+        geometry = classify_swr_overlap_geometry(ev, swr).iloc[0]
+        coarse = classify_swr_overlap(ev, swr).iloc[0]
+
+        assert geometry["overlap_class"] == "non_swr"
+        assert geometry["overlap_subclass"] == "no_overlap"
+        assert geometry["n_swrs_overlapping"] == 0
+        assert coarse["overlap_class"] == "non_swr"
+
+
+def test_event_strict_overlap_keys_excludes_point_events_on_both_sides():
+    """Time-bin overlap keys obey the same positive-duration convention."""
+    rows = []
+    for time, primary, other in (
+        (0.0, 1, 0),
+        (1.0, 1, 2),
+        (2.0, 1, 0),
+        (3.0, 3, 4),
+        (4.0, 3, 4),
+    ):
+        rows.append(
+            {
+                "time": time,
+                "animal": "a",
+                "day": 1,
+                "epoch": "01_r1",
+                "primary_event": primary,
+                "other_event": other,
+            }
+        )
+    data = pd.DataFrame(rows).set_index("time")
+
+    keys = event_strict_overlap_keys(
+        data, "primary_event", "other_event"
+    )
+
+    # primary 1 has duration but other 2 is a point; primary 3 and other 4
+    # both span positive duration and overlap.
+    assert keys == {("a", 1, "01_r1", 3)}
 
 
 class TestMergedIntervalDuration:

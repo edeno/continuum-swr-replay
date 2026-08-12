@@ -21,8 +21,10 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_event_arm_table,
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
@@ -152,3 +154,69 @@ def test_movement_spanning_event_excluded_invariant_holds():
     assert int(stop["n_events"].sum()) == len(ev) == 1, (
         f"Σ stop.n_events={int(stop['n_events'].sum())} != len(event_table)={len(ev)}"
     )
+
+
+@pytest.mark.parametrize(
+    ("event_source", "event_col"),
+    [("SWR", "SWR_event"), ("MUA", "MUA_event")],
+)
+@pytest.mark.parametrize("bad_speed", [4.0, np.nan, np.inf, -np.inf, 10.0])
+def test_every_external_event_source_rejects_one_bad_bin_atomically(
+    event_source, event_col, bad_speed
+):
+    """SWR and MUA share the exact finite, strict whole-event criterion."""
+    dot = _two_event_dot()
+    if event_col == "MUA_event":
+        dot["MUA_event"] = dot["SWR_event"]
+        dot["SWR_event"] = 0
+
+    event_1 = dot[event_col].to_numpy() == 1
+    dot.loc[event_1, "head_speed"] = 1.0
+    middle = np.flatnonzero(event_1)[event_1.sum() // 2]
+    dot.iloc[middle, dot.columns.get_loc("head_speed")] = bad_speed
+
+    env, graph, trials = _EnvStub(), _bandit_graph(), _empty_trials()
+    event = build_contfrag_event_table(
+        dot, env, trials, graph, event_source=event_source
+    )
+    arm = build_contfrag_event_arm_table(
+        event, dot, env, trials, graph, event_source=event_source
+    )
+    stop = build_contfrag_stop_table(
+        dot, trials, graph, event_source=event_source
+    )
+
+    assert event[event_col].tolist() == [2]
+    assert arm["event_id"].nunique() == 1
+    assert len(arm) == 9
+    assert int(stop["n_events"].sum()) == len(event) == 1
+
+
+@pytest.mark.parametrize(
+    ("mua_start_offset", "expected_overlap"),
+    [(0, False), (-1, True)],
+)
+def test_cross_source_flags_use_strict_event_level_overlap(
+    mua_start_offset, expected_overlap
+):
+    """SWR/MUA boundary contact is not positive-duration overlap."""
+    dot = _two_event_dot()
+    dot["MUA_event"] = 0
+    swr_rows = np.flatnonzero(dot["SWR_event"].to_numpy() == 2)
+    start = swr_rows[-1] + mua_start_offset
+    stop = swr_rows[-1] + 4
+    dot.iloc[start:stop, dot.columns.get_loc("MUA_event")] = 7
+    dot.iloc[start:stop, dot.columns.get_loc("head_speed")] = 1.0
+
+    env, graph, trials = _EnvStub(), _bandit_graph(), _empty_trials()
+    swr_events = build_contfrag_event_table(
+        dot, env, trials, graph, event_source="SWR"
+    )
+    mua_events = build_contfrag_event_table(
+        dot, env, trials, graph, event_source="MUA"
+    )
+
+    swr_2 = swr_events.loc[swr_events["SWR_event"] == 2].iloc[0]
+    mua_7 = mua_events.loc[mua_events["MUA_event"] == 7].iloc[0]
+    assert bool(swr_2["is_mua"]) is expected_overlap
+    assert bool(mua_7["is_swr"]) is expected_overlap

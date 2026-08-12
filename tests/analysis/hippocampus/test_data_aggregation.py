@@ -351,6 +351,23 @@ def test_validate_dot_contract_rejects_unsorted_time():
         validate_dot_event_contract(dot)
 
 
+def test_validate_dot_contract_rejects_duplicate_time():
+    dot = _clean_dot()
+    dot.index = [0.0, 1.0, 2.0, 2.0, 4.0, 5.0]
+    with pytest.raises(ValueError, match="unsorted_time|input-contract"):
+        validate_dot_event_contract(dot)
+
+
+@pytest.mark.parametrize("bad_time", [np.nan, np.inf, -np.inf])
+def test_validate_dot_contract_rejects_nonfinite_time(bad_time):
+    dot = _clean_dot()
+    index = dot.index.to_numpy(copy=True)
+    index[2] = bad_time
+    dot.index = index
+    with pytest.raises(ValueError, match="nonfinite_time|input-contract"):
+        validate_dot_event_contract(dot)
+
+
 def test_validate_dot_contract_rejects_noncontiguous_label():
     dot = _clean_dot()
     # label 1 split by a gap (rows 1 and 3) -> non-contiguous event

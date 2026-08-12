@@ -70,6 +70,9 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_results,
     select_typical_event_by_class,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    build_speed_eligible_event_cohort,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.figure_utilities import (
@@ -124,7 +127,7 @@ def pick_example_events(
     """Deterministic three-example selection for panel a.
 
     Filters the pre-built classified table to the example session,
-    restricts to immobile (endpoints rule, matching panel b) events with
+    restricts to canonical whole-event-immobile events (matching panel b) with
     ``peak_nonlocal_prob >= peak_threshold``, then runs
     :func:`select_typical_event_by_class` per overlap class (median
     duration within class). Returns a dict ``{class -> pd.Series}`` whose
@@ -136,7 +139,7 @@ def pick_example_events(
         (classified_events_all["animal"] == animal)
         & (classified_events_all["day"] == day)
         & (classified_events_all["epoch"] == epoch_name)
-        & classified_events_all["endpoints_speed_below_thresh"]
+        & classified_events_all["whole_event_speed_eligible"]
     ]
     # select_typical_event_by_class expects ``overlap_class``, ``duration``,
     # and (via the precomputed path) a ``peak_prob`` column.
@@ -169,7 +172,9 @@ def _figure02_cache_path(
     """
     animal, day = parse_nwb_filename(nwb_file_name)
     return (
-        data_dir / "intermediates" / f"{animal}{day}_{epoch_name}_figure02_cache.joblib"
+        data_dir
+        / "intermediates"
+        / f"{animal}{day}_{epoch_name}_figure02_whole_event_speed_v1_cache.joblib"
     )
 
 
@@ -190,7 +195,13 @@ def _compute_figure_inputs(
     """
     # ── Load data ──
     logging.info(f"Loading session {nwb_file_name} {epoch_name}...")
-    data = load_data(nwb_file_name, epoch_name)
+    data = dict(load_data(nwb_file_name, epoch_name))
+    data["ripple_times"], _ = build_speed_eligible_event_cohort(
+        data["ripple_times"],
+        speed=data["position_info"].head_speed.to_numpy(),
+        time=data["position_info"].index,
+        event_col="SWR_event",
+    )
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
@@ -205,13 +216,13 @@ def _compute_figure_inputs(
     # (parity-tested against this table).
     classified_events_all = build_classified_nonlocal_event_table(data_over_time)
     n_total = len(classified_events_all)
-    immobile_mask = classified_events_all["endpoints_speed_below_thresh"].astype(bool)
+    immobile_mask = classified_events_all["whole_event_speed_eligible"].astype(bool)
     n_immobile = int(immobile_mask.sum())
     class_counts_log = classified_events_all.loc[immobile_mask][
         "overlap_class"
     ].value_counts()
     logging.info(
-        "Classified %d non-local events; %d pass endpoints-immobility filter; "
+        "Classified %d non-local events; %d pass whole-event immobility; "
         "by class: contained=%d, partial=%d, non_swr=%d",
         n_total,
         n_immobile,

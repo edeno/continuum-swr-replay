@@ -9,8 +9,8 @@ Constants
 SAMPLING_FREQUENCY : int
     Decoding sampling frequency (500 Hz). All temporal analyses use this rate.
 MAX_SPEED_THRESHOLD_CM_PER_SEC : float
-    Maximum speed threshold (4.0 cm/s) for filtering non-local events. Events
-    with speeds above this are likely not genuine replay events.
+    Whole-event speed threshold (4.0 cm/s) shared by Non-Local, SWR, and MUA
+    analysis cohorts. Every event sample must be finite and strictly below it.
 ROOT_DIR : Path
     Root directory of the project (parent of src/).
 PROCESSED_DATA_DIR : Path
@@ -71,8 +71,8 @@ import numpy as np
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
 
-# Maximum speed threshold for filtering non-local events (cm/s)
-# Events with speeds above this are likely not genuine replay events
+# Canonical whole-event immobility threshold for Non-Local, SWR, and MUA
+# analysis events (cm/s). Every event-bin speed must be strictly below it.
 MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 
 # Data directories and definitions

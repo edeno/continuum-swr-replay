@@ -85,6 +85,21 @@ class TestGetImmobileEvents:
         assert 1 not in event_ids, "Event 1 should be filtered (max=6.0 > 4.0)"
         assert 3 not in event_ids, "Event 3 should be filtered (max=5.0 > 4.0)"
 
+    @pytest.mark.parametrize("bad_speed", [np.nan, np.inf, -np.inf, 4.0])
+    def test_default_rule_rejects_complete_event_for_any_bad_sample(
+        self, mock_event_data, bad_speed
+    ):
+        """Missing/nonfinite/exact-threshold samples reject the whole event."""
+        data = mock_event_data.copy()
+        event_2_rows = np.flatnonzero(data["event"].to_numpy() == 2)
+        data.iloc[event_2_rows[len(event_2_rows) // 2], data.columns.get_loc("head_speed")] = (
+            bad_speed
+        )
+
+        result = get_immobile_events(data, event_col="event")
+
+        assert 2 not in set(result["event"])
+
     def test_mean_method_filters_correctly(self, mock_event_data):
         """Mean method should filter based on mean speed during event."""
         result = get_immobile_events(

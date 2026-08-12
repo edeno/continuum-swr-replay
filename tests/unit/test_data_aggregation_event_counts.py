@@ -2,10 +2,8 @@
 
 The helper used to crash when immobility filtering removed every
 event_col_a row (``int(empty_series.sum())`` → TypeError) and used
-to mix filtered / unfiltered definitions of "A overlaps B": ``n_a``
-came from the immobility-filtered frame but ``n_b_with_a`` checked
-the raw column. The fix returns an explicit zero on empty groups
-and counts ``n_b_with_a`` against the same filtered ``a_data``.
+to mix filtered / unfiltered event populations. Both directions now use
+the same globally qualified whole-event populations.
 """
 
 from __future__ import annotations
@@ -19,6 +17,10 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 
 def _frame(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
+    df["Non-Local_Continuous_prob"] = df["non_local_event"].gt(0).map(
+        {True: 0.9, False: 0.1}
+    )
+    df["Non-Local_Fragmented_prob"] = 0.0
     return df.set_index("time").rename_axis(None)
 
 
@@ -56,7 +58,7 @@ class TestCrossSessionTimeCollision:
         # The bare ``index.isin`` form would falsely count session
         # 2's SWR as overlapping the surviving A-set because the
         # time index 0.0 also belongs to session 1's surviving row.
-        df = pd.DataFrame(
+        df = _frame(
             [
                 # Session 1 — low-speed, retained.
                 {
@@ -67,7 +69,7 @@ class TestCrossSessionTimeCollision:
                     "time": 0.5, "animal": "s1", "day": 1, "epoch": "e",
                     "head_speed": 0.0, "non_local_event": 1, "SWR_event": 1,
                 },
-                # Session 2 — high-speed, excluded from A; SWR present.
+                # Session 2 — high-speed, excluded from both populations.
                 {
                     "time": 0.0, "animal": "s2", "day": 1, "epoch": "e",
                     "head_speed": 50.0, "non_local_event": 1, "SWR_event": 1,
@@ -77,13 +79,13 @@ class TestCrossSessionTimeCollision:
                     "head_speed": 50.0, "non_local_event": 1, "SWR_event": 1,
                 },
             ]
-        ).set_index("time").rename_axis(None)
+        )
         out = compute_swr_nl_event_counts(df)
         # A is just session 1's NL event.
         assert out["n_a"] == 1
-        # Session 1's SWR overlaps; session 2's SWR does NOT overlap
-        # any retained A row → ``n_b_with_a`` must be 1, not 2.
-        assert out["n_b"] == 2
+        # SWRs now share the same whole-event speed cohort. Session 2's
+        # high-speed SWR is excluded rather than retained as a raw B event.
+        assert out["n_b"] == 1
         assert out["n_b_with_a"] == 1, (
             f"n_b_with_a={out['n_b_with_a']} — bare time-index "
             "matching leaked session 2's high-speed overlap into "
@@ -118,8 +120,9 @@ class TestFilterConsistency:
         # A is the immobility-filtered NL set: NL=2 only.
         assert out["n_a"] == 1
         assert out["n_a_with_b"] == 0
-        # B (SWRs) is just SWR=1.
-        assert out["n_b"] == 1
+        # The co-located SWR is also a high-speed event and is excluded by the
+        # same global criterion; it cannot remain as a secondary detector.
+        assert out["n_b"] == 0
         # The SWR overlapped only the *excluded* high-speed NL event,
         # so it should NOT count as overlapping the A-set.
         assert out["n_b_with_a"] == 0, (

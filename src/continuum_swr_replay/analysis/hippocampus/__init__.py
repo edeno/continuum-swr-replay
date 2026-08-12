@@ -92,7 +92,7 @@ _LAZY_EXPORTS = {
     # event_table — canonical per-non-local-event classification table.
     "assert_drawn_class_matches_ripples": "event_table",
     "build_classified_nonlocal_event_table": "event_table",
-    "intervals_from_labels": "event_table",
+    "intervals_from_labels": "event_immobility",
     # hpc_raw_stats.
     "DISCRETE_STATE_ORDER": "hpc_raw_stats",
     "RAW_STAT_COLUMNS": "hpc_raw_stats",
@@ -158,10 +158,10 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         get_overlap_times,
         select_typical_event_by_class,
     )
+    from .event_immobility import intervals_from_labels  # noqa: F401
     from .event_table import (  # noqa: F401
         assert_drawn_class_matches_ripples,
         build_classified_nonlocal_event_table,
-        intervals_from_labels,
     )
     from .hpc_raw_stats import (  # noqa: F401
         DISCRETE_STATE_ORDER,

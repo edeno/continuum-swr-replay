@@ -29,6 +29,13 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_start_end_times,
     get_signal_windows,
 )
+from continuum_swr_replay.analysis.hippocampus.event_detection import (
+    event_strict_overlap_mask,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    filter_event_labels_by_speed,
+    validate_nonlocal_event_probability_contract,
+)
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
     PANEL_SINGLE_SQUARE,
@@ -388,6 +395,22 @@ def plot_swr_zscore_by_state(
         plt.close(fig)
 
 
+def _nonlocal_swr_event_bin_masks(
+    data_over_time: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    """Return whole-event SWR/non-SWR masks for eligible Non-Local bins."""
+    validate_nonlocal_event_probability_contract(data_over_time)
+    eligible = filter_event_labels_by_speed(
+        data_over_time,
+        ["non_local_event", "SWR_event"],
+    )
+    active = eligible["non_local_event"] > 0
+    is_swr_event = event_strict_overlap_mask(
+        eligible, "non_local_event", "SWR_event"
+    )
+    return active & is_swr_event, active & ~is_swr_event
+
+
 def plot_replay_speed_by_swr(
     data_over_time: pd.DataFrame,
     output_dir: Path | None = None,
@@ -415,9 +438,7 @@ def plot_replay_speed_by_swr(
 
     bins = np.arange(0, 3000, 100)
 
-    swr_mask = (data_over_time["non_local_event"] > 0) & (
-        data_over_time["SWR_event"] > 0
-    )
+    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_speed"],
         bins=bins,
@@ -427,9 +448,6 @@ def plot_replay_speed_by_swr(
         label="SWR-coincident non-local",
     )
 
-    no_swr_mask = (data_over_time["non_local_event"] > 0) & (
-        data_over_time["SWR_event"] == 0
-    )
     ax.hist(
         data_over_time.loc[no_swr_mask, "map_speed"],
         bins=bins,
@@ -480,9 +498,7 @@ def plot_replay_position_by_swr(
     unique_positions = data_over_time["max_linear_position"].unique()
     bins = int(np.nanmedian(unique_positions[~np.isnan(unique_positions)]) / 2)
 
-    swr_mask = (data_over_time["non_local_event"] > 0) & (
-        data_over_time["SWR_event"] > 0
-    )
+    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_estimate"]
         / data_over_time.loc[swr_mask, "max_linear_position"],
@@ -493,9 +509,6 @@ def plot_replay_position_by_swr(
         label="SWR-coincident non-local",
     )
 
-    no_swr_mask = (data_over_time["non_local_event"] > 0) & (
-        data_over_time["SWR_event"] == 0
-    )
     ax.hist(
         data_over_time.loc[no_swr_mask, "map_estimate"]
         / data_over_time.loc[no_swr_mask, "max_linear_position"],

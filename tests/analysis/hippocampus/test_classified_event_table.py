@@ -17,7 +17,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.hippocampus.event_table import (
+    _match_swr,
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
     intervals_from_labels,
@@ -25,6 +29,31 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
 
 DT = 1.0 / 500.0  # 500 Hz sampling
 SPEED_THRESHOLD = 4.0
+EXPECTED_CLASSIFIED_COLUMNS = [
+    "animal",
+    "day",
+    "epoch",
+    "non_local_event",
+    "event_id",
+    "event_start",
+    "event_end",
+    "event_duration",
+    "event_midpoint_time",
+    "max_speed",
+    "mean_speed",
+    "start_speed",
+    "end_speed",
+    "whole_event_speed_eligible",
+    "endpoints_speed_below_thresh",
+    "peak_nonlocal_prob",
+    "is_swr",
+    "overlap_class",
+    "overlap_subclass",
+    "n_swrs_overlapping",
+    "matched_swr_event",
+    "matched_swr_start",
+    "matched_swr_end",
+]
 
 # Session 1 event windows (inclusive sample ranges) and the SWR windows
 # arranged to realise each interval-geometry case. SWR label ids are
@@ -85,6 +114,10 @@ def _label(frame: pd.DataFrame, col: str, windows: dict[int, tuple[int, int]]) -
     for label_id, (lo, hi) in windows.items():
         arr[lo : hi + 1] = label_id
     frame[col] = arr
+    if col == "non_local_event":
+        frame.loc[
+            frame[col] > 0, "Non-Local_Continuous_prob"
+        ] = 0.9
 
 
 @pytest.fixture
@@ -93,6 +126,9 @@ def dot() -> pd.DataFrame:
     s1 = _blank_session("m", 1, "01_r1", n=1000)
     _label(s1, "non_local_event", _EVENTS_1)
     _label(s1, "SWR_event", _SWRS_1)
+    s1.loc[
+        s1["non_local_event"] > 0, "Non-Local_Continuous_prob"
+    ] = 0.9
 
     # ev6: fast middle, immobile endpoints.
     speed = s1["head_speed"].to_numpy()
@@ -102,7 +138,7 @@ def dot() -> pd.DataFrame:
     # ev1: a known non-local-prob trajectory peaking inside the window.
     cont = s1["Non-Local_Continuous_prob"].to_numpy()
     frag = s1["Non-Local_Fragmented_prob"].to_numpy()
-    cont[100:111] = np.linspace(0.30, 0.70, 11)  # peak 0.70 at sample 110
+    cont[100:111] = np.linspace(0.61, 0.70, 11)  # total stays > .8
     frag[100:111] = 0.20
     s1["Non-Local_Continuous_prob"] = cont
     s1["Non-Local_Fragmented_prob"] = frag
@@ -112,6 +148,9 @@ def dot() -> pd.DataFrame:
     # ``non_swr``; a leak would label it ``swr_contained``.
     s2 = _blank_session("m", 1, "02_r2", n=200)
     _label(s2, "non_local_event", {1: (100, 110)})
+    s2.loc[
+        s2["non_local_event"] > 0, "Non-Local_Continuous_prob"
+    ] = 0.9
 
     return pd.concat([s1, s2])
 
@@ -214,6 +253,8 @@ def test_max_speed_vs_endpoints(dot):
     assert ev["max_speed"] > SPEED_THRESHOLD
     assert ev["start_speed"] < SPEED_THRESHOLD
     assert ev["end_speed"] < SPEED_THRESHOLD
+    assert not ev["whole_event_speed_eligible"]
+    # Retained as a diagnostic only; endpoints no longer define the cohort.
     assert ev["endpoints_speed_below_thresh"]
     # mean_speed is the within-window mean (not median/max/sum); derive the
     # expected value independently from the fixture's speed profile.
@@ -255,18 +296,7 @@ def test_empty_session():
     frame = _blank_session("m", 1, "01_r1", n=n)  # all-zero event labels
     table = build_classified_nonlocal_event_table(frame)
     assert table.empty
-    expected_cols = build_classified_nonlocal_event_table(
-        _make_minimal_event_frame()
-    ).columns.tolist()
-    assert table.columns.tolist() == expected_cols
-
-
-def _make_minimal_event_frame() -> pd.DataFrame:
-    """Tiny single-event frame used to read off the canonical column order."""
-    frame = _blank_session("m", 1, "01_r1", n=20)
-    _label(frame, "non_local_event", {1: (5, 8)})
-    return frame
-
+    assert table.columns.tolist() == EXPECTED_CLASSIFIED_COLUMNS
 
 def test_no_overlapping_pairs_schema():
     # Events exist; no SWR labels anywhere -> every event is non_swr and
@@ -327,6 +357,17 @@ def test_missing_required_column_raises():
         build_classified_nonlocal_event_table(frame)
 
 
+def test_invalid_saved_nonlocal_probability_fails_loud(dot):
+    bad = dot.copy()
+    event_row = (bad["epoch"] == "01_r1") & (bad["non_local_event"] == 2)
+    bad.loc[event_row, "Non-Local_Continuous_prob"] = 0.9
+    bad.loc[event_row, "Non-Local_Fragmented_prob"] = 0.0
+    bad.loc[bad.index[event_row][3], "Non-Local_Continuous_prob"] = 0.5
+
+    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+        build_classified_nonlocal_event_table(bad)
+
+
 # --- Downstream consumers: parity with get_event_types, table-driven counts,
 #     and the inline timing-offset column subtraction. ---
 
@@ -359,7 +400,7 @@ def test_event_types_matches_classified_overlap(dot):
     )
     classified_overlap_keys = _key_set(
         classified[
-            classified["endpoints_speed_below_thresh"]
+            classified["whole_event_speed_eligible"]
             & (classified["overlap_class"] != "non_swr")
         ]
     )
@@ -373,12 +414,13 @@ def test_compute_swr_overlap_class_counts(dot):
     classified = build_classified_nonlocal_event_table(dot)
     counts = compute_swr_overlap_class_counts(classified)
     # session 1: ev1 contained; ev2/ev3/ev8 partial; ev4/5/6/7 non_swr.
-    # session 2: ev1 non_swr. All events are immobile in the fixture.
+    # session 2: ev1 non_swr. Event 6 has slow endpoints but a fast interior,
+    # so the canonical whole-event criterion excludes it from this tally.
     assert counts == {
         "swr_contained": 1,
         "swr_partial": 3,
-        "non_swr": 5,
-        "total": 9,
+        "non_swr": 4,
+        "total": 8,
     }
 
 
@@ -410,7 +452,7 @@ def test_panel_b_full_swr_intervals_not_clipped_to_nl_rows():
 def _timing_offsets(classified: pd.DataFrame) -> pd.DataFrame:
     """Mirror the inline panel-d computation in generate_figure02."""
     overlap = classified[
-        classified["endpoints_speed_below_thresh"]
+        classified["whole_event_speed_eligible"]
         & (classified["overlap_class"] != "non_swr")
     ].copy()
     overlap["start_diff"] = overlap["event_start"] - overlap["matched_swr_start"]
@@ -487,3 +529,17 @@ def test_zero_duration_event_inside_swr_is_non_swr():
     geo = classify_swr_overlap_geometry(events, swrs)
     assert geo["overlap_class"].iloc[0] == "non_swr"
     assert geo["overlap_subclass"].iloc[0] == "no_overlap"
+
+
+def test_match_swr_ignores_earlier_point_interval():
+    """Representative matching uses the classifier's duration-valid SWR set."""
+    matched = _match_swr(
+        "swr_partial",
+        0.0,
+        2.0,
+        np.array([1, 2]),
+        np.array([0.5, 1.5]),
+        np.array([0.5, 2.5]),
+    )
+
+    assert matched == (2, 1.5, 2.5)
