@@ -6,8 +6,8 @@ promoting the ``time_availability`` column of
 assert against. Two distinct leaks get two distinct remedies (see
 :func:`assert_predictor_timing`):
 
-- **POST_OUTCOME** — carries the current trip's reward (``rpe``,
-  ``global_mu_update_abs_postoutcome_sess``, ``is_after_reward``/``is_after_omission``/``reward_outcome``).
+- **POST_OUTCOME** — carries a current-trip value update (``rpe``,
+  ``global_mu_update_abs_postoutcome_sess``).
   Fixable by restricting the fit to **post-current-outcome** bins (``retrospective=True``).
 - **FUTURE_REFERENCING** — the value itself embeds a not-yet-occurred event
   (``trials_since_switch`` signs toward the *next* switch; ``next_arm``/``is_next``).
@@ -26,17 +26,20 @@ from __future__ import annotations
 from .model_specs import N_HISTORY_BASIS, N_HISTORY_LAGS, N_REWARD_LAGS
 
 POST_OUTCOME = frozenset({  # NOT available before the current trip's reward
-    "reward_outcome", "is_after_reward", "is_after_omission",
     "rpe",  # beta reward prediction error (reward - q_chosen)
     "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
+    "unchosen_patches_mu_update_abs_postoutcome_sess",  # alternative-patch update
 })
 FUTURE_REFERENCING = frozenset({  # references a not-yet-occurred event
     "next_arm", "is_next", "ends_at_next", "contains_path_to_next",
     "chosen_arm_fraction", "trials_since_switch", "is_post_switch",
 })
 PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-reward
+    # Outcome of the last trip completed by event/stop start.
+    "reward_outcome", "is_after_reward", "is_after_omission",
     "reward_lag1", "reward_lag2", "reward_rate_trial_k10", "reward_rate_arm_k10",
-    "visit_recency", "visit_recency_demeaned", "visit_recency_patch", "cumulative_reward",
+    "visit_recency", "visit_recency_demeaned", "visit_recency_patch",
+    "arm_never_visited", "arm_never_visited_patch", "cumulative_reward",
     "is_current", "is_prev", "is_last_rewarded", "is_last_rewarded_elsewhere",
     "is_after_switch",
     "q_arm", "p_reward_arm",
@@ -49,6 +52,9 @@ PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-rewa
 SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})
 
 DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
+    # fit_uncertainty_rate renames the beta-model RPE to distinguish it from
+    # older nominal stand-ins; its information time is unchanged.
+    "rpe_model": ["rpe"],
     # content `_x_current` interactions (source is the z-scalar's base covariate)
     "rpe_x_current": ["rpe"], "rpe_x_current_z": ["rpe"],
     "relval_x_current": ["switch_advantage_mu_preoutcome_sess"],
@@ -67,6 +73,7 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
+    "swr_x_arm_never_visited": ["arm_never_visited"],
     "swr_x_q_arm": ["q_arm"],  # qvals-dependent
     # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):
     # raw betadist_var has SD ~0.02 (~5-6x smaller than q_arm), which makes the

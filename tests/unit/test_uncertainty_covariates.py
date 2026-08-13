@@ -46,6 +46,13 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     for j in range(1, 4):
         if f"reward_lag{j}" not in df:
             df[f"reward_lag{j}"] = np.nan
+    # Real stop-table frames carry the origin arm and the outcome of the most
+    # recently completed trip.  With one stop per visit, these are exactly the
+    # lagged counterparts of ``is_stay`` used by the historical definition.
+    if "prev_arm" not in df:
+        df["prev_arm"] = np.arange(len(df), dtype=float)
+    if "is_after_switch" not in df:
+        df["is_after_switch"] = (1.0 - df["is_stay"]).shift(1)
     return df
 
 
@@ -63,8 +70,8 @@ def test_omission_streak():
 
 
 def test_recent_switch_rate_no_leakage():
-    # is_stay sequence -> is_switch = 1 - is_stay. recent_switch_rate uses only
-    # prior stops (shift(1)) with a window of 5.
+    # With one stop per completed choice, retain the historical result exactly:
+    # is_stay -> is_switch = 1 - is_stay, lagged by one visit.
     df = _frame(
         [
             {"is_stay": 1.0},  # switch 0
@@ -79,6 +86,51 @@ def test_recent_switch_rate_no_leakage():
     assert rates[1] == pytest.approx(0.0)  # mean of [switch@0]=0
     assert rates[2] == pytest.approx(0.5)  # mean of [0,1]
     assert rates[3] == pytest.approx(2 / 3)  # mean of [0,1,1]
+
+
+def test_recent_switch_rate_is_computed_once_per_completed_visit():
+    """Repeated bouts cannot expose or over-count a visit's future choice."""
+    df = _frame(
+        [
+            # Six rows shaped like real stop-table bouts: ``prev_arm`` and
+            # ``is_after_switch`` stay fixed until another trip completes.
+            # ``is_stay`` is the eventual *outbound* choice and is future
+            # information throughout each two-bout visit.
+            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
+            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
+            {"prev_arm": 0.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {"prev_arm": 0.0, "is_after_switch": 0.0, "is_stay": 0.0},
+        ]
+    )
+
+    out = add_uncertainty_covariates(df, switch_window=5)
+
+    np.testing.assert_allclose(
+        out["recent_switch_rate"].to_numpy(),
+        np.array([np.nan, np.nan, 1.0, 1.0, 0.5, 0.5]),
+        equal_nan=True,
+    )
+
+
+def test_recent_switch_rate_ignores_eventual_choice_within_visit():
+    """Changing a not-yet-completed choice cannot change same-visit history."""
+    df = _frame(
+        [
+            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
+            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
+        ]
+    )
+    changed_future = df.copy()
+    changed_future.loc[changed_future["prev_arm"] == 3.0, "is_stay"] = 1.0
+
+    original = add_uncertainty_covariates(df)["recent_switch_rate"]
+    changed = add_uncertainty_covariates(changed_future)["recent_switch_rate"]
+
+    np.testing.assert_allclose(original, changed, equal_nan=True)
 
 
 def test_wsls_deviation_truth_table():
@@ -183,6 +235,49 @@ def test_drop_first_session_per_animal():
     assert set(out["stop_id"]) == {1}
 
 
+def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
+    design = pd.DataFrame(
+        {
+            "stop_id": [1, 1, 1],
+            "stop_start": [10.0, 10.0, 10.0],
+            "binj": [0, 1, 2],
+            "outcome_known_time": [10.0 + fur.BIN_S] * 3,
+        }
+    )
+
+    gated, audit = fur._gate_bins_after_outcome(design)
+
+    assert gated["binj"].tolist() == [1, 2]
+    assert gated["response_time"].tolist() == pytest.approx(
+        [10.0 + fur.BIN_S, 10.0 + 2 * fur.BIN_S]
+    )
+    assert audit == {
+        "n_bins_before_post_outcome_gate": 3,
+        "n_bins_after_post_outcome_gate": 2,
+        "n_bins_excluded_missing_timing": 0,
+        "n_bins_excluded_pre_outcome": 1,
+    }
+
+
+def test_post_outcome_bin_gate_fails_loud_without_physical_timing():
+    design = pd.DataFrame({"stop_id": [1], "binj": [0]})
+    with pytest.raises(KeyError, match="outcome_known_time"):
+        fur._gate_bins_after_outcome(design)
+
+
+def test_post_outcome_bin_gate_rejects_inconsistent_stop_boundary():
+    design = pd.DataFrame(
+        {
+            "stop_id": [1, 1],
+            "stop_start": [10.0, 10.0],
+            "binj": [0, 1],
+            "outcome_known_time": [10.0, 10.1],
+        }
+    )
+    with pytest.raises(ValueError, match="constant within stop_id"):
+        fur._gate_bins_after_outcome(design)
+
+
 @pytest.mark.slow
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
@@ -215,7 +310,13 @@ def test_runner_smoke():
     # Nominal schedule + real model covariates, all from qvals_table -- one
     # exactly poke_out-aligned source, mirroring the runner's main().
     qvals = pd.read_pickle(qvals_path)
-    qcols = qvals[["stop_id", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]].rename(
+    if "outcome_known_time" not in qvals:
+        pytest.skip(
+            "qvals_table.pkl predates physical post-outcome timing; regenerate it"
+        )
+    qcols = qvals[
+        ["stop_id", "outcome_known_time", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]
+    ].rename(
         columns={"rpe": "rpe_model"}
     )
     stop = stop.merge(
@@ -235,4 +336,3 @@ def test_runner_smoke():
         assert f"rr_{cov}" in models.columns
     # reward kernel is also present (the controlled-for block).
     assert f"coef_reward_lag{N_REWARD_LAGS}" in models.columns
-

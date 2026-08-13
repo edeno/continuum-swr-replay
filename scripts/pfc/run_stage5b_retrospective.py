@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.replay import (
+    at_well_event_cohort,
     retrospective_alignment_with_shuffle,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -104,6 +105,15 @@ def main() -> None:
         len(event_sequence_table),
         event_table.groupby(SESSION_COLS).ngroups,
     )
+    n_before_location = len(event_table)
+    event_table, event_arm_table, event_sequence_table = at_well_event_cohort(
+        event_table, event_arm_table, event_sequence_table
+    )
+    logging.info(
+        "Explicit at-well cohort: retained %d/%d events",
+        len(event_table),
+        n_before_location,
+    )
 
     if args.swr_only:
         keep = event_table["is_swr"].astype(bool)
@@ -155,17 +165,17 @@ def main() -> None:
             continue
 
         t0 = time.time()
-        try:
-            result = retrospective_alignment_with_shuffle(
-                ev_s,
-                ea_s,
-                es_s,
-                n_shuffles=args.n_shuffles,
-                rng=np.random.default_rng(rng.integers(0, 2**32)),
-            )
-        except Exception as exc:  # noqa: BLE001 — surface error per session, keep going
-            logging.error("FAILED %s/%s/%s: %s", animal, day, epoch, exc)
-            continue
+        # Fail the batch before publication when any session violates the
+        # location/observability contract.  Continuing here would turn a
+        # scientific integrity error into an unreported session exclusion and
+        # then persist a plausible-looking partial cohort.
+        result = retrospective_alignment_with_shuffle(
+            ev_s,
+            ea_s,
+            es_s,
+            n_shuffles=args.n_shuffles,
+            rng=np.random.default_rng(rng.integers(0, 2**32)),
+        )
 
         result.update(
             {

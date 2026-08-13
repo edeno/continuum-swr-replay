@@ -13,6 +13,11 @@ this continuous quantity). This script asks, across non-local events:
      event (power ~ covariates), i.e. acting on SWR-COUPLING strength rather than
      on whether an event occurs (occurrence is the separate per-bin rate model)?
 
+The model contains the current trial's RPE, so its fit cohort is restricted to
+events beginning at or after ``outcome_known_time`` (reward-on for rewarded
+trials; conservatively poke-out for omissions). Distribution and duration
+descriptives remain summaries of all non-local events.
+
 Scope / caveat: this fits only the *conditional power-vs-covariates* relationship
 by per-event OLS pooled across sessions. It is NOT a full marked point process --
 it does not jointly model the event intensity, does not test whether the power
@@ -37,6 +42,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (
+    assert_predictor_timing,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -45,6 +53,10 @@ POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
 PREDICTORS = ["reward_lag1", "p_reward_current", "rpe",
               "recent_switch_rate", "value_diff_patch", "q_current",
               "time_since_stop"]
+OUTCOME_TIME_SEMANTICS = (
+    "reward_on_ts for rewarded trials; poke_out_ts for omissions"
+)
+POST_OUTCOME_GATE_RULE = "event_start >= outcome_known_time"
 
 
 def _bimodality_coef(x: np.ndarray) -> float:
@@ -67,29 +79,109 @@ def _assemble() -> pd.DataFrame:
     df = ev.merge(stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
                   on="stop_id", how="left")
     df = df.merge(
-        cont[["stop_id", "p_reward_current", "rpe", "value_diff_patch", "q_current"]],
+        cont[
+            [
+                "stop_id",
+                "outcome_known_time",
+                "p_reward_current",
+                "rpe",
+                "value_diff_patch",
+                "q_current",
+            ]
+        ],
         on="stop_id", how="left")
     return df
 
 
+def _gate_events_after_outcome(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep events whose physical start is at/after the current outcome.
+
+    Equality is eligible. Rows with non-finite event or boundary timestamps do
+    not pass; the returned session-level audit distinguishes missing timing
+    from physically pre-outcome events.
+    """
+    required = (*SC, "event_start", "outcome_known_time")
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise KeyError(
+            "Post-outcome SWR-power gating requires physical timing column(s): "
+            f"{missing}. Regenerate event_table.pkl and qvals_table.pkl."
+        )
+
+    event_start = df["event_start"].to_numpy(dtype=float)
+    boundary = df["outcome_known_time"].to_numpy(dtype=float)
+    finite = np.isfinite(event_start) & np.isfinite(boundary)
+    eligible = finite & (event_start >= boundary)
+
+    audit_rows = []
+    for keys, positions in df.groupby(SC, sort=False).indices.items():
+        pos = np.asarray(positions, dtype=int)
+        finite_g = finite[pos]
+        eligible_g = eligible[pos]
+        audit_rows.append(
+            {
+                **dict(zip(SC, keys, strict=True)),
+                "post_outcome_gate": True,
+                "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
+                "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
+                "n_events_before_post_outcome_gate": int(len(pos)),
+                "n_events_after_post_outcome_gate": int(eligible_g.sum()),
+                "n_events_excluded_missing_timing": int((~finite_g).sum()),
+                "n_events_excluded_pre_outcome": int(
+                    (finite_g & ~eligible_g).sum()
+                ),
+            }
+        )
+    return df.loc[eligible].copy(), pd.DataFrame(audit_rows)
+
+
 def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
     """Per-session OLS: ripple_power_z ~ standardized covariates. One row/session."""
+    assert_predictor_timing(PREDICTORS, retrospective=True)
+    gated, gate_audit = _gate_events_after_outcome(df)
+    gate_by_session = {
+        tuple(row[column] for column in SC): row
+        for row in gate_audit.to_dict(orient="records")
+    }
     rows = []
-    for keys, g in df.groupby(SC, sort=False):
-        g = g[[*PREDICTORS, POWER_COL]].dropna()
+    for keys, g in gated.groupby(SC, sort=False):
+        g = g[[*PREDICTORS, POWER_COL]]
+        finite = np.isfinite(g.to_numpy(dtype=float)).all(axis=1)
+        g = g.loc[finite]
         if len(g) < 30:
             continue
         X = g[PREDICTORS].to_numpy(dtype=float)
         X = (X - X.mean(0)) / np.where(X.std(0) > 0, X.std(0), 1.0)
         y = g[POWER_COL].to_numpy(dtype=float)
         beta, *_ = np.linalg.lstsq(np.c_[np.ones(len(g)), X], y, rcond=None)
-        rows.append({**dict(zip(SC, keys, strict=True)), "n_events": len(g),
-                     **dict(zip(PREDICTORS, beta[1:], strict=True))})
-    return pd.DataFrame(rows)
+        gate_metadata = gate_by_session[keys]
+        rows.append(
+            {
+                **dict(zip(SC, keys, strict=True)),
+                "n_events": len(g),
+                **{
+                    key: value
+                    for key, value in gate_metadata.items()
+                    if key not in SC
+                },
+                **dict(zip(PREDICTORS, beta[1:], strict=True)),
+            }
+        )
+    result = pd.DataFrame(rows)
+    result.attrs["post_outcome_gate_audit"] = gate_audit.to_dict(orient="records")
+    return result
 
 
 # Predictors sourced (via left join) from qvals_table -- NaN on the mechanism-B tail.
-_QVALS_PREDICTORS = ("p_reward_current", "rpe", "value_diff_patch", "q_current")
+_QVALS_PREDICTORS = (
+    "outcome_known_time",
+    "p_reward_current",
+    "rpe",
+    "value_diff_patch",
+    "q_current",
+)
 
 
 def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
@@ -99,29 +191,54 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     NaNs to own, and the <30-event session gate to excluded."""
     n_in = len(df)
     qp = [c for c in _QVALS_PREDICTORS if c in df.columns]
-    op = [c for c in (*PREDICTORS, POWER_COL) if c not in qp and c in df.columns]
-    qmask = df[qp].isna().any(axis=1) if qp else pd.Series(False, index=df.index)
+    op = [
+        c
+        for c in (*PREDICTORS, POWER_COL, "event_start")
+        if c not in qp and c in df.columns
+    ]
+    qmask = (
+        ~np.isfinite(df[qp].to_numpy(dtype=float)).all(axis=1)
+        if qp
+        else pd.Series(False, index=df.index)
+    )
+    qmask = pd.Series(qmask, index=df.index)
     omask = (
-        df[op].isna().any(axis=1) if op else pd.Series(False, index=df.index)
-    ) & ~qmask
-    valid = df[~(qmask | omask)]
+        ~np.isfinite(df[op].to_numpy(dtype=float)).all(axis=1)
+        if op
+        else pd.Series(False, index=df.index)
+    )
+    omask = pd.Series(omask, index=df.index) & ~qmask
+    complete = ~(qmask | omask)
+    post_outcome = complete & (
+        df["event_start"].to_numpy(dtype=float)
+        >= df["outcome_known_time"].to_numpy(dtype=float)
+    )
+    valid = df[post_outcome]
     fit_keys = {tuple(r) for r in coefs[SC].to_numpy()} if len(coefs) else set()
     vbs = valid.groupby(SC, sort=False).size()
     n_modeled = int(sum(int(vbs.get(k, 0)) for k in fit_keys))
     n_qvals, n_own = int(qmask.sum()), int(omask.sum())
-    return [cohort_record(
+    records = [cohort_record(
         "swr_power", "all", "event",
         n_in=n_in, n_modeled=n_modeled,
         sessions_in=df.groupby(SC).ngroups, sessions_modeled=len(fit_keys),
         animals_modeled=len({k[0] for k in fit_keys}),
         drop_notes=(
             "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
-            "other predictor/response NaN -> own; <30-event sessions -> excluded"
+            "other predictor/response/timing NaN -> own; physical pre-outcome "
+            "event or <30-event session -> excluded"
         ),
         n_drop_qvals_gap=n_qvals,
         n_drop_own_predictor_missing=n_own,
         n_excluded_session=n_in - n_qvals - n_own - n_modeled,
     )]
+    records[0].update(
+        post_outcome_gate=True,
+        post_outcome_gate_rule=POST_OUTCOME_GATE_RULE,
+        outcome_time_semantics=OUTCOME_TIME_SEMANTICS,
+        n_events_excluded_pre_outcome=int((complete & ~post_outcome).sum()),
+    )
+    return records
 
 
 def main() -> None:
@@ -145,8 +262,13 @@ def main() -> None:
           f"  (log-dur {np.corrcoef(np.log(d.event_duration), d[POWER_COL])[0,1]:+.3f}) ===")
 
     coefs = fit_power_model(df)
+    gate_audit = pd.DataFrame(coefs.attrs["post_outcome_gate_audit"])
     out = RC / "models_per_bin_rate" / "swr_power_model.pkl"
     coefs.to_pickle(out)
+    gate_audit.to_csv(
+        RC / "models_per_bin_rate" / "swr_power_post_outcome_gate_audit.csv",
+        index=False,
+    )
     write_cohort_audit(
         _cohort_records(df, coefs),
         RC / "models_per_bin_rate" / "swr_power_cohort_audit.csv",

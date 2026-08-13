@@ -154,6 +154,23 @@ def test_movement_spanning_event_excluded_invariant_holds():
     assert int(stop["n_events"].sum()) == len(ev) == 1, (
         f"Σ stop.n_events={int(stop['n_events'].sum())} != len(event_table)={len(ev)}"
     )
+    # Empty trial history is explicit rather than silently mapping the modal
+    # physical arm onto a behavioral well. The same schema is present on both
+    # canonical event-source tables.
+    assert ev["location_state"].tolist() == ["unknown"]
+    assert ev["at_well"].isna().all()
+    assert ev["location_arm"].isna().all()
+    assert ev["current_arm"].isna().all()
+    assert ev["physical_arm"].tolist() == [0.0]
+    for column in (
+        "location_state",
+        "at_well",
+        "location_well",
+        "location_arm",
+        "physical_arm",
+        "nearest_well_distance_cm_max",
+    ):
+        assert column in stop.columns
 
 
 @pytest.mark.parametrize(

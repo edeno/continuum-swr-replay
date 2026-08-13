@@ -34,8 +34,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
 
+from .covariates import center_visit_recency_within_event
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
@@ -59,6 +60,7 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
     "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
     "swr_x_reward_rate_arm_k10": ("reward_rate_arm_k10", "is_swr"),
     "swr_x_visit_recency_demeaned": ("visit_recency_demeaned", "is_swr"),
+    "swr_x_arm_never_visited": ("arm_never_visited", "is_swr"),
     "swr_x_is_last_rewarded_elsewhere": ("is_last_rewarded_elsewhere", "is_swr"),
     "mua_x_last_rewarded": ("is_last_rewarded", "is_mua"),
     "switch_x_current": ("is_current", "is_after_switch"),
@@ -84,6 +86,38 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=-1, keepdims=True)
     exp = np.exp(shifted)
     return exp / exp.sum(axis=-1, keepdims=True)
+
+
+def _sample_visit_history(
+    n_events: int, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sample internally coherent recency and never-visited arm matrices.
+
+    Each synthetic event receives a positive completed-trial history. Trial
+    destinations are sampled from the topology-defined leaf arms, after which
+    the production definitions are applied exactly: last-visit trials ago for
+    visited leaves, ``n_completed + 1`` and novelty ``1`` for unvisited leaves,
+    and structural ``0`` for trunks.
+    """
+    n_arms = len(ALL_ARMS)
+    arm_position = {arm: j for j, arm in enumerate(ALL_ARMS)}
+    leaf_arms = np.asarray(WELL_ARMS, dtype=int)
+    recency = np.zeros((n_events, n_arms), dtype=float)
+    never_visited = np.zeros((n_events, n_arms), dtype=float)
+
+    for event_idx in range(n_events):
+        n_completed = int(rng.integers(1, 31))
+        destinations = rng.choice(leaf_arms, size=n_completed)
+        for arm in leaf_arms:
+            j = arm_position[int(arm)]
+            visits = np.flatnonzero(destinations == arm)
+            if visits.size:
+                recency[event_idx, j] = n_completed - visits[-1]
+            else:
+                recency[event_idx, j] = n_completed + 1
+                never_visited[event_idx, j] = 1.0
+
+    return recency, never_visited
 
 
 def sample_arm_design(
@@ -129,12 +163,19 @@ def sample_arm_design(
     )
 
     # Continuous: independent across events and arms with arbitrary scale.
-    if "visit_recency" in predictors or "visit_recency_demeaned" in predictors:
-        vr = rng.uniform(0, 10, size=(n_events, n_arms))
+    if any(
+        name in predictors
+        for name in ("visit_recency", "visit_recency_demeaned", "arm_never_visited")
+    ):
+        vr, never_visited = _sample_visit_history(n_events, rng)
         if "visit_recency" in predictors:
             feature_cols["visit_recency"] = vr
         if "visit_recency_demeaned" in predictors:
-            feature_cols["visit_recency_demeaned"] = vr - vr.mean(axis=0, keepdims=True)
+            feature_cols["visit_recency_demeaned"] = (
+                center_visit_recency_within_event(vr)
+            )
+        if "arm_never_visited" in predictors:
+            feature_cols["arm_never_visited"] = never_visited
     if "cumulative_reward" in predictors:
         feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
     if "reward_rate_arm_k10" in predictors:
@@ -276,7 +317,8 @@ def simulate_with_event_covariates(
     rng = np.random.default_rng(seed)
     predictor_list = list(beta_true)
     n_arms = len(ALL_ARMS)
-    leaf = np.array([0, 1, 2, 3, 4, 5])
+    leaf = np.asarray(WELL_ARMS, dtype=int)
+    visit_recency, arm_never_visited = _sample_visit_history(n_events, rng)
 
     # Arm-varying base binary predictors, sampled per event.
     current = rng.choice(leaf, size=n_events)
@@ -291,7 +333,8 @@ def simulate_with_event_covariates(
         "is_prev": (arm_grid == prev[:, None]).astype(float),
         "is_next": (arm_grid == nxt[:, None]).astype(float),
         "is_last_rewarded": (arm_grid == rewarded[:, None]).astype(float),
-        "visit_recency": rng.uniform(0, 10, size=(n_events, n_arms)),
+        "visit_recency": visit_recency,
+        "arm_never_visited": arm_never_visited,
         "cumulative_reward": rng.uniform(0, 5, size=(n_events, n_arms)),
         "reward_rate_arm_k10": rng.uniform(0, 1, size=(n_events, n_arms)),
         "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
@@ -301,10 +344,9 @@ def simulate_with_event_covariates(
     arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
         1.0 - arm_features["is_current"]
     )
-    # M4 visit-recency predictor: visit_recency with each arm's mean
-    # removed (the part orthogonal to the arm fixed effects).
+    # M4 visit-recency predictor: time-local relative recency among leaf arms.
     _vr = arm_features["visit_recency"]
-    arm_features["visit_recency_demeaned"] = _vr - _vr.mean(axis=0, keepdims=True)
+    arm_features["visit_recency_demeaned"] = center_visit_recency_within_event(_vr)
     # Arm fixed-effect dummies: constant across events, so a fit
     # recovers their coefficients at 0 unless the generative truth
     # assigns them a non-zero β.

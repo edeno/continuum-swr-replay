@@ -24,6 +24,8 @@ import logging
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+
 from ._fit_diagnostics import (
     capture_fit_warnings,
     count_fit_quality_warnings,
@@ -44,8 +46,6 @@ logger = logging.getLogger(__name__)
 # already documents that trunk arms cannot be stop endpoints. The
 # learning-stage helpers use the same set under
 # ``StopSummaryConfig.well_arms`` for "best arm" lookups.
-WELL_ARMS: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
-
 _SESSION_COLS = ("animal", "day", "epoch")
 
 
@@ -249,9 +249,9 @@ def build_choice_dataset(
 ) -> pd.DataFrame:
     """Build a stop × arm choice dataset for the choice models.
 
-    For each stop that has (a) at least one replay event and (b) a
-    valid ``next_arm`` (known next destination), produces one row per
-    candidate arm. The choice set is the well arms (leaf arms 0-5,
+    For each stop that is explicitly labeled ``at_well``, has (a) at least
+    one replay event and (b) a valid ``next_arm`` (known next destination),
+    produces one row per candidate arm. The choice set is the well arms (leaf arms 0-5,
     one per well) minus ``current_arm`` — the animal can only choose
     to visit a well, and consecutive pokes at the same port are never
     rewarded. Trunk arms (6/7/8) are transit-only — they connect
@@ -277,16 +277,18 @@ def build_choice_dataset(
         - ``arm`` — candidate arm ID
         - ``chosen`` — 1 if the animal chose this arm, 0 otherwise
         - ``replay_frac`` — mean fraction across events in this stop
-        - ``visit_recency``, ``cumulative_reward``,
+        - ``visit_recency``, ``arm_never_visited``, ``cumulative_reward``,
           ``reward_rate_arm_k10``, ``dist_to_arm``, ``is_same_patch``
           — behavioral baseline predictors (from the last event in
           the stop)
         - ``n_events`` — number of replay events in this stop
+        - ``location_state``, ``at_well`` — explicit cohort provenance
         - Session identifiers (``animal``, ``day``, ``epoch``)
     """
-    # Stops with replay, a valid next choice, and a defined current arm.
-    # current_arm is required so the ``arm != current_arm`` exclusion
-    # below removes exactly one arm from the WELL_ARMS candidate set
+    # Choice analysis is the first downstream consumer that intentionally
+    # selects the at-well cohort. ``current_arm`` is additionally required so
+    # the ``arm != current_arm`` exclusion below removes exactly one arm from
+    # the WELL_ARMS candidate set
     # (5 alternatives after the well-arm filter); when current_arm is
     # NaN the comparison evaluates True for every arm (IEEE 754),
     # silently inflating the choice set to all 6 well arms for those
@@ -300,8 +302,17 @@ def build_choice_dataset(
         event_arm_table, "stop_id", helper_name="build_choice_dataset"
     )
 
+    required_location = ["location_state", "at_well"]
+    missing_location = [c for c in required_location if c not in stop_table.columns]
+    if missing_location:
+        raise KeyError(
+            "build_choice_dataset requires explicit stop location columns; "
+            f"missing {missing_location}. Regenerate the canonical tables."
+        )
+
     has_replay = (
         stop_table["has_replay"]
+        & stop_table["at_well"].eq(True).fillna(False)
         & stop_table["next_arm"].notna()
         & stop_table["current_arm"].notna()
     )
@@ -319,6 +330,7 @@ def build_choice_dataset(
             "arm",
             fraction_col,
             "visit_recency",
+            "arm_never_visited",
             "cumulative_reward",
             "reward_rate_arm_k10",
             "dist_to_arm",
@@ -337,6 +349,7 @@ def build_choice_dataset(
         .agg(
             replay_frac=(fraction_col, strict_mean),
             visit_recency=("visit_recency", "last"),
+            arm_never_visited=("arm_never_visited", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             reward_rate_arm_k10=("reward_rate_arm_k10", "last"),
             dist_to_arm=("dist_to_arm", "last"),
@@ -381,6 +394,8 @@ def build_choice_dataset(
             "animal",
             "day",
             "epoch",
+            "location_state",
+            "at_well",
             "current_arm",
             "next_arm",
             "n_events",

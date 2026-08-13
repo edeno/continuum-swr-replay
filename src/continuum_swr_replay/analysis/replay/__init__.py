@@ -11,8 +11,11 @@ from ._helpers import (
     add_trial_context,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
+    behavioral_location_at_times,
+    nearest_well_distance_cm,
     raised_cosine_history_basis,
     single_arm_from_well,
+    summarize_behavioral_location,
     trial_context_at_times,
     trial_cutoff_times,
 )
@@ -69,6 +72,7 @@ from .per_bin_rate_model import (
 from .per_stop_rate_model import PER_STOP_RATE_OUTCOMES, fit_per_stop_rate_model
 from .retrospective import (
     arm_path_well_to_well,
+    at_well_event_cohort,
     chosen_arm_fraction,
     chosen_patch_fraction,
     compute_retrospective_metrics,
@@ -126,7 +130,9 @@ __all__ = [
     "aggregate_to_timebins",
     "arm_dist_rank",
     "arm_path_well_to_well",
+    "at_well_event_cohort",
     "attach_is_swr_to_onsets",
+    "behavioral_location_at_times",
     "build_choice_dataset",
     "build_control_aligned_table",
     "build_event_arm_table",
@@ -158,6 +164,7 @@ __all__ = [
     "fit_per_stop_rate_model",
     "freeze_common_cohort",
     "next_arm_circular_shift",
+    "nearest_well_distance_cm",
     "per_bin_rate_gof",
     "raised_cosine_history_basis",
     "single_arm_from_well",
@@ -166,6 +173,7 @@ __all__ = [
     "stop_label_shuffle",
     "stop_patch_replay",
     "stop_replay_summary",
+    "summarize_behavioral_location",
     "trial_context_at_times",
     "trial_cutoff_times",
 ]

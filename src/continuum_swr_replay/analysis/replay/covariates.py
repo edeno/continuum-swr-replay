@@ -22,7 +22,11 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
 
-from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+from continuum_swr_replay.data_loaders.constants import (
+    ALL_ARMS,
+    WELL_ARMS,
+    WELL_PATCH_MAPPING,
+)
 
 from ._helpers import _trial_cutoff_times, build_well_to_arm_map
 
@@ -43,79 +47,153 @@ UNCERTAINTY_COVARIATES = (
 )
 
 
+def center_visit_recency_within_event(recency: np.ndarray) -> np.ndarray:
+    """Center leaf-arm recency within each event without using future events.
+
+    Only the six reward-site arms participate in the mean. Structural trunk
+    values remain zero once history exists, and an all-unknown event remains
+    all-NaN. This retains a relative-recency predictor while guaranteeing that
+    appending later events cannot change an earlier row.
+    """
+    values = np.asarray(recency, dtype=float)
+    if values.ndim != 2 or values.shape[1] != len(ALL_ARMS):
+        raise ValueError(
+            "recency must have shape (n_events, len(ALL_ARMS)); "
+            f"got {values.shape}"
+        )
+    output = values.copy()
+    arm_positions = {arm: index for index, arm in enumerate(ALL_ARMS)}
+    leaf_positions = np.asarray([arm_positions[arm] for arm in WELL_ARMS])
+    leaf_values = values[:, leaf_positions]
+    finite = np.isfinite(leaf_values)
+    counts = finite.sum(axis=1)
+    totals = np.where(finite, leaf_values, 0.0).sum(axis=1)
+    means = np.divide(
+        totals,
+        counts,
+        out=np.full(len(values), np.nan),
+        where=counts > 0,
+    )
+    output[:, leaf_positions] = leaf_values - means[:, None]
+    return output
+
+
 def visit_recency_all_events(
     event_times: np.ndarray,
     trials: pd.DataFrame,
     well_to_arm: dict[int, int],
-    n_default: int | None = None,
 ) -> np.ndarray:
-    """Trials-ago since each arm was last visited, for all events.
+    """Completed trials since each arm was last visited, for all events.
 
-    Returns ``(n_events, n_arms)`` array with the same semantics as
-    :func:`visit_recency_per_arm` but computed in a single vectorized
-    pass.
+    A reachable arm not yet visited at an event receives
+    ``n_completed_trials + 1``. This right-censored value depends only on
+    history available at the event; appending later trials cannot change it.
+    Trunk/non-reachable arms are structural ``0`` once history exists, and all
+    arms are ``NaN`` before the first completed trial.
+
     """
-    n_arms = len(ALL_ARMS)
-    arm_idx = {a: j for j, a in enumerate(ALL_ARMS)}
-    n_events = len(event_times)
-    n_trials_total = len(trials)
+    recency, _ = _visit_recency_and_never_visited_all_events(
+        event_times, trials, well_to_arm
+    )
+    return recency
 
-    if n_default is None:
-        n_default = n_trials_total + 1
-    default_f = float(n_default)
+
+def arm_never_visited_all_events(
+    event_times: np.ndarray,
+    trials: pd.DataFrame,
+    well_to_arm: dict[int, int],
+) -> np.ndarray:
+    """Indicate arms not visited before each event.
+
+    Returns a float ``(n_events, len(ALL_ARMS))`` array so unknown history can
+    remain ``NaN``. With completed history, reachable never-visited arms are
+    ``1``, visited arms are ``0``, and trunk/non-reachable arms are structural
+    ``0``.
+    """
+    _, never_visited = _visit_recency_and_never_visited_all_events(
+        event_times, trials, well_to_arm
+    )
+    return never_visited
+
+
+def _visit_recency_and_never_visited_all_events(
+    event_times: np.ndarray,
+    trials: pd.DataFrame,
+    well_to_arm: dict[int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute time-local recency and novelty from one shared history pass."""
+    n_events = len(event_times)
+    n_arms = len(ALL_ARMS)
+    n_trials_total = len(trials)
+    recency = np.full((n_events, n_arms), np.nan)
+    never_visited = np.full((n_events, n_arms), np.nan)
 
     if n_trials_total == 0:
-        return np.full((n_events, n_arms), np.nan)
+        return recency, never_visited
 
-    # ``np.searchsorted`` below assumes the cutoff times are non-decreasing.
-    # Sort defensively so chronological-order assumptions hold for any
-    # caller (Spyglass-loaded frames are not guaranteed to be sorted).
-    # Use ``goal_arrival_time`` (with ``end_time`` fallback) as the
-    # cutoff so this helper aligns with ``add_trial_context`` —
-    # see ``_trial_cutoff_times`` for the rationale.
+    arm_idx = {arm: j for j, arm in enumerate(ALL_ARMS)}
+    mapped_wells = set(well_to_arm)
+    expected_wells = set(WELL_PATCH_MAPPING)
+    if mapped_wells != expected_wells:
+        missing = sorted(expected_wells - mapped_wells)
+        unexpected = sorted(mapped_wells - expected_wells)
+        raise ValueError(
+            "well_to_arm must cover every canonical reward-site well exactly; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    mapped_leaf_arms = set(well_to_arm.values())
+    expected_leaf_arms = set(WELL_ARMS)
+    if mapped_leaf_arms != expected_leaf_arms:
+        missing = sorted(expected_leaf_arms - mapped_leaf_arms)
+        unexpected = sorted(mapped_leaf_arms - expected_leaf_arms)
+        raise ValueError(
+            "well_to_arm must cover every canonical reward-site leaf arm "
+            f"exactly; missing={missing}, unexpected={unexpected}"
+        )
+    if len(well_to_arm) != len(expected_leaf_arms):
+        raise ValueError(
+            "well_to_arm must map exactly one well to each canonical leaf arm"
+        )
+    reachable_arms = expected_leaf_arms
+
+    # ``np.searchsorted`` assumes chronological cutoff times. A visit becomes
+    # available at goal arrival (or the per-row end-time fallback).
     trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
     trials = trials.sort_values("_cutoff").reset_index(drop=True)
     cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
-
-    # For each trial, record which arm was visited (to_well = destination).
-    # Uses to_well only, consistent with cumulative_reward_all_events.
-    # A "visit" is arriving at a well, not departing from one.
-    arm_visit_indices: list[np.ndarray] = [np.empty(0, dtype=np.intp) for _ in ALL_ARMS]
-    for ti in range(n_trials_total):
-        w = to_wells[ti]
-        if np.isnan(w):
-            continue
-        arm_id = well_to_arm.get(int(w))
-        if arm_id is not None and arm_id in arm_idx:
-            j = arm_idx[arm_id]
-            arm_visit_indices[j] = np.append(arm_visit_indices[j], ti)
-
-    # cutoff[i] = number of trials with cutoff_time <= event_times[i]
     cutoffs = np.searchsorted(cutoff_times, event_times, side="right")
+    has_history = cutoffs > 0
 
-    out = np.full((n_events, n_arms), default_f)
+    visit_lists: list[list[int]] = [[] for _ in ALL_ARMS]
+    for trial_idx, well in enumerate(to_wells):
+        if pd.isna(well):
+            continue
+        arm = well_to_arm.get(int(well))
+        if arm in arm_idx:
+            visit_lists[arm_idx[arm]].append(trial_idx)
 
-    # Events with no past trials -> NaN
-    no_past = cutoffs == 0
-    out[no_past] = np.nan
+    for j, arm in enumerate(ALL_ARMS):
+        if arm not in reachable_arms:
+            recency[has_history, j] = 0.0
+            never_visited[has_history, j] = 0.0
+            continue
 
-    for j in range(n_arms):
-        visits = arm_visit_indices[j]
+        # Right-censored fill for a reachable arm with no visit yet. Unlike a
+        # session-wide default, this can be known at the event time.
+        recency[has_history, j] = cutoffs[has_history] + 1.0
+        never_visited[has_history, j] = 1.0
+
+        visits = np.asarray(visit_lists[j], dtype=np.intp)
         if visits.size == 0:
             continue
-        # For each event, find how many of this arm's visits are before cutoff
-        n_vis = np.searchsorted(visits, cutoffs, side="left")
-        # The last visit before cutoff is at visits[n_vis - 1]
-        has_visit = (~no_past) & (n_vis > 0)
-        last_visit_trial_idx = np.where(
-            has_visit, visits[np.clip(n_vis - 1, 0, visits.size - 1)], -1
-        )
-        # trials_ago = cutoff - last_visit_trial_idx
-        trials_ago = np.where(has_visit, cutoffs - last_visit_trial_idx, default_f)
-        out[has_visit, j] = trials_ago[has_visit].astype(float)
+        n_visits = np.searchsorted(visits, cutoffs, side="left")
+        was_visited = has_history & (n_visits > 0)
+        last_visit = visits[np.clip(n_visits[was_visited] - 1, 0, None)]
+        recency[was_visited, j] = cutoffs[was_visited] - last_visit
+        never_visited[was_visited, j] = 0.0
 
-    return out
+    return recency, never_visited
 
 
 def cumulative_reward_all_events(
@@ -203,13 +281,11 @@ def recent_reward_rate_all_events(
     every event has three trunk-arm rows — leaving them NaN would
     annihilate the M3+ event set.
 
-    **Mechanism-A ENCODE:** a leaf arm not yet visited in a
-    session *with* prior trials is filled ``0.0`` (no rewards observed
-    on it yet), retaining the ~11.6% of events the old ``NaN`` branch
-    dropped (the novel-arm / early-session regime). Only the
-    no-trial-history rows (no prior trials at all) stay ``NaN``. A separate
-    novelty indicator was considered and **not** added (see model_specs);
-    this coefficient absorbs the modest (~13%) novel-arm effect.
+    A leaf arm not yet visited in a session *with* prior trials is filled
+    ``0.0`` (no rewards observed on it yet), retaining the novel-arm /
+    early-session regime. Only no-trial-history rows stay ``NaN``. Models that
+    use recency also carry ``arm_never_visited``, separating this censored
+    state from an observed zero reward rate.
     """
     n_arms = len(ALL_ARMS)
     n_events = len(event_times)
@@ -448,6 +524,58 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
     return out
 
 
+def _recent_switch_rate_per_visit(
+    stops: pd.DataFrame, switch_window: int
+) -> np.ndarray:
+    """Roll completed switch outcomes at visit grain, then broadcast to bouts.
+
+    The consecutive ``(prev_arm, current_arm)`` pair identifies the most
+    recently completed trip in canonical stop tables and is constant across
+    all bouts with that completed-choice context.  ``is_after_switch`` is
+    therefore known at every bout start, unlike the same row's retrospective
+    ``is_stay``.
+    """
+    prev_arm = stops["prev_arm"].to_numpy(dtype=float)
+    current_arm = stops["current_arm"].to_numpy(dtype=float)
+    is_after_switch = stops["is_after_switch"].to_numpy(dtype=float)
+    if len(stops) == 0:
+        return np.array([], dtype=float)
+
+    same_prev = (prev_arm[1:] == prev_arm[:-1]) | (
+        np.isnan(prev_arm[1:]) & np.isnan(prev_arm[:-1])
+    )
+    same_current = (current_arm[1:] == current_arm[:-1]) | (
+        np.isnan(current_arm[1:]) & np.isnan(current_arm[:-1])
+    )
+    same_visit = same_prev & same_current
+    visit_id = np.r_[0, np.cumsum(~same_visit)]
+    n_visits = int(visit_id[-1]) + 1
+    visit_switch = np.full(n_visits, np.nan)
+    for visit in range(n_visits):
+        values = is_after_switch[visit_id == visit]
+        finite = values[np.isfinite(values)]
+        if finite.size:
+            if finite.size != values.size or not np.all(finite == finite[0]):
+                raise ValueError(
+                    "is_after_switch must be constant within each completed "
+                    "visit (consecutive rows with the same prev/current arms)"
+                )
+            visit_switch[visit] = finite[0]
+
+    # The trip leading into the first observed visit can predate the recorded
+    # session.  Treat that carry-in state as unknown even if a stale source
+    # supplied a numeric label.
+    visit_switch[0] = np.nan
+
+    visit_rate = (
+        pd.Series(visit_switch)
+        .rolling(switch_window, min_periods=1)
+        .mean()
+        .to_numpy()
+    )
+    return visit_rate[visit_id]
+
+
 def add_uncertainty_covariates(
     stop_table: pd.DataFrame,
     *,
@@ -468,9 +596,10 @@ def add_uncertainty_covariates(
     - ``omission_streak``: leading consecutive omissions = count of leading 0s
       in ``reward_lag1, reward_lag2, ...`` (stop at the first 1; a ``NaN`` lag
       terminates the streak).
-    - ``recent_switch_rate``: ``(1 - is_stay).shift(1).rolling(switch_window,
-      min_periods=1).mean()`` within session (prior stops only -> no leakage of
-      the current stop's choice).
+    - ``recent_switch_rate``: rolling mean of ``is_after_switch`` over the last
+      ``switch_window`` completed visits. Multiple stop/bout rows sharing one
+      completed-choice context receive the same value; the current visit's
+      eventual ``is_stay`` is never used.
     - ``wsls_deviation``: 1.0 (deviated from win-stay/lose-shift) unless the stop
       is ``(is_after_reward & is_stay)`` or ``(is_after_omission & ~is_stay)``,
       in which case 0.0. ``NaN`` when neither ``is_after_reward`` nor
@@ -488,10 +617,11 @@ def add_uncertainty_covariates(
     ----------
     stop_table : pd.DataFrame
         Per-stop table. Must carry ``animal``, ``day``, ``epoch``, ``stop_idx``,
-        ``is_stay``, ``is_after_reward``, ``is_after_omission``,
-        ``reward_outcome``, ``current_arm``, and ``reward_lag1..`` columns.
+        ``prev_arm``, ``is_after_switch``, ``is_stay``, ``is_after_reward``,
+        ``is_after_omission``, ``reward_outcome``, ``current_arm``, and
+        ``reward_lag1..`` columns.
     switch_window : int
-        Rolling window (in stops) for ``recent_switch_rate``.
+        Rolling window (in completed visits) for ``recent_switch_rate``.
     q_alpha : float
         Leaky-integration learning rate for ``leaky_q_value_diff``.
 
@@ -520,14 +650,7 @@ def add_uncertainty_covariates(
         else:
             omission.loc[pos] = 0.0
 
-        is_switch = 1.0 - g["is_stay"].to_numpy(dtype=float)
-        switch_rate.loc[pos] = (
-            pd.Series(is_switch, index=pos)
-            .shift(1)
-            .rolling(switch_window, min_periods=1)
-            .mean()
-            .to_numpy()
-        )
+        switch_rate.loc[pos] = _recent_switch_rate_per_visit(g, switch_window)
 
         after_reward = g["is_after_reward"].to_numpy(dtype=float)
         after_omission = g["is_after_omission"].to_numpy(dtype=float)
@@ -559,13 +682,21 @@ def visit_recency_per_arm(
     event_time: float,
     trials: pd.DataFrame,
     track_graph: nx.Graph,
-    n_default: int | None = None,
 ) -> dict[int, float]:
     """Trials since each arm was last visited."""
     w2a = build_well_to_arm_map(track_graph)
-    row = visit_recency_all_events(
-        np.array([event_time]), trials, w2a, n_default=n_default
-    )
+    row = visit_recency_all_events(np.array([event_time]), trials, w2a)
+    return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}
+
+
+def arm_never_visited_per_arm(
+    event_time: float,
+    trials: pd.DataFrame,
+    track_graph: nx.Graph,
+) -> dict[int, float]:
+    """Indicate which reachable arms were unvisited before one event."""
+    w2a = build_well_to_arm_map(track_graph)
+    row = arm_never_visited_all_events(np.array([event_time]), trials, w2a)
     return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}
 
 

@@ -42,12 +42,13 @@ Named by **scope + window** so the same word never hides a different definition.
 |---|---|---|---|---|---|
 | `reward_lag{1..10}` | outcome of the j-th most recent trial | 10 trials, per-lag | all-arm (per-trial) | binary | rate A (Rlag), rate B, MU, coupling — main effects |
 | `reward_rate_trial_k10` | rewarded fraction of the last 10 **trials** | 10 trials | all-arm | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
-| `reward_rate_arm_k10` | rewarded fraction of the last 10 **visits to that arm**; an unvisited leaf (no prior visit, but the session has prior trials) is **encoded `0.0`** (mechanism-A, phase 4), not NaN, retaining the ~11.6% novel-arm events the old NaN dropped. Trunk arms structurally `0.0`; no-prior-trials rows NaN. A novelty indicator was considered and not added, so this coefficient **absorbs the modest (~13%) novel-arm effect**. | 10 arm-visits | per-arm | fraction | content (main effect), choice (main effect); rate/coupling via `× is_current` |
+| `reward_rate_arm_k10` | rewarded fraction of the last 10 **visits to that arm**; an unvisited leaf (no prior visit, but the session has prior trials) is encoded `0.0`, while the explicit `arm_never_visited` term separates novelty from an observed zero. Trunk arms are structurally `0.0`; no-prior-trials rows are NaN. | 10 arm-visits | per-arm | fraction | content (main effect), choice (main effect); rate/coupling via `× is_current` |
 
 Change from prior code (implemented): the per-arm rate was **5-visit**
 (`recent_reward_rate`) and is now **10-visit** (`reward_rate_arm_k10`). The all-arm
 10-trial rate (`recent_trial_reward_rate`) was renamed `reward_rate_trial_k10`. Trunk
-arms keep the structural `0.0`; never-visited leaf arms keep `NaN`.
+arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
+`arm_never_visited = 1`.
 
 ### 2. Value — both nominal and experienced, available to every family
 
@@ -181,8 +182,14 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
 [`behavior_model_covariates.md`](behavior_model_covariates.md).
 
 **Spatial / trajectory** (per event-arm):
-- `is_current`, `is_prev`, `is_next` — arm equals the animal's current / previous-
-  trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
+- `location_state` / `at_well` / `location_well` — whole-window behavioral
+  location. An event is `at_well` only if every bin is at the same well;
+  `in_transit`, `mixed`, and `unknown` events remain in the canonical tables so
+  analyses can filter them explicitly. `physical_arm` is the modal observed
+  track segment, including trunks. `current_arm` is a compatibility alias of
+  `location_arm` and is NaN off-well; there is no trunk-to-destination fallback.
+- `is_current`, `is_prev`, `is_next` — arm equals the animal's at-well /
+  previous-trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
   (the destination the animal will run to); used only where a spec includes it, and
   interpreted as forward representation, not a causal predictor.
 - `is_same_patch` — arm shares a patch with `current_arm`.
@@ -194,9 +201,13 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   (up to) 10 completed trials; this is a finite-window count, not a
   session-to-date cumulative total.
 - `visit_recency` — **trials-ago** since the animal last visited that arm (a discrete
-  trial count, not elapsed time); an arm never visited in the session takes the
-  sentinel `len(trials) + 1`. `visit_recency_demeaned` subtracts the per-arm mean
-  (the part orthogonal to the arm fixed effects; M4+).
+  trial count, not elapsed time), using only trials completed by the event. A
+  reachable arm not yet visited receives the time-local right-censored value
+  `n_completed_trials + 1`; `arm_never_visited` separately marks that state.
+  Appending future trials therefore cannot change an earlier event's recency.
+  `visit_recency_demeaned` subtracts the mean across the six leaf arms within
+  that same event (trunks remain structural zero). This is a time-local relative
+  recency contrast: appending later events cannot change earlier rows.
 - `reward_rate_arm_k10` — rewarded fraction of the last 10 visits to that arm
   (trunk arms 0.0; a leaf arm not yet visited is also encoded 0.0, *not* NaN —
   only rows with no prior trials at all stay NaN). See §2.
@@ -217,8 +228,13 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
 - `immobility_time` — stop (immobility bout) duration; the **`log(immobility_time)`
   exposure offset** in the rate models (per stop).
 - `time_since_stop` — time from the immobility-bout onset to the event.
-- `time_since_port_entry` — time from well/port entry (goal arrival) to the event.
-- `time_since_reward` — time from the last reward to the event.
+- `time_since_last_port_entry` — time from the most recent well/port entry
+  completed by the event start to the event start. `time_since_port_entry` is
+  a compatibility alias. An arrival during an event never enters this value.
+  Both are nonnegative when present; an in-progress trip's future arrival is
+  never used.
+- `time_since_reward` — time from the last reward available by event start to
+  the event start.
 - `event_duration`, `event_start`, `event_end`, `event_midpoint_time` — the event's
   span and boundary/mid timestamps.
 

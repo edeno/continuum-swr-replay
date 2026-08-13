@@ -340,6 +340,30 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     return pt, [*model_cols, *NOMINAL_COVARIATES]
 
 
+def _outcome_known_time(
+    *,
+    rewarded: bool,
+    poke_in_time: float,
+    poke_out_time: float,
+    reward_on_time: float,
+) -> float:
+    """Conservative time at which the current trip's outcome is observable.
+
+    Reward onset is an explicit positive feedback cue. The source table has no
+    timestamp for a negative-feedback cue, so an omission is not assumed known
+    merely at poke-in; it becomes conservatively available at poke-out. This
+    may discard usable post-omission dwell, but cannot expose a rewarded-versus-
+    omitted label before the absence of reward is physically established.
+    """
+    if not np.isfinite(poke_in_time):
+        raise ValueError("current trial lacks finite poke_in_ts")
+    if not np.isfinite(poke_out_time):
+        raise ValueError("current trial lacks finite poke_out_ts")
+    if rewarded and not np.isfinite(reward_on_time):
+        raise ValueError("rewarded trial lacks finite reward_on_ts")
+    return float(reward_on_time if rewarded else poke_out_time)
+
+
 def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd.DataFrame:
     pt, model_cols = _per_trial(animal, beh, rl)
     st = stop_table[stop_table.animal == animal].copy()
@@ -363,6 +387,18 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
         valid = ti >= 0
         for k, se in zip(s_idx[valid], ti[valid], strict=True):
             trow = g.iloc[int(se)]
+            rewarded = bool(trow["reward_time"])
+            try:
+                outcome_known_time = _outcome_known_time(
+                    rewarded=rewarded,
+                    poke_in_time=pi[se],
+                    poke_out_time=po[se],
+                    reward_on_time=ron[se],
+                )
+            except ValueError as error:
+                raise ValueError(
+                    f"{error} for {nwb} epoch {epnum} trial {se}"
+                ) from error
             rows.append({
                 "stop_id": st.iloc[k]["stop_id"],
                 "epoch": st.iloc[k]["epoch"],
@@ -370,6 +406,11 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
                 "in_poke": bool(pi[se] <= mid[k] <= po[se]),
                 "is_rewarding": bool((not np.isnan(ron[se])) and ron[se] <= mid[k] <= roff[se]),
                 "trial_reward": int(trow["reward_time"]),  # poke-record reward (times' 'reward', '_time' suffix)
+                # Physical availability boundary for post-outcome covariates:
+                # reward onset on rewarded trials; conservatively, poke-out on
+                # omissions because this table has no explicit negative-
+                # feedback timestamp.
+                "outcome_known_time": outcome_known_time,
                 **{c: trow[c] for c in model_cols},
             })
     out = pd.DataFrame(rows)

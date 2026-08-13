@@ -262,6 +262,112 @@ def _single_arm_trials(n_trials: int, rewarded_indices: set[int]) -> pd.DataFram
     )
 
 
+def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
+    """Recency uses only completed history; trunks are structural, not novel."""
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0, 10.0, 20.0],
+            "end_time": [9.0, 19.0, 29.0],
+            "goal_arrival_time": [8.0, 18.0, 28.0],
+            "from_well": [1, 0, 1],
+            "to_well": [0, 1, 0],
+            "is_reward": [True, False, True],
+            "is_patch_change": [False, False, False],
+        }
+    )
+    event_times = np.array([7.0, 9.0, 19.0, 30.0])
+    well_to_arm = {well: well for well in range(6)}
+
+    recency = covariates.visit_recency_all_events(
+        event_times, trials, well_to_arm
+    )
+    never_visited = covariates.arm_never_visited_all_events(
+        event_times, trials, well_to_arm
+    )
+
+    expected_recency = np.array(
+        [
+            [np.nan] * 9,
+            [1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0],
+            [2.0, 1.0, 3.0, 3.0, 3.0, 3.0, 0.0, 0.0, 0.0],
+            [1.0, 2.0, 4.0, 4.0, 4.0, 4.0, 0.0, 0.0, 0.0],
+        ]
+    )
+    expected_never_visited = np.array(
+        [
+            [np.nan] * 9,
+            [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+        ]
+    )
+
+    np.testing.assert_array_equal(recency, expected_recency)
+    np.testing.assert_array_equal(never_visited, expected_never_visited)
+    assert recency.shape == never_visited.shape == (len(event_times), 9)
+
+
+def test_recency_and_never_visited_ignore_appended_future_trials():
+    """Appending trials after an event cannot retroactively change covariates."""
+    trials = _single_arm_trials(5, rewarded_indices=set())
+    event_times = np.array([15.0])  # only trial 0 (arrival 8 s) has completed
+    well_to_arm = {well: well for well in range(6)}
+
+    for function in (
+        covariates.visit_recency_all_events,
+        covariates.arm_never_visited_all_events,
+    ):
+        short = function(event_times, trials.iloc[:2], well_to_arm)
+        long = function(event_times, trials, well_to_arm)
+        np.testing.assert_array_equal(short, long)
+
+
+def test_visit_recency_centering_is_within_event_and_future_invariant():
+    recency = np.array(
+        [
+            [1, 2, 3, 4, 5, 6, 0, 0, 0],
+            [6, 5, 4, 3, 2, 1, 0, 0, 0],
+            [np.nan] * 9,
+        ],
+        dtype=float,
+    )
+    centered = covariates.center_visit_recency_within_event(recency)
+    np.testing.assert_allclose(centered[:2, :6].mean(axis=1), 0.0, atol=1e-12)
+    np.testing.assert_array_equal(centered[:2, 6:], 0.0)
+    assert np.isnan(centered[2]).all()
+
+    appended = np.vstack([recency, [[100, 1, 1, 1, 1, 1, 0, 0, 0]]])
+    np.testing.assert_array_equal(
+        covariates.center_visit_recency_within_event(appended)[:3], centered
+    )
+
+
+def test_recency_rejects_incomplete_leaf_topology():
+    """A missing leaf mapping is invalid, not a structural trunk zero."""
+    trials = _single_arm_trials(1, rewarded_indices=set())
+    incomplete = {well: well for well in range(5)}
+
+    for function in (
+        covariates.visit_recency_all_events,
+        covariates.arm_never_visited_all_events,
+    ):
+        with pytest.raises(ValueError, match="cover every canonical"):
+            function(np.array([20.0]), trials, incomplete)
+
+
+def test_recency_rejects_wrong_well_keys_despite_complete_arm_values():
+    """A fake well cannot substitute for a missing canonical reward site."""
+    trials = _single_arm_trials(1, rewarded_indices=set())
+    wrong_well = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 99: 5}
+
+    for function in (
+        covariates.visit_recency_all_events,
+        covariates.arm_never_visited_all_events,
+    ):
+        with pytest.raises(ValueError, match="reward-site well"):
+            function(np.array([20.0]), trials, wrong_well)
+
+
 def test_cumulative_reward_counts_only_the_last_ten_trials():
     """``cumulative_reward_all_events`` is a rolling k=10 window, not a total.
 

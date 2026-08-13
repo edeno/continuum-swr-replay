@@ -33,6 +33,7 @@ def _make_event_arm_table(cumulative_reward_values):
             "is_same_patch": np.zeros(n_arms, dtype=int),
             "cumulative_reward": cumulative_reward_values,
             "visit_recency": np.full(n_arms, np.nan),
+            "arm_never_visited": np.full(n_arms, np.nan),
         }
     )
 
@@ -74,6 +75,23 @@ class TestEventPatchTableCumulativeRewardNaN:
         assert out.loc[1, "cumulative_reward_patch"] == pytest_approx(0.75)
         assert np.isnan(out.loc[2, "cumulative_reward_patch"])
         assert out.loc[3, "cumulative_reward_patch"] == pytest_approx(7.0)
+
+
+def test_patch_recency_and_novelty_use_leaf_arms_only():
+    """A structural trunk zero must not overwrite leaf recency/novelty."""
+    eat = _make_event_arm_table(np.zeros(9))
+    # Patch arms: (0,1,6), (2,3,7), (4,5,8). Trunk values are structural 0.
+    eat["visit_recency"] = [5, 7, 2, 9, 4, 6, 0, 0, 0]
+    eat["arm_never_visited"] = [1, 1, 0, 1, 0, 0, 0, 0, 0]
+
+    out = build_event_patch_table(_make_event_table(), eat).set_index("patch")
+
+    np.testing.assert_array_equal(
+        out.loc[[1, 2, 3], "visit_recency_patch"].to_numpy(), [5, 2, 4]
+    )
+    np.testing.assert_array_equal(
+        out.loc[[1, 2, 3], "arm_never_visited_patch"].to_numpy(), [1, 0, 0]
+    )
 
 
 def pytest_approx(value, tol=1e-9):

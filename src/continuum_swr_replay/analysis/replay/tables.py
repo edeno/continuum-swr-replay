@@ -70,6 +70,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
+    WELL_ARMS,
 )
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 
@@ -116,6 +117,9 @@ from ._helpers import (
     lagged_trial_rewards as _lagged_trial_rewards,
 )
 from ._helpers import (
+    nearest_well_distance_cm as _nearest_well_distance_cm,
+)
+from ._helpers import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
 from ._helpers import (
@@ -131,10 +135,19 @@ from ._helpers import (
     strict_first as _strict_first,
 )
 from ._helpers import (
+    summarize_behavioral_location as _summarize_behavioral_location,
+)
+from ._helpers import (
     time_since_stop as _time_since_stop,
 )
 from ._helpers import (
     visit_recency_all_events as _visit_recency_all_events,
+)
+from .covariates import (
+    arm_never_visited_all_events as _arm_never_visited_all_events,
+)
+from .covariates import (
+    center_visit_recency_within_event as _center_visit_recency_within_event,
 )
 from .model_specs import N_REWARD_LAGS
 from .spatial import arm_dist_rank, dist_to_arm_from_well
@@ -346,8 +359,10 @@ def build_event_table(
     Timing (compatibility aliases of the same window)
         ``label_event_start``, ``label_event_end``,
         ``label_event_duration``, ``label_event_midpoint_time``
-    Arms (scalar per event)
-        ``current_arm``, ``prev_arm``, ``next_arm`` (post-hoc),
+    Behavioral location and arms
+        ``location_state``, ``at_well``, ``location_well``,
+        ``location_arm``, ``physical_arm``, ``current_arm`` (compatibility
+        alias of ``location_arm``), ``prev_arm``, ``next_arm`` (post-hoc),
         ``last_rewarded_arm``
     Patches
         ``current_patch``, ``prev_patch``, ``next_patch`` (post-hoc)
@@ -385,12 +400,13 @@ def build_event_table(
     ``non_local_event`` under the same ``event_id``; callers that need
     paranoia can group on the tuple instead.
 
-    ``current_arm`` is the modal ``decoded_arm`` of the animal's physical
-    position during the event (from the decoder's map estimate on
-    ``head_position``-derived track-segment labeling). Falls back to
-    ``well_to_arm_set(current_well)`` when the modal position
-    lands on a trunk arm — matches the pre-refactor semantic in
-    ``data_preparation._add_per_arm_predictors_single_session``.
+    ``location_state`` is rolled up over the complete event window. An event
+    is ``at_well`` only when every sampled bin is at the same well; canonical
+    tables retain ``in_transit``, ``mixed``, and ``unknown`` events so model
+    cohorts can filter them explicitly. ``physical_arm`` is the modal observed
+    track segment, including trunks. ``current_arm`` is retained for model/API
+    compatibility but is now exactly ``location_arm`` and therefore NaN unless
+    the event is wholly at one well.
     """
     # --- 1. Annotate the full dot frame (needed for bout detection and
     #     per-timebin arm mapping prior to event filtering) ---
@@ -408,6 +424,7 @@ def build_event_table(
         else set()
     )
     dot = _add_trial_context(dot, trials)
+    dot["nearest_well_distance_cm"] = _nearest_well_distance_cm(dot, track_graph)
 
     # Per-session immobility bouts — computed from the full frame so
     # bout starts are correct even when an event begins partway through
@@ -461,26 +478,23 @@ def build_event_table(
         # count, not a count of MAPs that landed on a junction.
         n_junction = int((~real_arm_mask).sum())
 
-        # current_arm: modal track_segment_id (the arm the animal is
-        # physically on during the event). Accept only leaf arms — the
-        # ones that touch a well. ``arm_to_well`` returns NaN for trunk
-        # arms (6/7/8 in the bandit graph) because they connect two
-        # junctions and no well, which is the same condition the legacy
-        # ``_add_per_arm_predictors_single_session`` uses to trigger the
-        # ``current_well`` fallback. Driving the check off the
-        # graph — rather than hard-coding {0..5} — keeps the fallback
-        # correct on any track graph.
+        # Keep behavioral location and physical segment as distinct facts.
+        # The old trunk->destination-well fallback silently made an in-transit
+        # event look as though it occurred at the future goal. The whole-window
+        # location rollup is the model-facing definition; the modal physical
+        # segment remains available for topology/QC without changing it.
         ts = (
             g["track_segment_id"]
             if "track_segment_id" in g.columns
             else pd.Series(dtype=float)
         )
-        ts_modal = _safe_mode(ts)
-        current_arm = np.nan
-        if not np.isnan(ts_modal):
-            well_of_modal = arm_to_well(ts_modal, track_graph)
-            if not np.isnan(well_of_modal):
-                current_arm = float(ts_modal)
+        physical_arm = _safe_mode(ts)
+        location = _summarize_behavioral_location(
+            g[["location_state", "location_well"]]
+        )
+        location_well = float(location["location_well"])
+        location_arm = _single_arm_from_well(location_well, track_graph)
+        current_arm = location_arm
         # Trial-derived context columns are NaN at every dot timebin
         # before the first trial start (see ``add_trial_context``).
         # ``_safe_first`` would silently skip those leading NaNs and
@@ -489,11 +503,6 @@ def build_event_table(
         # stop-table builder already uses the strict semantics for the
         # same hazard — match it here so trial-derived event-level
         # fields propagate NaN when the event begins before any trial.
-        if np.isnan(current_arm):
-            current_arm = _single_arm_from_well(
-                _strict_first(g["current_well"]), track_graph
-            )
-
         prev_arm = _single_arm_from_well(_strict_first(g["prev_well"]), track_graph)
         next_arm = _single_arm_from_well(_strict_first(g["next_well"]), track_graph)
         last_rewarded_arm = _single_arm_from_well(
@@ -508,6 +517,22 @@ def build_event_table(
             1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
         )
 
+        midpoint_idx = len(times) // 2
+        midpoint_time = float(times[midpoint_idx])
+        context_time = float(times[0])
+        last_port_entry = g["_goal_arrival_time"].iloc[0]
+        time_since_last_port_entry = (
+            context_time - float(last_port_entry)
+            if pd.notna(last_port_entry)
+            else np.nan
+        )
+        if np.isfinite(time_since_last_port_entry) and time_since_last_port_entry < 0:
+            raise RuntimeError(
+                "past-only trial context produced a negative time since port entry"
+            )
+        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
+        finite_distance = distance[np.isfinite(distance)]
+
         event_records.append(
             {
                 "non_local_event": int(ev_id),
@@ -515,6 +540,11 @@ def build_event_table(
                 "event_end": float(times[-1]),
                 "event_duration": float(times[-1] - times[0]),
                 "is_mua": (animal, day, epoch, int(ev_id)) in mua_overlap_keys,
+                "location_state": location["location_state"],
+                "at_well": location["at_well"],
+                "location_well": location_well,
+                "location_arm": location_arm,
+                "physical_arm": physical_arm,
                 "current_arm": current_arm,
                 "prev_arm": prev_arm,
                 "next_arm": next_arm,
@@ -535,21 +565,28 @@ def build_event_table(
                 else np.nan,
                 "n_junction_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
-                "event_midpoint_time": float(times[len(times) // 2]),
-                "time_since_port_entry": float(
-                    times[len(times) // 2] - _strict_first(g["_goal_arrival_time"])
-                )
-                if not np.isnan(_strict_first(g["_goal_arrival_time"]))
-                else np.nan,
+                "event_midpoint_time": midpoint_time,
+                "time_since_port_entry": time_since_last_port_entry,
+                "time_since_last_port_entry": time_since_last_port_entry,
                 "time_since_reward": float(
-                    times[len(times) // 2] - _strict_first(g["_last_reward_time"])
+                    context_time - g["_last_reward_time"].iloc[0]
                 )
-                if not np.isnan(_strict_first(g["_last_reward_time"]))
+                if pd.notna(g["_last_reward_time"].iloc[0])
                 else np.nan,
+                "nearest_well_distance_cm_min": (
+                    float(finite_distance.min()) if finite_distance.size else np.nan
+                ),
+                "nearest_well_distance_cm_mean": (
+                    float(finite_distance.mean()) if finite_distance.size else np.nan
+                ),
+                "nearest_well_distance_cm_max": (
+                    float(finite_distance.max()) if finite_distance.size else np.nan
+                ),
             }
         )
 
     per_event = pd.DataFrame.from_records(event_records)
+    per_event["at_well"] = pd.array(per_event["at_well"], dtype="boolean")
 
     # --- 5. Align summary arrays (sorted by event id) with per_event ---
     # summaries.* returned unique_ids in sorted order; groupby(sort=True)
@@ -889,6 +926,7 @@ def build_stop_table(
         dot, speed_threshold, nonlocal_threshold
     ).to_numpy()
     dot = _add_trial_context(dot, trials)
+    dot["nearest_well_distance_cm"] = _nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = _immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
@@ -1003,27 +1041,44 @@ def build_stop_table(
         else:
             per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields. ``current_arm`` uses the same modal-segment
-    # + trunk-fallback rule as event-level current_arm; at a well-stop
-    # the modal segment is a leaf arm. ``_strict_first`` keeps the
-    # first row's NaN-or-finite value as-is so a bout that started
-    # before any trial doesn't inherit the next trial's context.
+    # Behavioral-location and physical-segment fields use the whole bout.
+    # ``current_arm`` remains a compatibility alias for the strict at-well
+    # ``location_arm``; a trunk/in-transit/mixed bout is never rewritten as a
+    # destination leaf arm. ``_strict_first`` below is reserved for contextual
+    # previous/next/rewarded wells at the bout start.
+    location_state_vals: list[str] = []
+    at_well_vals: list[object] = []
+    location_well_vals = np.full(n_bouts, np.nan)
+    location_arm_vals = np.full(n_bouts, np.nan)
+    physical_arm_vals = np.full(n_bouts, np.nan)
+    nearest_min_vals = np.full(n_bouts, np.nan)
+    nearest_mean_vals = np.full(n_bouts, np.nan)
+    nearest_max_vals = np.full(n_bouts, np.nan)
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
-        ts_modal = (
+        physical_arm = (
             _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
         )
-        ca = np.nan
-        if not np.isnan(ts_modal):
-            well_of_modal = arm_to_well(ts_modal, track_graph)
-            if not np.isnan(well_of_modal):
-                ca = float(ts_modal)
-        if np.isnan(ca):
-            ca = _single_arm_from_well(_strict_first(g["current_well"]), track_graph)
-        current_arm_vals[bi] = ca
+        location = _summarize_behavioral_location(
+            g[["location_state", "location_well"]]
+        )
+        location_well = float(location["location_well"])
+        location_arm = _single_arm_from_well(location_well, track_graph)
+        location_state_vals.append(str(location["location_state"]))
+        at_well_vals.append(location["at_well"])
+        location_well_vals[bi] = location_well
+        location_arm_vals[bi] = location_arm
+        physical_arm_vals[bi] = physical_arm
+        current_arm_vals[bi] = location_arm
+        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
+        finite_distance = distance[np.isfinite(distance)]
+        if finite_distance.size:
+            nearest_min_vals[bi] = finite_distance.min()
+            nearest_mean_vals[bi] = finite_distance.mean()
+            nearest_max_vals[bi] = finite_distance.max()
         prev_arm_vals[bi] = _single_arm_from_well(
             _strict_first(g["prev_well"]), track_graph
         )
@@ -1034,6 +1089,14 @@ def build_stop_table(
             _strict_first(g["last_rewarded_well"]), track_graph
         )
 
+    per_bout["location_state"] = location_state_vals
+    per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
+    per_bout["location_well"] = location_well_vals
+    per_bout["location_arm"] = location_arm_vals
+    per_bout["physical_arm"] = physical_arm_vals
+    per_bout["nearest_well_distance_cm_min"] = nearest_min_vals
+    per_bout["nearest_well_distance_cm_mean"] = nearest_mean_vals
+    per_bout["nearest_well_distance_cm_max"] = nearest_max_vals
     per_bout["current_arm"] = current_arm_vals
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
@@ -1324,10 +1387,17 @@ def build_event_arm_table(
         ]
     )
 
-    # -- visit_recency, cumulative_reward, reward_rate_arm_k10 (batch) --
-    event_times = event_table["event_midpoint_time"].to_numpy()
+    # -- visit recency/novelty, cumulative reward, reward rate (batch) --
+    # Use the event start for every model-facing history covariate.  Event-level
+    # outcome/context columns use the first event row too; using the midpoint
+    # here would let a mixed event that crosses goal arrival combine pre-arrival
+    # context with post-arrival history in the same regression row.
+    event_times = event_table["event_start"].to_numpy()
     if len(trials) > 0:
         vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)
+        anv_2d = _arm_never_visited_all_events(
+            event_times, trials, well_to_arm_map
+        )
         cr_2d = _cumulative_reward_all_events(event_times, trials, well_to_arm_map)
         # canonical per-arm reward rate: rewarded fraction of the last 10 visits
         # to that arm (covariate_dictionary.md D1; was 5-visit).
@@ -1336,26 +1406,28 @@ def build_event_arm_table(
         )
     else:
         vr_2d = np.full((n_events, n_arms), np.nan)
+        anv_2d = np.full((n_events, n_arms), np.nan)
         cr_2d = np.full((n_events, n_arms), np.nan)
         rrr_2d = np.full((n_events, n_arms), np.nan)
 
-    # Events with NaN midpoint time get NaN for trial-derived columns
+    # Events with NaN start time get NaN for trial-derived columns.
     nan_mask = np.isnan(event_times)
     if nan_mask.any():
         vr_2d[nan_mask] = np.nan
+        anv_2d[nan_mask] = np.nan
         cr_2d[nan_mask] = np.nan
         rrr_2d[nan_mask] = np.nan
 
     long["dist_to_arm"] = dist_2d.flatten()
     long["arm_dist_rank"] = rank_2d.flatten()
     long["visit_recency"] = vr_2d.flatten()
-    # visit_recency with each arm's mean subtracted. Raw visit_recency
-    # has a large static per-arm component that the arm fixed effects
-    # absorb; the demeaned column is the part orthogonal to arm_fe and
-    # is what M4+ uses (see model_specs.py).
-    long["visit_recency_demeaned"] = long["visit_recency"] - long.groupby("arm")[
-        "visit_recency"
-    ].transform("mean")
+    long["arm_never_visited"] = anv_2d.flatten()
+    # Relative leaf-arm recency, centered independently inside each event.
+    # Unlike the old across-event/session mean, this cannot change when later
+    # events are appended. Structural trunk recencies stay at zero.
+    long["visit_recency_demeaned"] = _center_visit_recency_within_event(
+        vr_2d
+    ).flatten()
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
 
@@ -1401,6 +1473,9 @@ def build_event_arm_table(
     )
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_arm_never_visited"] = (
+        is_swr_i * long["arm_never_visited"].to_numpy()
     )
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
@@ -1448,6 +1523,7 @@ def build_event_patch_table(
         ``is_current_patch``, ``is_prev_patch``,
         ``is_last_rewarded_patch``, ``is_last_rewarded_patch_elsewhere``,
         ``cumulative_reward_patch``, ``visit_recency_patch``,
+        ``arm_never_visited_patch``,
         ``switch_x_current_patch``, ``swr_x_current_patch``,
         ``swr_x_last_rewarded_patch_elsewhere``, ``swr_x_prev_patch``.
     """
@@ -1485,13 +1561,16 @@ def build_event_patch_table(
             "cumulative_reward",
             lambda s: s.sum(min_count=1),
         ),
-        "visit_recency_patch": ("visit_recency", "min"),
     }
     # Value aggregates: patch mean over the patch's LEAF arms only (trunk arms
     # 6,7,8 are not reward sites) per the aggregator rule. Mask trunk to NaN so
     # the skipna mean averages the leaves; a patch whose leaves are all NaN
     # (unmapped stop / never-visited) stays NaN and drops at fit time.
-    leaf = eat["arm"] < 6
+    leaf = eat["arm"].isin(WELL_ARMS)
+    # Recency is defined for reachable leaf arms; trunks carry structural zero.
+    # Mask trunks before taking a patch minimum so zero cannot make every patch
+    # appear maximally recent. A patch is novel only if both of its leaf arms
+    # are novel, hence the minimum over leaf novelty indicators.
     for col, out_col in (
         ("reward_rate_arm_k10", "reward_rate_arm_k10_patch"),
         ("p_reward_arm", "p_reward_arm_patch"),
@@ -1501,6 +1580,27 @@ def build_event_patch_table(
             eat[f"_leaf_{col}"] = eat[col].where(leaf)
             agg_spec[out_col] = (f"_leaf_{col}", "mean")
     patch_eat = eat.groupby(["event_id", "patch"]).agg(**agg_spec).reset_index()
+    leaf_history = (
+        eat.loc[leaf]
+        .groupby(["event_id", "patch"])
+        .agg(
+            visit_recency_patch=(
+                "visit_recency",
+                lambda values: values.min(skipna=False),
+            ),
+            arm_never_visited_patch=(
+                "arm_never_visited",
+                lambda values: values.min(skipna=False),
+            ),
+        )
+        .reset_index()
+    )
+    patch_eat = patch_eat.merge(
+        leaf_history,
+        on=["event_id", "patch"],
+        how="left",
+        validate="one_to_one",
+    )
 
     # is_last_rewarded_patch: is the last-rewarded arm in this patch?
     last_rew = event_table[["event_id", "last_rewarded_arm"]].copy()
@@ -1575,17 +1675,32 @@ def build_event_patch_table(
     )
     patch_eat["swr_x_prev_patch"] = is_swr_i * patch_eat["is_prev_patch"].to_numpy()
 
-    # Session keys are required by the patch-level fitter, which groups
-    # by ["animal", "day", "epoch"] before fitting per session. Without
-    # them, ``fit_replay_content_models.py --hierarchy patch`` raises
-    # KeyError before fitting; loading the joined table would otherwise
-    # silently mix events across sessions.
-    session_cols = ["animal", "day", "epoch"]
-    if all(col in event_table.columns for col in session_cols):
+    # Broadcast event-level identity/location so patch analyses can apply the
+    # same explicit at-well/in-transit/mixed cohort filters as arm analyses.
+    # Session keys are also required by the patch fitter's per-session groups.
+    event_context_cols = [
+        column
+        for column in (
+            "animal",
+            "day",
+            "epoch",
+            "location_state",
+            "at_well",
+            "location_well",
+            "location_arm",
+            "physical_arm",
+            "nearest_well_distance_cm_min",
+            "nearest_well_distance_cm_mean",
+            "nearest_well_distance_cm_max",
+        )
+        if column in event_table.columns
+    ]
+    if event_context_cols:
         patch_eat = patch_eat.merge(
-            event_table[["event_id", *session_cols]],
+            event_table[["event_id", *event_context_cols]],
             on="event_id",
             how="left",
+            validate="many_to_one",
         )
 
     return patch_eat
@@ -1607,7 +1722,16 @@ _EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "event_midpoint_time",
     "time_since_stop",
     "time_since_port_entry",
+    "time_since_last_port_entry",
     "time_since_reward",
+    "location_state",
+    "at_well",
+    "location_well",
+    "location_arm",
+    "physical_arm",
+    "nearest_well_distance_cm_min",
+    "nearest_well_distance_cm_mean",
+    "nearest_well_distance_cm_max",
     "is_swr",
     "is_mua",
     "is_after_switch",
@@ -1685,6 +1809,14 @@ _STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "is_after_stay",
     "reward_outcome",
     "is_stay",
+    "location_state",
+    "at_well",
+    "location_well",
+    "location_arm",
+    "physical_arm",
+    "nearest_well_distance_cm_min",
+    "nearest_well_distance_cm_mean",
+    "nearest_well_distance_cm_max",
     "current_arm",
     "prev_arm",
     "next_arm",
@@ -1712,7 +1844,16 @@ _EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
     "event_duration",
     "time_since_stop",
     "time_since_port_entry",
+    "time_since_last_port_entry",
     "time_since_reward",
+    "location_state",
+    "at_well",
+    "location_well",
+    "location_arm",
+    "physical_arm",
+    "nearest_well_distance_cm_min",
+    "nearest_well_distance_cm_mean",
+    "nearest_well_distance_cm_max",
     "is_swr",
     "is_mua",
     "is_after_switch",
@@ -1751,6 +1892,7 @@ _EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
     # Reward / value
     "visit_recency",
     "visit_recency_demeaned",
+    "arm_never_visited",
     "cumulative_reward",
     "reward_rate_arm_k10",
     "p_reward_arm",
@@ -1767,6 +1909,7 @@ _EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
     "swr_x_last_rewarded",
     "swr_x_reward_rate_arm_k10",
     "swr_x_visit_recency_demeaned",
+    "swr_x_arm_never_visited",
     "swr_x_is_last_rewarded_elsewhere",
     "swr_x_arm_uncertainty",
     "mua_x_current",

@@ -84,7 +84,10 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.replay._helpers import immobility_bout_intervals
+from continuum_swr_replay.analysis.replay._helpers import (
+    immobility_bout_intervals,
+    trial_cutoff_times,
+)
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
@@ -453,48 +456,21 @@ def _arm_strip_labels(track_graph, edge_order: list, env) -> list:
     return out
 
 
-def _current_well(track_graph, x: float, y: float) -> int | None:
-    """Nearest reward-well node (degree-1) to a 2D point, or None."""
-    wells = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
-    if not wells:
-        return None
-    pos = {n: track_graph.nodes[n]["pos"] for n in wells}
-    return min(wells, key=lambda n: (pos[n][0] - x) ** 2 + (pos[n][1] - y) ** 2)
-
-
-def _run_into_well(
-    trials: pd.DataFrame, well: int | None, t: float
-) -> pd.Series | None:
-    """The run that delivered the animal to ``well`` (its ``to_well``) by ``t``.
-
-    An immobile event happens while the animal sits at a well; the run to show
-    is the most recent trial whose ``to_well`` is that well and that began by
-    ``t`` (so the displayed path actually ends where the animal now is — not a
-    run it is only part-way through). Falls back to the most recent trial that
-    ended before ``t`` if no ``to_well`` match exists.
-    """
-    if well is not None:
-        match = trials[(trials["to_well"] == well) & (trials["start_time"] <= t)]
-        if len(match):
-            return match.sort_values("start_time").iloc[-1]
-    ended = trials[trials["end_time"] <= t].sort_values("end_time")
-    return ended.iloc[-1] if len(ended) else None
-
-
 def _plot_2d_context(
     ax,
     data: dict,
     center: float,
+    event_start: float,
     window_sec: float,
     arm_of_edge: dict,
     et_row: pd.Series | None = None,
 ) -> pd.Series | None:
-    """2D track with labeled wells/arms, the animal's position, and last run.
+    """2D track, event position, and the last run completed before the event.
 
     Draws the arm-colored track + faint occupancy (shared color map with the
     1D strip), labels each well node and arm with its id, marks the animal's
-    head position during the event window, and highlights the last run's
-    ``from_well`` -> ``to_well``. Returns the trial row used (or None).
+    head position during the event window, and highlights the last run whose
+    outcome was available by ``event_start``. Returns that trial row (or None).
     """
     track_graph = data["track_graph"]
     plot_track_graph_2d(
@@ -587,29 +563,12 @@ def _plot_2d_context(
     pos = data["position_info"]
     win = pos.loc[center - window_sec : center + window_sec]
 
-    # The animal's current well comes from the pipeline-derived ``current_arm``
-    # (modal decoded arm of the animal's physical position; leaf arm w == well
-    # w). Fall back to nearest-well from position only when the pipeline value
-    # is unavailable (swr_not_nonlocal events) or lands on a trunk arm (6-8).
-    cur_well = None
-    if et_row is not None:
-        ca = et_row.get("current_arm")
-        if ca is not None and not (isinstance(ca, float) and np.isnan(ca)):
-            ca = int(ca)
-            if ca in range(6):
-                cur_well = ca
-    if cur_well is None and len(win):
-        cur_well = _current_well(
-            track_graph,
-            float(win["head_position_x"].median()),
-            float(win["head_position_y"].median()),
-        )
-
-    # Actual run trajectory: the animal's real head-position path during the
-    # run that delivered it to its current well (from_well -> cur_well). Use
-    # the run portion [start_time, goal_arrival_time] when available, else the
-    # whole trial interval.
-    trial = _run_into_well(data["trials"], cur_well, center)
+    # Regression-aligned historical path: never substitute the nearest well
+    # for ``current_arm`` and never reveal an in-progress destination/outcome.
+    # The magenta event-position marker below independently shows where the
+    # animal physically was.
+    completed = _completed_trials_at(data["trials"], event_start)
+    trial = completed.iloc[-1] if len(completed) else None
     if trial is not None:
         run_end = trial.get("goal_arrival_time")
         if run_end is None or (isinstance(run_end, float) and np.isnan(run_end)):
@@ -633,8 +592,8 @@ def _plot_2d_context(
                 ],
             )
         fw, tw = int(trial["from_well"]), int(trial["to_well"])
-        # Reward status of the run into the current well (pipeline-derived
-        # trials.is_reward): green = rewarded, red = omission.
+        # This outcome is safe to show because the run was complete by the
+        # event start.
         rewarded = bool(trial.get("is_reward", False))
         rew_color = "limegreen" if rewarded else "red"
         if fw in node_pos:
@@ -674,11 +633,12 @@ def _plot_2d_context(
     if trial is not None:
         rew = "rewarded" if bool(trial.get("is_reward", False)) else "omission"
         ax.set_title(
-            f"run: W{int(trial['from_well'])}→W{int(trial['to_well'])} ({rew})",
+            "last completed run: "
+            f"W{int(trial['from_well'])}→W{int(trial['to_well'])} ({rew})",
             fontsize=7,
         )
     else:
-        ax.set_title("run: W?→W?", fontsize=7)
+        ax.set_title("last completed run: none", fontsize=7)
     return trial
 
 
@@ -748,16 +708,29 @@ def _plot_arm_content_bar(
             )
 
 
+def _completed_trials_at(trials: pd.DataFrame, event_start: float) -> pd.DataFrame:
+    """Return trials whose outcomes were available at ``event_start``."""
+    if trials is None or not len(trials):
+        return pd.DataFrame() if trials is None else trials.copy()
+    completed = trials.copy()
+    completed["_completion_time"] = trial_cutoff_times(completed)
+    return (
+        completed[completed["_completion_time"] <= event_start]
+        .sort_values("_completion_time", kind="stable")
+        .reset_index(drop=True)
+    )
+
+
 def _plot_trial_history(
-    ax, data: dict, center: float, arm_rows: pd.DataFrame, n_trials: int = 20
+    ax, data: dict, event_start: float, arm_rows: pd.DataFrame, n_trials: int = 20
 ) -> None:
     """Trial-by-trial reward history, marked up with the value covariates.
 
     Grid of wells (rows W0-W5) × recent trials (columns, time → right). Each
     trial's ``to_well`` is marked with the TRIAL-level reward (``is_reward`` =
-    any poke in that trial's stay was rewarded): filled green if rewarded,
-    open if an omission — the same trial-level label the regression uses
-    (``reward_outcome``), not the per-poke reward. Current trial ringed magenta.
+    any poke in that trial's stay was rewarded): filled green if rewarded and
+    open if an omission. Only trials completed by the event start are shown,
+    matching the information available to the regression covariates.
 
     Marked up so the value covariates can be read directly:
       - gold band over the **last 10 trials** = the ``cumulative_reward`` window.
@@ -767,7 +740,7 @@ def _plot_trial_history(
         ``vr`` (visit_recency, trials-ago), ``rr`` (reward_rate_arm_k10),
         ``cum`` (cumulative_reward over 10 trials).
     """
-    ax.set_title("trial reward history (regression-level, → event)", fontsize=7)
+    ax.set_title("completed-trial reward history (→ event start)", fontsize=7)
     ax.set_yticks(range(6))
     ax.set_yticklabels([f"W{w}" for w in range(6)], fontsize=5)
     ax.set_ylim(-0.6, 6.2)
@@ -788,11 +761,20 @@ def _plot_trial_history(
             transform=ax.transAxes,
         )
         return
-    trials = trials.sort_values("start_time").reset_index(drop=True)
-    started = trials.index[trials["start_time"] <= center]
-    cur_idx = int(started[-1]) if len(started) else 0
-    lo = max(0, cur_idx - n_trials + 1)
-    window = trials.loc[lo:cur_idx]
+    completed = _completed_trials_at(trials, event_start)
+    if not len(completed):
+        ax.text(
+            0.5,
+            0.5,
+            "no completed trials at event start",
+            fontsize=6,
+            ha="center",
+            va="center",
+            color="gray",
+            transform=ax.transAxes,
+        )
+        return
+    window = completed.tail(n_trials).reset_index(drop=True)
 
     xs = list(range(len(window)))
     wells = [int(w) for w in window["to_well"].to_numpy()]
@@ -821,17 +803,6 @@ def _plot_trial_history(
                 linewidth=1.0,
                 zorder=3,
             )
-    # Current trial (the one containing the event) highlighted in magenta.
-    ax.scatter(
-        xs[-1],
-        wells[-1],
-        s=140,
-        marker="o",
-        facecolor="none",
-        edgecolor="magenta",
-        linewidth=1.6,
-        zorder=4,
-    )
     n = len(window)
 
     # cumulative_reward window: the last 10 trials (gold band).
@@ -933,14 +904,14 @@ def _plot_trial_history(
 def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
     """Per-arm continuous/binary regressors the arm models use (M3-M5).
 
-    A 3×9 strip (rows = ``visit_recency_demeaned``, ``reward_rate_arm_k10``,
-    ``is_last_rewarded_elsewhere``; columns = arms 0-8). Each row is colored
-    on its own scale (these regressors live on different units) with the
-    actual value printed in each cell, so the arm design matrix is visible
-    alongside the content bar above.
+    Rows show ``visit_recency_demeaned``, ``arm_never_visited``,
+    ``reward_rate_arm_k10``, and ``is_last_rewarded_elsewhere``; columns are
+    arms 0-8. Each row is colored on its own scale (these regressors live on
+    different units) with the actual value printed in each cell.
     """
     preds = [
         ("visit_recency_demeaned", "visit_rec"),
+        ("arm_never_visited", "never_vis"),
         ("reward_rate_arm_k10", "rew_rate"),
         ("is_last_rewarded_elsewhere", "lastR_elsw"),
     ]
@@ -1060,17 +1031,18 @@ def _plot_patch_content_bar(
                 )
 
 
-def _current_trial(trials: pd.DataFrame, t: float) -> pd.Series | None:
-    """The trial the regression assigns to time ``t``: latest trial started.
+def _active_trip_at_time(trials: pd.DataFrame, t: float) -> pd.Series | None:
+    """Return the physical trip interval containing ``t``, if any.
 
-    Matches ``_add_trial_context`` (``searchsorted`` on trial start times), so
-    its ``is_reward`` is exactly the event's ``reward_outcome`` covariate.
+    This is a post-hoc visualization of the animal's run/dwell interval. It is
+    deliberately separate from regression context, which includes only trial
+    outcomes completed by the event start.
     """
     if trials is None or not len(trials):
         return None
-    started = trials.sort_values("start_time")
-    started = started[started["start_time"] <= t]
-    return started.iloc[-1] if len(started) else None
+    ordered = trials.sort_values("start_time", kind="stable")
+    active = ordered[(ordered["start_time"] <= t) & (ordered["end_time"] >= t)]
+    return active.iloc[-1] if len(active) else None
 
 
 def _plot_behavioral_context(
@@ -1080,8 +1052,7 @@ def _plot_behavioral_context(
 
     Three lanes vs time-from-event-center:
       - TRIAL: run segment [start→goal_arrival] (solid) + post-arrival dwell
-        [goal_arrival→end] (hatched) — the trial-level "stop" the reward
-        covariates use.
+        [goal_arrival→end] (hatched), shown post hoc as physical context.
       - STOP: the immobility bout containing the event (dark grey) + the
         previous bout (light grey) — the bounded stop unit (time_since_stop).
       - EVENT: the event's true extent, in the non-local (or SWR) color.
@@ -1089,7 +1060,8 @@ def _plot_behavioral_context(
     Showing the trial dwell and the immobility bout together makes the
     degenerate-trial mismatch visible: in a disengagement tail the dwell bar
     spans minutes while the stop bout stays short. The most recent reward pump
-    (green ▼) and the trial-level reward_outcome are annotated.
+    (green ▼) and the active trip's eventual outcome are annotated. The
+    annotation explicitly marks whether that outcome was already known.
     """
     cls = row["category"]
     ev_color = COLORS["SWR"] if cls == "swr_not_nonlocal" else COLORS["Non-Local"]
@@ -1103,8 +1075,9 @@ def _plot_behavioral_context(
     ax.axvline(0, color="black", lw=0.6, zorder=1)
     xs = [0.0]
 
-    trial = _current_trial(data.get("trials"), center)
+    trial = _active_trip_at_time(data.get("trials"), center)
     rewarded = None
+    outcome_known = False
     if trial is not None:
         ga = trial.get("goal_arrival_time")
         if ga is None or (isinstance(ga, float) and np.isnan(ga)):
@@ -1115,6 +1088,9 @@ def _plot_behavioral_context(
             trial["end_time"] - center,
         )
         rewarded = bool(trial.get("is_reward", False))
+        outcome_known = bool(
+            trial_cutoff_times(pd.DataFrame([trial]))[0] <= center
+        )
         ax.barh(lane_trial, gr - rs, left=rs, height=0.5, color="steelblue", zorder=3)
         ax.barh(
             lane_trial,
@@ -1260,8 +1236,9 @@ def _plot_behavioral_context(
             ax2.tick_params(axis="y", labelsize=4.5, colors="0.4")
 
     if rewarded is not None:
+        timing = "known" if outcome_known else "eventual"
         ax.annotate(
-            "REWARDED" if rewarded else "OMISSION",
+            f"{timing} " + ("REWARDED" if rewarded else "OMISSION"),
             (0.99, 0.97),
             xycoords="axes fraction",
             ha="right",
@@ -1322,9 +1299,16 @@ def _plot_decoding_stack(
 
 
 def _arm_set(value) -> str:
-    if value is None or (isinstance(value, float) and np.isnan(value)):
+    if value is None or pd.isna(value):
         return "?"
     return str(int(value)) if not isinstance(value, str) else value
+
+
+def _truth_label(value) -> str:
+    """Format nullable booleans without treating unknown as true."""
+    if value is None or pd.isna(value):
+        return "n/a"
+    return str(bool(value)).lower()
 
 
 def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
@@ -1348,21 +1332,21 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
     if et_row is None:
         return head + "\nNOT in M0-M7 population (failed in-event filter)"
     arms = (
-        f"arms:  current={_arm_set(et_row.get('current_arm'))}"
+        f"arms:  location={_arm_set(et_row.get('current_arm'))}"
         f"  prev={_arm_set(et_row.get('prev_arm'))}"
-        f"  next={_arm_set(et_row.get('next_arm'))}"
+        f"  next(post-hoc)={_arm_set(et_row.get('next_arm'))}"
         f"  last_rew={_arm_set(et_row.get('last_rewarded_arm'))}"
     )
     patch = (
-        f"patch: current={_arm_set(et_row.get('current_patch'))}"
+        f"patch: location={_arm_set(et_row.get('current_patch'))}"
         f"  prev={_arm_set(et_row.get('prev_patch'))}"
-        f"  next={_arm_set(et_row.get('next_patch'))}"
-        f"  is_mua={bool(et_row.get('is_mua'))}"
+        f"  next(post-hoc)={_arm_set(et_row.get('next_patch'))}"
+        f"  is_mua={_truth_label(et_row.get('is_mua'))}"
     )
     ctx = (
-        f"ctx: after_switch={bool(et_row.get('is_after_switch'))}"
-        f" after_reward={bool(et_row.get('is_after_reward'))}"
-        f" after_omission={bool(et_row.get('is_after_omission'))}"
+        f"ctx: after_switch={_truth_label(et_row.get('is_after_switch'))}"
+        f" after_reward={_truth_label(et_row.get('is_after_reward'))}"
+        f" after_omission={_truth_label(et_row.get('is_after_omission'))}"
     )
     tsr = et_row.get("time_since_reward")
     tsr_str = (
@@ -1424,8 +1408,19 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         6, 1, height_ratios=[3.0, 0.95, 1.2, 0.85, 1.2, 1.05], hspace=0.32
     )
     ax_2d = fig.add_subplot(gs_left[0])
+    regression_event_start = (
+        float(et_row["event_start"])
+        if et_row is not None and pd.notna(et_row.get("event_start"))
+        else float(row["plot_start"])
+    )
     _plot_2d_context(
-        ax_2d, ctx["data"], center, WINDOW_SEC, ctx["arm_of_edge"], et_row=et_row
+        ax_2d,
+        ctx["data"],
+        center,
+        regression_event_start,
+        WINDOW_SEC,
+        ctx["arm_of_edge"],
+        et_row=et_row,
     )
     ax_text = fig.add_subplot(gs_left[1])
     ax_text.axis("off")
@@ -1498,7 +1493,9 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
 
     # Bottom: full-width trial reward-history grid, marked up with the
     # value covariates (visit_recency / reward_rate_arm_k10 / cumulative_reward).
-    _plot_trial_history(fig.add_subplot(outer[1]), ctx["data"], center, arm_rows)
+    _plot_trial_history(
+        fig.add_subplot(outer[1]), ctx["data"], regression_event_start, arm_rows
+    )
 
     fig.savefig(out_path)
     plt.close(fig)

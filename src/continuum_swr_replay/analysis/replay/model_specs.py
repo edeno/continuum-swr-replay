@@ -219,12 +219,11 @@ def default_content_model_names(
 
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
-# Mechanism-A: an unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not
-# NaN) so its event is retained. A ``has_arm_history`` novelty indicator was considered
-# but deliberately NOT added (the novel-arm effect is modest, ~13% less replay); the
-# ``reward_rate_arm_k10`` coefficient therefore absorbs that novelty component.
+# An unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not NaN) so its
+# event is retained. M4 adds ``arm_never_visited`` alongside time-local recency,
+# separating novelty from an observed zero reward rate while preserving nesting.
 _M3 = (*_M2, "reward_rate_arm_k10")
-_M4 = (*_M3, "visit_recency_demeaned")
+_M4 = (*_M3, "visit_recency_demeaned", "arm_never_visited")
 _M5 = (*_M4, "is_last_rewarded_elsewhere")
 _M6 = (*_M5, "swr_x_current", "swr_x_prev")
 _M7 = (
@@ -292,7 +291,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M4": ModelSpec(
         name="M4",
         predictors=_M4,
-        description="+ visit recency (within-arm demeaned)",
+        description="+ visit recency (centered across leaf arms within event)",
         parent="M3",
     ),
     "M5": ModelSpec(
@@ -908,6 +907,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 
 _CHOICE_BEHAVIOR = (
     "visit_recency",
+    "arm_never_visited",
     "cumulative_reward",
     "reward_rate_arm_k10",
     "arm_dist_rank",  # ranked choice-set distance (identifiable; replaces the
@@ -1041,7 +1041,14 @@ SWR_CONTRAST_RATE_S_SPECS = _s_specs()
 # --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
 # name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)
 ARMFE = [f"arm_fe_{a}" for a in range(8)]
-BASEc = [*ARMFE, "is_current", "is_prev", "visit_recency_demeaned", "arm_dist_rank"]
+BASEc = [
+    *ARMFE,
+    "is_current",
+    "is_prev",
+    "visit_recency_demeaned",
+    "arm_never_visited",
+    "arm_dist_rank",
+]
 _TSC = "tsc_x_current"
 SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C0_armfe": (ARMFE, "split"),
@@ -1126,7 +1133,12 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C13_armuncert": "arm_uncertainty_z",
     "CS6_armuncert": "swr_x_arm_uncertainty_z",
 }
-BASEc_PATCH = ["is_current_patch", "is_prev_patch", "visit_recency_patch"]
+BASEc_PATCH = [
+    "is_current_patch",
+    "is_prev_patch",
+    "visit_recency_patch",
+    "arm_never_visited_patch",
+]
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"
 SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP0_base": (BASEc_PATCH, "split"),

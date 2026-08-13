@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.replay.simulation import (
     simulate_full_pipeline,
     simulate_hard_vs_soft_counts,
     simulate_posterior_bumps,
+    simulate_with_event_covariates,
 )
 
 
@@ -107,6 +108,35 @@ class TestContinuousPredictor:
         fit = _recover(beta, n_events=500, L_e=30, seed=5)
         z = _zscore(fit, "visit_recency", -0.15)
         assert abs(z) < 3, f"visit_recency z={z:.2f}"
+
+    def test_novelty_is_coherent_with_recency_and_swr_interaction(self):
+        df = simulate_with_event_covariates(
+            {
+                "visit_recency": 0.0,
+                "arm_never_visited": 0.0,
+                "swr_x_arm_never_visited": 0.0,
+            },
+            n_events=40,
+            seed=17,
+        )
+        assert df["arm_never_visited"].eq(1.0).any()
+        assert df["arm_never_visited"].eq(0.0).any()
+        for _, event in df.groupby("event_id"):
+            event = event.set_index("arm_id")
+            np.testing.assert_array_equal(
+                event.loc[[6, 7, 8], "arm_never_visited"], 0.0
+            )
+            novelty = event.loc[range(6), "arm_never_visited"]
+            assert novelty.isin([0.0, 1.0]).all()
+            if novelty.eq(1.0).any() and novelty.eq(0.0).any():
+                assert (
+                    event.loc[novelty.index[novelty.eq(1.0)], "visit_recency"].min()
+                    > event.loc[novelty.index[novelty.eq(0.0)], "visit_recency"].max()
+                )
+        np.testing.assert_array_equal(
+            df["swr_x_arm_never_visited"],
+            df["is_swr"] * df["arm_never_visited"],
+        )
 
 
 class TestFractionalResponse:

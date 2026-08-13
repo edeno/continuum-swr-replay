@@ -178,17 +178,21 @@ class TestTrialRail:
             }
         )
 
-    def test_destination_switch_uses_production_trial_start_time(self):
-        """The rail follows ``add_trial_context`` current-trip semantics."""
+    def test_dwell_rail_is_blank_during_transit_and_updates_at_arrival(self):
+        """Well location is visible only after each trip completes."""
         fig, ax = plt.subplots()
         _plot_trial_rail(ax, _ctx_with_trials(self._timed_trials(), (0.0, 20.0)))
 
-        (rail,) = [line for line in ax.lines if line.get_color() == "#333333"]
-        vertices = np.asarray(rail.get_path().vertices, dtype=float)
-        vertical = np.diff(vertices[:, 1]) != 0
-        switch_times = vertices[1:, 0][vertical]
-
-        assert switch_times == pytest.approx([10.0])
+        rails = [line for line in ax.lines if line.get_color() == "#333333"]
+        assert len(rails) == 2
+        segments = [
+            (
+                np.asarray(line.get_xdata(), dtype=float).tolist(),
+                np.asarray(line.get_ydata(), dtype=float).tolist(),
+            )
+            for line in rails
+        ]
+        assert segments == [([6.0, 10.0], [1.0, 1.0]), ([18.0, 20.0], [3.0, 3.0])]
         plt.close(fig)
 
     def test_reward_star_uses_goal_arrival_with_end_time_fallback(self):
@@ -212,14 +216,14 @@ class TestTrialRail:
         )
         plt.close(fig)
 
-    def test_patch_switch_tick_uses_trial_start_time(self):
+    def test_patch_switch_tick_uses_trip_completion_time(self):
         fig, ax = plt.subplots()
         _plot_trial_rail(ax, _ctx_with_trials(self._timed_trials(), (0.0, 20.0)))
 
         ticks = [line for line in ax.lines if line.get_color() == "#9467bd"]
         assert len(ticks) == 1
         assert np.asarray(ticks[0].get_xdata(), dtype=float) == pytest.approx(
-            [10.0, 10.0]
+            [18.0, 18.0]
         )
         plt.close(fig)
 

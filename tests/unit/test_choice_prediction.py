@@ -59,6 +59,8 @@ def _make_minimal_tables(
                 "epoch": "02_r1",
                 "has_replay": True,
                 "n_events": 1,
+                "location_state": "at_well" if pd.notna(s["current_arm"]) else "unknown",
+                "at_well": pd.notna(s["current_arm"]),
                 "reward_outcome": 0,
                 "is_after_reward": False,
                 "is_after_omission": False,
@@ -91,6 +93,7 @@ def _make_minimal_tables(
                     "is_prev": 0.0,
                     "is_next": 0.0,
                     "visit_recency": 0.0,
+                    "arm_never_visited": float(arm in {2, 4}),
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
                     "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
@@ -105,6 +108,26 @@ def _make_minimal_tables(
 
 
 class TestBuildChoiceDataset:
+    def test_filters_explicit_non_well_stop_even_with_leaf_current_arm(self):
+        """Location state, not a coincidental arm value, defines the cohort."""
+        et, eat, st = _make_minimal_tables(
+            [
+                {"stop_id": 1, "current_arm": 0, "next_arm": 3},
+                {
+                    "stop_id": 2,
+                    "current_arm": 5,
+                    "next_arm": 2,
+                    "location_state": "in_transit",
+                    "at_well": False,
+                },
+            ]
+        )
+
+        ds = build_choice_dataset(et, eat, st)
+
+        assert ds["stop_id"].unique().tolist() == [1]
+        assert ds["at_well"].eq(True).all()
+
     def test_drops_stops_with_nan_current_arm(self):
         """arm != NaN is True for every arm in IEEE 754, so the
         ``choice_df[choice_df['arm'] != choice_df['current_arm']]``
@@ -234,6 +257,7 @@ class TestBuildChoiceDataset:
                 "is_prev": 0.0,
                 "is_next": 0.0,
                 "visit_recency": 0.0,
+                "arm_never_visited": float(arm in {2, 4}),
                 "cumulative_reward": 0.0,
                 "reward_rate_arm_k10": 0.0,
                 "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
@@ -287,6 +311,7 @@ class TestBuildChoiceDataset:
                 "is_prev": 0.0,
                 "is_next": 0.0,
                 "visit_recency": 0.0,
+                "arm_never_visited": float(arm in {2, 4}),
                 "cumulative_reward": 0.0,
                 "reward_rate_arm_k10": 0.0,
                 "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
@@ -311,6 +336,16 @@ class TestBuildChoiceDataset:
         # Other arms (no NaN) should still be finite.
         arm1 = ds.loc[ds["arm"] == 1, "replay_frac"].iloc[0]
         assert not np.isnan(arm1)
+
+    def test_never_visited_indicator_is_carried_into_choice_rows(self):
+        et, eat, st = _make_minimal_tables(
+            [{"stop_id": 1, "current_arm": 0, "next_arm": 3}]
+        )
+        ds = build_choice_dataset(et, eat, st).set_index("arm")
+        np.testing.assert_array_equal(
+            ds.loc[[1, 2, 3, 4, 5], "arm_never_visited"].to_numpy(),
+            [0.0, 1.0, 0.0, 1.0, 0.0],
+        )
 
 
 # ── predict_arm_fractions ──

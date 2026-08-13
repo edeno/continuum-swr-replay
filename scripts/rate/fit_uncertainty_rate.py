@@ -12,6 +12,9 @@ Per session: load ``stop_table``; add ``recent_switch_rate``
 behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
 poke_out-aligned source -- no difflib CSV); drop the first (exposure) session per
 animal; attach the canonical ``is_swr`` to the onsets.
+Because the fitted block contains current-trip RPE/value updates, retain only
+physical response bins whose left edge is at or after ``outcome_known_time``
+(reward-on for rewarded trials; conservatively poke-out for omissions).
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
 fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
@@ -42,6 +45,7 @@ import logging  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
@@ -62,6 +66,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
     stop_own_missing,
     write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
+    assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
@@ -130,6 +137,13 @@ FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATE
 # null and is not fit here).
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
+OUTCOME_TIME_SEMANTICS = (
+    "reward_on_ts for rewarded trials; poke_out_ts for omissions"
+)
+POST_OUTCOME_GATE_RULE = (
+    "stop_start + binj * BIN_S >= outcome_known_time"
+)
+
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
 # shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
 # reward_rate is OFF: reward_rate_trial_k10 (the reward_rate covariate) is exactly the mean of
@@ -174,6 +188,55 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     return stop_table.merge(keep, on=SESSION_COLS)
 
 
+def _gate_bins_after_outcome(
+    design: pd.DataFrame,
+    *,
+    bin_s: float = BIN_S,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Keep bins whose physical left edge is at/after the current outcome.
+
+    ``binj`` is zero-based, so a bin's physical observation time is
+    ``stop_start + binj * bin_s``. Equality is eligible: information known at
+    the boundary can be associated with responses beginning at that boundary.
+    Non-finite timing rows are counted separately and never pass the gate.
+    """
+    required = ("stop_id", "stop_start", "binj", "outcome_known_time")
+    missing = [column for column in required if column not in design.columns]
+    if missing:
+        raise KeyError(
+            "Post-outcome uncertainty-rate gating requires physical timing "
+            f"column(s): {missing}. Regenerate qvals_table.pkl and stop_table.pkl."
+        )
+
+    timing = design.groupby("stop_id", sort=False)[
+        ["stop_start", "outcome_known_time"]
+    ]
+    inconsistent = timing.nunique(dropna=False).gt(1).any(axis=1)
+    if inconsistent.any():
+        bad_ids = tuple(inconsistent[inconsistent].index)
+        raise ValueError(
+            "Post-outcome uncertainty-rate gating requires stop_start and "
+            "outcome_known_time to be constant within stop_id; invalid stop_id(s): "
+            f"{bad_ids}"
+        )
+
+    output = design.copy()
+    stop_start = output["stop_start"].to_numpy(dtype=float)
+    binj = output["binj"].to_numpy(dtype=float)
+    boundary = output["outcome_known_time"].to_numpy(dtype=float)
+    response_time = stop_start + binj * float(bin_s)
+    finite = np.isfinite(response_time) & np.isfinite(boundary)
+    eligible = finite & (response_time >= boundary)
+    output["response_time"] = response_time
+    audit = {
+        "n_bins_before_post_outcome_gate": int(len(output)),
+        "n_bins_after_post_outcome_gate": int(eligible.sum()),
+        "n_bins_excluded_missing_timing": int((~finite).sum()),
+        "n_bins_excluded_pre_outcome": int((finite & ~eligible).sum()),
+    }
+    return output.loc[eligible].reset_index(drop=True), audit
+
+
 def fit_uncertainty_rate(
     stop_table: pd.DataFrame,
     onsets: pd.DataFrame,
@@ -183,10 +246,17 @@ def fit_uncertainty_rate(
     ``stop_table`` must already carry the uncertainty + value covariates and the
     reward lags; ``onsets`` must already carry ``is_swr``.
     """
+    assert_predictor_timing(FITTED_COVARIATES, retrospective=True)
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
-    stop_covariates = (*STOP_COVARIATES, *FITTED_COVARIATES)
+    stop_covariates = (
+        *STOP_COVARIATES,
+        *FITTED_COVARIATES,
+        "stop_start",
+        "outcome_known_time",
+    )
 
     rows: list[dict] = []
+    gate_audit_rows: list[dict] = []
     attempted = dict.fromkeys(POPULATIONS_TO_FIT, 0)
     n_unfit = dict.fromkeys(POPULATIONS_TO_FIT, 0)
     for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
@@ -205,6 +275,17 @@ def fit_uncertainty_rate(
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,
             )
+            design, gate_audit = _gate_bins_after_outcome(design)
+            gate_audit_rows.append(
+                {
+                    **dict(zip(SESSION_COLS, keys, strict=True)),
+                    "outcome": outcome,
+                    "post_outcome_gate": True,
+                    "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
+                    "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
+                    **gate_audit,
+                }
+            )
             fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
             if fit is None:
                 n_unfit[outcome] += 1
@@ -214,6 +295,10 @@ def fit_uncertainty_rate(
                 {
                     "outcome": outcome,
                     "model": MU_UNCERTAINTY.name,
+                    "post_outcome_gate": True,
+                    "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
+                    "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
+                    **gate_audit,
                     **dict(zip(SESSION_COLS, keys, strict=True)),
                     **{k: v for k, v in fit.items() if k != "predicted"},
                 }
@@ -227,7 +312,9 @@ def fit_uncertainty_rate(
             (logger.warning if frac > 0.2 else logger.info)(
                 "population %s: %d/%d session cells unfit (%.0f%%)", outcome, bad, att, 100 * frac
             )
-    return pd.DataFrame(rows)
+    result = pd.DataFrame(rows)
+    result.attrs["post_outcome_gate_audit"] = gate_audit_rows
+    return result
 
 
 def _cohort_records(
@@ -264,7 +351,8 @@ def _cohort_records(
             animals_modeled=len({k[0] for k in fit_keys}),
             drop_notes=(
                 "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                "stop-level predictor -> own; first-session/subset/gates -> excluded"
+                "stop-level predictor -> own; first-session/subset/physical "
+                "post-outcome bin gate -> excluded"
             ),
             n_drop_qvals_gap=int(qvals_gap),
             n_drop_own_predictor_missing=n_own,
@@ -309,7 +397,9 @@ def main() -> None:
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
     qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    qcols = qvals[["stop_id", *VALUE_COVARIATES, "rpe", *RL_COVARIATES]].rename(
+    qcols = qvals[
+        ["stop_id", "outcome_known_time", *VALUE_COVARIATES, "rpe", *RL_COVARIATES]
+    ].rename(
         columns={"rpe": "rpe_model"}
     )
     n_before = len(stop)
@@ -356,19 +446,24 @@ def main() -> None:
         args.switch_window,
     )
     models = fit_uncertainty_rate(stop, onsets)
+    gate_audit = pd.DataFrame(models.attrs["post_outcome_gate_audit"])
 
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     fname = (
         "uncertainty_rate_smoke.pkl" if args.max_per_animal else "uncertainty_rate.pkl"
     )
+    csfx = "_smoke" if args.max_per_animal else ""
     out = out_dir / fname
     models.to_pickle(out)
+    gate_audit.to_csv(
+        out_dir / f"uncertainty_rate_post_outcome_gate_audit{csfx}.csv",
+        index=False,
+    )
 
     # Cohort audit (stop grain). The inner qvals join is the mechanism-B qvals-gap;
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
     # first-session-per-animal drop, subset, and per-bin gates -> excluded.
-    csfx = "_smoke" if args.max_per_animal else ""
     audit_qvals = 0 if args.max_per_animal else (n_before - n_postjoin)  # smoke: N/A
     audit_records = _cohort_records(
         models, stop, n_postjoin=n_postjoin,

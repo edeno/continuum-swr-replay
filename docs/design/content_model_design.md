@@ -126,11 +126,11 @@ CPS3 + is_swr:(is_last_rewarded_patch:trials_since_switch)   # is the old-patch 
   forward-bias are DROPPED (see patch ladder). C3/C4 earn a place ONLY to test
   whether they survive the autocorrelation controls (is_current + is_prev +
   visit_recency) AND are is_swr-specific in a way autocorrelation can't produce.
-- **`is_current` is a modal-over-event summary** (`tables.py`: modal
-  `track_segment_id`, trunk→`current_well` fallback), not a per-timebin state.
-  `X:is_current` interactions on switch-straddling events (esp. `C10`) are
-  boundary-noisy exactly where the effect concentrates — report the fallback-path
-  fraction near `trials_since_switch≈0`, or window those events out.
+- **`is_current` uses strict whole-window at-well context**: `current_arm` is
+  `location_arm` only when every event bin is at the same well; transit, mixed,
+  and unknown events have no current arm. `physical_arm` separately preserves
+  the modal observed segment. Report the explicit location-state composition and
+  use an at-well sensitivity cohort for any `X:is_current` interpretation.
 - **Multi-df terms need JOINT tests, not per-coefficient reporting:** `PERISWITCH`
   (3 df; C10) and any spline interaction → report a joint LR test + fitted curves
   (predicted content vs `trials_since_switch`), never signed-rank on one loading.

@@ -119,9 +119,21 @@ def main() -> int:
         m = pd.notna(ea[base]) & pd.notna(ea[inter])
         check("A", f"{inter} == is_swr * {base}",
               np.abs(x[m] - sw[m] * b[m]).max() < 1e-9, "")
-    vrd = ea.groupby("arm")["visit_recency_demeaned"].mean()
-    check("H", "visit_recency_demeaned within-arm mean ~ 0", vrd.abs().max() < 1e-6,
-          f"max|per-arm mean|={vrd.abs().max():.2e}")
+    leaves = ea.loc[ea["arm"].isin(range(6))]
+    leaf_event_mean = leaves.groupby("event_id")["visit_recency_demeaned"].mean()
+    trunks = ea.loc[~ea["arm"].isin(range(6)), "visit_recency_demeaned"]
+    centered = (
+        leaf_event_mean.dropna().abs().max()
+        if leaf_event_mean.notna().any()
+        else 0.0
+    )
+    trunks_zero = trunks.dropna().eq(0).all()
+    check(
+        "H",
+        "visit_recency_demeaned leaf mean ~ 0 within event; trunks = 0",
+        centered < 1e-6 and trunks_zero,
+        f"max|event leaf mean|={centered:.2e}; trunks_zero={trunks_zero}",
+    )
     check("H", "visit_recency >= 0", np.nanmin(ea["visit_recency"]) >= 0, "")
     check("H", "cumulative_reward >= 0", np.nanmin(ea["cumulative_reward"]) >= 0, "")
     adr = ea.groupby("event_id")["arm_dist_rank"].apply(list)

@@ -29,6 +29,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay.retrospective import (
     arm_path_well_to_well,
+    at_well_event_cohort,
     chosen_arm_fraction,
     chosen_arm_fraction_prev,
     chosen_patch_fraction,
@@ -94,6 +95,7 @@ def _make_event_table(events: list[dict]) -> pd.DataFrame:
         "day": 1,
         "epoch": "01_r1",
         "event_midpoint_time": np.nan,
+        "at_well": True,
     }.items():
         if col not in df.columns:
             df[col] = default
@@ -299,6 +301,20 @@ class TestContainsPathToNext:
         es = _make_event_sequence_table({1: [0, 6, 2]})
         out = contains_path_to_next(ev, es).set_index("event_id")
         assert bool(out.loc[1, "contains_path_to_next"]) is False
+
+    def test_set_membership_does_not_require_order_or_continuity(self):
+        """Coverage is deliberately a set metric, not a trajectory metric."""
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 0, "next_arm": 2}]
+        )
+        # Required set is {0, 2, 6, 7}.  It appears out of route order,
+        # interleaved with unrelated arms, and with duplicates.  All of those
+        # details are intentionally irrelevant to path-arm set coverage.
+        es = _make_event_sequence_table({1: [7, 4, 0, 7, 8, 2, 6, 4]})
+
+        out = contains_path_to_next(ev, es).set_index("event_id")
+
+        assert bool(out.loc[1, "contains_path_to_next"]) is True
 
     def test_same_patch_path_short(self):
         ev = _make_event_table(
@@ -535,6 +551,53 @@ class TestComputeRetrospectiveMetrics:
 
 
 class TestRetrospectiveAlignmentWithShuffle:
+    def test_rejects_legacy_location_schema(self):
+        ev = _make_event_table(
+            [{"event_id": 1, "current_arm": 0, "next_arm": 1}]
+        ).drop(columns="at_well")
+        ea = _make_event_arm_table({1: [1.0] + [0.0] * 8})
+        es = _make_event_sequence_table({1: [0, 1]})
+        with pytest.raises(KeyError, match="regenerate event tables"):
+            at_well_event_cohort(ev, ea, es)
+
+    def test_rejects_singleton_after_explicit_at_well_cohort(self):
+        ev = _make_event_table(
+            [
+                {
+                    "event_id": 1,
+                    "current_arm": 0,
+                    "next_arm": 1,
+                    "next_patch": 1,
+                    "at_well": True,
+                },
+                {
+                    "event_id": 2,
+                    "current_arm": np.nan,
+                    "next_arm": 2,
+                    "next_patch": 2,
+                    "at_well": False,
+                },
+            ]
+        )
+        ea = _make_event_arm_table(
+            {1: [0.1, 0.9, 0, 0, 0, 0, 0, 0, 0], 2: [0, 0, 1, 0, 0, 0, 0, 0, 0]}
+        )
+        es = _make_event_sequence_table({1: [0, 1], 2: [2]})
+
+        ev_at, ea_at, es_at = at_well_event_cohort(ev, ea, es)
+        assert ev_at["event_id"].tolist() == [1]
+        assert set(ea_at["event_id"]) == {1}
+        assert set(es_at["event_id"]) == {1}
+
+        with pytest.raises(ValueError, match="at least two events.*retained 1"):
+            retrospective_alignment_with_shuffle(
+                ev,
+                ea,
+                es,
+                n_shuffles=1,
+                rng=np.random.default_rng(0),
+            )
+
     def test_shuffle_destroys_alignment_on_aligned_data(self):
         rng = np.random.default_rng(0)
         # Build a session where chosen_arm_fraction is reliably 0.6 on the

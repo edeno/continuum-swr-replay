@@ -167,22 +167,12 @@ def test_swr_interactions_follow_the_is_swr_flag(audit_session):
 # ── Failing regressions: confirmed covariate-timing defects ──
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "AUDIT 2026-08-08: visit_recency_all_events fills never-visited arms "
-        "with len(trials)+1, the session's TOTAL trial count, which is not "
-        "knowable at event time. Fill rows are 4.78% of leaf rows but carry "
-        "57.5% of visit_recency_demeaned's sum of squares."
-    ),
-)
 def test_visit_recency_does_not_depend_on_future_trials():
     """A covariate at time t must not change when later trials are appended.
 
-    This is the defining property of a backward-looking covariate, and it is
-    the cleanest statement of the defect: the never-visited fill is
-    ``len(trials) + 1``, so simply running the session longer retroactively
-    changes the value assigned to an event that already happened.
+    This is the defining property of a backward-looking covariate. The
+    never-visited fill must use the number of trials completed at the event,
+    not the eventual session length.
     """
 
     def _trials(n: int) -> pd.DataFrame:
@@ -209,16 +199,6 @@ def test_visit_recency_does_not_depend_on_future_trials():
     np.testing.assert_array_equal(short[:, 2], long[:, 2])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "AUDIT 2026-08-08: add_trial_context indexes trial context by "
-        "trial start_time (departure), so during the run — before "
-        "goal_arrival_time — is_after_switch/reward_outcome encode the "
-        "in-progress trip's outcome. ~24-30% of stop rows and ~55% of "
-        "is_after_switch==1 rows are such transit rows."
-    ),
-)
 def test_trial_context_is_not_taken_from_the_in_progress_trip():
     """Context during a run must not describe the run's own outcome.
 

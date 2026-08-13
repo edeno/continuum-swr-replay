@@ -1,11 +1,18 @@
 # `current_arm` can name an arm the animal has not reached yet
 
-**Status:** confirmed defect, measured, not fixed
+**Status:** fixed in `event-location-context-cohorts`; regeneration pending
 **Found:** 2026-08-10, following the replay-tables review
 **Severity:** negligible pooled (0.93 % of events); material per-animal for wilbur
 (3.9 %) and disqualifying for one session (`wilbur20210329_16_r8`, 40.8 %)
 
 ## What
+
+The text and measurements below describe the pre-fix artifacts. The canonical
+builders now label the complete event/bout window as `at_well`, `in_transit`,
+`mixed`, or `unknown`, preserve the modal observed segment as `physical_arm`,
+and set `current_arm = location_arm` only for a window wholly at one well.
+In-progress trips no longer expose their destination or outcome through past
+context. Existing pickles retain the old values until regeneration.
 
 `build_event_table` sets `current_arm` to the modal `track_segment_id` during the
 event — but only when that segment touches a well. Trunk arms (6/7/8) connect two
@@ -83,19 +90,25 @@ value-block join (one of the eight "rat quit early" sessions). Both flags share 
 cause: **behavioral engagement ended before the recording did, while the event
 pipeline kept producing events.**
 
-## What to do
+## Resolution
+
+- Trial history now advances at `goal_arrival_time` (with the established
+  per-row `end_time` fallback), not departure.
+- Exact arrival is at-well; exact departure is in-transit.
+- No eligible event is dropped by default. Location columns make a later
+  well-only sensitivity cohort explicit and auditable.
+- `current_arm` is NaN for transit/mixed/unknown windows instead of guessing a
+  destination leaf; `physical_arm` remains available for topology and QC.
+
+## Guidance for legacy artifacts
 
 - **Pooled estimates are safe.** 0.93 % of events with a mislabelled `is_current`
   cannot move an effect of the size `is_current` carries.
 - **Sensitivity-check wilbur** if per-animal estimates are quoted.
 - **Exclude `wilbur20210329_16_r8`** from per-session analyses, or report it with
   the caveat. It is compromised from two independent directions.
-- **The real fix** is the same one C1 needs: index trial context by *arrival*, not
-  departure, so a trip in progress does not contribute its own destination. Until
-  then, an event whose modal segment is a trunk arm should arguably carry
-  `current_arm = NaN` rather than a guess.
-- Deciding the **well-versus-transit event scope** would remove the issue by
-  construction: restricting the event population to well stops drops all 616.
+- Regenerate canonical tables before using the new location labels or recency
+  semantics. Until then, retain the legacy sensitivity cautions above.
 
 ## Reproducing
 

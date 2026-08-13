@@ -122,8 +122,7 @@ def _build_dot(
     dot.loc[rows, "SWR_event"] = event_id
     dot.loc[rows, "head_speed"] = 1.0  # immobile
     dot.loc[rows, "map_estimate"] = bin_order
-    # ``track_segment_id`` is the modal-position fallback for
-    # current_arm; setting it to a leaf arm keeps current_arm finite.
+    # ``track_segment_id`` supplies the independent physical-arm diagnostic.
     arm_with_most_bins = max(leaf_bins, key=leaf_bins.get) if leaf_bins else 0
     dot.loc[rows, "track_segment_id"] = float(arm_with_most_bins)
     return dot
@@ -187,3 +186,62 @@ class TestContfragArmFractionDenominator:
             "every-junction event should propagate NaN arm_fraction; "
             f"got {eat['arm_fraction'].tolist()}."
         )
+
+    def test_novelty_column_and_swr_interaction_follow_completed_visits(
+        self, env, graph
+    ):
+        dot = _build_dot({0: 3, 1: 2}, junction_bins=0)
+        trials = pd.DataFrame(
+            {
+                "start_time": [-1.0],
+                "goal_arrival_time": [-0.5],
+                "end_time": [-0.4],
+                "from_well": [1],
+                "to_well": [0],
+                "from_patch": [1],
+                "to_patch": [1],
+                "is_reward": [True],
+                "is_patch_change": [False],
+            }
+        )
+        ev = build_contfrag_event_table(
+            dot, env, trials, graph, event_source="SWR"
+        )
+        eat = build_contfrag_event_arm_table(
+            ev, dot, env, trials, graph, event_source="SWR"
+        ).set_index("arm")
+
+        expected = np.array([0, 1, 1, 1, 1, 1, 0, 0, 0], dtype=float)
+        np.testing.assert_array_equal(eat.loc[range(9), "arm_never_visited"], expected)
+        np.testing.assert_array_equal(
+            eat.loc[range(9), "swr_x_arm_never_visited"], expected
+        )
+
+    def test_history_is_frozen_at_event_start_when_event_crosses_arrival(
+        self, env, graph
+    ):
+        dot = _build_dot({0: 3, 1: 2}, junction_bins=0)
+        trials = pd.DataFrame(
+            {
+                "start_time": [-1.0],
+                # Event spans 0.05--0.09 and has midpoint 0.07. The arrival
+                # would leak into history under the retired midpoint cutoff.
+                "goal_arrival_time": [0.07],
+                "end_time": [0.10],
+                "from_well": [1],
+                "to_well": [0],
+                "from_patch": [1],
+                "to_patch": [1],
+                "is_reward": [True],
+                "is_patch_change": [False],
+            }
+        )
+
+        ev = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
+        assert ev.iloc[0]["location_state"] == "mixed"
+        eat = build_contfrag_event_arm_table(
+            ev, dot, env, trials, graph, event_source="SWR"
+        )
+
+        assert eat["visit_recency"].isna().all()
+        assert eat["arm_never_visited"].isna().all()

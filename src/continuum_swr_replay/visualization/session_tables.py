@@ -449,18 +449,13 @@ def _plot_speed(ax: Axes, ctx: _PanelContext) -> None:
 
 
 def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
-    """Production-aligned behavioral destination and outcome timing.
+    """Production-aligned behavioral location and completed-trip context.
 
-    The step rail follows :func:`trial_context_at_times`: ``to_well`` changes
-    at ``start_time`` because that is when the production context changes to
-    the new current trip. Purple switch ticks use that same start time.
-    Reward stars instead use :func:`trial_cutoff_times` — goal arrival when
-    available, with the production ``end_time`` fallback — because that is
-    when reward and visit-history covariates update.
-
-    Keeping the two clocks explicit prevents a common but consequential visual
-    error: delaying current-trip context and reward history together until the
-    interval end even though the production builders do neither.
+    Dark horizontal segments show dwell intervals at a well. Light shading
+    marks ``[start_time, goal_arrival_time)`` transit intervals, during which
+    destination and outcome are not exposed as current context. Reward stars
+    and purple patch-switch ticks occur at the completion cutoff (goal arrival,
+    with the established per-row ``end_time`` fallback).
     """
     trials = ctx.trials
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
@@ -486,7 +481,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             va="center",
             color="grey",
         )
-        ax.set_ylabel("current trip\nto well")
+        ax.set_ylabel("behavioral\nlocation")
         ax.set_ylim(-0.5, 5.5)
         return
 
@@ -497,13 +492,47 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             "trials.start_time must be finite and chronologically sortable"
         )
 
-    initial_well = float(
-        trial_context_at_times(np.array([lo]), ordered)["current_well"].iloc[0]
-    )
-    transition_mask = (start_times > lo) & (start_times <= hi)
-    transitions = ordered.loc[transition_mask]
-    if not np.isfinite(initial_well) and len(transitions) == 0:
-        # Before the first trial there is no production current-trip context.
+    # Validate using the same helper as the canonical table builders.
+    trial_context_at_times(np.array([lo]), ordered)
+    completion_times = trial_cutoff_times(ordered)
+    if not np.isfinite(completion_times).all():
+        raise ValueError("canonical trial cutoff times must be finite")
+
+    drew_interval = False
+    for trial_idx, row in ordered.iterrows():
+        transit_start = max(float(row["start_time"]), lo)
+        transit_end = min(float(completion_times[trial_idx]), hi)
+        if transit_end > transit_start:
+            ax.axvspan(
+                transit_start,
+                transit_end,
+                color="#bdbdbd",
+                alpha=0.22,
+                linewidth=0,
+                zorder=0,
+            )
+            drew_interval = True
+
+        next_start = (
+            float(start_times[trial_idx + 1])
+            if trial_idx + 1 < len(ordered)
+            else hi
+        )
+        dwell_start = max(float(completion_times[trial_idx]), lo)
+        dwell_end = min(next_start, hi)
+        if dwell_end > dwell_start:
+            well = float(row["to_well"])
+            ax.plot(
+                [dwell_start, dwell_end],
+                [well, well],
+                color="#333333",
+                linewidth=1.2,
+                solid_capstyle="butt",
+                clip_on=False,
+            )
+            drew_interval = True
+
+    if not drew_interval:
         ax.text(
             0.5,
             0.5,
@@ -513,44 +542,13 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             va="center",
             color="grey",
         )
-        ax.set_ylabel("current trip\nto well")
+        ax.set_ylabel("behavioral\nlocation")
         ax.set_ylim(-0.5, 5.5)
         return
 
-    transition_times = transitions["start_time"].to_numpy(dtype=float)
-    transition_wells = transitions["to_well"].to_numpy(dtype=float)
-    if np.isfinite(initial_well):
-        rail_times = np.concatenate(([lo], transition_times, [hi]))
-        rail_wells = np.concatenate(
-            (
-                [initial_well],
-                transition_wells,
-                [transition_wells[-1] if len(transitions) else initial_well],
-            )
-        )
-    else:
-        # Begin at the first observed trip start; leave pre-first-trial time
-        # blank instead of inventing a destination.
-        rail_times = np.concatenate((transition_times, [hi]))
-        rail_wells = np.concatenate((transition_wells, [transition_wells[-1]]))
-
-    # Step-post: (t0, y0) → (t1, y0) → (t1, y1) → ...
-    # Explicit anchors retain the production current trip through inter-trip
-    # gaps until the next start-time transition.
-    ax.plot(
-        rail_times,
-        rail_wells,
-        drawstyle="steps-post",
-        color="#333333",
-        linewidth=1.2,
-        clip_on=False,
-    )
-
     # Reward markers use the same arrival cutoffs as last-rewarded, recency,
     # cumulative-reward, and recent-reward-rate production covariates.
-    reward_times = trial_cutoff_times(ordered)
-    if not np.isfinite(reward_times).all():
-        raise ValueError("canonical trial cutoff times must be finite")
+    reward_times = completion_times
     reward_mask = (
         ordered["is_reward"].to_numpy(dtype=bool)
         & (reward_times >= lo)
@@ -569,22 +567,21 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             clip_on=False,
         )
 
-    # Patch-change markers — purple ticks (deliberately NOT the SWR
-    # orange, which would collide with SWR shading in panels 1–2).
+    # Patch-change outcome becomes past context at trip completion.
     switch_mask = (
         ordered["is_patch_change"].to_numpy(dtype=bool)
-        & (start_times >= lo)
-        & (start_times <= hi)
+        & (completion_times >= lo)
+        & (completion_times <= hi)
     )
     if switch_mask.any():
-        for t in start_times[switch_mask]:
+        for t in completion_times[switch_mask]:
             ax.axvline(t, color="#9467bd", linewidth=0.7, alpha=0.5)
 
     # Per-well horizontal guidelines so step levels are easy to read.
     for well in sorted(WELL_PATCH_MAPPING):
         ax.axhline(well, color="lightgrey", linewidth=0.3, zorder=0)
 
-    ax.set_ylabel("current trip\nto well")
+    ax.set_ylabel("behavioral\nlocation")
     ax.set_ylim(-0.5, 5.5)
     ax.set_yticks(sorted(WELL_PATCH_MAPPING))
 
@@ -1336,7 +1333,7 @@ def _plot_visit_recency(ax: Axes, ctx: _PanelContext) -> None:
     ax.text(
         0.005,
         0.02,
-        f"never visited = {len(ctx.trials) + 1:g} sentinel",
+        "never visited = completed trials + 1\n(explicit novelty row)",
         transform=ax.transAxes,
         ha="left",
         va="bottom",
@@ -1467,7 +1464,7 @@ def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
         0.005,
         0.02,
         "session 95% color range; saturation = clipped\n"
-        "never-visited sentinel included before centering",
+        "time-local censored values included before centering",
         transform=ax.transAxes,
         ha="left",
         va="bottom",
@@ -1571,6 +1568,17 @@ def _plot_is_last_rewarded_elsewhere(ax: Axes, ctx: _PanelContext) -> None:
         color="#2ca02c",
         label="is_last_rew.\nelsewhere",
         reference_cols=("last_rewarded_arm", "current_arm"),
+    )
+
+
+def _plot_arm_never_visited(ax: Axes, ctx: _PanelContext) -> None:
+    """Explicit novel-leaf indicator paired with censored visit recency."""
+    _draw_event_arm_indicator(
+        ax,
+        ctx,
+        value_col="arm_never_visited",
+        color="#7b3294",
+        label="arm never\nvisited",
     )
 
 
@@ -2372,9 +2380,9 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
     The value averages the available most-recent trials (maximum ten) at
     stop start and is missing only before the first completed trial. R2 uses
     this smoothed history together with ``reward_lag1``; Rlag instead uses
-    the ten lag outcomes separately. On a shared complete-history cohort,
-    R2 is an eight-degree-of-freedom constrained submodel of Rlag. Production
-    fits use per-rung complete cases, however, so their realized cohorts differ.
+    the ten lag outcomes separately. On their production ladder-wide common
+    cohort, R2 is an eight-degree-of-freedom constrained submodel of Rlag; all
+    rungs use the exact same stop IDs.
     """
     view = _stop_view(ctx, ["reward_rate_trial_k10"])
     ax.set_ylabel("reward fraction\nprior ≤10 trials")
@@ -2702,6 +2710,7 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "arm_uncertainty": _plot_arm_uncertainty,
     # Remaining fitted arm-grain predictors.
     "visit_recency_demeaned": _plot_visit_recency_demeaned,
+    "arm_never_visited": _plot_arm_never_visited,
     "is_current": _plot_is_current,
     "is_prev": _plot_is_prev,
     "is_last_rewarded_elsewhere": _plot_is_last_rewarded_elsewhere,
@@ -2730,6 +2739,7 @@ ARM_COVARIATE_PANELS: tuple[str, ...] = (
     "is_prev",
     "is_last_rewarded_elsewhere",
     "visit_recency_demeaned",
+    "arm_never_visited",
     "reward_rate_arm_k10",
     "cumulative_reward",
     "arm_dist_rank",
@@ -2767,6 +2777,7 @@ _EVENT_INTERVAL_CELL_PANELS = frozenset(
         "dist_to_arm",
         "arm_dist_rank",
         "visit_recency_demeaned",
+        "arm_never_visited",
         "q_arm",
         "arm_uncertainty",
         "is_current",
@@ -2928,6 +2939,7 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "q_arm": 1.4,
     "arm_uncertainty": 1.4,
     "visit_recency_demeaned": 1.4,
+    "arm_never_visited": 1.4,
     "is_current": 1.4,
     "is_prev": 1.4,
     "is_last_rewarded_elsewhere": 1.4,

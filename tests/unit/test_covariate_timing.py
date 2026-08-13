@@ -52,10 +52,30 @@ def test_post_outcome_fixable_by_retrospective_but_future_is_not():
     assert_predictor_timing(["trials_since_switch"], descriptive=True)  # no raise
 
 
+@pytest.mark.parametrize(
+    "predictor",
+    [
+        "rpe_model",
+        "unchosen_patches_mu_update_abs_postoutcome_sess",
+    ],
+)
+def test_uncertainty_rate_post_outcome_names_require_retrospective_gate(predictor):
+    with pytest.raises(ValueError, match="post-outcome"):
+        assert_predictor_timing([predictor])
+    assert_predictor_timing([predictor], retrospective=True)
+
+
 def test_is_after_switch_is_safe():
-    """Destination is chosen at departure -> pre-outcome-safe, never rejected."""
+    """Last-completed-trip switch status is past-only and never rejected."""
     assert_predictor_timing(["is_after_switch"])  # no raise
     assert timing_of("is_after_switch") == ["is_after_switch"]
+
+
+def test_last_completed_outcome_context_is_past_only():
+    """Completion-indexed outcome flags need no retrospective override."""
+    assert_predictor_timing(
+        ["reward_outcome", "is_after_reward", "is_after_omission"]
+    )
 
 
 def test_descriptive_whitelists_both_leak_types():

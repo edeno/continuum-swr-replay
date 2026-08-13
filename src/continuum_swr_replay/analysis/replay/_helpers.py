@@ -15,12 +15,264 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.constants import (
+    TRACK_SEGMENT_TO_PATCH,
+    WELL_PATCH_MAPPING,
+)
 
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
 
 # ── Trial-derived context ──
+
+
+_LOCATION_STATES = ("at_well", "in_transit", "mixed", "unknown")
+
+
+def _validate_well_values(values: np.ndarray, column: str) -> None:
+    """Require finite integral IDs from the canonical six-well task."""
+    valid = np.asarray(tuple(WELL_PATCH_MAPPING), dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError(f"trial {column} values must be finite")
+    if not np.equal(values, np.floor(values)).all() or not np.isin(values, valid).all():
+        raise ValueError(
+            f"trial {column} values must be canonical integral well IDs "
+            f"{tuple(WELL_PATCH_MAPPING)}"
+        )
+
+
+def _prepare_trials_for_context(
+    trials: pd.DataFrame,
+    *,
+    required_columns: tuple[str, ...] = (),
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Validate and order trials by their canonical completion time.
+
+    A trial is complete at ``goal_arrival_time``, with the established
+    per-row ``end_time`` fallback.  Sorting by that cutoff is essential:
+    trial-derived history must be indexed by when information became known,
+    not by when the animal departed.
+    """
+    if trials.empty:
+        return trials.copy(), np.array([], dtype=float)
+
+    base_columns = {"start_time", "end_time", "to_well", *required_columns}
+    missing = sorted(base_columns.difference(trials.columns))
+    if missing:
+        raise KeyError(f"trial context requires columns {missing}")
+
+    prepared = trials.copy()
+    starts = prepared["start_time"].to_numpy(dtype=float)
+    ends = prepared["end_time"].to_numpy(dtype=float)
+    cutoffs = _trial_cutoff_times(prepared)
+    to_wells = prepared["to_well"].to_numpy(dtype=float)
+
+    if not np.isfinite(starts).all():
+        raise ValueError("trial start_time values must be finite")
+    if not np.isfinite(ends).all():
+        raise ValueError("trial end_time values must be finite")
+    if not np.isfinite(cutoffs).all():
+        raise ValueError("trial completion cutoffs must be finite")
+    _validate_well_values(to_wells, "to_well")
+    if np.any(cutoffs < starts):
+        raise ValueError("a trial completion cutoff occurs before its start")
+    if np.any(cutoffs > ends):
+        raise ValueError("a trial completion cutoff occurs after its end_time")
+
+    order = np.argsort(cutoffs, kind="stable")
+    prepared = prepared.iloc[order].reset_index(drop=True)
+    cutoffs = cutoffs[order]
+    starts = starts[order]
+
+    # Consecutive trips may meet at a boundary.  They may not overlap: an
+    # animal cannot be in two transit intervals at once.  This check also
+    # catches trial orders that disagree between departure and completion.
+    if len(prepared) > 1 and np.any(starts[1:] < cutoffs[:-1]):
+        raise ValueError("trial transit intervals overlap")
+
+    return prepared, cutoffs
+
+
+def behavioral_location_at_times(
+    times: np.ndarray,
+    trials: pd.DataFrame,
+) -> pd.DataFrame:
+    """Classify timestamps from trip departure/arrival intervals.
+
+    ``[start_time, completion_cutoff)`` is ``"in_transit"``.  From the
+    completion cutoff through the next trip's start is ``"at_well"`` at the
+    completed trial's destination.  Consequently, exact arrival is at-well
+    and exact departure is in-transit.  Times before the first departure are
+    ``"unknown"``.  The final dwell extends beyond the last recorded trial.
+
+    The returned columns are ``location_state`` (categorical), ``at_well``
+    (nullable boolean), and ``location_well`` (nullable ``Float64``).
+    """
+    sample_times = np.asarray(times, dtype=float)
+    if sample_times.ndim != 1:
+        raise ValueError("times must be a one-dimensional sequence")
+    if not np.isfinite(sample_times).all():
+        raise ValueError("times must contain only finite timestamps")
+
+    index = pd.Index(sample_times, name="time")
+    if trials.empty:
+        return pd.DataFrame(
+            {
+                "location_state": pd.Categorical(
+                    ["unknown"] * len(sample_times), categories=_LOCATION_STATES
+                ),
+                "at_well": pd.array([pd.NA] * len(sample_times), dtype="boolean"),
+                "location_well": pd.array(
+                    [pd.NA] * len(sample_times), dtype="Float64"
+                ),
+            },
+            index=index,
+        )
+
+    prepared, cutoffs = _prepare_trials_for_context(trials)
+    starts = prepared["start_time"].to_numpy(dtype=float)
+    to_wells = prepared["to_well"].to_numpy(dtype=float)
+
+    started_idx = np.searchsorted(starts, sample_times, side="right") - 1
+    has_started = started_idx >= 0
+    clipped = np.clip(started_idx, 0, len(prepared) - 1)
+    is_transit = has_started & (sample_times < cutoffs[clipped])
+    is_at_well = has_started & ~is_transit
+
+    state = np.full(len(sample_times), "unknown", dtype=object)
+    state[is_transit] = "in_transit"
+    state[is_at_well] = "at_well"
+    at_well = pd.array([pd.NA] * len(sample_times), dtype="boolean")
+    at_well[is_transit] = False
+    at_well[is_at_well] = True
+    location_well = pd.array([pd.NA] * len(sample_times), dtype="Float64")
+    location_well[is_at_well] = to_wells[clipped[is_at_well]]
+
+    return pd.DataFrame(
+        {
+            "location_state": pd.Categorical(state, categories=_LOCATION_STATES),
+            "at_well": at_well,
+            "location_well": location_well,
+        },
+        index=index,
+    )
+
+
+def summarize_behavioral_location(
+    states: pd.DataFrame | pd.Series | np.ndarray | list[str],
+    wells: pd.Series | np.ndarray | list[float] | None = None,
+) -> dict[str, object]:
+    """Roll time-resolved location labels up over one complete window.
+
+    A window is ``at_well`` only when every sampled bin is at the same well.
+    It is ``in_transit`` only when every bin is in transit, ``unknown`` when
+    empty or wholly unknown, and ``mixed`` whenever states differ or an
+    at-well window spans multiple wells.  ``at_well`` is nullable only for an
+    unknown window; mixed windows are explicitly false.
+    """
+    if isinstance(states, pd.DataFrame):
+        if wells is not None:
+            raise ValueError("wells must be omitted when states is a DataFrame")
+        required = {"location_state", "location_well"}
+        missing = sorted(required.difference(states.columns))
+        if missing:
+            raise KeyError(f"location frame requires columns {missing}")
+        wells = states["location_well"]
+        states = states["location_state"]
+
+    state_values = np.asarray(states, dtype=object)
+    if state_values.ndim != 1:
+        raise ValueError("location states must be one-dimensional")
+    if wells is None:
+        well_values = np.full(len(state_values), np.nan)
+    else:
+        well_values = pd.to_numeric(pd.Series(wells), errors="coerce").to_numpy(
+            dtype=float, na_value=np.nan
+        )
+        if well_values.ndim != 1 or len(well_values) != len(state_values):
+            raise ValueError("location states and wells must have equal lengths")
+
+    if len(state_values) == 0:
+        return {
+            "location_state": "unknown",
+            "at_well": pd.NA,
+            "location_well": np.nan,
+        }
+
+    allowed = set(_LOCATION_STATES) - {"mixed"}
+    observed_states = set(state_values.tolist())
+    invalid = observed_states.difference(allowed)
+    if invalid:
+        raise ValueError(f"invalid time-resolved location states: {sorted(invalid)}")
+
+    if observed_states == {"unknown"}:
+        return {
+            "location_state": "unknown",
+            "at_well": pd.NA,
+            "location_well": np.nan,
+        }
+    if observed_states == {"in_transit"}:
+        return {
+            "location_state": "in_transit",
+            "at_well": False,
+            "location_well": np.nan,
+        }
+    if observed_states == {"at_well"}:
+        unique_wells = np.unique(well_values[np.isfinite(well_values)])
+        if len(unique_wells) == 1 and np.isfinite(well_values).all():
+            return {
+                "location_state": "at_well",
+                "at_well": True,
+                "location_well": float(unique_wells[0]),
+            }
+
+    return {
+        "location_state": "mixed",
+        "at_well": False,
+        "location_well": np.nan,
+    }
+
+
+def nearest_well_distance_cm(
+    dot: pd.DataFrame,
+    track_graph: nx.Graph,
+) -> np.ndarray:
+    """Euclidean distance from each projected position to the nearest well.
+
+    Wells are the degree-one nodes of ``track_graph``.  A full-NaN vector is
+    returned when either projected coordinate column or any required well
+    position is unavailable.  Individual non-finite positions yield NaN.
+    """
+    n_rows = len(dot)
+    coordinate_columns = ("projected_x_position", "projected_y_position")
+    if not set(coordinate_columns).issubset(dot.columns):
+        return np.full(n_rows, np.nan)
+
+    well_nodes = [node for node in track_graph.nodes if track_graph.degree(node) == 1]
+    if not well_nodes:
+        return np.full(n_rows, np.nan)
+    node_positions = nx.get_node_attributes(track_graph, "pos")
+    if any(node not in node_positions for node in well_nodes):
+        return np.full(n_rows, np.nan)
+
+    try:
+        well_positions = np.asarray(
+            [node_positions[node] for node in well_nodes], dtype=float
+        )
+    except (TypeError, ValueError):
+        return np.full(n_rows, np.nan)
+    if well_positions.shape != (len(well_nodes), 2) or not np.isfinite(
+        well_positions
+    ).all():
+        return np.full(n_rows, np.nan)
+
+    positions = dot.loc[:, coordinate_columns].to_numpy(dtype=float)
+    output = np.full(n_rows, np.nan)
+    valid = np.isfinite(positions).all(axis=1)
+    if valid.any():
+        displacement = positions[valid, None, :] - well_positions[None, :, :]
+        output[valid] = np.linalg.norm(displacement, axis=2).min(axis=1)
+    return output
 
 
 def add_trial_context(
@@ -29,28 +281,35 @@ def add_trial_context(
 ) -> pd.DataFrame:
     """Attach per-timebin trial-derived columns to ``dot`` (in place, returned).
 
-    In-progress trip semantics: at each timepoint ``t``, the "current
-    trip" is the latest trial whose ``start_time`` is at or before ``t``.
-    This is the trip the animal is currently completing (or has just
-    completed, if ``t`` falls in the gap between two trips).
+    Every past-context column is indexed by the most recent trial completed
+    at or before ``t``.  An in-progress trip cannot expose its destination,
+    reward, or switch outcome through these columns.  ``next_well`` is the
+    sole explicitly retrospective future destination.
 
     Columns added
     -------------
-    - ``prev_well``, ``current_well``
-    - ``next_well``
+    - ``prev_well``, ``current_well``, ``last_visited_well`` (past-only)
+    - ``next_well`` (retrospective future destination)
     - ``last_rewarded_well``
-    - ``is_after_switch`` — current trip's ``is_patch_change``
-    - ``is_after_omission`` — ``~current trip's is_reward``
-    - ``is_after_reward`` — current trip's ``is_reward``
-    - ``reward_outcome`` — current trip's ``is_reward`` as float
+    - ``is_after_switch`` — last completed trip's ``is_patch_change``
+    - ``is_after_omission`` — ``~last completed trip's is_reward``
+    - ``is_after_reward`` — last completed trip's ``is_reward``
+    - ``reward_outcome`` — last completed trip's ``is_reward`` as float
+    - ``location_state``, ``at_well``, ``location_well``
     """
-    dot_times = dot.index.values
-    n_trials = len(trials)
+    dot_times = np.asarray(dot.index.values, dtype=float)
+    if dot_times.ndim != 1 or not np.isfinite(dot_times).all():
+        raise ValueError("dot index must contain only finite timestamps")
 
-    if n_trials == 0:
+    location = behavioral_location_at_times(dot_times, trials)
+    for column in location.columns:
+        dot[column] = location[column].array
+
+    if trials.empty:
         for col in (
             "prev_well",
             "current_well",
+            "last_visited_well",
             "next_well",
             "last_rewarded_well",
             "reward_outcome",
@@ -63,41 +322,45 @@ def add_trial_context(
             dot[col] = np.nan
         return dot
 
-    # ``np.searchsorted`` below assumes ``trial_start_times`` /
-    # ``reward_timestamps`` are non-decreasing. The local data-loader
-    # path produces sorted trials, but Spyglass-loaded or manually
-    # passed frames are not protected — sort defensively so
-    # ``current_well`` / ``last_rewarded_well`` never silently drift
-    # from the true chronological order.
-    trials = trials.sort_values("start_time").reset_index(drop=True)
+    trials, arrival_times = _prepare_trials_for_context(
+        trials,
+        required_columns=("from_well", "is_reward", "is_patch_change"),
+    )
+    n_trials = len(trials)
+    trial_start_times = trials["start_time"].to_numpy(dtype=float)
+    to_wells = trials["to_well"].to_numpy(dtype=float)
+    from_wells = trials["from_well"].to_numpy(dtype=float)
+    reward_values = trials["is_reward"].to_numpy(dtype=float)
+    patch_change_values = trials["is_patch_change"].to_numpy(dtype=float)
+    _validate_well_values(from_wells, "from_well")
+    for name, values in (
+        ("is_reward", reward_values),
+        ("is_patch_change", patch_change_values),
+    ):
+        if not np.isfinite(values).all() or not np.isin(values, (0.0, 1.0)).all():
+            raise ValueError(f"trial {name} values must be finite binary values")
+    is_reward = reward_values.astype(bool)
+    is_patch_change = patch_change_values.astype(bool)
 
-    trial_start_times = trials["start_time"].values
-    to_wells = trials["to_well"].values
-    from_wells = trials["from_well"].values
-    is_reward = trials["is_reward"].values
-    is_patch_change = trials["is_patch_change"].values
+    completed_idx = np.searchsorted(arrival_times, dot_times, side="right") - 1
+    has_completed = completed_idx >= 0
+    completed_clipped = np.clip(completed_idx, 0, n_trials - 1)
 
-    current_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
-    valid = current_idx >= 0
+    dot["prev_well"] = np.where(
+        has_completed, from_wells[completed_clipped], np.nan
+    )
+    last_visited = np.where(has_completed, to_wells[completed_clipped], np.nan)
+    dot["last_visited_well"] = last_visited
+    # Compatibility alias: unlike the previous implementation, current_well
+    # is now strictly past-only and never means an in-progress destination.
+    dot["current_well"] = last_visited
 
-    current_clipped = np.clip(current_idx, 0, n_trials - 1)
-    next_idx = current_idx + 1
-    next_valid = valid & (next_idx < n_trials)
+    started_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
+    next_idx = completed_idx + 1
+    next_valid = (started_idx >= 0) & (next_idx < n_trials)
     next_clipped = np.clip(next_idx, 0, n_trials - 1)
-
-    dot["prev_well"] = np.where(valid, from_wells[current_clipped], np.nan)
-    dot["current_well"] = np.where(valid, to_wells[current_clipped], np.nan)
     dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
-    # Use the same per-row goal-arrival cutoff convention as
-    # ``_trial_cutoff_times``: ``goal_arrival_time`` when finite,
-    # ``end_time`` when NaN, ``end_time`` everywhere when the column
-    # is absent. The history helpers
-    # (``visit_recency_all_events`` etc.) call ``_trial_cutoff_times``
-    # for the same alignment — this consolidation makes the per-row
-    # NaN fallback match between ``add_trial_context``'s reward /
-    # goal-arrival writes and the history helpers' cutoffs.
-    arrival_times = _trial_cutoff_times(trials)
     reward_timestamps = arrival_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(reward_timestamps) > 0:
@@ -109,7 +372,9 @@ def add_trial_context(
     else:
         dot["last_rewarded_well"] = np.nan
 
-    dot["_goal_arrival_time"] = np.where(valid, arrival_times[current_clipped], np.nan)
+    dot["_goal_arrival_time"] = np.where(
+        has_completed, arrival_times[completed_clipped], np.nan
+    )
 
     if len(reward_timestamps) > 0:
         dot["_last_reward_time"] = np.where(
@@ -118,12 +383,16 @@ def add_trial_context(
     else:
         dot["_last_reward_time"] = np.nan
 
-    current_reward = np.where(valid, is_reward[current_clipped].astype(float), np.nan)
-    dot["reward_outcome"] = current_reward
-    dot["is_after_reward"] = current_reward
-    dot["is_after_omission"] = np.where(valid, 1.0 - current_reward, np.nan)
+    previous_reward = np.where(
+        has_completed, is_reward[completed_clipped].astype(float), np.nan
+    )
+    dot["reward_outcome"] = previous_reward
+    dot["is_after_reward"] = previous_reward
+    dot["is_after_omission"] = np.where(
+        has_completed, 1.0 - previous_reward, np.nan
+    )
     dot["is_after_switch"] = np.where(
-        valid, is_patch_change[current_clipped].astype(float), np.nan
+        has_completed, is_patch_change[completed_clipped].astype(float), np.nan
     )
 
     return dot

@@ -139,6 +139,115 @@ def _tiny_posterior(dot: pd.DataFrame) -> xr.DataArray:
     )
 
 
+def _location_contract_session():
+    """Three retained events: transit, at one well, and mixed."""
+    times = np.arange(0.0, 9.01, 0.1)
+    dot = pd.DataFrame(
+        {
+            "animal": "test",
+            "day": 1,
+            "epoch": "02_r1",
+            "non_local_event": 0,
+            "SWR_event": 0,
+            "MUA_event": 0,
+            "Non-Local_Continuous_prob": 0.0,
+            "Non-Local_Fragmented_prob": 0.0,
+            "map_estimate": np.nan,
+            "head_speed": 10.0,
+            "track_segment_id": np.nan,
+            "projected_x_position": np.nan,
+            "projected_y_position": np.nan,
+        },
+        index=pd.Index(times, name="time"),
+    )
+    for event_id, start, end, physical_arm in (
+        (1, 2.0, 2.4, 7),
+        (2, 4.0, 4.4, 1),
+        # Crosses the second goal arrival at 8.0. History must remain frozen
+        # at the 7.8 event start, even though the midpoint is at arrival.
+        (3, 7.8, 8.2, 7),
+    ):
+        mask = (dot.index >= start) & (dot.index <= end)
+        dot.loc[mask, "non_local_event"] = event_id
+        dot.loc[mask, "Non-Local_Continuous_prob"] = 0.9
+        dot.loc[mask, "head_speed"] = 1.0
+        dot.loc[mask, "map_estimate"] = 2.0
+        dot.loc[mask, "track_segment_id"] = physical_arm
+
+    trials = pd.DataFrame(
+        {
+            "start_time": [1.0, 6.5],
+            "goal_arrival_time": [3.0, 8.0],
+            "end_time": [3.0, 8.0],
+            "from_well": [0, 1],
+            "to_well": [1, 2],
+            "is_reward": [False, True],
+            "is_patch_change": [False, True],
+        }
+    )
+    graph = _bandit_graph()
+    for node in graph:
+        graph.nodes[node]["pos"] = (float(node * 10), 0.0)
+    dot.loc[:, "projected_x_position"] = 10.0
+    dot.loc[:, "projected_y_position"] = 0.0
+    return dot, _EnvStub(), trials, graph
+
+
+def test_event_and_stop_tables_label_location_without_filtering_events():
+    dot, env, trials, graph = _location_contract_session()
+
+    events = build_event_table(dot, env, trials, graph).sort_values(
+        "non_local_event"
+    )
+    stops = build_stop_table(dot, trials, graph).sort_values("stop_start")
+    event_arms = build_event_arm_table(events, dot, env, trials, graph)
+    event_patches = build_event_patch_table(events, event_arms)
+
+    assert events["non_local_event"].tolist() == [1, 2, 3]
+    assert events["location_state"].tolist() == [
+        "in_transit",
+        "at_well",
+        "mixed",
+    ]
+    assert events["at_well"].tolist() == [False, True, False]
+    np.testing.assert_allclose(
+        events["location_well"], [np.nan, 1.0, np.nan], equal_nan=True
+    )
+    np.testing.assert_allclose(
+        events["location_arm"], [np.nan, 1.0, np.nan], equal_nan=True
+    )
+    np.testing.assert_allclose(
+        events["current_arm"], events["location_arm"], equal_nan=True
+    )
+    assert events["physical_arm"].tolist() == [7.0, 1.0, 7.0]
+    assert (events["nearest_well_distance_cm_max"] == 0.0).all()
+    assert events["time_since_last_port_entry"].dropna().ge(0).all()
+    np.testing.assert_allclose(
+        events["time_since_port_entry"],
+        events["time_since_last_port_entry"],
+        equal_nan=True,
+    )
+    mixed_history = event_arms.loc[
+        event_arms["non_local_event"].eq(3) & event_arms["arm"].eq(2)
+    ].iloc[0]
+    mixed_event = events.loc[events["non_local_event"].eq(3)].iloc[0]
+    assert mixed_event["time_since_last_port_entry"] == pytest.approx(4.8)
+    assert pd.isna(mixed_event["time_since_reward"])
+    assert mixed_history["arm_never_visited"] == 1.0
+    assert mixed_history["visit_recency"] == 2.0
+
+    # Each event is its own immobility bout in this fixture, so the stop and
+    # event labels should agree exactly and no cohort row is lost.
+    assert stops["location_state"].tolist() == events["location_state"].tolist()
+    assert stops["at_well"].tolist() == events["at_well"].tolist()
+    assert int(stops["n_events"].sum()) == len(events) == 3
+    for table, rows_per_event in ((event_arms, 9), (event_patches, 3)):
+        assert len(table) == len(events) * rows_per_event
+        states = table.groupby("event_id", sort=False)["location_state"].first()
+        expected = events.set_index("event_id")["location_state"].reindex(states.index)
+        pd.testing.assert_series_equal(states, expected, check_names=False)
+
+
 @pytest.fixture
 def tiny_session():
     dot = _tiny_dot_with_two_events()
@@ -168,26 +277,17 @@ def tiny_session_with_posterior(tiny_session):
 # ── Regression tests ──
 
 
-def test_trunk_arm_triggers_current_well_fallback():
-    """Trunk-arm events must route through the ``current_well`` fallback.
-
-    Regression coverage for the refactored trunk fallback: when the
-    modal ``track_segment_id`` is a trunk arm (6/7/8 — no well
-    attached), ``build_event_table`` must re-derive ``current_arm`` by
-    reading the renamed intermediate column ``current_well`` (was
-    ``prev_trial_to_well``). A misspelling of that
-    column name would silently produce ``current_arm = NaN`` for every
-    trunk event; a real crash would instead surface as ``KeyError``.
-    """
+def test_physical_trunk_is_kept_separate_from_at_well_location_arm():
+    """A modal trunk segment must not overwrite behavioral well location."""
     dot = _tiny_dot_with_two_events()
     # Force both events onto trunk arm 7 (patch junction 7 ↔ center 9).
     for sl in (slice(20, 30), slice(60, 70)):
         rows = dot.index[sl]
         dot.loc[rows, "track_segment_id"] = 7
 
-    # Stub trials with a single trip that ended at well 3 (adjacent to
-    # leaf arm 3). Both events should see ``current_well = 3`` via
-    # trial context and therefore ``current_arm = 3`` via the fallback.
+    # Stub trials with a single completed trip to well 3. Both events occur
+    # during the subsequent dwell even though this synthetic physical-segment
+    # field says trunk 7; the two facts must be exposed independently.
     trials = pd.DataFrame(
         {
             "start_time": [0.0],
@@ -205,12 +305,12 @@ def test_trunk_arm_triggers_current_well_fallback():
 
     et = build_event_table(dot, env, trials, graph)
     assert len(et) == 2
-    # Both events should hit the fallback — track_segment_id == 7 is a
-    # trunk arm, so arm_to_well returns NaN and current_arm is
-    # re-derived from current_well (= 3) via _single_arm_from_well.
+    assert (et["location_state"] == "at_well").all()
+    assert (et["location_arm"] == 3).all()
     assert (et["current_arm"] == 3).all(), (
-        f"trunk-arm fallback failed — got {et['current_arm'].tolist()}"
+        f"location-arm compatibility alias failed — got {et['current_arm'].tolist()}"
     )
+    assert (et["physical_arm"] == 7).all()
 
 
 def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
@@ -245,6 +345,52 @@ def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
         assert (
             eat_shifted[col].notna().sum() == eat_baseline[col].notna().sum()
         ), f"column {col} lost values when event_table had a non-zero-based index"
+
+
+def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_session):
+    """Novelty follows completed visits and its SWR interaction is exact."""
+    dot, env, empty_trials, graph = tiny_session
+    et = build_event_table(dot, env, empty_trials, graph)
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0, 4.0],
+            "goal_arrival_time": [1.0, 5.0],
+            "end_time": [1.5, 5.5],
+            "from_well": [1, 0],
+            "to_well": [0, 1],
+            "from_patch": [1, 1],
+            "to_patch": [1, 1],
+            "is_reward": [True, False],
+            "is_patch_change": [False, False],
+        }
+    )
+
+    eat = build_event_arm_table(et, dot, env, trials, graph)
+    event_ids = et["event_id"].tolist()
+    first = eat[eat["event_id"] == event_ids[0]].set_index("arm")
+    second = eat[eat["event_id"] == event_ids[1]].set_index("arm")
+
+    np.testing.assert_array_equal(
+        first.loc[range(9), "arm_never_visited"].to_numpy(),
+        [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+    )
+    np.testing.assert_array_equal(
+        second.loc[range(9), "arm_never_visited"].to_numpy(),
+        [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+    )
+    for frame in (first, second):
+        assert frame.loc[range(6), "visit_recency_demeaned"].mean() == pytest.approx(
+            0.0
+        )
+        np.testing.assert_array_equal(
+            frame.loc[range(6, 9), "visit_recency_demeaned"].to_numpy(),
+            [0.0, 0.0, 0.0],
+        )
+        np.testing.assert_array_equal(
+            frame["swr_x_arm_never_visited"].to_numpy(),
+            frame["is_swr"].astype(int).to_numpy()
+            * frame["arm_never_visited"].to_numpy(),
+        )
 
 
 def test_value_block_predictors_resolve_and_populate(tiny_session):
@@ -368,6 +514,7 @@ class TestEventTableSchema:
         assert et["is_mua"].dtype == bool
         assert et["whole_event_speed_eligible"].dtype == bool
         assert et["whole_event_speed_eligible"].all()
+        assert str(et["at_well"].dtype) == "boolean"
 
     def test_empty_session_returns_empty_frame_with_schema(self, tiny_session):
         dot, env, trials, graph = tiny_session

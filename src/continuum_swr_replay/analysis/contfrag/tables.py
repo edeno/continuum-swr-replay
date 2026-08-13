@@ -41,13 +41,19 @@ from ..replay._helpers import (
     eq_indicator,
     hash_stop_id,
     immobility_bout_intervals,
+    nearest_well_distance_cm,
     recent_reward_rate_per_arm,
     recent_trial_reward_rate,
     safe_mode,
     single_arm_from_well,
     strict_first,
+    summarize_behavioral_location,
     time_since_stop,
     visit_recency_per_arm,
+)
+from ..replay.covariates import (
+    arm_never_visited_per_arm,
+    center_visit_recency_within_event,
 )
 from ..replay.spatial import arm_dist_rank, dist_to_arm_from_well
 from ..replay.spatial_mapping import arm_to_well, map_estimate_to_arm
@@ -283,6 +289,7 @@ def build_contfrag_event_table(
         else set()
     )
     dot = add_trial_context(dot, trials)
+    dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
@@ -307,18 +314,21 @@ def build_contfrag_event_table(
         arms_real = arm_series[real_arm_mask]
         n_junction = int((~real_arm_mask).sum())
 
-        # current_arm: modal track_segment_id
+        # Keep whole-window behavioral location separate from the observed
+        # physical segment. A trunk/in-transit event must not be rewritten as
+        # the trip's destination well.
         ts = (
             g["track_segment_id"]
             if "track_segment_id" in g.columns
             else pd.Series(dtype=float)
         )
-        ts_modal = safe_mode(ts)
-        current_arm = np.nan
-        if not np.isnan(ts_modal):
-            well_of_modal = arm_to_well(ts_modal, track_graph)
-            if not np.isnan(well_of_modal):
-                current_arm = float(ts_modal)
+        physical_arm = safe_mode(ts)
+        location = summarize_behavioral_location(
+            g[["location_state", "location_well"]]
+        )
+        location_well = float(location["location_well"])
+        location_arm = single_arm_from_well(location_well, track_graph)
+        current_arm = location_arm
         # Trial-derived context columns are NaN at every dot timebin
         # before the first trial start (see ``add_trial_context``).
         # ``safe_first`` would skip leading NaNs and return the next
@@ -327,11 +337,6 @@ def build_contfrag_event_table(
         # uses the strict semantics for the same hazard — match it
         # here so trial-derived event-level fields propagate NaN when
         # the event begins before any trial.
-        if np.isnan(current_arm):
-            current_arm = single_arm_from_well(
-                strict_first(g["current_well"]), track_graph
-            )
-
         prev_arm = single_arm_from_well(strict_first(g["prev_well"]), track_graph)
         next_arm = single_arm_from_well(strict_first(g["next_well"]), track_graph)
         last_rewarded_arm = single_arm_from_well(
@@ -360,6 +365,22 @@ def build_contfrag_event_table(
             g["Fragmented_prob"].to_numpy(),
         )
 
+        midpoint_idx = len(times) // 2
+        midpoint_time = float(times[midpoint_idx])
+        context_time = float(times[0])
+        last_port_entry = g["_goal_arrival_time"].iloc[0]
+        time_since_last_port_entry = (
+            context_time - float(last_port_entry)
+            if pd.notna(last_port_entry)
+            else np.nan
+        )
+        if np.isfinite(time_since_last_port_entry) and time_since_last_port_entry < 0:
+            raise RuntimeError(
+                "past-only trial context produced a negative time since port entry"
+            )
+        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
+        finite_distance = distance[np.isfinite(distance)]
+
         record = {
             event_col: int(ev_id),
             "event_start": float(times[0]),
@@ -373,6 +394,11 @@ def build_contfrag_event_table(
             "fragmented_prob_mean": frag_mean,
             "dominant_state": dominant,
             "continuous_fraction": cont_frac,
+            "location_state": location["location_state"],
+            "at_well": location["at_well"],
+            "location_well": location_well,
+            "location_arm": location_arm,
+            "physical_arm": physical_arm,
             "current_arm": current_arm,
             "prev_arm": prev_arm,
             "next_arm": next_arm,
@@ -396,21 +422,28 @@ def build_contfrag_event_table(
             # undecoded (NaN ``map_estimate``) bins, not junction MAPs.
             "n_junction_bins": n_junction,
             "n_unique_arms": int(arms_real.nunique()),
-            "event_midpoint_time": float(times[len(times) // 2]),
-            "time_since_port_entry": float(
-                times[len(times) // 2] - strict_first(g["_goal_arrival_time"])
-            )
-            if not np.isnan(strict_first(g["_goal_arrival_time"]))
-            else np.nan,
+            "event_midpoint_time": midpoint_time,
+            "time_since_port_entry": time_since_last_port_entry,
+            "time_since_last_port_entry": time_since_last_port_entry,
             "time_since_reward": float(
-                times[len(times) // 2] - strict_first(g["_last_reward_time"])
+                context_time - g["_last_reward_time"].iloc[0]
             )
-            if not np.isnan(strict_first(g["_last_reward_time"]))
+            if pd.notna(g["_last_reward_time"].iloc[0])
             else np.nan,
+            "nearest_well_distance_cm_min": (
+                float(finite_distance.min()) if finite_distance.size else np.nan
+            ),
+            "nearest_well_distance_cm_mean": (
+                float(finite_distance.mean()) if finite_distance.size else np.nan
+            ),
+            "nearest_well_distance_cm_max": (
+                float(finite_distance.max()) if finite_distance.size else np.nan
+            ),
         }
         event_records.append(record)
 
     per_event = pd.DataFrame.from_records(event_records)
+    per_event["at_well"] = pd.array(per_event["at_well"], dtype="boolean")
 
     # time_since_stop per event
     per_timebin_tss = time_since_stop(ev.index.to_numpy(), bout_starts)
@@ -622,6 +655,7 @@ def build_contfrag_event_arm_table(
     dist_vals = np.full(n_events * n_arms, np.nan)
     rank_vals = np.full(n_events * n_arms, np.nan)
     vr_vals = np.full(n_events * n_arms, np.nan)
+    anv_vals = np.full(n_events * n_arms, np.nan)
     cr_vals = np.full(n_events * n_arms, np.nan)
     rrr_vals = np.full(n_events * n_arms, np.nan)
 
@@ -637,13 +671,18 @@ def build_contfrag_event_arm_table(
         dist_arr = np.array([dists[a] for a in ALL_ARMS])
         ranks = arm_dist_rank(dist_arr)
 
-        event_time = ev_row["event_midpoint_time"]
+        # Match the event-level context cutoff: all model-facing history is
+        # frozen at event start.  A mixed event crossing goal arrival must not
+        # combine pre-arrival outcome context with post-arrival recency.
+        event_time = ev_row["event_start"]
         if np.isnan(event_time) or len(trials) == 0:
             vr = dict.fromkeys(ALL_ARMS, np.nan)
+            anv = dict.fromkeys(ALL_ARMS, np.nan)
             cr = dict.fromkeys(ALL_ARMS, np.nan)
             rrr = dict.fromkeys(ALL_ARMS, np.nan)
         else:
             vr = visit_recency_per_arm(event_time, trials, track_graph)
+            anv = arm_never_visited_per_arm(event_time, trials, track_graph)
             cr = cumulative_reward_per_arm(event_time, trials, track_graph)
             # canonical 10-visit per-arm reward rate (covariate_dictionary.md D1)
             rrr = recent_reward_rate_per_arm(event_time, trials, track_graph, k=10)
@@ -653,17 +692,19 @@ def build_contfrag_event_arm_table(
             dist_vals[idx] = dist_arr[j]
             rank_vals[idx] = ranks[j]
             vr_vals[idx] = vr[a]
+            anv_vals[idx] = anv[a]
             cr_vals[idx] = cr[a]
             rrr_vals[idx] = rrr[a]
 
     long["dist_to_arm"] = dist_vals
     long["arm_dist_rank"] = rank_vals
     long["visit_recency"] = vr_vals
-    # Within-arm-demeaned visit_recency — the part orthogonal to the
-    # arm fixed effects; M4+ uses this (see replay/model_specs.py).
-    long["visit_recency_demeaned"] = long["visit_recency"] - long.groupby("arm")[
-        "visit_recency"
-    ].transform("mean")
+    long["arm_never_visited"] = anv_vals
+    # Time-local relative recency among the six leaf arms. Centering within
+    # each event prevents future events from changing earlier model rows.
+    long["visit_recency_demeaned"] = center_visit_recency_within_event(
+        vr_vals.reshape(n_events, n_arms)
+    ).reshape(-1)
     long["cumulative_reward"] = cr_vals
     long["reward_rate_arm_k10"] = rrr_vals
 
@@ -708,6 +749,9 @@ def build_contfrag_event_arm_table(
     long["swr_x_reward_rate_arm_k10"] = is_swr_i * long["reward_rate_arm_k10"].to_numpy()
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
+    )
+    long["swr_x_arm_never_visited"] = (
+        is_swr_i * long["arm_never_visited"].to_numpy()
     )
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
@@ -772,6 +816,7 @@ def build_contfrag_stop_table(
 
     dot = _filter_contfrag_event_labels(dot, speed_threshold)
     dot = add_trial_context(dot, trials)
+    dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
@@ -865,26 +910,41 @@ def build_contfrag_stop_table(
         else:
             per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
 
-    # Arm / patch fields. ``strict_first`` keeps the first row's
-    # NaN-or-finite value as-is so a bout that started before any
-    # trial doesn't inherit the next trial's context via
-    # ``safe_first``'s skip-NaN behavior.
+    # Whole-window behavioral location plus modal physical segment. The legacy
+    # current_arm name is a compatibility alias of strict location_arm.
+    location_state_vals: list[str] = []
+    at_well_vals: list[object] = []
+    location_well_vals = np.full(n_bouts, np.nan)
+    location_arm_vals = np.full(n_bouts, np.nan)
+    physical_arm_vals = np.full(n_bouts, np.nan)
+    nearest_min_vals = np.full(n_bouts, np.nan)
+    nearest_mean_vals = np.full(n_bouts, np.nan)
+    nearest_max_vals = np.full(n_bouts, np.nan)
     current_arm_vals = np.full(n_bouts, np.nan)
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
-        ts_modal = (
+        physical_arm = (
             safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
         )
-        ca = np.nan
-        if not np.isnan(ts_modal):
-            well_of_modal = arm_to_well(ts_modal, track_graph)
-            if not np.isnan(well_of_modal):
-                ca = float(ts_modal)
-        if np.isnan(ca):
-            ca = single_arm_from_well(strict_first(g["current_well"]), track_graph)
-        current_arm_vals[bi] = ca
+        location = summarize_behavioral_location(
+            g[["location_state", "location_well"]]
+        )
+        location_well = float(location["location_well"])
+        location_arm = single_arm_from_well(location_well, track_graph)
+        location_state_vals.append(str(location["location_state"]))
+        at_well_vals.append(location["at_well"])
+        location_well_vals[bi] = location_well
+        location_arm_vals[bi] = location_arm
+        physical_arm_vals[bi] = physical_arm
+        current_arm_vals[bi] = location_arm
+        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
+        finite_distance = distance[np.isfinite(distance)]
+        if finite_distance.size:
+            nearest_min_vals[bi] = finite_distance.min()
+            nearest_mean_vals[bi] = finite_distance.mean()
+            nearest_max_vals[bi] = finite_distance.max()
         prev_arm_vals[bi] = single_arm_from_well(
             strict_first(g["prev_well"]), track_graph
         )
@@ -895,6 +955,14 @@ def build_contfrag_stop_table(
             strict_first(g["last_rewarded_well"]), track_graph
         )
 
+    per_bout["location_state"] = location_state_vals
+    per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
+    per_bout["location_well"] = location_well_vals
+    per_bout["location_arm"] = location_arm_vals
+    per_bout["physical_arm"] = physical_arm_vals
+    per_bout["nearest_well_distance_cm_min"] = nearest_min_vals
+    per_bout["nearest_well_distance_cm_mean"] = nearest_mean_vals
+    per_bout["nearest_well_distance_cm_max"] = nearest_max_vals
     per_bout["current_arm"] = current_arm_vals
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
@@ -946,7 +1014,16 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
         "event_midpoint_time",
         "time_since_stop",
         "time_since_port_entry",
+        "time_since_last_port_entry",
         "time_since_reward",
+        "location_state",
+        "at_well",
+        "location_well",
+        "location_arm",
+        "physical_arm",
+        "nearest_well_distance_cm_min",
+        "nearest_well_distance_cm_mean",
+        "nearest_well_distance_cm_max",
         "is_swr",
         "is_mua",
         "continuous_prob_mean",
@@ -1005,6 +1082,14 @@ _CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "is_after_stay",
     "reward_outcome",
     "is_stay",
+    "location_state",
+    "at_well",
+    "location_well",
+    "location_arm",
+    "physical_arm",
+    "nearest_well_distance_cm_min",
+    "nearest_well_distance_cm_mean",
+    "nearest_well_distance_cm_max",
     "current_arm",
     "prev_arm",
     "next_arm",
@@ -1035,7 +1120,16 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "event_duration",
         "time_since_stop",
         "time_since_port_entry",
+        "time_since_last_port_entry",
         "time_since_reward",
+        "location_state",
+        "at_well",
+        "location_well",
+        "location_arm",
+        "physical_arm",
+        "nearest_well_distance_cm_min",
+        "nearest_well_distance_cm_mean",
+        "nearest_well_distance_cm_max",
         "is_swr",
         "is_mua",
         "continuous_prob_mean",
@@ -1077,6 +1171,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         # Reward / value
         "visit_recency",
         "visit_recency_demeaned",
+        "arm_never_visited",
         "cumulative_reward",
         "reward_rate_arm_k10",
         "p_reward_arm",
@@ -1092,6 +1187,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "swr_x_last_rewarded",
         "swr_x_reward_rate_arm_k10",
         "swr_x_visit_recency_demeaned",
+        "swr_x_arm_never_visited",
         "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
         "mua_x_prev",

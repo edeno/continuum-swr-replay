@@ -171,6 +171,9 @@ The 6-well environment is organized into 3 patches:
 - Patch 3: Wells 4, 5
 """
 
+WELL_ARMS: tuple[int, ...] = tuple(sorted(WELL_PATCH_MAPPING))
+"""Leaf arm IDs that terminate at the six reward wells, in canonical order."""
+
 TRACK_SEGMENT_TO_PATCH = {
     0: 1,
     1: 1,
@@ -198,4 +201,3 @@ order, and per-arm matrices are indexed by position in it, so analysis and
 visualization must share a single definition — reordering it silently
 reinterprets every per-arm coefficient.
 """
-

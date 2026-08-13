@@ -14,11 +14,51 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
+    _outcome_known_time,
     add_beta_belief_entropy,
     add_experienced_value_columns,
     assign_stops_to_trials,
     peri_switch_index,
 )
+
+
+@pytest.mark.parametrize(
+    ("rewarded", "expected"),
+    ((True, 12.5), (False, 14.0)),
+)
+def test_outcome_known_time_uses_reward_on_or_conservative_omission_poke_out(
+    rewarded, expected
+):
+    assert _outcome_known_time(
+        rewarded=rewarded,
+        poke_in_time=10.0,
+        poke_out_time=14.0,
+        reward_on_time=12.5,
+    ) == expected
+
+
+def test_outcome_known_time_rejects_missing_physical_boundary():
+    with pytest.raises(ValueError, match="poke_in"):
+        _outcome_known_time(
+            rewarded=False,
+            poke_in_time=np.nan,
+            poke_out_time=14.0,
+            reward_on_time=np.nan,
+        )
+    with pytest.raises(ValueError, match="poke_out"):
+        _outcome_known_time(
+            rewarded=False,
+            poke_in_time=10.0,
+            poke_out_time=np.nan,
+            reward_on_time=np.nan,
+        )
+    with pytest.raises(ValueError, match="reward_on"):
+        _outcome_known_time(
+            rewarded=True,
+            poke_in_time=10.0,
+            poke_out_time=14.0,
+            reward_on_time=np.nan,
+        )
 
 
 def _toy_times(leaves, ports_pct, *, epoch="02_r1", block=0):

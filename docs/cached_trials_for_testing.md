@@ -104,9 +104,11 @@ with open(f"/tmp/continuum_test_cache/{session_id}_track_graph.pkl", "rb") as f:
 
 From here use `trials` / `track_graph` as if they came from
 `load_data()`. The pipeline has been validated end-to-end on
-`j1620210710_02_r1` with this path — 299 events, 591 stops, 2691
-event-arm rows, 13773 sequence rows, no NaN in `current_arm` /
-`prev_arm` / `next_arm`.
+`j1620210710_02_r1` with the pre-location-context tables — 299 events, 591 stops,
+2691 event-arm rows, and 13773 sequence rows. The historical “no NaN in
+`current_arm`” check is no longer valid: current tables deliberately leave
+`current_arm` missing for transit, mixed, and unknown windows and expose
+`location_state` / `physical_arm` instead.
 
 ## Cleanup
 
