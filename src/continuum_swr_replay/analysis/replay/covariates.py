@@ -1,7 +1,7 @@
 """Behavioral covariate definitions for the replay rate / content / choice models.
 
 Single home for the per-event / per-stop / per-arm behavioral covariates (reward
-history, visit recency, model-free uncertainty) plus the local fitted-alpha
+history, visit recency, model-free uncertainty) plus the fixed-alpha local
 leaky-Q learner (``leaky_q_value_diff``). Note: the per-arm value block
 (``attach_contingency_value_block`` -> ``p_reward_arm`` / ``q_arm``) is sourced
 from ``qvals_table`` -- ``q_arm`` is the beta-model belief (Q), NOT leaky-Q; the
@@ -37,6 +37,12 @@ _Q_PORT_COLS = [f"q_port{i}" for i in range(6)]
 # variance counterpart of _Q_PORT_COLS (mean). betadist_var{i} indexes leaf port
 # i-1 (1-indexed columns), so leaf arm j -> _BETADIST_VAR_COLS[j] = betadist_var{j+1}.
 _BETADIST_VAR_COLS = [f"betadist_var{i}" for i in range(1, 7)]
+
+# Canonical paper-analysis settings. These covariates are computed from the
+# complete completion-ordered trial stream before it is reduced to stop rows;
+# they cannot be reconstructed correctly from a stop table with missing visits.
+CANONICAL_SWITCH_WINDOW = 5
+CANONICAL_LEAKY_Q_ALPHA = 0.3
 
 
 UNCERTAINTY_COVARIATES = (
@@ -460,30 +466,30 @@ def _leaky_q_value_diff(
     reward_outcome: np.ndarray,
     q_alpha: float,
 ) -> np.ndarray:
-    """Per-stop experienced-value choice margin from a leaky per-arm Q.
+    """Pre-update experienced-value margin over an ordered visit sequence.
 
-    For each arm ``a`` a leaky reward-rate is updated in stop order
+    For each arm ``a`` a leaky reward-rate is updated once per input row
     ``Q_a <- (1 - q_alpha) Q_a + q_alpha * reward_outcome`` (init 0.5 for all
-    arms). The covariate at a stop is the gap between the best and second-best
-    arm value ``sort(Q)[-1] - sort(Q)[-2]`` evaluated **before** that stop's
-    update (so it is the experienced choice margin the animal faced going in).
+    arms). The returned value is the best-minus-second-best gap evaluated
+    **before** that row's update. Canonical paper tables call this on the full
+    completion-ordered trial stream, never on the reduced stop sequence.
 
     Parameters
     ----------
-    current_arm : np.ndarray, shape (n_stops,)
-        Arm 0..5 visited at each stop (in stop order). A ``NaN`` arm still
+    current_arm : np.ndarray, shape (n_visits,)
+        Arm/well 0..5 visited at each completed visit. A ``NaN`` arm still
         yields the current pre-update Q-spread margin (a real value -- the
         choice margin does not depend on which arm is visited) but does not
         update any arm's ``Q`` (the unknown arm cannot be credited).
-    reward_outcome : np.ndarray, shape (n_stops,)
-        Binary reward (0/1) at each stop.
+    reward_outcome : np.ndarray, shape (n_visits,)
+        Binary reward (0/1) at each completed visit.
     q_alpha : float
         Leaky-integration learning rate.
 
     Returns
     -------
-    np.ndarray, shape (n_stops,)
-        Pre-update best-minus-second-best arm value at each stop.
+    np.ndarray, shape (n_visits,)
+        Pre-update best-minus-second-best arm value at each visit.
     """
     q = np.full(6, 0.5)
     out = np.full(current_arm.size, np.nan)
@@ -495,6 +501,163 @@ def _leaky_q_value_diff(
             a = int(arm)
             q[a] = (1.0 - q_alpha) * q[a] + q_alpha * reward_outcome[i]
     return out
+
+
+def canonical_trial_uncertainty_history(
+    completed_well: np.ndarray,
+    reward_outcome: np.ndarray,
+    is_after_switch: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute canonical uncertainty history over every completed trial.
+
+    The switch rate at trial ``j`` is the rolling mean through ``j`` because
+    that trip's switch outcome is known at its completion. The leaky-Q margin
+    at ``j`` is evaluated immediately before trial ``j`` updates its visited
+    well's value; every completed trial then updates exactly once, whether or
+    not that visit later contributes an immobility-bout row.
+    """
+    well = np.asarray(completed_well, dtype=float)
+    reward = np.asarray(reward_outcome, dtype=float)
+    switched = np.asarray(is_after_switch, dtype=float)
+    if well.ndim != 1 or reward.ndim != 1 or switched.ndim != 1:
+        raise ValueError("completed-trial uncertainty inputs must be one-dimensional")
+    if not (len(well) == len(reward) == len(switched)):
+        raise ValueError("completed-trial uncertainty inputs must have equal lengths")
+    if not np.isfinite(well).all() or not np.equal(well, np.floor(well)).all():
+        raise ValueError("completed well IDs must be finite integers")
+    if not np.isin(well, tuple(WELL_PATCH_MAPPING)).all():
+        raise ValueError(
+            "completed well IDs must be canonical task wells "
+            f"{tuple(WELL_PATCH_MAPPING)}"
+        )
+    for name, values in (("reward_outcome", reward), ("is_after_switch", switched)):
+        if not np.isfinite(values).all() or not np.isin(values, (0.0, 1.0)).all():
+            raise ValueError(f"{name} must contain finite binary values")
+
+    recent_switch_rate = (
+        pd.Series(switched)
+        .rolling(CANONICAL_SWITCH_WINDOW, min_periods=1)
+        .mean()
+        .to_numpy()
+    )
+    leaky_q_value_diff = _leaky_q_value_diff(
+        well,
+        reward,
+        CANONICAL_LEAKY_Q_ALPHA,
+    )
+    return recent_switch_rate, leaky_q_value_diff
+
+
+def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
+    """Validate and collapse stop rows to explicitly identified visits.
+
+    ``completed_trial_id`` is the zero-based completion-order ID regenerated
+    by :func:`add_trial_context`. Stop tables need not contain every completed
+    trial: a visit with no immobility bout has no stop row, so ID gaps are
+    valid. IDs must nevertheless be nondecreasing in stop order, nullable rows
+    may occur only before the first observed ID (true carry-in), and every row
+    sharing an ID must agree on its completed-trial arm, outcome, and switch
+    status.
+
+    The returned sequence contains only visits represented in ``stops``. It is
+    not a reconstruction of completed visits with no stop row; computing such
+    a full sequence would require the original trials table, which this
+    stop-table-only helper deliberately does not accept.
+    """
+    required = (
+        "completed_trial_id",
+        "completed_trial_arm",
+        "reward_outcome",
+        "is_after_switch",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
+    )
+    missing = [column for column in required if column not in stops]
+    if missing:
+        raise KeyError(
+            "visit-grain uncertainty covariates require explicit completed "
+            f"trial context columns {missing}; regenerate stop_table.pkl"
+        )
+    if len(stops) == 0:
+        return pd.DataFrame(columns=required)
+
+    raw_ids = stops["completed_trial_id"]
+    try:
+        visit_ids = pd.array(raw_ids, dtype="Int64")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "completed_trial_id must contain nullable integral completion-order IDs"
+        ) from exc
+    finite_ids = visit_ids[~visit_ids.isna()].to_numpy(dtype=np.int64)
+    if len(finite_ids) and (finite_ids < 0).any():
+        raise ValueError("completed_trial_id must be nonnegative")
+    if len(finite_ids) and np.any(np.diff(finite_ids) < 0):
+        raise ValueError("completed_trial_id must be nondecreasing in stop order")
+    if len(finite_ids):
+        first_observed = int(np.flatnonzero(~visit_ids.isna())[0])
+        if visit_ids[first_observed:].isna().any():
+            raise ValueError(
+                "nullable completed_trial_id carry-in rows may occur only before "
+                "the first observed completed trial"
+            )
+
+    carry_in = visit_ids.isna()
+    history_columns = (
+        "completed_trial_arm",
+        "reward_outcome",
+        "is_after_switch",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
+    )
+    if stops.loc[carry_in, list(history_columns)].notna().to_numpy().any():
+        raise ValueError(
+            "carry-in rows without a completed_trial_id must have unknown "
+            "completed-trial context and canonical history covariates"
+        )
+
+    working = stops.loc[~carry_in, list(required)].copy()
+    working["completed_trial_id"] = finite_ids
+    if working.empty:
+        return working
+
+    for column in history_columns:
+        values = pd.to_numeric(working[column], errors="coerce")
+        raw_finite = working[column].notna()
+        if (raw_finite & values.isna()).any():
+            raise ValueError(f"{column} must be numeric within completed trials")
+        working[column] = values.astype(float)
+        inconsistent = working.groupby("completed_trial_id", sort=False)[column].apply(
+            lambda group: group.nunique(dropna=False) != 1
+        )
+        if inconsistent.any():
+            bad = tuple(inconsistent[inconsistent].index[:10])
+            raise ValueError(
+                f"{column} must be constant within each completed_trial_id; "
+                f"invalid ID(s): {bad}"
+            )
+
+    visits = working.drop_duplicates("completed_trial_id", keep="first").reset_index(
+        drop=True
+    )
+    for column in history_columns:
+        if not np.isfinite(visits[column].to_numpy(dtype=float)).all():
+            raise ValueError(
+                f"{column} must be finite for every observed completed_trial_id"
+            )
+    arm = visits["completed_trial_arm"].to_numpy(dtype=float)
+    if not np.equal(arm, np.floor(arm)).all() or not np.isin(arm, WELL_ARMS).all():
+        raise ValueError(
+            f"completed_trial_arm must be a canonical leaf arm {tuple(WELL_ARMS)}"
+        )
+    for column in ("reward_outcome", "is_after_switch"):
+        values = visits[column].to_numpy(dtype=float)
+        if not np.isin(values, (0.0, 1.0)).all():
+            raise ValueError(f"{column} must be binary within completed trials")
+    for column in ("recent_switch_rate", "leaky_q_value_diff"):
+        values = visits[column].to_numpy(dtype=float)
+        if ((values < 0.0) | (values > 1.0)).any():
+            raise ValueError(f"{column} must lie in [0, 1]")
+    return visits
 
 
 def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
@@ -524,58 +687,6 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
     return out
 
 
-def _recent_switch_rate_per_visit(
-    stops: pd.DataFrame, switch_window: int
-) -> np.ndarray:
-    """Roll completed switch outcomes at visit grain, then broadcast to bouts.
-
-    The consecutive ``(prev_arm, current_arm)`` pair identifies the most
-    recently completed trip in canonical stop tables and is constant across
-    all bouts with that completed-choice context.  ``is_after_switch`` is
-    therefore known at every bout start, unlike the same row's retrospective
-    ``is_stay``.
-    """
-    prev_arm = stops["prev_arm"].to_numpy(dtype=float)
-    current_arm = stops["current_arm"].to_numpy(dtype=float)
-    is_after_switch = stops["is_after_switch"].to_numpy(dtype=float)
-    if len(stops) == 0:
-        return np.array([], dtype=float)
-
-    same_prev = (prev_arm[1:] == prev_arm[:-1]) | (
-        np.isnan(prev_arm[1:]) & np.isnan(prev_arm[:-1])
-    )
-    same_current = (current_arm[1:] == current_arm[:-1]) | (
-        np.isnan(current_arm[1:]) & np.isnan(current_arm[:-1])
-    )
-    same_visit = same_prev & same_current
-    visit_id = np.r_[0, np.cumsum(~same_visit)]
-    n_visits = int(visit_id[-1]) + 1
-    visit_switch = np.full(n_visits, np.nan)
-    for visit in range(n_visits):
-        values = is_after_switch[visit_id == visit]
-        finite = values[np.isfinite(values)]
-        if finite.size:
-            if finite.size != values.size or not np.all(finite == finite[0]):
-                raise ValueError(
-                    "is_after_switch must be constant within each completed "
-                    "visit (consecutive rows with the same prev/current arms)"
-                )
-            visit_switch[visit] = finite[0]
-
-    # The trip leading into the first observed visit can predate the recorded
-    # session.  Treat that carry-in state as unknown even if a stale source
-    # supplied a numeric label.
-    visit_switch[0] = np.nan
-
-    visit_rate = (
-        pd.Series(visit_switch)
-        .rolling(switch_window, min_periods=1)
-        .mean()
-        .to_numpy()
-    )
-    return visit_rate[visit_id]
-
-
 def add_uncertainty_covariates(
     stop_table: pd.DataFrame,
     *,
@@ -584,52 +695,83 @@ def add_uncertainty_covariates(
 ) -> pd.DataFrame:
     """Add four model-free behavioral-uncertainty covariates per stop.
 
-    Computed from existing ``stop_table`` columns only (no new data), grouped by
-    session ``(animal, day, epoch)`` and ordered by ``stop_idx`` within each
-    session. These are the experienced/subjective complement to the nominal
-    contingency values; both enter the rate model so nominal and experienced
-    value are dissociable. The input is not mutated; the returned frame keeps
-    the input's index and row count.
+    Validates the two visit-history covariates already computed from the full
+    completion-ordered trial stream, and adds the two stop-local summaries.
+    A reduced stop table cannot reconstruct history across completed visits
+    that contain no immobility bout, so missing canonical columns fail loudly.
+    The input is not mutated; the returned frame keeps its index and row count.
 
     The four covariates:
 
     - ``omission_streak``: leading consecutive omissions = count of leading 0s
       in ``reward_lag1, reward_lag2, ...`` (stop at the first 1; a ``NaN`` lag
       terminates the streak).
-    - ``recent_switch_rate``: rolling mean of ``is_after_switch`` over the last
-      ``switch_window`` completed visits. Multiple stop/bout rows sharing one
-      completed-choice context receive the same value; the current visit's
-      eventual ``is_stay`` is never used.
+    - ``recent_switch_rate``: canonical rolling mean of ``is_after_switch`` over
+      the last five completed visits in the full trial stream, through the
+      identified completed trial. It is validated and retained, not recomputed.
     - ``wsls_deviation``: 1.0 (deviated from win-stay/lose-shift) unless the stop
       is ``(is_after_reward & is_stay)`` or ``(is_after_omission & ~is_stay)``,
       in which case 0.0. ``NaN`` when neither ``is_after_reward`` nor
       ``is_after_omission`` is set (no defined prior outcome, e.g. the first
       stop of a session) -- such rows are dropped at fit time rather than
       counted as a deviation.
-    - ``leaky_q_value_diff``: best-minus-second-best per-arm leaky reward-rate
-      (init 0.5, rate ``q_alpha``) evaluated **before** the stop's update -- the
-      experienced-value choice margin.
+    - ``leaky_q_value_diff``: canonical best-minus-second-best leaky-Q margin
+      (init 0.5, alpha 0.3) immediately before the identified completed trial's
+      update. It is validated and retained, not recomputed.
 
-    ``q_alpha`` and ``switch_window`` are free parameters (a fitted RL model
-    would learn them); defaults ``0.3`` / ``5``. Report sensitivity.
+    Noncanonical ``q_alpha`` or ``switch_window`` requests fail: sensitivity
+    values require recomputation from the complete trials table, not this
+    reduced stop table.
 
     Parameters
     ----------
     stop_table : pd.DataFrame
         Per-stop table. Must carry ``animal``, ``day``, ``epoch``, ``stop_idx``,
-        ``prev_arm``, ``is_after_switch``, ``is_stay``, ``is_after_reward``,
-        ``is_after_omission``, ``reward_outcome``, ``current_arm``, and
+        ``completed_trial_id``, ``completed_trial_arm``, ``is_after_switch``,
+        ``is_stay``, ``is_after_reward``, ``is_after_omission``,
+        ``reward_outcome``, ``recent_switch_rate``, ``leaky_q_value_diff``, and
         ``reward_lag1..`` columns.
     switch_window : int
-        Rolling window (in completed visits) for ``recent_switch_rate``.
+        Must equal the canonical value 5.
     q_alpha : float
-        Leaky-integration learning rate for ``leaky_q_value_diff``.
+        Must equal the canonical value 0.3.
 
     Returns
     -------
     pd.DataFrame
         Copy of ``stop_table`` with the four covariate columns added.
     """
+    if switch_window != CANONICAL_SWITCH_WINDOW:
+        raise ValueError(
+            "noncanonical switch_window requires recomputation from the full "
+            "trials table; a stop table cannot recover visits without stops"
+        )
+    if not np.isfinite(q_alpha) or q_alpha != CANONICAL_LEAKY_Q_ALPHA:
+        raise ValueError(
+            "noncanonical q_alpha requires recomputation from the full trials "
+            "table; a stop table cannot recover visits without stops"
+        )
+
+    required = (
+        *_SESSION_COLS,
+        "stop_idx",
+        "completed_trial_id",
+        "completed_trial_arm",
+        "is_after_switch",
+        "is_after_reward",
+        "is_after_omission",
+        "reward_outcome",
+        "is_stay",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
+    )
+    missing = [column for column in required if column not in stop_table]
+    if missing:
+        raise KeyError(
+            "uncertainty covariates require canonical stop-table columns "
+            f"{missing}; regenerate stop_table.pkl"
+        )
+
     out = stop_table.copy()
     lag_cols = sorted(
         (c for c in out.columns if c.startswith("reward_lag")),
@@ -637,20 +779,17 @@ def add_uncertainty_covariates(
     )
 
     omission = pd.Series(np.nan, index=out.index, dtype=float)
-    switch_rate = pd.Series(np.nan, index=out.index, dtype=float)
     wsls = pd.Series(np.nan, index=out.index, dtype=float)
-    leaky = pd.Series(np.nan, index=out.index, dtype=float)
 
     for _, idx in out.groupby(_SESSION_COLS, sort=False).groups.items():
         g = out.loc[idx].sort_values("stop_idx")
         pos = g.index
+        _completed_visit_context(g)
 
         if lag_cols:
             omission.loc[pos] = _omission_streak(g[lag_cols].to_numpy(dtype=float))
         else:
             omission.loc[pos] = 0.0
-
-        switch_rate.loc[pos] = _recent_switch_rate_per_visit(g, switch_window)
 
         after_reward = g["is_after_reward"].to_numpy(dtype=float)
         after_omission = g["is_after_omission"].to_numpy(dtype=float)
@@ -665,16 +804,8 @@ def add_uncertainty_covariates(
         wsls_vals[no_prior] = np.nan
         wsls.loc[pos] = wsls_vals
 
-        leaky.loc[pos] = _leaky_q_value_diff(
-            g["current_arm"].to_numpy(dtype=float),
-            g["reward_outcome"].to_numpy(dtype=float),
-            q_alpha,
-        )
-
     out["omission_streak"] = omission
-    out["recent_switch_rate"] = switch_rate
     out["wsls_deviation"] = wsls
-    out["leaky_q_value_diff"] = leaky
     return out
 
 

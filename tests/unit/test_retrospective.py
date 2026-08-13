@@ -598,6 +598,127 @@ class TestRetrospectiveAlignmentWithShuffle:
                 rng=np.random.default_rng(0),
             )
 
+    def test_missing_final_arm_is_endpoint_failure_not_cohort_exclusion(self):
+        """A nonfinite final MAP bin stays in the endpoint denominator.
+
+        The earlier valid bin makes both events observable for the path metric,
+        while event 2's final junction bin is deliberately nonfinite.  The
+        shared default cohort must retain both events: event 2 is a False
+        endpoint, not an excluded endpoint.
+        """
+        ev = _make_event_table(
+            [
+                {
+                    "event_id": 1,
+                    "current_arm": 0,
+                    "next_arm": 0,
+                    "next_patch": 1,
+                },
+                {
+                    "event_id": 2,
+                    "current_arm": 0,
+                    "next_arm": 0,
+                    "next_patch": 1,
+                },
+            ]
+        )
+        ea = _make_event_arm_table(
+            {
+                1: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                2: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        es = _make_event_sequence_table({1: [0], 2: [0, 1]})
+        es.loc[
+            es["event_id"].eq(2) & es["t_in_event"].eq(1),
+            "decoded_arm_map",
+        ] = np.nan
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            es,
+            n_shuffles=2,
+            rng=np.random.default_rng(0),
+        )
+
+        assert result["n_events"] == 2
+        assert result["n_events_ends_at_next"] == 2
+        assert result["n_events_ends_at_next_patch"] == 2
+        assert result["real_mean_ends_at_next"] == 0.5
+        assert result["real_mean_ends_at_next_patch"] == 0.5
+
+    def test_endpoint_only_counts_event_with_no_sequence_rows_as_failure(self):
+        """Endpoint-only inference does not require a decoded sequence row."""
+        ev = _make_event_table(
+            [
+                {"event_id": 1, "current_arm": 0, "next_arm": 0},
+                {"event_id": 2, "current_arm": 0, "next_arm": 0},
+            ]
+        )
+        ea = _make_event_arm_table(
+            {
+                1: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                2: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        es = _make_event_sequence_table({1: [0]})
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            es,
+            n_shuffles=2,
+            metrics=("ends_at_next",),
+            rng=np.random.default_rng(0),
+        )
+
+        assert result["n_events"] == 2
+        assert result["n_events_ends_at_next"] == 2
+        assert result["real_mean_ends_at_next"] == 0.5
+
+    def test_rejects_metric_with_fewer_than_two_actual_observations(self):
+        """The inferential gate uses the computed metric denominator."""
+        ev = _make_event_table(
+            [
+                {
+                    "event_id": 1,
+                    "current_arm": 0,
+                    "next_arm": 0,
+                    "next_patch": 1,
+                },
+                {
+                    "event_id": 2,
+                    "current_arm": 0,
+                    "next_arm": 0,
+                    "next_patch": np.nan,
+                },
+            ]
+        )
+        ea = _make_event_arm_table(
+            {
+                1: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                2: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        es = _make_event_sequence_table({1: [0], 2: [0]})
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "at least two observed events for chosen_patch_fraction.*"
+                "retained 1"
+            ),
+        ):
+            retrospective_alignment_with_shuffle(
+                ev,
+                ea,
+                es,
+                n_shuffles=0,
+                metrics=("chosen_patch_fraction",),
+                rng=np.random.default_rng(0),
+            )
+
     def test_shuffle_destroys_alignment_on_aligned_data(self):
         rng = np.random.default_rng(0)
         # Build a session where chosen_arm_fraction is reliably 0.6 on the

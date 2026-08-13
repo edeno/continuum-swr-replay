@@ -82,7 +82,8 @@ _CONTFRAG_STATE_COLS = {
 # ``_summarize_event_state`` (pre-augmentation-safe), so the orchestrator
 # supplies every shared column *except* those two.
 _CONTFRAG_TRAJECTORY_COLUMNS = tuple(
-    c for c in SHARED_TRAJECTORY_COLUMNS
+    c
+    for c in SHARED_TRAJECTORY_COLUMNS
     if c not in ("continuous_prob_mean", "fragmented_prob_mean")
 )
 
@@ -323,9 +324,7 @@ def build_contfrag_event_table(
             else pd.Series(dtype=float)
         )
         physical_arm = safe_mode(ts)
-        location = summarize_behavioral_location(
-            g[["location_state", "location_well"]]
-        )
+        location = summarize_behavioral_location(g[["location_state", "location_well"]])
         location_well = float(location["location_well"])
         location_arm = single_arm_from_well(location_well, track_graph)
         current_arm = location_arm
@@ -425,9 +424,7 @@ def build_contfrag_event_table(
             "event_midpoint_time": midpoint_time,
             "time_since_port_entry": time_since_last_port_entry,
             "time_since_last_port_entry": time_since_last_port_entry,
-            "time_since_reward": float(
-                context_time - g["_last_reward_time"].iloc[0]
-            )
+            "time_since_reward": float(context_time - g["_last_reward_time"].iloc[0])
             if pd.notna(g["_last_reward_time"].iloc[0])
             else np.nan,
             "nearest_well_distance_cm_min": (
@@ -746,13 +743,13 @@ def build_contfrag_event_arm_table(
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
     # M7 — SWR × value/memory interactions (mirrors replay/tables.py).
-    long["swr_x_reward_rate_arm_k10"] = is_swr_i * long["reward_rate_arm_k10"].to_numpy()
+    long["swr_x_reward_rate_arm_k10"] = (
+        is_swr_i * long["reward_rate_arm_k10"].to_numpy()
+    )
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
-    long["swr_x_arm_never_visited"] = (
-        is_swr_i * long["arm_never_visited"].to_numpy()
-    )
+    long["swr_x_arm_never_visited"] = is_swr_i * long["arm_never_visited"].to_numpy()
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
     )
@@ -897,6 +894,8 @@ def build_contfrag_stop_table(
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
     ):
         if col == "is_after_stay":
             stay = np.where(
@@ -909,6 +908,11 @@ def build_contfrag_stop_table(
             )
         else:
             per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+
+    per_bout["completed_trial_id"] = pd.array(
+        bout_first_row["completed_trial_id"].reindex(np.arange(n_bouts)),
+        dtype="Int64",
+    )
 
     # Whole-window behavioral location plus modal physical segment. The legacy
     # current_arm name is a compatibility alias of strict location_arm.
@@ -924,13 +928,12 @@ def build_contfrag_stop_table(
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
+    completed_trial_arm_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
         physical_arm = (
             safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
         )
-        location = summarize_behavioral_location(
-            g[["location_state", "location_well"]]
-        )
+        location = summarize_behavioral_location(g[["location_state", "location_well"]])
         location_well = float(location["location_well"])
         location_arm = single_arm_from_well(location_well, track_graph)
         location_state_vals.append(str(location["location_state"]))
@@ -954,6 +957,9 @@ def build_contfrag_stop_table(
         last_rew_vals[bi] = single_arm_from_well(
             strict_first(g["last_rewarded_well"]), track_graph
         )
+        completed_trial_arm_vals[bi] = single_arm_from_well(
+            strict_first(g["last_visited_well"]), track_graph
+        )
 
     per_bout["location_state"] = location_state_vals
     per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
@@ -967,6 +973,7 @@ def build_contfrag_stop_table(
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals
+    per_bout["completed_trial_arm"] = completed_trial_arm_vals
     cur_patch = np.array([arm_to_patch(a) for a in current_arm_vals])
     nxt_patch = np.array([arm_to_patch(a) for a in next_arm_vals])
     per_bout["current_patch"] = cur_patch
@@ -1081,6 +1088,10 @@ _CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "is_after_reward",
     "is_after_stay",
     "reward_outcome",
+    "completed_trial_id",
+    "completed_trial_arm",
+    "recent_switch_rate",
+    "leaky_q_value_diff",
     "is_stay",
     "location_state",
     "at_well",

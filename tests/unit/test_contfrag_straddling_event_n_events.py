@@ -171,6 +171,10 @@ def test_movement_spanning_event_excluded_invariant_holds():
         "nearest_well_distance_cm_max",
     ):
         assert column in stop.columns
+    assert stop["completed_trial_id"].isna().all()
+    assert stop["completed_trial_arm"].isna().all()
+    assert stop["recent_switch_rate"].isna().all()
+    assert stop["leaky_q_value_diff"].isna().all()
 
 
 @pytest.mark.parametrize(
@@ -199,9 +203,7 @@ def test_every_external_event_source_rejects_one_bad_bin_atomically(
     arm = build_contfrag_event_arm_table(
         event, dot, env, trials, graph, event_source=event_source
     )
-    stop = build_contfrag_stop_table(
-        dot, trials, graph, event_source=event_source
-    )
+    stop = build_contfrag_stop_table(dot, trials, graph, event_source=event_source)
 
     assert event[event_col].tolist() == [2]
     assert arm["event_id"].nunique() == 1
@@ -226,12 +228,8 @@ def test_cross_source_flags_use_strict_event_level_overlap(
     dot.iloc[start:stop, dot.columns.get_loc("head_speed")] = 1.0
 
     env, graph, trials = _EnvStub(), _bandit_graph(), _empty_trials()
-    swr_events = build_contfrag_event_table(
-        dot, env, trials, graph, event_source="SWR"
-    )
-    mua_events = build_contfrag_event_table(
-        dot, env, trials, graph, event_source="MUA"
-    )
+    swr_events = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
+    mua_events = build_contfrag_event_table(dot, env, trials, graph, event_source="MUA")
 
     swr_2 = swr_events.loc[swr_events["SWR_event"] == 2].iloc[0]
     mua_7 = mua_events.loc[mua_events["MUA_event"] == 7].iloc[0]

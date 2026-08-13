@@ -177,7 +177,10 @@ from .uncertainty import (
 # The build fills NaN placeholders per session; the real global z is computed once in
 # ``prepare_data.main`` after the all-session concat (see analysis.replay.standardization).
 EVENT_ARM_STANDARDIZED_COLS = (
-    "q_arm", "reward_rate_arm_k10", "p_reward_arm", "arm_uncertainty"
+    "q_arm",
+    "reward_rate_arm_k10",
+    "p_reward_arm",
+    "arm_uncertainty",
 )
 
 # State-probability column mapping for the 4-state Non-Local model:
@@ -948,9 +951,7 @@ def build_stop_table(
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
-    per_bout["reward_rate_trial_k10"] = _recent_trial_reward_rate(
-        bout_starts, trials
-    )
+    per_bout["reward_rate_trial_k10"] = _recent_trial_reward_rate(bout_starts, trials)
     # Per-lag reward outcomes (reward_lag1..N): the immediate previous trial
     # (lag1, dwell-confounded) through earlier trials (lag>=2, dwell-clean) —
     # the kernel parameterization fit by the Rlag rate model.
@@ -1027,6 +1028,8 @@ def build_stop_table(
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
     ):
         if col == "is_after_stay":
             # Not produced by _add_trial_context; derive from is_after_switch.
@@ -1040,6 +1043,11 @@ def build_stop_table(
             )
         else:
             per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+
+    per_bout["completed_trial_id"] = pd.array(
+        bout_first_row["completed_trial_id"].reindex(np.arange(n_bouts)),
+        dtype="Int64",
+    )
 
     # Behavioral-location and physical-segment fields use the whole bout.
     # ``current_arm`` remains a compatibility alias for the strict at-well
@@ -1058,6 +1066,7 @@ def build_stop_table(
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
+    completed_trial_arm_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
         physical_arm = (
             _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
@@ -1088,6 +1097,9 @@ def build_stop_table(
         last_rew_vals[bi] = _single_arm_from_well(
             _strict_first(g["last_rewarded_well"]), track_graph
         )
+        completed_trial_arm_vals[bi] = _single_arm_from_well(
+            _strict_first(g["last_visited_well"]), track_graph
+        )
 
     per_bout["location_state"] = location_state_vals
     per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
@@ -1101,6 +1113,7 @@ def build_stop_table(
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals
+    per_bout["completed_trial_arm"] = completed_trial_arm_vals
     cur_patch = np.array([_arm_to_patch(a) for a in current_arm_vals])
     nxt_patch = np.array([_arm_to_patch(a) for a in next_arm_vals])
     per_bout["current_patch"] = cur_patch
@@ -1395,9 +1408,7 @@ def build_event_arm_table(
     event_times = event_table["event_start"].to_numpy()
     if len(trials) > 0:
         vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)
-        anv_2d = _arm_never_visited_all_events(
-            event_times, trials, well_to_arm_map
-        )
+        anv_2d = _arm_never_visited_all_events(event_times, trials, well_to_arm_map)
         cr_2d = _cumulative_reward_all_events(event_times, trials, well_to_arm_map)
         # canonical per-arm reward rate: rewarded fraction of the last 10 visits
         # to that arm (covariate_dictionary.md D1; was 5-visit).
@@ -1425,9 +1436,7 @@ def build_event_arm_table(
     # Relative leaf-arm recency, centered independently inside each event.
     # Unlike the old across-event/session mean, this cannot change when later
     # events are appended. Structural trunk recencies stay at zero.
-    long["visit_recency_demeaned"] = _center_visit_recency_within_event(
-        vr_2d
-    ).flatten()
+    long["visit_recency_demeaned"] = _center_visit_recency_within_event(vr_2d).flatten()
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
 
@@ -1474,9 +1483,7 @@ def build_event_arm_table(
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
-    long["swr_x_arm_never_visited"] = (
-        is_swr_i * long["arm_never_visited"].to_numpy()
-    )
+    long["swr_x_arm_never_visited"] = is_swr_i * long["arm_never_visited"].to_numpy()
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
     )
@@ -1808,6 +1815,10 @@ _STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "is_after_reward",
     "is_after_stay",
     "reward_outcome",
+    "completed_trial_id",
+    "completed_trial_arm",
+    "recent_switch_rate",
+    "leaky_q_value_diff",
     "is_stay",
     "location_state",
     "at_well",

@@ -58,7 +58,7 @@ arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
 | `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
 | `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect — **the value construct used by C4/CS5/Mv** (and the is_swr rate ladder's value covariates); **not** used in the Stage-5A choice model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13** when the paper standardized on the beta-bernoulli model.) |
-| `leaky_q_value_diff` | per-**stop** leaky-Q best-minus-second **margin** (α=0.3) | scalar | `_leaky_q_value_diff` | **retained comparison** (MU only), like `is_after_switch` under D4 |
+| `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** for the most recently completed trial (α=0.3), computed over the full trial stream and broadcast to its stops | scalar | `canonical_trial_uncertainty_history` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
 `nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
@@ -68,8 +68,10 @@ not a local leaky-Q learner: all value covariates were migrated to `qvals_table.
 (DataJoint, exact `poke_out` alignment; retires the difflib contingency CSV). The
 model's per-port `Q{i}` populate `q_port{i}` → `q_arm`, and `Q{leaf}` = `q_chosen` →
 `q_current`. **`leaky_q_value_diff` is NOT this** — it is a *different*, still-local
-construct (per-stop best-minus-second margin, α=0.3, computed in `covariates.py`), kept
-as a reported MU-only comparison. `value_diff_patch` (nominal) remains a scalar
+construct (one pre-update best-minus-second margin per completed trial, α=0.3,
+computed over every completed trial in `covariates.py`, persisted on stop rows,
+and then broadcast to events by `stop_id`), kept as a reported MU-only comparison. `value_diff_patch`
+(nominal) remains a scalar
 rate/coupling covariate. **`rpe` is now the model RPE everywhere** (`reward − q_chosen`,
 from `qvals_table.pkl`; see [behavior_model_covariates.md](behavior_model_covariates.md)) —
 after the migration every consumer (MU-uncertainty as `rpe_model`, plus `fit_swr_power`
@@ -79,8 +81,8 @@ and `_covariate_ranking`) uses the model RPE, not a nominal one.
 
 | canonical name | definition | window | units | enters |
 |---|---|---|---|---|
-| `recent_switch_rate` | rolling mean of `(1 − is_stay)` over the last 5 stops, lagged 1 (no leakage) | 5 stops | fraction | **canonical** cross-family: rate/coupling main effect; content via `× is_current` |
-| `is_after_switch` | current trial is a patch change | 1 trial | binary | **retained comparison** (per D4): the immediate-binary complement, available alongside `recent_switch_rate` wherever the estimator allows |
+| `recent_switch_rate` | rolling mean of `is_patch_change` over the last (up to) 5 completed trials, including the most recently completed trial | 5 completed trials | fraction | **canonical** cross-family: rate/coupling main effect; content via `× is_current` |
+| `is_after_switch` | the most recently completed trip changed patch | 1 completed trial | binary | **retained comparison** (per D4): the immediate-binary complement, available alongside `recent_switch_rate` wherever the estimator allows |
 
 (D4: both kept — `recent_switch_rate` is the canonical graded covariate; `is_after_switch`
 is a valued immediate-contrast comparison, not dropped.)
@@ -126,8 +128,9 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   populated), not a new parallel column.
 - **D3** — **add** the experienced-value covariate `q_current` / `q_arm` (now the
   **beta-model belief** from `qvals_table`, not a local leaky-Q learner) as canonical,
-  and **keep `leaky_q_value_diff`** (the per-stop margin, a different, still-local
-  construct) as a *reported comparison*. (Revised from "drop": the two are different
+  and **keep `leaky_q_value_diff`** (the completed-trial pre-update margin, a
+  different local construct) as a *reported comparison*. (Revised from "drop":
+  the two are different
   algorithms, and the margin is deliberately kept in the MU dissociation table.)
 - **D4** — exploration canonical = **`recent_switch_rate`**; **keep `is_after_switch`**
   as the immediate-binary comparison (not dropped).
@@ -159,7 +162,7 @@ the event it predicts. Classification of the covariates fitted by the rate model
 |---|---|---|
 | `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
 | `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
-| `recent_switch_rate` | rolling, **lag-1** | yes — by construction excludes the current stop |
+| `recent_switch_rate` | rolling over completed trials | yes — includes only trips completed by the bout start and never uses that stop's eventual outbound choice |
 | `beta_reward_entropy` | beta belief entropy (mean per-leaf Beta differential entropy) | yes (pre-outcome posterior) |
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
 

@@ -240,6 +240,20 @@ def test_event_and_stop_tables_label_location_without_filtering_events():
     # event labels should agree exactly and no cohort row is lost.
     assert stops["location_state"].tolist() == events["location_state"].tolist()
     assert stops["at_well"].tolist() == events["at_well"].tolist()
+    assert stops["completed_trial_id"].tolist() == [pd.NA, 0, 0]
+    np.testing.assert_allclose(
+        stops["completed_trial_arm"], [np.nan, 1.0, 1.0], equal_nan=True
+    )
+    np.testing.assert_allclose(
+        stops["recent_switch_rate"].to_numpy(dtype=float),
+        [np.nan, 0.0, 0.0],
+        equal_nan=True,
+    )
+    np.testing.assert_allclose(
+        stops["leaky_q_value_diff"].to_numpy(dtype=float),
+        [np.nan, 0.0, 0.0],
+        equal_nan=True,
+    )
     assert int(stops["n_events"].sum()) == len(events) == 3
     for table, rows_per_event in ((event_arms, 9), (event_patches, 3)):
         assert len(table) == len(events) * rows_per_event

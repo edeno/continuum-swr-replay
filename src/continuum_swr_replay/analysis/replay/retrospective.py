@@ -655,7 +655,14 @@ def _observable_event_keys(
     event_sequence_table: pd.DataFrame,
     metrics: tuple[str, ...],
 ) -> pd.DataFrame:
-    """Keys observable for every requested metric and every label shuffle."""
+    """Keys observable for every requested metric and every label shuffle.
+
+    Endpoint metrics deliberately do *not* require a finite final MAP arm.
+    Their scientific question is whether the event ends at the target, so an
+    undecoded final bin is a negative endpoint rather than missing data.  Path
+    coverage still requires at least one finite decoded arm; otherwise there
+    is no decoded sequence on which to evaluate set coverage.
+    """
     key_cols = [*_session_keys(event_table), "event_id"]
     keys = event_table[key_cols].drop_duplicates()
     if any(
@@ -682,16 +689,18 @@ def _observable_event_keys(
         ][key_cols]
         keys = keys.merge(arm_observed, on=key_cols, how="inner")
 
-    sequence_metrics = {
-        "ends_at_next",
-        "contains_path_to_next",
-        "ends_at_next_patch",
-    }
-    if any(metric in sequence_metrics for metric in metrics):
+    endpoint_metrics = {"ends_at_next", "ends_at_next_patch"}
+    path_metrics = {"contains_path_to_next"}
+    requested_sequence_metrics = set(metrics) & (
+        endpoint_metrics | path_metrics
+    )
+    if requested_sequence_metrics:
         if "decoded_arm_map" not in event_sequence_table:
             raise KeyError(
                 "Sequence retrospective metrics require decoded_arm_map"
             )
+
+    if set(metrics) & path_metrics:
         sequence = event_sequence_table.assign(
             _valid_decoded=np.isfinite(
                 pd.to_numeric(
@@ -703,29 +712,9 @@ def _observable_event_keys(
         sequence_observed = grouped_sequence.agg(
             _any_valid_decoded=("_valid_decoded", "any")
         ).reset_index()
-        ends_metrics = {"ends_at_next", "ends_at_next_patch"}
-        if any(metric in ends_metrics for metric in metrics):
-            order_cols = [*key_cols]
-            if "t_in_event" in sequence:
-                order_cols.append("t_in_event")
-            last = sequence.sort_values(order_cols, kind="stable").groupby(
-                key_cols, as_index=False
-            ).tail(1)
-            sequence_observed = sequence_observed.merge(
-                last[[*key_cols, "_valid_decoded"]].rename(
-                    columns={"_valid_decoded": "_valid_final_decoded"}
-                ),
-                on=key_cols,
-                how="left",
-                validate="one_to_one",
-            )
-            sequence_observed = sequence_observed[
-                sequence_observed["_valid_final_decoded"]
-            ]
-        else:
-            sequence_observed = sequence_observed[
-                sequence_observed["_any_valid_decoded"]
-            ]
+        sequence_observed = sequence_observed[
+            sequence_observed["_any_valid_decoded"]
+        ]
         sequence_observed = sequence_observed[key_cols]
         keys = keys.merge(sequence_observed, on=key_cols, how="inner")
     return keys
@@ -819,12 +808,34 @@ def retrospective_alignment_with_shuffle(
     real = compute_retrospective_metrics(
         event_table, event_arm_table, event_sequence_table
     )
-    real_means = _per_session_metric_means(real)
+    missing_metrics = [metric for metric in metrics if metric not in real]
+    if missing_metrics:
+        raise KeyError(
+            "Requested retrospective metric(s) were not computed: "
+            f"{missing_metrics}"
+        )
     real_counts = {
-        metric: int(real[metric].notna().sum())
-        for metric in metrics
-        if metric in real
+        metric: int(real[metric].notna().sum()) for metric in metrics
     }
+
+    # Validate the *computed* denominators, not only the number of event rows.
+    # A metric can still lose observations after cohort selection if an input
+    # target such as ``next_patch`` is missing.  Such a singleton cannot support
+    # the circular-shift inference and must fail before doing the shuffles.
+    n_events = int(len(event_table))
+    for metric, count in real_counts.items():
+        if count < 2:
+            raise ValueError(
+                "Retrospective circular-shift inference requires at least two "
+                f"observed events for {metric} after the final cohort is "
+                f"frozen; retained {count}"
+            )
+        if count != n_events:
+            raise RuntimeError(
+                f"Retrospective metric {metric} observed {count} events but "
+                f"the frozen common cohort contains {n_events}"
+            )
+    real_means = _per_session_metric_means(real)
 
     shuffled_acc: dict[str, list[float]] = {m: [] for m in metrics}
     for _ in range(n_shuffles):
@@ -839,8 +850,6 @@ def retrospective_alignment_with_shuffle(
 
     # Every requested metric and every shuffle uses this same explicit
     # at-well, valid-next event cohort.
-    n_events = int(len(event_table))
-
     out: dict[str, float] = {
         "n_events": n_events,
         "n_shuffles": int(n_shuffles),
@@ -848,11 +857,6 @@ def retrospective_alignment_with_shuffle(
     for m in metrics:
         if m not in real_means:
             continue
-        if real_counts[m] != n_events:
-            raise RuntimeError(
-                f"Retrospective metric {m} observed {real_counts[m]} events but "
-                f"the frozen common cohort contains {n_events}"
-            )
         out[f"real_mean_{m}"] = real_means[m]
         if shuffled_acc[m]:
             out[f"shuffled_mean_{m}"] = float(np.mean(shuffled_acc[m]))

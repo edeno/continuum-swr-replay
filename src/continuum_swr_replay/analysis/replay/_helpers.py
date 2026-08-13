@@ -122,9 +122,7 @@ def behavioral_location_at_times(
                     ["unknown"] * len(sample_times), categories=_LOCATION_STATES
                 ),
                 "at_well": pd.array([pd.NA] * len(sample_times), dtype="boolean"),
-                "location_well": pd.array(
-                    [pd.NA] * len(sample_times), dtype="Float64"
-                ),
+                "location_well": pd.array([pd.NA] * len(sample_times), dtype="Float64"),
             },
             index=index,
         )
@@ -261,9 +259,10 @@ def nearest_well_distance_cm(
         )
     except (TypeError, ValueError):
         return np.full(n_rows, np.nan)
-    if well_positions.shape != (len(well_nodes), 2) or not np.isfinite(
-        well_positions
-    ).all():
+    if (
+        well_positions.shape != (len(well_nodes), 2)
+        or not np.isfinite(well_positions).all()
+    ):
         return np.full(n_rows, np.nan)
 
     positions = dot.loc[:, coordinate_columns].to_numpy(dtype=float)
@@ -291,6 +290,12 @@ def add_trial_context(
     - ``prev_well``, ``current_well``, ``last_visited_well`` (past-only)
     - ``next_well`` (retrospective future destination)
     - ``last_rewarded_well``
+    - ``completed_trial_id`` — zero-based completion-order ID regenerated
+      within the session (not an index copied from the source trial table)
+    - ``recent_switch_rate`` — canonical five-completed-trial rolling switch
+      rate through the identified trial, computed from the full trial stream
+    - ``leaky_q_value_diff`` — canonical alpha-0.3 pre-update Q margin for the
+      identified trial, computed while updating on every completed trial
     - ``is_after_switch`` — last completed trip's ``is_patch_change``
     - ``is_after_omission`` — ``~last completed trip's is_reward``
     - ``is_after_reward`` — last completed trip's ``is_reward``
@@ -318,8 +323,11 @@ def add_trial_context(
             "is_after_switch",
             "_goal_arrival_time",
             "_last_reward_time",
+            "recent_switch_rate",
+            "leaky_q_value_diff",
         ):
             dot[col] = np.nan
+        dot["completed_trial_id"] = pd.array([pd.NA] * len(dot), dtype="Int64")
         return dot
 
     trials, arrival_times = _prepare_trials_for_context(
@@ -342,13 +350,36 @@ def add_trial_context(
     is_reward = reward_values.astype(bool)
     is_patch_change = patch_change_values.astype(bool)
 
+    # Local import avoids the module's deliberate re-export cycle: covariates
+    # imports low-level trial helpers from this module, while this call needs
+    # the canonical scientific definition owned by covariates. The function is
+    # invoked only after both modules have finished importing.
+    from .covariates import canonical_trial_uncertainty_history
+
+    trial_switch_rate, trial_q_margin = canonical_trial_uncertainty_history(
+        to_wells,
+        reward_values,
+        patch_change_values,
+    )
+
     completed_idx = np.searchsorted(arrival_times, dot_times, side="right") - 1
     has_completed = completed_idx >= 0
     completed_clipped = np.clip(completed_idx, 0, n_trials - 1)
-
-    dot["prev_well"] = np.where(
-        has_completed, from_wells[completed_clipped], np.nan
+    # This ID is deliberately regenerated after canonical completion-time
+    # sorting. Source trial indices are not stable across loaders, whereas a
+    # zero-based completion order is the visit identity needed by downstream
+    # history covariates. Before the first observed completion it is unknown.
+    completed_trial_id = pd.array(completed_idx, dtype="Int64")
+    completed_trial_id[~has_completed] = pd.NA
+    dot["completed_trial_id"] = completed_trial_id
+    dot["recent_switch_rate"] = np.where(
+        has_completed, trial_switch_rate[completed_clipped], np.nan
     )
+    dot["leaky_q_value_diff"] = np.where(
+        has_completed, trial_q_margin[completed_clipped], np.nan
+    )
+
+    dot["prev_well"] = np.where(has_completed, from_wells[completed_clipped], np.nan)
     last_visited = np.where(has_completed, to_wells[completed_clipped], np.nan)
     dot["last_visited_well"] = last_visited
     # Compatibility alias: unlike the previous implementation, current_well
@@ -388,9 +419,7 @@ def add_trial_context(
     )
     dot["reward_outcome"] = previous_reward
     dot["is_after_reward"] = previous_reward
-    dot["is_after_omission"] = np.where(
-        has_completed, 1.0 - previous_reward, np.nan
-    )
+    dot["is_after_omission"] = np.where(has_completed, 1.0 - previous_reward, np.nan)
     dot["is_after_switch"] = np.where(
         has_completed, is_patch_change[completed_clipped].astype(float), np.nan
     )

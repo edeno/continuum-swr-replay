@@ -7,8 +7,9 @@ SWR-coupled vs non-SWR non-local events, controlling for the within-stop time
 course, raised-cosine self-history, the reward kernel, and the recent reward
 rate. Rate-only -- replay direction is out of scope.
 
-Per session: load ``stop_table``; add ``recent_switch_rate``
-(:func:`add_uncertainty_covariates`); inner-merge the nominal value + real
+Per session: load ``stop_table``; validate its canonical ``recent_switch_rate``
+and derive stop-local summaries (:func:`add_uncertainty_covariates`); inner-merge
+the nominal value + real
 behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
 poke_out-aligned source -- no difflib CSV); drop the first (exposure) session per
 animal; attach the canonical ``is_swr`` to the onsets.
@@ -69,6 +70,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
+    CANONICAL_SWITCH_WINDOW,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
@@ -376,7 +380,15 @@ def main() -> None:
         help="Smoke mode: keep only the first N (post-exposure) sessions per animal.",
     )
     parser.add_argument(
-        "--switch-window", type=int, default=5, help="recent_switch_rate window."
+        "--switch-window",
+        type=int,
+        choices=(CANONICAL_SWITCH_WINDOW,),
+        default=CANONICAL_SWITCH_WINDOW,
+        help=(
+            "Completed-trial window for recent_switch_rate. The canonical "
+            "tables currently support only 5; other values require rebuilding "
+            "from the full trial stream."
+        ),
     )
     args = parser.parse_args()
 
@@ -387,9 +399,10 @@ def main() -> None:
         pd.read_pickle(RC / "event_table.pkl"),
     )
 
-    # add_uncertainty_covariates supplies recent_switch_rate (the only model-free
-    # covariate still fit); its leaky_q_value_diff / omission_streak / wsls_deviation
-    # stand-ins are no longer used here.
+    # add_uncertainty_covariates validates the upstream recent_switch_rate (the
+    # only model-free covariate still fit) and derives stop-local summaries. Its
+    # leaky_q_value_diff / omission_streak / wsls_deviation stand-ins are no
+    # longer used here.
     stop = add_uncertainty_covariates(stop, switch_window=args.switch_window)
     # Nominal schedule + real model covariates, ALL from qvals_table -- one
     # exactly poke_out-aligned source (retires the difflib contingency_table_csv

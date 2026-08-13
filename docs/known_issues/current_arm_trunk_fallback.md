@@ -1,6 +1,6 @@
 # `current_arm` can name an arm the animal has not reached yet
 
-**Status:** fixed in `event-location-context-cohorts`; regeneration pending
+**Status:** fixed in `event-location-context`; regeneration pending
 **Found:** 2026-08-10, following the replay-tables review
 **Severity:** negligible pooled (0.93 % of events); material per-animal for wilbur
 (3.9 %) and disqualifying for one session (`wilbur20210329_16_r8`, 40.8 %)
@@ -95,6 +95,13 @@ pipeline kept producing events.**
 - Trial history now advances at `goal_arrival_time` (with the established
   per-row `end_time` fallback), not departure.
 - Exact arrival is at-well; exact departure is in-transit.
+- Stop rows carry a nullable, zero-based `completed_trial_id` plus
+  `completed_trial_arm`. The ID is regenerated in completion order within each
+  session; repeated immobility bouts after one arrival share the same ID.
+- `recent_switch_rate` and `leaky_q_value_diff` are computed once from the full
+  completion-ordered trial stream, then stored once per stop context. Model
+  consumers broadcast them to events by `stop_id`. Thus a completed trial with
+  no immobility bout still contributes exactly once to later history.
 - No eligible event is dropped by default. Location columns make a later
   well-only sensitivity cohort explicit and auditable.
 - `current_arm` is NaN for transit/mixed/unknown windows instead of guessing a

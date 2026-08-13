@@ -16,6 +16,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay.covariates import (
+    canonical_trial_uncertainty_history,
+)
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
@@ -43,16 +46,26 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     ):
         if col not in df:
             df[col] = 0.0
+    if "completed_trial_id" not in df:
+        df["completed_trial_id"] = pd.array(range(len(df)), dtype="Int64")
+    else:
+        df["completed_trial_id"] = pd.array(df["completed_trial_id"], dtype="Int64")
+    if "completed_trial_arm" not in df:
+        df["completed_trial_arm"] = df["current_arm"]
+    has_completed = df["completed_trial_id"].notna()
+    if "recent_switch_rate" not in df:
+        df["recent_switch_rate"] = np.where(has_completed, 0.0, np.nan)
+    if "leaky_q_value_diff" not in df:
+        df["leaky_q_value_diff"] = np.where(has_completed, 0.0, np.nan)
     for j in range(1, 4):
         if f"reward_lag{j}" not in df:
             df[f"reward_lag{j}"] = np.nan
-    # Real stop-table frames carry the origin arm and the outcome of the most
-    # recently completed trip.  With one stop per visit, these are exactly the
-    # lagged counterparts of ``is_stay`` used by the historical definition.
+    # Real stop-table frames carry an explicit regenerated completed-trial ID.
+    # Most tests do not exercise switch history, so use a valid neutral default.
     if "prev_arm" not in df:
         df["prev_arm"] = np.arange(len(df), dtype=float)
     if "is_after_switch" not in df:
-        df["is_after_switch"] = (1.0 - df["is_stay"]).shift(1)
+        df["is_after_switch"] = 0.0
     return df
 
 
@@ -70,22 +83,21 @@ def test_omission_streak():
 
 
 def test_recent_switch_rate_no_leakage():
-    # With one stop per completed choice, retain the historical result exactly:
-    # is_stay -> is_switch = 1 - is_stay, lagged by one visit.
+    # The completed trip's switch status is already past context at each stop.
     df = _frame(
         [
-            {"is_stay": 1.0},  # switch 0
-            {"is_stay": 0.0},  # switch 1
-            {"is_stay": 0.0},  # switch 1
-            {"is_stay": 1.0},  # switch 0
+            {"is_after_switch": 0.0, "recent_switch_rate": 0.0, "is_stay": 1.0},
+            {"is_after_switch": 1.0, "recent_switch_rate": 0.5, "is_stay": 0.0},
+            {"is_after_switch": 1.0, "recent_switch_rate": 2 / 3, "is_stay": 0.0},
+            {"is_after_switch": 0.0, "recent_switch_rate": 0.5, "is_stay": 1.0},
         ]
     )
     out = add_uncertainty_covariates(df, switch_window=5).sort_values("stop_idx")
     rates = out["recent_switch_rate"].to_numpy()
-    assert np.isnan(rates[0])  # no prior stop
-    assert rates[1] == pytest.approx(0.0)  # mean of [switch@0]=0
-    assert rates[2] == pytest.approx(0.5)  # mean of [0,1]
-    assert rates[3] == pytest.approx(2 / 3)  # mean of [0,1,1]
+    assert rates[0] == pytest.approx(0.0)
+    assert rates[1] == pytest.approx(0.5)
+    assert rates[2] == pytest.approx(2 / 3)
+    assert rates[3] == pytest.approx(0.5)
 
 
 def test_recent_switch_rate_is_computed_once_per_completed_visit():
@@ -96,12 +108,48 @@ def test_recent_switch_rate_is_computed_once_per_completed_visit():
             # ``is_after_switch`` stay fixed until another trip completes.
             # ``is_stay`` is the eventual *outbound* choice and is future
             # information throughout each two-bout visit.
-            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
-            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
-            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
-            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
-            {"prev_arm": 0.0, "is_after_switch": 0.0, "is_stay": 0.0},
-            {"prev_arm": 0.0, "is_after_switch": 0.0, "is_stay": 0.0},
+            {
+                "completed_trial_id": 0,
+                "prev_arm": 3.0,
+                "is_after_switch": 0.0,
+                "recent_switch_rate": 0.0,
+                "is_stay": 0.0,
+            },
+            {
+                "completed_trial_id": 0,
+                "prev_arm": 3.0,
+                "is_after_switch": 0.0,
+                "recent_switch_rate": 0.0,
+                "is_stay": 0.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "prev_arm": 2.0,
+                "is_after_switch": 1.0,
+                "recent_switch_rate": 0.5,
+                "is_stay": 1.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "prev_arm": 2.0,
+                "is_after_switch": 1.0,
+                "recent_switch_rate": 0.5,
+                "is_stay": 1.0,
+            },
+            {
+                "completed_trial_id": 2,
+                "prev_arm": 0.0,
+                "is_after_switch": 0.0,
+                "recent_switch_rate": 1 / 3,
+                "is_stay": 0.0,
+            },
+            {
+                "completed_trial_id": 2,
+                "prev_arm": 0.0,
+                "is_after_switch": 0.0,
+                "recent_switch_rate": 1 / 3,
+                "is_stay": 0.0,
+            },
         ]
     )
 
@@ -109,7 +157,7 @@ def test_recent_switch_rate_is_computed_once_per_completed_visit():
 
     np.testing.assert_allclose(
         out["recent_switch_rate"].to_numpy(),
-        np.array([np.nan, np.nan, 1.0, 1.0, 0.5, 0.5]),
+        np.array([0.0, 0.0, 0.5, 0.5, 1 / 3, 1 / 3]),
         equal_nan=True,
     )
 
@@ -118,10 +166,30 @@ def test_recent_switch_rate_ignores_eventual_choice_within_visit():
     """Changing a not-yet-completed choice cannot change same-visit history."""
     df = _frame(
         [
-            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
-            {"prev_arm": 3.0, "is_after_switch": 0.0, "is_stay": 0.0},
-            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
-            {"prev_arm": 2.0, "is_after_switch": 1.0, "is_stay": 1.0},
+            {
+                "completed_trial_id": 0,
+                "prev_arm": 3.0,
+                "is_after_switch": 0.0,
+                "is_stay": 0.0,
+            },
+            {
+                "completed_trial_id": 0,
+                "prev_arm": 3.0,
+                "is_after_switch": 0.0,
+                "is_stay": 0.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "prev_arm": 2.0,
+                "is_after_switch": 1.0,
+                "is_stay": 1.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "prev_arm": 2.0,
+                "is_after_switch": 1.0,
+                "is_stay": 1.0,
+            },
         ]
     )
     changed_future = df.copy()
@@ -131,6 +199,112 @@ def test_recent_switch_rate_ignores_eventual_choice_within_visit():
     changed = add_uncertainty_covariates(changed_future)["recent_switch_rate"]
 
     np.testing.assert_allclose(original, changed, equal_nan=True)
+
+
+def test_recent_switch_rate_leaves_only_true_carry_in_rows_unknown():
+    df = _frame(
+        [
+            {
+                "completed_trial_id": pd.NA,
+                "completed_trial_arm": np.nan,
+                "reward_outcome": np.nan,
+                "is_after_switch": np.nan,
+            },
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 2.0,
+                "reward_outcome": 1.0,
+                "is_after_switch": 1.0,
+                "recent_switch_rate": 1.0,
+            },
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 2.0,
+                "reward_outcome": 1.0,
+                "is_after_switch": 1.0,
+                "recent_switch_rate": 1.0,
+            },
+        ]
+    )
+
+    rates = add_uncertainty_covariates(df)["recent_switch_rate"].to_numpy()
+
+    np.testing.assert_allclose(rates, [np.nan, 1.0, 1.0], equal_nan=True)
+
+
+@pytest.mark.parametrize(
+    ("column", "replacement"),
+    [
+        ("completed_trial_arm", 2.0),
+        ("reward_outcome", 0.0),
+        ("is_after_switch", 1.0),
+        ("recent_switch_rate", 1.0),
+        ("leaky_q_value_diff", 1.0),
+    ],
+)
+def test_completed_trial_context_must_be_constant_within_id(column, replacement):
+    rows = [
+        {
+            "completed_trial_id": 0,
+            "completed_trial_arm": 1.0,
+            "reward_outcome": 1.0,
+            "is_after_switch": 0.0,
+        },
+        {
+            "completed_trial_id": 0,
+            "completed_trial_arm": 1.0,
+            "reward_outcome": 1.0,
+            "is_after_switch": 0.0,
+        },
+    ]
+    rows[1][column] = replacement
+
+    with pytest.raises(ValueError, match=column):
+        add_uncertainty_covariates(_frame(rows))
+
+
+def test_completed_trial_id_gaps_are_valid_but_order_must_be_nondecreasing():
+    gap = _frame(
+        [
+            {"completed_trial_id": 0, "recent_switch_rate": 0.0},
+            {"completed_trial_id": 2, "recent_switch_rate": 2 / 3},
+        ]
+    )
+    out = add_uncertainty_covariates(gap)
+    np.testing.assert_allclose(out["recent_switch_rate"], [0.0, 2 / 3])
+
+    reversed_ids = _frame(
+        [
+            {"completed_trial_id": 1},
+            {"completed_trial_id": 0},
+        ]
+    )
+    with pytest.raises(ValueError, match="nondecreasing"):
+        add_uncertainty_covariates(reversed_ids)
+
+
+def test_carry_in_rows_must_precede_observed_completed_trial_ids():
+    df = _frame(
+        [
+            {"completed_trial_id": 0},
+            {"completed_trial_id": pd.NA},
+        ]
+    )
+    with pytest.raises(ValueError, match="carry-in"):
+        add_uncertainty_covariates(df)
+
+
+def test_completed_trial_ids_must_be_nonnegative():
+    with pytest.raises(ValueError, match="nonnegative"):
+        add_uncertainty_covariates(_frame([{"completed_trial_id": -1}]))
+
+
+@pytest.mark.parametrize("column", ["recent_switch_rate", "leaky_q_value_diff"])
+@pytest.mark.parametrize("bad_value", [-0.1, 1.1, np.nan, np.inf])
+def test_canonical_history_covariates_must_be_finite_probabilities(column, bad_value):
+    df = _frame([{column: bad_value}])
+    with pytest.raises(ValueError, match=column):
+        add_uncertainty_covariates(df)
 
 
 def test_wsls_deviation_truth_table():
@@ -161,43 +335,112 @@ def test_wsls_deviation_no_prior_is_nan():
     assert vals[1] == 0.0
 
 
-def test_leaky_q_value_diff_nan_arm():
-    # A NaN current_arm yields a real margin (the current Q-spread) and does NOT
-    # update any arm's Q, so the margin on the stop after it is unchanged.
+def test_add_uncertainty_preserves_canonical_leaky_q_margin():
     df = _frame(
         [
-            {"current_arm": 0.0, "reward_outcome": 1.0},  # Q0 -> 0.75
-            {"current_arm": np.nan, "reward_outcome": 1.0},  # margin .25; no update
-            {"current_arm": 1.0, "reward_outcome": 0.0},  # margin still .25
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 0.0,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "completed_trial_arm": 0.0,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.15,
+            },
+            {
+                "completed_trial_id": 2,
+                "completed_trial_arm": 1.0,
+                "reward_outcome": 0.0,
+                "leaky_q_value_diff": 0.255,
+            },
         ]
     )
-    out = add_uncertainty_covariates(df, q_alpha=0.5).sort_values("stop_idx")
-    margins = out["leaky_q_value_diff"].to_numpy()
-    assert margins[0] == pytest.approx(0.0)
-    assert np.isfinite(margins[1])  # NaN arm -> real margin, not NaN
-    assert margins[1] == pytest.approx(0.25)
-    # Q unchanged across the NaN-arm stop, so stop 2 sees the same .25 margin.
-    assert margins[2] == pytest.approx(0.25)
+    out = add_uncertainty_covariates(df).sort_values("stop_idx")
+    np.testing.assert_allclose(out["leaky_q_value_diff"], [0.0, 0.15, 0.255])
 
 
 def test_leaky_q_value_diff_recurrence():
-    # Two arms only (0 and 1); all start at 0.5. q_alpha = 0.5.
-    # Pre-update margin = sort(Q)[-1] - sort(Q)[-2].
+    switch_rate, margins = canonical_trial_uncertainty_history(
+        np.array([0.0, 0.0, 1.0]),
+        np.array([1.0, 1.0, 0.0]),
+        np.array([0.0, 1.0, 1.0]),
+    )
+    np.testing.assert_allclose(switch_rate, [0.0, 0.5, 2 / 3])
+    # alpha=.3: Q0 .5→.65→.755, with every margin evaluated pre-update.
+    np.testing.assert_allclose(margins, [0.0, 0.15, 0.255])
+
+
+def test_canonical_leaky_q_is_broadcast_once_per_explicit_completed_trial():
     df = _frame(
         [
-            {"current_arm": 0.0, "reward_outcome": 1.0},
-            {"current_arm": 0.0, "reward_outcome": 1.0},
-            {"current_arm": 1.0, "reward_outcome": 0.0},
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 0.0,
+                "current_arm": np.nan,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.0,
+            },
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 0.0,
+                "current_arm": 4.0,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "completed_trial_arm": 0.0,
+                "current_arm": 3.0,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.15,
+            },
+            {
+                "completed_trial_id": 1,
+                "completed_trial_arm": 0.0,
+                "current_arm": np.nan,
+                "reward_outcome": 1.0,
+                "leaky_q_value_diff": 0.15,
+            },
+            {
+                "completed_trial_id": 2,
+                "completed_trial_arm": 1.0,
+                "current_arm": 5.0,
+                "reward_outcome": 0.0,
+                "leaky_q_value_diff": 0.255,
+            },
         ]
     )
-    out = add_uncertainty_covariates(df, q_alpha=0.5).sort_values("stop_idx")
-    margins = out["leaky_q_value_diff"].to_numpy()
-    # stop0: all Q=0.5 -> margin 0; then Q0 = .5*.5 + .5*1 = .75
-    # stop1: Q=[.75,.5,.5,...] -> margin .75-.5 = .25; then Q0 = .5*.75+.5 = .875
-    # stop2: Q=[.875,.5,.5,...] -> margin .875-.5 = .375
-    assert margins[0] == pytest.approx(0.0)
-    assert margins[1] == pytest.approx(0.25)
-    assert margins[2] == pytest.approx(0.375)
+
+    margins = add_uncertainty_covariates(df)["leaky_q_value_diff"].to_numpy()
+
+    np.testing.assert_allclose(margins, [0.0, 0.0, 0.15, 0.15, 0.255])
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"switch_window": 3}, "full trials table"),
+        ({"q_alpha": 0.5}, "full trials table"),
+    ],
+)
+def test_noncanonical_history_parameters_require_full_trials(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        add_uncertainty_covariates(_frame([{}]), **kwargs)
+
+
+def test_missing_canonical_history_columns_requires_regeneration():
+    df = _frame([{}]).drop(columns=["recent_switch_rate"])
+    with pytest.raises(KeyError, match="regenerate stop_table"):
+        add_uncertainty_covariates(df)
+
+
+def test_empty_legacy_table_still_requires_canonical_schema():
+    legacy = pd.DataFrame(columns=["animal", "day", "epoch", "stop_idx"])
+    with pytest.raises(KeyError, match="regenerate stop_table"):
+        add_uncertainty_covariates(legacy)
 
 
 def test_no_mutation():
@@ -301,6 +544,14 @@ def test_runner_smoke():
         )
 
     stop = pd.read_pickle(rc / "stop_table.pkl")
+    canonical_columns = {
+        "completed_trial_id",
+        "completed_trial_arm",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
+    }
+    if not canonical_columns.issubset(stop.columns):
+        pytest.skip("canonical stop_table.pkl has not been regenerated")
     onsets = attach_is_swr_to_onsets(
         pd.read_pickle(rc / "event_onset_table.pkl"),
         pd.read_pickle(rc / "event_table.pkl"),

@@ -82,6 +82,9 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     assert pd.isna(out.loc[2.0, "prev_well"])
     assert pd.isna(out.loc[2.0, "reward_outcome"])
     assert pd.isna(out.loc[2.0, "is_after_switch"])
+    assert pd.isna(out.loc[2.0, "completed_trial_id"])
+    assert pd.isna(out.loc[2.0, "recent_switch_rate"])
+    assert pd.isna(out.loc[2.0, "leaky_q_value_diff"])
     assert out.loc[2.0, "next_well"] == 1.0
 
     # Arrival is inclusive: trial 1 becomes past context at exactly t=3.
@@ -93,6 +96,9 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
         assert out.loc[time, "is_after_reward"] == 1.0
         assert out.loc[time, "is_after_omission"] == 0.0
         assert out.loc[time, "is_after_switch"] == 0.0
+        assert out.loc[time, "completed_trial_id"] == 0
+        assert out.loc[time, "recent_switch_rate"] == 0.0
+        assert out.loc[time, "leaky_q_value_diff"] == 0.0
         assert out.loc[time, "_goal_arrival_time"] == 3.0
         assert out.loc[time, "next_well"] == 2.0
 
@@ -107,7 +113,12 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     assert out.loc[6.0, "reward_outcome"] == 0.0
     assert out.loc[6.0, "is_after_omission"] == 1.0
     assert out.loc[6.0, "is_after_switch"] == 1.0
+    assert out.loc[6.0, "completed_trial_id"] == 1
+    assert out.loc[6.0, "recent_switch_rate"] == pytest.approx(0.5)
+    assert out.loc[6.0, "leaky_q_value_diff"] == pytest.approx(0.15)
     assert pd.isna(out.loc[6.0, "next_well"])
+
+    assert str(out["completed_trial_id"].dtype) == "Int64"
 
 
 def test_appending_future_trials_cannot_change_past_context_or_location():
@@ -129,6 +140,9 @@ def test_appending_future_trials_cannot_change_past_context_or_location():
         "is_after_reward",
         "is_after_omission",
         "is_after_switch",
+        "completed_trial_id",
+        "recent_switch_rate",
+        "leaky_q_value_diff",
         "_goal_arrival_time",
         "_last_reward_time",
         "location_state",
@@ -154,6 +168,35 @@ def test_empty_trials_have_explicit_unknown_location_and_context():
     assert out["location_well"].isna().all()
     assert out["last_visited_well"].isna().all()
     assert out["next_well"].isna().all()
+    assert out["completed_trial_id"].isna().all()
+    assert out["recent_switch_rate"].isna().all()
+    assert out["leaky_q_value_diff"].isna().all()
+    assert str(out["completed_trial_id"].dtype) == "Int64"
+
+
+def test_full_trial_history_includes_a_completed_visit_with_no_sampled_stop():
+    """A reduced stop sequence may jump 0→2, but history must include trial 1."""
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0, 2.0, 4.0],
+            "goal_arrival_time": [1.0, 3.0, 5.0],
+            "end_time": [1.5, 3.5, 5.5],
+            "from_well": [1, 0, 0],
+            "to_well": [0, 0, 1],
+            "is_reward": [True, False, True],
+            "is_patch_change": [False, True, True],
+        }
+    )
+
+    # Deliberately sample no timestamp after trial 1 and before trial 2. This
+    # mimics a completed visit with no immobility bout in the reduced stop table.
+    out = add_trial_context(pd.DataFrame(index=[1.2, 5.2]), trials)
+
+    assert out["completed_trial_id"].tolist() == [0, 2]
+    np.testing.assert_allclose(out["recent_switch_rate"], [0.0, 2 / 3])
+    # Trial 0 raises Q(well 0) to .65; the missing-stop omission on trial 1
+    # updates it to .455. Thus trial 2's pre-update top-two margin is again 0.
+    np.testing.assert_allclose(out["leaky_q_value_diff"], [0.0, 0.0])
 
 
 @pytest.mark.parametrize(
