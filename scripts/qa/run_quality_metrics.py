@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
     RAW_STAT_COLUMNS,
     TRANSITION_MATRIX_COLUMNS,
@@ -177,6 +178,7 @@ def plot_diagnostics(
     data: pd.DataFrame,
     summary: pd.DataFrame,
     output_dir: str,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> None:
     """Generate diagnostic plots."""
     figure_utilities.set_figure_defaults(context="paper")
@@ -189,7 +191,11 @@ def plot_diagnostics(
         _plot_state_fractions(summary, output_path)
         _plot_nonlocal_movement(summary, output_path)
         _plot_calibration_curves(data, output_path)
-        _plot_event_context(data, output_path)
+        _plot_event_context(
+            data,
+            output_path,
+            non_local_threshold=non_local_threshold,
+        )
         _plot_nospike_correlation(summary, output_path)
         _plot_segment_error(data, output_path)
 
@@ -312,9 +318,17 @@ def _plot_calibration_curves(data: pd.DataFrame, output_path) -> None:
     plt.close(fig)
 
 
-def _plot_event_context(data: pd.DataFrame, output_path) -> None:
+def _plot_event_context(
+    data: pd.DataFrame,
+    output_path,
+    *,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> None:
     """E: Non-local event context breakdown."""
-    context = compute_non_local_event_context(data)
+    context = compute_non_local_event_context(
+        data,
+        non_local_threshold=non_local_threshold,
+    )
     if context.empty:
         return
 
@@ -424,6 +438,7 @@ def main():
     args = parser.parse_args()
 
     data = load_all_sessions(animal=args.animal, threshold=args.threshold)
+    non_local_threshold = args.threshold / 100.0
 
     output_path = PROCESSED_DATA_DIR / args.output
 
@@ -433,7 +448,9 @@ def main():
     else:
         logger.info("Computing quality metrics...")
         summary = compute_session_quality_summary(
-            data, sampling_frequency=SAMPLING_FREQUENCY,
+            data,
+            non_local_threshold=non_local_threshold,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         summary = maybe_merge_raw_stats(
             summary, PROCESSED_DATA_DIR / args.raw_stats_csv,
@@ -445,7 +462,12 @@ def main():
 
     if not args.no_plots:
         logger.info("Generating diagnostic plots...")
-        plot_diagnostics(data, summary, output_dir=args.figure_dir)
+        plot_diagnostics(
+            data,
+            summary,
+            output_dir=args.figure_dir,
+            non_local_threshold=non_local_threshold,
+        )
         logger.info("Saved plots to %s", FIGURE_DIR / args.figure_dir)
 
 

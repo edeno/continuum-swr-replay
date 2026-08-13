@@ -78,6 +78,7 @@ from scipy.ndimage import label
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 
 from .event_immobility import (
@@ -241,7 +242,7 @@ def compute_state_fraction_during_movement(
 def compute_non_local_during_movement(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    non_local_threshold: float = 0.8,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     sampling_frequency: float = 500.0,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
@@ -748,6 +749,7 @@ def compute_non_local_event_context(
     theta_power_threshold: float = 2.0,
     group_cols: list[str] | None = None,
     event_col: str = "non_local_event",
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """Classify events by neural context (SWR, theta, neither).
 
@@ -770,6 +772,9 @@ def compute_non_local_event_context(
         Session grouping columns.
     event_col : str, optional
         Event label column, by default ``"non_local_event"``.
+    non_local_threshold : float, optional
+        Minimum combined Non-Local posterior required at every labeled bin.
+        This must match the threshold used to create ``non_local_event``.
 
     Returns
     -------
@@ -783,12 +788,17 @@ def compute_non_local_event_context(
         group_cols = list(_DEFAULT_GROUP_COLS)
 
     if event_col == "non_local_event":
-        validate_nonlocal_event_probability_contract(data)
+        validate_nonlocal_event_probability_contract(
+            data,
+            probability_threshold=non_local_threshold,
+        )
     event_group_cols = group_cols + [event_col]
     event_cols = [event_col]
     if "SWR_event" in data.columns and "SWR_event" not in event_cols:
         event_cols.append("SWR_event")
-    eligible_data = filter_event_labels_by_speed(data, event_cols)
+    eligible_data = filter_event_labels_by_speed(
+        data, event_cols, group_cols=group_cols
+    )
 
     non_local = eligible_data.loc[eligible_data[event_col] > 0]
 
@@ -1109,7 +1119,7 @@ def compute_session_quality_summary(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
-    non_local_threshold: float = 0.8,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     theta_power_threshold: float = 2.0,
     sampling_frequency: float = 500.0,
     error_flag_threshold_cm: float = 15.0,
@@ -1206,7 +1216,10 @@ def compute_session_quality_summary(
     nospike_df = compute_no_spike_firing_correspondence(data, group_cols=group_cols)
 
     context_df = compute_non_local_event_context(
-        data, theta_power_threshold=theta_power_threshold, group_cols=group_cols,
+        data,
+        theta_power_threshold=theta_power_threshold,
+        non_local_threshold=non_local_threshold,
+        group_cols=group_cols,
     )
 
     calib_df = compute_calibration_curve(data, group_cols=group_cols)

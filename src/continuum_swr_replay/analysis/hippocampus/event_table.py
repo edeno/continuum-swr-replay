@@ -2,8 +2,11 @@
 
 This module owns the single, figure-and-model-agnostic definition of a
 non-local event's timing and its overlap relationship with detected
-sharp-wave ripples (SWRs). One row per non-local event, derived from the
-full event-label window (no immobility / probability filtering applied).
+sharp-wave ripples (SWRs). One row per non-local event over its complete
+event-label window: the label's probability contract is *validated* rather
+than re-filtered, so no non-local event is dropped or clipped here, while
+the SWR comparison population is restricted by the canonical whole-event
+speed rule (see below).
 
 The public entry point :func:`build_classified_nonlocal_event_table`
 takes a time-indexed ``data_over_time`` slice and emits, per event:
@@ -261,6 +264,7 @@ def build_classified_nonlocal_event_table(
         ["SWR_event"],
         speed_threshold=speed_threshold,
     )
+    overlap_sessions = overlap_dot.groupby(_SESSION_COLS, sort=False)
 
     if (dot["non_local_event"] > 0).sum() == 0:
         return pd.DataFrame(columns=column_order)
@@ -310,13 +314,10 @@ def build_classified_nonlocal_event_table(
         events_df = pd.DataFrame.from_records(records)
 
         # --- SWR overlap classification (single canonical rule) ---
-        # Select by session keys rather than the time index: concatenated
-        # sessions routinely reuse the same timestamps.
-        session_overlap_dot = overlap_dot.loc[
-            (overlap_dot["animal"] == animal)
-            & (overlap_dot["day"] == day)
-            & (overlap_dot["epoch"] == epoch)
-        ]
+        # Select from a grouping built once rather than rescanning the pooled
+        # frame for every session. Session keys, rather than the time index,
+        # are required because concatenated sessions routinely reuse times.
+        session_overlap_dot = overlap_sessions.get_group(session_key)
         swr_intervals = intervals_from_labels(session_overlap_dot, "SWR_event")
         classifier_events = events_df.rename(
             columns={"event_start": "start_time", "event_end": "end_time"}

@@ -84,13 +84,22 @@ def _session_keys(dot: pd.DataFrame) -> tuple[str, int, str]:
 
 
 def build_event_onset_table(
-    dot: pd.DataFrame, pump_times: np.ndarray
+    dot: pd.DataFrame,
+    pump_times: np.ndarray,
+    *,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
-    """Sparse per-onset table (one row per SWR / non-local / MUA onset in a stop)."""
+    """Sparse per-onset table (one row per SWR / non-local / MUA onset in a stop).
+
+    ``nonlocal_threshold`` must match the threshold used to create
+    ``dot``'s Non-Local labels — it is validated, not re-applied. Family A
+    (``replay/tables.py``) threads the same parameter; keep the two in
+    step or the families will disagree on which sessions are admissible.
+    """
     if "non_local_event" in dot:
         validate_nonlocal_event_probability_contract(
             dot,
-            probability_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+            probability_threshold=nonlocal_threshold,
         )
     event_cols = [column for column in EVENT_TYPES.values() if column in dot]
     dot = filter_event_labels_by_speed(
@@ -142,13 +151,21 @@ def build_event_onset_table(
 
 
 def build_stop_timebin_table(
-    dot: pd.DataFrame, pump_times: np.ndarray, *, bin_s: float = 0.004
+    dot: pd.DataFrame,
+    pump_times: np.ndarray,
+    *,
+    bin_s: float = 0.004,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
-    """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms)."""
+    """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms).
+
+    ``nonlocal_threshold`` must match the threshold used to create ``dot``'s
+    Non-Local labels — see :func:`build_event_onset_table`.
+    """
     if "non_local_event" in dot:
         validate_nonlocal_event_probability_contract(
             dot,
-            probability_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+            probability_threshold=nonlocal_threshold,
         )
     event_cols = [column for column in EVENT_TYPES.values() if column in dot]
     dot = filter_event_labels_by_speed(

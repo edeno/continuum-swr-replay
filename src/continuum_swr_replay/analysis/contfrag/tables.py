@@ -120,32 +120,20 @@ def _in_contfrag_event_mask(
 ) -> pd.Series:
     """Boolean mask for in-event timebins using external event detectors.
 
-    Immobility is evaluated at the **event level with the all-immobile
-    ("max") rule**: an externally-detected event (a contiguous run of
-    ``SWR_event`` / ``MUA_event``) is in-event iff *every* one of its
-    timebins is below ``speed_threshold``. All timebins of a qualifying
-    event are returned; events containing any mobile timebin are excluded
-    entirely.
+    Thin wrapper over
+    :func:`~continuum_swr_replay.analysis.hippocampus.event_immobility.whole_event_immobility_mask`,
+    which owns the repo-wide definition. What was once a ContFrag-local
+    choice — all-immobile rather than per-timebin or endpoints, so that
+    movement-spanning events cannot straddle two immobility bouts and
+    break ``Σ stop.n_events == len(event_table)`` — is now the shared rule
+    for every event source. The degenerate multi-second ``MUA_event``
+    labels in ``docs/known_issues/degenerate_mua_events.md`` are the
+    motivating case.
 
-    Why all-immobile rather than per-timebin or endpoints:
-
-    - **Per-timebin** (``label > 0 & speed < thr``) keeps only the immobile
-      bins of an event and drops the mobile ones. When an event spans a
-      brief movement, its immobile bins land in two immobility bouts, so
-      the stop-table count and the (atomic) event table disagree —
-      breaking ``Σ stop.n_events == len(event_table)``.
-    - **Endpoints** (first & last bin immobile) admits movement-spanning
-      events as single atomic events — e.g. the degenerate multi-second
-      ``MUA_event`` labels (up to ~23 s) documented in
-      ``docs/known_issues/degenerate_mua_events.md``, which run through real
-      locomotion.
-    - **All-immobile** excludes exactly those movement-spanning events,
-      cannot straddle bouts by construction, and matches the effective
-      gating of the model-detected non-local events (which only exist
-      during immobility) — so the event-source comparison is
-      apples-to-apples.
-
-    Excluded fraction is small (~0.5% SWR, ~0.7% MUA across HPC sessions).
+    On a frame that already went through ``_filter_contfrag_event_labels``
+    or a speed-eligible cohort builder this is a no-op; it excludes
+    nothing further. The historical ~0.5% SWR / ~0.7% MUA exclusion
+    happens upstream at cohort construction.
     """
     event_col = _resolve_event_col(event_source)
     return whole_event_immobility_mask(

@@ -113,6 +113,7 @@ from scipy.stats import zscore
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
@@ -542,6 +543,8 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
 def get_event_types(
     data_over_time: pd.DataFrame,
     event_col: str = "non_local_event",
+    *,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> dict:
     """Classify events by overlap with other detectors (SWR, MUA).
 
@@ -558,6 +561,10 @@ def get_event_types(
         ``MUA_event``, and ``head_speed`` columns.
     event_col : str, optional
         Primary event column, by default ``"non_local_event"``.
+    nonlocal_threshold : float, optional
+        Minimum combined Non-Local posterior required at every labeled
+        bin. Must match the threshold used to create the labels — it is
+        validated, not re-applied.
 
     Returns
     -------
@@ -565,7 +572,17 @@ def get_event_types(
         Keys use ``event_col`` as prefix, e.g. for
         ``event_col="SWR_event"``:
         ``SWR_event_immobile``, ``SWR_event_immobile_overlap_MUA_event``,
-        etc. Each value is a filtered subset of the input DataFrame.
+        etc. Each value is a row subset of a *copy* in which ineligible
+        event labels have been set to 0 — the label columns are mutated
+        relative to the input, not merely filtered. ``_immobile`` means
+        the canonical whole-event rule (every sampled speed finite and
+        strictly below the threshold), not the retired endpoint rule.
+
+    Raises
+    ------
+    EventDefinitionError
+        When the saved labels violate the probability contract.
+        Regenerate the data-over-time file.
 
     """
     all_event_cols = {"non_local_event", "SWR_event", "MUA_event"}
@@ -576,7 +593,10 @@ def get_event_types(
     other_cols = sorted(all_event_cols - {event_col})
 
     if "non_local_event" in data_over_time.columns:
-        validate_nonlocal_event_probability_contract(data_over_time)
+        validate_nonlocal_event_probability_contract(
+            data_over_time,
+            probability_threshold=nonlocal_threshold,
+        )
     present_event_cols = sorted(all_event_cols.intersection(data_over_time.columns))
     eligible_data = filter_event_labels_by_speed(
         data_over_time,
@@ -714,6 +734,7 @@ def compute_swr_nl_event_counts(
     event_col_b: str = "SWR_event",
     *,
     immobile_col_a: bool = True,
+    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> dict[str, int]:
     """Event-level totals and overlap for two event detectors.
 
@@ -733,11 +754,23 @@ def compute_swr_nl_event_counts(
     immobile_col_a : bool, optional
         Deprecated compatibility argument. It must remain ``True`` because all
         event sources now share the canonical whole-event speed criterion.
+    nonlocal_threshold : float, optional
+        Minimum combined Non-Local posterior required at every labeled
+        bin. Must match the threshold used to create the labels — it is
+        validated, not re-applied.
+
+    Raises
+    ------
+    ValueError
+        When ``immobile_col_a`` is ``False``.
+    EventDefinitionError
+        When the saved Non-Local labels violate the probability contract.
 
     Returns
     -------
     dict[str, int]
-        Keys: ``n_a``, ``n_a_with_b``, ``n_b``, ``n_b_with_a``.
+        Keys: ``n_a``, ``n_a_with_b``, ``n_b``, ``n_b_with_a``. Both totals
+        are speed-eligible counts, not raw detector counts.
 
     """
     if not immobile_col_a:
@@ -748,7 +781,10 @@ def compute_swr_nl_event_counts(
         )
 
     if "non_local_event" in (event_col_a, event_col_b):
-        validate_nonlocal_event_probability_contract(data_over_time)
+        validate_nonlocal_event_probability_contract(
+            data_over_time,
+            probability_threshold=nonlocal_threshold,
+        )
     eligible_data = filter_event_labels_by_speed(
         data_over_time,
         [event_col_a, event_col_b],

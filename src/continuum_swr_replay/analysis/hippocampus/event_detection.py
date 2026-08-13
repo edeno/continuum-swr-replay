@@ -156,10 +156,14 @@ def event_strict_overlap_keys(
     ``(*session_cols, primary_id)`` tuples that pass the strict-overlap
     test.
 
-    Pass ``other_data`` to draw ``other_col`` bounds from a different
-    frame than the primary (e.g. immobility-filtered ``a_data`` for
-    primary, raw ``data_over_time`` for other). Defaults to using
-    ``data_over_time`` for both sides.
+    ``other_data`` draws ``other_col`` bounds from a different frame than
+    the primary; it defaults to using ``data_over_time`` for both sides,
+    which is what every current caller wants. Do not use it to pair a
+    speed-filtered primary against a raw other: both sides must come from
+    the same speed-eligible cohort, or the overlap counts mix populations.
+
+    Events whose labeled span covers a single timebin have zero duration
+    and are excluded from both sides of the comparison.
 
     Why this exists: the inclusive timebin labels written by
     :func:`continuum_swr_replay.data_loaders.utils.get_labels` make a

@@ -131,7 +131,10 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     # Validate the persisted cohort before any auxiliary load or early-return
     # path can turn corruption into an ordinary missing-data skip.
     validate_dot_event_contract(dot)
-    validate_nonlocal_event_probability_contract(dot)
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_threshold=NON_LOCAL_THRESHOLD,
+    )
     env = joblib.load(PROCESSED_DATA_DIR / f"{epoch_id}_environment.pkl")
     # The fit flag is not persisted, but the grid + track graph are intact.
     env._is_fitted = True
@@ -152,7 +155,10 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
 
     # Retain validation at the business-logic boundary as defense in depth for
     # direct callers that may later refactor the entry path above.
-    validate_nonlocal_event_probability_contract(dot)
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_threshold=NON_LOCAL_THRESHOLD,
+    )
     eligible_dot = filter_event_labels_by_speed(
         dot, ["non_local_event", "SWR_event"]
     )

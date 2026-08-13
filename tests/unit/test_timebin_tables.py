@@ -157,6 +157,42 @@ def test_invalid_nonlocal_probability_labels_fail_loud():
         build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
 
 
+def test_custom_nonlocal_threshold_accepts_labels_built_at_that_threshold():
+    """Family B must validate at the threshold that created the labels.
+
+    Family A (``replay/tables.py``) already threads ``nonlocal_threshold``.
+    With it hard-coded here, a ``_50_data_over_time`` file raised on
+    perfectly valid labels while Family A accepted them.
+    """
+    t = np.round(np.arange(20) * 0.01, 2)
+    nl = np.zeros(20, dtype=int)
+    nlprob = np.zeros(20)
+    nl[5:7] = 1
+    nlprob[5:7] = 0.6  # valid at 0.5, invalid at the 0.8 default
+    dot = pd.DataFrame(
+        {
+            "animal": "x", "day": 1, "epoch": "02_r1",
+            "head_speed": np.full(20, 1.0),
+            "SWR_event": 0, "non_local_event": nl, "MUA_event": 0,
+            "Non-Local_Continuous_prob": nlprob, "Non-Local_Fragmented_prob": 0.0,
+        },
+        index=t,
+    )
+
+    # Default threshold rejects these labels ...
+    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+        build_event_onset_table(dot, np.array([]))
+
+    # ... and the matching threshold accepts them, keeping the event.
+    onset = build_event_onset_table(dot, np.array([]), nonlocal_threshold=0.5)
+    assert (onset["event_type"] == "non_local").sum() == 1
+
+    dense = build_stop_timebin_table(
+        dot, np.array([]), bin_s=0.01, nonlocal_threshold=0.5
+    )
+    assert len(dense) > 0
+
+
 def test_all_sources_exclude_a_movement_spanning_event_atomically():
     """One fast interior bin removes the same event from sparse and dense rates."""
     t = np.round(np.arange(40) * 0.01, 2)

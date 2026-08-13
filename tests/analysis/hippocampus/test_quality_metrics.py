@@ -282,6 +282,45 @@ class TestComputeNoSpikeFiringCorrespondence:
 
 
 class TestComputeNonLocalEventContext:
+    def test_accepts_labels_created_at_custom_nonlocal_threshold(
+        self, session_with_events
+    ):
+        """The validator must use the threshold that created the labels."""
+        data = session_with_events.copy()
+        active = data["non_local_event"].to_numpy() > 0
+        data.loc[active, "Non-Local_Continuous_prob"] = 0.6
+        data.loc[active, "Non-Local_Fragmented_prob"] = 0.0
+
+        result = compute_non_local_event_context(
+            data,
+            non_local_threshold=0.5,
+        )
+
+        assert result["n_events"].iloc[0] == 3
+
+    def test_custom_group_cols_scope_reused_event_labels(self):
+        """Eligibility and overlap grouping must use the caller's session key."""
+        data = pd.DataFrame(
+            {
+                "session": ["a", "a", "a", "b", "b", "b"],
+                "non_local_event": [1, 1, 0, 1, 1, 0],
+                "SWR_event": [0, 0, 0, 0, 0, 0],
+                "head_speed": [1.0, 1.0, 1.0, 1.0, 5.0, 1.0],
+                "Non-Local_Continuous_prob": [0.9, 0.9, 0.0, 0.9, 0.9, 0.0],
+                "Non-Local_Fragmented_prob": [0.0] * 6,
+                "theta_power_zscore": [0.0] * 6,
+                "theta_phase": [0.0] * 6,
+            },
+            index=[0.0, 0.1, 0.2, 0.0, 0.1, 0.2],
+        )
+
+        # Keep the established positional API for ``group_cols`` covered:
+        # adding a new optional threshold must not silently shift this argument.
+        result = compute_non_local_event_context(data, 2.0, ["session"])
+
+        assert result["session"].tolist() == ["a"]
+        assert result["n_events"].tolist() == [1]
+
     def test_classifies_swr_theta_neither(self, session_with_events):
         result = compute_non_local_event_context(
             session_with_events, theta_power_threshold=2.0,
@@ -621,6 +660,21 @@ class TestComputeCalibrationCurve:
 
 
 class TestComputeSessionQualitySummary:
+    def test_propagates_custom_nonlocal_threshold(self, session_with_events):
+        """Every metric in the summary must validate the selected cohort."""
+        data = session_with_events.copy()
+        active = data["non_local_event"].to_numpy() > 0
+        data.loc[active, "Non-Local_Continuous_prob"] = 0.6
+        data.loc[active, "Non-Local_Fragmented_prob"] = 0.0
+
+        result = compute_session_quality_summary(
+            data,
+            non_local_threshold=0.5,
+            sampling_frequency=SAMPLING_FREQUENCY,
+        )
+
+        assert result["n_events"].iloc[0] == 3
+
     def test_perfect_session_no_flags(self, perfect_session):
         result = compute_session_quality_summary(
             perfect_session, sampling_frequency=SAMPLING_FREQUENCY,

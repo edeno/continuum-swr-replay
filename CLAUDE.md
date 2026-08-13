@@ -189,23 +189,38 @@ The single source of truth for a non-local event's timing and its
 SWR-overlap classification is
 `analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`.
 It produces one row per non-local event over the *full* event-label
-window (no immobility/probability filter), deriving full-window timing,
-per-event speed summaries, peak non-local probability, the 3-way
-`overlap_class` (and 6-way `overlap_subclass`), and the matched SWR. SWR
-intervals are always taken from the `SWR_event` timebin labels; event-level
-`is_swr` means strict positive-duration overlap, not the old inclusive
-`any SWR_event > 0`. (The stop-level `is_swr_stop` flag in
+window: the label's probability contract is **validated, not re-filtered**
+(a violation raises `EventDefinitionError` rather than silently dropping
+bins), so no non-local event is clipped. From that window it derives
+timing, per-event speed summaries, peak non-local probability, the 3-way
+`overlap_class` (and 6-way `overlap_subclass`), and the matched SWR.
+
+**One speed-eligible population.** Non-Local, SWR, and MUA cohorts all
+apply the same canonical whole-event immobility rule — every sampled speed
+finite and strictly below 4 cm/s — defined once in
+`analysis/hippocampus/event_immobility.py`. SWR intervals still come from
+the `SWR_event` timebin labels, but those labels are speed-gated first, so
+a movement-spanning SWR cannot mark an immobile non-local event.
+Event-level `is_swr` means strict positive-duration overlap, not the old
+inclusive `any SWR_event > 0`. (The stop-level `is_swr_stop` flag in
 `build_stop_table` deliberately still uses the inclusive per-timebin rule —
-the two flags do not share a convention.) A consequence of that dual
-convention: the stop-level `n_SWR`/`n_MUA` totals slightly exceed the
-bin/onset counts (Δ82/Δ250; `n_non_local` matches exactly), so the count
-must **not** be cross-substituted between the stop-level and bin-level tables — see
+the two flags do not share a convention.) Because of that dual convention
+the stop-level `n_SWR`/`n_MUA` totals still differ slightly from the
+bin/onset counts, so the count must **not** be cross-substituted between
+the stop-level and bin-level tables — see
 [docs/known_issues/swr_mua_count_conventions.md](docs/known_issues/swr_mua_count_conventions.md).
-The replay-content
-`build_event_table` in `analysis/replay/tables.py` builds on top of this:
-it keeps its legacy filtered-survivor-window columns bit-identical and
-merges the classified columns in on `event_id`, carrying the full
-label-window boundary additively as `label_event_*`.
+The previously recorded Δ82/Δ250 magnitudes predate the unified speed
+gating and **must be re-derived** before being cited.
+
+The replay-content `build_event_table` in `analysis/replay/tables.py`
+builds on top of this: `event_*` and `label_event_*` now denote the *same*
+complete label window (`label_event_*` is retained as a compatibility
+alias), and the classified columns are merged in on `event_id`.
+
+Changing the eligible cohort renumbers non-local labels, so `event_id`
+hashes shift. `event_table`, `event_arm_table`, `event_sequence_table`,
+`stop_table`, and the qvals/stop joins must therefore be regenerated as
+one atomic set — a partial regeneration mis-joins silently on `event_id`.
 
 ### Spatial Variables
 

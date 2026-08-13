@@ -9,9 +9,14 @@ the same globally qualified whole-event populations.
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     compute_swr_nl_event_counts,
+    get_event_types,
+)
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
 )
 
 
@@ -192,3 +197,47 @@ class TestBoundaryTouchOverlap:
         out = compute_swr_nl_event_counts(df)
         assert out["n_a_with_b"] == 1
         assert out["n_b_with_a"] == 1
+
+
+class TestNonLocalThreshold:
+    """The validator must use the threshold that created the labels."""
+
+    @staticmethod
+    def _low_prob_frame() -> pd.DataFrame:
+        df = _frame(
+            [
+                {"time": 0.0, "animal": "a", "day": 1, "epoch": "e1",
+                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 2},
+                {"time": 0.5, "animal": "a", "day": 1, "epoch": "e1",
+                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 2},
+                {"time": 1.0, "animal": "a", "day": 1, "epoch": "e1",
+                 "head_speed": 0.0, "non_local_event": 0, "SWR_event": 0},
+            ]
+        )
+        # Valid at 0.5, invalid at the 0.8 default.
+        df.loc[df["non_local_event"] > 0, "Non-Local_Continuous_prob"] = 0.6
+        return df
+
+    def test_event_counts_accept_matching_threshold(self):
+        df = self._low_prob_frame()
+
+        with pytest.raises(
+            EventDefinitionError, match="probability-threshold contract"
+        ):
+            compute_swr_nl_event_counts(df)
+
+        out = compute_swr_nl_event_counts(df, nonlocal_threshold=0.5)
+        assert out["n_a"] == 1
+        assert out["n_a_with_b"] == 1
+
+    def test_get_event_types_accepts_matching_threshold(self):
+        df = self._low_prob_frame()
+        df["MUA_event"] = 0
+
+        with pytest.raises(
+            EventDefinitionError, match="probability-threshold contract"
+        ):
+            get_event_types(df)
+
+        out = get_event_types(df, nonlocal_threshold=0.5)
+        assert len(out["non_local_event_immobile"]) == 2

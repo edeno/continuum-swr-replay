@@ -13,9 +13,19 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 
 | count | stop-level rule | vs bin/onset | Δ |
 | --- | --- | --- | --- |
-| `n_SWR` | inclusive per-timebin `is_swr_stop` over the **full** bout | onset-in-window | **+~0.2 % (Δ82)** |
-| `n_MUA` | inclusive per-timebin rule over the full bout | onset-in-window | **+~0.75 % (Δ250)** |
+| `n_SWR` | inclusive per-timebin `is_swr_stop` over the **full** bout | onset-in-window | **stale — see below** |
+| `n_MUA` | inclusive per-timebin rule over the full bout | onset-in-window | **stale — see below** |
 | `n_non_local` | — | — | **0 (matches exactly)** |
+
+> **⚠️ The Δ magnitudes are stale (2026-08-12).** The previously recorded
+> +~0.2 % (Δ82) / +~0.75 % (Δ250) were measured before the
+> `unified-event-immobility` change, when SWR/MUA labels were **not**
+> speed-gated. Both grains now draw from the same whole-event
+> speed-eligible cohort (`analysis/hippocampus/event_immobility.py`), so
+> both sides of the comparison moved. **Re-derive these numbers before
+> citing them.** The *direction* of the effect and the rule below are
+> unchanged: the two rules still differ, so the counts still must not be
+> cross-substituted.
 
 ## Why
 
@@ -41,6 +51,7 @@ substituting a count into an offset.
 **Do not cross-substitute the `n_SWR` / `n_MUA` count between the stop-level and bin-level
 tables** — e.g. do not use the stop-level `n_SWR` as the response for a bin-level model
 (or compare a stop-level count to a bin-level count as if they were the same quantity).
-The two differ by ~0.2 %/0.75 % (Δ82/Δ250) from boundary-straddling events, so mixing them
-biases the rate. When a count must be shared or compared across the two grains, use
+The two differ because of boundary-straddling events, so mixing them biases the rate.
+(The magnitude of that difference needs re-deriving — see the note above.)
+When a count must be shared or compared across the two grains, use
 `n_non_local`, which is defined identically on both sides and matches exactly.

@@ -9,6 +9,7 @@ import pytest
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
+    event_speeds_are_immobile,
     filter_event_intervals_by_speed,
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
@@ -43,6 +44,30 @@ def test_interval_filter_uses_inclusive_event_boundaries():
     speed = np.array([0.0, 1.0, 4.0, 0.0])
 
     assert filter_event_intervals_by_speed(events, speed=speed, time=time).empty
+
+
+def test_interval_filter_excludes_events_covering_no_sample():
+    """An event with no speed sample is unverifiable, so it is excluded.
+
+    This is the conservative reading of the whole-event rule: immobility
+    that cannot be measured is not asserted. It bites for intervals
+    falling in a position-tracking gap or past the position tail, which
+    are dropped from ``n_SWR`` / ``n_MUA`` without a diagnostic — see the
+    caveat in the module docstring.
+    """
+    # Samples exist at t ∈ {0, 1, 2, 10, 11}; both events miss all of them.
+    time = np.array([0.0, 1.0, 2.0, 10.0, 11.0])
+    speed = np.zeros_like(time)  # immobile wherever it is measured
+    events = pd.DataFrame(
+        {"start_time": [3.0, 100.0], "end_time": [4.0, 101.0]},
+    )
+
+    assert filter_event_intervals_by_speed(events, speed=speed, time=time).empty
+
+
+def test_empty_speed_array_is_not_immobile():
+    """Zero samples must not vacuously satisfy the all-samples rule."""
+    assert event_speeds_are_immobile(np.array([], dtype=float)) is False
 
 
 def test_cohort_preserves_source_ids_when_an_earlier_event_is_rejected():

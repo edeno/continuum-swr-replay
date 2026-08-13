@@ -3,6 +3,19 @@
 An event is eligible only when it contains at least one sampled speed and
 every sampled speed is finite and strictly below the configured threshold.
 The strict comparison matches the repository's immobility-bout definition.
+
+*Atomic* throughout this module means an event is accepted or rejected as a
+whole — never clipped bin by bin.
+
+Caveats worth knowing before citing a filtered count:
+
+- Ineligibility has three causes that are not distinguished in the returned
+  mask: the animal was moving, the speed sample was non-finite, or the
+  interval covers no sample at all (a position-tracking gap, or an interval
+  past the position tail). All three yield ``False``.
+- Filtering is silent. Nothing here logs how many events were removed, so a
+  caller that reports ``n_SWR`` / ``n_MUA`` is reporting the eligible count
+  with no record of the drop.
 """
 
 from __future__ import annotations

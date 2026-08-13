@@ -164,7 +164,10 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     nlp = (dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]).to_numpy()
     immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
     ab = dot["ahead_behind_distance"].to_numpy()
-    validate_nonlocal_event_probability_contract(dot)
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_threshold=NON_LOCAL_THRESHOLD,
+    )
     eligible = filter_event_labels_by_speed(
         dot, ["non_local_event", "SWR_event"]
     )
@@ -354,7 +357,10 @@ def analyze_session(
     # Validate before loading encoding data so a missing/corrupt auxiliary
     # artifact cannot mask malformed event labels as an ordinary session skip.
     validate_dot_event_contract(dot)
-    validate_nonlocal_event_probability_contract(dot)
+    validate_nonlocal_event_probability_contract(
+        dot,
+        probability_threshold=NON_LOCAL_THRESHOLD,
+    )
     enc = load_encoding(epoch_id)
     env, encargs, pos, gpi = enc["env"], enc["encargs"], enc["pos"], enc["gpi"]
     gpi_peak_pos = float(pos[np.argmax(gpi)])

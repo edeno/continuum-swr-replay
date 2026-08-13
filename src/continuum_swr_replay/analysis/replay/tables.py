@@ -717,8 +717,10 @@ def build_event_table(
     if n_unclassified > 0:
         raise RuntimeError(
             f"{n_unclassified}/{len(per_event)} replay events have no row in "
-            "the classified event table; the filtered replay population must "
-            "be a subset of the full event-label window."
+            "the classified event table; both passes cover the identical "
+            "validated label window, so an unmatched key means the two "
+            "passes hashed different (animal, day, epoch, non_local_event) "
+            "tuples."
         )
 
     return per_event[column_order]
