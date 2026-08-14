@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_audit import DROP_FIELDS
 
@@ -24,11 +25,18 @@ def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardlag_nan=3, seed=0)
     frames = []
     for animal, day in [("a", 1), ("b", 2)]:
         n = n_per_session
-        df = pd.DataFrame({
-            "animal": animal, "day": day, "epoch": "e",
-            "immobility_time": rng.uniform(5, 30, n),
-            **{f"reward_lag{j}": rng.integers(0, 2, n).astype(float) for j in range(1, 11)},
-        })
+        df = pd.DataFrame(
+            {
+                "animal": animal,
+                "day": day,
+                "epoch": "e",
+                "immobility_time": rng.uniform(5, 30, n),
+                **{
+                    f"reward_lag{j}": rng.integers(0, 2, n).astype(float)
+                    for j in range(1, 11)
+                },
+            }
+        )
         frames.append(df)
     stop = pd.concat(frames, ignore_index=True)
     stop.loc[: n_immobility_bad - 1, "immobility_time"] = 0.0  # immobility<=0 own-drop
@@ -44,11 +52,22 @@ def test_per_bin_records_attribute_own_drops():
     stop = _stop_table()
     total = len(stop)
     # Synthetic models: M0_const and M1_rew1 fit on 'non_local' for both sessions.
-    models = pd.DataFrame([
-        {"model": m, "outcome": "non_local", "animal": a, "day": d, "epoch": "e",
-         "n_stops": 15, "converged": True, "separated": False}
-        for m in ("M0_const", "M1_rew1") for a, d in [("a", 1), ("b", 2)]
-    ])
+    models = pd.DataFrame(
+        [
+            {
+                "model": m,
+                "outcome": "non_local",
+                "animal": a,
+                "day": d,
+                "epoch": "e",
+                "n_stops": 15,
+                "converged": True,
+                "separated": False,
+            }
+            for m in ("M0_const", "M1_rew1")
+            for a, d in [("a", 1), ("b", 2)]
+        ]
+    )
     recs = mod._cohort_records(models, stop)
     assert all(_reconciles(r) for r in recs)
 
@@ -71,11 +90,21 @@ def test_contrast_records_attribute_qvals_and_own():
     # Post-join stop table carries the beta value scalars (non-NaN after the inner join).
     stop["switch_advantage_mu_preoutcome_sess"] = 0.1
     stop["rpe"] = 0.0
-    models = pd.DataFrame([
-        {"model": "G0_base", "population": "non_local", "animal": a, "day": d,
-         "epoch": "e", "n_stops": 12, "converged": True, "separated": False}
-        for a, d in [("a", 1), ("b", 2)]
-    ])
+    models = pd.DataFrame(
+        [
+            {
+                "model": "G0_base",
+                "population": "non_local",
+                "animal": a,
+                "day": d,
+                "epoch": "e",
+                "n_stops": 12,
+                "converged": True,
+                "separated": False,
+            }
+            for a, d in [("a", 1), ("b", 2)]
+        ]
+    )
     recs = mod._cohort_records(models, stop, n_qvals_dropped=7)
     assert all(_reconciles(r) for r in recs)
 
@@ -94,23 +123,48 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
 
     # Fitted frame = 2 sessions (one animal's first session already dropped upstream).
     rng = np.random.default_rng(0)
-    stop_fitted = pd.concat([
-        pd.DataFrame({
-            "animal": a, "day": d, "epoch": "e",
-            "immobility_time": rng.uniform(5, 30, 15),
-            **{f"reward_lag{j}": rng.integers(0, 2, 15).astype(float) for j in range(1, 11)},
-        })
-        for a, d in [("a", 2), ("b", 3)]
-    ], ignore_index=True)
+    stop_fitted = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "animal": a,
+                    "day": d,
+                    "epoch": "e",
+                    "immobility_time": rng.uniform(5, 30, 15),
+                    **{
+                        f"reward_lag{j}": rng.integers(0, 2, 15).astype(float)
+                        for j in range(1, 11)
+                    },
+                }
+            )
+            for a, d in [("a", 2), ("b", 3)]
+        ],
+        ignore_index=True,
+    )
     stop_fitted.loc[0:1, "immobility_time"] = 0.0  # 2 own-drops
 
-    models = pd.DataFrame([
-        {"model": mod.MU_UNCERTAINTY.name, "outcome": o, "animal": a, "day": d,
-         "epoch": "e", "n_stops": 10, "converged": True, "separated": False}
-        for o in mod.POPULATIONS_TO_FIT for a, d in [("a", 2), ("b", 3)]
-    ])
+    models = pd.DataFrame(
+        [
+            {
+                "model": mod.MU_UNCERTAINTY.name,
+                "outcome": o,
+                "animal": a,
+                "day": d,
+                "epoch": "e",
+                "n_stops": 10,
+                "converged": True,
+                "separated": False,
+            }
+            for o in mod.POPULATIONS_TO_FIT
+            for a, d in [("a", 2), ("b", 3)]
+        ]
+    )
     recs = mod._cohort_records(
-        models, stop_fitted, n_postjoin=100, n_sessions_postjoin=3, qvals_gap=8,
+        models,
+        stop_fitted,
+        n_postjoin=100,
+        n_sessions_postjoin=3,
+        qvals_gap=8,
     )
     assert recs and all(_reconciles(r) for r in recs)
     r0 = recs[0]
@@ -126,23 +180,176 @@ def test_swr_power_records_split_qvals_and_own():
 
     rng = np.random.default_rng(0)
     n = 200
-    df = pd.DataFrame({
-        "animal": np.repeat(["a", "b"], n // 2), "day": 1, "epoch": "e",
-        **{c: rng.normal(size=n) for c in mod.PREDICTORS},
-        mod.POWER_COL: rng.normal(size=n),
-    })
-    df.loc[0:9, "q_current"] = np.nan       # 10 qvals-derived NaN -> qvals_gap
+    df = pd.DataFrame(
+        {
+            "animal": np.repeat(["a", "b"], n // 2),
+            "day": 1,
+            "epoch": "e",
+            **{c: rng.normal(size=n) for c in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=n),
+            # Every event starts after its outcome, so the post-outcome gate
+            # is a no-op here and the split under test is the NaN attribution.
+            "event_start": 10.0,
+            "outcome_known_time": 5.0,
+            "trial_reward": np.tile([0.0, 1.0], n // 2),
+        }
+    )
+    df.loc[0:9, "q_current"] = np.nan  # 10 qvals-derived NaN -> qvals_gap
     df.loc[100:104, "reward_lag1"] = np.nan  # 5 own-predictor NaN -> own
-    coefs = pd.DataFrame([
-        {"animal": "a", "day": 1, "epoch": "e", "n_events": 85},
-        {"animal": "b", "day": 1, "epoch": "e", "n_events": 90},
-    ])
+    coefs = pd.DataFrame(
+        [
+            {"animal": "a", "day": 1, "epoch": "e", "n_events": 85},
+            {"animal": "b", "day": 1, "epoch": "e", "n_events": 90},
+        ]
+    )
     recs = mod._cohort_records(df, coefs)
     assert all(_reconciles(r) for r in recs)
     r = recs[0]
     assert r["n_drop_qvals_gap"] == 10
     assert r["n_drop_own_predictor_missing"] == 5
     assert r["n_in"] == n
+
+
+def test_swr_power_missing_timing_is_attributed_not_absorbed():
+    """Both timing columns land in named buckets, never the residual.
+
+    ``outcome_known_time`` arrives on the qvals left join, so its
+    absence is a qvals gap; ``event_start`` is an event-table column,
+    so its absence is an own-predictor gap. A physically pre-outcome
+    event is neither -- it is a real event the gate excludes.
+    """
+    from scripts.rate import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(0)
+    n = 200
+    df = pd.DataFrame(
+        {
+            "animal": np.repeat(["a", "b"], n // 2),
+            "day": 1,
+            "epoch": "e",
+            **{c: rng.normal(size=n) for c in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=n),
+            "event_start": 10.0,
+            "outcome_known_time": 5.0,
+            "trial_reward": np.tile([0.0, 1.0], n // 2),
+        }
+    )
+    df.loc[0:6, "outcome_known_time"] = np.nan  # 7 -> qvals_gap
+    df.loc[50:52, "event_start"] = np.nan  # 3 -> own
+    df.loc[100:103, "event_start"] = 1.0  # 4 physically pre-outcome
+    coefs = pd.DataFrame(
+        [
+            {"animal": "a", "day": 1, "epoch": "e", "n_events": 90},
+            {"animal": "b", "day": 1, "epoch": "e", "n_events": 96},
+        ]
+    )
+    r = mod._cohort_records(df, coefs)[0]
+    assert _reconciles(r)
+    assert r["n_drop_qvals_gap"] == 7
+    assert r["n_drop_own_predictor_missing"] == 3
+    assert r["n_events_excluded_pre_outcome"] == 4
+
+
+def test_swr_power_gate_requires_timing_columns():
+    """The gate names the missing columns instead of raising KeyError."""
+    from scripts.rate import fit_swr_power_model as mod
+
+    df = pd.DataFrame(
+        {
+            "animal": ["a"],
+            "day": [1],
+            "epoch": ["e"],
+            **{c: [0.0] for c in mod.PREDICTORS},
+            mod.POWER_COL: [0.0],
+        }
+    )
+    with pytest.raises(KeyError, match="event_start"):
+        mod._cohort_records(df, pd.DataFrame())
+
+
+def test_swr_power_gate_treats_equality_as_eligible():
+    """An event starting exactly at the outcome boundary is kept."""
+    from scripts.rate import fit_swr_power_model as mod
+
+    df = pd.DataFrame(
+        {
+            "animal": ["a", "a"],
+            "day": 1,
+            "epoch": "e",
+            "event_start": [5.0, 4.999],
+            "outcome_known_time": [5.0, 5.0],
+            "trial_reward": [1.0, 0.0],
+        }
+    )
+    finite, eligible = mod._post_outcome_masks(df)
+    assert finite.all()
+    assert eligible.tolist() == [True, False]
+
+
+def test_swr_power_gate_suppresses_session_when_one_outcome_vanishes():
+    from scripts.rate import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame(
+        {
+            "animal": ["a"] * 4,
+            "day": 1,
+            "epoch": "e",
+            **{column: rng.normal(size=4) for column in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=4),
+            "event_start": [5.0, 6.0, 4.0, 4.5],
+            "outcome_known_time": [5.0] * 4,
+            "trial_reward": [1.0, 1.0, 0.0, 0.0],
+        }
+    )
+
+    gated, audit = mod._gate_events_after_outcome(df)
+
+    assert gated.empty
+    row = audit.iloc[0]
+    assert row["n_rewarded_events_after_post_outcome_gate"] == 2
+    assert row["n_omission_events_after_post_outcome_gate"] == 0
+    assert not bool(row["outcome_balance_valid"])
+    assert row["n_events_after_outcome_balance_guard"] == 0
+
+
+@pytest.mark.parametrize("invalid_value", [np.nan, np.inf, -np.inf])
+def test_swr_power_complete_case_guard_blocks_rewarded_only_fit(invalid_value):
+    """A non-finite sole omission cannot disappear inside the OLS fit."""
+    from scripts.rate import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(2)
+    n_rewarded = 31
+    n = n_rewarded + 1
+    df = pd.DataFrame(
+        {
+            "animal": ["a"] * n,
+            "day": 1,
+            "epoch": "e",
+            **{column: rng.normal(size=n) for column in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=n),
+            "event_start": 10.0,
+            "outcome_known_time": 5.0,
+            "trial_reward": [1.0] * n_rewarded + [0.0],
+        }
+    )
+    # q_current is a qvals-derived predictor, so this row must remain a
+    # mechanism-B qvals gap in the cohort audit even though it also triggers
+    # the post-complete-case outcome-balance guard.
+    df.loc[n - 1, "q_current"] = invalid_value
+
+    coefs = mod.fit_power_model(df)
+
+    assert coefs.empty
+    gate = pd.DataFrame(coefs.attrs["post_outcome_gate_audit"]).iloc[0]
+    assert gate["n_rewarded_events_before_complete_case"] == n_rewarded
+    assert gate["n_omission_events_before_complete_case"] == 1
+    assert gate["n_rewarded_events_after_complete_case"] == n_rewarded
+    assert gate["n_omission_events_after_complete_case"] == 0
+    assert gate["n_events_excluded_incomplete_fit"] == 1
+    assert not bool(gate["outcome_balance_valid"])
+    assert gate["outcome_balance_status"] == "missing_after_complete_case:omission"
+    assert mod._cohort_records(df, coefs)[0]["n_drop_qvals_gap"] == 1
 
 
 def test_per_stop_hierarchy_records_reconcile():
@@ -152,15 +359,24 @@ def test_per_stop_hierarchy_records_reconcile():
     frames = []
     for a, d in [("a", 1), ("b", 2)]:
         n = 60
-        frames.append(pd.DataFrame({
-            "animal": a, "day": d, "epoch": "e",
-            "n_non_local": rng.poisson(2, n).astype(float),
-            "immobility_time": rng.uniform(5, 30, n),
-            **{f"reward_lag{j}": rng.integers(0, 2, n).astype(float) for j in range(1, 11)},
-            "is_after_omission": rng.integers(0, 2, n).astype(float),
-            "is_after_switch": rng.integers(0, 2, n).astype(float),
-            "recent_trial_reward_rate": rng.uniform(0, 1, n),
-        }))
+        frames.append(
+            pd.DataFrame(
+                {
+                    "animal": a,
+                    "day": d,
+                    "epoch": "e",
+                    "n_non_local": rng.poisson(2, n).astype(float),
+                    "immobility_time": rng.uniform(5, 30, n),
+                    **{
+                        f"reward_lag{j}": rng.integers(0, 2, n).astype(float)
+                        for j in range(1, 11)
+                    },
+                    "is_after_omission": rng.integers(0, 2, n).astype(float),
+                    "is_after_switch": rng.integers(0, 2, n).astype(float),
+                    "recent_trial_reward_rate": rng.uniform(0, 1, n),
+                }
+            )
+        )
     stop = pd.concat(frames, ignore_index=True)
     stop.loc[0:1, "immobility_time"] = 0.0
     _, recs = mod.fit_per_stop_rate_hierarchy(stop, run_cv=False)

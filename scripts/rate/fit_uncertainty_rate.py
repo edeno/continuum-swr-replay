@@ -141,12 +141,8 @@ FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATE
 # null and is not fit here).
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
-OUTCOME_TIME_SEMANTICS = (
-    "reward_on_ts for rewarded trials; poke_out_ts for omissions"
-)
-POST_OUTCOME_GATE_RULE = (
-    "stop_start + binj * BIN_S >= outcome_known_time"
-)
+OUTCOME_TIME_SEMANTICS = "reward_on_ts for rewarded trials; poke_out_ts for omissions"
+POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
 # shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
@@ -196,15 +192,24 @@ def _gate_bins_after_outcome(
     design: pd.DataFrame,
     *,
     bin_s: float = BIN_S,
-) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Keep bins whose physical left edge is at/after the current outcome.
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Keep fit-complete bins whose left edge is at/after the current outcome.
 
     ``binj`` is zero-based, so a bin's physical observation time is
     ``stop_start + binj * bin_s``. Equality is eligible: information known at
     the boundary can be associated with responses beginning at that boundary.
-    Non-finite timing rows are counted separately and never pass the gate.
+    Non-finite timing rows are counted separately and never pass the gate. The
+    outcome-balance guard is evaluated only after applying the same listwise
+    column selection and positive-exposure filter as
+    :func:`fit_per_bin_rate_model`.
     """
-    required = ("stop_id", "stop_start", "binj", "outcome_known_time")
+    required = (
+        "stop_id",
+        "stop_start",
+        "binj",
+        "outcome_known_time",
+        "trial_reward",
+    )
     missing = [column for column in required if column not in design.columns]
     if missing:
         raise KeyError(
@@ -213,32 +218,98 @@ def _gate_bins_after_outcome(
         )
 
     timing = design.groupby("stop_id", sort=False)[
-        ["stop_start", "outcome_known_time"]
+        ["stop_start", "outcome_known_time", "trial_reward"]
     ]
     inconsistent = timing.nunique(dropna=False).gt(1).any(axis=1)
     if inconsistent.any():
         bad_ids = tuple(inconsistent[inconsistent].index)
         raise ValueError(
-            "Post-outcome uncertainty-rate gating requires stop_start and "
-            "outcome_known_time to be constant within stop_id; invalid stop_id(s): "
+            "Post-outcome uncertainty-rate gating requires stop_start, "
+            "outcome_known_time, and trial_reward to be constant within stop_id; "
+            "invalid stop_id(s): "
             f"{bad_ids}"
+        )
+
+    fit_columns = [*_design_columns(MU_UNCERTAINTY), "exposure"]
+    missing_fit = [column for column in fit_columns if column not in design.columns]
+    if missing_fit:
+        raise KeyError(
+            "Post-outcome uncertainty-rate gating requires exact fit column(s): "
+            f"{missing_fit}"
         )
 
     output = design.copy()
     stop_start = output["stop_start"].to_numpy(dtype=float)
     binj = output["binj"].to_numpy(dtype=float)
     boundary = output["outcome_known_time"].to_numpy(dtype=float)
+    trial_reward = output["trial_reward"].to_numpy(dtype=float)
+    if (
+        not np.isfinite(trial_reward).all()
+        or not np.isin(trial_reward, (0.0, 1.0)).all()
+    ):
+        raise ValueError("trial_reward must contain finite binary 0/1 values")
     response_time = stop_start + binj * float(bin_s)
     finite = np.isfinite(response_time) & np.isfinite(boundary)
     eligible = finite & (response_time >= boundary)
     output["response_time"] = response_time
+    # Match fit_per_bin_rate_model exactly: listwise drop over formula columns
+    # plus exposure, followed by exposure > 0. Keeping this selection here
+    # prevents the sole row class from disappearing inside the fitter after an
+    # apparently balanced physical gate.
+    # Treat +/-inf as unavailable too. Statsmodels may fail deep in fitting or
+    # emit non-finite estimates if an infinite design value is allowed through;
+    # the scientific complete-case contract is finite, not merely non-null.
+    listwise_complete = np.isfinite(output[fit_columns].to_numpy(dtype=float)).all(
+        axis=1
+    )
+    positive_exposure = output["exposure"].to_numpy(dtype=float) > 0
+    fit_complete = listwise_complete & positive_exposure
+    candidate = eligible & fit_complete
+    rewarded = trial_reward == 1.0
+    omitted = trial_reward == 0.0
+    reward_after = int((eligible & rewarded).sum())
+    omission_after = int((eligible & omitted).sum())
+    reward_complete = int((candidate & rewarded).sum())
+    omission_complete = int((candidate & omitted).sum())
+    outcome_balance_valid = reward_complete > 0 and omission_complete > 0
+    if outcome_balance_valid:
+        balance_status = "both_outcomes_retained"
+    else:
+        missing = []
+        if reward_complete == 0:
+            missing.append("rewarded")
+        if omission_complete == 0:
+            missing.append("omission")
+        balance_status = "missing_after_complete_case:" + ",".join(missing)
     audit = {
         "n_bins_before_post_outcome_gate": int(len(output)),
         "n_bins_after_post_outcome_gate": int(eligible.sum()),
+        "n_rewarded_bins_before_post_outcome_gate": int(rewarded.sum()),
+        "n_rewarded_bins_after_post_outcome_gate": reward_after,
+        "n_omission_bins_before_post_outcome_gate": int(omitted.sum()),
+        "n_omission_bins_after_post_outcome_gate": omission_after,
+        "n_bins_before_complete_case": int(eligible.sum()),
+        "n_rewarded_bins_before_complete_case": reward_after,
+        "n_omission_bins_before_complete_case": omission_after,
+        "n_bins_after_complete_case": int(candidate.sum()),
+        "n_rewarded_bins_after_complete_case": reward_complete,
+        "n_omission_bins_after_complete_case": omission_complete,
         "n_bins_excluded_missing_timing": int((~finite).sum()),
         "n_bins_excluded_pre_outcome": int((finite & ~eligible).sum()),
+        "n_bins_excluded_incomplete_fit": int((eligible & ~listwise_complete).sum()),
+        "n_bins_excluded_nonpositive_exposure": int(
+            (eligible & listwise_complete & ~positive_exposure).sum()
+        ),
+        "outcome_balance_valid": outcome_balance_valid,
+        "outcome_balance_status": balance_status,
+        "n_bins_after_outcome_balance_guard": int(candidate.sum())
+        if outcome_balance_valid
+        else 0,
     }
-    return output.loc[eligible].reset_index(drop=True), audit
+    # A one-outcome survivor set changes the estimand and makes current-outcome
+    # terms uninterpretable. Keep the audit, but do not fit that cell.
+    selected = candidate if outcome_balance_valid else np.zeros(len(output), dtype=bool)
+    return output.loc[selected].reset_index(drop=True), audit
 
 
 def fit_uncertainty_rate(
@@ -257,6 +328,7 @@ def fit_uncertainty_rate(
         *FITTED_COVARIATES,
         "stop_start",
         "outcome_known_time",
+        "trial_reward",
     )
 
     rows: list[dict] = []
@@ -290,6 +362,15 @@ def fit_uncertainty_rate(
                     **gate_audit,
                 }
             )
+            if not gate_audit["outcome_balance_valid"]:
+                n_unfit[outcome] += 1
+                logger.warning(
+                    "  %s / %s: skipped (%s)",
+                    "_".join(map(str, keys)),
+                    outcome,
+                    gate_audit["outcome_balance_status"],
+                )
+                continue
             fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
             if fit is None:
                 n_unfit[outcome] += 1
@@ -314,7 +395,11 @@ def fit_uncertainty_rate(
         if att and bad:
             frac = bad / att
             (logger.warning if frac > 0.2 else logger.info)(
-                "population %s: %d/%d session cells unfit (%.0f%%)", outcome, bad, att, 100 * frac
+                "population %s: %d/%d session cells unfit (%.0f%%)",
+                outcome,
+                bad,
+                att,
+                100 * frac,
             )
     result = pd.DataFrame(rows)
     result.attrs["post_outcome_gate_audit"] = gate_audit_rows
@@ -338,36 +423,47 @@ def _cohort_records(
     ``n_excluded_session``. ``sessions_in`` is the post-join (pre-first-drop) session
     count so it matches ``n_in``'s stop population. Reconciles by construction.
     """
-    stop_level = [c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns]
+    stop_level = [
+        c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns
+    ]
     n_own = int(stop_own_missing(stop_fitted, stop_level).sum())
     records = []
     for outcome in POPULATIONS_TO_FIT:
         sub = (
             models[(models.model == MU_UNCERTAINTY.name) & (models.outcome == outcome)]
-            if len(models) else models
+            if len(models)
+            else models
         )
         n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
-        fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
-        records.append(cohort_record(
-            MU_UNCERTAINTY.name, outcome, "stop",
-            n_in=n_postjoin + int(qvals_gap), n_modeled=n_modeled,
-            sessions_in=n_sessions_postjoin, sessions_modeled=len(fit_keys),
-            animals_modeled=len({k[0] for k in fit_keys}),
-            drop_notes=(
-                "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                "stop-level predictor -> own; first-session/subset/physical "
-                "post-outcome bin gate -> excluded"
-            ),
-            n_drop_qvals_gap=int(qvals_gap),
-            n_drop_own_predictor_missing=n_own,
-            n_excluded_session=n_postjoin - n_own - n_modeled,
-            n_sessions_flagged_nonconverged=(
-                int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
-            ),
-            n_sessions_flagged_separated=(
-                int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
-            ),
-        ))
+        fit_keys = (
+            {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+        )
+        records.append(
+            cohort_record(
+                MU_UNCERTAINTY.name,
+                outcome,
+                "stop",
+                n_in=n_postjoin + int(qvals_gap),
+                n_modeled=n_modeled,
+                sessions_in=n_sessions_postjoin,
+                sessions_modeled=len(fit_keys),
+                animals_modeled=len({k[0] for k in fit_keys}),
+                drop_notes=(
+                    "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
+                    "stop-level predictor -> own; first-session/subset/physical "
+                    "post-outcome bin gate -> excluded"
+                ),
+                n_drop_qvals_gap=int(qvals_gap),
+                n_drop_own_predictor_missing=n_own,
+                n_excluded_session=n_postjoin - n_own - n_modeled,
+                n_sessions_flagged_nonconverged=(
+                    int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
+                ),
+                n_sessions_flagged_separated=(
+                    int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+                ),
+            )
+        )
     return records
 
 
@@ -411,10 +507,15 @@ def main() -> None:
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
     qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = qvals[
-        ["stop_id", "outcome_known_time", *VALUE_COVARIATES, "rpe", *RL_COVARIATES]
-    ].rename(
-        columns={"rpe": "rpe_model"}
-    )
+        [
+            "stop_id",
+            "outcome_known_time",
+            "trial_reward",
+            *VALUE_COVARIATES,
+            "rpe",
+            *RL_COVARIATES,
+        ]
+    ].rename(columns={"rpe": "rpe_model"})
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
@@ -427,7 +528,9 @@ def main() -> None:
         raise ValueError(
             f"qvals join kept only {frac:.1%} of stops -- check qvals_table stop_id convention"
         )
-    logger.info("qvals join: %d -> %d stops (%.0f%% kept)", n_before, len(stop), 100 * frac)
+    logger.info(
+        "qvals join: %d -> %d stops (%.0f%% kept)", n_before, len(stop), 100 * frac
+    )
     stop = _drop_first_session_per_animal(stop)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
@@ -441,11 +544,14 @@ def main() -> None:
                 "RL covariate %r is non-NaN on only %.0f%% of fitted rows; its SD "
                 "(hence the per-SD rate ratio) is set by that minority and rows with "
                 "NaN drop from every model listwise",
-                c, 100 * frac_valid,
+                c,
+                100 * frac_valid,
             )
         sd = stop[c].std()
         if pd.isna(sd) or sd == 0:
-            raise ValueError(f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score")
+            raise ValueError(
+                f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score"
+            )
         stop[c] = (stop[c] - stop[c].mean()) / sd
 
     n_sessions = stop.groupby(SESSION_COLS).ngroups
@@ -479,10 +585,21 @@ def main() -> None:
     # first-session-per-animal drop, subset, and per-bin gates -> excluded.
     audit_qvals = 0 if args.max_per_animal else (n_before - n_postjoin)  # smoke: N/A
     audit_records = _cohort_records(
-        models, stop, n_postjoin=n_postjoin,
-        n_sessions_postjoin=n_sessions_postjoin, qvals_gap=audit_qvals,
+        models,
+        stop,
+        n_postjoin=n_postjoin,
+        n_sessions_postjoin=n_sessions_postjoin,
+        qvals_gap=audit_qvals,
     )
-    write_cohort_audit(audit_records, out_dir / f"uncertainty_rate_cohort_audit{csfx}.csv")
+    write_cohort_audit(
+        audit_records, out_dir / f"uncertainty_rate_cohort_audit{csfx}.csv"
+    )
+    if models.empty:
+        raise RuntimeError(
+            "No uncertainty-rate cell retained both rewarded and omission bins "
+            "after the physical post-outcome and complete-case gates; audits "
+            "were written, but a one-outcome survivor model was not fit."
+        )
     logger.info(
         "Saved %d rows (%d sessions, populations=%s) to %s in %.1fs",
         len(models),

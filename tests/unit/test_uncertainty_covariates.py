@@ -17,12 +17,16 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.covariates import (
+    CANONICAL_SWITCH_WINDOW,
     canonical_trial_uncertainty_history,
 )
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
-    Path(__file__).resolve().parents[2] / "scripts" / "rate" / "fit_uncertainty_rate.py",
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "rate"
+    / "fit_uncertainty_rate.py",
 )
 fur = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(fur)
@@ -57,7 +61,7 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
         df["recent_switch_rate"] = np.where(has_completed, 0.0, np.nan)
     if "leaky_q_value_diff" not in df:
         df["leaky_q_value_diff"] = np.where(has_completed, 0.0, np.nan)
-    for j in range(1, 4):
+    for j in range(1, 11):
         if f"reward_lag{j}" not in df:
             df[f"reward_lag{j}"] = np.nan
     # Real stop-table frames carry an explicit regenerated completed-trial ID.
@@ -80,6 +84,29 @@ def test_omission_streak():
     )
     out = add_uncertainty_covariates(df)
     assert list(out["omission_streak"]) == [2, 0, 1, 3]
+
+
+def test_omission_streak_requires_exact_contiguous_binary_lag_schema():
+    missing = _frame([{}]).drop(columns=["reward_lag4"])
+    with pytest.raises(KeyError, match="exact contiguous"):
+        add_uncertainty_covariates(missing)
+
+    unexpected = _frame([{}]).assign(reward_lag11=0.0)
+    with pytest.raises(KeyError, match="unexpected"):
+        add_uncertainty_covariates(unexpected)
+
+    nonbinary = _frame([{"reward_lag4": 2.0}])
+    with pytest.raises(ValueError, match="binary"):
+        add_uncertainty_covariates(nonbinary)
+
+
+def test_omission_streak_schema_does_not_depend_on_dataframe_column_order():
+    frame = _frame([{"reward_lag1": 0.0, "reward_lag2": 1.0}])
+    reordered = frame[list(reversed(frame.columns))]
+
+    out = add_uncertainty_covariates(reordered)
+
+    assert out["omission_streak"].iloc[0] == 1.0
 
 
 def test_recent_switch_rate_no_leakage():
@@ -263,6 +290,30 @@ def test_completed_trial_context_must_be_constant_within_id(column, replacement)
         add_uncertainty_covariates(_frame(rows))
 
 
+def test_completed_trial_outcome_can_transition_once_from_unknown_to_known():
+    frame = _frame(
+        [
+            {"completed_trial_id": 0, "reward_outcome": np.nan},
+            {"completed_trial_id": 0, "reward_outcome": 1.0},
+        ]
+    )
+
+    out = add_uncertainty_covariates(frame)
+
+    assert len(out) == 2
+
+
+def test_completed_trial_outcome_availability_cannot_regress():
+    frame = _frame(
+        [
+            {"completed_trial_id": 0, "reward_outcome": 1.0},
+            {"completed_trial_id": 0, "reward_outcome": np.nan},
+        ]
+    )
+    with pytest.raises(ValueError, match="reward_outcome"):
+        add_uncertainty_covariates(frame)
+
+
 def test_completed_trial_id_gaps_are_valid_but_order_must_be_nondecreasing():
     gap = _frame(
         [
@@ -310,10 +361,26 @@ def test_canonical_history_covariates_must_be_finite_probabilities(column, bad_v
 def test_wsls_deviation_truth_table():
     df = _frame(
         [
-            {"is_after_reward": 1.0, "is_after_omission": 0.0, "is_stay": 1.0},  # win-stay -> 0
-            {"is_after_reward": 0.0, "is_after_omission": 1.0, "is_stay": 0.0},  # lose-shift -> 0
-            {"is_after_reward": 1.0, "is_after_omission": 0.0, "is_stay": 0.0},  # win-shift -> 1
-            {"is_after_reward": 0.0, "is_after_omission": 1.0, "is_stay": 1.0},  # lose-stay -> 1
+            {
+                "is_after_reward": 1.0,
+                "is_after_omission": 0.0,
+                "is_stay": 1.0,
+            },  # win-stay -> 0
+            {
+                "is_after_reward": 0.0,
+                "is_after_omission": 1.0,
+                "is_stay": 0.0,
+            },  # lose-shift -> 0
+            {
+                "is_after_reward": 1.0,
+                "is_after_omission": 0.0,
+                "is_stay": 0.0,
+            },  # win-shift -> 1
+            {
+                "is_after_reward": 0.0,
+                "is_after_omission": 1.0,
+                "is_stay": 1.0,
+            },  # lose-stay -> 1
         ]
     )
     out = add_uncertainty_covariates(df)
@@ -326,7 +393,11 @@ def test_wsls_deviation_no_prior_is_nan():
     df = _frame(
         [
             {"is_after_reward": 0.0, "is_after_omission": 0.0, "is_stay": 1.0},
-            {"is_after_reward": 1.0, "is_after_omission": 0.0, "is_stay": 1.0},  # win-stay -> 0
+            {
+                "is_after_reward": 1.0,
+                "is_after_omission": 0.0,
+                "is_stay": 1.0,
+            },  # win-stay -> 0
         ]
     )
     out = add_uncertainty_covariates(df).sort_values("stop_idx")
@@ -371,6 +442,24 @@ def test_leaky_q_value_diff_recurrence():
     np.testing.assert_allclose(switch_rate, [0.0, 0.5, 2 / 3])
     # alpha=.3: Q0 .5→.65→.755, with every margin evaluated pre-update.
     np.testing.assert_allclose(margins, [0.0, 0.15, 0.255])
+
+
+def test_switch_rate_window_truncates_at_the_canonical_length():
+    """Pin ``CANONICAL_SWITCH_WINDOW`` itself, not just the rolling mean.
+
+    With ``min_periods=1`` a three-trial sequence gives the same answer
+    for every window >= 3, so it cannot distinguish 5 from 4 or 10.
+    Seven switch outcomes can: the trailing mean is 3/5 only at width 5
+    (4/6 at 6, 2/4 at 4).
+    """
+    n = 7
+    switch_rate, _ = canonical_trial_uncertainty_history(
+        np.zeros(n),
+        np.ones(n),
+        np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0]),
+    )
+    assert CANONICAL_SWITCH_WINDOW == 5
+    assert switch_rate[-1] == pytest.approx(3 / 5)
 
 
 def test_canonical_leaky_q_is_broadcast_once_per_explicit_completed_trial():
@@ -464,6 +553,32 @@ def test_no_mutation():
         assert col in out.columns
 
 
+def test_visit_context_is_validated_per_session_not_pooled():
+    """Each session's completed-trial sequence restarts independently.
+
+    Two epochs of the same animal/day each number their completed trials
+    from zero. Validating the pooled frame would see the second epoch's
+    IDs step backwards and reject an ordinary stop table, so the session
+    grouping is load-bearing rather than incidental.
+    """
+    rows = [
+        {"current_arm": 0.0, "completed_trial_id": 0, "recent_switch_rate": 0.0},
+        {"current_arm": 1.0, "completed_trial_id": 1, "recent_switch_rate": 0.5},
+    ]
+    first = _frame(rows)
+    second = _frame(rows)
+    second["epoch"] = "04_r2"
+    pooled = pd.concat([first, second], ignore_index=True)
+
+    out = add_uncertainty_covariates(pooled)
+
+    assert len(out) == len(pooled)
+    # Both epochs keep their own history, unshifted by the other's.
+    for epoch in ("02_r1", "04_r2"):
+        got = out.loc[out["epoch"] == epoch, "recent_switch_rate"].tolist()
+        assert got == [0.0, 0.5], epoch
+
+
 def test_drop_first_session_per_animal():
     st = pd.DataFrame(
         {
@@ -478,27 +593,59 @@ def test_drop_first_session_per_animal():
     assert set(out["stop_id"]) == {1}
 
 
+def _with_mu_fit_columns(data: dict) -> pd.DataFrame:
+    """Complete a tiny physical-gate fixture with the exact MU design schema."""
+    design = pd.DataFrame(data)
+    for column in fur._design_columns(fur.MU_UNCERTAINTY):
+        if column not in design:
+            design[column] = 0.0
+    if "exposure" not in design:
+        design["exposure"] = fur.BIN_S
+    return design
+
+
 def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
-    design = pd.DataFrame(
+    design = _with_mu_fit_columns(
         {
-            "stop_id": [1, 1, 1],
-            "stop_start": [10.0, 10.0, 10.0],
-            "binj": [0, 1, 2],
-            "outcome_known_time": [10.0 + fur.BIN_S] * 3,
+            "stop_id": [1, 1, 1, 2, 2, 2],
+            "stop_start": [10.0] * 6,
+            "binj": [0, 1, 2, 0, 1, 2],
+            "outcome_known_time": [10.0 + fur.BIN_S] * 6,
+            "trial_reward": [1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
         }
     )
 
     gated, audit = fur._gate_bins_after_outcome(design)
 
-    assert gated["binj"].tolist() == [1, 2]
+    assert gated["binj"].tolist() == [1, 2, 1, 2]
     assert gated["response_time"].tolist() == pytest.approx(
-        [10.0 + fur.BIN_S, 10.0 + 2 * fur.BIN_S]
+        [
+            10.0 + fur.BIN_S,
+            10.0 + 2 * fur.BIN_S,
+            10.0 + fur.BIN_S,
+            10.0 + 2 * fur.BIN_S,
+        ]
     )
     assert audit == {
-        "n_bins_before_post_outcome_gate": 3,
-        "n_bins_after_post_outcome_gate": 2,
+        "n_bins_before_post_outcome_gate": 6,
+        "n_bins_after_post_outcome_gate": 4,
+        "n_rewarded_bins_before_post_outcome_gate": 3,
+        "n_rewarded_bins_after_post_outcome_gate": 2,
+        "n_omission_bins_before_post_outcome_gate": 3,
+        "n_omission_bins_after_post_outcome_gate": 2,
+        "n_bins_before_complete_case": 4,
+        "n_rewarded_bins_before_complete_case": 2,
+        "n_omission_bins_before_complete_case": 2,
+        "n_bins_after_complete_case": 4,
+        "n_rewarded_bins_after_complete_case": 2,
+        "n_omission_bins_after_complete_case": 2,
         "n_bins_excluded_missing_timing": 0,
-        "n_bins_excluded_pre_outcome": 1,
+        "n_bins_excluded_pre_outcome": 2,
+        "n_bins_excluded_incomplete_fit": 0,
+        "n_bins_excluded_nonpositive_exposure": 0,
+        "outcome_balance_valid": True,
+        "outcome_balance_status": "both_outcomes_retained",
+        "n_bins_after_outcome_balance_guard": 4,
     }
 
 
@@ -515,10 +662,86 @@ def test_post_outcome_bin_gate_rejects_inconsistent_stop_boundary():
             "stop_start": [10.0, 10.0],
             "binj": [0, 1],
             "outcome_known_time": [10.0, 10.1],
+            "trial_reward": [1.0, 1.0],
         }
     )
     with pytest.raises(ValueError, match="constant within stop_id"):
         fur._gate_bins_after_outcome(design)
+
+
+def test_post_outcome_bin_gate_suppresses_one_outcome_survivor_set():
+    design = _with_mu_fit_columns(
+        {
+            "stop_id": [1, 1, 2, 2],
+            "stop_start": [10.0] * 4,
+            "binj": [0, 1, 0, 1],
+            "outcome_known_time": [10.0, 10.0, 11.0, 11.0],
+            "trial_reward": [1.0, 1.0, 0.0, 0.0],
+        }
+    )
+
+    gated, audit = fur._gate_bins_after_outcome(design)
+
+    assert gated.empty
+    assert audit["n_rewarded_bins_after_post_outcome_gate"] == 2
+    assert audit["n_omission_bins_after_post_outcome_gate"] == 0
+    assert audit["outcome_balance_valid"] is False
+    assert audit["n_bins_after_outcome_balance_guard"] == 0
+
+
+@pytest.mark.parametrize("invalid_value", [np.nan, np.inf, -np.inf])
+def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
+    monkeypatch, invalid_value
+):
+    """The sole omission's non-finite predictor is audited before any GLM call."""
+    stop = pd.DataFrame(
+        {
+            "animal": ["a", "a"],
+            "day": [1, 1],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_id": [1, 2],
+            "immobility_time": [0.06, 0.06],
+            "stop_start": [10.0, 20.0],
+            "outcome_known_time": [10.0, 20.0],
+            "trial_reward": [1.0, 0.0],
+            "reward_rate_trial_k10": [0.5, 0.5],
+            "is_after_switch": [0.0, 0.0],
+            **{f"reward_lag{j}": [float(j % 2), float(j % 2)] for j in range(1, 11)},
+            **{column: [0.1, 0.2] for column in fur.FITTED_COVARIATES},
+        }
+    )
+    stop.loc[stop["trial_reward"] == 0.0, "p_reward_current"] = invalid_value
+    onsets = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a"],
+            "day": [1, 1, 1],
+            "epoch": ["02_r1", "02_r1", "02_r1"],
+            "stop_id": [1, 1, 1],
+            "t_since_stop_onset": [0.01, 0.02, 0.03],
+            "event_type": ["SWR", "non_local", "non_local"],
+            "is_swr": [True, True, False],
+        }
+    )
+    calls = []
+
+    def _record_fit(design, spec):
+        calls.append((design, spec))
+        return {"n_stops": design["stop_id"].nunique()}
+
+    monkeypatch.setattr(fur, "fit_per_bin_rate_model", _record_fit)
+
+    models = fur.fit_uncertainty_rate(stop, onsets)
+
+    assert models.empty
+    assert calls == []
+    audits = models.attrs["post_outcome_gate_audit"]
+    assert len(audits) == len(fur.POPULATIONS_TO_FIT)
+    for audit in audits:
+        assert audit["n_omission_bins_before_complete_case"] > 0
+        assert audit["n_omission_bins_after_complete_case"] == 0
+        assert audit["n_rewarded_bins_after_complete_case"] > 0
+        assert audit["n_bins_excluded_incomplete_fit"] > 0
+        assert audit["outcome_balance_status"] == "missing_after_complete_case:omission"
 
 
 @pytest.mark.slow
@@ -566,13 +789,16 @@ def test_runner_smoke():
             "qvals_table.pkl predates physical post-outcome timing; regenerate it"
         )
     qcols = qvals[
-        ["stop_id", "outcome_known_time", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]
-    ].rename(
-        columns={"rpe": "rpe_model"}
-    )
-    stop = stop.merge(
-        qcols, on="stop_id", how="inner", validate="many_to_one"
-    )
+        [
+            "stop_id",
+            "outcome_known_time",
+            "trial_reward",
+            *fur.VALUE_COVARIATES,
+            "rpe",
+            *fur.RL_COVARIATES,
+        ]
+    ].rename(columns={"rpe": "rpe_model"})
+    stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     stop = fur._drop_first_session_per_animal(stop)
     stop = fur._subset_max_per_animal(stop, 1)
 

@@ -50,12 +50,17 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 RC = PROCESSED_DATA_DIR / "replay_content"
 SC = ["animal", "day", "epoch"]
 POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
-PREDICTORS = ["reward_lag1", "p_reward_current", "rpe",
-              "recent_switch_rate", "value_diff_patch", "q_current",
-              "time_since_stop"]
-OUTCOME_TIME_SEMANTICS = (
-    "reward_on_ts for rewarded trials; poke_out_ts for omissions"
-)
+PREDICTORS = [
+    "reward_lag1",
+    "p_reward_current",
+    "rpe",
+    "recent_switch_rate",
+    "value_diff_patch",
+    "q_current",
+    "time_since_stop",
+]
+POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
+OUTCOME_TIME_SEMANTICS = "reward_on_ts for rewarded trials; poke_out_ts for omissions"
 POST_OUTCOME_GATE_RULE = "event_start >= outcome_known_time"
 
 
@@ -76,33 +81,53 @@ def _assemble() -> pd.DataFrame:
     # replacing the retired difflib nominal-rpe / leaky-Q.
     cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
     cont = cont.rename(columns={"q_chosen": "q_current"})
-    df = ev.merge(stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
-                  on="stop_id", how="left")
+    # Many events per stop, one row per stop on both right-hand tables.
+    # Without validate= a duplicated stop_id would silently multiply
+    # events into the per-event OLS instead of raising.
+    df = ev.merge(
+        stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
+        on="stop_id",
+        how="left",
+        validate="many_to_one",
+    )
     df = df.merge(
         cont[
             [
                 "stop_id",
                 "outcome_known_time",
+                "trial_reward",
                 "p_reward_current",
                 "rpe",
                 "value_diff_patch",
                 "q_current",
             ]
         ],
-        on="stop_id", how="left")
+        on="stop_id",
+        how="left",
+        validate="many_to_one",
+    )
     return df
 
 
-def _gate_events_after_outcome(
-    df: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Keep events whose physical start is at/after the current outcome.
+def _post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """``(finite, eligible)`` row masks for the post-outcome gate.
 
-    Equality is eligible. Rows with non-finite event or boundary timestamps do
-    not pass; the returned session-level audit distinguishes missing timing
-    from physically pre-outcome events.
+    The single definition of the gate rule, shared by the fit and the
+    cohort audit so the two cannot drift apart. Equality is eligible.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Event-grain frame carrying ``event_start`` and ``outcome_known_time``.
+
+    Returns
+    -------
+    finite : np.ndarray, shape (n_events,)
+        Both timestamps present.
+    eligible : np.ndarray, shape (n_events,)
+        Finite *and* starting at/after the outcome boundary.
     """
-    required = (*SC, "event_start", "outcome_known_time")
+    required = (*SC, "event_start", "outcome_known_time", "trial_reward")
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise KeyError(
@@ -112,14 +137,62 @@ def _gate_events_after_outcome(
 
     event_start = df["event_start"].to_numpy(dtype=float)
     boundary = df["outcome_known_time"].to_numpy(dtype=float)
-    finite = np.isfinite(event_start) & np.isfinite(boundary)
-    eligible = finite & (event_start >= boundary)
+    raw_trial_reward = df["trial_reward"]
+    trial_reward = pd.to_numeric(raw_trial_reward, errors="coerce").to_numpy(
+        dtype=float
+    )
+    if (raw_trial_reward.notna() & ~np.isfinite(trial_reward)).any():
+        raise ValueError("trial_reward must contain binary 0/1 values or NaN")
+    known_outcome = np.isfinite(trial_reward)
+    if not np.isin(trial_reward[known_outcome], (0.0, 1.0)).all():
+        raise ValueError("trial_reward must contain binary 0/1 values or NaN")
+    # A left-join qvals gap legitimately has no outcome label. It cannot pass
+    # the physical gate and is attributed to qvals_gap by the cohort audit,
+    # rather than aborting the entire paper-scale fit.
+    finite = np.isfinite(event_start) & np.isfinite(boundary) & known_outcome
+    return finite, finite & (event_start >= boundary)
 
+
+def _power_fit_complete_mask(df: pd.DataFrame) -> np.ndarray:
+    """Rows retained by the OLS model's exact listwise-finite filter."""
+    missing = [column for column in POWER_FIT_COLUMNS if column not in df.columns]
+    if missing:
+        raise KeyError(f"SWR-power fit requires model column(s): {missing}")
+    return np.isfinite(df[list(POWER_FIT_COLUMNS)].to_numpy(dtype=float)).all(axis=1)
+
+
+def _balanced_post_outcome_selection(
+    df: pd.DataFrame,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
+    """Return physical and fit-complete outcome-balanced masks plus an audit."""
+    finite, eligible = _post_outcome_masks(df)
+    fit_complete = _power_fit_complete_mask(df)
+    trial_reward = df["trial_reward"].to_numpy(dtype=float)
+    selected = np.zeros(len(df), dtype=bool)
     audit_rows = []
     for keys, positions in df.groupby(SC, sort=False).indices.items():
         pos = np.asarray(positions, dtype=int)
         finite_g = finite[pos]
         eligible_g = eligible[pos]
+        fit_complete_g = fit_complete[pos]
+        candidate_g = eligible_g & fit_complete_g
+        rewarded_g = trial_reward[pos] == 1.0
+        omitted_g = trial_reward[pos] == 0.0
+        reward_after = int((eligible_g & rewarded_g).sum())
+        omission_after = int((eligible_g & omitted_g).sum())
+        reward_complete = int((candidate_g & rewarded_g).sum())
+        omission_complete = int((candidate_g & omitted_g).sum())
+        balance_valid = reward_complete > 0 and omission_complete > 0
+        if balance_valid:
+            selected[pos] = candidate_g
+            balance_status = "both_outcomes_retained"
+        else:
+            missing = []
+            if reward_complete == 0:
+                missing.append("rewarded")
+            if omission_complete == 0:
+                missing.append("omission")
+            balance_status = "missing_after_complete_case:" + ",".join(missing)
         audit_rows.append(
             {
                 **dict(zip(SC, keys, strict=True)),
@@ -128,13 +201,42 @@ def _gate_events_after_outcome(
                 "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
                 "n_events_before_post_outcome_gate": int(len(pos)),
                 "n_events_after_post_outcome_gate": int(eligible_g.sum()),
+                "n_rewarded_events_before_post_outcome_gate": int(rewarded_g.sum()),
+                "n_rewarded_events_after_post_outcome_gate": reward_after,
+                "n_omission_events_before_post_outcome_gate": int(omitted_g.sum()),
+                "n_omission_events_after_post_outcome_gate": omission_after,
+                "n_events_before_complete_case": int(eligible_g.sum()),
+                "n_rewarded_events_before_complete_case": reward_after,
+                "n_omission_events_before_complete_case": omission_after,
+                "n_events_after_complete_case": int(candidate_g.sum()),
+                "n_rewarded_events_after_complete_case": reward_complete,
+                "n_omission_events_after_complete_case": omission_complete,
                 "n_events_excluded_missing_timing": int((~finite_g).sum()),
-                "n_events_excluded_pre_outcome": int(
-                    (finite_g & ~eligible_g).sum()
+                "n_events_excluded_pre_outcome": int((finite_g & ~eligible_g).sum()),
+                "n_events_excluded_incomplete_fit": int(
+                    (eligible_g & ~fit_complete_g).sum()
                 ),
+                "outcome_balance_valid": balance_valid,
+                "outcome_balance_status": balance_status,
+                "n_events_after_outcome_balance_guard": int(candidate_g.sum())
+                if balance_valid
+                else 0,
             }
         )
-    return df.loc[eligible].copy(), pd.DataFrame(audit_rows)
+    return finite, eligible, selected, pd.DataFrame(audit_rows)
+
+
+def _gate_events_after_outcome(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep fit-complete events whose start is at/after the current outcome.
+
+    Equality is eligible. Rows with non-finite event or boundary timestamps do
+    not pass. Outcome balance is evaluated after the OLS listwise-finite mask;
+    the audit distinguishes timing, physical-gate, and complete-case losses.
+    """
+    _, _, selected, audit = _balanced_post_outcome_selection(df)
+    return df.loc[selected].copy(), audit
 
 
 def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
@@ -147,9 +249,9 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
     }
     rows = []
     for keys, g in gated.groupby(SC, sort=False):
-        g = g[[*PREDICTORS, POWER_COL]]
-        finite = np.isfinite(g.to_numpy(dtype=float)).all(axis=1)
-        g = g.loc[finite]
+        # ``_balanced_post_outcome_selection`` already applied this exact
+        # listwise-finite column set before checking outcome balance.
+        g = g[list(POWER_FIT_COLUMNS)]
         if len(g) < 30:
             continue
         X = g[PREDICTORS].to_numpy(dtype=float)
@@ -161,11 +263,7 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
             {
                 **dict(zip(SC, keys, strict=True)),
                 "n_events": len(g),
-                **{
-                    key: value
-                    for key, value in gate_metadata.items()
-                    if key not in SC
-                },
+                **{key: value for key, value in gate_metadata.items() if key not in SC},
                 **dict(zip(PREDICTORS, beta[1:], strict=True)),
             }
         )
@@ -177,6 +275,7 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
 # Predictors sourced (via left join) from qvals_table -- NaN on the mechanism-B tail.
 _QVALS_PREDICTORS = (
     "outcome_known_time",
+    "trial_reward",
     "p_reward_current",
     "rpe",
     "value_diff_patch",
@@ -190,6 +289,9 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     attributes them to ``n_drop_qvals_gap`` (mechanism B), the other predictor/response
     NaNs to own, and the <30-event session gate to excluded."""
     n_in = len(df)
+    # Raises if the timing columns are absent, so ``event_start`` below
+    # needs no membership guard: reaching this point means it exists.
+    _, eligible, selected, _ = _balanced_post_outcome_selection(df)
     qp = [c for c in _QVALS_PREDICTORS if c in df.columns]
     op = [
         c
@@ -209,34 +311,46 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     )
     omask = pd.Series(omask, index=df.index) & ~qmask
     complete = ~(qmask | omask)
-    post_outcome = complete & (
-        df["event_start"].to_numpy(dtype=float)
-        >= df["outcome_known_time"].to_numpy(dtype=float)
-    )
+    post_outcome = complete & pd.Series(selected, index=df.index)
     valid = df[post_outcome]
     fit_keys = {tuple(r) for r in coefs[SC].to_numpy()} if len(coefs) else set()
     vbs = valid.groupby(SC, sort=False).size()
     n_modeled = int(sum(int(vbs.get(k, 0)) for k in fit_keys))
     n_qvals, n_own = int(qmask.sum()), int(omask.sum())
-    records = [cohort_record(
-        "swr_power", "all", "event",
-        n_in=n_in, n_modeled=n_modeled,
-        sessions_in=df.groupby(SC).ngroups, sessions_modeled=len(fit_keys),
-        animals_modeled=len({k[0] for k in fit_keys}),
-        drop_notes=(
-            "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
-            "other predictor/response/timing NaN -> own; physical pre-outcome "
-            "event or <30-event session -> excluded"
-        ),
-        n_drop_qvals_gap=n_qvals,
-        n_drop_own_predictor_missing=n_own,
-        n_excluded_session=n_in - n_qvals - n_own - n_modeled,
-    )]
+    records = [
+        cohort_record(
+            "swr_power",
+            "all",
+            "event",
+            n_in=n_in,
+            n_modeled=n_modeled,
+            sessions_in=df.groupby(SC).ngroups,
+            sessions_modeled=len(fit_keys),
+            animals_modeled=len({k[0] for k in fit_keys}),
+            drop_notes=(
+                "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
+                "other predictor/response/timing NaN -> own; physical pre-outcome "
+                "event or <30-event session -> excluded"
+            ),
+            n_drop_qvals_gap=n_qvals,
+            n_drop_own_predictor_missing=n_own,
+            n_excluded_session=n_in - n_qvals - n_own - n_modeled,
+        )
+    ]
     records[0].update(
         post_outcome_gate=True,
         post_outcome_gate_rule=POST_OUTCOME_GATE_RULE,
         outcome_time_semantics=OUTCOME_TIME_SEMANTICS,
-        n_events_excluded_pre_outcome=int((complete & ~post_outcome).sum()),
+        n_events_excluded_pre_outcome=int(
+            (complete & ~pd.Series(eligible, index=df.index)).sum()
+        ),
+        n_events_excluded_outcome_imbalance=int(
+            (
+                complete
+                & pd.Series(eligible, index=df.index)
+                & ~pd.Series(selected, index=df.index)
+            ).sum()
+        ),
     )
     return records
 
@@ -245,7 +359,9 @@ def main() -> None:
     df = _assemble()
     m = df[POWER_COL].to_numpy()
     print(f"=== SWR power distribution ({POWER_COL}, n={len(df)} non-local events) ===")
-    print("  pctiles 5/25/50/75/95:", np.round(np.percentile(m, [5, 25, 50, 75, 95]), 2))
+    print(
+        "  pctiles 5/25/50/75/95:", np.round(np.percentile(m, [5, 25, 50, 75, 95]), 2)
+    )
     print(f"  Sarle bimodality coef = {_bimodality_coef(m):.3f}  (>0.555 => bimodal)")
     for lab, sub in [("non-SWR events", df[~df.is_swr]), ("SWR events", df[df.is_swr])]:
         s = sub[POWER_COL]
@@ -257,9 +373,11 @@ def main() -> None:
         print(f"    {c:+5.1f} | {'#' * int(40 * cnt / h.max())}")
 
     d = df[["event_duration", POWER_COL]].dropna()
-    print(f"\n=== duration confound: corr(power, event_duration) ="
-          f" {np.corrcoef(d.event_duration, d[POWER_COL])[0,1]:+.3f}"
-          f"  (log-dur {np.corrcoef(np.log(d.event_duration), d[POWER_COL])[0,1]:+.3f}) ===")
+    print(
+        f"\n=== duration confound: corr(power, event_duration) ="
+        f" {np.corrcoef(d.event_duration, d[POWER_COL])[0, 1]:+.3f}"
+        f"  (log-dur {np.corrcoef(np.log(d.event_duration), d[POWER_COL])[0, 1]:+.3f}) ==="
+    )
 
     coefs = fit_power_model(df)
     gate_audit = pd.DataFrame(coefs.attrs["post_outcome_gate_audit"])
@@ -273,14 +391,24 @@ def main() -> None:
         _cohort_records(df, coefs),
         RC / "models_per_bin_rate" / "swr_power_cohort_audit.csv",
     )
+    if coefs.empty:
+        raise RuntimeError(
+            "No SWR-power session retained both rewarded and omission events "
+            "after the physical post-outcome and complete-case gates; audits "
+            "were written, but a one-outcome survivor model was not fit."
+        )
     print(f"\n=== power model: {POWER_COL} ~ standardized covariates (per session) ===")
-    print(f"  {len(coefs)} sessions, {coefs.animal.nunique()} animals; saved -> {out}\n")
+    print(
+        f"  {len(coefs)} sessions, {coefs.animal.nunique()} animals; saved -> {out}\n"
+    )
     print(f"  {'covariate':<22}{'med coef':>10}{'%pos':>7}{'animals':>9}{'p':>10}")
     for c in PREDICTORS:
         s = coefs[c].dropna()
         n_an = (coefs.groupby("animal")[c].median() > 0).sum()
-        print(f"  {c:<22}{s.median():>+10.3f}{(s > 0).mean() * 100:>6.0f}%"
-              f"{f'{n_an}/5':>9}{wilcoxon(s)[1]:>10.1e}")
+        print(
+            f"  {c:<22}{s.median():>+10.3f}{(s > 0).mean() * 100:>6.0f}%"
+            f"{f'{n_an}/5':>9}{wilcoxon(s)[1]:>10.1e}"
+        )
 
 
 if __name__ == "__main__":
