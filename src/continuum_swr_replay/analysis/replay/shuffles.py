@@ -9,7 +9,7 @@ Three shuffles:
    across stops within a session, preserving events-per-stop counts.
    Null for replay–behavior alignment analyses.
 3. :func:`next_arm_circular_shift` — circularly shift ``next_arm``
-   (and associated post-hoc columns) across stops within a session.
+   (and associated post-hoc columns) across visit contexts within a session.
    Null for the retrospective alignment metrics, guarding against patch
    geometry or block-drift correlations.
 
@@ -145,17 +145,29 @@ def next_arm_circular_shift(
         "next_arm",
         "next_patch",
     ),
+    unit_col: str | None = None,
+    strata_cols: tuple[str, ...] = (),
+    variation_cols: tuple[str, ...] | None = None,
+    require_movement: bool = False,
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Circularly shift ``next_arm`` and associated post-hoc columns.
+    """Circularly shift future-choice labels at the stop/visit grain.
 
-    Orders events by ``event_midpoint_time``, picks a random shift
-    ``k ∈ [1, n_events - 1]``, and rolls the post-hoc columns by
-    ``k`` positions. This preserves the marginal distribution of
-    ``next_arm`` across the session AND the temporal ordering of
-    "next" labels (slow drifts in patch preference are carried over),
-    but breaks the event-specific alignment between replay content
-    and what the animal actually did next.
+    Canonical retrospective analyses pass a derived contiguous-current-arm-run
+    column as ``unit_col``. Every future-choice label is then read once per
+    visit, shifted among visits, and broadcast back to all events in that visit.
+    This prevents events in one visit receiving incompatible shuffled choices
+    while allowing a long immobility bout that crosses a trial boundary—or
+    returns to an earlier arm—to contain distinct visits. ``strata_cols``
+    restricts shifts to scientifically exchangeable visits. Within each
+    stratum, units are ordered by their earliest ``event_midpoint_time`` and a
+    non-identity circular shift is drawn.
+
+    When ``unit_col`` is omitted, ``stop_id`` is used if present; otherwise each
+    row is treated as its own unit for backward-compatible use on generic event
+    frames.  Strata with fewer than two units, or whose relevant labels cannot
+    change, are left untouched.  Set ``require_movement=True`` to fail instead;
+    publication analyses use that guard after excluding non-identifiable strata.
 
     Designed specifically as the null for the retrospective
     alignment, where the concern is that patch geometry or block-drift
@@ -176,6 +188,17 @@ def next_arm_circular_shift(
         and the shifted ``next_patch``. Rolling the source row's
         ``is_stay`` would silently keep the wrong current-patch
         reference.
+    unit_col : str, optional
+        Behavioral unit whose events must retain one common label. Defaults to
+        ``stop_id`` when available, otherwise one unit per row.
+    strata_cols : tuple of str
+        Unit-level columns that must match before labels can be exchanged.
+        Every value must be constant within a unit.
+    variation_cols : tuple of str, optional
+        Shifted labels that must each change somewhere in a stratum. Defaults to
+        every present member of ``columns``.
+    require_movement : bool, default False
+        Raise when no stratum admits a non-identity label shift.
     rng : numpy Generator, optional
 
     Returns
@@ -197,14 +220,98 @@ def next_arm_circular_shift(
                 "pass one session at a time to avoid cross-session label "
                 "contamination."
             )
-    out = event_table.sort_values("event_midpoint_time").copy()
-    n = len(out)
-    if n < 2:
+    out = event_table.sort_values("event_midpoint_time", kind="stable").copy()
+    if out.empty:
         return out
-    shift = int(rng.integers(1, n))
-    for col in columns:
-        if col in out.columns:
-            out[col] = np.roll(out[col].to_numpy(), shift)
+
+    label_cols = tuple(column for column in columns if column in out.columns)
+    if not label_cols:
+        return out
+    relevant_cols = label_cols if variation_cols is None else variation_cols
+    missing_variation = sorted(set(relevant_cols).difference(label_cols))
+    if missing_variation:
+        raise KeyError(
+            "variation_cols must be present in the shifted columns; missing "
+            f"{missing_variation}"
+        )
+
+    temporary_unit_col = "_next_label_shuffle_row_unit"
+    if unit_col is None:
+        unit_col = "stop_id" if "stop_id" in out.columns else temporary_unit_col
+    if unit_col == temporary_unit_col:
+        out[unit_col] = np.arange(len(out), dtype=np.int64)
+    elif unit_col not in out.columns:
+        raise KeyError(f"next-label shuffle requires unit column {unit_col!r}")
+    if out[unit_col].isna().any():
+        raise ValueError(f"next-label shuffle unit column {unit_col!r} contains NaN")
+
+    required_unit_columns = tuple(dict.fromkeys((*label_cols, *strata_cols)))
+    missing = sorted(set(required_unit_columns).difference(out.columns))
+    if missing:
+        raise KeyError(f"next-label shuffle is missing unit column(s): {missing}")
+    grouped = out.groupby(unit_col, sort=False, dropna=False)
+    for column in required_unit_columns:
+        n_unique = grouped[column].nunique(dropna=False)
+        inconsistent = n_unique[n_unique > 1]
+        if not inconsistent.empty:
+            example = inconsistent.index[0]
+            raise ValueError(
+                f"next-label shuffle requires one {column!r} value per "
+                f"{unit_col}; unit {example!r} has multiple values"
+            )
+
+    unit_rows = out.drop_duplicates(unit_col, keep="first")[
+        [unit_col, *required_unit_columns]
+    ].copy()
+    unit_time = grouped["event_midpoint_time"].min()
+    unit_rows["_unit_time"] = unit_rows[unit_col].map(unit_time)
+    unit_rows = unit_rows.sort_values("_unit_time", kind="stable").reset_index(
+        drop=True
+    )
+    shuffled_labels = unit_rows[[unit_col, *label_cols]].copy()
+
+    if strata_cols:
+        strata = unit_rows.groupby(list(strata_cols), sort=False, dropna=False)
+        stratum_positions = [np.asarray(indices) for indices in strata.indices.values()]
+    else:
+        stratum_positions = [np.arange(len(unit_rows), dtype=np.int64)]
+
+    n_moved_strata = 0
+    for positions in stratum_positions:
+        if len(positions) < 2:
+            continue
+        ordered = unit_rows.iloc[positions]
+        candidates: list[int] = []
+        for shift in range(1, len(ordered)):
+            if all(
+                not ordered[column]
+                .reset_index(drop=True)
+                .equals(pd.Series(np.roll(ordered[column].to_numpy(), shift)))
+                for column in relevant_cols
+            ):
+                candidates.append(shift)
+        if not candidates:
+            continue
+        candidate_index = int(rng.integers(1, len(candidates) + 1)) - 1
+        shift = candidates[candidate_index]
+        for column in label_cols:
+            shuffled_labels.loc[positions, column] = np.roll(
+                ordered[column].to_numpy(), shift
+            )
+        n_moved_strata += 1
+
+    if require_movement and n_moved_strata != len(stratum_positions):
+        raise ValueError(
+            "next-label shuffle could not move every requested stratum; "
+            f"moved {n_moved_strata}/{len(stratum_positions)} strata"
+        )
+
+    label_lookup = shuffled_labels.set_index(unit_col)
+    for column in label_cols:
+        out[column] = out[unit_col].map(label_lookup[column])
+
+    if temporary_unit_col in out.columns:
+        out = out.drop(columns=temporary_unit_col)
 
     # Recompute ``is_stay`` from the destination row's
     # ``current_patch`` and the just-shifted ``next_patch`` so the

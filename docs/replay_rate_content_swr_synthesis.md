@@ -6,6 +6,12 @@ relate. Companion to the per-layer references: rate ladder
 [per_bin_rate_results.md](per_bin_rate_results.md) / [rate_models.md](rate_models.md);
 content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 
+> **Historical-results warning (2026-08-14):** The numerical results below
+> predate the event-location, two-clock reward-history, time-local recency, and
+> exact-cohort contracts. They are retained as an audit trail, not as current
+> paper estimates. Regenerate the canonical tables and models, then re-evaluate
+> every coefficient, model comparison, and conclusion before citing them.
+
 ## Provenance & methods (read first)
 
 - **Data:** event tables (`event_table.pkl`, `event_arm_table.pkl`, `stop_table.pkl`)

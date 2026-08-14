@@ -2,7 +2,7 @@
 """Stage 5B: per-session retrospective replay-content alignment.
 
 Reads the canonical tables under ``PROCESSED_DATA_DIR/replay_content/``
-and computes, for every session, three event-level alignment metrics
+and computes, for every session, five event-level alignment metrics
 between replay content during a stop and the arm the animal visited
 next:
 
@@ -10,10 +10,17 @@ next:
 - ``ends_at_next``        — last in-event MAP arm equals ``next_arm``
 - ``contains_path_to_next`` — MAP-arm trace covers the geometric path
   from ``current_arm`` to ``next_arm``
+- ``chosen_patch_fraction`` — replay mass on ``next_patch``
+- ``ends_at_next_patch`` — final MAP arm belongs to ``next_patch``
 
-Each metric is compared against a within-session
-``next_arm_circular_shift`` null over ``--n-shuffles`` draws. Output
-is one row per session.
+Each metric is compared against a within-session, visit-context future-label
+shuffle over ``--n-shuffles`` draws. A visit context is a contiguous
+``current_arm`` run within ``stop_id`` because one long immobility bout can span
+a trial boundary or return to an earlier arm. Arm metrics condition on current
+arm, patch metrics on current patch, and path coverage on current arm, route
+length, and coarse duration. Each family has its own cohort and denominator.
+Output is one row per session with explicit retained/excluded unit and stratum
+counts.
 
 Usage::
 
@@ -47,6 +54,24 @@ INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
 SESSION_COLS = ["animal", "day", "epoch"]
+
+
+def _family_unit_counts(
+    result: dict[str, float | int | bool | str],
+) -> dict[str, int]:
+    """Movable visit-context counts for each calibrated metric family."""
+    return {
+        family: int(result[f"n_shuffle_units_{family}_family"])
+        for family in ("arm", "patch", "path")
+    }
+
+
+def _retrospective_status(
+    result: dict[str, float | int | bool | str],
+) -> str:
+    """Explicit persisted status for a session's retrospective analysis."""
+    counts = _family_unit_counts(result)
+    return "ok" if max(counts.values(), default=0) >= 2 else "no_movable_family"
 
 
 def main() -> None:
@@ -140,6 +165,7 @@ def main() -> None:
 
     rng = np.random.default_rng(args.seed)
     rows = []
+    n_no_movable = 0
     sessions = sorted(event_table.groupby(SESSION_COLS).groups.keys())
     for i, sess_key in enumerate(sessions):
         animal, day, epoch = sess_key
@@ -158,12 +184,6 @@ def main() -> None:
             & (event_sequence_table["day"] == day)
             & (event_sequence_table["epoch"] == epoch)
         ]
-        if len(ev_s) < 2:
-            logging.info(
-                "Skipping %s/%s/%s (only %d events)", animal, day, epoch, len(ev_s)
-            )
-            continue
-
         t0 = time.time()
         # Fail the batch before publication when any session violates the
         # location/observability contract.  Continuing here would turn a
@@ -176,6 +196,18 @@ def main() -> None:
             n_shuffles=args.n_shuffles,
             rng=np.random.default_rng(rng.integers(0, 2**32)),
         )
+        family_unit_counts = _family_unit_counts(result)
+        retrospective_status = _retrospective_status(result)
+        if retrospective_status == "no_movable_family":
+            logging.info(
+                "Retaining %s/%s/%s with NaN metrics (no family has two movable "
+                "contiguous visit contexts; %s)",
+                animal,
+                day,
+                epoch,
+                family_unit_counts,
+            )
+            n_no_movable += 1
 
         result.update(
             {
@@ -183,6 +215,7 @@ def main() -> None:
                 "day": day,
                 "epoch": epoch,
                 "subset": label,
+                "retrospective_status": retrospective_status,
                 "elapsed_s": time.time() - t0,
             }
         )
@@ -193,6 +226,11 @@ def main() -> None:
     out = pd.DataFrame(rows)
     out.to_pickle(output_path)
     logging.info("Saved %d sessions → %s", len(out), output_path)
+    logging.info(
+        "Persisted %d/%d sessions with status=no_movable_family",
+        n_no_movable,
+        len(sessions),
+    )
 
     # Summary across sessions for quick stdout interpretation.
     logging.info("===== Summary across %d sessions (subset=%s) =====", len(out), label)
@@ -209,14 +247,16 @@ def main() -> None:
             continue
         med_real = float(out[real_col].median())
         med_diff = float(out[diff_col].median())
-        n_pos = int((out[diff_col] > 0).sum())
+        finite_metric = np.isfinite(pd.to_numeric(out[diff_col], errors="coerce"))
+        n_pos = int((out.loc[finite_metric, diff_col] > 0).sum())
+        n_finite = int(finite_metric.sum())
         logging.info(
             "  %-25s  real=%.3f  Δ vs shuffle=%+.3f  pos=%d/%d",
             metric,
             med_real,
             med_diff,
             n_pos,
-            len(out),
+            n_finite,
         )
 
 

@@ -39,8 +39,12 @@ from continuum_swr_replay.analysis.replay.retrospective import (
     ends_at_next,
     ends_at_next_patch,
     ends_at_prev,
+    freeze_retrospective_cohort,
     retrospective_alignment_with_shuffle,
 )
+from continuum_swr_replay.analysis.replay.shuffles import next_arm_circular_shift
+from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
+from scripts.pfc.run_stage5b_retrospective import _retrospective_status
 
 # ─────────────────────────────────────────────────────────────────────────────
 # arm_path_well_to_well
@@ -96,11 +100,18 @@ def _make_event_table(events: list[dict]) -> pd.DataFrame:
         "epoch": "01_r1",
         "event_midpoint_time": np.nan,
         "at_well": True,
+        "n_nonlocal_bins": 4,
     }.items():
         if col not in df.columns:
             df[col] = default
     if "event_midpoint_time" in df.columns and df["event_midpoint_time"].isna().all():
         df["event_midpoint_time"] = np.arange(len(df), dtype=float)
+    if "stop_id" not in df.columns:
+        df["stop_id"] = df["event_id"]
+    if "current_patch" not in df.columns:
+        df["current_patch"] = pd.to_numeric(df["current_arm"], errors="coerce").map(
+            WELL_PATCH_MAPPING
+        )
     return df
 
 
@@ -304,9 +315,7 @@ class TestContainsPathToNext:
 
     def test_set_membership_does_not_require_order_or_continuity(self):
         """Coverage is deliberately a set metric, not a trajectory metric."""
-        ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 0, "next_arm": 2}]
-        )
+        ev = _make_event_table([{"event_id": 1, "current_arm": 0, "next_arm": 2}])
         # Required set is {0, 2, 6, 7}.  It appears out of route order,
         # interleaved with unrelated arms, and with duplicates.  All of those
         # details are intentionally irrelevant to path-arm set coverage.
@@ -526,8 +535,13 @@ class TestComputeRetrospectiveMetrics:
     def test_empty_schema_complete_inputs_return_empty_metrics(self):
         ev = pd.DataFrame(
             columns=[
-                "animal", "day", "epoch", "event_id", "current_arm",
-                "next_arm", "next_patch",
+                "animal",
+                "day",
+                "epoch",
+                "event_id",
+                "current_arm",
+                "next_arm",
+                "next_patch",
             ]
         )
         ea = pd.DataFrame(
@@ -535,7 +549,11 @@ class TestComputeRetrospectiveMetrics:
         )
         es = pd.DataFrame(
             columns=[
-                "animal", "day", "epoch", "event_id", "t_in_event",
+                "animal",
+                "day",
+                "epoch",
+                "event_id",
+                "t_in_event",
                 "decoded_arm_map",
             ]
         )
@@ -552,9 +570,9 @@ class TestComputeRetrospectiveMetrics:
 
 class TestRetrospectiveAlignmentWithShuffle:
     def test_rejects_legacy_location_schema(self):
-        ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 0, "next_arm": 1}]
-        ).drop(columns="at_well")
+        ev = _make_event_table([{"event_id": 1, "current_arm": 0, "next_arm": 1}]).drop(
+            columns="at_well"
+        )
         ea = _make_event_arm_table({1: [1.0] + [0.0] * 8})
         es = _make_event_sequence_table({1: [0, 1]})
         with pytest.raises(KeyError, match="regenerate event tables"):
@@ -589,14 +607,54 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert set(ea_at["event_id"]) == {1}
         assert set(es_at["event_id"]) == {1}
 
-        with pytest.raises(ValueError, match="at least two events.*retained 1"):
-            retrospective_alignment_with_shuffle(
-                ev,
-                ea,
-                es,
-                n_shuffles=1,
-                rng=np.random.default_rng(0),
-            )
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            es,
+            n_shuffles=1,
+            rng=np.random.default_rng(0),
+        )
+        assert result["n_events_arm_family"] == 0
+        assert result["n_events_patch_family"] == 0
+        assert result["n_events_path_family"] == 0
+        assert result["n_shuffle_units_excluded_singleton_arm_family"] == 1
+        assert _retrospective_status(result) == "no_movable_family"
+
+    def test_missing_at_well_is_excluded_like_an_explicit_false(self):
+        """``pd.NA`` must not survive the cohort filter.
+
+        Before the first completed trip ``at_well`` is NA, where
+        ``.eq(True)`` yields NA rather than False; without the explicit
+        fill those location-unknown events would enter the cohort.
+        """
+        ev = _make_event_table(
+            [
+                {
+                    "event_id": 1,
+                    "current_arm": 0,
+                    "next_arm": 1,
+                    "next_patch": 1,
+                    "at_well": True,
+                },
+                {
+                    "event_id": 2,
+                    "current_arm": np.nan,
+                    "next_arm": 2,
+                    "next_patch": 2,
+                    "at_well": pd.NA,
+                },
+            ]
+        )
+        ea = _make_event_arm_table(
+            {1: [0.1, 0.9, 0, 0, 0, 0, 0, 0, 0], 2: [0, 0, 1, 0, 0, 0, 0, 0, 0]}
+        )
+        es = _make_event_sequence_table({1: [0, 1], 2: [2]})
+
+        ev_at, ea_at, es_at = at_well_event_cohort(ev, ea, es)
+
+        assert ev_at["event_id"].tolist() == [1]
+        assert set(ea_at["event_id"]) == {1}
+        assert set(es_at["event_id"]) == {1}
 
     def test_missing_final_arm_is_endpoint_failure_not_cohort_exclusion(self):
         """A nonfinite final MAP bin stays in the endpoint denominator.
@@ -611,26 +669,26 @@ class TestRetrospectiveAlignmentWithShuffle:
                 {
                     "event_id": 1,
                     "current_arm": 0,
-                    "next_arm": 0,
-                    "next_patch": 1,
+                    "next_arm": 2,
+                    "next_patch": 2,
                 },
                 {
                     "event_id": 2,
                     "current_arm": 0,
-                    "next_arm": 0,
-                    "next_patch": 1,
+                    "next_arm": 4,
+                    "next_patch": 3,
                 },
             ]
         )
         ea = _make_event_arm_table(
             {
-                1: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                2: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                1: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                2: [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
             }
         )
-        es = _make_event_sequence_table({1: [0], 2: [0, 1]})
+        es = _make_event_sequence_table({1: [0, 6, 7, 2], 2: [0, 6, 8, 4, 1]})
         es.loc[
-            es["event_id"].eq(2) & es["t_in_event"].eq(1),
+            es["event_id"].eq(2) & es["t_in_event"].eq(4),
             "decoded_arm_map",
         ] = np.nan
 
@@ -642,7 +700,10 @@ class TestRetrospectiveAlignmentWithShuffle:
             rng=np.random.default_rng(0),
         )
 
-        assert result["n_events"] == 2
+        assert "n_events" not in result
+        assert result["n_events_arm_family"] == 2
+        assert result["n_events_patch_family"] == 2
+        assert result["n_events_path_family"] == 2
         assert result["n_events_ends_at_next"] == 2
         assert result["n_events_ends_at_next_patch"] == 2
         assert result["real_mean_ends_at_next"] == 0.5
@@ -653,7 +714,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         ev = _make_event_table(
             [
                 {"event_id": 1, "current_arm": 0, "next_arm": 0},
-                {"event_id": 2, "current_arm": 0, "next_arm": 0},
+                {"event_id": 2, "current_arm": 0, "next_arm": 1},
             ]
         )
         ea = _make_event_arm_table(
@@ -677,8 +738,8 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert result["n_events_ends_at_next"] == 2
         assert result["real_mean_ends_at_next"] == 0.5
 
-    def test_rejects_metric_with_fewer_than_two_actual_observations(self):
-        """The inferential gate uses the computed metric denominator."""
+    def test_rejects_missing_patch_target_before_inference(self):
+        """A missing target cannot silently create a smaller denominator."""
         ev = _make_event_table(
             [
                 {
@@ -703,13 +764,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         )
         es = _make_event_sequence_table({1: [0], 2: [0]})
 
-        with pytest.raises(
-            ValueError,
-            match=(
-                "at least two observed events for chosen_patch_fraction.*"
-                "retained 1"
-            ),
-        ):
+        with pytest.raises(ValueError, match="1 invalid next_patch"):
             retrospective_alignment_with_shuffle(
                 ev,
                 ea,
@@ -718,6 +773,318 @@ class TestRetrospectiveAlignmentWithShuffle:
                 metrics=("chosen_patch_fraction",),
                 rng=np.random.default_rng(0),
             )
+
+    def test_metrics_selection_does_not_touch_unrequested_sequence_path(self):
+        """Arm-only inference works with no sequence-table schema at all."""
+        events = [
+            {"event_id": event_id, "current_arm": 0, "next_arm": next_arm}
+            for event_id, next_arm in enumerate((1, 2, 3, 4))
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["next_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            pd.DataFrame(),
+            n_shuffles=2,
+            metrics=("chosen_arm_fraction",),
+            rng=np.random.default_rng(0),
+        )
+
+        assert result["n_events"] == 4
+        assert result["n_events_chosen_arm_fraction"] == 4
+        assert "real_mean_ends_at_next" not in result
+
+    def test_current_patch_content_is_not_a_false_next_patch_null(self):
+        """Deterministic within-patch routes are explicitly non-identifiable.
+
+        A global label shift would exchange patch-1 and patch-2 labels and make
+        replay of the animal's *current* patch look next-patch aligned. Once
+        current patch is held fixed, next patch is deterministic in both
+        strata, so the scientifically honest result is exclusion.
+        """
+        events = [
+            {"event_id": 0, "current_arm": 0, "next_arm": 1, "next_patch": 1},
+            {"event_id": 1, "current_arm": 0, "next_arm": 1, "next_patch": 1},
+            {"event_id": 2, "current_arm": 2, "next_arm": 3, "next_patch": 2},
+            {"event_id": 3, "current_arm": 2, "next_arm": 3, "next_patch": 2},
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["current_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+
+        frozen_ev, _, _ = freeze_retrospective_cohort(
+            ev,
+            ea,
+            pd.DataFrame(),
+            metrics=("chosen_patch_fraction",),
+        )
+        assert frozen_ev.empty
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            pd.DataFrame(),
+            n_shuffles=1,
+            metrics=("chosen_patch_fraction",),
+            rng=np.random.default_rng(0),
+        )
+        assert result["n_events"] == 0
+        assert result["n_shuffle_units_excluded_deterministic"] == 4
+        assert np.isnan(result["real_mean_chosen_patch_fraction"])
+
+    def test_long_bout_is_split_into_visit_context_units(self):
+        """A bout may cross a boundary and later return to the first well."""
+        events = [
+            {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1},
+            {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 1},
+            {"event_id": 2, "stop_id": 10, "current_arm": 2, "next_arm": 3},
+            {"event_id": 3, "stop_id": 10, "current_arm": 2, "next_arm": 3},
+            {"event_id": 4, "stop_id": 10, "current_arm": 0, "next_arm": 4},
+            {"event_id": 5, "stop_id": 10, "current_arm": 0, "next_arm": 4},
+            {"event_id": 6, "stop_id": 11, "current_arm": 0, "next_arm": 2},
+            {"event_id": 7, "stop_id": 12, "current_arm": 2, "next_arm": 4},
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["next_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            pd.DataFrame(),
+            n_shuffles=2,
+            metrics=("chosen_arm_fraction",),
+            rng=np.random.default_rng(0),
+        )
+
+        assert ev["stop_id"].nunique() == 3
+        assert result["n_shuffle_units_input"] == 5
+        assert result["n_shuffle_units"] == 5
+        assert result["n_events_chosen_arm_fraction"] == 8
+
+    def test_visit_label_validation_precedes_observability_filter(self):
+        """An unobservable event cannot hide conflicting labels in a visit."""
+        ev = _make_event_table(
+            [
+                {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1},
+                {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 2},
+            ]
+        )
+        # Event 1 is deliberately absent, so an observability-first pipeline
+        # would silently discard the conflicting label.
+        ea = _make_event_arm_table({0: [0.0, 1.0, *([0.0] * 7)]})
+
+        with pytest.raises(ValueError, match="multiple 'next_arm' values"):
+            retrospective_alignment_with_shuffle(
+                ev,
+                ea,
+                pd.DataFrame(),
+                n_shuffles=1,
+                metrics=("chosen_arm_fraction",),
+                rng=np.random.default_rng(0),
+            )
+
+    def test_default_families_have_distinct_calibrated_cohorts(self):
+        """Arm metrics retain within-patch visits that path cannot permute."""
+        events = [
+            {
+                "event_id": 0,
+                "current_arm": 0,
+                "next_arm": 1,
+                "next_patch": 1,
+            },
+            {
+                "event_id": 1,
+                "current_arm": 0,
+                "next_arm": 1,
+                "next_patch": 1,
+            },
+            {
+                "event_id": 2,
+                "current_arm": 0,
+                "next_arm": 2,
+                "next_patch": 2,
+            },
+            {
+                "event_id": 3,
+                "current_arm": 0,
+                "next_arm": 4,
+                "next_patch": 3,
+            },
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["next_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+        es = _make_event_sequence_table(
+            {
+                0: [0, 1],
+                1: [0, 1],
+                2: [0, 6, 7, 2],
+                3: [0, 6, 8, 4],
+            }
+        )
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            es,
+            n_shuffles=2,
+            rng=np.random.default_rng(0),
+        )
+
+        assert "n_events" not in result
+        assert result["n_events_arm_family"] == 4
+        assert result["n_events_chosen_arm_fraction"] == 4
+        assert result["n_events_ends_at_next"] == 4
+        assert result["n_events_patch_family"] == 4
+        assert result["n_events_chosen_patch_fraction"] == 4
+        assert result["n_events_ends_at_next_patch"] == 4
+        assert result["n_events_path_family"] == 2
+        assert result["n_events_contains_path_to_next"] == 2
+        assert result["n_shuffle_units_excluded_deterministic_path_family"] == 2
+        assert result["cohort_policy"] == "metric_family_specific"
+        assert result["path_null_effectively_cross_patch"] is True
+        assert _retrospective_status(result) == "ok"
+
+    def test_patch_family_exchanges_visits_across_arms_in_same_patch(self):
+        """Patch calibration conditions on current patch, not current arm."""
+        events = [
+            {
+                "event_id": 0,
+                "current_arm": 0,
+                "next_arm": 2,
+                "next_patch": 2,
+            },
+            {
+                "event_id": 1,
+                "current_arm": 1,
+                "next_arm": 4,
+                "next_patch": 3,
+            },
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["next_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            pd.DataFrame(),
+            n_shuffles=1,
+            metrics=("chosen_patch_fraction",),
+            rng=np.random.default_rng(0),
+        )
+
+        assert result["n_events"] == 2
+        assert result["n_shuffle_units"] == 2
+        assert result["n_shuffle_strata"] == 1
+
+    def test_reports_singleton_and_deterministic_visit_exclusions(self):
+        events = [
+            {"event_id": 0, "current_arm": 0, "next_arm": 2},
+            {"event_id": 1, "current_arm": 0, "next_arm": 4},
+            {"event_id": 2, "current_arm": 1, "next_arm": 3},
+            {"event_id": 3, "current_arm": 2, "next_arm": 3},
+            {"event_id": 4, "current_arm": 2, "next_arm": 3},
+        ]
+        ev = _make_event_table(events)
+        ea = _make_event_arm_table(
+            {
+                row["event_id"]: [float(arm == row["next_arm"]) for arm in range(9)]
+                for row in events
+            }
+        )
+
+        result = retrospective_alignment_with_shuffle(
+            ev,
+            ea,
+            pd.DataFrame(),
+            n_shuffles=1,
+            metrics=("chosen_arm_fraction",),
+            rng=np.random.default_rng(0),
+        )
+
+        assert result["n_events"] == 2
+        assert result["n_shuffle_units_input"] == 5
+        assert result["n_shuffle_units"] == 2
+        assert result["n_shuffle_units_excluded_singleton"] == 1
+        assert result["n_shuffle_units_excluded_deterministic"] == 2
+        assert result["n_shuffle_strata"] == 1
+        assert result["n_shuffle_strata_excluded_singleton"] == 1
+        assert result["n_shuffle_strata_excluded_deterministic"] == 1
+
+    def test_stop_grain_shuffle_preserves_labels_and_length_strata(self):
+        rows = []
+        event_id = 0
+        stop_id = 0
+        strata = (
+            (0, 0, (2, 3)),
+            (0, 1, (4, 5)),
+            (2, 0, (0, 1)),
+        )
+        for current_arm, length_bin, targets in strata:
+            for target in targets:
+                for within_stop in range(2):
+                    rows.append(
+                        {
+                            "event_id": event_id,
+                            "stop_id": stop_id,
+                            "event_midpoint_time": float(event_id),
+                            "current_arm": current_arm,
+                            "route_length": 4,
+                            "length_bin": length_bin,
+                            "next_arm": target,
+                            "within_stop": within_stop,
+                        }
+                    )
+                    event_id += 1
+                stop_id += 1
+        events = pd.DataFrame(rows)
+
+        shuffled = next_arm_circular_shift(
+            events,
+            columns=("next_arm",),
+            unit_col="stop_id",
+            strata_cols=("current_arm", "route_length", "length_bin"),
+            variation_cols=("next_arm",),
+            require_movement=True,
+            rng=np.random.default_rng(0),
+        )
+
+        assert shuffled.groupby("stop_id")["next_arm"].nunique().eq(1).all()
+        original_by_stop = events.groupby("stop_id")["next_arm"].first()
+        shuffled_by_stop = shuffled.groupby("stop_id")["next_arm"].first()
+        assert original_by_stop.ne(shuffled_by_stop).all()
+        np.testing.assert_array_equal(shuffled["current_arm"], events["current_arm"])
+        np.testing.assert_array_equal(shuffled["route_length"], events["route_length"])
+        np.testing.assert_array_equal(shuffled["length_bin"], events["length_bin"])
+        for current_arm, length_bin, targets in strata:
+            in_stratum = shuffled["current_arm"].eq(current_arm) & shuffled[
+                "length_bin"
+            ].eq(length_bin)
+            assert set(shuffled.loc[in_stratum, "next_arm"]) == set(targets)
 
     def test_shuffle_destroys_alignment_on_aligned_data(self):
         rng = np.random.default_rng(0)
@@ -811,28 +1178,44 @@ class TestPrevArmMirror:
         )
         path = sorted(arm_path_well_to_well(0, 3))
         es_full = _make_event_sequence_table({1: path})
-        assert bool(
-            contains_path_from_prev(ev, es_full).set_index("event_id").loc[
-                1, "contains_path_from_prev"
-            ]
-        ) is True
+        assert (
+            bool(
+                contains_path_from_prev(ev, es_full)
+                .set_index("event_id")
+                .loc[1, "contains_path_from_prev"]
+            )
+            is True
+        )
         es_partial = _make_event_sequence_table({1: [0, 3]})  # missing trunks
-        assert bool(
-            contains_path_from_prev(ev, es_partial).set_index("event_id").loc[
-                1, "contains_path_from_prev"
-            ]
-        ) is False
+        assert (
+            bool(
+                contains_path_from_prev(ev, es_partial)
+                .set_index("event_id")
+                .loc[1, "contains_path_from_prev"]
+            )
+            is False
+        )
 
     def test_compute_metrics_includes_prev_columns(self):
         ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3,
-              "next_patch": 2}]
+            [
+                {
+                    "event_id": 1,
+                    "current_arm": 3,
+                    "prev_arm": 0,
+                    "next_arm": 3,
+                    "next_patch": 2,
+                }
+            ]
         )
         ea = _make_event_arm_table({1: [0.4, 0, 0, 0.3, 0, 0, 0, 0, 0]})
         es = _make_event_sequence_table({1: [3, 7, 6, 0]})
         out = compute_retrospective_metrics(ev, ea, es)
-        for col in ("chosen_arm_fraction_prev", "ends_at_prev",
-                    "contains_path_from_prev"):
+        for col in (
+            "chosen_arm_fraction_prev",
+            "ends_at_prev",
+            "contains_path_from_prev",
+        ):
             assert col in out.columns
         # include_prev=False omits them
         out2 = compute_retrospective_metrics(ev, ea, es, include_prev=False)

@@ -18,6 +18,7 @@ from ._helpers import (
     summarize_behavioral_location,
     trial_context_at_times,
     trial_cutoff_times,
+    trial_outcome_times,
 )
 from .choice_prediction import (
     build_choice_dataset,
@@ -79,6 +80,7 @@ from .retrospective import (
     contains_path_to_next,
     ends_at_next,
     ends_at_next_patch,
+    freeze_retrospective_cohort,
     retrospective_alignment_with_shuffle,
 )
 from .shuffles import (
@@ -131,6 +133,7 @@ __all__ = [
     "arm_dist_rank",
     "arm_path_well_to_well",
     "at_well_event_cohort",
+    "freeze_retrospective_cohort",
     "attach_is_swr_to_onsets",
     "behavioral_location_at_times",
     "build_choice_dataset",
@@ -176,4 +179,5 @@ __all__ = [
     "summarize_behavioral_location",
     "trial_context_at_times",
     "trial_cutoff_times",
+    "trial_outcome_times",
 ]

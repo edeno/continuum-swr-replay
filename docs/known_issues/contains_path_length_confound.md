@@ -1,9 +1,8 @@
 # `contains_path_to_next` is confounded with route length and event length
 
-**Status:** confirmed confound, measured; one consumer, mitigated by its null
+**Status:** fixed in code; Stage 5B outputs must be regenerated
 **Found:** 2026-08-10, following the replay-tables review
-**Severity:** would be severe if the raw rate were compared across trip types;
-partially mitigated in the one consumer, which uses a shuffle null
+**Severity:** severe for raw pooled rates and for the previous unconditioned null
 
 ## What
 
@@ -75,27 +74,64 @@ each, carrying `real_mean_`, `shuffled_mean_` and
 `real_minus_shuffled_contains_path_to_next` (real mean 0.116, real − shuffled
 −0.028).
 
-That consumer is **not** the naive comparison this document warns against: it
-scores each session against a `next_arm` shuffle null, which reproduces the
-marginal distribution of required-path lengths, so the geometric advantage
-largely cancels in the difference. What the shuffle does not remove is the
-*floor effect*: an event too short to cover 2 or 4 arms scores 0 in both the
-real and shuffled arms, so those events attenuate the contrast rather than
-bias it. The reported difference is therefore conservative in magnitude but
-not directionally suspect.
+The shipped files predate the calibrated null and must not be interpreted as
+corrected results. The earlier event-row circular shift changed the association
+between replay content and current location, route length, and event duration.
+On this track those variables strongly constrain both the future label and the
+probability of satisfying an all-or-nothing path criterion, so preserving only
+the session-wide marginal distribution was insufficient.
+
+The revised Stage 5B null time-orders the at-well events in each `stop_id` and
+uses each contiguous run of one `current_arm` as its permutation unit. This is
+visit context rather than immobility-bout context: a long bout can cross a trial
+boundary or return to an earlier arm, and those runs may have different future
+labels. Every event in one contiguous visit context receives the same shuffled
+future label.
+
+The three comparison families are calibrated separately rather than forcing
+every metric onto the path metric's restrictive cohort:
+
+- arm fraction and arm endpoint condition on `current_arm` and permute
+  `next_arm`;
+- patch fraction and patch endpoint condition on `current_patch` and permute
+  `next_patch` (with its paired `next_arm` label);
+- path coverage conditions on `current_arm`, exact required-route length
+  (1, 2, or 4 arms), and an octave bin of the visit's median
+  `n_nonlocal_bins`, then permutes `next_arm`.
+
+Labels move only within strata with at least two visit contexts and variation
+in the relevant future target. Singleton and deterministic strata are excluded
+rather than returned as degenerate zero-difference evidence. Output columns
+report a distinct denominator and retained/excluded event, visit, and stratum
+counts for each family.
+
+On this topology, fixing both `current_arm` and exact route length makes the
+same-well and within-patch path targets deterministic. The path null is thus
+identifiable only in movable strata—effectively cross-patch routes in the
+canonical task. This restriction applies only to `contains_path_to_next`; the
+arm and patch families retain their broader independently calibrated cohorts.
+
+The metric itself is still set membership and therefore still has a floor
+effect. The new null calibrates the reported real-minus-shuffled contrast; it
+does not make the raw rate comparable across route or duration classes.
 
 No model spec or figure reads the `event_table` column itself.
 
 ## If you use it
 
 - Stratify by required-path length, or restrict to one trip type. Never pool a
-  raw rate across trip types; the stage-5B shuffle null is the minimum bar.
+  raw rate across trip types; the calibrated Stage 5B shuffle is the minimum
+  bar for a null contrast.
 - Condition on event length (`n_nonlocal_bins`) as well.
 - Prefer a graded alternative to the all-or-nothing rule — the fraction of
   required arms covered — which is far less floor-bound and much weaker in its
   dependence on route length.
 - `ends_at_next` does not share the confound: it tests only the final MAP arm, so
   the criterion is one arm regardless of trip type.
+- Inspect the family-specific Stage 5B exclusion and denominator columns. For
+  path coverage, exact current-location and route conditioning makes some route
+  classes deterministic and scientifically non-identifiable under label
+  permutation; that does not remove them from the arm or patch families.
 
 ## Reproducing
 

@@ -5,17 +5,21 @@ the next choice (adding `arm_fraction` to a behavior-only baseline), these
 metrics ask the weaker, post-hoc question: does the replay content during
 a stop align with whichever arm the animal actually visited next?
 
-Three event-level metrics are computed:
+Five event-level metrics are computed across three comparison families:
 
 - ``chosen_arm_fraction``: per-event ``arm_fraction`` at ``arm == next_arm``.
 - ``ends_at_next``: does the last in-event MAP arm equal ``next_arm``?
 - ``contains_path_to_next``: does the event's MAP-arm trace cover the
   geometric path from ``current_arm`` to ``next_arm``?
+- ``chosen_patch_fraction``: replay mass assigned to ``next_patch``.
+- ``ends_at_next_patch``: does the final MAP arm belong to ``next_patch``?
 
-The natural null is :func:`next_arm_circular_shift` (in
-:mod:`shuffles`), which shifts ``next_arm`` across events in temporal
-order, preserving the marginal distribution of ``next`` and slow drifts
-in patch preference but breaking the per-event alignment.
+The null is :func:`next_arm_circular_shift` (in :mod:`shuffles`), with one
+future label per contiguous current-arm run within ``stop_id``. Arm metrics
+condition on current arm, patch metrics on current patch, and path coverage on
+current arm, exact route length, and a coarse event-duration bin. Each family
+has its own observable cohort and denominator. Non-identifiable strata are
+excluded and reported rather than treated as evidence of no effect.
 
 Bandit-track topology
 ---------------------
@@ -38,6 +42,8 @@ production code share the same source of truth.
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -62,6 +68,7 @@ __all__ = [
     "ends_at_next",
     "ends_at_next_patch",
     "ends_at_prev",
+    "freeze_retrospective_cohort",
     "retrospective_alignment_with_shuffle",
 ]
 
@@ -90,6 +97,40 @@ def _session_keys(df: pd.DataFrame) -> list[str]:
     return [c for c in ("animal", "day", "epoch") if c in df.columns]
 
 
+def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
+    """Contiguous current-arm runs within an immobility bout.
+
+    ``stop_id`` identifies an immobility bout, not necessarily one behavioral
+    visit. A bout can cross a trial boundary, and the animal can even return to
+    an earlier arm before the bout ends. Sorting events in time and incrementing
+    a run counter whenever ``current_arm`` changes keeps those visits distinct.
+    """
+    if event_table.empty:
+        return pd.Series(index=event_table.index, dtype=object)
+    ordered = event_table[["stop_id", "current_arm", "event_midpoint_time"]].copy()
+    ordered["_source_position"] = np.arange(len(ordered), dtype=np.int64)
+    ordered = ordered.sort_values("event_midpoint_time", kind="stable")
+    previous_arm = ordered.groupby("stop_id", sort=False)["current_arm"].shift()
+    starts_visit = ordered["current_arm"].ne(previous_arm)
+    run_number = (
+        starts_visit.groupby(ordered["stop_id"], sort=False).cumsum().astype(int) - 1
+    )
+    ordered_units = pd.Series(
+        list(
+            zip(
+                ordered["stop_id"],
+                run_number,
+                ordered["current_arm"],
+                strict=True,
+            )
+        ),
+        dtype=object,
+    ).to_numpy()
+    source_order_units = np.empty(len(ordered), dtype=object)
+    source_order_units[ordered["_source_position"].to_numpy(dtype=int)] = ordered_units
+    return pd.Series(source_order_units, index=event_table.index, dtype=object)
+
+
 def at_well_event_cohort(
     event_table: pd.DataFrame,
     event_arm_table: pd.DataFrame,
@@ -109,8 +150,7 @@ def at_well_event_cohort(
             event_sequence_table.iloc[0:0].copy(),
         )
     missing = [
-        column for column in ("at_well", "current_arm")
-        if column not in event_table
+        column for column in ("at_well", "current_arm") if column not in event_table
     ]
     if missing:
         raise KeyError(
@@ -130,8 +170,7 @@ def at_well_event_cohort(
         missing = [column for column in key_cols if column not in frame]
         if missing:
             raise KeyError(
-                "Event-family table is missing at-well cohort key column(s): "
-                f"{missing}"
+                f"Event-family table is missing at-well cohort key column(s): {missing}"
             )
         return frame.merge(keys, on=key_cols, how="inner", validate="many_to_one")
 
@@ -238,8 +277,10 @@ def chosen_arm_fraction(
         present in ``event_table``.
     """
     return _arm_fraction_at(
-        event_table, event_arm_table,
-        target_col="next_arm", out_col="chosen_arm_fraction",
+        event_table,
+        event_arm_table,
+        target_col="next_arm",
+        out_col="chosen_arm_fraction",
     )
 
 
@@ -253,8 +294,10 @@ def chosen_arm_fraction_prev(
     replay content sits on the arm the animal just left.
     """
     return _arm_fraction_at(
-        event_table, event_arm_table,
-        target_col="prev_arm", out_col="chosen_arm_fraction_prev",
+        event_table,
+        event_arm_table,
+        target_col="prev_arm",
+        out_col="chosen_arm_fraction_prev",
     )
 
 
@@ -309,8 +352,10 @@ def ends_at_next(
         columns are passed through if present.
     """
     return _ends_at_arm(
-        event_table, event_sequence_table,
-        target_col="next_arm", out_col="ends_at_next",
+        event_table,
+        event_sequence_table,
+        target_col="next_arm",
+        out_col="ends_at_next",
     )
 
 
@@ -324,8 +369,10 @@ def ends_at_prev(
     trajectory ends at the arm the animal just left.
     """
     return _ends_at_arm(
-        event_table, event_sequence_table,
-        target_col="prev_arm", out_col="ends_at_prev",
+        event_table,
+        event_sequence_table,
+        target_col="prev_arm",
+        out_col="ends_at_prev",
     )
 
 
@@ -366,9 +413,7 @@ def _contains_path(
     # session. Use named aggregation so the result is
     # always a DataFrame, even when empty.
     if event_sequence_table.empty:
-        arm_sets = pd.DataFrame(
-            columns=[*sess_keys, "event_id", "_decoded_arm_set"]
-        )
+        arm_sets = pd.DataFrame(columns=[*sess_keys, "event_id", "_decoded_arm_set"])
     else:
         arm_sets = event_sequence_table.groupby(
             [*sess_keys, "event_id"], as_index=False
@@ -419,8 +464,10 @@ def contains_path_to_next(
         Columns: ``event_id``, ``contains_path_to_next`` (bool).
     """
     return _contains_path(
-        event_table, event_sequence_table,
-        source_col="current_arm", target_col="next_arm",
+        event_table,
+        event_sequence_table,
+        source_col="current_arm",
+        target_col="next_arm",
         out_col="contains_path_to_next",
     )
 
@@ -436,8 +483,10 @@ def contains_path_from_prev(
     where it currently is).
     """
     return _contains_path(
-        event_table, event_sequence_table,
-        source_col="prev_arm", target_col="current_arm",
+        event_table,
+        event_sequence_table,
+        source_col="prev_arm",
+        target_col="current_arm",
         out_col="contains_path_from_prev",
     )
 
@@ -497,9 +546,7 @@ def chosen_patch_fraction(
     # NaN — but we *want* zero for legitimate "all-zero target arms,
     # no contribution" cases. So we keep non-target as 0.0 only when
     # ``in_target_patch`` has at least one True per group.
-    merged["_mass"] = merged["arm_fraction"].astype(float).where(
-        in_target_patch, 0.0
-    )
+    merged["_mass"] = merged["arm_fraction"].astype(float).where(in_target_patch, 0.0)
     has_target_rows = (
         merged.assign(_in=in_target_patch)
         .groupby(grp_cols, as_index=False)["_in"]
@@ -638,14 +685,115 @@ _DEFAULT_METRICS = (
     "ends_at_next_patch",
 )
 
+_ARM_TARGET_METRICS = frozenset({"chosen_arm_fraction", "ends_at_next"})
+_PATCH_TARGET_METRICS = frozenset({"chosen_patch_fraction", "ends_at_next_patch"})
+_PATH_METRICS = frozenset({"contains_path_to_next"})
+_METRIC_FAMILIES = {
+    "arm": _ARM_TARGET_METRICS,
+    "patch": _PATCH_TARGET_METRICS,
+    "path": _PATH_METRICS,
+}
+_SHUFFLE_VISIT_UNIT = "_retrospective_visit_unit"
+_SHUFFLE_CURRENT_ARM = "_retrospective_current_arm"
+_SHUFFLE_CURRENT_PATCH = "_retrospective_current_patch"
+_SHUFFLE_ROUTE_LENGTH = "_retrospective_route_length"
+_SHUFFLE_EVENT_LENGTH_BIN = "_retrospective_event_length_bin"
+_SHUFFLE_HELPER_COLUMNS = (
+    _SHUFFLE_VISIT_UNIT,
+    _SHUFFLE_CURRENT_ARM,
+    _SHUFFLE_CURRENT_PATCH,
+    _SHUFFLE_ROUTE_LENGTH,
+    _SHUFFLE_EVENT_LENGTH_BIN,
+)
 
-def _per_session_metric_means(metrics_df: pd.DataFrame) -> dict[str, float]:
+
+@dataclass(frozen=True)
+class _FrozenRetrospectiveCohort:
+    """Common observable cohort plus its calibrated-shuffle definition."""
+
+    event_table: pd.DataFrame
+    event_arm_table: pd.DataFrame
+    event_sequence_table: pd.DataFrame
+    audit: dict[str, int]
+    family: str
+    strata_cols: tuple[str, ...]
+    variation_cols: tuple[str, ...]
+    label_cols: tuple[str, ...]
+
+
+def _validate_requested_metrics(metrics: tuple[str, ...]) -> tuple[str, ...]:
+    """Validate and de-duplicate the public metric selection."""
+    requested = tuple(dict.fromkeys(metrics))
+    if not requested:
+        raise ValueError("At least one retrospective metric must be requested")
+    unknown = sorted(set(requested).difference(_DEFAULT_METRICS))
+    if unknown:
+        raise ValueError(f"Unknown retrospective metric(s): {unknown}")
+    return requested
+
+
+def _requested_metrics_by_family(
+    metrics: tuple[str, ...],
+) -> dict[str, tuple[str, ...]]:
+    """Partition requested metrics without imposing a cross-family cohort."""
+    requested = _validate_requested_metrics(metrics)
+    return {
+        family: tuple(metric for metric in requested if metric in family_metrics)
+        for family, family_metrics in _METRIC_FAMILIES.items()
+        if any(metric in family_metrics for metric in requested)
+    }
+
+
+def _compute_requested_metrics(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    metrics: tuple[str, ...],
+) -> pd.DataFrame:
+    """Compute only selected metrics on one already-frozen event cohort."""
+    metrics = _validate_requested_metrics(metrics)
+    key_cols = [*_session_keys(event_table), "event_id"]
+    out = event_table[key_cols].copy()
+    calculators = {
+        "chosen_arm_fraction": lambda: chosen_arm_fraction(
+            event_table, event_arm_table
+        ),
+        "ends_at_next": lambda: ends_at_next(event_table, event_sequence_table),
+        "contains_path_to_next": lambda: contains_path_to_next(
+            event_table, event_sequence_table
+        ),
+        "chosen_patch_fraction": lambda: chosen_patch_fraction(
+            event_table, event_arm_table
+        ),
+        "ends_at_next_patch": lambda: ends_at_next_patch(
+            event_table, event_sequence_table
+        ),
+    }
+    for metric in metrics:
+        calculated = calculators[metric]()
+        out = out.merge(
+            calculated,
+            on=key_cols,
+            how="left",
+            validate="one_to_one",
+        )
+    return out
+
+
+def _per_session_metric_means(
+    metrics_df: pd.DataFrame,
+    metrics: tuple[str, ...] | None = None,
+) -> dict[str, float]:
     """Reduce per-event metrics to the session-level statistics
     these metrics report."""
     out: dict[str, float] = {}
-    for col in _DEFAULT_METRICS:
-        if col in metrics_df.columns:
-            out[col] = float(np.nanmean(metrics_df[col].astype(float)))
+    selected = (
+        tuple(col for col in _DEFAULT_METRICS if col in metrics_df)
+        if metrics is None
+        else metrics
+    )
+    for col in selected:
+        out[col] = float(np.nanmean(metrics_df[col].astype(float)))
     return out
 
 
@@ -666,8 +814,7 @@ def _observable_event_keys(
     key_cols = [*_session_keys(event_table), "event_id"]
     keys = event_table[key_cols].drop_duplicates()
     if any(
-        metric in {"chosen_arm_fraction", "chosen_patch_fraction"}
-        for metric in metrics
+        metric in {"chosen_arm_fraction", "chosen_patch_fraction"} for metric in metrics
     ):
         if not {"arm", "arm_fraction"}.issubset(event_arm_table):
             raise KeyError(
@@ -691,33 +838,350 @@ def _observable_event_keys(
 
     endpoint_metrics = {"ends_at_next", "ends_at_next_patch"}
     path_metrics = {"contains_path_to_next"}
-    requested_sequence_metrics = set(metrics) & (
-        endpoint_metrics | path_metrics
-    )
+    requested_sequence_metrics = set(metrics) & (endpoint_metrics | path_metrics)
     if requested_sequence_metrics:
         if "decoded_arm_map" not in event_sequence_table:
-            raise KeyError(
-                "Sequence retrospective metrics require decoded_arm_map"
-            )
+            raise KeyError("Sequence retrospective metrics require decoded_arm_map")
 
     if set(metrics) & path_metrics:
         sequence = event_sequence_table.assign(
             _valid_decoded=np.isfinite(
-                pd.to_numeric(
-                    event_sequence_table["decoded_arm_map"], errors="coerce"
-                )
+                pd.to_numeric(event_sequence_table["decoded_arm_map"], errors="coerce")
             )
         )
         grouped_sequence = sequence.groupby(key_cols, sort=False)
         sequence_observed = grouped_sequence.agg(
             _any_valid_decoded=("_valid_decoded", "any")
         ).reset_index()
-        sequence_observed = sequence_observed[
-            sequence_observed["_any_valid_decoded"]
-        ]
+        sequence_observed = sequence_observed[sequence_observed["_any_valid_decoded"]]
         sequence_observed = sequence_observed[key_cols]
         keys = keys.merge(sequence_observed, on=key_cols, how="inner")
     return keys
+
+
+def _freeze_retrospective_cohort_with_audit(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    *,
+    metrics: tuple[str, ...] = _DEFAULT_METRICS,
+) -> _FrozenRetrospectiveCohort:
+    """Freeze one metric family's cohort and calibrated shuffle strata."""
+    metrics = _validate_requested_metrics(metrics)
+    matching_families = [
+        family
+        for family, family_metrics in _METRIC_FAMILIES.items()
+        if set(metrics).issubset(family_metrics)
+    ]
+    if len(matching_families) != 1:
+        raise ValueError(
+            "A frozen retrospective cohort can contain only one metric family; "
+            f"got {metrics}"
+        )
+    family = matching_families[0]
+    n_events_input = int(len(event_table))
+    required_event_columns = {
+        "current_arm",
+        "next_arm",
+        "stop_id",
+        "event_midpoint_time",
+    }
+    if family == "patch":
+        required_event_columns.update({"current_patch", "next_patch"})
+    if family == "path":
+        required_event_columns.add("n_nonlocal_bins")
+    missing = sorted(required_event_columns.difference(event_table.columns))
+    if missing:
+        raise KeyError(
+            "Calibrated retrospective shuffle requires canonical event "
+            f"column(s) {missing}; regenerate event tables"
+        )
+    session_cols = _session_keys(event_table)
+    if session_cols and event_table[session_cols].drop_duplicates().shape[0] > 1:
+        raise ValueError(
+            "retrospective alignment requires one session at a time; "
+            "cross-session label exchange is invalid"
+        )
+
+    events, event_arm, event_sequence = at_well_event_cohort(
+        event_table, event_arm_table, event_sequence_table
+    )
+    n_events_after_at_well = int(len(events))
+    numeric_current = pd.to_numeric(events["current_arm"], errors="coerce")
+    invalid_current = ~numeric_current.isin(_VALID_WELL_ARMS)
+    if invalid_current.any():
+        raise ValueError(
+            "Retrospective endpoints must be integer well arms 0..5; found "
+            f"{int(invalid_current.sum())} invalid current_arm values"
+        )
+    events["current_arm"] = numeric_current.astype(int)
+    if events["stop_id"].isna().any():
+        raise ValueError("Retrospective shuffle unit stop_id contains NaN")
+    midpoint = pd.to_numeric(events["event_midpoint_time"], errors="coerce")
+    if not np.isfinite(midpoint).all():
+        raise ValueError("Retrospective event_midpoint_time must be finite")
+    events["event_midpoint_time"] = midpoint.astype(float)
+    # Derive visits before removing undefined future labels. Otherwise an
+    # intervening visit with no next choice could disappear and collapse a
+    # later return to the same arm into the earlier visit.
+    events[_SHUFFLE_VISIT_UNIT] = _visit_context_ids(events)
+    visit_groups = events.groupby(_SHUFFLE_VISIT_UNIT, sort=False, dropna=False)
+    available_next_labels = [
+        column for column in ("next_arm", "next_patch") if column in events
+    ]
+    for column in available_next_labels:
+        n_unique = visit_groups[column].nunique(dropna=False)
+        inconsistent = n_unique[n_unique > 1]
+        if not inconsistent.empty:
+            raise ValueError(
+                "Retrospective shuffle requires one future label per "
+                "contiguous visit context; unit "
+                f"{inconsistent.index[0]!r} has multiple {column!r} values"
+            )
+
+    numeric_next = pd.to_numeric(events["next_arm"], errors="coerce")
+    valid_next = np.isfinite(numeric_next)
+    events = events.loc[valid_next].copy()
+    numeric_next = numeric_next.loc[valid_next]
+    invalid_next = ~numeric_next.isin(_VALID_WELL_ARMS)
+    if invalid_next.any():
+        raise ValueError(
+            "Retrospective endpoints must be integer well arms 0..5; found "
+            f"{int(invalid_next.sum())} invalid next_arm values"
+        )
+    events["next_arm"] = numeric_next.astype(int)
+    n_events_after_valid_next = int(len(events))
+
+    key_cols = [*_session_keys(events), "event_id"]
+
+    def _restrict_family(
+        frame: pd.DataFrame,
+        keys: pd.DataFrame,
+    ) -> pd.DataFrame:
+        if frame.empty:
+            return frame.iloc[0:0].copy()
+        missing_keys = sorted(set(key_cols).difference(frame.columns))
+        if missing_keys:
+            raise KeyError(
+                "Event-family table is missing retrospective cohort key "
+                f"column(s): {missing_keys}"
+            )
+        return frame.merge(keys, on=key_cols, how="inner", validate="many_to_one")
+
+    event_keys = events[key_cols].drop_duplicates()
+    event_arm = _restrict_family(event_arm, event_keys)
+    event_sequence = _restrict_family(event_sequence, event_keys)
+
+    if family == "patch":
+        numeric_current_patch = pd.to_numeric(events["current_patch"], errors="coerce")
+        numeric_patch = pd.to_numeric(events["next_patch"], errors="coerce")
+        expected_current_patch = (
+            events["current_arm"].map(WELL_PATCH_MAPPING).astype(float)
+        )
+        expected_patch = events["next_arm"].map(WELL_PATCH_MAPPING).astype(float)
+        invalid_current_patch = ~np.isfinite(
+            numeric_current_patch
+        ) | numeric_current_patch.ne(expected_current_patch)
+        invalid_next_patch = ~np.isfinite(numeric_patch) | numeric_patch.ne(
+            expected_patch
+        )
+        if invalid_current_patch.any() or invalid_next_patch.any():
+            raise ValueError(
+                "Patch retrospective metrics require finite patch labels "
+                "consistent with their arms; found "
+                f"{int(invalid_current_patch.sum())} invalid current_patch and "
+                f"{int(invalid_next_patch.sum())} invalid next_patch event(s)"
+            )
+        events["current_patch"] = numeric_current_patch.astype(int)
+        events["next_patch"] = numeric_patch.astype(int)
+
+    observable_keys = _observable_event_keys(
+        events,
+        event_arm,
+        event_sequence,
+        metrics,
+    )
+    events = events.merge(
+        observable_keys, on=key_cols, how="inner", validate="one_to_one"
+    )
+    event_arm = _restrict_family(event_arm, observable_keys)
+    event_sequence = _restrict_family(event_sequence, observable_keys)
+    n_events_after_observability = int(len(events))
+
+    events[_SHUFFLE_CURRENT_ARM] = events["current_arm"].astype(int)
+
+    if family == "arm":
+        strata_cols = [_SHUFFLE_CURRENT_ARM]
+        variation_cols = ["next_arm"]
+        label_cols = ["next_arm"]
+    elif family == "patch":
+        events[_SHUFFLE_CURRENT_PATCH] = events["current_patch"].astype(int)
+        strata_cols = [_SHUFFLE_CURRENT_PATCH]
+        variation_cols = ["next_patch"]
+        # Shift the paired future-arm label with its patch label even though
+        # patch metrics use only next_patch.
+        label_cols = ["next_arm", "next_patch"]
+    else:
+        events[_SHUFFLE_ROUTE_LENGTH] = np.fromiter(
+            (
+                len(arm_path_well_to_well(current, target))
+                for current, target in zip(
+                    events["current_arm"], events["next_arm"], strict=True
+                )
+            ),
+            dtype=np.int64,
+            count=len(events),
+        )
+        lengths = pd.to_numeric(events["n_nonlocal_bins"], errors="coerce")
+        invalid_length = (
+            ~np.isfinite(lengths) | lengths.le(0) | lengths.ne(np.floor(lengths))
+        )
+        if invalid_length.any():
+            raise ValueError(
+                "Path retrospective metrics require positive integer "
+                f"n_nonlocal_bins; found {int(invalid_length.sum())} invalid event(s)"
+            )
+        # Labels move at visit-context grain, so event duration also needs a
+        # visit-grain summary. Octave bins of the within-visit median preserve
+        # broad duration opportunity without making almost every visit unique.
+        visit_median_length = lengths.groupby(events[_SHUFFLE_VISIT_UNIT]).transform(
+            "median"
+        )
+        events[_SHUFFLE_EVENT_LENGTH_BIN] = np.floor(
+            np.log2(visit_median_length)
+        ).astype(int)
+        strata_cols = [
+            _SHUFFLE_CURRENT_ARM,
+            _SHUFFLE_ROUTE_LENGTH,
+            _SHUFFLE_EVENT_LENGTH_BIN,
+        ]
+        variation_cols = ["next_arm"]
+        label_cols = ["next_arm"]
+
+    grouped_units = events.groupby(_SHUFFLE_VISIT_UNIT, sort=False, dropna=False)
+    unit_constant_cols = list(strata_cols)
+    for column in dict.fromkeys(unit_constant_cols):
+        n_unique = grouped_units[column].nunique(dropna=False)
+        inconsistent = n_unique[n_unique > 1]
+        if not inconsistent.empty:
+            raise ValueError(
+                "Retrospective shuffle requires constant strata within each "
+                "contiguous visit context; unit "
+                f"{inconsistent.index[0]!r} has multiple {column!r} values"
+            )
+
+    unit_rows = events.drop_duplicates(_SHUFFLE_VISIT_UNIT, keep="first")[
+        [_SHUFFLE_VISIT_UNIT, *strata_cols, *label_cols]
+    ].copy()
+    stratum_group = unit_rows.groupby(strata_cols, sort=False, dropna=False)
+    n_units_in_stratum = stratum_group[_SHUFFLE_VISIT_UNIT].transform("size")
+    singleton = n_units_in_stratum.lt(2)
+    # Every relevant future label must vary. A stratum that is constant in
+    # even one requested target cannot identify that target's null contrast.
+    any_constant = pd.Series(False, index=unit_rows.index)
+    for column in variation_cols:
+        any_constant |= stratum_group[column].transform("nunique").lt(2)
+    deterministic = n_units_in_stratum.ge(2) & any_constant
+    movable = ~(singleton | deterministic)
+    retained_units = unit_rows.loc[movable, _SHUFFLE_VISIT_UNIT]
+    retained_unit_set = set(retained_units)
+
+    n_strata_input = int(unit_rows[strata_cols].drop_duplicates().shape[0])
+    n_strata_singleton = int(
+        unit_rows.loc[singleton, strata_cols].drop_duplicates().shape[0]
+    )
+    n_strata_deterministic = int(
+        unit_rows.loc[deterministic, strata_cols].drop_duplicates().shape[0]
+    )
+    n_units_input = int(len(unit_rows))
+    n_units_singleton = int(singleton.sum())
+    n_units_deterministic = int(deterministic.sum())
+
+    events = events.loc[events[_SHUFFLE_VISIT_UNIT].isin(retained_unit_set)].copy()
+    retained_keys = events[key_cols].drop_duplicates()
+    event_arm = _restrict_family(event_arm, retained_keys)
+    event_sequence = _restrict_family(event_sequence, retained_keys)
+    audit = {
+        "n_events_input": n_events_input,
+        "n_events_after_at_well": n_events_after_at_well,
+        "n_events_after_valid_next": n_events_after_valid_next,
+        "n_events_after_common_observability": n_events_after_observability,
+        "n_events_excluded_immovable": (
+            n_events_after_observability - int(len(events))
+        ),
+        "n_shuffle_units_input": n_units_input,
+        "n_shuffle_units": int(len(retained_units)),
+        "n_shuffle_units_excluded_singleton": n_units_singleton,
+        "n_shuffle_units_excluded_deterministic": n_units_deterministic,
+        "n_shuffle_strata_input": n_strata_input,
+        "n_shuffle_strata": n_strata_input
+        - n_strata_singleton
+        - n_strata_deterministic,
+        "n_shuffle_strata_excluded_singleton": n_strata_singleton,
+        "n_shuffle_strata_excluded_deterministic": n_strata_deterministic,
+    }
+    return _FrozenRetrospectiveCohort(
+        event_table=events,
+        event_arm_table=event_arm,
+        event_sequence_table=event_sequence,
+        audit=audit,
+        family=family,
+        strata_cols=tuple(strata_cols),
+        variation_cols=tuple(variation_cols),
+        label_cols=tuple(label_cols),
+    )
+
+
+def freeze_retrospective_cohort(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    *,
+    metrics: tuple[str, ...] = _DEFAULT_METRICS,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Return the union of requested families' identifiable cohorts.
+
+    Each metric family is frozen independently. The returned event keys are
+    their union, not a denominator for inference; use the per-metric counts from
+    :func:`retrospective_alignment_with_shuffle` for scientific reporting.
+
+    Returns
+    -------
+    tuple of pd.DataFrame
+        The three tables restricted to the union of frozen family cohorts.
+    """
+    family_metrics = _requested_metrics_by_family(metrics)
+    frozen_families = [
+        _freeze_retrospective_cohort_with_audit(
+            event_table,
+            event_arm_table,
+            event_sequence_table,
+            metrics=selected,
+        )
+        for selected in family_metrics.values()
+    ]
+    key_cols = [*_session_keys(event_table), "event_id"]
+    union_events = (
+        pd.concat(
+            [frozen.event_table for frozen in frozen_families],
+            ignore_index=True,
+        )
+        .drop_duplicates(key_cols, keep="first")
+        .drop(columns=_SHUFFLE_HELPER_COLUMNS, errors="ignore")
+    )
+    union_keys = union_events[key_cols].drop_duplicates()
+
+    def _restrict(frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame.iloc[0:0].copy()
+        return frame.merge(
+            union_keys,
+            on=key_cols,
+            how="inner",
+            validate="many_to_one",
+        )
+
+    return union_events, _restrict(event_arm_table), _restrict(event_sequence_table)
 
 
 def retrospective_alignment_with_shuffle(
@@ -728,12 +1192,17 @@ def retrospective_alignment_with_shuffle(
     n_shuffles: int = 100,
     metrics: tuple[str, ...] = _DEFAULT_METRICS,
     rng: np.random.Generator | None = None,
-) -> dict[str, float]:
+) -> dict[str, float | int | bool | str]:
     """Real vs. shuffled alignment for one session.
 
-    Each shuffle calls :func:`next_arm_circular_shift` on
-    ``event_table`` and recomputes the requested metrics. The
-    statistic of interest is real minus shuffled for each metric.
+    Each metric family gets its own visit-context cohort and calibrated null:
+    arm metrics condition on ``current_arm``; patch metrics condition on
+    ``current_patch``; path coverage conditions on ``current_arm``, exact route
+    length, and coarse duration. The statistic is real minus shuffled.
+
+    Metrics share a cohort only within their family. A family with no movable
+    stratum reports zero events and NaN statistics without removing observable
+    events from another family.
 
     Parameters
     ----------
@@ -743,9 +1212,8 @@ def retrospective_alignment_with_shuffle(
     n_shuffles : int, default 100
         Number of circular-shift draws.
     metrics : tuple of str
-        Subset of ``("chosen_arm_fraction", "ends_at_next",
-        "contains_path_to_next")``. Useful in tests for skipping the
-        sequence-table-dependent metrics.
+        Subset of :data:`_DEFAULT_METRICS`. Useful in tests for
+        skipping the sequence-table-dependent metrics.
     rng : numpy Generator, optional
 
     Returns
@@ -753,120 +1221,121 @@ def retrospective_alignment_with_shuffle(
     dict
         Keys: ``real_mean_<metric>``, ``shuffled_mean_<metric>``,
         ``real_minus_shuffled_<metric>``, ``shuffled_std_<metric>``,
-        ``n_events``, ``n_shuffles``.
+        ``n_events_<metric>`` and family-specific retained/excluded visit and
+        stratum audits. A legacy ``n_events`` key is included only when one
+        metric family was requested; multi-family output has no misleading
+        global denominator. Provenance fields record the visit-unit and cohort
+        policy; path output explicitly records its movable-strata scope.
+
+    Raises
+    ------
+    KeyError
+        If a required column is absent.
+    RuntimeError
+        If a metric's observed count disagrees with the frozen cohort
+        size, which would mean the common-cohort guarantee was broken.
     """
     if rng is None:
         rng = np.random.default_rng()
-
-    event_table, event_arm_table, event_sequence_table = at_well_event_cohort(
-        event_table, event_arm_table, event_sequence_table
-    )
-    if "next_arm" in event_table:
-        next_arm = pd.to_numeric(event_table["next_arm"], errors="coerce")
-        event_table = event_table.loc[np.isfinite(next_arm)].copy()
-        key_cols = [*_session_keys(event_table), "event_id"]
-        keys = event_table[key_cols].drop_duplicates()
-        event_arm_table = event_arm_table.merge(
-            keys, on=key_cols, how="inner", validate="many_to_one"
-        )
-        event_sequence_table = event_sequence_table.merge(
-            keys, on=key_cols, how="inner", validate="many_to_one"
-        )
-    observable_keys = _observable_event_keys(
-        event_table,
-        event_arm_table,
-        event_sequence_table,
-        metrics,
-    )
-    key_cols = [*_session_keys(event_table), "event_id"]
-    event_table = event_table.merge(
-        observable_keys, on=key_cols, how="inner", validate="one_to_one"
-    )
-    event_arm_table = event_arm_table.merge(
-        observable_keys, on=key_cols, how="inner", validate="many_to_one"
-    )
-    event_sequence_table = event_sequence_table.merge(
-        observable_keys, on=key_cols, how="inner", validate="many_to_one"
-    )
-
-    if len(event_table) < 2:
-        raise ValueError(
-            "Retrospective circular-shift inference requires at least two "
-            "events after the at-well, valid-next, common-observability cohort "
-            f"is frozen; retained {len(event_table)}"
-        )
-
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_table.columns]
-    if sess_keys:
-        n_sess = event_table[sess_keys].drop_duplicates().shape[0]
-        if n_sess > 1:
-            raise ValueError(
-                f"retrospective_alignment_with_shuffle received {n_sess} "
-                "sessions; pass one session at a time."
-            )
-
-    real = compute_retrospective_metrics(
-        event_table, event_arm_table, event_sequence_table
-    )
-    missing_metrics = [metric for metric in metrics if metric not in real]
-    if missing_metrics:
-        raise KeyError(
-            "Requested retrospective metric(s) were not computed: "
-            f"{missing_metrics}"
-        )
-    real_counts = {
-        metric: int(real[metric].notna().sum()) for metric in metrics
-    }
-
-    # Validate the *computed* denominators, not only the number of event rows.
-    # A metric can still lose observations after cohort selection if an input
-    # target such as ``next_patch`` is missing.  Such a singleton cannot support
-    # the circular-shift inference and must fail before doing the shuffles.
-    n_events = int(len(event_table))
-    for metric, count in real_counts.items():
-        if count < 2:
-            raise ValueError(
-                "Retrospective circular-shift inference requires at least two "
-                f"observed events for {metric} after the final cohort is "
-                f"frozen; retained {count}"
-            )
-        if count != n_events:
-            raise RuntimeError(
-                f"Retrospective metric {metric} observed {count} events but "
-                f"the frozen common cohort contains {n_events}"
-            )
-    real_means = _per_session_metric_means(real)
-
-    shuffled_acc: dict[str, list[float]] = {m: [] for m in metrics}
-    for _ in range(n_shuffles):
-        shuffled_ev = next_arm_circular_shift(event_table, rng=rng)
-        sm = compute_retrospective_metrics(
-            shuffled_ev, event_arm_table, event_sequence_table
-        )
-        sm_means = _per_session_metric_means(sm)
-        for m in metrics:
-            if m in sm_means:
-                shuffled_acc[m].append(sm_means[m])
-
-    # Every requested metric and every shuffle uses this same explicit
-    # at-well, valid-next event cohort.
-    out: dict[str, float] = {
-        "n_events": n_events,
+    metrics = _validate_requested_metrics(metrics)
+    if n_shuffles < 0:
+        raise ValueError("n_shuffles must be nonnegative")
+    family_metrics = _requested_metrics_by_family(metrics)
+    out: dict[str, float | int | bool | str] = {
         "n_shuffles": int(n_shuffles),
+        "cohort_policy": "metric_family_specific",
+        "shuffle_unit_definition": "contiguous_current_arm_run_within_stop_id",
     }
-    for m in metrics:
-        if m not in real_means:
+    if "path" in family_metrics:
+        out["path_null_scope"] = "movable_current_arm_route_length_duration_strata"
+        out["path_null_effectively_cross_patch"] = True
+
+    for family, selected_metrics in family_metrics.items():
+        frozen = _freeze_retrospective_cohort_with_audit(
+            event_table,
+            event_arm_table,
+            event_sequence_table,
+            metrics=selected_metrics,
+        )
+        family_suffix = f"{family}_family"
+        n_events = int(len(frozen.event_table))
+        for audit_name, value in frozen.audit.items():
+            out[f"{audit_name}_{family_suffix}"] = value
+        out[f"n_events_{family_suffix}"] = n_events
+
+        if len(family_metrics) == 1:
+            out.update(frozen.audit)
+            out["n_events"] = n_events
+
+        if frozen.audit["n_shuffle_units"] < 2:
+            for metric in selected_metrics:
+                out[f"n_events_{metric}"] = 0
+                out[f"real_mean_{metric}"] = float("nan")
+                out[f"shuffled_mean_{metric}"] = float("nan")
+                out[f"shuffled_std_{metric}"] = float("nan")
+                out[f"real_minus_shuffled_{metric}"] = float("nan")
             continue
-        out[f"real_mean_{m}"] = real_means[m]
-        if shuffled_acc[m]:
-            out[f"shuffled_mean_{m}"] = float(np.mean(shuffled_acc[m]))
-            out[f"shuffled_std_{m}"] = float(np.std(shuffled_acc[m]))
-            out[f"real_minus_shuffled_{m}"] = real_means[m] - float(
-                np.mean(shuffled_acc[m])
+
+        real = _compute_requested_metrics(
+            frozen.event_table,
+            frozen.event_arm_table,
+            frozen.event_sequence_table,
+            selected_metrics,
+        )
+        real_counts = {
+            metric: int(real[metric].notna().sum()) for metric in selected_metrics
+        }
+        for metric, count in real_counts.items():
+            if count != n_events:
+                raise RuntimeError(
+                    f"Retrospective metric {metric} observed {count} events but "
+                    f"its frozen {family} cohort contains {n_events}"
+                )
+        real_means = _per_session_metric_means(real, selected_metrics)
+        shuffled_acc: dict[str, list[float]] = {
+            metric: [] for metric in selected_metrics
+        }
+        for _ in range(n_shuffles):
+            shuffled_ev = next_arm_circular_shift(
+                frozen.event_table,
+                columns=frozen.label_cols,
+                unit_col=_SHUFFLE_VISIT_UNIT,
+                strata_cols=frozen.strata_cols,
+                variation_cols=frozen.variation_cols,
+                require_movement=True,
+                rng=rng,
             )
-        else:
-            out[f"shuffled_mean_{m}"] = float("nan")
-            out[f"shuffled_std_{m}"] = float("nan")
-            out[f"real_minus_shuffled_{m}"] = float("nan")
-        out[f"n_events_{m}"] = real_counts[m]
+            shuffled_metrics = _compute_requested_metrics(
+                shuffled_ev,
+                frozen.event_arm_table,
+                frozen.event_sequence_table,
+                selected_metrics,
+            )
+            shuffled_means = _per_session_metric_means(
+                shuffled_metrics, selected_metrics
+            )
+            for metric in selected_metrics:
+                shuffled_count = int(shuffled_metrics[metric].notna().sum())
+                if shuffled_count != n_events:
+                    raise RuntimeError(
+                        f"Shuffled retrospective metric {metric} observed "
+                        f"{shuffled_count} events but its frozen {family} "
+                        f"cohort contains {n_events}"
+                    )
+                shuffled_acc[metric].append(shuffled_means[metric])
+
+        for metric in selected_metrics:
+            out[f"real_mean_{metric}"] = real_means[metric]
+            out[f"n_events_{metric}"] = real_counts[metric]
+            if shuffled_acc[metric]:
+                shuffled_mean = float(np.mean(shuffled_acc[metric]))
+                out[f"shuffled_mean_{metric}"] = shuffled_mean
+                out[f"shuffled_std_{metric}"] = float(np.std(shuffled_acc[metric]))
+                out[f"real_minus_shuffled_{metric}"] = (
+                    real_means[metric] - shuffled_mean
+                )
+            else:
+                out[f"shuffled_mean_{metric}"] = float("nan")
+                out[f"shuffled_std_{metric}"] = float("nan")
+                out[f"real_minus_shuffled_{metric}"] = float("nan")
     return out
