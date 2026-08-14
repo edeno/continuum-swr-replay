@@ -514,9 +514,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             drew_interval = True
 
         next_start = (
-            float(start_times[trial_idx + 1])
-            if trial_idx + 1 < len(ordered)
-            else hi
+            float(start_times[trial_idx + 1]) if trial_idx + 1 < len(ordered) else hi
         )
         dwell_start = max(float(completion_times[trial_idx]), lo)
         dwell_end = min(next_start, hi)
@@ -1438,13 +1436,13 @@ def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
 
 
 def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
-    """Arm-demeaned visit recency — the column M4+ actually fits.
+    """Event-local centered visit recency — the column M4+ actually fits.
 
-    Raw ``visit_recency`` carries a large static per-arm component that
-    the arm fixed effects absorb; the demeaned column is the part
-    orthogonal to ``arm_fe`` and is what enters the model. Plotted on a
-    diverging map centered at 0 (above/below this arm's session mean)
-    rather than the sequential map used for the raw column.
+    At each event, the mean over visited leaf arms is subtracted from leaf-arm
+    recency. Never-visited leaves are excluded from that mean and represented
+    separately by ``arm_never_visited``; trunks remain structural zero. The
+    diverging map therefore shows recency relative to the event's visited-leaf
+    mean, not relative to a future-dependent session mean.
     """
     _draw_event_arm_heatmap(
         ax,
@@ -1458,7 +1456,7 @@ def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
         structural_na_rows=_TRUNK_ARMS,
         scale_across_table=True,
         robust_symmetric_quantile=0.95,
-        colorbar_label="trials from arm mean",
+        colorbar_label="trials from event visited-leaf mean",
     )
     ax.text(
         0.005,

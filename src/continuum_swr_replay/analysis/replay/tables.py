@@ -105,6 +105,9 @@ from ._helpers import (
     eq_indicator as _eq_indicator,
 )
 from ._helpers import (
+    eq_indicator_or_nan as _eq_indicator_or_nan,
+)
+from ._helpers import (
     hash_event_id as _hash_event_id,
 )
 from ._helpers import (
@@ -140,14 +143,11 @@ from ._helpers import (
 from ._helpers import (
     time_since_stop as _time_since_stop,
 )
-from ._helpers import (
-    visit_recency_all_events as _visit_recency_all_events,
-)
-from .covariates import (
-    arm_never_visited_all_events as _arm_never_visited_all_events,
-)
 from .covariates import (
     center_visit_recency_within_event as _center_visit_recency_within_event,
+)
+from .covariates import (
+    visit_recency_and_never_visited_all_events as _visit_recency_and_never_visited_all_events,
 )
 from .model_specs import N_REWARD_LAGS
 from .spatial import arm_dist_rank, dist_to_arm_from_well
@@ -1344,9 +1344,16 @@ def build_event_arm_table(
     # On real bandit graph each well has degree 1 so is_prev / is_next
     # / is_last_rewarded are 1 on exactly one arm per event. If a
     # reference arm is NaN (session boundary, no last-rewarded, etc.),
-    # the indicator is 0 for every arm of that event.
+    # the indicator is 0 for every arm of that event -- absent, not
+    # unobserved.
+    #
+    # ``is_current`` and ``is_same_patch`` are the exception: their
+    # reference is NaN precisely when the event window is not wholly at
+    # one well, i.e. the animal's location is *unobserved* rather than
+    # absent. They propagate NaN so complete-case selection drops the
+    # event instead of asserting "not current" on all nine arms.
     arm_arr = long["arm"].to_numpy()
-    long["is_current"] = _eq_indicator(arm_arr, long["current_arm"].to_numpy())
+    long["is_current"] = _eq_indicator_or_nan(arm_arr, long["current_arm"].to_numpy())
     long["is_prev"] = _eq_indicator(arm_arr, long["prev_arm"].to_numpy())
     long["is_next"] = _eq_indicator(arm_arr, long["next_arm"].to_numpy())
     long["is_last_rewarded"] = _eq_indicator(
@@ -1360,11 +1367,13 @@ def build_event_arm_table(
     # carries the rewarded-at-current-arm case; this indicator is the
     # identifiable residual — reward memory at a non-current arm — and
     # has disjoint support from ``is_current`` by construction.
-    long["is_last_rewarded_elsewhere"] = (
-        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
-    ).astype(int)
+    # NaN-valued where is_current is unobserved: "rewarded somewhere
+    # other than here" is undefined when "here" is unknown.
+    long["is_last_rewarded_elsewhere"] = long["is_last_rewarded"].to_numpy() * (
+        1 - long["is_current"].to_numpy()
+    )
     long["arm_patch_id"] = np.array([_arm_to_patch(a) for a in arm_arr])
-    long["is_same_patch"] = _eq_indicator(
+    long["is_same_patch"] = _eq_indicator_or_nan(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
     )
 
@@ -1407,8 +1416,9 @@ def build_event_arm_table(
     # context with post-arrival history in the same regression row.
     event_times = event_table["event_start"].to_numpy()
     if len(trials) > 0:
-        vr_2d = _visit_recency_all_events(event_times, trials, well_to_arm_map)
-        anv_2d = _arm_never_visited_all_events(event_times, trials, well_to_arm_map)
+        vr_2d, anv_2d = _visit_recency_and_never_visited_all_events(
+            event_times, trials, well_to_arm_map
+        )
         cr_2d = _cumulative_reward_all_events(event_times, trials, well_to_arm_map)
         # canonical per-arm reward rate: rewarded fraction of the last 10 visits
         # to that arm (covariate_dictionary.md D1; was 5-visit).
@@ -1436,7 +1446,9 @@ def build_event_arm_table(
     # Relative leaf-arm recency, centered independently inside each event.
     # Unlike the old across-event/session mean, this cannot change when later
     # events are appended. Structural trunk recencies stay at zero.
-    long["visit_recency_demeaned"] = _center_visit_recency_within_event(vr_2d).flatten()
+    long["visit_recency_demeaned"] = _center_visit_recency_within_event(
+        vr_2d, anv_2d
+    ).flatten()
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
 
@@ -1632,10 +1644,11 @@ def build_event_patch_table(
     # (the animal is usually rewarded in its current patch); the patch
     # hierarchy uses this disjoint-support residual at P2/P3, mirroring
     # the arm-level ``is_last_rewarded_elsewhere``. See model_specs.py.
-    patch_eat["is_last_rewarded_patch_elsewhere"] = (
-        patch_eat["is_last_rewarded_patch"].to_numpy()
-        * (1 - patch_eat["is_current_patch"].to_numpy())
-    ).astype(int)
+    # NaN where is_current_patch is unobserved -- casting to int here
+    # would turn that NaN into a sentinel integer.
+    patch_eat["is_last_rewarded_patch_elsewhere"] = patch_eat[
+        "is_last_rewarded_patch"
+    ].to_numpy() * (1 - patch_eat["is_current_patch"].to_numpy())
 
     # is_prev_patch: is this the patch the animal just came from?
     prev_p = event_table[["event_id", "prev_patch"]].copy()

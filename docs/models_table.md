@@ -150,6 +150,14 @@ Rlag  n_events ~ REWK + is_after_switch
 ## Content — arm
 `fit_replay_content_models.py --hierarchy arm` (per is_swr split {all, T, F})
 
+The runner accepts only the current canonical table schema and validates every
+requested rung before fitting. A stale/legacy table or one missing any requested
+predictor aborts the complete request; models are never warning-skipped into a
+partial ladder. Candidate identities, current-location indicators, and hard-count
+responses are checked as scientific invariants. All rungs are then restricted to
+the same successfully fitted session/event cohort and published as one staged
+directory bundle, so a late failed rung cannot leave mixed-generation outputs.
+
 ```r
 M0   arm_count ~ 1                        # null (uniform over arms) | strata(event_id)
 M0a  arm_count ~ ARMFE
@@ -157,8 +165,9 @@ M1   arm_count ~ ARMFE + is_current
 M2   arm_count ~ ARMFE + is_current + is_prev
 M3   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10
 M4   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
+                 + arm_never_visited
 M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
-                 + is_last_rewarded_elsewhere
+                 + arm_never_visited + is_last_rewarded_elsewhere
 M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
 M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
                  + swr_x_is_last_rewarded_elsewhere
@@ -187,10 +196,12 @@ Same conditional-Poisson forms on the contfrag tables, truncated ladders:
 
 ```r
 C_replay_only      chosen ~ replay_frac
-C_behavior         chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
-C_full             chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
-                            + replay_frac
-C_full_swr_split   chosen ~ visit_recency + cumulative_reward + reward_rate_arm_k10 + arm_dist_rank
+C_behavior         chosen ~ visit_recency + arm_never_visited + cumulative_reward
+                            + reward_rate_arm_k10 + arm_dist_rank
+C_full             chosen ~ visit_recency + arm_never_visited + cumulative_reward
+                            + reward_rate_arm_k10 + arm_dist_rank + replay_frac
+C_full_swr_split   chosen ~ visit_recency + arm_never_visited + cumulative_reward
+                            + reward_rate_arm_k10 + arm_dist_rank
                             + replay_frac_swr + replay_frac_non_swr
 ```
 

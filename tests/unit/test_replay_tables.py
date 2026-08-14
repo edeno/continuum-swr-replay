@@ -196,9 +196,7 @@ def _location_contract_session():
 def test_event_and_stop_tables_label_location_without_filtering_events():
     dot, env, trials, graph = _location_contract_session()
 
-    events = build_event_table(dot, env, trials, graph).sort_values(
-        "non_local_event"
-    )
+    events = build_event_table(dot, env, trials, graph).sort_values("non_local_event")
     stops = build_stop_table(dot, trials, graph).sort_values("stop_start")
     event_arms = build_event_arm_table(events, dot, env, trials, graph)
     event_patches = build_event_patch_table(events, event_arms)
@@ -356,9 +354,9 @@ def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
     for col in ("dist_to_arm", "arm_dist_rank"):
         # ``dist_to_arm`` is NaN when current_arm is NaN — accept that,
         # but require the number of non-NaN rows to match the baseline.
-        assert (
-            eat_shifted[col].notna().sum() == eat_baseline[col].notna().sum()
-        ), f"column {col} lost values when event_table had a non-zero-based index"
+        assert eat_shifted[col].notna().sum() == eat_baseline[col].notna().sum(), (
+            f"column {col} lost values when event_table had a non-zero-based index"
+        )
 
 
 def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_session):
@@ -393,9 +391,16 @@ def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_sessi
         [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
     )
     for frame in (first, second):
-        assert frame.loc[range(6), "visit_recency_demeaned"].mean() == pytest.approx(
-            0.0
-        )
+        # Centering uses the *visited* leaf arms only, so it is their mean
+        # that is zero. Including the never-visited arms -- whose value is
+        # the right-censoring fill rather than a measured recency -- would
+        # drag the visited arms by an arbitrary amount.
+        novelty = frame.loc[range(6), "arm_never_visited"].to_numpy()
+        demeaned = frame.loc[range(6), "visit_recency_demeaned"].to_numpy()
+        assert demeaned[novelty == 0.0].mean() == pytest.approx(0.0)
+        # The censored arms stay above every visited arm rather than
+        # pulling them negative.
+        assert demeaned[novelty == 1.0].min() > demeaned[novelty == 0.0].max()
         np.testing.assert_array_equal(
             frame.loc[range(6, 9), "visit_recency_demeaned"].to_numpy(),
             [0.0, 0.0, 0.0],
@@ -427,8 +432,7 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     eat = build_event_arm_table(et, dot, env, trials, graph)
 
     # value-block columns are emitted (present even without a contingency)
-    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm",
-                "arm_uncertainty"):
+    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm", "arm_uncertainty"):
         assert col in eat.columns
 
     # every Mv predictor (bar the fit-time arm fixed effects) resolves
@@ -506,18 +510,34 @@ class TestEventTableSchema:
         dot, env, trials, graph, post = tiny_session_with_posterior
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         for col in (
-            "animal", "day", "epoch", "non_local_event", "event_id",
-            "stop_idx", "stop_id",
-            "event_start", "event_end", "event_duration",
-            "time_since_stop", "is_swr", "is_mua",
+            "animal",
+            "day",
+            "epoch",
+            "non_local_event",
+            "event_id",
+            "stop_idx",
+            "stop_id",
+            "event_start",
+            "event_end",
+            "event_duration",
+            "time_since_stop",
+            "is_swr",
+            "is_mua",
             "whole_event_speed_eligible",
-            "current_arm", "prev_arm", "next_arm", "last_rewarded_arm",
-            "n_nonlocal_bins", "nonlocal_weight_sum",
-            "posterior_mass_total", "posterior_peak_mean",
+            "current_arm",
+            "prev_arm",
+            "next_arm",
+            "last_rewarded_arm",
+            "n_nonlocal_bins",
+            "nonlocal_weight_sum",
+            "posterior_mass_total",
+            "posterior_peak_mean",
             "posterior_entropy_mean",
-            "posterior_hpd_width_50", "posterior_hpd_width_80",
+            "posterior_hpd_width_50",
+            "posterior_hpd_width_80",
             "posterior_hpd_width_95",
-            "n_junction_bins", "n_unique_arms",
+            "n_junction_bins",
+            "n_unique_arms",
         ):
             assert col in et.columns, f"missing canonical column: {col}"
 
@@ -584,7 +604,9 @@ class TestEventTableInvariants:
             invalid.columns.get_loc("Non-Local_Fragmented_prob"),
         ] = 0.0
 
-        with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
+        with pytest.raises(
+            EventDefinitionError, match="probability-threshold contract"
+        ):
             build_event_table(
                 invalid,
                 env,
@@ -632,9 +654,7 @@ class TestEventTableInvariants:
         with pytest.raises(EventDefinitionError, match=match):
             build_stop_table(invalid, trials, graph)
 
-    @pytest.mark.parametrize(
-        "bad_probability", [0.8, 0.5, np.nan, np.inf, -np.inf]
-    )
+    @pytest.mark.parametrize("bad_probability", [0.8, 0.5, np.nan, np.inf, -np.inf])
     def test_nonlocal_probability_contract_fails_atomically(
         self, tiny_session_with_posterior, bad_probability
     ):
@@ -704,17 +724,13 @@ class TestEventTableInvariants:
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         # Event 1 covers slice(20,30) = 10 bins. Event 2 covers 10 bins.
-        np.testing.assert_array_equal(
-            et["n_nonlocal_bins"].to_numpy(), [10, 10]
-        )
+        np.testing.assert_array_equal(et["n_nonlocal_bins"].to_numpy(), [10, 10])
 
     def test_nonlocal_weight_sum_equals_sum_of_nonlocal_prob(self, tiny_session):
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         # Non-Local_Continuous_prob = 0.9 × 10 bins = 9.0 per event.
-        np.testing.assert_allclose(
-            et["nonlocal_weight_sum"].to_numpy(), [9.0, 9.0]
-        )
+        np.testing.assert_allclose(et["nonlocal_weight_sum"].to_numpy(), [9.0, 9.0])
 
     def test_legacy_and_label_timing_share_one_atomic_window(self, tiny_session):
         dot, env, trials, graph = tiny_session
@@ -782,15 +798,21 @@ class TestEventTableInvariants:
     def test_hpd_width_monotonic_50_80_95(self, tiny_session_with_posterior):
         dot, env, trials, graph, post = tiny_session_with_posterior
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
-        assert (et["posterior_hpd_width_50"] <= et["posterior_hpd_width_80"] + 1e-9).all()
-        assert (et["posterior_hpd_width_80"] <= et["posterior_hpd_width_95"] + 1e-9).all()
+        assert (
+            et["posterior_hpd_width_50"] <= et["posterior_hpd_width_80"] + 1e-9
+        ).all()
+        assert (
+            et["posterior_hpd_width_80"] <= et["posterior_hpd_width_95"] + 1e-9
+        ).all()
 
     def test_posterior_peak_mean_within_unit_interval(
         self, tiny_session_with_posterior
     ):
         dot, env, trials, graph, post = tiny_session_with_posterior
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
-        assert ((et["posterior_peak_mean"] >= 0) & (et["posterior_peak_mean"] <= 1)).all()
+        assert (
+            (et["posterior_peak_mean"] >= 0) & (et["posterior_peak_mean"] <= 1)
+        ).all()
 
     def test_posterior_entropy_mean_nonnegative(self, tiny_session_with_posterior):
         dot, env, trials, graph, post = tiny_session_with_posterior
@@ -922,16 +944,48 @@ class TestEventArmTableInvariants:
         np.testing.assert_allclose(sum_mass.to_numpy(), pmt.to_numpy(), atol=1e-10)
 
     def test_is_current_indicator_is_valid(self, tiny_session):
-        """Exactly one arm per event is marked ``is_current`` when
-        ``current_arm`` resolves, zero arms when it is NaN.
+        """With no trials every event is location-unknown, so
+        ``is_current`` is missing rather than a fabricated zero.
         """
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
-        per_event = eat.groupby("event_id")["is_current"].sum()
-        # For every event, current_arm is a leaf arm (1 or 3) — so
-        # is_current sum == 1.
-        assert set(per_event.unique()) <= {0, 1}
+        assert eat["is_current"].isna().all()
+
+    def test_is_current_is_one_hot_at_well_and_missing_off_well(self):
+        """``is_current`` is defined only where the animal's location is.
+
+        An at-well event marks exactly one arm; transit and mixed events
+        carry NaN on every arm, so complete-case fitting drops them instead
+        of reading them as "not the current arm" nine times over.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+
+        state = et.set_index("event_id")["location_state"].to_dict()
+        by_event = dict(eat.groupby("event_id").__iter__())
+        assert len(by_event) == 3
+
+        seen = set()
+        for event_id, g in by_event.items():
+            ic = g["is_current"].to_numpy(dtype=float)
+            seen.add(state[event_id])
+            if state[event_id] == "at_well":
+                # Well 1 is degree-1, so it touches exactly arm 1.
+                assert np.isfinite(ic).all()
+                assert ic.sum() == 1.0
+                assert g.loc[g["is_current"] == 1.0, "arm"].tolist() == [1]
+                # The elsewhere-residual stays defined here.
+                assert g["is_last_rewarded_elsewhere"].notna().all()
+            else:
+                assert np.isnan(ic).all(), (
+                    f"{state[event_id]} leaked a numeric is_current"
+                )
+                assert g["is_same_patch"].isna().all()
+                assert g["is_last_rewarded_elsewhere"].isna().all()
+                assert g["swr_x_current"].isna().all()
+        assert seen == {"in_transit", "at_well", "mixed"}
 
     def test_dist_to_arm_nonnegative_and_rank_1_is_min(self, tiny_session):
         dot, env, trials, graph = tiny_session
@@ -959,12 +1013,19 @@ class TestEventArmTableInvariants:
             ("swr_x_current", "is_current"),
             ("mua_x_prev", "is_prev"),
         ):
-            p = eat[prod].to_numpy()
-            ind = eat[indicator_col].to_numpy()
-            nz_mask = p != 0
-            assert (
-                ind[nz_mask] == 1
-            ).all(), f"{prod} nonzero with {indicator_col} == 0"
+            p = eat[prod].to_numpy(dtype=float)
+            ind = eat[indicator_col].to_numpy(dtype=float)
+            # ``is_current`` is NaN where the animal's location is
+            # unobserved; the product must carry that NaN through
+            # rather than collapsing it to a number.
+            assert np.array_equal(np.isnan(p), np.isnan(ind)), (
+                f"{prod} does not propagate {indicator_col} missingness"
+            )
+            finite = ~np.isnan(p)
+            nz_mask = finite & (p != 0)
+            assert (ind[nz_mask] == 1).all(), (
+                f"{prod} nonzero with {indicator_col} == 0"
+            )
 
 
 # ── Cross-table invariants ──
@@ -1060,7 +1121,9 @@ def _traj_env():
     )
     g = nx.Graph()
     for i in range(len(node_id) - 1):
-        g.add_edge(int(node_id[i]), int(node_id[i + 1]), distance=abs(lp[i + 1] - lp[i]))
+        g.add_edge(
+            int(node_id[i]), int(node_id[i + 1]), distance=abs(lp[i + 1] - lp[i])
+        )
     env.track_graph_with_bin_centers_edges_ = g
     # Mirrors how ``Environment`` populates this at fit time
     # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
@@ -1074,10 +1137,18 @@ def _augmented_dot():
     """tiny dot + the augmented per-bin columns set to known constants."""
     dot = _tiny_dot_with_two_events()
     constants = {
-        "map_speed": 5.0, "step_distance": 1.0, "ahead_behind_distance": 3.0,
-        "hpd": 12.0, "Local_prob": 0.1, "No-Spike_prob": 0.0,
-        "run_speed_baseline": 50.0, "ripple_power": 20.0, "SWR_zscore": 1.5,
-        "mua_rate": 100.0, "MUA_zscore": 2.0, "theta_power": 0.3,
+        "map_speed": 5.0,
+        "step_distance": 1.0,
+        "ahead_behind_distance": 3.0,
+        "hpd": 12.0,
+        "Local_prob": 0.1,
+        "No-Spike_prob": 0.0,
+        "run_speed_baseline": 50.0,
+        "ripple_power": 20.0,
+        "SWR_zscore": 1.5,
+        "mua_rate": 100.0,
+        "MUA_zscore": 2.0,
+        "theta_power": 0.3,
         "theta_power_zscore": 0.5,
     }
     for col, val in constants.items():
@@ -1090,8 +1161,16 @@ class TestTrajectoryRollupWiring:
         dot = _augmented_dot()
         env = _traj_env()
         trials = pd.DataFrame(
-            columns=["start_time", "end_time", "to_well", "from_well",
-                     "from_patch", "to_patch", "is_reward", "is_patch_change"]
+            columns=[
+                "start_time",
+                "end_time",
+                "to_well",
+                "from_well",
+                "from_patch",
+                "to_patch",
+                "is_reward",
+                "is_patch_change",
+            ]
         )
         graph = _bandit_graph()
         post = _tiny_posterior(dot)
@@ -1122,8 +1201,16 @@ class TestTrajectoryRollupWiring:
         dot = _tiny_dot_with_two_events()  # no step_distance etc.
         env = _traj_env()
         trials = pd.DataFrame(
-            columns=["start_time", "end_time", "to_well", "from_well",
-                     "from_patch", "to_patch", "is_reward", "is_patch_change"]
+            columns=[
+                "start_time",
+                "end_time",
+                "to_well",
+                "from_well",
+                "from_patch",
+                "to_patch",
+                "is_reward",
+                "is_patch_change",
+            ]
         )
         et = build_event_table(dot, env, trials, _bandit_graph())
         for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):

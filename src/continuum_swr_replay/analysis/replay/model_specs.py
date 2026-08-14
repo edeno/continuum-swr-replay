@@ -36,16 +36,20 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   conflates value with visit frequency — a frequently-visited arm
   scores high even at a mediocre reward rate — so its M3 coefficient
   partly re-encodes spatial recency. ``reward_rate_arm_k10`` is a
-  true rate. Cost: it is undefined (NaN) for never-visited arms, so
-  the M3+ complete-case event set is smaller than M0–M2's.
-- M4 uses ``visit_recency_demeaned`` — ``visit_recency`` with each
-  arm's session-mean subtracted — not the raw column. Raw
-  ``visit_recency`` has a large static per-arm component (some arms
-  are visited far more than others) that the ``arm_fe`` block
-  already absorbs; with arm FE in the model the two collide (raw
-  ``visit_recency`` VIF ≈ 27). Demeaning within arm removes the part
-  ``arm_fe`` carries, leaving the identifiable signal: whether an arm
-  was visited longer ago than is typical for that arm.
+  true rate. Once any trial has completed, a never-visited leaf is
+  encoded as 0.0 rather than NaN; M4 adds ``arm_never_visited`` so
+  that right-censored novelty is distinguishable from an observed
+  zero reward rate. Events before the first completed trial remain
+  unknown and are removed by complete-case selection.
+- M4 uses event-local ``visit_recency_demeaned`` rather than a
+  session-wide transformation. At each event, the mean recency over
+  the *visited* reward-site arms is subtracted from every leaf-arm
+  recency; never-visited leaves are excluded from that mean because
+  their ``n_completed + 1`` value is a censoring rule, not a measured
+  recency. ``arm_never_visited`` carries that state separately and
+  trunk arms remain structural zero. Appending future events cannot
+  change an earlier design row, and the coefficient represents
+  relative recency within the event above the arm-FE baseline.
 - ``is_last_rewarded`` is NOT used as a predictor: it is ~98%
   identical to ``is_current`` (the animal is usually rewarded where
   it currently sits), so a model carrying both is near-collinear
@@ -67,13 +71,13 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   uninformative (null when estimated independently; VIF 28 and 12
   with ``is_current``). The spatial effect is binary "here vs
   not here," not a distance gradient.
-- SWR interactions limited to spatial predictors only
-  (``swr_x_current``, ``swr_x_prev``). ``swr_x_last_rewarded`` was
-  dropped because it was r=1.0 with ``swr_x_current`` under the old
-  ``is_last_rewarded`` predictor; with ``is_last_rewarded_elsewhere``
-  a ``swr_x_last_rewarded_elsewhere`` term would now be identifiable
-  but is left out — at ~2% event support its SWR interaction is too
-  sparse to power.
+- SWR modulation is split across two rungs: M6 adds the spatial
+  interactions (``swr_x_current``, ``swr_x_prev``), and M7 adds
+  reward-rate, relative-recency, and elsewhere-reward-memory
+  interactions. The last is sparse because
+  ``is_last_rewarded_elsewhere`` itself has support on only ~2% of
+  events, so convergence and uncertainty require real-data
+  re-validation after canonical table regeneration.
 - MUA interactions are a separate analysis (split, not interaction)
   to avoid the same collinearity.
 """
@@ -291,7 +295,10 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M4": ModelSpec(
         name="M4",
         predictors=_M4,
-        description="+ visit recency (centered across leaf arms within event)",
+        description=(
+            "+ visit recency (centered across visited leaf arms within event) "
+            "and never-visited novelty"
+        ),
         parent="M3",
     ),
     "M5": ModelSpec(

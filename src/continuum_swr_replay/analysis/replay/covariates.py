@@ -28,7 +28,12 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
 
-from ._helpers import _trial_cutoff_times, build_well_to_arm_map
+from ._helpers import (
+    _trial_arrival_times,
+    _trial_outcome_times,
+    build_well_to_arm_map,
+)
+from .model_specs import N_REWARD_LAGS
 
 _SESSION_COLS = ["animal", "day", "epoch"]
 _P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
@@ -53,27 +58,56 @@ UNCERTAINTY_COVARIATES = (
 )
 
 
-def center_visit_recency_within_event(recency: np.ndarray) -> np.ndarray:
+def center_visit_recency_within_event(
+    recency: np.ndarray,
+    never_visited: np.ndarray,
+) -> np.ndarray:
     """Center leaf-arm recency within each event without using future events.
 
-    Only the six reward-site arms participate in the mean. Structural trunk
-    values remain zero once history exists, and an all-unknown event remains
-    all-NaN. This retains a relative-recency predictor while guaranteeing that
-    appending later events cannot change an earlier row.
+    Only *visited* reward-site arms participate in the mean. A never-visited
+    arm carries the right-censoring fill (``n_completed + 1``), which is a
+    property of the censoring rule rather than a measured recency; letting it
+    into the mean would displace every other arm in the event by an arbitrary
+    amount. In a session with one durably avoided well the fill can exceed the
+    visited arms by two orders of magnitude, so the resulting coefficient would
+    be estimated off the censoring rule instead of off recency.
+    ``arm_never_visited`` carries the censored state on its own.
+
+    Structural trunk values remain zero once history exists, and an event with
+    no visited leaf arm remains all-NaN. Guarantees that appending later
+    events cannot change an earlier row.
+
+    Parameters
+    ----------
+    recency : np.ndarray, shape (n_events, len(ALL_ARMS))
+        Per-event per-arm visit recency.
+    never_visited : np.ndarray, shape (n_events, len(ALL_ARMS))
+        1.0 where the arm has never been visited by this event, else 0.0.
+        NaN is treated as not-censored, matching ``recency``'s own NaN.
+
+    Returns
+    -------
+    np.ndarray, shape (n_events, len(ALL_ARMS))
+        Recency with visited leaf arms centered within each event.
     """
     values = np.asarray(recency, dtype=float)
+    censored = np.asarray(never_visited, dtype=float)
     if values.ndim != 2 or values.shape[1] != len(ALL_ARMS):
         raise ValueError(
-            "recency must have shape (n_events, len(ALL_ARMS)); "
-            f"got {values.shape}"
+            f"recency must have shape (n_events, len(ALL_ARMS)); got {values.shape}"
+        )
+    if censored.shape != values.shape:
+        raise ValueError(
+            "never_visited must match recency shape "
+            f"{values.shape}; got {censored.shape}"
         )
     output = values.copy()
     arm_positions = {arm: index for index, arm in enumerate(ALL_ARMS)}
     leaf_positions = np.asarray([arm_positions[arm] for arm in WELL_ARMS])
     leaf_values = values[:, leaf_positions]
-    finite = np.isfinite(leaf_values)
-    counts = finite.sum(axis=1)
-    totals = np.where(finite, leaf_values, 0.0).sum(axis=1)
+    visited = np.isfinite(leaf_values) & (censored[:, leaf_positions] != 1.0)
+    counts = visited.sum(axis=1)
+    totals = np.where(visited, leaf_values, 0.0).sum(axis=1)
     means = np.divide(
         totals,
         counts,
@@ -98,7 +132,7 @@ def visit_recency_all_events(
     arms are ``NaN`` before the first completed trial.
 
     """
-    recency, _ = _visit_recency_and_never_visited_all_events(
+    recency, _ = visit_recency_and_never_visited_all_events(
         event_times, trials, well_to_arm
     )
     return recency
@@ -116,18 +150,32 @@ def arm_never_visited_all_events(
     ``1``, visited arms are ``0``, and trunk/non-reachable arms are structural
     ``0``.
     """
-    _, never_visited = _visit_recency_and_never_visited_all_events(
+    _, never_visited = visit_recency_and_never_visited_all_events(
         event_times, trials, well_to_arm
     )
     return never_visited
 
 
-def _visit_recency_and_never_visited_all_events(
+def visit_recency_and_never_visited_all_events(
     event_times: np.ndarray,
     trials: pd.DataFrame,
     well_to_arm: dict[int, int],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute time-local recency and novelty from one shared history pass."""
+    """Compute time-local recency and novelty from one shared history pass.
+
+    This is the batched source of truth for the two coupled visit-history
+    covariates.  Both outputs use the same arrival-time cutoffs, arm mapping,
+    and right-censoring rule, so callers that need both should use this helper
+    rather than scanning the trial stream once per output.
+
+    Returns
+    -------
+    recency, never_visited : tuple[np.ndarray, np.ndarray]
+        Two float arrays with shape ``(n_events, len(ALL_ARMS))``.  Rows before
+        any completed arrival are all-NaN; after history begins, trunk arms are
+        structural zero and unvisited leaf arms carry the time-local censored
+        recency plus a novelty indicator of one.
+    """
     n_events = len(event_times)
     n_arms = len(ALL_ARMS)
     n_trials_total = len(trials)
@@ -164,7 +212,7 @@ def _visit_recency_and_never_visited_all_events(
 
     # ``np.searchsorted`` assumes chronological cutoff times. A visit becomes
     # available at goal arrival (or the per-row end-time fallback).
-    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    trials = trials.assign(_cutoff=_trial_arrival_times(trials))
     trials = trials.sort_values("_cutoff").reset_index(drop=True)
     cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
@@ -232,9 +280,10 @@ def cumulative_reward_all_events(
         # (matches the sibling helpers).
         return np.full((n_events, n_arms), np.nan)
 
-    # Sort defensively by the goal-arrival cutoff (see
-    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
-    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    # Reward-bearing history advances at outcome availability, not destination
+    # arrival. This prevents an event during the arrival-to-pump/poke-out gap
+    # from seeing the current trial's eventual reward.
+    trials = trials.assign(_cutoff=_trial_outcome_times(trials))
     trials = trials.sort_values("_cutoff").reset_index(drop=True)
     cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
@@ -303,9 +352,9 @@ def recent_reward_rate_all_events(
     if n_trials_total == 0:
         return np.full((n_events, n_arms), np.nan)
 
-    # Sort defensively by the goal-arrival cutoff (see
-    # ``visit_recency_all_events`` and ``_trial_cutoff_times``).
-    trials = trials.assign(_cutoff=_trial_cutoff_times(trials))
+    # Visits are spatially known at arrival, but their reward values enter this
+    # statistic only when the outcome is observable.
+    trials = trials.assign(_cutoff=_trial_outcome_times(trials))
     trials = trials.sort_values("_cutoff").reset_index(drop=True)
     cutoff_times = trials["_cutoff"].to_numpy()
     to_wells = trials["to_well"].to_numpy()
@@ -372,8 +421,8 @@ def recent_trial_reward_rate(
 
     The arm-agnostic counterpart of :func:`recent_reward_rate_all_events`:
     the denominator is trials, not visits to one arm. A trial is "before"
-    a query time if its goal-arrival cutoff (see :func:`_trial_cutoff_times`)
-    is at or before that time.
+    a query time if its reward/omission availability time (see
+    :func:`_trial_outcome_times`) is at or before that time.
 
     Parameters
     ----------
@@ -381,7 +430,7 @@ def recent_trial_reward_rate(
         Times (s) at which to evaluate the recent reward rate — e.g.
         immobility-bout start times for the stop-level rate model.
     trials : pd.DataFrame
-        Must carry ``is_reward`` plus the columns ``_trial_cutoff_times``
+        Must carry ``is_reward`` plus the columns ``_trial_outcome_times``
         consumes.
     k : int
         Window length in trials.
@@ -396,11 +445,10 @@ def recent_trial_reward_rate(
     if len(trials) == 0:
         return np.full(query_times.size, np.nan)
 
-    # Sort by the goal-arrival cutoff so ``searchsorted`` is valid; see
-    # ``_trial_cutoff_times`` for why this cutoff (not ``end_time``).
-    cutoff_times = np.sort(_trial_cutoff_times(trials))
+    # Sort by outcome availability so ``searchsorted`` is valid.
+    cutoff_times = np.sort(_trial_outcome_times(trials))
     is_reward = (
-        trials.assign(_cutoff=_trial_cutoff_times(trials))
+        trials.assign(_cutoff=_trial_outcome_times(trials))
         .sort_values("_cutoff")["is_reward"]
         .to_numpy()
         .astype(float)
@@ -435,7 +483,7 @@ def lagged_trial_rewards(
     query_times : np.ndarray, shape (n_query,)
         Times (s) at which to evaluate — immobility-bout start times.
     trials : pd.DataFrame
-        Must carry ``is_reward`` plus what :func:`_trial_cutoff_times` needs.
+        Must carry ``is_reward`` plus what :func:`_trial_outcome_times` needs.
     k : int
         Number of lags.
 
@@ -449,7 +497,7 @@ def lagged_trial_rewards(
     out = np.full((query_times.size, k), np.nan)
     if len(trials) == 0:
         return out
-    cutoff = _trial_cutoff_times(trials)
+    cutoff = _trial_outcome_times(trials)
     order = np.argsort(cutoff)
     cutoff_sorted = cutoff[order]
     is_reward = trials["is_reward"].to_numpy().astype(float)[order]
@@ -602,13 +650,13 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
             )
 
     carry_in = visit_ids.isna()
-    history_columns = (
+    arrival_history_columns = (
         "completed_trial_arm",
-        "reward_outcome",
         "is_after_switch",
         "recent_switch_rate",
         "leaky_q_value_diff",
     )
+    history_columns = (*arrival_history_columns, "reward_outcome")
     if stops.loc[carry_in, list(history_columns)].notna().to_numpy().any():
         raise ValueError(
             "carry-in rows without a completed_trial_id must have unknown "
@@ -626,9 +674,23 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
         if (raw_finite & values.isna()).any():
             raise ValueError(f"{column} must be numeric within completed trials")
         working[column] = values.astype(float)
-        inconsistent = working.groupby("completed_trial_id", sort=False)[column].apply(
-            lambda group: group.nunique(dropna=False) != 1
-        )
+        if column == "reward_outcome":
+            # An arrived trip can legitimately have pre-outcome bouts (NaN)
+            # followed by post-outcome bouts (one binary value). Its realized
+            # value may never change, and availability may never regress from
+            # finite back to missing as stop time advances.
+            grouped_outcome = working.groupby("completed_trial_id", sort=False)[column]
+            inconsistent = grouped_outcome.apply(
+                lambda group: group.dropna().nunique() > 1
+            )
+            regressed = grouped_outcome.apply(
+                lambda group: bool((group.notna().cummax() & group.isna()).any())
+            )
+            inconsistent = inconsistent | regressed
+        else:
+            inconsistent = working.groupby("completed_trial_id", sort=False)[
+                column
+            ].apply(lambda group: group.nunique(dropna=False) != 1)
         if inconsistent.any():
             bad = tuple(inconsistent[inconsistent].index[:10])
             raise ValueError(
@@ -639,7 +701,7 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
     visits = working.drop_duplicates("completed_trial_id", keep="first").reset_index(
         drop=True
     )
-    for column in history_columns:
+    for column in arrival_history_columns:
         if not np.isfinite(visits[column].to_numpy(dtype=float)).all():
             raise ValueError(
                 f"{column} must be finite for every observed completed_trial_id"
@@ -649,10 +711,13 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(
             f"completed_trial_arm must be a canonical leaf arm {tuple(WELL_ARMS)}"
         )
-    for column in ("reward_outcome", "is_after_switch"):
+    for column in ("is_after_switch",):
         values = visits[column].to_numpy(dtype=float)
         if not np.isin(values, (0.0, 1.0)).all():
             raise ValueError(f"{column} must be binary within completed trials")
+    reward_values = working["reward_outcome"].dropna().to_numpy(dtype=float)
+    if not np.isin(reward_values, (0.0, 1.0)).all():
+        raise ValueError("reward_outcome must be binary whenever it is known")
     for column in ("recent_switch_rate", "leaky_q_value_diff"):
         values = visits[column].to_numpy(dtype=float)
         if ((values < 0.0) | (values > 1.0)).any():
@@ -675,6 +740,12 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
         Number of leading 0s before the first 1; a ``NaN`` lag terminates the
         streak (counts the omissions seen before it).
     """
+    reward_lag_matrix = np.asarray(reward_lag_matrix, dtype=float)
+    if reward_lag_matrix.ndim != 2:
+        raise ValueError("reward_lag_matrix must be two-dimensional")
+    finite = reward_lag_matrix[np.isfinite(reward_lag_matrix)]
+    if not np.isin(finite, (0.0, 1.0)).all():
+        raise ValueError("reward lag values must be binary 0/1 or NaN")
     n_stops = reward_lag_matrix.shape[0]
     out = np.zeros(n_stops)
     for i in range(n_stops):
@@ -693,12 +764,15 @@ def add_uncertainty_covariates(
     switch_window: int = 5,
     q_alpha: float = 0.3,
 ) -> pd.DataFrame:
-    """Add four model-free behavioral-uncertainty covariates per stop.
+    """Complete the four model-free behavioral-uncertainty covariates per stop.
 
-    Validates the two visit-history covariates already computed from the full
-    completion-ordered trial stream, and adds the two stop-local summaries.
-    A reduced stop table cannot reconstruct history across completed visits
-    that contain no immobility bout, so missing canonical columns fail loudly.
+    Only two columns are *added* -- ``omission_streak`` and ``wsls_deviation``,
+    the stop-local summaries. The two visit-history covariates
+    (``recent_switch_rate``, ``leaky_q_value_diff``) must already be present:
+    they are computed from the full completion-ordered trial stream and are
+    here validated and passed through unchanged, never recomputed. A reduced
+    stop table cannot reconstruct history across completed visits that contain
+    no immobility bout, so missing canonical columns fail loudly.
     The input is not mutated; the returned frame keeps its index and row count.
 
     The four covariates:
@@ -739,7 +813,8 @@ def add_uncertainty_covariates(
     Returns
     -------
     pd.DataFrame
-        Copy of ``stop_table`` with the four covariate columns added.
+        Copy of ``stop_table`` with canonical upstream history validated and
+        the stop-local ``omission_streak`` and ``wsls_deviation`` columns added.
     """
     if switch_window != CANONICAL_SWITCH_WINDOW:
         raise ValueError(
@@ -773,10 +848,28 @@ def add_uncertainty_covariates(
         )
 
     out = stop_table.copy()
-    lag_cols = sorted(
-        (c for c in out.columns if c.startswith("reward_lag")),
-        key=lambda c: int(c.removeprefix("reward_lag")),
+    expected_lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
+    observed_lag_cols = [c for c in out.columns if c.startswith("reward_lag")]
+    duplicate_lags = sorted(
+        {column for column in observed_lag_cols if observed_lag_cols.count(column) > 1}
     )
+    if set(observed_lag_cols) != set(expected_lag_cols) or duplicate_lags:
+        missing_lags = [c for c in expected_lag_cols if c not in observed_lag_cols]
+        unexpected_lags = [c for c in observed_lag_cols if c not in expected_lag_cols]
+        raise KeyError(
+            "omission_streak requires the exact contiguous canonical reward-lag "
+            f"schema {expected_lag_cols}; missing={missing_lags}, "
+            f"unexpected={unexpected_lags}, duplicates={duplicate_lags}"
+        )
+    raw_lags = out[expected_lag_cols]
+    numeric_lags = raw_lags.apply(pd.to_numeric, errors="coerce")
+    if (raw_lags.notna() & numeric_lags.isna()).to_numpy().any():
+        raise ValueError("reward lag values must be numeric binary 0/1 or NaN")
+    finite_lags = numeric_lags.to_numpy(dtype=float)
+    finite_values = finite_lags[np.isfinite(finite_lags)]
+    if not np.isin(finite_values, (0.0, 1.0)).all():
+        raise ValueError("reward lag values must be binary 0/1 or NaN")
+    out.loc[:, expected_lag_cols] = numeric_lags
 
     omission = pd.Series(np.nan, index=out.index, dtype=float)
     wsls = pd.Series(np.nan, index=out.index, dtype=float)
@@ -786,10 +879,7 @@ def add_uncertainty_covariates(
         pos = g.index
         _completed_visit_context(g)
 
-        if lag_cols:
-            omission.loc[pos] = _omission_streak(g[lag_cols].to_numpy(dtype=float))
-        else:
-            omission.loc[pos] = 0.0
+        omission.loc[pos] = _omission_streak(g[expected_lag_cols].to_numpy(dtype=float))
 
         after_reward = g["is_after_reward"].to_numpy(dtype=float)
         after_omission = g["is_after_omission"].to_numpy(dtype=float)
@@ -946,9 +1036,7 @@ def load_contingency(path: Path) -> pd.DataFrame | None:
             "loaded qvals_table (%d stop rows) for p_reward_arm / q_arm", len(cont)
         )
         return cont
-    logging.warning(
-        "no qvals_table at %s — p_reward_arm / q_arm will be NaN", path
-    )
+    logging.warning("no qvals_table at %s — p_reward_arm / q_arm will be NaN", path)
     return None
 
 

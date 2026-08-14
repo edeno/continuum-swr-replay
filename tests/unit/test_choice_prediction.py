@@ -18,6 +18,7 @@ invariants:
 - ``fit_choice_model``: rejects under-determined input, recovers a
   known coefficient
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -59,7 +60,9 @@ def _make_minimal_tables(
                 "epoch": "02_r1",
                 "has_replay": True,
                 "n_events": 1,
-                "location_state": "at_well" if pd.notna(s["current_arm"]) else "unknown",
+                "location_state": "at_well"
+                if pd.notna(s["current_arm"])
+                else "unknown",
                 "at_well": pd.notna(s["current_arm"]),
                 "reward_outcome": 0,
                 "is_after_reward": False,
@@ -96,7 +99,8 @@ def _make_minimal_tables(
                     "arm_never_visited": float(arm in {2, 4}),
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
-                    "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
+                    "dist_to_arm": 1.0,
+                    "arm_dist_rank": 1.0,
                     "is_same_patch": 0,
                 }
             )
@@ -127,6 +131,29 @@ class TestBuildChoiceDataset:
 
         assert ds["stop_id"].unique().tolist() == [1]
         assert ds["at_well"].eq(True).all()
+
+    def test_filters_stop_whose_at_well_is_missing(self):
+        """A location-unknown stop is excluded, not admitted by default.
+
+        ``at_well`` is NA before the first trip, where ``.eq(True)``
+        yields NA; only the explicit fill keeps it out of the cohort.
+        """
+        et, eat, st = _make_minimal_tables(
+            [
+                {"stop_id": 1, "current_arm": 0, "next_arm": 3},
+                {
+                    "stop_id": 2,
+                    "current_arm": 5,
+                    "next_arm": 2,
+                    "location_state": "unknown",
+                    "at_well": pd.NA,
+                },
+            ]
+        )
+
+        ds = build_choice_dataset(et, eat, st)
+
+        assert ds["stop_id"].unique().tolist() == [1]
 
     def test_drops_stops_with_nan_current_arm(self):
         """arm != NaN is True for every arm in IEEE 754, so the
@@ -249,20 +276,23 @@ class TestBuildChoiceDataset:
         # Add a second event for stop 1 with all mass on arm 3.
         new_event_rows = []
         for arm in range(9):
-            new_event_rows.append({
-                "event_id": 2,
-                "stop_id": 1,
-                "arm": arm,
-                "arm_fraction": 1.0 if arm == 3 else 0.0,
-                "is_prev": 0.0,
-                "is_next": 0.0,
-                "visit_recency": 0.0,
-                "arm_never_visited": float(arm in {2, 4}),
-                "cumulative_reward": 0.0,
-                "reward_rate_arm_k10": 0.0,
-                "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
-                "is_same_patch": 0,
-            })
+            new_event_rows.append(
+                {
+                    "event_id": 2,
+                    "stop_id": 1,
+                    "arm": arm,
+                    "arm_fraction": 1.0 if arm == 3 else 0.0,
+                    "is_prev": 0.0,
+                    "is_next": 0.0,
+                    "visit_recency": 0.0,
+                    "arm_never_visited": float(arm in {2, 4}),
+                    "cumulative_reward": 0.0,
+                    "reward_rate_arm_k10": 0.0,
+                    "dist_to_arm": 1.0,
+                    "arm_dist_rank": 1.0,
+                    "is_same_patch": 0,
+                }
+            )
         eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)
         et = pd.concat(
             [et, pd.DataFrame({"event_id": [2], "stop_id": [1]})],
@@ -303,20 +333,23 @@ class TestBuildChoiceDataset:
         # arm_fraction is NaN (other arms keep finite values).
         new_event_rows = []
         for arm in range(9):
-            new_event_rows.append({
-                "event_id": 2,
-                "stop_id": 1,
-                "arm": arm,
-                "arm_fraction": np.nan if arm == 3 else 1.0 / 8,
-                "is_prev": 0.0,
-                "is_next": 0.0,
-                "visit_recency": 0.0,
-                "arm_never_visited": float(arm in {2, 4}),
-                "cumulative_reward": 0.0,
-                "reward_rate_arm_k10": 0.0,
-                "dist_to_arm": 1.0, "arm_dist_rank": 1.0,
-                "is_same_patch": 0,
-            })
+            new_event_rows.append(
+                {
+                    "event_id": 2,
+                    "stop_id": 1,
+                    "arm": arm,
+                    "arm_fraction": np.nan if arm == 3 else 1.0 / 8,
+                    "is_prev": 0.0,
+                    "is_next": 0.0,
+                    "visit_recency": 0.0,
+                    "arm_never_visited": float(arm in {2, 4}),
+                    "cumulative_reward": 0.0,
+                    "reward_rate_arm_k10": 0.0,
+                    "dist_to_arm": 1.0,
+                    "arm_dist_rank": 1.0,
+                    "is_same_patch": 0,
+                }
+            )
         eat = pd.concat([eat, pd.DataFrame(new_event_rows)], ignore_index=True)
         et = pd.concat(
             [et, pd.DataFrame({"event_id": [2], "stop_id": [1]})],
@@ -356,12 +389,16 @@ class TestPredictArmFractions:
         rows = []
         for ev in range(1, n_events + 1):
             for arm in range(9):
-                rows.append({
-                    "event_id": ev,
-                    "arm": arm,
-                    "is_prev": predictor_value_fn(ev, arm) if predictor_value_fn else 0.0,
-                    "arm_fraction": 1.0 / 9,
-                })
+                rows.append(
+                    {
+                        "event_id": ev,
+                        "arm": arm,
+                        "is_prev": predictor_value_fn(ev, arm)
+                        if predictor_value_fn
+                        else 0.0,
+                        "arm_fraction": 1.0 / 9,
+                    }
+                )
         return pd.DataFrame(rows)
 
     def test_predicted_frac_sums_to_one_per_event(self):
@@ -404,8 +441,12 @@ class TestPredictArmFractions:
         predicted[arm=0] >> 1/9, so residual[arm=0] < 0; predicted on
         other arms < 1/9, so residual > 0."""
         rows = [
-            {"event_id": 1, "arm": arm, "is_prev": 1.0 if arm == 0 else 0.0,
-             "arm_fraction": 1.0 / 9}
+            {
+                "event_id": 1,
+                "arm": arm,
+                "is_prev": 1.0 if arm == 0 else 0.0,
+                "arm_fraction": 1.0 / 9,
+            }
             for arm in range(9)
         ]
         eat = pd.DataFrame(rows)
@@ -413,15 +454,23 @@ class TestPredictArmFractions:
         out = predict_arm_fractions(eat, fit_result, predictors=["is_prev"])
         residual_arm_0 = out.loc[out["arm"] == 0, "residual_frac"].iloc[0]
         residual_arm_1 = out.loc[out["arm"] == 1, "residual_frac"].iloc[0]
-        assert residual_arm_0 < 0, "model overpredicted arm 0; residual should be negative"
-        assert residual_arm_1 > 0, "model underpredicted arm 1; residual should be positive"
+        assert residual_arm_0 < 0, (
+            "model overpredicted arm 0; residual should be negative"
+        )
+        assert residual_arm_1 > 0, (
+            "model underpredicted arm 1; residual should be positive"
+        )
 
     def test_softmax_numerically_stable_under_large_logits(self):
         """The implementation subtracts the per-event max before
         exponentiating. Verify this doesn't blow up for huge β·X."""
         rows = [
-            {"event_id": 1, "arm": arm, "is_prev": 1000.0 if arm == 0 else 0.0,
-             "arm_fraction": 1.0 / 9}
+            {
+                "event_id": 1,
+                "arm": arm,
+                "is_prev": 1000.0 if arm == 0 else 0.0,
+                "arm_fraction": 1.0 / 9,
+            }
             for arm in range(9)
         ]
         eat = pd.DataFrame(rows)
@@ -505,12 +554,14 @@ class TestFitChoiceModel:
             probs /= probs.sum()
             chosen_idx = rng.choice(n_alts, p=probs)
             for i, arm in enumerate(arms):
-                rows.append({
-                    "stop_id": stop_id,
-                    "arm": int(arm),
-                    "replay_frac": replay_frac[i],
-                    "chosen": 1 if i == chosen_idx else 0,
-                })
+                rows.append(
+                    {
+                        "stop_id": stop_id,
+                        "arm": int(arm),
+                        "replay_frac": replay_frac[i],
+                        "chosen": 1 if i == chosen_idx else 0,
+                    }
+                )
         return pd.DataFrame(rows)
 
     def test_returns_none_for_too_few_stops(self):

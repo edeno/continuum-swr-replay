@@ -68,11 +68,7 @@ def _require_session_unique_ids(
     missing = [c for c in _SESSION_COLS if c not in df.columns]
     if missing or id_col not in df.columns:
         return
-    per_id_session_count = (
-        df.groupby(id_col)[list(_SESSION_COLS)]
-        .nunique()
-        .max(axis=1)
-    )
+    per_id_session_count = df.groupby(id_col)[list(_SESSION_COLS)].nunique().max(axis=1)
     bad = per_id_session_count[per_id_session_count > 1]
     if len(bad):
         sample = bad.index[: min(3, len(bad))].tolist()
@@ -126,9 +122,7 @@ def predict_arm_fractions(
         ``residual_frac`` columns added.
     """
     eat = event_arm_table.copy()
-    _require_session_unique_ids(
-        eat, event_col, helper_name="predict_arm_fractions"
-    )
+    _require_session_unique_ids(eat, event_col, helper_name="predict_arm_fractions")
 
     # Event-wise NaN filtering matches ``fit_conditional_poisson``:
     # if any predictor (or the observed fraction) is NaN for any
@@ -310,13 +304,28 @@ def build_choice_dataset(
             f"missing {missing_location}. Regenerate the canonical tables."
         )
 
+    replay_stops = stop_table["has_replay"]
+    # ``at_well`` is NA where the stop's location is unobserved, so the
+    # fillna keeps those out rather than letting NA read as True.
+    at_well_stops = stop_table["at_well"].eq(True).fillna(False)
     has_replay = (
-        stop_table["has_replay"]
-        & stop_table["at_well"].eq(True).fillna(False)
+        replay_stops
+        & at_well_stops
         & stop_table["next_arm"].notna()
         & stop_table["current_arm"].notna()
     )
     valid_stops = stop_table.loc[has_replay].copy()
+    # The cohort shrinks with the immobility threshold and the trial
+    # boundaries; log it so a changed N is traceable to its cause.
+    logger.info(
+        "build_choice_dataset: %d/%d stops with replay; %d retained after "
+        "at-well (%d dropped) + finite next/current arm (%d dropped)",
+        int(replay_stops.sum()),
+        len(stop_table),
+        len(valid_stops),
+        int((replay_stops & ~at_well_stops).sum()),
+        int((replay_stops & at_well_stops & ~has_replay).sum()),
+    )
 
     if len(valid_stops) == 0:
         return pd.DataFrame()
@@ -367,9 +376,7 @@ def build_choice_dataset(
     # honest NaN lets the fitter drop those stops from any model using
     # the split predictors.
     if "is_swr" in event_arm_table.columns:
-        eat_swr = event_arm_table[
-            ["stop_id", "arm", fraction_col, "is_swr"]
-        ].copy()
+        eat_swr = event_arm_table[["stop_id", "arm", fraction_col, "is_swr"]].copy()
         swr_frac = (
             eat_swr[eat_swr["is_swr"]]
             .groupby(["stop_id", "arm"])[fraction_col]

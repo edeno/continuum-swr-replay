@@ -9,6 +9,7 @@ from scripts.figures.generate_event_gallery import (
     _active_trip_at_time,
     _completed_trials_at,
     _intervals_overlap_any,
+    _outcome_known_trials_at,
     _regression_footer,
 )
 
@@ -60,6 +61,24 @@ def test_gallery_completion_is_inclusive_at_goal_arrival():
     completed = _completed_trials_at(trials, 3.0)
 
     assert completed["to_well"].tolist() == [1]
+
+
+def test_gallery_distinguishes_arrived_destination_from_pending_outcome():
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0],
+            "goal_arrival_time": [3.0],
+            "reward_on_time": [3.4],
+            "outcome_known_time": [3.4],
+            "end_time": [3.8],
+            "to_well": [1],
+            "is_reward": [1],
+        }
+    )
+
+    assert _completed_trials_at(trials, 3.2)["to_well"].tolist() == [1]
+    assert _outcome_known_trials_at(trials, 3.2).empty
+    assert _outcome_known_trials_at(trials, 3.4)["to_well"].tolist() == [1]
 
 
 def test_gallery_footer_formats_unknown_boolean_context_as_na():

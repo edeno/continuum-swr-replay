@@ -87,6 +87,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
 from continuum_swr_replay.analysis.replay._helpers import (
     immobility_bout_intervals,
     trial_cutoff_times,
+    trial_outcome_times,
 )
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
@@ -592,10 +593,10 @@ def _plot_2d_context(
                 ],
             )
         fw, tw = int(trial["from_well"]), int(trial["to_well"])
-        # This outcome is safe to show because the run was complete by the
-        # event start.
+        outcome_time = trial_outcome_times(pd.DataFrame([trial]))[0]
+        outcome_known = bool(outcome_time <= event_start)
         rewarded = bool(trial.get("is_reward", False))
-        rew_color = "limegreen" if rewarded else "red"
+        rew_color = ("limegreen" if rewarded else "red") if outcome_known else "0.5"
         if fw in node_pos:
             ax.scatter(
                 *node_pos[fw],
@@ -632,9 +633,12 @@ def _plot_2d_context(
 
     if trial is not None:
         rew = "rewarded" if bool(trial.get("is_reward", False)) else "omission"
+        outcome_time = trial_outcome_times(pd.DataFrame([trial]))[0]
+        timing = "known" if outcome_time <= event_start else "eventual"
         ax.set_title(
             "last completed run: "
-            f"W{int(trial['from_well'])}→W{int(trial['to_well'])} ({rew})",
+            f"W{int(trial['from_well'])}→W{int(trial['to_well'])} "
+            f"({timing} {rew})",
             fontsize=7,
         )
     else:
@@ -709,7 +713,12 @@ def _plot_arm_content_bar(
 
 
 def _completed_trials_at(trials: pd.DataFrame, event_start: float) -> pd.DataFrame:
-    """Return trials whose outcomes were available at ``event_start``."""
+    """Return trips *completed* (goal arrival) at or before ``event_start``.
+
+    Completion is arrival, not outcome delivery -- a trip completed just
+    before the event may have had its reward or omission resolved after
+    it. This is a visualization helper; do not reuse it to gate a fit.
+    """
     if trials is None or not len(trials):
         return pd.DataFrame() if trials is None else trials.copy()
     completed = trials.copy()
@@ -717,6 +726,19 @@ def _completed_trials_at(trials: pd.DataFrame, event_start: float) -> pd.DataFra
     return (
         completed[completed["_completion_time"] <= event_start]
         .sort_values("_completion_time", kind="stable")
+        .reset_index(drop=True)
+    )
+
+
+def _outcome_known_trials_at(trials: pd.DataFrame, event_start: float) -> pd.DataFrame:
+    """Return trials whose reward/omission was observable by ``event_start``."""
+    if trials is None or not len(trials):
+        return pd.DataFrame() if trials is None else trials.copy()
+    known = trials.copy()
+    known["_outcome_known_time"] = trial_outcome_times(known)
+    return (
+        known[known["_outcome_known_time"] <= event_start]
+        .sort_values("_outcome_known_time", kind="stable")
         .reset_index(drop=True)
     )
 
@@ -729,8 +751,9 @@ def _plot_trial_history(
     Grid of wells (rows W0-W5) × recent trials (columns, time → right). Each
     trial's ``to_well`` is marked with the TRIAL-level reward (``is_reward`` =
     any poke in that trial's stay was rewarded): filled green if rewarded and
-    open if an omission. Only trials completed by the event start are shown,
-    matching the information available to the regression covariates.
+    open if an omission. Only outcomes known by the event start are shown.
+    Destination/visit history may already include a more recent arrival whose
+    outcome is still pending; that trip is deliberately absent here.
 
     Marked up so the value covariates can be read directly:
       - gold band over the **last 10 trials** = the ``cumulative_reward`` window.
@@ -740,7 +763,7 @@ def _plot_trial_history(
         ``vr`` (visit_recency, trials-ago), ``rr`` (reward_rate_arm_k10),
         ``cum`` (cumulative_reward over 10 trials).
     """
-    ax.set_title("completed-trial reward history (→ event start)", fontsize=7)
+    ax.set_title("known-outcome reward history (→ event start)", fontsize=7)
     ax.set_yticks(range(6))
     ax.set_yticklabels([f"W{w}" for w in range(6)], fontsize=5)
     ax.set_ylim(-0.6, 6.2)
@@ -761,12 +784,12 @@ def _plot_trial_history(
             transform=ax.transAxes,
         )
         return
-    completed = _completed_trials_at(trials, event_start)
+    completed = _outcome_known_trials_at(trials, event_start)
     if not len(completed):
         ax.text(
             0.5,
             0.5,
-            "no completed trials at event start",
+            "no known outcomes at event start",
             fontsize=6,
             ha="center",
             va="center",
@@ -1035,8 +1058,9 @@ def _active_trip_at_time(trials: pd.DataFrame, t: float) -> pd.Series | None:
     """Return the physical trip interval containing ``t``, if any.
 
     This is a post-hoc visualization of the animal's run/dwell interval. It is
-    deliberately separate from regression context, which includes only trial
-    outcomes completed by the event start.
+    deliberately separate from regression context. Destination/visit context
+    becomes available at arrival, while reward-bearing context is withheld
+    until the separate reward-on or omission poke-out boundary.
     """
     if trials is None or not len(trials):
         return None
@@ -1088,9 +1112,8 @@ def _plot_behavioral_context(
             trial["end_time"] - center,
         )
         rewarded = bool(trial.get("is_reward", False))
-        outcome_known = bool(
-            trial_cutoff_times(pd.DataFrame([trial]))[0] <= center
-        )
+        outcome_time = trial_outcome_times(pd.DataFrame([trial]))[0]
+        outcome_known = bool(outcome_time <= center)
         ax.barh(lane_trial, gr - rs, left=rs, height=0.5, color="steelblue", zorder=3)
         ax.barh(
             lane_trial,
@@ -1121,7 +1144,17 @@ def _plot_behavioral_context(
             ha="center",
             va="bottom",
         )
-        xs += [rs, te]
+        outcome_rel = float(outcome_time) - center
+        ax.axvline(outcome_rel, color="purple", ls="--", lw=0.8, zorder=2)
+        ax.annotate(
+            "outcome available",
+            (outcome_rel, 2.75),
+            fontsize=4.0,
+            color="purple",
+            ha="center",
+            va="bottom",
+        )
+        xs += [rs, te, outcome_rel]
 
     starts, ends = np.asarray(imm_bouts[0]), np.asarray(imm_bouts[1])
     if len(starts):
@@ -1330,7 +1363,7 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
     if is_swr:
         head += " (pooled)"
     if et_row is None:
-        return head + "\nNOT in M0-M7 population (failed in-event filter)"
+        return head + "\nNOT in canonical event table (failed in-event filter)"
     arms = (
         f"arms:  location={_arm_set(et_row.get('current_arm'))}"
         f"  prev={_arm_set(et_row.get('prev_arm'))}"
@@ -1357,7 +1390,12 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
     outcome = et_row.get("reward_outcome")
     outcome_str = "rewarded" if outcome == 1 else "omission" if outcome == 0 else "n/a"
     rew = f"reward: outcome={outcome_str}  time_since_reward={tsr_str}"
-    return f"{head}\nIN M0-M7 population\n{arms}\n{patch}\n{ctx}\n{rew}"
+    # Presence in event_table is not equivalent to membership in a fitted
+    # model cohort: complete-case selection can still exclude an event (for
+    # example, when current-arm context is undefined off-well).  Keep this QC
+    # footer factual and leave model-cohort membership to the persisted fit
+    # audit rather than inferring it from table presence.
+    return f"{head}\nIN canonical event table\n{arms}\n{patch}\n{ctx}\n{rew}"
 
 
 def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> bool:

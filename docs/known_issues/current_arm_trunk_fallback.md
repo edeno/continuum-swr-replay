@@ -2,10 +2,47 @@
 
 **Status:** fixed in `event-location-context`; regeneration pending
 **Found:** 2026-08-10, following the replay-tables review
-**Severity:** negligible pooled (0.93 % of events); material per-animal for wilbur
-(3.9 %) and disqualifying for one session (`wilbur20210329_16_r8`, 40.8 %)
+**Severity of the defect:** negligible pooled (0.93 % of events *mislabelled*);
+material per-animal for wilbur (3.9 %) and disqualifying for one session
+(`wilbur20210329_16_r8`, 40.8 %)
+**Footprint of the fix:** ~11 % of events lose a defined `current_arm` — an
+order of magnitude larger than the defect, and a different population. See
+[Footprint of the fix](#footprint-of-the-fix) before budgeting for it.
 
-## What
+## Footprint of the fix
+
+The severity line above counts events whose `is_current` was *wrong*. It is not
+the number of events the fix changes, and quoting it as such understates the
+change by roughly 12×.
+
+`current_arm` is now defined only when the whole event window is at one well.
+"Every bin at the same well" is a far stronger condition than "the modal segment
+is a leaf arm", so it nulls a much larger set:
+
+| | share of events |
+| --- | --- |
+| `current_arm` NaN, old rule | 0.00 % |
+| `current_arm` NaN, new rule | **10.8 %** |
+
+Measured on this branch over 36 sessions / 11,377 non-local events, replaying
+the production `_in_event_mask` → `summarize_behavioral_location` path;
+independently corroborated at 12.4 % on a separate 15-session run and at 6.4 %
+on the seven cached j16 sessions (93.6 % `at_well`, 6.25 % `in_transit`, 0.14 %
+`mixed`). Per-animal 3.8 % (senor) → 25.2 % (wilbur); per-session median 5.9 %,
+max 58.1 % (`wilbur20210329_16_r8`). Where both rules give a finite arm they
+agree 100 % — the change is purely subtractive.
+
+**Most of it is not the trunk defect.** 77.5 % of the newly-NaN events had a
+modal *leaf* arm under the old rule, so they were never mislabelled by the
+trunk fallback this document describes. They are nulled because the animal sat
+immobile on a leaf arm before `goal_arrival_time` — a correct application of
+the new definition, but not a correction of a prior error.
+
+`is_current` and `is_same_patch` propagate that NaN (see `eq_indicator_or_nan`),
+so these events are dropped by complete-case fitting rather than entering a
+model as "not the current arm" on all nine arms.
+
+## Pre-fix measurements (superseded)
 
 The text and measurements below describe the pre-fix artifacts. The canonical
 builders now label the complete event/bout window as `at_well`, `in_transit`,
@@ -102,15 +139,23 @@ pipeline kept producing events.**
   completion-ordered trial stream, then stored once per stop context. Model
   consumers broadcast them to events by `stop_id`. Thus a completed trial with
   no immobility bout still contributes exactly once to later history.
-- No eligible event is dropped by default. Location columns make a later
-  well-only sensitivity cohort explicit and auditable.
+- No eligible event is dropped from the *tables* by default; the location
+  columns are retained so every cohort decision is explicit and auditable.
+  Models are a different matter: `is_current` is NaN off-well, so any spec
+  containing it fits the at-well cohort. That is the only cohort in which
+  `is_current` is defined — it is not a "sensitivity" subset.
 - `current_arm` is NaN for transit/mixed/unknown windows instead of guessing a
   destination leaf; `physical_arm` remains available for topology and QC.
 
 ## Guidance for legacy artifacts
 
-- **Pooled estimates are safe.** 0.93 % of events with a mislabelled `is_current`
-  cannot move an effect of the size `is_current` carries.
+- **Do not treat the legacy pooled estimates as validated under the new
+  definition.** The specific destination-mislabel defect affected 0.93 % of
+  events and is therefore unlikely to dominate a pooled effect, but that is a
+  plausibility argument rather than a result comparison. The new whole-window
+  location rule changes a much larger 10.8 % cohort, so only regeneration and
+  an old-versus-new coefficient audit can establish conclusion stability; see
+  [Footprint of the fix](#footprint-of-the-fix).
 - **Sensitivity-check wilbur** if per-animal estimates are quoted.
 - **Exclude `wilbur20210329_16_r8`** from per-session analyses, or report it with
   the caveat. It is compromised from two independent directions.

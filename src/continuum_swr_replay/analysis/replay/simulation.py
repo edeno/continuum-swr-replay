@@ -171,8 +171,8 @@ def sample_arm_design(
         if "visit_recency" in predictors:
             feature_cols["visit_recency"] = vr
         if "visit_recency_demeaned" in predictors:
-            feature_cols["visit_recency_demeaned"] = (
-                center_visit_recency_within_event(vr)
+            feature_cols["visit_recency_demeaned"] = center_visit_recency_within_event(
+                vr, never_visited
             )
         if "arm_never_visited" in predictors:
             feature_cols["arm_never_visited"] = never_visited
@@ -188,9 +188,7 @@ def sample_arm_design(
     # events (the static per-arm baseline the FE model controls for).
     for k, name in enumerate(ARM_FE_PREDICTORS):
         if name in predictors:
-            feature_cols[name] = np.tile(
-                (arm_grid == k).astype(float), (n_events, 1)
-            )
+            feature_cols[name] = np.tile((arm_grid == k).astype(float), (n_events, 1))
 
     missing = [p for p in predictors if p not in feature_cols]
     if missing:
@@ -345,15 +343,14 @@ def simulate_with_event_covariates(
         1.0 - arm_features["is_current"]
     )
     # M4 visit-recency predictor: time-local relative recency among leaf arms.
-    _vr = arm_features["visit_recency"]
-    arm_features["visit_recency_demeaned"] = center_visit_recency_within_event(_vr)
+    arm_features["visit_recency_demeaned"] = center_visit_recency_within_event(
+        arm_features["visit_recency"], arm_features["arm_never_visited"]
+    )
     # Arm fixed-effect dummies: constant across events, so a fit
     # recovers their coefficients at 0 unless the generative truth
     # assigns them a non-zero β.
     for k, name in enumerate(ARM_FE_PREDICTORS):
-        arm_features[name] = np.tile(
-            (arm_grid == k).astype(float), (n_events, 1)
-        )
+        arm_features[name] = np.tile((arm_grid == k).astype(float), (n_events, 1))
 
     # Event-level scalars, broadcast to all arms.
     event_scalars: dict[str, np.ndarray] = {

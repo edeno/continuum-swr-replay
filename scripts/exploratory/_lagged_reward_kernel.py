@@ -22,8 +22,8 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
-from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
-    _trial_cutoff_times,
+from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    trial_outcome_times,
 )
 from continuum_swr_replay.analysis.replay.per_stop_rate_model import (  # noqa: E402
     fit_per_stop_rate_model,
@@ -45,7 +45,9 @@ def lagged_rewards(query_times: np.ndarray, trials: pd.DataFrame, k: int) -> np.
     out = np.full((query_times.size, k), np.nan)
     if len(trials) == 0:
         return out
-    cutoff = _trial_cutoff_times(trials)
+    # Reward lags become available at feedback, not merely at destination
+    # arrival. Older trial frames conservatively fall back to end_time.
+    cutoff = trial_outcome_times(trials)
     order = np.argsort(cutoff)
     cutoff_sorted = cutoff[order]
     is_reward = trials["is_reward"].to_numpy().astype(float)[order]
@@ -67,13 +69,16 @@ def main() -> None:
         adate = Path(s["dot_file"]).name.split("_")[0]
         animal, day = adate[:-8], int(adate[-8:])
         grp = stop[
-            (stop.animal == animal) & (stop.day == day) & (stop.epoch == s["epoch_name"])
+            (stop.animal == animal)
+            & (stop.day == day)
+            & (stop.epoch == s["epoch_name"])
         ].copy()
         if len(grp) < 30:
             continue
         try:
             data = load_data(
-                s["nwb_file_name"], s["epoch_name"],
+                s["nwb_file_name"],
+                s["epoch_name"],
                 include=frozenset({SessionDataKeys.TRIALS}),
             )
             trials = data.get("trials")
@@ -84,7 +89,10 @@ def main() -> None:
         lags = lagged_rewards(grp["stop_start"].to_numpy(), trials, K)
         for j in range(K):
             grp[f"reward_lag{j + 1}"] = lags[:, j]
-        for outcome, col in [("swr", "n_SWR"), ("non_local_no_swr", "n_non_local_no_SWR")]:
+        for outcome, col in [
+            ("swr", "n_SWR"),
+            ("non_local_no_swr", "n_non_local_no_SWR"),
+        ]:
             res = fit_per_stop_rate_model(grp, preds, response_col=col)
             if res is not None:
                 rows.append({"outcome": outcome, "animal": animal, **res})
@@ -98,8 +106,10 @@ def main() -> None:
             c = f"coef_reward_lag{j}"
             v = d[c].dropna()
             rr = np.exp(v.median())
-            print(f"  reward_lag{j}: RR={rr:.2f}  (median coef {v.median():+.3f}, "
-                  f"{(v > 0).sum()}+/{(v < 0).sum()}-)")
+            print(
+                f"  reward_lag{j}: RR={rr:.2f}  (median coef {v.median():+.3f}, "
+                f"{(v > 0).sum()}+/{(v < 0).sum()}-)"
+            )
         sw = d["coef_is_after_switch"].dropna()
         print(f"  is_after_switch: RR={np.exp(sw.median()):.2f}")
 

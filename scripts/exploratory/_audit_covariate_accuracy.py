@@ -76,20 +76,29 @@ def main(reconstruct_n: int = 0) -> None:
     x, y = cal.index.to_numpy(), cal["mean"].to_numpy()
     print("=== #1a p_reward_current calibration vs DIO reward (at-well) ===")
     print(cal.round(3).to_string())
-    print(f"  slope(emp~nominal)={np.polyfit(x, y, 1)[0]:.2f} (expect ~1.0), "
-          f"max|emp-nominal|={np.max(np.abs(y - x)):.3f}")
+    print(
+        f"  slope(emp~nominal)={np.polyfit(x, y, 1)[0]:.2f} (expect ~1.0), "
+        f"max|emp-nominal|={np.max(np.abs(y - x)):.3f}"
+    )
 
     # ---- #1b ΔV predicts actual switch ----
-    dv = q[["stop_id", "switch_advantage_mu_preoutcome_sess"]].merge(
-        st[["stop_id", "is_stay", "animal"]], on="stop_id", how="left"
-    ).dropna(subset=["switch_advantage_mu_preoutcome_sess", "is_stay"])
+    dv = (
+        q[["stop_id", "switch_advantage_mu_preoutcome_sess"]]
+        .merge(st[["stop_id", "is_stay", "animal"]], on="stop_id", how="left")
+        .dropna(subset=["switch_advantage_mu_preoutcome_sess", "is_stay"])
+    )
     dv["is_switch"] = (~dv["is_stay"].astype(bool)).astype(float)
     print("\n=== #1b ΔV (switch_advantage) predicts actual switch ===")
     print(f"  {'animal':8s} {'n':>6s} {'dV|switch':>10s} {'dV|stay':>9s} {'r_pb':>7s}")
     for a, g in dv.groupby("animal"):
-        v, s = g["switch_advantage_mu_preoutcome_sess"].to_numpy(), g["is_switch"].to_numpy()
+        v, s = (
+            g["switch_advantage_mu_preoutcome_sess"].to_numpy(),
+            g["is_switch"].to_numpy(),
+        )
         r = np.corrcoef(v, s)[0, 1] if g["is_switch"].nunique() > 1 else np.nan
-        print(f"  {a:8s} {len(g):6d} {v[s == 1].mean():10.3f} {v[s == 0].mean():9.3f} {r:7.3f}")
+        print(
+            f"  {a:8s} {len(g):6d} {v[s == 1].mean():10.3f} {v[s == 0].mean():9.3f} {r:7.3f}"
+        )
     print("  expect dV|switch > dV|stay and r_pb > 0")
 
     # ---- #2 leakage exposure ----
@@ -97,24 +106,32 @@ def main(reconstruct_n: int = 0) -> None:
     rew = ons[ons["is_reward_stop"]]
     tsp = rew["t_since_pump"].dropna()
     print("\n=== #2 leakage exposure (events vs reward pump) ===")
-    print(f"  events on rewarded stops: {len(tsp)}; before pump (leak): "
-          f"{100 * (tsp < 0).mean():.1f}%; median t_since_pump={tsp.median():.2f}s")
+    print(
+        f"  events on rewarded stops: {len(tsp)}; before pump (leak): "
+        f"{100 * (tsp < 0).mean():.1f}%; median t_since_pump={tsp.median():.2f}s"
+    )
 
     # ---- #6a coverage: unmapped stops ----
     st2 = st.copy()
     st2["mapped"] = st2["stop_id"].isin(set(q["stop_id"]))
     st2["pos"] = _within_epoch_pos(st2)
     print("\n=== #6a coverage: stops unmapped to a trial ===")
-    print(f"  unmapped {(~st2['mapped']).sum()}/{len(st2)} "
-          f"({100 * (~st2['mapped']).mean():.1f}%); by animal "
-          f"{(100 * (1 - st2.groupby('animal')['mapped'].mean())).round(1).to_dict()}")
-    print(f"  unmapped within-epoch pos {st2.loc[~st2['mapped'], 'pos'].mean():.2f} "
-          f"(mapped {st2.loc[st2['mapped'], 'pos'].mean():.2f}); 1.0=end-of-epoch")
+    print(
+        f"  unmapped {(~st2['mapped']).sum()}/{len(st2)} "
+        f"({100 * (~st2['mapped']).mean():.1f}%); by animal "
+        f"{(100 * (1 - st2.groupby('animal')['mapped'].mean())).round(1).to_dict()}"
+    )
+    print(
+        f"  unmapped within-epoch pos {st2.loc[~st2['mapped'], 'pos'].mean():.2f} "
+        f"(mapped {st2.loc[st2['mapped'], 'pos'].mean():.2f}); 1.0=end-of-epoch"
+    )
 
     # ---- #6b complete-case drop over fitted covariates ----
     stc = add_uncertainty_covariates(st)  # keeps animal/day/epoch/stop_idx from st
     qcols = ["stop_id", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]
-    d = stc.merge(q[qcols].rename(columns={"rpe": "rpe_model"}), on="stop_id", how="inner")
+    d = stc.merge(
+        q[qcols].rename(columns={"rpe": "rpe_model"}), on="stop_id", how="inner"
+    )
     fitted = [c for c in fur.FITTED_COVARIATES if c in d]
     anynan = d[fitted].isna().any(axis=1)
     d["pos"] = _within_epoch_pos(d)
@@ -123,10 +140,14 @@ def main(reconstruct_n: int = 0) -> None:
         r = 100 * d[c].isna().mean()
         if r > 0:
             print(f"  {c:52s} {r:5.1f}% NaN")
-    print(f"  listwise drop {anynan.sum()} ({100 * anynan.mean():.1f}%); by animal "
-          f"{(100 * d.assign(x=anynan).groupby('animal')['x'].mean()).round(1).to_dict()}")
-    print(f"  dropped within-epoch pos {d.loc[anynan.values, 'pos'].mean():.2f} "
-          f"(kept {d.loc[~anynan.values, 'pos'].mean():.2f})")
+    print(
+        f"  listwise drop {anynan.sum()} ({100 * anynan.mean():.1f}%); by animal "
+        f"{(100 * d.assign(x=anynan).groupby('animal')['x'].mean()).round(1).to_dict()}"
+    )
+    print(
+        f"  dropped within-epoch pos {d.loc[anynan.values, 'pos'].mean():.2f} "
+        f"(kept {d.loc[~anynan.values, 'pos'].mean():.2f})"
+    )
 
     _nonrl_checks(st)
     if reconstruct_n:
@@ -142,29 +163,42 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
     (reusing only the topology/timing helpers, not the rate logic under test). Heavy
     (Spyglass), so gated behind --reconstruct-arm-rate. Validated 100% on 2 sessions.
     """
-    from continuum_swr_replay.analysis.replay._helpers import (
-        _trial_cutoff_times,
-        build_well_to_arm_map,
-    )
+    from continuum_swr_replay.analysis.replay import trial_outcome_times
+    from continuum_swr_replay.analysis.replay._helpers import build_well_to_arm_map
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.types import SessionDataKeys
 
     ea = pd.read_pickle(RC / "event_arm_table.pkl")
     et = pd.read_pickle(RC / "event_table.pkl")
     tcol = next(c for c in et.columns if "midpoint" in c and "time" in c)
-    ea = ea.merge(et[["event_id", tcol]].rename(columns={tcol: "t"}), on="event_id", how="left")
-    print(f"\n=== non-RL: reward_rate_arm_k10 independent reconstruction "
-          f"({n_sessions} session(s), Spyglass) ===")
-    for _, s in ea[["animal", "day", "epoch"]].drop_duplicates().head(n_sessions).iterrows():
+    ea = ea.merge(
+        et[["event_id", tcol]].rename(columns={tcol: "t"}), on="event_id", how="left"
+    )
+    print(
+        f"\n=== non-RL: reward_rate_arm_k10 independent reconstruction "
+        f"({n_sessions} session(s), Spyglass) ==="
+    )
+    for _, s in (
+        ea[["animal", "day", "epoch"]].drop_duplicates().head(n_sessions).iterrows()
+    ):
         sub = ea[(ea.animal == s.animal) & (ea.day == s.day) & (ea.epoch == s.epoch)]
-        d = load_data(f"{s.animal}{int(s.day)}_.nwb", s.epoch,
-                      include=frozenset({SessionDataKeys.TRIALS}))
+        d = load_data(
+            f"{s.animal}{int(s.day)}_.nwb",
+            s.epoch,
+            include=frozenset({SessionDataKeys.TRIALS}),
+        )
         w2a = build_well_to_arm_map(d["track_graph"])
-        tr = d["trials"].assign(_c=_trial_cutoff_times(d["trials"])).sort_values("_c")
+        # This reconstructs a reward-bearing covariate, so the history clock is
+        # feedback availability rather than goal arrival.
+        tr = d["trials"].assign(_c=trial_outcome_times(d["trials"])).sort_values("_c")
         cut = tr["_c"].to_numpy()
         rew = tr["is_reward"].to_numpy().astype(float)
-        arm_of = np.array([w2a.get(int(w)) if not np.isnan(w) else -1
-                           for w in tr["to_well"].to_numpy()])
+        arm_of = np.array(
+            [
+                w2a.get(int(w)) if not np.isnan(w) else -1
+                for w in tr["to_well"].to_numpy()
+            ]
+        )
         reach = set(w2a.values())
         vis = {a: (cut[arm_of == a], rew[arm_of == a]) for a in range(9)}
         got = sub["reward_rate_arm_k10"].to_numpy()
@@ -182,10 +216,16 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
             if m.any():
                 exp[i] = vr[m][-10:].mean()
         both = ~np.isnan(got) & ~np.isnan(exp)
-        agree = np.isclose(got[both], exp[both], atol=1e-9).mean() if both.any() else float("nan")
+        agree = (
+            np.isclose(got[both], exp[both], atol=1e-9).mean()
+            if both.any()
+            else float("nan")
+        )
         nanm = (np.isnan(got) == np.isnan(exp)).mean()
-        print(f"  {s.animal} {int(s.day)} {s.epoch}: value-agree {100 * agree:.2f}% "
-              f"(n={both.sum()}), NaN-pattern {100 * nanm:.2f}%")
+        print(
+            f"  {s.animal} {int(s.day)} {s.epoch}: value-agree {100 * agree:.2f}% "
+            f"(n={both.sum()}), NaN-pattern {100 * nanm:.2f}%"
+        )
 
 
 def _nonrl_checks(st: pd.DataFrame) -> None:
@@ -199,12 +239,19 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
     would mismatch on grain, not correctness -- so they are intentionally omitted.
     """
     ea = pd.read_pickle(RC / "event_arm_table.pkl")
-    print("\n=== non-RL: spatial current_arm cross-source (event_arm vs stop_table) ===")
-    m = (ea[["stop_id", "current_arm"]].drop_duplicates()
-         .merge(st[["stop_id", "current_arm"]], on="stop_id", suffixes=("_ea", "_st"))
-         .dropna())
-    print(f"  agree {100 * (m['current_arm_ea'] == m['current_arm_st']).mean():.2f}% "
-          f"(n={len(m)}); position-derived arm consistent across builders")
+    print(
+        "\n=== non-RL: spatial current_arm cross-source (event_arm vs stop_table) ==="
+    )
+    m = (
+        ea[["stop_id", "current_arm"]]
+        .drop_duplicates()
+        .merge(st[["stop_id", "current_arm"]], on="stop_id", suffixes=("_ea", "_st"))
+        .dropna()
+    )
+    print(
+        f"  agree {100 * (m['current_arm_ea'] == m['current_arm_st']).mean():.2f}% "
+        f"(n={len(m)}); position-derived arm consistent across builders"
+    )
 
     print("\n=== non-RL: decode content integrity (per-event over 9 arms) ===")
     for col in ["arm_fraction_posterior", "arm_fraction"]:
@@ -212,18 +259,27 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
             continue
         s = ea.groupby("event_id")[col].sum()
         s = s[s.notna() & (s > 0)]
-        print(f"  {col}: sum-to-1 for {100 * ((s > 0.99) & (s < 1.01)).mean():.1f}% "
-              f"of events (median {s.median():.4f}); junction bins would break this")
+        print(
+            f"  {col}: sum-to-1 for {100 * ((s > 0.99) & (s < 1.01)).mean():.1f}% "
+            f"of events (median {s.median():.4f}); junction bins would break this"
+        )
     uni = ea.groupby("event_id")["arm_fraction_posterior"].apply(
         lambda x: x.isna().all() or x.notna().all()
     )
-    print(f"  arm_fraction_posterior NaN uniform per event (all-or-none): "
-          f"{100 * uni.mean():.1f}%; arm range {int(ea['arm'].min())}..{int(ea['arm'].max())} (must be 0..8)")
+    print(
+        f"  arm_fraction_posterior NaN uniform per event (all-or-none): "
+        f"{100 * uni.mean():.1f}%; arm range {int(ea['arm'].min())}..{int(ea['arm'].max())} (must be 0..8)"
+    )
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--reconstruct-arm-rate", type=int, default=0, metavar="N",
-                    help="also reconstruct reward_rate_arm_k10 on N sessions (Spyglass; slow)")
+    ap.add_argument(
+        "--reconstruct-arm-rate",
+        type=int,
+        default=0,
+        metavar="N",
+        help="also reconstruct reward_rate_arm_k10 on N sessions (Spyglass; slow)",
+    )
     args = ap.parse_args()
     main(reconstruct_n=args.reconstruct_arm_rate)

@@ -37,23 +37,24 @@ from ..replay._helpers import (
     arm_to_patch,
     assign_bout,
     attach_contingency_value_block,
-    cumulative_reward_per_arm,
+    build_well_to_arm_map,
     eq_indicator,
+    eq_indicator_or_nan,
     hash_stop_id,
     immobility_bout_intervals,
     nearest_well_distance_cm,
-    recent_reward_rate_per_arm,
     recent_trial_reward_rate,
     safe_mode,
     single_arm_from_well,
     strict_first,
     summarize_behavioral_location,
     time_since_stop,
-    visit_recency_per_arm,
 )
 from ..replay.covariates import (
-    arm_never_visited_per_arm,
     center_visit_recency_within_event,
+    cumulative_reward_all_events,
+    recent_reward_rate_all_events,
+    visit_recency_and_never_visited_all_events,
 )
 from ..replay.spatial import arm_dist_rank, dist_to_arm_from_well
 from ..replay.spatial_mapping import arm_to_well, map_estimate_to_arm
@@ -629,9 +630,12 @@ def build_contfrag_event_arm_table(
         )
     long["arm_fraction"] = frac
 
-    # Binary indicators
+    # Binary indicators. is_current / is_same_patch propagate NaN where
+    # the animal's location is unobserved (event window not wholly at
+    # one well); the rest treat an absent reference as a true zero.
+    # Mirrors replay/tables.py -- see eq_indicator_or_nan.
     arm_arr = long["arm"].to_numpy()
-    long["is_current"] = eq_indicator(arm_arr, long["current_arm"].to_numpy())
+    long["is_current"] = eq_indicator_or_nan(arm_arr, long["current_arm"].to_numpy())
     long["is_prev"] = eq_indicator(arm_arr, long["prev_arm"].to_numpy())
     long["is_next"] = eq_indicator(arm_arr, long["next_arm"].to_numpy())
     long["is_last_rewarded"] = eq_indicator(
@@ -640,21 +644,19 @@ def build_contfrag_event_arm_table(
     # M5/M6 identifiable reward-memory predictor: last-rewarded arm
     # restricted to events where it is NOT the current arm. Mirrors
     # replay/tables.py — see model_specs.py for the rationale.
-    long["is_last_rewarded_elsewhere"] = (
-        long["is_last_rewarded"].to_numpy() * (1 - long["is_current"].to_numpy())
-    ).astype(int)
+    long["is_last_rewarded_elsewhere"] = long["is_last_rewarded"].to_numpy() * (
+        1 - long["is_current"].to_numpy()
+    )
     long["arm_patch_id"] = np.array([arm_to_patch(a) for a in arm_arr])
-    long["is_same_patch"] = eq_indicator(
+    long["is_same_patch"] = eq_indicator_or_nan(
         long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
     )
 
-    # Per-event per-arm predictors
+    # Per-event spatial predictors. Distances still depend on the event's
+    # current location, but trial-history covariates are computed in batch
+    # below so the full trial frame is not rescanned for every event.
     dist_vals = np.full(n_events * n_arms, np.nan)
     rank_vals = np.full(n_events * n_arms, np.nan)
-    vr_vals = np.full(n_events * n_arms, np.nan)
-    anv_vals = np.full(n_events * n_arms, np.nan)
-    cr_vals = np.full(n_events * n_arms, np.nan)
-    rrr_vals = np.full(n_events * n_arms, np.nan)
 
     for pos, (_, ev_row) in enumerate(event_table.iterrows()):
         base = pos * n_arms
@@ -668,30 +670,39 @@ def build_contfrag_event_arm_table(
         dist_arr = np.array([dists[a] for a in ALL_ARMS])
         ranks = arm_dist_rank(dist_arr)
 
-        # Match the event-level context cutoff: all model-facing history is
-        # frozen at event start.  A mixed event crossing goal arrival must not
-        # combine pre-arrival outcome context with post-arrival recency.
-        event_time = ev_row["event_start"]
-        if np.isnan(event_time) or len(trials) == 0:
-            vr = dict.fromkeys(ALL_ARMS, np.nan)
-            anv = dict.fromkeys(ALL_ARMS, np.nan)
-            cr = dict.fromkeys(ALL_ARMS, np.nan)
-            rrr = dict.fromkeys(ALL_ARMS, np.nan)
-        else:
-            vr = visit_recency_per_arm(event_time, trials, track_graph)
-            anv = arm_never_visited_per_arm(event_time, trials, track_graph)
-            cr = cumulative_reward_per_arm(event_time, trials, track_graph)
-            # canonical 10-visit per-arm reward rate (covariate_dictionary.md D1)
-            rrr = recent_reward_rate_per_arm(event_time, trials, track_graph, k=10)
-
-        for j, a in enumerate(ALL_ARMS):
+        for j in range(n_arms):
             idx = base + j
             dist_vals[idx] = dist_arr[j]
             rank_vals[idx] = ranks[j]
-            vr_vals[idx] = vr[a]
-            anv_vals[idx] = anv[a]
-            cr_vals[idx] = cr[a]
-            rrr_vals[idx] = rrr[a]
+
+    # Match the event-level context cutoff: every model-facing history
+    # covariate is frozen at event start. A mixed event crossing goal arrival
+    # must not combine pre-arrival outcome context with post-arrival history.
+    event_times = event_table["event_start"].to_numpy(dtype=float)
+    vr_2d = np.full((n_events, n_arms), np.nan)
+    anv_2d = np.full((n_events, n_arms), np.nan)
+    cr_2d = np.full((n_events, n_arms), np.nan)
+    rrr_2d = np.full((n_events, n_arms), np.nan)
+    query_mask = ~np.isnan(event_times)
+    if len(trials) > 0 and query_mask.any():
+        well_to_arm = build_well_to_arm_map(track_graph)
+        query_times = event_times[query_mask]
+        vr_2d[query_mask], anv_2d[query_mask] = (
+            visit_recency_and_never_visited_all_events(query_times, trials, well_to_arm)
+        )
+        cr_2d[query_mask] = cumulative_reward_all_events(
+            query_times, trials, well_to_arm
+        )
+        # Canonical per-arm reward rate: rewarded fraction of the last ten
+        # visits to that arm (covariate_dictionary.md D1).
+        rrr_2d[query_mask] = recent_reward_rate_all_events(
+            query_times, trials, well_to_arm, k=10
+        )
+
+    vr_vals = vr_2d.reshape(-1)
+    anv_vals = anv_2d.reshape(-1)
+    cr_vals = cr_2d.reshape(-1)
+    rrr_vals = rrr_2d.reshape(-1)
 
     long["dist_to_arm"] = dist_vals
     long["arm_dist_rank"] = rank_vals
@@ -700,7 +711,7 @@ def build_contfrag_event_arm_table(
     # Time-local relative recency among the six leaf arms. Centering within
     # each event prevents future events from changing earlier model rows.
     long["visit_recency_demeaned"] = center_visit_recency_within_event(
-        vr_vals.reshape(n_events, n_arms)
+        vr_vals.reshape(n_events, n_arms), anv_vals.reshape(n_events, n_arms)
     ).reshape(-1)
     long["cumulative_reward"] = cr_vals
     long["reward_rate_arm_k10"] = rrr_vals

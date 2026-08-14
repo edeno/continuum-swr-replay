@@ -24,6 +24,12 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table,
     build_contfrag_event_table,
 )
+from continuum_swr_replay.analysis.replay.covariates import (
+    arm_never_visited_per_arm,
+    cumulative_reward_per_arm,
+    recent_reward_rate_per_arm,
+    visit_recency_per_arm,
+)
 
 
 class _EnvStub:
@@ -53,10 +59,15 @@ class _EnvStub:
 def _bandit_graph() -> nx.Graph:
     g = nx.Graph()
     for u, v, eid in (
-        (0, 6, 0), (1, 6, 1),
-        (2, 7, 2), (3, 7, 3),
-        (4, 8, 4), (5, 8, 5),
-        (6, 9, 6), (7, 9, 7), (8, 9, 8),
+        (0, 6, 0),
+        (1, 6, 1),
+        (2, 7, 2),
+        (3, 7, 3),
+        (4, 8, 4),
+        (5, 8, 5),
+        (6, 9, 6),
+        (7, 9, 7),
+        (8, 9, 8),
     ):
         g.add_edge(u, v, edge_id=eid, distance=1.0)
     return g
@@ -65,8 +76,14 @@ def _bandit_graph() -> nx.Graph:
 def _empty_trials() -> pd.DataFrame:
     return pd.DataFrame(
         columns=[
-            "start_time", "end_time", "to_well", "from_well",
-            "from_patch", "to_patch", "is_reward", "is_patch_change",
+            "start_time",
+            "end_time",
+            "to_well",
+            "from_well",
+            "from_patch",
+            "to_patch",
+            "is_reward",
+            "is_patch_change",
         ]
     )
 
@@ -128,6 +145,52 @@ def _build_dot(
     return dot
 
 
+def _build_three_event_dot() -> pd.DataFrame:
+    """Three separated immobile events with different decoded arms."""
+    idx = pd.Index(np.arange(60, dtype=float) * 0.01, name="time")
+    dot = pd.DataFrame(
+        {
+            "animal": "test",
+            "day": 1,
+            "epoch": "02_r1",
+            "SWR_event": 0,
+            "MUA_event": 0,
+            "Continuous_prob": 0.5,
+            "Fragmented_prob": 0.5,
+            "map_estimate": np.nan,
+            "head_speed": 10.0,
+            "track_segment_id": np.nan,
+        },
+        index=idx,
+    )
+    for event_id, (start, arm) in enumerate(((5, 0), (25, 2), (45, 4)), start=1):
+        rows = dot.index[start : start + 3]
+        dot.loc[rows, "SWR_event"] = event_id
+        dot.loc[rows, "head_speed"] = 1.0
+        dot.loc[rows, "map_estimate"] = float(arm * 2)
+        dot.loc[rows, "track_segment_id"] = float(arm)
+    return dot
+
+
+def _three_trial_history() -> pd.DataFrame:
+    """Visits whose arrival and outcome clocks bracket the three events."""
+    return pd.DataFrame(
+        {
+            "start_time": [-0.20, 0.10, 0.32],
+            "goal_arrival_time": [0.00, 0.20, 0.40],
+            "reward_on_time": [0.01, 0.255, np.nan],
+            "outcome_known_time": [0.01, 0.255, 0.42],
+            "end_time": [0.02, 0.30, 0.42],
+            "from_well": [1, 0, 2],
+            "to_well": [0, 2, 4],
+            "from_patch": [1, 1, 2],
+            "to_patch": [1, 2, 3],
+            "is_reward": [True, True, False],
+            "is_patch_change": [False, True, True],
+        }
+    )
+
+
 class TestContfragArmFractionDenominator:
     """Production-builder regression for the ContFrag arm-fraction
     denominator. The pre-fix builder divided by ``n_timebins`` (all
@@ -150,12 +213,21 @@ class TestContfragArmFractionDenominator:
         # (3+2)/10 = 0.5. Post-fix divides by 5 → fractions sum to 1.
         dot = _build_dot({0: 3, 1: 2}, junction_bins=5)
         ev = build_contfrag_event_table(
-            dot, env, _empty_trials(), graph, event_source="SWR",
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
         )
         assert len(ev) == 1, f"expected 1 event in fixture; got {len(ev)}"
 
         eat = build_contfrag_event_arm_table(
-            ev, dot, env, _empty_trials(), graph, event_source="SWR",
+            ev,
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
         )
         # 9 arms × 1 event.
         assert len(eat) == 9
@@ -176,11 +248,20 @@ class TestContfragArmFractionDenominator:
         # denominator is zero → every arm_fraction is NaN.
         dot = _build_dot({}, junction_bins=5)
         ev = build_contfrag_event_table(
-            dot, env, _empty_trials(), graph, event_source="SWR",
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
         )
         assert len(ev) == 1
         eat = build_contfrag_event_arm_table(
-            ev, dot, env, _empty_trials(), graph, event_source="SWR",
+            ev,
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
         )
         assert eat["arm_fraction"].isna().all(), (
             "every-junction event should propagate NaN arm_fraction; "
@@ -204,9 +285,7 @@ class TestContfragArmFractionDenominator:
                 "is_patch_change": [False],
             }
         )
-        ev = build_contfrag_event_table(
-            dot, env, trials, graph, event_source="SWR"
-        )
+        ev = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
         eat = build_contfrag_event_arm_table(
             ev, dot, env, trials, graph, event_source="SWR"
         ).set_index("arm")
@@ -245,3 +324,55 @@ class TestContfragArmFractionDenominator:
 
         assert eat["visit_recency"].isna().all()
         assert eat["arm_never_visited"].isna().all()
+
+    def test_batched_history_matches_scalar_reference_at_each_event_start(
+        self, env, graph
+    ):
+        """Batching preserves row order, NaNs, and the event-start cutoff.
+
+        Event 2 begins before its current reward is delivered but ends after
+        delivery.  The scalar reference is evaluated at each event start, so
+        this also detects an accidental switch back to midpoint history.
+        """
+        dot = _build_three_event_dot()
+        trials = _three_trial_history()
+        events = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
+        event_arms = build_contfrag_event_arm_table(
+            events, dot, env, trials, graph, event_source="SWR"
+        )
+
+        assert events["event_start"].tolist() == pytest.approx([0.05, 0.25, 0.45])
+        np.testing.assert_array_equal(
+            event_arms["arm"].to_numpy().reshape(len(events), 9),
+            np.tile(np.arange(9), (len(events), 1)),
+        )
+
+        scalar_functions = {
+            "visit_recency": visit_recency_per_arm,
+            "arm_never_visited": arm_never_visited_per_arm,
+            "cumulative_reward": cumulative_reward_per_arm,
+            "reward_rate_arm_k10": lambda t, trials, graph: (
+                recent_reward_rate_per_arm(t, trials, graph, k=10)
+            ),
+        }
+        for column, function in scalar_functions.items():
+            expected = np.asarray(
+                [
+                    [function(t, trials, graph)[arm] for arm in range(9)]
+                    for t in events["event_start"].to_numpy(dtype=float)
+                ]
+            )
+            actual = event_arms[column].to_numpy(dtype=float).reshape(len(events), 9)
+            np.testing.assert_allclose(actual, expected, rtol=0.0, atol=0.0)
+
+        start_reward = cumulative_reward_per_arm(0.25, trials, graph)[2]
+        midpoint_reward = cumulative_reward_per_arm(0.26, trials, graph)[2]
+        assert start_reward == 0.0
+        assert midpoint_reward == 1.0
+        assert (
+            event_arms.loc[
+                (event_arms["SWR_event"] == 2) & (event_arms["arm"] == 2),
+                "cumulative_reward",
+            ].item()
+            == start_reward
+        )

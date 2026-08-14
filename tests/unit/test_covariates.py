@@ -115,8 +115,9 @@ def test_q_all_arm_pre_update_and_group_reset():
     assert q[1, 0] == 0.75
     assert q[1, 1] == 0.5
     # new group resets every arm to init
-    q2 = covariates.q_all_arm(np.array([0, 0]), np.array([1.0, 1.0]),
-                              np.array([0, 1]), 0.5)
+    q2 = covariates.q_all_arm(
+        np.array([0, 0]), np.array([1.0, 1.0]), np.array([0, 1]), 0.5
+    )
     np.testing.assert_allclose(q2[1], np.full(6, 0.5))  # second row is a fresh group
 
 
@@ -215,9 +216,7 @@ def test_value_block_warns_on_duplicate_stop_id():
     b.loc[0, "p_reward_port0"] = 0.9  # conflicting value for the same stop
     cont = pd.concat([a, b], ignore_index=True)
     with pytest.warns(UserWarning, match="duplicate stop_id"):
-        covariates.attach_contingency_value_block(
-            np.array([0]), np.array([111]), cont
-        )
+        covariates.attach_contingency_value_block(np.array([0]), np.array([111]), cont)
 
 
 def test_value_block_plain_key_populates_suffixed_key_misses():
@@ -229,13 +228,18 @@ def test_value_block_plain_key_populates_suffixed_key_misses():
     stop_idx = np.array([0, 0])
     arm = np.array([0, 6])  # one leaf, one trunk
     plain = _helpers.hash_stop_id(
-        np.array([animal, animal]), np.array([day, day]),
-        np.array([epoch, epoch]), stop_idx,
+        np.array([animal, animal]),
+        np.array([day, day]),
+        np.array([epoch, epoch]),
+        stop_idx,
     )
     suffixed = _helpers.hash_stop_id(
-        np.array([animal, animal]), np.array([day, day]),
-        np.array([epoch, epoch]), stop_idx,
-        brain_area="HPC", event_source="SWR",
+        np.array([animal, animal]),
+        np.array([day, day]),
+        np.array([epoch, epoch]),
+        stop_idx,
+        brain_area="HPC",
+        event_source="SWR",
     )
     assert plain[0] != suffixed[0]  # the two keyings genuinely differ
     cont = _toy_contingency(int(plain[0]))
@@ -278,11 +282,14 @@ def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
     event_times = np.array([7.0, 9.0, 19.0, 30.0])
     well_to_arm = {well: well for well in range(6)}
 
-    recency = covariates.visit_recency_all_events(
-        event_times, trials, well_to_arm
-    )
+    recency = covariates.visit_recency_all_events(event_times, trials, well_to_arm)
     never_visited = covariates.arm_never_visited_all_events(
         event_times, trials, well_to_arm
+    )
+    combined_recency, combined_never_visited = (
+        covariates.visit_recency_and_never_visited_all_events(
+            event_times, trials, well_to_arm
+        )
     )
 
     expected_recency = np.array(
@@ -304,6 +311,8 @@ def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
 
     np.testing.assert_array_equal(recency, expected_recency)
     np.testing.assert_array_equal(never_visited, expected_never_visited)
+    np.testing.assert_array_equal(combined_recency, expected_recency)
+    np.testing.assert_array_equal(combined_never_visited, expected_never_visited)
     assert recency.shape == never_visited.shape == (len(event_times), 9)
 
 
@@ -331,15 +340,56 @@ def test_visit_recency_centering_is_within_event_and_future_invariant():
         ],
         dtype=float,
     )
-    centered = covariates.center_visit_recency_within_event(recency)
+    visited = np.zeros_like(recency)
+    centered = covariates.center_visit_recency_within_event(recency, visited)
     np.testing.assert_allclose(centered[:2, :6].mean(axis=1), 0.0, atol=1e-12)
     np.testing.assert_array_equal(centered[:2, 6:], 0.0)
     assert np.isnan(centered[2]).all()
 
     appended = np.vstack([recency, [[100, 1, 1, 1, 1, 1, 0, 0, 0]]])
+    appended_visited = np.vstack([visited, [np.zeros(9)]])
     np.testing.assert_array_equal(
-        covariates.center_visit_recency_within_event(appended)[:3], centered
+        covariates.center_visit_recency_within_event(appended, appended_visited)[:3],
+        centered,
     )
+
+
+def test_centering_excludes_the_right_censoring_fill_from_the_mean():
+    """A never-visited arm must not displace the arms that were visited.
+
+    Arm 3 is censored at 201 in a 200-trial session while the visited
+    arms sit at 1-5. Including the fill would drag the mean to ~36 and
+    report every visited arm as ~-33; only the censored arm's own value
+    may depend on the censoring rule.
+    """
+    recency = np.array([[1, 2, 3, 201, 4, 5, 0, 0, 0]], dtype=float)
+    never_visited = np.array([[0, 0, 0, 1, 0, 0, 0, 0, 0]], dtype=float)
+
+    centered = covariates.center_visit_recency_within_event(recency, never_visited)
+
+    visited_mean = np.mean([1, 2, 3, 4, 5])
+    np.testing.assert_allclose(
+        centered[0, [0, 1, 2, 4, 5]],
+        np.array([1, 2, 3, 4, 5]) - visited_mean,
+    )
+    # The censored arm keeps its offset from the visited mean, and stays
+    # far above every visited arm rather than dragging them down.
+    assert centered[0, 3] == pytest.approx(201 - visited_mean)
+    assert (centered[0, [0, 1, 2, 4, 5]] > -10).all()
+
+
+def test_centering_leaves_an_all_censored_event_uncentered():
+    """With no visited leaf arm there is no mean to subtract."""
+    recency = np.array([[7, 7, 7, 7, 7, 7, 0, 0, 0]], dtype=float)
+    never_visited = np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0]], dtype=float)
+    centered = covariates.center_visit_recency_within_event(recency, never_visited)
+    assert np.isnan(centered[0, :6]).all()
+
+
+def test_centering_rejects_mismatched_never_visited_shape():
+    recency = np.zeros((2, 9))
+    with pytest.raises(ValueError, match="never_visited must match"):
+        covariates.center_visit_recency_within_event(recency, np.zeros((2, 6)))
 
 
 def test_recency_rejects_incomplete_leaf_topology():
