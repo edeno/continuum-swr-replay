@@ -1,0 +1,676 @@
+"""Fail-closed schema checks for the replay-content model runner."""
+
+from __future__ import annotations
+
+import sys
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from scripts.content import fit_replay_content_models as runner
+
+
+def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
+    """Small canonical arm table with every default-ladder predictor."""
+    arms = np.tile(np.arange(9), n_events)
+    event_ids = np.repeat(np.arange(n_events), 9)
+    frame = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "event_id": event_ids,
+            "arm": arms,
+            "arm_count_hard": (arms == (event_ids % 9)).astype(float),
+            "location_state": "at_well",
+            "at_well": True,
+            "location_well": 0.0,
+            "location_arm": 0.0,
+            "current_arm": 0.0,
+            "is_current": (arms == 0).astype(float),
+            "visit_recency_demeaned": 0.0,
+            "arm_never_visited": 0.0,
+        }
+    )
+    requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
+    for model_name in requested:
+        for predictor in runner.MODEL_HIERARCHY[model_name].predictors:
+            if predictor.startswith("arm_fe_") or predictor in frame:
+                continue
+            frame[predictor] = 0.0
+    return frame
+
+
+def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
+    """Small canonical patch table with every default-ladder predictor."""
+    patches = np.tile([1, 2, 3], n_events)
+    event_ids = np.repeat(np.arange(n_events), 3)
+    frame = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "event_id": event_ids,
+            "patch": patches,
+            "patch_count_hard": (patches == ((event_ids % 3) + 1)).astype(float),
+            "location_state": "at_well",
+            "at_well": True,
+            "location_well": 0.0,
+            "location_arm": 0.0,
+            "is_current_patch": (patches == 1).astype(float),
+            "visit_recency_patch": 0.0,
+            "arm_never_visited_patch": 0.0,
+        }
+    )
+    requested = runner.default_content_model_names(runner.MODEL_PATCH)
+    for model_name in requested:
+        for predictor in runner.MODEL_PATCH[model_name].predictors:
+            if predictor in frame:
+                continue
+            frame[predictor] = 0.0
+    return frame
+
+
+def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch):
+    """An old table cannot silently fit only the rungs it happens to satisfy."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    stale = _canonical_arm_table().drop(
+        columns=[
+            "location_state",
+            "at_well",
+            "location_well",
+            "location_arm",
+            "arm_never_visited",
+        ]
+    )
+    stale.to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_must_not_run(*args, **kwargs):
+        pytest.fail("schema validation must run before model fitting")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    with pytest.raises(ValueError, match="current-location/novelty schema"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch):
+    """A legacy pickle cannot write into the canonical model directory."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    pd.DataFrame({"event_uid": [1], "arm_count": [1]}).to_pickle(
+        input_dir / "long_count.pkl"
+    )
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    with pytest.raises(FileNotFoundError, match="Legacy fallback is disabled"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
+    """Every requested rung survives preflight when its real columns are present."""
+    requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
+
+    prepared, model_names, predictors, response_col, event_col = (
+        runner.prepare_canonical_fit_request(
+            _canonical_arm_table(),
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=requested,
+            hierarchy_kind="arm",
+            table_label="synthetic event_arm_table.pkl",
+        )
+    )
+
+    assert model_names == requested
+    assert "arm_never_visited" in predictors
+    assert "arm_fe_0" in prepared
+    assert response_col == "arm_count_hard"
+    assert event_col == "event_id"
+
+
+def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypatch):
+    """A complete canonical request reaches the real fitter and canonical outputs."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    runner.main()
+
+    output_dir = input_dir / "models"
+    assert (output_dir / "M0.pkl").exists()
+    assert (output_dir / "all_models.pkl").exists()
+    assert (output_dir / "all_models_cohort_audit.csv").exists()
+    result = pd.read_pickle(output_dir / "all_models.pkl")
+    assert result["model"].unique().tolist() == ["M0"]
+
+
+def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
+    tmp_path, monkeypatch
+):
+    """The runner dispatches and persists the complete validated default ladder."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    frame = _canonical_arm_table()
+    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
+    calls = []
+
+    def _record_fit(long_df, model_name, predictors, **kwargs):
+        calls.append(model_name)
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["02_r1"],
+                "model": [model_name],
+                "n_events": [long_df["event_id"].nunique()],
+                "converged": [True],
+                "separated": [False],
+            }
+        )
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _record_fit)
+    monkeypatch.setattr(
+        runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py"])
+
+    runner.main()
+
+    output_dir = input_dir / "models"
+    assert tuple(calls) == requested
+    assert all((output_dir / f"{model_name}.pkl").exists() for model_name in requested)
+    combined = pd.read_pickle(output_dir / "all_models.pkl")
+    assert tuple(combined["model"]) == requested
+
+
+def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().drop(columns="swr_x_current").to_pickle(
+        input_dir / "event_arm_table.pkl"
+    )
+
+    def _fit_must_not_run(*args, **kwargs):
+        pytest.fail("the complete ladder must validate before fitting")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M5,M6"],
+    )
+
+    with pytest.raises(ValueError, match=r"M6=.*swr_x_current"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
+    """Off-well zeros cannot silently admit undefined-current events to a fit."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    frame = _canonical_arm_table()
+    event_mask = frame["event_id"].eq(0)
+    frame.loc[event_mask, "location_state"] = "in_transit"
+    frame.loc[event_mask, "at_well"] = False
+    frame.loc[event_mask, ["location_well", "location_arm", "current_arm"]] = np.nan
+    frame.loc[event_mask, "is_current"] = 0.0
+    frame.to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_must_not_run(*args, **kwargs):
+        pytest.fail("location contract validation must run before fitting")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    with pytest.raises(ValueError, match="one-hot at wells and NaN off-well"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_arm_current_indicator_must_match_location_arm():
+    frame = _canonical_arm_table()
+    event_mask = frame["event_id"].eq(0)
+    frame.loc[event_mask, "is_current"] = (
+        frame.loc[event_mask, "arm"].eq(1).astype(float)
+    )
+
+    with pytest.raises(ValueError, match="must match location_arm"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=("M0",),
+            hierarchy_kind="arm",
+            table_label="corrupt arm table",
+        )
+
+
+def test_unknown_location_events_are_accepted_with_null_at_well():
+    """``unknown`` carries ``at_well = NA`` by construction, not by corruption.
+
+    Events before the first completed trip have no observed location, so
+    ``at_well`` is null while transit/mixed windows are explicitly False.
+    A canonical table is entitled to contain them; rejecting the null would
+    abort a whole session for a state this validator lists as valid.
+    """
+    frame = _canonical_arm_table()
+    event_mask = frame["event_id"].eq(0)
+    frame["at_well"] = frame["at_well"].astype("boolean")
+    frame.loc[event_mask, "location_state"] = "unknown"
+    frame.loc[event_mask, "at_well"] = pd.NA
+    for column in ("location_well", "location_arm", "current_arm", "is_current"):
+        frame.loc[event_mask, column] = np.nan
+
+    request = runner.prepare_canonical_fit_request(
+        frame,
+        hierarchy=runner.MODEL_HIERARCHY,
+        model_names=("M0",),
+        hierarchy_kind="arm",
+        table_label="table with an unknown-location event",
+    )
+
+    assert request is not None
+
+
+@pytest.mark.parametrize(
+    ("state", "at_well_value"),
+    [("at_well", pd.NA), ("in_transit", pd.NA), ("unknown", False)],
+)
+def test_at_well_null_pattern_must_track_location_state(state, at_well_value):
+    """Null-ness is only permitted for ``unknown``, and required there."""
+    frame = _canonical_arm_table()
+    event_mask = frame["event_id"].eq(0)
+    frame["at_well"] = frame["at_well"].astype("boolean")
+    frame.loc[event_mask, "location_state"] = state
+    frame.loc[event_mask, "at_well"] = at_well_value
+    if state != "at_well":
+        for column in ("location_well", "location_arm", "current_arm", "is_current"):
+            frame.loc[event_mask, column] = np.nan
+
+    with pytest.raises(ValueError, match="inconsistent with location_state"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=("M0",),
+            hierarchy_kind="arm",
+            table_label="corrupt arm table",
+        )
+
+
+def test_patch_current_indicator_must_match_mapped_location_arm():
+    frame = _canonical_patch_table()
+    event_mask = frame["event_id"].eq(0)
+    frame.loc[event_mask, "is_current_patch"] = (
+        frame.loc[event_mask, "patch"].eq(2).astype(float)
+    )
+
+    with pytest.raises(ValueError, match="mapped location_arm"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_PATCH,
+            model_names=("P0",),
+            hierarchy_kind="patch",
+            table_label="corrupt patch table",
+        )
+
+
+def test_location_reference_must_be_constant_across_candidate_rows():
+    """Row-varying references cannot make a corrupt one-hot look valid."""
+    frame = _canonical_arm_table()
+    corrupt_row = frame["event_id"].eq(0) & frame["arm"].eq(1)
+    # This row still has is_current=0 and arm=1, so the later row-wise
+    # indicator check would pass (1 != 2) unless the event-level reference is
+    # first required to be constant.
+    frame.loc[corrupt_row, ["location_arm", "current_arm"]] = 2.0
+
+    with pytest.raises(ValueError, match="event context.*changes"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=("M0",),
+            hierarchy_kind="arm",
+            table_label="row-varying location table",
+        )
+
+
+@pytest.mark.parametrize("bad_count", [np.nan, np.inf, -1.0, 0.5])
+def test_response_counts_must_be_finite_nonnegative_integers(bad_count):
+    frame = _canonical_arm_table()
+    frame.loc[0, "arm_count_hard"] = bad_count
+
+    with pytest.raises(ValueError, match="finite nonnegative integer counts"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=("M0",),
+            hierarchy_kind="arm",
+            table_label="corrupt response table",
+        )
+
+
+def test_each_session_event_requires_the_exact_candidate_set():
+    frame = _canonical_arm_table()
+    frame.loc[frame.index[0], "arm"] = 1
+
+    with pytest.raises(ValueError, match="exactly the expected arm candidates"):
+        runner.prepare_canonical_fit_request(
+            frame,
+            hierarchy=runner.MODEL_HIERARCHY,
+            model_names=("M0",),
+            hierarchy_kind="arm",
+            table_label="corrupt candidate table",
+        )
+
+
+def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_with_empty_late_rung(long_df, model_name, predictors, **kwargs):
+        if model_name == "M1":
+            return pd.DataFrame()
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["02_r1"],
+                "model": [model_name],
+                "n_events": [long_df["event_id"].nunique()],
+            }
+        )
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_with_empty_late_rung)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0,M1"],
+    )
+
+    with pytest.raises(RuntimeError, match="M1.*no session fits"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    output_dir = input_dir / "models"
+    output_dir.mkdir(parents=True)
+    sentinel = output_dir / "previous_complete_run.txt"
+    sentinel.write_text("unchanged")
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_then_raise(long_df, model_name, predictors, **kwargs):
+        if model_name == "M1":
+            raise RuntimeError("late numerical failure")
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["02_r1"],
+                "model": [model_name],
+                "n_events": [long_df["event_id"].nunique()],
+            }
+        )
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_then_raise)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0,M1"],
+    )
+
+    with pytest.raises(RuntimeError, match="late numerical failure"):
+        runner.main()
+
+    assert sentinel.read_text() == "unchanged"
+    assert sorted(path.name for path in output_dir.iterdir()) == [sentinel.name]
+
+
+def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    output_dir = input_dir / "models"
+    output_dir.mkdir(parents=True)
+    (output_dir / "M7.pkl").write_bytes(b"stale later rung")
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    runner.main()
+
+    assert not (output_dir / "M7.pkl").exists()
+    assert (output_dir / "M0.pkl").exists()
+    assert (output_dir / "all_models.pkl").exists()
+
+
+def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _wrong_cohort_size(long_df, model_name, predictors, **kwargs):
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["02_r1"],
+                "model": [model_name],
+                "n_events": [long_df["event_id"].nunique() - 1],
+            }
+        )
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _wrong_cohort_size)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    with pytest.raises(RuntimeError, match="expected 2 from the frozen cohort"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_published_ladder_uses_intersection_of_successful_sessions(
+    tmp_path, monkeypatch
+):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    frame = _canonical_arm_table(n_events=4)
+    frame.loc[frame["event_id"].ge(2), "animal"] = "b"
+    frame.to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_with_one_late_session_failure(long_df, model_name, predictors, **kwargs):
+        rows = []
+        for keys, group in long_df.groupby(runner.SESSION_COLS):
+            if model_name == "M1" and keys[0] == "a":
+                continue
+            rows.append(
+                {
+                    **dict(zip(runner.SESSION_COLS, keys, strict=True)),
+                    "model": model_name,
+                    "n_events": group["event_id"].nunique(),
+                }
+            )
+        return pd.DataFrame(rows)
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        runner, "fit_model_per_session", _fit_with_one_late_session_failure
+    )
+    monkeypatch.setattr(
+        runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0,M1"],
+    )
+
+    runner.main()
+
+    output_dir = input_dir / "models"
+    for model_name in ("M0", "M1"):
+        result = pd.read_pickle(output_dir / f"{model_name}.pkl")
+        assert result["animal"].tolist() == ["b"]
+        assert result["n_events"].tolist() == [2]
+
+
+def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
+    """A primary fit without its explicitly requested CV result is incomplete."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    # Two events are enough for the null primary fit but not 5-fold CV.
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
+    )
+
+    with pytest.raises(RuntimeError, match="M0.*no session fits"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _primary_without_cv(long_df, model_name, predictors, **kwargs):
+        assert kwargs["run_cv"] is True
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "day": [1],
+                "epoch": ["02_r1"],
+                "model": [model_name],
+                "n_events": [long_df["event_id"].nunique()],
+            }
+        )
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _primary_without_cv)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
+    )
+
+    with pytest.raises(RuntimeError, match="CV result.*missing column"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    # Five-fold CV requires at least ten events; exercise the real null-model
+    # fit and CV path rather than only a mocked result dictionary.
+    _canonical_arm_table(n_events=10).to_pickle(input_dir / "event_arm_table.pkl")
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
+    )
+
+    runner.main()
+
+    result = pd.read_pickle(input_dir / "models" / "M0.pkl")
+    assert result["n_events"].tolist() == [10]
+    assert result["cv_n_folds"].tolist() == [5]
+    assert np.isfinite(result["cv_ll_per_event_mean"]).all()
+
+
+def _one_session_primary_result(long_df, model_name):
+    return pd.DataFrame(
+        {
+            "animal": ["a"],
+            "day": [1],
+            "epoch": ["02_r1"],
+            "model": [model_name],
+            "n_events": [long_df["event_id"].nunique()],
+        }
+    )
+
+
+def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "fit_model_per_session",
+        lambda long_df, model_name, predictors, **kwargs: _one_session_primary_result(
+            long_df, model_name
+        ),
+    )
+    monkeypatch.setattr(runner, "fit_conditional_logit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M1", "--logit"],
+    )
+
+    with pytest.raises(RuntimeError, match="logit robustness fit failed"):
+        runner.main()
+
+    assert not (input_dir / "models").exists()
+
+
+def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypatch):
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "fit_model_per_session",
+        lambda long_df, model_name, predictors, **kwargs: _one_session_primary_result(
+            long_df, model_name
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "fit_conditional_logit",
+        lambda group, **kwargs: {"n_events": group["event_id"].nunique()},
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M1", "--logit"],
+    )
+
+    runner.main()
+
+    output_dir = input_dir / "models"
+    assert (output_dir / "M1.pkl").exists()
+    logit = pd.read_pickle(output_dir / "logit" / "M1_logit.pkl")
+    assert logit["model"].tolist() == ["M1"]
+    assert logit["n_events"].tolist() == [2]
