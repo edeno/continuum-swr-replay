@@ -46,12 +46,12 @@ def _prepare_trials_for_context(
     *,
     required_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, np.ndarray]:
-    """Validate and order trials by their canonical completion time.
+    """Validate and order trials by their canonical destination-arrival time.
 
-    A trial is complete at ``goal_arrival_time``, with the established
-    per-row ``end_time`` fallback.  Sorting by that cutoff is essential:
-    trial-derived history must be indexed by when information became known,
-    not by when the animal departed.
+    A trip reaches its destination at ``goal_arrival_time``, with the
+    established per-row ``end_time`` fallback. Sorting by that clock is
+    essential for location and visit history. Reward history uses the separate
+    outcome clock returned by :func:`_trial_outcome_times`.
     """
     if trials.empty:
         return trials.copy(), np.array([], dtype=float)
@@ -64,7 +64,7 @@ def _prepare_trials_for_context(
     prepared = trials.copy()
     starts = prepared["start_time"].to_numpy(dtype=float)
     ends = prepared["end_time"].to_numpy(dtype=float)
-    cutoffs = _trial_cutoff_times(prepared)
+    cutoffs = _trial_arrival_times(prepared)
     to_wells = prepared["to_well"].to_numpy(dtype=float)
 
     if not np.isfinite(starts).all():
@@ -72,12 +72,12 @@ def _prepare_trials_for_context(
     if not np.isfinite(ends).all():
         raise ValueError("trial end_time values must be finite")
     if not np.isfinite(cutoffs).all():
-        raise ValueError("trial completion cutoffs must be finite")
+        raise ValueError("trial destination-arrival cutoffs must be finite")
     _validate_well_values(to_wells, "to_well")
     if np.any(cutoffs < starts):
-        raise ValueError("a trial completion cutoff occurs before its start")
+        raise ValueError("a trial destination arrival occurs before its start")
     if np.any(cutoffs > ends):
-        raise ValueError("a trial completion cutoff occurs after its end_time")
+        raise ValueError("a trial destination arrival occurs after its end_time")
 
     order = np.argsort(cutoffs, kind="stable")
     prepared = prepared.iloc[order].reset_index(drop=True)
@@ -237,9 +237,31 @@ def nearest_well_distance_cm(
 ) -> np.ndarray:
     """Euclidean distance from each projected position to the nearest well.
 
-    Wells are the degree-one nodes of ``track_graph``.  A full-NaN vector is
-    returned when either projected coordinate column or any required well
-    position is unavailable.  Individual non-finite positions yield NaN.
+    Wells are the degree-one nodes of ``track_graph``.  A malformed track
+    graph raises: an all-NaN column is indistinguishable from "the animal
+    was never near a well", and would silently empty any downstream
+    near-a-well cohort for the whole session.  Missing position *data*
+    (absent coordinate columns, individual non-finite rows) is a genuine
+    data gap and still yields NaN.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        Timebin frame; uses ``projected_x_position`` / ``projected_y_position``.
+    track_graph : nx.Graph
+        Track graph whose degree-one nodes are wells, each with a ``pos``
+        attribute holding a finite ``(x, y)`` pair.
+
+    Returns
+    -------
+    np.ndarray, shape (len(dot),)
+        Distance in cm, NaN where the position is unavailable.
+
+    Raises
+    ------
+    ValueError
+        If the graph has no degree-one nodes, or any well lacks a finite
+        two-element ``pos``.
     """
     n_rows = len(dot)
     coordinate_columns = ("projected_x_position", "projected_y_position")
@@ -248,22 +270,32 @@ def nearest_well_distance_cm(
 
     well_nodes = [node for node in track_graph.nodes if track_graph.degree(node) == 1]
     if not well_nodes:
-        return np.full(n_rows, np.nan)
+        raise ValueError(
+            "track_graph has no degree-one nodes, so no wells can be located"
+        )
     node_positions = nx.get_node_attributes(track_graph, "pos")
-    if any(node not in node_positions for node in well_nodes):
-        return np.full(n_rows, np.nan)
+    missing_pos = [node for node in well_nodes if node not in node_positions]
+    if missing_pos:
+        raise ValueError(
+            f"track_graph well nodes lack a 'pos' attribute: {missing_pos}"
+        )
 
     try:
         well_positions = np.asarray(
             [node_positions[node] for node in well_nodes], dtype=float
         )
-    except (TypeError, ValueError):
-        return np.full(n_rows, np.nan)
+    except (TypeError, ValueError) as err:
+        raise ValueError(
+            "track_graph well 'pos' attributes are not numeric (x, y) pairs"
+        ) from err
     if (
         well_positions.shape != (len(well_nodes), 2)
         or not np.isfinite(well_positions).all()
     ):
-        return np.full(n_rows, np.nan)
+        raise ValueError(
+            "track_graph well 'pos' attributes must be finite two-element "
+            f"(x, y) pairs; got shape {well_positions.shape}"
+        )
 
     positions = dot.loc[:, coordinate_columns].to_numpy(dtype=float)
     output = np.full(n_rows, np.nan)
@@ -280,16 +312,21 @@ def add_trial_context(
 ) -> pd.DataFrame:
     """Attach per-timebin trial-derived columns to ``dot`` (in place, returned).
 
-    Every past-context column is indexed by the most recent trial completed
-    at or before ``t``.  An in-progress trip cannot expose its destination,
-    reward, or switch outcome through these columns.  ``next_well`` is the
-    sole explicitly retrospective future destination.
+    Destination and switch context is indexed by the most recent trip that
+    reached its goal at or before ``t``. Reward-bearing context uses a second
+    clock and stays unknown until that same trip's outcome is observable. An
+    in-progress trip cannot expose its destination, reward, or switch outcome
+    through these columns. ``next_well`` is the
+    sole forward-looking column: it names a destination the animal has not
+    reached yet, so it is a response variable, never a causal predictor.
+    (Elsewhere in this codebase "retrospective" means past-referenced -- see
+    ``retrospective.py`` -- so it is deliberately not used for ``next_well``.)
 
     Columns added
     -------------
     - ``prev_well``, ``current_well``, ``last_visited_well`` (past-only)
-    - ``next_well`` (retrospective future destination)
-    - ``last_rewarded_well``
+    - ``next_well`` (forward-looking: the not-yet-reached destination)
+    - ``last_rewarded_well`` — advances only when a reward is observable
     - ``completed_trial_id`` — zero-based completion-order ID regenerated
       within the session (not an index copied from the source trial table)
     - ``recent_switch_rate`` — canonical five-completed-trial rolling switch
@@ -297,9 +334,9 @@ def add_trial_context(
     - ``leaky_q_value_diff`` — canonical alpha-0.3 pre-update Q margin for the
       identified trial, computed while updating on every completed trial
     - ``is_after_switch`` — last completed trip's ``is_patch_change``
-    - ``is_after_omission`` — ``~last completed trip's is_reward``
-    - ``is_after_reward`` — last completed trip's ``is_reward``
-    - ``reward_outcome`` — last completed trip's ``is_reward`` as float
+    - ``is_after_omission`` — current arrived trip's omission, NaN until known
+    - ``is_after_reward`` — current arrived trip's reward, NaN until known
+    - ``reward_outcome`` — current arrived trip's outcome, NaN until known
     - ``location_state``, ``at_well``, ``location_well``
     """
     dot_times = np.asarray(dot.index.values, dtype=float)
@@ -334,6 +371,7 @@ def add_trial_context(
         trials,
         required_columns=("from_well", "is_reward", "is_patch_change"),
     )
+    outcome_times = _trial_outcome_times(trials)
     n_trials = len(trials)
     trial_start_times = trials["start_time"].to_numpy(dtype=float)
     to_wells = trials["to_well"].to_numpy(dtype=float)
@@ -349,6 +387,12 @@ def add_trial_context(
             raise ValueError(f"trial {name} values must be finite binary values")
     is_reward = reward_values.astype(bool)
     is_patch_change = patch_change_values.astype(bool)
+    if np.any(np.diff(outcome_times) < 0):
+        raise ValueError("trial outcome-known times must be nondecreasing")
+    if n_trials > 1 and np.any(outcome_times[:-1] > arrival_times[1:]):
+        raise ValueError(
+            "a trial outcome remains unknown after the next destination arrival"
+        )
 
     # Local import avoids the module's deliberate re-export cycle: covariates
     # imports low-level trial helpers from this module, while this call needs
@@ -392,7 +436,11 @@ def add_trial_context(
     next_clipped = np.clip(next_idx, 0, n_trials - 1)
     dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
-    reward_timestamps = arrival_times[is_reward]
+    # Reward identity is not available merely because the animal arrived.
+    # Advance this history at the physical outcome clock: exact pump onset for
+    # newly generated rewarded trials, poke-out for omissions, or the explicit
+    # conservative end-time fallback documented by _trial_outcome_times.
+    reward_timestamps = outcome_times[is_reward]
     rewarded_wells = to_wells[is_reward]
     if len(reward_timestamps) > 0:
         rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
@@ -414,12 +462,19 @@ def add_trial_context(
     else:
         dot["_last_reward_time"] = np.nan
 
-    previous_reward = np.where(
-        has_completed, is_reward[completed_clipped].astype(float), np.nan
+    current_outcome_known = has_completed & (
+        dot_times >= outcome_times[completed_clipped]
     )
-    dot["reward_outcome"] = previous_reward
-    dot["is_after_reward"] = previous_reward
-    dot["is_after_omission"] = np.where(has_completed, 1.0 - previous_reward, np.nan)
+    current_reward = np.where(
+        current_outcome_known,
+        is_reward[completed_clipped].astype(float),
+        np.nan,
+    )
+    dot["reward_outcome"] = current_reward
+    dot["is_after_reward"] = current_reward
+    dot["is_after_omission"] = np.where(
+        current_outcome_known, 1.0 - current_reward, np.nan
+    )
     dot["is_after_switch"] = np.where(
         has_completed, is_patch_change[completed_clipped].astype(float), np.nan
     )
@@ -695,11 +750,50 @@ def assign_bout(
 
 
 def eq_indicator(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
-    """Elementwise ``int(values == reference)`` with NaN-in-reference = 0."""
+    """Elementwise ``int(values == reference)`` with NaN-in-reference = 0.
+
+    Use this only where an absent reference genuinely means "no arm
+    qualifies" -- ``is_prev`` on the first trip of a session, or
+    ``is_last_rewarded`` before the first reward.  Where an absent
+    reference instead means "unobserved", use
+    :func:`eq_indicator_or_nan` so the row is excluded by complete-case
+    fitting rather than silently labelled a zero.
+    """
     values = np.asarray(values, dtype=float)
     reference = np.asarray(reference, dtype=float)
     out = (values == reference).astype(int)
     out[np.isnan(reference)] = 0
+    return out
+
+
+def eq_indicator_or_nan(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Elementwise ``values == reference`` as 1.0/0.0, NaN where reference is NaN.
+
+    The missing-data counterpart of :func:`eq_indicator`, for indicators
+    whose reference can be *unobserved* rather than merely absent.
+    ``current_arm`` is NaN whenever an event window is not wholly at one
+    well (``in_transit``, ``mixed``, ``unknown``); the animal still
+    occupies some arm, we just cannot say which.  Encoding that as 0 on
+    every arm would assert "not the current arm" for all nine, which is
+    a fabricated observation.  Propagating NaN instead lets complete-case
+    cohort selection drop the event through its logged path.
+
+    Parameters
+    ----------
+    values : np.ndarray, shape (n_rows,)
+        Per-row candidate values (e.g. arm or patch IDs).
+    reference : np.ndarray, shape (n_rows,)
+        Per-row reference value, broadcast alongside ``values``.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,), dtype float
+        1.0 where equal, 0.0 where unequal, NaN where ``reference`` is NaN.
+    """
+    values = np.asarray(values, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    out = (values == reference).astype(float)
+    out[np.isnan(reference)] = np.nan
     return out
 
 
@@ -794,26 +888,15 @@ def build_well_to_arm_map(track_graph: nx.Graph) -> dict[int, int]:
 # ── Vectorized batch helpers (operate on all events at once) ──
 
 
-def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
-    """Per-trial cutoff timestamp for "is this trial past relative to an event?".
+def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
+    """Per-trial destination-arrival timestamps for visit/location history.
 
-    Uses ``goal_arrival_time`` (the moment the animal arrives at and
-    is rewarded at the goal well) when available, falling back to
-    ``end_time`` per-row when ``goal_arrival_time`` is NaN, and
-    per-frame when the column is absent. This matches the convention
-    already used by :func:`add_trial_context` for ``last_rewarded_well``
-    and the ``_goal_arrival_time`` / ``_last_reward_time`` columns.
-
-    Why this matters: between ``goal_arrival_time`` and ``end_time``
-    of the same trial the animal is sitting at the well in the
-    post-arrival stop. Cutting at ``end_time`` makes a replay event
-    during that stop see ``last_rewarded_well`` set to the just-
-    completed well (because that uses ``goal_arrival_time``) while
-    ``visit_recency`` / ``cumulative_reward`` / ``reward_rate_arm_k10``
-    haven't counted the same arrival yet — value history that lags
-    the reward-context columns by the post-arrival window. Using
-    ``goal_arrival_time`` uniformly aligns all four trial-derived
-    columns onto the same temporal cutoff.
+    Uses ``goal_arrival_time`` (the moment the animal *arrives at* the
+    goal well -- poke-in, which precedes reward delivery) when available,
+    falling back to ``end_time`` per row when ``goal_arrival_time`` is NaN,
+    and per frame when the column is absent. This clock controls destination,
+    visit-recency, and switch history only. Reward-bearing history must use
+    :func:`_trial_outcome_times` instead.
     """
     if "goal_arrival_time" in trials.columns:
         cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
@@ -823,16 +906,108 @@ def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
     return trials["end_time"].to_numpy(dtype=float)
 
 
-def trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
-    """Return the canonical goal-arrival cutoff for each trial.
+def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
+    """Backward-compatible alias for the destination-arrival clock.
 
-    Production reward and visit-history covariates use
-    ``goal_arrival_time`` when finite and fall back to ``end_time`` on a
-    per-row basis.  This public wrapper exposes that same calculation to
-    visualization and audit code while retaining the established private
-    helper for backwards compatibility.
+    New code should name the intended clock explicitly with
+    :func:`_trial_arrival_times` or :func:`_trial_outcome_times`.
     """
-    return _trial_cutoff_times(trials)
+    return _trial_arrival_times(trials)
+
+
+def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
+    """Per-trial timestamp at which reward versus omission is observable.
+
+    Newly generated trial tables carry ``outcome_known_time``: first pump onset
+    for a rewarded trial and destination poke-out for an omission. Older or
+    manually constructed frames lack that field; for those frames ``end_time``
+    is an explicit conservative fallback for both outcomes. This fallback can
+    delay rewarded history, but it cannot expose reward before delivery.
+
+    Every returned value must be finite and lie within
+    ``[destination_arrival, end_time]``. Invalid explicit timestamps raise
+    rather than silently falling back to another clock.
+    """
+    if len(trials) == 0:
+        return np.array([], dtype=float)
+    if "end_time" not in trials.columns:
+        raise KeyError("trial outcome timing requires end_time")
+
+    end = trials["end_time"].to_numpy(dtype=float)
+    arrival = _trial_arrival_times(trials)
+    reward = None
+    if "is_reward" in trials.columns:
+        reward = trials["is_reward"].to_numpy(dtype=float)
+        if not np.isfinite(reward).all() or not np.isin(reward, (0.0, 1.0)).all():
+            raise ValueError("trial is_reward values must be finite binary values")
+
+    reward_column = next(
+        (
+            column
+            for column in ("reward_on_time", "reward_on_ts")
+            if column in trials.columns
+        ),
+        None,
+    )
+    expected_from_physical_clock = None
+    if reward_column is not None:
+        if reward is None:
+            raise KeyError(
+                f"{reward_column} requires is_reward to identify rewarded trials"
+            )
+        reward_on = trials[reward_column].to_numpy(dtype=float)
+        rewarded = reward.astype(bool)
+        if (~np.isfinite(reward_on[rewarded])).any():
+            raise ValueError("rewarded trials must have finite reward-on timestamps")
+        if np.isfinite(reward_on[~rewarded]).any():
+            raise ValueError("omission trials cannot carry reward-on timestamps")
+        expected_from_physical_clock = np.where(rewarded, reward_on, end)
+
+    if "outcome_known_time" in trials.columns:
+        outcome = trials["outcome_known_time"].to_numpy(dtype=float)
+        if expected_from_physical_clock is not None and not np.allclose(
+            outcome,
+            expected_from_physical_clock,
+            rtol=0.0,
+            atol=1e-9,
+            equal_nan=True,
+        ):
+            raise ValueError(
+                "outcome_known_time conflicts with reward-on/end-time semantics"
+            )
+    elif expected_from_physical_clock is not None:
+        outcome = expected_from_physical_clock
+    else:
+        outcome = end.copy()
+
+    invalid = (
+        ~np.isfinite(end)
+        | ~np.isfinite(arrival)
+        | ~np.isfinite(outcome)
+        | (outcome < arrival)
+        | (outcome > end)
+    )
+    if invalid.any():
+        bad = tuple(np.flatnonzero(invalid)[:10])
+        raise ValueError(
+            "trial outcome-known times must be finite and lie between "
+            f"destination arrival and end_time; invalid row(s): {bad}"
+        )
+    return outcome
+
+
+def trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
+    """Return the canonical destination-arrival cutoff for each trial.
+
+    This public compatibility wrapper is for visit/location history. Reward
+    history uses :func:`trial_outcome_times`.
+    """
+    return _trial_arrival_times(trials)
+
+
+def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
+    """Return the canonical reward/omission availability time per trial."""
+    return _trial_outcome_times(trials)
 
 
 _SESSION_COLS = ["animal", "day", "epoch"]
@@ -1104,9 +1279,9 @@ POPULATIONS = {
 
 # Behavioral covariate definitions were extracted to covariates.py; they are
 # re-exported here so existing ``from ..._helpers import <name>`` call sites keep
-# resolving. covariates.py imports _trial_cutoff_times / build_well_to_arm_map from
-# this module, so _helpers must finish loading first (it does: the package __init__
-# imports _helpers before covariates).
+# resolving. covariates.py imports the explicit arrival/outcome clocks and
+# build_well_to_arm_map from this module, so _helpers must finish loading first
+# (it does: the package __init__ imports _helpers before covariates).
 from .covariates import (  # noqa: E402,F401
     UNCERTAINTY_COVARIATES,
     _leaky_q_value_diff,

@@ -22,6 +22,8 @@ def _trials() -> pd.DataFrame:
             "start_time": [4.0, 1.0],
             "end_time": [7.0, 3.5],
             "goal_arrival_time": [6.0, 3.0],
+            "reward_on_time": [np.nan, 3.25],
+            "outcome_known_time": [7.0, 3.25],
             "from_well": [1, 0],
             "to_well": [2, 1],
             "is_reward": [False, True],
@@ -71,8 +73,9 @@ def test_behavioral_location_uses_arrival_and_departure_boundaries():
 
 
 def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
-    # Mid-trip 1, exact arrival 1, exact departure 2, mid-trip 2, arrival 2.
-    times = np.array([2.0, 3.0, 4.0, 5.0, 6.0])
+    # Mid-trip 1, arrival, reward onset, departure, mid-trip 2, arrival,
+    # omission boundary.
+    times = np.array([2.0, 3.0, 3.249, 3.25, 4.0, 5.0, 6.0, 7.0])
     out = add_trial_context(pd.DataFrame(index=times), _trials())
 
     # The in-progress first trip exposes no destination/outcome through a
@@ -87,14 +90,16 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     assert pd.isna(out.loc[2.0, "leaky_q_value_diff"])
     assert out.loc[2.0, "next_well"] == 1.0
 
-    # Arrival is inclusive: trial 1 becomes past context at exactly t=3.
-    for time in (3.0, 4.0, 5.0):
+    # Arrival is inclusive for destination/switch history, but the current
+    # reward stays unavailable until its separate pump-onset clock.
+    for time in (3.0, 3.249):
         assert out.loc[time, "last_visited_well"] == 1.0
         assert out.loc[time, "current_well"] == 1.0
         assert out.loc[time, "prev_well"] == 0.0
-        assert out.loc[time, "reward_outcome"] == 1.0
-        assert out.loc[time, "is_after_reward"] == 1.0
-        assert out.loc[time, "is_after_omission"] == 0.0
+        assert pd.isna(out.loc[time, "reward_outcome"])
+        assert pd.isna(out.loc[time, "is_after_reward"])
+        assert pd.isna(out.loc[time, "is_after_omission"])
+        assert pd.isna(out.loc[time, "last_rewarded_well"])
         assert out.loc[time, "is_after_switch"] == 0.0
         assert out.loc[time, "completed_trial_id"] == 0
         assert out.loc[time, "recent_switch_rate"] == 0.0
@@ -102,21 +107,34 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
         assert out.loc[time, "_goal_arrival_time"] == 3.0
         assert out.loc[time, "next_well"] == 2.0
 
+    # Pump onset is inclusive for reward-bearing context.
+    for time in (3.25, 4.0, 5.0):
+        assert out.loc[time, "reward_outcome"] == 1.0
+        assert out.loc[time, "is_after_reward"] == 1.0
+        assert out.loc[time, "is_after_omission"] == 0.0
+        assert out.loc[time, "last_rewarded_well"] == 1.0
+        assert out.loc[time, "_last_reward_time"] == 3.25
+
     # Exact departure changes location, but cannot change completed context.
     assert out.loc[3.0, "location_state"] == "at_well"
     assert out.loc[4.0, "location_state"] == "in_transit"
 
-    # Trial 2 becomes visible only at its exact completion cutoff.
+    # Trial 2's destination is visible at arrival, while its omission remains
+    # unknown until the conservative trip-end/poke-out boundary.
     assert out.loc[6.0, "last_visited_well"] == 2.0
     assert out.loc[6.0, "current_well"] == 2.0
     assert out.loc[6.0, "prev_well"] == 1.0
-    assert out.loc[6.0, "reward_outcome"] == 0.0
-    assert out.loc[6.0, "is_after_omission"] == 1.0
+    assert pd.isna(out.loc[6.0, "reward_outcome"])
+    assert pd.isna(out.loc[6.0, "is_after_omission"])
     assert out.loc[6.0, "is_after_switch"] == 1.0
     assert out.loc[6.0, "completed_trial_id"] == 1
     assert out.loc[6.0, "recent_switch_rate"] == pytest.approx(0.5)
     assert out.loc[6.0, "leaky_q_value_diff"] == pytest.approx(0.15)
     assert pd.isna(out.loc[6.0, "next_well"])
+    assert out.loc[7.0, "reward_outcome"] == 0.0
+    assert out.loc[7.0, "is_after_reward"] == 0.0
+    assert out.loc[7.0, "is_after_omission"] == 1.0
+    assert out.loc[7.0, "last_rewarded_well"] == 1.0
 
     assert str(out["completed_trial_id"].dtype) == "Int64"
 
@@ -129,7 +147,7 @@ def test_appending_future_trials_cannot_change_past_context_or_location():
     short = add_trial_context(pd.DataFrame(index=dot_time), first)
     long = add_trial_context(pd.DataFrame(index=dot_time), appended)
 
-    # ``next_well`` is intentionally retrospective and can become known when
+    # ``next_well`` is intentionally forward-looking and can become known when
     # later data are appended. Every past-only field must be invariant.
     past_only = [
         "prev_well",

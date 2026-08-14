@@ -25,28 +25,68 @@ from __future__ import annotations
 
 from .model_specs import N_HISTORY_BASIS, N_HISTORY_LAGS, N_REWARD_LAGS
 
-POST_OUTCOME = frozenset({  # NOT available before the current trip's reward
-    "rpe",  # beta reward prediction error (reward - q_chosen)
-    "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
-    "unchosen_patches_mu_update_abs_postoutcome_sess",  # alternative-patch update
-})
-FUTURE_REFERENCING = frozenset({  # references a not-yet-occurred event
-    "next_arm", "is_next", "ends_at_next", "contains_path_to_next",
-    "chosen_arm_fraction", "trials_since_switch", "is_post_switch",
-})
-PRE_OUTCOME_SAFE = frozenset({  # trailing/backward, safe as predictors pre-reward
-    # Outcome of the last trip completed by event/stop start.
-    "reward_outcome", "is_after_reward", "is_after_omission",
-    "reward_lag1", "reward_lag2", "reward_rate_trial_k10", "reward_rate_arm_k10",
-    "visit_recency", "visit_recency_demeaned", "visit_recency_patch",
-    "arm_never_visited", "arm_never_visited_patch", "cumulative_reward",
-    "is_current", "is_prev", "is_last_rewarded", "is_last_rewarded_elsewhere",
-    "is_after_switch",
-    "q_arm", "p_reward_arm",
-    "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
-    # beta-bernoulli value/decision block (pre-outcome by name): relative value + belief entropy
-    "switch_advantage_mu_preoutcome_sess", "beta_reward_entropy",
-})
+POST_OUTCOME = frozenset(
+    {  # NOT available before the current trip's reward
+        "rpe",  # beta reward prediction error (reward - q_chosen)
+        "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
+        "unchosen_patches_mu_update_abs_postoutcome_sess",  # alternative-patch update
+        # Trip *completion* is goal arrival (poke-in), which is strictly earlier
+        # than the outcome: reward onset for a rewarded trip, and poke-out for an
+        # omission (there is no negative-feedback cue to timestamp -- see
+        # qvals_table._outcome_known_time). Between arrival and that boundary
+        # these three already carry the outcome, so "completed by event start"
+        # does not make them pre-outcome safe. Gate on ``outcome_known_time`` to
+        # use them; do not reclassify.
+        "reward_outcome",
+        "is_after_reward",
+        "is_after_omission",
+    }
+)
+FUTURE_REFERENCING = frozenset(
+    {  # references a not-yet-occurred event
+        "next_arm",
+        "is_next",
+        "ends_at_next",
+        "contains_path_to_next",
+        "chosen_arm_fraction",
+        "trials_since_switch",
+        "is_post_switch",
+        # Stop-table ``is_stay`` is the eventual outbound choice from the current
+        # well (current_patch == next_patch), not the completed inbound trip.
+        "is_stay",
+    }
+)
+PRE_OUTCOME_SAFE = frozenset(
+    {  # trailing/backward, safe as predictors pre-reward
+        "reward_lag1",
+        "reward_lag2",
+        "reward_rate_trial_k10",
+        "reward_rate_arm_k10",
+        "visit_recency",
+        "visit_recency_demeaned",
+        "visit_recency_patch",
+        "arm_never_visited",
+        "arm_never_visited_patch",
+        "cumulative_reward",
+        "is_current",
+        "is_prev",
+        "is_last_rewarded",
+        "is_last_rewarded_elsewhere",
+        "is_after_switch",
+        "is_after_stay",
+        "q_arm",
+        "q_current",
+        "p_reward_arm",
+        "p_reward_current",
+        "value_diff_patch",
+        "time_since_stop",
+        "leaky_q_value_diff",
+        "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
+        # beta-bernoulli value/decision block (pre-outcome by name): relative value + belief entropy
+        "switch_advantage_mu_preoutcome_sess",
+        "beta_reward_entropy",
+    }
+)
 
 # Gating factors, not outcome-bearing -- dropped when resolving a patsy interaction.
 SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})
@@ -55,20 +95,27 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     # fit_uncertainty_rate renames the beta-model RPE to distinguish it from
     # older nominal stand-ins; its information time is unchanged.
     "rpe_model": ["rpe"],
+    # Stop-local summaries. Omission streak is a deterministic reduction of the
+    # causal reward-lag vector. WSLS uses the eventual outbound choice and is
+    # therefore future-referencing even after the current outcome is known.
+    "omission_streak": [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+    "wsls_deviation": ["reward_outcome", "is_stay"],
     # content `_x_current` interactions (source is the z-scalar's base covariate)
-    "rpe_x_current": ["rpe"], "rpe_x_current_z": ["rpe"],
+    "rpe_x_current": ["rpe"],
+    "rpe_x_current_z": ["rpe"],
     "relval_x_current": ["switch_advantage_mu_preoutcome_sess"],
     "entropy_x_current": ["beta_reward_entropy"],
     "update_x_current": ["global_mu_update_abs_postoutcome_sess"],  # POST_OUTCOME
-    "tss_x_current": ["trials_since_switch"],             # FUTURE_REFERENCING
-    "postsw_x_current": ["is_post_switch"],               # FUTURE_REFERENCING
+    "tss_x_current": ["trials_since_switch"],  # FUTURE_REFERENCING
+    "postsw_x_current": ["is_post_switch"],  # FUTURE_REFERENCING
     "tsspostsw_x_current": ["trials_since_switch", "is_post_switch"],
-    "block_x_current": ["trials_since_block_change"],     # safe (backward)
-    "switchrate_x_current": ["recent_switch_rate"],       # safe (backward)
-    "tsc_x_current": [],                                   # within-stop time, safe & value-free
+    "block_x_current": ["trials_since_block_change"],  # safe (backward)
+    "switchrate_x_current": ["recent_switch_rate"],  # safe (backward)
+    "tsc_x_current": [],  # within-stop time, safe & value-free
     # pre-materialized swr_x_* columns used directly in the CS-rungs (model_specs.py)
-    "swr_x_current": ["is_current"], "swr_x_prev": ["is_prev"],
-    "swr_x_next": ["is_next"],                            # FUTURE_REFERENCING
+    "swr_x_current": ["is_current"],
+    "swr_x_prev": ["is_prev"],
+    "swr_x_next": ["is_next"],  # FUTURE_REFERENCING
     "swr_x_last_rewarded": ["is_last_rewarded"],
     "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
@@ -86,31 +133,46 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_current_patch": ["is_current_patch"],
     "swr_x_last_rewarded_patch_elsewhere": ["is_last_rewarded_patch_elsewhere"],
     "swr_x_prev_patch": ["is_prev_patch"],
-    "currentpatch_x_tss": ["trials_since_switch"],        # FUTURE_REFERENCING
-    "currentpatch_x_tsc": [],                              # within-stop time, safe
+    "currentpatch_x_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
+    "currentpatch_x_tsc": [],  # within-stop time, safe
     "currentpatch_x_switchrate": ["recent_switch_rate"],  # safe (backward)
-    "lastrewpatch_x_tss": ["trials_since_switch"],        # FUTURE_REFERENCING
-    "swr_x_lastrewpatch_tss": ["trials_since_switch"],    # FUTURE_REFERENCING
+    "lastrewpatch_x_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
+    "swr_x_lastrewpatch_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
 }
 
 # Rate-design basis terms — safe backward/within-stop covariates. Generated from the same
 # constants the specs use (do not hard-code the ranges).
 _DESIGN_BASIS = (
-    {"tc"}                                                             # bs(tc,...) spline argument
-    | {f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)}          # reward_lag1..10
-    | {f"onset_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)}          # onset_lag1..10 self-history
-    | {f"cross_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)}          # cross-history dummies
-    | {f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}               # raised-cosine history basis
-    | {f"cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}         # cross-history basis
+    {"tc"}  # bs(tc,...) spline argument
+    | {f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)}  # reward_lag1..10
+    | {
+        f"onset_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)
+    }  # onset_lag1..10 self-history
+    | {f"cross_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)}  # cross-history dummies
+    | {f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}  # raised-cosine history basis
+    | {f"cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}  # cross-history basis
 )
 
 # Universe every atom must fall in — the completeness test fails on anything unclassified.
-KNOWN_ATOMS = POST_OUTCOME | FUTURE_REFERENCING | PRE_OUTCOME_SAFE | _DESIGN_BASIS | frozenset({
-    "recent_switch_rate", "trials_since_block_change",   # backward-safe context
-    "arm_dist_rank", "is_same_patch", "dist_to_arm",     # spatial, value-free
-    "is_current_patch", "is_prev_patch",                 # patch spatial identity
-    "is_last_rewarded_patch_elsewhere",                  # patch backward-safe
-}) | {f"arm_fe_{i}" for i in range(8)}
+KNOWN_ATOMS = (
+    POST_OUTCOME
+    | FUTURE_REFERENCING
+    | PRE_OUTCOME_SAFE
+    | _DESIGN_BASIS
+    | frozenset(
+        {
+            "recent_switch_rate",
+            "trials_since_block_change",  # backward-safe context
+            "arm_dist_rank",
+            "is_same_patch",
+            "dist_to_arm",  # spatial, value-free
+            "is_current_patch",
+            "is_prev_patch",  # patch spatial identity
+            "is_last_rewarded_patch_elsewhere",  # patch backward-safe
+        }
+    )
+    | {f"arm_fe_{i}" for i in range(8)}
+)
 
 
 def timing_of(predictor: str) -> list[str]:
@@ -144,6 +206,12 @@ def assert_predictor_timing(
     """
     for p in predictors:
         atoms = set(timing_of(p))
+        unknown = atoms - KNOWN_ATOMS
+        if unknown:
+            raise ValueError(
+                f"{p} resolves to unclassified timing atom(s) {sorted(unknown)}; "
+                "add an explicit timing classification before fitting"
+            )
         if atoms & FUTURE_REFERENCING and not descriptive:
             raise ValueError(
                 f"{p} is future-referencing (e.g. trials_since_switch signs toward the "

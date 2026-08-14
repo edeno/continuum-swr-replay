@@ -6,14 +6,16 @@ choice / coupling**. Agreed decisions D1–D5 (2026-06-29) are recorded at the e
 This is the target the model specs and covariate-computation layer implement
 against; the harmonization refactor brings the code to this spec.
 
-**Status: implemented (2026-06-29, harmonization phase-1).** The covariate
+**Status: definitions implemented; canonical tables and model artifacts require
+regeneration before paper results are updated.** The covariate
 definitions live in `analysis/replay/covariates.py`; the per-arm value block
 (`reward_rate_arm_k10` at k=10, `p_reward_arm`, `q_arm`) is emitted by the event
 builders from the per-stop contingency artifact (`p_reward_port`/`q_port`,
 per-animal fitted α in `contingency_csv_alpha.json`); the value rungs are `Mv`
 (arm) / `Pv` (patch); `q_current` enters the MU/coupling runners; the choice
-baseline is `arm_dist_rank`. Coefficients are produced by the phase-2 re-fit on
-the regenerated canonical tables.
+baseline is `arm_dist_rank`. Existing coefficients predate the location and
+two-clock history contracts and must not be treated as results from these
+definitions.
 
 ## A. Entry-rule contract (forced by estimator type)
 
@@ -40,8 +42,8 @@ Named by **scope + window** so the same word never hides a different definition.
 
 | canonical name | definition | window (N=10) | scope | units | enters |
 |---|---|---|---|---|---|
-| `reward_lag{1..10}` | outcome of the j-th most recent trial | 10 trials, per-lag | all-arm (per-trial) | binary | rate A (Rlag), rate B, MU, coupling — main effects |
-| `reward_rate_trial_k10` | rewarded fraction of the last 10 **trials** | 10 trials | all-arm | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
+| `reward_lag{1..10}` | outcome of the j-th most recent trial whose outcome was observable by the query time | 10 known outcomes, per-lag | all-arm (per-trial) | binary | rate A (Rlag), rate B, MU, coupling — main effects |
+| `reward_rate_trial_k10` | rewarded fraction of the last 10 trials with known outcomes | 10 known outcomes | all-arm | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
 | `reward_rate_arm_k10` | rewarded fraction of the last 10 **visits to that arm**; an unvisited leaf (no prior visit, but the session has prior trials) is encoded `0.0`, while the explicit `arm_never_visited` term separates novelty from an observed zero. Trunk arms are structurally `0.0`; no-prior-trials rows are NaN. | 10 arm-visits | per-arm | fraction | content (main effect), choice (main effect); rate/coupling via `× is_current` |
 
 Change from prior code (implemented): the per-arm rate was **5-visit**
@@ -162,16 +164,36 @@ the event it predicts. Classification of the covariates fitted by the rate model
 |---|---|---|
 | `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
 | `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
-| `recent_switch_rate` | rolling over completed trials | yes — includes only trips completed by the bout start and never uses that stop's eventual outbound choice |
+| destination/visit recency, `is_after_switch`, `recent_switch_rate` | **arrival clock** | yes — destination and inbound patch change become known at goal arrival |
+| reward lags/rates/counts, last-rewarded well | **outcome clock** | yes — advance only at first pump onset (reward) or destination poke-out (omission) |
 | `beta_reward_entropy` | beta belief entropy (mean per-leaf Beta differential entropy) | yes (pre-outcome posterior) |
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
+| `reward_outcome`, `is_after_reward`, `is_after_omission` | most recently arrived trip's outcome | finite **only after** that outcome is observable; otherwise NaN |
+| `is_stay`, `wsls_deviation` | eventual outbound choice | no — future-referencing; descriptive use only |
 
-The three post-outcome covariates are the only leakage risk. **Empirically there is
-no leakage in the current cached tables:** on rewarded stops, 0.0% of
-non-local/SWR/MUA events occur before the reward pump (minimum finite
-`t_since_pump` is ≈0.03 s for non-local events, with median ≈4.07 s;
-`event_onset_table`), so the realized outcome is known before the modeled event.
-Re-check this exposure if the immobility/event-window definition changes.
+**Arrival is not the outcome boundary.** Canonical trials therefore carry two
+clocks. `goal_arrival_time` controls destination, visit, and inbound-switch
+history. `outcome_known_time` is the first pump onset for a rewarded trial and
+the destination poke-out for an omission (there is no separate negative-feedback
+cue). Between those boundaries, arrival-derived fields are populated while all
+current reward-bearing fields remain NaN. Older/manual trial frames without a
+physical outcome column use `end_time` for both outcomes: conservative for
+rewards, but never anticipatory.
+
+Outcome-bearing fields remain in `POST_OUTCOME` in `covariate_timing.py` because
+their finite values semantically encode the realized current outcome. A model
+may use them only with a physical `outcome_known_time` gate
+(`retrospective=True`). The uncertainty-rate and SWR-power runners audit counts
+before/after that gate separately for rewarded and omission observations, and
+skip a session/population cell if either class disappears. Future-referencing
+outbound-choice fields (`is_stay`, `wsls_deviation`, `next_*`) cannot be repaired
+by this gate and require explicitly descriptive use.
+
+**The previously recorded
+"0.0 % of events occur before the reward pump" measurement predates the unified
+speed gating and the event-location work and must be re-derived** before it is
+cited again — the immobility/event-window definition it warned about has since
+changed. Re-check this exposure whenever that definition changes.
 
 ## G. Base covariate reference
 
@@ -191,35 +213,66 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   analyses can filter them explicitly. `physical_arm` is the modal observed
   track segment, including trunks. `current_arm` is a compatibility alias of
   `location_arm` and is NaN off-well; there is no trunk-to-destination fallback.
+  Roughly 11 % of events are off-well — see
+  [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
 - `is_current`, `is_prev`, `is_next` — arm equals the animal's at-well /
   previous-trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
   (the destination the animal will run to); used only where a spec includes it, and
   interpreted as forward representation, not a causal predictor.
-- `is_same_patch` — arm shares a patch with `current_arm`.
+  `is_current` is **NaN** (not 0) wherever `current_arm` is, so any spec
+  containing it is fit on the at-well cohort by complete-case selection. That
+  is the only cohort in which "the current arm" is defined — it is not an
+  optional sensitivity subset. `is_prev` / `is_next` / `is_last_rewarded`
+  instead encode an absent reference as 0, because "no previous trip" genuinely
+  means no arm qualifies.
+- `is_same_patch` — arm shares a patch with `current_arm`; NaN wherever
+  `is_current` is.
 - `dist_to_arm` — track-graph distance from the animal's current position to the arm
   (0 at the current arm); `arm_dist_rank` is its within-event min-rank.
 
 **Reward / value history** (per event-arm, from the trial sequence):
 - `cumulative_reward` — number of rewards received at that arm among the prior
-  (up to) 10 completed trials; this is a finite-window count, not a
+  (up to) 10 outcome-known trials; this is a finite-window count, not a
   session-to-date cumulative total.
 - `visit_recency` — **trials-ago** since the animal last visited that arm (a discrete
-  trial count, not elapsed time), using only trials completed by the event. A
-  reachable arm not yet visited receives the time-local right-censored value
-  `n_completed_trials + 1`; `arm_never_visited` separately marks that state.
-  Appending future trials therefore cannot change an earlier event's recency.
-  `visit_recency_demeaned` subtracts the mean across the six leaf arms within
-  that same event (trunks remain structural zero). This is a time-local relative
+  trial count, not elapsed time), measured at the **event start** using only
+  trials completed by then. A reachable arm not yet visited receives the
+  time-local right-censored value `n_completed_trials + 1`;
+  `arm_never_visited` separately marks that state. Appending future trials
+  therefore cannot change an earlier event's recency. **Trunk arms carry a
+  structural `0.0`** once any history exists — they are not reward sites, so
+  "trials since last visit" is undefined for them and zero is a placeholder,
+  not "just visited". Any aggregation over arms must mask trunks first
+  (`visit_recency_patch` takes its minimum over leaf arms only for exactly
+  this reason).
+  `visit_recency_demeaned` subtracts the mean across the **visited** leaf arms
+  within that same event (trunks remain structural zero). Never-visited arms
+  are excluded from that mean: their value is set by the censoring rule rather
+  than measured, and including it would displace every other arm in the event.
+  An event with no visited leaf arm is NaN. This is a time-local relative
   recency contrast: appending later events cannot change earlier rows.
-- `reward_rate_arm_k10` — rewarded fraction of the last 10 visits to that arm
+- `arm_never_visited` — 1.0 where the animal has never visited that leaf arm by
+  the event start, else 0.0; trunk arms 0.0. Carries the right-censored state
+  that `visit_recency`'s fill value can only approximate, and enters M4+,
+  `BASEc`, and the choice ladder alongside `visit_recency_demeaned`. Because a
+  never-visited arm always holds the maximum pre-centering recency, the two
+  move together by construction — check conditioning before reading their
+  coefficients separately.
+- `visit_recency_patch` / `arm_never_visited_patch` — per-patch aggregates,
+  both taken as the **minimum over the patch's two leaf arms** (trunks
+  excluded). A patch is novel only if both its leaves are novel.
+- `reward_rate_arm_k10` — rewarded fraction of the last 10 outcome-known visits to that arm
   (trunk arms 0.0; a leaf arm not yet visited is also encoded 0.0, *not* NaN —
   only rows with no prior trials at all stay NaN). See §2.
 
 **Recent-trial context** (per stop, broadcast to the stop's events):
-- `is_after_reward` / `is_after_omission` — the previous trial was / was not rewarded
-  (exact complements).
-- `is_after_stay` / `is_after_switch` — the previous transition stayed in / switched
-  patch (exact complements).
+- `reward_outcome` / `is_after_reward` / `is_after_omission` — the most recently
+  arrived trip's outcome, exact complements once known and all NaN while that
+  outcome is pending.
+- `is_after_stay` / `is_after_switch` — the completed inbound transition stayed
+  in / switched patch (exact complements; available at destination arrival).
+- `is_stay` — whether the later outbound trip stays within the patch. This is a
+  future-referencing response, not the same construct as `is_after_stay`.
 
 **Event / state indicators** (per event):
 - `is_swr` — event overlaps a sharp-wave ripple (strict positive-duration overlap;

@@ -17,9 +17,13 @@ def test_rejects_derived_post_outcome():
     """A derived interaction whose source is post-outcome must be caught (the name does
     not contain the source scalar, so a string heuristic would miss it)."""
     with pytest.raises(ValueError, match="post-outcome"):
-        assert_predictor_timing(["update_x_current"])  # source global_mu_update_abs_postoutcome_sess
+        assert_predictor_timing(
+            ["update_x_current"]
+        )  # source global_mu_update_abs_postoutcome_sess
     # ...but only when the source really is post-outcome; relval is safe.
-    assert_predictor_timing(["relval_x_current"])  # switch_advantage_mu_preoutcome_sess -> no raise
+    assert_predictor_timing(
+        ["relval_x_current"]
+    )  # switch_advantage_mu_preoutcome_sess -> no raise
 
 
 def test_rejects_derived_future_referencing():
@@ -71,11 +75,33 @@ def test_is_after_switch_is_safe():
     assert timing_of("is_after_switch") == ["is_after_switch"]
 
 
-def test_last_completed_outcome_context_is_past_only():
-    """Completion-indexed outcome flags need no retrospective override."""
-    assert_predictor_timing(
-        ["reward_outcome", "is_after_reward", "is_after_omission"]
-    )
+@pytest.mark.parametrize(
+    "predictor", ["reward_outcome", "is_after_reward", "is_after_omission"]
+)
+def test_completion_indexed_outcome_flags_still_require_a_gate(predictor):
+    """Their finite values are meaningful only after outcome availability.
+
+    ``add_trial_context`` now leaves these fields missing between arrival and
+    reward onset/poke-out. They remain POST_OUTCOME because whenever they are
+    finite they encode the current realized outcome, so callers must preserve
+    the physical gate rather than treating them as ordinary predictors.
+    """
+    with pytest.raises(ValueError, match="post-outcome"):
+        assert_predictor_timing([predictor])
+    # The gated path is how a fit legitimately uses them.
+    assert_predictor_timing([predictor], retrospective=True)
+
+
+def test_unknown_timing_atom_fails_closed():
+    with pytest.raises(ValueError, match="unclassified timing atom"):
+        assert_predictor_timing(["plausible_but_unregistered_covariate"])
+
+
+@pytest.mark.parametrize("predictor", ["is_stay", "wsls_deviation"])
+def test_eventual_choice_covariates_are_future_referencing(predictor):
+    with pytest.raises(ValueError, match="future-referencing"):
+        assert_predictor_timing([predictor], retrospective=True)
+    assert_predictor_timing([predictor], descriptive=True)
 
 
 def test_descriptive_whitelists_both_leak_types():
@@ -86,7 +112,10 @@ def test_descriptive_whitelists_both_leak_types():
 
 def _all_ladder_predictors():
     preds: set[str] = set()
-    for lad in (ms.SWR_CONTRAST_CONTENT_ARM_LADDER, ms.SWR_CONTRAST_CONTENT_PATCH_LADDER):
+    for lad in (
+        ms.SWR_CONTRAST_CONTENT_ARM_LADDER,
+        ms.SWR_CONTRAST_CONTENT_PATCH_LADDER,
+    ):
         for _name, (pr, _scope) in lad.items():
             preds.update(pr)
     for lad in (ms.SWR_CONTRAST_RATE_G_SPECS, ms.SWR_CONTRAST_RATE_S_SPECS):

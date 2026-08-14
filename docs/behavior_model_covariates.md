@@ -42,8 +42,12 @@ back onto row *t*.
 Each stop is assigned to a trial by Alison's convention
 (`alison_decoding.add_trial_info_to_clusterless_results`): within an epoch, trial
 *t* spans `[poke_out_ts[t-1], poke_out_ts[t])`, i.e.
-`trial = searchsorted(poke_out_ts, stop_midpoint, side="right")`. The trial's
-pre-outcome state is broadcast to every stop in that interval. Validated against
+`trial = searchsorted(poke_out_ts, stop_start, side="right")`. Stop-level
+covariates are frozen at bout start throughout the replay tables; using a
+midpoint can silently jump to a later trial when a low-speed bout spans a
+trial boundary. The trial's
+pre-outcome state is attached to every stop whose **start** lies in that
+interval and is then held fixed across that bout. Validated against
 signals the alignment never uses: at-well (`in_poke`) arm vs position `current_arm`
 **99.9–100%**, at-well reward vs DIO `reward_outcome` **99.8–100%**. Caveats:
 - **Coverage is 97–99%**; the unmapped 1–3% are *trailing* stops after the epoch's
@@ -62,6 +66,7 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 | `stop_id` | join key to `stop_table` (uint64) |
 | `epoch` | epoch label, e.g. `"02_r1"` |
 | `trial_number_by_epoch` | assigned trial (0-based) within the epoch |
+| `qvals_context_time` | `stop_start`, the timestamp used for trial assignment |
 | `in_poke` | stop midpoint inside `[poke_in_ts, poke_out_ts]` (at-well vs transit) |
 | `is_rewarding` | stop midpoint inside `[reward_on_ts, reward_off_ts]` (pump on) |
 | `trial_reward` | the trial's reward outcome (0/1) |

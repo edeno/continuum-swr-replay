@@ -31,13 +31,13 @@ def track_graph():
 
     # Wells in a star pattern around center
     positions = {
-        0: (0, 20),    # Patch 1
-        1: (0, -20),   # Patch 1
-        2: (20, 20),   # Patch 2
+        0: (0, 20),  # Patch 1
+        1: (0, -20),  # Patch 1
+        2: (20, 20),  # Patch 2
         3: (20, -20),  # Patch 2
-        4: (40, 20),   # Patch 3
+        4: (40, 20),  # Patch 3
         5: (40, -20),  # Patch 3
-        6: (20, 0),    # Center
+        6: (20, 0),  # Center
     }
     for node, pos in positions.items():
         graph.nodes[node]["pos"] = pos
@@ -107,6 +107,7 @@ class TestMakeWellVisitsDf:
             "to_well",
             "is_run",
             "is_reward",
+            "reward_on_time",
             "from_patch",
             "to_patch",
             "is_patch_change",
@@ -184,6 +185,20 @@ class TestMakeWellVisitsDf:
         # At least one row should have is_reward=True
         assert result["is_reward"].any(), "No rewards detected"
 
+    def test_reward_on_time_uses_earliest_unsorted_pump(
+        self, beam_breaks, position_info, track_graph
+    ):
+        """Direct callers need not pre-sort pump events."""
+        pumps = pd.DataFrame({"start_time": [12.08, 12.05]})
+
+        result = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+
+        reward_times = result.loc[
+            result["is_reward"] & result["reward_on_time"].notna(),
+            "reward_on_time",
+        ]
+        assert reward_times.min() == pytest.approx(12.05)
+
     def test_patch_mapping_correct(
         self, beam_breaks, pump_events, position_info, track_graph
     ):
@@ -209,9 +224,7 @@ class TestMakeWellVisitsDf:
         )
 
         expected = result["from_patch"] != result["to_patch"]
-        np.testing.assert_array_equal(
-            result["is_patch_change"].values, expected.values
-        )
+        np.testing.assert_array_equal(result["is_patch_change"].values, expected.values)
 
     def test_no_pump_events_means_no_rewards(
         self, beam_breaks, position_info, track_graph
@@ -308,6 +321,8 @@ class TestMakeTrialsDfFromWellVisits:
             "start_time",
             "end_time",
             "is_reward",
+            "reward_on_time",
+            "outcome_known_time",
             "from_well",
             "to_well",
             "from_patch",
@@ -318,3 +333,23 @@ class TestMakeTrialsDfFromWellVisits:
         ]
         for col in required:
             assert col in trials.columns, f"Missing column: {col}"
+
+    def test_outcome_clock_uses_pump_for_reward_and_poke_out_for_omission(
+        self, beam_breaks, pump_events, position_info, track_graph
+    ):
+        well_visits = make_well_visits_df(
+            beam_breaks, pump_events, position_info, track_graph
+        )
+        trials = make_trials_df_from_well_visits(well_visits)
+
+        rewarded = trials["is_reward"]
+        np.testing.assert_allclose(
+            trials.loc[rewarded, "outcome_known_time"],
+            trials.loc[rewarded, "reward_on_time"],
+        )
+        np.testing.assert_allclose(
+            trials.loc[~rewarded, "outcome_known_time"],
+            trials.loc[~rewarded, "end_time"],
+        )
+        assert (trials["outcome_known_time"] >= trials["goal_arrival_time"]).all()
+        assert (trials["outcome_known_time"] <= trials["end_time"]).all()

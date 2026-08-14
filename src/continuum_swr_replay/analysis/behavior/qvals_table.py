@@ -56,20 +56,30 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 RC = PROCESSED_DATA_DIR / "replay_content"
 ANIMALS = ("chimi", "j16", "peanut", "senor", "wilbur")
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
-ANIMAL_SUBJECT = {"chimi": "chimi", "j16": "j16", "peanut": "peanut",
-                  "senor": "Senor", "wilbur": "wilbur"}
-MODEL_KEY = {"behavior_model_params_name": "beta_stable_withleaf",
-             "trials_info_by_rat_params_name": "stable_default",
-             "trials_info_csv_params_name": "original_csv_format"}
+ANIMAL_SUBJECT = {
+    "chimi": "chimi",
+    "j16": "j16",
+    "peanut": "peanut",
+    "senor": "Senor",
+    "wilbur": "wilbur",
+}
+MODEL_KEY = {
+    "behavior_model_params_name": "beta_stable_withleaf",
+    "trials_info_by_rat_params_name": "stable_default",
+    "trials_info_csv_params_name": "original_csv_format",
+}
 # Continuous stop-level covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``
 # by this builder (after the all-epoch concat). This is the qvals side of the persisted
 # _z that used to be stamped post-hoc by _add_standardized_cols; prepare_data only READS
 # this table and must not re-standardize it.
 QVALS_STANDARDIZED_COLS = [
-    "trials_since_switch", "trials_since_block_change",
+    "trials_since_switch",
+    "trials_since_block_change",
     # beta-bernoulli value / decision / uncertainty block:
-    "rpe", "switch_advantage_mu_preoutcome_sess",
-    "global_mu_update_abs_postoutcome_sess", "beta_reward_entropy",
+    "rpe",
+    "switch_advantage_mu_preoutcome_sess",
+    "global_mu_update_abs_postoutcome_sess",
+    "beta_reward_entropy",
 ]
 KEYS = ["nwb_file_name", "epoch", "trial_number_by_epoch"]
 TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
@@ -79,30 +89,45 @@ TIME_COLS = ["poke_in_ts", "poke_out_ts", "reward_on_ts", "reward_off_ts"]
 # variables (computed by the vendored beta-bernoulli pipeline), the derived beta
 # belief entropy, RPE, and the raw value/uncertainty/choice columns.
 COVARIATES = [
-    "arm", "q_chosen", "rpe", "rpe_abs",
+    "arm",
+    "q_chosen",
+    "rpe",
+    "rpe_abs",
     # expected value (per port / patch / belief mean)
-    *[f"Q{i}" for i in range(1, 7)], *[f"Qstem{i}" for i in range(1, 4)],
+    *[f"Q{i}" for i in range(1, 7)],
+    *[f"Qstem{i}" for i in range(1, 4)],
     *[f"betadist_mu{i}" for i in range(1, 7)],
     # per-port model value (alias of Q1..6, 0-indexed) for the content/contfrag
     # builders: q_port{arm} -> q_arm (attach_contingency_value_block).
     *[f"q_port{i}" for i in range(6)],
     # decision variables: Stay / Switch / Relative (DeltaV)
-    "stay_sibling_mu_preoutcome_sess", "best_other_patch_mean_mu_preoutcome_sess",
-    "switch_advantage_mu_preoutcome_sess", "switch_advantage_preoutcome_sess_Qstem",
+    "stay_sibling_mu_preoutcome_sess",
+    "best_other_patch_mean_mu_preoutcome_sess",
+    "switch_advantage_mu_preoutcome_sess",
+    "switch_advantage_preoutcome_sess_Qstem",
     # absolute value-update magnitudes, 4 scopes (paper) + global signed
-    "global_mu_update_abs_postoutcome_sess", "chosen_leaf_mu_update_abs_postoutcome_sess",
-    "chosen_patch_mu_update_abs_postoutcome_sess", "unchosen_patches_mu_update_abs_postoutcome_sess",
+    "global_mu_update_abs_postoutcome_sess",
+    "chosen_leaf_mu_update_abs_postoutcome_sess",
+    "chosen_patch_mu_update_abs_postoutcome_sess",
+    "unchosen_patches_mu_update_abs_postoutcome_sess",
     "global_mu_update_signed_postoutcome_sess",
     # uncertainty
     *[f"betadist_var{i}" for i in range(1, 7)],
-    "global_leaf_var_sum_preoutcome_sess", "chosen_leaf_var_preoutcome_sess",
-    "prev_local_variance", "prev_global_variance", "upcoming_leaf_variance", "next_choice_variance",
+    "global_leaf_var_sum_preoutcome_sess",
+    "chosen_leaf_var_preoutcome_sess",
+    "prev_local_variance",
+    "prev_global_variance",
+    "upcoming_leaf_variance",
+    "next_choice_variance",
     # beta belief-entropy (mean per-leaf Beta differential entropy)
     "beta_reward_entropy",
     # depletion / choice probabilities
     *[f"depletion_leaf_{i}" for i in range(1, 7)],
     *[f"depletion_mean_stem_{i}" for i in range(1, 4)],
-    "stem_choice_p", "leaf_choice_p", "stem_stay_p", *[f"stem_{i}_p" for i in range(1, 4)],
+    "stem_choice_p",
+    "leaf_choice_p",
+    "stem_stay_p",
+    *[f"stem_{i}_p" for i in range(1, 4)],
 ]
 
 # Nominal schedule covariates derived from TrialsInfoByEpoch (the same table read
@@ -111,10 +136,14 @@ COVARIATES = [
 # value_diff_patch / trials_since_block_change use this project's definitions
 # (Alison computes no nominal value-diff -- her decision variables are model-based).
 NOMINAL_COVARIATES = [
-    "p_reward_current", "p_reward_best", "value_diff_patch", "trials_since_block_change",
+    "p_reward_current",
+    "p_reward_best",
+    "value_diff_patch",
+    "trials_since_block_change",
     # peri-switch trial index (signed distance to the nearest patch switch) +
     # post-switch indicator; the paper's "trials since switch" axis (Comrie et al Fig 2).
-    "trials_since_switch", "is_post_switch",
+    "trials_since_switch",
+    "is_post_switch",
     # per-port nominal p(R); the content/contfrag builders map p_reward_port{arm}
     # -> p_reward_arm (attach_contingency_value_block).
     *[f"p_reward_port{i}" for i in range(6)],
@@ -123,7 +152,9 @@ NOMINAL_COVARIATES = [
 WELL_PATCH = np.array([0, 0, 1, 1, 2, 2])
 
 
-def peri_switch_index(patch: np.ndarray, clip: int = 20) -> tuple[np.ndarray, np.ndarray]:
+def peri_switch_index(
+    patch: np.ndarray, clip: int = 20
+) -> tuple[np.ndarray, np.ndarray]:
     """Signed trials-to-nearest-patch-switch + post-switch flag for one epoch.
 
     A *switch* is a trial whose patch differs from the previous trial's. For each
@@ -155,11 +186,11 @@ def peri_switch_index(patch: np.ndarray, clip: int = 20) -> tuple[np.ndarray, np
     if pos.size == 0:
         return np.full(n, np.nan), np.full(n, np.nan)
     idx = np.arange(n)
-    li = np.searchsorted(pos, idx, side="right") - 1        # last switch at/before idx
+    li = np.searchsorted(pos, idx, side="right") - 1  # last switch at/before idx
     since = np.where(li >= 0, idx - pos[np.clip(li, 0, None)], np.inf)
-    ni = np.searchsorted(pos, idx, side="right")            # first switch after idx
+    ni = np.searchsorted(pos, idx, side="right")  # first switch after idx
     until = np.where(ni < pos.size, pos[np.clip(ni, 0, pos.size - 1)] - idx, np.inf)
-    post = since <= until                                    # nearest switch is behind (ties -> post)
+    post = since <= until  # nearest switch is behind (ties -> post)
     signed = np.clip(np.where(post, since, -until).astype(float), -clip, clip)
     return signed, post.astype(float)
 
@@ -185,7 +216,9 @@ def _add_nominal_contingency(times: pd.DataFrame) -> pd.DataFrame:
     times["p_reward_best"] = ports.max(axis=1)
     for i in range(6):
         times[f"p_reward_port{i}"] = ports[:, i]  # per-port nominal p(R)
-    patch_val = np.stack([ports[:, WELL_PATCH == p].mean(axis=1) for p in range(3)], axis=1)
+    patch_val = np.stack(
+        [ports[:, WELL_PATCH == p].mean(axis=1) for p in range(3)], axis=1
+    )
     srt = np.sort(patch_val, axis=1)
     times["value_diff_patch"] = srt[:, -1] - srt[:, -2]
     times["trials_since_block_change"] = times.groupby(
@@ -242,8 +275,12 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
     HMM discrete Shannon entropy) -- expected; the covariate is used standardized.
     Mutates and returns ``vals``. Raises if the posterior params are absent.
     """
-    missing = [f"betadist_{g}{i}" for i in range(1, 7) for g in ("α", "β")
-               if f"betadist_{g}{i}" not in vals.columns]
+    missing = [
+        f"betadist_{g}{i}"
+        for i in range(1, 7)
+        for g in ("α", "β")
+        if f"betadist_{g}{i}" not in vals.columns
+    ]
     if missing:
         raise ValueError(
             f"beta posterior params missing {missing}; cannot build beta_reward_entropy"
@@ -252,8 +289,12 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
     for i in range(1, 7):
         a = vals[f"betadist_α{i}"].to_numpy(dtype=float)
         b = vals[f"betadist_β{i}"].to_numpy(dtype=float)
-        ent += (betaln(a, b) - (a - 1) * digamma(a) - (b - 1) * digamma(b)
-                + (a + b - 2) * digamma(a + b))
+        ent += (
+            betaln(a, b)
+            - (a - 1) * digamma(a)
+            - (b - 1) * digamma(b)
+            + (a + b - 2) * digamma(a + b)
+        )
     result = ent / 6.0
     # Guard the "α,β ≥ 1 → finite" assumption: a NaN/±inf here would otherwise flow
     # into the pooled-SD standardization and silently blank EVERY beta_reward_entropy_z
@@ -269,9 +310,9 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
 
 
 def assign_stops_to_trials(
-    poke_out_ts: np.ndarray, stop_mid: np.ndarray
+    poke_out_ts: np.ndarray, stop_context_time: np.ndarray
 ) -> np.ndarray:
-    """Assign each stop midpoint to a trial by poke-out interval.
+    """Assign each stop's frozen context time to a trial by poke-out interval.
 
     Alison's rule: trial ``t`` spans ``[poke_out[t-1], poke_out[t])`` (with
     ``poke_out[-1] = -inf``), reproduced by ``searchsorted(..., side="right")``.
@@ -280,8 +321,10 @@ def assign_stops_to_trials(
     ----------
     poke_out_ts : np.ndarray, shape (n_trials,)
         Per-trial poke-out times, sorted ascending (temporal trial order).
-    stop_mid : np.ndarray, shape (n_stops,)
-        Stop midpoint times.
+    stop_context_time : np.ndarray, shape (n_stops,)
+        Time at which stop-level covariates are frozen. Canonical callers use
+        ``stop_start``; a speed bout can cross a trial boundary, so using its
+        midpoint would attach a later trial than the rest of the stop table.
 
     Returns
     -------
@@ -289,7 +332,7 @@ def assign_stops_to_trials(
         Trial index per stop, or ``-1`` for stops at or after the last poke-out
         (no enclosing trial -> dropped by the caller).
     """
-    ti = np.searchsorted(poke_out_ts, stop_mid, side="right")
+    ti = np.searchsorted(poke_out_ts, stop_context_time, side="right")
     return np.where(ti < len(poke_out_ts), ti, -1)
 
 
@@ -323,17 +366,24 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     pt_attrs_entropy = float(vals["beta_reward_entropy"].notna().mean())
 
     nwbs = vals["nwb_file_name"].unique().tolist()
-    times = pd.DataFrame((beh.TrialsInfoByEpoch.ByTrial
-                          & [{"nwb_file_name": n} for n in nwbs]).fetch())
+    times = pd.DataFrame(
+        (beh.TrialsInfoByEpoch.ByTrial & [{"nwb_file_name": n} for n in nwbs]).fetch()
+    )
     # epoch arrives as an int epoch-number from DataJoint; if it were a string the
     # epoch_number join below would silently drop every stop.
     if not pd.api.types.is_integer_dtype(times["epoch"].dtype):
-        raise TypeError(f"expected integer epoch from DataJoint, got {times['epoch'].dtype}")
+        raise TypeError(
+            f"expected integer epoch from DataJoint, got {times['epoch'].dtype}"
+        )
     times = _add_nominal_contingency(times)
     times = times[[*KEYS, *TIME_COLS, "leaf", "reward", *NOMINAL_COVARIATES]]
 
-    pt = times.merge(vals[[*KEYS, "leaf", "reward", *model_cols]], on=KEYS,
-                     suffixes=("_time", "_val"), validate="one_to_one")
+    pt = times.merge(
+        vals[[*KEYS, "leaf", "reward", *model_cols]],
+        on=KEYS,
+        suffixes=("_time", "_val"),
+        validate="one_to_one",
+    )
     pt.attrs["leaf_agree"] = float((pt["leaf_time"] == pt["leaf_val"]).mean())
     pt.attrs["entropy_cov"] = pt_attrs_entropy
     # nominal block (from times) + model block (from vals) are both broadcast to stops
@@ -359,17 +409,30 @@ def _outcome_known_time(
         raise ValueError("current trial lacks finite poke_in_ts")
     if not np.isfinite(poke_out_time):
         raise ValueError("current trial lacks finite poke_out_ts")
+    if poke_out_time < poke_in_time:
+        raise ValueError("current trial has poke_out_ts before poke_in_ts")
     if rewarded and not np.isfinite(reward_on_time):
         raise ValueError("rewarded trial lacks finite reward_on_ts")
+    if rewarded and not (poke_in_time <= reward_on_time <= poke_out_time):
+        raise ValueError(
+            "rewarded trial reward_on_ts must lie within poke_in_ts/poke_out_ts"
+        )
+    if not rewarded and np.isfinite(reward_on_time):
+        raise ValueError("omission trial unexpectedly carries finite reward_on_ts")
     return float(reward_on_time if rewarded else poke_out_time)
 
 
-def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd.DataFrame:
+def build_animal(
+    animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame
+) -> pd.DataFrame:
     pt, model_cols = _per_trial(animal, beh, rl)
     st = stop_table[stop_table.animal == animal].copy()
     st["nwb_file_name"] = animal + st["day"].astype(str) + "_.nwb"
     st["epoch_number"] = st["epoch"].str.split("_").str[0].astype("int64")
+    context_time = st["stop_start"].to_numpy(dtype=float)
     mid = ((st["stop_start"] + st["stop_end"]) / 2).to_numpy()
+    if not np.isfinite(context_time).all():
+        raise ValueError("stop_start must be finite for qvals trial assignment")
 
     rows = []
     for (nwb, epnum), g in pt.groupby(["nwb_file_name", "epoch"]):
@@ -377,13 +440,21 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
         po, pi = g["poke_out_ts"].to_numpy(), g["poke_in_ts"].to_numpy()
         ron, roff = g["reward_on_ts"].to_numpy(), g["reward_off_ts"].to_numpy()
         # searchsorted needs sorted poke_out; trial order is temporal, so this holds.
-        assert (np.diff(po) >= 0).all(), f"poke_out_ts not sorted: {nwb} epoch {epnum}"
-        s_idx = np.where(((st["nwb_file_name"] == nwb) & (st["epoch_number"] == epnum)).to_numpy())[0]
+        if not (np.diff(po) >= 0).all():
+            raise ValueError(f"poke_out_ts not sorted: {nwb} epoch {epnum}")
+        s_idx = np.where(
+            ((st["nwb_file_name"] == nwb) & (st["epoch_number"] == epnum)).to_numpy()
+        )[0]
         if len(s_idx) == 0:
             continue
         # trial t = [poke_out[t-1], poke_out[t]); stops past the last poke_out
         # get -1 and drop out.
-        ti = assign_stops_to_trials(po, mid[s_idx])
+        # All stop-level predictors use the bout-start context. A bout may span
+        # a trial boundary; midpoint assignment would silently attach a later
+        # trial than the canonical stop/event covariates. Physical post-outcome
+        # consumers may still use bins after the stored outcome boundary, but
+        # they retain the trial that was active when the bout began.
+        ti = assign_stops_to_trials(po, context_time[s_idx])
         valid = ti >= 0
         for k, se in zip(s_idx[valid], ti[valid], strict=True):
             trow = g.iloc[int(se)]
@@ -399,20 +470,27 @@ def build_animal(animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame) -> pd
                 raise ValueError(
                     f"{error} for {nwb} epoch {epnum} trial {se}"
                 ) from error
-            rows.append({
-                "stop_id": st.iloc[k]["stop_id"],
-                "epoch": st.iloc[k]["epoch"],
-                "trial_number_by_epoch": int(trow["trial_number_by_epoch"]),
-                "in_poke": bool(pi[se] <= mid[k] <= po[se]),
-                "is_rewarding": bool((not np.isnan(ron[se])) and ron[se] <= mid[k] <= roff[se]),
-                "trial_reward": int(trow["reward_time"]),  # poke-record reward (times' 'reward', '_time' suffix)
-                # Physical availability boundary for post-outcome covariates:
-                # reward onset on rewarded trials; conservatively, poke-out on
-                # omissions because this table has no explicit negative-
-                # feedback timestamp.
-                "outcome_known_time": outcome_known_time,
-                **{c: trow[c] for c in model_cols},
-            })
+            rows.append(
+                {
+                    "stop_id": st.iloc[k]["stop_id"],
+                    "epoch": st.iloc[k]["epoch"],
+                    "trial_number_by_epoch": int(trow["trial_number_by_epoch"]),
+                    "qvals_context_time": float(context_time[k]),
+                    "in_poke": bool(pi[se] <= mid[k] <= po[se]),
+                    "is_rewarding": bool(
+                        (not np.isnan(ron[se])) and ron[se] <= mid[k] <= roff[se]
+                    ),
+                    "trial_reward": int(
+                        trow["reward_time"]
+                    ),  # poke-record reward (times' 'reward', '_time' suffix)
+                    # Physical availability boundary for post-outcome covariates:
+                    # reward onset on rewarded trials; conservatively, poke-out on
+                    # omissions because this table has no explicit negative-
+                    # feedback timestamp.
+                    "outcome_known_time": outcome_known_time,
+                    **{c: trow[c] for c in model_cols},
+                }
+            )
     out = pd.DataFrame(rows)
     out.attrs["leaf_agree"] = pt.attrs["leaf_agree"]
     out.attrs["entropy_cov"] = pt.attrs["entropy_cov"]
@@ -446,28 +524,40 @@ def main() -> None:
         arm_ok = np.mean(t["arm"].to_numpy()[poke] == cur[poke])
         rew_ok = np.mean(t["trial_reward"].to_numpy()[poke] == rout[poke])
         entropy_cov = t.attrs["entropy_cov"]
-        print(f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100*len(t)/len(st):.0f}%)  "
-              f"in_poke={100*t['in_poke'].mean():.0f}%  "
-              f"at-well arm=={100*arm_ok:.1f}%  at-well reward=={100*rew_ok:.1f}%  "
-              f"[leaf-join {100*t.attrs['leaf_agree']:.1f}%  entropy {100*entropy_cov:.0f}%]")
+        print(
+            f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100 * len(t) / len(st):.0f}%)  "
+            f"in_poke={100 * t['in_poke'].mean():.0f}%  "
+            f"at-well arm=={100 * arm_ok:.1f}%  at-well reward=={100 * rew_ok:.1f}%  "
+            f"[leaf-join {100 * t.attrs['leaf_agree']:.1f}%  entropy {100 * entropy_cov:.0f}%]"
+        )
         # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
         # pull as q_port), so coverage should be ~100% — anything materially below flags
         # a partial-fit/join regression (the old 0.5 HMM-merge floor is too loose now).
         if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.95:
-            print(f"  WARNING [{a}]: coverage {100*len(t)/len(st):.0f}% (expect ~97-99%), "
-                  f"at-well arm agreement {100*arm_ok:.1f}% (expect ~100%), or "
-                  f"beta_reward_entropy coverage {100*entropy_cov:.0f}% (expect ~100%; a low "
-                  f"figure voids the belief-entropy covariate) -- possible mapping/model regression")
+            print(
+                f"  WARNING [{a}]: coverage {100 * len(t) / len(st):.0f}% (expect ~97-99%), "
+                f"at-well arm agreement {100 * arm_ok:.1f}% (expect ~100%), or "
+                f"beta_reward_entropy coverage {100 * entropy_cov:.0f}% (expect ~100%; a low "
+                f"figure voids the belief-entropy covariate) -- possible mapping/model regression"
+            )
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
-    print(f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}")
+    print(
+        f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}"
+    )
 
     # Fail loudly if the per-arm value block is incomplete: model_cols filters
     # COVARIATES by presence, so an upstream BehaviorModelResults/schema change
     # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
     # make attach_contingency_value_block blank the whole value block downstream.
-    required = {"stop_id", "p_reward_current", "q_chosen", *[f"p_reward_port{i}" for i in range(6)],
-                *[f"q_port{i}" for i in range(6)], "beta_reward_entropy"}
+    required = {
+        "stop_id",
+        "p_reward_current",
+        "q_chosen",
+        *[f"p_reward_port{i}" for i in range(6)],
+        *[f"q_port{i}" for i in range(6)],
+        "beta_reward_entropy",
+    }
     missing = required - set(tab.columns)
     if missing:
         raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")

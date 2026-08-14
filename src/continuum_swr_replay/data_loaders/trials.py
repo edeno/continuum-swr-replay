@@ -34,12 +34,15 @@ Well Visits DataFrame contains:
     - from_patch, to_patch: Start and end patch IDs (1-3)
     - is_run: True if movement interval (from_well != to_well)
     - is_reward: True if reward was delivered during this interval
+    - reward_on_time: First pump onset in the interval, NaN for no pump
     - is_patch_change: True if movement crossed patch boundaries
     - trial_number: Trial index assignment
 
 Trials DataFrame contains:
     - start_time, end_time, duration: Trial timing (sum of visit durations)
     - goal_arrival_time: Time when animal reached goal well
+    - reward_on_time: First pump onset on rewarded trials, else NaN
+    - outcome_known_time: reward_on_time for rewards; end_time for omissions
     - from_well, to_well: Starting and ending well IDs
     - from_patch, to_patch: Starting and ending patch IDs
     - is_reward: True if trial resulted in reward
@@ -319,20 +322,29 @@ def make_well_visits_df(
 
     # Vectorized reward detection: O(n_visits + n_pumps) instead of O(n_visits × n_pumps)
     # Check which well visits contain pump events using binary search
-    pump_times_arr = pump_events["start_time"].values
+    pump_times_arr = np.sort(pump_events["start_time"].to_numpy(dtype=float))
+    if not np.isfinite(pump_times_arr).all():
+        raise ValueError("pump event start_time values must be finite")
     visit_starts = well_visits["start_time"].values
     visit_ends = well_visits["end_time"].values
 
-    # Initialize is_reward as False
+    # Preserve the first physical pump onset inside each visit, not merely the
+    # eventual binary label.  Downstream replay covariates need this timestamp
+    # to keep goal arrival (destination known) separate from reward delivery
+    # (outcome known).  ``NaN`` means no pump occurred in the visit.
     is_reward = np.zeros(len(well_visits), dtype=bool)
+    reward_on_time = np.full(len(well_visits), np.nan)
 
     # For each pump event, find which visit(s) it belongs to
     for pump_time in pump_times_arr:
         # Find visits where start_time <= pump_time <= end_time
         is_in_visit = (visit_starts <= pump_time) & (pump_time <= visit_ends)
         is_reward |= is_in_visit
+        first_pump = is_in_visit & ~np.isfinite(reward_on_time)
+        reward_on_time[first_pump] = float(pump_time)
 
     well_visits["is_reward"] = is_reward
+    well_visits["reward_on_time"] = reward_on_time
     well_visits["is_reward"] = (
         well_visits["is_run"] & well_visits["is_reward"].shift(-1)
     ) | well_visits["is_reward"]
@@ -366,8 +378,15 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
         Trials with aggregated information (reward, timing, start/end wells)
 
     """
+    if "reward_on_time" not in well_visits.columns:
+        raise KeyError(
+            "well_visits must carry reward_on_time; regenerate it with "
+            "make_well_visits_df so trial outcomes have a physical timestamp"
+        )
+
     trials = well_visits.groupby("trial_number").agg(
         is_reward=("is_reward", lambda x: x.sum() > 0),
+        reward_on_time=("reward_on_time", "min"),
         start_time=("start_time", "min"),
         end_time=("end_time", "max"),
         is_patch_change=("is_patch_change", lambda x: x.sum() > 0),
@@ -384,4 +403,44 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
             goal_arrival_time=("end_time", "min"),
         )
     )
-    return trials.merge(goal_time, left_index=True, right_index=True)
+    trials = trials.merge(goal_time, left_index=True, right_index=True)
+    rewarded = trials["is_reward"].to_numpy(dtype=bool)
+    reward_on = trials["reward_on_time"].to_numpy(dtype=float)
+    trial_end = trials["end_time"].to_numpy(dtype=float)
+    arrival = trials["goal_arrival_time"].to_numpy(dtype=float)
+
+    if (~np.isfinite(reward_on[rewarded])).any():
+        bad = tuple(trials.index[rewarded & ~np.isfinite(reward_on)][:10])
+        raise ValueError(
+            "rewarded trials must have a finite reward_on_time; invalid "
+            f"trial_number(s): {bad}"
+        )
+    if np.isfinite(reward_on[~rewarded]).any():
+        bad = tuple(trials.index[(~rewarded) & np.isfinite(reward_on)][:10])
+        raise ValueError(
+            "omission trials cannot carry reward_on_time; invalid "
+            f"trial_number(s): {bad}"
+        )
+
+    # Positive feedback is known at the first pump onset.  With no explicit
+    # negative-feedback cue, an omission becomes known conservatively when the
+    # destination poke ends (the trial's end_time/poke-out).
+    outcome_known = np.where(rewarded, reward_on, trial_end)
+    if (
+        not np.isfinite(outcome_known).all()
+        or (outcome_known < arrival).any()
+        or (outcome_known > trial_end).any()
+    ):
+        bad_mask = (
+            ~np.isfinite(outcome_known)
+            | (outcome_known < arrival)
+            | (outcome_known > trial_end)
+        )
+        bad = tuple(trials.index[bad_mask][:10])
+        raise ValueError(
+            "trial outcome_known_time must be finite and lie between "
+            "goal_arrival_time and end_time; invalid trial_number(s): "
+            f"{bad}"
+        )
+    trials["outcome_known_time"] = outcome_known
+    return trials

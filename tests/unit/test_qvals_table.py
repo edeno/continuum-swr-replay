@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import continuum_swr_replay.analysis.behavior.qvals_table as qvals_table
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
     _outcome_known_time,
@@ -23,18 +24,21 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
 
 
 @pytest.mark.parametrize(
-    ("rewarded", "expected"),
-    ((True, 12.5), (False, 14.0)),
+    ("rewarded", "reward_on", "expected"),
+    ((True, 12.5, 12.5), (False, np.nan, 14.0)),
 )
 def test_outcome_known_time_uses_reward_on_or_conservative_omission_poke_out(
-    rewarded, expected
+    rewarded, reward_on, expected
 ):
-    assert _outcome_known_time(
-        rewarded=rewarded,
-        poke_in_time=10.0,
-        poke_out_time=14.0,
-        reward_on_time=12.5,
-    ) == expected
+    assert (
+        _outcome_known_time(
+            rewarded=rewarded,
+            poke_in_time=10.0,
+            poke_out_time=14.0,
+            reward_on_time=reward_on,
+        )
+        == expected
+    )
 
 
 def test_outcome_known_time_rejects_missing_physical_boundary():
@@ -58,6 +62,27 @@ def test_outcome_known_time_rejects_missing_physical_boundary():
             poke_in_time=10.0,
             poke_out_time=14.0,
             reward_on_time=np.nan,
+        )
+
+
+@pytest.mark.parametrize(
+    ("rewarded", "poke_in", "poke_out", "reward_on", "match"),
+    [
+        (True, 10.0, 14.0, 9.9, "within"),
+        (True, 10.0, 14.0, 14.1, "within"),
+        (False, 10.0, 14.0, 12.5, "omission"),
+        (False, 14.0, 10.0, np.nan, "before"),
+    ],
+)
+def test_outcome_known_time_rejects_inconsistent_physical_clock(
+    rewarded, poke_in, poke_out, reward_on, match
+):
+    with pytest.raises(ValueError, match=match):
+        _outcome_known_time(
+            rewarded=rewarded,
+            poke_in_time=poke_in,
+            poke_out_time=poke_out,
+            reward_on_time=reward_on,
         )
 
 
@@ -139,9 +164,13 @@ def test_per_port_identities_and_patch_value():
     out = _add_nominal_contingency(t)
     # p_reward_port{i} == p_rew_leaf{i+1} / 100
     for i in range(6):
-        assert out[f"p_reward_port{i}"].iloc[0] == pytest.approx([0.2, 0.5, 0.8, 0.8, 0.2, 0.2][i])
+        assert out[f"p_reward_port{i}"].iloc[0] == pytest.approx(
+            [0.2, 0.5, 0.8, 0.8, 0.2, 0.2][i]
+        )
     # p_reward_current == p_reward_port[leaf-1]
-    assert out["p_reward_current"].iloc[0] == pytest.approx(out["p_reward_port2"].iloc[0])
+    assert out["p_reward_current"].iloc[0] == pytest.approx(
+        out["p_reward_port2"].iloc[0]
+    )
     assert out["p_reward_best"].iloc[0] == pytest.approx(0.8)
     # patch means (WELL_PATCH=[0,0,1,1,2,2]): {.35, .8, .2}; diff = .8 - .35
     assert out["value_diff_patch"].iloc[0] == pytest.approx(0.45)
@@ -181,10 +210,10 @@ def test_leaf_range_guard_raises(bad_leaf):
 @pytest.mark.parametrize(
     "mid, expected",
     [
-        (15, 1),   # interior of [10, 20)
-        (10, 1),   # left boundary == poke_out[0]: belongs to the STARTING trial 1
-        (20, 2),   # == poke_out[1]: rolls to trial 2, not trial 1
-        (5, 0),    # before the first poke_out -> trial 0
+        (15, 1),  # interior of [10, 20)
+        (10, 1),  # left boundary == poke_out[0]: belongs to the STARTING trial 1
+        (20, 2),  # == poke_out[1]: rolls to trial 2, not trial 1
+        (5, 0),  # before the first poke_out -> trial 0
         (30, -1),  # exactly the last poke_out -> no enclosing trial (dropped)
         (99, -1),  # after the last poke_out -> dropped
     ],
@@ -222,6 +251,63 @@ def test_assign_stops_interval_invariant_property():
                 assert lo <= m < po[t]
 
 
+def test_stop_start_context_does_not_jump_to_midpoint_trial():
+    """A long speed bout keeps the trial active at its canonical start.
+
+    The same bout's midpoint lies after a poke-out boundary; assigning by the
+    midpoint would attach trial 1 even though all stop-level context is frozen
+    at the trial-0 bout start.
+    """
+    poke_out = np.array([10.0, 20.0])
+    stop_start = np.array([9.0])
+    stop_midpoint = np.array([11.0])
+
+    assert assign_stops_to_trials(poke_out, stop_start).tolist() == [0]
+    assert assign_stops_to_trials(poke_out, stop_midpoint).tolist() == [1]
+
+
+def test_build_animal_assigns_qvals_from_stop_start_not_midpoint(monkeypatch):
+    """Pin the production caller, not only the pure interval helper."""
+    per_trial = pd.DataFrame(
+        {
+            "nwb_file_name": ["rat20200101_.nwb"] * 2,
+            "epoch": [2, 2],
+            "trial_number_by_epoch": [0, 1],
+            "poke_in_ts": [8.0, 18.0],
+            "poke_out_ts": [10.0, 20.0],
+            "reward_on_ts": [np.nan, 19.0],
+            "reward_off_ts": [np.nan, 19.5],
+            "reward_time": [0, 1],
+            "q_chosen": [0.1, 0.9],
+        }
+    )
+    per_trial.attrs["leaf_agree"] = 1.0
+    per_trial.attrs["entropy_cov"] = 1.0
+    monkeypatch.setattr(
+        qvals_table,
+        "_per_trial",
+        lambda animal, beh, rl: (per_trial, ["q_chosen"]),
+    )
+    stops = pd.DataFrame(
+        {
+            "animal": ["rat"],
+            "day": ["20200101"],
+            "epoch": ["02_r1"],
+            "stop_id": ["stop-0"],
+            "stop_start": [9.0],
+            # The midpoint is 11.0, after trial 0's poke-out boundary.
+            "stop_end": [13.0],
+        }
+    )
+
+    result = qvals_table.build_animal("rat", object(), object(), stops)
+
+    assert result.loc[0, "trial_number_by_epoch"] == 0
+    assert result.loc[0, "qvals_context_time"] == 9.0
+    assert result.loc[0, "q_chosen"] == pytest.approx(0.1)
+    assert result.loc[0, "outcome_known_time"] == 10.0
+
+
 # ── add_experienced_value_columns (model belief of the chosen arm) ──
 # Concept: q_chosen is the model value for the arm the animal chose (Q{leaf}),
 # with correct 1-based-leaf -> 0-based-arm indexing; rpe = reward - q_chosen.
@@ -240,7 +326,7 @@ def test_experienced_value_picks_chosen_arm(reward, exp_rpe):
     # distinct Q per port so picking the wrong arm gives a different literal
     q = [0.11, 0.22, 0.33, 0.44, 0.55, 0.66]
     out = add_experienced_value_columns(_toy_vals([3], [reward], [q]))
-    assert out["arm"].iloc[0] == 2                       # leaf 3 -> arm 2
+    assert out["arm"].iloc[0] == 2  # leaf 3 -> arm 2
     assert out["q_chosen"].iloc[0] == pytest.approx(0.33)  # Q3, not Q2/Q4
     assert out["q_port0"].iloc[0] == pytest.approx(0.11)
     assert out["q_port5"].iloc[0] == pytest.approx(0.66)
@@ -291,7 +377,9 @@ def test_beta_belief_entropy_matches_scipy_oracle():
     ab = [(1.0, 1.0), (2.0, 5.0), (10.0, 3.0), (3.0, 3.0), (1.5, 4.0), (8.0, 2.0)]
     out = add_beta_belief_entropy(_beta_frame(ab))
     oracle = float(np.mean([beta_dist(a, b).entropy() for a, b in ab]))
-    np.testing.assert_allclose(out["beta_reward_entropy"].to_numpy(), [oracle], atol=1e-10)
+    np.testing.assert_allclose(
+        out["beta_reward_entropy"].to_numpy(), [oracle], atol=1e-10
+    )
 
 
 def test_beta_belief_entropy_uniform_is_zero():
@@ -302,10 +390,12 @@ def test_beta_belief_entropy_uniform_is_zero():
 
 def test_beta_belief_entropy_decreases_with_concentration():
     # A concentrated belief (high α+β) is more certain -> lower differential entropy.
-    diffuse = add_beta_belief_entropy(_beta_frame([(1.0, 1.0)] * 6))["beta_reward_entropy"].iloc[0]
-    concentrated = add_beta_belief_entropy(
-        _beta_frame([(20.0, 20.0)] * 6)
-    )["beta_reward_entropy"].iloc[0]
+    diffuse = add_beta_belief_entropy(_beta_frame([(1.0, 1.0)] * 6))[
+        "beta_reward_entropy"
+    ].iloc[0]
+    concentrated = add_beta_belief_entropy(_beta_frame([(20.0, 20.0)] * 6))[
+        "beta_reward_entropy"
+    ].iloc[0]
     assert concentrated < diffuse
 
 
