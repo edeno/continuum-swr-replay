@@ -476,6 +476,12 @@ def build_animal(
                     "epoch": st.iloc[k]["epoch"],
                     "trial_number_by_epoch": int(trow["trial_number_by_epoch"]),
                     "qvals_context_time": float(context_time[k]),
+                    # NOTE: the two flags below are read at the bout MIDPOINT,
+                    # while the trial they are attached to is chosen by the
+                    # bout START. They describe whether the animal happened to
+                    # be poking / receiving reward mid-bout, not the instant
+                    # the covariates were frozen; they are descriptive only and
+                    # must not be used to gate a cohort.
                     "in_poke": bool(pi[se] <= mid[k] <= po[se]),
                     "is_rewarding": bool(
                         (not np.isnan(ron[se])) and ron[se] <= mid[k] <= roff[se]

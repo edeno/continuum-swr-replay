@@ -44,7 +44,10 @@ from continuum_swr_replay.analysis.replay.retrospective import (
 )
 from continuum_swr_replay.analysis.replay.shuffles import next_arm_circular_shift
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from scripts.pfc.run_stage5b_retrospective import _retrospective_status
+from scripts.pfc.run_stage5b_retrospective import (
+    _family_unit_counts,
+    _retrospective_status,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # arm_path_well_to_well
@@ -108,6 +111,9 @@ def _make_event_table(events: list[dict]) -> pd.DataFrame:
         df["event_midpoint_time"] = np.arange(len(df), dtype=float)
     if "stop_id" not in df.columns:
         df["stop_id"] = df["event_id"]
+    if "completed_trial_id" not in df.columns:
+        # One completed trip per event unless a test models a shared visit.
+        df["completed_trial_id"] = np.arange(len(df), dtype=float)
     if "current_patch" not in df.columns:
         df["current_patch"] = pd.to_numeric(df["current_arm"], errors="coerce").map(
             WELL_PATCH_MAPPING
@@ -844,15 +850,27 @@ class TestRetrospectiveAlignmentWithShuffle:
 
     def test_long_bout_is_split_into_visit_context_units(self):
         """A bout may cross a boundary and later return to the first well."""
+        # Bout 10 holds three visits: arm 0, then arm 2, then arm 0 again.
+        # The completed-trip ID is what separates the two arm-0 visits --
+        # ``current_arm`` alone reads them as one contiguous run, because the
+        # intervening trip leaves no at-well event behind.
         events = [
-            {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1},
-            {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 1},
-            {"event_id": 2, "stop_id": 10, "current_arm": 2, "next_arm": 3},
-            {"event_id": 3, "stop_id": 10, "current_arm": 2, "next_arm": 3},
-            {"event_id": 4, "stop_id": 10, "current_arm": 0, "next_arm": 4},
-            {"event_id": 5, "stop_id": 10, "current_arm": 0, "next_arm": 4},
-            {"event_id": 6, "stop_id": 11, "current_arm": 0, "next_arm": 2},
-            {"event_id": 7, "stop_id": 12, "current_arm": 2, "next_arm": 4},
+            {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+             "completed_trial_id": 5.0},
+            {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+             "completed_trial_id": 5.0},
+            {"event_id": 2, "stop_id": 10, "current_arm": 2, "next_arm": 3,
+             "completed_trial_id": 6.0},
+            {"event_id": 3, "stop_id": 10, "current_arm": 2, "next_arm": 3,
+             "completed_trial_id": 6.0},
+            {"event_id": 4, "stop_id": 10, "current_arm": 0, "next_arm": 4,
+             "completed_trial_id": 7.0},
+            {"event_id": 5, "stop_id": 10, "current_arm": 0, "next_arm": 4,
+             "completed_trial_id": 7.0},
+            {"event_id": 6, "stop_id": 11, "current_arm": 0, "next_arm": 2,
+             "completed_trial_id": 8.0},
+            {"event_id": 7, "stop_id": 12, "current_arm": 2, "next_arm": 4,
+             "completed_trial_id": 9.0},
         ]
         ev = _make_event_table(events)
         ea = _make_event_arm_table(
@@ -880,8 +898,10 @@ class TestRetrospectiveAlignmentWithShuffle:
         """An unobservable event cannot hide conflicting labels in a visit."""
         ev = _make_event_table(
             [
-                {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1},
-                {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 2},
+                {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+                 "completed_trial_id": 3.0},
+                {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 2,
+                 "completed_trial_id": 3.0},
             ]
         )
         # Event 1 is deliberately absent, so an observability-first pipeline
@@ -963,6 +983,41 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert result["cohort_policy"] == "metric_family_specific"
         assert result["path_null_effectively_cross_patch"] is True
         assert _retrospective_status(result) == "ok"
+
+    def test_family_unit_counts_ignore_qualified_sibling_keys(self):
+        """Only the retained-count key names a family.
+
+        ``n_shuffle_units_excluded_singleton_arm_family`` shares the prefix
+        and suffix but is a breakdown, and its legitimate zero would read as
+        a family with nothing movable.
+        """
+        result = {
+            "n_shuffle_units_arm_family": 4,
+            "n_shuffle_units_input_arm_family": 9,
+            "n_shuffle_units_excluded_singleton_arm_family": 0,
+            "n_shuffle_units_excluded_deterministic_arm_family": 5,
+            "n_shuffle_units_path_family": 2,
+            "n_shuffle_units_excluded_singleton_path_family": 0,
+        }
+
+        assert _family_unit_counts(result) == {"arm": 4, "path": 2}
+        assert _retrospective_status(result) == "ok"
+
+    def test_status_separates_partial_from_no_movable_family(self):
+        """A session can estimate one family and not another."""
+        assert (
+            _retrospective_status(
+                {"n_shuffle_units_arm_family": 4, "n_shuffle_units_path_family": 1}
+            )
+            == "partial_movable_families"
+        )
+        assert (
+            _retrospective_status(
+                {"n_shuffle_units_arm_family": 1, "n_shuffle_units_path_family": 0}
+            )
+            == "no_movable_family"
+        )
+        assert _retrospective_status({}) == "no_movable_family"
 
     def test_patch_family_exchanges_visits_across_arms_in_same_patch(self):
         """Patch calibration conditions on current patch, not current arm."""

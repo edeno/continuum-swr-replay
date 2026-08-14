@@ -714,7 +714,14 @@ def _validate_and_match_fit_results(
 
 
 def _publish_staged_directory(staged_dir: Path, output_dir: Path) -> None:
-    """Swap a fully written staged bundle into place, restoring on failure."""
+    """Swap a fully written staged bundle into place, restoring on failure.
+
+    Directories cannot be swapped in a single rename, so there is a window
+    between moving the old bundle aside and moving the new one in. Exceptions
+    unwind it; a kill signal cannot. If the process dies inside that window the
+    output directory is absent and the previous bundle is intact next to it, in
+    a directory named ``.<output-name>.previous-*`` -- rename it back.
+    """
     backup_root: Path | None = None
     backup_dir: Path | None = None
     if output_dir.exists():

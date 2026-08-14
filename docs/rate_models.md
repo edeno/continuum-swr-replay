@@ -256,6 +256,27 @@ What the ladder actually shows (218 sessions):
 - **Family B truncates at `TMAX = 4 s`.** It models only the first 4 s of each
   stop (~80 % of onsets; median onset ≈ 2.4 s with a long tail). Every Family-B
   conclusion is conditional on the first 4 s.
+- **The post-outcome gate truncates the time course a second time, unevenly by
+  outcome.** `MU_uncertainty` carries the current trial's realized outcome, so
+  `fit_uncertainty_rate` keeps only bins whose left edge is at or after
+  `outcome_known_time`. That boundary is pump onset on a rewarded trip but
+  poke-out on an omission, and poke-out is later — so the gate removes more of
+  an omission's early bins than a reward's.
+
+  The consequence is a design property, not a bug in the gate. The spline's
+  boundary knots stay at `(0, TMAX)` while no bin near `tc = 0` survives for
+  omissions, so that region is extrapolated for one class and populated by the
+  other. The basis is therefore **not orthogonal to outcome**, and the
+  time-course and reward-kernel coefficients are partially confounded. Read
+  `bs(tc)` coefficients from this model as conditional on the retained,
+  outcome-dependent support — do not compare them to an ungated Family-B fit.
+
+  Size the asymmetry before interpreting: the per-session gate audit
+  (`*_post_outcome_gate_audit.csv`) reports `min_retained_tc_rewarded`,
+  `min_retained_tc_omission`, their medians, and
+  `min_retained_tc_omission_minus_rewarded`. A gap that is small relative to
+  the first interior knot (1 s) leaves the spline comparable across classes; a
+  gap approaching it does not.
 
 ## Future work (noted, not built here)
 

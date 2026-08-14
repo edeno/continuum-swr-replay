@@ -98,37 +98,46 @@ def _session_keys(df: pd.DataFrame) -> list[str]:
 
 
 def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
-    """Contiguous current-arm runs within an immobility bout.
+    """One identifier per behavioral visit: ``(stop, completed trip, arm)``.
 
-    ``stop_id`` identifies an immobility bout, not necessarily one behavioral
-    visit. A bout can cross a trial boundary, and the animal can even return to
-    an earlier arm before the bout ends. Sorting events in time and incrementing
-    a run counter whenever ``current_arm`` changes keeps those visits distinct.
+    ``stop_id`` identifies an immobility bout, not a visit. A bout can cross a
+    trial boundary, and the animal can leave and return before it ends, so a
+    bout may contain several visits with different future choices.
+
+    ``completed_trial_id`` is what separates them. Keying on contiguous
+    ``current_arm`` runs alone would merge two visits to the *same* well within
+    one bout -- the intervening trip is invisible once transit events are
+    filtered out -- and the only symptom would be a hard failure on the
+    one-label-per-unit check. The completion-order ID advances across that
+    trip, so the two visits stay distinct.
+
+    Raises
+    ------
+    KeyError
+        If ``completed_trial_id`` is absent, which marks a table built before
+        the event schema carried per-event trial context.
     """
+    required = ("stop_id", "completed_trial_id", "current_arm")
+    missing = [column for column in required if column not in event_table.columns]
+    if missing:
+        raise KeyError(
+            "Retrospective visit contexts require event-grain column(s) "
+            f"{missing}; regenerate event_table.pkl with the current builder"
+        )
     if event_table.empty:
         return pd.Series(index=event_table.index, dtype=object)
-    ordered = event_table[["stop_id", "current_arm", "event_midpoint_time"]].copy()
-    ordered["_source_position"] = np.arange(len(ordered), dtype=np.int64)
-    ordered = ordered.sort_values("event_midpoint_time", kind="stable")
-    previous_arm = ordered.groupby("stop_id", sort=False)["current_arm"].shift()
-    starts_visit = ordered["current_arm"].ne(previous_arm)
-    run_number = (
-        starts_visit.groupby(ordered["stop_id"], sort=False).cumsum().astype(int) - 1
-    )
-    ordered_units = pd.Series(
+    return pd.Series(
         list(
             zip(
-                ordered["stop_id"],
-                run_number,
-                ordered["current_arm"],
+                event_table["stop_id"],
+                event_table["completed_trial_id"],
+                event_table["current_arm"],
                 strict=True,
             )
         ),
+        index=event_table.index,
         dtype=object,
-    ).to_numpy()
-    source_order_units = np.empty(len(ordered), dtype=object)
-    source_order_units[ordered["_source_position"].to_numpy(dtype=int)] = ordered_units
-    return pd.Series(source_order_units, index=event_table.index, dtype=object)
+    )
 
 
 def at_well_event_cohort(

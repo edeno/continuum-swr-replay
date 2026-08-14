@@ -596,6 +596,11 @@ def test_drop_first_session_per_animal():
 def _with_mu_fit_columns(data: dict) -> pd.DataFrame:
     """Complete a tiny physical-gate fixture with the exact MU design schema."""
     design = pd.DataFrame(data)
+    # ``tc`` is the within-stop bin centre, not a filler: the gate audit
+    # reports the retained time-course support, so a constant here would
+    # make that report vacuous.
+    if "tc" not in design and "binj" in design:
+        design["tc"] = (design["binj"].to_numpy(dtype=float) + 0.5) * fur.BIN_S
     for column in fur._design_columns(fur.MU_UNCERTAINTY):
         if column not in design:
             design[column] = 0.0
@@ -646,7 +651,42 @@ def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
         "outcome_balance_valid": True,
         "outcome_balance_status": "both_outcomes_retained",
         "n_bins_after_outcome_balance_guard": 4,
+        # Symmetric here by construction: both classes share a boundary.
+        "min_retained_tc_rewarded": pytest.approx(1.5 * fur.BIN_S),
+        "median_retained_tc_rewarded": pytest.approx(2.0 * fur.BIN_S),
+        "min_retained_tc_omission": pytest.approx(1.5 * fur.BIN_S),
+        "median_retained_tc_omission": pytest.approx(2.0 * fur.BIN_S),
+        "min_retained_tc_omission_minus_rewarded": pytest.approx(0.0),
     }
+
+
+def test_gate_audit_exposes_asymmetric_time_course_truncation():
+    """An omission's later boundary shortens its retained time course.
+
+    The spline's boundary knots are fixed, so a class whose early bins are
+    all gated away contributes nothing to the low-``tc`` region and the
+    basis stops being orthogonal to outcome. Counts alone cannot show this;
+    the retained support can.
+    """
+    design = _with_mu_fit_columns(
+        {
+            "stop_id": [1, 1, 1, 1, 2, 2, 2, 2],
+            "stop_start": [10.0] * 8,
+            "binj": [0, 1, 2, 3, 0, 1, 2, 3],
+            # Rewarded stop 1 clears at once; omission stop 2 only at bin 3.
+            "outcome_known_time": [10.0] * 4 + [10.0 + 3 * fur.BIN_S] * 4,
+            "trial_reward": [1.0] * 4 + [0.0] * 4,
+        }
+    )
+
+    _, audit = fur._gate_bins_after_outcome(design)
+
+    assert audit["outcome_balance_valid"]
+    assert audit["min_retained_tc_rewarded"] == pytest.approx(0.5 * fur.BIN_S)
+    assert audit["min_retained_tc_omission"] == pytest.approx(3.5 * fur.BIN_S)
+    assert audit["min_retained_tc_omission_minus_rewarded"] == pytest.approx(
+        3.0 * fur.BIN_S
+    )
 
 
 def test_post_outcome_bin_gate_fails_loud_without_physical_timing():

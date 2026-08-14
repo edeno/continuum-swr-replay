@@ -59,19 +59,47 @@ SESSION_COLS = ["animal", "day", "epoch"]
 def _family_unit_counts(
     result: dict[str, float | int | bool | str],
 ) -> dict[str, int]:
-    """Movable visit-context counts for each calibrated metric family."""
-    return {
-        family: int(result[f"n_shuffle_units_{family}_family"])
-        for family in ("arm", "patch", "path")
-    }
+    """Movable visit-context counts for each calibrated metric family.
+
+    Only families the run actually requested appear in ``result``, so read
+    whichever suffixed keys are present rather than assuming all three.
+    """
+    suffix = "_family"
+    prefix = "n_shuffle_units_"
+    counts: dict[str, int] = {}
+    for key, value in result.items():
+        if not (key.startswith(prefix) and key.endswith(suffix)):
+            continue
+        family = key[len(prefix) : -len(suffix)]
+        # The retained count is ``n_shuffle_units_<family>_family``. Sibling
+        # keys qualify the same suffix -- ``..._input_<family>_family``,
+        # ``..._excluded_singleton_<family>_family`` -- and their zeros would
+        # read as a non-movable family. A family name is a single token.
+        if "_" in family:
+            continue
+        counts[family] = int(value)
+    return counts
 
 
 def _retrospective_status(
     result: dict[str, float | int | bool | str],
 ) -> str:
-    """Explicit persisted status for a session's retrospective analysis."""
+    """Explicit persisted status for a session's retrospective analysis.
+
+    A family needs two movable visit contexts before its null can move a
+    label, and the families are calibrated independently, so a session can
+    estimate some metrics and not others. Distinguish that from the case
+    where nothing is estimable: ``ok`` means every requested family is
+    movable, ``partial_movable_families`` that at least one is not, and
+    ``no_movable_family`` that none are.
+    """
     counts = _family_unit_counts(result)
-    return "ok" if max(counts.values(), default=0) >= 2 else "no_movable_family"
+    if not counts:
+        return "no_movable_family"
+    movable = [count >= 2 for count in counts.values()]
+    if all(movable):
+        return "ok"
+    return "partial_movable_families" if any(movable) else "no_movable_family"
 
 
 def main() -> None:
@@ -198,13 +226,14 @@ def main() -> None:
         )
         family_unit_counts = _family_unit_counts(result)
         retrospective_status = _retrospective_status(result)
-        if retrospective_status == "no_movable_family":
+        if retrospective_status != "ok":
             logging.info(
-                "Retaining %s/%s/%s with NaN metrics (no family has two movable "
-                "contiguous visit contexts; %s)",
+                "Retaining %s/%s/%s with status=%s; families without two "
+                "movable visit contexts report NaN metrics (%s)",
                 animal,
                 day,
                 epoch,
+                retrospective_status,
                 family_unit_counts,
             )
             n_no_movable += 1
@@ -227,7 +256,7 @@ def main() -> None:
     out.to_pickle(output_path)
     logging.info("Saved %d sessions → %s", len(out), output_path)
     logging.info(
-        "Persisted %d/%d sessions with status=no_movable_family",
+        "Persisted %d/%d sessions with at least one non-movable metric family",
         n_no_movable,
         len(sessions),
     )

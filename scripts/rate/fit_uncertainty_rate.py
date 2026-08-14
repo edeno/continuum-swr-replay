@@ -188,6 +188,46 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     return stop_table.merge(keep, on=SESSION_COLS)
 
 
+def _retained_time_course_support(
+    time_in_stop: pd.Series,
+    retained: np.ndarray,
+    rewarded: np.ndarray,
+    omitted: np.ndarray,
+) -> dict[str, float]:
+    """Where the surviving within-stop time course starts, by outcome class.
+
+    The spline's boundary knots are fixed at ``(0, TMAX)``, but the gate
+    removes early bins -- and removes more of them from omissions, whose
+    outcome boundary is poke-out rather than pump onset. The low-``tc``
+    region is then populated mainly by rewarded stops, so the basis is not
+    orthogonal to outcome and the time-course and reward coefficients are
+    partially confounded. Reporting the retained support makes the size of
+    that asymmetry visible per session instead of assumed away.
+
+    Returns
+    -------
+    dict
+        Minimum and median retained ``tc`` for each outcome class, plus the
+        rewarded-minus-omission gap in minimum retained ``tc``. NaN where a
+        class retains no bin.
+    """
+    values = time_in_stop.to_numpy(dtype=float)
+    support: dict[str, float] = {}
+    for label, mask in (("rewarded", rewarded), ("omission", omitted)):
+        kept = values[retained & mask]
+        kept = kept[np.isfinite(kept)]
+        support[f"min_retained_tc_{label}"] = (
+            float(kept.min()) if kept.size else float("nan")
+        )
+        support[f"median_retained_tc_{label}"] = (
+            float(np.median(kept)) if kept.size else float("nan")
+        )
+    support["min_retained_tc_omission_minus_rewarded"] = (
+        support["min_retained_tc_omission"] - support["min_retained_tc_rewarded"]
+    )
+    return support
+
+
 def _gate_bins_after_outcome(
     design: pd.DataFrame,
     *,
@@ -305,6 +345,12 @@ def _gate_bins_after_outcome(
         "n_bins_after_outcome_balance_guard": int(candidate.sum())
         if outcome_balance_valid
         else 0,
+        # Where the retained within-stop time course starts, per outcome
+        # class. An omission's boundary is poke-out and a reward's is pump
+        # onset, so the gate truncates the two classes by different amounts
+        # and the time spline is no longer orthogonal to outcome. Counts
+        # alone cannot show that; these do. See docs/rate_models.md.
+        **_retained_time_course_support(output["tc"], candidate, rewarded, omitted),
     }
     # A one-outcome survivor set changes the estimand and makes current-outcome
     # terms uninterpretable. Keep the audit, but do not fit that cell.

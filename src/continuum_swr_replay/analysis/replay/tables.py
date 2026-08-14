@@ -512,6 +512,11 @@ def build_event_table(
             _strict_first(g["last_rewarded_well"]), track_graph
         )
 
+        # Completion-order ID of the trip completed by the event start.
+        # Two visits to the same well inside one long immobility bout are
+        # separated only by this ID, so downstream visit-grain grouping
+        # cannot tell them apart without it.
+        completed_trial_id = _strict_first(g["completed_trial_id"])
         is_after_switch = _strict_first(g["is_after_switch"])
         is_after_omission = _strict_first(g["is_after_omission"])
         is_after_reward = _strict_first(g["is_after_reward"])
@@ -555,6 +560,7 @@ def build_event_table(
                 "current_patch": _arm_to_patch(current_arm),
                 "prev_patch": _arm_to_patch(prev_arm),
                 "next_patch": _arm_to_patch(next_arm),
+                "completed_trial_id": completed_trial_id,
                 "is_after_switch": is_after_switch,
                 "is_after_omission": is_after_omission,
                 "is_after_reward": is_after_reward,
@@ -1761,6 +1767,7 @@ _EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "reward_outcome",
     "is_stay",
     "current_arm",
+    "completed_trial_id",
     "prev_arm",
     "next_arm",
     "last_rewarded_arm",
