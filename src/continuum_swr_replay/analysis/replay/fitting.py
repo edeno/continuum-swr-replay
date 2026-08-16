@@ -220,6 +220,7 @@ def fit_conditional_poisson(
     try:
         diag = _compute_conditional_diagnostics(X, predictors)
         output.update(diag)
+        _warn_on_collinear_design(diag, predictors)
     except Exception as exc:
         logger.debug("VIF/conditional diagnostics skipped: %s", exc)
 
@@ -450,16 +451,72 @@ def _drop_zero_count_events(
     return kept
 
 
+
+# Condition number above which collinearity is strong enough that individual
+# coefficients should not be read separately. Belsley's conventional band is
+# 10-30 for moderate and >30 for strong; use the upper end so the warning marks
+# designs whose coefficients are genuinely not separable.
+COND_NUMBER_WARN = 30.0
+
+
+def _warn_on_collinear_design(diagnostics: dict, predictors: list[str]) -> None:
+    """Log when a design's coefficients should not be read separately.
+
+    Warns rather than raises. Some collinearity here is structural and
+    intended -- ``arm_never_visited`` is 1 exactly where the pre-centering
+    ``visit_recency`` is maximal, so M4 carries the two together on purpose --
+    and refusing to fit would remove the rung rather than qualify it. The
+    point is that the joint step stays interpretable while the individual
+    coefficients do not, which is a reader's problem, not the fitter's.
+    """
+    cond_number = diagnostics.get("cond_number")
+    if cond_number is None or not np.isfinite(cond_number):
+        return
+    if cond_number <= COND_NUMBER_WARN:
+        return
+    worst = sorted(
+        (
+            (value, name)
+            for name, value in (
+                (p, diagnostics.get(f"vif_{p}", np.nan)) for p in predictors
+            )
+            if np.isfinite(value)
+        ),
+        reverse=True,
+    )[:3]
+    logger.warning(
+        "Collinear design (condition number %.1f > %.0f): read the joint "
+        "model-comparison step, not the individual coefficients. Highest VIF: %s",
+        cond_number,
+        COND_NUMBER_WARN,
+        ", ".join(f"{name}={value:.1f}" for value, name in worst) or "unavailable",
+    )
+
+
 def _compute_conditional_diagnostics(
     X: np.ndarray,
     predictors: list[str],
 ) -> dict:
-    """Compute diagnostics for conditional model (VIF, condition number)."""
+    """Compute diagnostics for conditional model (VIF, condition number).
+
+    ``cond_number`` is the condition number of the **column-scaled design**,
+    which is what the conventional 10/30 bands refer to. Two earlier variants
+    are deliberately not used: ``cond(X)`` unscaled reports the arbitrary
+    relative units of the columns rather than their collinearity, and
+    ``cond(X.T @ X)`` is that quantity *squared*, so a design at the
+    conventional threshold reads as ~900. Scaling each column to unit norm
+    isolates the part that matters -- how close the columns are to linearly
+    dependent -- and makes the number comparable with the same column produced
+    by ``uncertainty_content.within_arm_horserace``.
+    """
     result = {}
 
-    # Condition number
     if X.shape[1] > 0:
-        result["cond_number"] = float(np.linalg.cond(X.T @ X))
+        norms = np.linalg.norm(X, axis=0)
+        # A structurally-zero column (e.g. an arm indicator absent from this
+        # session) carries no scale; leave it as-is rather than dividing by 0.
+        scale = np.where(norms > 0, norms, 1.0)
+        result["cond_number"] = float(np.linalg.cond(X / scale))
 
     # VIF (add constant for VIF computation)
     X_with_const = sm.add_constant(X)

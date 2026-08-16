@@ -8,8 +8,11 @@ likelihood (and the logit's dominant-arm logic) is degenerate there.
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay import fitting as fitting_mod
 from continuum_swr_replay.analysis.replay.fitting import (
@@ -193,3 +196,64 @@ def test_within_group_constant_predictor_is_rejected():
 
     assert fit_conditional_poisson(long_df, predictors=["ev_level"]) is None
     assert fit_conditional_logit(long_df, predictors=["ev_level"]) is None
+
+
+# ── Collinearity diagnostics ──
+
+
+def test_condition_number_is_scale_invariant_and_on_the_design_not_the_gram():
+    """The reported number must be comparable with the conventional bands.
+
+    Two variants are wrong here and both were live at some point: ``cond(X)``
+    unscaled reports the columns' arbitrary relative units, and
+    ``cond(X.T @ X)`` squares whatever that is. Only the column-scaled design
+    condition number is comparable to the 10/30 bands -- and to the same
+    column emitted by ``within_arm_horserace``.
+    """
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(400, 3))
+
+    plain = fitting_mod._compute_conditional_diagnostics(X, ["a", "b", "c"])
+    # Rescaling one column by 1000 changes its units, not its collinearity.
+    rescaled = X.copy()
+    rescaled[:, 1] *= 1000.0
+    scaled = fitting_mod._compute_conditional_diagnostics(rescaled, ["a", "b", "c"])
+
+    assert plain["cond_number"] == pytest.approx(scaled["cond_number"], rel=1e-6)
+    # Near-orthogonal columns sit far below the warning band; the Gram-matrix
+    # variant would report roughly this squared.
+    assert plain["cond_number"] < 5.0
+
+
+def test_collinear_design_warns_without_refusing_to_fit(caplog):
+    """A structurally collinear rung is reported, not withheld."""
+    rng = np.random.default_rng(1)
+    base = rng.normal(size=(500, 1))
+    # Second column is the first plus a whisker of noise: near-dependent.
+    X = np.column_stack([base, base + rng.normal(scale=1e-3, size=(500, 1))])
+    diagnostics = fitting_mod._compute_conditional_diagnostics(X, ["recency", "novelty"])
+
+    assert diagnostics["cond_number"] > fitting_mod.COND_NUMBER_WARN
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        fitting_mod._warn_on_collinear_design(diagnostics, ["recency", "novelty"])
+    assert any("Collinear design" in r.message for r in caplog.records)
+    assert any("condition number" in r.message for r in caplog.records)
+
+
+def test_well_conditioned_design_is_silent(caplog):
+    rng = np.random.default_rng(2)
+    X = rng.normal(size=(400, 3))
+    diagnostics = fitting_mod._compute_conditional_diagnostics(X, ["a", "b", "c"])
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        fitting_mod._warn_on_collinear_design(diagnostics, ["a", "b", "c"])
+    assert not [r for r in caplog.records if "Collinear design" in r.message]
+
+
+def test_zero_variance_column_does_not_divide_by_zero():
+    """An arm indicator absent from a session is structurally zero."""
+    rng = np.random.default_rng(3)
+    X = np.column_stack([rng.normal(size=200), np.zeros(200)])
+    diagnostics = fitting_mod._compute_conditional_diagnostics(X, ["a", "absent_arm"])
+    assert np.isfinite(diagnostics["cond_number"]) or np.isinf(
+        diagnostics["cond_number"]
+    )
