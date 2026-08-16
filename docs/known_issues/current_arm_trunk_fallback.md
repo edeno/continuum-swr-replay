@@ -22,15 +22,24 @@ is a leaf arm", so it nulls a much larger set:
 | | share of events |
 | --- | --- |
 | `current_arm` NaN, old rule | 0.00 % |
-| `current_arm` NaN, new rule | **10.8 %** |
+| `current_arm` NaN, new rule | **9.10 %** |
 
-Measured on this branch over 36 sessions / 11,377 non-local events, replaying
-the production `_in_event_mask` → `summarize_behavioral_location` path;
-independently corroborated at 12.4 % on a separate 15-session run and at 6.4 %
-on the seven cached j16 sessions (93.6 % `at_well`, 6.25 % `in_transit`, 0.14 %
-`mixed`). Per-animal 3.8 % (senor) → 25.2 % (wilbur); per-session median 5.9 %,
-max 58.1 % (`wilbur20210329_16_r8`). Where both rules give a finite arm they
-agree 100 % — the change is purely subtractive.
+**Measured on the regenerated tables** (2026-08-16, all 218 sessions / 65,913
+non-local events): 90.90 % `at_well`, 8.88 % `in_transit`, 0.21 % `mixed`.
+`is_current` is NaN on exactly 9.10 % of event-arm rows, matching the off-well
+event share. Per-animal 4.92 % (senor) → 11.64 % (chimi); per-session median
+5.14 %, p90 15.50 %, max 58.13 % (`wilbur20210329_16_r8`), with 5 of 218
+sessions entirely at-well.
+
+The event and stop cohorts are unchanged by the rebuild — 65,913 events,
+593,217 event-arm rows and 107,400 stops both before and after — so this is a
+column refresh, not a renumbering, and the change is purely subtractive.
+
+*(Pre-regeneration estimates of 10.8 % over 36 sessions, 12.4 % over 15, and
+6.4 % over the seven cached j16 sessions are superseded by the line above. They
+replayed the production path over stale event windows on session subsets; the
+per-animal spread in particular was much wider in those samples — 3.8–25.2 % —
+than in the full corpus.)*
 
 **Most of it is not the trunk defect.** 77.5 % of the newly-NaN events had a
 modal *leaf* arm under the old rule, so they were never mislabelled by the

@@ -213,7 +213,7 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   analyses can filter them explicitly. `physical_arm` is the modal observed
   track segment, including trunks. `current_arm` is a compatibility alias of
   `location_arm` and is NaN off-well; there is no trunk-to-destination fallback.
-  Roughly 11 % of events are off-well — see
+  9.10 % of events are off-well on the regenerated tables — see
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
 - `is_current`, `is_prev`, `is_next` — arm equals the animal's at-well /
   previous-trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
