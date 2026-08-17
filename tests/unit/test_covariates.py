@@ -490,3 +490,87 @@ class TestAlignCountMatrix:
             counts, np.array([10]), np.array([10, 99]), n_arms=2
         )
         assert np.isnan(out[1]).all()
+
+
+# ── Guards for invariants that survived mutation testing ──
+
+
+def test_omission_streak_is_undefined_without_a_resolved_outcome():
+    """A streak of leading omissions needs a known outcome to start from.
+
+    Returning 0 would put every pre-first-outcome stop in the same bucket as a
+    stop whose most recent trial was rewarded -- a fabricated reference
+    category, systematically the earliest stops of each session.
+    """
+    no_history = np.full((1, 10), np.nan)
+    assert np.isnan(covariates._omission_streak(no_history)[0])
+    # A genuine "last trial rewarded" is the value it must not be confused with.
+    rewarded = np.array([[1.0] + [0.0] * 9])
+    assert covariates._omission_streak(rewarded)[0] == 0.0
+    # An unresolved tail still truncates the count rather than voiding it.
+    partial = np.array([[0.0, np.nan] + [np.nan] * 8])
+    assert covariates._omission_streak(partial)[0] == 1.0
+
+
+def test_reward_rate_arm_window_is_ten_visits_not_five():
+    """The column is named k10; pin the window so a 5->10 migration can't half-land."""
+    trials = pd.DataFrame(
+        {
+            "start_time": np.arange(12, dtype=float),
+            "goal_arrival_time": np.arange(12, dtype=float) + 0.5,
+            "end_time": np.arange(12, dtype=float) + 0.5,
+            "from_well": [0] * 12,
+            "to_well": [1] * 12,
+            # First two visits rewarded, next ten omitted.
+            "is_reward": [True, True] + [False] * 10,
+            "is_patch_change": [False] * 12,
+        }
+    )
+    w2a = {i: i for i in range(6)}
+    rate = covariates.recent_reward_rate_all_events(
+        np.array([11.9]), trials, w2a, k=10
+    )
+    # Last 10 visits = trials 2..11, all omitted -> 0.0. A k=5 window also
+    # gives 0.0, so include the earlier query that separates them.
+    early = covariates.recent_reward_rate_all_events(
+        np.array([6.9]), trials, w2a, k=10
+    )
+    # By t=6.9 seven visits have completed: 2 rewarded of 7 -> 2/7 at k=10,
+    # but 0/5 at k=5.
+    assert early[0, 1] == pytest.approx(2 / 7)
+    assert rate[0, 1] == pytest.approx(0.0)
+
+
+def test_reward_rate_arm_counts_only_resolved_visits():
+    """A visit whose outcome has not resolved must not enter the rate.
+
+    Two stages compose here: how many trials have resolved by the query time
+    (equality eligible), then how many of THIS arm's visits fall among them.
+    The second search must exclude the visit whose index equals the resolved
+    count -- that trial is the first unresolved one. `visit_recency` has a
+    guard for its equivalent boundary; this twin did not, and the mutation
+    leaked one trial's outcome into 6.8% of event-arm rows.
+    """
+    trials = pd.DataFrame(
+        {
+            "start_time": [0.0, 10.0],
+            "goal_arrival_time": [5.0, 15.0],
+            "end_time": [6.0, 16.0],
+            "from_well": [0, 1],
+            "to_well": [1, 1],
+            # Visit 0 omitted, visit 1 rewarded. Leaking visit 1 turns 0.0 into 0.5.
+            "is_reward": [False, True],
+            "is_patch_change": [False, False],
+        }
+    )
+    w2a = {i: i for i in range(6)}
+    # Query after visit 0's outcome (6.0) but before visit 1's (16.0).
+    between = covariates.recent_reward_rate_all_events(
+        np.array([12.0]), trials, w2a, k=10
+    )
+    assert between[0, 1] == pytest.approx(0.0), "unresolved visit's reward leaked"
+    # Once visit 1 resolves, it counts: 1 of 2 rewarded.
+    after = covariates.recent_reward_rate_all_events(
+        np.array([16.0]), trials, w2a, k=10
+    )
+    assert after[0, 1] == pytest.approx(0.5)

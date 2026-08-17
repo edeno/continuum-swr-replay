@@ -1058,25 +1058,29 @@ def attach_is_swr_to_onsets(
     # object dtype holds the matched booleans alongside NaN for SWR/MUA rows
     # without the float coercion pandas now warns about.
     out["is_swr"] = pd.Series(np.nan, index=out.index, dtype="object")
+    # Join on the onset time itself, not on within-stop ordinal rank. A
+    # non-local onset IS its event's start, so the two are exactly equal by
+    # construction. Ranking instead makes one missing onset shift every later
+    # rank in that stop, relabelling events that were present and correct --
+    # and because the shifted ranks still all find *a* row, the match-rate
+    # guard below stays silent through it. Matching on time contains the
+    # failure to the row that is actually missing.
     ev = event_table[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
     nl = out[out["event_type"] == "non_local"].copy()
-    nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
     merged = nl.merge(
-        ev[["stop_id", "rank", "is_swr"]],
-        on=["stop_id", "rank"],
+        ev.rename(columns={"event_start": "onset_time"}),
+        on=["stop_id", "onset_time"],
         how="left",
         suffixes=("", "_ev"),
-        # duplicate (stop_id, rank) keys would expand rows and misalign the
-        # positional assignment below; the cumcount ranks are unique by
-        # construction, so this is cheap insurance against that silent failure.
+        # Duplicate (stop_id, onset_time) keys would expand rows and misalign
+        # the positional assignment below.
         validate="one_to_one",
     )
-    # The rank-join only assigns the correct is_swr if the onset table and
-    # event_table carry the same per-stop non-local events. A handful of
-    # boundary onsets legitimately fail to match (~0.1%), but a gross mismatch
-    # means the two were built from divergent non-local/speed thresholds or
-    # decodes -- fail loud rather than silently mislabel is_swr downstream.
+    # A gross mismatch means the onset table and event_table were built from
+    # divergent non-local/speed thresholds or decodes -- fail loud rather than
+    # silently leave is_swr unlabelled downstream. On the shipped artifacts the
+    # time join matches exactly, so this tolerance is slack, not an expected
+    # boundary loss.
     matched = merged["is_swr_ev"].notna()
     if len(merged) and matched.mean() < 0.99:
         raise ValueError(

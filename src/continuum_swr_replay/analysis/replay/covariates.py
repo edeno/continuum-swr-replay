@@ -738,7 +738,10 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
     -------
     np.ndarray, shape (n_stops,)
         Number of leading 0s before the first 1; a ``NaN`` lag terminates the
-        streak (counts the omissions seen before it).
+        streak (counts the omissions seen before it). ``NaN`` when the most
+        recent outcome itself is unresolved -- with no known outcome to start
+        from, a count of leading omissions is undefined, and returning 0 would
+        be indistinguishable from "the last trial was rewarded".
     """
     reward_lag_matrix = np.asarray(reward_lag_matrix, dtype=float)
     if reward_lag_matrix.ndim != 2:
@@ -755,6 +758,11 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
                 break
             streak += 1
         out[i] = streak
+    # No resolved most-recent outcome -> the streak has nothing to count from.
+    # Without this the pre-first-outcome stops of every session land in the
+    # streak==0 bucket alongside genuinely just-rewarded stops.
+    if n_stops:
+        out[~np.isfinite(reward_lag_matrix[:, 0])] = np.nan
     return out
 
 
