@@ -170,6 +170,7 @@ the event it predicts. Classification of the covariates fitted by the rate model
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
 | `reward_outcome`, `is_after_reward`, `is_after_omission` | most recently arrived trip's outcome | finite **only after** that outcome is observable; otherwise NaN |
 | `is_stay`, `wsls_deviation` | eventual outbound choice | no — future-referencing; descriptive use only |
+| `completed_trial_reward` | completed trip's realized outcome, **ungated** | no — post-outcome; exists only so `wsls_deviation` can name the outcome the animal just experienced |
 
 **Arrival is not the outcome boundary.** Canonical trials therefore carry two
 clocks. `goal_arrival_time` controls destination, visit, and inbound-switch

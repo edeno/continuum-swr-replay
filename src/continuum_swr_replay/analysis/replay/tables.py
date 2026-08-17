@@ -1034,6 +1034,7 @@ def build_stop_table(
         "is_after_reward",
         "is_after_stay",
         "reward_outcome",
+        "completed_trial_reward",
         "recent_switch_rate",
         "leaky_q_value_diff",
     ):
@@ -1835,6 +1836,7 @@ _STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "is_after_reward",
     "is_after_stay",
     "reward_outcome",
+    "completed_trial_reward",
     "completed_trial_id",
     "completed_trial_arm",
     "recent_switch_rate",

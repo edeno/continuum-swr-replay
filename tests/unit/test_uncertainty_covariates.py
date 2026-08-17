@@ -46,6 +46,7 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
         "is_after_reward",
         "is_after_omission",
         "reward_outcome",
+        "completed_trial_reward",
         "current_arm",
     ):
         if col not in df:
@@ -361,43 +362,49 @@ def test_canonical_history_covariates_must_be_finite_probabilities(column, bad_v
 def test_wsls_deviation_truth_table():
     df = _frame(
         [
-            {
-                "is_after_reward": 1.0,
-                "is_after_omission": 0.0,
-                "is_stay": 1.0,
-            },  # win-stay -> 0
-            {
-                "is_after_reward": 0.0,
-                "is_after_omission": 1.0,
-                "is_stay": 0.0,
-            },  # lose-shift -> 0
-            {
-                "is_after_reward": 1.0,
-                "is_after_omission": 0.0,
-                "is_stay": 0.0,
-            },  # win-shift -> 1
-            {
-                "is_after_reward": 0.0,
-                "is_after_omission": 1.0,
-                "is_stay": 1.0,
-            },  # lose-stay -> 1
+            {"completed_trial_reward": 1.0, "is_stay": 1.0},   # win-stay   -> 0
+            {"completed_trial_reward": 0.0, "is_stay": 0.0},   # lose-shift -> 0
+            {"completed_trial_reward": 1.0, "is_stay": 0.0},   # win-shift  -> 1
+            {"completed_trial_reward": 0.0, "is_stay": 1.0},   # lose-stay  -> 1
         ]
     )
     out = add_uncertainty_covariates(df)
     assert list(out["wsls_deviation"]) == [0.0, 0.0, 1.0, 1.0]
 
 
-def test_wsls_deviation_no_prior_is_nan():
-    # Neither is_after_reward nor is_after_omission set (e.g. first stop of a
-    # session) -> NaN, not 1.0, so the row drops at fit time.
+def test_wsls_deviation_survives_the_bout_start_outcome_gate():
+    """The covariate must be defined where win-stay/lose-shift means something.
+
+    An at-well bout begins at arrival, before the trip's outcome exists, so
+    the gated ``is_after_reward`` / ``is_after_omission`` are missing on every
+    at-well stop. Reading the realized outcome instead keeps the covariate
+    defined; reading the gated flags would make it NaN throughout.
+    """
     df = _frame(
         [
-            {"is_after_reward": 0.0, "is_after_omission": 0.0, "is_stay": 1.0},
-            {
-                "is_after_reward": 1.0,
-                "is_after_omission": 0.0,
-                "is_stay": 1.0,
-            },  # win-stay -> 0
+            {"completed_trial_reward": 1.0, "is_stay": 1.0},
+            {"completed_trial_reward": 0.0, "is_stay": 1.0},
+        ]
+    )
+    # Exactly the state of a regenerated at-well stop: outcome not yet known
+    # at the frozen context time.
+    df["is_after_reward"] = np.nan
+    df["is_after_omission"] = np.nan
+    df["reward_outcome"] = np.nan
+
+    out = add_uncertainty_covariates(df)
+
+    assert out["wsls_deviation"].notna().all()
+    assert list(out["wsls_deviation"]) == [0.0, 1.0]
+
+
+def test_wsls_deviation_no_prior_is_nan():
+    # No completed trip yet (e.g. first stop of a session) -> NaN, not 1.0,
+    # so the row drops at fit time instead of counting as a deviation.
+    df = _frame(
+        [
+            {"completed_trial_reward": np.nan, "is_stay": 1.0},
+            {"completed_trial_reward": 1.0, "is_stay": 1.0},  # win-stay -> 0
         ]
     )
     out = add_uncertainty_covariates(df).sort_values("stop_idx")
@@ -812,6 +819,7 @@ def test_runner_smoke():
         "completed_trial_arm",
         "recent_switch_rate",
         "leaky_q_value_diff",
+        "completed_trial_reward",
     }
     if not canonical_columns.issubset(stop.columns):
         pytest.skip("canonical stop_table.pkl has not been regenerated")

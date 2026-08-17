@@ -337,6 +337,8 @@ def add_trial_context(
     - ``is_after_omission`` — current arrived trip's omission, NaN until known
     - ``is_after_reward`` — current arrived trip's reward, NaN until known
     - ``reward_outcome`` — current arrived trip's outcome, NaN until known
+    - ``completed_trial_reward`` — the same outcome, ungated (post-outcome;
+      descriptive constructs only, never a predictor)
     - ``location_state``, ``at_well``, ``location_well``
     """
     dot_times = np.asarray(dot.index.values, dtype=float)
@@ -355,6 +357,7 @@ def add_trial_context(
             "next_well",
             "last_rewarded_well",
             "reward_outcome",
+            "completed_trial_reward",
             "is_after_reward",
             "is_after_omission",
             "is_after_switch",
@@ -474,6 +477,17 @@ def add_trial_context(
     dot["is_after_reward"] = current_reward
     dot["is_after_omission"] = np.where(
         current_outcome_known, 1.0 - current_reward, np.nan
+    )
+    # The completed trip's realized outcome, NOT gated on when it became
+    # observable. The gated columns above are the ones a predictor may use;
+    # this one exists for constructs that are *about* the outcome the animal
+    # just experienced and are already barred from predictive use for another
+    # reason. ``wsls_deviation`` is the case: it pairs this outcome with
+    # ``is_stay``, the eventual outbound choice, so it is future-referencing
+    # whatever the outcome clock does, and gating it at the bout start only
+    # made it undefined at every at-well stop.
+    dot["completed_trial_reward"] = np.where(
+        has_completed, is_reward[completed_clipped].astype(float), np.nan
     )
     dot["is_after_switch"] = np.where(
         has_completed, is_patch_change[completed_clipped].astype(float), np.nan

@@ -784,11 +784,13 @@ def add_uncertainty_covariates(
       the last five completed visits in the full trial stream, through the
       identified completed trial. It is validated and retained, not recomputed.
     - ``wsls_deviation``: 1.0 (deviated from win-stay/lose-shift) unless the stop
-      is ``(is_after_reward & is_stay)`` or ``(is_after_omission & ~is_stay)``,
-      in which case 0.0. ``NaN`` when neither ``is_after_reward`` nor
-      ``is_after_omission`` is set (no defined prior outcome, e.g. the first
-      stop of a session) -- such rows are dropped at fit time rather than
-      counted as a deviation.
+      is ``(rewarded & is_stay)`` or ``(omitted & ~is_stay)``, in which case
+      0.0. Uses ``completed_trial_reward``, the trip's *realized* outcome, not
+      the bout-start-gated ``is_after_reward`` -- an at-well bout starts at
+      arrival, before the outcome exists, so the gated form was NaN at every
+      at-well stop. ``NaN`` where no trip has completed or the outbound choice
+      is unresolved -- such rows are dropped at fit time rather than counted as
+      a deviation. Descriptive only: it embeds the eventual choice.
     - ``leaky_q_value_diff``: canonical best-minus-second-best leaky-Q margin
       (init 0.5, alpha 0.3) immediately before the identified completed trial's
       update. It is validated and retained, not recomputed.
@@ -802,7 +804,7 @@ def add_uncertainty_covariates(
     stop_table : pd.DataFrame
         Per-stop table. Must carry ``animal``, ``day``, ``epoch``, ``stop_idx``,
         ``completed_trial_id``, ``completed_trial_arm``, ``is_after_switch``,
-        ``is_stay``, ``is_after_reward``, ``is_after_omission``,
+        ``is_stay``, ``completed_trial_reward``,
         ``reward_outcome``, ``recent_switch_rate``, ``leaky_q_value_diff``, and
         ``reward_lag1..`` columns.
     switch_window : int
@@ -881,17 +883,25 @@ def add_uncertainty_covariates(
 
         omission.loc[pos] = _omission_streak(g[expected_lag_cols].to_numpy(dtype=float))
 
-        after_reward = g["is_after_reward"].to_numpy(dtype=float)
-        after_omission = g["is_after_omission"].to_numpy(dtype=float)
+        # Read the trip's *realized* outcome, not the bout-start-gated flags.
+        # A bout at a well begins at arrival, which precedes reward onset (and
+        # poke-out on an omission), so ``is_after_reward`` / ``is_after_omission``
+        # are missing at essentially every at-well stop and gating here left the
+        # covariate NaN wherever it means anything. Win-stay/lose-shift is by
+        # definition about the outcome the animal just experienced, paired with
+        # the choice it then makes -- and that choice, ``is_stay``, is future
+        # information regardless, so this construct is descriptive-only however
+        # the outcome is clocked. See covariate_timing.FUTURE_REFERENCING.
+        outcome = g["completed_trial_reward"].to_numpy(dtype=float)
         stay = g["is_stay"].to_numpy(dtype=float)
-        win_stay = (after_reward == 1.0) & (stay == 1.0)
-        lose_shift = (after_omission == 1.0) & (stay == 0.0)
+        win_stay = (outcome == 1.0) & (stay == 1.0)
+        lose_shift = (outcome == 0.0) & (stay == 0.0)
         wsls_vals = np.where(win_stay | lose_shift, 0.0, 1.0)
-        # No defined prior outcome (neither after-reward nor after-omission set,
-        # e.g. the first stop of a session) -> NaN, so the row drops at fit time
-        # instead of being counted as a deviation.
-        no_prior = (after_reward != 1.0) & (after_omission != 1.0)
-        wsls_vals[no_prior] = np.nan
+        # No completed trip (e.g. before the session's first arrival) or no
+        # resolved outbound choice -> NaN, so the row drops at fit time instead
+        # of being counted as a deviation.
+        undefined = ~np.isfinite(outcome) | ~np.isfinite(stay)
+        wsls_vals[undefined] = np.nan
         wsls.loc[pos] = wsls_vals
 
     out["omission_streak"] = omission

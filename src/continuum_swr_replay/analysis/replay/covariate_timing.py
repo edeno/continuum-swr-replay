@@ -40,6 +40,12 @@ POST_OUTCOME = frozenset(
         "reward_outcome",
         "is_after_reward",
         "is_after_omission",
+        # The same outcome with no gate at all. It exists so a descriptive
+        # construct can name the outcome the animal just experienced --
+        # ``wsls_deviation`` pairs it with the eventual choice, so it is
+        # future-referencing whatever the outcome clock does, and gating it at
+        # the bout start only made it undefined at every at-well stop.
+        "completed_trial_reward",
     }
 )
 FUTURE_REFERENCING = frozenset(
