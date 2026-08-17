@@ -105,7 +105,19 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     # causal reward-lag vector. WSLS uses the eventual outbound choice and is
     # therefore future-referencing even after the current outcome is known.
     "omission_streak": [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
-    "wsls_deviation": ["reward_outcome", "is_stay"],
+    # Reads completed_trial_reward since 1290257, not reward_outcome.
+    "wsls_deviation": ["completed_trial_reward", "is_stay"],
+    # Patch aggregates of already-classified arm covariates. Registered
+    # explicitly so the patch ladder resolves, rather than relying on a
+    # name-split heuristic that would treat "<x>_patch" as its own atom.
+    "cumulative_reward_patch": ["cumulative_reward"],
+    "p_reward_arm_patch": ["p_reward_arm"],
+    "q_arm_patch": ["q_arm"],
+    "reward_rate_arm_k10_patch": ["reward_rate_arm_k10"],
+    # Replay content during the stop, measured before the outbound choice.
+    "replay_frac": [],
+    "replay_frac_swr": [],
+    "replay_frac_non_swr": [],
     # content `_x_current` interactions (source is the z-scalar's base covariate)
     "rpe_x_current": ["rpe"],
     "rpe_x_current_z": ["rpe"],

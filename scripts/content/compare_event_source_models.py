@@ -55,6 +55,12 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
 )
+from continuum_swr_replay.analysis.replay.covariate_timing import (
+    assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (
+    DESCRIPTIVE_CONTENT_RUNGS,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(
@@ -374,13 +380,32 @@ def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
     )
 
 
+def _assert_ladder_timing(models: dict, *, ladder: str) -> None:
+    """Gate every model in a ladder through the causal-hygiene registry.
+
+    Every other shipped fitter asserts predictor timing before fitting; this
+    script did not, so a leaky covariate added to MODEL_PATCH / _SWITCH /
+    MODEL_CHOICE would have been fit here without complaint. Descriptive
+    exemptions must be declared by rung name, exactly as the content and rate
+    runners declare theirs -- not granted implicitly by which script runs.
+    """
+    for name, spec in models.items():
+        assert_predictor_timing(
+            spec.predictors,
+            descriptive=name in DESCRIPTIVE_CONTENT_RUNGS,
+        )
+    logging.debug("timing gate passed for %d %s model(s)", len(models), ladder)
+
+
 def fit_patch_hierarchy(
     patch_table: pd.DataFrame, event_source: str
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Fit the source-appropriate patch hierarchy per session."""
+    models = _patch_models_for_source(event_source)
+    _assert_ladder_timing(models, ladder="patch hierarchy")
     return _fit_per_session_common_cohort(
         patch_table,
-        _patch_models_for_source(event_source),
+        models,
         _fit_patch_conditional,
         analysis="patch_hierarchy",
         unit_col="event_id",
@@ -400,9 +425,11 @@ def fit_patch_switch(
         sw.rename("is_after_switch"), left_on="event_id", right_index=True, how="left"
     )
     switch_patch = switch_patch[switch_patch["is_after_switch"] == 1]
+    switch_models = _patch_switch_models_for_source(event_source)
+    _assert_ladder_timing(switch_models, ladder="patch switch")
     return _fit_per_session_common_cohort(
         switch_patch,
-        _patch_switch_models_for_source(event_source),
+        switch_models,
         _fit_patch_conditional,
         analysis="patch_switch",
         unit_col="event_id",
@@ -457,9 +484,9 @@ def fit_choice_blocks(
     blocks: dict[str, dict[str, pd.DataFrame]] = {}
     provenance: dict[str, pd.DataFrame] = {}
 
-    primary, primary_prov = _fit_choice_block(
-        choice, _choice_models_for_source(event_source), "choice"
-    )
+    choice_models = _choice_models_for_source(event_source)
+    _assert_ladder_timing(choice_models, ladder="choice")
+    primary, primary_prov = _fit_choice_block(choice, choice_models, "choice")
     blocks["choice"] = primary
     provenance["choice"] = primary_prov
 

@@ -1368,12 +1368,14 @@ def build_event_arm_table(
     )
     # is_last_rewarded_elsewhere: the last-rewarded arm, but only on
     # events where it is NOT the arm the animal currently occupies.
-    # ``is_last_rewarded`` is ~98% identical to ``is_current`` (the
-    # animal is usually rewarded where it now sits), so the two are
-    # near-collinear in a joint model. ``is_current`` (M1) already
-    # carries the rewarded-at-current-arm case; this indicator is the
-    # identifiable residual — reward memory at a non-current arm — and
-    # has disjoint support from ``is_current`` by construction.
+    # ``is_last_rewarded`` overlaps ``is_current`` on 33.7% of
+    # location-resolved events (measured 2026-08-17; the historical
+    # ~98% predates the outcome clock on ``last_rewarded_well``, and
+    # the near-collinearity it described no longer holds).
+    # ``is_current`` (M1) already carries the rewarded-at-current-arm
+    # case; this indicator is the identifiable residual — reward
+    # memory at a non-current arm — and has disjoint support from
+    # ``is_current`` by construction.
     # NaN-valued where is_current is unobserved: "rewarded somewhere
     # other than here" is undefined when "here" is unknown.
     long["is_last_rewarded_elsewhere"] = long["is_last_rewarded"].to_numpy() * (
@@ -1494,7 +1496,8 @@ def build_event_arm_table(
     # M7 — SWR × value/memory interactions. Previously omitted: the
     # raw swr_x_last_rewarded was r=1.0 with swr_x_current under the
     # old is_last_rewarded predictor; the _elsewhere fix makes the
-    # reward-memory interaction identifiable. Sparse (~2% of events)
+    # reward-memory interaction identifiable. Marks an arm on 58.2% of
+    # events (not the ~2% recorded before the outcome-clock change)
     # but honest.
     long["swr_x_reward_rate_arm_k10"] = (
         is_swr_i * long["reward_rate_arm_k10"].to_numpy()

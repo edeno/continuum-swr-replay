@@ -50,23 +50,29 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   trunk arms remain structural zero. Appending future events cannot
   change an earlier design row, and the coefficient represents
   relative recency within the event above the arm-FE baseline.
-- ``is_last_rewarded`` is NOT used as a predictor: it is ~98%
-  identical to ``is_current`` (the animal is usually rewarded where
-  it currently sits), so a model carrying both is near-collinear
-  (VIF tail >100, occasional rank-deficient non-convergence). M5/M6
-  instead use ``is_last_rewarded_elsewhere`` = the last-rewarded arm
-  restricted to events where it differs from the current arm.
-  ``is_current`` (M1) already carries the rewarded-at-current-arm
-  case, so the "elsewhere" indicator is exactly the identifiable
-  residual — reward memory at a non-current arm — with disjoint
-  support from ``is_current``. The trade is honest: it is sparse
-  (~2% of events), so its coefficient has low power rather than a
-  falsely-confident inflated estimate.
+- ``is_last_rewarded`` is NOT used as a predictor. M5/M6 instead use
+  ``is_last_rewarded_elsewhere`` = the last-rewarded arm restricted
+  to events where it differs from the current arm. ``is_current``
+  (M1) already carries the rewarded-at-current-arm case, so the
+  "elsewhere" indicator is exactly the identifiable residual —
+  reward memory at a non-current arm — with disjoint support from
+  ``is_current`` (verified: 0 overlap across 38,349 marked rows).
+  NOTE: the original rationale — that ``is_last_rewarded`` was ~98%
+  identical to ``is_current``, hence near-collinear (VIF tail >100)
+  — no longer holds. Since ``last_rewarded_well`` moved onto the
+  outcome clock, the two agree on only 33.7% of location-resolved
+  events (20,208/59,918, measured 2026-08-17 on the regenerated
+  tables). The separation is therefore far cleaner than when this
+  choice was made, and the "elsewhere" residual is NOT sparse: it
+  marks an arm on 58.2% of events, not ~2%. Re-derive the
+  collinearity comparison before citing the original justification.
 - ``is_next`` excluded: the alternation structure makes
   ``prev_arm == next_arm`` on >90% of events.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both
-  ``is_current`` and ``is_last_rewarded`` (98% overlap in typical
-  sessions). Causes convergence failures.
+  ``is_current`` and ``is_last_rewarded``. Measured under the old
+  ~98%-overlap regime; see the note above — that overlap is now
+  33.7%, so this exclusion also needs re-deriving before it is
+  cited as a current fact.
 - ``dist_to_arm`` and ``is_same_patch`` excluded: proven
   uninformative (null when estimated independently; VIF 28 and 12
   with ``is_current``). The spatial effect is binary "here vs

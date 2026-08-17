@@ -123,8 +123,21 @@ def _all_ladder_predictors():
             preds.update(need)
     for _name, spec in ms.MODEL_PER_STOP_RATE.items():
         preds.update(spec.predictors)
-    for _name, spec in ms.MODEL_HIERARCHY.items():
-        preds.update(spec.predictors)
+    for family in (
+        ms.MODEL_HIERARCHY,
+        ms.MODEL_HIERARCHY_SWR,
+        ms.MODEL_HIERARCHY_MUA,
+        # Previously unenumerated: the patch, switch and choice families are
+        # shipped and fitted, so an unclassified atom in any of them must fail
+        # here rather than at whichever runner happens to load it.
+        ms.MODEL_PATCH,
+        ms.MODEL_PATCH_SWR,
+        ms.MODEL_PATCH_MUA,
+        ms.MODEL_PATCH_SWITCH,
+        ms.MODEL_CHOICE,
+    ):
+        for _name, spec in family.items():
+            preds.update(spec.predictors)
     for _name, spec in ms.MODEL_PER_BIN_RATE.items():
         preds.update(c for c in _design_columns(spec) if c != "count")
     return preds
