@@ -66,6 +66,14 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   choice was made, and the "elsewhere" residual is NOT sparse: it
   marks an arm on 58.2% of events, not ~2%. Re-derive the
   collinearity comparison before citing the original justification.
+- **M3 is the only rung carrying ``reward_rate_arm_k10`` without
+  ``arm_never_visited``.** A never-visited leaf is encoded ``0.0`` there,
+  identical to "visited and never rewarded", and M4 adds the disambiguator.
+  So the M3->M4 step is not a pure novelty test: part of it is M4 cleaning up
+  an encoding M3 was already using ambiguously. The nesting is deliberate and
+  the step is a valid likelihood comparison, but do not report it as
+  "replay tracks novelty" on its own -- cite ``arm_never_visited``'s own
+  coefficient for that.
 - ``is_next`` excluded: the alternation structure makes
   ``prev_arm == next_arm`` on >90% of events.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both

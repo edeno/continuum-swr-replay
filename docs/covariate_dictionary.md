@@ -199,6 +199,30 @@ speed gating and the event-location work and must be re-derived** before it is
 cited again — the immobility/event-window definition it warned about has since
 changed. Re-check this exposure whenever that definition changes.
 
+### F.0 Whose knowledge? Scheduled is not the same as known
+
+Timing-safety answers "was this value determined before the response?" It does
+not answer "could the animal have been representing it?" Three classes, and the
+distinction matters for what a coefficient licenses you to claim:
+
+| class | covariates | a coefficient means |
+| --- | --- | --- |
+| **experienced** | `is_current`, `is_prev`, `dist_to_arm`, `time_since_stop`, `reward_lag{j}`, `omission_streak`, `cumulative_reward`, `reward_rate_arm_k10`, `last_rewarded_arm`, `is_after_switch`, `visit_recency`, `arm_never_visited` | content covaries with something the animal directly underwent |
+| **inferred** (model belief) | `q_arm`, `q_current`, `arm_uncertainty`, `beta_reward_entropy`, `switch_advantage_mu_preoutcome_sess`, `leaky_q_value_diff`, `rpe`, `global_mu_update_*` | content covaries with a *hypothesised* internal state, conditional on the belief model being right |
+| **scheduled** (experimenter-only) | `p_reward_arm`, `p_reward_current`, `value_diff_patch`, `trials_since_block_change` | content covaries with the **programmed contingency** |
+
+The third row is the one that gets over-claimed. The animal never observes a
+block boundary or a nominal p(reward); it only ever holds a noisy estimate. A
+coefficient on `trials_since_block_change` is informative *insofar as the
+animal has learned the schedule* — it is not evidence that the animal
+represents trials-since-block-change. Report these as schedule effects, and if
+the claim is about representation, use the inferred-belief covariates instead.
+
+(Timing itself is fine in all three: `trials_since_block_change` is a
+backward `cumcount` within a block, unlike `trials_since_switch`, which is
+signed toward the nearest switch — including future ones — and is therefore
+future-referencing.)
+
 ### F.1 Two clocks can coexist in one design row
 
 The value block (`q_arm`, `p_reward_arm`, `arm_uncertainty`) is the belief

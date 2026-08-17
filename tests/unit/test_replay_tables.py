@@ -1364,6 +1364,42 @@ class TestMutationSurvivorGuards:
             "fixture does not straddle a trial outcome; test cannot discriminate"
         )
 
+    def test_is_after_stay_and_is_stay_point_in_opposite_directions(self):
+        """One is the completed trip; the other is the choice not yet made.
+
+        ``is_after_stay`` is the complement of the last completed trip's patch
+        change (backward, a safe predictor). ``is_stay`` asks whether the NEXT
+        trip stays in this patch (forward, a response). The names are one word
+        apart and the values are both 0/1, so a builder-side swap would be
+        invisible -- the timing registry only catches ``is_stay`` used as a
+        declared predictor, not a column wired to the wrong source.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        stops = build_stop_table(dot, trials, graph)
+
+        both = stops[["is_after_stay", "is_stay"]].dropna()
+        assert len(both), "fixture must define both columns on some stop"
+        # The fixture's first trip stays in patch 1 and the second leaves it,
+        # so a stop between them has is_after_stay=1 and is_stay=0.
+        assert (both["is_after_stay"] != both["is_stay"]).any(), (
+            "fixture cannot distinguish the two columns; the test would pass "
+            "against a swapped assignment"
+        )
+        # Each must equal its own definition, not the other's.
+        defined = stops["is_after_switch"].notna()
+        np.testing.assert_allclose(
+            stops.loc[defined, "is_after_stay"].to_numpy(dtype=float),
+            1.0 - stops.loc[defined, "is_after_switch"].to_numpy(dtype=float),
+        )
+        stay_defined = stops["is_stay"].notna()
+        np.testing.assert_allclose(
+            stops.loc[stay_defined, "is_stay"].to_numpy(dtype=float),
+            (
+                stops.loc[stay_defined, "current_patch"].to_numpy(dtype=float)
+                == stops.loc[stay_defined, "next_patch"].to_numpy(dtype=float)
+            ).astype(float),
+        )
+
     def test_immobility_time_is_positive_bout_duration(self):
         """The Family-A offset is ``log(immobility_time)``; a sign flip makes
         every offset NaN downstream while the table itself looks populated.
