@@ -391,7 +391,6 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
 
     trials = well_visits.groupby("trial_number").agg(
         is_reward=("is_reward", lambda x: x.sum() > 0),
-        reward_on_time=("reward_on_time", "min"),
         start_time=("start_time", "min"),
         end_time=("end_time", "max"),
         is_patch_change=("is_patch_change", lambda x: x.sum() > 0),
@@ -409,6 +408,24 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
         )
     )
     trials = trials.merge(goal_time, left_index=True, right_index=True)
+
+    # The trial's reward is the one delivered at its DESTINATION, so take the
+    # first pump at or after goal arrival. A plain min over the trial's visits
+    # also sees the origin-well poke -- on the first trial of a session that
+    # produced a reward_on_time up to ~38 s BEFORE the arrival it was supposed
+    # to follow, which then failed the [arrival, end_time] range check and
+    # skipped the whole session.
+    arrival = trials["goal_arrival_time"]
+    visit_reward = well_visits[["trial_number", "reward_on_time"]].dropna(
+        subset=["reward_on_time"]
+    )
+    visit_reward = visit_reward.join(arrival, on="trial_number")
+    at_destination = visit_reward[
+        visit_reward["reward_on_time"] >= visit_reward["goal_arrival_time"]
+    ]
+    trials["reward_on_time"] = (
+        at_destination.groupby("trial_number")["reward_on_time"].min()
+    )
     rewarded = trials["is_reward"].to_numpy(dtype=bool)
     reward_on = trials["reward_on_time"].to_numpy(dtype=float)
     trial_end = trials["end_time"].to_numpy(dtype=float)
