@@ -228,11 +228,17 @@ future-referencing.)
 The value block (`q_arm`, `p_reward_arm`, `arm_uncertainty`) is the belief
 *entering* the trial, so it is pre-outcome by construction. The reward-history
 block (`cumulative_reward`, `reward_rate_arm_k10`, `reward_lag{j}`) advances on
-the outcome clock. On **83.9 % of events** (54,537 / 65,020 matched; measured
-2026-08-17) the event starts after its trial's `outcome_known_time`, and 54,451
-of those trials were rewarded — so within a single design row the two blocks
-summarise history through **different endpoints, differing by the
-just-received reward**.
+the outcome clock. On **83.9 % of events** (54,537 / 65,020 matched) the event starts after its
+trial's `outcome_known_time`, and 54,451 of those trials were rewarded — so
+within a single design row the two blocks summarise history through
+**different endpoints, differing by the just-received reward**.
+
+> **That 83.9 % must be re-derived.** It was measured against the *previous*
+> omission boundary (destination poke-out). The boundary is now poke-in +
+> `OMISSION_KNOWN_LATENCY_SEC`, which is earlier by a median 0.87 s, so more
+> events clear it and the share will move — upward. The qualitative claim (the
+> two blocks close at different endpoints, differing by the just-received
+> reward) is unaffected; only the number is stale.
 
 This is not leakage: the value block carries strictly *less* recent
 information than the reward block, never more. It is verified pre-update —

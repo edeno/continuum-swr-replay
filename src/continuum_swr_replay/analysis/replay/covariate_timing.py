@@ -40,6 +40,17 @@ POST_OUTCOME = frozenset(
         "reward_outcome",
         "is_after_reward",
         "is_after_omission",
+        # Not outcome-bearing -- these are *chosen-arm* quantities, and the
+        # chosen arm is the assigned trial's, where a stop is assigned to the
+        # trial whose poke-out comes next after stop_start. On 20.5% of stops
+        # (measured 2026-08-17; 99.9% of them in transit, median 4.2 s lead)
+        # the bout ends before that trial's poke-in, so these describe a choice
+        # the animal has not yet made. They belong here rather than in
+        # FUTURE_REFERENCING because the remedy is the same one this class
+        # names: 0.00% of those stops survive the post-outcome gate. Under
+        # ``retrospective=True`` they are safe; ungated they are not.
+        "q_current",
+        "p_reward_current",
         # The same outcome with no gate at all. It exists so a descriptive
         # construct can name the outcome the animal just experienced --
         # ``wsls_deviation`` pairs it with the eventual choice, so it is
@@ -81,15 +92,20 @@ PRE_OUTCOME_SAFE = frozenset(
         "is_after_switch",
         "is_after_stay",
         "q_arm",
-        "q_current",
         "p_reward_arm",
-        "p_reward_current",
         "value_diff_patch",
         "time_since_stop",
         "leaky_q_value_diff",
         "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
         # beta-bernoulli value/decision block (pre-outcome by name): relative value + belief entropy
         "switch_advantage_mu_preoutcome_sess",
+        # Positively classified rather than passing by omission from the two
+        # leak sets: "safe" and "never reviewed" should not look the same.
+        "is_same_patch",
+        "dist_to_arm",
+        "arm_dist_rank",
+        "recent_switch_rate",
+        "trials_since_block_change",
         "beta_reward_entropy",
     }
 )

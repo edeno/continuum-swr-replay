@@ -843,6 +843,11 @@ def add_uncertainty_covariates(
         "completed_trial_id",
         "completed_trial_arm",
         "is_after_switch",
+        # wsls_deviation reads the *realized* outcome, not the gated flags --
+        # validate the column actually consumed. The gated trio is retained
+        # here only because a stop table lacking them predates the outcome
+        # clock entirely and should fail this check too.
+        "completed_trial_reward",
         "is_after_reward",
         "is_after_omission",
         "reward_outcome",

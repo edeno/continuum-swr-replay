@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.constants import (
+    OMISSION_KNOWN_LATENCY_SEC,
+)
 from continuum_swr_replay.analysis.replay._helpers import (
     add_trial_context,
     behavioral_location_at_times,
@@ -23,7 +26,13 @@ def _trials() -> pd.DataFrame:
             "end_time": [7.0, 3.5],
             "goal_arrival_time": [6.0, 3.0],
             "reward_on_time": [np.nan, 3.25],
-            "outcome_known_time": [7.0, 3.25],
+            # Omission: arrival + the omission latency, capped at end_time.
+            # Rewarded: pump onset. Derived from the constant so this fixture
+            # cannot drift away from the production rule.
+            "outcome_known_time": [
+                min(6.0 + OMISSION_KNOWN_LATENCY_SEC, 7.0),
+                3.25,
+            ],
             "from_well": [1, 0],
             "to_well": [2, 1],
             "is_reward": [False, True],

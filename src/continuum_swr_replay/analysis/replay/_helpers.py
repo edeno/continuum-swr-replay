@@ -14,6 +14,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    OMISSION_KNOWN_LATENCY_SEC,
 )
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
@@ -975,7 +976,18 @@ def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
             raise ValueError("rewarded trials must have finite reward-on timestamps")
         if np.isfinite(reward_on[~rewarded]).any():
             raise ValueError("omission trials cannot carry reward-on timestamps")
-        expected_from_physical_clock = np.where(rewarded, reward_on, end)
+        # Must mirror the canonical derivation in
+        # ``data_loaders.trials.make_trials_df_from_well_visits`` and
+        # ``qvals_table._outcome_known_time``: pump onset when rewarded, else
+        # arrival plus the omission latency, capped at ``end_time``. Recomputing
+        # the *old* poke-out rule here made this validator reject every trials
+        # frame built under the current one -- so a non-cache rebuild, the only
+        # way to refresh a stale session cache, crashed on its first session.
+        expected_from_physical_clock = np.where(
+            rewarded,
+            reward_on,
+            np.minimum(arrival + OMISSION_KNOWN_LATENCY_SEC, end),
+        )
 
     if "outcome_known_time" in trials.columns:
         outcome = trials["outcome_known_time"].to_numpy(dtype=float)
