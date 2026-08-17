@@ -517,6 +517,16 @@ def build_contfrag_event_table(
 
     # stop_id
     stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
+    # The whole-event immobility filter guarantees every retained event sits
+    # inside a bout, so a -1 here means that invariant broke upstream. Hashing
+    # it would mint a stop_id matching no stop row -- an event silently orphaned
+    # from every stop-keyed join. The NonLocal builder raises; match it.
+    n_outside = int((stop_idx < 0).sum())
+    if n_outside > 0:
+        raise ValueError(
+            f"{n_outside}/{len(stop_idx)} {event_source} events fall outside "
+            "all immobility bouts"
+        )
     per_event["stop_idx"] = stop_idx
     per_event["stop_id"] = hash_stop_id(
         animal,

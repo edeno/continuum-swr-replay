@@ -47,6 +47,7 @@ import pickle
 import re
 import time
 
+import numpy as np
 import pandas as pd
 from pandas.errors import MergeError
 
@@ -321,6 +322,53 @@ def _process_session(
     }
 
 
+def _assert_value_block_matches_source(
+    event_arm_table: pd.DataFrame,
+    contingency: pd.DataFrame | None,
+) -> None:
+    """Fail if the built value block disagrees with the qvals table it came from.
+
+    ``q_arm`` / ``p_reward_arm`` / ``arm_uncertainty`` are baked into the
+    event-arm table from ``qvals_table.pkl`` at build time, so the dependency
+    runs qvals -> tables. Rebuilding the tables *before* refreshing qvals
+    silently leaves the value block one fit behind, and the SWR-contrast runner
+    then joins a fresh ``rpe`` onto a stale ``q_arm`` for the same stop. That
+    happened once (281 rows across 36 stops, all five animals) and nothing
+    caught it -- the per-table standardization checks compare each table only
+    against its own reference.
+    """
+    if contingency is None or event_arm_table.empty:
+        return
+    port_cols = [f"q_port{i}" for i in range(6)]
+    if not set(port_cols).issubset(contingency.columns):
+        return
+    leaf = event_arm_table.loc[
+        event_arm_table["arm"] <= 5, ["stop_id", "arm", "q_arm"]
+    ]
+    source = contingency.drop_duplicates("stop_id").set_index("stop_id")[port_cols]
+    joined = leaf.join(source, on="stop_id")
+    port_values = joined[port_cols].to_numpy(dtype=float)
+    comparable = np.isfinite(port_values).all(axis=1) & np.isfinite(
+        joined["q_arm"].to_numpy(dtype=float)
+    )
+    if not comparable.any():
+        return
+    expected = port_values[
+        np.arange(len(joined)), joined["arm"].to_numpy(dtype=int)
+    ]
+    mismatched = comparable & ~np.isclose(
+        expected, joined["q_arm"].to_numpy(dtype=float), rtol=0, atol=1e-9
+    )
+    if mismatched.any():
+        bad_stops = joined.loc[mismatched, "stop_id"].nunique()
+        raise ValueError(
+            f"event_arm q_arm disagrees with qvals_table on "
+            f"{int(mismatched.sum())} leaf row(s) across {bad_stops} stop(s). "
+            "The value block is stale: rebuild qvals_table.pkl first, then "
+            "rerun this script."
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -504,6 +552,7 @@ def main():
     # Rebuild-completeness guard: a future refactor must not silently drop the _z
     # columns (the exact regression this phase fixes).
     assert_standardized_present(event_arm_table_all, EVENT_ARM_STANDARDIZED_COLS)
+    _assert_value_block_matches_source(event_arm_table_all, contingency)
     logging.info(
         "standardized event_arm _z columns: %s",
         [f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],

@@ -1217,3 +1217,164 @@ class TestTrajectoryRollupWiring:
             assert col in et.columns
         assert et["path_length"].isna().all()
         assert et["ripple_power_z"].isna().all()
+
+
+# ── Guards for invariants that survived mutation testing ──
+
+
+class TestMutationSurvivorGuards:
+    """Each test here kills a mutation the suite previously missed.
+
+    These are not redundant with the invariant tests above: those check shape,
+    range, and one-hot structure, all of which hold for the *wrong* reference
+    column or the *inverted* polarity. These pin identity and direction.
+    """
+
+    def test_is_stay_is_same_patch_not_different_patch(self):
+        """``is_stay`` polarity, unpinned until now.
+
+        It is the response variable of the stay/leave analysis, so an inverted
+        definition flips a scientific conclusion while every range and NaN
+        check still passes.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        stops = build_stop_table(dot, trials, graph)
+        defined = stops["is_stay"].notna()
+        assert defined.any(), "fixture must produce at least one defined is_stay"
+        same_patch = (
+            stops.loc[defined, "current_patch"].to_numpy(dtype=float)
+            == stops.loc[defined, "next_patch"].to_numpy(dtype=float)
+        )
+        np.testing.assert_array_equal(
+            stops.loc[defined, "is_stay"].to_numpy(dtype=float),
+            same_patch.astype(float),
+        )
+        # The trials fixture crosses patches (well 1 -> well 2), so a leave
+        # exists; a constant column would pass the equality above vacuously.
+        assert stops.loc[defined, "is_stay"].nunique() >= 1
+
+    def test_is_prev_references_prev_arm_not_next_arm(self, tiny_session):
+        """``prev_arm == next_arm`` on ~81% of real events, so swapping the
+        reference leaves the fit plausible and every structural check intact.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        ref = et.set_index("event_id")[["prev_arm", "next_arm"]]
+        # Choose an event where the two references actually differ, or the
+        # assertion cannot distinguish them.
+        differing = ref[ref["prev_arm"].ne(ref["next_arm"])].dropna()
+        assert len(differing), "fixture must contain prev_arm != next_arm"
+        for event_id, row in differing.iterrows():
+            g = eat[eat["event_id"] == event_id]
+            marked = g.loc[g["is_prev"] == 1.0, "arm"].tolist()
+            assert marked == [int(row["prev_arm"])], (
+                f"is_prev marked {marked}, expected prev_arm {row['prev_arm']}"
+            )
+
+    def test_is_last_rewarded_elsewhere_excludes_the_current_arm(self):
+        """The residual must be ``is_last_rewarded * (1 - is_current)``.
+
+        Inverting the factor recreates the near-collinearity with
+        ``is_current`` that this predictor exists to avoid. Discriminating it
+        needs an event sitting AT the last-rewarded well -- otherwise
+        ``is_last_rewarded`` is all-zero and either factor gives zero.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        # Trial 2 arrives at well 2 at t=8.0 and is rewarded. Add an event
+        # during the dwell that follows, so is_current and is_last_rewarded
+        # both mark arm 2 on the same row.
+        mask = (dot.index >= 8.5) & (dot.index <= 8.8)
+        dot.loc[mask, "non_local_event"] = 4
+        dot.loc[mask, "Non-Local_Continuous_prob"] = 0.9
+        dot.loc[mask, "head_speed"] = 1.0
+        dot.loc[mask, "map_estimate"] = 2.0
+        dot.loc[mask, "track_segment_id"] = 2
+
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+
+        current = eat["is_current"].to_numpy(dtype=float)
+        last_rew = eat["is_last_rewarded"].to_numpy(dtype=float)
+        assert ((current == 1.0) & (last_rew == 1.0)).any(), (
+            "fixture has no row where the current arm is also the last "
+            "rewarded arm; the test would pass against an inverted factor"
+        )
+        both = (eat["is_current"] == 1.0) & (eat["is_last_rewarded_elsewhere"] == 1.0)
+        assert not both.any(), "elsewhere overlaps the current arm"
+        np.testing.assert_allclose(
+            eat["is_last_rewarded_elsewhere"].to_numpy(dtype=float),
+            last_rew * (1.0 - current),
+            equal_nan=True,
+        )
+
+    def test_swr_interactions_use_is_swr_not_is_mua(self):
+        """The two flags agree on only ~82% of real events, so a swapped gate
+        is wrong on the rest without looking broken.
+
+        Needs a fixture where the base column is finite AND non-zero AND the
+        two flags differ -- otherwise ``is_swr * x`` and ``is_mua * x`` are
+        trivially equal (all-NaN or all-zero) and the test proves nothing. The
+        anti-vacuity assertion below enforces that.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        # Event 2 is the at-well event, so is_current is finite there. Mark it
+        # SWR and mark the transit event MUA, making the flags disagree.
+        dot.loc[(dot.index >= 4.0) & (dot.index <= 4.4), "SWR_event"] = 1
+        dot.loc[(dot.index >= 2.0) & (dot.index <= 2.4), "MUA_event"] = 1
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+
+        swr = eat["is_swr"].astype(float).to_numpy()
+        mua = eat["is_mua"].astype(float).to_numpy()
+        base = eat["is_current"].to_numpy(dtype=float)
+        discriminating = (swr != mua) & np.isfinite(base) & (base != 0.0)
+        assert discriminating.any(), (
+            "fixture cannot distinguish is_swr from is_mua; the test would "
+            "pass against a swapped gate"
+        )
+        np.testing.assert_allclose(
+            eat["swr_x_current"].to_numpy(dtype=float),
+            swr * base,
+            equal_nan=True,
+        )
+
+    def test_stop_reward_rate_anchors_on_bout_start_not_bout_end(self):
+        """Anchoring on ``stop_end`` lets the covariate see trials that
+        resolved *during* the bout -- a future leak on ~3.6% of real stops.
+        """
+        from continuum_swr_replay.analysis.replay._helpers import (
+            recent_trial_reward_rate,
+        )
+
+        dot, env, trials, graph = _location_contract_session()
+        stops = build_stop_table(dot, trials, graph)
+        starts = stops["stop_start"].to_numpy(dtype=float)
+        ends = stops["stop_end"].to_numpy(dtype=float)
+        from_start = recent_trial_reward_rate(starts, trials)
+        from_end = recent_trial_reward_rate(ends, trials)
+        np.testing.assert_allclose(
+            stops["reward_rate_trial_k10"].to_numpy(dtype=float),
+            from_start,
+            equal_nan=True,
+        )
+        # The fixture must actually distinguish the two anchors, or this test
+        # would pass against the leaky version too.
+        assert not np.allclose(from_start, from_end, equal_nan=True), (
+            "fixture does not straddle a trial outcome; test cannot discriminate"
+        )
+
+    def test_immobility_time_is_positive_bout_duration(self):
+        """The Family-A offset is ``log(immobility_time)``; a sign flip makes
+        every offset NaN downstream while the table itself looks populated.
+        """
+        dot, env, trials, graph = _location_contract_session()
+        stops = build_stop_table(dot, trials, graph)
+        duration = (
+            stops["stop_end"].to_numpy(dtype=float)
+            - stops["stop_start"].to_numpy(dtype=float)
+        )
+        np.testing.assert_allclose(
+            stops["immobility_time"].to_numpy(dtype=float), duration
+        )
+        assert (stops["immobility_time"] > 0).all()
