@@ -57,6 +57,7 @@ arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
 | canonical name | definition | scope | source | enters |
 |---|---|---|---|---|
 | `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
+| `value_diff_patch` | nominal **patch**-level best-minus-second-best: the gap between the highest and second-highest patch mean p(reward). Always >= 0; a global scalar per trial, entered as a main effect only (never `× is_current_patch`) | scalar | `qvals_table` (nominal schedule) | rate/coupling main effect |
 | `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
 | `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect — **the value construct used by C4/CS5/Mv** (and the is_swr rate ladder's value covariates); **not** used in the Stage-5A choice model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13** when the paper standardized on the beta-bernoulli model.) |
@@ -85,6 +86,8 @@ and `_covariate_ranking`) uses the model RPE, not a nominal one.
 |---|---|---|---|---|
 | `recent_switch_rate` | rolling mean of `is_patch_change` over the last (up to) 5 completed trials, including the most recently completed trial | 5 completed trials | fraction | **canonical** cross-family: rate/coupling main effect; content via `× is_current` |
 | `is_after_switch` | the most recently completed trip changed patch | 1 completed trial | binary | **retained comparison** (per D4): the immediate-binary complement, available alongside `recent_switch_rate` wherever the estimator allows |
+| `omission_streak` | leading consecutive omissions: count of leading 0s in `reward_lag1, reward_lag2, …`, stopping at the first 1. A `NaN` lag truncates the count. **`NaN` when `reward_lag1` itself is unresolved** — with no known most-recent outcome there is nothing to count from, and returning 0 would be indistinguishable from "the last trial was rewarded" (1,359 / 107,400 stops, the earliest of each session) | up to 10 known outcomes | count | model-free uncertainty block; excluded from the MU rate fit for collinearity with `reward_lag1` |
+| `wsls_deviation` | 0 on win-stay or lose-shift, 1 on win-shift or lose-stay. Reads `completed_trial_reward` (the trip's *realized* outcome, ungated) paired with `is_stay`. `NaN` where no trip has completed or the outbound choice is unresolved | 1 completed trial | binary | **descriptive only** — embeds the eventual choice, so future-referencing however the outcome is clocked |
 
 (D4: both kept — `recent_switch_rate` is the canonical graded covariate; `is_after_switch`
 is a valued immediate-contrast comparison, not dropped.)
@@ -196,6 +199,68 @@ speed gating and the event-location work and must be re-derived** before it is
 cited again — the immobility/event-window definition it warned about has since
 changed. Re-check this exposure whenever that definition changes.
 
+### F.1 Two clocks can coexist in one design row
+
+The value block (`q_arm`, `p_reward_arm`, `arm_uncertainty`) is the belief
+*entering* the trial, so it is pre-outcome by construction. The reward-history
+block (`cumulative_reward`, `reward_rate_arm_k10`, `reward_lag{j}`) advances on
+the outcome clock. On **83.9 % of events** (54,537 / 65,020 matched; measured
+2026-08-17) the event starts after its trial's `outcome_known_time`, and 54,451
+of those trials were rewarded — so within a single design row the two blocks
+summarise history through **different endpoints, differing by the
+just-received reward**.
+
+This is not leakage: the value block carries strictly *less* recent
+information than the reward block, never more. It is verified pre-update —
+`q_port[chosen]` moves +0.078 after a reward and −0.091 after an omission on
+the following trial, and `rpe == trial_reward − q_chosen` exactly.
+
+It is an interpretation hazard. A coefficient on `q_arm` read against one on
+`reward_rate_arm_k10` is not "value vs. reward history at the same moment";
+the value term is one outcome behind. Say so when the two appear in the same
+rung (M v, C4/CS5, C13/CS6).
+
+A related, smaller offset: the value block is frozen at `stop_start` (it is
+joined by `stop_id` from the per-stop qvals artifact) while every other
+event-arm history covariate is frozen at `event_start`. Median gap 2.39 s. The
+practical impact is small — qvals' assigned arm equals the event's own
+`current_arm` on 100.00 % of at-well events whose stop is `mixed` — but the
+two are not the same instant.
+
+### F.2 Scope condition: the at-well cohort is not SWR-neutral
+
+`is_current` is undefined off-well, so every rung containing it fits the
+at-well cohort (see
+[`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md)).
+That exclusion is **not balanced across the SWR contrast**: it removes
+
+| | off-well share |
+| --- | --- |
+| SWR events | **3.28 %** (866 / 26,403) |
+| non-SWR events | **12.98 %** (5,129 / 39,510) |
+
+(χ² = 1800, p ≈ 0; measured 2026-08-17 on the regenerated tables.) The SWR
+share of the cohort therefore rises from 40.06 % to 42.62 %, and 5,129 non-SWR
+events — disproportionately locomotor-pause, locally-anchored ones — never
+enter any SWR-vs-non-SWR contrast.
+
+Two consequences to state wherever those contrasts are reported:
+
+1. The estimand is "SWR vs non-SWR content **among at-well events**", not in
+   general. The contrast within the cohort is valid; the generalisation is not.
+2. The exclusion rate is animal-dependent (senor 4.92 % → chimi 11.64 %), so
+   per-animal consistency checks — the "5/5 animals" statements — compare
+   differentially restricted populations.
+
+### F.3 `time_since_stop` and `tc` are different quantities
+
+`event_table.time_since_stop` is the **median over the event's bins**, i.e.
+the event *midpoint* minus `stop_start`. The Family-B design's `tc` is the bin
+centre, and `event_onset_table.t_since_stop_onset` is the event *start* minus
+`stop_start`. They agree on **0 of 65,913 events**, differing by exactly
+`event_duration / 2` (median 31 ms, max 1.71 s). Negligible for
+`time_x_current`-style interactions, but they are not one construct.
+
 ## G. Base covariate reference
 
 Definitions for the base (non-interaction) covariates on the canonical tables.
@@ -252,6 +317,22 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   than measured, and including it would displace every other arm in the event.
   An event with no visited leaf arm is NaN. This is a time-local relative
   recency contrast: appending later events cannot change earlier rows.
+  **Caveat on the censored arms themselves.** Excluding them from the *mean*
+  does not remove the censoring rule from their own values: a never-visited
+  leaf still carries `n_completed + 1` minus the visited mean, which on the
+  regenerated tables is 18,897 / 395,478 leaf rows (4.78 %) with mean +9.66 and
+  max +163.5 against ~0 for visited arms. Every shipped rung pairs
+  `visit_recency_demeaned` with `arm_never_visited`, which absorbs that state —
+  a rung using the former without the latter would estimate roughly 5 % of its
+  slope off the censoring rule. Pair them.
+- **Trunk-arm convention (applies to the value block too).** Trunk arms 6/7/8
+  are not reward sites. `reward_rate_arm_k10` and `visit_recency` document their
+  structural `0.0`; `q_arm`, `p_reward_arm` and `arm_uncertainty` follow the
+  identical convention (structural `0.0` for a mapped stop, `NaN` when the stop
+  has no qvals row at all) even though it was previously stated only for the
+  first two. Any aggregation over arms must mask trunks first — a structural
+  zero entering a `min` or a `mean` is silently wrong, which is why
+  `visit_recency_patch` takes its minimum over leaf arms only.
 - `arm_never_visited` — 1.0 where the animal has never visited that leaf arm by
   the event start, else 0.0; trunk arms 0.0. Carries the right-censored state
   that `visit_recency`'s fill value can only approximate, and enters M4+,
