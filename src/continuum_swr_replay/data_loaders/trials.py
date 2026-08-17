@@ -390,7 +390,6 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
         )
 
     trials = well_visits.groupby("trial_number").agg(
-        is_reward=("is_reward", lambda x: x.sum() > 0),
         start_time=("start_time", "min"),
         end_time=("end_time", "max"),
         is_patch_change=("is_patch_change", lambda x: x.sum() > 0),
@@ -426,6 +425,12 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
     trials["reward_on_time"] = (
         at_destination.groupby("trial_number")["reward_on_time"].min()
     )
+    # Derive the label from the timestamp so the two cannot disagree. Taking
+    # ``any(is_reward)`` over the trial's visits has the same origin-poke
+    # contamination the timestamp just shed: it marked trials rewarded whose
+    # only pump fired at the well they departed from, leaving a rewarded trial
+    # with no destination pump to timestamp.
+    trials["is_reward"] = trials["reward_on_time"].notna()
     rewarded = trials["is_reward"].to_numpy(dtype=bool)
     reward_on = trials["reward_on_time"].to_numpy(dtype=float)
     trial_end = trials["end_time"].to_numpy(dtype=float)

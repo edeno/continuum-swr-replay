@@ -51,6 +51,14 @@ import numpy as np
 import pandas as pd
 from pandas.errors import MergeError
 
+try:  # datajoint does not connect on import; guard so offline runs still work
+    from datajoint.errors import DataJointError as _DataJointError
+except ImportError:  # pragma: no cover - datajoint always present in practice
+
+    class _DataJointError(Exception):
+        """Placeholder so the skip clause is well-formed without datajoint."""
+
+
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
@@ -441,7 +449,7 @@ def main():
             # MergeError subclasses ValueError, so it must be re-raised here
             # *before* the data-gap clause or it would be silently skipped.
             raise
-        except (FileNotFoundError, OSError, ValueError) as e:
+        except (FileNotFoundError, OSError, ValueError, _DataJointError) as e:
             # Skip-and-continue is only appropriate for data-gap
             # errors (missing file, corrupt input, unexpected shape).
             # ``KeyError`` / ``AttributeError`` / ``AssertionError``
