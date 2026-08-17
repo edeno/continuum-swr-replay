@@ -632,6 +632,19 @@ HORSERACE_PREDICTORS: tuple[str, ...] = (
 )
 
 
+def _scaled_condition_number(design: np.ndarray) -> float:
+    """Condition number of the column-scaled design.
+
+    Scaling each column to unit norm isolates how close the columns are to
+    linearly dependent, rather than reporting their arbitrary relative units,
+    and is the form the conventional 10/30 bands refer to. Shared definition
+    with :func:`analysis.replay.fitting._compute_conditional_diagnostics`.
+    """
+    norms = np.linalg.norm(design, axis=0)
+    scale = np.where(norms > 0, norms, 1.0)
+    return float(np.linalg.cond(design / scale))
+
+
 def within_arm_horserace(
     event_arm: pd.DataFrame,
     *,
@@ -733,7 +746,11 @@ def within_arm_horserace(
                     "session_id": session_id,
                     "population": population,
                     "n_rows": int(len(fit)),
-                    "cond_number": float(np.linalg.cond(design)),
+                    # Column-scaled, matching fitting._compute_conditional_diagnostics
+                    # so the two producers of this column mean the same thing and
+                    # the conventional 10/30 bands apply to both. Unscaled, this
+                    # also reports the columns' arbitrary relative units.
+                    "cond_number": float(_scaled_condition_number(design)),
                     **{
                         f"coef_{col}": float(b)
                         for col, b in zip(design_cols, beta, strict=True)
