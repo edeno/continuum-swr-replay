@@ -42,7 +42,8 @@ Trials DataFrame contains:
     - start_time, end_time, duration: Trial timing (sum of visit durations)
     - goal_arrival_time: Time when animal reached goal well
     - reward_on_time: First pump onset on rewarded trials, else NaN
-    - outcome_known_time: reward_on_time for rewards; end_time for omissions
+    - outcome_known_time: reward_on_time for rewards; goal_arrival_time +
+      OMISSION_KNOWN_LATENCY_SEC (capped at end_time) for omissions
     - from_well, to_well: Starting and ending well IDs
     - from_patch, to_patch: Starting and ending patch IDs
     - is_reward: True if trial resulted in reward
@@ -76,6 +77,10 @@ Examples
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.analysis.constants import (
+    OMISSION_KNOWN_LATENCY_SEC,
+)
 
 from ..types import WellNodeData
 from .constants import WELL_PATCH_MAPPING
@@ -422,10 +427,17 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
             f"trial_number(s): {bad}"
         )
 
-    # Positive feedback is known at the first pump onset.  With no explicit
-    # negative-feedback cue, an omission becomes known conservatively when the
-    # destination poke ends (the trial's end_time/poke-out).
-    outcome_known = np.where(rewarded, reward_on, trial_end)
+    # Positive feedback is known at the first pump onset. An omission has no
+    # cue to timestamp, so it is established once a pump would have fired had
+    # the trial been rewarded -- ``goal_arrival_time`` (destination poke-in)
+    # plus OMISSION_KNOWN_LATENCY_SEC, which exceeds every observed reward
+    # latency. Capped at ``end_time``: leaving is itself conclusive, and the
+    # boundary must stay inside the trial.
+    outcome_known = np.where(
+        rewarded,
+        reward_on,
+        np.minimum(arrival + OMISSION_KNOWN_LATENCY_SEC, trial_end),
+    )
     if (
         not np.isfinite(outcome_known).all()
         or (outcome_known < arrival).any()

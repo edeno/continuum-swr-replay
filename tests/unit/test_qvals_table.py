@@ -21,24 +21,47 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
     assign_stops_to_trials,
     peri_switch_index,
 )
+from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
 
 
 @pytest.mark.parametrize(
     ("rewarded", "reward_on", "expected"),
-    ((True, 12.5, 12.5), (False, np.nan, 14.0)),
+    (
+        (True, 12.5, 12.5),
+        # Omission: poke_in + the latency by which a pump would have fired,
+        # NOT poke-out. Poke-out is a behavioural boundary and lands a median
+        # 880 ms after the information exists.
+        (False, np.nan, 10.0 + OMISSION_KNOWN_LATENCY_SEC),
+    ),
 )
-def test_outcome_known_time_uses_reward_on_or_conservative_omission_poke_out(
+def test_outcome_known_time_uses_reward_on_or_omission_latency(
     rewarded, reward_on, expected
 ):
-    assert (
-        _outcome_known_time(
-            rewarded=rewarded,
-            poke_in_time=10.0,
-            poke_out_time=14.0,
-            reward_on_time=reward_on,
-        )
-        == expected
+    assert _outcome_known_time(
+        rewarded=rewarded,
+        poke_in_time=10.0,
+        poke_out_time=14.0,
+        reward_on_time=reward_on,
+    ) == pytest.approx(expected)
+
+
+def test_omission_boundary_is_capped_at_poke_out():
+    """A poke shorter than the latency is settled by the departure itself."""
+    short = _outcome_known_time(
+        rewarded=False,
+        poke_in_time=10.0,
+        poke_out_time=10.1,  # shorter than OMISSION_KNOWN_LATENCY_SEC
+        reward_on_time=np.nan,
     )
+    assert short == pytest.approx(10.1)
+
+
+def test_omission_latency_exceeds_every_observed_reward_latency():
+    """The boundary must not declare an omission while a pump could fire.
+
+    Max observed reward latency across 52,605 rewarded trials is 0.298 s.
+    """
+    assert OMISSION_KNOWN_LATENCY_SEC > 0.298
 
 
 def test_outcome_known_time_rejects_missing_physical_boundary():
@@ -305,7 +328,11 @@ def test_build_animal_assigns_qvals_from_stop_start_not_midpoint(monkeypatch):
     assert result.loc[0, "trial_number_by_epoch"] == 0
     assert result.loc[0, "qvals_context_time"] == 9.0
     assert result.loc[0, "q_chosen"] == pytest.approx(0.1)
-    assert result.loc[0, "outcome_known_time"] == 10.0
+    # Omission trial (poke_in 8.0, poke_out 10.0): the boundary is
+    # poke_in + the omission latency, not poke-out.
+    assert result.loc[0, "outcome_known_time"] == pytest.approx(
+        8.0 + OMISSION_KNOWN_LATENCY_SEC
+    )
 
 
 # ── add_experienced_value_columns (model belief of the chosen arm) ──

@@ -41,6 +41,7 @@ import numpy as np
 import pandas as pd
 from scipy.special import betaln, digamma
 
+from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_present,
     attach_standardized,
@@ -397,13 +398,20 @@ def _outcome_known_time(
     poke_out_time: float,
     reward_on_time: float,
 ) -> float:
-    """Conservative time at which the current trip's outcome is observable.
+    """Time at which the current trip's outcome is observable.
 
-    Reward onset is an explicit positive feedback cue. The source table has no
-    timestamp for a negative-feedback cue, so an omission is not assumed known
-    merely at poke-in; it becomes conservatively available at poke-out. This
-    may discard usable post-omission dwell, but cannot expose a rewarded-versus-
-    omitted label before the absence of reward is physically established.
+    Reward onset is an explicit positive-feedback cue. An omission has none, so
+    its boundary is ``poke_in + OMISSION_KNOWN_LATENCY_SEC`` -- the point by
+    which a pump would have fired had the trial been rewarded, capped at
+    poke-out because leaving is itself conclusive. The latency exceeds every
+    reward latency in the corpus, so this cannot label an omission while a pump
+    could still arrive.
+
+    The previous rule used poke-out directly. That is a *behavioural* boundary
+    against the rewarded case's *stimulus* one, which is both circular (dwell
+    length plausibly covaries with the replay being measured) and empirically
+    ruinous: it placed the boundary a median 880 ms after the information was
+    available and excluded 99% of omission events from every gated fit.
     """
     if not np.isfinite(poke_in_time):
         raise ValueError("current trial lacks finite poke_in_ts")
@@ -419,7 +427,12 @@ def _outcome_known_time(
         )
     if not rewarded and np.isfinite(reward_on_time):
         raise ValueError("omission trial unexpectedly carries finite reward_on_ts")
-    return float(reward_on_time if rewarded else poke_out_time)
+    if rewarded:
+        return float(reward_on_time)
+    # Capped at poke-out: if the animal left sooner than the latency, its
+    # departure already settles the outcome and the boundary cannot exceed
+    # the poke it belongs to.
+    return float(min(poke_in_time + OMISSION_KNOWN_LATENCY_SEC, poke_out_time))
 
 
 def build_animal(
