@@ -519,21 +519,36 @@ def main() -> None:
         t = build_animal(a, beh, rl, st_all)
         st = st_all[st_all.animal == a]
         obs = st.set_index("stop_id")
-        # arm / reward agreement is only meaningful at at-well (in_poke) stops:
-        # on transit stops the mapped trial's destination leaf (arm 0-5) need not
-        # equal the physical current_arm (which can be a trunk arm 6-8), so a
-        # whole-set figure understates agreement and would trip a spurious
-        # mapping-regression warning. Restrict the checks to in_poke stops.
-        poke = t["in_poke"].to_numpy()
-        cur = obs["current_arm"].reindex(t["stop_id"]).to_numpy()
-        rout = obs["reward_outcome"].reindex(t["stop_id"]).to_numpy()
-        arm_ok = np.mean(t["arm"].to_numpy()[poke] == cur[poke])
-        rew_ok = np.mean(t["trial_reward"].to_numpy()[poke] == rout[poke])
+        # Arm / reward agreement is only meaningful where the stop table has a
+        # location to agree with. Restrict on the canonical whole-window
+        # ``at_well`` label, NOT ``in_poke``: the latter is read at the bout
+        # midpoint, so it marks bouts whose window is not wholly at one well,
+        # and those carry ``current_arm = NaN`` by construction. Comparing
+        # against that NaN scores every such stop as a disagreement and reads
+        # as a mapping regression that is not there.
+        at_well = (
+            obs["at_well"].reindex(t["stop_id"]).eq(True).fillna(False).to_numpy()
+        )
+        cur = obs["current_arm"].reindex(t["stop_id"]).to_numpy(dtype=float)
+        rout = obs["reward_outcome"].reindex(t["stop_id"]).to_numpy(dtype=float)
+        arm_ok = np.mean(t["arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
+        # ``reward_outcome`` is frozen at the bout start, which precedes the
+        # trip's own outcome, so it is missing on essentially every at-well
+        # stop. Score agreement only where the reference exists and report the
+        # comparable share, rather than counting "not yet known" as "wrong".
+        rew_known = at_well & np.isfinite(rout)
+        rew_ok = (
+            np.mean(t["trial_reward"].to_numpy(dtype=float)[rew_known] == rout[rew_known])
+            if rew_known.any()
+            else float("nan")
+        )
+        rew_share = float(rew_known.sum()) / max(int(at_well.sum()), 1)
         entropy_cov = t.attrs["entropy_cov"]
         print(
             f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100 * len(t) / len(st):.0f}%)  "
             f"in_poke={100 * t['in_poke'].mean():.0f}%  "
-            f"at-well arm=={100 * arm_ok:.1f}%  at-well reward=={100 * rew_ok:.1f}%  "
+            f"at-well arm=={100 * arm_ok:.1f}%  "
+            f"at-well reward=={100 * rew_ok:.1f}% (on {100 * rew_share:.0f}% w/ known outcome)  "
             f"[leaf-join {100 * t.attrs['leaf_agree']:.1f}%  entropy {100 * entropy_cov:.0f}%]"
         )
         # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
