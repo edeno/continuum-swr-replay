@@ -1,7 +1,7 @@
 """Phase-4 fast path: ``--from-cache`` rebuilds are byte-identical to a Spyglass run.
 
 The unit tests in ``test_prepare_data_cache.py`` pin the cache *seam*
-(:func:`_load_trials_track_graph`) with fake inputs. This slow test closes the
+(:func:`load_trials_track_graph`) with fake inputs. This slow test closes the
 end-to-end gap the reviewer flagged: it runs the *whole* :func:`_process_session`
 (all four table builders) twice for one real session — once populating the cache from
 Spyglass (``from_cache=False``), once served entirely from the cache

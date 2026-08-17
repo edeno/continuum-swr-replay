@@ -148,8 +148,8 @@ def find_sessions(max_per_animal: int | None = None):
     return selected
 
 
-def _load_trials_track_graph(
-    session: dict, *, from_cache: bool
+def load_trials_track_graph(
+    session: dict, *, from_cache: bool, cache_key: str | None = None
 ) -> tuple[pd.DataFrame | None, object | None, bool]:
     """Return ``(trials, track_graph, hit_cache)``, caching the Spyglass fetch.
 
@@ -172,7 +172,11 @@ def _load_trials_track_graph(
     trials keep the old derivation silently. Run a full (non-cache) pass to
     refresh after any such change; ``--from-cache`` is for covariate-only work.
     """
-    cache_path = SESSION_CACHE_DIR / f"{session['session_id']}.pkl"
+    # ``cache_key`` lets a sibling pipeline share this cache. trials and
+    # track_graph are session facts, independent of which decoder produced the
+    # posteriors, so the ContFrag prep reuses these entries under the NonLocal
+    # session_id rather than paying for (or duplicating) its own Spyglass fetch.
+    cache_path = SESSION_CACHE_DIR / f"{cache_key or session['session_id']}.pkl"
     if from_cache and cache_path.exists():
         with open(cache_path, "rb") as f:
             cached = pickle.load(f)
@@ -238,7 +242,7 @@ def _process_session(
 
     # Trials + track_graph come from Spyglass (slow; the ~3 h/full-run cost),
     # unless served from the per-session cache (--from-cache).
-    trials, track_graph, hit_cache = _load_trials_track_graph(
+    trials, track_graph, hit_cache = load_trials_track_graph(
         session, from_cache=from_cache
     )
     if trials is None or track_graph is None:

@@ -55,10 +55,11 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
-from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.analysis.replay.prepare_data import (
+    load_trials_track_graph,
+)
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.types import SessionDataKeys
 
 logging.basicConfig(
     level=logging.INFO,
@@ -172,6 +173,8 @@ def _process_session(
     session: dict,
     event_source: str,
     contingency: pd.DataFrame | None = None,
+    *,
+    from_cache: bool = False,
 ) -> dict[str, pd.DataFrame] | None:
     """Run ContFrag table builders on one session."""
     nwb = session["nwb_file_name"]
@@ -194,9 +197,22 @@ def _process_session(
     with open(session["env_file"], "rb") as f:
         env = pickle.load(f)
 
-    data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
-    trials = data.get("trials")
-    track_graph = data.get("track_graph")
+    # Reuse the NonLocal per-session trials/track_graph cache. Those are
+    # session facts, not decoder outputs, so the ContFrag build has no reason
+    # to re-fetch them -- and on a host where NWB reads fail (hdmf namespace
+    # mismatch) the cache is the only way this pipeline runs at all. The cache
+    # is keyed by the NonLocal session_id, which is this one without the
+    # ``_contfrag`` suffix.
+    cache_key = f"{nwb.replace('_.nwb', '')}_{epoch}_{brain_area}"
+    trials, track_graph, _ = load_trials_track_graph(
+        {
+            "nwb_file_name": nwb,
+            "epoch_name": epoch,
+            "session_id": cache_key,
+        },
+        from_cache=from_cache,
+        cache_key=cache_key,
+    )
     if trials is None or track_graph is None:
         return None
 
@@ -265,6 +281,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--test", action="store_true", help="2 sessions per animal")
+    parser.add_argument(
+        "--from-cache",
+        action="store_true",
+        help=(
+            "Read trials/track_graph from the NonLocal per-session cache "
+            "instead of Spyglass (falls back to Spyglass per session when an "
+            "entry is missing). Required on hosts where NWB reads fail."
+        ),
+    )
     parser.add_argument("--max-per-animal", type=int, default=None)
     parser.add_argument(
         "--event-source",
@@ -321,7 +346,12 @@ def main():
         epoch = session["epoch_name"]
 
         try:
-            result = _process_session(session, event_source, contingency=contingency)
+            result = _process_session(
+                session,
+                event_source,
+                contingency=contingency,
+                from_cache=args.from_cache,
+            )
         except (FileNotFoundError, OSError, ValueError) as e:
             logging.warning("skip %s %s: %s", nwb, epoch, e)
             skipped.append((nwb, epoch, str(e)))

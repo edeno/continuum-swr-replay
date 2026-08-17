@@ -3,7 +3,7 @@
 The only per-session Spyglass fetch (``trials`` + ``track_graph``) is pickled per
 session on every full run and read back with ``--from-cache`` so a covariate-only
 rebuild avoids ``load_data``. These tests pin the seam
-(:func:`_load_trials_track_graph`) hermetically — no Spyglass, no materialized tables —
+(:func:`load_trials_track_graph`) hermetically — no Spyglass, no materialized tables —
 by faking ``load_data`` and pointing the cache at ``tmp_path``.
 """
 
@@ -45,7 +45,7 @@ def patched(tmp_path, monkeypatch, fake_payload):
         calls["n"] += 1
         return {"trials": trials, "track_graph": g}
 
-    # `_load_trials_track_graph` imports `load_data` lazily from
+    # `load_trials_track_graph` imports `load_data` lazily from
     # `data_loaders` (kept out of module scope so importing prepare_data
     # doesn't open DataJoint). Patch the name in the `data_loaders` __dict__
     # via setitem so we don't trigger its PEP-562 __getattr__ (which would
@@ -56,7 +56,7 @@ def patched(tmp_path, monkeypatch, fake_payload):
 
 def test_cold_calls_spyglass_and_writes_cache(patched, fake_session, fake_payload):
     calls, cache_dir = patched
-    trials, g, hit = pdm._load_trials_track_graph(fake_session, from_cache=False)
+    trials, g, hit = pdm.load_trials_track_graph(fake_session, from_cache=False)
     assert calls["n"] == 1  # Spyglass hit
     assert hit is False
     pd.testing.assert_frame_equal(trials, fake_payload[0])
@@ -66,9 +66,9 @@ def test_cold_calls_spyglass_and_writes_cache(patched, fake_session, fake_payloa
 def test_warm_reads_cache_without_spyglass(patched, fake_session, fake_payload):
     calls, _ = patched
     # Prime the cache (one Spyglass call), then read it back.
-    pdm._load_trials_track_graph(fake_session, from_cache=False)
+    pdm.load_trials_track_graph(fake_session, from_cache=False)
     assert calls["n"] == 1
-    trials, g, hit = pdm._load_trials_track_graph(fake_session, from_cache=True)
+    trials, g, hit = pdm.load_trials_track_graph(fake_session, from_cache=True)
     assert calls["n"] == 1  # NO additional Spyglass call — served from cache
     assert hit is True
     pd.testing.assert_frame_equal(trials, fake_payload[0])
@@ -78,7 +78,7 @@ def test_warm_reads_cache_without_spyglass(patched, fake_session, fake_payload):
 def test_from_cache_falls_back_when_missing(patched, fake_session):
     """--from-cache on an uncached session still loads (and caches) it — never dropped."""
     calls, cache_dir = patched
-    _, _, hit = pdm._load_trials_track_graph(fake_session, from_cache=True)
+    _, _, hit = pdm.load_trials_track_graph(fake_session, from_cache=True)
     assert calls["n"] == 1  # fell back to Spyglass
     assert hit is False
     assert (cache_dir / f"{fake_session['session_id']}.pkl").exists()  # now cached
