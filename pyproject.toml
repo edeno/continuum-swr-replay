@@ -131,3 +131,19 @@ build-backend = "uv_build"
 dev = [
     "pytest-cov>=7.1.0",
 ]
+
+[tool.uv]
+# Spyglass HEAD pins numpy<2 / scipy<1.13 / jax<0.7.2 with
+# "TODO(#1609): remove with SpikeInterface bump" -- the pin exists for
+# SpikeInterface's spike-sorting paths, which this project does not use (we
+# consume trials, DIO, position and LFP). Accepting those pins would downgrade
+# numpy below 2, and every artifact in Processed-Data is a numpy-2 pickle:
+# the decode outputs alone are ~589 MB per session and cost days of GPU, so
+# they cannot simply be regenerated. Override the transitive pins to keep
+# numpy 2 while taking Spyglass HEAD for pynwb>=3.1.3, which is what the
+# restored NWB files (core schema 2.9.0) require.
+override-dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "jax>=0.7.2",
+]
