@@ -66,6 +66,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table, table_exists
 
 # Map event source to model hierarchy and input directory
 _EVENT_SOURCE_CONFIG = {
@@ -982,7 +983,7 @@ def main():
     # results into the canonical ``models/`` directory.
     canonical_path = input_dir / f"{table_name}.pkl"
     legacy_path = input_dir / "long_count.pkl"
-    if not canonical_path.exists():
+    if not table_exists(canonical_path):
         legacy_note = (
             f" Found legacy artifact {legacy_path}, but it cannot be used "
             "for canonical fits."
@@ -996,7 +997,7 @@ def main():
         )
 
     logging.info("Loading %s...", canonical_path)
-    long_df = pd.read_pickle(canonical_path)
+    long_df = read_table(canonical_path)
     (
         long_df,
         valid_model_names,

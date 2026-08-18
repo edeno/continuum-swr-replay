@@ -832,7 +832,7 @@ def test_runner_smoke():
     stop = add_uncertainty_covariates(stop)
     # Nominal schedule + real model covariates, all from qvals_table -- one
     # exactly poke_out-aligned source, mirroring the runner's main().
-    qvals = pd.read_pickle(qvals_path)
+    qvals = read_table(qvals_path)
     if "outcome_known_time" not in qvals:
         pytest.skip(
             "qvals_table.pkl predates physical post-outcome timing; regenerate it"

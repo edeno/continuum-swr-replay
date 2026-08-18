@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
     build_event_table,
 )
+from continuum_swr_replay.table_io import read_table, table_exists
 
 from .test_replay_tables import (
     _bandit_graph,
@@ -247,10 +248,10 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     unit. The coefficient is therefore quoted per 1.62 leaf-SDs, not per 1 SD.
     """
     tables = Path("Processed-Data/replay_content/event_arm_table.pkl")
-    if not tables.exists():
+    if not table_exists(tables):
         pytest.skip("materialized event_arm_table.pkl not available")
 
-    eat = pd.read_pickle(tables)
+    eat = read_table(tables)
     leaf = eat.loc[eat["arm"] < 6, "arm_uncertainty_z"].to_numpy()
     np.testing.assert_allclose(np.nanstd(leaf), 1.0, rtol=0.05)
 

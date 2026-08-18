@@ -9,6 +9,8 @@ it; and a missing table raises rather than returning something empty.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -143,3 +145,45 @@ def test_empty_frame_with_schema_roundtrips_with_column_order(tmp_path):
 
     assert list(loaded.columns) == cols
     assert len(loaded) == 0
+
+
+CANONICAL_TABLE_NAMES = (
+    "event_table",
+    "event_arm_table",
+    "event_patch_table",
+    "event_sequence_table",
+    "stop_table",
+    "qvals_table",
+    "event_onset_table",
+)
+
+
+def test_no_module_reads_a_canonical_table_with_read_pickle():
+    """A canonical table must never be read with ``pd.read_pickle``.
+
+    The tables live beside their retired pickles in the archive directories, and
+    for a while lived beside them outright. A reader on ``pd.read_pickle`` either
+    fails outright (the pickle has moved) or, worse, quietly serves a
+    pre-migration copy -- which is how a whole value block once came back NaN
+    without anything raising.
+
+    This catches the common form, where the filename is a literal on the same
+    line. It cannot see paths built through variables, so it is a backstop, not
+    a proof.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    offenders = []
+    for directory in ("src", "scripts", "tests"):
+        for path in (repo_root / directory).rglob("*.py"):
+            if "archive" in path.parts or path.name == "convert_tables_to_parquet.py":
+                continue
+            for number, line in enumerate(path.read_text().splitlines(), start=1):
+                if "pd.read_pickle(" not in line:
+                    continue
+                if any(f"{name}.pkl" in line for name in CANONICAL_TABLE_NAMES):
+                    offenders.append(f"{path.relative_to(repo_root)}:{number}")
+
+    assert not offenders, (
+        "canonical tables must be read via table_io.read_table, not pd.read_pickle: "
+        + ", ".join(offenders)
+    )

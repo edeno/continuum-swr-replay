@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
 NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
@@ -204,9 +205,9 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     ``replay_content/event_arm_table.pkl`` is unavailable.
     """
     f = PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.pkl"
-    if not f.exists():
+    if not table_exists(f):
         return None
-    ea = pd.read_pickle(f)
+    ea = read_table(f)
     if animal is not None and "animal" in ea.columns:
         ea = ea[ea["animal"] == animal]
     ea = ea.assign(group=np.where(ea["is_swr"].astype(bool), "SWR", "nonSWR"))

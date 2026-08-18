@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
@@ -186,7 +187,7 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
         ("stop_table", "stop_table"),
     ]:
         path = d / f"{base}{suffix}.pkl"
-        tables[short] = pd.read_pickle(path)
+        tables[short] = read_table(path)
         logger.info("loaded %s: %d rows", path.name, len(tables[short]))
     return tables
 

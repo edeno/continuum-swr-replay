@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 CF = PROCESSED_DATA_DIR / "contfrag_replay_content"
@@ -100,8 +101,8 @@ def _summarize(col: pd.Series) -> str:
 
 
 def verify_table(label: str, bpath, npath) -> bool:
-    b = pd.read_pickle(bpath)
-    n = pd.read_pickle(npath)
+    b = read_table(bpath)
+    n = read_table(npath)
     ok = True
     print(f"\n=== {label} ===  backup {b.shape}  new {n.shape}")
 

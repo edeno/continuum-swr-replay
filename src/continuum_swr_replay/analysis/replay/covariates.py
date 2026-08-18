@@ -27,6 +27,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_ARMS,
     WELL_PATCH_MAPPING,
 )
+from continuum_swr_replay.table_io import read_table, table_exists
 
 from ._helpers import (
     _trial_arrival_times,
@@ -1053,8 +1054,8 @@ def load_contingency(path: Path) -> pd.DataFrame | None:
     builders then emit those columns as NaN, dropping uniformly at fit time).
     """
     path = Path(path)
-    if path.exists():
-        cont = pd.read_pickle(path)
+    if table_exists(path):
+        cont = read_table(path)
         logging.info(
             "loaded qvals_table (%d stop rows) for p_reward_arm / q_arm", len(cont)
         )
