@@ -4,11 +4,25 @@ from continuum_swr_replay.analysis.replay import model_specs as specs
 from continuum_swr_replay.analysis.replay.covariate_timing import timing_of
 
 
+def _has_recency(predictors) -> bool:
+    """Both the linear and log-scale recency forms carry the same hazard."""
+    return any(
+        p in predictors
+        for p in ("visit_recency_demeaned", *specs.RECENCY_SPLINE_COLUMNS)
+    )
+
+
 def test_arm_hierarchy_adds_novelty_main_effect_with_recency():
     for name in ("M4", "M5", "M6", "Mv", "Mu", "Mvu"):
-        assert "visit_recency_demeaned" in specs.MODEL_HIERARCHY[name].predictors
+        assert any(
+            c in specs.MODEL_HIERARCHY[name].predictors
+            for c in specs.RECENCY_SPLINE_COLUMNS
+        )
         assert "arm_never_visited" in specs.MODEL_HIERARCHY[name].predictors
-    assert "swr_x_visit_recency_demeaned" in specs.MODEL_HIERARCHY["M6"].predictors
+    assert any(
+        f"swr_x_{c}" in specs.MODEL_HIERARCHY["M6"].predictors
+        for c in specs.RECENCY_SPLINE_COLUMNS
+    )
     # The sparse interaction remains materialized for sensitivity analyses but
     # is not in the primary ladder: it makes five otherwise estimable shipped
     # sessions rank-deficient and would silently change the M5->M6 session set.
@@ -30,7 +44,7 @@ def test_novelty_timing_is_past_only():
 
 
 def test_every_recency_rung_carries_the_novelty_companion():
-    """``visit_recency_demeaned`` must never appear without ``arm_never_visited``.
+    """Either recency form must never appear without ``arm_never_visited``.
 
     Centering excludes censored arms from the *mean*, but their own values are
     still the right-censoring rule (``n_completed + 1`` minus the visited
@@ -53,17 +67,17 @@ def test_every_recency_rung_carries_the_novelty_companion():
     for family, ladder in families.items():
         for name, spec in ladder.items():
             predictors = set(spec.predictors)
-            if "visit_recency_demeaned" in predictors and (
+            if _has_recency(predictors) and (
                 "arm_never_visited" not in predictors
             ):
                 unpaired.append(f"{family}:{name}")
     for name, (predictors, _scope) in ms.SWR_CONTRAST_CONTENT_ARM_LADDER.items():
-        if "visit_recency_demeaned" in predictors and (
+        if _has_recency(predictors) and (
             "arm_never_visited" not in predictors
         ):
             unpaired.append(f"SWR_CONTRAST_ARM:{name}")
 
     assert not unpaired, (
-        "rungs carry visit_recency_demeaned without arm_never_visited: "
+        "rungs carry a recency term without arm_never_visited: "
         f"{unpaired}"
     )

@@ -26,6 +26,10 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+# Above this share of unidentified session fits, a term's aggregate is a
+# statement about the identified minority and is not emitted at all.
+MAX_UNIDENTIFIED_SHARE = 0.20
+
 logger = logging.getLogger(__name__)
 
 # Binary predictors (per-category; not standardized). Full term names, including the
@@ -80,10 +84,40 @@ def aggregate_contrast(
         if ccol not in s_all.columns:
             continue
         present = s_all[ccol].notna()
-        kept = present & (s_all[ccol].abs() < 10)  # drop quasi-separated
+        # Identifiability filter. The |coef| bound alone is selection ON the
+        # estimate: over a set of unidentified fits it keeps exactly the ones
+        # whose runaway estimate happened to land under the threshold, which is
+        # how CS3_lastrew came to report -2.72 next to a typical session SE of
+        # 2,428 (the identified sessions give -0.77). Drop a session when the
+        # fit is flagged separated, or when the standard error is large relative
+        # to the estimate -- a coefficient known only to within an order of
+        # magnitude carries no information about its own sign.
+        finite_se = s_all[scol] if scol in s_all.columns else None
+        unstable = (
+            (finite_se > 10 * s_all[ccol].abs()) & finite_se.notna()
+            if finite_se is not None
+            else pd.Series(False, index=s_all.index)
+        )
+        flagged = (
+            s_all["separated"] == True  # noqa: E712 (NaN must not count)
+            if "separated" in s_all.columns
+            else pd.Series(False, index=s_all.index)
+        )
+        kept = present & (s_all[ccol].abs() < 10) & ~unstable & ~flagged
         n_dropped = int((present & ~kept).sum())
         s = s_all[kept]
         if len(s) < 5:
+            continue
+        # Refuse to publish a term that is unidentified in a large share of the
+        # sessions that were fit: the surviving median describes the identified
+        # minority, not the corpus, and reads as if it described the corpus.
+        drop_share = n_dropped / max(int(present.sum()), 1)
+        if drop_share > MAX_UNIDENTIFIED_SHARE:
+            logging.warning(
+                "%s/%s/%s: %.0f%% of fitted sessions unidentified (%d of %d); "
+                "not emitting an aggregate row",
+                model, pop, term, 100 * drop_share, n_dropped, int(present.sum()),
+            )
             continue
         coef = s[ccol]
         per_animal = s.groupby("animal")[ccol].median()

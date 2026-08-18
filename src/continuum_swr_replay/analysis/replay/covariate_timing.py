@@ -81,6 +81,9 @@ PRE_OUTCOME_SAFE = frozenset(
         "reward_rate_arm_k10",
         "visit_recency",
         "visit_recency_demeaned",
+        "visit_recency_spline1_demeaned",
+        "visit_recency_spline2_demeaned",
+        "visit_recency_spline3_demeaned",
         "visit_recency_patch",
         "arm_never_visited",
         "arm_never_visited_patch",
@@ -154,6 +157,9 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
     "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
     "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
+    "swr_x_visit_recency_spline1_demeaned": ["visit_recency_spline1_demeaned"],
+    "swr_x_visit_recency_spline2_demeaned": ["visit_recency_spline2_demeaned"],
+    "swr_x_visit_recency_spline3_demeaned": ["visit_recency_spline3_demeaned"],
     "swr_x_arm_never_visited": ["arm_never_visited"],
     "swr_x_q_arm": ["q_arm"],  # qvals-dependent
     # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):

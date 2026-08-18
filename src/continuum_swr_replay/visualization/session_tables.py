@@ -81,7 +81,10 @@ from continuum_swr_replay.analysis.replay import (
     trial_context_at_times,
     trial_cutoff_times,
 )
-from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
+from continuum_swr_replay.analysis.replay.model_specs import (
+    N_REWARD_LAGS,
+    RECENCY_SPLINE_COLUMNS,
+)
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS as _ALL_ARMS,
 )
@@ -1435,6 +1438,34 @@ def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+def _make_recency_spline_panel(column: str, index: int):
+    """Panel for one recency-spline basis column.
+
+    The basis is zero outside its identified support (visited leaves that are
+    neither the current nor the previous arm), so those rows read as structural
+    zeros rather than missing data -- the same convention the trunk rows use in
+    the linear-recency panel above.
+    """
+
+    def _plot(ax: Axes, ctx: _PanelContext) -> None:
+        _draw_event_arm_heatmap(
+            ax,
+            ctx,
+            value_col=column,
+            cmap_name="coolwarm",
+            vmin=None,
+            vmax=None,
+            center=0.0,
+            label=f"recency spline\nbasis {index} [centered]",
+            structural_na_rows=_TRUNK_ARMS,
+            scale_across_table=True,
+            robust_symmetric_quantile=0.95,
+            colorbar_label="basis value from event mean",
+        )
+
+    return _plot
+
+
 def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
     """Event-local centered visit recency — the column M4+ actually fits.
 
@@ -2708,6 +2739,10 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "arm_uncertainty": _plot_arm_uncertainty,
     # Remaining fitted arm-grain predictors.
     "visit_recency_demeaned": _plot_visit_recency_demeaned,
+    **{
+        _c: _make_recency_spline_panel(_c, _i + 1)
+        for _i, _c in enumerate(RECENCY_SPLINE_COLUMNS)
+    },
     "arm_never_visited": _plot_arm_never_visited,
     "is_current": _plot_is_current,
     "is_prev": _plot_is_prev,
@@ -2737,6 +2772,7 @@ ARM_COVARIATE_PANELS: tuple[str, ...] = (
     "is_prev",
     "is_last_rewarded_elsewhere",
     "visit_recency_demeaned",
+    *RECENCY_SPLINE_COLUMNS,
     "arm_never_visited",
     "reward_rate_arm_k10",
     "cumulative_reward",
@@ -2775,6 +2811,7 @@ _EVENT_INTERVAL_CELL_PANELS = frozenset(
         "dist_to_arm",
         "arm_dist_rank",
         "visit_recency_demeaned",
+    *RECENCY_SPLINE_COLUMNS,
         "arm_never_visited",
         "q_arm",
         "arm_uncertainty",
@@ -2791,6 +2828,7 @@ _STRUCTURAL_NA_PANELS = frozenset(
         "reward_rate_arm_k10",
         "p_reward_arm",
         "visit_recency_demeaned",
+    *RECENCY_SPLINE_COLUMNS,
         "q_arm",
         "arm_uncertainty",
     }
@@ -2937,6 +2975,7 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "q_arm": 1.4,
     "arm_uncertainty": 1.4,
     "visit_recency_demeaned": 1.4,
+    **{_c: 1.4 for _c in RECENCY_SPLINE_COLUMNS},
     "arm_never_visited": 1.4,
     "is_current": 1.4,
     "is_prev": 1.4,

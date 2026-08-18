@@ -41,7 +41,7 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   that right-censored novelty is distinguishable from an observed
   zero reward rate. Events before the first completed trial remain
   unknown and are removed by complete-case selection.
-- M4 uses event-local ``visit_recency_demeaned`` rather than a
+- M4 uses an event-local recency *spline* rather than a
   session-wide transformation. At each event, the mean recency over
   the *visited* reward-site arms is subtracted from every leaf-arm
   recency; never-visited leaves are excluded from that mean because
@@ -109,6 +109,7 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -264,18 +265,43 @@ def default_content_model_names(
 # terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 # VIF > 70).
 
+# Natural-cubic-spline basis for visit recency, on the log1p scale.
+#
+# Recency is a trial count spanning 1 to ~200 and is *deterministic* on the two
+# arms that already have their own indicators: exactly 1 on the current arm and
+# exactly 2 on the previous arm. A basis evaluated there is a fixed vector, hence
+# exactly collinear with ``is_current`` + ``is_prev`` -- fitting it unmasked is
+# rank-deficient. The basis is therefore masked to the arms where recency is not
+# already determined (visited leaves that are neither current nor previous, where
+# recency is >= 3 by construction), and one basis column is dropped as reference
+# because a natural spline basis is a partition of unity and would otherwise sum
+# to the mask.
+#
+# Knots are fixed globally rather than fitted per session: a per-session basis
+# would give each session its own units and make the coefficients incomparable
+# across the medians the ladders aggregate over. They sit near the quartiles of
+# the visited-leaf distribution (recency 7 and 25; support 3 to 200).
+RECENCY_SPLINE_KNOTS: tuple[float, float] = (float(math.log1p(7.0)), float(math.log1p(25.0)))
+RECENCY_SPLINE_BOUNDS: tuple[float, float] = (float(math.log1p(3.0)), float(math.log1p(200.0)))
+RECENCY_SPLINE_COLUMNS: tuple[str, ...] = (
+    "visit_recency_spline1_demeaned",
+    "visit_recency_spline2_demeaned",
+    "visit_recency_spline3_demeaned",
+)
+
+
 _M1 = (*ARM_FE_PREDICTORS, "is_current")
 _M2 = (*_M1, "is_prev")
 # An unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not NaN) so its
 # event is retained. M4 adds ``arm_never_visited`` alongside time-local recency,
 # separating novelty from an observed zero reward rate while preserving nesting.
 _M3 = (*_M2, "reward_rate_arm_k10")
-_M4 = (*_M3, "visit_recency_demeaned", "arm_never_visited")
+_M4 = (*_M3, *RECENCY_SPLINE_COLUMNS, "arm_never_visited")
 _M5 = (*_M4, "swr_x_current", "swr_x_prev")
 _M6 = (
     *_M5,
     "swr_x_reward_rate_arm_k10",
-    "swr_x_visit_recency_demeaned",
+    *(f"swr_x_{_c}" for _c in RECENCY_SPLINE_COLUMNS),
 )
 # Value block: per-arm nominal value (p_reward_arm) + per-arm beta-model value
 # (q_arm, the beta-bernoulli per-leaf belief mean) as conditional main effects on the
@@ -1075,13 +1101,22 @@ SWR_CONTRAST_RATE_S_SPECS = _s_specs()
 # --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
 # name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)
 ARMFE = [f"arm_fe_{a}" for a in range(8)]
+# ``arm_dist_rank`` is deliberately absent. It takes five tied values over a
+# fixed track topology, its rank-1 level is *identical* to ``is_current``
+# (agreement 1.000000 across 59,374 location-resolved events), and it ranks last
+# in unique likelihood of any covariate here. Carrying it collapsed the
+# current-arm coefficient from +0.705 (5/5 animals) to +0.102 (3/5) and doubled
+# its standard error, making every C*/CS* ``is_current`` non-comparable with
+# ``M1``/``C1_current``. Its removal leaves the SWR interactions untouched
+# (``swr_x_q_arm`` -2.390 -> -2.407). This also restores consistency with the
+# module docstring above, which excludes ``dist_to_arm`` and ``is_same_patch``
+# on the same grounds -- ``arm_dist_rank`` re-imported most of their content.
 BASEc = [
     *ARMFE,
     "is_current",
     "is_prev",
-    "visit_recency_demeaned",
+    *RECENCY_SPLINE_COLUMNS,
     "arm_never_visited",
-    "arm_dist_rank",
 ]
 _TSC = "tsc_x_current"
 SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
@@ -1173,11 +1208,18 @@ BASEc_PATCH = [
     "visit_recency_patch",
     "arm_never_visited_patch",
 ]
+# ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18. Both crossed
+# ``is_last_rewarded_patch_elsewhere`` with a ``trials_since_switch`` term, and
+# the indicator correlates -0.96/-0.97 with its own interaction, so the design
+# was rank-deficient in 83 and 87 of 215 sessions. What survived the |coef|<10
+# filter was selection on the estimate: CP2 reported +4.83 with a typical
+# session SE of 7,313, against +0.36 on the sessions that were actually
+# identified. A 3%-support indicator crossed with a time term is not estimable
+# per session in a 3-alternative model.
 _LR_PATCH = "is_last_rewarded_patch_elsewhere"
 SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP0_base": (BASEc_PATCH, "split"),
     "CP1_lastrew": ([*BASEc_PATCH, _LR_PATCH], "split"),
-    "CP2_olddecay": ([*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss"], "split"),
     "CP3_newgrowth": ([*BASEc_PATCH, "currentpatch_x_tss"], "split"),
     "CP4_switchrate": ([*BASEc_PATCH, "currentpatch_x_switchrate"], "split"),
     # Time-controlled (currentpatch_x_tsc, within-stop-time) + uncontrolled twin,
@@ -1191,21 +1233,15 @@ SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
         [*BASEc_PATCH, _LR_PATCH, "swr_x_last_rewarded_patch_elsewhere"],
         "pooled",
     ),
-    "CPS3_olddecay": (
-        [*BASEc_PATCH, _LR_PATCH, "lastrewpatch_x_tss", "swr_x_lastrewpatch_tss"],
-        "pooled",
-    ),
 }
 SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
     "CP0_base": "is_current_patch",
     "CP1_lastrew": _LR_PATCH,
-    "CP2_olddecay": "lastrewpatch_x_tss",
     "CP3_newgrowth": "currentpatch_x_tss",
     "CP4_switchrate": "currentpatch_x_switchrate",
     "CPS1_current": "swr_x_current_patch",
     "CPS1nt_current": "swr_x_current_patch",
     "CPS2_lastrew": "swr_x_last_rewarded_patch_elsewhere",
-    "CPS3_olddecay": "swr_x_lastrewpatch_tss",
 }
 SWR_CONTRAST_CONTENT_BASEC = BASEc
 SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
@@ -1225,9 +1261,7 @@ DESCRIPTIVE_CONTENT_RUNGS = frozenset(
         "C6_rpe",
         "C9_update",  # POST_OUTCOME: RPE / value-update association
         "C10_periswitch",  # FUTURE_REFERENCING: peri-switch alignment
-        "CP2_olddecay",
         "CP3_newgrowth",
-        "CPS3_olddecay",  # patch peri-switch alignment
     }
 )
 DESCRIPTIVE_RATE_RUNGS = frozenset(

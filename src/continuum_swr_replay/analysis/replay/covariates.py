@@ -34,7 +34,12 @@ from ._helpers import (
     _trial_outcome_times,
     build_well_to_arm_map,
 )
-from .model_specs import N_REWARD_LAGS
+from .model_specs import (
+    N_REWARD_LAGS,
+    RECENCY_SPLINE_BOUNDS,
+    RECENCY_SPLINE_COLUMNS,
+    RECENCY_SPLINE_KNOTS,
+)
 
 _SESSION_COLS = ["animal", "day", "epoch"]
 _P_REWARD_PORT_COLS = [f"p_reward_port{i}" for i in range(6)]
@@ -62,6 +67,8 @@ UNCERTAINTY_COVARIATES = (
 def center_visit_recency_within_event(
     recency: np.ndarray,
     never_visited: np.ndarray,
+    *,
+    log_scale: bool = False,
 ) -> np.ndarray:
     """Center leaf-arm recency within each event without using future events.
 
@@ -85,6 +92,17 @@ def center_visit_recency_within_event(
     never_visited : np.ndarray, shape (n_events, len(ALL_ARMS))
         1.0 where the arm has never been visited by this event, else 0.0.
         NaN is treated as not-censored, matching ``recency``'s own NaN.
+    log_scale : bool
+        Apply ``log1p`` to the raw recency *before* centering. Recency is a
+        trial count spanning 1 to ~200, and it is deterministic on the two arms
+        that matter -- exactly 1 on the current arm and exactly 2 on the
+        previous arm -- so a linear term forces the current-versus-previous
+        contrast to one unit while the data show far more. Within event, among
+        the arms that are neither current nor previous, the relationship with
+        replay share is monotone (median within-event r = +0.24, positive in
+        70% of events), so a monotone transform is the right shape; a spline
+        is not needed. Transforming before centering keeps the censoring rule
+        below unchanged -- the mean is still taken over visited leaves only.
 
     Returns
     -------
@@ -102,6 +120,8 @@ def center_visit_recency_within_event(
             "never_visited must match recency shape "
             f"{values.shape}; got {censored.shape}"
         )
+    if log_scale:
+        values = np.log1p(values)
     output = values.copy()
     arm_positions = {arm: index for index, arm in enumerate(ALL_ARMS)}
     leaf_positions = np.asarray([arm_positions[arm] for arm in WELL_ARMS])
@@ -117,6 +137,55 @@ def center_visit_recency_within_event(
     )
     output[:, leaf_positions] = leaf_values - means[:, None]
     return output
+
+
+def spline_visit_recency_within_event(
+    recency: np.ndarray,
+    never_visited: np.ndarray,
+    is_current: np.ndarray,
+    is_prev: np.ndarray,
+    arm: np.ndarray,
+    event_id: np.ndarray,
+) -> np.ndarray:
+    """Event-centered natural-spline basis of recency, on its identified support.
+
+    All inputs are flat per-(event, arm) row arrays of equal length. Returns
+    ``(n_rows, len(RECENCY_SPLINE_COLUMNS))``, zero outside the masked support so
+    the columns carry no weight on arms whose recency is already determined.
+
+    The within-event mean is taken over the masked rows only, mirroring
+    :func:`center_visit_recency_within_event`: an arm outside the support must
+    not displace the arms inside it.
+    """
+    from patsy import dmatrix
+
+    values = np.asarray(recency, dtype=float)
+    mask = (
+        (np.asarray(arm) < len(WELL_ARMS))
+        & (np.asarray(never_visited, dtype=float) == 0.0)
+        & (np.asarray(is_current, dtype=float) == 0.0)
+        & (np.asarray(is_prev, dtype=float) == 0.0)
+        & np.isfinite(values)
+    )
+    basis = np.asarray(
+        dmatrix(
+            "cr(x, knots=k, lower_bound=lo, upper_bound=hi) - 1",
+            {
+                "x": np.log1p(np.where(np.isfinite(values), values, 1.0)),
+                "k": list(RECENCY_SPLINE_KNOTS),
+                "lo": RECENCY_SPLINE_BOUNDS[0],
+                "hi": RECENCY_SPLINE_BOUNDS[1],
+            },
+            return_type="dataframe",
+        )
+    )[:, 1:]
+    out = basis * mask[:, None]
+    events = pd.Series(np.asarray(event_id))
+    for column in range(out.shape[1]):
+        masked = pd.Series(np.where(mask, out[:, column], np.nan))
+        means = masked.groupby(events).transform("mean").fillna(0.0).to_numpy()
+        out[:, column] = np.where(mask, out[:, column] - means, 0.0)
+    return out
 
 
 def visit_recency_all_events(

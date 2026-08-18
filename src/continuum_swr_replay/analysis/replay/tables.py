@@ -144,7 +144,13 @@ from ._helpers import (
     time_since_stop as _time_since_stop,
 )
 from .covariates import (
+    RECENCY_SPLINE_COLUMNS as _RECENCY_SPLINE_COLUMNS,
+)
+from .covariates import (
     center_visit_recency_within_event as _center_visit_recency_within_event,
+)
+from .covariates import (
+    spline_visit_recency_within_event as _spline_visit_recency_within_event,
 )
 from .covariates import (
     visit_recency_and_never_visited_all_events as _visit_recency_and_never_visited_all_events,
@@ -1475,6 +1481,19 @@ def build_event_arm_table(
     long["visit_recency_demeaned"] = _center_visit_recency_within_event(
         vr_2d, anv_2d
     ).flatten()
+    # Spline basis of the same recency, on its identified support. The linear
+    # column above is kept so old and new fits stay comparable, but the ladders
+    # fit the basis: see ``spline_visit_recency_within_event``.
+    _recency_basis = _spline_visit_recency_within_event(
+        long["visit_recency"].to_numpy(),
+        long["arm_never_visited"].to_numpy(),
+        long["is_current"].to_numpy(),
+        long["is_prev"].to_numpy(),
+        arm_arr,
+        long["event_id"].to_numpy(),
+    )
+    for _index, _column in enumerate(_RECENCY_SPLINE_COLUMNS):
+        long[_column] = _recency_basis[:, _index]
     long["cumulative_reward"] = cr_2d.flatten()
     long["reward_rate_arm_k10"] = rrr_2d.flatten()
 
@@ -1522,6 +1541,8 @@ def build_event_arm_table(
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
+    for _column in _RECENCY_SPLINE_COLUMNS:
+        long[f"swr_x_{_column}"] = is_swr_i * long[_column].to_numpy()
     long["swr_x_arm_never_visited"] = is_swr_i * long["arm_never_visited"].to_numpy()
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
@@ -1945,6 +1966,7 @@ _EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
     # Reward / value
     "visit_recency",
     "visit_recency_demeaned",
+    *_RECENCY_SPLINE_COLUMNS,
     "arm_never_visited",
     "cumulative_reward",
     "reward_rate_arm_k10",
@@ -1962,6 +1984,7 @@ _EVENT_ARM_TABLE_COLUMNS: tuple[str, ...] = (
     "swr_x_last_rewarded",
     "swr_x_reward_rate_arm_k10",
     "swr_x_visit_recency_demeaned",
+    *(f"swr_x_{_c}" for _c in _RECENCY_SPLINE_COLUMNS),
     "swr_x_arm_never_visited",
     "swr_x_is_last_rewarded_elsewhere",
     "swr_x_arm_uncertainty",
