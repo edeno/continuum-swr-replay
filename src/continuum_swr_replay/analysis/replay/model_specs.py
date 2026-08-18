@@ -1265,6 +1265,44 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 # for exactly these names; a NEW rung that introduces a leaky covariate but is NOT listed
 # here fails the timing assertion (it is not silently promoted to a predictive claim).
 # See docs/models_table.md and analysis.replay.covariate_timing.
+# Contrast rungs fitted over the six leaf arms only, not all nine.
+#
+# The trunk arms carry a structural zero for every leaf-derived belief covariate
+# (`q_arm`, `p_reward_arm`, `arm_uncertainty`), so including them adds rows that
+# say nothing about those covariates while manufacturing collinearity between
+# them: `q_arm` and `arm_uncertainty_z` correlate **+0.820 over nine arms and
+# -0.038 over the six leaves**, and a nine-arm design has condition number 14.7
+# and max VIF 12.1 against 3.66 and 3.35 leaf-only. The shared variance is
+# entirely "leaf versus trunk", which `arm_fe_6/7` already absorb.
+#
+# Restricted to the standalone contrast rungs. The arm-ladder belief rungs
+# (Mv/Mu/Mvu) are nested -- their parents are M4 and Mu, fitted over nine arms --
+# and changing the candidate set changes the conditional likelihood, so a
+# leaf-only Mv could not be compared to a nine-arm M4 by ΔAIC. Making those
+# leaf-only would require a leaf-only parent rung as well.
+LEAF_ONLY_CONTRAST_RUNGS = frozenset(
+    {
+        "C4_armvalue",
+        "C13_armuncert",
+        "CS5_armvalue",
+        "CS5b_valuevsprevgoal",
+        "CS6_armuncert",
+    }
+)
+LEAF_ONLY_N_CATEGORIES = 6
+# Arm fixed effects for a leaf-only fit: five dummies for six leaves, arm 5 the
+# reference. The nine-arm set (arm_fe_0..7) is rank-deficient once the trunks are
+# gone -- arm_fe_6 and arm_fe_7 are then identically zero -- so a leaf-only rung
+# carrying it does not fit at all.
+LEAF_ONLY_ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"arm_fe_{i}" for i in range(5))
+
+
+def leaf_only_predictors(predictors) -> list[str]:
+    """Drop the arm fixed effects that are structurally zero on a leaf-only fit."""
+    dropped = set(ARM_FE_PREDICTORS) - set(LEAF_ONLY_ARM_FE_PREDICTORS)
+    return [p for p in predictors if p not in dropped]
+
+
 DESCRIPTIVE_CONTENT_RUNGS = frozenset(
     {
         "C6_rpe",

@@ -72,6 +72,9 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
+    LEAF_ONLY_CONTRAST_RUNGS,
+    LEAF_ONLY_N_CATEGORIES,
+    leaf_only_predictors,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_KEY_TERM as ARM_KEY_TERM,
@@ -310,10 +313,24 @@ def _run(
             sessions_in = sessions_modeled = n_nonconv = n_sep = 0
             animals_modeled: set = set()
             dropped_frames = []
-            for keys, g in splits[pop].groupby(SC, sort=False):
+            # Belief rungs are fitted over the leaf arms only: the trunks carry a
+            # structural zero for every leaf-derived belief covariate, so they add
+            # no information about it while manufacturing collinearity between
+            # q_arm and arm_uncertainty_z (+0.820 over nine arms, -0.038 over six).
+            # See LEAF_ONLY_CONTRAST_RUNGS.
+            leaf_only = name in LEAF_ONLY_CONTRAST_RUNGS
+            pop_frame = splits[pop]
+            fit_categories = n_categories
+            fit_preds = preds
+            if leaf_only:
+                pop_frame = pop_frame[pop_frame["arm"] < LEAF_ONLY_N_CATEGORIES]
+                fit_categories = LEAF_ONLY_N_CATEGORIES
+                fit_preds = leaf_only_predictors(preds)
+            for keys, g in pop_frame.groupby(SC, sort=False):
                 sessions_in += 1
                 r, a = _fit_session(
-                    g, preds, response_col=response_col, n_categories=n_categories
+                    g, fit_preds, response_col=response_col,
+                    n_categories=fit_categories,
                 )
                 for k in acc:
                     acc[k] += a[k]
