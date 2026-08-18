@@ -343,13 +343,27 @@ def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
     # connection on import, which would make DB-free unit tests of the pure
     # helpers (e.g. _add_nominal_contingency) require live DB access.
     from spyglass.common import AnalysisNwbfile
-    from spyglass.utils.dj_helper_fn import fetch_nwb
+    from spyglass.utils.nwb_helper_fn import get_nwb_file
 
     sel = rl.BehaviorModelResults & {"subject_id": subject, **key}
-    results = fetch_nwb(sel, (AnalysisNwbfile, "analysis_file_abs_path"))
-    if not results:
+    # Resolve the AnalysisNwbfile by hand rather than via ``fetch_nwb``. The
+    # helper only exists on Spyglass mixin tables, and ``rl`` is a virtual
+    # module reflected from Alison's schema, whose tables are plain DataJoint.
+    recs = sel.fetch(
+        "analysis_file_name", "behavior_model_results_object_id", as_dict=True
+    )
+    if not recs:
         raise ValueError(f"no BehaviorModelResults for {subject!r} with {key}")
-    return results[0]["behavior_model_results"].reset_index(drop=True)
+    if len(recs) > 1:
+        raise ValueError(
+            f"{len(recs)} BehaviorModelResults rows for {subject!r} with {key}; "
+            "expected exactly one -- the model key no longer identifies a "
+            "single fit, so which values get used would be arbitrary"
+        )
+    rec = recs[0]
+    path = AnalysisNwbfile.get_abs_path(rec["analysis_file_name"])
+    obj = get_nwb_file(path).objects[rec["behavior_model_results_object_id"]]
+    return obj.to_dataframe().reset_index(drop=True)
 
 
 def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]:
