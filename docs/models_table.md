@@ -166,11 +166,9 @@ M2   arm_count ~ ARMFE + is_current + is_prev
 M3   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10
 M4   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
                  + arm_never_visited
-M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_recency_demeaned
-                 + arm_never_visited + is_last_rewarded_elsewhere
-M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
-M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
-Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
+M5   arm_count ~ [M4 terms] + swr_x_current + swr_x_prev
+M6   arm_count ~ [M5 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
+Mv   arm_count ~ [M4 terms] + p_reward_arm + q_arm
 ```
 
 ## Content — patch
@@ -188,7 +186,7 @@ Pv   patch_count ~ [P3 terms] + p_reward_arm_patch + q_arm_patch
 ## Contfrag content (SWR / MUA event sources)
 `prepare_contfrag_replay_content_data.py` + content runner, `--event-source {SWR,MUA}`.
 Same conditional-Poisson forms on the contfrag tables, truncated ladders:
-`MODEL_HIERARCHY_SWR/MUA` = arm **M0–M5**; `MODEL_PATCH_SWR/MUA` = patch **P0–P3**.
+`MODEL_HIERARCHY_SWR/MUA` = arm **M0–M4**; `MODEL_PATCH_SWR/MUA` = patch **P0–P3**.
 
 ## Choice
 `compare_event_source_models.py` (`clogit(chosen ~ …, strata(stop))`)
@@ -314,9 +312,9 @@ design columns; verified by `_verify_harmonization_parity`, see
 |---|---|---|
 | MU uncertainty | MU_uncertainty (**done**) | — |
 | SWR power | ripple_power_z model (model `rpe`/`q_current`) | — |
-| Content arm | M3, M4, M5, M6, M7, Mv | M0, M0a, M1, M2 |
+| Content arm | M3, M4, M5, M6, Mv | M0, M0a, M1, M2 |
 | Content patch | Pv | P0–P4 |
-| Contfrag content | arm M3–M5 | arm M0–M2, patch P0–P3 |
+| Contfrag content | arm M3–M4 | arm M0–M2, patch P0–P3 |
 | Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
 | Per-bin rate (B) | — covariates unchanged; **verify** the 07-01 table regen / TMAX fix didn't move onset counts, else refit | all specs |
 | Per-stop rate (A) | — | R0, R1, R2, Rlag |

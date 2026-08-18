@@ -1368,10 +1368,13 @@ def build_event_arm_table(
     )
     # is_last_rewarded_elsewhere: the last-rewarded arm, but only on
     # events where it is NOT the arm the animal currently occupies.
-    # ``is_last_rewarded`` overlaps ``is_current`` on 33.7% of
-    # location-resolved events (measured 2026-08-17; the historical
-    # ~98% predates the outcome clock on ``last_rewarded_well``, and
-    # the near-collinearity it described no longer holds).
+    # ``is_last_rewarded`` overlaps ``is_current`` on 93.2% of
+    # location-resolved events (measured 2026-08-18). A 33.7% figure
+    # recorded on 2026-08-17 was an artifact of tables where an
+    # unresolved location set ``is_current`` to 0 rather than NaN; do
+    # not cite it. The near-collinearity is real and this column is the
+    # residual that avoids it -- but the residual is thin, so it feeds
+    # only the pooled contrast rungs, not the per-session ladder.
     # ``is_current`` (M1) already carries the rewarded-at-current-arm
     # case; this indicator is the identifiable residual — reward
     # memory at a non-current arm — and has disjoint support from
@@ -1493,12 +1496,12 @@ def build_event_arm_table(
     long["swr_x_prev"] = is_swr_i * ip
     long["swr_x_next"] = is_swr_i * inx
     long["swr_x_last_rewarded"] = is_swr_i * ilr
-    # M7 — SWR × value/memory interactions. Previously omitted: the
-    # raw swr_x_last_rewarded was r=1.0 with swr_x_current under the
-    # old is_last_rewarded predictor; the _elsewhere fix makes the
-    # reward-memory interaction identifiable. Marks an arm on 58.2% of
-    # events (not the ~2% recorded before the outcome-clock change)
-    # but honest.
+    # M6 — SWR × value interactions. The reward-memory interaction
+    # ``swr_x_is_last_rewarded_elsewhere`` is built here but is NOT in
+    # the per-session ladder: it is constant within every event in 58 of
+    # 215 sessions. It feeds the pooled contrast rung CS3_lastrew. A
+    # 58.2% support figure recorded on 2026-08-17 was an artifact of the
+    # is_current-as-0 tables; the true support is 6.1% of events.
     long["swr_x_reward_rate_arm_k10"] = (
         is_swr_i * long["reward_rate_arm_k10"].to_numpy()
     )

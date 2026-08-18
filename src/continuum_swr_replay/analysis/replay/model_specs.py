@@ -50,22 +50,28 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   trunk arms remain structural zero. Appending future events cannot
   change an earlier design row, and the coefficient represents
   relative recency within the event above the arm-FE baseline.
-- ``is_last_rewarded`` is NOT used as a predictor. M5/M6 instead use
-  ``is_last_rewarded_elsewhere`` = the last-rewarded arm restricted
-  to events where it differs from the current arm. ``is_current``
-  (M1) already carries the rewarded-at-current-arm case, so the
-  "elsewhere" indicator is exactly the identifiable residual —
-  reward memory at a non-current arm — with disjoint support from
-  ``is_current`` (verified: 0 overlap across 38,349 marked rows).
-  NOTE: the original rationale — that ``is_last_rewarded`` was ~98%
-  identical to ``is_current``, hence near-collinear (VIF tail >100)
-  — no longer holds. Since ``last_rewarded_well`` moved onto the
-  outcome clock, the two agree on only 33.7% of location-resolved
-  events (20,208/59,918, measured 2026-08-17 on the regenerated
-  tables). The separation is therefore far cleaner than when this
-  choice was made, and the "elsewhere" residual is NOT sparse: it
-  marks an arm on 58.2% of events, not ~2%. Re-derive the
-  collinearity comparison before citing the original justification.
+- Reward memory has NO rung in the per-session arm ladder. Neither
+  form of the last-rewarded indicator is usable here: the raw
+  ``is_last_rewarded`` correlates 0.919 with ``is_current`` (it marks
+  the same arm on 93.2% of location-resolved events), and the
+  ``is_last_rewarded_elsewhere`` residual has support on only 6.1% of
+  events and is perfectly separated in 99 of 208 sessions. Both
+  survive in the pooled SWR-contrast rungs (C5_lastrew, CS3_lastrew),
+  where pooling across sessions supplies the variation a per-session
+  fit lacks.
+
+  History, because the reasoning reversed twice and the intermediate
+  numbers are still quoted elsewhere. The "elsewhere" residual was
+  introduced to break a ~98% overlap between ``is_last_rewarded`` and
+  ``is_current``. On 2026-08-17 that overlap was measured at 33.7% and
+  the residual at 58.2% of events, which read as the collinearity
+  having dissolved. Both figures were artifacts: they came from tables
+  where an unresolved location made ``is_current`` 0 rather than NaN,
+  so every in-transit event silently counted the last-rewarded arm as
+  "elsewhere". Off-well events are 9.1% of the corpus and carry
+  ``is_last_rewarded`` on 93.4% of themselves. Once they are NaN, the
+  overlap is 93.2% and the residual 6.1% -- the original ~98% regime,
+  essentially intact. **Do not cite the 33.7% or 58.2% figures.**
 - **M3 is the only rung carrying ``reward_rate_arm_k10`` without
   ``arm_never_visited``.** A never-visited leaf is encoded ``0.0`` there,
   identical to "visited and never rewarded", and M4 adds the disambiguator.
@@ -77,18 +83,18 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
 - ``is_next`` excluded: the alternation structure makes
   ``prev_arm == next_arm`` on >90% of events.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both
-  ``is_current`` and ``is_last_rewarded``. Measured under the old
-  ~98%-overlap regime; see the note above — that overlap is now
-  33.7%, so this exclusion also needs re-deriving before it is
-  cited as a current fact.
+  ``is_current`` and ``is_last_rewarded``. Measured under the ~98%
+  overlap regime, which the 93.2% figure above shows still holds, so
+  the exclusion stands.
 - ``dist_to_arm`` and ``is_same_patch`` excluded: proven
   uninformative (null when estimated independently; VIF 28 and 12
   with ``is_current``). The spatial effect is binary "here vs
   not here," not a distance gradient.
-- SWR modulation is split across two rungs: M6 adds the spatial
-  interactions (``swr_x_current``, ``swr_x_prev``), and M7 adds
-  reward-rate, relative-recency, and elsewhere-reward-memory
-  interactions. The last is sparse because
+- SWR modulation is split across two rungs: M5 adds the spatial
+  interactions (``swr_x_current``, ``swr_x_prev``), and M6 adds the
+  reward-rate and relative-recency interactions. Superseded note: an
+  elsewhere-reward-memory interaction was once a third term here and
+  was removed, because
   ``is_last_rewarded_elsewhere`` itself has support on only ~2% of
   events, so convergence and uncertainty require real-data
   re-validation after canonical table regeneration.
@@ -173,7 +179,7 @@ class ModelSpec:
 
 # These rungs depend on the external contingency/qvals artifact. They must not
 # enter the default base-ladder union because unmapped stops would then shrink
-# otherwise qvals-independent M0-M7/P0-P4 fits. Explicit belief comparisons use
+# otherwise qvals-independent M0-M6/P0-P4 fits. Explicit belief comparisons use
 # their own matched cohort instead.
 BELIEF_DEPENDENT_CONTENT_MODELS = frozenset({"Mv", "Mu", "Mvu", "Pv"})
 
@@ -201,45 +207,43 @@ def default_content_model_names(
 # where the animal never leaves one well can become rank-deficient
 # (is_current ≡ that arm's dummy) and fail to converge. The
 # ``n_events < 2 * n_predictors`` gate in ``fit_conditional_poisson``
-# also drops more small sessions now (M6 needs ≥30 events).
+# also drops more small sessions now (M6 needs ≥26 events).
 #
-# M5/M6 use ``is_last_rewarded_elsewhere`` rather than the raw
-# ``is_last_rewarded``. The raw indicator overlaps ``is_current``
-# ~98%; on the full dataset that drove M5/M6 max VIF into the 100s
-# with 3/218 non-convergences. The "elsewhere" indicator has
-# disjoint support from ``is_current`` so the collinearity is gone,
-# at the cost of being sparse (a session with no current≠last-
-# rewarded events yields an all-zero column and M5/M6 are then
-# unidentifiable for that session — fit returns None, as before,
-# but for a clear reason). Convergence / VIF must be re-validated
-# on the regenerated tables.
+# There is no reward-memory rung. There was one -- M5 carried
+# ``is_last_rewarded_elsewhere`` and the SWR rungs sat above it at M6
+# and M7 -- and it was removed on 2026-08-18, with the SWR rungs
+# renumbered down into M5 and M6.
 #
-# SWR interactions enter at M6 / M7. M6 carries the *spatial* × SWR
+# The predictor is not identifiable per-session. It fires on 6.1% of
+# events, and in 99 of 208 sessions no replay mass ever lands on the arm
+# it marks, which is perfect separation: the coefficient runs to -inf
+# and the standard error explodes (median -3.503, SE > 10 in 49% of
+# sessions). Its SWR interaction was worse -- constant within every
+# event in 58 sessions -- and because the ladder freezes one
+# complete-case cohort over the union of all rungs, the refusals
+# propagated to every rung including M0, fitting 145 of 215 sessions
+# where 215 of 218 had fitted before.
+#
+# The raw ``is_last_rewarded`` cannot take its place: it correlates
+# 0.919 with ``is_current``, which is the near-collinearity the
+# "elsewhere" residual existed to remove. Reward memory therefore lives
+# only in the pooled contrast rungs C5_lastrew / CS3_lastrew, where
+# pooling across sessions supplies the within-event variation that a
+# per-session conditional fit does not have.
+#
+# SWR interactions enter at M5 / M6. M5 carries the *spatial* × SWR
 # interactions (swr_x_current, swr_x_prev) — does the local/previous
-# bias differ for SWR-overlapping events? M7 adds the *value/memory*
-# × SWR interactions (swr_x_reward_rate_arm_k10,
-# swr_x_visit_recency_demeaned) — does the reward/memory structure of
-# replay differ on SWR events? Splitting M6 from M7 lets the nested LR
-# cleanly separate "spatial is SWR-modulated" from "reward memory is
-# SWR-modulated".
+# bias differ for SWR-overlapping events? M6 adds the *value* × SWR
+# interactions (swr_x_reward_rate_arm_k10,
+# swr_x_visit_recency_demeaned) — does the reward structure of replay
+# differ on SWR events? Splitting M5 from M6 lets the nested LR cleanly
+# separate "spatial is SWR-modulated" from "reward is SWR-modulated".
 #
-# ``swr_x_is_last_rewarded_elsewhere`` is deliberately NOT here. It was,
-# and it cost the whole ladder: ``is_last_rewarded_elsewhere`` fires on a
-# median of one SWR event per session and on none at all in 58 of 215
-# sessions, so the interaction is constant within every event and the
-# within-group rank check refuses those sessions. Because the ladder
-# freezes one complete-case cohort over the union of all rungs, that
-# refusal removed 70 sessions from *every* rung, M0 included -- 145 of 215
-# sessions modeled, against 215 before. A term identifiable in a third of
-# the corpus is not worth a third of the corpus. It survives as the key
-# term of the pooled contrast rung CS3_lastrew, where pooling across
-# sessions restores the variation that per-session fitting lacks.
-#
-# An SWR split (fit M0–M7 separately on is_swr=True and is_swr=False
+# An SWR split (fit M0–M4 separately on is_swr=True and is_swr=False
 # event subsets) is the unrestricted complement to these interaction
 # terms — same pattern documented for MUA below.
 #
-# MUA event-type effects are assessed via split analysis (fit M0–M7
+# MUA event-type effects are assessed via split analysis (fit M0–M4
 # separately on MUA-only and non-MUA events) rather than interaction
 # terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 # VIF > 70).
@@ -251,27 +255,26 @@ _M2 = (*_M1, "is_prev")
 # separating novelty from an observed zero reward rate while preserving nesting.
 _M3 = (*_M2, "reward_rate_arm_k10")
 _M4 = (*_M3, "visit_recency_demeaned", "arm_never_visited")
-_M5 = (*_M4, "is_last_rewarded_elsewhere")
-_M6 = (*_M5, "swr_x_current", "swr_x_prev")
-_M7 = (
-    *_M6,
+_M5 = (*_M4, "swr_x_current", "swr_x_prev")
+_M6 = (
+    *_M5,
     "swr_x_reward_rate_arm_k10",
     "swr_x_visit_recency_demeaned",
 )
 # Value block: per-arm nominal value (p_reward_arm) + per-arm beta-model value
 # (q_arm, the beta-bernoulli per-leaf belief mean) as conditional main effects on the
-# M5 spatial/reward-memory base (covariate_dictionary.md D2/D3). The beta q_arm is the
+# M4 spatial/recency base (covariate_dictionary.md D2/D3). The beta q_arm is the
 # single value construct shared with the is_swr rate ladder's beta value covariates.
 # Additive in *spec* — but because p_reward_arm/
 # q_arm are NaN for stops absent from the contingency, co-fitting Mv in the same
 # run restricts the shared complete-case event set, so it is excluded from the default
 # model list along with the other belief-dependent rungs (see
 # BELIEF_DEPENDENT_CONTENT_MODELS). Request them explicitly on their own matched
-# cohort: --models M5,Mv,Mu,Mvu (arm) or --models P3,Pv (patch).
-_Mv = (*_M5, "p_reward_arm", "q_arm")
+# cohort: --models M4,Mv,Mu,Mvu (arm) or --models P3,Pv (patch).
+_Mv = (*_M4, "p_reward_arm", "q_arm")
 
 # Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
-# betadist_var) added on the M5 spatial/reward base. Mvu pairs it with the beta
+# betadist_var) added on the M4 spatial/recency base. Mvu pairs it with the beta
 # per-arm VALUE (q_arm) so value+uncertainty come from the SAME Beta posterior — a
 # construct-coherent exploit-vs-explore contrast (one behavioral model). arm_uncertainty is added AFTER
 # visit_recency (M4) so its coefficient is the recency-independent effect (docs: beta
@@ -280,8 +283,8 @@ _Mv = (*_M5, "p_reward_arm", "q_arm")
 # Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.02, ~5-6x smaller than
 # q_arm, which makes the per-session covariance singular; the _z form is well-scaled
 # (SD 1) and is what these rungs fit.
-_Mu = (*_M5, "arm_uncertainty_z")
-_Mvu = (*_M5, "q_arm", "arm_uncertainty_z")
+_Mu = (*_M4, "arm_uncertainty_z")
+_Mvu = (*_M4, "q_arm", "arm_uncertainty_z")
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -326,33 +329,27 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M5": ModelSpec(
         name="M5",
         predictors=_M5,
-        description="+ last-rewarded arm (when not the current arm)",
+        description="+ SWR × spatial interactions",
         parent="M4",
     ),
     "M6": ModelSpec(
         name="M6",
         predictors=_M6,
-        description="+ SWR × spatial interactions",
-        parent="M5",
-    ),
-    "M7": ModelSpec(
-        name="M7",
-        predictors=_M7,
         description="+ SWR × value/memory interactions",
-        parent="M6",
+        parent="M5",
     ),
     "Mv": ModelSpec(
         name="Mv",
         predictors=_Mv,
         description="+ per-arm nominal value (p_reward_arm) + per-arm "
         "beta model value (q_arm)",
-        parent="M5",
+        parent="M4",
     ),
     "Mu": ModelSpec(
         name="Mu",
         predictors=_Mu,
         description="+ per-arm beta belief uncertainty (arm_uncertainty; exploration)",
-        parent="M5",
+        parent="M4",
     ),
     "Mvu": ModelSpec(
         name="Mvu",
@@ -395,19 +392,19 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # is_swr == 1; every MUA-event has is_mua == 1) so that flag's
 # interactions with arm-varying predictors collapse onto the main
 # effects and are unidentifiable. The hierarchy therefore mirrors
-# MODEL_HIERARCHY's M0–M5 and stops there.
+# MODEL_HIERARCHY's M0–M4 and stops there.
 #
-# A cross-modality M6 (mua_x_* inside SWR-events, swr_x_* inside
+# A cross-modality rung (mua_x_* inside SWR-events, swr_x_* inside
 # MUA-events) is potentially identifiable when the cross-modality
 # flag varies, but should only be added once the ContFrag event_arm
 # tables are built and the cross-modality variability is verified.
 
-_M0_TO_M5 = {
-    name: MODEL_HIERARCHY[name] for name in ("M0", "M0a", "M1", "M2", "M3", "M4", "M5")
+_M0_TO_M4 = {
+    name: MODEL_HIERARCHY[name] for name in ("M0", "M0a", "M1", "M2", "M3", "M4")
 }
 
-MODEL_HIERARCHY_SWR: dict[str, ModelSpec] = dict(_M0_TO_M5)
-MODEL_HIERARCHY_MUA: dict[str, ModelSpec] = dict(_M0_TO_M5)
+MODEL_HIERARCHY_SWR: dict[str, ModelSpec] = dict(_M0_TO_M4)
+MODEL_HIERARCHY_MUA: dict[str, ModelSpec] = dict(_M0_TO_M4)
 
 
 MODEL_PATCH: dict[str, ModelSpec] = {
@@ -472,7 +469,7 @@ MODEL_PATCH: dict[str, ModelSpec] = {
 # Mirror MODEL_PATCH's P0–P3 but drop P4: under ContFrag event-source
 # restriction is_swr is constant, so the swr_x_* interactions collapse
 # onto the main effects and are unidentifiable — same reason the arm
-# hierarchy SWR/MUA versions stop at M5.
+# hierarchy SWR/MUA versions stop at M4.
 
 _P0_TO_P3 = {name: MODEL_PATCH[name] for name in ("P0", "P1", "P2", "P3")}
 MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(_P0_TO_P3)

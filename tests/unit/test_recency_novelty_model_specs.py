@@ -5,14 +5,14 @@ from continuum_swr_replay.analysis.replay.covariate_timing import timing_of
 
 
 def test_arm_hierarchy_adds_novelty_main_effect_with_recency():
-    for name in ("M4", "M5", "M6", "M7", "Mv", "Mu", "Mvu"):
+    for name in ("M4", "M5", "M6", "Mv", "Mu", "Mvu"):
         assert "visit_recency_demeaned" in specs.MODEL_HIERARCHY[name].predictors
         assert "arm_never_visited" in specs.MODEL_HIERARCHY[name].predictors
-    assert "swr_x_visit_recency_demeaned" in specs.MODEL_HIERARCHY["M7"].predictors
+    assert "swr_x_visit_recency_demeaned" in specs.MODEL_HIERARCHY["M6"].predictors
     # The sparse interaction remains materialized for sensitivity analyses but
     # is not in the primary ladder: it makes five otherwise estimable shipped
-    # sessions rank-deficient and would silently change the M6->M7 session set.
-    assert "swr_x_arm_never_visited" not in specs.MODEL_HIERARCHY["M7"].predictors
+    # sessions rank-deficient and would silently change the M5->M6 session set.
+    assert "swr_x_arm_never_visited" not in specs.MODEL_HIERARCHY["M6"].predictors
 
 
 def test_choice_and_contrast_bases_add_novelty_alongside_recency():

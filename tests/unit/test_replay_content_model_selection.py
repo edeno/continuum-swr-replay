@@ -149,11 +149,13 @@ class TestSelectionUpgradesWhenTruthIsLarger:
         truth = {
             "is_current": 0.5,
             "is_prev": 0.4,
-            # Reward-memory signal enters the hierarchy at M5.
-            "is_last_rewarded_elsewhere": 0.6,
-            # M3/M4 predictors at 0 — not the truth
+            # Reward signal enters the hierarchy at M3. It used to be carried
+            # here by ``is_last_rewarded_elsewhere``, which is no longer in any
+            # rung -- a truth the ladder cannot represent would make this test
+            # assert that selection detects a predictor nobody fits.
+            "reward_rate_arm_k10": 0.6,
             "visit_recency_demeaned": 0.0,
-            "reward_rate_arm_k10": 0.0,
+            "is_last_rewarded_elsewhere": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3", "M4", "M5"])
