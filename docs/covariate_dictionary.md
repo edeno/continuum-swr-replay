@@ -99,6 +99,12 @@ is a valued immediate-contrast comparison, not dropped.)
 support), `arm_fe_{0..7}` (content baseline), `arm_dist_rank` (choice baseline,
 replaces `dist_to_arm` for identifiability). Definitions unchanged.
 
+Both `_elsewhere` columns are **pooled-only as of 2026-08-18**: they are built
+and feed the pooled SWR-contrast rungs, but no per-session ladder rung uses
+them. They fire on 6.1% (arm) and 2.9% (patch) of events and are perfectly
+separated in roughly half the sessions, which made every rung in a
+frozen-union cohort inherit the refusals. See `model_specs.py`.
+
 ### 5. Time / self-history — rate-only, no change
 
 `bs(tc)` (fixed knots (1,2,3) s, [0,4]), the reward-lag kernel, `onset_lag{j}` /

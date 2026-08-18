@@ -374,16 +374,21 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # patch?) and ``cumulative_reward_patch`` (= sum of rewards across
 # both wells in this patch over the last 10 trials).
 #
-# P2/P3 use ``is_last_rewarded_patch_elsewhere`` rather than the raw
-# ``is_last_rewarded_patch``. The raw indicator overlaps
-# ``is_current_patch`` heavily (the animal is usually rewarded in
-# the patch it currently occupies) — the same near-collinearity the
-# arm hierarchy avoids with ``is_last_rewarded_elsewhere``. The
-# "elsewhere" form is the last-rewarded patch restricted to events
-# where it is not the current patch; ``is_current_patch`` (P1)
-# already carries the rewarded-in-current-patch case, so this is the
-# identifiable residual with disjoint support. ``MODEL_PATCH_SWITCH``
-# remains the dedicated test of the previous-vs-current contrast.
+# There is no patch reward-memory rung, for the reason the arm ladder
+# has none (see the M5 note above). ``is_last_rewarded_patch`` overlaps
+# ``is_current_patch`` at r = 0.945, and the "elsewhere" residual that
+# was meant to break that overlap fires on 2.9% of events and is
+# perfectly separated in 77 of 184 sessions. At patch level it also
+# carries no signal to recover: mean ``patch_count_hard`` is 14.76 on
+# the marked patch against 14.81 elsewhere, where ``is_current_patch``
+# shows 17.16 against 13.63.
+#
+# It cost more here than in the arm ladder. Carrying it in P2/P3 lost 31
+# sessions and its SWR interaction in P4 lost 120, leaving 95 of 215 --
+# the frozen-union cohort propagates each refusal to every rung. Removed
+# 2026-08-18, P3 and P4 renumbered down into P2 and P3.
+# ``MODEL_PATCH_SWITCH`` remains the dedicated test of the
+# previous-vs-current contrast.
 
 # ── Event-source-restricted hierarchies (ContFrag pipeline) ──
 #
@@ -422,58 +427,45 @@ MODEL_PATCH: dict[str, ModelSpec] = {
     ),
     "P2": ModelSpec(
         name="P2",
-        predictors=("is_current_patch", "is_last_rewarded_patch_elsewhere"),
-        description="+ last-rewarded patch (when not the current patch)",
+        predictors=("is_current_patch", "cumulative_reward_patch"),
+        description="+ patch-level reward history",
         parent="P1",
     ),
     "P3": ModelSpec(
         name="P3",
         predictors=(
             "is_current_patch",
-            "is_last_rewarded_patch_elsewhere",
-            "cumulative_reward_patch",
-        ),
-        description="+ patch-level reward history",
-        parent="P2",
-    ),
-    "P4": ModelSpec(
-        name="P4",
-        predictors=(
-            "is_current_patch",
-            "is_last_rewarded_patch_elsewhere",
             "cumulative_reward_patch",
             "swr_x_current_patch",
-            "swr_x_last_rewarded_patch_elsewhere",
         ),
-        description="+ SWR × patch interactions (spatial + memory)",
-        parent="P3",
+        description="+ SWR × current-patch interaction",
+        parent="P2",
     ),
     "Pv": ModelSpec(
         name="Pv",
         predictors=(
             "is_current_patch",
-            "is_last_rewarded_patch_elsewhere",
             "cumulative_reward_patch",
             "p_reward_arm_patch",
             "q_arm_patch",
         ),
         description="+ per-patch nominal value (p_reward_arm_patch) + "
         "per-patch model value (q_arm_patch, Q)",
-        parent="P3",
+        parent="P2",
     ),
 }
 
 
 # ── Event-source-restricted patch hierarchies (ContFrag pipeline) ──
 #
-# Mirror MODEL_PATCH's P0–P3 but drop P4: under ContFrag event-source
+# Mirror MODEL_PATCH's P0–P2 but drop P3: under ContFrag event-source
 # restriction is_swr is constant, so the swr_x_* interactions collapse
 # onto the main effects and are unidentifiable — same reason the arm
 # hierarchy SWR/MUA versions stop at M4.
 
-_P0_TO_P3 = {name: MODEL_PATCH[name] for name in ("P0", "P1", "P2", "P3")}
-MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(_P0_TO_P3)
-MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P3)
+_P0_TO_P2 = {name: MODEL_PATCH[name] for name in ("P0", "P1", "P2")}
+MODEL_PATCH_SWR: dict[str, ModelSpec] = dict(_P0_TO_P2)
+MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P2)
 
 # ── Post-switch patch model ──
 #

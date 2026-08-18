@@ -177,16 +177,15 @@ Mv   arm_count ~ [M4 terms] + p_reward_arm + q_arm
 ```r
 P0   patch_count ~ 1                       # null | strata(event_id)
 P1   patch_count ~ is_current_patch
-P2   patch_count ~ is_current_patch + is_last_rewarded_patch_elsewhere
-P3   patch_count ~ is_current_patch + is_last_rewarded_patch_elsewhere + cumulative_reward_patch
-P4   patch_count ~ [P3 terms] + swr_x_current_patch + swr_x_last_rewarded_patch_elsewhere
-Pv   patch_count ~ [P3 terms] + p_reward_arm_patch + q_arm_patch
+P2   patch_count ~ is_current_patch + cumulative_reward_patch
+P3   patch_count ~ [P2 terms] + swr_x_current_patch
+Pv   patch_count ~ [P2 terms] + p_reward_arm_patch + q_arm_patch
 ```
 
 ## Contfrag content (SWR / MUA event sources)
 `prepare_contfrag_replay_content_data.py` + content runner, `--event-source {SWR,MUA}`.
 Same conditional-Poisson forms on the contfrag tables, truncated ladders:
-`MODEL_HIERARCHY_SWR/MUA` = arm **M0–M4**; `MODEL_PATCH_SWR/MUA` = patch **P0–P3**.
+`MODEL_HIERARCHY_SWR/MUA` = arm **M0–M4**; `MODEL_PATCH_SWR/MUA` = patch **P0–P2**.
 
 ## Choice
 `compare_event_source_models.py` (`clogit(chosen ~ …, strata(stop))`)
@@ -313,8 +312,8 @@ design columns; verified by `_verify_harmonization_parity`, see
 | MU uncertainty | MU_uncertainty (**done**) | — |
 | SWR power | ripple_power_z model (model `rpe`/`q_current`) | — |
 | Content arm | M3, M4, M5, M6, Mv | M0, M0a, M1, M2 |
-| Content patch | Pv | P0–P4 |
-| Contfrag content | arm M3–M4 | arm M0–M2, patch P0–P3 |
+| Content patch | Pv | P0–P3 |
+| Contfrag content | arm M3–M4 | arm M0–M2, patch P0–P2 |
 | Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
 | Per-bin rate (B) | — covariates unchanged; **verify** the 07-01 table regen / TMAX fix didn't move onset counts, else refit | all specs |
 | Per-stop rate (A) | — | R0, R1, R2, Rlag |

@@ -26,10 +26,12 @@ def _load_compare_script():
 def test_source_restricted_patch_models_drop_swr_interactions():
     compare = _load_compare_script()
 
-    assert tuple(compare._patch_models_for_source("SWR")) == ("P0", "P1", "P2", "P3")
-    assert tuple(compare._patch_models_for_source("MUA")) == ("P0", "P1", "P2", "P3")
-    assert "P4" not in compare._patch_models_for_source("SWR")
-    assert "P4" in compare._patch_models_for_source("non_local")
+    assert tuple(compare._patch_models_for_source("SWR")) == ("P0", "P1", "P2")
+    assert tuple(compare._patch_models_for_source("MUA")) == ("P0", "P1", "P2")
+    # P3 is the swr_x_current_patch rung; under an event-source restriction
+    # is_swr is constant, so it collapses onto the main effect.
+    assert "P3" not in compare._patch_models_for_source("SWR")
+    assert "P3" in compare._patch_models_for_source("non_local")
 
 
 def test_source_restricted_switch_models_drop_swr_interactions():
