@@ -218,13 +218,22 @@ def default_content_model_names(
 # interactions (swr_x_current, swr_x_prev) — does the local/previous
 # bias differ for SWR-overlapping events? M7 adds the *value/memory*
 # × SWR interactions (swr_x_reward_rate_arm_k10,
-# swr_x_visit_recency_demeaned, swr_x_is_last_rewarded_elsewhere) —
-# does the reward/memory structure of replay differ on SWR events?
-# Splitting M6 from M7 lets the nested LR cleanly separate "spatial
-# is SWR-modulated" from "reward memory is SWR-modulated". The M7
-# interactions are sparser than M6's (the reward-memory one is on
-# ~2% of events × is_swr subset); honest non-identifiability is
-# expected in sessions with no SWR-overlap memory events.
+# swr_x_visit_recency_demeaned) — does the reward/memory structure of
+# replay differ on SWR events? Splitting M6 from M7 lets the nested LR
+# cleanly separate "spatial is SWR-modulated" from "reward memory is
+# SWR-modulated".
+#
+# ``swr_x_is_last_rewarded_elsewhere`` is deliberately NOT here. It was,
+# and it cost the whole ladder: ``is_last_rewarded_elsewhere`` fires on a
+# median of one SWR event per session and on none at all in 58 of 215
+# sessions, so the interaction is constant within every event and the
+# within-group rank check refuses those sessions. Because the ladder
+# freezes one complete-case cohort over the union of all rungs, that
+# refusal removed 70 sessions from *every* rung, M0 included -- 145 of 215
+# sessions modeled, against 215 before. A term identifiable in a third of
+# the corpus is not worth a third of the corpus. It survives as the key
+# term of the pooled contrast rung CS3_lastrew, where pooling across
+# sessions restores the variation that per-session fitting lacks.
 #
 # An SWR split (fit M0–M7 separately on is_swr=True and is_swr=False
 # event subsets) is the unrestricted complement to these interaction
@@ -248,7 +257,6 @@ _M7 = (
     *_M6,
     "swr_x_reward_rate_arm_k10",
     "swr_x_visit_recency_demeaned",
-    "swr_x_is_last_rewarded_elsewhere",
 )
 # Value block: per-arm nominal value (p_reward_arm) + per-arm beta-model value
 # (q_arm, the beta-bernoulli per-leaf belief mean) as conditional main effects on the

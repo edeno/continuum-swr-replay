@@ -170,7 +170,6 @@ M5   arm_count ~ ARMFE + is_current + is_prev + reward_rate_arm_k10 + visit_rece
                  + arm_never_visited + is_last_rewarded_elsewhere
 M6   arm_count ~ [M5 terms] + swr_x_current + swr_x_prev
 M7   arm_count ~ [M6 terms] + swr_x_reward_rate_arm_k10 + swr_x_visit_recency_demeaned
-                 + swr_x_is_last_rewarded_elsewhere
 Mv   arm_count ~ [M5 terms] + p_reward_arm + q_arm
 ```
 
