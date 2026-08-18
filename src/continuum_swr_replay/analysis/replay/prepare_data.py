@@ -157,6 +157,11 @@ def find_sessions(max_per_animal: int | None = None):
     return selected
 
 
+# Written by ``load_data`` since the outcome clock landed. Their absence dates a
+# cache entry to before it, and dates its reward-history covariates with it.
+OUTCOME_CLOCK_TRIAL_COLUMNS = ("reward_on_time", "outcome_known_time")
+
+
 def load_trials_track_graph(
     session: dict, *, from_cache: bool, cache_key: str | None = None
 ) -> tuple[pd.DataFrame | None, object | None, bool]:
@@ -174,12 +179,21 @@ def load_trials_track_graph(
     whether the values came from the cache (vs Spyglass). ``trials`` /
     ``track_graph`` are ``None`` when the session cannot be loaded.
 
-    **Staleness is presence-only.** The cache is trusted whenever the pickle
-    exists — there is no schema/version tag. So ``--from-cache`` freezes not
-    just Spyglass-side data (re-curation, new intervals) but also
-    ``load_data``'s own trial-derivation *code*: if that logic changes, cached
-    trials keep the old derivation silently. Run a full (non-cache) pass to
-    refresh after any such change; ``--from-cache`` is for covariate-only work.
+    **Staleness is presence-only, with one exception.** The cache is otherwise
+    trusted whenever the pickle exists — there is no schema/version tag. So
+    ``--from-cache`` freezes not just Spyglass-side data (re-curation, new
+    intervals) but also ``load_data``'s own trial-derivation *code*: if that
+    logic changes, cached trials keep the old derivation silently. Run a full
+    (non-cache) pass to refresh after any such change; ``--from-cache`` is for
+    covariate-only work.
+
+    The exception is the outcome clock. An entry written before
+    ``reward_on_time`` / ``outcome_known_time`` existed makes every reward-history
+    covariate silently resolve at poke-out instead of pump onset, and that is
+    not visible in any output. Such an entry is treated as a cache miss, so the
+    session is re-fetched from Spyglass and fails loudly there if it cannot be
+    read -- which is the honest outcome, since a session whose NWB file will not
+    open cannot be rebuilt correctly from a stale cache either.
     """
     # ``cache_key`` lets a sibling pipeline share this cache. trials and
     # track_graph are session facts, independent of which decoder produced the
@@ -189,7 +203,20 @@ def load_trials_track_graph(
     if from_cache and cache_path.exists():
         with open(cache_path, "rb") as f:
             cached = pickle.load(f)
-        return cached["trials"], cached["track_graph"], True
+        stale = [
+            column
+            for column in OUTCOME_CLOCK_TRIAL_COLUMNS
+            if column not in cached["trials"].columns
+        ]
+        if stale:
+            logging.warning(
+                "session cache entry %s predates the outcome clock (missing %s); "
+                "ignoring it and re-fetching from Spyglass",
+                cache_path.name,
+                ", ".join(stale),
+            )
+        else:
+            return cached["trials"], cached["track_graph"], True
 
     # Imported lazily: `data_loaders` imports `spyglass.common` at module top
     # level, which opens a DataJoint connection. Keeping this out of module

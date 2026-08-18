@@ -9,6 +9,8 @@ by faking ``load_data`` and pointing the cache at ``tmp_path``.
 
 from __future__ import annotations
 
+import pickle
+
 import networkx as nx
 import pandas as pd
 import pytest
@@ -28,7 +30,17 @@ def fake_session():
 
 @pytest.fixture
 def fake_payload():
-    trials = pd.DataFrame({"to_well": [0, 1, 2], "is_reward": [1, 0, 1]})
+    # The outcome-clock columns are what dates a cache entry: an entry without
+    # them predates the clock and is rejected, so a payload standing in for a
+    # current entry has to carry them.
+    trials = pd.DataFrame(
+        {
+            "to_well": [0, 1, 2],
+            "is_reward": [1, 0, 1],
+            "reward_on_time": [10.0, float("nan"), 30.0],
+            "outcome_known_time": [10.0, 20.3, 30.0],
+        }
+    )
     g = nx.Graph()
     g.add_edge(0, 6)
     return trials, g
@@ -82,3 +94,44 @@ def test_from_cache_falls_back_when_missing(patched, fake_session):
     assert calls["n"] == 1  # fell back to Spyglass
     assert hit is False
     assert (cache_dir / f"{fake_session['session_id']}.pkl").exists()  # now cached
+
+
+def test_cache_entry_without_the_outcome_clock_is_not_trusted(
+    patched, fake_session, fake_payload
+):
+    """A pre-outcome-clock entry must be re-fetched, not silently reused.
+
+    Such an entry resolves every reward-history covariate at poke-out rather
+    than pump onset, and nothing downstream reveals it -- the run simply
+    reports one more session than a Spyglass pass would. This is exactly how
+    three ContFrag sessions ended up on the retired clock.
+    """
+    calls, cache_dir = patched
+    trials, graph = fake_payload
+    stale = trials.drop(columns=["reward_on_time", "outcome_known_time"])
+    with open(cache_dir / f"{fake_session['session_id']}.pkl", "wb") as f:
+        pickle.dump({"trials": stale, "track_graph": graph}, f)
+
+    got_trials, _, hit_cache = pdm.load_trials_track_graph(
+        fake_session, from_cache=True
+    )
+
+    assert not hit_cache, "a pre-outcome-clock entry was served as a cache hit"
+    assert calls["n"] == 1, "Spyglass was not consulted for the rejected entry"
+    assert "outcome_known_time" in got_trials.columns
+
+
+def test_cache_entry_with_the_outcome_clock_is_trusted(
+    patched, fake_session, fake_payload
+):
+    """The rejection must key on the outcome clock, not reject every entry."""
+    calls, cache_dir = patched
+    trials, graph = fake_payload
+    assert "outcome_known_time" in trials.columns  # the condition under test
+    with open(cache_dir / f"{fake_session['session_id']}.pkl", "wb") as f:
+        pickle.dump({"trials": trials, "track_graph": graph}, f)
+
+    _, _, hit_cache = pdm.load_trials_track_graph(fake_session, from_cache=True)
+
+    assert hit_cache
+    assert calls["n"] == 0, "Spyglass was consulted for a current cache entry"
