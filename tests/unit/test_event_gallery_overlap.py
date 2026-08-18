@@ -68,17 +68,21 @@ def test_gallery_distinguishes_arrived_destination_from_pending_outcome():
         {
             "start_time": [0.0],
             "goal_arrival_time": [3.0],
-            "reward_on_time": [3.4],
-            "outcome_known_time": [3.4],
+            # 0.2 s pump latency, inside the observed distribution and under
+            # OMISSION_KNOWN_LATENCY_SEC (see the guard in _trial_outcome_times).
+            "reward_on_time": [3.2],
+            "outcome_known_time": [3.2],
             "end_time": [3.8],
             "to_well": [1],
             "is_reward": [1],
         }
     )
 
-    assert _completed_trials_at(trials, 3.2)["to_well"].tolist() == [1]
-    assert _outcome_known_trials_at(trials, 3.2).empty
-    assert _outcome_known_trials_at(trials, 3.4)["to_well"].tolist() == [1]
+    # Arrived at 3.0, pump at 3.2: between the two the destination is known but
+    # the outcome is not; at pump onset equality is eligible.
+    assert _completed_trials_at(trials, 3.1)["to_well"].tolist() == [1]
+    assert _outcome_known_trials_at(trials, 3.1).empty
+    assert _outcome_known_trials_at(trials, 3.2)["to_well"].tolist() == [1]
 
 
 def test_gallery_footer_formats_unknown_boolean_context_as_na():

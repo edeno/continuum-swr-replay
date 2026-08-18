@@ -11,6 +11,9 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     timing_of,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import _design_columns
+from continuum_swr_replay.analysis.replay.uncertainty_content import (
+    HORSERACE_PREDICTORS,
+)
 
 
 def test_rejects_derived_post_outcome():
@@ -140,6 +143,10 @@ def _all_ladder_predictors():
             preds.update(spec.predictors)
     for _name, spec in ms.MODEL_PER_BIN_RATE.items():
         preds.update(c for c in _design_columns(spec) if c != "count")
+    # The within-arm horse-race is not a ModelSpec ladder, so enumerating the
+    # spec families misses it -- and its coefficients are cited. Include it, or a
+    # leaky predictor added there stays invisible to every completeness check.
+    preds.update(HORSERACE_PREDICTORS)
     return preds
 
 

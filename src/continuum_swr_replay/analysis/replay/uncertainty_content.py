@@ -30,6 +30,8 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from .covariate_timing import assert_predictor_timing
+
 LOGGER = logging.getLogger(__name__)
 
 LEAF_ARMS: tuple[int, ...] = tuple(range(6))
@@ -694,6 +696,12 @@ def within_arm_horserace(
         ``coef_<z-name>`` for each predictor, ``cond_number`` (design condition
         number = identifiability evidence), and ``n_rows``. Correlational.
     """
+    # Causal-hygiene gate. Every other shipped fitter asserts predictor timing
+    # before fitting; this one did not, and its coefficients are cited, so a
+    # leaky covariate added to HORSERACE_PREDICTORS would have been fit and
+    # reported without complaint. ``predictors`` is gated rather than the module
+    # constant so a caller-supplied override is checked too.
+    assert_predictor_timing(predictors)
     needed = {"animal", "day", "epoch", "event_id", "arm", "is_current", "is_swr",
               response, *predictors}
     _require_columns(event_arm, needed, "event-arm table")

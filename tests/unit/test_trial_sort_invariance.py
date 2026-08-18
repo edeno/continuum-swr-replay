@@ -167,8 +167,12 @@ class TestNoPastTrialsContract:
                     "start_time": 1.0,
                     "end_time": 3.0,
                     "goal_arrival_time": 2.0,
-                    "reward_on_time": 2.8,
-                    "outcome_known_time": 2.8,
+                    # 0.2 s pump latency: within the real distribution (max
+                    # observed 0.298 s) and under OMISSION_KNOWN_LATENCY_SEC, so
+                    # the fixture exercises the arrival-vs-pump gap without
+                    # tripping the latency guard in _trial_outcome_times.
+                    "reward_on_time": 2.2,
+                    "outcome_known_time": 2.2,
                     "from_well": 0,
                     "to_well": 2,
                     "is_reward": True,
@@ -176,7 +180,7 @@ class TestNoPastTrialsContract:
                 }
             ]
         )
-        event_times = np.array([2.6, 2.8])
+        event_times = np.array([2.1, 2.2])
         vr = visit_recency_all_events(event_times, trials, _well_to_arm())
         cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
         rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
@@ -186,22 +190,22 @@ class TestNoPastTrialsContract:
 
         # Destination/visit history advances at inclusive goal arrival.
         assert vr[0, 2] == 1.0
-        assert context.loc[2.6, "last_visited_well"] == 2.0
+        assert context.loc[2.1, "last_visited_well"] == 2.0
         # Reward-bearing histories remain genuinely unknown before pump onset.
         assert np.isnan(cr[0]).all()
         assert np.isnan(rrr[0]).all()
         assert np.isnan(trial_rate[0])
         assert np.isnan(lags[0, 0])
-        assert pd.isna(context.loc[2.6, "reward_outcome"])
-        assert pd.isna(context.loc[2.6, "last_rewarded_well"])
+        assert pd.isna(context.loc[2.1, "reward_outcome"])
+        assert pd.isna(context.loc[2.1, "last_rewarded_well"])
 
         # Equality at pump onset is eligible across every reward-history path.
         assert cr[1, 2] == 1.0
         assert rrr[1, 2] == 1.0
         assert trial_rate[1] == 1.0
         assert lags[1, 0] == 1.0
-        assert context.loc[2.8, "reward_outcome"] == 1.0
-        assert context.loc[2.8, "last_rewarded_well"] == 2.0
+        assert context.loc[2.2, "reward_outcome"] == 1.0
+        assert context.loc[2.2, "last_rewarded_well"] == 2.0
 
     def test_history_cutoffs_falls_back_to_end_time_when_goal_arrival_time_missing(
         self,

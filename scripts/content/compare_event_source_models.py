@@ -493,6 +493,7 @@ def fit_choice_blocks(
 
     split_models = _choice_swr_split_models_for_source(event_source)
     if split_models:
+        _assert_ladder_timing(split_models, ladder="choice_swr_split")
         split, split_prov = _fit_choice_block(choice, split_models, "choice_swr_split")
         blocks["choice_swr_split"] = split
         provenance["choice_swr_split"] = split_prov

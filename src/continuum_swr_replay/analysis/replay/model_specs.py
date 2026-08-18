@@ -81,7 +81,12 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
   "replay tracks novelty" on its own -- cite ``arm_never_visited``'s own
   coefficient for that.
 - ``is_next`` excluded: the alternation structure makes
-  ``prev_arm == next_arm`` on >90% of events.
+  ``prev_arm == next_arm`` on **84.5%** of the events where both are
+  defined (measured 2026-08-18; an earlier ">90%" here was never
+  re-derived). They separate on 15.5% of events, but **98.4% of those
+  are also patch switches**, so the separating population is the same
+  event class ``is_prev`` plus ``is_after_switch`` already indexes --
+  which is why the exclusion still stands on the corrected number.
 - ``current_x_last_rewarded`` excluded: VIF 97-100 with both
   ``is_current`` and ``is_last_rewarded``. Measured under the ~98%
   overlap regime, which the 93.2% figure above shows still holds, so

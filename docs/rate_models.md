@@ -33,8 +33,11 @@ one-population null tested against its split.
 > goal-arrival cutoff — the same past-only cutoff Family B uses) is always known before
 > the stop. Because `reward_lag1 ≈ 1 − is_after_omission`, **this is a sign-flip
 > reparameterization, not a re-cohorting**: the coefficient flips sign and its magnitude
-> shifts *everywhere* (the intercept absorbs the offset), not only on the ~15% approach
-> stops where the causal-vs-leaky values genuinely disagree. So the new `reward_lag1`
+> shifts *everywhere* (the intercept absorbs the offset). Note the ~15% figure once
+> quoted here is a **coverage** gap, not a disagreement: measured 2026-08-18,
+> `reward_lag1` and `1 - is_after_omission` are equal on **all 89,645 stops where
+> both are defined**, but `reward_lag1` is defined on 104,956 stops (99.1%) against
+> 89,645 (84.7%), so 14.5% of stops carry one and not the other. So the new `reward_lag1`
 > coefficient reads with the *opposite* sign of the old `is_after_omission` one — a
 > **positive** `reward_lag1` coefficient means the previous reward *raises* the rate,
 > equivalent to the old **negative** omission-suppression result. Do not compare the two

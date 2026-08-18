@@ -976,6 +976,22 @@ def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
             raise ValueError("rewarded trials must have finite reward-on timestamps")
         if np.isfinite(reward_on[~rewarded]).any():
             raise ValueError("omission trials cannot carry reward-on timestamps")
+        # The omission boundary is only sound while no pump can still fire after
+        # it. OMISSION_KNOWN_LATENCY_SEC was set just above the largest reward
+        # latency in the corpus (0.298 s of a 0.30 s constant -- 2 ms of
+        # headroom), so a new animal, a hardware change, or simply more trials
+        # can exceed it. Past that point an omission is declared while a reward
+        # could still arrive, and every reward-history covariate in the affected
+        # window is silently wrong. Fail here instead.
+        observed_latency = reward_on[rewarded] - arrival[rewarded]
+        if observed_latency.size and observed_latency.max() > OMISSION_KNOWN_LATENCY_SEC:
+            raise ValueError(
+                f"reward latency {observed_latency.max():.3f}s exceeds "
+                f"OMISSION_KNOWN_LATENCY_SEC={OMISSION_KNOWN_LATENCY_SEC}s, so the "
+                "omission boundary would declare 'no reward' while a pump could "
+                "still fire. Re-derive the constant from the reward-latency "
+                "distribution over the current corpus."
+            )
         # Must mirror the canonical derivation in
         # ``data_loaders.trials.make_trials_df_from_well_visits`` and
         # ``qvals_table._outcome_known_time``: pump onset when rewarded, else

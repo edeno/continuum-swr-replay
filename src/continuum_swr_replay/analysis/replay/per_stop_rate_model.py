@@ -11,8 +11,11 @@ Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 - **R0**: intercept only — baseline event rate.
 - **R1**: + ``reward_lag1``, ``is_after_switch`` — does the immediately
   preceding trial's context change event rate? ``reward_lag1`` (the
-  previous trial's reward, strict goal-arrival cutoff) is the past-only
-  predictor; it replaced ``is_after_omission`` for causal hygiene,
+  previous trial's reward, cut off at the **outcome** clock -- pump onset
+  when rewarded, else arrival + ``OMISSION_KNOWN_LATENCY_SEC``, via
+  ``_trial_outcome_times``; this docstring previously named the
+  goal-arrival clock, which is not what ``lagged_trial_rewards`` uses and
+  is less conservative than what ships) is the past-only predictor; it replaced ``is_after_omission`` for causal hygiene,
   which was built from trial-start time and could encode the not-yet-
   delivered outcome on approach-phase stops. Since
   ``reward_lag1 ≈ 1 − is_after_omission``, the coefficient reads with the
