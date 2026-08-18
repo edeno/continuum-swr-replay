@@ -67,7 +67,7 @@ Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
 `nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
 in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the
 experienced-value covariate — now the **beta-model belief** (`beta_stable_withleaf`),
-not a local leaky-Q learner: all value covariates were migrated to `qvals_table.pkl`
+not a local leaky-Q learner: all value covariates were migrated to `qvals_table.parquet`
 (DataJoint, exact `poke_out` alignment; retires the difflib contingency CSV). The
 model's per-port `Q{i}` populate `q_port{i}` → `q_arm`, and `Q{leaf}` = `q_chosen` →
 `q_current`. **`leaky_q_value_diff` is NOT this** — it is a *different*, still-local
@@ -76,7 +76,7 @@ computed over every completed trial in `covariates.py`, persisted on stop rows,
 and then broadcast to events by `stop_id`), kept as a reported MU-only comparison. `value_diff_patch`
 (nominal) remains a scalar
 rate/coupling covariate. **`rpe` is now the model RPE everywhere** (`reward − q_chosen`,
-from `qvals_table.pkl`; see [behavior_model_covariates.md](behavior_model_covariates.md)) —
+from `qvals_table.parquet`; see [behavior_model_covariates.md](behavior_model_covariates.md)) —
 after the migration every consumer (MU-uncertainty as `rpe_model`, plus `fit_swr_power`
 and `_covariate_ranking`) uses the model RPE, not a nominal one.
 

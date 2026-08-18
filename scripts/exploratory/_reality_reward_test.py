@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 PARQUET = sys.argv[1] if len(sys.argv) > 1 else (
@@ -35,7 +36,7 @@ def main() -> None:
     ev = pd.read_parquet(PARQUET)
     if "start_time" not in ev.columns:
         raise SystemExit("parquet lacks start_time — re-run the engine with the patch")
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     stop = stop.assign(
         epoch_id=stop["animal"].astype(str) + stop["day"].astype(str)
         + "_" + stop["epoch"].astype(str) + "_HPC",

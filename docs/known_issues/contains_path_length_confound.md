@@ -135,7 +135,7 @@ No model spec or figure reads the `event_table` column itself.
 
 ## Reproducing
 
-Reads the shipped `replay_content/event_table.pkl` only; no Spyglass access and
+Reads the shipped `replay_content/event_table.parquet` only; no Spyglass access and
 no rebuild. Recompute the required-arm count per event with
 `arm_path_well_to_well(current_arm, next_arm)` and cross-tabulate against
 `contains_path_to_next` and **global** quartiles of `n_nonlocal_bins` (taken

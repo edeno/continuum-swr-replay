@@ -60,6 +60,7 @@ from continuum_swr_replay.analysis.replay.prepare_data import (
 )
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import write_table
 
 logging.basicConfig(
     level=logging.INFO,
@@ -443,8 +444,7 @@ def main():
         (basenames["event_patch_table"], event_patch_table_all),
         (basenames["stop_table"], stop_table_all),
     ):
-        path = OUTPUT_DIR / f"{name}.pkl"
-        frame.to_pickle(path)
+        path = write_table(frame, OUTPUT_DIR / name)
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
 
     logging.info("total time: %ds", int(time.time() - t0))

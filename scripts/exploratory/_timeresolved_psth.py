@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 RC = P / "replay_content"
 BIN_S = 0.004
@@ -42,8 +43,8 @@ def main() -> None:
     sec = exp_h * BIN_S  # seconds of immobility exposure per t-bin
 
     onset = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     nl = onset[onset.event_type == "non_local"]
 

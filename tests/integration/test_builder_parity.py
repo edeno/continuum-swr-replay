@@ -25,7 +25,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZED_COLS
@@ -35,6 +34,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
 )
 from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table, table_exists
 
 pytestmark = pytest.mark.slow
 
@@ -46,9 +46,9 @@ _QVALS_REF = _RC / "models_per_bin_rate" / "qvals_standardization_reference.json
 
 
 def _require(path: Path):
-    if not path.exists():
+    if not table_exists(path):
         pytest.skip(f"materialized table not present: {path}")
-    return pd.read_pickle(path)
+    return read_table(path)
 
 
 @pytest.mark.parametrize(

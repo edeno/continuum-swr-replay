@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     within_arm_horserace,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table, table_exists
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_DATA_DIR = PROCESSED_DATA_DIR / "replay_content"
@@ -234,14 +235,16 @@ def main() -> None:
     stop_path = args.data_dir / "stop_table.pkl"
     qvals_path = args.data_dir / "models_per_bin_rate" / "qvals_table.pkl"
     mu_path = args.data_dir / "models" / "Mu.pkl"
-    for path in [event_arm_path, stop_path, qvals_path, mu_path]:
-        if not path.exists():
+    for path in [event_arm_path, stop_path, qvals_path]:
+        if not table_exists(path):
             raise FileNotFoundError(path)
+    if not mu_path.exists():
+        raise FileNotFoundError(mu_path)
 
     LOGGER.info("Loading canonical tables")
-    event_arm = pd.read_pickle(event_arm_path)
-    stops = pd.read_pickle(stop_path)
-    qvals = pd.read_pickle(qvals_path)
+    event_arm = read_table(event_arm_path)
+    stops = read_table(stop_path)
+    qvals = read_table(qvals_path)
     mu = pd.read_pickle(mu_path)
 
     LOGGER.info("Building trial x reward-well table")

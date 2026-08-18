@@ -7,7 +7,7 @@ are cross-substituted in an exposure/offset term.
 
 ## What
 
-The per-stop `n_SWR` / `n_MUA` counts (stop-level tables — `stop_table.pkl`) do **not**
+The per-stop `n_SWR` / `n_MUA` counts (stop-level tables — `stop_table.parquet`) do **not**
 exactly equal the timebin/onset counts of SWR/MUA events used by the per-bin (Family B)
 and onset tables. Across the 218 HPC sessions the stop-level totals are slightly **larger**:
 

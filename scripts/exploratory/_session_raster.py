@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 RC = P / "replay_content"
 SC = ["animal", "day", "epoch"]
@@ -188,8 +189,8 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
 
 
 def main() -> None:
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
+    onset = read_table(RC / "event_onset_table.pkl")
+    ev = read_table(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
     ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
     nl = onset[onset.event_type == "non_local"].copy()
     nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
@@ -197,7 +198,7 @@ def main() -> None:
     swr = onset[onset.event_type == "SWR"]
     nl_swr = nl[nl.is_swr.eq(True)]
     nl_no = nl[nl.is_swr.eq(False)]
-    st = pd.read_pickle(RC / "stop_table.pkl")
+    st = read_table(RC / "stop_table.pkl")
 
     # pick session: most non-SWR onsets among sessions with 100-700 stops.
     model = "--model" in sys.argv

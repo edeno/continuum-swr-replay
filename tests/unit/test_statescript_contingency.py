@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.table_io import read_table
+
 _SPEC = importlib.util.spec_from_file_location(
     "_statescript_contingency",
     Path(__file__).resolve().parents[2] / "scripts" / "exploratory" / "_statescript_contingency.py",
@@ -172,7 +174,7 @@ def test_stop_before_first_block_is_dropped():
 def test_real_session_parse():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-    stop_table = pd.read_pickle(
+    stop_table = read_table(
         PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
     )
     # >= 3 sessions across >= 2 animals that exist in stop_table.

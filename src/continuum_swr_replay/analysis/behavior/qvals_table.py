@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
     save_reference,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table, write_table
 
 from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
 
@@ -539,7 +540,7 @@ def main() -> None:
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
-    st_all = pd.read_pickle(RC / "stop_table.pkl")
+    st_all = read_table(RC / "stop_table.pkl")
 
     parts = []
     for a in animals:
@@ -553,9 +554,7 @@ def main() -> None:
         # and those carry ``current_arm = NaN`` by construction. Comparing
         # against that NaN scores every such stop as a disagreement and reads
         # as a mapping regression that is not there.
-        at_well = (
-            obs["at_well"].reindex(t["stop_id"]).eq(True).fillna(False).to_numpy()
-        )
+        at_well = obs["at_well"].reindex(t["stop_id"]).eq(True).fillna(False).to_numpy()
         cur = obs["current_arm"].reindex(t["stop_id"]).to_numpy(dtype=float)
         rout = obs["reward_outcome"].reindex(t["stop_id"]).to_numpy(dtype=float)
         arm_ok = np.mean(t["arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
@@ -565,7 +564,9 @@ def main() -> None:
         # comparable share, rather than counting "not yet known" as "wrong".
         rew_known = at_well & np.isfinite(rout)
         rew_ok = (
-            np.mean(t["trial_reward"].to_numpy(dtype=float)[rew_known] == rout[rew_known])
+            np.mean(
+                t["trial_reward"].to_numpy(dtype=float)[rew_known] == rout[rew_known]
+            )
             if rew_known.any()
             else float("nan")
         )
@@ -618,8 +619,7 @@ def main() -> None:
     z_cols = [f"{c}_z" for c in QVALS_STANDARDIZED_COLS if c in tab.columns]
 
     if args.write:
-        out = RC / "models_per_bin_rate" / "qvals_table.pkl"
-        tab.to_pickle(out)
+        out = write_table(tab, RC / "models_per_bin_rate" / "qvals_table")
         save_reference(
             qv_reference,
             RC / "models_per_bin_rate" / "qvals_standardization_reference.json",

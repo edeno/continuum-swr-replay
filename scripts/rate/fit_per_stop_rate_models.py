@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -157,7 +158,7 @@ def main() -> None:
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
 
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     missing = [c for c in RESPONSE_COLS.values() if c not in stop.columns]
     if missing:
         raise SystemExit(

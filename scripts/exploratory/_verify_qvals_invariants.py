@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 Q = [f"Q{i}" for i in range(1, 7)]
@@ -35,8 +36,8 @@ VAR = [f"betadist_var{i}" for i in range(1, 7)]
 
 
 def main() -> int:
-    q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    st = pd.read_pickle(RC / "stop_table.pkl")[
+    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    st = read_table(RC / "stop_table.pkl")[
         ["stop_id", "animal", "epoch", "current_arm", "reward_outcome"]
     ]
     m = q.merge(st, on="stop_id", how="left", suffixes=("", "_st"))

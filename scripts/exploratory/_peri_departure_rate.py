@@ -23,6 +23,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/peri_departure_outputs"
@@ -30,9 +31,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> None:
-    ea = pd.read_pickle(RC / "event_arm_table.pkl")
-    et = pd.read_pickle(RC / "event_table.pkl")
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    ea = read_table(RC / "event_arm_table.pkl")
+    et = read_table(RC / "event_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
 
     dom = ea.loc[ea.groupby("event_id")["arm_count_hard"].idxmax(),
                  ["event_id", "arm"]].rename(columns={"arm": "dominant_arm"})

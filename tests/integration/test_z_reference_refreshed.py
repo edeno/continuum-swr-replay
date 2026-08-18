@@ -18,12 +18,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table, table_exists
 
 pytestmark = pytest.mark.slow
 
@@ -35,13 +35,21 @@ _ENCODED_COL = "reward_rate_arm_k10"
 
 
 def _require(path: Path):
+    """Guard a plain file (the JSON reference), which has no columnar sibling."""
     if not path.exists():
+        pytest.skip(f"materialized file not present: {path}")
+    return path
+
+
+def _require_table(path: Path):
+    """Guard a canonical table, which may be on disk in either format."""
+    if not table_exists(path):
         pytest.skip(f"materialized table not present: {path}")
     return path
 
 
 def _load():
-    ea = pd.read_pickle(_require(_EVENT_ARM))
+    ea = read_table(_require_table(_EVENT_ARM))
     ref = load_reference(_require(_EVENT_ARM_REF))
     return ea, ref
 

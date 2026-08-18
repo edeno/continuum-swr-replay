@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 SC = ["animal", "day", "epoch"]
@@ -74,12 +75,12 @@ def _bimodality_coef(x: np.ndarray) -> float:
 
 
 def _assemble() -> pd.DataFrame:
-    ev = pd.read_pickle(RC / "event_table.pkl")
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
+    ev = read_table(RC / "event_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
     # qvals_table (exact poke_out alignment). rpe/q_current are now the
     # beta-model experienced value (rpe = R - q_chosen, q_current = q_chosen),
     # replacing the retired difflib nominal-rpe / leaky-Q.
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     cont = cont.rename(columns={"q_chosen": "q_current"})
     # Many events per stop, one row per stop on both right-hand tables.
     # Without validate= a duplicated stop_id would silently multiply

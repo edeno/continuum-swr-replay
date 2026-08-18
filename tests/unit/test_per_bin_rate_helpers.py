@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.replay import (
     raised_cosine_history_basis,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -220,9 +221,9 @@ def session_slice():
     for p in paths.values():
         if not p.exists():
             pytest.skip(f"missing {p}")
-    onset = pd.read_pickle(paths["event_onset_table"])
-    event = pd.read_pickle(paths["event_table"])
-    stop = pd.read_pickle(paths["stop_table"])
+    onset = read_table(paths["event_onset_table"])
+    event = read_table(paths["event_table"])
+    stop = read_table(paths["stop_table"])
 
     # Pick the session with the most non-local onsets for a meaningful slice.
     sc = ["animal", "day", "epoch"]

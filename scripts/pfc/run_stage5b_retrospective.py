@@ -43,6 +43,7 @@ from continuum_swr_replay.analysis.replay import (
     retrospective_alignment_with_shuffle,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
     level=logging.INFO,
@@ -148,9 +149,9 @@ def main() -> None:
         output_path = str(INPUT_DIR / f"stage5b_retrospective_{label}.pkl")
 
     logging.info("Loading canonical tables from %s", INPUT_DIR)
-    event_table = pd.read_pickle(INPUT_DIR / "event_table.pkl")
-    event_arm_table = pd.read_pickle(INPUT_DIR / "event_arm_table.pkl")
-    event_sequence_table = pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")
+    event_table = read_table(INPUT_DIR / "event_table.pkl")
+    event_arm_table = read_table(INPUT_DIR / "event_arm_table.pkl")
+    event_sequence_table = read_table(INPUT_DIR / "event_sequence_table.pkl")
     logging.info(
         "events=%d  event_arm rows=%d  event_seq rows=%d  sessions=%d",
         len(event_table),

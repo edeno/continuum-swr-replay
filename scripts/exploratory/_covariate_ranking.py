@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -125,8 +126,8 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     cont = cont.rename(columns={"q_chosen": "q_current"})
     stop = stop.merge(
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
@@ -138,8 +139,8 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     merged = stop.merge(first, on=SESSION_COLS, how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     return stop, onsets
 

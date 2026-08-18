@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 OUT = Path("paper/figures/swr_contrast")
@@ -37,9 +38,9 @@ def _global_sd(covariates):
     """Global (pooled) SD of each continuous covariate from its source table."""
     from continuum_swr_replay.analysis.replay._helpers import add_uncertainty_covariates
 
-    arm = pd.read_pickle(RC / "event_arm_table.pkl")
-    qv = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
+    arm = read_table(RC / "event_arm_table.pkl")
+    qv = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
     sd = {}
     for c in covariates:
         for src in (arm, qv, stop):

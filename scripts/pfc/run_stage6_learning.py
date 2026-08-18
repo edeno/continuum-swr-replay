@@ -37,6 +37,7 @@ from continuum_swr_replay.analysis.replay.learning import (
     stop_replay_summary,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,9 +86,9 @@ def main() -> None:
 
     if not SUMMARY_PATH.exists() or args.rebuild_summary:
         logging.info("Building stop_replay_summary from canonical tables...")
-        st = pd.read_pickle(INPUT_DIR / "stop_table.pkl")
-        ev = pd.read_pickle(INPUT_DIR / "event_table.pkl")
-        ea = pd.read_pickle(INPUT_DIR / "event_arm_table.pkl")
+        st = read_table(INPUT_DIR / "stop_table.pkl")
+        ev = read_table(INPUT_DIR / "event_table.pkl")
+        ea = read_table(INPUT_DIR / "event_arm_table.pkl")
         logging.info(
             "  stops=%d  events=%d  event_arm rows=%d",
             len(st),

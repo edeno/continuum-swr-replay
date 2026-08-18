@@ -121,7 +121,7 @@ uncertainty beyond the time/reward/history controls. It is the M7r base
 - **nominal (per-unit):** `p_reward_current`, `value_diff_patch`,
   `recent_switch_rate`, `trials_since_block_change`.
 - **model value (per-unit):** `rpe_model` = `reward − q_chosen` from the fitted
-  RL model (`qvals_table.pkl`), used *instead of* the contingency-table nominal
+  RL model (`qvals_table.parquet`), used *instead of* the contingency-table nominal
   `rpe` (r≈0.71).
 - **RL decision variables (z-scored → per-SD rate ratios):** `switch_advantage`
   (ΔV = switch − stay value), `reward_entropy` (HMM outcome uncertainty), and the

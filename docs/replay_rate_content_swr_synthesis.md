@@ -14,7 +14,7 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 
 ## Provenance & methods (read first)
 
-- **Data:** event tables (`event_table.pkl`, `event_arm_table.pkl`, `stop_table.pkl`)
+- **Data:** event tables (`event_table.parquet`, `event_arm_table.parquet`, `stop_table.parquet`)
   regenerated 2026-06-24. Nominal value from the canonical
   LorenFrankLab/SpatialBanditTask parsed CSVs (commit `96dfed1`), mapped to
   `stop_id` (`scripts/_bandit_csv_contingency.py`; 96% agreement with the retired

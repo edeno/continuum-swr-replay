@@ -63,6 +63,7 @@ from matplotlib.lines import Line2D
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.table_io import read_table
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 # Publication-friendly text: sans-serif with editable (Type-42) fonts so a PDF
@@ -460,7 +461,7 @@ def main() -> None:
                    help="raster DPI (heatmaps/scatter are rasterized)")
     args = p.parse_args()
 
-    event_arm = pd.read_pickle(RC_DIR / "event_arm_table.pkl")
+    event_arm = read_table(RC_DIR / "event_arm_table.pkl")
     # Stop table + RL value-state block, assembled as the SWR-contrast runners
     # do: recent_switch_rate via add_uncertainty_covariates (default
     # switch_window=5), the rest merged from qvals_table on stop_id. Two
@@ -469,8 +470,8 @@ def main() -> None:
     # absent from qvals are kept and shown masked, rather than dropped by the
     # rate runner's inner join; and covariates are shown raw, not z-scored as
     # the fitters standardize them.
-    stops = add_uncertainty_covariates(pd.read_pickle(RC_DIR / "stop_table.pkl"))
-    qvals = pd.read_pickle(RC_DIR / "models_per_bin_rate" / "qvals_table.pkl")
+    stops = add_uncertainty_covariates(read_table(RC_DIR / "stop_table.pkl"))
+    qvals = read_table(RC_DIR / "models_per_bin_rate" / "qvals_table.pkl")
     value_state = ["trials_since_switch", "is_post_switch",
                    "trials_since_block_change", "hmm_relative_value", "hmm_rpe",
                    "reward_entropy", "hmm_value_update"]

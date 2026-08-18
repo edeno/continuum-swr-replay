@@ -78,6 +78,7 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
 # recorded per fit as flags in per_bin_rate_model (analysis.replay._fit_diagnostics),
@@ -535,10 +536,10 @@ def main() -> None:
     args = parser.parse_args()
 
     t0 = time.perf_counter()
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
 
     # add_uncertainty_covariates validates the upstream recent_switch_rate (the
@@ -551,7 +552,7 @@ def main() -> None:
     # for this model). qvals' `rpe` (R - q_chosen) -> rpe_model. Inner join: keep
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
-    qvals = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    qvals = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = qvals[
         [
             "stop_id",

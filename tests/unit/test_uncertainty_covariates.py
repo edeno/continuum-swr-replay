@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.replay.covariates import (
     CANONICAL_SWITCH_WINDOW,
     canonical_trial_uncertainty_history,
 )
+from continuum_swr_replay.table_io import read_table
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
@@ -813,7 +814,7 @@ def test_runner_smoke():
             "(run continuum_swr_replay.analysis.behavior.qvals_table --write first)"
         )
 
-    stop = pd.read_pickle(rc / "stop_table.pkl")
+    stop = read_table(rc / "stop_table.pkl")
     canonical_columns = {
         "completed_trial_id",
         "completed_trial_arm",
@@ -824,8 +825,8 @@ def test_runner_smoke():
     if not canonical_columns.issubset(stop.columns):
         pytest.skip("canonical stop_table.pkl has not been regenerated")
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(rc / "event_onset_table.pkl"),
-        pd.read_pickle(rc / "event_table.pkl"),
+        read_table(rc / "event_onset_table.pkl"),
+        read_table(rc / "event_table.pkl"),
     )
 
     stop = add_uncertainty_covariates(stop)

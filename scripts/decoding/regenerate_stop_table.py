@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import pickle
 import time
 
 import numpy as np
@@ -33,6 +32,7 @@ from continuum_swr_replay.analysis.replay.tables import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table, table_exists, write_table
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -107,20 +107,18 @@ def main() -> None:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
     stop = pd.concat(tables, ignore_index=True)
 
-    event_table = pd.read_pickle(RC / "event_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
     stop = add_nonlocal_swr_split(stop, event_table)
     validate(stop)
 
     if args.no_save:
         logger.info("--no-save: built %d stops, not written", len(stop))
         return
-    out = RC / "stop_table.pkl"
-    if out.exists():
-        backup = out.with_suffix(".pkl.bak")
-        with open(backup, "wb") as f:
-            pickle.dump(pd.read_pickle(out), f)
+    out = RC / "stop_table"
+    if table_exists(out):
+        backup = write_table(read_table(out), RC / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)
-    stop.to_pickle(out)
+    out = write_table(stop, out)
     logger.info("saved %d stops -> %s", len(stop), out)
 
 

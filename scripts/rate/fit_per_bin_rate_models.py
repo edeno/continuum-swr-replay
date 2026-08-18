@@ -77,6 +77,7 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
 # RR); these are median-robust at read time and are not fit failures. Convergence /
@@ -291,10 +292,10 @@ def main() -> None:
     for spec in MODEL_PER_BIN_RATE.values():
         assert_predictor_timing(c for c in _design_columns(spec) if c != "count")
 
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)

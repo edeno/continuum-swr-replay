@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -176,10 +177,10 @@ def main() -> None:
     p.add_argument("--write", action="store_true")
     args = p.parse_args()
 
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     if args.max_per_animal is not None:
         keep = (

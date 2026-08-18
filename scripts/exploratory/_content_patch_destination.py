@@ -14,12 +14,13 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 
 def main() -> None:
-    pt = pd.read_pickle(RC / "event_patch_table.pkl")
+    pt = read_table(RC / "event_patch_table.pkl")
     tot = pt.groupby("event_id")["patch_count_hard"].transform("sum")
     pt = pt[tot > 0].copy()
     pt["frac"] = pt["patch_count_hard"] / tot[tot > 0]

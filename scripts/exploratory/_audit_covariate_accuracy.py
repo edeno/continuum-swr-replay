@@ -43,6 +43,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -62,8 +63,8 @@ def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:
 
 
 def main(reconstruct_n: int = 0) -> None:
-    q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    st = pd.read_pickle(RC / "stop_table.pkl")
+    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    st = read_table(RC / "stop_table.pkl")
     fur = _fur()
 
     # ---- #1a calibration: nominal p vs independent DIO reward ----
@@ -102,7 +103,7 @@ def main(reconstruct_n: int = 0) -> None:
     print("  expect dV|switch > dV|stay and r_pb > 0")
 
     # ---- #2 leakage exposure ----
-    ons = pd.read_pickle(RC / "event_onset_table.pkl")
+    ons = read_table(RC / "event_onset_table.pkl")
     rew = ons[ons["is_reward_stop"]]
     tsp = rew["t_since_pump"].dropna()
     print("\n=== #2 leakage exposure (events vs reward pump) ===")
@@ -168,8 +169,8 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.types import SessionDataKeys
 
-    ea = pd.read_pickle(RC / "event_arm_table.pkl")
-    et = pd.read_pickle(RC / "event_table.pkl")
+    ea = read_table(RC / "event_arm_table.pkl")
+    et = read_table(RC / "event_table.pkl")
     tcol = next(c for c in et.columns if "midpoint" in c and "time" in c)
     ea = ea.merge(
         et[["event_id", tcol]].rename(columns={tcol: "t"}), on="event_id", how="left"
@@ -238,7 +239,7 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
     their atom (reward_outcome). Checking them here against a stop-sequence oracle
     would mismatch on grain, not correctness -- so they are intentionally omitted.
     """
-    ea = pd.read_pickle(RC / "event_arm_table.pkl")
+    ea = read_table(RC / "event_arm_table.pkl")
     print(
         "\n=== non-RL: spatial current_arm cross-source (event_arm vs stop_table) ==="
     )

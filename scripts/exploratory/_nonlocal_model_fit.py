@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.replay.choice_prediction import predict_arm_f
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.table_io import read_table
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
@@ -328,7 +329,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    ev = pd.read_pickle(RC_DIR / "event_arm_table.pkl")
+    ev = read_table(RC_DIR / "event_arm_table.pkl")
     sub = ev[(ev.animal == args.animal) & (ev.day == args.day)
              & (ev.epoch == args.epoch)]
     if sub.empty:

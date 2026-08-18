@@ -41,6 +41,7 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +432,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
     rc = PROCESSED_DATA_DIR / "replay_content"
-    stop_table = pd.read_pickle(rc / "stop_table.pkl")
+    stop_table = read_table(rc / "stop_table.pkl")
 
     session_cols = ["animal", "day", "epoch"]
     sessions = stop_table[session_cols].drop_duplicates().sort_values(session_cols)

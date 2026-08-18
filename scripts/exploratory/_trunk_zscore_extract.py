@@ -14,13 +14,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.table_io import read_table
+
 PD = Path("Processed-Data")
 TRUNK = {6, 7, 8}
 
 
 def main():
-    eat = pd.read_pickle(PD / "replay_content" / "event_arm_table.pkl")
-    et = pd.read_pickle(PD / "replay_content" / "event_table.pkl")
+    eat = read_table(PD / "replay_content" / "event_arm_table.pkl")
+    et = read_table(PD / "replay_content" / "event_table.pkl")
 
     # trunk share + n_unique_arms (recompute n_unique from arms with mass)
     eat = eat.dropna(subset=["arm_count_hard"]).copy()

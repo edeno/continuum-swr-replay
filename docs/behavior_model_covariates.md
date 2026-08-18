@@ -1,12 +1,12 @@
-# Behavioral-model covariates — `qvals_table.pkl` data dictionary
+# Behavioral-model covariates — `qvals_table.parquet` data dictionary
 
 Per-stop table of the SpatialBanditTask behavioral-model latent variables (value,
 decision variables, uncertainty, value updates, entropy), one row per stop,
-keyed by `stop_id` (joins to `stop_table.pkl`).
+keyed by `stop_id` (joins to `stop_table.parquet`).
 
 - **Generator:** [`analysis/behavior/qvals_table.py`](../src/continuum_swr_replay/analysis/behavior/qvals_table.py)
   — run `python -m continuum_swr_replay.analysis.behavior.qvals_table --write`.
-- **Output:** `Processed-Data/replay_content/models_per_bin_rate/qvals_table.pkl`
+- **Output:** `Processed-Data/replay_content/models_per_bin_rate/qvals_table.parquet`
   (gitignored data artifact; regenerate from the script).
 - **Decision-variable functions:** vendored verbatim from Alison Comrie's
   `rl_helpers.py` →
@@ -104,7 +104,7 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 | `global_leaf_var_sum_preoutcome_sess` | Σ of the 6 port variances |
 | `chosen_leaf_var_preoutcome_sess` | variance of the chosen port |
 | `prev_local_variance`, `prev_global_variance` | pre-outcome uncertainty (chosen-leaf / global) |
-| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.pkl`) but are **never fitted** (not in `fit_uncertainty_rate.RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
+| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.parquet`) but are **never fitted** (not in `fit_uncertainty_rate.RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
 
 ### Belief entropy (beta — the outcome-uncertainty covariate)
 | Column | Meaning |

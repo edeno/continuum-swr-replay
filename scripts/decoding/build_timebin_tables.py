@@ -28,7 +28,8 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
     build_stop_timebin_table,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import write_table  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -101,7 +102,7 @@ def main() -> None:
     if args.no_save:
         logger.info("--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense))
         return
-    onset.to_pickle(RC / "event_onset_table.pkl")
+    write_table(onset, RC / "event_onset_table")
     dense.to_parquet(RC / "stop_timebin_table.parquet", compression="zstd", index=False)
     logger.info(
         "saved %d onsets -> event_onset_table.pkl, %d bins -> stop_timebin_table.parquet",

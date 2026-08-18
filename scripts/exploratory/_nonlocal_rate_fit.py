@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.table_io import read_table
 
 plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
                      "font.family": "sans-serif",
@@ -258,7 +259,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    st = pd.read_pickle(RC_DIR / "stop_table.pkl")
+    st = read_table(RC_DIR / "stop_table.pkl")
     sub = st[(st.animal == args.animal) & (st.day == args.day)
              & (st.epoch == args.epoch)]
     if sub.empty:

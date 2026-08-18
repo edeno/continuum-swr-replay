@@ -97,6 +97,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
 # is silenced. Convergence/separation are recorded per fit as flags inside _fit (see
@@ -235,8 +236,8 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     qcols = [
         "stop_id",
         "trials_since_switch",
@@ -271,8 +272,8 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         100 * len(stop) / n0,
     )
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
@@ -450,8 +451,8 @@ def main() -> None:
         # Audited aggregation mirroring the content ladder (per-animal primary,
         # session signed-rank, BH-FDR, standardized per-SD columns). G-rungs are
         # relabeled non_local/_swr/_no_swr -> all/SWR/nonSWR to match the content table.
-        qv = pd.read_pickle(out_dir / "qvals_table.pkl")
-        st = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
+        qv = read_table(out_dir / "qvals_table.pkl")
+        st = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
         sd = {}
         for c in _RATE_CONT_COVARS:
             src = qv if c in qv.columns else st if c in st.columns else None

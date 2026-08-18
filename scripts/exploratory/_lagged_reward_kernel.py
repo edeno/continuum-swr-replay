@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.replay.prepare_data import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 K = 5
@@ -61,7 +62,7 @@ def lagged_rewards(query_times: np.ndarray, trials: pd.DataFrame, k: int) -> np.
 
 def main() -> None:
     n_per = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     sessions = find_sessions(max_per_animal=n_per)
     preds = [f"reward_lag{j}" for j in range(1, K + 1)] + ["is_after_switch"]
     rows = []

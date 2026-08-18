@@ -21,6 +21,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 from continuum_swr_replay.analysis.replay.spatial_mapping import map_estimate_to_arm
+from continuum_swr_replay.table_io import read_table
 
 PD = Path("Processed-Data")
 TRUNK = {6, 7, 8}
@@ -30,7 +31,7 @@ BIN_EDGES = np.arange(-3.0, 14.01, 0.5)
 
 
 def main():
-    et = pd.read_pickle(PD / "replay_content" / "event_table.pkl")
+    et = read_table(PD / "replay_content" / "event_table.pkl")
     sessions = list(et.groupby(["animal", "day", "epoch"]))
 
     # global binned accumulators: n and n_trunk per z-bin, for SWR and MUA

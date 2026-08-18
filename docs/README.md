@@ -25,7 +25,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 
 - [models_table.md](models_table.md) — *catalog*: every model in R formula notation.
 - [covariate_dictionary.md](covariate_dictionary.md) — *definitions*: covariate semantics across families.
-- [behavior_model_covariates.md](behavior_model_covariates.md) — *definitions*: `qvals_table.pkl` data dictionary.
+- [behavior_model_covariates.md](behavior_model_covariates.md) — *definitions*: `qvals_table.parquet` data dictionary.
 - [behavior_models.md](behavior_models.md) — *reference*: the generative behavioral models (Beta-Bernoulli, HMM, Q-learners) whose latent variables the above columns hold.
 - [rate_models.md](rate_models.md) — *methods*: the two event-rate families (A per-stop, B per-bin).
 - [per_bin_rate_results.md](per_bin_rate_results.md) — *results*: fitted Family-B effects (auto-generated).
@@ -58,11 +58,17 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 
 Three tiers:
 
-1. **Result DATA** (`.pkl`/`.nc`, gitignored) under `Processed-Data/replay_content/`:
+1. **Result DATA** (`.parquet`/`.pkl`/`.nc`, gitignored) under `Processed-Data/replay_content/`:
+
+   The canonical tables (events, event-arms, event-patches, sequences, stops, qvals)
+   are **parquet**; read and write them through `continuum_swr_replay.table_io`
+   (`read_table` / `write_table`), never `pd.read_pickle`. Fitted-model artifacts
+   (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
+   Superseded table pickles are kept under `_pickle_archive/`; nothing reads them.
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | `all_models.pkl` (Family-B ladder); also holds `qvals_table.pkl`, `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `swr_power_model.pkl` |
+   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | `all_models.pkl` (Family-B ladder); also holds `qvals_table.parquet`, `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `swr_power_model.pkl` |
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | content M0–M7 / P0–P4, all events; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |

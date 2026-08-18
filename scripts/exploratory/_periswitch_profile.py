@@ -30,6 +30,7 @@ from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
@@ -88,7 +89,7 @@ def prep(stop: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    df = prep(pd.read_pickle(RC / "stop_table.pkl"))
+    df = prep(read_table(RC / "stop_table.pkl"))
     logging.info("%d stops, %d sessions", len(df), df["session"].nunique())
     print("stops per distance bin:")
     print(df["bin"].value_counts().to_string())

@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -51,7 +52,7 @@ def main() -> int:
         return np.nanmin(v) >= -tol and np.nanmax(v) <= 1 + tol
 
     # ================= stop_table =================
-    st = pd.read_pickle(RC / "stop_table.pkl")
+    st = read_table(RC / "stop_table.pkl")
     print("\n### stop_table (per-stop rate A / rate B input) ###")
     lags = [f"reward_lag{i}" for i in range(1, 11)]
     L = st[lags].to_numpy()
@@ -86,7 +87,7 @@ def main() -> int:
         check("S", "recent_switch_rate in [0,1]", False, f"could not recompute: {e}")
 
     # ================= event_arm_table =================
-    ea = pd.read_pickle(RC / "event_arm_table.pkl")
+    ea = read_table(RC / "event_arm_table.pkl")
     print("\n### event_arm_table (content arm + choice) ###")
     arm = ea["arm"].to_numpy()
     check("H", "arm in 0..8 (9 arms/event)", set(np.unique(arm)) == set(range(9)),
@@ -147,7 +148,7 @@ def main() -> int:
           (ea["arm_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= event_patch_table =================
-    ep = pd.read_pickle(RC / "event_patch_table.pkl")
+    ep = read_table(RC / "event_patch_table.pkl")
     print("\n### event_patch_table (content patch) ###")
     check("H", "3 patches/event", abs(len(ep) / ep["event_id"].nunique() - 3) < 1e-9, "")
     cps = ep.groupby("event_id")["is_current_patch"].sum()
@@ -160,7 +161,7 @@ def main() -> int:
     check("H", "patch_count_hard >= 0", (ep["patch_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= qvals_table value block =================
-    cont = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     print("\n### qvals_table (nominal + model value block) ###")
     check("H", "stop_id unique", cont["stop_id"].is_unique,
           f"{cont['stop_id'].nunique()}/{len(cont)}")

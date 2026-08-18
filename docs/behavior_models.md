@@ -9,7 +9,7 @@ parameters — so the covariates can be interpreted correctly.
 - **This doc = the models.** For the **column-by-column data dictionary** of the
   exported latent variables, see
   [`behavior_model_covariates.md`](behavior_model_covariates.md) (the
-  `qvals_table.pkl` reference). The two are complementary: read this for "what does
+  `qvals_table.parquet` reference). The two are complementary: read this for "what does
   `betadist_var` *mean*," read that for "which column holds it."
 - **Paper:** Comrie et al., *Hippocampal representations of alternative
   possibilities are flexibly generated to meet cognitive demands* (bioRxiv
@@ -70,7 +70,7 @@ The paper's published choice model (Comrie et al. p26) is: a **softmax over the
 with temperature `βport` and per-patch `b_portbias`. Note the repo code's shared
 layer is a **superset**: it additionally carries the `depletion` (satiety) and
 `γ2` terms above (and they surface as the `depletion_*` columns in
-`qvals_table.pkl`), which the paper's Methods choice-model description does not
+`qvals_table.parquet`), which the paper's Methods choice-model description does not
 list. In code the paper's `βport` is named `βleaf`. _[paper p26 + source]_
 
 **Consequence:** any divergence between the two models in the exported quantities
@@ -170,7 +170,7 @@ marginal reward distribution `[p(0.2), p(0.5), p(0.8)]` (paper p28, Fig 5D). **B
 `hmm.jl` also computes a per-leaf posterior variance** —
 `leaf_var = Σ_i α_i (ϕ_{i,leaf} − Q_leaf)²` (the variables `leaf_1_var`,
 `leaf_2_var`), i.e. exactly the construct-consistent per-arm uncertainty. It is
-simply **not pulled into `qvals_table.pkl`**, which takes only the two entropies
+simply **not pulled into `qvals_table.parquet`**, which takes only the two entropies
 from the HMM fit. Unlike `betadist_var`, this per-leaf HMM variance updates for
 **unvisited** ports through the shared state (assumption 6), so it is **not**
 mechanically tied to visit-recency — which is why it, not `betadist_var`, is the
@@ -247,7 +247,7 @@ All five items originally flagged were resolved 2026-07-07 from the paper Method
    `target = μ(1−d)/(1−d·μ)`, `μ = α/(α+β)` (§Model 1).
 3. **Per-port HMM uncertainty — computed, not exported.** `hmm.jl` computes the
    per-leaf posterior variance (`leaf_1_var`/`leaf_2_var`); it is simply not pulled
-   into `qvals_table.pkl`. Recoverable from the fit or recomputable from `α`, `ϕ`
+   into `qvals_table.parquet`. Recoverable from the fit or recomputable from `α`, `ϕ`
    (§Model 2).
 4. **Fit granularity — hierarchical, per-day within per-rat**, fit separately per
    rat; EM + Laplace (§EM harness, paper p28).

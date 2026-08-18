@@ -37,6 +37,7 @@ from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
@@ -78,7 +79,7 @@ def rr_table(res, terms):
 
 
 def main():
-    df = prep(pd.read_pickle(RC / "stop_table.pkl"))
+    df = prep(read_table(RC / "stop_table.pkl"))
     n_sess = df["session"].nunique()
     logging.info(
         "%d stops, %d sessions | pre_switch=%d post_switch=%d after_omission=%d",

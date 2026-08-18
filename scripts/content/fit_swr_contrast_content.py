@@ -86,6 +86,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 # Quasi-separated coefficients legitimately overflow exp() when rate ratios are formed
 # outside the fit (RuntimeWarning). Convergence/perfect-separation warnings are recorded
@@ -119,10 +120,10 @@ def _z(x: np.ndarray) -> np.ndarray:
 
 
 def _assemble_arm() -> pd.DataFrame:
-    ev = pd.read_pickle(RC / "event_arm_table.pkl")
+    ev = read_table(RC / "event_arm_table.pkl")
     add_arm_fixed_effects(ev)
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     ev = ev.merge(
         stop[["stop_id", "reward_lag1", "recent_switch_rate"]], on="stop_id", how="left"
     )
@@ -171,7 +172,7 @@ def _assemble_arm() -> pd.DataFrame:
 
 
 def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
-    pt = pd.read_pickle(RC / "event_patch_table.pkl")
+    pt = read_table(RC / "event_patch_table.pkl")
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
     e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
     pt = pt.merge(e2s, on="event_id", how="left")
@@ -179,8 +180,8 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     # carry it for the within-stop-time duration control (currentpatch_x_tsc).
     e2t = arm_ev[["event_id", "time_since_stop"]].drop_duplicates("event_id")
     pt = pt.merge(e2t, on="event_id", how="left")
-    stop = add_uncertainty_covariates(pd.read_pickle(RC / "stop_table.pkl"))
-    q = pd.read_pickle(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     pt = pt.merge(stop[["stop_id", "recent_switch_rate"]], on="stop_id", how="left")
     pt = pt.merge(q[["stop_id", "trials_since_switch"]], on="stop_id", how="left")
     pt["trials_since_switch_z"] = _z(pt["trials_since_switch"].to_numpy(float))

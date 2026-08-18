@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     TMAX,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.table_io import read_table
 
 RC = P / "replay_content"
 FIGS = P.parent / "paper" / "figures" / "rate"
@@ -244,10 +245,10 @@ def _panel_covar(ax, df):
 
 def main() -> None:
     df = pd.read_pickle(RC / "models_per_bin_rate" / "all_models.pkl")
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     onsets = attach_is_swr_to_onsets(
-        pd.read_pickle(RC / "event_onset_table.pkl"),
-        pd.read_pickle(RC / "event_table.pkl"),
+        read_table(RC / "event_onset_table.pkl"),
+        read_table(RC / "event_table.pkl"),
     )
     FIGS.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplot_mosaic(

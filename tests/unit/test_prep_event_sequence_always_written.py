@@ -3,7 +3,7 @@
 sequence rows.
 
 The retrospective-alignment pass does
-``pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")``
+``read_table(INPUT_DIR / "event_sequence_table.pkl")``
 unconditionally. The previous prep code returned ``None`` for the
 aggregated sequence frame and skipped the save when no posterior
 was available, which crashed the retrospective pass with
@@ -22,11 +22,11 @@ The contract the prep script must keep:
    it, no fallback frame is enough.
 3. The empty-fallback path uses the canonical schema from
    :data:`_EVENT_SEQUENCE_TABLE_COLUMNS` so the retrospective pass finds the
-   columns it expects when ``read_pickle`` returns 0 rows.
+   columns it expects when the reader returns 0 rows.
 
 These three preconditions are checked here through AST inspection
 (structural) plus a behavioral roundtrip of the empty schema frame
-(pickle → read_pickle preserves the canonical column order).
+(write_table → read_table preserves the canonical column order).
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay.tables import (
     _EVENT_SEQUENCE_TABLE_COLUMNS,
 )
+from continuum_swr_replay.table_io import read_table, write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # The replay-content prep driver moved from scripts/ into the package (ee1eb51).
@@ -73,7 +74,7 @@ def test_event_sequence_table_all_never_assigned_None_in_main():
                         bad.append(rhs_dump)
     assert not bad, (
         "event_sequence_table_all is still being assigned None in "
-        f"main() — the retrospective pass will crash on read_pickle. RHS samples: "
+        f"main() — the retrospective pass will crash on read. RHS samples: "
         f"{bad}"
     )
 
@@ -105,7 +106,7 @@ def test_save_loop_includes_event_sequence_table_tuple():
     assert found, (
         "The saver-loop tuple in main() no longer contains "
         '("event_sequence_table", event_sequence_table_all). '
-        "the retrospective pass's read_pickle will fail with FileNotFoundError."
+        "the retrospective pass's read will fail with FileNotFoundError."
     )
 
 
@@ -143,16 +144,15 @@ def test_empty_fallback_uses_canonical_sequence_schema():
     )
 
 
-def test_empty_canonical_frame_roundtrips_through_pickle(tmp_path):
+def test_empty_canonical_frame_roundtrips_through_storage(tmp_path):
     """Behavioral: an empty frame with the canonical schema
-    survives pickle → read_pickle with column order intact. This is
+    survives write_table → read_table with column order intact. This is
     what the retrospective pass receives when no session contributed sequences,
     so the column set is the contract the retrospective pass relies on."""
     cols = list(_EVENT_SEQUENCE_TABLE_COLUMNS)
     df = pd.DataFrame(columns=cols)
-    path = tmp_path / "event_sequence_table.pkl"
-    df.to_pickle(path)
-    loaded = pd.read_pickle(path)
+    path = write_table(df, tmp_path / "event_sequence_table")
+    loaded = read_table(path)
     assert list(loaded.columns) == cols, (
         f"empty schema frame did not roundtrip cleanly: "
         f"{list(loaded.columns)} != {cols}"

@@ -85,6 +85,7 @@ from continuum_swr_replay.analysis.replay.tables import (
 )
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import write_table
 from continuum_swr_replay.types import SessionDataKeys
 
 logging.basicConfig(
@@ -492,7 +493,7 @@ def main():
     # Always materialize ``event_sequence_table.pkl`` — even when no
     # session contributed any sequence rows. The retrospective pass (the
     # retrospective-alignment step) does
-    # ``pd.read_pickle(INPUT_DIR / "event_sequence_table.pkl")``
+    # ``read_table(INPUT_DIR / "event_sequence_table.pkl")``
     # unconditionally, so a missing file would crash a posterior-
     # unavailable run with FileNotFoundError. The retrospective
     # helpers already treat an empty sequence frame as a legitimate
@@ -580,8 +581,7 @@ def main():
         if frame is None:
             logging.info("  %s: skipped (no data)", name)
             continue
-        path = OUTPUT_DIR / f"{name}.pkl"
-        frame.to_pickle(path)
+        path = write_table(frame, OUTPUT_DIR / name)
         logging.info("saved %s → %s (%d rows)", name, path, len(frame))
 
     logging.info("total time: %ds", int(time.time() - t0))

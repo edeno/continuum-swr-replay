@@ -15,7 +15,6 @@ import warnings
 
 import joblib
 import numpy as np
-import pandas as pd
 from continuum_swr_replay.analysis.replay.rate_model import fit_rate_model
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
@@ -26,6 +25,7 @@ from continuum_swr_replay.analysis.replay._helpers import (
 )
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
@@ -73,7 +73,7 @@ def _pool(coefs_by_pred):
 
 def main():
     # Arm: arm FE + one predictor (conditional Poisson on arm counts).
-    arm_tbl = add_arm_fixed_effects(pd.read_pickle(RC / "event_arm_table.pkl"))
+    arm_tbl = add_arm_fixed_effects(read_table(RC / "event_arm_table.pkl"))
     logging.info("arm univariate fits...")
     arm_uni = _pool(_univariate(
         arm_tbl, ARM_P,
@@ -81,7 +81,7 @@ def main():
     ))
 
     # Patch: one predictor alone (3-category conditional Poisson).
-    patch_tbl = pd.read_pickle(RC / "event_patch_table.pkl")
+    patch_tbl = read_table(RC / "event_patch_table.pkl")
     logging.info("patch univariate fits...")
     patch_uni = _pool(_univariate(
         patch_tbl, PATCH_P,
@@ -89,7 +89,7 @@ def main():
     ))
 
     # Rate: intercept + one predictor (Poisson w/ log-immobility offset).
-    stop = pd.read_pickle(RC / "stop_table.pkl")
+    stop = read_table(RC / "stop_table.pkl")
     logging.info("rate univariate fits...")
     rate_uni = _pool(_univariate(stop, RATE_P, lambda g, p: fit_rate_model(g, [p])))
 

@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 RC = P / "replay_content"
 XMAX = 8.0
@@ -27,8 +28,8 @@ N_ROWS = 1500  # stops sampled for the raster
 
 
 def main() -> None:
-    onset = pd.read_pickle(RC / "event_onset_table.pkl")
-    ev = pd.read_pickle(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
+    onset = read_table(RC / "event_onset_table.pkl")
+    ev = read_table(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
     ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
     nl = onset[onset.event_type == "non_local"].copy()
     nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
@@ -38,7 +39,7 @@ def main() -> None:
         "SWR": onset[onset.event_type == "SWR"],
         "non-local NO SWR": nl[nl.is_swr.eq(False)],
     }
-    st = pd.read_pickle(RC / "stop_table.pkl")[["stop_id", "immobility_time"]]
+    st = read_table(RC / "stop_table.pkl")[["stop_id", "immobility_time"]]
     dur = st.set_index("stop_id")["immobility_time"]
 
     # Sample stops that have >=1 onset of either population, sorted by duration.
