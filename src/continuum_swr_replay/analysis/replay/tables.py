@@ -1368,17 +1368,31 @@ def build_event_arm_table(
     )
     # is_last_rewarded_elsewhere: the last-rewarded arm, but only on
     # events where it is NOT the arm the animal currently occupies.
+    #
+    # **This is an omission-only indicator, despite the name.** It cannot
+    # fire on a rewarded stop: if the animal was just rewarded here, the
+    # last-rewarded arm *is* here and the residual is identically zero.
+    # Measured on the shipped table: fires on 0.0% of rewarded at-well
+    # events, 67.4% of omission ones, and 100% of the events where it does
+    # fire are omissions. Its support is the omission subpopulation, whose
+    # ~10% base rate is the hard ceiling on the 6.7% of at-well events it
+    # marks. Any coefficient on it therefore answers "within omission
+    # stops, is the previously-rewarded arm over- or under-represented",
+    # not "does replay avoid the last-rewarded arm" in general -- and the
+    # per-session conditional fit separates in roughly half of sessions,
+    # tracking their omission count (median 14 vs 22 omission events).
+    #
     # ``is_last_rewarded`` overlaps ``is_current`` on 93.2% of
-    # location-resolved events (measured 2026-08-18). A 33.7% figure
+    # location-resolved events (measured 2026-08-18) -- the animal is
+    # usually still standing where it was last rewarded. A 33.7% figure
     # recorded on 2026-08-17 was an artifact of tables where an
-    # unresolved location set ``is_current`` to 0 rather than NaN; do
-    # not cite it. The near-collinearity is real and this column is the
-    # residual that avoids it -- but the residual is thin, so it feeds
-    # only the pooled contrast rungs, not the per-session ladder.
-    # ``is_current`` (M1) already carries the rewarded-at-current-arm
-    # case; this indicator is the identifiable residual — reward
-    # memory at a non-current arm — and has disjoint support from
-    # ``is_current`` by construction.
+    # unresolved location set ``is_current`` to 0 rather than NaN, which
+    # injected the raw last-rewarded arm into this column on in-transit
+    # events and disguised the omission-only structure; do not cite it.
+    # The near-collinearity is real and this column is the residual that
+    # avoids it, but the residual is thin, so it feeds only the pooled
+    # contrast rungs, not the per-session ladder.
+    #
     # NaN-valued where is_current is unobserved: "rewarded somewhere
     # other than here" is undefined when "here" is unknown.
     long["is_last_rewarded_elsewhere"] = long["is_last_rewarded"].to_numpy() * (

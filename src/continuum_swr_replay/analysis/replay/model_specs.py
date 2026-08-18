@@ -214,11 +214,22 @@ def default_content_model_names(
 # and M7 -- and it was removed on 2026-08-18, with the SWR rungs
 # renumbered down into M5 and M6.
 #
-# The predictor is not identifiable per-session. It fires on 6.1% of
+# The predictor is not identifiable per-session, and it does not measure
+# what its name says. It is an **omission-only** indicator: it cannot fire
+# on a rewarded stop, because if the animal was just rewarded here then
+# the last-rewarded arm is here and the residual is zero. It fires on 0.0%
+# of rewarded at-well events and 67.4% of omission ones, and every event
+# where it fires is an omission. So its support is capped by the ~10%
+# omission rate, and any coefficient answers "within omission stops, is
+# the previously-rewarded arm over- or under-represented" rather than
+# anything about reward memory in general.
+#
+# On top of that it is not estimable per-session. It fires on 6.1% of
 # events, and in 99 of 208 sessions no replay mass ever lands on the arm
 # it marks, which is perfect separation: the coefficient runs to -inf
 # and the standard error explodes (median -3.503, SE > 10 in 49% of
-# sessions). Its SWR interaction was worse -- constant within every
+# sessions). Which sessions separate tracks their omission count (median
+# 14 omission events, against 22 for the identified ones). Its SWR interaction was worse -- constant within every
 # event in 58 sessions -- and because the ladder freezes one
 # complete-case cohort over the union of all rungs, the refusals
 # propagated to every rung including M0, fitting 145 of 215 sessions

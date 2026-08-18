@@ -105,6 +105,13 @@ them. They fire on 6.1% (arm) and 2.9% (patch) of events and are perfectly
 separated in roughly half the sessions, which made every rung in a
 frozen-union cohort inherit the refusals. See `model_specs.py`.
 
+They are also **omission-only by construction**, which the name does not convey:
+a rewarded stop leaves the last-rewarded arm equal to the current arm, so the
+residual is identically zero there. Measured: 0.0% firing on rewarded at-well
+events, 67.4% on omission ones, and 100% of firing events are omissions. Read
+any coefficient as "within omission stops", and note that the ~10% omission
+rate — not the location-cohort rule — is the ceiling on their support.
+
 ### 5. Time / self-history — rate-only, no change
 
 `bs(tc)` (fixed knots (1,2,3) s, [0,4]), the reward-lag kernel, `onset_lag{j}` /
