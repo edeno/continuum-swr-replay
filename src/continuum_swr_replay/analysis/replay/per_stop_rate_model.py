@@ -155,7 +155,9 @@ def fit_per_stop_rate_model(
     except Exception:
         logger.warning("Poisson GLM failed for predictors %s", predictors)
         return None
-    status = fit_status(result, "glm")
+    status = fit_status(
+        result, "glm", predictor_sd=np.asarray(X, dtype=float).std(axis=0)
+    )
 
     coefs = dict(zip(col_names, result.params, strict=True))
     bse = dict(zip(col_names, result.bse, strict=True))

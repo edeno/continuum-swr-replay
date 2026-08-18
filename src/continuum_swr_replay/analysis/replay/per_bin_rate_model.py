@@ -160,7 +160,13 @@ def fit_per_bin_rate_model(
     except _EXPECTED_FIT_ERRORS as exc:
         logger.warning("Per-bin GLM failed for %s: %r", spec.name, exc)
         return None
-    status = fit_status(result, "glm")
+    # Effect-scale separation: the per-bin design carries spline bases whose columns
+    # are far from O(1), so the legacy |coef| rule mis-flags them.
+    status = fit_status(
+        result,
+        "glm",
+        predictor_sd=np.asarray(result.model.exog, dtype=float).std(axis=0),
+    )
 
     params = result.params
     bse = result.bse

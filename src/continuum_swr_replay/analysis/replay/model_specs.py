@@ -109,7 +109,6 @@ Design decisions informed by exploratory analysis on 7 j16 sessions:
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -265,24 +264,34 @@ def default_content_model_names(
 # terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 # VIF > 70).
 
-# Natural-cubic-spline basis for visit recency, on the log1p scale.
+# Natural-cubic-spline basis for visit recency, on the raw trial-count scale.
 #
-# Recency is a trial count spanning 1 to ~200 and is *deterministic* on the two
-# arms that already have their own indicators: exactly 1 on the current arm and
-# exactly 2 on the previous arm. A basis evaluated there is a fixed vector, hence
-# exactly collinear with ``is_current`` + ``is_prev`` -- fitting it unmasked is
-# rank-deficient. The basis is therefore masked to the arms where recency is not
-# already determined (visited leaves that are neither current nor previous, where
-# recency is >= 3 by construction), and one basis column is dropped as reference
-# because a natural spline basis is a partition of unity and would otherwise sum
-# to the mask.
+# Recency is deterministic on the two arms that already have their own
+# indicators: exactly 1 on the current arm and exactly 2 on the previous arm, on
+# 100.00% of location-resolved events. A basis evaluated there is a fixed
+# vector, hence exactly collinear with ``is_current`` + ``is_prev`` -- fitting it
+# unmasked is rank-deficient. The basis is therefore masked to the arms where
+# recency is not already determined (visited leaves that are neither current nor
+# previous, where recency is >= 3 by construction), and one basis column is
+# dropped as reference because a natural spline basis is a partition of unity
+# and would otherwise sum to the mask.
 #
 # Knots are fixed globally rather than fitted per session: a per-session basis
-# would give each session its own units and make the coefficients incomparable
-# across the medians the ladders aggregate over. They sit near the quartiles of
-# the visited-leaf distribution (recency 7 and 25; support 3 to 200).
-RECENCY_SPLINE_KNOTS: tuple[float, float] = (float(math.log1p(7.0)), float(math.log1p(25.0)))
-RECENCY_SPLINE_BOUNDS: tuple[float, float] = (float(math.log1p(3.0)), float(math.log1p(200.0)))
+# would give each session its own units and make coefficients incomparable
+# across the medians the ladders aggregate over. 12 and 40 trials sit near the
+# tertiles of the identified support (13 and 36), and are the best-conditioned
+# of the placements tried.
+#
+# Raw rather than log1p, by preference for knots that read directly in trials.
+# Measured trade-off: the two are indistinguishable on fit (median paired Δllf
+# 5.6 on a ~22,700 session log-likelihood, log1p ahead in 13 of 30 sessions),
+# but raw is less well conditioned -- within-event demeaned condition number
+# 4.12 against 2.74, and the third basis column has SD 0.032 against the first's
+# 0.386 because recency is right-skewed (median 21 on the support, max 198). If
+# per-session instability in these columns becomes a problem, the log1p scale is
+# the first thing to try: only these two constants change.
+RECENCY_SPLINE_KNOTS: tuple[float, float] = (12.0, 40.0)
+RECENCY_SPLINE_BOUNDS: tuple[float, float] = (3.0, 200.0)
 RECENCY_SPLINE_COLUMNS: tuple[str, ...] = (
     "visit_recency_spline1_demeaned",
     "visit_recency_spline2_demeaned",

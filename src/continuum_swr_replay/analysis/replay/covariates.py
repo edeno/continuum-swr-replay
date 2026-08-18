@@ -37,7 +37,6 @@ from ._helpers import (
 from .model_specs import (
     N_REWARD_LAGS,
     RECENCY_SPLINE_BOUNDS,
-    RECENCY_SPLINE_COLUMNS,
     RECENCY_SPLINE_KNOTS,
 )
 
@@ -149,6 +148,10 @@ def spline_visit_recency_within_event(
 ) -> np.ndarray:
     """Event-centered natural-spline basis of recency, on its identified support.
 
+    The basis is built on the raw trial-count scale (see the knot constants in
+    ``model_specs``), so a coefficient reads per unit of the basis at knots that
+    are themselves trial counts.
+
     All inputs are flat per-(event, arm) row arrays of equal length. Returns
     ``(n_rows, len(RECENCY_SPLINE_COLUMNS))``, zero outside the masked support so
     the columns carry no weight on arms whose recency is already determined.
@@ -171,7 +174,7 @@ def spline_visit_recency_within_event(
         dmatrix(
             "cr(x, knots=k, lower_bound=lo, upper_bound=hi) - 1",
             {
-                "x": np.log1p(np.where(np.isfinite(values), values, 1.0)),
+                "x": np.where(np.isfinite(values), values, RECENCY_SPLINE_BOUNDS[0]),
                 "k": list(RECENCY_SPLINE_KNOTS),
                 "lo": RECENCY_SPLINE_BOUNDS[0],
                 "hi": RECENCY_SPLINE_BOUNDS[1],

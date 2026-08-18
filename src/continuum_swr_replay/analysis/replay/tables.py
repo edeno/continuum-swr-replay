@@ -144,9 +144,6 @@ from ._helpers import (
     time_since_stop as _time_since_stop,
 )
 from .covariates import (
-    RECENCY_SPLINE_COLUMNS as _RECENCY_SPLINE_COLUMNS,
-)
-from .covariates import (
     center_visit_recency_within_event as _center_visit_recency_within_event,
 )
 from .covariates import (
@@ -156,6 +153,7 @@ from .covariates import (
     visit_recency_and_never_visited_all_events as _visit_recency_and_never_visited_all_events,
 )
 from .model_specs import N_REWARD_LAGS
+from .model_specs import RECENCY_SPLINE_COLUMNS as _RECENCY_SPLINE_COLUMNS
 from .spatial import arm_dist_rank, dist_to_arm_from_well
 from .spatial_mapping import arm_to_well, map_estimate_to_arm
 from .summaries import (

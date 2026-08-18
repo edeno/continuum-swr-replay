@@ -170,7 +170,11 @@ def fit_conditional_poisson(
             "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
         )
         return None
-    status = fit_status(result, "conditional", caught=caught)
+    # Judge separation on the effect scale: a basis column with a small SD reaches a
+    # large coefficient at an ordinary effect size, and would otherwise be mis-flagged.
+    status = fit_status(
+        result, "conditional", caught=caught, predictor_sd=X.std(axis=0)
+    )
     n_fit_warnings = count_fit_quality_warnings(caught)
 
     coefs = dict(zip(predictors, result.params, strict=True))
@@ -397,7 +401,9 @@ def fit_conditional_logit(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
         return None
-    status = fit_status(result, "conditional", caught=caught)
+    status = fit_status(
+        result, "conditional", caught=caught, predictor_sd=X.std(axis=0)
+    )
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
