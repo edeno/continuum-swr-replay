@@ -146,7 +146,13 @@ def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
             captured["y"] = np.asarray(y)
             captured["groups"] = np.asarray(groups)
 
-        def fit(self, disp=0):
+        def fit(self, disp=0, **kwargs):
+            # **kwargs so the stub tracks the real fit() signature. The fitters
+            # pass maxiter (statsmodels' default of 100 leaves the larger rungs
+            # short of the optimum); a stub that accepts only what it was written
+            # against fails on the call rather than on the behaviour under test.
+            captured["fit_kwargs"] = kwargs
+
             class Result:
                 params = np.array([0.0])
                 bse = np.array([1.0])

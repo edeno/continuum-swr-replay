@@ -32,7 +32,7 @@ from ._fit_diagnostics import (
     fit_status,
 )
 from ._helpers import strict_mean
-from .fitting import within_group_full_rank
+from .fitting import CONDITIONAL_FIT_MAXITER, within_group_full_rank
 
 logger = logging.getLogger(__name__)
 
@@ -514,7 +514,7 @@ def fit_choice_model(
     try:
         with capture_fit_warnings() as caught:
             model = ConditionalLogit(y, X, groups=groups)
-            result = model.fit(disp=0)
+            result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
     except Exception:
         logger.warning("ConditionalLogit failed for %s", predictors)
         return None

@@ -34,6 +34,22 @@ from ._fit_diagnostics import (
 logger = logging.getLogger(__name__)
 
 
+# Iteration budget for the conditional fits.
+#
+# statsmodels defaults to BFGS with maxiter=100, which is not enough for the
+# larger rungs: M6 carries 21 predictors whose column SDs span a 159x range (the
+# recency spline basis is the small end), and badly-scaled columns make BFGS take
+# many small steps. 43 of 213 M6 sessions stopped at the iteration cap rather
+# than at an optimum -- 11.4 log-likelihood units short on the session examined
+# -- and because a non-converged fold invalidates the whole CV metric, that also
+# voided cross-validation for 72 sessions.
+#
+# It is not a design problem: that session's within-event design is full rank
+# with condition number 12.3, and BFGS, LBFGS and Newton all reach the same
+# optimum once allowed to run. Nor is it expensive -- the same fit takes 2.0s
+# failing at 100 iterations and 2.1s converging at 1000.
+CONDITIONAL_FIT_MAXITER = 1000
+
 def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
     """True iff the within-group-demeaned design is full column rank.
 
@@ -164,7 +180,7 @@ def fit_conditional_poisson(
     try:
         with capture_fit_warnings() as caught:
             model = ConditionalPoisson(y, X, groups=groups)
-            result = model.fit(disp=0)
+            result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
     except Exception:
         logger.warning(
             "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
@@ -452,7 +468,7 @@ def fit_conditional_logit(
     try:
         with capture_fit_warnings() as caught:
             model = ConditionalLogit(y, X, groups=groups)
-            result = model.fit(disp=0)
+            result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
     except Exception:
         logger.warning(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True

@@ -79,7 +79,7 @@ def cross_validate_conditional_poisson(
     # per-event mean drifts (we verified a single zero-count event
     # shifts ``cv_ll_per_event_mean`` from -2.7465 to -3.2958 while
     # the per-timebin LL stays identical).
-    from .fitting import _drop_zero_count_events
+    from .fitting import CONDITIONAL_FIT_MAXITER, _drop_zero_count_events
 
     df = _drop_zero_count_events(df, event_col, response_col)
     if len(df) == 0:
@@ -129,7 +129,7 @@ def cross_validate_conditional_poisson(
             try:
                 with capture_fit_warnings() as caught:
                     model = ConditionalPoisson(y_train, X_train, groups=groups_train)
-                    result = model.fit(disp=0)
+                    result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
             except Exception:
                 return None
             status = fit_status(
