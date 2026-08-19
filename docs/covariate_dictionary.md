@@ -104,6 +104,32 @@ the animal is still inside its well-visit interval but a mean 48.4 cm from the
 well. Neither is a fallback for the other; a cohort needing occupancy off-well
 must state which construct it means.
 
+**Scope and support traps, measured 2026-08-19.** Six covariates whose names promise
+more than the data delivers:
+
+- **`is_post_switch = 0` does not mean "no switch yet".** It means the *nearest* switch
+  is ahead rather than behind (`trials_since_switch >= 0`). Of the 35.1% of trials
+  labelled 0, **94.75% already had a switch earlier in the session**. It is a
+  nearest-neighbour tie-break, not a causal ordering flag.
+- **`trials_since_switch` is signed and clipped.** 35.1% of trials are negative
+  (counting down to a *future* switch) and **26.9% sit exactly on the ±20 clip**, so a
+  linear slope is fit partly on a saturation plateau.
+- **`arm_dist_rank` is ranked over all nine arms**, but the choice set drops the current
+  arm and the trunks, leaving only ranks **{2, 6, 8}**. In that set the 2→6 step spans
+  **108 cm** of real distance and the 6→8 step spans **1.3 cm** — entered linearly, a
+  third of its slope is assigned to a 1 cm difference. Do not read its coefficient as a
+  distance gradient. (Removed from `BASEc` 2026-08-18; still the only geometry control
+  in `C_full`.)
+- **A "stop" is an immobility bout, not a well visit.** Median **0.33 s**, 73.5% under
+  1 s, and only 22.7% contain any event. Those sub-second bouts are 73.5% of the
+  per-stop rate ladder's rows but hold 6.4% of the events.
+- **`patch_count_hard` includes the patch's trunk**, and trunk arms carry **24.1%** of
+  all decoded MAP bins — so every patch-level coefficient is partly about corridor
+  representation.
+- **Choice-model `replay_frac` does not sum to 1** over the candidate set: mean
+  **0.49**, because `arm_fraction` is normalised over nine arms and the choice set keeps
+  five. The excluded current arm alone holds mean 0.24.
+
 **Per-SD readings need the fitted cohort's SD, not the table's.** `arm_uncertainty_z`
 is standardized over all nine arms, a third of which are structural trunk zeros, but
 `C13`/`CS6`/`Mu` fit the **six leaves**, where it has mean +0.61 and **SD 0.618** — so a

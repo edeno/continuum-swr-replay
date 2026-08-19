@@ -7,9 +7,19 @@ enter a conditional/multinomial-over-arms model (a constant-across-arms term can
 in the event normalization). Each interaction asks whether the current-arm content
 bias *sharpens* with the behavioral variable:
 
-  rew_x_current    = is_current * reward_lag1          (within-well outcome contrast)
-  value_x_current  = is_current * p_reward_current     (current-arm nominal value)
-  switch_x_current = is_current * recent_switch_rate   (exploration)
+  rew_x_current        = is_current * reward_lag1        (within-well outcome contrast)
+  nominalp_x_current   = is_current * p_reward_current   (current arm's SCHEDULED
+                                                          contingency -- experimenter-
+                                                          only, not a belief)
+  switchrate_x_current = is_current * recent_switch_rate (exploration; a 5-trial
+                                                          fraction, 0 on 64% of stops
+                                                          and 0.2 on 28%, so read the
+                                                          coefficient per 0.2)
+
+These were previously called ``value_x_current`` and ``switch_x_current``. The latter
+collided with a persisted ``event_arm_table`` column of the same name meaning
+``is_after_switch * is_current``, which this script overwrote on the same frame; the
+overwritten construct is what paper/claims_table.md row 19f reports.
 
 The within-well outcome contrast (rew_x_current) is the occupancy-confound-clean
 test: it compares rewarded vs omitted visits to the SAME current well (identifiable
@@ -41,7 +51,7 @@ from continuum_swr_replay.table_io import read_table
 RC = PROCESSED_DATA_DIR / "replay_content"
 SC = ["animal", "day", "epoch"]
 SCALARS = ["reward_lag1", "p_reward_current", "recent_switch_rate"]
-INTERACTIONS = ["rew_x_current", "value_x_current", "switch_x_current"]
+INTERACTIONS = ["rew_x_current", "nominalp_x_current", "switchrate_x_current"]
 REPORT = ["is_current", *INTERACTIONS]
 
 
@@ -58,8 +68,21 @@ def _assemble() -> pd.DataFrame:
     ev = ev.dropna(subset=SCALARS).reset_index(drop=True)
     cur = ev["is_current"].to_numpy(dtype=float)
     ev["rew_x_current"] = cur * ev["reward_lag1"].to_numpy(dtype=float)
-    ev["value_x_current"] = cur * ev["p_reward_current"].to_numpy(dtype=float)
-    ev["switch_x_current"] = cur * ev["recent_switch_rate"].to_numpy(dtype=float)
+    # Named for what they are, and NOT for what the canonical table already
+    # calls something else. `switch_x_current` is a persisted column of
+    # event_arm_table meaning `is_after_switch x is_current` (binary, last
+    # completed trip changed patch); building a different construct under that
+    # name on the same frame silently overwrote it, and the overwritten version
+    # is what reached paper/claims_table.md row 19f.
+    #
+    # `p_reward_current` is the *scheduled* contingency the animal never
+    # observes (covariate_dictionary F.0), so calling it "value" invites a
+    # belief reading it does not support.
+    ev["nominalp_x_current"] = cur * ev["p_reward_current"].to_numpy(dtype=float)
+    # recent_switch_rate is a 5-trial fraction that is exactly 0 on 64% of stops
+    # and exactly 0.2 on 28%, so a per-unit coefficient extrapolates 5x beyond
+    # the modal step; read it per 0.2, not per 1.
+    ev["switchrate_x_current"] = cur * ev["recent_switch_rate"].to_numpy(dtype=float)
     # duration control: within-stop time on the current arm (z(log1p), so the
     # 0-105 s range and the long-stop outliers don't dominate the conditioning).
     tsc = np.log1p(ev["time_since_stop"].to_numpy(dtype=float))
