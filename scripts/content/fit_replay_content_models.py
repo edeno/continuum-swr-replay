@@ -1138,6 +1138,34 @@ def main():
             len(long_df),
         )
 
+    # Cohort: at-well events only, stated rather than inferred.
+    #
+    # Every location-derived predictor (`is_current` and everything built from
+    # it) is NaN when the event window is not wholly at one well, so the
+    # complete-case filter below would remove these events anyway -- the two
+    # sets are identical, verified at 59,374 events with zero disagreements. But
+    # arriving there via `dropna` makes a scope decision look like missing data:
+    # it appears in the audit as "predictor NaN" rather than as a cohort, it
+    # would silently not apply to a rung that happens to omit `is_current`, and
+    # it cannot be varied to ask what in-transit events would show under a
+    # different predictor set. Applying it here states the restriction, and the
+    # complete-case filter remains as a safety net that should now find nothing
+    # location-related to drop.
+    #
+    # The restriction is not balanced across the SWR contrast (3.3% of SWR
+    # events are off-well against 13.0% of non-SWR) -- expected, since SWR
+    # events concentrate at wells -- so the cohort belongs in Methods.
+    if "location_state" in long_df.columns:
+        at_well = long_df["location_state"].eq("at_well")
+        n_before_events = long_df[event_col].nunique()
+        long_df = long_df.loc[at_well].reset_index(drop=True)
+        logging.info(
+            "cohort = at-well events: %d -> %d events (%.1f%% retained)",
+            n_before_events,
+            long_df[event_col].nunique(),
+            100 * long_df[event_col].nunique() / max(n_before_events, 1),
+        )
+
     # Pre-filter to common complete-case event set: drop entire events
     # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
     # Keep the pre-filter frame for the cohort audit (per-model drop attribution).
