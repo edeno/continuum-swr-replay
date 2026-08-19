@@ -414,6 +414,21 @@ def build_event_table(
     track segment, including trunks. ``current_arm`` is retained for model/API
     compatibility but is now exactly ``location_arm`` and therefore NaN unless
     the event is wholly at one well.
+
+    Two similarly-named columns answer different questions, and the names hide
+    it (see ``behavioral_location_at_times`` for the full note):
+    ``location_arm``/``current_arm`` is a **task state** -- which well is being
+    visited, from trip intervals, NaN mid-trip -- while ``physical_arm`` is a
+    **position** -- which graph edge the tracking falls on, always defined. They
+    disagree on 46 of 59,374 at-well events, where the animal is inside its
+    well-visit interval but a mean 48.4 cm from the well. Neither substitutes
+    for the other.
+
+    ``in_transit`` labels the trip interval, **not** motion: the modelled cohort
+    is speed-gated immobility throughout, and off-well events have a median
+    speed of 1.35 cm/s. Those events are animals standing still partway through
+    a trip. They are excluded from the content models because the well-visit
+    construct is undefined there, not because the animal was running.
     """
     # --- 1. Annotate the full dot frame (needed for bout detection and
     #     per-timebin arm mapping prior to event filtering) ---

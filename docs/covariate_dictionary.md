@@ -94,6 +94,25 @@ is a valued immediate-contrast comparison, not dropped.)
 
 ### 4. Spatial / role — already consistent, no change
 
+**Two occupancy columns, two constructs.** `location_arm` (aliased as
+`current_arm`) is a *task state*: which well the animal is visiting, derived
+from trip intervals, and **NaN during a trip** — the destination is never named
+before arrival, which is what makes it safe as a predictor. `physical_arm` is a
+*position*: the modal track segment the tracking falls on, always defined,
+trunks included. They disagree on 46 of 59,374 at-well events (0.077%), where
+the animal is still inside its well-visit interval but a mean 48.4 cm from the
+well. Neither is a fallback for the other; a cohort needing occupancy off-well
+must state which construct it means.
+
+**`in_transit` does not mean "moving".** It labels the trip interval. The
+modelled cohort is speed-gated immobility throughout, and off-well events have
+a median speed of 1.35 cm/s — they are animals standing still partway through a
+trip. The content models exclude them because the well-visit construct is
+undefined there (so `is_current` and everything derived from it is NaN), not
+because of motion. The at-well cohort is stated explicitly in the runner rather
+than emerging from that NaN pattern.
+
+
 `is_current`, `is_current_patch`, `is_prev`, `is_prev_patch`,
 `is_last_rewarded_elsewhere` / `is_last_rewarded_patch_elsewhere` (disjoint
 support), `arm_fe_{0..7}` (content baseline), `arm_dist_rank` (choice baseline,

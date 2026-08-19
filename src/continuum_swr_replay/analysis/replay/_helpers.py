@@ -108,6 +108,32 @@ def behavioral_location_at_times(
 
     The returned columns are ``location_state`` (categorical), ``at_well``
     (nullable boolean), and ``location_well`` (nullable ``Float64``).
+
+    **These are task states, not positions, and the names undersell that.**
+    Two different questions are answered by two similarly-named columns:
+
+    * ``location_well`` / ``location_arm`` / ``current_arm`` (the last two are
+      the same quantity, aliased) -- *which well is the animal visiting?* It is
+      derived from trip intervals, not from tracked position, and is **NaN
+      during a trip**: the destination is never named before the animal reaches
+      it, which is what keeps it usable as a predictor.
+    * ``physical_arm`` (built in ``tables.py``) -- *which track segment does the
+      tracked position fall on?* Always defined, trunks included.
+
+    They are allowed to disagree, and do on 46 of 59,374 at-well events (0.077%,
+    measured 2026-08-19): the animal is still inside its well-visit interval
+    while its tracked position is a mean 48.4 cm away (max 82.3 cm), usually on
+    the adjoining trunk. Both labels are right about their own construct.
+    Neither is a fallback for the other, so a cohort that needs occupancy
+    off-well must say which one it means rather than defaulting.
+
+    ``"in_transit"`` names the **trip interval, not the animal's motion**, and
+    this reliably misleads. Every event in the modelled cohort is speed-gated
+    immobility; off-well events have a median speed of 1.35 cm/s. An
+    ``in_transit`` event is an animal *standing still partway through a trip*,
+    not a running animal. The reason the content models exclude those events is
+    narrow -- the well-visit construct is undefined there, so ``is_current`` and
+    everything derived from it is NaN -- and not that the animal was moving.
     """
     sample_times = np.asarray(times, dtype=float)
     if sample_times.ndim != 1:
