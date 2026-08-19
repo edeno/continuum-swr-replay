@@ -54,8 +54,10 @@ from ..replay.covariates import (
     center_visit_recency_within_event,
     cumulative_reward_all_events,
     recent_reward_rate_all_events,
+    spline_visit_recency_within_event,
     visit_recency_and_never_visited_all_events,
 )
+from ..replay.model_specs import RECENCY_SPLINE_COLUMNS
 from ..replay.spatial import arm_dist_rank, dist_to_arm_from_well
 from ..replay.spatial_mapping import arm_to_well, map_estimate_to_arm
 from ..replay.summaries import (
@@ -720,6 +722,16 @@ def build_contfrag_event_arm_table(
     long["arm_never_visited"] = anv_vals
     # Time-local relative recency among the six leaf arms. Centering within
     # each event prevents future events from changing earlier model rows.
+    _recency_basis = spline_visit_recency_within_event(
+        long["visit_recency"].to_numpy(),
+        long["arm_never_visited"].to_numpy(),
+        long["is_current"].to_numpy(),
+        long["is_prev"].to_numpy(),
+        arm_arr,
+        long["event_id"].to_numpy(),
+    )
+    for _index, _column in enumerate(RECENCY_SPLINE_COLUMNS):
+        long[_column] = _recency_basis[:, _index]
     long["visit_recency_demeaned"] = center_visit_recency_within_event(
         vr_vals.reshape(n_events, n_arms), anv_vals.reshape(n_events, n_arms)
     ).reshape(-1)
@@ -770,6 +782,8 @@ def build_contfrag_event_arm_table(
     long["swr_x_visit_recency_demeaned"] = (
         is_swr_i * long["visit_recency_demeaned"].to_numpy()
     )
+    for _column in RECENCY_SPLINE_COLUMNS:
+        long[f"swr_x_{_column}"] = is_swr_i * long[_column].to_numpy()
     long["swr_x_arm_never_visited"] = is_swr_i * long["arm_never_visited"].to_numpy()
     long["swr_x_is_last_rewarded_elsewhere"] = (
         is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
@@ -1203,6 +1217,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         # Reward / value
         "visit_recency",
         "visit_recency_demeaned",
+        *RECENCY_SPLINE_COLUMNS,
         "arm_never_visited",
         "cumulative_reward",
         "reward_rate_arm_k10",
@@ -1219,6 +1234,7 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "swr_x_last_rewarded",
         "swr_x_reward_rate_arm_k10",
         "swr_x_visit_recency_demeaned",
+        *(f"swr_x_{_c}" for _c in RECENCY_SPLINE_COLUMNS),
         "swr_x_arm_never_visited",
         "swr_x_is_last_rewarded_elsewhere",
         "mua_x_current",
