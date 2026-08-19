@@ -10,7 +10,9 @@ using the beta-bernoulli covariates (the HMM was retired 2026-07-13).
 ## Covariate dictionary (shared with the rate ladder)
 Task dimensions, all from the beta-bernoulli model, per event/stop scalars:
 - `reward_lag1` — current (consummatory) reward at this stop.
-- `switch_advantage_mu_preoutcome_sess` (ΔV) — beta relative value (Stay-vs-Switch).
+- `switch_advantage_mu_preoutcome_sess` (ΔV) — beta relative value, **Switch − Stay**
+  (r = −0.952 with the stay value, so a positive `relval_x_current` means the current
+  arm's value is *low*; an earlier "Stay-vs-Switch" label here was backwards).
 - `rpe` — beta reward prediction error (reward − q_chosen).
 - `beta_reward_entropy` — beta belief entropy (mean per-leaf Beta differential entropy).
 - `global_mu_update_abs_postoutcome_sess` — beta global value update Σ|Δμ|.

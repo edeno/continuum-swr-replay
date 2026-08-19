@@ -190,8 +190,11 @@ runner provenance).
   (all 0/5, p<1e-11). Net of autocorrelation controls (`C2_base`), the SWR current-
   bias **vanishes** (−0.04 n.s.) while non-SWR persists (+0.67, p=3e-11).
 - **Beta state modulation of the current-bias** (refit 2026-07-13, beta covariates):
-  relative value ΔV **sharpens onto current** (`relval_x_current` +0.16, 4/5, p=9e-15;
-  SWR +0.16 5/5); **RPE pushes off current** (`rpe_x_current` −0.24, 5/5, p=2e-11;
+  relative value ΔV (`relval_x_current` +0.16, 4/5, p=9e-15; SWR +0.16 5/5). **Read the
+  sign with care:** ΔV is *Switch − Stay*, and is ~ −(the current arm's stay value)
+  (r = −0.952 with the stay value, −0.890 with `q_chosen`). So a positive coefficient
+  means content sharpens onto the current arm when that arm's value is **low** — not
+  "value sharpens onto current", which is how this line previously read; **RPE pushes off current** (`rpe_x_current` −0.24, 5/5, p=2e-11;
   non-SWR −0.20) — value and RPE oppose; value-update **sharpens onto current**
   (`update_x_current` +0.28, 5/5, p=3e-20; SWR +0.34). The scalar **belief-entropy
   interaction is null** (`entropy_x_current` −0.00 n.s.) — the beta-entropy scalar

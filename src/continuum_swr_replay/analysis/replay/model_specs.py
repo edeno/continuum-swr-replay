@@ -1027,7 +1027,9 @@ _BLOCK_F = {
     "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
     "BLOCK": "trials_since_block_change",
     "SWITCHRATE": "recent_switch_rate",
-    "VALUE": "switch_advantage_mu_preoutcome_sess",  # beta relative value (Stay-vs-Switch DeltaV)
+    # beta relative value DeltaV. Sign convention: Switch - Stay; ~= -(current stay value), r = -0.952 with stay_sibling_mu_preoutcome_sess and -0.890 with q_chosen, so a POSITIVE coefficient means the current option's value is LOW.
+    # An earlier "Stay-vs-Switch" label here had it backwards.
+    "VALUE": "switch_advantage_mu_preoutcome_sess",
     "RPE": "rpe",  # beta reward prediction error (reward - q_chosen)
     "UNCERT": "beta_reward_entropy",  # beta belief entropy (per-leaf Beta differential entropy)
     "UPDATE": "global_mu_update_abs_postoutcome_sess",  # beta value-update magnitude

@@ -230,7 +230,7 @@ HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch  # peri-switch broken-stick (one construct; see Note 1b)
 BLOCK     := trials_since_block_change  # learning across a contingency block
 SWITCHRATE:= recent_switch_rate         # local switch volatility
-VALUE     := switch_advantage_mu_preoutcome_sess  # beta relative value ΔV (Stay-vs-Switch)
+VALUE     := switch_advantage_mu_preoutcome_sess  # beta relative value ΔV (Switch − Stay)
 RPE       := rpe                        # reward - q_chosen (beta)
 UNCERT    := beta_reward_entropy        # mean per-leaf Beta differential entropy (derived)
 UPDATE    := global_mu_update_abs_postoutcome_sess  # beta global value update Σ_leaf|Δμ|
@@ -280,7 +280,10 @@ interaction; internal r ≈ 0.71) stay together — the interaction is meaningle
 main effects, and jointly they are the paper's broken-stick ramp around a switch. (2) **Value
 and decision are one dimension:** the paper fits a single relative-value axis (ΔV),
 not separate value and decision covariates, so we follow it with the single beta
-`switch_advantage_mu_preoutcome_sess` (Stay-vs-Switch). `q_chosen`/`q_arm` (belief
+`switch_advantage_mu_preoutcome_sess` (**Switch − Stay**; it is ~ −(current stay
+value), r = −0.952 with the stay value and −0.890 with `q_chosen`, so a positive
+coefficient on `relval_x_current` means content sharpens onto the current arm when
+that arm's value is **low**). `q_chosen`/`q_arm` (belief
 mean) is a per-arm robustness re-param, not co-fit on the rate ladder. (3) The reward kernel is split `reward_lag1` (current,
 dwell-confounded) + `REWK_prev` (former, dwell-clean) so the current-vs-former gating
 contrast separates. (4) `beta_reward_entropy` is the mean per-leaf **Beta** differential entropy (from

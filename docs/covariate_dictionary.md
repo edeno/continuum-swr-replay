@@ -104,6 +104,21 @@ the animal is still inside its well-visit interval but a mean 48.4 cm from the
 well. Neither is a fallback for the other; a cohort needing occupancy off-well
 must state which construct it means.
 
+**Per-SD readings need the fitted cohort's SD, not the table's.** `arm_uncertainty_z`
+is standardized over all nine arms, a third of which are structural trunk zeros, but
+`C13`/`CS6`/`Mu` fit the **six leaves**, where it has mean +0.61 and **SD 0.618** — so a
+coefficient reported "per 1 SD" is per 0.618 leaf-SD and must be divided by **1.618**
+for a within-leaf reading. Worse for comparison: `swr_x_q_arm` is built on **raw**
+`q_arm` (leaf SD 0.119), so a coefficient of −1.03 is **−0.123 per leaf-SD** — the
+value and uncertainty terms plotted beside each other are on scales differing by an
+order of magnitude and are not visually comparable.
+
+**`switch_advantage_mu_preoutcome_sess` (ΔV) is Switch − Stay**, and is ~ −(the current
+arm's stay value): r = −0.952 with `stay_sibling_mu_preoutcome_sess`, −0.890 with
+`q_chosen`, with identical SD (0.158). A **positive** `relval_x_current` therefore means
+content sharpens onto the current arm when that arm's value is **low**. Two shipped docs
+previously labelled it "Stay-vs-Switch", which inverts the reading; corrected 2026-08-19.
+
 **`in_transit` does not mean "moving".** It labels the trip interval. The
 modelled cohort is speed-gated immobility throughout, and off-well events have
 a median speed of 1.35 cm/s — they are animals standing still partway through a
