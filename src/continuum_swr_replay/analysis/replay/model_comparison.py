@@ -156,6 +156,25 @@ def summarize_comparison(
     else:
         result["wilcoxon_p"] = np.nan
 
+    # Animal-level view of the same step. Sessions within an animal are not
+    # independent and the corpus is unbalanced, so the session Wilcoxon above is a
+    # cross-session consistency statistic, not a population test on n=5. The
+    # per-animal median delta-AIC is balanced across animals, and how many animals
+    # agree on the sign is the claim a reader should weigh.
+    if "animal" in comparison_df.columns:
+        per_animal = (
+            comparison_df.assign(_d=daic).dropna(subset=["_d"]).groupby("animal")["_d"].median()
+        )
+        result["delta_aic_animal_median"] = (
+            float(per_animal.median()) if len(per_animal) else np.nan
+        )
+        result["n_animals"] = int(per_animal.size)
+        result["n_animals_child_better"] = int((per_animal > 0).sum())
+    else:
+        result["delta_aic_animal_median"] = np.nan
+        result["n_animals"] = 0
+        result["n_animals_child_better"] = 0
+
     return result
 
 

@@ -832,9 +832,22 @@ def print_model_results(
         _, corrected, _, _ = multipletests([x[1] for x in raw_pvals], method="fdr_bh")
         corrected_map = {x[0]: c for x, c in zip(raw_pvals, corrected, strict=True)}
 
-    print("\nCoefficients (median across sessions, FDR-corrected Wilcoxon p):")
-    print(f"  {'Predictor':<25} {'Median':>8} {'SE':>8} {'!=0 p':>10}")
-    print(f"  {'-' * 55}")
+    # PRIMARY evidence is at the animal level, matching the SWR-contrast ladder
+    # (see contrast_aggregation's module docstring). Sessions within an animal are
+    # not independent and the corpus is unbalanced -- two animals supply over half
+    # the sessions and one supplies 6% -- so a session-level median is largely a
+    # statement about those two, and a session-level p treats correlated
+    # observations as independent. The per-animal median is balanced across
+    # animals, and with n=5 the sign consistency IS the claim; the Wilcoxon stays
+    # for cross-session consistency but is descriptive, not the population test.
+    n_animals = mdf["animal"].nunique() if "animal" in mdf.columns else 0
+    print(
+        f"\nCoefficients (animal-level primary, n={n_animals} animals; "
+        "session median/p descriptive):"
+    )
+    header = f"  {'Predictor':<25} {'AnimalMed':>10} {'agree':>7} {'SessMed':>9} {'SE':>8} {'sess p':>10}"
+    print(header)
+    print(f"  {'-' * (len(header) - 2)}")
     for pred in predictors:
         if pred not in coef_info:
             continue
@@ -843,7 +856,23 @@ def print_model_results(
         se = mdf[se_col].median() if se_col in mdf.columns else float("nan")
         p = corrected_map.get(pred)
         p_str = f"{p:.2e}" if p is not None else "—"
-        print(f"  {pred:<25} {vals.median():8.3f} {se:8.3f} {p_str:>10}")
+        if n_animals:
+            per_animal = (
+                mdf.dropna(subset=[f"coef_{pred}"])
+                .groupby("animal")[f"coef_{pred}"]
+                .median()
+            )
+            animal_med = per_animal.median()
+            n_pos = int((per_animal > 0).sum())
+            # Sign consistency is reported toward the effect's own direction, so
+            # "5/5" always means unanimous rather than "unanimously positive".
+            agree = f"{max(n_pos, len(per_animal) - n_pos)}/{len(per_animal)}"
+        else:
+            animal_med, agree = float("nan"), "—"
+        print(
+            f"  {pred:<25} {animal_med:10.3f} {agree:>7} {vals.median():9.3f} "
+            f"{se:8.3f} {p_str:>10}"
+        )
 
 
 def main():
@@ -1219,19 +1248,27 @@ def main():
             print("MODEL COMPARISON (positive ΔAIC = child better)")
             print(f"{'=' * 60}")
             print(
-                f"\n  {'Step':<12} {'ΔAIC med':>10} {'Child wins':>12} "
-                f"{'Parent wins':>13} {'LRT sig':>10} {'Wilcoxon p':>12}"
+                f"\n  {'Step':<12} {'ΔAIC animal':>12} {'animals':>8} "
+                f"{'ΔAIC sess':>11} {'Child wins':>12} {'LRT sig':>10} {'sess p':>11}"
             )
-            print(f"  {'-' * 70}")
+            print(f"  {'-' * 78}")
             for _, row in comparison.iterrows():
                 step = f"{row['parent']}→{row['child']}"
                 wp = f"{row['wilcoxon_p']:.2e}" if pd.notna(row["wilcoxon_p"]) else "—"
+                am = row.get("delta_aic_animal_median", float("nan"))
+                am_str = f"{am:.1f}" if pd.notna(am) else "—"
+                agree = (
+                    f"{int(row.get('n_animals_child_better', 0))}/"
+                    f"{int(row.get('n_animals', 0))}"
+                    if row.get("n_animals", 0)
+                    else "—"
+                )
                 print(
-                    f"  {step:<12} {row['delta_aic_median']:>10.1f} "
+                    f"  {step:<12} {am_str:>12} {agree:>8} "
+                    f"{row['delta_aic_median']:>11.1f} "
                     f"{row['child_better_aic']:>8}/{row['n_sessions']:<3} "
-                    f"{row['parent_better_aic']:>9}/{row['n_sessions']:<3} "
                     f"{row['lrt_significant']:>6}/{row['n_sessions']:<3} "
-                    f"{wp:>12}"
+                    f"{wp:>11}"
                 )
 
     # Conditional-logit robustness results are also collected before the output
