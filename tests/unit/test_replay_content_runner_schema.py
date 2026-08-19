@@ -535,7 +535,12 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
 
 
 def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
-    """A primary fit without its explicitly requested CV result is incomplete."""
+    """CV that scores NO session is broken, and must not publish.
+
+    The complementary case -- CV scoring *some* sessions -- must publish, with
+    the primary coefficients keeping the full cohort. Letting a failed fold drop
+    the session cost 5 of 213 sessions their coefficients purely because CV was
+    requested, which made the reported effects depend on a diagnostic."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     # Two events are enough for the null primary fit but not 5-fold CV.
@@ -547,7 +552,9 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
         ["fit_replay_content_models.py", "--models", "M0", "--cv"],
     )
 
-    with pytest.raises(RuntimeError, match="M0.*no session fits"):
+    # The primary fit now survives a failed CV, so the abort comes from CV
+    # scoring nothing at all -- which means CV is broken, not marginal.
+    with pytest.raises(RuntimeError, match="no scored session"):
         runner.main()
 
     assert not (input_dir / "models").exists()

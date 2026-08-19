@@ -577,13 +577,21 @@ def fit_model_per_session(
                 response_col=response_col,
                 n_categories=n_categories,
             )
-            if cv is None:
-                # ``--cv`` is a requested analysis, not a best-effort
-                # annotation. Exclude this session here so the later shared-
-                # session intersection cannot publish a primary fit without
-                # its corresponding held-out result.
-                continue
-            r.update(cv)
+            # A failed CV must not cost the session its primary coefficient. CV
+            # is a diagnostic on the fit, not a precondition for it, and letting
+            # it gate the cohort means the reported effects depend on whether
+            # cross-validation was requested -- measured at 213 sessions without
+            # --cv against 208 with it. The CV columns are left NaN instead, so
+            # held-out comparisons run on the sessions that have scores (and can
+            # report that count) while the coefficients keep the full cohort.
+            if cv is not None:
+                r.update(cv)
+            else:
+                # Keep the CV schema stable whether or not a session scored, so
+                # downstream checks can distinguish "this session has no score"
+                # from "CV never ran at all" instead of tripping over an absent
+                # column.
+                r.update(dict.fromkeys(_CV_RESULT_COLUMNS, np.nan))
 
         r["model"] = model_name
         for col, val in zip(SESSION_COLS, keys, strict=True):
@@ -654,7 +662,24 @@ def _validate_and_match_fit_results(
                     f"Requested CV result for {model_name} is missing column(s) "
                     f"{missing_cv}; no output will be published"
                 )
-            cv_counts = result[list(_CV_COUNT_COLUMNS)].apply(
+            # Sessions whose CV did not run carry NaN in every CV column. Those
+            # are tolerated -- a failed fold must not cost a session its primary
+            # coefficient -- but a rung where NO session scored means CV is
+            # broken rather than marginal, and that still refuses to publish.
+            scored = result["cv_n_folds"].notna()
+            if not scored.any():
+                raise RuntimeError(
+                    f"Requested CV produced no scored session for {model_name}; "
+                    "no output will be published"
+                )
+            if not scored.all():
+                logging.warning(
+                    "%s: CV scored %d of %d sessions (%.0f%%); coefficients keep "
+                    "the full cohort, held-out comparisons use the scored subset",
+                    model_name, int(scored.sum()), len(result),
+                    100 * scored.mean(),
+                )
+            cv_counts = result.loc[scored, list(_CV_COUNT_COLUMNS)].apply(
                 pd.to_numeric, errors="coerce"
             )
             invalid_cv_counts = (
