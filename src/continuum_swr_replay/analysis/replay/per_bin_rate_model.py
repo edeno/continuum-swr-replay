@@ -281,7 +281,15 @@ def cross_validate_per_bin_rate_model(
             return None
         # Fold counts as nonconverged/separated if EITHER the model or its baseline
         # fails the check.
-        s_res, s_res0 = fit_status(res, "glm"), fit_status(res0, "glm")
+        # Effect-scale separation, matching the main fit path. Without the
+        # predictor scales this falls back to |coef| >= 10, which every
+        # self-history rung trips on its raised-cosine basis (small-SD columns,
+        # ordinary effects) -- that flagged all 10 folds separated and voided the
+        # CV metric for M3/M4/M6/M7/M8, leaving 2 of 215 sessions scored.
+        sd_res = np.asarray(res.model.exog, dtype=float).std(axis=0)
+        sd_res0 = np.asarray(res0.model.exog, dtype=float).std(axis=0)
+        s_res = fit_status(res, "glm", predictor_sd=sd_res)
+        s_res0 = fit_status(res0, "glm", predictor_sd=sd_res0)
         n_nonconverged += (not s_res["converged"]) or (not s_res0["converged"])
         n_separated += s_res["separated"] or s_res0["separated"]
         y = te["count"].to_numpy(dtype=float)

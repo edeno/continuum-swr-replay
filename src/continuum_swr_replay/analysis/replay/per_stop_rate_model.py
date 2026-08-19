@@ -241,7 +241,9 @@ def cross_validate_per_stop_rate_model(
             ).fit(disp=0)
         except Exception:
             return None
-        status = fit_status(res, "glm")
+        status = fit_status(
+            res, "glm", predictor_sd=np.asarray(res.model.exog, dtype=float).std(axis=0)
+        )
         n_nonconverged += not status["converged"]
         n_separated += status["separated"]
         mu = np.exp(np.clip(X[test] @ res.params + offset[test], -30, 30))

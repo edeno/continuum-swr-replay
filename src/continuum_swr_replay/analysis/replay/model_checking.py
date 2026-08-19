@@ -132,7 +132,9 @@ def cross_validate_conditional_poisson(
                     result = model.fit(disp=0)
             except Exception:
                 return None
-            status = fit_status(result, "conditional", caught=caught)
+            status = fit_status(
+                result, "conditional", caught=caught, predictor_sd=X_train.std(axis=0)
+            )
             n_nonconverged += status["converged"] is False
             n_separated += status["separated"]
 

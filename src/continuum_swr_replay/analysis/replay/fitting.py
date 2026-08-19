@@ -287,6 +287,63 @@ def fit_null_model_conditional(
     }
 
 
+def fit_null_model_conditional_logit(
+    long_df: pd.DataFrame,
+    event_col: str = "event_id",
+    response_col: str = "arm_count_hard",
+    n_arms: int = 9,
+) -> dict:
+    """Analytical null for the dominant-arm conditional logit.
+
+    The event-grain counterpart of :func:`fit_null_model_conditional`. There the
+    unit is a timebin, so the null log-likelihood scales with the event's total
+    count; here the unit is the *event* -- one choice among ``n_arms`` -- so it
+    scales with the number of events:
+
+        l0 = -n_events * log(n_arms)
+
+    Without this the null rung produces no fit at the event grain and the whole
+    ladder is refused publication, since every rung's ΔAIC is measured against
+    it.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format data with counts and event IDs.
+    event_col, response_col : str
+        Event id and arm-count columns.
+    n_arms : int
+        Size of the candidate set per event.
+
+    Returns
+    -------
+    dict
+        Null fit statistics with 0 parameters, keyed to match
+        :func:`fit_conditional_logit`.
+    """
+    df = long_df[[event_col, response_col]].copy()
+    has_nan = df.isna().any(axis=1)
+    df = df[~df[event_col].isin(df.loc[has_nan, event_col].unique())]
+    df = _drop_zero_count_events(df.reset_index(drop=True), event_col, response_col)
+
+    n_events = int(df[event_col].nunique())
+    llf = -n_events * float(np.log(n_arms))
+    return {
+        "n_events": n_events,
+        "n_rows": len(df),
+        "n_params": 0,
+        "llf": llf,
+        "llf_null": llf,
+        "aic": float(-2 * llf),
+        "bic": float(-2 * llf),
+        "pseudo_r2": 0.0,
+        "predicted_frac": 1.0 / n_arms,
+        "converged": True,
+        "separated": False,
+        "n_convergence_warnings": 0,
+    }
+
+
 def fit_conditional_logit(
     long_df: pd.DataFrame,
     predictors: list[str],

@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
+    fit_null_model_conditional_logit,
 )
 from continuum_swr_replay.analysis.replay.model_checking import (
     cross_validate_conditional_poisson,
@@ -500,6 +501,7 @@ def fit_model_per_session(
     response_col: str = "arm_count_hard",
     event_col: str = "event_id",
     n_categories: int = 9,
+    grain: str = "timebin",
 ) -> pd.DataFrame:
     """Fit conditional Poisson model across all sessions.
 
@@ -535,17 +537,39 @@ def fit_model_per_session(
         if len(group) < min_rows:
             continue
 
-        r = fit_conditional_poisson(
-            group,
-            predictors=list(predictors),
-            response_col=response_col,
-            event_col=event_col,
-            n_categories=n_categories,
-        )
+        if grain == "event" and not predictors:
+            r = fit_null_model_conditional_logit(
+                group,
+                event_col=event_col,
+                response_col=response_col,
+                n_arms=n_categories,
+            )
+        elif grain == "event":
+            # One observation per event -- which arm won -- instead of one per
+            # timebin. The timebin grain treats a median 32 bins per event as
+            # independent multinomial draws when they are heavily
+            # autocorrelated, so its standard errors are optimistic by roughly
+            # 5x; collapsing makes n honest at the event level, at the cost of
+            # discarding the within-event distribution (so "SWR spreads mass
+            # over more arms" is not askable here).
+            r = fit_conditional_logit(
+                group,
+                predictors=list(predictors),
+                response_col=response_col,
+                event_col=event_col,
+            )
+        else:
+            r = fit_conditional_poisson(
+                group,
+                predictors=list(predictors),
+                response_col=response_col,
+                event_col=event_col,
+                n_categories=n_categories,
+            )
         if r is None:
             continue
 
-        if run_cv:
+        if run_cv and grain != "event":
             cv = cross_validate_conditional_poisson(
                 group,
                 predictors=list(predictors),
@@ -892,6 +916,23 @@ def main():
         help="Run event-based cross-validation per session (slower)",
     )
     parser.add_argument(
+        "--grain",
+        type=str,
+        default="timebin",
+        choices=["timebin", "event"],
+        help=(
+            "Observation grain. 'timebin' (default) fits the conditional "
+            "Poisson over per-arm timebin counts. 'event' collapses each event "
+            "to a single observation -- which arm won -- and fits the "
+            "conditional logit, so n is the number of events rather than the "
+            "number of timebins. The timebin grain treats ~32 autocorrelated "
+            "bins per event as independent draws and its SEs are optimistic by "
+            "roughly 5x; the event grain is honest about n but cannot see the "
+            "within-event distribution. Written to a '_event_grain' output "
+            "directory so the two never overwrite each other."
+        ),
+    )
+    parser.add_argument(
         "--logit",
         action="store_true",
         help="Also fit conditional logit on dominant arm (robustness)",
@@ -995,6 +1036,13 @@ def main():
             list(hierarchy.keys()),
             output_dir,
         )
+
+    # Applied last so it composes with the SWR-subset suffix rather than being
+    # overwritten by it: an event-grain SWR-subset run needs its own directory
+    # too, or it would silently publish over the timebin-grain subset fits.
+    if args.grain == "event":
+        output_dir = output_dir.with_name(f"{output_dir.name}_event_grain")
+        logging.info("grain = event (one observation per event) -> %s", output_dir)
 
     # Determine which models to fit
     if args.models:
@@ -1143,6 +1191,7 @@ def main():
             response_col=response_col,
             event_col=event_col,
             n_categories=n_categories,
+            grain=args.grain,
         )
 
         elapsed = time.time() - t0
