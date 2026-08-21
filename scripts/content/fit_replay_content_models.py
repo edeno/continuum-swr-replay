@@ -62,6 +62,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PATCH_SWR,
     default_content_model_names,
 )
+from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
+from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
@@ -166,6 +171,50 @@ _CV_COUNT_COLUMNS = (
     "cv_n_nonconverged_folds",
     "cv_n_separated_folds",
 )
+
+
+def _validate_requested_standardization(
+    long_df: pd.DataFrame,
+    *,
+    union_predictors: Sequence[str],
+    input_dir: Path,
+    table_label: object,
+) -> None:
+    """Fail before fitting if requested persisted ``_z`` units are stale.
+
+    The canonical event-arm builder estimates these moments on the six leaf arms.
+    Older materialized tables used all nine arms, which inflated uncertainty
+    coefficients while preserving plausible column names.  Only inspect sources
+    whose standardized columns are actually requested by this invocation.
+    """
+    sources = tuple(
+        source
+        for source in EVENT_ARM_STANDARDIZED_COLS
+        if f"{source}_z" in union_predictors
+    )
+    if not sources:
+        return
+
+    reference_path = input_dir / "standardization_reference.json"
+    if not reference_path.exists():
+        raise FileNotFoundError(
+            f"Requested standardized predictor(s) {[f'{c}_z' for c in sources]} "
+            f"from {table_label}, but {reference_path} is missing. Regenerate the "
+            "canonical event-arm table and its leaf-support reference."
+        )
+    try:
+        assert_standardized_matches_reference(
+            long_df,
+            sources,
+            load_reference(reference_path),
+            support_label="leaf_arms",
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Canonical standardization for {table_label} is stale or invalid: "
+            f"{exc}. Regenerate the event-arm table and "
+            "standardization_reference.json before fitting."
+        ) from exc
 
 
 def _validate_canonical_table_contract(
@@ -1113,6 +1162,12 @@ def main():
         hierarchy_kind=args.hierarchy,
         table_label=canonical_path,
     )
+    _validate_requested_standardization(
+        long_df,
+        union_predictors=union_predictors,
+        input_dir=input_dir,
+        table_label=canonical_path,
+    )
     logging.info(
         "Loaded %d rows, %d sessions",
         len(long_df),
@@ -1179,14 +1234,19 @@ def main():
         drop_zero_response=True,
     )
     n_before = cohort_selection["n_units_before"]
-    n_complete_case = n_before - cohort_selection["n_missing_units"]
+    n_complete_case = (
+        n_before
+        - cohort_selection["n_missing_units"]
+        - cohort_selection["n_nonfinite_units"]
+    )
     if n_before != n_complete_case:
         logging.info(
             "Filtered to common complete-case events: %d → %d events "
-            "(%d dropped due to NaN in %s)",
+            "(%d missing, %d nonfinite in %s)",
             n_before,
             n_complete_case,
             cohort_selection["n_missing_units"],
+            cohort_selection["n_nonfinite_units"],
             list(union_predictors),
         )
     if cohort_selection["n_zero_response_units"]:
@@ -1202,7 +1262,8 @@ def main():
         # fitting M0 on zero events.
         raise RuntimeError(
             f"Complete-case filtering removed all {n_before} events because a "
-            f"predictor in {list(union_predictors)} is NaN on some candidate "
+            f"predictor in {list(union_predictors)} is missing or nonfinite "
+            "on some candidate "
             "row of every event. Regenerate the canonical table."
         )
     if cohort_selection["n_units_after"] == 0:
@@ -1293,6 +1354,7 @@ def main():
             for k in (
                 "n_drop_qvals_gap",
                 "n_drop_own_predictor_missing",
+                "n_drop_nonfinite",
                 "n_drop_common_cohort_other",
                 "n_drop_zero_response",
             )
@@ -1314,6 +1376,7 @@ def main():
                 drop_notes=drop_profile(dropped),
                 n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
                 n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
+                n_drop_nonfinite=buckets["n_drop_nonfinite"],
                 n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
                 n_drop_zero_response=buckets["n_drop_zero_response"],
                 n_excluded_session=n_before - n_drops - n_modeled,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -181,3 +182,24 @@ def test_freeze_common_cohort_rejects_missing_unit_identifier():
             unit_col="event_id",
             required_cols=("response",),
         )
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf])
+def test_freeze_common_cohort_drops_whole_unit_for_nonfinite_numeric_value(bad):
+    frame = pd.DataFrame(
+        {
+            "event_id": [1, 1, 2, 2],
+            "response": [1, 0, 1, 0],
+            "predictor": [0.1, bad, 0.2, 0.3],
+        }
+    )
+
+    cohort, report = freeze_common_cohort(
+        frame,
+        unit_col="event_id",
+        required_cols=("response", "predictor"),
+    )
+
+    assert tuple(cohort["event_id"].unique()) == (2,)
+    assert report["nonfinite_unit_ids"] == (1,)
+    assert report["n_nonfinite_units"] == 1

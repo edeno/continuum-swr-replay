@@ -12,7 +12,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 
 def _as_python_scalar(value: Any) -> Any:
@@ -43,9 +45,10 @@ def freeze_common_cohort(
     Filtering occurs in a fixed, mutually exclusive order:
 
     1. remove a unit if any of its rows is missing a required value;
-    2. remove a unit if any row has a nonpositive exposure/offset;
-    3. optionally remove a unit whose response sums to zero or less;
-    4. optionally remove a choice set containing a non-binary response or whose
+    2. remove a unit if any numeric required value is infinite;
+    3. remove a unit if any row has a nonpositive exposure/offset;
+    4. optionally remove a unit whose response sums to zero or less;
+    5. optionally remove a choice set containing a non-binary response or whose
        response does not sum to exactly one.
 
     Columns named by ``response_col``, ``offset_col``, and
@@ -120,6 +123,18 @@ def freeze_common_cohort(
     if missing_ids:
         cohort = cohort.loc[~cohort[unit_col].isin(missing_ids)].copy()
 
+    numeric_required = [
+        column for column in required if is_numeric_dtype(cohort[column])
+    ]
+    if numeric_required:
+        numeric_values = cohort[numeric_required].to_numpy(dtype=float)
+        has_nonfinite = ~np.isfinite(numeric_values).all(axis=1)
+        nonfinite_ids = _sorted_unit_ids(cohort.loc[has_nonfinite, unit_col])
+    else:
+        nonfinite_ids = ()
+    if nonfinite_ids:
+        cohort = cohort.loc[~cohort[unit_col].isin(nonfinite_ids)].copy()
+
     nonpositive_offset_ids: tuple[Any, ...] = ()
     if offset_col is not None:
         nonpositive = cohort[offset_col] <= 0
@@ -155,6 +170,8 @@ def freeze_common_cohort(
         "n_units_before": len(ids_before),
         "missing_unit_ids": missing_ids,
         "n_missing_units": len(missing_ids),
+        "nonfinite_unit_ids": nonfinite_ids,
+        "n_nonfinite_units": len(nonfinite_ids),
         "nonpositive_offset_unit_ids": nonpositive_offset_ids,
         "n_nonpositive_offset_units": len(nonpositive_offset_ids),
         "zero_response_unit_ids": zero_response_ids,

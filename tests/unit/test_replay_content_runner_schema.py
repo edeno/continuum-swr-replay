@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import sys
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.standardization import (
+    attach_standardized,
+    save_reference,
+)
 from scripts.content import fit_replay_content_models as runner
 
 
@@ -218,6 +223,60 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
         runner.main()
 
     assert not (input_dir / "models").exists()
+
+
+def test_uncertainty_model_rejects_legacy_all_arm_standardization(
+    tmp_path, monkeypatch
+):
+    """A named ``arm_uncertainty_z`` cannot bypass its leaf-support contract."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    frame = _canonical_arm_table()
+    frame["arm_uncertainty"] = np.where(frame["arm"].lt(6), frame["arm"] + 1.0, 0.0)
+    frame, legacy = attach_standardized(frame, ["arm_uncertainty"])
+    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    # Simulate the shipped pre-fix sidecar: right mean/SD keys, no scientific
+    # support metadata, and moments computed over all nine candidates.
+    (input_dir / "standardization_reference.json").write_text(
+        json.dumps(
+            {
+                "arm_uncertainty": {
+                    "mean": legacy["arm_uncertainty"]["mean"],
+                    "std": legacy["arm_uncertainty"]["std"],
+                }
+            }
+        )
+    )
+
+    def _fit_must_not_run(*args, **kwargs):
+        pytest.fail("standardization validation must run before model fitting")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "Mu"])
+
+    with pytest.raises(ValueError, match="stale or invalid"):
+        runner.main()
+    assert not (input_dir / "models").exists()
+
+
+def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
+    frame = _canonical_arm_table()
+    frame["arm_uncertainty"] = np.where(frame["arm"].lt(6), frame["arm"] + 1.0, 0.0)
+    frame, reference = attach_standardized(
+        frame,
+        ["arm_uncertainty"],
+        support_mask=frame["arm"].lt(6),
+        support_label="leaf_arms",
+    )
+    save_reference(reference, tmp_path / "standardization_reference.json")
+
+    runner._validate_requested_standardization(
+        frame,
+        union_predictors=("arm_uncertainty_z",),
+        input_dir=tmp_path,
+        table_label="fresh event_arm_table",
+    )
 
 
 def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):

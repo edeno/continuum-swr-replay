@@ -226,7 +226,8 @@ def test_records_from_common_cohort_provenance():
     prov = pd.DataFrame([
         {"animal": "a", "day": 1, "epoch": "e", "n_units_before": 50,
          "n_units_after": 40, "n_missing_units": 5, "n_invalid_choice_units": 3,
-         "n_nonpositive_offset_units": 0, "n_zero_response_units": 2, "status": "fit"},
+         "n_nonfinite_units": 1, "n_nonpositive_offset_units": 0,
+         "n_zero_response_units": 1, "status": "fit"},
         {"animal": "b", "day": 2, "epoch": "e", "n_units_before": 30,
          "n_units_after": 0, "n_missing_units": 0, "n_invalid_choice_units": 0,
          "n_nonpositive_offset_units": 0, "n_zero_response_units": 0,
@@ -235,10 +236,32 @@ def test_records_from_common_cohort_provenance():
     rec = records_from_common_cohort_provenance(prov, "choice", "all")
     assert rec["n_in"] == 80
     assert rec["n_drop_own_predictor_missing"] == 8  # missing 5 + invalid-choice 3
-    assert rec["n_drop_zero_response"] == 2
+    assert rec["n_drop_nonfinite"] == 1
+    assert rec["n_drop_zero_response"] == 1
     assert rec["n_modeled"] == 40  # only the fit session's surviving units
     assert rec["n_excluded_session"] == 30  # the too_few session's 30 units
     assert rec["n_sessions_modeled"] == 1
+
+
+def test_event_drop_buckets_attributes_infinity_explicitly():
+    frame = pd.DataFrame(
+        {
+            "event_id": [1, 1, 2, 2],
+            "y": [1, 0, 1, 0],
+            "x": [0.0, 0.0, np.inf, 1.0],
+        }
+    )
+
+    buckets = event_drop_buckets(
+        frame,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=["x"],
+        union_predictors=["x"],
+    )
+
+    assert buckets["n_drop_nonfinite"] == 1
+    assert buckets["dropped_event_ids"] == {2}
 
 
 def test_records_from_provenance_empty_returns_none():

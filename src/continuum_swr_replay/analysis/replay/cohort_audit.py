@@ -25,9 +25,10 @@ import pandas as pd
 DROP_FIELDS = (
     "n_drop_qvals_gap",  # [1] value covariate missing (mechanism B — the qvals tail)
     "n_drop_own_predictor_missing",  # [2] this model's own required predictor is NaN
-    "n_drop_zero_response",  # [3] all responses zero (content: Σcount==0)
-    "n_drop_common_cohort_other",  # [4] common mode: dropped only for ANOTHER rung's NaN
-    "n_excluded_session",  # [5] data-level session gates (min_*/rank/n<2·n_pred)
+    "n_drop_nonfinite",  # [3] NaN-free but ±Inf/invalid numeric required value
+    "n_drop_zero_response",  # [4] all responses zero (content: Σcount==0)
+    "n_drop_common_cohort_other",  # [5] dropped only for another rung's NaN
+    "n_excluded_session",  # [6] data-level session gates (min_*/rank/n<2·n_pred)
 )
 
 # Session-level informational flags. Carried on the record but NOT subtracted in the
@@ -141,27 +142,37 @@ def event_drop_buckets(
     """Per-event drop classification for a **union complete-case** (common-cohort) rung.
 
     ``long_df`` is the *pre-filter* long frame. Under the union complete-case rule an
-    event is dropped if ANY union predictor is NaN in ANY of its rows; a surviving event
-    is dropped if its response sums to zero. Each dropped event is attributed to exactly
-    one bucket by the schema priority (qvals_gap → own_predictor_missing →
-    common_cohort_other → zero_response):
+    event is dropped if ANY union predictor is missing or nonfinite in ANY of
+    its rows; a surviving event is dropped if its response sums to zero. Each
+    dropped event is attributed to exactly one bucket by the schema priority
+    (qvals_gap → own_predictor_missing → nonfinite → common_cohort_other →
+    zero_response):
 
     - ``n_drop_qvals_gap`` — a qvals-tail covariate (:data:`QVALS_GAP_COLS`) that **this
       rung itself uses** is NaN (0 for a rung with no value covariate, per Contract 1);
     - ``n_drop_own_predictor_missing`` — one of *this rung's* own (non-qvals) predictors
       is NaN;
+    - ``n_drop_nonfinite`` — a required numeric value is present but ±Inf or
+      otherwise nonnumeric;
     - ``n_drop_common_cohort_other`` — dropped only because *another* rung's predictor is
       NaN (this rung's own predictors are all present) — the F4 common-cohort bucket. A
       qvals-tail event where the value covariate belongs to a *different* rung lands here,
       NOT in ``n_drop_qvals_gap``.
     - ``n_drop_zero_response`` — survives complete-case but the response sums to zero.
 
-    Returns the four counts plus ``dropped_event_ids`` (the union of all dropped events).
+    Returns the five counts plus ``dropped_event_ids`` (the union of all dropped events).
     """
     present_union = [c for c in union_predictors if c in long_df.columns]
     nan_by_col = {
         c: set(long_df.loc[long_df[c].isna(), event_col]) for c in present_union
     }
+    nonfinite_by_col = {}
+    for column in present_union:
+        numeric = pd.to_numeric(long_df[column], errors="coerce")
+        invalid = long_df[column].notna() & ~np.isfinite(
+            numeric.to_numpy(dtype=float)
+        )
+        nonfinite_by_col[column] = set(long_df.loc[invalid, event_col])
     # qvals gap is attributed only when THIS rung's own value covariate is missing.
     own_qvals_cols = [
         c for c in own_predictors if c in QVALS_GAP_COLS and c in nan_by_col
@@ -179,15 +190,28 @@ def event_drop_buckets(
         set().union(*nan_by_col.values()) if nan_by_col else set()
     )
     common_events = all_nan_events - qvals_events - own_events
-    survivors = long_df[~long_df[event_col].isin(all_nan_events)]
+    all_nonfinite_events = (
+        set().union(*nonfinite_by_col.values()) if nonfinite_by_col else set()
+    )
+    nonfinite_events = all_nonfinite_events - all_nan_events
+    survivors = long_df[
+        ~long_df[event_col].isin(all_nan_events | nonfinite_events)
+    ]
     totals = survivors.groupby(event_col)[response_col].sum()
     zero_events = set(totals[totals == 0].index)
     return {
         "n_drop_qvals_gap": len(qvals_events),
         "n_drop_own_predictor_missing": len(own_events),
+        "n_drop_nonfinite": len(nonfinite_events),
         "n_drop_common_cohort_other": len(common_events),
         "n_drop_zero_response": len(zero_events),
-        "dropped_event_ids": qvals_events | own_events | common_events | zero_events,
+        "dropped_event_ids": (
+            qvals_events
+            | own_events
+            | nonfinite_events
+            | common_events
+            | zero_events
+        ),
     }
 
 
@@ -235,7 +259,8 @@ def records_from_common_cohort_provenance(prov, model: str, population: str, *, 
 
     ``compare_event_source_models.py`` fits its patch/rate/**choice** blocks on a frozen
     per-session complete-case cohort and records rich per-session provenance
-    (``n_units_before``/``n_units_after``/``n_missing_units``/``n_invalid_choice_units``/
+    (``n_units_before``/``n_units_after``/``n_missing_units``/
+    ``n_nonfinite_units``/``n_invalid_choice_units``/
     ``n_nonpositive_offset_units``/``n_zero_response_units``/``status``). This maps that
     native provenance onto the standardized schema so the choice cohort is on the same
     footing as the rate/content ladders. The block's up-front selection (e.g. the choice
@@ -246,13 +271,14 @@ def records_from_common_cohort_provenance(prov, model: str, population: str, *, 
         return None
 
     def _col(c):
-        return prov[c] if c in prov.columns else 0
+        return prov[c] if c in prov.columns else pd.Series(0, index=prov.index)
 
     n_in = int(_col("n_units_before").sum())
     n_own = int(
         (_col("n_missing_units") + _col("n_invalid_choice_units")
          + _col("n_nonpositive_offset_units")).sum()
     )
+    n_nonfinite = int(_col("n_nonfinite_units").sum())
     n_zero = int(_col("n_zero_response_units").sum())
     fit_mask = prov["status"] == "fit" if "status" in prov.columns else pd.Series(False, index=prov.index)
     n_modeled = int(prov.loc[fit_mask, "n_units_after"].sum()) if fit_mask.any() else 0
@@ -271,8 +297,9 @@ def records_from_common_cohort_provenance(prov, model: str, population: str, *, 
             "size-gate / fit-failed sessions -> excluded"
         ),
         n_drop_own_predictor_missing=n_own,
+        n_drop_nonfinite=n_nonfinite,
         n_drop_zero_response=n_zero,
-        n_excluded_session=n_in - n_own - n_zero - n_modeled,
+        n_excluded_session=n_in - n_own - n_nonfinite - n_zero - n_modeled,
     )
 
 
