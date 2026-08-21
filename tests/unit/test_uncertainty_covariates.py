@@ -9,6 +9,7 @@ not mutate its input.
 from __future__ import annotations
 
 import importlib.util
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +21,7 @@ from continuum_swr_replay.analysis.replay.covariates import (
     CANONICAL_SWITCH_WINDOW,
     canonical_trial_uncertainty_history,
 )
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.table_io import read_table, table_exists
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
@@ -237,12 +238,14 @@ def test_recent_switch_rate_leaves_only_true_carry_in_rows_unknown():
                 "completed_trial_id": pd.NA,
                 "completed_trial_arm": np.nan,
                 "reward_outcome": np.nan,
+                "completed_trial_reward": np.nan,
                 "is_after_switch": np.nan,
             },
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 2.0,
                 "reward_outcome": 1.0,
+                "completed_trial_reward": 1.0,
                 "is_after_switch": 1.0,
                 "recent_switch_rate": 1.0,
             },
@@ -250,6 +253,7 @@ def test_recent_switch_rate_leaves_only_true_carry_in_rows_unknown():
                 "completed_trial_id": 0,
                 "completed_trial_arm": 2.0,
                 "reward_outcome": 1.0,
+                "completed_trial_reward": 1.0,
                 "is_after_switch": 1.0,
                 "recent_switch_rate": 1.0,
             },
@@ -404,14 +408,43 @@ def test_wsls_deviation_no_prior_is_nan():
     # so the row drops at fit time instead of counting as a deviation.
     df = _frame(
         [
-            {"completed_trial_reward": np.nan, "is_stay": 1.0},
-            {"completed_trial_reward": 1.0, "is_stay": 1.0},  # win-stay -> 0
+            {
+                "completed_trial_id": pd.NA,
+                "completed_trial_arm": np.nan,
+                "completed_trial_reward": np.nan,
+                "reward_outcome": np.nan,
+                "is_after_switch": np.nan,
+                "is_stay": 1.0,
+            },
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 2.0,
+                "reward_outcome": 1.0,
+                "completed_trial_reward": 1.0,
+                "is_after_switch": 0.0,
+                "is_stay": 1.0,
+            },  # win-stay -> 0
         ]
     )
     out = add_uncertainty_covariates(df).sort_values("stop_idx")
     vals = out["wsls_deviation"].to_numpy()
     assert np.isnan(vals[0])
     assert vals[1] == 0.0
+
+
+@pytest.mark.parametrize(
+    "column,bad",
+    [
+        ("completed_trial_reward", 2.0),
+        ("completed_trial_reward", -1.0),
+        ("is_stay", 2.0),
+        ("is_stay", 0.5),
+    ],
+)
+def test_wsls_consumed_columns_must_be_binary(column, bad):
+    df = _frame([{column: bad}])
+    with pytest.raises(ValueError, match=column):
+        add_uncertainty_covariates(df)
 
 
 def test_add_uncertainty_preserves_canonical_leaky_q_margin():
@@ -796,7 +829,7 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
 
-    Requires ``qvals_table.pkl`` alongside the canonical tables. Writes
+    Requires the canonical q-values table alongside the canonical tables. Writes
     ``uncertainty_rate_smoke.pkl`` and checks the tidy schema carries every
     uncertainty/value coefficient across the three populations.
     """
@@ -808,9 +841,9 @@ def test_runner_smoke():
 
     rc = PROCESSED_DATA_DIR / "replay_content"
     qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
-    if not qvals_path.exists():
+    if not table_exists(qvals_path):
         pytest.skip(
-            "qvals_table.pkl not present "
+            "qvals_table not present "
             "(run continuum_swr_replay.analysis.behavior.qvals_table --write first)"
         )
 
@@ -824,14 +857,20 @@ def test_runner_smoke():
     }
     if not canonical_columns.issubset(stop.columns):
         pytest.skip("canonical stop_table.pkl has not been regenerated")
-    onsets = attach_is_swr_to_onsets(
-        read_table(rc / "event_onset_table.pkl"),
-        read_table(rc / "event_table.pkl"),
-    )
+    onset_table = read_table(rc / "event_onset_table.pkl")
+    event_table = read_table(rc / "event_table.pkl")
+    # The helper freezes the shared natural-session cohort and warns about any
+    # independently regenerated onset-only/event-only sessions. Unit tests pin
+    # that warning/audit; this slow smoke should continue across the shared
+    # sessions instead of reinstating the old whole-corpus count blocker.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        onsets = attach_is_swr_to_onsets(onset_table, event_table)
 
     stop = add_uncertainty_covariates(stop)
     # Nominal schedule + real model covariates, all from qvals_table -- one
-    # exactly poke_out-aligned source, mirroring the runner's main().
+    # stop-start-aligned source with a separate physical outcome boundary,
+    # mirroring the runner's main().
     qvals = read_table(qvals_path)
     if "outcome_known_time" not in qvals:
         pytest.skip(

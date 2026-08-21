@@ -173,6 +173,14 @@ def test_value_block_missing_cols_raises():
         covariates.attach_contingency_value_block(arm, sid, bad)
 
 
+@pytest.mark.parametrize("bad_arm", [-1, 1.5, 9, np.inf])
+def test_value_block_rejects_noncanonical_arm_ids(bad_arm):
+    with pytest.raises(ValueError, match="arm IDs"):
+        covariates.attach_contingency_value_block(
+            np.array([bad_arm]), np.array([111]), _toy_contingency(111)
+        )
+
+
 # ── load_contingency (shared value-artifact load seam) ──
 # Concept: qvals_table is the SOLE value source, so its absence must degrade
 # visibly (warning + None), not silently; presence returns the frame.
@@ -209,14 +217,55 @@ def test_load_contingency_absent_yields_all_nan_value_block(tmp_path):
     assert np.isnan(p).all() and np.isnan(q).all()
 
 
-def test_value_block_warns_on_duplicate_stop_id():
-    """Duplicate stop_id with differing values warns (silent-pick guard)."""
+def test_value_block_rejects_duplicate_stop_id():
+    """A duplicate scientific key is an alignment failure, not a warning."""
     a = _toy_contingency(111)
     b = _toy_contingency(111)
     b.loc[0, "p_reward_port0"] = 0.9  # conflicting value for the same stop
     cont = pd.concat([a, b], ignore_index=True)
-    with pytest.warns(UserWarning, match="duplicate stop_id"):
+    with pytest.raises(ValueError, match="duplicate stop_id"):
         covariates.attach_contingency_value_block(np.array([0]), np.array([111]), cont)
+
+
+def test_value_block_rejects_partially_missing_matched_row():
+    cont = _toy_contingency(111)
+    cont.loc[0, "q_port4"] = np.nan
+
+    with pytest.raises(ValueError, match="finite"):
+        covariates.attach_contingency_value_block(
+            np.array([0, 4]), np.array([111, 111]), cont
+        )
+
+
+@pytest.mark.parametrize(("column", "bad"), [("p_reward_port2", 1.1), ("q_port3", -0.1)])
+def test_value_block_rejects_out_of_range_probability_or_q(column, bad):
+    cont = _toy_contingency(111)
+    cont.loc[0, column] = bad
+
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        covariates.attach_contingency_value_block(
+            np.array([0]), np.array([111]), cont
+        )
+
+
+def test_uncertainty_block_rejects_duplicate_stop_id():
+    cont = _toy_contingency(111)
+    for i in range(1, 7):
+        cont[f"betadist_var{i}"] = 0.01 * i
+    cont = pd.concat([cont, cont], ignore_index=True)
+
+    with pytest.raises(ValueError, match="duplicate stop_id"):
+        covariates.attach_arm_uncertainty(np.array([0]), np.array([111]), cont)
+
+
+def test_uncertainty_block_rejects_invalid_beta_variance():
+    cont = _toy_contingency(111)
+    for i in range(1, 7):
+        cont[f"betadist_var{i}"] = 0.01 * i
+    cont.loc[0, "betadist_var4"] = 0.3
+
+    with pytest.raises(ValueError, match=r"\[0, 0.25\]"):
+        covariates.attach_arm_uncertainty(np.array([0]), np.array([111]), cont)
 
 
 def test_value_block_plain_key_populates_suffixed_key_misses():
@@ -490,6 +539,45 @@ class TestAlignCountMatrix:
             counts, np.array([10]), np.array([10, 99]), n_arms=2
         )
         assert np.isnan(out[1]).all()
+
+
+class TestEventLabelAlignment:
+    def test_accepts_same_event_set_in_different_order(self):
+        _helpers.assert_event_label_alignment(
+            np.array([2, 1, 2, 1]), np.array([1, 2]), source_name="dot"
+        )
+
+    @pytest.mark.parametrize(
+        "source,target",
+        [
+            ([1], [1, 2]),
+            ([1, 2, 3], [1, 2]),
+            ([1, np.nan], [1]),
+            ([1, 1.5], [1]),
+        ],
+    )
+    def test_rejects_missing_extra_or_nonfinite_event_ids(self, source, target):
+        with pytest.raises(ValueError, match="event-label alignment"):
+            _helpers.assert_event_label_alignment(
+                np.asarray(source), np.asarray(target), source_name="dot"
+            )
+
+    def test_requires_same_single_natural_session(self):
+        source = pd.DataFrame(
+            {"animal": ["a", "a"], "day": [1, 1], "epoch": ["e", "e"]}
+        )
+        target = pd.DataFrame({"animal": ["b"], "day": [1], "epoch": ["e"]})
+
+        with pytest.raises(ValueError, match="session alignment failed"):
+            _helpers.assert_single_session_alignment(
+                source, target, source_name="dot"
+            )
+
+        _helpers.assert_single_session_alignment(
+            source,
+            target.assign(animal="a"),
+            source_name="dot",
+        )
 
 
 # ── Guards for invariants that survived mutation testing ──

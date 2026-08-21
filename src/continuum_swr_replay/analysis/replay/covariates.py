@@ -14,7 +14,6 @@ Implements the constructs specified in
 from __future__ import annotations
 
 import logging
-import warnings
 from pathlib import Path
 
 import networkx as nx
@@ -354,7 +353,7 @@ def cumulative_reward_all_events(
         return np.full((n_events, n_arms), np.nan)
 
     # Reward-bearing history advances at outcome availability, not destination
-    # arrival. This prevents an event during the arrival-to-pump/poke-out gap
+    # arrival. This prevents an event during the arrival-to-feedback gap
     # from seeing the current trial's eventual reward.
     trials = trials.assign(_cutoff=_trial_outcome_times(trials))
     trials = trials.sort_values("_cutoff").reset_index(drop=True)
@@ -689,6 +688,7 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
         "completed_trial_id",
         "completed_trial_arm",
         "reward_outcome",
+        "completed_trial_reward",
         "is_after_switch",
         "recent_switch_rate",
         "leaky_q_value_diff",
@@ -729,7 +729,11 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
         "recent_switch_rate",
         "leaky_q_value_diff",
     )
-    history_columns = (*arrival_history_columns, "reward_outcome")
+    history_columns = (
+        *arrival_history_columns,
+        "reward_outcome",
+        "completed_trial_reward",
+    )
     if stops.loc[carry_in, list(history_columns)].notna().to_numpy().any():
         raise ValueError(
             "carry-in rows without a completed_trial_id must have unknown "
@@ -791,6 +795,13 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
     reward_values = working["reward_outcome"].dropna().to_numpy(dtype=float)
     if not np.isin(reward_values, (0.0, 1.0)).all():
         raise ValueError("reward_outcome must be binary whenever it is known")
+    completed_reward = visits["completed_trial_reward"].to_numpy(dtype=float)
+    if not np.isfinite(completed_reward).all() or not np.isin(
+        completed_reward, (0.0, 1.0)
+    ).all():
+        raise ValueError(
+            "completed_trial_reward must be finite binary within completed trials"
+        )
     for column in ("recent_switch_rate", "leaky_q_value_diff"):
         values = visits[column].to_numpy(dtype=float)
         if ((values < 0.0) | (values > 1.0)).any():
@@ -970,8 +981,8 @@ def add_uncertainty_covariates(
         omission.loc[pos] = _omission_streak(g[expected_lag_cols].to_numpy(dtype=float))
 
         # Read the trip's *realized* outcome, not the bout-start-gated flags.
-        # A bout at a well begins at arrival, which precedes reward onset (and
-        # poke-out on an omission), so ``is_after_reward`` / ``is_after_omission``
+        # A bout at a well begins at arrival, which precedes the physical
+        # outcome boundary, so ``is_after_reward`` / ``is_after_omission``
         # are missing at essentially every at-well stop and gating here left the
         # covariate NaN wherever it means anything. Win-stay/lose-shift is by
         # definition about the outcome the animal just experienced, paired with
@@ -980,6 +991,9 @@ def add_uncertainty_covariates(
         # the outcome is clocked. See covariate_timing.FUTURE_REFERENCING.
         outcome = g["completed_trial_reward"].to_numpy(dtype=float)
         stay = g["is_stay"].to_numpy(dtype=float)
+        finite_stay = stay[np.isfinite(stay)]
+        if not np.isin(finite_stay, (0.0, 1.0)).all():
+            raise ValueError("is_stay must be binary whenever it is known")
         win_stay = (outcome == 1.0) & (stay == 1.0)
         lose_shift = (outcome == 0.0) & (stay == 0.0)
         wsls_vals = np.where(win_stay | lose_shift, 0.0, 1.0)
@@ -1182,11 +1196,18 @@ def attach_contingency_value_block(
         ``q_port{0..5}`` columns (e.g. an old artifact from before the per-arm
         migration).
     """
-    arm = np.asarray(arm)
+    arm = np.asarray(arm, dtype=float)
+    if arm.ndim != 1 or not np.isfinite(arm).all():
+        raise ValueError("arm IDs must be a finite one-dimensional array")
+    if not np.equal(arm, np.floor(arm)).all() or not np.isin(arm, ALL_ARMS).all():
+        raise ValueError(f"arm IDs must be canonical members of {tuple(ALL_ARMS)}")
+    arm = arm.astype(np.int64)
     n_rows = len(arm)
     if contingency is None:
         return np.full(n_rows, np.nan), np.full(n_rows, np.nan)
-    missing = {*_P_REWARD_PORT_COLS, *_Q_PORT_COLS} - set(contingency.columns)
+    missing = {"stop_id", *_P_REWARD_PORT_COLS, *_Q_PORT_COLS} - set(
+        contingency.columns
+    )
     if missing:
         raise ValueError(
             "contingency is missing per-arm value columns "
@@ -1195,26 +1216,35 @@ def attach_contingency_value_block(
             "`python -m continuum_swr_replay.analysis.behavior.qvals_table --write`)"
         )
 
-    n_unique = contingency["stop_id"].nunique()
+    if contingency["stop_id"].isna().any():
+        raise ValueError("contingency stop_id must not be missing")
+    n_unique = contingency["stop_id"].nunique(dropna=False)
     if n_unique != len(contingency):
-        warnings.warn(
+        raise ValueError(
             f"contingency has {len(contingency) - n_unique} duplicate stop_id "
-            "row(s); keeping the first occurrence per stop_id. If duplicate "
-            "rows carry different port/q values this silently picks one.",
-            stacklevel=2,
+            "row(s); q/value alignment requires one row per stop"
         )
     cont = contingency.drop_duplicates("stop_id")[
         ["stop_id", *_P_REWARD_PORT_COLS, *_Q_PORT_COLS]
     ]
     merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
-        cont, on="stop_id", how="left"
+        cont, on="stop_id", how="left", validate="many_to_one", indicator="_qvals_merge"
     )
     port_mat = merged[_P_REWARD_PORT_COLS].to_numpy(dtype=float)
     q_mat = merged[_Q_PORT_COLS].to_numpy(dtype=float)
     leaf = arm < 6
     leaf_idx = np.clip(arm, 0, 5).astype(int)
     row = np.arange(n_rows)
-    present = ~np.isnan(port_mat[:, 0])  # stop_id had a contingency row
+    present = merged["_qvals_merge"].eq("both").to_numpy()
+    if present.any() and not np.isfinite(port_mat[present]).all():
+        raise ValueError("matched contingency rows must carry finite p_reward_port values")
+    if present.any() and not np.isfinite(q_mat[present]).all():
+        raise ValueError("matched contingency rows must carry finite q_port values")
+    if present.any() and (
+        ((port_mat[present] < 0.0) | (port_mat[present] > 1.0)).any()
+        or ((q_mat[present] < 0.0) | (q_mat[present] > 1.0)).any()
+    ):
+        raise ValueError("matched contingency probabilities and Q values must lie in [0, 1]")
     trunk_fill = np.where(present, 0.0, np.nan)
     p_reward_arm = np.where(leaf, port_mat[row, leaf_idx], trunk_fill)
     q_arm = np.where(leaf, q_mat[row, leaf_idx], trunk_fill)
@@ -1252,11 +1282,16 @@ def attach_arm_uncertainty(
     -------
     arm_uncertainty : np.ndarray, shape (n_rows,)
     """
-    arm = np.asarray(arm)
+    arm = np.asarray(arm, dtype=float)
+    if arm.ndim != 1 or not np.isfinite(arm).all():
+        raise ValueError("arm IDs must be a finite one-dimensional array")
+    if not np.equal(arm, np.floor(arm)).all() or not np.isin(arm, ALL_ARMS).all():
+        raise ValueError(f"arm IDs must be canonical members of {tuple(ALL_ARMS)}")
+    arm = arm.astype(np.int64)
     n_rows = len(arm)
     if contingency is None:
         return np.full(n_rows, np.nan)
-    missing = set(_BETADIST_VAR_COLS) - set(contingency.columns)
+    missing = {"stop_id", *_BETADIST_VAR_COLS} - set(contingency.columns)
     if missing:
         raise ValueError(
             "contingency is missing per-leaf beta-variance columns "
@@ -1264,14 +1299,30 @@ def attach_arm_uncertainty(
             "continuum_swr_replay.analysis.behavior.qvals_table --write` "
             "(carries betadist_var{1..6})."
         )
-    cont = contingency.drop_duplicates("stop_id")[["stop_id", *_BETADIST_VAR_COLS]]
+    if contingency["stop_id"].isna().any():
+        raise ValueError("contingency stop_id must not be missing")
+    n_unique = contingency["stop_id"].nunique(dropna=False)
+    if n_unique != len(contingency):
+        raise ValueError(
+            f"contingency has {len(contingency) - n_unique} duplicate stop_id "
+            "row(s); uncertainty alignment requires one row per stop"
+        )
+    cont = contingency[["stop_id", *_BETADIST_VAR_COLS]]
     merged = pd.DataFrame({"stop_id": np.asarray(stop_id), "arm": arm}).merge(
-        cont, on="stop_id", how="left"
+        cont, on="stop_id", how="left", validate="many_to_one", indicator="_qvals_merge"
     )
     var_mat = merged[_BETADIST_VAR_COLS].to_numpy(dtype=float)
     leaf = arm < 6
     leaf_idx = np.clip(arm, 0, 5).astype(int)
     row = np.arange(n_rows)
-    present = ~np.isnan(var_mat[:, 0])  # stop_id had a value row
+    present = merged["_qvals_merge"].eq("both").to_numpy()
+    if present.any() and not np.isfinite(var_mat[present]).all():
+        raise ValueError(
+            "matched contingency rows must carry finite betadist variance values"
+        )
+    if present.any() and (
+        (var_mat[present] < 0.0) | (var_mat[present] > 0.25)
+    ).any():
+        raise ValueError("matched Beta posterior variances must lie in [0, 0.25]")
     trunk_fill = np.where(present, 0.0, np.nan)
     return np.where(leaf, var_mat[row, leaf_idx], trunk_fill)
