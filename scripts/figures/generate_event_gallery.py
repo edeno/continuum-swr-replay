@@ -1060,7 +1060,7 @@ def _active_trip_at_time(trials: pd.DataFrame, t: float) -> pd.Series | None:
     This is a post-hoc visualization of the animal's run/dwell interval. It is
     deliberately separate from regression context. Destination/visit context
     becomes available at arrival, while reward-bearing context is withheld
-    until the separate reward-on or omission poke-out boundary.
+    until the separate reward-on or omission latency/departure boundary.
     """
     if trials is None or not len(trials):
         return None

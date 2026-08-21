@@ -134,11 +134,14 @@ def predict_arm_fractions(
     # preventing residuals from being constructed against a
     # contaminated softmax.
     required_cols = list(predictors) + [fraction_col]
-    has_nan = eat[required_cols].isna().any(axis=1)
-    events_with_nan = eat.loc[has_nan, event_col].unique()
+    required_values = eat[required_cols].to_numpy(dtype=float)
+    invalid_row = ~np.isfinite(required_values).all(axis=1)
+    events_with_nan = eat.loc[invalid_row, event_col].unique()
     is_dropped = eat[event_col].isin(events_with_nan)
 
     params = np.array([fit_result[f"coef_{p}"] for p in predictors])
+    if not np.isfinite(params).all():
+        raise ValueError("content-fit coefficients must be finite for prediction")
     X = eat[predictors].values.astype(float)
     eta = X @ params
 
@@ -271,8 +274,9 @@ def build_choice_dataset(
         - ``arm`` — candidate arm ID
         - ``chosen`` — 1 if the animal chose this arm, 0 otherwise
         - ``replay_frac`` — mean fraction across events in this stop
-        - ``visit_recency``, ``arm_never_visited``, ``cumulative_reward``,
-          ``reward_rate_arm_k10``, ``dist_to_arm``, ``is_same_patch``
+        - ``visit_recency``, ``arm_never_visited``, ``reward_rate_arm_k10``,
+          learned ``q_arm``, nominal ``p_reward_arm``, ``dist_to_arm``,
+          ``is_same_patch``
           — behavioral baseline predictors (from the last event in
           the stop)
         - ``n_events`` — number of replay events in this stop
@@ -342,6 +346,8 @@ def build_choice_dataset(
             "arm_never_visited",
             "cumulative_reward",
             "reward_rate_arm_k10",
+            "q_arm",
+            "p_reward_arm",
             "dist_to_arm",
             "arm_dist_rank",
             "is_same_patch",
@@ -361,6 +367,8 @@ def build_choice_dataset(
             arm_never_visited=("arm_never_visited", "last"),
             cumulative_reward=("cumulative_reward", "last"),
             reward_rate_arm_k10=("reward_rate_arm_k10", "last"),
+            q_arm=("q_arm", "last"),
+            p_reward_arm=("p_reward_arm", "last"),
             dist_to_arm=("dist_to_arm", "last"),
             arm_dist_rank=("arm_dist_rank", "last"),
             is_same_patch=("is_same_patch", "last"),
@@ -481,8 +489,9 @@ def fit_choice_model(
     # be ambiguous (1 of 7 vs 1 of 9). Mirrors the event-wise NaN
     # filtering in ``fit_conditional_poisson``.
     df = choice_df[required].copy()
-    has_nan = df.isna().any(axis=1)
-    bad_stops = df.loc[has_nan, stop_col].unique()
+    numeric = df[["chosen", *predictors]].to_numpy(dtype=float)
+    invalid = ~np.isfinite(numeric).all(axis=1) | df[stop_col].isna().to_numpy()
+    bad_stops = df.loc[invalid, stop_col].unique()
     df = df[~df[stop_col].isin(bad_stops)].reset_index(drop=True)
 
     # Drop stops where no arm is chosen (shouldn't happen after

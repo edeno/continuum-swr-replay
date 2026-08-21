@@ -2255,6 +2255,19 @@ def _plot_p_reward_arm_patch(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
+def _plot_reward_rate_arm_k10_patch(ax: Axes, ctx: _PanelContext) -> None:
+    """Mean recent reward rate across the patch's two reward-site arms."""
+    _draw_event_patch_heatmap(
+        ax,
+        ctx,
+        value_col="reward_rate_arm_k10_patch",
+        cmap_name=_PROBABILITY_CMAP,
+        vmin=0.0,
+        vmax=1.0,
+        label="mean leaf reward fraction\nprior ≤10 arm visits",
+    )
+
+
 def _plot_cumulative_reward_patch(ax: Axes, ctx: _PanelContext) -> None:
     """Rewards on this patch over the last ten completed trials.
 
@@ -2750,6 +2763,7 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     # Patch ladder (P0–P4) design matrix.
     "q_arm_patch": _plot_q_arm_patch,
     "p_reward_arm_patch": _plot_p_reward_arm_patch,
+    "reward_rate_arm_k10_patch": _plot_reward_rate_arm_k10_patch,
     "cumulative_reward_patch": _plot_cumulative_reward_patch,
     "is_current_patch": _plot_is_current_patch,
     "is_last_rewarded_patch_elsewhere": _plot_is_last_rewarded_patch_elsewhere,
@@ -2788,6 +2802,7 @@ PATCH_COVARIATE_PANELS: tuple[str, ...] = (
     "is_current_patch",
     "is_prev_patch",
     "is_last_rewarded_patch_elsewhere",
+    "reward_rate_arm_k10_patch",
     "cumulative_reward_patch",
     "p_reward_arm_patch",
     "q_arm_patch",
@@ -2908,7 +2923,7 @@ def _add_figure_semantic_legend(fig: Figure, panel_names: tuple[str, ...]) -> No
                     linestyle="none",
                     markerfacecolor="gold",
                     markeredgecolor="black",
-                    label="reward at goal arrival",
+                    label="reward delivery",
                 ),
                 Line2D(
                     [],
@@ -2975,13 +2990,14 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "q_arm": 1.4,
     "arm_uncertainty": 1.4,
     "visit_recency_demeaned": 1.4,
-    **{_c: 1.4 for _c in RECENCY_SPLINE_COLUMNS},
+    **dict.fromkeys(RECENCY_SPLINE_COLUMNS, 1.4),
     "arm_never_visited": 1.4,
     "is_current": 1.4,
     "is_prev": 1.4,
     "is_last_rewarded_elsewhere": 1.4,
     "q_arm_patch": 1.0,
     "p_reward_arm_patch": 1.0,
+    "reward_rate_arm_k10_patch": 1.0,
     "cumulative_reward_patch": 1.0,
     "is_current_patch": 1.0,
     "is_last_rewarded_patch_elsewhere": 1.0,

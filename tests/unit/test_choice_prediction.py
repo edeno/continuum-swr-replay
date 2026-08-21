@@ -99,6 +99,8 @@ def _make_minimal_tables(
                     "arm_never_visited": float(arm in {2, 4}),
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
+                    "q_arm": 0.5,
+                    "p_reward_arm": 0.5,
                     "dist_to_arm": 1.0,
                     "arm_dist_rank": 1.0,
                     "is_same_patch": 0,
@@ -242,6 +244,20 @@ class TestBuildChoiceDataset:
             stop_arms = set(ds.loc[ds["stop_id"] == stop_id, "arm"])
             assert current_arm not in stop_arms
 
+    def test_carries_learned_and_nominal_value_as_distinct_columns(self):
+        et, eat, st = _make_minimal_tables(
+            [{"stop_id": 1, "current_arm": 0, "next_arm": 3}]
+        )
+        eat["q_arm"] = eat["arm"] / 10.0
+        eat["p_reward_arm"] = 1.0 - eat["arm"] / 20.0
+
+        ds = build_choice_dataset(et, eat, st).set_index("arm")
+
+        np.testing.assert_allclose(ds["q_arm"], ds.index.to_numpy() / 10.0)
+        np.testing.assert_allclose(
+            ds["p_reward_arm"], 1.0 - ds.index.to_numpy() / 20.0
+        )
+
     def test_drops_stops_with_nan_next_arm(self):
         """Without a known next destination, ``chosen`` is undefined;
         such stops must be excluded."""
@@ -288,6 +304,8 @@ class TestBuildChoiceDataset:
                     "arm_never_visited": float(arm in {2, 4}),
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
+                    "q_arm": 0.5,
+                    "p_reward_arm": 0.5,
                     "dist_to_arm": 1.0,
                     "arm_dist_rank": 1.0,
                     "is_same_patch": 0,
@@ -345,6 +363,8 @@ class TestBuildChoiceDataset:
                     "arm_never_visited": float(arm in {2, 4}),
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
+                    "q_arm": 0.5,
+                    "p_reward_arm": 0.5,
                     "dist_to_arm": 1.0,
                     "arm_dist_rank": 1.0,
                     "is_same_patch": 0,
@@ -482,6 +502,17 @@ class TestPredictArmFractions:
         # arm 0 fraction ≈ 1.
         assert out.loc[out["arm"] == 0, "predicted_frac"].iloc[0] == pytest.approx(1.0)
 
+    def test_nonfinite_predictor_drops_whole_event(self):
+        eat = self._eat_for_softmax(n_events=2)
+        eat.loc[(eat["event_id"] == 1) & (eat["arm"] == 0), "is_prev"] = np.inf
+
+        out = predict_arm_fractions(
+            eat, {"coef_is_prev": 1.0}, predictors=["is_prev"]
+        )
+
+        assert out.loc[out["event_id"] == 1, "predicted_frac"].isna().all()
+        assert np.isfinite(out.loc[out["event_id"] == 2, "predicted_frac"]).all()
+
 
 # ── build_residualized_choice_dataset ──
 
@@ -585,3 +616,12 @@ class TestFitChoiceModel:
         df = self._choice_df_for_fit(n_stops=20)
         result = fit_choice_model(df, predictors=["nonexistent"])
         assert result is None
+
+    def test_nonfinite_predictor_drops_whole_stop(self):
+        df = self._choice_df_for_fit(n_stops=20)
+        df.loc[df["stop_id"] == 1, "replay_frac"] = np.inf
+
+        result = fit_choice_model(df, predictors=["replay_frac"])
+
+        assert result is not None
+        assert result["n_stops"] == 19

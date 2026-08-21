@@ -37,6 +37,21 @@ def test_choice_and_contrast_bases_add_novelty_alongside_recency():
     assert "arm_never_visited_patch" in specs.SWR_CONTRAST_CONTENT_BASEC_PATCH
 
 
+def test_primary_choice_and_patch_models_use_rate_and_learned_value():
+    choice = set(specs.MODEL_CHOICE["C_behavior"].predictors)
+    assert "q_arm" in choice
+    assert "reward_rate_arm_k10" in choice
+    assert "cumulative_reward" not in choice
+    # Nominal contingency is retained in the table as a distinct sensitivity
+    # variable, not co-fit with learned Q in the manuscript-aligned baseline.
+    assert "p_reward_arm" not in choice
+
+    for name in ("P2", "P3", "Pv"):
+        predictors = set(specs.MODEL_PATCH[name].predictors)
+        assert "reward_rate_arm_k10_patch" in predictors
+        assert "cumulative_reward_patch" not in predictors
+
+
 def test_novelty_timing_is_past_only():
     assert timing_of("arm_never_visited") == ["arm_never_visited"]
     assert timing_of("arm_never_visited_patch") == ["arm_never_visited_patch"]

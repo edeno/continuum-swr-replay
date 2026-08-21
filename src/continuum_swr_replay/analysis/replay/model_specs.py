@@ -332,8 +332,8 @@ _Mv = (*_M4, "p_reward_arm", "q_arm")
 # variance is +0.54 correlated with visit_recency by construction, but the effect
 # survives orthogonalization). See docs/behavior_models.md.
 # Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.02, ~5-6x smaller than
-# q_arm, which makes the per-session covariance singular; the _z form is well-scaled
-# (SD 1) and is what these rungs fit.
+# q_arm, which makes the per-session covariance singular; the _z form uses one
+# pooled SD over the six reward-site arms (not structural-zero trunks).
 _Mu = (*_M4, "arm_uncertainty_z")
 _Mvu = (*_M4, "q_arm", "arm_uncertainty_z")
 
@@ -422,8 +422,10 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 #
 # Predictors use ``_patch`` suffix to distinguish from the arm-level
 # versions — e.g., ``is_current_patch`` (= is the animal in this
-# patch?) and ``cumulative_reward_patch`` (= sum of rewards across
-# both wells in this patch over the last 10 trials).
+# patch?) and ``reward_rate_arm_k10_patch`` (= mean recent reward rate
+# across the two reward-site arms in the patch). This mirrors the arm
+# ladder's rate definition and avoids reintroducing a visit-frequency
+# confound through an accumulated reward count.
 #
 # There is no patch reward-memory rung, for the reason the arm ladder
 # has none (see the M5 note above). ``is_last_rewarded_patch`` overlaps
@@ -478,15 +480,15 @@ MODEL_PATCH: dict[str, ModelSpec] = {
     ),
     "P2": ModelSpec(
         name="P2",
-        predictors=("is_current_patch", "cumulative_reward_patch"),
-        description="+ patch-level reward history",
+        predictors=("is_current_patch", "reward_rate_arm_k10_patch"),
+        description="+ patch-level recent reward rate",
         parent="P1",
     ),
     "P3": ModelSpec(
         name="P3",
         predictors=(
             "is_current_patch",
-            "cumulative_reward_patch",
+            "reward_rate_arm_k10_patch",
             "swr_x_current_patch",
         ),
         description="+ SWR × current-patch interaction",
@@ -496,7 +498,7 @@ MODEL_PATCH: dict[str, ModelSpec] = {
         name="Pv",
         predictors=(
             "is_current_patch",
-            "cumulative_reward_patch",
+            "reward_rate_arm_k10_patch",
             "p_reward_arm_patch",
             "q_arm_patch",
         ),
@@ -576,15 +578,16 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # main effects.
 #
 # ``predictors=()`` for R0 means intercept-only (the offset is always
-# included by the fitter). ``is_after_reward`` is intentionally absent
-# from R1: it equals ``1 - is_after_omission`` wherever both are
-# defined, so including it with the intercept is rank-deficient.
+# included by the fitter). Current-outcome indicators are intentionally absent
+# from R1: they are post-outcome quantities and do not have a stable
+# trial-relative relationship to the bout-start reward-history covariates.
 #
-# R1 looks only one trial back. R2 adds ``reward_rate_trial_k10``
+# R1 uses the newest outcome observable by bout start. R2 adds
+# ``reward_rate_trial_k10``
 # (rewarded fraction of the last 10 trials) — the stop-level analog
 # of the content hierarchy's reward-history axis (``reward_rate_arm_k10``
 # at M3). R2 vs R1 tests whether replay *occurrence* tracks a deeper
-# reward history, not just the immediately preceding trial; it is
+# reward history, not just the newest known outcome; it is
 # also the confound check for whether an M3 content effect is partly
 # a rate effect. ``visit_recency`` has no stop-level analog (every
 # trial visits some arm), so the rate hierarchy stops at R2.
@@ -608,14 +611,12 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     ),
     "R1": ModelSpec(
         name="R1",
-        # ``reward_lag1`` (past reward indicator, strict goal-arrival cutoff) replaces
-        # the former ``is_after_omission`` (built from trial-start time, which can encode
-        # the FUTURE reward outcome during a stop's approach phase). Since
-        # ``reward_lag1 ~= 1 - is_after_omission``, this is a sign-flip REPARAMETERIZATION:
-        # the coefficient flips sign and changes everywhere (see docs/rate_models.md), not
-        # only on the ~15% approach stops where the causal-vs-leaky values disagree.
+        # ``reward_lag1`` is the most recent outcome already observable at
+        # bout start. It can be the arrived trip's outcome after its physical
+        # feedback boundary or the preceding known outcome before that boundary;
+        # it is past-only, but not a fixed trial-relative index.
         predictors=("reward_lag1", "is_after_switch"),
-        description="+ previous-trial reward (reward_lag1, past-only) / switch context",
+        description="+ most-recent-known reward at bout start / switch context",
         parent="R0",
     ),
     "R2": ModelSpec(
@@ -632,25 +633,22 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 
 # ── Lagged reward-kernel rate model ──
 #
-# A non-nested reparameterization of R2: instead of one immediate-trial
-# indicator (``is_after_omission``) plus a smoothed window
+# A non-nested reparameterization of R2: instead of one most-recent-known
+# indicator (``reward_lag1``) plus a smoothed window
 # (``reward_rate_trial_k10``) — which overlap (lag-1 sits inside the window)
 # and conflate two timescales — model the reward outcome at each of the last
 # ``N_REWARD_LAGS`` trials as its own predictor. Reading the per-lag rate-ratio
-# kernel separates the dwell-confounded immediate effect (``reward_lag1`` sets
-# the current stop's duration) from the dwell-clean reward *memory* at
-# ``reward_lag>=2`` (earlier trials don't set the current stop's duration).
-# ``reward_lag1`` also uses the strict goal-arrival cutoff, so it is always
-# past-only — unlike R1's ``is_after_omission`` (built from trial start time),
-# which can encode the *future* reward outcome for a stop during the approach
-# phase. This is why the two disagree on ~15% of stops (inter-trial stops).
+# kernel describes successive outcomes known by bout start. Lag 1 is the newest
+# known outcome, not uniformly the current or previous trial: the mapping changes
+# when the arrived trip crosses its physical outcome boundary. All lags are
+# past-only, but coefficient labels must not imply a fixed trial index.
 N_REWARD_LAGS = 10
 
 MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     name="Rlag",
     predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1))
     + ("is_after_switch",),
-    description="Lagged reward kernel: per-trial reward at lags 1-10 + switch",
+    description="Lagged reward kernel: 10 most-recent-known outcomes + switch",
     parent="R0",
 )
 
@@ -810,7 +808,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         0,
         False,
         False,
-        "+ previous reward (reward_lag1)",
+        "+ most-recent-known reward at bout start (reward_lag1)",
         "M0_const",
     ),
     "M2_rewhist": PerBinRateModelSpec(
@@ -977,8 +975,8 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 _CHOICE_BEHAVIOR = (
     "visit_recency",
     "arm_never_visited",
-    "cumulative_reward",
     "reward_rate_arm_k10",
+    "q_arm",
     "arm_dist_rank",  # ranked choice-set distance (identifiable; replaces the
     # quasi-separating raw dist_to_arm as the geometric baseline, dictionary §4)
 )
@@ -993,7 +991,7 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
     "C_behavior": ModelSpec(
         name="C_behavior",
         predictors=_CHOICE_BEHAVIOR,
-        description="Behavioural baseline (recency, reward history)",
+        description="Behavioural baseline (recency, recent reward rate, learned Q)",
         parent=None,
     ),
     "C_full": ModelSpec(
@@ -1272,10 +1270,9 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 # The trunk arms carry a structural zero for every leaf-derived belief covariate
 # (`q_arm`, `p_reward_arm`, `arm_uncertainty`), so including them adds rows that
 # say nothing about those covariates while manufacturing collinearity between
-# them: `q_arm` and `arm_uncertainty_z` correlate **+0.820 over nine arms and
-# -0.038 over the six leaves**, and a nine-arm design has condition number 14.7
-# and max VIF 12.1 against 3.66 and 3.35 leaf-only. The shared variance is
-# entirely "leaf versus trunk", which `arm_fe_6/7` already absorb.
+# them. Their persisted z units are now defined over the six reward-site arms;
+# the nine-arm design still retains trunk response rows, but structural zeros no
+# longer determine the scale of value/uncertainty coefficients.
 #
 # Restricted to the standalone contrast rungs. The arm-ladder belief rungs
 # (Mv/Mu/Mvu) are nested -- their parents are M4 and Mu, fitted over nine arms --

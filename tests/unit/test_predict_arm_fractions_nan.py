@@ -102,6 +102,8 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
                     "arm_never_visited": 0.0,
                     "cumulative_reward": 0.0,
                     "reward_rate_arm_k10": 0.0,
+                    "q_arm": 0.5,
+                    "p_reward_arm": 0.5,
                     "dist_to_arm": 0.0, "arm_dist_rank": 0.0,
                     "is_same_patch": 0,
                     "current_patch": 1,

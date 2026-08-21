@@ -9,19 +9,13 @@ multiplicative changes in event rate per second of immobility.
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``reward_lag1``, ``is_after_switch`` — does the immediately
-  preceding trial's context change event rate? ``reward_lag1`` (the
-  previous trial's reward, cut off at the **outcome** clock -- pump onset
-  when rewarded, else arrival + ``OMISSION_KNOWN_LATENCY_SEC``, via
-  ``_trial_outcome_times``; this docstring previously named the
-  goal-arrival clock, which is not what ``lagged_trial_rewards`` uses and
-  is less conservative than what ships) is the past-only predictor; it replaced ``is_after_omission`` for causal hygiene,
-  which was built from trial-start time and could encode the not-yet-
-  delivered outcome on approach-phase stops. Since
-  ``reward_lag1 ≈ 1 − is_after_omission``, the coefficient reads with the
-  OPPOSITE sign of the old omission effect (sign-flip reparameterization;
-  a positive ``reward_lag1`` = previous reward raises the rate). See
-  ``docs/rate_models.md``.
+- **R1**: + ``reward_lag1``, ``is_after_switch`` — does the newest outcome
+  physically observable by bout start, plus recent switch context, change the
+  event rate? ``reward_lag1`` is closed at the **outcome** clock: pump onset
+  when rewarded, otherwise arrival plus ``OMISSION_KNOWN_LATENCY_SEC`` capped
+  at departure. Before an arrived trip reaches that boundary, lag 1 remains
+  the preceding known outcome; afterward it names the arrived trip. It is
+  therefore past-only but not a fixed current- or previous-trial index.
 - **R2**: + ``reward_rate_trial_k10`` (rewarded fraction of the
   last 10 trials) — does event rate track a deeper reward history,
   beyond the single previous trial?

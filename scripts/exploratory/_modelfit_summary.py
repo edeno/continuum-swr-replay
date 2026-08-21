@@ -65,13 +65,13 @@ PATCH_ORDER = ["P0", "P1", "P2", "P3", "P4"]
 PATCH_PREDICTORS = [
     "is_current_patch",
     "is_last_rewarded_patch_elsewhere",
-    "cumulative_reward_patch",
+    "reward_rate_arm_k10_patch",
     "swr_x_current_patch",
     "swr_x_last_rewarded_patch_elsewhere",
 ]
 RATE_ORDER = ["R0", "R1", "R2"]
 RATE_PREDICTORS = [
-    "is_after_omission",
+    "reward_lag1",
     "is_after_switch",
     "reward_rate_trial_k10",
 ]

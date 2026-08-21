@@ -46,8 +46,9 @@ Every ladder runner enforces covariate timing at model-build via
 `analysis.replay.covariate_timing.assert_predictor_timing`; a rung whose predictor is
 post-outcome or future-referencing must be **declared descriptive**, else the run fails.
 
-- **Per-stop R1/R2** now use `reward_lag1` (past-only) instead of `is_after_omission` — a
-  sign-flip reparameterization (see [rate_models.md](rate_models.md)).
+- **Per-stop R1/R2** use `reward_lag1`, the newest physically known outcome at
+  bout start, instead of the post-outcome `is_after_omission` flag. This is not
+  a fixed current/previous-trial relabeling (see [rate_models.md](rate_models.md)).
 - **Descriptive rungs** (retained under an explicit *association* / *peri-switch
   alignment* claim, NOT a forward prediction — `DESCRIPTIVE_CONTENT_RUNGS` /
   `DESCRIPTIVE_RATE_RUNGS` in `model_specs.py`):
@@ -80,7 +81,8 @@ exclusive**, assigned by priority:
 
 `n_drop_qvals_gap` (mechanism B — a value covariate is missing on the ~896-event /
 2056-stop tail) → `n_drop_own_predictor_missing` (this model's own predictor NaN, e.g.
-`reward_rate_arm_k10`'s early-session mechanism-A gap) → `n_drop_zero_response`
+`reward_rate_arm_k10`'s early-session mechanism-A gap) → `n_drop_nonfinite`
+(a required value is present but invalid, such as ±Inf) → `n_drop_zero_response`
 (Σcount==0) → `n_drop_common_cohort_other` (union complete-case: dropped only for
 *another* rung's predictor) → `n_excluded_session` (data-level `min_*`/rank gates).
 
@@ -142,8 +144,8 @@ MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
 
 ```r
 R0    n_events ~ 1
-R1    n_events ~ is_after_omission + is_after_switch
-R2    n_events ~ is_after_omission + is_after_switch + reward_rate_trial_k10
+R1    n_events ~ reward_lag1 + is_after_switch
+R2    n_events ~ reward_lag1 + is_after_switch + reward_rate_trial_k10
 Rlag  n_events ~ REWK + is_after_switch
 ```
 
@@ -177,7 +179,7 @@ Mv   arm_count ~ [M4 terms] + p_reward_arm + q_arm
 ```r
 P0   patch_count ~ 1                       # null | strata(event_id)
 P1   patch_count ~ is_current_patch
-P2   patch_count ~ is_current_patch + cumulative_reward_patch
+P2   patch_count ~ is_current_patch + reward_rate_arm_k10_patch
 P3   patch_count ~ [P2 terms] + swr_x_current_patch
 Pv   patch_count ~ [P2 terms] + p_reward_arm_patch + q_arm_patch
 ```
@@ -192,12 +194,12 @@ Same conditional-Poisson forms on the contfrag tables, truncated ladders:
 
 ```r
 C_replay_only      chosen ~ replay_frac
-C_behavior         chosen ~ visit_recency + arm_never_visited + cumulative_reward
-                            + reward_rate_arm_k10 + arm_dist_rank
-C_full             chosen ~ visit_recency + arm_never_visited + cumulative_reward
-                            + reward_rate_arm_k10 + arm_dist_rank + replay_frac
-C_full_swr_split   chosen ~ visit_recency + arm_never_visited + cumulative_reward
-                            + reward_rate_arm_k10 + arm_dist_rank
+C_behavior         chosen ~ visit_recency + arm_never_visited + reward_rate_arm_k10
+                            + q_arm + arm_dist_rank
+C_full             chosen ~ visit_recency + arm_never_visited + reward_rate_arm_k10
+                            + q_arm + arm_dist_rank + replay_frac
+C_full_swr_split   chosen ~ visit_recency + arm_never_visited + reward_rate_arm_k10
+                            + q_arm + arm_dist_rank
                             + replay_frac_swr + replay_frac_non_swr
 ```
 
@@ -225,7 +227,7 @@ Shorthands / covariate blocks. The task dimensions are **the paper's variables
 (Comrie et al.), all from the **beta-bernoulli** model (HMM retired 2026-07-13):
 ```
 BASE      := bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4)) + reward_lag1 + REWK_prev + HISTCOS   # = M7r nuisance base
-REWK_prev := reward_lag2 + ... + reward_lag10          # former trials (dwell-clean)
+REWK_prev := reward_lag2 + ... + reward_lag10          # successively older known outcomes
 HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= trials_since_switch + is_post_switch + trials_since_switch:is_post_switch  # peri-switch broken-stick (one construct; see Note 1b)
 BLOCK     := trials_since_block_change  # learning across a contingency block
@@ -258,7 +260,7 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | model | formula (`count ~ … + offset(log exposure)`) | question |
 |---|---|---|
 | `S0_rate` | `is_swr + BASE` | Do SWR-coincident non-local events occur at a different **overall rate** than non-SWR ones, holding the shared time/reward/history structure? |
-| `S1_rew1` | `BASE + is_swr + is_swr:reward_lag1` | Does the **current (consummatory) reward** gate the rate **differently** for SWR vs non-SWR events? (headline reward-gating dissociation) |
+| `S1_rew1` | `BASE + is_swr + is_swr:reward_lag1` | Does the **most-recent-known outcome at bout start** gate the rate differently for SWR vs non-SWR events? |
 | `S2_base` | `is_swr * BASE` | Do the time-course, reward-history, and self-history each modulate the rate differently by SWR status? |
 | `S3_periswitch` | `is_swr * (BASE + PERISWITCH)` | Does the peri-switch ramp of rate differ by SWR? |
 | `S4_block` | `is_swr * (BASE + BLOCK)` | Does the across-block (learning) modulation differ by SWR? |
@@ -284,9 +286,10 @@ not separate value and decision covariates, so we follow it with the single beta
 value), r = −0.952 with the stay value and −0.890 with `q_chosen`, so a positive
 coefficient on `relval_x_current` means content sharpens onto the current arm when
 that arm's value is **low**). `q_chosen`/`q_arm` (belief
-mean) is a per-arm robustness re-param, not co-fit on the rate ladder. (3) The reward kernel is split `reward_lag1` (current,
-dwell-confounded) + `REWK_prev` (former, dwell-clean) so the current-vs-former gating
-contrast separates. (4) `beta_reward_entropy` is the mean per-leaf **Beta** differential entropy (from
+mean) is a per-arm robustness re-param, not co-fit on the rate ladder. (3) The reward kernel is split `reward_lag1` (newest
+outcome known at bout start) + `REWK_prev` (successively older known outcomes).
+Because feedback can occur during a visit, lag 1 is not uniformly a fixed
+current- or previous-trial label. (4) `beta_reward_entropy` is the mean per-leaf **Beta** differential entropy (from
 `betadist_α/β`, `qvals_table.add_beta_belief_entropy`) — the beta analog of the retired
 HMM `reward_entropy`; the per-arm belief *variance* `arm_uncertainty` is the separate
 content-uncertainty covariate (see the content ladder).
@@ -306,16 +309,21 @@ this rung is what tests that assumption directly.
 ## Phase-2 refit classification
 
 Which specs change under the phase-1/1.5 harmonization (→ coefficients move, true
-refit + report) vs are covariate-unchanged (→ **parity-only**: refit reproduces the
-design columns; verified by `_verify_harmonization_parity`, see
+refit + report) vs are covariate-unchanged (→ **parity-only**: refit should reproduce the
+design columns; checked by `_verify_harmonization_parity`, see
 [plan phase-2](../.claude/docs/plans/covariate-harmonization/phase-2-refit-verify.md)).
+
+> **Current materialized status (2026-08-20): not yet a parity pass.** The
+> key-aligned gate reproduces every declared unchanged column on shared rows but
+> fails coverage because a transient rebuild error omitted three Replay sessions
+> (218 → 215). Regenerate those sessions before treating any row as verified.
 
 | family | CHANGED (report old→new) | parity-only |
 |---|---|---|
 | MU uncertainty | MU_uncertainty (**done**) | — |
 | SWR power | ripple_power_z model (model `rpe`/`q_current`) | — |
 | Content arm | M3, M4, M5, M6, Mv | M0, M0a, M1, M2 |
-| Content patch | Pv | P0–P3 |
+| Content patch | P2, P3, Pv (patch reward rate replaces count) | P0–P1 |
 | Contfrag content | arm M3–M4 | arm M0–M2, patch P0–P2 |
 | Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
 | Per-bin rate (B) | — covariates unchanged; **verify** the 07-01 table regen / TMAX fix didn't move onset counts, else refit | all specs |

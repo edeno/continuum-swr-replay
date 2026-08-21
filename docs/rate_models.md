@@ -21,27 +21,18 @@ one-population null tested against its split.
 
 ## Family A — per-stop rate (the literature-comparable layer)
 
-- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` previous-trial reward/switch,
+- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` most-recent-known reward/switch,
   `R2` + recent reward rate, `Rlag` lagged reward kernel `reward_lag1..10` +
   `is_after_switch`) in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
 
-> **Causal-hygiene change (phase 4): R1/R2 now use `reward_lag1`, not
-> `is_after_omission`.** The old `is_after_omission` was built from the trial *start*
-> time, so on a stop's approach phase it could encode the trial's not-yet-delivered
-> reward outcome (a leak). `reward_lag1` (the previous trial's reward, strict
-> goal-arrival cutoff — the same past-only cutoff Family B uses) is always known before
-> the stop. Because `reward_lag1 ≈ 1 − is_after_omission`, **this is a sign-flip
-> reparameterization, not a re-cohorting**: the coefficient flips sign and its magnitude
-> shifts *everywhere* (the intercept absorbs the offset). Note the ~15% figure once
-> quoted here is a **coverage** gap, not a disagreement: measured 2026-08-18,
-> `reward_lag1` and `1 - is_after_omission` are equal on **all 89,645 stops where
-> both are defined**, but `reward_lag1` is defined on 104,956 stops (99.1%) against
-> 89,645 (84.7%), so 14.5% of stops carry one and not the other. So the new `reward_lag1`
-> coefficient reads with the *opposite* sign of the old `is_after_omission` one — a
-> **positive** `reward_lag1` coefficient means the previous reward *raises* the rate,
-> equivalent to the old **negative** omission-suppression result. Do not compare the two
-> coefficients at face value.
+> **Timing definition:** `reward_lag1` is the newest outcome physically known at
+> bout start. After the arrived trip's feedback boundary it names that trip;
+> before the boundary it remains the preceding known outcome. It is therefore
+> past-only but is not a fixed "current" or "previous" trial index. Lags 2–10
+> are successively older known outcomes under the same rule. Interpret the
+> coefficients as an outcome-history kernel closed at bout start, and do not
+> label lag 1 as uniformly consummatory or previous-trial reward.
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**
@@ -73,7 +64,7 @@ offset. Its limitation is exactly that offset — see below.
   | model | adds |
   | --- | --- |
   | `M0_const` | homogeneous Poisson baseline (`count ~ 1`) |
-  | `M1_rew1` | previous reward (`reward_lag1`) |
+  | `M1_rew1` | most-recent-known reward at bout start (`reward_lag1`) |
   | `M2_rewhist` | reward history kernel (`reward_lag1..10`) |
   | `M2r_rewrate` | continuous recent reward rate (alt encoding) |
   | `M3_hist` | self-history / autoregression (`onset_lag1..10`) |
@@ -262,9 +253,10 @@ What the ladder actually shows (218 sessions):
 - **The post-outcome gate truncates the time course a second time, unevenly by
   outcome.** `MU_uncertainty` carries the current trial's realized outcome, so
   `fit_uncertainty_rate` keeps only bins whose left edge is at or after
-  `outcome_known_time`. That boundary is pump onset on a rewarded trip but
-  poke-out on an omission, and poke-out is later — so the gate removes more of
-  an omission's early bins than a reward's.
+  `outcome_known_time`. That boundary is pump onset on a rewarded trip but the
+  conservative omission boundary (arrival + 0.30 s, capped at departure) on an
+  omitted trip. The two outcome classes can therefore retain different portions
+  of the stop and are audited separately before fitting.
 
   The consequence is a design property, not a bug in the gate. The spline's
   boundary knots stay at `(0, TMAX)` while no bin near `tc = 0` survives for

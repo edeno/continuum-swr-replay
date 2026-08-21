@@ -35,8 +35,8 @@ SESSION = ["animal", "day", "epoch"]
 ARM_P = ["is_current", "is_prev", "reward_rate_arm_k10", "visit_recency_demeaned",
          "is_last_rewarded_elsewhere"]
 PATCH_P = ["is_current_patch", "is_last_rewarded_patch_elsewhere",
-           "cumulative_reward_patch"]
-RATE_P = ["is_after_omission", "is_after_switch", "reward_rate_trial_k10"]
+           "reward_rate_arm_k10_patch"]
+RATE_P = ["reward_lag1", "is_after_switch", "reward_rate_trial_k10"]
 
 
 def _univariate(table, predictors, fit_one):
