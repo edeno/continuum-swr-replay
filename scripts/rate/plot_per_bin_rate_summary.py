@@ -263,8 +263,13 @@ def main() -> None:
     _panel_selfhistory(ax["hist"], df)
     _panel_ladder(ax["ladder"], df)
     _panel_covar(ax["covar"], df)
+    # Derive the cohort from the data actually plotted. A hardcoded count
+    # silently misreports the corpus whenever a session fails to regenerate
+    # (attach_is_swr_to_onsets excludes non-shared sessions).
+    n_sessions = onsets[["animal", "day", "epoch"]].drop_duplicates().shape[0]
     fig.suptitle(
-        "Per-bin replay-rate ladder (Family B): fitted effects by event type, 218 sessions",
+        "Per-bin replay-rate ladder (Family B): fitted effects by event type, "
+        f"{n_sessions} sessions",
         y=1.0,
     )
     fig.tight_layout()

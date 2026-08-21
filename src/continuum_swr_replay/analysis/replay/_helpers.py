@@ -8,6 +8,9 @@ arm/well/patch mappings, and generic DataFrame helpers.
 
 from __future__ import annotations
 
+import logging
+import warnings
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -23,6 +26,8 @@ from continuum_swr_replay.data_loaders.constants import (
 
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
+
+logger = logging.getLogger(__name__)
 
 # ── Trial-derived context ──
 
@@ -468,7 +473,8 @@ def add_trial_context(
 
     # Reward identity is not available merely because the animal arrived.
     # Advance this history at the physical outcome clock: exact pump onset for
-    # newly generated rewarded trials, poke-out for omissions, or the explicit
+    # newly generated rewarded trials, the canonical latency/departure boundary
+    # for omissions, or the explicit
     # conservative end-time fallback documented by _trial_outcome_times.
     reward_timestamps = outcome_times[is_reward]
     rewarded_wells = to_wells[is_reward]
@@ -869,6 +875,93 @@ def align_count_matrix(
     return out
 
 
+def assert_event_label_alignment(
+    source_ids: np.ndarray,
+    target_ids: np.ndarray,
+    *,
+    source_name: str,
+) -> None:
+    """Require one exact event-label set before response matrices are aligned.
+
+    ``align_count_matrix`` may legitimately fill a hard-count row when every bin
+    of a known event maps to a junction. It must not, however, conceal an event
+    missing from the source frame or an extra event from another/stale build.
+    Callers therefore pass the labels from *all* qualified source bins here,
+    before selecting only real-arm bins for counting.
+    """
+    source = np.asarray(source_ids, dtype=float)
+    target = np.asarray(target_ids, dtype=float)
+    if not np.isfinite(source).all() or not np.isfinite(target).all():
+        raise ValueError(
+            f"event-label alignment failed for {source_name}: labels must be finite"
+        )
+    if not np.equal(source, np.floor(source)).all() or not np.equal(
+        target, np.floor(target)
+    ).all():
+        raise ValueError(
+            f"event-label alignment failed for {source_name}: labels must be integral"
+        )
+    if len(np.unique(target)) != len(target):
+        raise ValueError(
+            "event-label alignment failed: target event table contains duplicate labels"
+        )
+    source_set = set(source.astype(np.int64))
+    target_set = set(target.astype(np.int64))
+    if source_set != target_set:
+        missing = sorted(target_set - source_set)[:10]
+        extra = sorted(source_set - target_set)[:10]
+        raise ValueError(
+            f"event-label alignment failed for {source_name}: missing target labels "
+            f"{missing}, extra source labels {extra}. The source frame and event "
+            "table must come from the same session and build."
+        )
+
+
+def assert_single_session_alignment(
+    source: pd.DataFrame,
+    target: pd.DataFrame,
+    *,
+    source_name: str,
+    session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
+) -> None:
+    """Require source and target frames to name the same single session.
+
+    Event labels are session-local integers. Exact label-set equality alone
+    cannot detect a stale source frame from another session whose labels happen
+    to overlap, so builders validate the natural session key before aligning
+    response matrices.
+    """
+    missing_source = [column for column in session_cols if column not in source]
+    missing_target = [column for column in session_cols if column not in target]
+    if missing_source or missing_target:
+        raise KeyError(
+            f"session alignment for {source_name} requires columns "
+            f"{session_cols}; missing from source={missing_source}, "
+            f"target={missing_target}"
+        )
+    if source.loc[:, list(session_cols)].isna().any().any() or target.loc[
+        :, list(session_cols)
+    ].isna().any().any():
+        raise ValueError(
+            f"session alignment for {source_name} requires nonmissing natural keys"
+        )
+
+    source_keys = source.loc[:, list(session_cols)].drop_duplicates()
+    target_keys = target.loc[:, list(session_cols)].drop_duplicates()
+    if len(source_keys) != 1 or len(target_keys) != 1:
+        raise ValueError(
+            f"session alignment for {source_name} requires exactly one session "
+            f"per frame; found source={len(source_keys)}, target={len(target_keys)}"
+        )
+    source_key = tuple(source_keys.iloc[0].tolist())
+    target_key = tuple(target_keys.iloc[0].tolist())
+    if source_key != target_key:
+        raise ValueError(
+            f"session alignment failed for {source_name}: source={source_key}, "
+            f"target={target_key}"
+        )
+
+
 def add_arm_fixed_effects(
     df: pd.DataFrame,
     arm_col: str = "arm",
@@ -942,7 +1035,12 @@ def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
     if "goal_arrival_time" in trials.columns:
         cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
         end = trials["end_time"].to_numpy(dtype=float)
-        missing = ~np.isfinite(cutoff)
+        if np.isinf(cutoff).any():
+            raise ValueError(
+                "goal_arrival_time contains infinity; corrupted physical timing "
+                "must not silently fall back to end_time"
+            )
+        missing = np.isnan(cutoff)
         return np.where(missing, end, cutoff)
     return trials["end_time"].to_numpy(dtype=float)
 
@@ -960,7 +1058,8 @@ def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     """Per-trial timestamp at which reward versus omission is observable.
 
     Newly generated trial tables carry ``outcome_known_time``: first pump onset
-    for a rewarded trial and destination poke-out for an omission. Older or
+    for a rewarded trial and ``min(arrival + OMISSION_KNOWN_LATENCY_SEC,
+    end_time)`` for an omission. Older or
     manually constructed frames lack that field; for those frames ``end_time``
     is an explicit conservative fallback for both outcomes. This fallback can
     delay rewarded history, but it cannot expose reward before delivery.
@@ -1089,10 +1188,13 @@ def attach_is_swr_to_onsets(
 ) -> pd.DataFrame:
     """Add a canonical ``is_swr`` column to the non-local onset rows.
 
-    Matches each non-local onset to its ``event_table`` event by within-stop
-    time rank (both are ordered by time within a stop and are 1:1 -- the
-    non-local onset count equals the event-table row count). SWR/MUA onset
-    rows get ``is_swr = NaN``. Returns a copy; does not mutate the input.
+    First freezes the intersection of natural session keys carried by both
+    tables, then matches each non-local onset to its ``event_table`` event by
+    exact ``(session, stop_id, onset_time == event_start)`` identity. Within
+    every retained session the sources must be a complete one-to-one partition.
+    Sessions present in only one artifact are excluded as an explicit
+    regeneration/build-coverage gap rather than blocking valid shared sessions.
+    SWR/MUA onset rows get ``is_swr = NaN``.
 
     Parameters
     ----------
@@ -1105,10 +1207,101 @@ def attach_is_swr_to_onsets(
     Returns
     -------
     pd.DataFrame
-        Copy of ``onset_df`` with an added ``is_swr`` column (the matched
-        boolean for ``event_type == "non_local"`` rows, ``NaN`` elsewhere).
+        Shared-session copy of ``onset_df`` with an added ``is_swr`` column (the
+        matched boolean for ``event_type == "non_local"`` rows, ``NaN``
+        elsewhere). ``attrs["event_session_alignment"]`` records shared and
+        excluded session keys and row counts.
     """
-    out = onset_df.copy()
+    session_presence = {
+        "onset": [column in onset_df for column in _SESSION_COLS],
+        "event": [column in event_table for column in _SESSION_COLS],
+    }
+    for name, presence in session_presence.items():
+        if any(presence) and not all(presence):
+            missing = [
+                column
+                for column, present in zip(_SESSION_COLS, presence, strict=True)
+                if not present
+            ]
+            raise KeyError(
+                f"{name} table has a partial natural session key; missing {missing}"
+            )
+    has_session_keys = all(session_presence["onset"]) and all(
+        session_presence["event"]
+    )
+    if all(session_presence["onset"]) != all(session_presence["event"]):
+        raise KeyError(
+            "onset and event tables must either both carry natural session keys "
+            f"{tuple(_SESSION_COLS)} or both be single-session fixtures"
+        )
+
+    if has_session_keys:
+        if onset_df[_SESSION_COLS].isna().any().any() or event_table[
+            _SESSION_COLS
+        ].isna().any().any():
+            raise ValueError("onset/event natural session keys must not be missing")
+        onset_sessions = pd.MultiIndex.from_frame(
+            onset_df[_SESSION_COLS].drop_duplicates()
+        )
+        event_sessions = pd.MultiIndex.from_frame(
+            event_table[_SESSION_COLS].drop_duplicates()
+        )
+        shared_sessions = onset_sessions.intersection(event_sessions, sort=False)
+        onset_only = onset_sessions.difference(event_sessions, sort=False)
+        event_only = event_sessions.difference(onset_sessions, sort=False)
+        if len(shared_sessions) == 0 and (len(onset_df) or len(event_table)):
+            raise ValueError(
+                "onset and event tables share no natural session keys; they are "
+                "from incompatible cohorts or builds"
+            )
+        onset_keys = pd.MultiIndex.from_frame(onset_df[_SESSION_COLS])
+        event_keys = pd.MultiIndex.from_frame(event_table[_SESSION_COLS])
+        out = onset_df.loc[onset_keys.isin(shared_sessions)].copy()
+        event_shared = event_table.loc[event_keys.isin(shared_sessions)].copy()
+        merge_keys = [*_SESSION_COLS, "stop_id"]
+    else:
+        # Small direct unit fixtures historically omit natural keys. Treat both
+        # complete frames as one implicit session and retain strict whole-frame
+        # equality; never mix a keyed frame with an unkeyed one above.
+        out = onset_df.copy()
+        event_shared = event_table.copy()
+        shared_sessions = ["<implicit-single-session>"] if len(out) or len(event_shared) else []
+        onset_only = []
+        event_only = []
+        merge_keys = ["stop_id"]
+
+    alignment_audit = {
+        "n_onset_sessions": int(len(shared_sessions) + len(onset_only)),
+        "n_event_sessions": int(len(shared_sessions) + len(event_only)),
+        "n_shared_sessions": int(len(shared_sessions)),
+        "onset_only_sessions": tuple(map(tuple, onset_only)),
+        "event_only_sessions": tuple(map(tuple, event_only)),
+        "n_onset_rows_input": int(len(onset_df)),
+        "n_event_rows_input": int(len(event_table)),
+        "n_onset_rows_retained": int(len(out)),
+        "n_event_rows_retained": int(len(event_shared)),
+    }
+    if len(onset_only) or len(event_only):
+        message = (
+            "attach_is_swr_to_onsets excluded non-shared artifact sessions; "
+            f"onset_only={alignment_audit['onset_only_sessions']}, "
+            f"event_only={alignment_audit['event_only_sessions']}. Regenerate "
+            "the missing sessions before full-corpus inference."
+        )
+        # The warning is the API-level signal, but every rate runner installs
+        # ``filterwarnings("ignore", category=RuntimeWarning)`` at import, so a
+        # warning alone would drop these sessions with no trace in the log. The
+        # cohort actually fitted is a scientific fact, not a nuisance.
+        logger.error(
+            "%s Fitting %d of %d onset sessions (%d of %d onset rows).",
+            message,
+            alignment_audit["n_shared_sessions"],
+            alignment_audit["n_onset_sessions"],
+            alignment_audit["n_onset_rows_retained"],
+            alignment_audit["n_onset_rows_input"],
+        )
+        warnings.warn(message, RuntimeWarning, stacklevel=2)
+
     # object dtype holds the matched booleans alongside NaN for SWR/MUA rows
     # without the float coercion pandas now warns about.
     out["is_swr"] = pd.Series(np.nan, index=out.index, dtype="object")
@@ -1119,32 +1312,52 @@ def attach_is_swr_to_onsets(
     # and because the shifted ranks still all find *a* row, the match-rate
     # guard below stays silent through it. Matching on time contains the
     # failure to the row that is actually missing.
-    ev = event_table[["stop_id", "event_start", "is_swr"]].copy()
+    ev = event_shared[[*merge_keys, "event_start", "is_swr"]].copy()
     nl = out[out["event_type"] == "non_local"].copy()
+    if has_session_keys:
+        onset_counts = nl.groupby(_SESSION_COLS, sort=False).size()
+        event_counts = ev.groupby(_SESSION_COLS, sort=False).size()
+        counts = pd.concat(
+            [onset_counts.rename("onsets"), event_counts.rename("events")], axis=1
+        ).fillna(0)
+        bad_counts = counts[counts["onsets"] != counts["events"]]
+    else:
+        bad_counts = pd.DataFrame() if len(nl) == len(ev) else pd.DataFrame(
+            {"onsets": [len(nl)], "events": [len(ev)]}, index=["implicit"]
+        )
+    if len(bad_counts):
+        raise ValueError(
+            "attach_is_swr_to_onsets requires an exact non-local onset/event "
+            "partition within every shared session; mismatched counts: "
+            f"{bad_counts.astype(int).to_dict(orient='index')}"
+        )
+    nl["_onset_order"] = np.arange(len(nl))
     merged = nl.merge(
         ev.rename(columns={"event_start": "onset_time"}),
-        on=["stop_id", "onset_time"],
+        on=[*merge_keys, "onset_time"],
         how="left",
         suffixes=("", "_ev"),
         # Duplicate (stop_id, onset_time) keys would expand rows and misalign
         # the positional assignment below.
         validate="one_to_one",
     )
-    # A gross mismatch means the onset table and event_table were built from
+    # Any mismatch means the onset table and event_table were built from
     # divergent non-local/speed thresholds or decodes -- fail loud rather than
     # silently leave is_swr unlabelled downstream. On the shipped artifacts the
-    # time join matches exactly, so this tolerance is slack, not an expected
-    # boundary loss.
+    # time join matches exactly; unmatched rows would make SWR and non-SWR fail
+    # to partition the pooled non-local population.
+    merged = merged.sort_values("_onset_order", kind="stable")
     matched = merged["is_swr_ev"].notna()
-    if len(merged) and matched.mean() < 0.99:
+    if len(merged) and not matched.all():
         raise ValueError(
-            "attach_is_swr_to_onsets: only "
-            f"{matched.mean():.1%} of non-local onsets matched an event_table "
-            "row by (stop_id, within-stop rank). The onset table and "
+            "attach_is_swr_to_onsets requires every non-local onset to be exactly "
+            f"matched; {int((~matched).sum())}/{len(matched)} were unmatched by "
+            "(session, stop_id, onset_time). The onset table and "
             "event_table must be built from the same non-local/speed thresholds "
             "and decodes."
         )
     out.loc[nl.index, "is_swr"] = merged["is_swr_ev"].to_numpy()
+    out.attrs["event_session_alignment"] = alignment_audit
     return out
 
 

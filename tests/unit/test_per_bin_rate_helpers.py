@@ -21,7 +21,7 @@ from continuum_swr_replay.analysis.replay import (
     raised_cosine_history_basis,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.table_io import read_table, table_exists
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -219,7 +219,7 @@ def session_slice():
         for name in ("event_onset_table", "event_table", "stop_table")
     }
     for p in paths.values():
-        if not p.exists():
+        if not table_exists(p):
             pytest.skip(f"missing {p}")
     onset = read_table(paths["event_onset_table"])
     event = read_table(paths["event_table"])
@@ -247,7 +247,7 @@ def test_attach_is_swr_match_rate(session_slice):
     tagged = attach_is_swr_to_onsets(onset_s, event_s)
 
     nl = tagged[tagged.event_type == "non_local"]
-    assert nl["is_swr"].notna().mean() >= 0.999
+    assert nl["is_swr"].notna().all()
 
     # Non-local SWR / no-SWR onset counts match the stop-table split totals.
     n_swr = int((nl.is_swr == True).sum())  # noqa: E712
@@ -257,6 +257,86 @@ def test_attach_is_swr_match_rate(session_slice):
 
     # SWR/MUA onset rows are left untagged.
     assert tagged.loc[tagged.event_type != "non_local", "is_swr"].isna().all()
+
+
+def test_attach_is_swr_requires_exact_nonlocal_partition():
+    onsets = pd.DataFrame(
+        {
+            "stop_id": [1, 1],
+            "event_type": ["non_local", "non_local"],
+            "onset_time": [1.0, 2.0],
+        }
+    )
+    events = pd.DataFrame(
+        {"stop_id": [1], "event_start": [1.0], "is_swr": [True]}
+    )
+
+    with pytest.raises(ValueError, match="exact.*partition|unmatched"):
+        attach_is_swr_to_onsets(onsets, events)
+
+
+def test_attach_is_swr_freezes_shared_sessions_then_is_strict_within_each():
+    """An onset-only session is audited/excluded, not allowed to block a valid one."""
+    onsets = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b"],
+            "day": [1, 1, 2],
+            "epoch": ["e", "e", "e"],
+            "stop_id": [1, 1, 2],
+            "event_type": ["non_local", "SWR", "non_local"],
+            "onset_time": [1.0, 1.1, 2.0],
+        }
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a"],
+            "day": [1],
+            "epoch": ["e"],
+            "stop_id": [1],
+            "event_start": [1.0],
+            "is_swr": [True],
+        }
+    )
+
+    with pytest.warns(RuntimeWarning, match="onset_only"):
+        tagged = attach_is_swr_to_onsets(onsets, events)
+
+    assert tagged[["animal", "day", "epoch"]].drop_duplicates().to_records(
+        index=False
+    ).tolist() == [("a", 1, "e")]
+    nonlocal_rows = tagged[tagged["event_type"] == "non_local"]
+    assert nonlocal_rows["is_swr"].tolist() == [True]
+    audit = tagged.attrs["event_session_alignment"]
+    assert audit["n_shared_sessions"] == 1
+    assert audit["onset_only_sessions"] == (("b", 2, "e"),)
+    assert audit["n_onset_rows_input"] == 3
+    assert audit["n_onset_rows_retained"] == 2
+
+
+def test_attach_is_swr_rejects_mismatch_inside_a_shared_session():
+    onsets = pd.DataFrame(
+        {
+            "animal": ["a", "a"],
+            "day": [1, 1],
+            "epoch": ["e", "e"],
+            "stop_id": [1, 1],
+            "event_type": ["non_local", "non_local"],
+            "onset_time": [1.0, 2.0],
+        }
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a"],
+            "day": [1],
+            "epoch": ["e"],
+            "stop_id": [1],
+            "event_start": [1.0],
+            "is_swr": [True],
+        }
+    )
+
+    with pytest.raises(ValueError, match="within every shared session"):
+        attach_is_swr_to_onsets(onsets, events)
 
 
 def test_attach_is_swr_does_not_mutate(session_slice):

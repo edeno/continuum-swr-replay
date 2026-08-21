@@ -87,6 +87,12 @@ from ._helpers import (
     arm_to_patch as _arm_to_patch,
 )
 from ._helpers import (
+    assert_event_label_alignment as _assert_event_label_alignment,
+)
+from ._helpers import (
+    assert_single_session_alignment as _assert_single_session_alignment,
+)
+from ._helpers import (
     assign_bout as _assign_bout,
 )
 from ._helpers import (
@@ -977,9 +983,10 @@ def build_stop_table(
     per_bout["stop_end"] = bout_ends
     per_bout["immobility_time"] = bout_ends - bout_starts
     per_bout["reward_rate_trial_k10"] = _recent_trial_reward_rate(bout_starts, trials)
-    # Per-lag reward outcomes (reward_lag1..N): the immediate previous trial
-    # (lag1, dwell-confounded) through earlier trials (lag>=2, dwell-clean) —
-    # the kernel parameterization fit by the Rlag rate model.
+    # Per-lag reward outcomes (reward_lag1..N), ordered from the most recent
+    # outcome already observable at bout start through earlier known outcomes.
+    # Lag 1 is deliberately not called "the previous trial": after feedback it
+    # can be the just-arrived trip; before feedback it remains the prior outcome.
     lag_rewards = _lagged_trial_rewards(bout_starts, trials, N_REWARD_LAGS)
     for j in range(N_REWARD_LAGS):
         per_bout[f"reward_lag{j + 1}"] = lag_rewards[:, j]
@@ -1298,6 +1305,13 @@ def build_event_arm_table(
     nonlocal_prob_real = nl["nonlocal_prob"].to_numpy()[real_mask]
     nonlocal_prob_all = nl["nonlocal_prob"].to_numpy()
     event_id_all = nl["non_local_event"].to_numpy()
+
+    _assert_single_session_alignment(dot, event_table, source_name="NonLocal dot")
+    _assert_event_label_alignment(
+        event_id_all,
+        event_table["non_local_event"].to_numpy(),
+        source_name="NonLocal qualified bins",
+    )
 
     ids_real, counts_hard = arm_count_hard(
         nonlocal_prob_real, arm_map_real, event_id_real, n_arms=n_arms, threshold=0.0

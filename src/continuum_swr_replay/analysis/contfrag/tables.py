@@ -35,6 +35,8 @@ from ..replay._helpers import (
     align_count_matrix,
     align_posterior_to_dot,
     arm_to_patch,
+    assert_event_label_alignment,
+    assert_single_session_alignment,
     assign_bout,
     attach_contingency_value_block,
     build_well_to_arm_map,
@@ -596,6 +598,15 @@ def build_contfrag_event_arm_table(
     weights_real = np.ones(real_mask.sum())
     weights_all = np.ones(len(ev))
     event_id_all = ev[event_col].to_numpy()
+
+    assert_single_session_alignment(
+        dot, event_table, source_name=f"ContFrag {event_source} dot"
+    )
+    assert_event_label_alignment(
+        event_id_all,
+        event_table[event_col].to_numpy(),
+        source_name=f"ContFrag {event_source} qualified bins",
+    )
 
     ids_real, counts_hard = arm_count_hard(
         weights_real, arm_map_real, event_id_real, n_arms=n_arms, threshold=0.0
