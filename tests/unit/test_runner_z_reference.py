@@ -10,9 +10,11 @@ reproducible. This locks that in.
 from __future__ import annotations
 
 import argparse
+import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.standardization import attach_standardized
 from scripts.content import fit_swr_contrast_content as mod
@@ -87,3 +89,32 @@ def test_z_reference_skips_absent_columns():
     frame = pd.DataFrame({"hmm_rpe": [1.0, 2.0, 3.0]})
     ref = mod._z_reference(frame, ["hmm_rpe", "not_a_column"])
     assert set(ref) == {"hmm_rpe"}
+
+
+def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
+    tmp_path, monkeypatch
+):
+    """The contrast runner cannot consume the shipped nine-arm uncertainty unit."""
+    frame = pd.DataFrame(
+        {
+            "arm_uncertainty": [1.0, 2.0],
+            "arm_uncertainty_z": [-1.0, 1.0],
+        }
+    )
+    frame.to_pickle(tmp_path / "event_arm_table.pkl")
+    (tmp_path / "standardization_reference.json").write_text(
+        json.dumps({"arm_uncertainty": {"mean": 1.5, "std": 0.5}})
+    )
+    monkeypatch.setattr(mod, "RC", tmp_path)
+
+    with pytest.raises(ValueError, match="stale or invalid"):
+        mod._assemble_arm()
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [([np.nan, np.nan], "no finite values"), ([1.0, np.inf], "infinity")],
+)
+def test_fit_time_reference_rejects_invalid_support(values, message):
+    with pytest.raises(ValueError, match=message):
+        mod._moment(np.asarray(values))

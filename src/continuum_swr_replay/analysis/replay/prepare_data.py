@@ -83,7 +83,7 @@ from continuum_swr_replay.analysis.replay.tables import (
     build_event_table,
     build_stop_table,
 )
-from continuum_swr_replay.data_loaders.constants import NWB_FILES
+from continuum_swr_replay.data_loaders.constants import NWB_FILES, WELL_ARMS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import write_table
 from continuum_swr_replay.types import SessionDataKeys
@@ -382,10 +382,15 @@ def _assert_value_block_matches_source(
     port_cols = [f"q_port{i}" for i in range(6)]
     if not set(port_cols).issubset(contingency.columns):
         return
+    if contingency["stop_id"].isna().any() or contingency["stop_id"].duplicated().any():
+        raise ValueError(
+            "qvals source must contain exactly one nonmissing row per stop_id "
+            "before event-arm value validation"
+        )
     leaf = event_arm_table.loc[
         event_arm_table["arm"] <= 5, ["stop_id", "arm", "q_arm"]
     ]
-    source = contingency.drop_duplicates("stop_id").set_index("stop_id")[port_cols]
+    source = contingency.set_index("stop_id")[port_cols]
     joined = leaf.join(source, on="stop_id")
     port_values = joined[port_cols].to_numpy(dtype=float)
     comparable = np.isfinite(port_values).all(axis=1) & np.isfinite(
@@ -585,13 +590,24 @@ def main():
     # persisted so the transform is reproducible and auditable. NB: this is NOT the
     # fit-time _z the is_swr-contrast runners compute over their event/stop cohort —
     # those are a different scope and are intentionally left untouched.
+    # All four quantities are learned/defined on the six reward-site arms.
+    # Structural trunk rows remain in the model table, but they must not shrink
+    # the scientific unit by contributing zeros to the reference moments.
+    leaf_support = event_arm_table_all["arm"].isin(WELL_ARMS)
     event_arm_table_all, z_reference = attach_standardized(
-        event_arm_table_all, EVENT_ARM_STANDARDIZED_COLS
+        event_arm_table_all,
+        EVENT_ARM_STANDARDIZED_COLS,
+        support_mask=leaf_support,
+        support_label="leaf_arms",
     )
     save_reference(z_reference, OUTPUT_DIR / "standardization_reference.json")
     # Rebuild-completeness guard: a future refactor must not silently drop the _z
     # columns (the exact regression this phase fixes).
-    assert_standardized_present(event_arm_table_all, EVENT_ARM_STANDARDIZED_COLS)
+    assert_standardized_present(
+        event_arm_table_all,
+        EVENT_ARM_STANDARDIZED_COLS,
+        support_mask=leaf_support,
+    )
     _assert_value_block_matches_source(event_arm_table_all, contingency)
     logging.info(
         "standardized event_arm _z columns: %s",

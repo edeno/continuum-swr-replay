@@ -130,6 +130,12 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
             "Missing uncertainty-content result artifacts. Run the analysis first: "
             + ", ".join(missing)
         )
+    audit = json.loads(paths["audit"].read_text())
+    if audit.get("arm_standardization_support") != "leaf_arms":
+        raise ValueError(
+            "Uncertainty-content results predate leaf-support standardization. "
+            "Regenerate the canonical event-arm table, Mu fit, and analysis bundle."
+        )
     return {
         "trial": pd.read_pickle(paths["trial"]),
         "profiles": pd.read_csv(paths["profiles"]),
@@ -138,7 +144,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
         "mu_animals": pd.read_csv(paths["mu_animals"]),
         "mu_overall": pd.read_csv(paths["mu_overall"]),
         "horserace_summary": pd.read_csv(paths["horserace_summary"]),
-        "audit": json.loads(paths["audit"].read_text()),
+        "audit": audit,
     }
 
 

@@ -7,8 +7,8 @@ table. A stale reference (means/SDs left over from the pre-encode table) would m
 plan's ``test_z_reference_refreshed`` guards.
 
 Durable formulation: rather than diff against transient pre-encode backup values, assert
-the persisted reference **equals the current (encoded) table's** ``np.nanmean`` /
-``np.nanstd`` — a reference computed before the encode would not match — and that
+the persisted reference **equals the current leaf-support table's** ``np.nanmean`` /
+``np.nanstd`` — structural-zero trunks do not identify the scientific unit — and that
 ``<col>_z`` is exactly ``(raw - ref_mean) / ref_std``. Marked slow; skips if the
 materialized tables are absent.
 """
@@ -62,7 +62,14 @@ def test_reference_matches_encoded_table_moments():
     """
     ea, ref = _load()
     assert _ENCODED_COL in ref, f"{_ENCODED_COL} missing from reference"
-    x = ea[_ENCODED_COL].to_numpy(dtype=float)
+    if ref[_ENCODED_COL].get("support") != "leaf_arms":
+        pytest.skip(
+            "materialized reference predates leaf-support scaling; regenerate tables"
+        )
+    leaf = ea["arm"].isin(range(6))
+    x = ea.loc[leaf, _ENCODED_COL].to_numpy(dtype=float)
+    assert ref[_ENCODED_COL]["support"] == "leaf_arms"
+    assert ref[_ENCODED_COL]["n_reference_rows"] == int(np.isfinite(x).sum())
     assert np.nanmean(x) == pytest.approx(ref[_ENCODED_COL]["mean"], rel=1e-9, abs=1e-9)
     assert np.nanstd(x) == pytest.approx(ref[_ENCODED_COL]["std"], rel=1e-9, abs=1e-9)
 

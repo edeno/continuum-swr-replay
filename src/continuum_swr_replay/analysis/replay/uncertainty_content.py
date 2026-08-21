@@ -671,9 +671,9 @@ def within_arm_horserace(
     and geometry, so the uncertainty coefficient is identified from *within-arm*
     variation over the session — the confound-free frame in which beta value and
     beta uncertainty separate cleanly (they are collinear only against the arm
-    dummies). NB: ``arm_uncertainty_z`` is pre-standardized over *all* arms (table
-    ``EVENT_ARM_STANDARDIZED_COLS``) while the others are standardized over this
-    non-current-leaf subset, so the "_z" SD populations differ slightly.
+    dummies). ``arm_uncertainty_z`` is pre-standardized over the six reward-site
+    leaf arms in the pooled event-arm table; the other predictors use this
+    analysis's non-current-leaf subset, so their SD populations still differ.
 
     Parameters
     ----------

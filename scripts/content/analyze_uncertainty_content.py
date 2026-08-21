@@ -22,6 +22,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
 from continuum_swr_replay.analysis.replay.uncertainty_content import (
     build_trial_leaf_table,
     hierarchical_quartile_profile,
@@ -234,18 +238,36 @@ def main() -> None:
     event_arm_path = args.data_dir / "event_arm_table.pkl"
     stop_path = args.data_dir / "stop_table.pkl"
     qvals_path = args.data_dir / "models_per_bin_rate" / "qvals_table.pkl"
+    standardization_path = args.data_dir / "standardization_reference.json"
     mu_path = args.data_dir / "models" / "Mu.pkl"
     for path in [event_arm_path, stop_path, qvals_path]:
         if not table_exists(path):
             raise FileNotFoundError(path)
     if not mu_path.exists():
         raise FileNotFoundError(mu_path)
+    if not standardization_path.exists():
+        raise FileNotFoundError(
+            f"{standardization_path} is required to validate the uncertainty unit"
+        )
 
     LOGGER.info("Loading canonical tables")
     event_arm = read_table(event_arm_path)
     stops = read_table(stop_path)
     qvals = read_table(qvals_path)
     mu = pd.read_pickle(mu_path)
+    try:
+        assert_standardized_matches_reference(
+            event_arm,
+            ("arm_uncertainty",),
+            load_reference(standardization_path),
+            support_label="leaf_arms",
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "The uncertainty-content inputs use a stale or invalid "
+            "arm_uncertainty_z unit. Regenerate the canonical event-arm table, "
+            f"leaf-support reference, and Mu fit before analysis: {exc}"
+        ) from exc
 
     LOGGER.info("Building trial x reward-well table")
     trial_leaf, audit = build_trial_leaf_table(event_arm, stops, qvals)
@@ -263,6 +285,7 @@ def main() -> None:
     audit.update(
         {
             "analysis_cohort": args.cohort,
+            "arm_standardization_support": "leaf_arms",
             "n_analysis_sessions": int(trial_leaf["session_id"].nunique()),
             "n_analysis_trials": int(
                 trial_leaf[["session_id", "trial_number_by_epoch"]]

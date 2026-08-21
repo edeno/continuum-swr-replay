@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_matches_reference,
     assert_standardized_present,
     attach_standardized,
     load_reference,
@@ -101,22 +102,26 @@ def test_assert_present_allows_zero_variance_all_nan():
     assert_standardized_present(df, ["c"])  # no raise
 
 
-@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_assert_present_fires_on_all_nan_source():
     """An entirely-NaN source (a failed upstream join) must NOT be waved through as if
     it were a legitimate zero-variance column."""
     df = pd.DataFrame({"q": [np.nan, np.nan, np.nan]})
-    attach_standardized(df, ["q"])
-    assert df["q_z"].isna().all()
-    with pytest.raises(RuntimeError, match="entirely NaN"):
-        assert_standardized_present(df, ["q"])
+    with pytest.raises(ValueError, match="no finite values"):
+        attach_standardized(df, ["q"])
 
 
 def test_apply_missing_reference_column_raises():
     """A partial/stale reference (missing a requested column) must fail loud, not
     silently recompute that column's mean/SD."""
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
-    partial = {"a": {"mean": 2.0, "std": 1.0}}  # 'b' absent
+    partial = {
+        "a": {
+            "mean": 2.0,
+            "std": 1.0,
+            "support": "all_rows",
+            "n_reference_rows": 3,
+        }
+    }  # 'b' absent
     with pytest.raises(KeyError, match="'b'"):
         attach_standardized(df, ["a", "b"], reference=partial)
 
@@ -133,3 +138,129 @@ def test_reference_applied_differs_from_recompute_on_subset():
     # Same raw values, but different means/SDs -> different _z (this is why the parity
     # gate must apply the frozen reference, not recompute per session).
     assert not np.allclose(via_ref["a_z"].to_numpy(), per_subset["a_z"].to_numpy())
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf])
+def test_nonfinite_source_fails_loudly(bad):
+    """Infinity is corrupted input, not ignorable missingness."""
+    df = pd.DataFrame({"a": [1.0, 2.0, bad]})
+    with pytest.raises(ValueError, match="non-finite.*a"):
+        attach_standardized(df, ["a"])
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        {"a": {"mean": np.inf, "std": 1.0}},
+        {"a": {"mean": 0.0, "std": np.inf}},
+        {"a": {"mean": 0.0, "std": np.nan}},
+    ],
+)
+def test_nonfinite_reference_fails_loudly(reference):
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    with pytest.raises(ValueError, match="non-finite standardization reference"):
+        attach_standardized(df, ["a"], reference=reference)
+
+
+def test_support_mask_sets_reference_on_scientific_support():
+    """Structural-zero trunk rows must not set a leaf-identified coefficient unit."""
+    df = pd.DataFrame(
+        {
+            "arm": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+            "uncertainty": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0, 0.0],
+        }
+    )
+    leaf = df["arm"].lt(6).to_numpy()
+    out, ref = attach_standardized(
+        df,
+        ["uncertainty"],
+        support_mask=leaf,
+        support_label="leaf_arms",
+    )
+
+    np.testing.assert_allclose(
+        np.nanstd(out.loc[leaf, "uncertainty_z"].to_numpy(dtype=float)), 1.0
+    )
+    assert ref["uncertainty"]["support"] == "leaf_arms"
+    assert ref["uncertainty"]["n_reference_rows"] == 6
+
+
+def test_apply_rejects_legacy_reference_missing_support_metadata():
+    frame = pd.DataFrame({"q": [0.1, 0.2, 0.3]})
+    legacy = {"q": {"mean": 0.2, "std": 0.1}}
+
+    with pytest.raises(ValueError, match="missing required metadata"):
+        attach_standardized(
+            frame,
+            ["q"],
+            reference=legacy,
+            support_label="leaf_arms",
+        )
+
+
+def test_empty_support_fails_without_emitting_nan_reference():
+    frame = pd.DataFrame({"q": [0.1, 0.2, 0.3]})
+
+    with pytest.raises(ValueError, match="at least one row"):
+        attach_standardized(frame, ["q"], support_mask=[False, False, False])
+
+
+def test_completeness_guard_uses_same_scientific_support():
+    frame = pd.DataFrame(
+        {"arm": list(range(9)), "q": [0.5] * 6 + [0.0, 0.0, 0.0]}
+    )
+    leaf = frame["arm"].lt(6)
+    attach_standardized(frame, ["q"], support_mask=leaf)
+
+    assert frame["q_z"].isna().all()
+    assert_standardized_present(frame, ["q"], support_mask=leaf)
+
+
+def test_materialized_z_must_match_frozen_scientific_support():
+    """Correct names cannot hide moments computed on the wrong candidate rows."""
+    raw = pd.DataFrame(
+        {
+            "arm": list(range(9)),
+            "uncertainty": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0, 0.0],
+        }
+    )
+    leaf = raw["arm"].lt(6)
+    current, reference = attach_standardized(
+        raw.copy(),
+        ["uncertainty"],
+        support_mask=leaf,
+        support_label="leaf_arms",
+    )
+    assert_standardized_matches_reference(
+        current,
+        ["uncertainty"],
+        reference,
+        support_label="leaf_arms",
+    )
+
+    stale, _ = attach_standardized(raw.copy(), ["uncertainty"])
+    with pytest.raises(ValueError, match="do not match.*leaf_arms"):
+        assert_standardized_matches_reference(
+            stale,
+            ["uncertainty"],
+            reference,
+            support_label="leaf_arms",
+        )
+
+
+def test_materialized_z_guard_rejects_missing_raw_or_z_column():
+    reference = {
+        "uncertainty": {
+            "mean": 0.0,
+            "std": 1.0,
+            "support": "leaf_arms",
+            "n_reference_rows": 2,
+        }
+    }
+    with pytest.raises(ValueError, match="missing raw/standardized"):
+        assert_standardized_matches_reference(
+            pd.DataFrame({"uncertainty_z": [0.0, 1.0]}),
+            ["uncertainty"],
+            reference,
+            support_label="leaf_arms",
+        )

@@ -88,6 +88,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
+from continuum_swr_replay.analysis.replay.standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -124,6 +128,25 @@ def _z(x: np.ndarray) -> np.ndarray:
 
 def _assemble_arm() -> pd.DataFrame:
     ev = read_table(RC / "event_arm_table.pkl")
+    reference_path = RC / "standardization_reference.json"
+    if not reference_path.exists():
+        raise FileNotFoundError(
+            f"{reference_path} is required to validate arm_uncertainty_z; "
+            "regenerate the canonical replay-content tables"
+        )
+    try:
+        assert_standardized_matches_reference(
+            ev,
+            ("arm_uncertainty",),
+            load_reference(reference_path),
+            support_label="leaf_arms",
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "event_arm_table arm_uncertainty_z has a stale or invalid "
+            "standardization reference; regenerate the canonical table and "
+            f"reference before fitting: {exc}"
+        ) from exc
     add_arm_fixed_effects(ev)
     stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
@@ -315,9 +338,8 @@ def _run(
             dropped_frames = []
             # Belief rungs are fitted over the leaf arms only: the trunks carry a
             # structural zero for every leaf-derived belief covariate, so they add
-            # no information about it while manufacturing collinearity between
-            # q_arm and arm_uncertainty_z (+0.820 over nine arms, -0.038 over six).
-            # See LEAF_ONLY_CONTRAST_RUNGS.
+            # no information about those constructs. Persisted z units are also
+            # defined on leaf support. See LEAF_ONLY_CONTRAST_RUNGS.
             leaf_only = name in LEAF_ONLY_CONTRAST_RUNGS
             pop_frame = splits[pop]
             fit_categories = n_categories
@@ -425,7 +447,17 @@ def _aggregate(
 def _moment(x: np.ndarray) -> dict:
     """Mean/SD of ``x`` matching :func:`_z`'s standardization."""
     x = np.asarray(x, dtype=float)
-    return {"mean": float(np.nanmean(x)), "std": float(np.nanstd(x))}
+    if np.isinf(x).any():
+        raise ValueError("fit-time standardization source contains infinity")
+    finite = np.isfinite(x)
+    if not finite.any():
+        raise ValueError("fit-time standardization support contains no finite values")
+    return {
+        "mean": float(np.nanmean(x)),
+        "std": float(np.nanstd(x)),
+        "support": "fit_cohort_rows",
+        "n_reference_rows": int(finite.sum()),
+    }
 
 
 def _z_reference(frame: pd.DataFrame, cols: list[str]) -> dict:

@@ -25,6 +25,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay._helpers import add_trial_context
 from continuum_swr_replay.analysis.replay.covariates import visit_recency_all_events
+from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.analysis.replay.tables import (
     build_event_arm_table,
     build_event_table,
@@ -229,16 +230,6 @@ def test_trial_context_is_not_taken_from_the_in_progress_trip():
     assert np.isnan(out["reward_outcome"].iloc[0])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "AUDIT 2026-08-08: arm_uncertainty is standardized over all nine arms, "
-        "but trunk arms 6/7/8 carry a constant 0.0 placeholder (they are not "
-        "reward sites). That inflates the pooled SD by 1.62x, so the fitted "
-        "coefficient is not 'per 1 SD' on the leaf support that identifies it, "
-        "contradicting model_specs.py's 'well-scaled (SD 1)' claim."
-    ),
-)
 def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     """``<col>_z`` must have unit SD on the rows that carry information.
 
@@ -248,8 +239,19 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     unit. The coefficient is therefore quoted per 1.62 leaf-SDs, not per 1 SD.
     """
     tables = Path("Processed-Data/replay_content/event_arm_table.pkl")
+    reference_path = Path(
+        "Processed-Data/replay_content/standardization_reference.json"
+    )
     if not table_exists(tables):
         pytest.skip("materialized event_arm_table.pkl not available")
+    if not reference_path.exists():
+        pytest.skip("leaf-support standardization reference not available")
+    reference = load_reference(reference_path)
+    if reference.get("arm_uncertainty", {}).get("support") != "leaf_arms":
+        pytest.skip(
+            "materialized arm_uncertainty_z predates leaf-support scaling; "
+            "regenerate canonical tables"
+        )
 
     eat = read_table(tables)
     leaf = eat.loc[eat["arm"] < 6, "arm_uncertainty_z"].to_numpy()

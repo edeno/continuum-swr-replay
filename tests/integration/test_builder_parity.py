@@ -1,8 +1,8 @@
-"""Phase-6 parity: the folded standardization reproduces the materialized ``_z``.
+"""Persisted standardization reproduces the materialized ``_z``.
 
-Proves the builder fold is inert — ``attach_standardized`` over the full table gives the
-same ``_z`` columns that currently ship (originally stamped by the retired
-``_add_standardized_cols`` one-off, same formula). Also exercises the frozen-reference
+Proves the builder fold is reproducible — ``attach_standardized`` over the declared
+scientific support gives the same ``_z`` columns that ship after regeneration.
+Also exercises the frozen-reference
 round-trip (F5): a reference computed from the full table, re-applied to a one-session
 slice, must match the materialized ``_z`` for that slice — a per-session *recompute*
 would not (that is why the parity gate must apply the frozen reference).
@@ -56,12 +56,30 @@ def _require(path: Path):
     [(_EVENT_ARM, EVENT_ARM_STANDARDIZED_COLS), (_QVALS, QVALS_STANDARDIZED_COLS)],
 )
 def test_folded_standardization_reproduces_materialized_z(path, cols):
-    """Inertness of the FORMULA: recomputing the fold gives the materialized _z. (Not the
-    frozen-reference gate — that is the JSON test below.)"""
+    """Recomputing the scientific reference gives the materialized transform."""
     df = _require(path)
     cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
     assert cols, f"no standardized columns to check in {path.name}"
-    recomputed, _ = attach_standardized(df[cols].copy(), cols)
+    if path == _EVENT_ARM:
+        if not _EVENT_ARM_REF.exists():
+            pytest.skip("leaf-support reference not written; regenerate event-arm table")
+        current_reference = load_reference(_EVENT_ARM_REF)
+        if any(
+            current_reference.get(column, {}).get("support") != "leaf_arms"
+            for column in cols
+        ):
+            pytest.skip(
+                "materialized event-arm z columns predate leaf-support scaling; "
+                "regenerate canonical tables"
+            )
+        recomputed, _ = attach_standardized(
+            df[cols].copy(),
+            cols,
+            support_mask=df["arm"].isin(range(6)),
+            support_label="leaf_arms",
+        )
+    else:
+        recomputed, _ = attach_standardized(df[cols].copy(), cols)
     for c in cols:
         np.testing.assert_allclose(
             recomputed[f"{c}_z"].to_numpy(),
@@ -89,6 +107,21 @@ def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, col
             f"reference not written yet: {ref_path} (run the full builder rebuild)"
         )
     reference = load_reference(ref_path)
+    if any(
+        not {"support", "n_reference_rows"}.issubset(reference.get(column, {}))
+        for column in cols
+    ):
+        pytest.skip(
+            f"materialized {ref_path.name} predates support-aware reference "
+            "metadata; regenerate its owning table"
+        )
+    if table_path == _EVENT_ARM and any(
+        reference.get(column, {}).get("support") != "leaf_arms" for column in cols
+    ):
+        pytest.skip(
+            "materialized event-arm reference predates leaf-support scaling; "
+            "regenerate canonical tables"
+        )
     cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
     applied, _ = attach_standardized(df[cols].copy(), cols, reference=reference)
     for c in cols:
@@ -111,8 +144,21 @@ def test_frozen_reference_matches_on_one_session_slice():
     ]
     if _EVENT_ARM_REF.exists():
         reference = load_reference(_EVENT_ARM_REF)
+        if any(
+            reference.get(column, {}).get("support") != "leaf_arms"
+            for column in cols
+        ):
+            pytest.skip(
+                "materialized event-arm reference predates leaf-support scaling; "
+                "regenerate canonical tables"
+            )
     else:
-        _, reference = attach_standardized(df[cols].copy(), cols)
+        _, reference = attach_standardized(
+            df[cols].copy(),
+            cols,
+            support_mask=df["arm"].isin(range(6)),
+            support_label="leaf_arms",
+        )
 
     session_cols = ["animal", "day", "epoch"]
     first_key = df[session_cols].drop_duplicates().iloc[0]

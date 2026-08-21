@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,6 +17,7 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     summarize_mu_coefficients,
     within_arm_horserace,
 )
+from scripts.figures import generate_uncertainty_content_figure as figure_script
 
 
 def _horserace_frame(uncertainty_slope: float, *, animal: str = "rat") -> pd.DataFrame:
@@ -410,3 +413,21 @@ def test_mu_summary_marks_fit_flags_and_balances_animal_medians():
     assert clean_animals.loc["b", "coefficient"] == 4.0
     assert overall["coefficient"] == 2.5
     assert overall["relative_weight"] == pytest.approx(np.exp(2.5))
+
+
+def test_figure_loader_rejects_pre_leaf_support_result_bundle(tmp_path):
+    """A stale result CSV bundle cannot outlive the corrected model/table guard."""
+    pd.DataFrame({"placeholder": []}).to_pickle(tmp_path / "trial_leaf_table.pkl")
+    for name in (
+        "quartile_profiles",
+        "quartile_contrasts",
+        "mu_session_coefficients",
+        "mu_animal_coefficients",
+        "mu_overall_coefficients",
+        "horserace_summary",
+    ):
+        pd.DataFrame({"placeholder": []}).to_csv(tmp_path / f"{name}.csv", index=False)
+    (tmp_path / "cohort_audit.json").write_text(json.dumps({"n_events": 10}))
+
+    with pytest.raises(ValueError, match="predate leaf-support"):
+        figure_script._load_results(tmp_path)
