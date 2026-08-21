@@ -13,7 +13,8 @@ definitions live in `analysis/replay/covariates.py`; the per-arm value block
 builders from the per-stop contingency artifact (`p_reward_port`/`q_port`,
 per-animal fitted α in `contingency_csv_alpha.json`); the value rungs are `Mv`
 (arm) / `Pv` (patch); `q_current` enters the MU/coupling runners; the choice
-baseline is `arm_dist_rank`. Existing coefficients predate the location and
+baseline includes learned `q_arm`, recent reward rate, recency/novelty, and
+`arm_dist_rank`. Existing coefficients predate the location and
 two-clock history contracts and must not be treated as results from these
 definitions.
 
@@ -58,9 +59,9 @@ arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
 |---|---|---|---|---|
 | `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
 | `value_diff_patch` | nominal **patch**-level best-minus-second-best: the gap between the highest and second-highest patch mean p(reward). Always >= 0; a global scalar per trial, entered as a main effect only (never `× is_current_patch`) | scalar | `qvals_table` (nominal schedule) | rate/coupling main effect |
-| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content/choice main effect; rate via `× is_current` |
+| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content value rung; retained as a separate choice sensitivity rather than co-fit with learned Q |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
-| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect — **the value construct used by C4/CS5/Mv** (and the is_swr rate ladder's value covariates); **not** used in the Stage-5A choice model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13** when the paper standardized on the beta-bernoulli model.) |
+| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect and the primary Stage-5A choice-value control, matching the manuscript's Beta–Bernoulli decision model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13**.) |
 | `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** for the most recently completed trial (α=0.3), computed over the full trial stream and broadcast to its stops | scalar | `canonical_trial_uncertainty_history` | **retained comparison** (MU only), like `is_after_switch` under D4 |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
@@ -68,7 +69,7 @@ Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
 in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the
 experienced-value covariate — now the **beta-model belief** (`beta_stable_withleaf`),
 not a local leaky-Q learner: all value covariates were migrated to `qvals_table.parquet`
-(DataJoint, exact `poke_out` alignment; retires the difflib contingency CSV). The
+(DataJoint, assigned at canonical stop start; retires the difflib contingency CSV). The
 model's per-port `Q{i}` populate `q_port{i}` → `q_arm`, and `Q{leaf}` = `q_chosen` →
 `q_current`. **`leaky_q_value_diff` is NOT this** — it is a *different*, still-local
 construct (one pre-update best-minus-second margin per completed trial, α=0.3,
@@ -130,20 +131,47 @@ more than the data delivers:
   **0.49**, because `arm_fraction` is normalised over nine arms and the choice set keeps
   five. The excluded current arm alone holds mean 0.24.
 
-**Per-SD readings need the fitted cohort's SD, not the table's.** `arm_uncertainty_z`
-is standardized over all nine arms, a third of which are structural trunk zeros, but
-`C13`/`CS6`/`Mu` fit the **six leaves**, where it has mean +0.61 and **SD 0.618** — so a
-coefficient reported "per 1 SD" is per 0.618 leaf-SD and must be divided by **1.618**
-for a within-leaf reading. Worse for comparison: `swr_x_q_arm` is built on **raw**
-`q_arm` (leaf SD 0.119), so a coefficient of −1.03 is **−0.123 per leaf-SD** — the
-value and uncertainty terms plotted beside each other are on scales differing by an
-order of magnitude and are not visually comparable.
+**Per-SD support: leaf-only is PENDING, not shipped.** The builder code now
+estimates `q_arm_z`, `p_reward_arm_z`, `reward_rate_arm_k10_z`, and
+`arm_uncertainty_z` from leaf rows only — structural-zero trunks cannot shrink the
+unit of a leaf-defined value or uncertainty effect — but **the materialized tables
+and `standardization_reference.json` still carry all-nine-arm moments.** Verified
+2026-08-20: each stored `_z` reproduces exactly under nine-arm moments and not under
+leaf-only, and the reference JSON has no `support` key. Until the canonical tables
+are regenerated, every persisted `_z`, and every coefficient quoted per 1 SD from
+one, is on the **nine-arm** unit. To restate a shipped coefficient on the leaf
+support, divide by the ratio below:
 
-**`switch_advantage_mu_preoutcome_sess` (ΔV) is Switch − Stay**, and is ~ −(the current
-arm's stay value): r = −0.952 with `stay_sibling_mu_preoutcome_sess`, −0.890 with
-`q_chosen`, with identical SD (0.158). A **positive** `relval_x_current` therefore means
-content sharpens onto the current arm when that arm's value is **low**. Two shipped docs
-previously labelled it "Stay-vs-Switch", which inverts the reading; corrected 2026-08-19.
+| column | nine-arm SD | leaf SD | divide by |
+|---|---|---|---|
+| `q_arm` | 0.249373 | 0.119117 | **2.094** |
+| `arm_uncertainty` | 0.034305 | 0.021199 | **1.618** |
+| `p_reward_arm` | 0.280519 | 0.239836 | 1.170 |
+| `reward_rate_arm_k10` | 0.306641 | 0.300561 | 1.020 |
+
+Of these, only `arm_uncertainty_z` is consumed by the fitted ladders (the other
+three enter raw), so in practice the shipped uncertainty coefficients are
+overstated by 1.618x. Raw `swr_x_q_arm` remains on probability units, so it still
+must not be compared numerically to a standardized uncertainty coefficient without
+an explicit SD conversion. The standard content runner, SWR-contrast content
+runner, uncertainty analysis, and uncertainty figure loader now fail closed on
+this legacy reference/result bundle; they require regeneration before publishing a
+leaf-support coefficient or figure.
+
+**`switch_advantage_mu_preoutcome_sess` (ΔV) is Switch − Stay**, confirmed against the
+manuscript (`references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`, Methods): Stay is
+the *upcoming* port within the patch, Switch is the greater of the two alternative patches'
+mean port values, and the difference is taken *"without accounting for the cost of Switching
+or other biases"*. The shipped column equals Switch − Stay exactly on all 102,975 rows
+carrying a finite value (r = 1.000000); 102,975 counts *stop rows*, not distinct trials.
+Use the `_mu` variant, not `_Qstem`: the latter is on the decision-value scale and is
+negative on 99.90% of rows (99 positive, max +0.755) because it carries the stay bonus.
+ΔV is ~ −(the current arm's stay value): r = −0.952 with
+`stay_sibling_mu_preoutcome_sess`, −0.890 with `q_chosen`, with near-identical SD
+(0.158). A **positive** `relval_x_current` therefore means content sharpens onto the
+current arm when that arm's value is **low**. Earlier labels called it "Stay-vs-Switch",
+which inverts the reading; corrected 2026-08-19, though one stale label remains in
+`scripts/rate/fit_swr_contrast_rate.py:23`.
 
 **`in_transit` does not mean "moving".** It labels the trip interval. The
 modelled cohort is speed-gated immobility throughout, and off-well events have
@@ -186,7 +214,7 @@ rate families; conditional models access within-stop time only as `tsc_x_current
 | reward kernel `reward_lag{j}` | main | main (Rlag) | main | `× is_current` | — |
 | `reward_rate_trial_k10` | (M2r standalone) | main (R2) | — | — | — |
 | `reward_rate_arm_k10` | `× is_current` | — | `× is_current` | **main** | **main** |
-| `p_reward_current` / `p_reward_arm` | main / `×is_current` | — | main | **`p_reward_arm` main** | **`p_reward_arm` main** |
+| `p_reward_current` / `p_reward_arm` | main / `×is_current` | — | main | **`p_reward_arm` main** | nominal-value sensitivity |
 | `q_current` / `q_arm` | main | — | main | **`q_arm` main** | **`q_arm` main** |
 | `rpe`, `value_diff_patch` | main | — | main | (nominal via interaction if tested) | — |
 | `recent_switch_rate` | main | main | main | `× is_current` | (main if predictive) |
@@ -201,7 +229,8 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   (10 visits, per-arm). Per-arm window changes 5→10. **Caveat:** "10" is not the same
   *real-time* span (a single arm is visited far less often than trials elapse) — it is
   10 in each construct's own unit, not 10 in time.
-- **D2** — add **per-arm nominal value** `p_reward_arm` to content/choice — by
+- **D2** — add **per-arm nominal value** `p_reward_arm` to content and retain it
+  for an explicit choice sensitivity — by
   **replacing the formerly-deferred `nominal_reward_prob` column** (renamed and now
   populated), not a new parallel column.
 - **D3** — **add** the experienced-value covariate `q_current` / `q_arm` (now the
@@ -241,7 +270,7 @@ the event it predicts. Classification of the covariates fitted by the rate model
 | `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
 | `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
 | destination/visit recency, `is_after_switch`, `recent_switch_rate` | **arrival clock** | yes — destination and inbound patch change become known at goal arrival |
-| reward lags/rates/counts, last-rewarded well | **outcome clock** | yes — advance only at first pump onset (reward) or destination poke-out (omission) |
+| reward lags/rates/counts, last-rewarded well | **outcome clock** | yes — advance at first pump onset (reward) or at the latest possible pump latency after arrival, capped at departure (omission) |
 | `beta_reward_entropy` | beta belief entropy (mean per-leaf Beta differential entropy) | yes (pre-outcome posterior) |
 | `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
 | `reward_outcome`, `is_after_reward`, `is_after_omission` | most recently arrived trip's outcome | finite **only after** that outcome is observable; otherwise NaN |
@@ -250,9 +279,11 @@ the event it predicts. Classification of the covariates fitted by the rate model
 
 **Arrival is not the outcome boundary.** Canonical trials therefore carry two
 clocks. `goal_arrival_time` controls destination, visit, and inbound-switch
-history. `outcome_known_time` is the first pump onset for a rewarded trial and
-the destination poke-out for an omission (there is no separate negative-feedback
-cue). Between those boundaries, arrival-derived fields are populated while all
+history. `outcome_known_time` is the first pump onset for a rewarded trial. For
+an omission it is destination arrival + `OMISSION_KNOWN_LATENCY_SEC` (0.30 s),
+capped at destination departure; this exceeds every observed reward latency and
+does not condition the boundary on the animal's full dwell duration. Between
+arrival and that boundary, arrival-derived fields are populated while all
 current reward-bearing fields remain NaN. Older/manual trial frames without a
 physical outcome column use `end_time` for both outcomes: conservative for
 rewards, but never anticipatory.

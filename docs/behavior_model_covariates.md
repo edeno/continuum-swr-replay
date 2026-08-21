@@ -13,7 +13,8 @@ keyed by `stop_id` (joins to `stop_table.parquet`).
   [`src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py`](../src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py).
 - **Paper:** Comrie et al., *Hippocampal representations of alternative
   possibilities are flexibly generated to meet cognitive demands* (bioRxiv
-  2024.09.23.613567; `references/nihpp-2024.09.23.613567v1.pdf`).
+  2024.09.23.613567). No copy of that preprint version is in `references/`; the
+  manuscript PDF held there is `Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`.
 
 ## Provenance & model
 
@@ -86,7 +87,42 @@ Indexing: ports/leaves are 1–6, patches/stems 1–3 (A/B/C). `{arm}` = `leaf-1
 | `stay_sibling_mu_preoutcome_sess` | **Stay value** | value of the upcoming port in the current patch |
 | `best_other_patch_mean_mu_preoutcome_sess` | **Switch value** | best alternative patch value (max over the two other patches of their 2-port mean) |
 | `switch_advantage_mu_preoutcome_sess` | **Relative value ΔV** | Switch − Stay (the central decision variable) |
-| `switch_advantage_preoutcome_sess_Qstem` | ΔV (Qstem) | same, from `Qstem` patch values |
+| `switch_advantage_preoutcome_sess_Qstem` | ΔV on the **decision-value** scale | **NOT the same construct.** `Qstem1..3` range −0.983 to 19.335, so they are decision values, not probabilities: beyond `β·Q + b` they also carry the model's γ2-weighting of the occupied stem, a depletion term, and stay/turn/spatial biases (see the `_spatial_bandit_rl.py` docstring) — an affine fit on patch-mean `μ` explains only ~23%. The two ΔV variants also differ structurally: `_Qstem` takes Stay = the whole **start stem**, `_mu` takes Stay = the **sibling leaf**. Net effect: `_Qstem` is negative on **99.90%** of rows (99 of 102,975 positive, max +0.755) against 51% positive for `_mu`; they correlate only 0.750. The manuscript defines ΔV *"without accounting for the cost of Switching or other biases"*, so **`switch_advantage_mu_preoutcome_sess` is the one that matches the paper**, and it is the one the ladders use. |
+
+### Verified against the manuscript (2026-08-20)
+
+Checked against `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
+(Methods, "Behavioral model" / "Behavioral model variables"):
+
+- **Beta posterior is internally consistent.** The manuscript gives
+  `μ = α/(α+β)` and `σ² = αβ/((α+β)²(α+β+1))`. Inverting the shipped `betadist_mu`
+  / `betadist_var` recovers an implied `α+β` spanning **2.00 to 73.26**, with the
+  minimum exactly at the `α = β = 1` initialisation the manuscript specifies.
+- **ΔV reproduces the manuscript's definition.** Stay = the *upcoming* port
+  within the patch; Switch = the **greater** of the two alternative patches' mean
+  port values; ΔV = **Switch − Stay**. The shipped
+  `switch_advantage_mu_preoutcome_sess` equals
+  `best_other_patch_mean_mu_preoutcome_sess − stay_sibling_mu_preoutcome_sess`
+  **exactly on all 102,975 rows** that carry a finite value (r = 1.000000, agreement
+  to floating-point tolerance). Note 102,975 counts *stop rows*, not distinct trials.
+  There is no residual to explain: the γ-weighting the manuscript applies to the
+  occupied patch belongs to the `_Qstem` path, not to this one.
+- **Sign convention.** Switch − Stay, so ΔV is ≈ −(the current option's value):
+  r = −0.952 with `stay_sibling_mu_preoutcome_sess`. A *positive* coefficient on
+  `relval_x_current` means content sharpens onto the current arm when that arm's
+  value is **low**. Earlier labels called this "Stay-vs-Switch", which inverts the
+  reading; corrected 2026-08-19 in `model_specs.py` and the docs, and the manuscript
+  independently confirms the direction. **One stale label remains** in
+  `scripts/rate/fit_swr_contrast_rate.py:23`.
+- **Scale.** `q_port*` / `betadist_mu*` / `q_chosen` are probabilities in [0,1];
+  `Qstem*` is the decision value `β·Q + b` and is **not** comparable to them.
+
+**One place we extend beyond the manuscript.** Its uncertainty measure (Fig 5B) is
+*"the variance over the reward belief state of the **upcoming port**"* — a
+per-trial scalar for one port. Our `arm_uncertainty` is the per-arm Beta variance
+across all six leaves, which is what makes a within-event arm contrast possible.
+That is a deliberate generalisation, not the manuscript's quantity; any sentence
+citing the paper for "uncertainty" should say which of the two it means.
 
 ### Value-update magnitudes (Fig 5E / S5; absolute, summed across ports)
 | Column | Scope |

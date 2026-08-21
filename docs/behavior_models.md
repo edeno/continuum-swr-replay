@@ -1,5 +1,11 @@
 # SpatialBanditTask behavioral models — generative-model reference
 
+> **Primary source:** `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
+> (Methods: "Behavioral model", "Behavioral model learning rule", "Behavioral choice
+> model", "Behavioral model variables") is the definition of record for the
+> Beta-Bernoulli model. Identities verified against it on 2026-08-20 are recorded in
+> [behavior_model_covariates.md](behavior_model_covariates.md).
+
 The latent variables we use as replay covariates (value, uncertainty, RPE,
 value-updates, entropy) are produced by behavioral models fit to the spatial
 bandit task in the **LorenFrankLab/SpatialBanditTask** repository (Comrie et al.).
@@ -13,7 +19,8 @@ parameters — so the covariates can be interpreted correctly.
   `betadist_var` *mean*," read that for "which column holds it."
 - **Paper:** Comrie et al., *Hippocampal representations of alternative
   possibilities are flexibly generated to meet cognitive demands* (bioRxiv
-  2024.09.23.613567; `references/nihpp-2024.09.23.613567v1.pdf`).
+  2024.09.23.613567). No copy of that preprint version is in `references/`; the
+  manuscript PDF held there is `Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`.
 
 ## Provenance & verification status
 
@@ -24,7 +31,7 @@ parameters — so the covariates can be interpreted correctly.
   (`code/beta_bernoulli.jl`, `code/hmm.jl`, directory listings, the `EM/`
   README) **and the paper Methods directly** (Comrie et al. pp. 24–28,
   "Behavioral Hidden Markov Model" through "Behavioral model variables";
-  `references/nihpp-2024.09.23.613567v1.pdf`). Details marked _[source]_ were
+  `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`). Details marked _[source]_ were
   read from the `.jl` files (via web fetch of the raw files — a summarizer read,
   so confirm an exact constant against the file before quoting it verbatim in a
   manuscript); _[paper]_ items are from the PDF Methods. The five items originally
