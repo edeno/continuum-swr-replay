@@ -31,9 +31,9 @@ POST_OUTCOME = frozenset(
         "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
         "unchosen_patches_mu_update_abs_postoutcome_sess",  # alternative-patch update
         # Trip *completion* is goal arrival (poke-in), which is strictly earlier
-        # than the outcome: reward onset for a rewarded trip, and poke-out for an
-        # omission (there is no negative-feedback cue to timestamp -- see
-        # qvals_table._outcome_known_time). Between arrival and that boundary
+        # than the outcome: reward onset for a rewarded trip, and the
+        # conservative omission-feedback boundary (arrival + fixed latency,
+        # capped at departure) for an omitted trip. Between arrival and that boundary
         # these three already carry the outcome, so "completed by event start"
         # does not make them pre-outcome safe. Gate on ``outcome_known_time`` to
         # use them; do not reclassify.

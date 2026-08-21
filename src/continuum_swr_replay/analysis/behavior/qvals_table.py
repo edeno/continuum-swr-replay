@@ -518,9 +518,8 @@ def build_animal(
                         trow["reward_time"]
                     ),  # poke-record reward (times' 'reward', '_time' suffix)
                     # Physical availability boundary for post-outcome covariates:
-                    # reward onset on rewarded trials; conservatively, poke-out on
-                    # omissions because this table has no explicit negative-
-                    # feedback timestamp.
+                    # reward onset on rewarded trials; on omissions, the latest
+                    # possible pump latency after arrival, capped at poke-out.
                     "outcome_known_time": outcome_known_time,
                     **{c: trow[c] for c in model_cols},
                 }
@@ -529,6 +528,60 @@ def build_animal(
     out.attrs["leaf_agree"] = pt.attrs["leaf_agree"]
     out.attrs["entropy_cov"] = pt.attrs["entropy_cov"]
     return out
+
+
+def _validate_qvals_output(tab: pd.DataFrame) -> None:
+    """Validate the persisted stop-value contract before standardization/write."""
+    required = {
+        "stop_id",
+        "p_reward_current",
+        "q_chosen",
+        *[f"p_reward_port{i}" for i in range(6)],
+        *[f"q_port{i}" for i in range(6)],
+        *[f"betadist_var{i}" for i in range(1, 7)],
+        "beta_reward_entropy",
+        "outcome_known_time",
+        "qvals_context_time",
+        "trial_reward",
+    }
+    missing = required - set(tab.columns)
+    if missing:
+        raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
+    if tab["stop_id"].isna().any() or tab["stop_id"].duplicated().any():
+        duplicates = int(tab["stop_id"].duplicated(keep=False).sum())
+        raise ValueError(
+            "qvals_table requires one nonmissing row per stop_id; "
+            f"found {duplicates} row(s) with duplicated IDs"
+        )
+
+    probability_cols = [
+        "p_reward_current",
+        "q_chosen",
+        *[f"p_reward_port{i}" for i in range(6)],
+        *[f"q_port{i}" for i in range(6)],
+    ]
+    probability_values = tab[probability_cols].to_numpy(dtype=float)
+    if not np.isfinite(probability_values).all():
+        raise ValueError("qvals probability/value columns must be finite on every row")
+    if ((probability_values < 0.0) | (probability_values > 1.0)).any():
+        raise ValueError("qvals probability/value columns must lie in [0, 1]")
+    entropy = tab["beta_reward_entropy"].to_numpy(dtype=float)
+    if not np.isfinite(entropy).all() or (entropy > 1e-12).any():
+        # Differential entropy is legitimately negative for concentrated Beta
+        # distributions and has a maximum of zero for the uniform Beta(1, 1).
+        raise ValueError("beta_reward_entropy must be finite and no greater than zero")
+    variance_cols = [f"betadist_var{i}" for i in range(1, 7)]
+    variances = tab[variance_cols].to_numpy(dtype=float)
+    if not np.isfinite(variances).all() or (
+        (variances < 0.0) | (variances > 0.25)
+    ).any():
+        raise ValueError("Beta posterior variances must be finite and lie in [0, 0.25]")
+    timing = tab[["qvals_context_time", "outcome_known_time"]].to_numpy(dtype=float)
+    if not np.isfinite(timing).all():
+        raise ValueError("qvals context and outcome-known times must be finite")
+    reward = tab["trial_reward"].to_numpy(dtype=float)
+    if not np.isfinite(reward).all() or not np.isin(reward, (0.0, 1.0)).all():
+        raise ValueError("trial_reward must be finite binary")
 
 
 def main() -> None:
@@ -582,12 +635,19 @@ def main() -> None:
         # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
         # pull as q_port), so coverage should be ~100% — anything materially below flags
         # a partial-fit/join regression (the old 0.5 HMM-merge floor is too loose now).
-        if len(t) / len(st) < 0.90 or arm_ok < 0.95 or entropy_cov < 0.95:
-            print(
-                f"  WARNING [{a}]: coverage {100 * len(t) / len(st):.0f}% (expect ~97-99%), "
-                f"at-well arm agreement {100 * arm_ok:.1f}% (expect ~100%), or "
-                f"beta_reward_entropy coverage {100 * entropy_cov:.0f}% (expect ~100%; a low "
-                f"figure voids the belief-entropy covariate) -- possible mapping/model regression"
+        if (
+            len(t) / len(st) < 0.90
+            or not np.isfinite(arm_ok)
+            or arm_ok < 0.95
+            or not np.isfinite(entropy_cov)
+            or entropy_cov < 0.95
+        ):
+            raise ValueError(
+                f"qvals mapping failed for {a}: coverage "
+                f"{100 * len(t) / len(st):.1f}%, at-well arm agreement "
+                f"{100 * arm_ok:.1f}%, beta entropy coverage "
+                f"{100 * entropy_cov:.1f}%; refusing to publish a partial or "
+                "misaligned scientific covariate table"
             )
         parts.append(t)
     tab = pd.concat(parts, ignore_index=True)
@@ -599,17 +659,7 @@ def main() -> None:
     # COVARIATES by presence, so an upstream BehaviorModelResults/schema change
     # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
     # make attach_contingency_value_block blank the whole value block downstream.
-    required = {
-        "stop_id",
-        "p_reward_current",
-        "q_chosen",
-        *[f"p_reward_port{i}" for i in range(6)],
-        *[f"q_port{i}" for i in range(6)],
-        "beta_reward_entropy",
-    }
-    missing = required - set(tab.columns)
-    if missing:
-        raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
+    _validate_qvals_output(tab)
 
     # Pooled-GLOBAL standardization of the continuous stop-level covariates (<col>_z),
     # owned by THIS builder (prepare_data reads qvals but must not re-standardize it).

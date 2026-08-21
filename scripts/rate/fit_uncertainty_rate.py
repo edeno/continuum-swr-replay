@@ -11,11 +11,12 @@ Per session: load ``stop_table``; validate its canonical ``recent_switch_rate``
 and derive stop-local summaries (:func:`add_uncertainty_covariates`); inner-merge
 the nominal value + real
 behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
-poke_out-aligned source -- no difflib CSV); drop the first (exposure) session per
+stop-start-aligned source -- no difflib CSV); drop the first (exposure) session per
 animal; attach the canonical ``is_swr`` to the onsets.
 Because the fitted block contains current-trip RPE/value updates, retain only
 physical response bins whose left edge is at or after ``outcome_known_time``
-(reward-on for rewarded trials; conservatively poke-out for omissions).
+(reward onset for rewarded trials; latest possible pump latency, capped at
+departure, for omissions).
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
 fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
@@ -49,6 +50,7 @@ import warnings  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS  # noqa: E402
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
@@ -92,7 +94,7 @@ SESSION_COLS = ["animal", "day", "epoch"]
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 # Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
-# p_rew_leaf/contingency_count, exactly poke_out-aligned) rather than the difflib
+# p_rew_leaf/contingency_count, exactly stop-start-aligned) rather than the difflib
 # contingency_table_csv -- so every covariate the model fits shares one alignment.
 VALUE_COVARIATES = (
     "p_reward_current",
@@ -142,7 +144,6 @@ FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATE
 # null and is not fit here).
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
-OUTCOME_TIME_SEMANTICS = "reward_on_ts for rewarded trials; poke_out_ts for omissions"
 POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
@@ -198,8 +199,8 @@ def _retained_time_course_support(
     """Where the surviving within-stop time course starts, by outcome class.
 
     The spline's boundary knots are fixed at ``(0, TMAX)``, but the gate
-    removes early bins -- and removes more of them from omissions, whose
-    outcome boundary is poke-out rather than pump onset. The low-``tc``
+    removes early bins -- and can remove different amounts by outcome class
+    because rewarded and omitted outcomes have different physical cues. The low-``tc``
     region is then populated mainly by rewarded stops, so the basis is not
     orthogonal to outcome and the time-course and reward coefficients are
     partially confounded. Reporting the retained support makes the size of
@@ -347,8 +348,8 @@ def _gate_bins_after_outcome(
         if outcome_balance_valid
         else 0,
         # Where the retained within-stop time course starts, per outcome
-        # class. An omission's boundary is poke-out and a reward's is pump
-        # onset, so the gate truncates the two classes by different amounts
+        # class. An omission's latency boundary and a reward's pump-onset
+        # boundary can truncate the two classes by different amounts
         # and the time spline is no longer orthogonal to outcome. Counts
         # alone cannot show that; these do. See docs/rate_models.md.
         **_retained_time_course_support(output["tc"], candidate, rewarded, omitted),
@@ -548,7 +549,7 @@ def main() -> None:
     # longer used here.
     stop = add_uncertainty_covariates(stop, switch_window=args.switch_window)
     # Nominal schedule + real model covariates, ALL from qvals_table -- one
-    # exactly poke_out-aligned source (retires the difflib contingency_table_csv
+    # exactly stop-start-aligned source (retires the difflib contingency_table_csv
     # for this model). qvals' `rpe` (R - q_chosen) -> rpe_model. Inner join: keep
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.

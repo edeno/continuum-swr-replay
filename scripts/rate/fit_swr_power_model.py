@@ -14,8 +14,9 @@ this continuous quantity). This script asks, across non-local events:
      on whether an event occurs (occurrence is the separate per-bin rate model)?
 
 The model contains the current trial's RPE, so its fit cohort is restricted to
-events beginning at or after ``outcome_known_time`` (reward-on for rewarded
-trials; conservatively poke-out for omissions). Distribution and duration
+events beginning at or after ``outcome_known_time`` (reward onset for rewarded
+trials; latest possible pump latency, capped at departure, for omissions).
+Distribution and duration
 descriptives remain summaries of all non-local events.
 
 Scope / caveat: this fits only the *conditional power-vs-covariates* relationship
@@ -37,6 +38,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import skew, wilcoxon
 
+from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.replay._helpers import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
@@ -61,7 +63,6 @@ PREDICTORS = [
     "time_since_stop",
 ]
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
-OUTCOME_TIME_SEMANTICS = "reward_on_ts for rewarded trials; poke_out_ts for omissions"
 POST_OUTCOME_GATE_RULE = "event_start >= outcome_known_time"
 
 
@@ -77,7 +78,7 @@ def _bimodality_coef(x: np.ndarray) -> float:
 def _assemble() -> pd.DataFrame:
     ev = read_table(RC / "event_table.pkl")
     stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
-    # qvals_table (exact poke_out alignment). rpe/q_current are now the
+    # qvals_table (exact stop-start alignment). rpe/q_current are now the
     # beta-model experienced value (rpe = R - q_chosen, q_current = q_chosen),
     # replacing the retired difflib nominal-rpe / leaky-Q.
     cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")

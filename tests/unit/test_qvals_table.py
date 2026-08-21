@@ -16,12 +16,65 @@ import continuum_swr_replay.analysis.behavior.qvals_table as qvals_table
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     _add_nominal_contingency,
     _outcome_known_time,
+    _validate_qvals_output,
     add_beta_belief_entropy,
     add_experienced_value_columns,
     assign_stops_to_trials,
     peri_switch_index,
 )
 from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
+
+
+def _valid_qvals_output() -> pd.DataFrame:
+    frame = pd.DataFrame(
+        {
+            "stop_id": [1, 2],
+            "p_reward_current": [0.2, 0.8],
+            "q_chosen": [0.3, 0.7],
+            "beta_reward_entropy": [0.0, -0.1],
+            "outcome_known_time": [1.0, 2.0],
+            "qvals_context_time": [0.5, 1.5],
+            "trial_reward": [0.0, 1.0],
+        }
+    )
+    for prefix in ("p_reward_port", "q_port"):
+        for arm in range(6):
+            frame[f"{prefix}{arm}"] = 0.1 * (arm + 1)
+    for arm in range(1, 7):
+        frame[f"betadist_var{arm}"] = 0.01 * arm
+    return frame
+
+
+def test_qvals_output_requires_unique_stop_ids():
+    frame = _valid_qvals_output()
+    frame.loc[1, "stop_id"] = frame.loc[0, "stop_id"]
+    with pytest.raises(ValueError, match="one nonmissing row per stop_id"):
+        _validate_qvals_output(frame)
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -0.1, 1.1])
+def test_qvals_output_requires_finite_probabilities_in_unit_interval(bad):
+    frame = _valid_qvals_output()
+    frame.loc[0, "q_port3"] = bad
+    with pytest.raises(ValueError, match="probability/value columns"):
+        _validate_qvals_output(frame)
+
+
+@pytest.mark.parametrize(
+    ("column", "bad", "message"),
+    [
+        ("betadist_var2", 0.3, "posterior variances"),
+        ("beta_reward_entropy", 0.1, "entropy"),
+        ("outcome_known_time", np.inf, "times"),
+        ("trial_reward", 0.5, "trial_reward"),
+    ],
+)
+def test_qvals_output_validates_uncertainty_timing_and_reward(column, bad, message):
+    frame = _valid_qvals_output()
+    frame.loc[0, column] = bad
+
+    with pytest.raises(ValueError, match=message):
+        _validate_qvals_output(frame)
 
 
 @pytest.mark.parametrize(

@@ -29,6 +29,7 @@ from continuum_swr_replay.parameters import (
 
 # Event detection thresholds
 DEFAULT_NON_LOCAL_THRESHOLD = 0.8
+"""Default probability threshold for classifying non-local events (0-1)."""
 
 # Seconds after destination poke-in by which the absence of reward is
 # established on an omission trial.
@@ -47,7 +48,11 @@ DEFAULT_NON_LOCAL_THRESHOLD = 0.8
 # omission pokes with a median 0.58 s of usable dwell. Re-derive from the
 # reward-latency distribution if the hardware or task timing changes.
 OMISSION_KNOWN_LATENCY_SEC: float = 0.30
-"""Default probability threshold for classifying non-local events (0-1)."""
+OUTCOME_TIME_SEMANTICS: str = (
+    "earliest reward onset for rewarded trials; min(destination arrival + "
+    f"{OMISSION_KNOWN_LATENCY_SEC:.2f} s, destination departure) for omissions"
+)
+"""Canonical physical availability rule for a trial's realized outcome."""
 
 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC: float = float(MAX_SPEED_THRESHOLD_CM_PER_SEC)
 """Default speed threshold for classifying immobile periods (cm/s).
