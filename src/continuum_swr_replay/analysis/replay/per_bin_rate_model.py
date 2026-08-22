@@ -75,8 +75,8 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
         cols += [f"cross_hist_rcos_{k}" for k in range(spec.cross_history_basis)]
     else:
         cols += [f"cross_lag{j}" for j in range(1, spec.cross_history_lags + 1)]
-    if spec.switch:
-        cols.append("is_after_switch")
+    # spec.switch is retired: the per-bin switch main effect (M8) was removed,
+    # so is_after_switch is never built into a per-bin design.
     cols += list(spec.extra_covariates)
     return list(dict.fromkeys(cols))  # de-duplicate, preserve order
 
@@ -285,7 +285,7 @@ def cross_validate_per_bin_rate_model(
         # predictor scales this falls back to |coef| >= 10, which every
         # self-history rung trips on its raised-cosine basis (small-SD columns,
         # ordinary effects) -- that flagged all 10 folds separated and voided the
-        # CV metric for M3/M4/M6/M7/M8, leaving 2 of 215 sessions scored.
+        # CV metric for M3/M4/M6/M7, leaving 2 of 215 sessions scored.
         sd_res = np.asarray(res.model.exog, dtype=float).std(axis=0)
         sd_res0 = np.asarray(res0.model.exog, dtype=float).std(axis=0)
         s_res = fit_status(res, "glm", predictor_sd=sd_res)

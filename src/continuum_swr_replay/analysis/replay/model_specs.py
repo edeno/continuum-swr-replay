@@ -615,15 +615,21 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
         # bout start. It can be the arrived trip's outcome after its physical
         # feedback boundary or the preceding known outcome before that boundary;
         # it is past-only, but not a fixed trial-relative index.
-        predictors=("reward_lag1", "is_after_switch"),
-        description="+ most-recent-known reward at bout start / switch context",
+        #
+        # The immediate-switch flag was removed from this general-purpose
+        # reward-history ladder: it is often constant within a session's
+        # complete-case cohort, which makes the design rank-deficient and
+        # rejects the whole session. See the naming spec's "Immediate switch
+        # is not a nuisance adjustment" section; a dedicated switch analysis
+        # uses ``patch_switch_fraction_last5_completed_trips`` instead.
+        predictors=("reward_lag1",),
+        description="+ most-recent-known reward at bout start",
         parent="R0",
     ),
     "R2": ModelSpec(
         name="R2",
         predictors=(
             "reward_lag1",
-            "is_after_switch",
             "reward_rate_trial_k10",
         ),
         description="+ recent reward history (rewarded fraction, last 10 trials)",
@@ -646,9 +652,10 @@ N_REWARD_LAGS = 10
 
 MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     name="Rlag",
-    predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1))
-    + ("is_after_switch",),
-    description="Lagged reward kernel: 10 most-recent-known outcomes + switch",
+    # Immediate-switch flag removed (see R1) -- a constant switch column within
+    # a session's complete-case cohort makes this design rank-deficient.
+    predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)),
+    description="Lagged reward kernel: 10 most-recent-known outcomes",
     parent="R0",
 )
 
@@ -687,10 +694,11 @@ _SPLINE = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX})"
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
 N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
 # Per-stop covariates the ladder needs beyond the reward/self-history lags
-# (M2r's continuous reward rate, M8's switch term) — carried into the per-bin
-# design by aggregate_to_timebins. Shared by the fitter orchestrator and the
+# (M2r's continuous reward rate) — carried into the per-bin design by
+# aggregate_to_timebins. Shared by the fitter orchestrator and the
 # model-checking plotter so the inline refit matches the persisted fits.
-STOP_COVARIATES = ("reward_rate_trial_k10", "is_after_switch")
+# The immediate-switch term was retired with the M8 rung (see R1).
+STOP_COVARIATES = ("reward_rate_trial_k10",)
 
 
 @dataclass(frozen=True)
@@ -719,7 +727,11 @@ class PerBinRateModelSpec:
         Number of ``onset_lag{j}`` terms (0 or ``N_HISTORY_LAGS``); the
         within-stop autoregressive / refractoriness block.
     switch : bool
-        Include ``is_after_switch``.
+        Retired and must stay ``False``. The per-bin switch main-effect
+        extension (M8) was removed because ``is_after_switch`` is often
+        constant within a session's complete-case cohort, which makes the
+        design rank-deficient. No shipped spec sets this, and ``formula`` no
+        longer reads it.
     reward_time_interaction : bool
         Include ``reward_lag1 : bs(tc, ...)`` — does reward modulate
         the time course?
@@ -762,6 +774,15 @@ class PerBinRateModelSpec:
     # ``stop_covariates``.
     extra_covariates: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if self.switch:
+            raise ValueError(
+                "PerBinRateModelSpec.switch is retired: the per-bin switch "
+                "main effect (M8) was removed because is_after_switch is often "
+                "constant within a session's complete-case cohort. Do not "
+                "re-enable it; use a dedicated switch analysis instead."
+            )
+
     def formula(self) -> str:
         """patsy formula (response ``count``; the offset is applied at fit time)."""
         terms: list[str] = []
@@ -778,8 +799,8 @@ class PerBinRateModelSpec:
             terms += [f"cross_hist_rcos_{k}" for k in range(self.cross_history_basis)]
         else:
             terms += [f"cross_lag{j}" for j in range(1, self.cross_history_lags + 1)]
-        if self.switch:
-            terms.append("is_after_switch")
+        # ``switch`` is retired (see the field docstring); is_after_switch is
+        # never added to a per-bin model.
         if self.reward_time_interaction:
             terms.append(f"reward_lag1:{_SPLINE}")
         terms += list(self.extra_covariates)
@@ -888,17 +909,11 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         "+ time + self-history + reward history",
         "M6_time_hist",
     ),
-    "M8_full_switch": PerBinRateModelSpec(
-        "M8_full_switch",
-        True,
-        _N,
-        False,
-        N_HISTORY_LAGS,
-        True,
-        False,
-        "+ switch (full additive)",
-        "M7_time_hist_rew",
-    ),
+    # M8_full_switch (the per-bin switch main-effect extension) was retired:
+    # is_after_switch is often constant within a session's complete-case
+    # cohort, making the design rank-deficient. See the naming spec's
+    # "Immediate switch is not a nuisance adjustment" section. Nothing parents
+    # off it (M9 parents off M7), so removal leaves the ladder intact.
     "M9_rew_x_time": PerBinRateModelSpec(
         "M9_rew_x_time",
         True,

@@ -36,7 +36,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [design/2026-07-13-content-rate-uncertainty-model-ladders.md](design/2026-07-13-content-rate-uncertainty-model-ladders.md)
     — proposed Aim-1 content-allocation, replay-occurrence, event-size, and
     marginal-content ladders in R formula notation.
+  - [design/2026-08-21-covariate-naming-scheme.md](design/2026-08-21-covariate-naming-scheme.md)
+    — proposed predictor-column names across the four canonical tables,
+    code-verified; also flags the duplicate and dead columns the pass found.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
+  - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
+    — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
+    checksum we don't control. Proceed with 215; don't gate on recovery.
   - [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
     cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count.
   - [current_arm_trunk_fallback.md](known_issues/current_arm_trunk_fallback.md) —

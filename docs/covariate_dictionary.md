@@ -62,7 +62,7 @@ arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
 | `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content value rung; retained as a separate choice sensitivity rather than co-fit with learned Q |
 | `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
 | `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect and the primary Stage-5A choice-value control, matching the manuscript's Beta–Bernoulli decision model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13**.) |
-| `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** for the most recently completed trial (α=0.3), computed over the full trial stream and broadcast to its stops | scalar | `canonical_trial_uncertainty_history` | **retained comparison** (MU only), like `is_after_switch` under D4 |
+| `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** for the most recently completed trial (α=0.3), computed over the full trial stream and broadcast to its stops | scalar | `canonical_trial_uncertainty_history` | **retained comparison** (MU only) |
 
 Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
 `nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
@@ -86,12 +86,13 @@ and `_covariate_ranking`) uses the model RPE, not a nominal one.
 | canonical name | definition | window | units | enters |
 |---|---|---|---|---|
 | `recent_switch_rate` | rolling mean of `is_patch_change` over the last (up to) 5 completed trials, including the most recently completed trial | 5 completed trials | fraction | **canonical** cross-family: rate/coupling main effect; content via `× is_current` |
-| `is_after_switch` | the most recently completed trip changed patch | 1 completed trial | binary | **retained comparison** (per D4): the immediate-binary complement, available alongside `recent_switch_rate` wherever the estimator allows |
+| `is_after_switch` | the most recently completed trip changed patch | 1 completed trial | binary | **retired as a fitted predictor** (2026-08-21, superseding D4): often constant within a session's complete-case cohort, which makes the design rank-deficient. Kept as a table column only, to define the dedicated switch cohort. See `docs/design/2026-08-21-covariate-naming-scheme.md`. |
 | `omission_streak` | leading consecutive omissions: count of leading 0s in `reward_lag1, reward_lag2, …`, stopping at the first 1. A `NaN` lag truncates the count. **`NaN` when `reward_lag1` itself is unresolved** — with no known most-recent outcome there is nothing to count from, and returning 0 would be indistinguishable from "the last trial was rewarded" (1,359 / 107,400 stops, the earliest of each session) | up to 10 known outcomes | count | model-free uncertainty block; excluded from the MU rate fit for collinearity with `reward_lag1` |
 | `wsls_deviation` | 0 on win-stay or lose-shift, 1 on win-shift or lose-stay. Reads `completed_trial_reward` (the trip's *realized* outcome, ungated) paired with `is_stay`. `NaN` where no trip has completed or the outbound choice is unresolved | 1 completed trial | binary | **descriptive only** — embeds the eventual choice, so future-referencing however the outcome is clocked |
 
-(D4: both kept — `recent_switch_rate` is the canonical graded covariate; `is_after_switch`
-is a valued immediate-contrast comparison, not dropped.)
+(D4 (2026-06-29) kept both; **superseded 2026-08-21**: `recent_switch_rate` (now
+`patch_switch_fraction_last5_completed_trips`) remains the canonical graded covariate, but
+`is_after_switch` is retired as a fitted predictor — see the row above.)
 
 ### 4. Spatial / role — already consistent, no change
 
@@ -218,7 +219,7 @@ rate families; conditional models access within-stop time only as `tsc_x_current
 | `q_current` / `q_arm` | main | — | main | **`q_arm` main** | **`q_arm` main** |
 | `rpe`, `value_diff_patch` | main | — | main | (nominal via interaction if tested) | — |
 | `recent_switch_rate` | main | main | main | `× is_current` | (main if predictive) |
-| `is_after_switch` | main (M8) | main (R1+) | comparison | `× is_current` comparison | — |
+| `is_after_switch` | — (retired) | — (retired) | cohort selector only | — (retired) | — |
 | spatial role / `arm_fe` | — | — | — | main | choice-set + `arm_dist_rank` |
 | `bs(tc)`, self-history | main | — | — | `tsc_x_current` only | — |
 
@@ -239,8 +240,9 @@ rate families; conditional models access within-stop time only as `tsc_x_current
   different local construct) as a *reported comparison*. (Revised from "drop":
   the two are different
   algorithms, and the margin is deliberately kept in the MU dissociation table.)
-- **D4** — exploration canonical = **`recent_switch_rate`**; **keep `is_after_switch`**
-  as the immediate-binary comparison (not dropped).
+- **D4** — exploration canonical = **`recent_switch_rate`**; keep `is_after_switch`
+  as the immediate-binary comparison. **Superseded 2026-08-21:** `is_after_switch` is
+  retired as a fitted predictor (rank deficiency); kept only as a cohort selector.
 - **D5** — adopt the **entry-rule contract** (§A) as the standing rule.
 
 ## E. Notes / non-goals

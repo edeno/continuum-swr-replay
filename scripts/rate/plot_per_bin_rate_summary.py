@@ -5,7 +5,7 @@ The visual companion to ``docs/per_bin_rate_results.md`` — reads
 ``models_per_bin_rate/all_models.pkl`` and renders, per event-type population:
 baseline rate (M0), the lag-1 reward dissociation (M7), the reward kernel and
 self-history kernel (M7), the model-comparison ladder (ΔAIC + CV bits/event),
-and the reward-rate / switch covariate dissociations (M2r / M8).
+and the reward-rate covariate dissociation (M2r).
 
 Usage:
     uv run python scripts/rate/plot_per_bin_rate_summary.py
@@ -43,7 +43,7 @@ STYLE = {  # outcome -> (label, color)
 }
 LADDER = ["M0_const", "M1_rew1", "M2_rewhist", "M2r_rewrate", "M3_hist",
           "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
-          "M7_time_hist_rew", "M7r_time_histcos_rew", "M8_full_switch",
+          "M7_time_hist_rew", "M7r_time_histcos_rew",
           "M9_rew_x_time"]
 POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
@@ -229,8 +229,7 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [("M2r_rewrate", _first_present(df, REWARD_RATE_COEF_CANDIDATES)),
-              ("M8_full_switch", "coef_is_after_switch")]
+    blocks = [("M2r_rewrate", _first_present(df, REWARD_RATE_COEF_CANDIDATES))]
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
             rr = np.exp(_coef(df, model, oc, coef).median())
@@ -240,7 +239,7 @@ def _panel_covar(ax, df):
     ax.set_xticks(range(3))
     ax.set_xticklabels(SHORT)
     ax.set_ylabel("rate ratio")
-    ax.set_title("F. Reward-rate (dark) & switch (light) by type")
+    ax.set_title("F. Reward-rate by type")
 
 
 def main() -> None:

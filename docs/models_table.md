@@ -121,7 +121,6 @@ M4_hist_rew           count ~ REWK + SELFLAG
 M5_time               count ~ BS_TC
 M6_time_hist          count ~ BS_TC + SELFLAG
 M7_time_hist_rew      count ~ BS_TC + REWK + SELFLAG
-M8_full_switch        count ~ BS_TC + REWK + SELFLAG + is_after_switch
 M9_rew_x_time         count ~ BS_TC + REWK + SELFLAG + reward_lag1:BS_TC
 M3r_histcos           count ~ HISTCOS
 M7r_time_histcos_rew  count ~ BS_TC + REWK + HISTCOS
@@ -144,9 +143,9 @@ MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
 
 ```r
 R0    n_events ~ 1
-R1    n_events ~ reward_lag1 + is_after_switch
-R2    n_events ~ reward_lag1 + is_after_switch + reward_rate_trial_k10
-Rlag  n_events ~ REWK + is_after_switch
+R1    n_events ~ reward_lag1
+R2    n_events ~ reward_lag1 + reward_rate_trial_k10
+Rlag  n_events ~ REWK
 ```
 
 ## Content — arm

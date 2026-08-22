@@ -21,9 +21,8 @@ one-population null tested against its split.
 
 ## Family A — per-stop rate (the literature-comparable layer)
 
-- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` most-recent-known reward/switch,
-  `R2` + recent reward rate, `Rlag` lagged reward kernel `reward_lag1..10` +
-  `is_after_switch`) in
+- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` most-recent-known reward,
+  `R2` + recent reward rate, `Rlag` lagged reward kernel `reward_lag1..10`) in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
 
 > **Timing definition:** `reward_lag1` is the newest outcome physically known at
@@ -50,7 +49,7 @@ offset. Its limitation is exactly that offset — see below.
 
 ## Family B — per-bin conditional intensity (the confound-free layer)
 
-- **Spec:** `MODEL_PER_BIN_RATE`, an 11-model **point-process GLM
+- **Spec:** `MODEL_PER_BIN_RATE`, a **point-process GLM
   conditional-intensity ladder** (Truccolo–Eden–Brown 2005) `M0_const … M9` in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
 - **Estimator:** one Poisson GLM per session on the **(stop × 15 ms bin)**
@@ -72,10 +71,9 @@ offset. Its limitation is exactly that offset — see below.
   | `M5_time` | within-stop time course (spline) |
   | `M6_time_hist` | time + self-history |
   | `M7_time_hist_rew` | time + self-history + reward history (**the full additive model**) |
-  | `M8_full_switch` | + `is_after_switch` |
   | `M9_rew_x_time` | + `reward_lag1 × bs(tc)` interaction (does reward modulate the time course?) |
 
-  The reward×time interaction (`M9`) and the switch model (`M8`) are **built and
+  The reward×time interaction (`M9`) is **built and
   fit**, not deferred.
 - **Runner / output:** `scripts/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →

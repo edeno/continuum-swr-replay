@@ -9,8 +9,8 @@ canonical (stop x bin) design from ``aggregate_to_timebins`` with a
 
 The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
 (session, outcome) the design is built ONCE — carrying the reward lags, the
-self-history lags, and the M2r/M8 stop covariates — and all 11
-``MODEL_PER_BIN_RATE`` models (M0_const..M9_rew_x_time) are fit against that
+self-history lags, and the M2r stop covariate — and every
+``MODEL_PER_BIN_RATE`` model (M0_const..M9_rew_x_time) is fit against that
 same design (each ``formula()`` selects its own columns). Sharing identical
 bins is what makes the nested AIC / CV / GOF comparison valid. Designs are
 built per session so all sessions' bins are never resident at once.

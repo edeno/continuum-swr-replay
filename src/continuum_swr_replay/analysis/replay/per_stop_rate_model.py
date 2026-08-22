@@ -9,9 +9,11 @@ multiplicative changes in event rate per second of immobility.
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``reward_lag1``, ``is_after_switch`` — does the newest outcome
-  physically observable by bout start, plus recent switch context, change the
-  event rate? ``reward_lag1`` is closed at the **outcome** clock: pump onset
+- **R1**: + ``reward_lag1`` — does the newest outcome physically observable
+  by bout start change the event rate? (The immediate-switch flag was
+  removed: it is often constant within a session's complete-case cohort,
+  making the design rank-deficient.) ``reward_lag1`` is closed at the
+  **outcome** clock: pump onset
   when rewarded, otherwise arrival plus ``OMISSION_KNOWN_LATENCY_SEC`` capped
   at departure. Before an arrived trip reaches that boundary, lag 1 remains
   the preceding known outcome; afterward it names the arrived trip. It is

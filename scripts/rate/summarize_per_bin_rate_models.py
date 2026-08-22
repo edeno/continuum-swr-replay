@@ -12,7 +12,7 @@ across-session significance and the cross-population comparisons:
 3. Reward kernel lags 1-10 (M7): boost-then-suppression shape, per type.
 4. Self-history kernel lags 1-10 (M3_hist raw, M7 controlled): refractory window
    and burstiness peak, compared across types.
-5. Other covariates (M2r recent reward rate, M8 switch).
+5. Other covariates (M2r recent reward rate).
 6. Ladder fit summary (AIC / CV bits/event / KS-in-band) per model x type.
 
 All "RR" are rate ratios = exp(coef); summaries are across-session medians with
@@ -141,7 +141,7 @@ def section_ladder():
     print("=" * 78)
     ladder = ["M0_const", "M1_rew1", "M2_rewhist", "M2r_rewrate", "M3_hist",
               "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
-              "M7_time_hist_rew", "M7r_time_histcos_rew", "M8_full_switch",
+              "M7_time_hist_rew", "M7r_time_histcos_rew",
               "M9_rew_x_time"]
     g = df[df.outcome == "non_local"]
     print(f"  {'model':22s} {'AIC':>8} {'cv_bits':>9} {'ks_band':>8} {'n':>4}")
@@ -177,8 +177,6 @@ def main():
 
     section_coef("5. RECENT REWARD RATE", "M2r_rewrate",
                  _first_present(df, REWARD_RATE_COEF_CANDIDATES))
-    section_coef("5. PATCH SWITCH", "M8_full_switch", "coef_is_after_switch")
-
     section_ladder()
 
 
