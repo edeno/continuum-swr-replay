@@ -846,6 +846,14 @@ def aggregate_to_timebins(
         ``stop_covariates``, ``count`` (population onsets in the bin),
         ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
         ``hist_rcos_0..self_history_basis-1``.
+
+    Raises
+    ------
+    ValueError
+        If the binned counts do not reconcile with the onsets that fall inside
+        the stops' exposed windows (``t_since_stop_onset < min(tmax,
+        immobility_duration_s)``) -- an onset lost to a dropped bin, or an onset
+        at or past the end of its stop's immobility.
     """
     if self_history_basis and not self_history_lags:
         raise ValueError("self_history_basis requires self_history_lags > 0")
@@ -883,11 +891,16 @@ def aggregate_to_timebins(
     out = out[out["exposure"] > 1e-4]
 
     src = onset_times[onset_times["t_since_stop_onset"] < tmax]
-    # clip into the design's bin range so an onset in the final partial window
-    # [(_nmax-1)*bin_s, tmax) lands in the last bin rather than a phantom bin
-    # that the merge below would silently drop.
+    # floor with a tolerance, not int(): int() truncates the quotient, and an
+    # onset exactly on a bin edge whose binary-float quotient lands just below
+    # the integer (0.3 / 0.1 -> 2.9999999999999996) would fall one bin early,
+    # shifting the estimated time course backwards. The clip keeps an onset in
+    # the final partial window [(nmax-1)*bin_s, tmax) in the last bin rather
+    # than a phantom bin that the merge below would silently drop.
     src_binj = np.clip(
-        (src["t_since_stop_onset"].to_numpy() / bin_s).astype(int), 0, nmax - 1
+        np.floor(src["t_since_stop_onset"].to_numpy() / bin_s + 1e-9).astype(int),
+        0,
+        nmax - 1,
     )
     cnt = (
         pd.DataFrame({"stop_id": src["stop_id"].to_numpy(), "binj": src_binj})
@@ -897,6 +910,28 @@ def aggregate_to_timebins(
     )
     out = out.merge(cnt, on=["stop_id", "binj"], how="left")
     out["count"] = out["count"].fillna(0)
+    # Every onset inside a stop's exposed window must land on exactly one row of
+    # the design; a mismatch means the response and the exposure disagree, which
+    # a Poisson fit cannot detect. Losses (an onset binned outside the stop's
+    # bins, or into a bin the exposure filter above removed) and gains (an onset
+    # at or past the end of the stop's immobility) are both contract violations.
+    expected = src[["stop_id", "t_since_stop_onset"]].merge(
+        s[["stop_id", "immobility_duration_s"]], on="stop_id", how="inner"
+    )
+    n_expected = int(
+        (
+            expected["t_since_stop_onset"]
+            < np.minimum(expected["immobility_duration_s"], tmax)
+        ).sum()
+    )
+    n_binned = int(out["count"].sum())
+    if n_binned != n_expected:
+        raise ValueError(
+            f"aggregate_to_timebins binned {n_binned} onset(s) but {n_expected} "
+            "fall inside a stop's exposed window "
+            "(t_since_stop_onset < min(tmax, immobility_duration_s)); the "
+            "(stop x bin) design's counts and exposure disagree"
+        )
 
     if self_history_lags:
         out = out.sort_values(["stop_id", "binj"])
@@ -918,7 +953,9 @@ def aggregate_to_timebins(
     if cross_history_lags:
         xsrc = cross_onset_times[cross_onset_times["t_since_stop_onset"] < tmax]
         xbinj = np.clip(
-            (xsrc["t_since_stop_onset"].to_numpy() / bin_s).astype(int), 0, nmax - 1
+            np.floor(xsrc["t_since_stop_onset"].to_numpy() / bin_s + 1e-9).astype(int),
+            0,
+            nmax - 1,
         )
         xcnt = (
             pd.DataFrame({"stop_id": xsrc["stop_id"].to_numpy(), "binj": xbinj})

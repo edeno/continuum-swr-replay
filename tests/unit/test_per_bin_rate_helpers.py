@@ -151,6 +151,49 @@ def test_aggregate_nondivisible_tmax_keeps_final_window():
     assert df.loc[df.binj == 0, "exposure"].iloc[0] == pytest.approx(0.1)
 
 
+def test_onset_on_bin_edge():
+    """An onset on a bin edge belongs to the bin that starts there.
+
+    ``(t / bin_s).astype(int)`` truncates the quotient, so an edge time whose
+    binary-float quotient lands just below the integer (0.3 / 0.1 evaluates to
+    2.9999999999999996) fell one bin early -- a systematic backward shift of
+    the estimated time course. Bin 2 spans [0.2, 0.3), so 0.3 is bin 3.
+    """
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.5],
+        }
+    )
+    onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.2, 0.3]})
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5).sort_values("binj")
+    assert df["count"].tolist() == [0.0, 0.0, 1.0, 1.0, 0.0]
+
+
+def test_onset_at_the_end_of_immobility_raises():
+    """An onset at ``t == immobility_duration_s`` is outside the stop's window.
+
+    It is binned (the stop's last bin covers it) but not expected, so the
+    (stop x bin) design would carry a count the exposure never earned. The
+    count reconciliation raises rather than fitting the inconsistency.
+    """
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.25],
+        }
+    )
+    onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.05, 0.25]})
+    with pytest.raises(ValueError, match=r"binned 2 onset\(s\) but 1"):
+        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+
+
 def test_raised_cosine_basis_shape_and_nonneg():
     B = raised_cosine_history_basis(10, 4)
     assert B.shape == (4, 10)
