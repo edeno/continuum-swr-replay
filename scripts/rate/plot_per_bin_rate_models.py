@@ -151,6 +151,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
 
     ax = axes[0]
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
+    shown = []  # every rate ratio drawn, for the y-limits
     for i, oc in enumerate(["swr", "non_local_swr", "non_local_no_swr"]):
         label, col = POP_STYLE[oc]
         animals, log_kernels = _reconstructed_kernels(m7, oc)
@@ -158,9 +159,11 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
         offset = 0.05 * (i - 1)
         # Per-animal medians first, so the across-session summary reads on top.
         for animal_kernel in _animal_median_kernels(animals, log_kernels).values():
+            animal_ratio = np.exp(animal_kernel)
+            shown.append(animal_ratio)
             ax.plot(
                 lags + offset,
-                np.exp(animal_kernel),
+                animal_ratio,
                 color=col,
                 lw=0.8,
                 alpha=0.35,
@@ -168,6 +171,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
             )
         med = np.median(kernels, axis=0)
         lo, hi = np.percentile(kernels, [25, 75], axis=0)
+        shown += [lo, hi]
         ax.errorbar(
             lags + offset,
             med,
@@ -183,14 +187,16 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     ax.set_xlabel("reward lag (trials back)")
     ax.set_ylabel("rate ratio (per-session median, IQR)")
     ax.set_title(
-        "Reward kernel (per-bin, time + self-history controlled)\n"
-        "basis reconstruction: bold = per-session median (IQR), "
-        "thin = per-animal medians"
+        "Reward kernel (time + self-history controlled)\n"
+        "bold: per-session median (IQR); thin: per-animal medians"
     )
     ax.set_xticks(lags)
-    # A few near-separated sessions give extreme whiskers; clip the display so
-    # the kernel shape is readable. The robust per-session medians are unaffected.
-    ax.set_ylim(0, 6)
+    # Fit the limits to what is drawn (medians, IQR, per-animal medians). A few
+    # near-separated sessions have extreme individual kernels, but none of them
+    # reaches the display: every drawn curve is a median or a quartile.
+    drawn = np.concatenate(shown)
+    span = drawn.max() - drawn.min()
+    ax.set_ylim(drawn.min() - 0.1 * span, drawn.max() + 0.1 * span)
     ax.legend(frameon=False)
 
     ax = axes[1]
@@ -207,7 +213,10 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
         patch.set_alpha(0.4)
     ax.axhline(1, color="0.5", ls=":")
     ax.set_ylabel("immediate reward effect — RR per unit (per session)")
-    ax.set_ylim(0, 5)
+    # The immediate component is a rate ratio per unit of a 0-1 reward fraction,
+    # so the per-session spread is multiplicative and covers orders of
+    # magnitude; a linear axis truncates the upper boxes.
+    ax.set_yscale("log")
 
     # paired dissociation annotation: non_local_swr vs non_local_no_swr
     a = m7[m7.outcome == "non_local_swr"][SC + [IMMEDIATE_COEF]]
