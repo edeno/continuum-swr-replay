@@ -50,8 +50,12 @@ structural nuisance terms `Intercept` and `reward_history_incomplete`
 baseline or structural-missingness coefficient says nothing about whether the
 model's scientific terms are identified. `separated` is simply "at least one
 non-nuisance term". The audited aggregation drops a session for a term only when
-that term (or, for an `is_swr:<covariate>` product, either of its factors) is
-named in `separated_terms`; the per-(model, population)
+that term itself is named in `separated_terms`. A product term
+(`is_swr:<covariate>`, `swr_x_<covariate>`) is judged on its **own** coefficient
+and does not inherit a factor's separation: its `bse·SD` already measures how
+well the interaction is pinned down, and a poorly identified `is_swr` main
+effect is a statement about the two streams' baseline rates, not about whether
+the covariate's slope differs between them. The per-(model, population)
 `n_sessions_flagged_nonconverged` / `n_sessions_flagged_separated` counts stay
 fit-level diagnostics. The remaining coefficient exclusion is the `|coef|>=10`
 backstop for fits that carry no flag.

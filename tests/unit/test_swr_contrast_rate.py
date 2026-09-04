@@ -288,3 +288,35 @@ def test_cohort_audit_reconciles_across_both_cohorts(two_session_fits):
     assert null_primary["n_drop_own_predictor_missing"] == 0
     assert null_primary["n_drop_common_cohort_other"] == 0
     assert null_primary["n_modeled"] == 48  # 2 sessions x 24 stops
+
+
+def test_aggregate_only_refuses_fits_without_per_term_flags(tmp_path, monkeypatch):
+    """A pre-term-level fit cannot be re-aggregated under the per-term drop rule.
+
+    Without ``separated_terms`` every session would read as unseparated for every
+    term, silently turning the identifiability filter off instead of applying it.
+    """
+    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "population": ["contrast"],
+            "model": ["S1_rew"],
+            "cohort": [mod.PRIMARY_COHORT],
+            "animal": ["a"],
+            "coef_is_swr:reward_history_rcos_0": [0.3],
+            "separated": [False],
+        }
+    ).to_pickle(out_dir / "swr_contrast_rate.pkl")
+    monkeypatch.setattr(mod, "RC", tmp_path)
+
+    with pytest.raises(SystemExit, match="separated_terms"):
+        mod._aggregate_only(smoke=False)
+
+
+def test_aggregate_only_requires_the_per_session_fits(tmp_path, monkeypatch):
+    (tmp_path / "models_per_bin_rate").mkdir(parents=True)
+    monkeypatch.setattr(mod, "RC", tmp_path)
+
+    with pytest.raises(SystemExit, match="no per-session fits"):
+        mod._aggregate_only(smoke=False)

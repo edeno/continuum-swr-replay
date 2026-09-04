@@ -68,7 +68,11 @@ DEFAULT_NEW_PER_STOP = RC / "models_per_stop_rate" / "all_models.pkl"
 # The term-level separation section compares the SAME specification fit under the
 # fit-level flag and under the per-term flag, so its "before" is the immediately
 # preceding refit, not the pre-reward-basis one used above.
-TERMLEVEL_BACKUP = RC / "_pre_termlevel_backup_20260904" / "models_per_bin_rate"
+TERMLEVEL_BACKUP_ROOT = RC / "_pre_termlevel_backup_20260904"
+TERMLEVEL_BACKUP = TERMLEVEL_BACKUP_ROOT / "models_per_bin_rate"
+DEFAULT_OLD_TERMLEVEL_PER_STOP = (
+    TERMLEVEL_BACKUP_ROOT / "models_per_stop_rate" / "all_models.pkl"
+)
 DEFAULT_OLD_CONTRAST = TERMLEVEL_BACKUP / "swr_contrast_rate.pkl"
 DEFAULT_NEW_CONTRAST = RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
 DEFAULT_OLD_AUDITED = TERMLEVEL_BACKUP / "swr_contrast_rate_audited.pkl"
@@ -408,6 +412,46 @@ def cv_validity_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     return merged.sort_values("model").reset_index(drop=True)
 
 
+def per_stop_validity_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Family A: flagged-fit and CV-valid share per rung, before and after.
+
+    The per-stop cross-validation is invalidated by the same rule as Family B's:
+    any fold whose fit carries a separated non-nuisance term voids
+    ``cv_ll_per_stop_mean`` for the whole rung.
+
+    Parameters
+    ----------
+    old, new : pd.DataFrame
+        Tidy per-session per-stop fits, before and after.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per rung, plus an ``all`` row over every rung.
+    """
+
+    def _shares(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+        if df.empty:
+            return pd.DataFrame(columns=["model", f"n_fits{suffix}"])
+        rows = []
+        for label, sub in [*df.groupby("model", sort=True), ("all", df)]:
+            rows.append(
+                {
+                    "model": label,
+                    f"n_fits{suffix}": len(sub),
+                    f"pct_separated{suffix}": 100
+                    * float((sub["separated"] == True).mean()),  # noqa: E712
+                    f"pct_cv_scored{suffix}": 100
+                    * float(np.isfinite(sub["cv_ll_per_stop_mean"]).mean()),
+                }
+            )
+        return pd.DataFrame(rows)
+
+    return _shares(old, "_before").merge(
+        _shares(new, "_after"), on="model", how="outer"
+    )
+
+
 def contrast_fit_flag_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     """Share of is_swr-contrast session-fits carrying the fit-level flag."""
 
@@ -567,10 +611,10 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     Parameters
     ----------
     frames : dict of str to pd.DataFrame
-        ``old_bin`` / ``new_bin`` (Family B), ``old_contrast`` / ``new_contrast``
-        (is_swr-contrast session fits) and ``old_audited`` / ``new_audited``
-        (the audited aggregate), the "old" side being the same specification fit
-        under the fit-level flag.
+        ``old_bin`` / ``new_bin`` (Family B), ``old_stop`` / ``new_stop``
+        (Family A), ``old_contrast`` / ``new_contrast`` (is_swr-contrast session
+        fits) and ``old_audited`` / ``new_audited`` (the audited aggregate), the
+        "old" side being the same specification fit under the fit-level flag.
 
     Returns
     -------
@@ -595,6 +639,17 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
         "survived as a finite number:\n"
     )
     add(_md(cv_validity_table(frames["old_bin"], frames["new_bin"]), "{:.1f}"))
+    add("\n### Family A — flagged fits and CV validity per rung\n")
+    add(
+        "The per-stop family carries the same rule; `pct_cv_scored` is the share "
+        "of session-fits whose `cv_ll_per_stop_mean` is finite:\n"
+    )
+    add(
+        _md(
+            per_stop_validity_table(frames["old_stop"], frames["new_stop"]),
+            "{:.1f}",
+        )
+    )
     add("\n### is_swr-contrast — flagged fits per population\n")
     add(
         _md(
@@ -612,11 +667,11 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     add("\n### is_swr-contrast — audited aggregate rows\n")
     add(
         "One row per (model, population, term) that survived the "
-        "unidentified-share gate. An `is_swr:<covariate>` product also drops "
-        "when its `is_swr` main effect is unidentified, so the contrast rungs "
-        "that fully interact `is_swr` with the BASE block inherit that main "
-        "effect's share (see the per-term table above) and can still sit above "
-        "the gate:\n"
+        "unidentified-share gate. A product term is judged on its OWN "
+        "coefficient: an `is_swr:<covariate>` interaction does not inherit the "
+        "`is_swr` main effect's separation, because a poorly identified "
+        "baseline-rate difference between the two streams says nothing about "
+        "whether the covariate's slope differs between them:\n"
     )
     add(_md(audited_row_table(frames["old_audited"], frames["new_audited"])))
     add("\n### is_swr-contrast — sessions dropped per emitted term (after)\n")
@@ -649,9 +704,10 @@ def build_report(
     per_stop_note : str
         Provenance caveat printed under the input table.
     termlevel : dict of str to pd.DataFrame, optional
-        ``old_bin`` / ``new_bin`` / ``old_contrast`` / ``new_contrast`` /
-        ``old_audited`` / ``new_audited`` for the term-level separation section.
-        Omitted when those artifacts are not available.
+        ``old_bin`` / ``new_bin`` / ``old_stop`` / ``new_stop`` /
+        ``old_contrast`` / ``new_contrast`` / ``old_audited`` / ``new_audited``
+        for the term-level separation section. Omitted when those artifacts are
+        not available.
     """
     lines: list[str] = []
     add = lines.append
@@ -789,6 +845,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OLD_TERMLEVEL_PER_BIN,
         help="Family B fit under the fit-level separation flag (same spec).",
     )
+    parser.add_argument(
+        "--old-termlevel-per-stop",
+        type=Path,
+        default=DEFAULT_OLD_TERMLEVEL_PER_STOP,
+        help="Family A fit under the fit-level separation flag (same spec).",
+    )
     parser.add_argument("--old-contrast", type=Path, default=DEFAULT_OLD_CONTRAST)
     parser.add_argument("--new-contrast", type=Path, default=DEFAULT_NEW_CONTRAST)
     parser.add_argument("--old-audited", type=Path, default=DEFAULT_OLD_AUDITED)
@@ -828,6 +890,8 @@ def main() -> None:
     termlevel_paths = {
         "old_bin": args.old_termlevel_per_bin,
         "new_bin": args.new_per_bin,
+        "old_stop": args.old_termlevel_per_stop,
+        "new_stop": args.new_per_stop,
         "old_contrast": args.old_contrast,
         "new_contrast": args.new_contrast,
         "old_audited": args.old_audited,
@@ -842,6 +906,7 @@ def main() -> None:
         inputs.update(
             {
                 "term-level Family B (before)": args.old_termlevel_per_bin,
+                "term-level Family A (before)": args.old_termlevel_per_stop,
                 "is_swr-contrast (before)": args.old_contrast,
                 "is_swr-contrast (after)": args.new_contrast,
                 "is_swr-contrast audited (before)": args.old_audited,

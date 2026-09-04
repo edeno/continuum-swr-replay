@@ -324,9 +324,14 @@ def term_diagnostics(
 ) -> pd.DataFrame:
     """Per (model, population, term) quasi-separation diagnostics (Contract 3).
 
-    Mirrors ``contrast_aggregation``'s per-(session, term) ``|coef| >= 10`` filter and
-    ``>= 5`` surviving-session requirement, surfaced as a standalone table so
-    term-specific coefficient exclusions stay OUT of the cohort reconciliation.
+    Reports ONLY the ``|coef| >= 10`` count (with the ``>= 5`` surviving-session
+    requirement), surfaced as a standalone table so term-specific coefficient
+    exclusions stay OUT of the cohort reconciliation. This is a backstop count, not
+    the exclusion the aggregate is built on: ``contrast_aggregation`` drops a session
+    for a term when the fitters named that term in ``separated_terms``, which is the
+    effect-scale rule and catches unidentified terms this threshold misses. Read
+    ``n_dropped`` in the audited aggregate as the authoritative per-term count;
+    ``n_sessions_quasiseparated`` here is strictly the runaway-coefficient subset.
 
     Parameters
     ----------

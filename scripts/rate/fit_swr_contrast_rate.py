@@ -42,6 +42,7 @@ sign consistency primary, session signed-rank descriptive — see the content ru
 Usage:
     uv run python scripts/rate/fit_swr_contrast_rate.py --max-per-animal 1   # smoke (~4 min)
     uv run python scripts/rate/fit_swr_contrast_rate.py --workers 16         # full
+    uv run python scripts/rate/fit_swr_contrast_rate.py --aggregate-only     # re-audit
 """
 
 from __future__ import annotations
@@ -59,6 +60,7 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from collections import Counter  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
@@ -720,6 +722,163 @@ def _cohort_records(
     return records
 
 
+def _write_aggregation(
+    models: pd.DataFrame,
+    out_dir: Path,
+    suffix: str,
+    fit_inputs: dict,
+    cli: list[str],
+) -> int:
+    """Aggregate the per-session fits and write the audited artifacts.
+
+    Writes ``swr_contrast_rate_term_diagnostics<suffix>.csv``,
+    ``swr_contrast_rate_audited<suffix>.pkl`` with its provenance sidecar, and
+    ``swr_contrast_rate_meta<suffix>.json``. Split out of the fitting path so
+    ``--aggregate-only`` can re-derive them from the persisted per-session fits
+    after an aggregation rule changes, without refitting 218 sessions.
+
+    The aggregation mirrors the content ladder (per-animal primary, session
+    signed-rank, BH-FDR, standardized per-SD columns). G-rungs are relabeled
+    ``non_local``/``_swr``/``_no_swr`` -> ``all``/``SWR``/``nonSWR`` to match the
+    content table. Each key term is aggregated over the cohort its rung was fit
+    on; the null refit on the post-outcome cohort exists for the AIC comparison
+    only and is never aggregated as a second copy of the ladder null.
+
+    Parameters
+    ----------
+    models : pd.DataFrame
+        Per-session fits, one row per (population, model, session, cohort).
+    out_dir : Path
+        ``models_per_bin_rate``.
+    suffix : str
+        ``"_smoke"`` for a smoke run, ``""`` otherwise.
+    fit_inputs : dict
+        Input records from :func:`record_inputs` for the audited sidecar.
+    cli : list of str
+        Command line recorded in the sidecar.
+
+    Returns
+    -------
+    int
+        Number of audited rows written (0 when ``models`` is empty).
+    """
+    if not len(models):
+        return 0
+
+    td_specs = [(g, p, t) for g, t in _G_KEY.items() for p in STRATA]
+    td_specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
+    pd.concat(
+        [
+            term_diagnostics(
+                models[models.cohort == cohort],
+                [sp for sp in td_specs if _home_cohort(sp[0]) == cohort],
+            ).assign(cohort=cohort)
+            for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
+        ],
+        ignore_index=True,
+    ).to_csv(out_dir / f"swr_contrast_rate_term_diagnostics{suffix}.csv", index=False)
+
+    qv = read_table(FIT_INPUTS["qvals_table"])
+    st = read_table(FIT_INPUTS["stop_table"])
+    require_covariate_schema(qv, table="qvals")
+    require_covariate_schema(st, table="stop")
+    st = add_uncertainty_covariates(st)
+    sd = {}
+    for c in _RATE_CONT_COVARS:
+        src = qv if c in qv.columns else st if c in st.columns else None
+        if src is not None:
+            sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
+    specs = [(g, p, t) for g, t in _G_KEY.items() for p in _POP_LABEL]
+    specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
+    agg = pd.concat(
+        [
+            aggregate_contrast(
+                models[models.cohort == cohort],
+                [sp for sp in specs if _home_cohort(sp[0]) == cohort],
+                "rate",
+                sd,
+            ).assign(cohort=cohort)
+            for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
+        ],
+        ignore_index=True,
+    )
+    agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
+    audited = out_dir / f"swr_contrast_rate_audited{suffix}.pkl"
+    agg.to_pickle(audited)
+    write_fit_provenance(audited, fit_inputs, "poisson_glm", cli)
+    # Persist the exact per-SD factors this run used for the std_* columns so the
+    # standardized coefficients are reproducible. These SDs are computed over the
+    # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the
+    # two differ negligibly on full data (~0.2% for recent_switch_rate). This is the
+    # runner's own reference; it is NOT the builder's pooled-global table _z.
+    (out_dir / f"swr_contrast_rate_meta{suffix}.json").write_text(
+        json.dumps(
+            {
+                "fit_time_sd_reference": {k: float(v) for k, v in sd.items()},
+                "sd_scope": (
+                    "full qvals_table + stop_table (std_factor = raw_coef * SD)"
+                ),
+                "note": (
+                    "the exact SD factors aggregate_contrast used for the std_* "
+                    "columns; NOT the builder's pooled-global table _z"
+                ),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    logger.info("Saved audited rate table (%d rows) + meta -> %s", len(agg), out_dir)
+    return len(agg)
+
+
+def _aggregate_only(smoke: bool) -> None:
+    """Re-derive the audited artifacts from the persisted per-session fits.
+
+    Reads ``swr_contrast_rate<suffix>.pkl`` and rewrites the audited table, the
+    term-diagnostics CSV and the meta JSON. The audited sidecar records that
+    pickle as its input, so the audited table is tied to the fit it was derived
+    from rather than to the tables that fit read.
+
+    Parameters
+    ----------
+    smoke : bool
+        Read/write the ``_smoke`` artifacts.
+
+    Raises
+    ------
+    SystemExit
+        If the per-session pickle is absent, or predates the per-term separation
+        flag (no ``separated_terms`` column) -- aggregating it would silently
+        apply the per-term drop rule to fits that carry no per-term information.
+    """
+    suffix = "_smoke" if smoke else ""
+    out_dir = RC / "models_per_bin_rate"
+    fits_path = out_dir / f"swr_contrast_rate{suffix}.pkl"
+    if not fits_path.exists():
+        raise SystemExit(f"no per-session fits at {fits_path}; run the fit first")
+    models = pd.read_pickle(fits_path)
+    if "separated_terms" not in models.columns:
+        raise SystemExit(
+            f"{fits_path} has no 'separated_terms' column: it predates the "
+            "per-term separation flag, and re-aggregating it would apply the "
+            "per-term drop rule to fits that carry no per-term information. "
+            "Refit before aggregating."
+        )
+    n_rows = _write_aggregation(
+        models,
+        out_dir,
+        suffix,
+        record_inputs({"swr_contrast_rate": fits_path}),
+        sys.argv,
+    )
+    logger.info(
+        "Re-aggregated %d per-session fits from %s -> %d audited rows",
+        len(models),
+        fits_path,
+        n_rows,
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -728,9 +887,20 @@ def main() -> None:
     ap.add_argument(
         "--workers", type=int, default=1, help="per-session process fan-out"
     )
+    ap.add_argument(
+        "--aggregate-only",
+        action="store_true",
+        help=(
+            "skip fitting: re-aggregate the persisted per-session fits into the "
+            "audited table, term diagnostics and meta JSON"
+        ),
+    )
     args = ap.parse_args()
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
+    if args.aggregate_only:
+        _aggregate_only(smoke)
+        return
 
     # Causal-hygiene gate: each rung's covariates must be pre-outcome, or the
     # rung is an explicitly-declared descriptive rung (RPE/value association or peri-switch
@@ -830,21 +1000,6 @@ def main() -> None:
         _cohort_records(models, stop, audit_qvals_drop, dict(cohort_stop_drops)),
         out_dir / f"swr_contrast_rate_cohort_audit{csfx}.csv",
     )
-    if len(models):
-        td_specs = [(g, p, t) for g, t in _G_KEY.items() for p in STRATA]
-        td_specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
-        pd.concat(
-            [
-                term_diagnostics(
-                    models[models.cohort == cohort],
-                    [sp for sp in td_specs if _home_cohort(sp[0]) == cohort],
-                ).assign(cohort=cohort)
-                for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
-            ],
-            ignore_index=True,
-        ).to_csv(
-            out_dir / f"swr_contrast_rate_term_diagnostics{csfx}.csv", index=False
-        )
     logger.info(
         "Saved %d rows (%d sessions, populations=%s, models=%s) to %s in %.1fs",
         len(models),
@@ -855,55 +1010,7 @@ def main() -> None:
         time.perf_counter() - t0,
     )
 
-    if len(models):
-        # Audited aggregation mirroring the content ladder (per-animal primary,
-        # session signed-rank, BH-FDR, standardized per-SD columns). G-rungs are
-        # relabeled non_local/_swr/_no_swr -> all/SWR/nonSWR to match the content table.
-        qv = read_table(FIT_INPUTS["qvals_table"])
-        st = read_table(FIT_INPUTS["stop_table"])
-        require_covariate_schema(qv, table="qvals")
-        require_covariate_schema(st, table="stop")
-        st = add_uncertainty_covariates(st)
-        sd = {}
-        for c in _RATE_CONT_COVARS:
-            src = qv if c in qv.columns else st if c in st.columns else None
-            if src is not None:
-                sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
-        specs = [(g, p, t) for g, t in _G_KEY.items() for p in _POP_LABEL]
-        specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
-        # Each key term is aggregated over the cohort its rung was fit on; the
-        # null refit on the post-outcome cohort exists for the AIC comparison
-        # only and is never aggregated as a second copy of the ladder null.
-        agg = pd.concat(
-            [
-                aggregate_contrast(
-                    models[models.cohort == cohort],
-                    [sp for sp in specs if _home_cohort(sp[0]) == cohort],
-                    "rate",
-                    sd,
-                ).assign(cohort=cohort)
-                for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
-            ],
-            ignore_index=True,
-        )
-        agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
-        asfx = "_smoke" if smoke else ""
-        audited = out_dir / f"swr_contrast_rate_audited{asfx}.pkl"
-        agg.to_pickle(audited)
-        write_fit_provenance(audited, fit_inputs, "poisson_glm", sys.argv)
-        # Persist the exact per-SD factors this run used for the std_* columns so the
-        # standardized coefficients are reproducible. These SDs are computed over the
-        # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the
-        # two differ negligibly on full data (~0.2% for recent_switch_rate). This is the
-        # runner's own reference; it is NOT the builder's pooled-global table _z.
-        (out_dir / f"swr_contrast_rate_meta{asfx}.json").write_text(json.dumps(
-            {"fit_time_sd_reference": {k: float(v) for k, v in sd.items()},
-             "sd_scope": "full qvals_table + stop_table (std_factor = raw_coef * SD)",
-             "note": "the exact SD factors aggregate_contrast used for the std_* columns; "
-                     "NOT the builder's pooled-global table _z"},
-            indent=2, sort_keys=True,
-        ))
-        logger.info("Saved audited rate table (%d rows) + meta -> %s", len(agg), out_dir)
+    _write_aggregation(models, out_dir, csfx, fit_inputs, sys.argv)
 
 
 if __name__ == "__main__":

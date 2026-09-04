@@ -171,32 +171,68 @@ def test_separation_drops_only_the_term_it_holds_for() -> None:
     assert set(out["n_sessions_flagged_separated"]) == {1}
 
 
-def test_is_swr_product_is_dropped_when_either_factor_separates() -> None:
-    """``is_swr:<c>`` is only estimable where both of its factors are."""
-    n = 12
-    fits = pd.DataFrame(
+def _product_fits(separated_terms: list[str]) -> pd.DataFrame:
+    """Twelve sessions carrying both ``is_swr`` and its product with ``q_arm``."""
+    n = len(separated_terms)
+    return pd.DataFrame(
         {
             "model": ["S4_value"] * n,
             "population": ["contrast"] * n,
-            "animal": ["a"] * 6 + ["b"] * 6,
+            "animal": ["a"] * (n // 2) + ["b"] * (n - n // 2),
             "coef_is_swr:q_arm": [0.1 * (i + 1) for i in range(n)],
             "bse_is_swr:q_arm": [0.10] * n,
             "pval_is_swr:q_arm": [0.01] * n,
-            "separated": [False] * n,
+            "coef_is_swr": [0.5] * n,
+            "bse_is_swr": [0.10] * n,
+            "pval_is_swr": [0.01] * n,
+            "separated": [bool(t) for t in separated_terms],
             "converged": [True] * n,
-            # Session 1 separated on the covariate, session 2 on the indicator.
-            "separated_terms": ["", "q_arm", "is_swr"] + [""] * (n - 3),
+            "separated_terms": separated_terms,
         }
     )
+
+
+def test_product_term_does_not_inherit_its_factors_separation() -> None:
+    """``is_swr:<c>`` is judged on its own coefficient, not on ``is_swr``'s.
+
+    A large SE on the ``is_swr`` main effect says the two streams' baseline rates
+    are hard to tell apart; it says nothing about whether the covariate's slope
+    differs between them, which is what the product estimates.
+    """
+    fits = _product_fits(["", "q_arm", "is_swr"] + [""] * 9)
+
+    out = aggregate_contrast(
+        fits,
+        [
+            ("S4_value", "contrast", "is_swr:q_arm"),
+            ("S4_value", "contrast", "is_swr"),
+        ],
+        level="rate",
+    ).set_index("term")
+
+    # The product keeps every session: neither factor's separation touches it.
+    assert out.loc["is_swr:q_arm", "n_sessions"] == 12
+    assert out.loc["is_swr:q_arm", "n_dropped"] == 0
+    assert out.loc["is_swr:q_arm", "coef_session_median"] == pytest.approx(0.65)
+    # The ``is_swr`` term itself is still dropped where it separated.
+    assert out.loc["is_swr", "n_sessions"] == 11
+    assert out.loc["is_swr", "n_dropped"] == 1
+    # The fit-level diagnostic still counts both flagged fits, for both terms.
+    assert set(out["n_sessions_flagged_separated"]) == {2}
+
+
+def test_product_term_is_dropped_when_the_product_itself_separates() -> None:
+    """Separation ON the product is what drops the session for the product."""
+    fits = _product_fits(["", "is_swr:q_arm", ""] + [""] * 9)
 
     out = aggregate_contrast(
         fits, [("S4_value", "contrast", "is_swr:q_arm")], level="rate"
     )
 
-    assert out.iloc[0]["n_sessions"] == 10
-    assert out.iloc[0]["n_dropped"] == 2
-    # 0.2 and 0.3 are gone; the remaining ten run 0.1, 0.4, 0.5, ..., 1.2.
-    assert out.iloc[0]["coef_session_median"] == pytest.approx(0.75)
+    assert out.iloc[0]["n_sessions"] == 11
+    assert out.iloc[0]["n_dropped"] == 1
+    # 0.2 is gone; the remaining eleven run 0.1, 0.3, 0.4, ..., 1.2 (median 0.7).
+    assert out.iloc[0]["coef_session_median"] == pytest.approx(0.70)
 
 
 def test_unrelated_separated_term_never_drops_a_session() -> None:

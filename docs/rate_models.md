@@ -194,9 +194,10 @@ while every scientific term beside it is ordinary. CV metrics carry per-fold
 `cv_n_nonconverged_folds` / `cv_n_separated_folds`, and a CV metric is
 invalidated (`nan`) if any fold is nonconverged or separated on a non-nuisance
 term, rather than dropping the fold. The aggregation drops a session for a term
-only when that term is named in its `separated_terms` (for an
-`is_swr:<covariate>` product, when either factor is); `|coef|>=10` remains a
-backstop for fits carrying no flag.
+only when that term itself is named in its `separated_terms`; a product term
+(`is_swr:<covariate>`, `swr_x_<covariate>`) is judged on its own coefficient and
+does not inherit a factor's separation. `|coef|>=10` remains a backstop for fits
+carrying no flag.
 
 What the ladder actually shows (218 sessions):
 

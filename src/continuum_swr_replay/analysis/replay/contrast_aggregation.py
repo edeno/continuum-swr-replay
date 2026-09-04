@@ -102,8 +102,13 @@ def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
     every term is what emptied the audited table. The per-term rule reads the
     ``separated_terms`` column written by the fitters (``"|"``-joined names).
 
-    An ``is_swr:<covariate>`` product is unidentified when either factor is: the
-    interaction is only estimable where both the indicator and the covariate are.
+    A product term (``is_swr:<covariate>``, ``swr_x_<covariate>``) is judged on
+    its OWN coefficient and nothing else. Its ``bse * sd`` already measures how
+    well the interaction itself is pinned down, so inheriting a factor's
+    separation would drop sessions in which the product is perfectly well
+    estimated: an ``is_swr`` main effect with a large SE is a statement about the
+    baseline rate difference between the two streams, not about whether the
+    covariate's slope differs between them.
 
     Parameters
     ----------
@@ -123,11 +128,8 @@ def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
         if "separated" not in fits.columns:
             return pd.Series(False, index=fits.index)
         return fits["separated"] == True  # noqa: E712 (NaN must not count)
-    factors = {term}
-    if term.startswith("is_swr:"):
-        factors |= {"is_swr", term.split(":", 1)[1]}
     return fits["separated_terms"].map(
-        lambda v: isinstance(v, str) and bool(factors & set(v.split("|")))
+        lambda v: isinstance(v, str) and term in v.split("|")
     )
 
 
