@@ -1179,6 +1179,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     if args.grain == "event":
         output_dir = output_dir.with_name(f"{output_dir.name}_event_grain")
         logging.info("grain = event (one observation per event) -> %s", output_dir)
+
     # Determine which models to fit
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
@@ -1213,9 +1214,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         output_dir = canonical_dir.with_name(
             f"{canonical_dir.name}_{'-'.join(model_names)}"
         )
-        logging.info(
-            "partial ladder (%s) -> %s", ", ".join(model_names), output_dir
-        )
+        logging.info("partial ladder (%s) -> %s", ", ".join(model_names), output_dir)
 
     return _RunConfig(
         hierarchy=hierarchy,
