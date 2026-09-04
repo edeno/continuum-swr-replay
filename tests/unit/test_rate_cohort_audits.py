@@ -360,7 +360,7 @@ def test_per_stop_hierarchy_records_reconcile():
 
     rng = np.random.default_rng(1)
     frames = []
-    for a, d in [("a", 1), ("b", 2)]:
+    for si, (a, d) in enumerate([("a", 1), ("b", 2)]):
         n = 60
         frames.append(
             pd.DataFrame(
@@ -368,6 +368,7 @@ def test_per_stop_hierarchy_records_reconcile():
                     "animal": a,
                     "session_date": d,
                     "epoch": "e",
+                    "stop_id": np.arange(si * n, (si + 1) * n),
                     "n_selected_events": rng.poisson(2, n).astype(float),
                     "immobility_duration_s": rng.uniform(5, 30, n),
                     **{
@@ -387,3 +388,71 @@ def test_per_stop_hierarchy_records_reconcile():
     assert recs and all(_reconciles(r) for r in recs)
     # immobility<=0 stops are attributed as own drops.
     assert any(r["n_drop_own_predictor_missing"] >= 2 for r in recs)
+
+
+def test_contrast_ladder_rungs_share_one_cohort():
+    """Both is_swr-contrast ladders are fit on one frozen cohort per session.
+
+    A qvals covariate that only some rungs use is NaN on a few stops. Per rung
+    NaN-dropping would fit G0_base (which does not use it) on more bins than
+    G5_rpe, so their AIC would not be comparable. The freeze removes those
+    stops from every rung of the stratum, and the audit books them as
+    ``n_drop_common_cohort_other`` for the rungs that did not need the column.
+    """
+    from threadpoolctl import threadpool_limits
+
+    from scripts.rate import fit_swr_contrast_rate as mod
+
+    rng = np.random.default_rng(0)
+    stop_rows, onset_rows = [], []
+    for sid in range(40):
+        immobility = float(rng.uniform(1.0, 1.6))
+        row = {
+            "animal": "a", "session_date": 1, "epoch": "02_r1", "stop_id": sid,
+            "immobility_duration_s": immobility,
+            "reward_history_rcos_0": float(sid % 2),
+            "reward_history_rcos_1": float(rng.uniform(0, 1)),
+            "reward_history_rcos_2": float(rng.uniform(0, 1)),
+            "reward_history_incomplete": 0.0,
+            **{c: float(rng.normal()) for c in mod.STOP_COVARS},
+        }
+        if sid % 10 == 0:  # 4 stops with no fitted value state
+            row["rpe_postoutcome"] = np.nan
+        stop_rows.append(row)
+        for _ in range(rng.poisson(12 * immobility)):
+            onset_rows.append({
+                "animal": "a", "session_date": 1, "epoch": "02_r1",
+                "stop_id": sid, "event_type": "non_local",
+                "t_since_stop_onset": float(rng.uniform(0, immobility)),
+                "is_swr": bool(rng.integers(0, 2)),
+            })
+    stop = pd.DataFrame(stop_rows)
+
+    with threadpool_limits(limits=1):
+        _, rows, skips, drops = mod._fit_one_session(
+            ("a", 1, "02_r1"), stop, pd.DataFrame(onset_rows)
+        )
+    fits = pd.DataFrame(rows)
+
+    assert not skips  # every rung fit
+    assert drops["non_local"] == 4  # the freeze removed the four NaN stops once
+    assert drops["contrast"] == 0  # the strata were frozen before stacking
+    for population, cell in fits.groupby("population"):
+        assert cell["n_bins"].nunique() == 1, population
+        assert cell["n_stops"].nunique() == 1, population
+        assert cell["n_stops"].iloc[0] == 36
+    # The stacked contrast design keeps its within-bin pairing: two rows per bin.
+    assert (
+        fits.loc[fits.population == "contrast", "n_bins"].iloc[0]
+        == 2 * fits.loc[fits.population == "non_local_swr", "n_bins"].iloc[0]
+    )
+
+    records = mod._cohort_records(fits, stop, 7, drops)
+    assert all(_reconciles(r) for r in records)
+    by = {(r["model"], r["population"]): r for r in records}
+    g0, g5 = by[("G0_base", "all")], by[("G5_rpe", "all")]
+    assert g0["n_drop_own_predictor_missing"] == 0
+    assert g0["n_drop_common_cohort_other"] == 4
+    assert g5["n_drop_own_predictor_missing"] == 4
+    assert g5["n_drop_common_cohort_other"] == 0
+    assert g0["n_modeled"] == g5["n_modeled"] == 36

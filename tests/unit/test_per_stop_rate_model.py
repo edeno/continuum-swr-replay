@@ -397,3 +397,78 @@ class TestCrossValidateRateModel:
         assert cv["cv_n_nonconverged_folds"] == 0
         assert np.isnan(cv["cv_ll_per_stop_mean"])
         assert np.isnan(cv["cv_ll_per_stop_std"])
+
+
+# ── One cohort for the whole ladder ──
+
+
+def test_hierarchy_shares_cohort():
+    """R0 and R1 are fit to the same stops, so their AIC comparison is valid.
+
+    A stop whose reward-history basis is missing is unusable by R1. Fitting each
+    rung against its own complete cases would put R0 on every stop and R1 on the
+    rest — AIC scales with n, so R0 would win mechanically. The runner freezes
+    one cohort per session over the union of the ladder's predictors instead.
+
+    Also pins the structural-missingness indicator's role: it is fit (a
+    coefficient comes back) but never enters the aggregated ladder summary.
+    """
+    from continuum_swr_replay.analysis.replay.model_comparison import (
+        run_full_hierarchy_comparison,
+    )
+    from continuum_swr_replay.analysis.replay.model_specs import MODEL_PER_STOP_RATE
+    from scripts.rate import fit_per_stop_rate_models as mod
+
+    rng = np.random.default_rng(3)
+    frames = []
+    for si, (animal, session_date) in enumerate([("a", 1), ("b", 2)]):
+        n = 120
+        df = _simulate_stops(n_stops=n, log_intercept=0.0, seed=si)
+        df["animal"] = animal
+        df["session_date"] = session_date
+        df["epoch"] = "02_r1"
+        df["stop_id"] = np.arange(si * n, (si + 1) * n)
+        for k in range(3):
+            df[f"reward_history_rcos_{k}"] = rng.uniform(0, 1, n)
+        df["reward_history_incomplete"] = 0.0
+        # An epoch-prefix is structurally incomplete: features zero-filled,
+        # indicator 1 (never NaN, so it never costs a stop).
+        df.loc[df.index[10:16], "reward_history_incomplete"] = 1.0
+        for k in range(3):
+            df.loc[df.index[10:16], f"reward_history_rcos_{k}"] = 0.0
+        # Ten stops per session have an unusable reward-history basis.
+        df.loc[df.index[:10], "reward_history_rcos_1"] = np.nan
+        frames.append(df)
+    stop = pd.concat(frames, ignore_index=True)
+
+    fits, records = mod.fit_per_stop_rate_hierarchy(stop, run_cv=False)
+
+    per_session = fits[fits.outcome == "non_local"].set_index(["model", "animal"])
+    for animal in ("a", "b"):
+        assert per_session.loc[("R0", animal), "n_stops"] == 110
+        assert per_session.loc[("R1", animal), "n_stops"] == 110
+
+    # The indicator is fit ...
+    r1 = fits[(fits.model == "R1") & (fits.outcome == "non_local")]
+    assert r1["coef_reward_history_incomplete"].notna().all()
+
+    # ... and the aggregated ladder summary neither reports it nor invalidates
+    # the R0-vs-R1 step (equal n_stops => the cohort guard stays quiet).
+    summary = run_full_hierarchy_comparison(
+        fits[fits.outcome == "non_local"].assign(model=fits["model"]),
+        hierarchy=MODEL_PER_STOP_RATE,
+    )
+    assert list(summary["child"]) == ["R1"]
+    assert np.isfinite(summary["delta_aic_median"]).all()
+    assert not any("reward_history_incomplete" in c for c in summary.columns)
+
+    # Audit: the 10 unusable stops are R1's own-predictor drop, and R0's
+    # common-cohort drop (R0 needs none of them but shares the cohort).
+    by_model = {(r["model"], r["population"]): r for r in records}
+    r0_rec = by_model[("R0", "non_local")]
+    r1_rec = by_model[("R1", "non_local")]
+    assert r0_rec["n_drop_own_predictor_missing"] == 0
+    assert r0_rec["n_drop_common_cohort_other"] == 20
+    assert r1_rec["n_drop_own_predictor_missing"] == 20
+    assert r1_rec["n_drop_common_cohort_other"] == 0
+    assert r0_rec["n_modeled"] == r1_rec["n_modeled"] == 220

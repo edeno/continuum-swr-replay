@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     add_uncertainty_covariates,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
+    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E402
     capture_fit_warnings,
@@ -151,8 +152,13 @@ _EXPECTED = (
 def _fit(
     design: pd.DataFrame, formula: str, need_cols: list[str]
 ) -> tuple[dict | None, str | None]:
-    """Poisson GLM `count ~ formula` with a log(exposure) offset. NaN-drop then
-    offset (mirrors fit_per_bin_rate_model to keep the offset aligned).
+    """Poisson GLM `count ~ formula` with a log(exposure) offset.
+
+    ``design`` must already be frozen to the ladder's common cohort
+    (:func:`freeze_per_bin_cohort` over the union of every rung's columns), so
+    every rung of a ladder is fit to the same rows and their AIC / deviance are
+    comparable. An incomplete design is a caller bug and raises rather than
+    being quietly subset here.
 
     Returns ``(row, reason)``: ``reason`` is ``None`` on success, else a short tag
     for the skip -- ``missing:<cols>`` (a needed column is absent -> a config/upstream
@@ -163,8 +169,24 @@ def _fit(
     missing = [c for c in need_cols if c not in design.columns]
     if missing:
         return None, f"missing:{','.join(missing)}"
-    df = design.dropna(subset=[*need_cols, "exposure"])
-    df = df[df["exposure"] > 0]
+    nan_cols = {
+        c: int(design[c].isna().sum())
+        for c in (*need_cols, "exposure")
+        if design[c].isna().any()
+    }
+    if nan_cols:
+        raise ValueError(
+            f"is_swr-contrast rate design has missing values in {nan_cols}; "
+            "freeze the ladder's common cohort with freeze_per_bin_cohort() "
+            "before fitting (a per-rung drop would split the ladder's cohort)."
+        )
+    n_bad = int((design["exposure"] <= 0).sum())
+    if n_bad:
+        raise ValueError(
+            f"is_swr-contrast rate design has {n_bad} row(s) with exposure <= 0; "
+            "freeze the ladder's common cohort with freeze_per_bin_cohort()."
+        )
+    df = design
     n_events = int((df["count"] > 0).sum())
     if len(df) < MIN_BINS or n_events < MIN_EVENTS:
         return None, "too_few"
@@ -199,9 +221,18 @@ def _fit(
     return out, None
 
 
-def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
+def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, dict]:
+    """Fit both ladders for one session, each on ONE frozen cohort.
+
+    Returns ``(keys, rows, skips, cohort_drops)``; ``cohort_drops`` maps a
+    population (each stratum plus ``"contrast"``) to the number of stops the
+    cohort freeze removed, which the audit reports as
+    ``n_drop_common_cohort_other`` for the rungs that do not need the missing
+    column themselves.
+    """
     rows: list[dict] = []
     skips: dict = {}  # (model, population, reason) -> count
+    cohort_drops: dict = {}
     designs = {
         pop: aggregate_to_timebins(
             stops_g,
@@ -215,6 +246,17 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
         )
         for pop in STRATA
     }
+    # ONE cohort per ladder: the union of every G rung's columns for each
+    # stratum. The union is identical across strata (the covariates are the
+    # same per-stop values; only ``count`` differs), so the stacked contrast
+    # design below keeps its within-bin pairing.
+    g_union = list(dict.fromkeys(c for _f, need in G_SPECS.values() for c in need))
+    for pop in STRATA:
+        frozen, freeze = freeze_per_bin_cohort(
+            designs[pop], (), extra_columns=g_union
+        )
+        cohort_drops[pop] = freeze["n_stops_before"] - freeze["n_stops_after"]
+        designs[pop] = frozen
     base = dict(zip(SESSION_COLS, keys, strict=True))
     # A. stratified
     for pop in STRATA:
@@ -232,6 +274,13 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
         ],
         ignore_index=True,
     )
+    s_union = list(dict.fromkeys(c for _f, need in S_SPECS.values() for c in need))
+    stacked, s_freeze = freeze_per_bin_cohort(
+        stacked, (), extra_columns=[*s_union, "is_swr"]
+    )
+    cohort_drops["contrast"] = (
+        s_freeze["n_stops_before"] - s_freeze["n_stops_after"]
+    )
     for name, (formula, need) in S_SPECS.items():
         fit, reason = _fit(stacked, formula, [*need, "is_swr"])
         if fit is not None:
@@ -240,7 +289,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
             skips[(name, "contrast", reason)] = (
                 skips.get((name, "contrast", reason), 0) + 1
             )
-    return keys, rows, skips
+    return keys, rows, skips, cohort_drops
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
@@ -299,24 +348,43 @@ def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
 
 
 def _cohort_records(
-    models: pd.DataFrame, stop: pd.DataFrame, n_qvals_dropped: int
+    models: pd.DataFrame,
+    stop: pd.DataFrame,
+    n_qvals_dropped: int,
+    cohort_stop_drops: dict | None = None,
 ) -> list[dict]:
     """One stop-grain cohort record per (model, population).
 
-    Grain is ``stop`` (the plan audits the rate family at stop grain — the timebin
+    Grain is ``stop`` (the rate family is audited at stop grain — the timebin
     design is aggregated per-session inside the fitter). Buckets:
     ``n_drop_qvals_gap`` = the inner qvals-join drop (mechanism B, stops with no fitted
-    value state, already removed in ``_load``); ``n_drop_own_predictor_missing`` =
+    value state, already removed in ``_load``, so the cohort freeze cannot see them
+    and they are never counted twice); ``n_drop_own_predictor_missing`` =
     post-join stops with ``immobility<=0`` or a NaN stop-level required predictor
-    (e.g. ``reward_history_rcos_0``, model-specific); ``n_modeled`` = the fitter's distinct
+    (e.g. ``reward_history_rcos_0``, model-specific);
+    ``n_drop_common_cohort_other`` = post-join stops this rung's own predictors
+    cover but that the frozen ladder cohort still removes because ANOTHER rung
+    needs a column that is NaN there; ``n_modeled`` = the fitter's distinct
     modeled-stop count (``n_stops``); the rest (bin-level drops, session gates) go to
     ``n_excluded_session``. Reconciles by construction.
+
+    ``cohort_stop_drops`` maps a fit population to the stops the freeze actually
+    removed; it must not exceed what the stop-level attribution accounts for.
     """
     total = int(len(stop))  # post-join stops
     n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
     need_by_model = {
         **{m: need for m, (_f, need) in G_SPECS.items()},
         **{m: need for m, (_f, need) in S_SPECS.items()},
+    }
+    frozen_drops = cohort_stop_drops or {}
+    union_by_ladder = {
+        "G": [c for _f, need in G_SPECS.values() for c in need if c in stop.columns],
+        "S": [c for _f, need in S_SPECS.values() for c in need if c in stop.columns],
+    }
+    union_missing = {
+        ladder: stop_own_missing(stop, list(dict.fromkeys(cols)))
+        for ladder, cols in union_by_ladder.items()
     }
     pairs = [(m, p) for m in G_SPECS for p in STRATA]
     pairs += [(m, "contrast") for m in S_SPECS]
@@ -329,19 +397,33 @@ def _cohort_records(
         fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
         n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
         stop_level = [c for c in need_by_model.get(name, ()) if c in stop.columns]
-        n_own = int(stop_own_missing(stop, stop_level).sum())
+        own_missing = stop_own_missing(stop, stop_level)
+        n_own = int(own_missing.sum())
+        n_common = int(
+            (union_missing["S" if pop == "contrast" else "G"] & ~own_missing).sum()
+        )
+        n_frozen_out = int(frozen_drops.get(pop, 0))
+        if n_frozen_out > n_own + n_common:
+            raise AssertionError(
+                f"{name}/{pop}: the cohort freeze removed {n_frozen_out} stops "
+                f"but the stop-level attribution only accounts for "
+                f"{n_own + n_common} (own {n_own} + common {n_common})"
+            )
         records.append(cohort_record(
-            name, _POP_LABEL.get(pop, pop), "stop",
+            name, _POP_LABEL.get(pop, pop), "stop", cohort_mode="common",
             n_in=total + int(n_qvals_dropped), n_modeled=n_modeled,
             sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
             animals_modeled=len({k[0] for k in fit_keys}),
             drop_notes=(
                 "qvals-join drop -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                "stop-level predictor -> own; bin-level + session gates -> excluded"
+                "own stop-level predictor -> own; NaN only in another rung's "
+                "column (frozen cohort) -> common; bin-level + session gates -> "
+                "excluded"
             ),
             n_drop_qvals_gap=int(n_qvals_dropped),
             n_drop_own_predictor_missing=n_own,
-            n_excluded_session=total - n_own - n_modeled,
+            n_drop_common_cohort_other=n_common,
+            n_excluded_session=total - n_own - n_common - n_modeled,
             n_sessions_flagged_nonconverged=(
                 int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
             ),
@@ -393,18 +475,21 @@ def main() -> None:
     t0 = time.perf_counter()
     rows: list[dict] = []
     skips: Counter = Counter()
+    cohort_stop_drops: Counter = Counter()
     if args.workers > 1:
         with ProcessPoolExecutor(max_workers=args.workers) as ex:
             futs = [ex.submit(_fit_one_session, k, s, o) for k, s, o in items]
             for fut in as_completed(futs):
-                _, r, sk = fut.result()
+                _, r, sk, drops = fut.result()
                 rows.extend(r)
                 skips.update(sk)
+                cohort_stop_drops.update(drops)
     else:
         for k, s, o in items:
-            _, r, sk = _fit_one_session(k, s, o)
+            _, r, sk, drops = _fit_one_session(k, s, o)
             rows.extend(r)
             skips.update(sk)
+            cohort_stop_drops.update(drops)
             logger.info("  %s: %d fits", "_".join(map(str, k)), len(r))
 
     # log skipped (model, population, reason) cells so a silently-shrunk per-model
@@ -440,7 +525,7 @@ def main() -> None:
     # tiny subset n_in would be meaningless. Report 0 there (smoke is not a reported run).
     audit_qvals_drop = 0 if args.max_per_animal else n_qvals_dropped
     write_cohort_audit(
-        _cohort_records(models, stop, audit_qvals_drop),
+        _cohort_records(models, stop, audit_qvals_drop, dict(cohort_stop_drops)),
         out_dir / f"swr_contrast_rate_cohort_audit{csfx}.csv",
     )
     if len(models):

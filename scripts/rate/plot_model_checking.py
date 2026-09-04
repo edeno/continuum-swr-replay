@@ -40,6 +40,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -112,6 +113,10 @@ def _refit_session(
         reward_basis=True, self_history_lags=N_HISTORY_LAGS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
     )
+    # Freeze the cohort before fitting (the fitter refuses an incomplete
+    # design). This design is built for one rung, not the whole ladder, so the
+    # freeze covers that rung's columns only.
+    design, _ = freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE[FULL]])
     fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE[FULL])
     return design, fit
 

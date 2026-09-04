@@ -86,7 +86,11 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
     """Fit ``model_name`` on one session's stops; draw predictors + obs/pred/resid."""
     spec = MODEL_PER_STOP_RATE[model_name]
     predictors = list(spec.predictors)
-    sub = sub.sort_values("stop_start").reset_index(drop=True)
+    sub = sub.sort_values("stop_start")
+    # Complete-case selection happens here, not in the fitter (which refuses an
+    # incomplete design), so the plotted rows are exactly the fitted rows.
+    sub = sub.dropna(subset=[response_col, "immobility_duration_s", *predictors])
+    sub = sub[sub["immobility_duration_s"] > 0].reset_index(drop=True)
     n_stops = len(sub)
     x = np.arange(n_stops)
 

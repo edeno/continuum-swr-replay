@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     attach_is_swr_to_onsets,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -111,6 +112,10 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
         cross_history_lags=N_HISTORY_LAGS, cross_history_basis=N_HISTORY_BASIS,
         **common,
     )
+    # One cohort per design before the first fit: the fitters refuse an
+    # incomplete design rather than subsetting it per rung.
+    design_self, _ = freeze_per_bin_cohort(design_self, [M_SELF])
+    design_cross, _ = freeze_per_bin_cohort(design_cross, [M_CROSS])
     fit_self = fit_per_bin_rate_model(design_self, M_SELF)
     fit_cross = fit_per_bin_rate_model(design_cross, M_CROSS)
     if fit_self is None or fit_cross is None:

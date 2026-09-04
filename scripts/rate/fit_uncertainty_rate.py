@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
@@ -422,6 +423,19 @@ def fit_uncertainty_rate(
                     gate_audit["outcome_balance_status"],
                 )
                 continue
+            # One cohort for the fitted rung, frozen before the fit: the
+            # fitter refuses an incomplete design rather than subsetting it.
+            # The physical post-outcome gate above already selected the rows
+            # that are complete for exactly these columns, so this must remove
+            # nothing -- a removal would mean the two selections disagree.
+            design, freeze = freeze_per_bin_cohort(design, [MU_UNCERTAINTY])
+            if freeze["n_bins_after"] != freeze["n_bins_before"]:
+                raise ValueError(
+                    f"{'_'.join(map(str, keys))} / {outcome}: the cohort freeze "
+                    f"removed {freeze['n_bins_before'] - freeze['n_bins_after']} "
+                    "bins the post-outcome gate had kept; the gate's complete-case "
+                    "selection and freeze_per_bin_cohort must agree."
+                )
             fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
             if fit is None:
                 n_unfit[outcome] += 1

@@ -8,12 +8,17 @@ canonical (stop x bin) design from ``aggregate_to_timebins`` with a
 ``log(exposure)`` offset, modelling the within-stop time course explicitly.
 
 The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
-(session, outcome) the design is built ONCE — carrying the reward lags, the
-self-history lags, and the M2r stop covariate — and every
-``MODEL_PER_BIN_RATE`` model (M0_const..M9_rew_x_time) is fit against that
-same design (each ``formula()`` selects its own columns). Sharing identical
-bins is what makes the nested AIC / CV / GOF comparison valid. Designs are
-built per session so all sessions' bins are never resident at once.
+(session, outcome) the design is built ONCE — carrying the reward-history
+basis and the self-history lags — then frozen to one cohort with
+``freeze_per_bin_cohort`` over the union of every rung's design columns, and
+every ``MODEL_PER_BIN_RATE`` model (M0_const..M9_rew_x_time) is fit against
+that frozen design (each ``formula()`` selects its own columns). The freeze is
+what makes the nested AIC / CV / GOF comparison valid: AIC scales with the
+number of rows, so a rung fit to fewer bins would win mechanically. The
+fitters raise rather than drop rows, and this runner additionally asserts that
+freezing the shipped ladder removes zero stops (every column it needs is
+complete on the canonical stop table by construction). Designs are built per
+session so all sessions' bins are never resident at once.
 
 Each (session, outcome, model) contributes one tidy row with the fit
 coefficients, the 10-fold stop-based cross-validation (``cv_bits_per_event``),
@@ -71,6 +76,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     attach_is_swr_to_onsets,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
@@ -110,21 +116,25 @@ def _fit_one_session(
     onsets_g: pd.DataFrame,
     run_cv: bool,
     run_gof: bool,
-) -> tuple[tuple, list[dict], dict, dict, float]:
-    """Fit all (outcome, model) cells for one session.
+) -> tuple[tuple, list[dict], dict, dict, dict, float]:
+    """Fit all (outcome, model) cells for one session on ONE frozen cohort.
 
-    Returns ``(keys, rows, none_counts, cv_none_counts, elapsed)``.
+    Returns ``(keys, rows, none_counts, cv_none_counts, cohort_drops, elapsed)``.
     ``none_counts`` maps ``(model, outcome) -> count`` of cells whose GLM fit
     returned ``None`` (too little data / unidentified / numerical failure);
     ``cv_none_counts`` maps the same key to cells that fit but whose
     cross-validation returned ``None`` (a fold failed or the design was not
     CV-able), which would otherwise drop the ``cv_*`` columns silently.
+    ``cohort_drops`` maps ``outcome -> stops removed by the cohort freeze``,
+    which the shipped ladder requires to be zero (asserted below) and which the
+    cohort audit reports as ``n_drop_common_cohort_other``.
     Top-level (picklable) so it can run in a worker process.
     """
     t0 = time.perf_counter()
     rows: list[dict] = []
     none_counts: dict = {}
     cv_none_counts: dict = {}
+    cohort_drops: dict = {}
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -136,6 +146,27 @@ def _fit_one_session(
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
         )
+        # ONE cohort for the whole ladder, frozen before the first fit.
+        frozen, freeze = freeze_per_bin_cohort(design, MODEL_PER_BIN_RATE.values())
+        n_dropped = freeze["n_stops_before"] - freeze["n_stops_after"]
+        cohort_drops[outcome] = n_dropped
+        if n_dropped:
+            offenders = {
+                col: int(design[col].isna().sum())
+                for col in freeze["required_columns"]
+                if design[col].isna().any()
+            }
+            raise ValueError(
+                f"{'_'.join(map(str, keys))}/{outcome}: freezing the shipped "
+                f"per-bin ladder removed {n_dropped} of "
+                f"{freeze['n_stops_before']} stops. Every column the ladder "
+                "needs is complete on the canonical stop table by construction "
+                "(the reward-history basis is zero-filled and flagged by "
+                "reward_history_incomplete, the history lags are zero-filled), "
+                f"so a drop means an upstream table changed. Missing values "
+                f"per column: {offenders}"
+            )
+        design = frozen
         for name, spec in MODEL_PER_BIN_RATE.items():
             fit = fit_per_bin_rate_model(design, spec)
             if fit is None:
@@ -164,7 +195,10 @@ def _fit_one_session(
                         cv_none_counts.get((name, outcome), 0) + 1
                     )
             rows.append(row)
-    return keys, rows, none_counts, cv_none_counts, time.perf_counter() - t0
+    return (
+        keys, rows, none_counts, cv_none_counts, cohort_drops,
+        time.perf_counter() - t0,
+    )
 
 
 def fit_per_bin_rate_models(
@@ -180,6 +214,12 @@ def fit_per_bin_rate_models(
     ``onsets`` must already carry the canonical ``is_swr`` column (run
     :func:`attach_is_swr_to_onsets` once before calling). ``workers > 1``
     fans the per-session work out over processes (sessions are independent).
+
+    Every rung of one (session, outcome) cell is fit to the same frozen cohort,
+    so all rungs of a cell report the same ``n_bins`` / ``n_stops``. The number
+    of stops that freeze removed per outcome is attached as
+    ``result.attrs["cohort_stop_drops"]`` for the cohort audit; the shipped
+    ladder requires it to be zero.
     """
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
     items = [
@@ -191,11 +231,13 @@ def fit_per_bin_rate_models(
     rows: list[dict] = []
     none_counts: Counter = Counter()
     cv_none_counts: Counter = Counter()
+    cohort_stop_drops: Counter = Counter()
 
-    def _collect(keys, r, nc, cvnc, elapsed):
+    def _collect(keys, r, nc, cvnc, drops, elapsed):
         rows.extend(r)
         none_counts.update(nc)
         cv_none_counts.update(cvnc)
+        cohort_stop_drops.update(drops)
         logger.info("  %s: %d fits in %.1fs", "_".join(map(str, keys)), len(r), elapsed)
 
     if workers > 1:
@@ -220,7 +262,11 @@ def fit_per_bin_rate_models(
             "CV-None (fit ok, CV dropped) counts per (model, outcome): %s",
             {f"{m}/{o}": c for (m, o), c in sorted(cv_none_counts.items())},
         )
-    return pd.DataFrame(rows)
+    result = pd.DataFrame(rows)
+    result.attrs["cohort_stop_drops"] = {
+        outcome: int(cohort_stop_drops.get(outcome, 0)) for outcome in POPULATIONS
+    }
+    return result
 
 
 def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -233,22 +279,44 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     return stop_table.merge(keep, on=SESSION_COLS)
 
 
-def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
+def _cohort_records(
+    models: pd.DataFrame,
+    stop: pd.DataFrame,
+    cohort_stop_drops: dict | None = None,
+) -> list[dict]:
     """Stop-grain cohort record per (model, population) for the per-bin ladder.
 
-    Family B has no qvals merge. A stop is dropped for **own-predictor** reasons when
-    ``immobility_time<=0`` or a stop-level required predictor is NaN (model-specific:
-    the reward-history rungs drop stops with a NaN basis feature, the const rung
-    drops none). ``n_modeled`` is the fitter's actual distinct-modeled-stop count
-    (``n_stops``); remaining survivors of skipped / gated sessions and any bin-level
-    drops fall into ``n_excluded_session``. Reconciles by construction.
+    Family B has no qvals merge, and every rung shares one frozen cohort
+    (``freeze_per_bin_cohort``), so a stop leaves the modelled set for one of
+    two reasons. It is an **own-predictor** drop when ``immobility_time<=0`` or
+    one of *this* rung's stop-level required predictors is NaN; it is a
+    **common-cohort** drop (``n_drop_common_cohort_other``) when this rung's own
+    predictors are all present but another rung of the ladder needs a column
+    that is NaN — the freeze removes it from every rung. ``n_modeled`` is the
+    fitter's actual distinct-modeled-stop count (``n_stops``); remaining
+    survivors of skipped / gated sessions and any bin-level drops fall into
+    ``n_excluded_session``. Reconciles by construction.
+
+    ``cohort_stop_drops`` is the runner's per-outcome count of stops the freeze
+    actually removed (``result.attrs["cohort_stop_drops"]``); it must not exceed
+    what the stop-level attribution accounts for.
     """
     total = int(len(stop))
     n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
+    frozen_drops = cohort_stop_drops or {}
+    union_cols = [
+        c
+        for spec in MODEL_PER_BIN_RATE.values()
+        for c in _design_columns(spec)
+        if c in stop.columns
+    ]
+    union_missing = stop_own_missing(stop, list(dict.fromkeys(union_cols)))
     recs = []
     for name, spec in MODEL_PER_BIN_RATE.items():
         stop_level = [c for c in _design_columns(spec) if c in stop.columns]
-        n_own = int(stop_own_missing(stop, stop_level).sum())
+        own_missing = stop_own_missing(stop, stop_level)
+        n_own = int(own_missing.sum())
+        n_common = int((union_missing & ~own_missing).sum())
         for outcome in POPULATIONS:
             sub = (
                 models[(models.model == name) & (models.outcome == outcome)]
@@ -258,17 +326,26 @@ def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
                 {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
             )
             n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
+            n_frozen_out = int(frozen_drops.get(outcome, 0))
+            if n_frozen_out > n_own + n_common:
+                raise AssertionError(
+                    f"{name}/{outcome}: the cohort freeze removed {n_frozen_out} "
+                    f"stops but the stop-level attribution only accounts for "
+                    f"{n_own + n_common} (own {n_own} + common {n_common})"
+                )
             recs.append(cohort_record(
-                name, outcome, "stop",
+                name, outcome, "stop", cohort_mode="common",
                 n_in=total, n_modeled=n_modeled,
                 sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
                 animals_modeled=len({k[0] for k in fit_keys}),
                 drop_notes=(
-                    "immobility<=0 / NaN stop-level predictor -> own; "
+                    "immobility<=0 / NaN own stop-level predictor -> own; "
+                    "NaN only in another rung's column (frozen cohort) -> common; "
                     "min_bins/min_events/reward-contrast gates + bin-level -> excluded"
                 ),
                 n_drop_own_predictor_missing=n_own,
-                n_excluded_session=total - n_own - n_modeled,
+                n_drop_common_cohort_other=n_common,
+                n_excluded_session=total - n_own - n_common - n_modeled,
                 n_sessions_flagged_nonconverged=(
                     int((sub["converged"] == False).sum())  # noqa: E712
                     if "converged" in sub else 0
@@ -338,7 +415,7 @@ def main() -> None:
     models.to_pickle(out)
     csfx = "_smoke" if args.max_per_animal else ""
     write_cohort_audit(
-        _cohort_records(models, stop),
+        _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),
         out_dir / f"per_bin_rate_cohort_audit{csfx}.csv",
     )
     logger.info(

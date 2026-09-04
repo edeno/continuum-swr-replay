@@ -117,3 +117,43 @@ def test_baseline_present_across_outcomes():
     for outcome in out["outcome"].unique():
         sub = out[out.outcome == outcome]
         assert "M0_const" in set(sub["model"])
+
+
+def test_no_stop_dropped_by_freeze():
+    """Freezing the shipped ladder keeps every stop, incomplete prefix included.
+
+    The first stops of an epoch have fewer than two known outcomes, so their
+    reward-history features are zero-filled and ``reward_history_incomplete``
+    is 1 — zero-filled, never NaN. The cohort freeze must therefore remove no
+    stop at all, and every rung must report the same bins and stops.
+    """
+    stop, onsets = _toy_tables()
+    # An unbroken prefix of each epoch is structurally incomplete.
+    prefix = stop.groupby(["animal", "session_date", "epoch"], sort=False).head(3)
+    stop["reward_history_incomplete"] = 0.0
+    stop.loc[prefix.index, "reward_history_incomplete"] = 1.0
+    for col in ("reward_history_rcos_0", "reward_history_rcos_1",
+                "reward_history_rcos_2"):
+        stop.loc[prefix.index, col] = 0.0
+
+    with threadpool_limits(limits=1):
+        out = fprm.fit_per_bin_rate_models(stop, onsets, run_cv=False, run_gof=False)
+
+    assert out.attrs["cohort_stop_drops"] == dict.fromkeys(POPULATIONS, 0)
+
+    n_stops_by_session = (
+        stop[stop.immobility_duration_s > 0]
+        .groupby(["animal", "session_date", "epoch"])["stop_id"]
+        .nunique()
+    )
+    for keys, cell in out.groupby(["outcome", "animal", "session_date", "epoch"]):
+        # One cohort per (session, outcome): every rung on the same rows.
+        assert cell["n_bins"].nunique() == 1, keys
+        assert cell["n_stops"].nunique() == 1, keys
+        # ... and that cohort is every stop of the session, prefix included.
+        assert cell["n_stops"].iloc[0] == n_stops_by_session.loc[keys[1:]]
+
+    # The cohort audit attributes nothing to either drop bucket.
+    records = fprm._cohort_records(out, stop, out.attrs["cohort_stop_drops"])
+    assert {r["n_drop_own_predictor_missing"] for r in records} == {0}
+    assert {r["n_drop_common_cohort_other"] for r in records} == {0}

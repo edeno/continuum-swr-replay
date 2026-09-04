@@ -93,6 +93,10 @@ def main() -> None:
         lags = lagged_rewards(grp["stop_start"].to_numpy(), trials, K)
         for j in range(K):
             grp[f"known_reward_outcome_lag_{j + 1}"] = lags[:, j]
+        # The fitter refuses an incomplete design, so select the complete
+        # cases here -- one cohort for both outcomes of this session.
+        grp = grp.dropna(subset=[*preds, "immobility_duration_s"])
+        grp = grp[grp["immobility_duration_s"] > 0]
         for outcome, col in [
             ("swr", "n_swr_events"),
             ("non_local_no_swr", "n_nonlocal_non_swr_events"),

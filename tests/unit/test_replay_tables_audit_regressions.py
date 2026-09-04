@@ -296,26 +296,18 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     np.testing.assert_allclose(np.nanstd(leaf), 1.0, rtol=0.05)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "AUDIT 2026-08-08: per_bin_rate_model drops NaNs per rung, splitting "
-        "the ladder into FOUR cohorts (7387816 / 7348182 / 6849272 / 6466795 "
-        "bins), so cross-rung AIC is not comparable. A common-cohort refit "
-        "preserves the M5-vs-M7r ranking but shrinks the margin ~10x."
-    ),
-)
+@pytest.mark.slow
 def test_rate_ladder_rungs_share_a_cohort():
     """Rungs compared by AIC must be fit on the same rows.
 
-    ``per_bin_rate_model`` drops NaNs against each rung's *own* predictor list,
-    so reward-bearing rungs (which need ``known_reward_outcome_lag_10``) lose the ~7% of stops
-    occurring before a session's 10th trial. AIC scales with n, so the smaller
-    cohort gains mechanically. ``freeze_common_cohort`` exists for exactly this
-    and is called by ``scripts/content/`` but by nothing in ``scripts/rate/``.
+    ``freeze_per_bin_cohort`` selects one (stop x bin) cohort per (session,
+    population) over the union of every rung's design columns, and the fitters
+    now raise rather than drop rows per rung, so every rung of the ladder must
+    report the same ``n_bins``. AIC scales with n: a rung fit to fewer bins
+    would gain mechanically.
 
-    Guards the ladder definition rather than the fit: if a ladder mixes rungs
-    with and without reward lags, the runner must freeze a common cohort.
+    Reads the materialized fits, so it holds only once they have been refit
+    with the frozen cohort (hence ``slow``; unit runs use ``-m "not slow"``).
     """
     fits = Path("Processed-Data/replay_content/models_per_bin_rate/all_models.pkl")
     if not fits.exists():
