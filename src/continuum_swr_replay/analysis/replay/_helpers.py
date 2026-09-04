@@ -852,8 +852,17 @@ def aggregate_to_timebins(
     ValueError
         If the binned counts do not reconcile with the onsets that fall inside
         the stops' exposed windows (``t_since_stop_onset < min(tmax,
-        immobility_duration_s)``) -- an onset lost to a dropped bin, or an onset
-        at or past the end of its stop's immobility.
+        immobility_duration_s)``) AND land in a bin the exposure filter keeps --
+        e.g. an onset at or past the end of its stop's immobility, which is
+        binned into the stop's last bin but earns no exposure there.
+
+    Notes
+    -----
+    A stop whose immobility ends a sliver past a bin edge has a final bin with
+    ``exposure <= 1e-4``, which is dropped from the design; an onset in that
+    sliver is therefore not counted anywhere. That is a real (tiny) loss rather
+    than an inconsistency, so it does not raise -- it is counted in
+    ``out.attrs["n_onsets_in_dropped_bins"]`` so it stays visible.
     """
     if self_history_basis and not self_history_lags:
         raise ValueError("self_history_basis requires self_history_lags > 0")
@@ -910,27 +919,32 @@ def aggregate_to_timebins(
     )
     out = out.merge(cnt, on=["stop_id", "binj"], how="left")
     out["count"] = out["count"].fillna(0)
-    # Every onset inside a stop's exposed window must land on exactly one row of
-    # the design; a mismatch means the response and the exposure disagree, which
-    # a Poisson fit cannot detect. Losses (an onset binned outside the stop's
-    # bins, or into a bin the exposure filter above removed) and gains (an onset
-    # at or past the end of the stop's immobility) are both contract violations.
+    # Every onset inside a stop's exposed window whose bin survives the exposure
+    # filter must land on exactly one row of the design; a mismatch means the
+    # response and the exposure disagree, which a Poisson fit cannot detect.
+    # The one legitimate loss is an onset in a final sliver bin that the filter
+    # removed (immobility ending just past a bin edge): it is counted, not
+    # raised on, so the design stays consistent and the loss stays visible.
     expected = src[["stop_id", "t_since_stop_onset"]].merge(
         s[["stop_id", "immobility_duration_s"]], on="stop_id", how="inner"
     )
-    n_expected = int(
-        (
-            expected["t_since_stop_onset"]
-            < np.minimum(expected["immobility_duration_s"], tmax)
-        ).sum()
+    t_expected = expected["t_since_stop_onset"].to_numpy(dtype=float)
+    immobility = expected["immobility_duration_s"].to_numpy(dtype=float)
+    stop_end = np.minimum(immobility, tmax)
+    in_window = t_expected < stop_end
+    expected_binj = np.clip(
+        np.floor(t_expected / bin_s + 1e-9).astype(int), 0, nmax - 1
     )
+    bin_kept = (stop_end - expected_binj * bin_s) > 1e-4
+    n_expected = int((in_window & bin_kept).sum())
+    n_onsets_in_dropped_bins = int((in_window & ~bin_kept).sum())
     n_binned = int(out["count"].sum())
     if n_binned != n_expected:
         raise ValueError(
             f"aggregate_to_timebins binned {n_binned} onset(s) but {n_expected} "
             "fall inside a stop's exposed window "
-            "(t_since_stop_onset < min(tmax, immobility_duration_s)); the "
-            "(stop x bin) design's counts and exposure disagree"
+            "(t_since_stop_onset < min(tmax, immobility_duration_s)) and in a "
+            "retained bin; the (stop x bin) design's counts and exposure disagree"
         )
 
     if self_history_lags:
@@ -977,8 +991,9 @@ def aggregate_to_timebins(
                 out[f"cross_hist_rcos_{k}"] = xproj[:, k]
         out = out.drop(columns=["cross_count"])
 
-    out = out.drop(columns=["immobility_duration_s"])
-    return out.reset_index(drop=True)
+    out = out.drop(columns=["immobility_duration_s"]).reset_index(drop=True)
+    out.attrs["n_onsets_in_dropped_bins"] = n_onsets_in_dropped_bins
+    return out
 
 
 # given onset_df already passed through attach_is_swr_to_onsets:

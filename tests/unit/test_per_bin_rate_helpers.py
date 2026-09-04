@@ -194,6 +194,38 @@ def test_onset_at_the_end_of_immobility_raises():
         aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
 
 
+def test_onset_in_a_dropped_sliver_bin_is_counted_not_raised():
+    """A stop ending a sliver past a bin edge loses that bin, and any onset in it.
+
+    ``immobility_duration_s = 0.30000005`` gives bin 3 an exposure of 5e-8, which
+    the ``exposure > 1e-4`` filter removes. An onset at 0.300000001 is inside the
+    stop but inside that dropped bin, so it is counted nowhere -- a real (tiny)
+    loss rather than a counts-vs-exposure inconsistency, so it is recorded rather
+    than raised on.
+    """
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.30000005],
+        }
+    )
+    onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.300000001]})
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    assert df.binj.tolist() == [0, 1, 2]  # the 5e-8-exposure bin 3 is gone
+    assert df["count"].sum() == 0
+    assert df.attrs["n_onsets_in_dropped_bins"] == 1
+
+
+def test_no_onsets_are_lost_in_an_ordinary_design(two_stop_design):
+    stops, onsets = two_stop_design
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    assert df["count"].sum() == 3
+    assert df.attrs["n_onsets_in_dropped_bins"] == 0
+
+
 def test_raised_cosine_basis_shape_and_nonneg():
     B = raised_cosine_history_basis(10, 4)
     assert B.shape == (4, 10)

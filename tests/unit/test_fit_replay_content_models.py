@@ -81,3 +81,49 @@ def test_subset_run_may_be_sent_to_an_explicit_non_canonical_directory() -> None
         _args(models="M4,Mv", output_dir=Path("/tmp/staging/models_belief"))
     )
     assert config.output_dir == Path("/tmp/staging/models_belief")
+
+
+def test_subset_may_not_target_another_configurations_canonical_bundle() -> None:
+    """The guard covers every canonical bundle, not just this invocation's.
+
+    A patch run pointed at ``models/``, or an SWR-subset run pointed at the
+    unrestricted ``models/``, would replace part of a bundle the run does not
+    even resolve to.
+    """
+    with pytest.raises(ValueError, match="canonical models/ bundle"):
+        mod._resolve_run_config(
+            _args(
+                hierarchy="patch",
+                models="P3,Pv",
+                output_dir=Path("/tmp/content-in/models"),
+            )
+        )
+    with pytest.raises(ValueError, match="canonical models/ bundle"):
+        mod._resolve_run_config(
+            _args(
+                swr_subset="T",
+                models="M0,M1",
+                output_dir=Path("/tmp/content-in/models"),
+            )
+        )
+
+
+def test_canonical_bundle_names_cover_every_suffix_variant() -> None:
+    names = mod.canonical_output_subdirs()
+    assert {"models", "models_patch"} <= names
+    assert {"models_swr_T", "models_patch_swr_F"} <= names
+    assert {"models_event_grain", "models_swr_T_event_grain"} <= names
+    assert {"models_swr_HPC", "models_patch_mua_OFC"} <= names
+    # Every name a full run of some configuration resolves to is in the set.
+    for hierarchy in ("arm", "patch"):
+        for swr_subset in ("all", "T"):
+            for grain in ("timebin", "event"):
+                config = mod._resolve_run_config(
+                    _args(hierarchy=hierarchy, swr_subset=swr_subset, grain=grain)
+                )
+                assert config.output_dir.name in names
+
+
+def test_swr_subset_run_keeps_its_own_suffixed_bundle() -> None:
+    config = mod._resolve_run_config(_args(swr_subset="T", grain="event"))
+    assert config.output_dir == Path("/tmp/content-in/models_swr_T_event_grain")

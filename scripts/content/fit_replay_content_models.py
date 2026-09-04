@@ -416,6 +416,16 @@ def _validate_canonical_table_contract(
         )
 
 
+# The CLI's accepted values, as constants: the canonical output-directory names
+# are the product of these, so a new choice cannot be added to the parser without
+# also entering the set of bundles a partial run is forbidden to overwrite.
+EVENT_SOURCE_CHOICES = ("non_local", "SWR", "MUA")
+BRAIN_AREA_CHOICES = ("HPC", "mPFC", "OFC")
+HIERARCHY_CHOICES = ("arm", "patch")
+SWR_SUBSET_CHOICES = ("all", "T", "F")
+GRAIN_CHOICES = ("timebin", "event")
+
+
 def resolve_contfrag_paths(
     event_source: str,
     brain_area: str,
@@ -449,6 +459,65 @@ def resolve_contfrag_paths(
     base_subdir = "models_patch" if hierarchy_kind == "patch" else "models"
     output_subdir = f"{base_subdir}_{event_source.lower()}_{brain_area}"
     return table_name, output_subdir
+
+
+def canonical_output_subdir(
+    event_source: str,
+    brain_area: str,
+    hierarchy_kind: str,
+    swr_subset: str,
+    grain: str,
+) -> str:
+    """Directory name a FULL-ladder run of one configuration publishes into.
+
+    The base name comes from :func:`resolve_contfrag_paths`; the SWR subset and
+    the event grain each append a suffix, in that order, so an event-grain
+    subset run has its own bundle rather than publishing over the timebin one.
+
+    Parameters
+    ----------
+    event_source : str
+        One of :data:`EVENT_SOURCE_CHOICES`.
+    brain_area : str
+        One of :data:`BRAIN_AREA_CHOICES` (ignored for ``non_local``).
+    hierarchy_kind : str
+        One of :data:`HIERARCHY_CHOICES`.
+    swr_subset : str
+        One of :data:`SWR_SUBSET_CHOICES`; ``"all"`` adds no suffix.
+    grain : str
+        One of :data:`GRAIN_CHOICES`; ``"timebin"`` adds no suffix.
+
+    Returns
+    -------
+    str
+        The bundle directory name, relative to the run's input directory.
+    """
+    _table_name, subdir = resolve_contfrag_paths(
+        event_source, brain_area, hierarchy_kind
+    )
+    if swr_subset != "all":
+        subdir = f"{subdir}_swr_{swr_subset}"
+    if grain == "event":
+        subdir = f"{subdir}_event_grain"
+    return subdir
+
+
+def canonical_output_subdirs() -> frozenset[str]:
+    """Every canonical bundle name, over all CLI configurations.
+
+    A partial ladder is fit on its own complete-case cohort, so it must not be
+    written into ANY of these -- not just the one the current invocation would
+    have used. Built from :func:`canonical_output_subdir` over the product of
+    the CLI choice tuples, so it cannot drift from the names full runs produce.
+    """
+    return frozenset(
+        canonical_output_subdir(source, area, hierarchy_kind, subset, grain)
+        for source in EVENT_SOURCE_CHOICES
+        for area in BRAIN_AREA_CHOICES
+        for hierarchy_kind in HIERARCHY_CHOICES
+        for subset in SWR_SUBSET_CHOICES
+        for grain in GRAIN_CHOICES
+    )
 
 
 def prepare_canonical_fit_request(
@@ -1007,7 +1076,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--grain",
         type=str,
         default="timebin",
-        choices=["timebin", "event"],
+        choices=list(GRAIN_CHOICES),
         help=(
             "Observation grain. 'timebin' (default) fits the conditional "
             "Poisson over per-arm timebin counts. 'event' collapses each event "
@@ -1029,14 +1098,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--event-source",
         type=str,
         default="non_local",
-        choices=["non_local", "SWR", "MUA"],
+        choices=list(EVENT_SOURCE_CHOICES),
         help="Event source: non_local (model-detected), SWR, or MUA (default: non_local)",
     )
     parser.add_argument(
         "--hierarchy",
         type=str,
         default="arm",
-        choices=["arm", "patch"],
+        choices=list(HIERARCHY_CHOICES),
         help=(
             "Resolution: 'arm' (9 candidate arms, M0-M7) or 'patch' (3 patches, "
             "P0-P4). Patch fits use event_patch_table.pkl and "
@@ -1047,7 +1116,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--swr-subset",
         type=str,
         default="all",
-        choices=["all", "T", "F"],
+        choices=list(SWR_SUBSET_CHOICES),
         help=(
             "Restrict to the SWR-overlap subset of events. 'T' keeps "
             "events with is_swr=True; 'F' keeps is_swr=False. With a "
@@ -1061,7 +1130,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--brain-area",
         type=str,
         default="HPC",
-        choices=["HPC", "mPFC", "OFC"],
+        choices=list(BRAIN_AREA_CHOICES),
         help=(
             "Brain area suffix used when resolving ContFrag prep "
             "outputs (event_arm_table_{source}_{brain_area}.pkl). "
@@ -1143,7 +1212,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     # has a direct unit-test target rather than only being exercised
     # at the end of the long ``main()``. The hierarchy / source
     # validity gates above are unchanged; this only resolves names.
-    table_name, output_subdir = resolve_contfrag_paths(
+    table_name, _output_subdir = resolve_contfrag_paths(
         args.event_source, args.brain_area, args.hierarchy
     )
 
@@ -1152,32 +1221,30 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         if args.input_dir is not None
         else PROCESSED_DATA_DIR / source_config["input_dir_name"]
     )
-    output_dir = input_dir / output_subdir
-
     # SWR subset: restrict to is_swr=True or =False events. Within a
     # subset is_swr is constant, so the swr_x_* interactions (M6/M7,
     # P4) collapse onto their main effects and are unidentifiable —
     # use the *_SWR variants (M0-M5 / P0-P3) which already drop them.
-    # Output goes to a suffixed subdirectory so the unrestricted fits
-    # are not overwritten.
+    # The subset and the event grain each get their own bundle
+    # directory (see ``canonical_output_subdir``) so neither publishes
+    # over the unrestricted timebin fits.
     if args.swr_subset != "all":
-        if args.hierarchy == "patch":
-            hierarchy = MODEL_PATCH_SWR
-        else:
-            hierarchy = MODEL_HIERARCHY_SWR
-        output_dir = input_dir / f"{output_subdir}_swr_{args.swr_subset}"
+        hierarchy = (
+            MODEL_PATCH_SWR if args.hierarchy == "patch" else MODEL_HIERARCHY_SWR
+        )
         logging.info(
-            "SWR subset = %s: hierarchy narrowed to %s, output -> %s",
+            "SWR subset = %s: hierarchy narrowed to %s",
             args.swr_subset,
             list(hierarchy.keys()),
-            output_dir,
         )
-
-    # Applied last so it composes with the SWR-subset suffix rather than being
-    # overwritten by it: an event-grain SWR-subset run needs its own directory
-    # too, or it would silently publish over the timebin-grain subset fits.
+    output_dir = input_dir / canonical_output_subdir(
+        args.event_source,
+        args.brain_area,
+        args.hierarchy,
+        args.swr_subset,
+        args.grain,
+    )
     if args.grain == "event":
-        output_dir = output_dir.with_name(f"{output_dir.name}_event_grain")
         logging.info("grain = event (one observation per event) -> %s", output_dir)
 
     # Determine which models to fit
@@ -1199,15 +1266,18 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     is_partial_ladder = set(model_names) != set(default_content_model_names(hierarchy))
     if args.output_dir is not None:
         output_dir = args.output_dir.resolve()
-        if is_partial_ladder and output_dir.name == canonical_dir.name:
+        # Any canonical bundle, not just this invocation's: an --output-dir can
+        # name the bundle of another hierarchy, SWR subset, grain, event source
+        # or brain area just as easily as its own.
+        if is_partial_ladder and output_dir.name in canonical_output_subdirs():
             raise ValueError(
                 f"--models {','.join(model_names)} is not the full "
                 f"{canonical_dir.name}/ ladder "
                 f"({','.join(default_content_model_names(hierarchy))}); writing it "
-                f"to {output_dir} would replace part of a cohort-matched bundle "
-                "with rungs fit on a different event set. Drop --output-dir to "
-                "get a directory keyed by the requested rungs, or name a "
-                "directory of your own."
+                f"to {output_dir}, the canonical {output_dir.name}/ bundle, would "
+                "replace part of a cohort-matched bundle with rungs fit on a "
+                "different event set. Drop --output-dir to get a directory keyed "
+                "by the requested rungs, or name a directory of your own."
             )
         logging.info("explicit model output -> %s", output_dir)
     elif is_partial_ladder:
