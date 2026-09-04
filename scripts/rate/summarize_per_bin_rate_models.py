@@ -28,7 +28,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.replay.model_specs import BIN_S
+from continuum_swr_replay.analysis.replay._helpers import raised_cosine_history_basis
+from continuum_swr_replay.analysis.replay.model_specs import (
+    BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
@@ -36,7 +42,7 @@ SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 LABEL = {"swr": "detected SWR", "non_local": "non-local (all)",
          "non_local_swr": "NL w/ SWR", "non_local_no_swr": "NL no-SWR"}
-REWARD_FRACTION_COEF = "coef_reward_fraction_last10_known_trials"
+IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
 def _one_sample(df: pd.DataFrame, model: str, coef: str, oc: str):
@@ -112,6 +118,24 @@ def section_kernel(title, model, prefix, n):
     return
 
 
+def section_reward_kernel(title, model):
+    """Reward kernel reconstructed from the raised-cosine basis coefficients.
+
+    The features are bump-weighted reward fractions, so an outcome at lag ``j``
+    contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the log rate.
+    """
+    B = raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS)
+    weights = B / B.sum(axis=1, keepdims=True)
+    print("\n" + "=" * 78)
+    print(f"{title}   ({model}: reconstructed RR per lag 1..{REWARD_HISTORY_N_LAGS})")
+    print("=" * 78)
+    for oc in OUT:
+        s = df[(df.model == model) & (df.outcome == oc)]
+        coefs = np.array([s[f"coef_{c}"].median() for c in REWARD_HISTORY_COLUMNS])
+        rr = np.exp(coefs @ weights)
+        print(f"  {LABEL[oc]:16s} " + " ".join(f"{v:5.2f}" for v in rr))
+
+
 def section_selfhistory(model):
     print("\n" + "=" * 78)
     print(f"   self-history kernel detail   ({model}: onset_lag, 15 ms lags)")
@@ -130,7 +154,7 @@ def section_ladder():
     print("\n" + "=" * 78)
     print("6. LADDER FIT (median AIC, CV bits/event, KS-in-band frac), outcome=non_local")
     print("=" * 78)
-    ladder = ["M0_const", "M1_rew1", "M2_rewhist", "M2r_rewrate", "M3_hist",
+    ladder = ["M0_const", "M1_rew", "M3_hist",
               "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
               "M7_time_hist_rew", "M7r_time_histcos_rew",
               "M9_rew_x_time"]
@@ -151,18 +175,17 @@ def main():
 
     section_baseline(df)
 
-    section_coef("2. REWARD LAG-1 (raw, uncontrolled)", "M1_rew1", "coef_known_reward_outcome_lag_1")
-    section_coef("2. REWARD LAG-1 (controlled: time+history+reward-kernel)",
-                 "M7_time_hist_rew", "coef_known_reward_outcome_lag_1")
-    print("\n  paired NL-w/SWR vs NL-no-SWR (M7 known_reward_outcome_lag_1):  "
-          + str(_paired(df, "M7_time_hist_rew", "coef_known_reward_outcome_lag_1",
+    section_coef("2. IMMEDIATE REWARD COMPONENT (raw, uncontrolled)", "M1_rew",
+                 IMMEDIATE_COEF)
+    section_coef("2. IMMEDIATE REWARD COMPONENT (controlled: time+history)",
+                 "M7_time_hist_rew", IMMEDIATE_COEF)
+    print(f"\n  paired NL-w/SWR vs NL-no-SWR (M7 {IMMEDIATE_COEF}):  "
+          + str(_paired(df, "M7_time_hist_rew", IMMEDIATE_COEF,
                         "non_local_swr", "non_local_no_swr")))
 
-    section_kernel(
-        "3. REWARD KERNEL (M7, controlled) — boost(lag1) then suppression",
+    section_reward_kernel(
+        "3. REWARD KERNEL (M7, controlled) — reconstructed from the basis",
         "M7_time_hist_rew",
-        "known_reward_outcome_lag_",
-        10,
     )
 
     section_kernel("4. SELF-HISTORY KERNEL (M3_hist, raw)", "M3_hist", "onset_lag", 10)
@@ -170,9 +193,11 @@ def main():
                    "onset_lag", 10)
     section_selfhistory("M7_time_hist_rew")
 
-    section_coef(
-        "5. RECENT REWARD FRACTION", "M2r_rewrate", REWARD_FRACTION_COEF
-    )
+    for k, column in enumerate(REWARD_HISTORY_COLUMNS):
+        section_coef(
+            f"5. REWARD-HISTORY BASIS COMPONENT {k}", "M7_time_hist_rew",
+            f"coef_{column}",
+        )
     section_ladder()
 
 

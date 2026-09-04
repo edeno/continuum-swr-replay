@@ -148,7 +148,8 @@ def test_switch_interaction_is_retired_not_renamed() -> None:
     assert "switch_x_current" in reg.retired_columns()
     assert "switch_x_current" not in reg.rename_map(table="event_arm")
     # The base switch predictor is still renamed (it stays a stored primitive;
-    # removing it from R1/R2/Rlag is a separate model-definition change).
+    # removing it from the per-stop rate ladder is a separate
+    # model-definition change).
     assert (
         reg.rename_map(table="stop")["is_after_switch"]
         == "did_last_completed_trip_switch_patch"

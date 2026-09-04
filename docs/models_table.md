@@ -12,8 +12,12 @@ Expanded once; used throughout:
 
 ```
 BS_TC   := bs(tc, knots=c(1,2,3), Boundary.knots=c(0,4))         # within-stop time-course spline
-REWK    := known_reward_outcome_lag_1 + ... + known_reward_outcome_lag_10
-                                                                # 10-known-outcome kernel
+REWBASIS:= reward_history_rcos_0 + reward_history_rcos_1 + reward_history_rcos_2
+           + reward_history_incomplete
+                                                                # raised-cosine reward-history
+                                                                # kernel over the last 10 known
+                                                                # outcomes + its structural-
+                                                                # missingness nuisance indicator
 SELFLAG := onset_lag1 + ... + onset_lag10                         # raw self-history (autoregressive)
 HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosine self-history
 ARMFE   := is_candidate_arm_0 + ... + is_candidate_arm_7          # arm 8 is reference
@@ -47,9 +51,10 @@ Every ladder runner enforces covariate timing at model-build via
 `analysis.replay.covariate_timing.assert_predictor_timing`; a rung whose predictor is
 post-outcome or future-referencing must be **declared descriptive**, else the run fails.
 
-- **Per-stop R1/R2** use `known_reward_outcome_lag_1`, the newest physically
-  known outcome at bout start, instead of a current-outcome flag. This is not
-  a fixed current/previous-trial relabeling (see [rate_models.md](rate_models.md)).
+- **Per-stop R1** uses the reward-history basis over the outcomes physically
+  known at bout start, instead of a current-outcome flag. The newest known
+  outcome is not a fixed current/previous-trial relabeling (see
+  [rate_models.md](rate_models.md)).
 - **Descriptive rungs** (retained under an explicit *association* / *peri-switch
   alignment* claim, NOT a forward prediction — `DESCRIPTIVE_CONTENT_RUNGS` /
   `DESCRIPTIVE_RATE_RUNGS` in `model_specs.py`):
@@ -115,24 +120,22 @@ documented, not silently dropped.
 
 ```r
 M0_const              count ~ 1
-M1_rew1               count ~ known_reward_outcome_lag_1
-M2_rewhist            count ~ REWK
-M2r_rewrate           count ~ reward_fraction_last10_known_trials
+M1_rew                count ~ REWBASIS
 M3_hist               count ~ SELFLAG
-M4_hist_rew           count ~ REWK + SELFLAG
+M4_hist_rew           count ~ REWBASIS + SELFLAG
 M5_time               count ~ BS_TC
 M6_time_hist          count ~ BS_TC + SELFLAG
-M7_time_hist_rew      count ~ BS_TC + REWK + SELFLAG
-M9_rew_x_time         count ~ BS_TC + REWK + SELFLAG + known_reward_outcome_lag_1:BS_TC
+M7_time_hist_rew      count ~ BS_TC + REWBASIS + SELFLAG
+M9_rew_x_time         count ~ BS_TC + REWBASIS + SELFLAG + reward_history_rcos_0:BS_TC
 M3r_histcos           count ~ HISTCOS
-M7r_time_histcos_rew  count ~ BS_TC + REWK + HISTCOS
+M7r_time_histcos_rew  count ~ BS_TC + REWBASIS + HISTCOS
 ```
 
 ## MU uncertainty — per-bin Poisson (M7r base + RL/value block)
 `fit_uncertainty_rate.py` → `models_per_bin_rate/uncertainty_rate.pkl`
 
 ```r
-MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
+MU_uncertainty  count ~ BS_TC + REWBASIS + HISTCOS
                         + task_reward_probability_chosen_arm + task_reward_probability_patch_mean_gap_best_vs_second
                         + patch_switch_fraction_last5_completed_trips
                         + trials_since_block_change + rpe_postoutcome
@@ -147,9 +150,7 @@ MU_uncertainty  count ~ BS_TC + REWK + HISTCOS
 
 ```r
 R0    n_selected_events ~ 1
-R1    n_selected_events ~ known_reward_outcome_lag_1
-R2    n_selected_events ~ known_reward_outcome_lag_1 + reward_fraction_last10_known_trials
-Rlag  n_selected_events ~ REWK
+R1    n_selected_events ~ REWBASIS
 ```
 
 ## Content — arm
@@ -240,8 +241,10 @@ Shorthands / covariate blocks. The task dimensions are **the paper's variables
 (Comrie et al.), all from the **beta-bernoulli** model (HMM retired 2026-07-13):
 ```
 BASE      := bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))
-             + known_reward_outcome_lag_1 + REWK_prev + HISTCOS
-REWK_prev := known_reward_outcome_lag_2 + ... + known_reward_outcome_lag_10
+             + reward_history_rcos_0 + reward_history_rcos_1 + reward_history_rcos_2
+             + HISTCOS
+             # reward_history_incomplete is appended to every G/S formula as a
+             # plain main effect, OUTSIDE any is_swr expansion
 HISTCOS   := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3
 PERISWITCH:= periswitch_index_trials + is_periswitch_post
              + periswitch_index_trials:is_periswitch_post
@@ -251,7 +254,7 @@ VALUE     := relative_value_switch_minus_stay_preoutcome
 RPE       := rpe_postoutcome
 UNCERT    := reward_belief_differential_entropy_leaf_mean_preoutcome
 UPDATE    := reward_belief_mean_update_l1_all_ports_postoutcome
-REWXTIME  := known_reward_outcome_lag_1:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))
+REWXTIME  := reward_history_rcos_0:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))
 ```
 
 ### A. Stratified — each formula fit 3× to `NL_all`, `NL_swr`, `NL_noswr`
@@ -275,7 +278,7 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | model | formula (`count ~ … + offset(log exposure)`) | question |
 |---|---|---|
 | `S0_rate` | `is_swr + BASE` | Do SWR-coincident non-local events occur at a different **overall rate** than non-SWR ones, holding the shared time/reward/history structure? |
-| `S1_rew1` | `BASE + is_swr + is_swr:known_reward_outcome_lag_1` | Does the **most-recent-known outcome at bout start** gate the rate differently for SWR vs non-SWR events? |
+| `S1_rew` | `BASE + is_swr + is_swr:reward_history_rcos_0` | Does the **immediate reward-history component** gate the rate differently for SWR vs non-SWR events? |
 | `S2_base` | `is_swr * BASE` | Do the time-course, reward-history, and self-history each modulate the rate differently by SWR status? |
 | `S3_periswitch` | `is_swr * (BASE + PERISWITCH)` | Does the peri-switch ramp of rate differ by SWR? |
 | `S4_block` | `is_swr * (BASE + BLOCK)` | Does the across-block (learning) modulation differ by SWR? |
@@ -308,10 +311,12 @@ coefficient on
 sharpens onto the current arm when
 that arm's value is **low**). Chosen/candidate-arm reward-belief mean is a
 robustness re-parameterization, not co-fit on the rate ladder. (3) The reward
-kernel is split `known_reward_outcome_lag_1` (newest
-outcome known at bout start) + `REWK_prev` (successively older known outcomes).
-Because feedback can occur during a visit, lag 1 is not uniformly a fixed
-current- or previous-trial label. (4)
+kernel is the raised-cosine basis: `reward_history_rcos_0` (the immediate
+component, weighted toward the newest outcomes known at bout start) plus two
+progressively slower bumps, each a weighted fraction in [0, 1]. Because feedback
+can occur during a visit, the newest known outcome is not uniformly a fixed
+current- or previous-trial label. `reward_history_incomplete` flags stops with
+fewer than two known outcomes (features zero-filled) and is fit, never reported. (4)
 `reward_belief_differential_entropy_leaf_mean_preoutcome` is the mean per-leaf
 **Beta** differential entropy (from
 `betadist_α/β`, `qvals_table.add_beta_belief_entropy`) — the beta analog of the retired
@@ -324,11 +329,11 @@ on low-event sessions). (6) **RPE is the unscaled canonical
 "get into 0–1 zone" transform), yielding `reward − 0.8·Q_leaf − 0.48` — *not* an affine
 transform of `reward − Q_leaf` (it reweights Q vs reward). We deliberately fit the
 textbook RPE, not the plotting-rescaled variant. (7) **REWXTIME =
-`known_reward_outcome_lag_1:bs(tc)`**
-tests whether the current reward changes the *shape* of the within-stop rate profile, not
+`reward_history_rcos_0:bs(tc)`**
+tests whether recent reward changes the *shape* of the within-stop rate profile, not
 just its level. The per-bin design + `offset(log exposure)` already removes the pure
 *duration* confound (rewarded stops are ~3.6× longer → more bins, not a higher per-bin
-rate); BASE's additive `known_reward_outcome_lag_1 + bs(tc)` still assumes a
+rate); BASE's additive `reward_history_rcos_0 + bs(tc)` still assumes a
 shared profile shape, and
 this rung is what tests that assumption directly.
 
@@ -353,7 +358,7 @@ design columns; checked by `_verify_harmonization_parity`, see
 | Contfrag content | arm M3–M4 | arm M0–M2, patch P0–P2 |
 | Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
 | Per-bin rate (B) | — covariates unchanged; **verify** the 07-01 table regen / TMAX fix didn't move onset counts, else refit | all specs |
-| Per-stop rate (A) | — | R0, R1, R2, Rlag |
+| Per-stop rate (A) | — | R0, R1 |
 
 Changed drivers: candidate-arm reward fraction (5→10 visits), the
 candidate-arm task-probability/reward-belief block, post-outcome RPE, and the

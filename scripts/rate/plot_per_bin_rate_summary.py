@@ -3,9 +3,10 @@
 
 The visual companion to ``docs/per_bin_rate_results.md`` — reads
 ``models_per_bin_rate/all_models.pkl`` and renders, per event-type population:
-baseline rate (M0), the lag-1 reward dissociation (M7), the reward kernel and
-self-history kernel (M7), the model-comparison ladder (ΔAIC + CV bits/event),
-and the reward-rate covariate dissociation (M2r).
+baseline rate (M0), the immediate reward-history dissociation (M7), the
+reconstructed reward kernel and the self-history kernel (M7), the
+model-comparison ladder (ΔAIC + CV bits/event), and the slow reward-history
+component by population (M7).
 
 Usage:
     uv run python scripts/rate/plot_per_bin_rate_summary.py
@@ -25,10 +26,16 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
+    raised_cosine_history_basis,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
     SPLINE_KNOTS,
     TMAX,
 )
@@ -44,14 +51,15 @@ STYLE = {  # outcome -> (label, color)
     "non_local_swr": ("NL w/ SWR", "C3"),
     "non_local_no_swr": ("NL no-SWR", "C0"),
 }
-LADDER = ["M0_const", "M1_rew1", "M2_rewhist", "M2r_rewrate", "M3_hist",
+LADDER = ["M0_const", "M1_rew", "M3_hist",
           "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
           "M7_time_hist_rew", "M7r_time_histcos_rew",
           "M9_rew_x_time"]
 POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
-REWARD_FRACTION_COEF = "coef_reward_fraction_last10_known_trials"
+IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
+SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
 
 
 def _coef(df, model, oc, coef):
@@ -131,7 +139,7 @@ def _panel_fitted_timecourse(ax, df, stop):
     scols = sorted(
         c for c in df.columns
         if c.startswith("coef_bs(tc, knots=") and c.endswith("]")
-        and "known_reward_outcome_lag_1:" not in c
+        and f"{REWARD_HISTORY_COLUMNS[0]}:" not in c
     )
     for oc in POPS4:
         s = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
@@ -163,29 +171,39 @@ def _panel_baseline(ax, df):
 
 
 def _panel_reward1(ax, df):
-    data = [np.exp(_coef(df, "M7_time_hist_rew", oc, "coef_known_reward_outcome_lag_1")) for oc in POPS3]
+    data = [np.exp(_coef(df, "M7_time_hist_rew", oc, IMMEDIATE_COEF)) for oc in POPS3]
     bp = ax.boxplot(data, labels=SHORT, showfliers=False, patch_artist=True)
     for patch, oc in zip(bp["boxes"], POPS3, strict=True):
         patch.set_facecolor(STYLE[oc][1])
         patch.set_alpha(0.4)
     ax.axhline(1, color="0.5", ls=":")
     ax.set_ylim(0, 6)
-    ax.set_ylabel("lag-1 reward RR (per session)")
-    ax.set_title("B. Previous-trial reward (M7, controlled)")
+    ax.set_ylabel("immediate reward RR (per session)")
+    ax.set_title("B. Immediate reward-history component (M7, controlled)")
 
 
 def _panel_reward_kernel(ax, df):
-    lags = np.arange(1, 11)
+    """Reward kernel reconstructed from the raised-cosine basis coefficients.
+
+    The fitted features are bump-weighted reward fractions, so an outcome at lag
+    ``j`` contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the log rate.
+    """
+    B = raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS)
+    weights = B / B.sum(axis=1, keepdims=True)
+    lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for oc in POPS4:
-        rr = [np.exp(_coef(df, "M7_time_hist_rew", oc, f"coef_known_reward_outcome_lag_{j}").median())
-              for j in lags]
-        ax.plot(lags, rr, marker="o", color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
+        coefs = np.array([
+            _coef(df, "M7_time_hist_rew", oc, f"coef_{c}").median()
+            for c in REWARD_HISTORY_COLUMNS
+        ])
+        ax.plot(lags, np.exp(coefs @ weights), marker="o", color=STYLE[oc][1],
+                label=STYLE[oc][0], lw=1.8, ms=4)
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xticks(lags)
     ax.set_ylim(0, 4.3)
     ax.set_xlabel("reward lag (trials back)")
     ax.set_ylabel("rate ratio")
-    ax.set_title("C. Reward kernel (M7): boost then suppression")
+    ax.set_title("C. Reward kernel (M7, reconstructed from the basis)")
     ax.legend(frameon=False, fontsize=7)
 
 
@@ -222,7 +240,7 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [("M2r_rewrate", REWARD_FRACTION_COEF)]
+    blocks = [("M7_time_hist_rew", SLOW_COEF)]
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
             rr = np.exp(_coef(df, model, oc, coef).median())
@@ -232,7 +250,7 @@ def _panel_covar(ax, df):
     ax.set_xticks(range(3))
     ax.set_xticklabels(SHORT)
     ax.set_ylabel("rate ratio")
-    ax.set_title("F. Reward-rate by type")
+    ax.set_title("F. Slow reward-history component by type (M7)")
 
 
 def main() -> None:

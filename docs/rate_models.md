@@ -21,18 +21,22 @@ one-population null tested against its split.
 
 ## Family A — per-stop rate (the literature-comparable layer)
 
-- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` most-recent-known reward,
-  `R2` + recent reward fraction, `Rlag` lagged reward kernel
-  `known_reward_outcome_lag_1..10`) in
+- **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` reward-history
+  raised-cosine basis `reward_history_rcos_0..2` + `reward_history_incomplete`)
+  in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
 
-> **Timing definition:** `known_reward_outcome_lag_1` is the newest outcome physically known at
-> bout start. After the arrived trip's feedback boundary it names that trip;
-> before the boundary it remains the preceding known outcome. It is therefore
-> past-only but is not a fixed "current" or "previous" trial index. Lags 2–10
-> are successively older known outcomes under the same rule. Interpret the
-> coefficients as an outcome-history kernel closed at bout start, and do not
-> label lag 1 as uniformly consummatory or previous-trial reward.
+> **Timing definition:** the basis is built from the outcomes physically known
+> at bout start. The newest known outcome names the arrived trip after that
+> trip's feedback boundary and the preceding outcome before it, so the kernel is
+> past-only but is not indexed by a fixed "current" or "previous" trial.
+> `reward_history_rcos_0` is the immediate component (weighted toward the newest
+> outcomes), `_1` and `_2` progressively slower ones; each is a weighted reward
+> fraction in [0, 1], so `exp(coef)` is per unit of that fraction. Interpret
+> them as an outcome-history kernel closed at bout start, and do not label the
+> immediate component as uniformly consummatory or previous-trial reward.
+> `reward_history_incomplete` marks stops with fewer than two known outcomes
+> (features zero-filled); it is a nuisance main effect, never reported.
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**
@@ -58,21 +62,19 @@ offset. Its limitation is exactly that offset — see below.
   within-stop time course is modelled explicitly by a `bs(tc, df=4)` spline
   rather than averaged into a per-stop dwell offset
   ([`per_bin_rate_model.py`](../src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py)).
-- **The ladder** toggles four blocks independently, all at one bin width
+- **The ladder** toggles three blocks independently, all at one bin width
   (`BIN_S = 0.015`) so the models are nested and AIC / CV / GOF are comparable:
 
   | model | adds |
   | --- | --- |
   | `M0_const` | homogeneous Poisson baseline (`count ~ 1`) |
-  | `M1_rew1` | most-recent-known reward at bout start (`known_reward_outcome_lag_1`) |
-  | `M2_rewhist` | reward history kernel (`known_reward_outcome_lag_1..10`) |
-  | `M2r_rewrate` | continuous recent reward rate (alt encoding) |
+  | `M1_rew` | reward-history basis (`reward_history_rcos_0..2` + `reward_history_incomplete`) |
   | `M3_hist` | self-history / autoregression (`onset_lag1..10`) |
   | `M4_hist_rew` | self-history + reward history |
   | `M5_time` | within-stop time course (spline) |
   | `M6_time_hist` | time + self-history |
   | `M7_time_hist_rew` | time + self-history + reward history (**the full additive model**) |
-  | `M9_rew_x_time` | + `known_reward_outcome_lag_1 × bs(tc)` interaction (does reward modulate the time course?) |
+  | `M9_rew_x_time` | + `reward_history_rcos_0 × bs(tc)` interaction (does reward modulate the time course?) |
 
   The reward×time interaction (`M9`) is **built and
   fit**, not deferred.
@@ -141,7 +143,7 @@ gating, in **both** estimators:
   `is_swr_stop` result, not this one.) This magnitude is a leakage + dwell upper
   bound — `is_after_omission` is built from the trial *start*, so it can encode
   the not-yet-delivered outcome on approach stops; the current causal spec uses
-  the past-only `known_reward_outcome_lag_1` instead (see the causal-hygiene note above).
+  the past-only reward-history basis instead (see the causal-hygiene note above).
 - **Family B (per-bin):** the lag-1 reward dissociation above, controlling for
   dwell, the within-stop time course, reward history, and event clustering.
 

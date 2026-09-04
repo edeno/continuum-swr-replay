@@ -2382,12 +2382,14 @@ def _stop_view(ctx: _PanelContext, cols: Sequence[str]) -> pd.DataFrame:
 
 
 def _plot_reward_lag_kernel(ax: Axes, ctx: _PanelContext) -> None:
-    """The full ``Rlag`` design: reward outcome at lags 1–10, per stop.
+    """The persisted known-outcome lag vector: lags 1–10, per stop.
 
     One row per lag, one column block per stop. Blue = rewarded, pale =
     observed omission, and dark-gray hatch = insufficient trial history.
-    The missing-history cells identify rows excluded from a model that uses
-    that lag; this plotting diagnostic does not alter any fitting cohort.
+    This is the stop metadata the reward-history basis is built from; the
+    missing-history cells are the ones the basis normalizes over (and, when a
+    bump's whole support is missing, flags with ``reward_history_incomplete``).
+    A plotting diagnostic only: it does not alter any fitting cohort.
     """
     lag_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)]
     view = _stop_view(ctx, lag_cols)
@@ -2449,11 +2451,10 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
     """Rewarded fraction among up to ten completed trials, per stop.
 
     The value averages the available most-recent trials (maximum ten) at
-    stop start and is missing only before the first completed trial. R2 uses
-    this smoothed history together with ``known_reward_outcome_lag_1``; Rlag instead uses
-    the ten lag outcomes separately. On their production ladder-wide common
-    cohort, R2 is an eight-degree-of-freedom constrained submodel of Rlag; all
-    rungs use the exact same stop IDs.
+    stop start and is missing only before the first completed trial. It is
+    persisted stop metadata, not a ladder predictor: the rate models encode
+    reward history with the raised-cosine basis instead, which spans the same
+    ten known outcomes without collapsing them to one unweighted mean.
     """
     view = _stop_view(ctx, ["reward_fraction_last10_known_trials"])
     ax.set_ylabel("reward fraction\nprior ≤10 trials")
