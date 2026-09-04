@@ -193,6 +193,8 @@ The new ladder carries one reward rung (`R1`: three basis features plus the stru
 
 Separation is now judged per coefficient, and the structural nuisance terms (`Intercept`, `reward_history_incomplete`) are excluded from the judgment. Both sides below are the SAME specification and the same cohort; only the flag differs. Under the fit-level flag one blown-up nuisance or self-history coefficient voided the whole fit — it voided the cross-validation metric and dropped the session for every term in the aggregation.
 
+**Two mechanisms can exclude a session from a term's aggregate, and they are not interchangeable.** (i) The **per-term separation flag**: the fitter named that coefficient in `separated_terms` because its SE is non-finite, above `1e3`, or at least as large as the predictor's own SD — the coefficient is genuinely not identified. (ii) The **`|coef| >= 10` backstop** in `aggregate_contrast`: a coefficient that ran away without tripping the flag is excluded on its magnitude alone. The tables below report the flag (i) share per term; the per-emitted-term drop table further down mixes both, and the two are separated there.
+
 
 ### Family B — flagged fits and CV validity per rung
 
@@ -239,7 +241,7 @@ The per-stop family carries the same rule; `pct_cv_scored` is the share of sessi
 
 ### is_swr-contrast — separated share per term (after)
 
-Share of the session-fits that carry each term in which THAT term is unidentified. Terms never flagged are omitted. Before the change there was no per-term information: a fit was flagged as a whole.
+Share of the session-fits that carry each term in which THAT term is flagged unidentified by mechanism (i), the per-term separation flag. Terms never flagged are omitted. The `|coef| >= 10` backstop is not counted here. Before the change there was no per-term information: a fit was flagged as a whole.
 
 | term | n_fits_with_term | pct_separated |
 | --- | --- | --- |
@@ -308,7 +310,9 @@ One row per (model, population, term) that survived the unidentified-share gate.
 
 ### is_swr-contrast — sessions dropped per emitted term (after)
 
-Per aggregated term, the share of the sessions fitted for it that were dropped as unidentified. A term whose share exceeds the unidentified-share gate emits no row and is absent here:
+Per aggregated term, the share of the sessions fitted for it that were excluded from the aggregate — by either mechanism, the per-term separation flag or the `|coef| >= 10` backstop. A term whose share exceeds the unidentified-share gate emits no row and is absent here.
+
+**Which mechanism produced these drops.** Only the peri-switch rungs are flag-driven: `G1_periswitch` (24 of 24 for SWR, 17 of 19 for nonSWR, 11 of 13 for all — the remainder tripping both) and `S3_periswitch` (19 of 21 by the flag, 2 both). Every other row in the table — `G0_base`, `G3_switchrate`, `G6_uncert`, `G7_update`, and all of `S5`–`S9` — is **entirely** the `|coef| >= 10` backstop, with zero sessions flagged for the term. So the 32 sessions on `S8_uncert` and the 11 on `S9_update` are runaway magnitudes the fitter did not flag, not coefficients the fitter reported as unidentified; read "dropped" in this table as "excluded from the aggregate", not as "the fitter judged it separated":
 
 | model | population | cohort | term | n_fitted | n_dropped | pct_dropped |
 | --- | --- | --- | --- | --- | --- | --- |

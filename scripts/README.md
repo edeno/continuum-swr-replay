@@ -41,6 +41,11 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `qa/` — diagnostics / validation
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
+- `compare_fits.py` — compares old vs new fitted rate artifacts (Family B, Family A
+  and the `is_swr`-contrast ladder) on the quantities that survive a respecification
+  — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung
+  session counts, per-term separation shares — and writes the markdown comparison
+  under `docs/audits/`.
 
 ## `pfc/` — cross-area / staged analyses
 - `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.

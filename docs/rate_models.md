@@ -30,13 +30,34 @@ one-population null tested against its split.
 > at bout start. The newest known outcome names the arrived trip after that
 > trip's feedback boundary and the preceding outcome before it, so the kernel is
 > past-only but is not indexed by a fixed "current" or "previous" trial.
-> `reward_history_rcos_0` is the immediate component (weighted toward the newest
-> outcomes), `_1` and `_2` progressively slower ones; each is a weighted reward
-> fraction in [0, 1], so `exp(coef)` is per unit of that fraction. Interpret
-> them as an outcome-history kernel closed at bout start, and do not label the
-> immediate component as uniformly consummatory or previous-trial reward.
-> `reward_history_incomplete` marks stops with fewer than two known outcomes
-> (features zero-filled); it is a nuisance main effect, never reported.
+> Each feature is the bump-weighted reward *fraction* over the lags its bump
+> covers, so it lies in [0, 1] and `exp(coef)` is per unit of that fraction — a
+> 0→1 contrast, not a single-trial indicator. `reward_history_rcos_0` weights
+> the newest outcomes (lags 1–7, weights 1.00, 0.79, 0.54, …) and is the
+> *immediate* component; `_1` spans all ten lags with its peak at lag 3; `_2`
+> spans lags 2–10 and rises to its maximum at lag 10. Interpret them as one
+> outcome-history kernel closed at bout start — read the per-lag effect off the
+> reconstruction (`reward_kernel_basis.png`, [per_bin_rate_results.md](per_bin_rate_results.md) §3),
+> not off a single coefficient — and do not label the immediate component as
+> uniformly consummatory or previous-trial reward.
+> `reward_history_incomplete` is the **structural-missingness nuisance
+> indicator**: 1 on the stops at the start of an epoch where fewer than two
+> outcomes are yet known (the three features are then zero-filled), 0 elsewhere.
+> The flagged stops form an unbroken prefix of every epoch and are 1.296 % of
+> stops / 1.576 % of events
+> ([audits/2026-09-04-stop-table-reward-basis-regen.md](audits/2026-09-04-stop-table-reward-basis-regen.md)).
+> It is carried as a plain main effect wherever the basis is fit — never inside
+> an `is_swr` expansion, never aggregated, never reported — and it is excluded
+> from the separation judgment (`NUISANCE_TERMS`, below).
+- **Cohort:** one frozen cohort per session for the whole ladder.
+  `freeze_common_cohort` intersects the complete rows over the union of every
+  `MODEL_PER_STOP_RATE` predictor with a positive `immobility_duration_s`
+  offset, and `fit_per_stop_rate_model` then **raises** on any residual NaN
+  instead of subsetting. `R0` and `R1` are therefore scored on identical stops,
+  which is what makes their ΔAIC a model comparison rather than a cohort
+  comparison. In the shipped ladder that cohort is simply every stop with
+  positive immobility: `n_drop_common_cohort_other` is 0 in
+  `models_per_stop_rate/all_models_cohort_audit.csv`.
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**
@@ -45,9 +66,16 @@ one-population null tested against its split.
   `Processed-Data/replay_content/models_per_stop_rate/all_models.pkl`.
 - **Cite it for:** the Ambrose 2016 / Sosa 2020 reward-rate comparison (same
   Poisson-events-per-second estimator) and the **detected-SWR positive
-  control** — detected SWRs reproduce the canonical reward-gating (omission and
-  recent-reward suppression; see `#19c` in
-  [`../paper/claims_table.md`](../paper/claims_table.md) for the values).
+  control**. The reward history enters as one four-parameter block, so the
+  citable quantity is the block's step: median per-session `R1 − R0` ΔAIC is
+  **−5.12** (non-local), **−2.43** (non-local w/ SWR), **−1.41** (detected SWR)
+  and **+0.30** (non-local, no SWR) — negative everywhere except the non-SWR
+  stream, and small
+  ([audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md),
+  "Family A — per-stop reward step"). `#19c` in
+  [`../paper/claims_table.md`](../paper/claims_table.md) still quotes per-stop
+  values from a retired `is_after_omission` rung that this ladder no longer
+  carries, so those numbers are not Family-A results any more.
 
 This is the simple layer: one rate per stop, dwell handled as an exposure
 offset. Its limitation is exactly that offset — see below.
@@ -76,8 +104,27 @@ offset. Its limitation is exactly that offset — see below.
   | `M7_time_hist_rew` | time + self-history + reward history (**the full additive model**) |
   | `M9_rew_x_time` | + `reward_history_rcos_0 × bs(tc)` interaction (does reward modulate the time course?) |
 
-  The reward×time interaction (`M9`) is **built and
-  fit**, not deferred.
+  Two raised-cosine self-history rungs sit beside them: `M3r_histcos`
+  (`hist_rcos_0..3` alone) and `M7r_time_histcos_rew` (time + reward basis +
+  raised-cosine history). The reward block is everywhere the same four columns —
+  the three basis features plus the `reward_history_incomplete` indicator
+  described under Family A — so "adds reward history" always means one
+  four-parameter block, never a per-lag dummy set. The reward×time interaction
+  (`M9`) is **built and fit**, not deferred.
+- **Cohort:** `freeze_per_bin_cohort` freezes one cohort per (session,
+  population) over the union of every rung's design columns, keeping only bins
+  complete for that union and with `exposure > 0`; `fit_per_bin_rate_model` and
+  its cross-validation then **raise** on a NaN or a non-positive exposure rather
+  than subsetting. Every rung of a session therefore reports the same `n_bins`
+  and `n_stops`, and `compare_nested_models` NaNs any comparison whose two rungs
+  disagree on `n_events` / `n_bins` / `n_stops`. For the shipped ladder the
+  union costs nothing — the cohort is every stop with positive immobility
+  (`n_drop_common_cohort_other` is 0 in
+  `models_per_bin_rate/per_bin_rate_cohort_audit.csv`). The freeze bites where
+  rungs need different covariates — the `is_swr`-contrast ladder, whose audit is
+  the only rate audit with a non-zero `n_drop_common_cohort_other`. There and in
+  `MU_uncertainty` the value covariates' missing tail is charged to
+  `n_drop_qvals_gap`, not to the union.
 - **Runner / output:** `scripts/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →
   `Processed-Data/replay_content/models_per_bin_rate/all_models.pkl`. Plot with
@@ -95,15 +142,21 @@ offset. Its limitation is exactly that offset — see below.
   animals, signed-rank p = 2.5e-23**. Those two are different measurements:
   the first is the size of the kernel at a lag, the second is the consistency of
   a between-population difference — quote them as separate clauses, never
-  spliced. So the reward kernel is **boost-then-suppression**: the most recent
-  reward *raises* the current rate (and that boost dissociates by SWR-coupling),
-  while reward accumulated over the preceding several trials *lowers* it (shared
-  across populations). The lag≥2 suppression is a recent-reward effect; it is
+  spliced. Both are properties of the *fitted kernel*, which is reconstructed
+  from the three basis coefficients per session and drawn in
+  `paper/figures/rate/reward_kernel_basis.png`; the smooth basis has no per-lag
+  parameter, so read shape off that reconstruction rather than off any one
+  coefficient. Its shape: a lag-1 rise that dissociates by SWR-coupling, then a
+  shallow dip below 1 from lag 3 that is shared across populations and closes by
+  lag 10. The lag≥2 suppression is a recent-reward effect; it is
   *consistent with* an RPE / relative-reward account (Kleinman & Foster 2024;
   Ambrose adaptive coding) but this GLM does not measure a prediction error, so
   the mechanism (RPE vs satiety vs reward-rate adaptation) is not established
-  here. The self-history kernel is **refractory** (<1) below 60 ms and **bursty**
-  (>1) at ~100–135 ms (events are non-Poisson).
+  here. The self-history kernel is **refractory** (RR < 1) at short lags — ≤60 ms
+  for detected SWR and for pooled non-local, but out to ≤150 ms for non-SWR
+  non-local events — and **bursty** (RR > 1) at ~105–135 ms, peaking at 2.77×
+  (detected SWR) down to 1.82× (non-SWR non-local); events are non-Poisson
+  ([per_bin_rate_results.md](per_bin_rate_results.md) §4).
 
   (Numbers from the 2026-09-04 refit onto the three-bump raised-cosine reward
   basis — see [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full
@@ -112,9 +165,11 @@ offset. Its limitation is exactly that offset — see below.
   the lag-1 boost is smaller than the retired per-lag specification reported;
   the ordering and the dissociation are unchanged. `#19c` in the claims table
   still carries the retired per-lag values and rung names. The audited
-  SWR-contrast ladder currently publishes **no aggregate rows** — every term
-  exceeds the unidentified-share gate on the full corpus — so nothing in that
-  table is quotable at present.)
+  SWR-contrast ladder publishes **32 aggregate rows** under the per-term
+  separation rule — `G0`–`G7` across the three stratified populations plus `S1`
+  and `S3`–`S9` on the contrast, split over the primary and post-outcome cohorts
+  (6 primary + 2 post-outcome rows per population). Under the retired fit-level
+  flag it published none.)
 
 ## MU — the uncertainty/value model (Family B extension)
 
@@ -145,21 +200,27 @@ pooled `non_local` null is not fit here).
 
 ## The result holds across both families
 
-Reward increases replay rate, and the SWR-coupled subset carries the strong
-gating, in **both** estimators:
+Both estimators now carry the *same* past-only reward-history block, and in both
+the reward dependence is carried by the SWR-coupled stream and is absent from the
+non-SWR one:
 
-- **Family A (per-stop):** omission suppresses the non-local event rate in
-  **85 % of sessions, 5/5 animals** (`is_after_omission RR ≈ 0.40`; stronger for
-  `non_local_swr`, weaker for `non_local_no_swr`). (The 98.6% figure is the
-  `is_swr_stop` result, not this one.) This magnitude is a leakage + dwell upper
-  bound — `is_after_omission` is built from the trial *start*, so it can encode
-  the not-yet-delivered outcome on approach stops; the current causal spec uses
-  the past-only reward-history basis instead (see the causal-hygiene note above).
-- **Family B (per-bin):** the lag-1 reward dissociation above, controlling for
-  dwell, the within-stop time course, reward history, and event clustering.
+- **Family A (per-stop):** the reward block improves the fit on every population
+  except the non-SWR one — median `R1 − R0` ΔAIC **−5.12** (non-local), **−2.43**
+  (non-local w/ SWR), **−1.41** (detected SWR), **+0.30** (non-local, no SWR).
+  The earlier per-stop headline (`is_after_omission RR ≈ 0.40` in 85 % of
+  sessions) came from a rung that is no longer fit: it was built from the trial
+  *start*, so it could encode the not-yet-delivered outcome on approach stops,
+  and the causal spec now uses the past-only basis instead (see the
+  causal-hygiene note above). Do not carry that magnitude forward.
+- **Family B (per-bin):** the reconstructed kernel's lag-1 dissociation (1.38
+  SWR-coupled vs 0.91 non-SWR) and the paired within-session comparison (80 % of
+  217 sessions, 5/5 animals, p = 2.5e-23), controlling for dwell, the within-stop
+  time course, reward history, and event clustering.
 
-The agreement across two estimators with different confound structure is the
-robustness argument for `#19c` in [`../paper/claims_table.md`](../paper/claims_table.md).
+Family A agrees in *direction* on a four-parameter block test; Family B is where
+the effect is measured. `#19c` in
+[`../paper/claims_table.md`](../paper/claims_table.md) still records the retired
+per-lag / `is_after_omission` values and needs re-deriving before it is cited.
 
 ## Point-process model checking (Family B)
 
@@ -199,48 +260,58 @@ only when that term itself is named in its `separated_terms`; a product term
 does not inherit a factor's separation. `|coef|>=10` remains a backstop for fits
 carrying no flag.
 
-What the ladder actually shows (218 sessions):
+What the ladder actually shows (218 sessions; the fit numbers below are the
+`outcome = non_local` column of
+[per_bin_rate_results.md](per_bin_rate_results.md) §6):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`
-  fails the KS band on ~half of sessions (`ks_within_band ≈ 0.50`, non-Poisson:
-  refractory + bursty), and the reward / self-history blocks *without* time
-  (`M1`–`M4`) do **not** fix it (`≈ 0.37–0.55`). Adding the `bs(tc)` spline
-  (`M5_time`) jumps `ks_within_band` to ≈ 0.83 and the full model `M7` to ≈ 0.91.
-  The dominant misfit of the constant model is the strong post-stop rate
-  transient, not the fine-timescale clustering.
-- **Dispersion stays well below 0.1 (underdispersed), not → 1.** At these sparse 15 ms
+  fails the KS band on about half of sessions (`ks_within_band` 0.49,
+  non-Poisson: refractory + bursty), and the reward / self-history blocks
+  *without* time do **not** fix it (`M1_rew` 0.46, `M3_hist` 0.40, `M3r_histcos`
+  0.39, `M4_hist_rew` 0.41). Adding the `bs(tc)` spline (`M5_time`) jumps
+  `ks_within_band` to 0.86 and the full model `M7_time_hist_rew` to 0.88
+  (`M7r_time_histcos_rew` 0.87). The dominant misfit of the constant model is
+  the strong post-stop rate transient, not the fine-timescale clustering.
+- **Dispersion stays far below 1 (underdispersed), not → 1.** At these sparse 15 ms
   bins the Poisson deviance is not a calibrated dispersion estimate, so the
   textbook "history block drives dispersion → 1" does not apply; read KS and the
-  rescaled-ISI autocorrelation (neither discretization-sensitive) instead. Mean
-  per-bin count is ≈ 0.005–0.015, so the trapezoid rescaling is well-behaved on
-  average; `mean_predicted` / `max_predicted` are reported so the high-rate-bin
-  KS bias can be ruled out.
-- **Held-out CV separates a generalizing block from an overfitting one — and
-  the overfit is a parameterization artifact, now fixed.** With the lag-dummy
-  history (`onset_lag1..10`), `cv_bits_per_event` is positive only for the time
-  block (`M5_time ≈ +0.23`); the self-history block **overfits**
-  (`M3_hist ≈ −0.25`, `M7` median ≈ −0.084, negative on 58% of sessions). The
-  cause is perfect separation: on the <45 ms refractory bins the unregularized
-  per-session MLE drives `onset_lag` coefficients to ≈ −25, so a held-out bin
-  that *does* fire shortly after another event is assigned ≈ 0 probability and
-  the log-likelihood blows up. **A smooth raised-cosine history basis fixes it**
-  — replacing the 10 collinear lag dummies with 4 log-spaced raised-cosine bumps
-  (the same 150 ms window) cannot separate, and lifts the median
-  `cv_bits_per_event` from **−0.084 to +0.212** (positive on 89% of sessions,
-  better than the dummy on 94%). But the raised-cosine fix only rescues the
-  history block from *actively hurting* CV — it does **not** make the full model
-  the best generalizer: the **time block alone (`M5_time`, CV +0.228) is the
-  best-generalizing rung** in the ladder, and the raised-cosine full model
-  (`M7r`, +0.199) has the **lowest AIC but does not beat `M5` on held-out CV**
-  (`M7r − M5 ≈ −0.010`, only ~46% of sessions improve). Reward + smooth
-  self-history add inferential signal but **negligible held-out bits** over the
-  within-stop time course; use `M5_time` as the parsimonious predictive model and
-  `M7r` for the full additive coefficient read. The raised-cosine models (`M3r_histcos`,
-  `M7r_time_histcos_rew`) are in the ladder; the dummy `onset_lag` models are
-  kept for the refractory/bursty *kernel-shape* readout, which is interpretable
-  per-lag where the smooth basis is not.
-- **Possible within-session non-stationarity (preliminary, not established).**
-  The cumulative point-process residual within a session makes slow excursions,
+  rescaled-ISI autocorrelation (neither discretization-sensitive) instead. The
+  mean per-bin count is the §1 baseline rate times the 15 ms bin — ≈ 0.003
+  (non-local w/ SWR) to ≈ 0.006 (non-local, all) — so the trapezoid rescaling is
+  well-behaved on average; `mean_predicted` / `max_predicted` are reported so the
+  high-rate-bin KS bias can be ruled out.
+- **The time block is the only rung with both a large CV gain and a full CV
+  cohort.** `M5_time` has the ladder's best held-out score, `cv_bits_per_event`
+  **+0.227 over 215 of 218 sessions**. Every rung carrying the `onset_lag`
+  dummies is scored on **2 sessions** (`M3_hist` 0.061, `M4_hist_rew` 0.071,
+  `M6_time_hist` 0.079, `M7_time_hist_rew` 0.094, `M9_rew_x_time` 0.099): the
+  dummies are genuinely separated — a short lag perfectly predicts `count == 0`
+  — in ~98 % of sessions, and a fold with an unidentified non-nuisance term voids
+  the whole metric, so those bits/event describe two sessions and must not be
+  quoted as corpus quantities. The raised-cosine history basis cannot separate
+  that way but is still scored on a minority (`M3r_histcos` 0.052 over 83
+  sessions, `M7r_time_histcos_rew` 0.130 over 86), so its CV is not a like-for-
+  like comparison against `M5_time` either. `M7r_time_histcos_rew` has the
+  ladder's **lowest median AIC (2244, against `M5_time`'s 2250)** while not
+  beating it on held-out bits. Use `M5_time` as the parsimonious predictive
+  model and `M7r` for the full additive coefficient read; keep the dummy
+  `onset_lag` models for the refractory/bursty *kernel-shape* readout, which is
+  interpretable per-lag where the smooth basis is not.
+- **The reward block is a small AIC step once the rungs share rows.** Median
+  per-session `M1_rew − M0_const` runs from **−4.96** (non-local) through
+  **−2.72** (non-local w/ SWR) and **−1.56** (detected SWR) to **+0.75**
+  (non-local, no SWR), and `M7_time_hist_rew − M6_time_hist` is **+0.79 to
+  +2.75** — the four-parameter smooth block does not pay for itself once the time
+  course and self-history are in the model, even though its immediate component
+  is a large and consistent effect. The retired eleven-parameter per-lag block
+  reported −68 to −163 on the same four populations, but its rungs were not
+  scored on the same rows as their parent — the per-lag columns are NaN early in
+  an epoch, so the reward rung was fit on fewer bins than the null it was
+  compared against — so that step was never a like-for-like model comparison
+  ([audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md)).
+- **Possible within-session non-stationarity (preliminary, not established;
+  the numbers in this bullet predate the reward-basis refit and were not
+  re-derived from it).** The cumulative point-process residual within a session makes slow excursions,
   and a weak population tendency for replay to rise over the session was seen
   (per-stop residual decile ramp ≈ −0.05 → +0.03; ~73% of sessions positive
   slope; not reward-rate). **But this does not survive a proper null:** because
@@ -261,12 +332,16 @@ What the ladder actually shows (218 sessions):
 - **Cross-family CV is not comparable.** Family A scores 5-fold per-stop mean
   log-likelihood; Family B scores 10-fold (over stops) per-bin log-likelihood
   plus `cv_bits_per_event` vs `M0_const`. Compare CV **within** a family only.
-- **Lag-dummy self-history overfits; use the raised-cosine variant for
-  prediction.** The `onset_lag` dummy history separates on the refractory bins
-  and hurts held-out CV (`M3_hist ≈ −0.25`); the raised-cosine models
-  (`M3r_histcos`, `M7r_time_histcos_rew`) fix this (median `cv_bits_per_event`
-  −0.084 → +0.212). Use the dummy models only to read the per-lag refractory/
-  bursty *kernel shape*; use the raised-cosine models for prediction / CV.
+- **Lag-dummy self-history is not cross-validatable; use the raised-cosine
+  variant for prediction.** The `onset_lag` dummies separate on the refractory
+  bins in ~98 % of sessions, which voids the CV metric and leaves `M3_hist` /
+  `M4_hist_rew` / `M6_time_hist` / `M7_time_hist_rew` / `M9_rew_x_time` scored on
+  2 of 218 sessions. The raised-cosine models (`M3r_histcos` 0.052 over 83
+  sessions, `M7r_time_histcos_rew` 0.130 over 86) are identified but still scored
+  on a minority, so neither is comparable with `M5_time`'s +0.227 over 215.
+  Use the dummy models only to read the per-lag refractory / bursty *kernel
+  shape*; use the raised-cosine models for prediction / CV, and compare CV
+  numbers only between rungs with comparable `n_cv`.
 - **Duration is a behavioral variable, not just exposure.** Stop durations are
   bimodal — reward creates the long consummatory mode — so the offset is not a
   nuisance to be divided out; the per-second / per-bin estimators isolate the

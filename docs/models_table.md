@@ -108,6 +108,25 @@ an early-session reward-history gap) → `n_drop_nonfinite`
 (Σcount==0) → `n_drop_common_cohort_other` (union complete-case: dropped only for
 *another* rung's predictor) → `n_excluded_session` (data-level `min_*`/rank gates).
 
+**The rate families now populate `n_drop_common_cohort_other`.** Both rate
+runners freeze one cohort per fitted unit before any rung is fit —
+`freeze_per_bin_cohort` over the union of every `MODEL_PER_BIN_RATE` design
+column (per session × population, `exposure > 0`) and `freeze_common_cohort` over
+the union of every `MODEL_PER_STOP_RATE` predictor (per session, positive
+`immobility_duration_s` offset) — and the fitters raise on a residual NaN instead
+of dropping rows, so a union drop is now a recorded number rather than an
+invisible per-rung `dropna`. Read the column as "complete for this rung, dropped
+for another rung's predictor". For the **shipped** Family-A and Family-B ladders
+it is **0** on every row (`models_per_stop_rate/all_models_cohort_audit.csv`,
+`models_per_bin_rate/per_bin_rate_cohort_audit.csv`): no rung there needs a
+covariate another rung lacks, so the frozen cohort is simply every stop with a
+positive immobility offset, and the only stop-level loss is the 20 stops with a
+non-positive/NaN offset under `n_drop_own_predictor_missing`. A non-zero value
+appears where rungs genuinely differ in what they need — the `is_swr`-contrast
+ladder (`swr_contrast_rate_cohort_audit.csv`), whose value-covariate rungs also
+charge their missing tail to `n_drop_qvals_gap` before the union is taken, as
+does `fit_uncertainty_rate.py`.
+
 **Reconciliation invariant (asserted, fail-loud):**
 `n_in − Σ n_drop_* == n_modeled`. Convergence/separation counts
 (`n_sessions_flagged_*`) and the `|coef|>=10` quasi-separation counts (the separate
@@ -297,7 +316,10 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 | `G8_rewxtime` | `BASE + REWXTIME` | Does the current reward reshape the within-stop rate *profile* (not just shift its level)? — the dwell-shape control (rewarded stops are ~3.6× longer). |
 
 ### B. `is_swr` contrast — pooled two non-local streams (design B)
-`is_swr:X` coefficients are the SWR-vs-non-SWR dissociation tests.
+`is_swr:X` coefficients are the SWR-vs-non-SWR dissociation tests. Every `S`
+formula below is emitted as `is_swr * (…) + reward_history_incomplete`: the
+structural-missingness indicator is a plain main effect and is never expanded
+against `is_swr`, so no `is_swr:reward_history_incomplete` term exists.
 
 | model | formula (`count ~ … + offset(log exposure)`) | question |
 |---|---|---|
@@ -372,6 +394,13 @@ design columns; checked by `_verify_harmonization_parity`, see
 > key-aligned gate reproduces every declared unchanged column on shared rows but
 > fails coverage because a transient rebuild error omitted three Replay sessions
 > (218 → 215). Regenerate those sessions before treating any row as verified.
+
+> **Superseded for the rate families (2026-09-04).** Both rate ladders were
+> respecified onto the reward-history raised-cosine basis (`REWBASIS`) and refit,
+> so the rate rows below describe the pre-basis ladder: `R1` is a different
+> specification from the one classified parity-only here, and the per-bin reward
+> rungs changed with it. The old→new comparison is in
+> [audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md).
 
 | family | CHANGED (report old→new) | parity-only |
 |---|---|---|
