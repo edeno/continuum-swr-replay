@@ -83,6 +83,7 @@ from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
@@ -586,6 +587,9 @@ def main() -> None:
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
     qvals = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     require_covariate_schema(qvals, table="qvals")
+    # Hash the inputs now, not at write time: the fit runs long enough that a
+    # table could be regenerated mid-run and be certified as this fit's input.
+    fit_inputs = record_inputs(FIT_INPUTS)
     qcols = qvals[
         [
             "stop_id",
@@ -655,7 +659,7 @@ def main() -> None:
     csfx = "_smoke" if args.max_per_animal else ""
     out = out_dir / fname
     models.to_pickle(out)
-    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
+    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
     gate_audit.to_csv(
         out_dir / f"uncertainty_rate_post_outcome_gate_audit{csfx}.csv",
         index=False,

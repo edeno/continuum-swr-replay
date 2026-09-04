@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
@@ -71,6 +72,9 @@ logger = logging.getLogger(__name__)
 
 SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
+
+# The table this family is fit on; recorded in the artifact's provenance sidecar.
+FIT_INPUTS = {"stop_table": RC / "stop_table.pkl"}
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
 RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 OFFSET_COL = "immobility_duration_s"
@@ -224,6 +228,9 @@ def main() -> None:
 
     stop = read_table(RC / "stop_table.pkl")
     require_covariate_schema(stop, table="stop")
+    # Hash the input now, not at write time, so the sidecar describes the bytes
+    # this fit read rather than whatever is on disk when it finishes.
+    fit_inputs = record_inputs(FIT_INPUTS)
     missing = [c for c in RESPONSE_COLS.values() if c not in stop.columns]
     if missing:
         raise SystemExit(
@@ -249,9 +256,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "all_models.pkl"
     rate.to_pickle(out)
-    write_fit_provenance(
-        out, {"stop_table": RC / "stop_table.pkl"}, "poisson_glm", sys.argv
-    )
+    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
     write_cohort_audit(cohort_audits, out_dir / "all_models_cohort_audit.csv")
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",

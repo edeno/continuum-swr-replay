@@ -37,6 +37,9 @@ from scipy.stats import wilcoxon
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
@@ -48,6 +51,9 @@ _FIT_SPEC = importlib.util.spec_from_file_location(
 _fit = importlib.util.module_from_spec(_FIT_SPEC)
 _FIT_SPEC.loader.exec_module(_fit)
 POPULATIONS = _fit.POPULATIONS_TO_FIT
+# The same tables the fitter recorded in the artifact's provenance sidecar.
+UNCERTAINTY_RATE = _fit.RC / "models_per_bin_rate" / "uncertainty_rate.pkl"
+UNCERTAINTY_RATE_INPUTS = _fit.FIT_INPUTS
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -156,15 +162,31 @@ def plot(models: pd.DataFrame, out_path) -> None:
     logger.info("Wrote %s", out_path)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--smoke", action="store_true", help="Read the smoke fit output."
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Plot the fit even if its input tables have changed since it was "
+            "fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     rc = PROCESSED_DATA_DIR / "replay_content" / "models_per_bin_rate"
     fname = "uncertainty_rate_smoke.pkl" if args.smoke else "uncertainty_rate.pkl"
+    require_fresh_inputs(
+        rc / fname, UNCERTAINTY_RATE_INPUTS, allow_stale=args.allow_stale
+    )
     models = pd.read_pickle(rc / fname)
     logger.info("Loaded %d rows from %s", len(models), rc / fname)
 

@@ -92,6 +92,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
@@ -400,6 +401,9 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # Hash the inputs now, not at write time: the ladder runs long enough that a
+    # table could be regenerated mid-fit and be certified as this fit's input.
+    fit_inputs = record_inputs(FIT_INPUTS)
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
@@ -426,7 +430,7 @@ def main() -> None:
     fname = "all_models_smoke.pkl" if args.max_per_animal else "all_models.pkl"
     out = out_dir / fname
     models.to_pickle(out)
-    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
+    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
     csfx = "_smoke" if args.max_per_animal else ""
     write_cohort_audit(
         _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),

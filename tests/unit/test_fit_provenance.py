@@ -7,11 +7,13 @@ changing exactly one byte of an input.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import importlib.util
 import json
 import re
 from pathlib import Path
+from types import ModuleType
 
 import pandas as pd
 import pytest
@@ -20,12 +22,16 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
     git_hash,
+    record_inputs,
     require_fresh_inputs,
     write_fit_provenance,
 )
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+RATE = REPO_ROOT / "scripts" / "rate"
+FIGURES = REPO_ROOT / "scripts" / "figures"
 
 
 def _sha256(path: Path) -> str:
@@ -92,6 +98,41 @@ def test_sidecar_hashes_the_parquet_a_pkl_path_resolves_to(fit_dir, inputs):
     assert recorded["inputs"]["stop_table"]["sha256"] != _sha256(
         fit_dir / "stop_table.pkl"
     )
+
+
+def test_recorded_hashes_survive_a_table_regenerated_during_the_fit(fit_dir, inputs):
+    """The sidecar describes the bytes the fit read, not the bytes it finished on.
+
+    A ladder over 218 sessions runs long enough for a table to be regenerated
+    underneath it; hashing at write time would certify a table the fit never saw.
+    """
+    fit_inputs = record_inputs(inputs)
+    before = _sha256(fit_dir / "stop_table.parquet")
+
+    _flip_one_byte(fit_dir / "stop_table.parquet")
+    write_fit_provenance(
+        fit_dir / "all_models.pkl", fit_inputs, "poisson_glm", ["fit.py"]
+    )
+
+    recorded = json.loads(fit_provenance_path(fit_dir / "all_models.pkl").read_text())
+    assert recorded["inputs"]["stop_table"]["sha256"] == before
+    assert recorded["inputs"]["stop_table"]["sha256"] != _sha256(
+        fit_dir / "stop_table.parquet"
+    )
+    # ... and the fit is then correctly reported stale against the table on disk.
+    assert check_fit_provenance(fit_dir / "all_models.pkl", inputs) == ["stop_table"]
+
+
+def test_each_input_carries_the_time_it_was_hashed(fit_dir, inputs):
+    fit_inputs = record_inputs(inputs)
+    write_fit_provenance(
+        fit_dir / "all_models.pkl", fit_inputs, "poisson_glm", ["fit.py"]
+    )
+
+    recorded = json.loads(fit_provenance_path(fit_dir / "all_models.pkl").read_text())
+    hashed_at = recorded["inputs"]["stop_table"]["hashed_at"]
+    assert hashed_at == fit_inputs["stop_table"]["hashed_at"]
+    assert hashed_at <= recorded["written_at"]
 
 
 def test_sidecar_records_the_current_commit(fit_dir, inputs):
@@ -170,32 +211,176 @@ def test_reader_gate_is_silent_on_a_current_fit(fit_dir, inputs):
     )
 
 
-def _load_script(name: str):
-    spec = importlib.util.spec_from_file_location(
-        name, REPO_ROOT / "scripts" / "rate" / f"{name}.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+_MODULES: dict[str, ModuleType] = {}
+
+
+def _load_script(path: Path) -> ModuleType:
+    """Import a script as a module (module level only -- never its ``main``)."""
+    if path.name not in _MODULES:
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _MODULES[path.name] = module
+    return _MODULES[path.name]
+
+
+def _module_constants(path: Path) -> dict[str, object]:
+    """Evaluate a script's module-level constants from source, without importing.
+
+    For scripts that do their work at import time (the swr-contrast coefficient
+    figure has no ``main``), so importing them would draw the figures. Only
+    assignments are evaluated, in order, against a namespace seeded with the
+    data-directory constants; anything that needs a name the namespace does not
+    carry (a dataframe read, a plot handle) is skipped.
+    """
+    namespace: dict[str, object] = {
+        "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR,
+        "P": PROCESSED_DATA_DIR,
+        "Path": Path,
+    }
+    for node in ast.parse(path.read_text()).body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            try:
+                value = eval(ast.unparse(node.value), namespace)  # noqa: S307
+            except Exception:
+                continue
+            namespace[node.targets[0].id] = value
+    return namespace
+
+
+def _read_table_paths(path: Path, constants: dict[str, object]) -> set[Path]:
+    """Every table path the script hands to ``read_table``, from its source."""
+    paths = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "read_table"
+        ):
+            continue
+        expression = ast.unparse(node.args[0])
+        try:
+            paths.add(Path(eval(expression, dict(constants))))  # noqa: S307
+        except Exception as error:  # pragma: no cover - drift makes this fire
+            raise AssertionError(
+                f"{path.name}: cannot resolve read_table({expression}) against the "
+                "module constants, so the provenance mapping cannot be checked "
+                "against it -- read the table through a module-level constant."
+            ) from error
+    return paths
+
+
+# Each fitter and the readers of the artifacts it writes, with the module-level
+# name each one declares its input mapping under.
+FITTERS = [
+    "fit_per_bin_rate_models",
+    "fit_per_stop_rate_models",
+    "fit_swr_contrast_rate",
+    "fit_uncertainty_rate",
+]
+# (reader, name of its input mapping, the fitter that writes what it reads).
+# ``plot_swr_contrast_coefs`` draws its figures at import, so its constants are
+# read from source rather than imported.
+READERS = [
+    (
+        RATE / "summarize_per_bin_rate_models.py",
+        "ALL_MODELS_INPUTS",
+        "fit_per_bin_rate_models",
+    ),
+    (
+        RATE / "plot_per_bin_rate_models.py",
+        "ALL_MODELS_INPUTS",
+        "fit_per_bin_rate_models",
+    ),
+    (RATE / "plot_model_checking.py", "ALL_MODELS_INPUTS", "fit_per_bin_rate_models"),
+    (
+        RATE / "plot_per_bin_rate_summary.py",
+        "ALL_MODELS_INPUTS",
+        "fit_per_bin_rate_models",
+    ),
+    (
+        RATE / "plot_uncertainty_rate.py",
+        "UNCERTAINTY_RATE_INPUTS",
+        "fit_uncertainty_rate",
+    ),
+    (
+        FIGURES / "plot_swr_contrast_coefs.py",
+        "SWR_CONTRAST_RATE_INPUTS",
+        "fit_swr_contrast_rate",
+    ),
+]
+RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
 
 
 @pytest.mark.parametrize(
-    "reader", ["summarize_per_bin_rate_models", "plot_per_bin_rate_models"]
+    "reader,mapping,fitter", READERS, ids=lambda v: getattr(v, "stem", v)
 )
-def test_readers_check_the_same_inputs_the_fitter_recorded(reader):
+def test_readers_check_the_same_inputs_the_fitter_recorded(reader, mapping, fitter):
     """A reader checking a different table set than the fitter recorded is blind."""
-    fitter = _load_script("fit_per_bin_rate_models")
-    module = _load_script(reader)
+    expected = _load_script(RATE / f"{fitter}.py").FIT_INPUTS
+    declared = (
+        _module_constants(reader)
+        if reader.name in RUNS_AT_IMPORT
+        else vars(_load_script(reader))
+    )
 
-    assert module.ALL_MODELS_INPUTS == fitter.FIT_INPUTS
-    assert module.ALL_MODELS == fitter.RC / "models_per_bin_rate" / "all_models.pkl"
+    assert declared[mapping] == expected
 
 
 @pytest.mark.parametrize(
-    "reader", ["summarize_per_bin_rate_models", "plot_per_bin_rate_models"]
+    "reader",
+    [
+        "summarize_per_bin_rate_models",
+        "plot_per_bin_rate_models",
+        "plot_model_checking",
+        "plot_per_bin_rate_summary",
+        "plot_uncertainty_rate",
+    ],
 )
 def test_readers_default_to_refusing_a_stale_fit(reader):
-    module = _load_script(reader)
+    module = _load_script(RATE / f"{reader}.py")
 
     assert module.build_parser().parse_args([]).allow_stale is False
     assert module.build_parser().parse_args(["--allow-stale"]).allow_stale is True
+
+
+@pytest.mark.parametrize(
+    "reader",
+    [
+        "summarize_per_bin_rate_models",
+        "plot_per_bin_rate_models",
+        "plot_model_checking",
+        "plot_per_bin_rate_summary",
+    ],
+)
+def test_per_bin_readers_gate_the_ladder_artifact(reader):
+    module = _load_script(RATE / f"{reader}.py")
+
+    assert module.ALL_MODELS == module.RC / "models_per_bin_rate" / "all_models.pkl"
+
+
+def test_contrast_figure_gates_the_rate_artifact():
+    constants = _module_constants(FIGURES / "plot_swr_contrast_coefs.py")
+    fitter = _load_script(RATE / "fit_swr_contrast_rate.py")
+
+    assert constants["SWR_CONTRAST_RATE"] == (
+        fitter.RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+    )
+
+
+@pytest.mark.parametrize("fitter", FITTERS)
+def test_fitters_record_every_table_they_read(fitter):
+    """The declared mapping is the whole set of tables the runner loads.
+
+    A new ``read_table`` that never reaches ``FIT_INPUTS`` would leave an input
+    out of the sidecar, so the fit would pass the reader gate after that table
+    was regenerated.
+    """
+    script = RATE / f"{fitter}.py"
+    constants = _module_constants(script)
+
+    assert _read_table_paths(script, constants) == set(constants["FIT_INPUTS"].values())

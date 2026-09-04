@@ -99,6 +99,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
@@ -724,6 +725,9 @@ def main() -> None:
             assert_predictor_timing(need, descriptive=(name in descr))
 
     stop, onsets, n_qvals_dropped = _load()
+    # Hash the inputs now, not at write time: the fan-out runs long enough that a
+    # table could be regenerated mid-fit and be certified as this fit's input.
+    fit_inputs = record_inputs(FIT_INPUTS)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 
@@ -798,7 +802,7 @@ def main() -> None:
         else "swr_contrast_rate.pkl"
     )
     models.to_pickle(out)
-    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
+    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
 
     # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +
     # term-level quasi-separation diagnostics, mirroring the content contrast runner.
@@ -840,8 +844,8 @@ def main() -> None:
         # Audited aggregation mirroring the content ladder (per-animal primary,
         # session signed-rank, BH-FDR, standardized per-SD columns). G-rungs are
         # relabeled non_local/_swr/_no_swr -> all/SWR/nonSWR to match the content table.
-        qv = read_table(out_dir / "qvals_table.pkl")
-        st = read_table(RC / "stop_table.pkl")
+        qv = read_table(FIT_INPUTS["qvals_table"])
+        st = read_table(FIT_INPUTS["stop_table"])
         require_covariate_schema(qv, table="qvals")
         require_covariate_schema(st, table="stop")
         st = add_uncertainty_covariates(st)
@@ -871,7 +875,7 @@ def main() -> None:
         asfx = "_smoke" if args.max_per_animal else ""
         audited = out_dir / f"swr_contrast_rate_audited{asfx}.pkl"
         agg.to_pickle(audited)
-        write_fit_provenance(audited, FIT_INPUTS, "poisson_glm", sys.argv)
+        write_fit_provenance(audited, fit_inputs, "poisson_glm", sys.argv)
         # Persist the exact per-SD factors this run used for the std_* columns so the
         # standardized coefficients are reproducible. These SDs are computed over the
         # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the

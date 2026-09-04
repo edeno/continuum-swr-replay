@@ -14,6 +14,14 @@ refuse to run against a fit whose inputs have changed since -- a fit with no
 sidecar at all counts as stale, because the absence of the record is exactly
 the situation the sidecar exists to end.
 
+The hashes describe the bytes the fit read, not the bytes on disk when the fit
+finished. A ladder over 218 sessions runs for long enough that a table can be
+regenerated underneath it, so each runner calls ``record_inputs`` immediately
+after loading its tables and hands the resulting records to the writer at the
+end; hashing at write time would certify a table the fit never saw. Each record
+carries its own ``hashed_at``, and the sidecar's ``written_at`` is the write
+time, so a reader can see the window the two bracket.
+
 The hashed file is the file that was *read*: ``read_table`` prefers the
 ``.parquet`` sibling of a ``.pkl`` path, so the paths handed in here are
 resolved the same way before hashing.
@@ -31,12 +39,16 @@ from continuum_swr_replay.table_io import parquet_path, read_attrs, sha256_file
 __all__ = [
     "fit_provenance_path",
     "git_hash",
+    "record_inputs",
     "write_fit_provenance",
     "check_fit_provenance",
     "require_fresh_inputs",
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+
+# One input's provenance: sha256, mtime, covariate_schema_version, hashed_at.
+InputRecord = dict[str, object]
 
 
 def fit_provenance_path(artifact_path: str | Path) -> Path:
@@ -99,8 +111,8 @@ def _resolve_input(path: str | Path) -> Path:
     raise FileNotFoundError(f"no input table at {parquet} or {pickle}")
 
 
-def _input_record(path: str | Path) -> dict[str, object]:
-    """Hash, mtime and covariate schema version of one input table."""
+def _input_record(path: str | Path) -> InputRecord:
+    """Hash, mtime, covariate schema version and hash time of one input table."""
     resolved = _resolve_input(path)
     return {
         "sha256": sha256_file(resolved),
@@ -108,12 +120,36 @@ def _input_record(path: str | Path) -> dict[str, object]:
         "covariate_schema_version": read_attrs(resolved).get(
             "covariate_schema_version"
         ),
+        "hashed_at": datetime.now(UTC).isoformat(),
     }
+
+
+def record_inputs(inputs: dict[str, Path]) -> dict[str, InputRecord]:
+    """Hash the input tables now, while the fit is reading them.
+
+    Call this immediately after the tables are loaded and pass the result to
+    :func:`write_fit_provenance` at the end of the run. Hashing at write time
+    instead would record whatever is on disk hours later, certifying a
+    regenerated table as the input to a fit that never saw it.
+
+    Parameters
+    ----------
+    inputs : dict of str to Path
+        Display name -> path of each table the fit was built from. A ``.pkl``
+        path is resolved through ``table_io.parquet_path`` so the hashed file
+        is the one ``read_table`` actually read.
+
+    Returns
+    -------
+    dict of str to dict
+        Name -> ``{sha256, mtime, covariate_schema_version, hashed_at}``.
+    """
+    return {name: _input_record(path) for name, path in inputs.items()}
 
 
 def write_fit_provenance(
     artifact_path: str | Path,
-    inputs: dict[str, Path],
+    inputs: dict[str, Path] | dict[str, InputRecord],
     estimator: str,
     cli: list[str],
 ) -> Path:
@@ -123,10 +159,10 @@ def write_fit_provenance(
     ----------
     artifact_path : str or Path
         The artifact just written (one sidecar per artifact).
-    inputs : dict of str to Path
-        Display name -> path of each table the fit was built from. A ``.pkl``
-        path is resolved through ``table_io.parquet_path`` so the hashed file
-        is the one ``read_table`` actually read.
+    inputs : dict of str to Path, or dict of str to dict
+        Either the records :func:`record_inputs` returned when the fit loaded
+        its tables -- the form every long-running runner uses -- or bare paths,
+        which are hashed here and so describe the tables as of *now*.
     estimator : str
         The estimator that produced the fits (e.g. ``"poisson_glm"``).
     cli : list of str
@@ -143,7 +179,10 @@ def write_fit_provenance(
         "written_at": datetime.now(UTC).isoformat(),
         "git_hash": git_hash(),
         "estimator": estimator,
-        "inputs": {name: _input_record(path) for name, path in inputs.items()},
+        "inputs": {
+            name: value if isinstance(value, dict) else _input_record(value)
+            for name, value in inputs.items()
+        },
         "cli": list(cli),
     }
     out = fit_provenance_path(artifact)

@@ -20,6 +20,7 @@ standardization factor is 1.0.
     uv run python scripts/figures/plot_swr_contrast_coefs.py
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -33,6 +34,7 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import PER_UNIT_T
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     POST_OUTCOME_COHORT,
     POST_OUTCOME_RATE_RUNGS,
@@ -44,6 +46,40 @@ from continuum_swr_replay.table_io import read_table
 RC = PROCESSED_DATA_DIR / "replay_content"
 OUT = Path("paper/figures/swr_contrast")
 OUT.mkdir(parents=True, exist_ok=True)
+
+SWR_CONTRAST_RATE = RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+# The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
+# provenance sidecar here, before any table or fit is read, so a figure cannot be
+# drawn from coefficients that predate the tables on disk.
+SWR_CONTRAST_RATE_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+}
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Plot the fit even if its input tables have changed since it was "
+            "fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
+# This script runs top to bottom at import; the gate has to fire here, ahead of
+# the first table read, rather than inside a main() it does not have.
+require_fresh_inputs(
+    SWR_CONTRAST_RATE,
+    SWR_CONTRAST_RATE_INPUTS,
+    allow_stale=build_parser().parse_args().allow_stale,
+)
 
 
 def _global_sd(covariates):
@@ -197,7 +233,7 @@ def forest(ax, df, rows, title):
 handles = [plt.Line2D([], [], marker="o", ls="", color=CMAP[a], label=a) for a in ANIM]
 
 # ---- RATE ----
-R = pd.read_pickle(RC / "models_per_bin_rate" / "swr_contrast_rate.pkl")
+R = pd.read_pickle(SWR_CONTRAST_RATE)
 SWR, NON = "non_local_swr", "non_local_no_swr"
 rate_rows = [
     ("immediate reward history · SWR", "G0_base", SWR, "reward_history_rcos_0"),

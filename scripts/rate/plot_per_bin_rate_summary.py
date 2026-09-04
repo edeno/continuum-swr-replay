@@ -14,6 +14,8 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
+
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -32,6 +34,9 @@ from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
@@ -43,6 +48,14 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E40
 from continuum_swr_replay.table_io import read_table
 
 RC = P / "replay_content"
+ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"
+# The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against the
+# artifact's provenance sidecar before any panel is drawn.
+ALL_MODELS_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+}
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
 STYLE = {  # outcome -> (label, color)
@@ -253,8 +266,24 @@ def _panel_covar(ax, df):
     ax.set_title("F. Slow reward-history component by type (M7)")
 
 
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Plot the fit even if its input tables have changed since it was "
+            "fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
 def main() -> None:
-    df = pd.read_pickle(RC / "models_per_bin_rate" / "all_models.pkl")
+    args = build_parser().parse_args()
+    require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
+    df = pd.read_pickle(ALL_MODELS)
     stop = read_table(RC / "stop_table.pkl")
     onset_table = read_table(RC / "event_onset_table.pkl")
     event_table = read_table(RC / "event_table.pkl")
