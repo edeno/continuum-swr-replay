@@ -17,6 +17,16 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
     pairing is carried by the per-session fit + across-session aggregation (no GLMM),
     matching the rest of Family B.
 
+TWO COHORTS per (session, population). `rpe_postoutcome` and
+`reward_belief_mean_update_l1_all_ports_postoutcome` are undefined on a stop that
+starts before its trial's outcome is known, so they are NaN'd there. The rungs that
+need them (`G5_rpe`, `G7_update`, `S7_rpe`, `S9_update`) are therefore fit on a
+POST_OUTCOME cohort -- the primary design re-frozen on those columns -- alongside a
+refit of their ladder's null (`G0_base` / `S0_rate`), so their AIC comparison shares
+rows. Every other rung shares the PRIMARY cohort, which the gate does not shrink.
+Each fitted row carries a `cohort` label; `(session, population, model, cohort)` is
+the key.
+
 Covariate blocks BASE/PERISWITCH/BLOCK/SWITCHRATE/VALUE/RPE/UNCERT/UPDATE/REWXTIME
 are defined below. The task
 dimensions are the paper's (Comrie et al.), all from the beta-bernoulli model:
@@ -89,6 +99,10 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
+    POST_OUTCOME_COHORT,
+    POST_OUTCOME_COVARIATES,
+    POST_OUTCOME_RATE_RUNGS,
+    PRIMARY_COHORT,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
@@ -223,17 +237,109 @@ def _fit(
     return out, None
 
 
-def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, dict]:
-    """Fit both ladders for one session, each on ONE frozen cohort.
+# Each ladder's null rung: the companion fit that gives a post-outcome rung a
+# same-rows AIC comparison on the post-outcome cohort.
+LADDER_NULL = {"G": "G0_base", "S": "S0_rate"}
 
-    Returns ``(keys, rows, skips, cohort_drops)``; ``cohort_drops`` maps a
-    population (each stratum plus ``"contrast"``) to the number of stops the
-    cohort freeze removed, which the audit reports as
+
+def _primary_union(specs: dict) -> list[str]:
+    """Design columns of every rung of ``specs`` that is not a post-outcome rung."""
+    return list(
+        dict.fromkeys(
+            c
+            for name, (_f, need) in specs.items()
+            if name not in POST_OUTCOME_RATE_RUNGS
+            for c in need
+        )
+    )
+
+
+def _fit_post_outcome_cohort(
+    design: pd.DataFrame,
+    specs: dict,
+    ladder: str,
+    population: str,
+    base: dict,
+    tag_cols: tuple[str, ...] = (),
+) -> tuple[list[dict], dict, int]:
+    """Fit a ladder's post-outcome rungs and its null on one re-frozen cohort.
+
+    The post-outcome covariates are undefined on stops that begin before the
+    outcome is known (see :func:`_mask_post_outcome_covariates`), so the rungs
+    that carry them cannot be fit on the ladder's primary cohort. They get a
+    second cohort: the primary design re-frozen on their own columns, shared by
+    every post-outcome rung of the ladder (both covariates are NaN on the same
+    rows) and by the ladder's null rung, which is refit here so the rungs'
+    AIC / deviance comparison against the null is made on identical rows.
+
+    Parameters
+    ----------
+    design : pd.DataFrame
+        The ladder's PRIMARY-frozen (stop x bin) design.
+    specs : dict
+        ``SWR_CONTRAST_RATE_G_SPECS`` or ``SWR_CONTRAST_RATE_S_SPECS``.
+    ladder : {"G", "S"}
+        Selects the companion null rung from :data:`LADDER_NULL`.
+    population : str
+        Fit population recorded on each row (a stratum, or ``"contrast"``).
+    base : dict
+        Session key columns copied onto each row.
+    tag_cols : tuple of str
+        Extra required columns of the design (``("is_swr",)`` for the stacked
+        contrast design).
+
+    Returns
+    -------
+    rows : list of dict
+        One row per fitted rung, tagged ``cohort=POST_OUTCOME_COHORT``.
+    skips : dict
+        ``(model, population, cohort, reason) -> count`` for rungs not fit.
+    n_stops_dropped : int
+        Stops the re-freeze removed from the primary cohort.
+    """
+    rungs = [n for n in specs if n in POST_OUTCOME_RATE_RUNGS]
+    need_union = list(dict.fromkeys(c for n in rungs for c in specs[n][1]))
+    frozen, freeze = freeze_per_bin_cohort(
+        design, (), extra_columns=[*need_union, *tag_cols]
+    )
+    n_stops_dropped = freeze["n_stops_before"] - freeze["n_stops_after"]
+    rows: list[dict] = []
+    skips: dict = {}
+    for name in (*rungs, LADDER_NULL[ladder]):
+        formula, need = specs[name]
+        fit, reason = _fit(frozen, formula, [*need, *tag_cols])
+        if fit is not None:
+            rows.append({
+                "population": population, "model": name,
+                "cohort": POST_OUTCOME_COHORT, **base, **fit,
+            })
+        else:
+            key = (name, population, POST_OUTCOME_COHORT, reason)
+            skips[key] = skips.get(key, 0) + 1
+    return rows, skips, n_stops_dropped
+
+
+def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, dict]:
+    """Fit both ladders for one session on TWO frozen cohorts each.
+
+    The primary cohort carries every rung whose covariates are all pre-outcome;
+    those rungs share one frozen cohort per (session, population), so their AIC /
+    deviance comparison is valid. The post-outcome rungs (``G5_rpe`` /
+    ``G7_update`` / ``S7_rpe`` / ``S9_update``) are fit on a second cohort --
+    the primary design re-frozen on their own columns -- together with their
+    ladder's null rung, so their comparison is also made on identical rows.
+    Every row carries a ``cohort`` label, so ``(session, population, model,
+    cohort)`` is unique.
+
+    Returns ``(keys, rows, skips, cohort_drops)``. ``cohort_drops`` maps a
+    population (each stratum plus ``"contrast"``) to the stops the primary
+    freeze removed, and ``(population, POST_OUTCOME_COHORT)`` to the stops both
+    freezes removed together; the audit reports them as
     ``n_drop_common_cohort_other`` for the rungs that do not need the missing
     column themselves.
     """
     rows: list[dict] = []
-    skips: dict = {}  # (model, population, reason) -> count
+    skips: dict = {}  # (model, population, cohort, reason) -> count
     cohort_drops: dict = {}
     designs = {
         pop: aggregate_to_timebins(
@@ -248,11 +354,14 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         )
         for pop in STRATA
     }
-    # ONE cohort per ladder: the union of every G rung's columns for each
-    # stratum. The union is identical across strata (the covariates are the
-    # same per-stop values; only ``count`` differs), so the stacked contrast
-    # design below keeps its within-bin pairing.
-    g_union = list(dict.fromkeys(c for _f, need in G_SPECS.values() for c in need))
+    # ONE primary cohort per ladder: the union of the columns of every rung that
+    # is not a post-outcome rung, for each stratum. The union is identical across
+    # strata (the covariates are the same per-stop values; only ``count``
+    # differs), so the stacked contrast design below keeps its within-bin
+    # pairing. The post-outcome covariates are deliberately NOT in this union:
+    # they are NaN on every stop that begins before its outcome is known, which
+    # would cost the whole ladder those stops.
+    g_union = _primary_union(G_SPECS)
     for pop in STRATA:
         frozen, freeze = freeze_per_bin_cohort(
             designs[pop], (), extra_columns=g_union
@@ -260,14 +369,29 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         cohort_drops[pop] = freeze["n_stops_before"] - freeze["n_stops_after"]
         designs[pop] = frozen
     base = dict(zip(SESSION_COLS, keys, strict=True))
-    # A. stratified
+    # A. stratified, primary cohort
     for pop in STRATA:
         for name, (formula, need) in G_SPECS.items():
+            if name in POST_OUTCOME_RATE_RUNGS:
+                continue
             fit, reason = _fit(designs[pop], formula, need)
             if fit is not None:
-                rows.append({"population": pop, "model": name, **base, **fit})
+                rows.append({
+                    "population": pop, "model": name,
+                    "cohort": PRIMARY_COHORT, **base, **fit,
+                })
             else:
-                skips[(name, pop, reason)] = skips.get((name, pop, reason), 0) + 1
+                key = (name, pop, PRIMARY_COHORT, reason)
+                skips[key] = skips.get(key, 0) + 1
+    # A2. stratified, post-outcome cohort (each rung + the ladder's null)
+    for pop in STRATA:
+        po_rows, po_skips, po_dropped = _fit_post_outcome_cohort(
+            designs[pop], G_SPECS, "G", pop, base
+        )
+        rows.extend(po_rows)
+        for key, count in po_skips.items():
+            skips[key] = skips.get(key, 0) + count
+        cohort_drops[(pop, POST_OUTCOME_COHORT)] = cohort_drops[pop] + po_dropped
     # B. is_swr contrast: stack the two non-local streams
     stacked = pd.concat(
         [
@@ -276,7 +400,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         ],
         ignore_index=True,
     )
-    s_union = list(dict.fromkeys(c for _f, need in S_SPECS.values() for c in need))
+    s_union = _primary_union(S_SPECS)
     stacked, s_freeze = freeze_per_bin_cohort(
         stacked, (), extra_columns=[*s_union, "is_swr"]
     )
@@ -284,20 +408,27 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         s_freeze["n_stops_before"] - s_freeze["n_stops_after"]
     )
     for name, (formula, need) in S_SPECS.items():
+        if name in POST_OUTCOME_RATE_RUNGS:
+            continue
         fit, reason = _fit(stacked, formula, [*need, "is_swr"])
         if fit is not None:
-            rows.append({"population": "contrast", "model": name, **base, **fit})
+            rows.append({
+                "population": "contrast", "model": name,
+                "cohort": PRIMARY_COHORT, **base, **fit,
+            })
         else:
-            skips[(name, "contrast", reason)] = (
-                skips.get((name, "contrast", reason), 0) + 1
-            )
+            key = (name, "contrast", PRIMARY_COHORT, reason)
+            skips[key] = skips.get(key, 0) + 1
+    po_rows, po_skips, po_dropped = _fit_post_outcome_cohort(
+        stacked, S_SPECS, "S", "contrast", base, tag_cols=("is_swr",)
+    )
+    rows.extend(po_rows)
+    for key, count in po_skips.items():
+        skips[key] = skips.get(key, 0) + count
+    cohort_drops[("contrast", POST_OUTCOME_COHORT)] = (
+        cohort_drops["contrast"] + po_dropped
+    )
     return keys, rows, skips, cohort_drops
-
-
-POST_OUTCOME_COVARIATES = (
-    "rpe_postoutcome",
-    "reward_belief_mean_update_l1_all_ports_postoutcome",
-)
 
 
 def _mask_post_outcome_covariates(
@@ -310,9 +441,8 @@ def _mask_post_outcome_covariates(
     A stop whose ``stop_start`` precedes that instant spans the pre-outcome
     interval, so attaching the trial's post-outcome value to it would let the
     model condition on information the animal did not yet have. Those values are
-    set to NaN here, before the ladder's common-cohort freeze, so the freeze --
-    not a silent per-rung drop inside the fitter -- decides which rows the
-    ladder is fit on.
+    set to NaN here, before any freeze, so the cohort freezes -- not a silent
+    per-rung drop inside the fitter -- decide which rows each rung is fit on.
 
     Parameters
     ----------
@@ -395,18 +525,30 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         100 * len(stop) / n0,
     )
     stop, n_masked_by_state = _mask_post_outcome_covariates(stop)
+    n_masked = int(n_masked_by_state.sum())
     logger.info(
-        "post-outcome gate: %d stop(s) start before the outcome is known; "
-        "%s set to NaN (by occupancy_state: %s)",
-        int(n_masked_by_state.sum()),
+        "post-outcome gate: %d of %d stops (%.1f%%) start before the outcome is "
+        "known; %s set to NaN there. Share by occupancy_state: %s",
+        n_masked,
+        len(stop),
+        100 * n_masked / max(len(stop), 1),
         ", ".join(POST_OUTCOME_COVARIATES),
-        n_masked_by_state.to_dict(),
+        {
+            state: f"{count} ({100 * count / max(n_masked, 1):.0f}% of gated)"
+            for state, count in n_masked_by_state.items()
+            if count
+        },
     )
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
     n_qvals_dropped = int(n0 - len(stop))
     return stop, onsets, n_qvals_dropped
+
+
+def _home_cohort(model: str) -> str:
+    """The cohort a rung's own coefficients are reported from."""
+    return POST_OUTCOME_COHORT if model in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
 
 
 def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -420,7 +562,7 @@ def _cohort_records(
     n_qvals_dropped: int,
     cohort_stop_drops: dict | None = None,
 ) -> list[dict]:
-    """One stop-grain cohort record per (model, population).
+    """One stop-grain cohort record per (model, population, cohort).
 
     Grain is ``stop`` (the rate family is audited at stop grain — the timebin
     design is aggregated per-session inside the fitter). Buckets:
@@ -435,30 +577,73 @@ def _cohort_records(
     modeled-stop count (``n_stops``); the rest (bin-level drops, session gates) go to
     ``n_excluded_session``. Reconciles by construction.
 
-    ``cohort_stop_drops`` maps a fit population to the stops the freeze actually
-    removed; it must not exceed what the stop-level attribution accounts for.
+    ``cohort_stop_drops`` maps a fit population (and, for the post-outcome
+    cohort, ``(population, POST_OUTCOME_COHORT)``) to the stops the freezes
+    actually removed; it must not exceed what the stop-level attribution
+    accounts for.
+
+    The two cohorts are distinguished by ``cohort_mode``: ``common`` for the
+    primary ladder, ``common_post_outcome`` for the post-outcome rungs and the
+    null refit beside them, so the ladder null appears once per cohort rather
+    than colliding on ``(model, population)``.
     """
     total = int(len(stop))  # post-join stops
     n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
+    if len(models) and "cohort" not in models.columns:
+        raise ValueError(
+            "the fitted rows must carry a 'cohort' column; the ladder null is "
+            "fit once per cohort and would otherwise be audited twice against "
+            "the same rows"
+        )
     need_by_model = {
         **{m: need for m, (_f, need) in G_SPECS.items()},
         **{m: need for m, (_f, need) in S_SPECS.items()},
     }
     frozen_drops = cohort_stop_drops or {}
+    # The union a rung's cohort was frozen on: the primary ladder's columns, plus
+    # the post-outcome columns for the rungs fit on the post-outcome cohort. A
+    # stop this rung's own predictors cover but that its cohort's union removes
+    # is a common-cohort drop, so the null refit beside a post-outcome rung books
+    # the gated stops there while the post-outcome rung itself books them as its
+    # own missing predictor.
     union_by_ladder = {
-        "G": [c for _f, need in G_SPECS.values() for c in need if c in stop.columns],
-        "S": [c for _f, need in S_SPECS.values() for c in need if c in stop.columns],
+        ("G", PRIMARY_COHORT): _primary_union(G_SPECS),
+        ("S", PRIMARY_COHORT): _primary_union(S_SPECS),
+        ("G", POST_OUTCOME_COHORT): [
+            c for _f, need in G_SPECS.values() for c in need
+        ],
+        ("S", POST_OUTCOME_COHORT): [
+            c for _f, need in S_SPECS.values() for c in need
+        ],
     }
     union_missing = {
-        ladder: stop_own_missing(stop, list(dict.fromkeys(cols)))
-        for ladder, cols in union_by_ladder.items()
+        key: stop_own_missing(
+            stop, list(dict.fromkeys(c for c in cols if c in stop.columns))
+        )
+        for key, cols in union_by_ladder.items()
     }
-    pairs = [(m, p) for m in G_SPECS for p in STRATA]
-    pairs += [(m, "contrast") for m in S_SPECS]
+    primary_g = [m for m in G_SPECS if m not in POST_OUTCOME_RATE_RUNGS]
+    primary_s = [m for m in S_SPECS if m not in POST_OUTCOME_RATE_RUNGS]
+    post_g = [m for m in G_SPECS if m in POST_OUTCOME_RATE_RUNGS]
+    post_s = [m for m in S_SPECS if m in POST_OUTCOME_RATE_RUNGS]
+    pairs = [(m, p, PRIMARY_COHORT) for m in primary_g for p in STRATA]
+    pairs += [(m, "contrast", PRIMARY_COHORT) for m in primary_s]
+    pairs += [
+        (m, p, POST_OUTCOME_COHORT)
+        for m in (*post_g, LADDER_NULL["G"])
+        for p in STRATA
+    ]
+    pairs += [
+        (m, "contrast", POST_OUTCOME_COHORT) for m in (*post_s, LADDER_NULL["S"])
+    ]
     records = []
-    for name, pop in pairs:
+    for name, pop, cohort in pairs:
         sub = (
-            models[(models.model == name) & (models.population == pop)]
+            models[
+                (models.model == name)
+                & (models.population == pop)
+                & (models.cohort == cohort)
+            ]
             if len(models) else models
         )
         fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
@@ -466,26 +651,32 @@ def _cohort_records(
         stop_level = [c for c in need_by_model.get(name, ()) if c in stop.columns]
         own_missing = stop_own_missing(stop, stop_level)
         n_own = int(own_missing.sum())
-        n_common = int(
-            (union_missing["S" if pop == "contrast" else "G"] & ~own_missing).sum()
+        ladder = "S" if pop == "contrast" else "G"
+        n_common = int((union_missing[(ladder, cohort)] & ~own_missing).sum())
+        n_frozen_out = int(
+            frozen_drops.get(
+                pop if cohort == PRIMARY_COHORT else (pop, cohort), 0
+            )
         )
-        n_frozen_out = int(frozen_drops.get(pop, 0))
         if n_frozen_out > n_own + n_common:
             raise AssertionError(
                 f"{name}/{pop}: the cohort freeze removed {n_frozen_out} stops "
                 f"but the stop-level attribution only accounts for "
                 f"{n_own + n_common} (own {n_own} + common {n_common})"
             )
+        cohort_mode = (
+            "common" if cohort == PRIMARY_COHORT else f"common_{POST_OUTCOME_COHORT}"
+        )
         records.append(cohort_record(
-            name, _POP_LABEL.get(pop, pop), "stop", cohort_mode="common",
+            name, _POP_LABEL.get(pop, pop), "stop", cohort_mode=cohort_mode,
             n_in=total + int(n_qvals_dropped), n_modeled=n_modeled,
             sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
             animals_modeled=len({k[0] for k in fit_keys}),
             drop_notes=(
                 "qvals-join drop -> qvals_gap (mechanism B); immobility<=0 / NaN "
                 "own stop-level predictor -> own; NaN only in another rung's "
-                "column (frozen cohort) -> common; bin-level + session gates -> "
-                "excluded"
+                "column of this cohort's union -> common; bin-level + session "
+                "gates -> excluded"
             ),
             n_drop_qvals_gap=int(n_qvals_dropped),
             n_drop_own_predictor_missing=n_own,
@@ -563,18 +754,30 @@ def main() -> None:
     # session count is visible before the downstream signed-rank aggregate.
     if skips:
         cfg = {
-            f"{m}/{p}": r
-            for (m, p, r), _ in skips.items()
+            f"{m}/{p}/{c}": r
+            for (m, p, c, r), _ in skips.items()
             if str(r).startswith("missing")
         }
         if cfg:
             logger.warning("MISSING-COLUMN skips (config/upstream bug): %s", cfg)
         logger.info(
-            "skipped (model/pop -> reason: count): %s",
-            {f"{m}/{p}:{r}": c for (m, p, r), c in sorted(skips.items())},
+            "skipped (model/pop/cohort -> reason: count): %s",
+            {f"{m}/{p}/{c}:{r}": n for (m, p, c, r), n in sorted(skips.items())},
         )
 
     models = pd.DataFrame(rows)
+    # Cohort sizes: the post-outcome cohort is the primary one minus the stops
+    # gated above, so the gap between the two lines is the cost of the gate.
+    if len(models):
+        for (pop, cohort), grp in models.groupby(["population", "cohort"]):
+            logger.info(
+                "cohort %-12s %-16s: %d fits, median n_stops=%.0f, n_bins=%.0f",
+                cohort,
+                pop,
+                len(grp),
+                grp["n_stops"].median(),
+                grp["n_bins"].median(),
+            )
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (
@@ -598,7 +801,16 @@ def main() -> None:
     if len(models):
         td_specs = [(g, p, t) for g, t in _G_KEY.items() for p in STRATA]
         td_specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
-        term_diagnostics(models, td_specs).to_csv(
+        pd.concat(
+            [
+                term_diagnostics(
+                    models[models.cohort == cohort],
+                    [sp for sp in td_specs if _home_cohort(sp[0]) == cohort],
+                ).assign(cohort=cohort)
+                for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
+            ],
+            ignore_index=True,
+        ).to_csv(
             out_dir / f"swr_contrast_rate_term_diagnostics{csfx}.csv", index=False
         )
     logger.info(
@@ -627,7 +839,21 @@ def main() -> None:
                 sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
         specs = [(g, p, t) for g, t in _G_KEY.items() for p in _POP_LABEL]
         specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
-        agg = aggregate_contrast(models, specs, "rate", sd)
+        # Each key term is aggregated over the cohort its rung was fit on; the
+        # null refit on the post-outcome cohort exists for the AIC comparison
+        # only and is never aggregated as a second copy of the ladder null.
+        agg = pd.concat(
+            [
+                aggregate_contrast(
+                    models[models.cohort == cohort],
+                    [sp for sp in specs if _home_cohort(sp[0]) == cohort],
+                    "rate",
+                    sd,
+                ).assign(cohort=cohort)
+                for cohort in (PRIMARY_COHORT, POST_OUTCOME_COHORT)
+            ],
+            ignore_index=True,
+        )
         agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
         asfx = "_smoke" if args.max_per_animal else ""
         agg.to_pickle(out_dir / f"swr_contrast_rate_audited{asfx}.pkl")

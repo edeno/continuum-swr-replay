@@ -97,6 +97,7 @@ def test_contrast_records_attribute_qvals_and_own():
             {
                 "model": "G0_base",
                 "population": "non_local",
+                "cohort": "primary",
                 "animal": a,
                 "session_date": d,
                 "epoch": "e",
@@ -110,12 +111,15 @@ def test_contrast_records_attribute_qvals_and_own():
     recs = mod._cohort_records(models, stop, n_qvals_dropped=7)
     assert all(_reconciles(r) for r in recs)
 
-    g0 = {(r["model"], r["population"]): r for r in recs}[("G0_base", "all")]
+    by = {(r["model"], r["population"], r["cohort_mode"]): r for r in recs}
+    g0 = by[("G0_base", "all", "common")]
     assert g0["n_drop_qvals_gap"] == 7  # the inner-join drop (mechanism B)
     # G0_base's need includes reward_history_rcos_0 -> immobility(2) + NaN feature(3) = 5 own.
     assert g0["n_drop_own_predictor_missing"] == 5
     assert g0["n_modeled"] == 24  # 2 sessions x 12, the fitter's stop count
     assert g0["n_in"] == len(stop) + 7
+    # The same rung refit on the post-outcome cohort is a separate record.
+    assert by[("G0_base", "all", "common_post_outcome")]["n_modeled"] == 0
 
 
 def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
@@ -391,13 +395,15 @@ def test_per_stop_hierarchy_records_reconcile():
 
 
 def test_contrast_ladder_rungs_share_one_cohort():
-    """Both is_swr-contrast ladders are fit on one frozen cohort per session.
+    """Each is_swr-contrast cohort is frozen once per session.
 
-    A qvals covariate that only some rungs use is NaN on a few stops. Per rung
-    NaN-dropping would fit G0_base (which does not use it) on more bins than
-    G5_rpe, so their AIC would not be comparable. The freeze removes those
-    stops from every rung of the stratum, and the audit books them as
-    ``n_drop_common_cohort_other`` for the rungs that did not need the column.
+    A post-outcome covariate is NaN on a few stops. Per rung NaN-dropping would
+    fit G0_base (which does not use it) on more bins than G5_rpe, so their AIC
+    would not be comparable. The nested ladder keeps every stop -- the
+    post-outcome columns are not in its union -- and G5_rpe is fit on a second
+    cohort alongside a G0_base refit, which shares its rows. The audit books
+    the missing stops as ``n_drop_own_predictor_missing`` for G5_rpe and as
+    ``n_drop_common_cohort_other`` for the null refit beside it.
     """
     from threadpoolctl import threadpool_limits
 
@@ -435,24 +441,33 @@ def test_contrast_ladder_rungs_share_one_cohort():
     fits = pd.DataFrame(rows)
 
     assert not skips  # every rung fit
-    assert drops["non_local"] == 4  # the freeze removed the four NaN stops once
+    assert drops["non_local"] == 0  # the primary cohort keeps all 40 stops
+    assert drops[("non_local", "post_outcome")] == 4  # the four NaN stops
     assert drops["contrast"] == 0  # the strata were frozen before stacking
-    for population, cell in fits.groupby("population"):
-        assert cell["n_bins"].nunique() == 1, population
-        assert cell["n_stops"].nunique() == 1, population
-        assert cell["n_stops"].iloc[0] == 36
+    assert drops[("contrast", "post_outcome")] == 4
+    for (population, cohort), cell in fits.groupby(["population", "cohort"]):
+        assert cell["n_bins"].nunique() == 1, (population, cohort)
+        assert cell["n_stops"].nunique() == 1, (population, cohort)
+        assert cell["n_stops"].iloc[0] == (40 if cohort == "primary" else 36)
     # The stacked contrast design keeps its within-bin pairing: two rows per bin.
-    assert (
-        fits.loc[fits.population == "contrast", "n_bins"].iloc[0]
-        == 2 * fits.loc[fits.population == "non_local_swr", "n_bins"].iloc[0]
-    )
+    for cohort in ("primary", "post_outcome"):
+        cell = fits[fits.cohort == cohort]
+        assert (
+            cell.loc[cell.population == "contrast", "n_bins"].iloc[0]
+            == 2 * cell.loc[cell.population == "non_local_swr", "n_bins"].iloc[0]
+        )
 
     records = mod._cohort_records(fits, stop, 7, drops)
     assert all(_reconciles(r) for r in records)
-    by = {(r["model"], r["population"]): r for r in records}
-    g0, g5 = by[("G0_base", "all")], by[("G5_rpe", "all")]
+    by = {(r["model"], r["population"], r["cohort_mode"]): r for r in records}
+    g0 = by[("G0_base", "all", "common")]
+    g0_post = by[("G0_base", "all", "common_post_outcome")]
+    g5 = by[("G5_rpe", "all", "common_post_outcome")]
     assert g0["n_drop_own_predictor_missing"] == 0
-    assert g0["n_drop_common_cohort_other"] == 4
+    assert g0["n_drop_common_cohort_other"] == 0
+    assert g0["n_modeled"] == 40
     assert g5["n_drop_own_predictor_missing"] == 4
     assert g5["n_drop_common_cohort_other"] == 0
-    assert g0["n_modeled"] == g5["n_modeled"] == 36
+    assert g0_post["n_drop_own_predictor_missing"] == 0
+    assert g0_post["n_drop_common_cohort_other"] == 4
+    assert g0_post["n_modeled"] == g5["n_modeled"] == 36

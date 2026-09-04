@@ -257,6 +257,15 @@ UPDATE    := reward_belief_mean_update_l1_all_ports_postoutcome
 REWXTIME  := reward_history_rcos_0:bs(tc,knots=c(1,2,3),Boundary.knots=c(0,4))
 ```
 
+**Two cohorts.** `rpe_postoutcome` and
+`reward_belief_mean_update_l1_all_ports_postoutcome` are undefined on a stop that
+begins before its trial's outcome is known (35% of stops), so the rungs that carry
+them (`G5_rpe`, `G7_update`, `S7_rpe`, `S9_update`) are **not** members of the
+nested ladder: they are fit on a post-outcome cohort together with a refit of their
+ladder's null (`G0_base` / `S0_rate`) so their ΔAIC is computed on identical rows,
+while every other rung shares one primary cohort that the gate does not shrink.
+Every fitted row carries a `cohort` label (`primary` / `post_outcome`).
+
 ### A. Stratified — each formula fit 3× to `NL_all`, `NL_swr`, `NL_noswr`
 Comparing a coefficient across the three populations = the descriptive dissociation.
 

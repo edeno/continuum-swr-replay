@@ -50,6 +50,10 @@ __all__ = [
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
+    "POST_OUTCOME_COHORT",
+    "POST_OUTCOME_COVARIATES",
+    "POST_OUTCOME_RATE_RUNGS",
+    "PRIMARY_COHORT",
     "PerBinRateModelSpec",
     "REWARD_HISTORY_COLUMNS",
     "REWARD_HISTORY_INCOMPLETE",
@@ -1094,6 +1098,31 @@ def _s_specs():
 
 SWR_CONTRAST_RATE_G_SPECS = _g_specs()
 SWR_CONTRAST_RATE_S_SPECS = _s_specs()
+
+# Covariates that are only defined once the trial's outcome is known. A stop that
+# begins before ``outcome_known_time`` carries no value for them, so the rate
+# runner NaNs them there; the rungs that need them are therefore fit on a smaller
+# cohort than the rest of the ladder.
+POST_OUTCOME_COVARIATES = (
+    "rpe_postoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+)
+
+# The is_swr-contrast rate rungs that carry a post-outcome covariate
+# (``G5_rpe``, ``G7_update``, ``S7_rpe``, ``S9_update``). They are fit on the
+# POST_OUTCOME_COHORT together with their ladder's null, so their AIC comparison
+# shares rows; they are not members of the nested ladder frozen on the
+# PRIMARY_COHORT.
+POST_OUTCOME_RATE_RUNGS = frozenset(
+    name
+    for specs in (SWR_CONTRAST_RATE_G_SPECS, SWR_CONTRAST_RATE_S_SPECS)
+    for name, (_formula, need) in specs.items()
+    if any(covariate in POST_OUTCOME_COVARIATES for covariate in need)
+)
+
+# Cohort labels carried on every fitted is_swr-contrast rate row.
+PRIMARY_COHORT = "primary"
+POST_OUTCOME_COHORT = "post_outcome"
 
 # --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
 # name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)

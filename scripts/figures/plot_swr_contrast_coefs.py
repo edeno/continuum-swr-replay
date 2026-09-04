@@ -33,6 +33,11 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import PER_UNIT_T
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.model_specs import (
+    POST_OUTCOME_COHORT,
+    POST_OUTCOME_RATE_RUNGS,
+    PRIMARY_COHORT,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -119,6 +124,14 @@ def std_factor(term):
 
 def sessions(df, mod, pop, term):
     g = df[(df.model == mod) & (df.population == pop)]
+    # The rate ladder fits its post-outcome rungs on their own cohort and refits
+    # the ladder null beside them, so a rung name alone can match two rows per
+    # session. Keep the cohort the rung's coefficients are reported from.
+    if "cohort" in g.columns:
+        home = (
+            POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
+        )
+        g = g[g.cohort == home]
     c = f"coef_{term}"
     if c not in g.columns:
         raise KeyError(
