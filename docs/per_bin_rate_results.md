@@ -7,9 +7,12 @@ fit per session over **218 sessions** and persisted in
 Numbers below are the **reward-basis** run (2026-09-04): the reward block is the
 three-bump raised-cosine basis over the last ten known outcomes
 (`reward_history_rcos_0..2` plus the `reward_history_incomplete` nuisance
-indicator), replacing the ten per-lag reward indicators. The time-course spline
-uses fixed shared knots so its coefficients are cross-session comparable and the
-fitted curve is reconstructable (see §1b). Regenerate with
+indicator), replacing the ten per-lag reward indicators, refit once more on
+2026-09-04 with separation judged per coefficient rather than per fit. Every
+coefficient, AIC and goodness-of-fit number is unchanged by that second refit;
+what changed is which sessions carry a valid cross-validation metric (§6). The
+time-course spline uses fixed shared knots so its coefficients are cross-session
+comparable and the fitted curve is reconstructable (see §1b). Regenerate with
 `uv run python scripts/rate/summarize_per_bin_rate_models.py`.
 
 **Figures:** the six-panel visual companion is
@@ -156,28 +159,41 @@ Median AIC across sessions, held-out bits/event from the per-session CV (0 = the
 constant model), and the share of sessions whose time-rescaling KS curve stays
 inside the band:
 
-| model | median AIC | CV bits/event | KS-in-band |
-| --- | --- | --- | --- |
-| M0_const | 2321 | 0.000 | 0.49 |
-| M1_rew | 2305 | 0.004 | 0.46 |
-| M3_hist (dummy) | 2312 | 0.061 | 0.40 |
-| M3r_histcos | 2309 | 0.052 | 0.39 |
-| M4_hist_rew | 2302 | 0.071 | 0.41 |
-| M5_time | 2250 | **0.226** | 0.86 |
-| M6_time_hist | 2253 | 0.079 | 0.85 |
-| M7_time_hist_rew (dummy history) | 2253 | 0.094 | 0.88 |
-| **M7r_time_histcos_rew** | **2244** | 0.198 | 0.87 |
-| M9_rew_x_time | 2259 | 0.099 | 0.88 |
+`n_cv` is the number of sessions whose CV metric is valid: a fold in which any
+non-nuisance term is unidentified voids the whole metric, so a rung with a small
+`n_cv` is summarized over a **selected minority** of sessions and its bits/event
+is not comparable with a rung scored on the full corpus.
+
+| model | median AIC | CV bits/event | n_cv | KS-in-band |
+| --- | --- | --- | --- | --- |
+| M0_const | 2321 | 0.000 | 218 | 0.49 |
+| M1_rew | 2305 | -0.050 | 214 | 0.46 |
+| M3_hist (dummy) | 2312 | 0.061 | 2 | 0.40 |
+| M3r_histcos | 2309 | 0.052 | 83 | 0.39 |
+| M4_hist_rew | 2302 | 0.071 | 2 | 0.41 |
+| M5_time | 2250 | **0.227** | 215 | 0.86 |
+| M6_time_hist | 2253 | 0.079 | 2 | 0.85 |
+| M7_time_hist_rew (dummy history) | 2253 | 0.094 | 2 | 0.88 |
+| **M7r_time_histcos_rew** | **2244** | 0.130 | 86 | 0.87 |
+| M9_rew_x_time | 2259 | 0.099 | 2 | 0.88 |
 
 - **The time spline calibrates the process** (KS-in-band jumps 0.49 → 0.86 at M5).
-- **The raised-cosine self-history basis beats the lag dummies on held-out data**
-  (`M7r` 0.198 vs `M7` 0.094 bits/event) and has the **lowest AIC (2244)** in the
-  ladder.
-- **M5_time is still the best-generalizing model** (CV 0.226, the highest in the
-  ladder). `M7r` has the lowest AIC but does **not** beat M5 on held-out CV — i.e.
-  reward + raised-cosine history add inferential signal but **negligible held-out
-  bits** over the within-stop time course. Use **M5_time as the parsimonious
-  predictive model**; **M7r for the full additive coefficient read**.
+- **The dummy-history rungs are barely cross-validated at all** (`n_cv` = 2 of
+  218 for M3/M4/M6/M7/M9). The `onset_lag*` dummies are genuinely separated — a
+  short lag perfectly predicts `count == 0` — in ~98% of sessions, and that
+  separation is in the model's own self-history terms, not in a nuisance term.
+  Their bits/event columns describe two sessions and must not be quoted as a
+  corpus quantity.
+- **The raised-cosine self-history basis has the lowest AIC (2244)** in the
+  ladder. It is also the only history parameterization with a usable CV cohort
+  (86 sessions vs 2), so the held-out comparison against `M7` is not a like-for-
+  like one.
+- **M5_time is the best-generalizing model** (CV 0.227 over 215 sessions, the
+  highest in the ladder). `M7r` has the lowest AIC but does **not** beat M5 on
+  held-out CV (0.130 over 86 sessions) — i.e. reward + raised-cosine history add
+  inferential signal but **negligible held-out bits** over the within-stop time
+  course. Use **M5_time as the parsimonious predictive model**; **M7r for the
+  full additive coefficient read**.
 - **The reward block is now a small AIC step.** Per session, `M1_rew − M0_const`
   has a median ΔAIC of −5.0 (non-local) to −1.6 (detected SWR), and
   `M7_time_hist_rew − M6_time_hist` is ≈ 0 to +2.8 — the four-parameter smooth
@@ -186,5 +202,6 @@ inside the band:
   (§2). The retired eleven-parameter per-lag block bought ~100–160 AIC points on
   the same cohorts; see
   [audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md).
-- M9 (reward×time) adds nothing on CV. See [rate_models.md](rate_models.md) for
-  the GOF/dispersion caveats and the preliminary within-session drift.
+- M9 (reward×time) adds nothing on CV, on the same two-session cohort as the
+  other dummy-history rungs. See [rate_models.md](rate_models.md) for the
+  GOF/dispersion caveats and the preliminary within-session drift.

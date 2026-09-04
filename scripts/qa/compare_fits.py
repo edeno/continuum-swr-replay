@@ -504,8 +504,61 @@ def audited_row_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
         return merged
     for column in ("n_rows_before", "n_rows_after"):
         if column in merged.columns:
-            merged[column] = merged[column].fillna(0).astype(int)
+            merged[column] = merged[column].astype(float).fillna(0).astype(int)
     return merged.sort_values(["population", "cohort"]).reset_index(drop=True)
+
+
+def audited_term_drop_table(audited: pd.DataFrame) -> pd.DataFrame:
+    """Per emitted aggregate row, the share of fitted sessions dropped as separated.
+
+    ``n_dropped`` is now a per-term count: sessions whose fit named THIS term (or
+    a factor of it) as unidentified, plus the ``|coef| >= 10`` backstop. A spec
+    whose share exceeds the unidentified-share gate emits no row at all and so
+    does not appear here.
+
+    Parameters
+    ----------
+    audited : pd.DataFrame
+        The audited aggregate, one row per (model, population, term).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``model``, ``population``, ``cohort``, ``term``, ``n_fitted``,
+        ``n_dropped``, ``pct_dropped``, worst first.
+    """
+    if audited.empty:
+        return pd.DataFrame(
+            columns=[
+                "model",
+                "population",
+                "cohort",
+                "term",
+                "n_fitted",
+                "n_dropped",
+                "pct_dropped",
+            ]
+        )
+    out = audited[
+        ["model", "population", "cohort", "term", "n_sessions", "n_dropped"]
+    ].copy()
+    out["n_fitted"] = out["n_sessions"] + out["n_dropped"]
+    out["pct_dropped"] = 100 * out["n_dropped"] / out["n_fitted"]
+    return (
+        out.drop(columns=["n_sessions"])
+        .sort_values("pct_dropped", ascending=False)
+        .reset_index(drop=True)[
+            [
+                "model",
+                "population",
+                "cohort",
+                "term",
+                "n_fitted",
+                "n_dropped",
+                "pct_dropped",
+            ]
+        ]
+    )
 
 
 def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
@@ -559,9 +612,20 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     add("\n### is_swr-contrast — audited aggregate rows\n")
     add(
         "One row per (model, population, term) that survived the "
-        "unidentified-share gate:\n"
+        "unidentified-share gate. An `is_swr:<covariate>` product also drops "
+        "when its `is_swr` main effect is unidentified, so the contrast rungs "
+        "that fully interact `is_swr` with the BASE block inherit that main "
+        "effect's share (see the per-term table above) and can still sit above "
+        "the gate:\n"
     )
     add(_md(audited_row_table(frames["old_audited"], frames["new_audited"])))
+    add("\n### is_swr-contrast — sessions dropped per emitted term (after)\n")
+    add(
+        "Per aggregated term, the share of the sessions fitted for it that were "
+        "dropped as unidentified. A term whose share exceeds the "
+        "unidentified-share gate emits no row and is absent here:\n"
+    )
+    add(_md(audited_term_drop_table(frames["new_audited"]), "{:.1f}"))
     return "\n".join(lines)
 
 
