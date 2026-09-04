@@ -55,8 +55,8 @@ Named by **scope + window** so the same word never hides a different definition.
 
 | canonical name | definition | window (N=10) | scope | units | enters |
 |---|---|---|---|---|---|
-| `known_reward_outcome_lag_{1..10}` | outcome of the j-th most recent port experience whose outcome was observable by the query time; experience 0 enters only when its outcome was physically observed | 10 known outcomes, per-lag | all-port | binary | rate A (Rlag), rate B, MU, coupling — main effects |
-| `reward_fraction_last10_known_trials` | rewarded fraction of the last 10 outcome-known port experiences; experience 0 enters only when its outcome was physically observed | 10 known outcomes | all-port | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
+| `known_reward_outcome_lag_{1..10}` | outcome of the j-th most recent port experience whose outcome was observable by the query time; experience 0 enters only when its outcome was physically observed | 10 known outcomes, per-lag | all-port | binary | stop metadata; the rate ladders enter it through the `reward_history_rcos_*` raised-cosine basis, never as per-lag dummies |
+| `reward_fraction_last10_known_trials` | rewarded fraction of the last 10 outcome-known port experiences; experience 0 enters only when its outcome was physically observed | 10 known outcomes | all-port | fraction | stop metadata only — **never a ladder predictor** (it is the kernel's unweighted mean → VIF ∞ against the basis) |
 | `reward_fraction_candidate_arm_last10_visits` | rewarded fraction of the last 10 **visits to that candidate arm**; an unvisited leaf is encoded `0.0`, while `is_candidate_arm_never_visited` separates novelty from an observed zero. Trunk arms are structurally `0.0`; rows before any known port outcome are NaN. | 10 arm-visits | candidate arm | fraction | content and choice main effect; rate/coupling via current-arm interaction |
 
 The candidate-arm fraction uses a **10-visit** window. The all-port fraction
@@ -233,8 +233,8 @@ explicit current-arm interaction when a within-stop content effect is tested.
 
 | construct | rate B (per-bin) | rate A (per-stop) | coupling | content (arm/patch) | choice |
 |---|---|---|---|---|---|
-| `known_reward_outcome_lag_{j}` | main | main (Rlag) | main | current-arm interaction if tested | — |
-| `reward_fraction_last10_known_trials` | M2r standalone | main (R2) | — | — | — |
+| `known_reward_outcome_lag_{j}` | via the `reward_history_rcos_*` basis | via the basis (R1) | via the basis | current-arm interaction if tested | — |
+| `reward_fraction_last10_known_trials` | — | — | — | — | — |
 | `reward_fraction_candidate_arm_last10_visits` | current-arm interaction | — | current-arm interaction | **main** | **main** |
 | current-arm task probability / `task_reward_probability_candidate_arm` | main | — | main | candidate-arm main | nominal-value sensitivity |
 | chosen-arm / candidate-arm reward-belief mean | main | — | main | candidate-arm main | candidate-arm main |
