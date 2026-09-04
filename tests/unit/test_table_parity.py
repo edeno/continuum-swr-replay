@@ -65,7 +65,10 @@ def test_value_drift_passes_when_declared():
     b = _frame()
     b.loc[0, "value"] = 1.5
     report = diff_table(
-        a, b, keys=["event_id"], label="t",
+        a,
+        b,
+        keys=["event_id"],
+        label="t",
         expected_drift_columns=frozenset({"value"}),
     )
     assert "value" in report
@@ -116,3 +119,129 @@ def test_compare_table_roots_detects_drift(tmp_path):
     write_table(_stop_frame(9.0), cand / "stop_table")
     with pytest.raises(ValueError, match="undeclared"):
         compare_table_roots(cand, base, ("stop_table",), atol=0.0)
+
+
+def test_declared_added_column_passes_and_is_not_compared():
+    """A candidate that gained a column matches a baseline that predates it."""
+    baseline = _frame()
+    candidate = _frame()
+    candidate["reward_history_rcos_0"] = [0.1, 0.2, 0.3]
+    report = diff_table(
+        candidate,
+        baseline,
+        keys=["event_id"],
+        label="t",
+        expected_added_columns=("reward_history_rcos_0",),
+        atol=0.0,
+    )
+    assert report == {}
+
+
+def test_undeclared_added_column_raises():
+    baseline = _frame()
+    candidate = _frame()
+    candidate["reward_history_rcos_0"] = [0.1, 0.2, 0.3]
+    with pytest.raises(ValueError, match="column set differs"):
+        diff_table(candidate, baseline, keys=["event_id"], label="t")
+
+
+def test_declaring_an_addition_does_not_hide_drift_or_a_missing_column():
+    """The declaration excuses exactly the named column and nothing else."""
+    baseline = _frame()
+    drifted = _frame()
+    drifted["reward_history_rcos_0"] = [0.1, 0.2, 0.3]
+    drifted.loc[0, "value"] = 1.5
+    with pytest.raises(ValueError, match="undeclared"):
+        diff_table(
+            drifted,
+            baseline,
+            keys=["event_id"],
+            label="t",
+            expected_added_columns=("reward_history_rcos_0",),
+            atol=0.0,
+        )
+
+    also_added = _frame()
+    also_added["reward_history_rcos_0"] = [0.1, 0.2, 0.3]
+    also_added["unexpected"] = [1, 2, 3]
+    with pytest.raises(ValueError, match="candidate-only=\\['unexpected'\\]"):
+        diff_table(
+            also_added,
+            baseline,
+            keys=["event_id"],
+            label="t",
+            expected_added_columns=("reward_history_rcos_0",),
+        )
+
+    dropped = _frame().drop(columns=["label"])
+    with pytest.raises(ValueError, match="baseline-only=\\['label'\\]"):
+        diff_table(
+            dropped,
+            baseline,
+            keys=["event_id"],
+            label="t",
+            expected_added_columns=("reward_history_rcos_0",),
+        )
+
+
+def test_declaring_a_column_the_candidate_lacks_is_harmless():
+    """One global declaration can cover a gate where only one table gained it."""
+    report = diff_table(
+        _frame(),
+        _frame(),
+        keys=["event_id"],
+        label="t",
+        expected_added_columns=("reward_history_rcos_0",),
+        atol=0.0,
+    )
+    assert report == {}
+
+
+def _uint64_frame(last: int) -> pd.DataFrame:
+    """Frame whose uint64 column holds values above 2**53 (stop_id is a hash)."""
+    return pd.DataFrame(
+        {
+            "event_id": [1, 2],
+            "stop_id": pd.array([8393993873049741010, last], dtype="uint64"),
+        }
+    )
+
+
+def test_uint64_drift_of_one_unit_above_2_53_is_caught():
+    """Integer columns are compared exactly, not through a lossy float cast."""
+    baseline_value = 8393993873049741011
+    assert baseline_value > 2**53
+    # The float64 images of the two values are identical, so a float comparison
+    # would report zero difference.
+    assert float(baseline_value) == float(baseline_value + 1)
+    with pytest.raises(ValueError, match="undeclared"):
+        diff_table(
+            _uint64_frame(baseline_value + 1),
+            _uint64_frame(baseline_value),
+            keys=["event_id"],
+            label="t",
+            atol=0.0,
+        )
+
+
+def test_identical_uint64_columns_report_no_drift():
+    report = diff_table(
+        _uint64_frame(8393993873049741011),
+        _uint64_frame(8393993873049741011),
+        keys=["event_id"],
+        label="t",
+        atol=0.0,
+    )
+    assert report == {}
+
+
+def test_nullable_integer_missing_values_compare_equal():
+    """Int64 with pd.NA must not raise, and NA-vs-NA must compare equal."""
+    frame = pd.DataFrame(
+        {"event_id": [1, 2], "trial": pd.array([7, None], dtype="Int64")}
+    )
+    assert diff_table(frame, frame.copy(), keys=["event_id"], label="t") == {}
+    changed = frame.copy()
+    changed["trial"] = pd.array([8, None], dtype="Int64")
+    with pytest.raises(ValueError, match="undeclared"):
+        diff_table(changed, frame, keys=["event_id"], label="t")

@@ -1,7 +1,7 @@
 # Stop-table regeneration for the reward-history basis columns
 
 **Date:** 2026-09-04
-**Code:** `4fda746ba937ce67e400e13352d2c052acfa1d56` (`regression-pipeline-fixes-phase-1`)
+**Code:** `4fda746ba937ce67e400e13352d2c052acfa1d56` (the commit that added the columns)
 **Artifact:** `Processed-Data/replay_content/stop_table.parquet`
 **Backup of the pre-change table:** `Processed-Data/replay_content/_pre_fix_backup_20260904/stop_table.parquet`
 **Candidate (staging):** `Processed-Data/replay_content/_staging_stop_regen_full_20260904/stop_table.parquet`
@@ -59,6 +59,18 @@ cross-table invariant `Σ n_selected_events == len(event_table) == 65913`.
 Log: `logs/stop_regen/full.log` (smoke logs: `smoke_full.log`,
 `smoke_stoponly.log`; cross-check: `stoponly_full.log`).
 
+Promotion, run only after every parity check below had passed. A plain copy, so
+the promoted file is bit-for-bit the staged one and the staging directory
+remains as its provenance:
+
+```bash
+cp -p Processed-Data/replay_content/_staging_stop_regen_full_20260904/stop_table.parquet \
+      Processed-Data/replay_content/stop_table.parquet
+```
+
+Verified afterwards: the promoted file has the same SHA-256 as the staged one
+and passes `require_covariate_schema(table="stop")`.
+
 ## Artifact integrity
 
 | file | SHA-256 | rows |
@@ -87,9 +99,11 @@ the live tables, and that the only thing the new code changed is the stop table.
 
 ## Parity of the pre-existing columns
 
-Checked by `scripts/qa/audit_stop_table_reward_history.py`, comparing the
-candidate against the backup positionally (rows are **not** re-sorted, so a
-reordering would fail):
+Checked by `scripts/qa/audit_stop_table_reward_history.py`, which runs the
+shared keyed-parity core (`table_parity.diff_table`) with the four new columns
+declared as expected additions, and adds the on-disk row-order and
+column-order checks the shared core does not make (it sorts on the row key, so
+it is blind to the order rows and columns are written in):
 
 - rows: 107,400 vs 107,400
 - `stop_id`: identical set **and** identical order (`Series.equals`)
@@ -151,19 +165,51 @@ reordering would fail):
 | `n_nonlocal_swr_events` | int64 | yes | 0 | 0 | identical |
 | `n_nonlocal_non_swr_events` | int64 | yes | 0 | 0 | identical |
 
-The parity comparison has teeth: injecting a 1e-6 float perturbation, a changed
-`completed_trial_arm` code, a flipped nullable-boolean `at_well`, a `+1` on an
-`int64` count, a `+1` on a nullable `Int64` id, or a single extra NaN each made
-the script raise. Integer columns are compared exactly rather than through a
-float cast -- 107,301 of the 107,400 `uint64` `stop_id` values exceed 2**53, so
-a float comparison would have been blind to a one-unit change in almost every
-row; a `+1` on one `stop_id` is caught.
+The per-column table above was produced at audit time; the script itself now
+reports the comparison in aggregate and raises on the first drifted column.
+
+The comparison has teeth. Seven mutants of the backup were each rebuilt at full
+scale and rejected: a 1e-6 perturbation of `stop_end` (float64), a changed
+`occupancy_state` string (object), a flipped `at_well` (nullable boolean), one
+extra NaN in `leaky_q_value_diff`, a `+1` on `n_swr_events` (int64), a `+1` on
+`completed_trial_id` (nullable Int64), and a `+1` on one `stop_id` (uint64).
+Integer columns are compared exactly rather than through a float cast: 107,301
+of the 107,400 `stop_id` values exceed 2**53, where the float64 images of *n*
+and *n+1* are identical, so a float comparison would have been blind to a
+one-unit change in almost every row.
 
 An independent `--stop-only --from-cache` build of all 218 sessions (a different
 driver entry point, run in a separate process) agrees with the promoted table on
 all 51 columns it produces — the two columns it deliberately omits are the
 assembly-level `n_nonlocal_swr_events` / `n_nonlocal_non_swr_events` split. The
 builder is therefore deterministic across runs, not merely self-consistent.
+
+### Invoking the golden-baseline gate from now on
+
+`table_parity.diff_table` refuses any column-set difference, so before this
+change `scripts/qa/compare_to_golden_baseline.py` hard-failed on `stop_table`
+against `_golden_baseline_v5_v4cache` — the four new columns were
+indistinguishable from structural drift. **The baseline was not re-frozen.**
+Instead `diff_table`, `compare_table_roots`, and the script gained
+`expected_added_columns` / `--expected-added-columns`: the named columns are
+excluded from the comparison, while any *other* candidate-only column, any
+baseline-only column, and any value drift still raise. **The gate must
+therefore now be invoked with the four stop-table columns declared as expected
+additions:**
+
+```bash
+uv run python scripts/qa/compare_to_golden_baseline.py \
+    --candidate Processed-Data/replay_content \
+    --baseline  Processed-Data/replay_content/_golden_baseline_v5_v4cache \
+    --tables event_table event_arm_table event_patch_table event_sequence_table stop_table \
+    --expected-added-columns reward_history_rcos_0,reward_history_rcos_1,reward_history_rcos_2,reward_history_incomplete
+```
+
+Run against the promoted root this reports `matches baseline across 5 table(s),
+ignoring declared added column(s)`. Omitting the declaration still fails, by
+design. Declaring a column a table does not carry is harmless, so this one
+declaration is safe to apply to the whole multi-table gate rather than per
+table.
 
 ## The added columns
 

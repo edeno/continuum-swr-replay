@@ -10,7 +10,7 @@ the column is in an explicitly declared allowlist.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -47,25 +47,40 @@ def diff_table(
     keys: list[str],
     label: str,
     expected_drift_columns: frozenset[str] = frozenset(),
+    expected_added_columns: Sequence[str] = (),
     atol: float = 1e-9,
 ) -> dict[str, object]:
     """Diff `candidate` against `baseline` on `keys`; raise on undeclared drift.
 
-    Structural drift (column set, row count, key set) always raises. Numeric
-    columns are compared with absolute tolerance `atol` (0.0 for exact); other
-    columns by object equality. A column that drifts and is not in
-    `expected_drift_columns` raises. Returns the per-column drift report.
+    Structural drift (column set, row count, key set) always raises. Float
+    columns are compared with absolute tolerance `atol` (0.0 for exact) and
+    must agree on NaN positions; integer, boolean, and object columns are
+    compared exactly, because a float cast silently loses integer precision
+    above 2**53 (`stop_id` is a uint64 hash, so almost every value is above it).
+    A column that drifts and is not in `expected_drift_columns` raises. Returns
+    the per-column drift report.
+
+    `expected_added_columns` names columns a *new* table version may carry that
+    the baseline does not -- the case where a pipeline gains a covariate and the
+    frozen baseline must stay frozen. Those columns are excluded from the
+    comparison; any other candidate-only column, and any baseline-only column,
+    still raises. Declaring a column that the candidate does not actually carry
+    is not an error, so one declaration can cover a multi-table gate where only
+    one table gained the columns.
     """
-    if set(candidate.columns) != set(baseline.columns):
+    added = set(expected_added_columns)
+    candidate_only = set(candidate.columns) - set(baseline.columns)
+    baseline_only = set(baseline.columns) - set(candidate.columns)
+    if baseline_only or (candidate_only - added):
         raise ValueError(
             f"{label}: column set differs from baseline "
-            f"(candidate-only={sorted(set(candidate.columns) - set(baseline.columns))}, "
-            f"baseline-only={sorted(set(baseline.columns) - set(candidate.columns))})"
+            f"(candidate-only={sorted(candidate_only - added)}, "
+            f"baseline-only={sorted(baseline_only)}); "
+            f"declared additions={sorted(added)}"
         )
+    candidate = candidate.drop(columns=sorted(candidate_only))
     if len(candidate) != len(baseline):
-        raise ValueError(
-            f"{label}: {len(candidate)} rows vs baseline {len(baseline)}"
-        )
+        raise ValueError(f"{label}: {len(candidate)} rows vs baseline {len(baseline)}")
     cand = candidate.set_index(keys).sort_index()
     base = baseline.set_index(keys).sort_index()
     if not cand.index.equals(base.index):
@@ -75,11 +90,11 @@ def diff_table(
     for column in cand.columns:
         cseries = cand[column]
         bseries = base[column]
-        if pd.api.types.is_numeric_dtype(cseries) and pd.api.types.is_numeric_dtype(
+        if pd.api.types.is_float_dtype(cseries) and pd.api.types.is_float_dtype(
             bseries
         ):
-            cvals = cseries.to_numpy(dtype=float)
-            bvals = bseries.to_numpy(dtype=float)
+            cvals = cseries.to_numpy(dtype=float, na_value=np.nan)
+            bvals = bseries.to_numpy(dtype=float, na_value=np.nan)
             nan_mismatch = int((np.isnan(cvals) != np.isnan(bvals)).sum())
             diff = np.abs(cvals - bvals)
             max_abs = float(np.nanmax(diff)) if diff.size else 0.0
@@ -89,18 +104,25 @@ def diff_table(
                     "nan_position_mismatch": nan_mismatch,
                 }
         else:
-            # Object/categorical: NaN and None both read as missing and must
-            # compare equal; compare with a missing-aware mask so a real value
-            # change is caught but a NaN-vs-None does not false-positive.
-            c_obj = cseries.astype(object).to_numpy()
-            b_obj = bseries.astype(object).to_numpy()
+            # Integer/boolean/object: compared exactly. Integers must not go
+            # through the float path -- above 2**53 the cast is lossy and a
+            # one-unit change compares equal. NaN, None, and pd.NA all read as
+            # missing and must compare equal to each other, so missing entries
+            # are normalized to None first (pd.NA also propagates through `!=`
+            # and would make the comparison raise).
             c_missing = cseries.isna().to_numpy()
             b_missing = bseries.isna().to_numpy()
-            mismatch = int(
-                ((c_obj != b_obj) & ~(c_missing & b_missing)).sum()
-            )
+            c_obj = cseries.astype(object).to_numpy()
+            b_obj = bseries.astype(object).to_numpy()
+            c_obj[c_missing] = None
+            b_obj[b_missing] = None
+            mismatch = int((c_obj != b_obj).sum())
+            missing_mismatch = int((c_missing != b_missing).sum())
             if mismatch:
-                drifted[column] = {"n_mismatch": mismatch}
+                drifted[column] = {
+                    "n_mismatch": mismatch,
+                    "missing_position_mismatch": missing_mismatch,
+                }
     undeclared = sorted(set(drifted) - expected_drift_columns)
     if undeclared:
         raise ValueError(
@@ -116,6 +138,7 @@ def compare_table_roots(
     table_basenames: tuple[str, ...] = CANONICAL_TABLE_BASENAMES,
     *,
     expected_drift_columns: frozenset[str] = frozenset(),
+    expected_added_columns: Sequence[str] = (),
     atol: float = 1e-9,
     read_candidate: Callable[[str], pd.DataFrame] | None = None,
     read_baseline: Callable[[str], pd.DataFrame] | None = None,
@@ -135,7 +158,10 @@ def compare_table_roots(
 
     ``expected_drift_columns`` applies to *every* table in ``table_basenames``;
     if you need to allow a column to move in one table but not another, call this
-    per table rather than declaring it globally.
+    per table rather than declaring it globally. ``expected_added_columns`` is
+    global in the same way, but harmless to over-declare: a name the table does
+    not carry is simply not matched, so declaring one table's new columns does
+    not weaken the check on the others.
     """
     if read_candidate is None:
         read_candidate = lambda name: read_table(candidate_root / name)  # noqa: E731
@@ -150,6 +176,7 @@ def compare_table_roots(
             keys=keys,
             label=f"baseline parity: {basename}",
             expected_drift_columns=expected_drift_columns,
+            expected_added_columns=expected_added_columns,
             atol=atol,
         )
     return report
