@@ -281,15 +281,17 @@ scale: `|coef| × sd >= 10` using the fit's own persisted `sd_<term>`, so a stee
 per-unit slope on a narrow covariate is kept and only legacy artifacts carrying
 no `sd_<term>` fall back to the raw `|coef| >= 10`.
 
-The fit-level `separated` share of the S rungs stays high (174–186 of the
-211–218 fits per rung) because one term dominates it: `is_swr:reward_history_rcos_1`
-is flagged in 149–181 fits per rung — the middle bump of the three-bump reward
-basis is nearly collinear with its neighbours *inside* the `is_swr` expansion,
-where it is estimated on the SWR-coupled bins alone. The key `is_swr:<covariate>`
-terms are unaffected: they lose 0–1 sessions per rung, except `S3_periswitch`
-(21), `S9_update` (11) and `S8_uncert` (32). Read the fit-level share as "some
-coefficient in this fit is unidentified", never as a verdict on the term being
-aggregated.
+The fit-level `separated` share of the S rungs stays high — 173–187 of the
+211–215 fits of every rung that carries an `is_swr` expansion (`S2`–`S10`) —
+because one term dominates it: `is_swr:reward_history_rcos_1` alone is flagged in
+148–181 fits per rung. The middle bump of the three-bump reward basis is nearly
+collinear with its neighbours *inside* the expansion, where it is estimated on
+the SWR-coupled bins alone; the same bump outside an expansion is ordinary
+(`S1_rew`, which has no `is_swr` reward expansion, flags 44 of 218 fits). The key
+`is_swr:<covariate>` terms are unaffected: every one of them loses 0 sessions to
+the aggregation except `S3_periswitch` (22 of 211) and `S4_block` (2 of 213).
+Read the fit-level share as "some coefficient in this fit is unidentified", never
+as a verdict on the term being aggregated.
 
 Judging separation per term is what restored the cross-validation metrics of
 Family A: the reward rung `R1` goes from **19.6 %** to **83.5 %** of session-fits
