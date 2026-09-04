@@ -29,7 +29,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     attach_is_swr_to_onsets,
 )
 from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
-    raised_cosine_history_basis,
+    reconstruct_reward_kernels,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -195,22 +195,48 @@ def _panel_reward1(ax, df):
     ax.set_title("B. Immediate reward-history component (M7, controlled)")
 
 
+def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+    """Across-session median of the per-session reconstructed reward kernel.
+
+    Each session's kernel is reconstructed from that session's own basis
+    coefficients and the median is then taken per lag -- the estimator
+    ``summarize_per_bin_rate_models.py`` and ``plot_per_bin_rate_models.py``
+    both use. Reconstructing from across-session median coefficients instead
+    would summarize a session that was never fit: the three bumps are strongly
+    collinear, so their marginal medians describe no fitted kernel.
+
+    Parameters
+    ----------
+    sessions : pd.DataFrame
+        One row per session for a single (model, outcome), carrying
+        ``coef_reward_history_rcos_*``. Sessions with any NaN basis coefficient
+        contribute nothing.
+
+    Returns
+    -------
+    np.ndarray, shape (REWARD_HISTORY_N_LAGS,)
+        Median rate ratio at each lag ``1..REWARD_HISTORY_N_LAGS``.
+    """
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    kernels = reconstruct_reward_kernels(
+        sessions[columns].to_numpy(dtype=float),
+        REWARD_HISTORY_N_LAGS,
+        REWARD_HISTORY_N_BASIS,
+    )
+    return np.median(np.exp(kernels), axis=0)
+
+
 def _panel_reward_kernel(ax, df):
     """Reward kernel reconstructed from the raised-cosine basis coefficients.
 
     The fitted features are bump-weighted reward fractions, so an outcome at lag
     ``j`` contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the log rate.
     """
-    B = raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS)
-    weights = B / B.sum(axis=1, keepdims=True)
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for oc in POPS4:
-        coefs = np.array([
-            _coef(df, "M7_time_hist_rew", oc, f"coef_{c}").median()
-            for c in REWARD_HISTORY_COLUMNS
-        ])
-        ax.plot(lags, np.exp(coefs @ weights), marker="o", color=STYLE[oc][1],
-                label=STYLE[oc][0], lw=1.8, ms=4)
+        sessions = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
+        ax.plot(lags, reward_kernel_rate_ratios(sessions), marker="o",
+                color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xticks(lags)
     ax.set_ylim(0, 4.3)

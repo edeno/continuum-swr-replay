@@ -2,9 +2,11 @@
 
 ``aggregate_contrast`` excludes a session from a term's aggregate either because
 the fitters named that coefficient in ``separated_terms`` or because it exceeded
-the ``|coef| >= 10`` magnitude backstop. The audit reports one total, so the
-decomposition is what keeps a reader from quoting a backstop exclusion as a
-separation diagnosis.
+the magnitude backstop, read on the effect scale as ``|coef| * sd >= 10`` (raw
+``|coef| >= 10`` only for legacy frames with no ``sd_`` column). The audit
+reports one total, so the decomposition is what keeps a reader from quoting a
+backstop exclusion as a separation diagnosis -- and it must use the same
+predicate as the aggregation, or the raise below fires on a correct aggregate.
 """
 
 from __future__ import annotations
@@ -17,9 +19,15 @@ from scripts.qa.compare_fits import drop_mechanism_table
 TERM = "is_swr:patch_switch_fraction_last5_completed_trips"
 
 
-def _contrast(rows: list[tuple[str, float, str]], population: str) -> pd.DataFrame:
-    """Per-session fits: (animal, coefficient, ``separated_terms``) per session."""
-    return pd.DataFrame(
+def _contrast(
+    rows: list[tuple[str, float, str]], population: str, sd: float | None = 1.0
+) -> pd.DataFrame:
+    """Per-session fits: (animal, coefficient, ``separated_terms``) per session.
+
+    ``sd`` is the term's persisted predictor SD, shared by every session; ``None``
+    writes no ``sd_`` column, which is what a legacy artifact looks like.
+    """
+    fits = pd.DataFrame(
         {
             "animal": [animal for animal, _, _ in rows],
             "model": "S5_switchrate",
@@ -29,6 +37,9 @@ def _contrast(rows: list[tuple[str, float, str]], population: str) -> pd.DataFra
             "separated_terms": [flagged for _, _, flagged in rows],
         }
     )
+    if sd is not None:
+        fits[f"sd_{TERM}"] = sd
+    return fits
 
 
 def _audited(population: str, n_dropped: int) -> pd.DataFrame:
@@ -76,6 +87,31 @@ def test_a_session_flagged_for_another_term_only_is_not_excluded():
     assert int(row.n_flag_only) == 0
     assert int(row.n_backstop_only) == 0
     assert int(row.n_both) == 0
+
+
+def test_a_steep_slope_on_a_narrow_covariate_is_not_a_backstop_exclusion():
+    """The backstop is the log-rate swing over one SD, not the raw coefficient.
+
+    ``|coef| = 12`` with an SD of 0.01 is a swing of 0.12: identified, kept by
+    ``aggregate_contrast``, and so counted here as no exclusion at all.
+    """
+    contrast = _contrast(
+        [("chimi", 12.0, ""), ("j16", -40.0, "")], "contrast", sd=0.01
+    )
+    out = drop_mechanism_table(contrast, _audited("contrast", 0))
+    row = out.iloc[0]
+    assert int(row.n_flag_only) == 0
+    assert int(row.n_backstop_only) == 0
+    assert int(row.n_both) == 0
+
+
+def test_legacy_frame_without_predictor_sds_uses_the_raw_coefficient():
+    """With no ``sd_`` column the only available scale is the coefficient itself."""
+    contrast = _contrast(
+        [("chimi", 12.0, ""), ("j16", 0.5, "")], "contrast", sd=None
+    )
+    out = drop_mechanism_table(contrast, _audited("contrast", 1))
+    assert int(out.iloc[0].n_backstop_only) == 1
 
 
 def test_stratified_population_labels_are_translated():

@@ -6,8 +6,10 @@ fractions, so their coefficients are per unit of the fraction), and continuous
 covariates scaled by their pooled SD.
 
 ``aggregate_contrast`` drops a session fit for a term only when THAT term is
-unidentified: the fitters name the separated terms on the effect scale, with
-``|coef| < 10`` as a backstop. Precision alone is not a drop criterion.
+unidentified: the fitters name the separated terms on the effect scale, with a
+magnitude backstop read on that same scale (``|coef| * sd >= 10``, using the
+fit's own persisted predictor SD; the raw ``|coef| >= 10`` only for legacy
+frames that carry no ``sd_`` column). Precision alone is not a drop criterion.
 """
 
 from __future__ import annotations
@@ -107,9 +109,14 @@ def test_separated_session_is_dropped() -> None:
     assert row["coef_session_median"] == pytest.approx(0.33)
 
 
-def test_runaway_coefficient_is_still_dropped_by_the_backstop() -> None:
-    """|coef| >= 10 remains a backstop for fits with no separation flag."""
+def test_legacy_frame_without_predictor_sds_uses_the_raw_coefficient() -> None:
+    """A frame with no ``sd_`` column has only the raw coefficient to judge on.
+
+    These are artifacts written before the fitters persisted per-term predictor
+    SDs; for them ``|coef| >= 10`` remains the backstop.
+    """
     fits = _session_fits()
+    assert "sd_rpe_postoutcome" not in fits.columns
     fits.loc[0, "coef_rpe_postoutcome"] = 42.0
 
     out = aggregate_contrast(fits, SPECS, level="rate")
@@ -117,6 +124,66 @@ def test_runaway_coefficient_is_still_dropped_by_the_backstop() -> None:
     row = out.iloc[0]
     assert row["n_sessions"] == 7
     assert row["n_dropped"] == 1
+
+
+def test_large_coefficient_on_a_tiny_sd_predictor_is_kept() -> None:
+    """A steep per-unit slope on a narrow covariate is identified, not runaway.
+
+    ``|coef| = 12`` over an SD of 0.01 is a log-rate swing of 0.12 across one SD
+    of the predictor -- an ordinary effect expressed in small units. Dropping it
+    on the raw coefficient would be selection ON the estimate.
+    """
+    fits = _session_fits(sd_rpe_postoutcome=[0.01] * 8)
+    fits.loc[0, "coef_rpe_postoutcome"] = 12.0
+
+    out = aggregate_contrast(fits, SPECS, level="rate")
+
+    row = out.iloc[0]
+    assert row["n_sessions"] == 8
+    assert row["n_dropped"] == 0
+    # 0.20, 0.25, 0.28, 0.33, 0.35, 0.40, 0.45, 12.0 -> median (0.33 + 0.35) / 2.
+    assert row["coef_session_median"] == pytest.approx(0.34)
+
+
+def test_large_coefficient_on_a_unit_sd_predictor_is_dropped() -> None:
+    """``|coef| = 12`` over an SD of 1.0 is a runaway swing on the effect scale."""
+    fits = _session_fits(sd_rpe_postoutcome=[1.0] * 8)
+    fits.loc[0, "coef_rpe_postoutcome"] = 12.0
+
+    out = aggregate_contrast(fits, SPECS, level="rate")
+
+    row = out.iloc[0]
+    assert row["n_sessions"] == 7
+    assert row["n_dropped"] == 1
+    assert row["coef_session_median"] == pytest.approx(0.33)
+
+
+def test_product_backstop_reads_the_products_own_sd() -> None:
+    """An ``is_swr:<c>`` product is judged against its OWN persisted SD.
+
+    The ``is_swr`` main effect's SD is 1.0 here and the product's is 0.01, so a
+    coefficient of 12 on the product is an ordinary effect while the same
+    coefficient on ``is_swr`` is a runaway one.
+    """
+    fits = _product_fits([""] * 12)
+    fits["sd_is_swr:q_arm"] = 0.01
+    fits["sd_is_swr"] = 1.0
+    fits.loc[0, "coef_is_swr:q_arm"] = 12.0
+    fits.loc[0, "coef_is_swr"] = 12.0
+
+    out = aggregate_contrast(
+        fits,
+        [
+            ("S4_value", "contrast", "is_swr:q_arm"),
+            ("S4_value", "contrast", "is_swr"),
+        ],
+        level="rate",
+    ).set_index("term")
+
+    assert out.loc["is_swr:q_arm", "n_dropped"] == 0
+    assert out.loc["is_swr:q_arm", "n_sessions"] == 12
+    assert out.loc["is_swr", "n_dropped"] == 1
+    assert out.loc["is_swr", "n_sessions"] == 11
 
 
 def _two_term_fits() -> pd.DataFrame:

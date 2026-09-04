@@ -133,8 +133,11 @@ offset. Its limitation is exactly that offset — see below.
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 
-  Every runner that writes a fitted artifact writes an `<artifact>.provenance.json`
-  sidecar beside it recording the git hash, the estimator, the command line, and
+  The four rate fitters — `scripts/rate/fit_per_bin_rate_models.py`,
+  `scripts/rate/fit_per_stop_rate_models.py`, `scripts/rate/fit_swr_contrast_rate.py`
+  and `scripts/rate/fit_uncertainty_rate.py` — plus the audited `is_swr`-contrast
+  aggregation each write an `<artifact>.provenance.json`
+  sidecar beside the artifact recording the git hash, the estimator, the command line, and
   the SHA-256 / mtime / covariate-schema version of each input table. Readers
   re-hash those inputs and **refuse a stale fit** — one whose input tables have
   changed since it was written — unless `--allow-stale` is passed, so a plot or
@@ -144,7 +147,10 @@ offset. Its limitation is exactly that offset — see below.
   audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7`, the reconstructed reward kernel at lag 1 dissociates —
-  `non_local_swr ≈ 1.38` > `swr ≈ 1.18` > `non_local_no_swr ≈ 0.91` — while the
+  `non_local_swr ≈ 1.38` > `swr ≈ 1.18` > `non_local_no_swr ≈ 0.91` (the same
+  three numbers to two decimals from `M7r_time_histcos_rew`, so the headline
+  kernel does not depend on which self-history parameterization carries it) —
+  while the
   slower **recent-reward suppression** from lag 3 on (RR ≈ 0.90–0.97 per lag) is
   **shared** across populations and returns to ~1 by lag 10. Separately, the
   single immediate basis coefficient is higher for `non_local_swr` than for
@@ -269,8 +275,27 @@ invalidated (`nan`) if any fold is nonconverged or separated on a non-nuisance
 term, rather than dropping the fold. The aggregation drops a session for a term
 only when that term itself is named in its `separated_terms`; a product term
 (`is_swr:<covariate>`, `swr_x_<covariate>`) is judged on its own coefficient and
-does not inherit a factor's separation. `|coef|>=10` remains a backstop for fits
-carrying no flag.
+does not inherit a factor's separation. A magnitude backstop still catches a
+coefficient that ran away without tripping the flag, read on the same effect
+scale: `|coef| × sd >= 10` using the fit's own persisted `sd_<term>`, so a steep
+per-unit slope on a narrow covariate is kept and only legacy artifacts carrying
+no `sd_<term>` fall back to the raw `|coef| >= 10`.
+
+The fit-level `separated` share of the S rungs stays high (174–186 of the
+211–218 fits per rung) because one term dominates it: `is_swr:reward_history_rcos_1`
+is flagged in 149–181 fits per rung — the middle bump of the three-bump reward
+basis is nearly collinear with its neighbours *inside* the `is_swr` expansion,
+where it is estimated on the SWR-coupled bins alone. The key `is_swr:<covariate>`
+terms are unaffected: they lose 0–1 sessions per rung, except `S3_periswitch`
+(21), `S9_update` (11) and `S8_uncert` (32). Read the fit-level share as "some
+coefficient in this fit is unidentified", never as a verdict on the term being
+aggregated.
+
+Judging separation per term is what restored the cross-validation metrics of
+Family A: the reward rung `R1` goes from **19.6 %** to **83.5 %** of session-fits
+carrying a finite `cv_ll_per_stop_mean`. Quote that, not the pooled `all` row of
+the audit table (59.8 % → 91.7 %), which averages `R1` with `R0` — a rung that is
+always scored, so pooling flatters the change.
 
 What the ladder actually shows (218 sessions; the fit numbers below are the
 `outcome = non_local` column of

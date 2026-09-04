@@ -28,6 +28,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from ._fit_diagnostics import SEPARATION_COEF_ABS
 from .model_specs import REWARD_HISTORY_COLUMNS
 
 # Above this share of unidentified session fits, a term's aggregate is a
@@ -142,7 +143,15 @@ def aggregate_contrast(
     ----------
     res : pd.DataFrame
         Per-session fits: columns ``model``, ``population``, ``animal`` and
-        ``coef_<term>`` (optionally ``bse_<term>``, ``pval_<term>``).
+        ``coef_<term>`` (optionally ``bse_<term>``, ``pval_<term>``,
+        ``sd_<term>``). A session is excluded from a term's aggregate when the
+        fitters named that term in ``separated_terms``, or when its coefficient
+        ran away past the magnitude backstop without tripping that flag. The
+        backstop is read on the effect scale, ``|coef_<term>| * sd_<term> >=
+        SEPARATION_COEF_ABS``, using the fit's own persisted predictor SD --
+        including for an ``is_swr:<covariate>`` product, which carries its own
+        ``sd_`` column. Frames with no ``sd_<term>`` column (legacy artifacts)
+        fall back to ``|coef_<term>| >= SEPARATION_COEF_ABS``.
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
@@ -160,19 +169,30 @@ def aggregate_contrast(
             continue
         present = s_all[ccol].notna()
         # Identifiability filter, applied PER TERM. Separation is measured on the
-        # effect scale (SE per SD of the predictor), which is what
+        # effect scale (SE times the predictor's own SD), which is what
         # non-identification actually shows up in, and the fitters name the terms
-        # it holds for. ``|coef| < 10`` is a backstop for fits that carry no flag
-        # (older result tables, or an estimate that ran away without tripping the
-        # flag); on its own it is selection ON the estimate, keeping whichever
-        # unidentified fits happened to land under the threshold, which is how
-        # CS3_lastrew came to report -2.72 next to a typical session SE of 2,428
-        # (the identified sessions give -0.77). Precision is deliberately NOT a
-        # criterion: the retired ``SE > 10 * |coef|`` rule dropped identified
-        # sessions whose effect was near zero, biasing the surviving median away
-        # from zero.
+        # it holds for. The magnitude backstop catches an estimate that ran away
+        # without tripping that flag, and it is read on the SAME effect scale:
+        # ``|coef| * sd`` is the log-rate swing the predictor actually produces
+        # over one SD of itself, so a large coefficient on a tiny-SD covariate --
+        # identified, just steep per unit -- is kept, while a genuinely runaway
+        # fit is dropped. Judging ``|coef|`` alone was selection ON the estimate:
+        # it dropped identified sessions for having small-SD predictors, and it
+        # kept whichever unidentified fits happened to land under the threshold,
+        # which is how CS3_lastrew came to report -2.72 next to a typical session
+        # SE of 2,428 (the identified sessions give -0.77). Precision is
+        # deliberately NOT a criterion: the retired ``SE > 10 * |coef|`` rule
+        # dropped identified sessions whose effect was near zero, biasing the
+        # surviving median away from zero.
         flagged = separated_for_term(s_all, term)
-        kept = present & (s_all[ccol].abs() < 10) & ~flagged
+        sdcol = f"sd_{term}"
+        if sdcol in s_all.columns:
+            runaway = s_all[ccol].abs() * s_all[sdcol] >= SEPARATION_COEF_ABS
+        else:
+            # Legacy artifacts predate the persisted per-fit predictor SDs; the
+            # raw coefficient is the only scale available for them.
+            runaway = s_all[ccol].abs() >= SEPARATION_COEF_ABS
+        kept = present & ~runaway & ~flagged
         n_dropped = int((present & ~kept).sum())
         s = s_all[kept]
         if len(s) < 5:
