@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.replay import (
     aggregate_to_timebins,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
 
@@ -244,29 +245,79 @@ def test_cv_one_bad_fold_invalidates_metric(monkeypatch):
     assert np.isnan(cv["cv_bits_per_event"])
 
 
-def test_cv_folds_split_on_stop():
+def test_cv_folds_split_on_stop(monkeypatch):
     """Folds partition whole stops -- a stop's bins never straddle train/test.
 
-    Replicates the splitting the CV performs (KFold over the unique stop_ids,
-    then ``isin`` to assign bins) and asserts every fold's train and test stop
-    sets are disjoint and every stop is held out exactly once. This locks the
-    "split on stops, not bins" contract the leakage-free CV depends on.
+    Exercises the real ``cross_validate_per_bin_rate_model`` split by recording
+    the ``stop_id`` sets it actually hands statsmodels: ``smf.glm(data=tr)``
+    supplies the train stops, and the fitted result's ``predict(te, ...)``
+    supplies the held-out stops. A bin-level split (or an ``isin`` on the wrong
+    side) would show up here as overlapping train/test stop sets, which the
+    old KFold-replicating test could not see.
     """
-    from sklearn.model_selection import KFold
+    import continuum_swr_replay.analysis.replay.per_bin_rate_model as pbm
+
+    real_glm = pbm.smf.glm
+    recorded: list[tuple[frozenset[int], frozenset[int]]] = []
+
+    class _RecordingResult:
+        """Real fit result; records the held-out stops each ``predict`` scores."""
+
+        def __init__(self, result, train_stops: frozenset[int]) -> None:
+            self._result = result
+            self._train_stops = train_stops
+
+        def predict(self, exog=None, *args, **kwargs):
+            recorded.append((self._train_stops, frozenset(exog["stop_id"])))
+            return self._result.predict(exog, *args, **kwargs)
+
+        def __getattr__(self, name):
+            return getattr(self._result, name)
+
+    class _RecordingModel:
+        def __init__(self, model, train_stops: frozenset[int]) -> None:
+            self._model = model
+            self._train_stops = train_stops
+
+        def fit(self, *args, **kwargs):
+            return _RecordingResult(self._model.fit(*args, **kwargs), self._train_stops)
+
+        def __getattr__(self, name):
+            return getattr(self._model, name)
+
+    def recording_glm(formula, data=None, **kwargs):
+        return _RecordingModel(
+            real_glm(formula, data=data, **kwargs), frozenset(data["stop_id"])
+        )
+
+    monkeypatch.setattr(pbm.smf, "glm", recording_glm)
 
     design = make_per_bin_rate_design(n_stops=120, seed=8)
-    stops = design["stop_id"].unique()
-    kf = KFold(n_splits=10, shuffle=True, random_state=0)
-    held_out: list[int] = []
-    for train_idx, test_idx in kf.split(stops):
-        train_stops, test_stops = set(stops[train_idx]), set(stops[test_idx])
+    frozen, report = freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M1_rew"]])
+    assert report["n_stops_after"] == 120
+    all_stops = frozenset(frozen["stop_id"])
+
+    cv = cross_validate_per_bin_rate_model(
+        frozen, MODEL_PER_BIN_RATE["M1_rew"], n_folds=10
+    )
+    assert cv is not None
+    assert cv["cv_n_folds"] == 10
+    # The recorder keeps real predict semantics, so the CV still scores.
+    assert np.isfinite(cv["cv_ll_per_bin_mean"])
+
+    # Model and M0_const baseline are fit on the same train fold and scored on
+    # the same held-out fold, so 10 folds produce 20 records over 10 distinct
+    # (train, test) stop-set pairs.
+    assert len(recorded) == 20
+    folds = sorted(set(recorded), key=lambda pair: sorted(pair[1]))
+    assert len(folds) == 10
+    for train_stops, test_stops in folds:
         assert train_stops.isdisjoint(test_stops)
-        # Bins assigned by the same isin rule never share a stop across sides.
-        train_bins = design[design.stop_id.isin(train_stops)]
-        test_bins = design[design.stop_id.isin(test_stops)]
-        assert set(train_bins.stop_id).isdisjoint(set(test_bins.stop_id))
-        held_out.extend(test_stops)
-    assert sorted(held_out) == sorted(stops)  # each stop held out exactly once
+        assert len(test_stops) == 12
+        assert train_stops | test_stops == all_stops
+    assert frozenset().union(*(test for _, test in folds)) == all_stops
+    # Each stop is held out exactly once.
+    assert sum(len(test) for _, test in folds) == 120
 
 
 def test_gof_reuses_package():
