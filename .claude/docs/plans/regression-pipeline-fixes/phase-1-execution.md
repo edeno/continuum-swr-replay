@@ -318,3 +318,53 @@ Files: `docs/rate_models.md`, `docs/models_table.md`, `docs/covariate_dictionary
 - `docs/covariate_dictionary.md`: entries for the three features and the indicator; mark the ten
   lags and the window-10 fraction as stop metadata, not predictors.
 - `scripts/README.md`: add `scripts/qa/compare_fits.py`.
+
+### Task 10: Term-level separation flag, nuisance exclusion, and refit
+
+Added after the Task 8 refit. Diagnosis on the refit `swr_contrast_rate.pkl` (9,093 fits): 55 % are
+flagged `separated` (S models 85–92 %, G models 45–58 %). The fit-level flag is tripped mostly by
+nuisance columns — `reward_history_incomplete` has `bse > 100` in 22 % of flagged fits (the
+indicator is 1 on a handful of event-free stops) and the four `hist_rcos_*` self-history terms in
+6–9 % each (doubled under `is_swr *`). Because `contrast_aggregation.aggregate_contrast` drops a
+session for every term when the fit is flagged, no term survives the 20 % unidentified gate and
+`swr_contrast_rate_audited.pkl` has zero rows. The same fit-level flag invalidates per-bin CV folds.
+
+Files: `src/continuum_swr_replay/analysis/replay/_fit_diagnostics.py:31-44, 84-114` (`fit_status`;
+`SEPARATION_COEF_ABS = 10`, `_SEPARATION_BSE_ABS = 1e3`, `SEPARATION_EFFECT_SE = 1.0`),
+`contrast_aggregation.py` (the `flagged` mask in `aggregate_contrast`), `per_bin_rate_model.py`
+(`fit_per_bin_rate_model`, `cross_validate_per_bin_rate_model` fold invalidation),
+`per_stop_rate_model.py`, `fitting.py` (conditional fitters; keep their behaviour but adopt the
+same return shape), the four rate runners, `scripts/qa/compare_fits.py`, `docs/models_table.md`
+(the "Every per-session fit carries converged / separated" paragraph), `docs/rate_models.md`.
+
+- `fit_status` gains a keyword `term_names: Sequence[str] | None` and `nuisance_terms: Collection[str] = ()`
+  and returns `{"converged", "separated", "separated_terms": tuple[str, ...]}`, where a term is
+  separated when its `bse` is non-finite or `> _SEPARATION_BSE_ABS`, or (effect scale) `bse * sd >= SEPARATION_EFFECT_SE`,
+  or (no usable sd) `|coef| >= SEPARATION_COEF_ABS`. Nuisance terms are excluded from the judgment
+  entirely; `separated` (fit-level) is `len(separated_terms) > 0`. Default nuisance set exported as
+  `NUISANCE_TERMS = frozenset({"Intercept", "reward_history_incomplete"})` in `_fit_diagnostics`.
+- Every fitter that calls `fit_status` passes `term_names` in coefficient order and the default
+  nuisance set, and persists `separated_terms` (a tuple; store as a `|`-joined string in result
+  frames so it survives pickling and CSV) plus `sd_<term>` for every coefficient.
+- `aggregate_contrast`: a session is dropped for term T only when T is in that fit's
+  `separated_terms` (or, for an `is_swr:<c>` product, when either factor's term is); the fit-level
+  `n_sessions_flagged_separated` count stays as a diagnostic. `MAX_UNIDENTIFIED_SHARE` unchanged.
+- Per-bin CV: a fold is invalid when a non-nuisance term separated in either the model or the
+  baseline fit (same rule through `fit_status`).
+- Tests: `tests/unit/test_fit_diagnostics.py` (a fit whose only huge-SE term is a nuisance term is
+  not separated; a huge-SE non-nuisance term names exactly that term; effect-scale rule applied per
+  term); `tests/unit/test_contrast_aggregation.py` (a session separated on `hist_rcos_2` is dropped
+  for that term and retained for `reward_history_rcos_0`); `tests/unit/test_per_bin_rate_model.py`
+  (a fold whose only separated term is the indicator keeps the CV metric); results frames carry
+  `separated_terms` and `sd_<term>`.
+- Refit: back up the Task-8 artifacts into `Processed-Data/replay_content/_pre_termlevel_backup_20260904/`
+  (move, preserving relative paths, incl. provenance sidecars), then rerun Family A, Family B
+  (`--workers 16`), SWR-contrast (`--workers 16`), and MU in `tmux` (`rate_family_a2`,
+  `rate_family_b2`, `rate_swr_contrast2`, `rate_uncertainty2`) with the same smoke-first
+  discipline. Report the audited-table row count by (population, cohort) and, per term, the share
+  of sessions dropped as separated; regenerate `docs/per_bin_rate_results.md`; rerun
+  `scripts/qa/compare_fits.py` against `_pre_fix_backup_20260904/` (not against the Task-8 backup)
+  and refresh `docs/audits/2026-09-04-rate-refit-comparison.md` with a section on what the
+  term-level flag changed (CV validity share before/after; audited rows before/after).
+- Docs: `docs/models_table.md` flag paragraph and `docs/rate_models.md` "Every rate/content/choice fit
+  additionally carries …" paragraph describe the term-level rule and the nuisance set.
