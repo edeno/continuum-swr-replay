@@ -19,6 +19,16 @@ from continuum_swr_replay.analysis.replay.standardization import (
 from scripts.content import fit_replay_content_models as runner
 
 
+def _partial_ladder_dir(input_dir, *rungs: str):
+    """Where a run that fits only ``rungs`` publishes.
+
+    A partial ladder is fit on its own complete-case cohort, so it is keyed by
+    the rungs it requested and never replaces part of the canonical ``models/``
+    bundle.
+    """
+    return input_dir / f"models_{'-'.join(rungs)}"
+
+
 def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
     """Small canonical arm table with every default-ladder predictor."""
     arms = np.tile(np.arange(9), n_events)
@@ -122,7 +132,7 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
     with pytest.raises(ValueError, match="current-location/novelty schema"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch):
@@ -138,7 +148,7 @@ def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch
     with pytest.raises(FileNotFoundError, match="Legacy fallback is disabled"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
@@ -172,7 +182,7 @@ def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypa
 
     runner.main()
 
-    output_dir = input_dir / "models"
+    output_dir = _partial_ladder_dir(input_dir, "M0")
     assert (output_dir / "M0.pkl").exists()
     assert (output_dir / "all_models.pkl").exists()
     assert (output_dir / "all_models_cohort_audit.csv").exists()
@@ -242,7 +252,7 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
     with pytest.raises(ValueError, match=r"M6=.*swr_x_is_current_arm"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M5", "M6")).exists()
 
 
 def test_uncertainty_model_rejects_legacy_all_arm_standardization(
@@ -277,7 +287,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
 
     with pytest.raises(ValueError, match="stale or invalid"):
         runner.main()
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "Mu")).exists()
 
 
 def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
@@ -321,7 +331,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="one-hot at wells and NaN off-well"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_arm_current_indicator_must_match_occupancy_well_arm():
@@ -491,12 +501,12 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
     with pytest.raises(RuntimeError, match="M1.*no session fits"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0", "M1")).exists()
 
 
 def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
-    output_dir = input_dir / "models"
+    output_dir = _partial_ladder_dir(input_dir, "M0", "M1")
     output_dir.mkdir(parents=True)
     sentinel = output_dir / "previous_complete_run.txt"
     sentinel.write_text("unchanged")
@@ -532,7 +542,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
 
 def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
-    output_dir = input_dir / "models"
+    output_dir = _partial_ladder_dir(input_dir, "M0")
     output_dir.mkdir(parents=True)
     (output_dir / "M7.pkl").write_bytes(b"stale later rung")
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
@@ -569,7 +579,7 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="expected 2 from the frozen cohort"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_published_ladder_uses_intersection_of_successful_sessions(
@@ -610,7 +620,7 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
 
     runner.main()
 
-    output_dir = input_dir / "models"
+    output_dir = _partial_ladder_dir(input_dir, "M0", "M1")
     for model_name in ("M0", "M1"):
         result = pd.read_pickle(output_dir / f"{model_name}.pkl")
         assert result["animal"].tolist() == ["b"]
@@ -640,7 +650,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="no scored session"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch):
@@ -671,7 +681,7 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
     with pytest.raises(RuntimeError, match="CV result.*missing column"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypatch):
@@ -689,7 +699,7 @@ def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypat
 
     runner.main()
 
-    result = pd.read_pickle(input_dir / "models" / "M0.pkl")
+    result = pd.read_pickle(_partial_ladder_dir(input_dir, "M0") / "M0.pkl")
     assert result["n_events"].tolist() == [10]
     assert result["cv_n_folds"].tolist() == [5]
     assert np.isfinite(result["cv_ll_per_event_mean"]).all()
@@ -730,7 +740,7 @@ def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch
     with pytest.raises(RuntimeError, match="logit robustness fit failed"):
         runner.main()
 
-    assert not (input_dir / "models").exists()
+    assert not (_partial_ladder_dir(input_dir, "M1")).exists()
 
 
 def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypatch):
@@ -759,7 +769,7 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
 
     runner.main()
 
-    output_dir = input_dir / "models"
+    output_dir = _partial_ladder_dir(input_dir, "M1")
     assert (output_dir / "M1.pkl").exists()
     logit = pd.read_pickle(output_dir / "logit" / "M1_logit.pkl")
     assert logit["model"].tolist() == ["M1"]

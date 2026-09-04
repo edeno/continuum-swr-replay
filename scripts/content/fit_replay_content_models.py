@@ -18,9 +18,13 @@ comes from the across-session distribution of the per-session coefficients
 ``--grain event`` collapses each event to one observation for an honest
 per-session n, at the cost of the within-event distribution.
 
+Any run that is not the full default ladder is fit on its own complete-case
+cohort, so it publishes into a directory keyed by the rungs it requested
+(``models_M5-Mv-Mu-Mvu/``) rather than into the canonical ``models/`` bundle.
+
 Usage:
     uv run python scripts/content/fit_replay_content_models.py                # base ladder
-    uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2
+    uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
     uv run python scripts/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
     uv run python scripts/content/fit_replay_content_models.py --cv           # + CV
     uv run python scripts/content/fit_replay_content_models.py --logit        # + logit robustness
@@ -1175,10 +1179,6 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     if args.grain == "event":
         output_dir = output_dir.with_name(f"{output_dir.name}_event_grain")
         logging.info("grain = event (one observation per event) -> %s", output_dir)
-    if args.output_dir is not None:
-        output_dir = args.output_dir.resolve()
-        logging.info("explicit model output -> %s", output_dir)
-
     # Determine which models to fit
     if args.models:
         model_names = [m.strip() for m in args.models.split(",")]
@@ -1189,6 +1189,33 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         # explicitly on their own matched cohort (e.g. --models M5,Mv,Mu,Mvu or
         # --models P3,Pv).
         model_names = list(default_content_model_names(hierarchy))
+
+    # A run that fits anything other than the full default ladder is fit on its
+    # own complete-case cohort, so its rungs are not comparable with the
+    # canonical bundle's and must not be written next to them (or over them).
+    # It gets its own directory, keyed by the rungs it fits.
+    canonical_dir = output_dir
+    is_partial_ladder = set(model_names) != set(default_content_model_names(hierarchy))
+    if args.output_dir is not None:
+        output_dir = args.output_dir.resolve()
+        if is_partial_ladder and output_dir.name == canonical_dir.name:
+            raise ValueError(
+                f"--models {','.join(model_names)} is not the full "
+                f"{canonical_dir.name}/ ladder "
+                f"({','.join(default_content_model_names(hierarchy))}); writing it "
+                f"to {output_dir} would replace part of a cohort-matched bundle "
+                "with rungs fit on a different event set. Drop --output-dir to "
+                "get a directory keyed by the requested rungs, or name a "
+                "directory of your own."
+            )
+        logging.info("explicit model output -> %s", output_dir)
+    elif is_partial_ladder:
+        output_dir = canonical_dir.with_name(
+            f"{canonical_dir.name}_{'-'.join(model_names)}"
+        )
+        logging.info(
+            "partial ladder (%s) -> %s", ", ".join(model_names), output_dir
+        )
 
     return _RunConfig(
         hierarchy=hierarchy,
