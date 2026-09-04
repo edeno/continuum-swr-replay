@@ -39,6 +39,7 @@ import pyarrow.parquet as pq
 
 __all__ = [
     "read_table",
+    "read_attrs",
     "write_table",
     "publish_canonical",
     "parquet_path",
@@ -55,6 +56,7 @@ def sha256_file(path: str | Path, *, chunk_bytes: int = 1 << 20) -> str:
         for chunk in iter(lambda: stream.read(chunk_bytes), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
 
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
 
@@ -212,11 +214,46 @@ def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFra
         return frame if columns is None else frame[columns]
 
     table = pq.read_table(parquet, columns=columns)
-    metadata = table.schema.metadata or {}
     frame = table.to_pandas()
 
-    frame.attrs = json.loads(metadata.get(_ATTRS_KEY, b"{}"))
+    frame.attrs = _attrs_from_metadata(table.schema.metadata)
     return frame
+
+
+def _attrs_from_metadata(metadata: dict[bytes, bytes] | None) -> dict[str, Any]:
+    """Decode the ``attrs`` blob ``write_table`` stashed in parquet metadata."""
+    return json.loads((metadata or {}).get(_ATTRS_KEY, b"{}"))
+
+
+def read_attrs(path: str | Path) -> dict[str, Any]:
+    """Return the ``attrs`` a :func:`read_table` of `path` would restore.
+
+    Reads the parquet footer only -- no row groups -- so a caller that wants
+    just the provenance stamp (``covariate_schema_version`` and friends) off a
+    multi-hundred-megabyte table does not pay for the table.
+
+    Parameters
+    ----------
+    path : str or Path
+        Table path, with either suffix.
+
+    Returns
+    -------
+    dict
+        The frame's ``attrs``; empty if the file carries none.
+
+    Raises
+    ------
+    FileNotFoundError
+        If neither the parquet nor the pickle form exists.
+    """
+    parquet = parquet_path(path)
+    if not parquet.exists():
+        pickle = Path(path).with_suffix(".pkl")
+        if not pickle.exists():
+            raise FileNotFoundError(f"no table at {parquet} or {pickle}")
+        return dict(pd.read_pickle(pickle).attrs)
+    return _attrs_from_metadata(pq.read_schema(parquet).metadata)
 
 
 def table_exists(path: str | Path) -> bool:

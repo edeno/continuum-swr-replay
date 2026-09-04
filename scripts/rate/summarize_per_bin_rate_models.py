@@ -20,15 +20,19 @@ per-animal sign consistency (n/5) and a signed-rank p where applicable.
 
 Usage:
     uv run python scripts/rate/summarize_per_bin_rate_models.py
+    uv run python scripts/rate/summarize_per_bin_rate_models.py --allow-stale
 """
 
 from __future__ import annotations
+
+import argparse
 
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay._helpers import raised_cosine_history_basis
+from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
     REWARD_HISTORY_COLUMNS,
@@ -37,6 +41,17 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
+
+RC = P / "replay_content"
+ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"
+# The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
+# the artifact's provenance sidecar before anything is summarized, so a table
+# regenerated after the fit cannot be reported through the old coefficients.
+ALL_MODELS_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+}
 
 SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
@@ -167,9 +182,25 @@ def section_ladder():
                   f"{s.ks_within_band.mean():8.2f} {len(s):4d}")
 
 
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Summarize the fit even if its input tables have changed since it "
+            "was fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
 def main():
+    args = build_parser().parse_args()
+    require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     global df
-    df = pd.read_pickle(P / "replay_content" / "models_per_bin_rate" / "all_models.pkl")
+    df = pd.read_pickle(ALL_MODELS)
     print(f"all_models.pkl: {len(df)} rows, {df.groupby(SC).ngroups} sessions, "
           f"{df.model.nunique()} models, BIN_S={BIN_S}")
 

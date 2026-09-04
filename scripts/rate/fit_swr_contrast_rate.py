@@ -54,6 +54,7 @@ for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
 import argparse  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
+import sys  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 from collections import Counter  # noqa: E402
@@ -96,6 +97,9 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
@@ -152,6 +156,14 @@ _RATE_CONT_COVARS = [
     "reward_belief_mean_update_l1_all_ports_postoutcome",
 ]
 RC = PROCESSED_DATA_DIR / "replay_content"
+
+# The tables `_load` reads; recorded in each artifact's provenance sidecar.
+FIT_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+}
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
 _EXPECTED = (
@@ -786,6 +798,7 @@ def main() -> None:
         else "swr_contrast_rate.pkl"
     )
     models.to_pickle(out)
+    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
 
     # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +
     # term-level quasi-separation diagnostics, mirroring the content contrast runner.
@@ -856,7 +869,9 @@ def main() -> None:
         )
         agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
         asfx = "_smoke" if args.max_per_animal else ""
-        agg.to_pickle(out_dir / f"swr_contrast_rate_audited{asfx}.pkl")
+        audited = out_dir / f"swr_contrast_rate_audited{asfx}.pkl"
+        agg.to_pickle(audited)
+        write_fit_provenance(audited, FIT_INPUTS, "poisson_glm", sys.argv)
         # Persist the exact per-SD factors this run used for the std_* columns so the
         # standardized coefficients are reproducible. These SDs are computed over the
         # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the

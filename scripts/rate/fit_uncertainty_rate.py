@@ -45,6 +45,7 @@ for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
 
 import argparse  # noqa: E402
 import logging  # noqa: E402
+import sys  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 
@@ -81,6 +82,9 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
 from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    write_fit_provenance,
+)
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
@@ -98,6 +102,14 @@ logger = logging.getLogger(__name__)
 
 SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
+
+# The tables `main` reads; recorded in the artifact's provenance sidecar.
+FIT_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+}
 
 # Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
 # p_rew_leaf/contingency_count, exactly stop-start-aligned) rather than the difflib
@@ -643,6 +655,7 @@ def main() -> None:
     csfx = "_smoke" if args.max_per_animal else ""
     out = out_dir / fname
     models.to_pickle(out)
+    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
     gate_audit.to_csv(
         out_dir / f"uncertainty_rate_post_outcome_gate_audit{csfx}.csv",
         index=False,

@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import sys
 
 import numpy as np
 import pandas as pd
@@ -47,6 +48,9 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
@@ -245,6 +249,9 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "all_models.pkl"
     rate.to_pickle(out)
+    write_fit_provenance(
+        out, {"stop_table": RC / "stop_table.pkl"}, "poisson_glm", sys.argv
+    )
     write_cohort_audit(cohort_audits, out_dir / "all_models_cohort_audit.csv")
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",

@@ -57,6 +57,7 @@ for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
 
 import argparse  # noqa: E402
 import logging  # noqa: E402
+import sys  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 from collections import Counter  # noqa: E402
@@ -90,6 +91,9 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
+    write_fit_provenance,
+)
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
@@ -108,6 +112,15 @@ logger = logging.getLogger(__name__)
 
 SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
+
+# The tables every fit in this family is built from. The provenance sidecar
+# records their hashes, and the summarizer/plotter check the same mapping, so a
+# regenerated table cannot be read through a fit that predates it.
+FIT_INPUTS = {
+    "stop_table": RC / "stop_table.pkl",
+    "event_onset_table": RC / "event_onset_table.pkl",
+    "event_table": RC / "event_table.pkl",
+}
 
 
 def _fit_one_session(
@@ -413,6 +426,7 @@ def main() -> None:
     fname = "all_models_smoke.pkl" if args.max_per_animal else "all_models.pkl"
     out = out_dir / fname
     models.to_pickle(out)
+    write_fit_provenance(out, FIT_INPUTS, "poisson_glm", sys.argv)
     csfx = "_smoke" if args.max_per_animal else ""
     write_cohort_audit(
         _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),
