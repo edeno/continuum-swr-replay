@@ -565,6 +565,8 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+    # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
+    smoke = args.max_per_animal is not None
 
     t0 = time.perf_counter()
     stop = read_table(RC / "stop_table.pkl")
@@ -653,10 +655,8 @@ def main() -> None:
 
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    fname = (
-        "uncertainty_rate_smoke.pkl" if args.max_per_animal else "uncertainty_rate.pkl"
-    )
-    csfx = "_smoke" if args.max_per_animal else ""
+    fname = "uncertainty_rate_smoke.pkl" if smoke else "uncertainty_rate.pkl"
+    csfx = "_smoke" if smoke else ""
     out = out_dir / fname
     models.to_pickle(out)
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
@@ -668,7 +668,7 @@ def main() -> None:
     # Cohort audit (stop grain). The inner qvals join is the mechanism-B qvals-gap;
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
     # first-session-per-animal drop, subset, and per-bin gates -> excluded.
-    audit_qvals = 0 if args.max_per_animal else (n_before - n_postjoin)  # smoke: N/A
+    audit_qvals = 0 if smoke else (n_before - n_postjoin)  # smoke: N/A
     audit_records = _cohort_records(
         models,
         stop,

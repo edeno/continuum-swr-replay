@@ -600,7 +600,7 @@ def main() -> None:
                 preds, descriptive=(name in DESCRIPTIVE_CONTENT_RUNGS)
             )
 
-    sfx = "_smoke" if args.max_per_animal else ""
+    sfx = "_smoke" if args.max_per_animal is not None else ""
     (RC / "models").mkdir(parents=True, exist_ok=True)
     ev = _assemble_arm()
     pt = _assemble_patch(ev)

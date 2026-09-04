@@ -86,24 +86,35 @@ offset. Its limitation is exactly that offset — see below.
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
-  dissociation**. In `M7`, the immediate (lag-1) reward rate ratio dissociates —
-  `non_local_swr ≈ 3.95` ≫ `non_local_no_swr ≈ 1.12` (`swr ≈ 1.45`), paired
-  `non_local_swr > non_local_no_swr` in **86 % of sessions, 5/5 animals,
-  p ≈ 1e-28** — while the slower **recent-reward suppression** at lags 2–10
-  (RR ~0.85–0.97 per lag, ~0.6× cumulative) is **shared**. So the reward kernel
-  is **boost-then-suppression**: the last trial's reward *raises* the current
-  rate (and that boost dissociates by SWR-coupling), while reward accumulated
-  over the preceding several trials *lowers* it (shared across populations). The
-  lag≥2 suppression is a recent-reward effect; it is *consistent with* an
-  RPE / relative-reward account (Kleinman & Foster 2024; Ambrose adaptive
-  coding) but this GLM does not measure a prediction error, so the mechanism
-  (RPE vs satiety vs reward-rate adaptation) is not established here. The
-  self-history kernel is **refractory** (<1) below 60 ms and **bursty** (>1) at
-  ~100 ms (events are non-Poisson).
+  dissociation**. In `M7`, the reconstructed reward kernel at lag 1 dissociates —
+  `non_local_swr ≈ 1.38` > `swr ≈ 1.18` > `non_local_no_swr ≈ 0.91` — while the
+  slower **recent-reward suppression** from lag 3 on (RR ≈ 0.90–0.97 per lag) is
+  **shared** across populations and returns to ~1 by lag 10. Separately, the
+  single immediate basis coefficient is higher for `non_local_swr` than for
+  `non_local_no_swr` **within session in 80 % of 217 paired sessions, 5/5
+  animals, signed-rank p = 2.5e-23**. Those two are different measurements:
+  the first is the size of the kernel at a lag, the second is the consistency of
+  a between-population difference — quote them as separate clauses, never
+  spliced. So the reward kernel is **boost-then-suppression**: the most recent
+  reward *raises* the current rate (and that boost dissociates by SWR-coupling),
+  while reward accumulated over the preceding several trials *lowers* it (shared
+  across populations). The lag≥2 suppression is a recent-reward effect; it is
+  *consistent with* an RPE / relative-reward account (Kleinman & Foster 2024;
+  Ambrose adaptive coding) but this GLM does not measure a prediction error, so
+  the mechanism (RPE vs satiety vs reward-rate adaptation) is not established
+  here. The self-history kernel is **refractory** (<1) below 60 ms and **bursty**
+  (>1) at ~100–135 ms (events are non-Poisson).
 
-  (These figures are from the most recent unified-15 ms-bin run; `#19c` in the
-  claims table retains the original mixed-binning values — same dissociation,
-  slightly different absolute coefficients, as expected from the re-binning.)
+  (Numbers from the 2026-09-04 refit onto the three-bump raised-cosine reward
+  basis — see [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full
+  kernel and [audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md)
+  for what changed. The smooth basis cannot represent a lag-specific spike, so
+  the lag-1 boost is smaller than the retired per-lag specification reported;
+  the ordering and the dissociation are unchanged. `#19c` in the claims table
+  still carries the retired per-lag values and rung names. The audited
+  SWR-contrast ladder currently publishes **no aggregate rows** — every term
+  exceeds the unidentified-share gate on the full corpus — so nothing in that
+  table is quotable at present.)
 
 ## MU — the uncertainty/value model (Family B extension)
 

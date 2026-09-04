@@ -277,7 +277,7 @@ def main() -> None:
 
     out_dir = RC / "models_per_stop_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    sfx = "_smoke" if args.max_per_animal else ""
+    sfx = "_smoke" if args.max_per_animal is not None else ""
     out = out_dir / f"all_models{sfx}.pkl"
     rate.to_pickle(out)
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)

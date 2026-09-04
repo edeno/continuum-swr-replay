@@ -714,6 +714,8 @@ def main() -> None:
         "--workers", type=int, default=1, help="per-session process fan-out"
     )
     args = ap.parse_args()
+    # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
+    smoke = args.max_per_animal is not None
 
     # Causal-hygiene gate: each rung's covariates must be pre-outcome, or the
     # rung is an explicitly-declared descriptive rung (RPE/value association or peri-switch
@@ -797,20 +799,18 @@ def main() -> None:
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (
-        "swr_contrast_rate_smoke.pkl"
-        if args.max_per_animal
-        else "swr_contrast_rate.pkl"
+        "swr_contrast_rate_smoke.pkl" if smoke else "swr_contrast_rate.pkl"
     )
     models.to_pickle(out)
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
 
     # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +
     # term-level quasi-separation diagnostics, mirroring the content contrast runner.
-    csfx = "_smoke" if args.max_per_animal else ""
+    csfx = "_smoke" if smoke else ""
     # The qvals-join drop is measured on the full stop table in _load(); in smoke mode
     # the per-animal subset happens after, so attributing the full-data drop against a
     # tiny subset n_in would be meaningless. Report 0 there (smoke is not a reported run).
-    audit_qvals_drop = 0 if args.max_per_animal else n_qvals_dropped
+    audit_qvals_drop = 0 if smoke else n_qvals_dropped
     write_cohort_audit(
         _cohort_records(models, stop, audit_qvals_drop, dict(cohort_stop_drops)),
         out_dir / f"swr_contrast_rate_cohort_audit{csfx}.csv",
@@ -872,7 +872,7 @@ def main() -> None:
             ignore_index=True,
         )
         agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
-        asfx = "_smoke" if args.max_per_animal else ""
+        asfx = "_smoke" if smoke else ""
         audited = out_dir / f"swr_contrast_rate_audited{asfx}.pkl"
         agg.to_pickle(audited)
         write_fit_provenance(audited, fit_inputs, "poisson_glm", sys.argv)

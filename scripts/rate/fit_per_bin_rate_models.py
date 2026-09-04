@@ -427,11 +427,13 @@ def main() -> None:
 
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    fname = "all_models_smoke.pkl" if args.max_per_animal else "all_models.pkl"
+    # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
+    smoke = args.max_per_animal is not None
+    fname = "all_models_smoke.pkl" if smoke else "all_models.pkl"
     out = out_dir / fname
     models.to_pickle(out)
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
-    csfx = "_smoke" if args.max_per_animal else ""
+    csfx = "_smoke" if smoke else ""
     write_cohort_audit(
         _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),
         out_dir / f"per_bin_rate_cohort_audit{csfx}.csv",

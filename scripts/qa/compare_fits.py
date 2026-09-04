@@ -33,7 +33,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.replay._helpers import reconstruct_reward_kernels
+from continuum_swr_replay.analysis.replay.model_specs import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
@@ -68,6 +75,9 @@ OLD_PER_STOP_STEPS = {"R2 vs R0": ("R2", "R0"), "Rlag vs R0": ("Rlag", "R0")}
 NEW_PER_STOP_STEPS = {"R1 vs R0": ("R1", "R0")}
 
 OUTCOME_ORDER = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
+# The rung both reward quantities below are read from.
+FULL_MODEL = "M7_time_hist_rew"
+IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
 def _sha256(path: Path) -> str:
@@ -78,24 +88,60 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def delta_aic(models: pd.DataFrame, rung: str, parent: str) -> pd.DataFrame:
-    """Per (session, outcome) ``AIC(rung) - AIC(parent)``.
+def delta_aic(
+    models: pd.DataFrame, rung: str, parent: str
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Per (session, outcome) ``AIC(rung) - AIC(parent)``, and what pairing cost.
 
-    Returns an empty frame when either rung is absent from ``models`` (the
-    two ladders do not carry the same rung names).
+    A session contributes a difference only when both rungs were fit there and
+    both carry a finite AIC. Sessions that reach only one side of the pair are
+    silently unusable for this comparison, so they are counted rather than
+    dropped without trace.
+
+    Parameters
+    ----------
+    models : pd.DataFrame
+        Tidy per-session fits with ``model``, ``outcome``, the session keys and
+        ``aic``.
+    rung, parent : str
+        The reward rung and its reward-free parent.
+
+    Returns
+    -------
+    paired : pd.DataFrame
+        One row per (session, outcome) with ``delta_aic``.
+    unpaired : dict of str to int
+        Per outcome, sessions carrying either rung that did not survive the
+        pairing (present on one side only, or with a non-finite AIC).
     """
     have = set(models["model"].unique())
     if rung not in have or parent not in have:
-        return pd.DataFrame(columns=KEY + ["delta_aic"])
+        return pd.DataFrame(columns=KEY + ["delta_aic"]), {}
     a = models.loc[models.model == rung, KEY + ["aic"]]
     b = models.loc[models.model == parent, KEY + ["aic"]]
     merged = a.merge(b, on=KEY, suffixes=("_rung", "_parent"))
     merged["delta_aic"] = merged["aic_rung"] - merged["aic_parent"]
-    return merged[KEY + ["delta_aic"]].dropna(subset=["delta_aic"])
+    paired = merged[KEY + ["delta_aic"]].dropna(subset=["delta_aic"])
+    either = pd.concat([a[KEY], b[KEY]]).drop_duplicates()
+    n_either = either.groupby("outcome", observed=True).size()
+    n_paired = paired.groupby("outcome", observed=True).size()
+    unpaired = n_either.subtract(n_paired, fill_value=0).astype(int).to_dict()
+    return paired, unpaired
 
 
-def _median_table(old: pd.DataFrame, new: pd.DataFrame, value: str) -> pd.DataFrame:
-    """Per-outcome median of ``value`` in each fit, with session counts."""
+def _median_table(
+    old: pd.DataFrame,
+    new: pd.DataFrame,
+    value: str,
+    old_unpaired: dict[str, int] | None = None,
+    new_unpaired: dict[str, int] | None = None,
+) -> pd.DataFrame:
+    """Per-outcome median of ``value`` in each fit, with session counts.
+
+    ``old_unpaired`` / ``new_unpaired`` add the sessions each side lost to the
+    rung-against-parent pairing, so a shrinking median cannot be read as a
+    shifted effect when it is really a shrinking denominator.
+    """
     rows = []
     for outcome in OUTCOME_ORDER:
         o = (
@@ -110,15 +156,17 @@ def _median_table(old: pd.DataFrame, new: pd.DataFrame, value: str) -> pd.DataFr
         )
         if o.empty and n.empty:
             continue
-        rows.append(
-            {
-                "outcome": outcome,
-                "n_sessions_before": int(o.notna().sum()),
-                "median_before": o.median(),
-                "n_sessions_after": int(n.notna().sum()),
-                "median_after": n.median(),
-            }
-        )
+        row = {
+            "outcome": outcome,
+            "n_sessions_before": int(o.notna().sum()),
+            "median_before": o.median(),
+            "n_sessions_after": int(n.notna().sum()),
+            "median_after": n.median(),
+        }
+        if old_unpaired is not None or new_unpaired is not None:
+            row["n_unpaired_before"] = int((old_unpaired or {}).get(outcome, 0))
+            row["n_unpaired_after"] = int((new_unpaired or {}).get(outcome, 0))
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -183,6 +231,84 @@ def n_bins_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def reward_quantities(new_bin: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The two reward quantities the refit is usually summarized by.
+
+    They are computed from different things and must not be quoted as one
+    clause. The first is the **reconstructed kernel**: each session's three
+    basis coefficients are mapped through the row-normalized basis and the
+    per-lag rate ratios are summarized by their median across sessions. The
+    second is a **paired test on one coefficient**, the immediate basis
+    component, comparing the SWR-coupled and non-SWR non-local populations
+    within session.
+
+    Parameters
+    ----------
+    new_bin : pd.DataFrame
+        Tidy per-session per-bin fits.
+
+    Returns
+    -------
+    kernel : pd.DataFrame
+        Median reconstructed rate ratio at lags 1-3 per outcome.
+    paired : pd.DataFrame
+        One row: the within-session paired comparison of the immediate
+        component between the two non-local populations.
+    """
+    full = new_bin[new_bin.model == FULL_MODEL]
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        fitted = full.loc[full.outcome == outcome, columns].dropna()
+        if fitted.empty:
+            continue
+        kernels = np.exp(
+            reconstruct_reward_kernels(
+                fitted.to_numpy(dtype=float),
+                REWARD_HISTORY_N_LAGS,
+                REWARD_HISTORY_N_BASIS,
+            )
+        )
+        median = np.median(kernels, axis=0)
+        rows.append(
+            {
+                "outcome": outcome,
+                "n_sessions": len(fitted),
+                "rr_lag1": median[0],
+                "rr_lag2": median[1],
+                "rr_lag3": median[2],
+            }
+        )
+    kernel = pd.DataFrame(rows)
+
+    a = full.loc[full.outcome == "non_local_swr", SC + [IMMEDIATE_COEF]]
+    b = full.loc[full.outcome == "non_local_no_swr", SC + [IMMEDIATE_COEF]]
+    merged = a.merge(b, on=SC, suffixes=("_swr", "_no_swr")).dropna()
+    if len(merged) < 2:
+        return kernel, pd.DataFrame()
+    difference = merged[f"{IMMEDIATE_COEF}_swr"] - merged[f"{IMMEDIATE_COEF}_no_swr"]
+    per_animal = merged.assign(d=difference).groupby("animal")["d"].median()
+    paired = pd.DataFrame(
+        [
+            {
+                "comparison": "non_local_swr − non_local_no_swr",
+                "n_paired_sessions": len(merged),
+                "pct_sessions_positive": 100 * float((difference > 0).mean()),
+                "animals_positive": f"{int((per_animal > 0).sum())}/{len(per_animal)}",
+                # Pre-formatted: a p-value of this magnitude is unreadable
+                # under the table's shared fixed-point float format.
+                "signrank_p": "{:.1e}".format(
+                    wilcoxon(
+                        merged[f"{IMMEDIATE_COEF}_swr"],
+                        merged[f"{IMMEDIATE_COEF}_no_swr"],
+                    ).pvalue
+                ),
+            }
+        ]
+    )
+    return kernel, paired
 
 
 def rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
@@ -264,6 +390,30 @@ def build_report(
     add(_md(pd.DataFrame(rows)))
     add(f"\n{per_stop_note}\n")
 
+    kernel, paired = reward_quantities(new_bin)
+    add("\n## Reward effect after the refit — two distinct quantities\n")
+    add(
+        "These two are routinely quoted together and are **not** the same "
+        f"measurement. Both are read from `{FULL_MODEL}` in the new fit.\n"
+    )
+    add(
+        f"\n**(a) Reconstructed kernel.** Each session's "
+        f"{REWARD_HISTORY_N_BASIS} basis coefficients are mapped through the "
+        "row-normalized basis to a rate ratio per reward lag; the table is the "
+        "median of those per-session kernels. It describes the size of the "
+        "reward effect at a given lag.\n"
+    )
+    add(_md(kernel, floatfmt="{:.2f}"))
+    add(
+        "\n**(b) Paired coefficient test.** A within-session comparison of the "
+        f"single immediate basis coefficient (`{IMMEDIATE_COEF}`) between the "
+        "two non-local populations. It describes how *consistently* the two "
+        "populations differ, not how large the kernel is. The session share, "
+        "the animal count and the p-value all come from this test and from no "
+        "other quantity.\n"
+    )
+    add(_md(paired, floatfmt="{:.1f}"))
+
     add("\n## Family B — joint reward step (per-bin conditional intensity)\n")
     for label, title in [
         (
@@ -275,11 +425,15 @@ def build_report(
             "Full model vs time+history (old and new `M7_time_hist_rew` − `M6_time_hist`)",
         ),
     ]:
-        old_d = delta_aic(old_bin, *OLD_PER_BIN_STEPS[label])
-        new_d = delta_aic(new_bin, *NEW_PER_BIN_STEPS[label])
+        old_d, old_unpaired = delta_aic(old_bin, *OLD_PER_BIN_STEPS[label])
+        new_d, new_unpaired = delta_aic(new_bin, *NEW_PER_BIN_STEPS[label])
         add(f"\n### {title}\n")
-        add("Per-session ΔAIC, median across sessions:\n")
-        add(_md(_median_table(old_d, new_d, "delta_aic")))
+        add(
+            "Per-session ΔAIC, median across sessions. `n_unpaired_*` counts "
+            "sessions that carried one of the two rungs but did not survive the "
+            "pairing, and so contribute to neither median:\n"
+        )
+        add(_md(_median_table(old_d, new_d, "delta_aic", old_unpaired, new_unpaired)))
         add("\nPer-animal medians:\n")
         add(_md(_per_animal_median_table(old_d, new_d, "delta_aic")))
 
@@ -315,10 +469,10 @@ def build_report(
         "as a term-for-term replacement.\n"
     )
     for label, (rung, parent) in {**OLD_PER_STOP_STEPS, **NEW_PER_STOP_STEPS}.items():
-        old_d = delta_aic(old_stop, rung, parent)
-        new_d = delta_aic(new_stop, rung, parent)
+        old_d, old_unpaired = delta_aic(old_stop, rung, parent)
+        new_d, new_unpaired = delta_aic(new_stop, rung, parent)
         add(f"\n### {label}\n")
-        add(_md(_median_table(old_d, new_d, "delta_aic")))
+        add(_md(_median_table(old_d, new_d, "delta_aic", old_unpaired, new_unpaired)))
 
     add("\n## Sessions fitted per rung\n")
     add("### Family B\n")

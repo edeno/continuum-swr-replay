@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.replay._helpers import raised_cosine_history_basis
+from continuum_swr_replay.analysis.replay._helpers import reconstruct_reward_kernels
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -133,21 +133,47 @@ def section_kernel(title, model, prefix, n):
     return
 
 
+def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+    """Across-session median of the per-session reconstructed reward kernel.
+
+    Each session's kernel is reconstructed from that session's own basis
+    coefficients and the median is taken per lag, which is the estimator
+    ``plot_per_bin_rate_models.py`` draws. Reconstructing from across-session
+    median coefficients instead would summarize a session that does not exist:
+    the basis coefficients are strongly collinear, so their marginal medians do
+    not describe any fitted kernel.
+
+    Parameters
+    ----------
+    sessions : pd.DataFrame
+        One row per session for a single (model, outcome), carrying
+        ``coef_reward_history_rcos_*``.
+
+    Returns
+    -------
+    np.ndarray, shape (REWARD_HISTORY_N_LAGS,)
+        Median rate ratio at each lag 1..10.
+    """
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    coefs = sessions[columns].to_numpy(dtype=float)
+    kernels = reconstruct_reward_kernels(
+        coefs, REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS
+    )
+    return np.median(np.exp(kernels), axis=0)
+
+
 def section_reward_kernel(title, model):
     """Reward kernel reconstructed from the raised-cosine basis coefficients.
 
     The features are bump-weighted reward fractions, so an outcome at lag ``j``
     contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the log rate.
     """
-    B = raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS)
-    weights = B / B.sum(axis=1, keepdims=True)
     print("\n" + "=" * 78)
     print(f"{title}   ({model}: reconstructed RR per lag 1..{REWARD_HISTORY_N_LAGS})")
     print("=" * 78)
     for oc in OUT:
         s = df[(df.model == model) & (df.outcome == oc)]
-        coefs = np.array([s[f"coef_{c}"].median() for c in REWARD_HISTORY_COLUMNS])
-        rr = np.exp(coefs @ weights)
+        rr = reward_kernel_rate_ratios(s)
         print(f"  {LABEL[oc]:16s} " + " ".join(f"{v:5.2f}" for v in rr))
 
 

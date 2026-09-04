@@ -91,17 +91,22 @@ immediate reward response.
 ## 3. Reward kernel, lags 1–10 (M7, reconstructed from the basis)
 
 The per-lag log-rate contribution is `Σ_k coef_k · B[k, lag] / Σ_lag B[k, lag]`
-(row-normalized basis), evaluated per session and summarized as the median RR:
+(row-normalized basis), evaluated **per session** and then summarized as the
+median rate ratio across sessions — the same estimator
+`plot_per_bin_rate_models.py` draws. (Reconstructing from across-session median
+coefficients instead would describe a session that does not exist: the three
+basis coefficients are strongly collinear, so their marginal medians are not a
+fitted kernel. That variant reads ~0.05 higher at lag 1.)
 
 | population | lag1 | lag2 | lag3 | lag4 | lag5 | lag6 | lag7 | lag8 | lag9 | lag10 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| detected SWR | 1.23 | 1.03 | 0.96 | 0.93 | 0.93 | 0.94 | 0.96 | 0.98 | 1.00 | 1.03 |
-| non-local (all) | 1.08 | 0.96 | 0.93 | 0.92 | 0.93 | 0.94 | 0.96 | 0.98 | 0.99 | 1.01 |
-| non-local, w/ SWR | **1.43** | 1.09 | 0.96 | 0.91 | 0.91 | 0.92 | 0.95 | 0.98 | 1.01 | 1.05 |
-| non-local, no SWR | **0.90** | 0.89 | 0.90 | 0.92 | 0.94 | 0.95 | 0.97 | 0.98 | 0.98 | 0.99 |
+| detected SWR | 1.18 | 0.99 | 0.93 | 0.92 | 0.92 | 0.93 | 0.95 | 0.97 | 1.00 | 1.02 |
+| non-local (all) | 1.06 | 0.95 | 0.92 | 0.92 | 0.93 | 0.94 | 0.96 | 0.98 | 1.00 | 1.02 |
+| non-local, w/ SWR | **1.38** | 1.05 | 0.93 | 0.90 | 0.90 | 0.92 | 0.94 | 0.99 | 1.02 | 1.06 |
+| non-local, no SWR | **0.91** | 0.89 | 0.91 | 0.94 | 0.95 | 0.97 | 0.97 | 0.99 | 0.99 | 1.00 |
 
-So the reward kernel is **boost at lag 1 (dissociates: 1.43 SWR-coupled vs 0.90
-non-SWR) then mild suppression over lags 2–7 (RR ≈ 0.89–0.96, shared across
+So the reward kernel is **boost at lag 1 (dissociates: 1.38 SWR-coupled vs 0.91
+non-SWR) then mild suppression from lag 3 on (RR ≈ 0.90–0.97, shared across
 populations) returning to ~1 by lag 10**. The smooth basis cannot represent a
 lag-specific spike, so the lag-1 boost is smaller here than the per-lag
 specification reported; the *ordering and the dissociation are unchanged*. The

@@ -37,7 +37,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
-    raised_cosine_history_basis,
+    reconstruct_reward_kernels,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
@@ -99,18 +99,6 @@ def _kernel(
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
-def _reward_kernel_weights() -> np.ndarray:
-    """Per-lag weight each basis coefficient contributes, shape (n_basis, n_lags).
-
-    The fitted features are bump-weighted reward *fractions* (each bump is
-    normalized by the sum of its weights over the known lags), so the log-rate
-    contribution of an outcome at lag ``j`` is
-    ``sum_k coef_k * B[k, j] / sum_j' B[k, j']``.
-    """
-    B = raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS)
-    return B / B.sum(axis=1, keepdims=True)
-
-
 def _reconstructed_kernels(
     m7: pd.DataFrame, outcome: str
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -132,8 +120,12 @@ def _reconstructed_kernels(
     """
     columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
     fitted = m7.loc[m7.outcome == outcome, ["animal", *columns]].dropna()
-    coefs = fitted[columns].to_numpy(dtype=float)
-    return fitted["animal"].to_numpy(), coefs @ _reward_kernel_weights()
+    kernels = reconstruct_reward_kernels(
+        fitted[columns].to_numpy(dtype=float),
+        REWARD_HISTORY_N_LAGS,
+        REWARD_HISTORY_N_BASIS,
+    )
+    return fitted["animal"].to_numpy(), kernels
 
 
 def _animal_median_kernels(

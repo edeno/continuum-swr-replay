@@ -784,6 +784,53 @@ def raised_cosine_history_basis(n_lags: int, n_basis: int) -> np.ndarray:
     return B
 
 
+def reward_kernel_weights(n_lags: int, n_basis: int) -> np.ndarray:
+    """Per-lag weight each reward-history basis coefficient contributes.
+
+    The persisted features are bump-weighted reward *fractions* (each bump is
+    normalized by the sum of its weights over the lags it spans), so an outcome
+    at lag ``j`` contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the
+    log rate. This returns that row-normalized basis.
+
+    Parameters
+    ----------
+    n_lags : int
+        Number of reward lags the basis spans.
+    n_basis : int
+        Number of raised-cosine bumps.
+
+    Returns
+    -------
+    np.ndarray, shape (n_basis, n_lags)
+        Row-normalized raised-cosine basis.
+    """
+    B = raised_cosine_history_basis(n_lags, n_basis)
+    return B / B.sum(axis=1, keepdims=True)
+
+
+def reconstruct_reward_kernels(
+    coefs: np.ndarray, n_lags: int, n_basis: int
+) -> np.ndarray:
+    """Per-session reward kernels over lags ``1..n_lags``, on the log-rate scale.
+
+    Parameters
+    ----------
+    coefs : np.ndarray, shape (n_sessions, n_basis)
+        Fitted basis coefficients, one row per session. Rows with any NaN are
+        dropped, so a session that did not fit the block contributes nothing.
+    n_lags, n_basis : int
+        Shape of the basis the coefficients were fit against.
+
+    Returns
+    -------
+    np.ndarray, shape (n_fitted_sessions, n_lags)
+        Log-rate contribution of a reward at each lag, per session.
+    """
+    coefs = np.atleast_2d(np.asarray(coefs, dtype=float))
+    coefs = coefs[~np.isnan(coefs).any(axis=1)]
+    return coefs @ reward_kernel_weights(n_lags, n_basis)
+
+
 def aggregate_to_timebins(
     stop_table: pd.DataFrame,
     onset_times: pd.DataFrame,
