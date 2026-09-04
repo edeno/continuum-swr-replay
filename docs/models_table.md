@@ -39,11 +39,22 @@ Per-family fit conventions:
 effects first enter at `M0a`/`P1`. "conditional Poisson over arms within event" is fit
 as Poisson with per-event fixed effects — the multinomial/`clogit` equivalent.
 
-Every per-session fit carries `converged` / `separated` status flags and an
-`n_convergence_warnings` count (`analysis.replay._fit_diagnostics`); the audited
-aggregation surfaces per-(model, population) `n_sessions_flagged_nonconverged` /
-`n_sessions_flagged_separated`. These are diagnostics on the retained cohort — the only
-coefficient exclusion is the `|coef|>=10` quasi-separation filter.
+Every per-session fit carries `converged` / `separated` status flags, the
+`|`-joined `separated_terms` naming which coefficients are unidentified, one
+`sd_<term>` per coefficient, and an `n_convergence_warnings` count
+(`analysis.replay._fit_diagnostics`). Separation is judged **per term** — a term
+is separated when its SE is non-finite or `> 1e3`, when its SE per SD of its own
+predictor reaches `1.0`, or (for a zero-SD column) when `|coef| >= 10` — and the
+structural nuisance terms `Intercept` and `reward_history_incomplete`
+(`NUISANCE_TERMS`) are excluded from the judgment entirely, since a blown-up
+baseline or structural-missingness coefficient says nothing about whether the
+model's scientific terms are identified. `separated` is simply "at least one
+non-nuisance term". The audited aggregation drops a session for a term only when
+that term (or, for an `is_swr:<covariate>` product, either of its factors) is
+named in `separated_terms`; the per-(model, population)
+`n_sessions_flagged_nonconverged` / `n_sessions_flagged_separated` counts stay
+fit-level diagnostics. The remaining coefficient exclusion is the `|coef|>=10`
+backstop for fits that carry no flag.
 
 ### Covariate causal-hygiene (phase 4)
 

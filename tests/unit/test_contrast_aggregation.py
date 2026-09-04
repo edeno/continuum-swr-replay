@@ -5,9 +5,9 @@ per-category predictors, the reward-history basis features (weighted reward
 fractions, so their coefficients are per unit of the fraction), and continuous
 covariates scaled by their pooled SD.
 
-``aggregate_contrast`` drops a session fit only when it is unidentified: the
-``separated`` flag is the effect-scale identifiability rule, with ``|coef| < 10``
-as a backstop. Precision alone is not a drop criterion.
+``aggregate_contrast`` drops a session fit for a term only when THAT term is
+unidentified: the fitters name the separated terms on the effect scale, with
+``|coef| < 10`` as a backstop. Precision alone is not a drop criterion.
 """
 
 from __future__ import annotations
@@ -22,6 +22,9 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
 from continuum_swr_replay.analysis.replay.model_specs import REWARD_HISTORY_COLUMNS
 
 SD = {"rpe_postoutcome": 2.0, "reward_history_rcos_0": 0.25}
+
+# Eight identified per-session coefficients; median 0.315.
+REWARD_COEFS = [0.30, 0.35, 0.25, 0.40, 0.20, 0.45, 0.28, 0.33]
 
 
 def test_binary_predictor_is_per_category() -> None:
@@ -90,7 +93,8 @@ def test_imprecise_but_identified_session_is_kept() -> None:
 
 
 def test_separated_session_is_dropped() -> None:
-    """The separation flag is the identifiability rule and still drops the fit."""
+    """Result frames written before the term-level flag carry only ``separated``;
+    for those the fit-level flag remains the identifiability rule."""
     fits = _session_fits()
     fits.loc[0, "separated"] = True
 
@@ -113,3 +117,98 @@ def test_runaway_coefficient_is_still_dropped_by_the_backstop() -> None:
     row = out.iloc[0]
     assert row["n_sessions"] == 7
     assert row["n_dropped"] == 1
+
+
+def _two_term_fits() -> pd.DataFrame:
+    """Eight sessions carrying both a self-history and a reward-basis coefficient."""
+    n = 8
+    return pd.DataFrame(
+        {
+            "model": ["S1_rew"] * n,
+            "population": ["contrast"] * n,
+            "animal": ["a"] * 4 + ["b"] * 4,
+            "coef_hist_rcos_2": [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80],
+            "bse_hist_rcos_2": [0.10] * n,
+            "pval_hist_rcos_2": [0.01] * n,
+            "coef_reward_history_rcos_0": REWARD_COEFS,
+            "bse_reward_history_rcos_0": [0.10] * n,
+            "pval_reward_history_rcos_0": [0.01] * n,
+            "separated": [False] * n,
+            "converged": [True] * n,
+            "separated_terms": [""] * n,
+        }
+    )
+
+
+def test_separation_drops_only_the_term_it_holds_for() -> None:
+    """A session separated on ``hist_rcos_2`` still contributes its reward coefficient.
+
+    The fit-level flag dropped the session for every term, which is what emptied
+    the audited is_swr-contrast table.
+    """
+    fits = _two_term_fits()
+    fits.loc[0, "separated"] = True
+    fits.loc[0, "separated_terms"] = "hist_rcos_2"
+
+    out = aggregate_contrast(
+        fits,
+        [
+            ("S1_rew", "contrast", "hist_rcos_2"),
+            ("S1_rew", "contrast", "reward_history_rcos_0"),
+        ],
+        level="rate",
+    ).set_index("term")
+
+    assert out.loc["hist_rcos_2", "n_sessions"] == 7
+    assert out.loc["hist_rcos_2", "n_dropped"] == 1
+    assert out.loc["hist_rcos_2", "coef_session_median"] == pytest.approx(0.50)
+    assert out.loc["reward_history_rcos_0", "n_sessions"] == 8
+    assert out.loc["reward_history_rcos_0", "n_dropped"] == 0
+    assert out.loc["reward_history_rcos_0", "coef_session_median"] == pytest.approx(
+        0.315
+    )
+    # The fit-level diagnostic still counts the flagged fit, for both terms.
+    assert set(out["n_sessions_flagged_separated"]) == {1}
+
+
+def test_is_swr_product_is_dropped_when_either_factor_separates() -> None:
+    """``is_swr:<c>`` is only estimable where both of its factors are."""
+    n = 12
+    fits = pd.DataFrame(
+        {
+            "model": ["S4_value"] * n,
+            "population": ["contrast"] * n,
+            "animal": ["a"] * 6 + ["b"] * 6,
+            "coef_is_swr:q_arm": [0.1 * (i + 1) for i in range(n)],
+            "bse_is_swr:q_arm": [0.10] * n,
+            "pval_is_swr:q_arm": [0.01] * n,
+            "separated": [False] * n,
+            "converged": [True] * n,
+            # Session 1 separated on the covariate, session 2 on the indicator.
+            "separated_terms": ["", "q_arm", "is_swr"] + [""] * (n - 3),
+        }
+    )
+
+    out = aggregate_contrast(
+        fits, [("S4_value", "contrast", "is_swr:q_arm")], level="rate"
+    )
+
+    assert out.iloc[0]["n_sessions"] == 10
+    assert out.iloc[0]["n_dropped"] == 2
+    # 0.2 and 0.3 are gone; the remaining ten run 0.1, 0.4, 0.5, ..., 1.2.
+    assert out.iloc[0]["coef_session_median"] == pytest.approx(0.75)
+
+
+def test_unrelated_separated_term_never_drops_a_session() -> None:
+    """The nuisance/self-history terms that flagged 55% of fits are inert here."""
+    fits = _two_term_fits()
+    fits["separated"] = True
+    fits["separated_terms"] = "hist_rcos_0|hist_rcos_1"
+
+    out = aggregate_contrast(
+        fits, [("S1_rew", "contrast", "reward_history_rcos_0")], level="rate"
+    )
+
+    assert out.iloc[0]["n_sessions"] == 8
+    assert out.iloc[0]["n_dropped"] == 0
+    assert out.iloc[0]["n_sessions_flagged_separated"] == 8

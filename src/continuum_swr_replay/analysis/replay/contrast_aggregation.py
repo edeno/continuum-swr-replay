@@ -93,6 +93,44 @@ def std_factor(term: str, sd: dict) -> tuple[float, str]:
     return 1.0, "per_SD"
 
 
+def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
+    """Per-fit mask: is ``term`` itself unidentified in this fit?
+
+    Separation is a property of a coefficient, not of a model. A fit whose
+    ``reward_history_incomplete`` or self-history coefficient ran away still
+    identifies its scientific terms perfectly well, so dropping the session for
+    every term is what emptied the audited table. The per-term rule reads the
+    ``separated_terms`` column written by the fitters (``"|"``-joined names).
+
+    An ``is_swr:<covariate>`` product is unidentified when either factor is: the
+    interaction is only estimable where both the indicator and the covariate are.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits for one (model, population).
+    term : str
+        The aggregated term.
+
+    Returns
+    -------
+    pd.Series of bool
+        Indexed like ``fits``. Frames written before the term-level flag carry no
+        ``separated_terms`` column; for those the fit-level ``separated`` flag is
+        the only information available and is used unchanged.
+    """
+    if "separated_terms" not in fits.columns:
+        if "separated" not in fits.columns:
+            return pd.Series(False, index=fits.index)
+        return fits["separated"] == True  # noqa: E712 (NaN must not count)
+    factors = {term}
+    if term.startswith("is_swr:"):
+        factors |= {"is_swr", term.split(":", 1)[1]}
+    return fits["separated_terms"].map(
+        lambda v: isinstance(v, str) and bool(factors & set(v.split("|")))
+    )
+
+
 def aggregate_contrast(
     res: pd.DataFrame, specs: list[tuple[str, str, str]], level: str, sd: dict | None = None
 ) -> pd.DataFrame:
@@ -119,22 +157,19 @@ def aggregate_contrast(
         if ccol not in s_all.columns:
             continue
         present = s_all[ccol].notna()
-        # Identifiability filter. ``separated`` is the rule: it is measured on
-        # the effect scale (SE per SD of the predictor), which is what
-        # non-identification actually shows up in. ``|coef| < 10`` is a backstop
-        # for fits that carry no flag (older result tables, or an estimate that
-        # ran away without tripping the flag); on its own it is selection ON the
-        # estimate, keeping whichever unidentified fits happened to land under
-        # the threshold, which is how CS3_lastrew came to report -2.72 next to a
-        # typical session SE of 2,428 (the identified sessions give -0.77).
-        # Precision is deliberately NOT a criterion: the retired
-        # ``SE > 10 * |coef|`` rule dropped identified sessions whose effect was
-        # near zero, biasing the surviving median away from zero.
-        flagged = (
-            s_all["separated"] == True  # noqa: E712 (NaN must not count)
-            if "separated" in s_all.columns
-            else pd.Series(False, index=s_all.index)
-        )
+        # Identifiability filter, applied PER TERM. Separation is measured on the
+        # effect scale (SE per SD of the predictor), which is what
+        # non-identification actually shows up in, and the fitters name the terms
+        # it holds for. ``|coef| < 10`` is a backstop for fits that carry no flag
+        # (older result tables, or an estimate that ran away without tripping the
+        # flag); on its own it is selection ON the estimate, keeping whichever
+        # unidentified fits happened to land under the threshold, which is how
+        # CS3_lastrew came to report -2.72 next to a typical session SE of 2,428
+        # (the identified sessions give -0.77). Precision is deliberately NOT a
+        # criterion: the retired ``SE > 10 * |coef|`` rule dropped identified
+        # sessions whose effect was near zero, biasing the surviving median away
+        # from zero.
+        flagged = separated_for_term(s_all, term)
         kept = present & (s_all[ccol].abs() < 10) & ~flagged
         n_dropped = int((present & ~kept).sum())
         s = s_all[kept]
@@ -154,10 +189,11 @@ def aggregate_contrast(
         coef = s[ccol]
         per_animal = s.groupby("animal")[ccol].median()
         srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
-        # Session-level fit-diagnostics counts (informational; NOT drops). Counted over
-        # ALL modeled session-fits for this (model, population), independent of the
-        # term-level |coef|>=10 quasi-separation filter above. NaN/absent flags (older
-        # res without diagnostics) are treated as not-flagged.
+        # Session-level fit-diagnostics counts (informational; NOT drops). These stay
+        # FIT-level -- they answer "how many fits had any unidentified term", which is
+        # a different question from the per-term drop above. Counted over ALL modeled
+        # session-fits for this (model, population). NaN/absent flags (older res
+        # without diagnostics) are treated as not-flagged.
         n_nonconverged = (
             int((s_all["converged"] == False).sum())  # noqa: E712 (NaN must not count)
             if "converged" in s_all.columns else 0

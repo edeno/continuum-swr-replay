@@ -26,6 +26,7 @@ from statsmodels.discrete.conditional_models import (
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from ._fit_diagnostics import (
+    NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
@@ -188,8 +189,14 @@ def fit_conditional_poisson(
         return None
     # Judge separation on the effect scale: a basis column with a small SD reaches a
     # large coefficient at an ordinary effect size, and would otherwise be mis-flagged.
+    predictor_sd = X.std(axis=0)
     status = fit_status(
-        result, "conditional", caught=caught, predictor_sd=X.std(axis=0)
+        result,
+        "conditional",
+        caught=caught,
+        predictor_sd=predictor_sd,
+        term_names=predictors,
+        nuisance_terms=NUISANCE_TERMS,
     )
     n_fit_warnings = count_fit_quality_warnings(caught)
 
@@ -231,8 +238,14 @@ def fit_conditional_poisson(
         "aic": float(aic),
         "bic": float(bic),
         "pseudo_r2": float(pseudo_r2),
+        **{
+            f"sd_{name}": float(s)
+            for name, s in zip(predictors, predictor_sd, strict=True)
+        },
         "converged": status["converged"],
         "separated": status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": n_fit_warnings,
     }
 
@@ -356,6 +369,7 @@ def fit_null_model_conditional_logit(
         "predicted_frac": 1.0 / n_arms,
         "converged": True,
         "separated": False,
+        "separated_terms": "",
         "n_convergence_warnings": 0,
     }
 
@@ -474,8 +488,14 @@ def fit_conditional_logit(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
         return None
+    predictor_sd = X.std(axis=0)
     status = fit_status(
-        result, "conditional", caught=caught, predictor_sd=X.std(axis=0)
+        result,
+        "conditional",
+        caught=caught,
+        predictor_sd=predictor_sd,
+        term_names=predictors,
+        nuisance_terms=NUISANCE_TERMS,
     )
 
     coefs = dict(zip(predictors, result.params, strict=True))
@@ -492,8 +512,14 @@ def fit_conditional_logit(
         "llf": float(result.llf),
         "aic": float(2 * len(predictors) - 2 * result.llf),
         "bic": float(len(predictors) * np.log(n_events) - 2 * result.llf),
+        **{
+            f"sd_{name}": float(s)
+            for name, s in zip(predictors, predictor_sd, strict=True)
+        },
         "converged": status["converged"],
         "separated": status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
     }
 

@@ -182,12 +182,21 @@ example sessions inline for the KS / Q-Q / ISI-autocorrelation / cumulative-
 residual quartet (`model_checking_example_{rich,sparse}.png`).
 
 Every rate/content/choice fit additionally carries `converged` / `separated`
-status flags and an `n_convergence_warnings` count (from
-`analysis.replay._fit_diagnostics`); CV metrics carry per-fold
+status flags, the `|`-joined `separated_terms` naming the unidentified
+coefficients, a `sd_<term>` per coefficient, and an `n_convergence_warnings`
+count (from `analysis.replay._fit_diagnostics`). Separation is judged **per
+term** (non-finite SE, SE `> 1e3`, SE per predictor SD `>= 1.0`, or `|coef| >=
+10` on a zero-SD column), and the structural nuisance terms `Intercept` and
+`reward_history_incomplete` (`NUISANCE_TERMS`) are excluded from the judgment:
+the indicator marks the handful of stops with fewer than two known outcomes,
+which in most sessions carry no events at all, so its coefficient runs to `-inf`
+while every scientific term beside it is ordinary. CV metrics carry per-fold
 `cv_n_nonconverged_folds` / `cv_n_separated_folds`, and a CV metric is
-invalidated (`nan`) if any fold is nonconverged/separated rather than dropping
-the fold. These flags are diagnostics only — the sole exclusion remains the
-`|coef|>=10` quasi-separation filter in the aggregation.
+invalidated (`nan`) if any fold is nonconverged or separated on a non-nuisance
+term, rather than dropping the fold. The aggregation drops a session for a term
+only when that term is named in its `separated_terms` (for an
+`is_swr:<covariate>` product, when either factor is); `|coef|>=10` remains a
+backstop for fits carrying no flag.
 
 What the ladder actually shows (218 sessions):
 

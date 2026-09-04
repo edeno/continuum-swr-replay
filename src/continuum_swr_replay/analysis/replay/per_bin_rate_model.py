@@ -44,6 +44,7 @@ from patsy import PatsyError
 from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
 from ._fit_diagnostics import (
+    NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
@@ -295,10 +296,14 @@ def fit_per_bin_rate_model(
         return None
     # Effect-scale separation: the per-bin design carries spline bases whose columns
     # are far from O(1), so the legacy |coef| rule mis-flags them.
+    predictor_sd = np.asarray(result.model.exog, dtype=float).std(axis=0)
+    term_names = [str(t) for t in result.params.index]
     status = fit_status(
         result,
         "glm",
-        predictor_sd=np.asarray(result.model.exog, dtype=float).std(axis=0),
+        predictor_sd=predictor_sd,
+        term_names=term_names,
+        nuisance_terms=NUISANCE_TERMS,
     )
 
     params = result.params
@@ -322,8 +327,14 @@ def fit_per_bin_rate_model(
         # modeled-cohort count for the stop-grain audit (bins were already dropped for
         # NaN predictors / exposure<=0 above, and immobility<=0 stops never entered).
         "n_stops": int(df["stop_id"].nunique()),
+        **{
+            f"sd_{name}": float(s)
+            for name, s in zip(term_names, predictor_sd, strict=True)
+        },
         "converged": status["converged"],
         "separated": status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
         # fitted mean count per bin, indexed by retained rows (GOF input).
         "predicted": result.fittedvalues,
@@ -430,8 +441,20 @@ def cross_validate_per_bin_rate_model(
         # CV metric for M3/M4/M6/M7, leaving 2 of 215 sessions scored.
         sd_res = np.asarray(res.model.exog, dtype=float).std(axis=0)
         sd_res0 = np.asarray(res0.model.exog, dtype=float).std(axis=0)
-        s_res = fit_status(res, "glm", predictor_sd=sd_res)
-        s_res0 = fit_status(res0, "glm", predictor_sd=sd_res0)
+        s_res = fit_status(
+            res,
+            "glm",
+            predictor_sd=sd_res,
+            term_names=[str(t) for t in res.params.index],
+            nuisance_terms=NUISANCE_TERMS,
+        )
+        s_res0 = fit_status(
+            res0,
+            "glm",
+            predictor_sd=sd_res0,
+            term_names=[str(t) for t in res0.params.index],
+            nuisance_terms=NUISANCE_TERMS,
+        )
         n_nonconverged += (not s_res["converged"]) or (not s_res0["converged"])
         n_separated += s_res["separated"] or s_res0["separated"]
         y = te["count"].to_numpy(dtype=float)

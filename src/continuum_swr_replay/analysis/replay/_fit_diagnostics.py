@@ -6,15 +6,23 @@ changing any estimand. A fit that was silently non-converged now carries
 ``converged=False``; a quasi-separated fit (a coefficient blown up to a large finite
 value or an exploded/non-finite SE) carries ``separated=True``.
 
-Nothing here *drops* a fit. The only exclusion in the pipeline remains the pre-existing
-``|coef| >= 10`` quasi-separation filter in ``contrast_aggregation`` (per session, per
-term); these flags are diagnostics on the retained cohort.
+Separation is judged **per term**: :func:`fit_status` returns the names of the terms
+that are not identified, and the fit-level ``separated`` flag is simply "at least one
+term". Structural nuisance terms (:data:`NUISANCE_TERMS`) are excluded from the
+judgment entirely -- a blown-up intercept or a blown-up structural-missingness
+indicator says nothing about whether the scientific terms of the model are identified,
+and flagging the whole fit on them discards every identified coefficient it carries.
+
+Nothing here *drops* a fit. The only exclusion in the pipeline remains the per-term
+quasi-separation filter in ``contrast_aggregation``; these flags are diagnostics on the
+retained cohort.
 """
 
 from __future__ import annotations
 
 import contextlib
 import warnings
+from collections.abc import Collection, Sequence
 
 import numpy as np
 from statsmodels.tools.sm_exceptions import (
@@ -43,12 +51,62 @@ _SEPARATION_BSE_ABS = 1e3
 # sessions reach 5.7.
 SEPARATION_EFFECT_SE = 1.0
 
+# Terms whose identifiability is structurally uninteresting and must never decide
+# whether a fit is usable. ``Intercept`` absorbs the baseline rate and is not a
+# reported effect. ``reward_history_incomplete`` marks the handful of stops with fewer
+# than two known outcomes; in most sessions those stops carry no events, so its
+# coefficient runs to -inf with an exploded SE. Judging the fit on either one flagged
+# 55% of the is_swr-contrast fits and left the audited aggregate empty, while every
+# scientific term in those same fits was ordinary.
+NUISANCE_TERMS = frozenset({"Intercept", "reward_history_incomplete"})
+
 # Warning categories that report a fit-quality problem (as opposed to benign numeric
 # noise). Counted per fit and surfaced as ``n_convergence_warnings``.
 FIT_QUALITY_WARNINGS = (ConvergenceWarning, PerfectSeparationWarning)
 
 
-def fit_status(result, kind: str, *, caught=None, predictor_sd=None) -> dict:
+def _resolve_term_names(result, term_names, n_terms: int) -> list[str]:
+    """Names for the fitted coefficients, in ``result.params`` order.
+
+    Parameters
+    ----------
+    result : statsmodels results object
+        Used only as a fallback source of names (``result.params.index`` for a
+        formula fit).
+    term_names : sequence of str or None
+        Caller-supplied names. When given they must match the coefficient count.
+    n_terms : int
+        Number of fitted coefficients.
+
+    Returns
+    -------
+    list of str
+        Length ``n_terms``. Falls back to the params index, then to positional
+        ``x0``, ``x1``, ... names for an array fit with no index.
+    """
+    if term_names is not None:
+        names = [str(t) for t in term_names]
+        if len(names) != n_terms:
+            raise ValueError(
+                f"term_names has {len(names)} entries; expected {n_terms} to match "
+                "the fitted coefficients"
+            )
+        return names
+    index = getattr(result.params, "index", None)
+    if index is not None and len(index) == n_terms:
+        return [str(t) for t in index]
+    return [f"x{i}" for i in range(n_terms)]
+
+
+def fit_status(
+    result,
+    kind: str,
+    *,
+    caught=None,
+    predictor_sd=None,
+    term_names: Sequence[str] | None = None,
+    nuisance_terms: Collection[str] = (),
+) -> dict:
     """Convergence + separation flags for a fitted statsmodels result.
 
     Parameters
@@ -75,11 +133,21 @@ def fit_status(result, kind: str, *, caught=None, predictor_sd=None) -> dict:
         the same order as ``result.params``. When given, separation is judged on
         the effect scale (``bse * sd``), which is scale-free; without it the
         legacy ``|coef| >= 10`` rule applies and mis-flags small-scale columns.
+    term_names : sequence of str, optional
+        Coefficient names in ``result.params`` order, used to name the separated
+        terms and to apply ``nuisance_terms``. Defaults to ``result.params.index``
+        for a formula fit and to positional ``x0``, ``x1``, ... otherwise.
+    nuisance_terms : collection of str, optional
+        Terms excluded from the separation judgment entirely. Pass
+        :data:`NUISANCE_TERMS` from every fitter whose design carries an intercept
+        or the structural-missingness indicator.
 
     Returns
     -------
     dict
-        ``{"converged": bool | None, "separated": bool}``.
+        ``{"converged": bool | None, "separated": bool, "separated_terms": tuple}``.
+        ``separated_terms`` names the non-nuisance terms that are not identified, in
+        coefficient order; ``separated`` is ``True`` iff that tuple is non-empty.
     """
     if kind == "glm":
         converged = bool(getattr(result, "converged", False))
@@ -97,9 +165,14 @@ def fit_status(result, kind: str, *, caught=None, predictor_sd=None) -> dict:
 
     params = np.asarray(result.params, dtype=float)
     bse = np.asarray(result.bse, dtype=float)
-    degenerate = bool(np.any(~np.isfinite(bse)) or np.any(bse > _SEPARATION_BSE_ABS))
+    names = _resolve_term_names(result, term_names, params.size)
+
+    # Every clause is per term: a fit is only as unidentified as its worst
+    # *scientific* term, and naming that term is what lets the aggregation drop the
+    # session for it alone instead of for every coefficient the fit carries.
+    degenerate = ~np.isfinite(bse) | (bse > _SEPARATION_BSE_ABS)
     if predictor_sd is None:
-        unpinned = bool(np.any(np.abs(params) >= SEPARATION_COEF_ABS))
+        unpinned = np.abs(params) >= SEPARATION_COEF_ABS
     else:
         scale = np.asarray(predictor_sd, dtype=float)
         if scale.shape != bse.shape:
@@ -109,11 +182,22 @@ def fit_status(result, kind: str, *, caught=None, predictor_sd=None) -> dict:
             )
         # A zero-SD column cannot be judged on the effect scale; fall back for it.
         usable = np.isfinite(scale) & (scale > 0)
-        unpinned = bool(
-            np.any(bse[usable] * scale[usable] >= SEPARATION_EFFECT_SE)
-            or np.any(np.abs(params[~usable]) >= SEPARATION_COEF_ABS)
+        unpinned = np.where(
+            usable,
+            bse * scale >= SEPARATION_EFFECT_SE,
+            np.abs(params) >= SEPARATION_COEF_ABS,
         )
-    return {"converged": converged, "separated": degenerate or unpinned}
+    excluded = frozenset(nuisance_terms)
+    separated_terms = tuple(
+        name
+        for name, name_flag in zip(names, degenerate | unpinned, strict=True)
+        if name_flag and name not in excluded
+    )
+    return {
+        "converged": converged,
+        "separated": len(separated_terms) > 0,
+        "separated_terms": separated_terms,
+    }
 
 
 @contextlib.contextmanager

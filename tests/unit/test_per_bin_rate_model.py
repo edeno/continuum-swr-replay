@@ -447,3 +447,57 @@ def test_freeze_per_bin_cohort_requires_its_columns():
     design = make_per_bin_rate_design(n_stops=20, n_bins=5, seed=0)
     with pytest.raises(KeyError, match="onset_lag1"):
         freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M3_hist"]])
+
+
+def _design_with_separated_indicator(seed: int = 11) -> pd.DataFrame:
+    """A design whose ``reward_history_incomplete`` stops carry no events at all.
+
+    That is the real corpus shape: the indicator marks a handful of stops with
+    fewer than two known outcomes, and in most sessions none of them contains an
+    event, so the indicator's coefficient runs to -inf with an exploded SE while
+    every other term is ordinary.
+    """
+    rng = np.random.default_rng(seed)
+    recs = []
+    for s in range(300):
+        incomplete = float(s % 15 == 0)
+        reward = 0.0 if incomplete else float(s % 2)
+        for b in range(40):
+            mu = 0.0 if incomplete else 0.08 * (2.5 if reward else 1.0)
+            recs.append(
+                ("sim", 1, "02_r1", s, b, (b + 0.5) * 0.015, 0.015,
+                 reward, 0.0, 0.0, incomplete, int(rng.poisson(mu)))
+            )
+    return pd.DataFrame(recs, columns=[
+        "animal", "session_date", "epoch", "stop_id", "binj", "tc", "exposure",
+        "reward_history_rcos_0", "reward_history_rcos_1", "reward_history_rcos_2",
+        "reward_history_incomplete", "count",
+    ])
+
+
+def test_fit_reports_separated_terms_and_predictor_sds():
+    """Every fit carries the named separated terms and each term's design SD."""
+    design = _design_with_separated_indicator()
+    fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE["M1_rew"])
+
+    assert fit is not None
+    # The nuisance indicator IS degenerate here but must not be named.
+    assert fit["separated_terms"] == ""
+    assert fit["separated"] is False
+    assert fit["sd_Intercept"] == 0.0
+    assert fit["sd_reward_history_rcos_0"] == pytest.approx(
+        design["reward_history_rcos_0"].std(ddof=0), rel=1e-6
+    )
+
+
+def test_cv_fold_separated_only_on_the_indicator_keeps_the_metric():
+    """A fold whose only separated term is the nuisance indicator stays scored."""
+    design = _design_with_separated_indicator()
+    cv = cross_validate_per_bin_rate_model(
+        design, MODEL_PER_BIN_RATE["M1_rew"], n_folds=5
+    )
+
+    assert cv is not None
+    assert cv["cv_n_separated_folds"] == 0
+    assert np.isfinite(cv["cv_ll_per_bin_mean"])
+    assert np.isfinite(cv["cv_bits_per_event"])

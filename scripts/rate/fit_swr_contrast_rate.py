@@ -79,6 +79,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E402
+    NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
@@ -230,8 +231,14 @@ def _fit(
             ).fit()
     except _EXPECTED as e:
         return None, type(e).__name__
+    predictor_sd = np.asarray(res.model.exog, dtype=float).std(axis=0)
+    term_names = [str(t) for t in res.params.index]
     status = fit_status(
-        res, "glm", predictor_sd=np.asarray(res.model.exog, dtype=float).std(axis=0)
+        res,
+        "glm",
+        predictor_sd=predictor_sd,
+        term_names=term_names,
+        nuisance_terms=NUISANCE_TERMS,
     )
     out = {f"coef_{k}": v for k, v in res.params.items()}
     # Within-session coefficient uncertainty: carry SE + p per term so downstream
@@ -240,11 +247,19 @@ def _fit(
     out.update({f"bse_{k}": v for k, v in res.bse.items()})
     out.update({f"pval_{k}": v for k, v in res.pvalues.items()})
     out.update(
+        {
+            f"sd_{name}": float(s)
+            for name, s in zip(term_names, predictor_sd, strict=True)
+        }
+    )
+    out.update(
         n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic),
         n_params=int(len(res.params)),
         # distinct stops that contributed >=1 retained bin -- the stop-grain modeled count.
         n_stops=int(df["stop_id"].nunique()),
         converged=status["converged"], separated=status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        separated_terms="|".join(status["separated_terms"]),
         n_convergence_warnings=count_fit_quality_warnings(caught),
     )
     return out, None

@@ -43,6 +43,7 @@ import pandas as pd
 import statsmodels.api as sm
 
 from ._fit_diagnostics import (
+    NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
@@ -174,8 +175,17 @@ def fit_per_stop_rate_model(
     except Exception:
         logger.warning("Poisson GLM failed for predictors %s", predictors)
         return None
+    predictor_sd = np.asarray(X, dtype=float).std(axis=0)
+    # The array design names its constant column "intercept"; the separation
+    # judgment uses the formula-style "Intercept" so the shared nuisance set
+    # covers it in both families.
+    term_names = ["Intercept", *col_names[1:]]
     status = fit_status(
-        result, "glm", predictor_sd=np.asarray(X, dtype=float).std(axis=0)
+        result,
+        "glm",
+        predictor_sd=predictor_sd,
+        term_names=term_names,
+        nuisance_terms=NUISANCE_TERMS,
     )
 
     coefs = dict(zip(col_names, result.params, strict=True))
@@ -198,8 +208,14 @@ def fit_per_stop_rate_model(
         "deviance": float(result.deviance),
         "pearson_chi2": float(result.pearson_chi2),
         "mean_rate": float(y.sum() / np.exp(offset).sum()),
+        **{
+            f"sd_{name}": float(s)
+            for name, s in zip(term_names, predictor_sd, strict=True)
+        },
         "converged": status["converged"],
         "separated": status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
     }
 
@@ -261,7 +277,11 @@ def cross_validate_per_stop_rate_model(
         except Exception:
             return None
         status = fit_status(
-            res, "glm", predictor_sd=np.asarray(res.model.exog, dtype=float).std(axis=0)
+            res,
+            "glm",
+            predictor_sd=np.asarray(res.model.exog, dtype=float).std(axis=0),
+            term_names=["Intercept", *predictors],
+            nuisance_terms=NUISANCE_TERMS,
         )
         n_nonconverged += not status["converged"]
         n_separated += status["separated"]

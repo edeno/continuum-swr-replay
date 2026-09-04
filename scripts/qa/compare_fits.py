@@ -18,6 +18,10 @@ of the reward-free time model, and the size of the fitted cohort:
 * ``n_bins`` per (session, outcome): the frozen-cohort size.
 * Family A (per-stop Poisson) reward step: the new ``R1`` against ``R0``,
   read beside the old ``R2`` and ``Rlag`` against ``R0``.
+* What the per-term separation flag changed: flagged-fit share, cross-validation
+  validity, per-term separated share, and audited aggregate rows. That comparison
+  has its own "before" — the immediately preceding refit of the SAME
+  specification, fit under the fit-level flag.
 
 Usage:
     uv run python scripts/qa/compare_fits.py
@@ -60,6 +64,16 @@ DEFAULT_OLD_PER_STOP = (
     / "all_models.pkl"
 )
 DEFAULT_NEW_PER_STOP = RC / "models_per_stop_rate" / "all_models.pkl"
+
+# The term-level separation section compares the SAME specification fit under the
+# fit-level flag and under the per-term flag, so its "before" is the immediately
+# preceding refit, not the pre-reward-basis one used above.
+TERMLEVEL_BACKUP = RC / "_pre_termlevel_backup_20260904" / "models_per_bin_rate"
+DEFAULT_OLD_CONTRAST = TERMLEVEL_BACKUP / "swr_contrast_rate.pkl"
+DEFAULT_NEW_CONTRAST = RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+DEFAULT_OLD_AUDITED = TERMLEVEL_BACKUP / "swr_contrast_rate_audited.pkl"
+DEFAULT_NEW_AUDITED = RC / "models_per_bin_rate" / "swr_contrast_rate_audited.pkl"
+DEFAULT_OLD_TERMLEVEL_PER_BIN = TERMLEVEL_BACKUP / "all_models.pkl"
 
 # The reward step of each family: (rung, its reward-free parent).
 OLD_PER_BIN_STEPS = {
@@ -353,6 +367,204 @@ def _md(df: pd.DataFrame, floatfmt: str = "{:.2f}") -> str:
     return f"{header}\n{rule}\n{body}\n"
 
 
+def cv_validity_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Per Family-B rung: share of session-fits flagged separated and CV-scored.
+
+    A fit-level separation flag voids the whole cross-validation metric for the
+    rung, so the two shares move together: the fraction of fits carrying the flag
+    and the fraction whose ``cv_bits_per_event`` survived as a finite number.
+
+    Parameters
+    ----------
+    old, new : pd.DataFrame
+        Tidy per-session per-bin fits, before and after.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per rung present in either fit.
+    """
+
+    def _shares(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+        if df.empty:
+            return pd.DataFrame(columns=["model", f"n_fits{suffix}"])
+        grouped = df.groupby("model", sort=True)
+        out = pd.DataFrame(
+            {
+                f"n_fits{suffix}": grouped.size(),
+                f"pct_separated{suffix}": 100
+                * grouped["separated"].apply(lambda s: (s == True).mean()),  # noqa: E712
+                f"pct_cv_scored{suffix}": 100
+                * grouped["cv_bits_per_event"].apply(
+                    lambda s: float(np.isfinite(s).mean())
+                ),
+            }
+        )
+        return out.reset_index()
+
+    merged = _shares(old, "_before").merge(
+        _shares(new, "_after"), on="model", how="outer"
+    )
+    return merged.sort_values("model").reset_index(drop=True)
+
+
+def contrast_fit_flag_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Share of is_swr-contrast session-fits carrying the fit-level flag."""
+
+    def _shares(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+        grouped = df.groupby(["population", "cohort"], sort=True)
+        return pd.DataFrame(
+            {
+                f"n_fits{suffix}": grouped.size(),
+                f"pct_separated{suffix}": 100
+                * grouped["separated"].apply(lambda s: (s == True).mean()),  # noqa: E712
+            }
+        ).reset_index()
+
+    return (
+        _shares(old, "_before")
+        .merge(_shares(new, "_after"), on=["population", "cohort"], how="outer")
+        .sort_values(["population", "cohort"])
+        .reset_index(drop=True)
+    )
+
+
+def term_separation_table(new: pd.DataFrame, min_share: float = 0.0) -> pd.DataFrame:
+    """Per term, the share of is_swr-contrast session-fits that name it separated.
+
+    Read from the ``separated_terms`` column (``"|"``-joined names). Only fits that
+    actually carry the term in their design are counted, so a term that only a few
+    rungs use is not diluted by the rungs without it: a fit carries the term when
+    it has a ``coef_<term>`` value.
+
+    Parameters
+    ----------
+    new : pd.DataFrame
+        Tidy per-session is_swr-contrast fits carrying ``separated_terms``.
+    min_share : float
+        Drop terms whose share is at or below this (as a fraction).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``term``, ``n_fits_with_term``, ``pct_separated``, sorted worst first.
+    """
+    if "separated_terms" not in new.columns:
+        return pd.DataFrame(columns=["term", "n_fits_with_term", "pct_separated"])
+    named = (
+        new["separated_terms"]
+        .fillna("")
+        .map(lambda v: set(v.split("|")) - {""} if isinstance(v, str) else set())
+    )
+    terms = sorted({t for names in named for t in names})
+    rows = []
+    for term in terms:
+        ccol = f"coef_{term}"
+        carries = (
+            new[ccol].notna()
+            if ccol in new.columns
+            else pd.Series(True, index=new.index)
+        )
+        n_carry = int(carries.sum())
+        if n_carry == 0:
+            continue
+        share = float((named.map(lambda s, t=term: t in s) & carries).sum()) / n_carry
+        if share > min_share:
+            rows.append(
+                {
+                    "term": term,
+                    "n_fits_with_term": n_carry,
+                    "pct_separated": 100 * share,
+                }
+            )
+    return (
+        pd.DataFrame(rows)
+        .sort_values("pct_separated", ascending=False)
+        .reset_index(drop=True)
+    )
+
+
+def audited_row_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Audited is_swr-contrast rows per (population, cohort), before and after."""
+
+    def _counts(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+        if df.empty:
+            return pd.DataFrame(columns=["population", "cohort", f"n_rows{suffix}"])
+        return (
+            df.groupby(["population", "cohort"], sort=True)
+            .size()
+            .rename(f"n_rows{suffix}")
+            .reset_index()
+        )
+
+    merged = _counts(old, "_before").merge(
+        _counts(new, "_after"), on=["population", "cohort"], how="outer"
+    )
+    if merged.empty:
+        return merged
+    for column in ("n_rows_before", "n_rows_after"):
+        if column in merged.columns:
+            merged[column] = merged[column].fillna(0).astype(int)
+    return merged.sort_values(["population", "cohort"]).reset_index(drop=True)
+
+
+def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
+    """The markdown section describing what the per-term separation flag changed.
+
+    Parameters
+    ----------
+    frames : dict of str to pd.DataFrame
+        ``old_bin`` / ``new_bin`` (Family B), ``old_contrast`` / ``new_contrast``
+        (is_swr-contrast session fits) and ``old_audited`` / ``new_audited``
+        (the audited aggregate), the "old" side being the same specification fit
+        under the fit-level flag.
+
+    Returns
+    -------
+    str
+        Markdown.
+    """
+    lines: list[str] = []
+    add = lines.append
+    add("\n## What the per-term separation flag changed\n")
+    add(
+        "Separation is now judged per coefficient, and the structural nuisance "
+        "terms (`Intercept`, `reward_history_incomplete`) are excluded from the "
+        "judgment. Both sides below are the SAME specification and the same "
+        "cohort; only the flag differs. Under the fit-level flag one blown-up "
+        "nuisance or self-history coefficient voided the whole fit — it voided "
+        "the cross-validation metric and dropped the session for every term in "
+        "the aggregation.\n"
+    )
+    add("\n### Family B — flagged fits and CV validity per rung\n")
+    add(
+        "`pct_cv_scored` is the share of session-fits whose `cv_bits_per_event` "
+        "survived as a finite number:\n"
+    )
+    add(_md(cv_validity_table(frames["old_bin"], frames["new_bin"]), "{:.1f}"))
+    add("\n### is_swr-contrast — flagged fits per population\n")
+    add(
+        _md(
+            contrast_fit_flag_table(frames["old_contrast"], frames["new_contrast"]),
+            "{:.1f}",
+        )
+    )
+    add("\n### is_swr-contrast — separated share per term (after)\n")
+    add(
+        "Share of the session-fits that carry each term in which THAT term is "
+        "unidentified. Terms never flagged are omitted. Before the change there "
+        "was no per-term information: a fit was flagged as a whole.\n"
+    )
+    add(_md(term_separation_table(frames["new_contrast"]), "{:.1f}"))
+    add("\n### is_swr-contrast — audited aggregate rows\n")
+    add(
+        "One row per (model, population, term) that survived the "
+        "unidentified-share gate:\n"
+    )
+    add(_md(audited_row_table(frames["old_audited"], frames["new_audited"])))
+    return "\n".join(lines)
+
+
 def build_report(
     old_bin: pd.DataFrame,
     new_bin: pd.DataFrame,
@@ -360,7 +572,23 @@ def build_report(
     new_stop: pd.DataFrame,
     inputs: dict[str, Path],
     per_stop_note: str,
+    termlevel: dict[str, pd.DataFrame] | None = None,
 ) -> str:
+    """Assemble the markdown audit.
+
+    Parameters
+    ----------
+    old_bin, new_bin, old_stop, new_stop : pd.DataFrame
+        Tidy per-session fits for the two rate families, before and after.
+    inputs : dict of str to Path
+        Artifacts to list with their hashes.
+    per_stop_note : str
+        Provenance caveat printed under the input table.
+    termlevel : dict of str to pd.DataFrame, optional
+        ``old_bin`` / ``new_bin`` / ``old_contrast`` / ``new_contrast`` /
+        ``old_audited`` / ``new_audited`` for the term-level separation section.
+        Omitted when those artifacts are not available.
+    """
     lines: list[str] = []
     add = lines.append
     add("# Rate refit comparison: pre-fix fits vs the reward-basis refit\n")
@@ -474,6 +702,9 @@ def build_report(
         add(f"\n### {label}\n")
         add(_md(_median_table(old_d, new_d, "delta_aic", old_unpaired, new_unpaired)))
 
+    if termlevel is not None:
+        add(_termlevel_section(termlevel))
+
     add("\n## Sessions fitted per rung\n")
     add("### Family B\n")
     add(_md(rung_session_counts(old_bin, new_bin)))
@@ -488,6 +719,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--new-per-bin", type=Path, default=DEFAULT_NEW_PER_BIN)
     parser.add_argument("--old-per-stop", type=Path, default=DEFAULT_OLD_PER_STOP)
     parser.add_argument("--new-per-stop", type=Path, default=DEFAULT_NEW_PER_STOP)
+    parser.add_argument(
+        "--old-termlevel-per-bin",
+        type=Path,
+        default=DEFAULT_OLD_TERMLEVEL_PER_BIN,
+        help="Family B fit under the fit-level separation flag (same spec).",
+    )
+    parser.add_argument("--old-contrast", type=Path, default=DEFAULT_OLD_CONTRAST)
+    parser.add_argument("--new-contrast", type=Path, default=DEFAULT_NEW_CONTRAST)
+    parser.add_argument("--old-audited", type=Path, default=DEFAULT_OLD_AUDITED)
+    parser.add_argument("--new-audited", type=Path, default=DEFAULT_NEW_AUDITED)
     parser.add_argument(
         "--per-stop-note",
         default=(
@@ -520,6 +761,29 @@ def main() -> None:
     missing = [str(p) for p in inputs.values() if not p.exists()]
     if missing:
         raise SystemExit(f"missing fit artifact(s): {missing}")
+    termlevel_paths = {
+        "old_bin": args.old_termlevel_per_bin,
+        "new_bin": args.new_per_bin,
+        "old_contrast": args.old_contrast,
+        "new_contrast": args.new_contrast,
+        "old_audited": args.old_audited,
+        "new_audited": args.new_audited,
+    }
+    termlevel_missing = [str(p) for p in termlevel_paths.values() if not p.exists()]
+    if termlevel_missing:
+        print(f"skipping the term-level section: missing {termlevel_missing}")
+        termlevel = None
+    else:
+        termlevel = {k: pd.read_pickle(v) for k, v in termlevel_paths.items()}
+        inputs.update(
+            {
+                "term-level Family B (before)": args.old_termlevel_per_bin,
+                "is_swr-contrast (before)": args.old_contrast,
+                "is_swr-contrast (after)": args.new_contrast,
+                "is_swr-contrast audited (before)": args.old_audited,
+                "is_swr-contrast audited (after)": args.new_audited,
+            }
+        )
     report = build_report(
         pd.read_pickle(args.old_per_bin),
         pd.read_pickle(args.new_per_bin),
@@ -527,6 +791,7 @@ def main() -> None:
         pd.read_pickle(args.new_per_stop),
         inputs,
         args.per_stop_note,
+        termlevel,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
