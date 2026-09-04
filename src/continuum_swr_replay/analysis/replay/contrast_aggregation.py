@@ -14,7 +14,9 @@ within an animal are not independent), with a BH-FDR across the rungs sharing a
 population (``session_signrank_fdr_q``). ``typical_session_se`` is the median
 per-session SE, not the aggregate's uncertainty. Continuous-predictor coefficients
 also carry a standardized (per-1-SD) form (``std_*``); binary predictors are
-per-category.
+per-category; and the reward-history basis features are weighted reward fractions
+in [0, 1], so their coefficients are reported per unit of the fraction (factor 1.0,
+``per_unit``) rather than per SD.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
+
+from .model_specs import REWARD_HISTORY_COLUMNS
 
 # Above this share of unidentified session fits, a term's aggregate is a
 # statement about the identified minority and is not emitted at all.
@@ -60,17 +64,29 @@ BINARY_TERMS = frozenset(
     }
 )
 
+# Predictors reported per unit of the predictor itself, not per SD: the
+# reward-history basis features are weighted reward fractions in [0, 1], so a
+# per-SD rescaling would make "one SD of a fraction" the unit of an effect whose
+# natural unit is "all of the recent outcomes rewarded vs none of them".
+PER_UNIT_TERMS = frozenset(
+    [*REWARD_HISTORY_COLUMNS, *(f"is_swr:{c}" for c in REWARD_HISTORY_COLUMNS)]
+)
+
 
 def std_factor(term: str, sd: dict) -> tuple[float, str]:
     """SD multiplier + unit label to convert a raw coef to standardized units.
 
     Continuous predictor -> (SD of the predictor, "per_SD"); the term may be the bare
     covariate, its ``swr_x_<cov>`` product, or its ``is_swr:<cov>`` product. Binary ->
-    (1.0, "per_category"). A term whose covariate is not in ``sd`` is assumed already
-    z-scored at fit time -> (1.0, "per_SD").
+    (1.0, "per_category"). Reward-history basis feature -> (1.0, "per_unit"), checked
+    before the ``sd`` lookup so a pooled SD computed for some other purpose cannot
+    silently rescale a fraction-valued coefficient. A term whose covariate is not in
+    ``sd`` is assumed already z-scored at fit time -> (1.0, "per_SD").
     """
     if term in BINARY_TERMS:
         return 1.0, "per_category"
+    if term in PER_UNIT_TERMS:
+        return 1.0, "per_unit"
     for cov, s in sd.items():
         if term in (cov, f"swr_x_{cov}", f"is_swr:{cov}"):
             return (s, "per_SD") if s > 0 else (1.0, "per_SD")

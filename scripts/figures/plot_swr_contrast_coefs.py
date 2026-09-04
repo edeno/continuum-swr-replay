@@ -7,7 +7,10 @@ per-animal medians -- the animal is the inferential unit, n=5). Continuous-predi
 coefficients are shown STANDARDIZED (per 1 SD of the predictor: raw_coef * SD, which
 is exact for these Poisson GLMs) so effect sizes are comparable across predictors,
 value constructs, and the two ladders. Binary-predictor terms (marked with a dagger)
-are per-category and are not standardized.
+are per-category and are not standardized. The reward-history basis features are
+weighted reward fractions in [0, 1] (marked with a double dagger); their coefficients
+are per unit of the fraction -- the effect of a fully rewarded recent history versus a
+fully unrewarded one -- and are likewise not standardized.
 
 Covariate SDs are computed here directly from the source tables (global/pooled),
 so the figure is self-contained. Content state-modulation rungs (rpe/relval/entropy/
@@ -26,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.contrast_aggregation import PER_UNIT_TERMS
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -71,39 +75,45 @@ RNG = np.random.default_rng(0)
 
 
 def std_factor(term):
-    """SD to convert a raw coef to per-1-SD units; (factor, is_binary).
+    """Scaling to standardized units; ``(factor, unit)``.
 
-    Raises on an unresolved continuous term so a covariate rename can't silently
-    render at raw scale under a "per 1 SD" axis (the migration renamed every rate/
-    content term; this asserts each still resolves).
+    Mirrors the three-way labelling of
+    ``analysis.replay.contrast_aggregation.std_factor`` -- ``"per_category"`` for
+    binary predictors, ``"per_unit"`` for the reward-history basis features
+    (weighted reward fractions, so a per-SD rescaling would misstate their unit),
+    ``"per_SD"`` otherwise -- but keeps this module's fail-loud behaviour: an
+    unresolved continuous term raises rather than rendering at raw scale under a
+    "per 1 SD" axis.
     """
     BIN = {
         "is_current_arm",
         "swr_x_is_current_arm",
         "swr_x_is_prev_arm",
         "swr_x_is_last_rewarded_noncurrent_arm",
-        "known_reward_outcome_lag_1",
         "is_current_patch",
         "is_last_rewarded_noncurrent_patch",
         "swr_x_is_current_patch",
         "swr_x_is_last_rewarded_noncurrent_patch",
     }
     if term in BIN:
-        return 1.0, True
+        return 1.0, "per_category"
+    if term in PER_UNIT_TERMS:
+        return 1.0, "per_unit"
     # per-arm / rate continuous covariates scaled by their global SD
     for cov, s in SD.items():
         if term == cov or term == f"swr_x_{cov}":
-            return s, False
+            return s, "per_SD"
     # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
     # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
     # must be in SD — so a renamed main effect (not an interaction) raises here rather
     # than silently plotting at raw scale under a "per 1 SD" axis.
     if "_x_" in term:
-        return 1.0, False
+        return 1.0, "per_SD"
     raise KeyError(
-        f"plot term {term!r} resolves to no SD entry and is not a binary or a "
-        f"z-scored-at-fit interaction (`*_x_*`) — a main-effect rename would silently "
-        f"mis-scale it. Add it to the SD (_global_sd) list."
+        f"plot term {term!r} resolves to no SD entry and is not a binary, a "
+        f"reward-history basis feature, or a z-scored-at-fit interaction (`*_x_*`) — "
+        f"a main-effect rename would silently mis-scale it. Add it to the SD "
+        f"(_global_sd) list."
     )
 
 
@@ -135,8 +145,8 @@ def forest(ax, df, rows, title):
     allv = []
     labels = []
     for yi, (label, mod, pop, term) in zip(y, rows, strict=True):
-        _, is_bin = std_factor(term)
-        labels.append(label + (" †" if is_bin else ""))
+        _, unit = std_factor(term)
+        labels.append(label + {"per_category": " †", "per_unit": " ‡"}.get(unit, ""))
         s = sessions(df, mod, pop, term)
         amed = []
         for a in ANIM:
@@ -163,7 +173,10 @@ def forest(ax, df, rows, title):
         lo, hi = np.percentile(cat, [1, 99])
         pad = 0.1 * (hi - lo + 1e-9)
         ax.set_xlim(lo - pad, hi + pad)
-    ax.set_xlabel("coefficient  (continuous: per 1 SD;  † binary: per category)")
+    ax.set_xlabel(
+        "coefficient  (continuous: per 1 SD;  † binary: per category;  "
+        "‡ reward fraction: per unit)"
+    )
     ax.set_title(title, fontsize=11, weight="bold")
     ax.grid(axis="x", alpha=0.25)
 
@@ -174,8 +187,8 @@ handles = [plt.Line2D([], [], marker="o", ls="", color=CMAP[a], label=a) for a i
 R = pd.read_pickle(RC / "models_per_bin_rate" / "swr_contrast_rate.pkl")
 SWR, NON = "non_local_swr", "non_local_no_swr"
 rate_rows = [
-    ("reward lag-1 · SWR", "G0_base", SWR, "known_reward_outcome_lag_1"),
-    ("reward lag-1 · nonSWR", "G0_base", NON, "known_reward_outcome_lag_1"),
+    ("immediate reward history · SWR", "G0_base", SWR, "reward_history_rcos_0"),
+    ("immediate reward history · nonSWR", "G0_base", NON, "reward_history_rcos_0"),
     ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe_postoutcome"),
     ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe_postoutcome"),
     ("rel. value (beta) · SWR", "G4_value", SWR, "relative_value_switch_minus_stay_preoutcome"),
