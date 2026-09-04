@@ -11,7 +11,7 @@ Both prep scripts used to do::
 That short-circuit dropped sessions whose immobility bouts had no
 non-local events — even though the stop table's documented
 contract explicitly includes "zero-event bouts" and the rate model
-fits ``n_events`` per stop over a denominator that must include
+fits ``n_selected_events`` per stop over a denominator that must include
 zero-event stops.
 
 This test extracts the prep-script ``_process_session`` AST and

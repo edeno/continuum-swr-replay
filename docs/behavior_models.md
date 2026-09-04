@@ -40,7 +40,8 @@ parameters — so the covariates can be interpreted correctly.
 - **Which fit we actually consume** (from
   [`behavior_model_covariates.md`](behavior_model_covariates.md)): **all** behavioral
   covariates — value / uncertainty / RPE / value-update **and** the belief entropy
-  (`beta_reward_entropy`, derived in-repo from the Beta posterior `α/β`) — come from
+  (`reward_belief_differential_entropy_leaf_mean_preoutcome`, derived in-repo
+  from the Beta posterior `α/β`) — come from
   the single **Beta-Bernoulli** fit `beta_stable_withleaf`, stored in DataJoint
   (`alison_rlmodel.BehaviorModelResults`), not re-fit in this repo. (The HMM
   `default_hmm` was **retired 2026-07-13**; its value/RPE/entropy covariates were
@@ -121,7 +122,8 @@ Independent conjugate belief per port×leaf. **This is the fit that supplies the
 variance (1/12) is the **maximum**. So `betadist_var` rises toward its ceiling
 *precisely because a port has not been visited recently* — the recency dependence
 is **built into `beta_decay`**, not incidental. Empirically
-`corr(betadist_var, visit_recency) ≈ +0.54`. Any use of `betadist_var` as an
+`corr(reward_belief_variance_candidate_arm_preoutcome, visit_recency_trials) ≈
++0.54`. Any use of candidate-arm reward-belief variance as an
 "uncertainty" covariate must disentangle this from visit-recency (see
 [`replay_rate_content_swr_synthesis.md`](replay_rate_content_swr_synthesis.md) /
 the content-model uncertainty work).
@@ -132,7 +134,8 @@ the content-model uncertainty work).
 > Beta-Bernoulli model (§Model 1); the HMM value/RPE/update/entropy covariates
 > (`q_arm_hmm`, `hmm_*`, `reward_entropy`, `state_entropy`) were dropped from every
 > model ladder and replaced with beta equivalents (belief entropy → the derived
-> `beta_reward_entropy`). This section is retained as **background** — it documents
+> `reward_belief_differential_entropy_leaf_mean_preoutcome`). This section is
+> retained as **background** — it documents
 > a model that still lives in Alison's `hmm.jl`, not a covariate source the current
 > analysis uses.
 

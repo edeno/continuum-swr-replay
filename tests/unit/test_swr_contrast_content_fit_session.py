@@ -13,7 +13,7 @@ def test_fit_session_drops_nan_events_not_rows(monkeypatch):
         {
             "event_id": [1, 1, 1, 2, 2, 2],
             "arm_count_hard": [1, 0, 0, 0, 1, 0],
-            "reward_rate_arm_k10": [float("nan"), 0.25, 0.50, 0.0, 0.5, 1.0],
+            "reward_fraction_candidate_arm_last10_visits": [float("nan"), 0.25, 0.50, 0.0, 0.5, 1.0],
         }
     )
     captured = {}
@@ -28,7 +28,7 @@ def test_fit_session_drops_nan_events_not_rows(monkeypatch):
 
     out, audit = mod._fit_session(
         df,
-        ["reward_rate_arm_k10"],
+        ["reward_fraction_candidate_arm_last10_visits"],
         response_col="arm_count_hard",
         n_categories=3,
     )

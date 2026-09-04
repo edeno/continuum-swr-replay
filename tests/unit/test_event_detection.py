@@ -156,7 +156,7 @@ class TestGetConfidentTimes:
         )
 
         assert len(events) == 1
-        assert events.iloc[0]["max_speed"] == pytest.approx(15.0, abs=0.1)
+        assert events.iloc[0]["animal_max_speed_cm_s"] == pytest.approx(15.0, abs=0.1)
 
     def test_speed_calculation_nan_handling(self):
         """NaN values in speed are handled with nanmax."""
@@ -174,7 +174,7 @@ class TestGetConfidentTimes:
         )
 
         # Should find max ignoring NaNs
-        assert events.iloc[0]["max_speed"] == pytest.approx(10.0, abs=0.1)
+        assert events.iloc[0]["animal_max_speed_cm_s"] == pytest.approx(10.0, abs=0.1)
 
     def test_speed_none_returns_nan(self):
         """When speed is None, max_speed column contains NaN."""
@@ -189,7 +189,7 @@ class TestGetConfidentTimes:
         )
 
         assert len(events) == 1
-        assert np.isnan(events.iloc[0]["max_speed"])
+        assert np.isnan(events.iloc[0]["animal_max_speed_cm_s"])
 
     def test_custom_threshold(self):
         """Custom probability threshold is respected."""
@@ -534,7 +534,7 @@ class TestSpeedCalculationBoundsFix:
 
         assert len(events) == 1
         # Speed should be computed without index errors
-        assert np.isfinite(events.iloc[0]["max_speed"]), "Should have valid speed"
+        assert np.isfinite(events.iloc[0]["animal_max_speed_cm_s"]), "Should have valid speed"
 
     def test_event_at_time_boundary_end(self):
         """Events at the end of the time range should have valid speed."""
@@ -551,7 +551,7 @@ class TestSpeedCalculationBoundsFix:
 
         assert len(events) == 1
         # Speed should be computed without index errors
-        assert np.isfinite(events.iloc[0]["max_speed"]), "Should have valid speed"
+        assert np.isfinite(events.iloc[0]["animal_max_speed_cm_s"]), "Should have valid speed"
 
     def test_event_within_data_bounds_detected(self):
         """When data starts after t=0 (offset position index), the detector
@@ -573,7 +573,7 @@ class TestSpeedCalculationBoundsFix:
         )
 
         assert len(events) == 1
-        assert events.iloc[0]["max_speed"] == pytest.approx(10.0)
+        assert events.iloc[0]["animal_max_speed_cm_s"] == pytest.approx(10.0)
 
 
 def _event(start, end):

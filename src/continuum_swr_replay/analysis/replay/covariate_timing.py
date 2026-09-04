@@ -1,217 +1,181 @@
 """Per-covariate pre/post-outcome timing registry + model-build enforcement.
 
-The single in-code home for "when is this covariate known relative to the response?",
-promoting the ``time_availability`` column of
-``.claude/docs/reviews/06_covariate_provenance.csv`` into frozensets the fitters can
-assert against. Two distinct leaks get two distinct remedies (see
-:func:`assert_predictor_timing`):
+The single in-code home for "when is this covariate known relative to the response?".
+The three availability frozensets are DERIVED from ``COVARIATE_DEFINITIONS``
+(each covariate's ``Availability`` field) — the provenance audit at
+``.claude/docs/reviews/06_covariate_provenance.csv`` is a cross-check reference,
+not the source; editing that CSV does not change enforcement. Two distinct leaks
+get two distinct remedies (see :func:`assert_predictor_timing`):
 
-- **POST_OUTCOME** — carries a current-trip value update (``rpe``,
-  ``global_mu_update_abs_postoutcome_sess``).
+- **POST_OUTCOME** — carries a current-trip value update
+  (``rpe_postoutcome``,
+  ``reward_belief_mean_update_l1_all_ports_postoutcome``).
   Fixable by restricting the fit to **post-current-outcome** bins (``retrospective=True``).
 - **FUTURE_REFERENCING** — the value itself embeds a not-yet-occurred event
-  (``trials_since_switch`` signs toward the *next* switch; ``next_arm``/``is_next``).
+  (``periswitch_index_trials`` signs toward the *next* switch;
+  ``next_arm``/``is_next_arm``).
   **No temporal gate makes it predictive-safe** — only ``descriptive=True`` (peri-switch
   alignment) or a strictly past-only replacement (e.g. ``trials_since_last_switch``).
 
-Derived/interaction columns (``update_x_current``, ``is_swr:rpe``, ``swr_x_q_arm``)
-resolve to their **source atoms** through :data:`DERIVED_COVARIATE_SOURCES` — a name-split
-heuristic silently fails (``update_x_current`` does not contain ``global_mu_update_abs_postoutcome_sess``), so
-the mapping is explicit and a completeness test asserts every ladder predictor resolves
-into :data:`KNOWN_ATOMS`.
+Derived/interaction columns (the canonical current-arm belief-update product,
+``is_swr:rpe_postoutcome``, and
+``swr_x_reward_belief_mean_candidate_arm_preoutcome``)
+resolve to their **source atoms** through :data:`DERIVED_COVARIATE_SOURCES`; the
+mapping is explicit because product spelling is not an information-time model, so
+the completeness test asserts every ladder predictor resolves into
+:data:`KNOWN_ATOMS`.
 """
 
 from __future__ import annotations
 
-from .model_specs import N_HISTORY_BASIS, N_HISTORY_LAGS, N_REWARD_LAGS
+from .covariates.definitions import (
+    COVARIATE_DEFINITIONS,
+    POST_CHOICE_COVARIATES,
+    Availability,
+)
+from .model_specs import N_REWARD_LAGS
 
-POST_OUTCOME = frozenset(
-    {  # NOT available before the current trip's reward
-        "rpe",  # beta reward prediction error (reward - q_chosen)
-        "global_mu_update_abs_postoutcome_sess",  # beta value-update (post-outcome by name)
-        "unchosen_patches_mu_update_abs_postoutcome_sess",  # alternative-patch update
-        # Trip *completion* is goal arrival (poke-in), which is strictly earlier
-        # than the outcome: reward onset for a rewarded trip, and the
-        # conservative omission-feedback boundary (arrival + fixed latency,
-        # capped at departure) for an omitted trip. Between arrival and that boundary
-        # these three already carry the outcome, so "completed by event start"
-        # does not make them pre-outcome safe. Gate on ``outcome_known_time`` to
-        # use them; do not reclassify.
-        "reward_outcome",
-        "is_after_reward",
-        "is_after_omission",
-        # Not outcome-bearing -- these are *chosen-arm* quantities, and the
-        # chosen arm is the assigned trial's, where a stop is assigned to the
-        # trial whose poke-out comes next after stop_start. On 20.5% of stops
-        # (measured 2026-08-17; 99.9% of them in transit, median 4.2 s lead)
-        # the bout ends before that trial's poke-in, so these describe a choice
-        # the animal has not yet made. They belong here rather than in
-        # FUTURE_REFERENCING because the remedy is the same one this class
-        # names: 0.00% of those stops survive the post-outcome gate. Under
-        # ``retrospective=True`` they are safe; ungated they are not.
-        "q_current",
-        "p_reward_current",
-        # The same outcome with no gate at all. It exists so a descriptive
-        # construct can name the outcome the animal just experienced --
-        # ``wsls_deviation`` pairs it with the eventual choice, so it is
-        # future-referencing whatever the outcome clock does, and gating it at
-        # the bout start only made it undefined at every at-well stop.
-        "completed_trial_reward",
-    }
+# Timing classification is derived from the scientific definition catalog so a
+# rename or new fitted atom cannot acquire a second, contradictory hand-written
+# timing definition here. Chosen-arm scalars are scientifically POST_CHOICE;
+# current fitters conservatively use the existing post-outcome gate for them.
+POST_OUTCOME = (
+    frozenset(
+        name
+        for name, definition in COVARIATE_DEFINITIONS.items()
+        if definition.availability is Availability.POST_OUTCOME
+    )
+    | POST_CHOICE_COVARIATES
 )
 FUTURE_REFERENCING = frozenset(
-    {  # references a not-yet-occurred event
-        "next_arm",
-        "is_next",
-        "ends_at_next",
-        "contains_path_to_next",
-        "chosen_arm_fraction",
-        "trials_since_switch",
-        "is_post_switch",
-        # Stop-table ``is_stay`` is the eventual outbound choice from the current
-        # well (current_patch == next_patch), not the completed inbound trip.
-        "is_stay",
-    }
+    name
+    for name, definition in COVARIATE_DEFINITIONS.items()
+    if definition.availability is Availability.FUTURE_REFERENCING
 )
 PRE_OUTCOME_SAFE = frozenset(
-    {  # trailing/backward, safe as predictors pre-reward
-        "reward_lag1",
-        "reward_lag2",
-        "reward_rate_trial_k10",
-        "reward_rate_arm_k10",
-        "visit_recency",
-        "visit_recency_demeaned",
-        "visit_recency_spline1_demeaned",
-        "visit_recency_spline2_demeaned",
-        "visit_recency_spline3_demeaned",
-        "visit_recency_patch",
-        "arm_never_visited",
-        "arm_never_visited_patch",
-        "cumulative_reward",
-        "is_current",
-        "is_prev",
-        "is_last_rewarded",
-        "is_last_rewarded_elsewhere",
-        "is_after_switch",
-        "is_after_stay",
-        "q_arm",
-        "p_reward_arm",
-        "value_diff_patch",
-        "time_since_stop",
-        "leaky_q_value_diff",
-        "arm_uncertainty",  # pre-outcome Beta belief variance (variance counterpart of q_arm)
-        # beta-bernoulli value/decision block (pre-outcome by name): relative value + belief entropy
-        "switch_advantage_mu_preoutcome_sess",
-        # Positively classified rather than passing by omission from the two
-        # leak sets: "safe" and "never reviewed" should not look the same.
-        "is_same_patch",
-        "dist_to_arm",
-        "arm_dist_rank",
-        "recent_switch_rate",
-        "trials_since_block_change",
-        "beta_reward_entropy",
-    }
+    name
+    for name, definition in COVARIATE_DEFINITIONS.items()
+    if definition.availability is Availability.PRE_OUTCOME
 )
 
 # Gating factors, not outcome-bearing -- dropped when resolving a patsy interaction.
 SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})
 
 DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
-    # fit_uncertainty_rate renames the beta-model RPE to distinguish it from
-    # older nominal stand-ins; its information time is unchanged.
-    "rpe_model": ["rpe"],
     # Stop-local summaries. Omission streak is a deterministic reduction of the
     # causal reward-lag vector. WSLS uses the eventual outbound choice and is
     # therefore future-referencing even after the current outcome is known.
-    "omission_streak": [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+    "omission_streak": [
+        f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)
+    ],
     # Reads completed_trial_reward since 1290257, not reward_outcome.
     "wsls_deviation": ["completed_trial_reward", "is_stay"],
     # Patch aggregates of already-classified arm covariates. Registered
     # explicitly so the patch ladder resolves, rather than relying on a
     # name-split heuristic that would treat "<x>_patch" as its own atom.
-    "cumulative_reward_patch": ["cumulative_reward"],
-    "p_reward_arm_patch": ["p_reward_arm"],
-    "q_arm_patch": ["q_arm"],
-    "reward_rate_arm_k10_patch": ["reward_rate_arm_k10"],
+    "reward_count_candidate_arm_last10_known_trials_patch": [
+        "reward_count_candidate_arm_last10_known_trials"
+    ],
+    "task_reward_probability_candidate_arm_patch": [
+        "task_reward_probability_candidate_arm"
+    ],
+    "reward_belief_mean_candidate_arm_preoutcome_patch": [
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ],
+    "reward_fraction_candidate_arm_last10_visits_patch": [
+        "reward_fraction_candidate_arm_last10_visits"
+    ],
     # Replay content during the stop, measured before the outbound choice.
-    "replay_frac": [],
-    "replay_frac_swr": [],
-    "replay_frac_non_swr": [],
-    # content `_x_current` interactions (source is the z-scalar's base covariate)
-    "rpe_x_current": ["rpe"],
-    "rpe_x_current_z": ["rpe"],
-    "relval_x_current": ["switch_advantage_mu_preoutcome_sess"],
-    "entropy_x_current": ["beta_reward_entropy"],
-    "update_x_current": ["global_mu_update_abs_postoutcome_sess"],  # POST_OUTCOME
-    "tss_x_current": ["trials_since_switch"],  # FUTURE_REFERENCING
-    "postsw_x_current": ["is_post_switch"],  # FUTURE_REFERENCING
-    "tsspostsw_x_current": ["trials_since_switch", "is_post_switch"],
-    "block_x_current": ["trials_since_block_change"],  # safe (backward)
-    "switchrate_x_current": ["recent_switch_rate"],  # safe (backward)
-    "tsc_x_current": [],  # within-stop time, safe & value-free
+    "replay_fraction": ["replay_fraction"],
+    "replay_fraction_swr": ["replay_fraction_swr"],
+    "replay_fraction_non_swr": ["replay_fraction_non_swr"],
+    # Content products: each name exposes every canonical factor.
+    "rpe_postoutcome_z_x_is_current_arm": ["rpe_postoutcome"],
+    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm": [
+        "relative_value_switch_minus_stay_preoutcome"
+    ],
+    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm": [
+        "reward_belief_differential_entropy_leaf_mean_preoutcome"
+    ],
+    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm": [
+        "reward_belief_mean_update_l1_all_ports_postoutcome"
+    ],
+    "periswitch_index_trials_z_x_is_current_arm": ["periswitch_index_trials"],
+    "is_periswitch_post_x_is_current_arm": ["is_periswitch_post"],
+    "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm": [
+        "periswitch_index_trials",
+        "is_periswitch_post",
+    ],
+    "trials_since_block_change_z_x_is_current_arm": ["trials_since_block_change"],
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm": [
+        "patch_switch_fraction_last5_completed_trips"
+    ],
+    "log1p_time_since_stop_start_s_z_x_is_current_arm": [
+        "time_since_stop_start_s",
+        "is_current_arm",
+    ],
     # pre-materialized swr_x_* columns used directly in the CS-rungs (model_specs.py)
-    "swr_x_current": ["is_current"],
-    "swr_x_prev": ["is_prev"],
-    "swr_x_next": ["is_next"],  # FUTURE_REFERENCING
-    "swr_x_last_rewarded": ["is_last_rewarded"],
-    "swr_x_is_last_rewarded_elsewhere": ["is_last_rewarded_elsewhere"],
-    "swr_x_reward_rate_arm_k10": ["reward_rate_arm_k10"],
-    "swr_x_visit_recency_demeaned": ["visit_recency_demeaned"],
-    "swr_x_visit_recency_spline1_demeaned": ["visit_recency_spline1_demeaned"],
-    "swr_x_visit_recency_spline2_demeaned": ["visit_recency_spline2_demeaned"],
-    "swr_x_visit_recency_spline3_demeaned": ["visit_recency_spline3_demeaned"],
-    "swr_x_arm_never_visited": ["arm_never_visited"],
-    "swr_x_q_arm": ["q_arm"],  # qvals-dependent
-    # beta belief variance (qvals-dependent). Used STANDARDIZED (arm_uncertainty_z):
-    # raw betadist_var has SD ~0.02 (~5-6x smaller than q_arm), which makes the
-    # per-session covariance singular ("need covariance") — the content models use the
-    # _z form. The runner builds swr_x_arm_uncertainty_z = is_swr * arm_uncertainty_z.
-    "arm_uncertainty_z": ["arm_uncertainty"],
-    "swr_x_arm_uncertainty": ["arm_uncertainty"],
-    "swr_x_arm_uncertainty_z": ["arm_uncertainty"],
+    "swr_x_is_current_arm": ["is_current_arm"],
+    "swr_x_is_prev_arm": ["is_prev_arm"],
+    "swr_x_is_next_arm": ["is_next_arm"],  # FUTURE_REFERENCING
+    "swr_x_is_last_rewarded_arm": ["is_last_rewarded_arm"],
+    "swr_x_is_last_rewarded_noncurrent_arm": ["is_last_rewarded_noncurrent_arm"],
+    "swr_x_reward_fraction_candidate_arm_last10_visits": [
+        "reward_fraction_candidate_arm_last10_visits"
+    ],
+    "swr_x_visit_recency_trials_event_leaf_centered": [
+        "visit_recency_trials_event_leaf_centered"
+    ],
+    "swr_x_visit_recency_trials_event_leaf_centered_spline_1": [
+        "visit_recency_trials_event_leaf_centered_spline_1"
+    ],
+    "swr_x_visit_recency_trials_event_leaf_centered_spline_2": [
+        "visit_recency_trials_event_leaf_centered_spline_2"
+    ],
+    "swr_x_visit_recency_trials_event_leaf_centered_spline_3": [
+        "visit_recency_trials_event_leaf_centered_spline_3"
+    ],
+    "swr_x_is_candidate_arm_never_visited": ["is_candidate_arm_never_visited"],
+    "swr_x_reward_belief_mean_candidate_arm_preoutcome": [
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ],
+    # Beta belief variance is qvals-dependent and standardized on leaf support;
+    # the raw variance has SD ~0.02, much smaller than the belief mean.
+    "reward_belief_variance_candidate_arm_preoutcome_z": [
+        "reward_belief_variance_candidate_arm_preoutcome"
+    ],
+    "swr_x_reward_belief_variance_candidate_arm_preoutcome": [
+        "reward_belief_variance_candidate_arm_preoutcome"
+    ],
+    "swr_x_reward_belief_variance_candidate_arm_preoutcome_z": [
+        "reward_belief_variance_candidate_arm_preoutcome"
+    ],
     # patch-cohort pre-materialized interactions (content patch ladder)
-    "swr_x_current_patch": ["is_current_patch"],
-    "swr_x_last_rewarded_patch_elsewhere": ["is_last_rewarded_patch_elsewhere"],
-    "swr_x_prev_patch": ["is_prev_patch"],
-    "currentpatch_x_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
-    "currentpatch_x_tsc": [],  # within-stop time, safe
-    "currentpatch_x_switchrate": ["recent_switch_rate"],  # safe (backward)
-    "lastrewpatch_x_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
-    "swr_x_lastrewpatch_tss": ["trials_since_switch"],  # FUTURE_REFERENCING
+    "swr_x_is_current_patch": ["is_current_patch"],
+    "swr_x_is_last_rewarded_noncurrent_patch": ["is_last_rewarded_noncurrent_patch"],
+    "swr_x_is_prev_patch": ["is_prev_patch"],
+    "periswitch_index_trials_z_x_is_current_patch": ["periswitch_index_trials"],
+    "log1p_time_since_stop_start_s_z_x_is_current_patch": [
+        "time_since_stop_start_s",
+        "is_current_patch",
+    ],
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch": [
+        "patch_switch_fraction_last5_completed_trips"
+    ],
 }
 
-# Rate-design basis terms — safe backward/within-stop covariates. Generated from the same
-# constants the specs use (do not hard-code the ranges).
-_DESIGN_BASIS = (
-    {"tc"}  # bs(tc,...) spline argument
-    | {f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)}  # reward_lag1..10
-    | {
-        f"onset_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)
-    }  # onset_lag1..10 self-history
-    | {f"cross_lag{j}" for j in range(1, N_HISTORY_LAGS + 1)}  # cross-history dummies
-    | {f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}  # raised-cosine history basis
-    | {f"cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)}  # cross-history basis
-)
+# Universe every source atom must fall in. Derived columns resolve to these
+# atoms through ``DERIVED_COVARIATE_SOURCES`` before enforcement.
+KNOWN_ATOMS = frozenset(COVARIATE_DEFINITIONS)
 
-# Universe every atom must fall in — the completeness test fails on anything unclassified.
-KNOWN_ATOMS = (
-    POST_OUTCOME
-    | FUTURE_REFERENCING
-    | PRE_OUTCOME_SAFE
-    | _DESIGN_BASIS
-    | frozenset(
-        {
-            "recent_switch_rate",
-            "trials_since_block_change",  # backward-safe context
-            "arm_dist_rank",
-            "is_same_patch",
-            "dist_to_arm",  # spatial, value-free
-            "is_current_patch",
-            "is_prev_patch",  # patch spatial identity
-            "is_last_rewarded_patch_elsewhere",  # patch backward-safe
-        }
-    )
-    | {f"arm_fe_{i}" for i in range(8)}
+# Load-bearing consistency check (keeps PRE_OUTCOME_SAFE from silently rotting):
+# every catalogued covariate carries exactly one Availability, so the three
+# availability-derived classes must cover the whole catalog. POST_OUTCOME also
+# folds in POST_CHOICE_COVARIATES (which are PRE_OUTCOME by availability but
+# gated conservatively), so it can only add names already inside KNOWN_ATOMS.
+assert (PRE_OUTCOME_SAFE | POST_OUTCOME | FUTURE_REFERENCING) == KNOWN_ATOMS, (
+    "covariate timing classes do not partition the definition catalog: "
+    f"unclassified={sorted(KNOWN_ATOMS - (PRE_OUTCOME_SAFE | POST_OUTCOME | FUTURE_REFERENCING))}"
 )
 
 
@@ -222,7 +186,7 @@ def timing_of(predictor: str) -> list[str]:
     Splits ALL ``:`` operands (not just the first), drops safe gating modifiers, and
     expands each remaining operand through :data:`DERIVED_COVARIATE_SOURCES` so a
     post-outcome operand can't hide behind a safe left operand
-    (``is_swr:rpe -> ['rpe']``, not ``['is_swr']``).
+    (``is_swr:rpe -> ['rpe_postoutcome']``, not ``['is_swr']``).
     """
     if predictor in DERIVED_COVARIATE_SOURCES:
         return list(DERIVED_COVARIATE_SOURCES[predictor])

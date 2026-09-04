@@ -19,11 +19,20 @@ Each (session, outcome, model) contributes one tidy row with the fit
 coefficients, the 10-fold stop-based cross-validation (``cv_bits_per_event``),
 and the point-process goodness-of-fit (``ks_statistic`` etc.), mirroring the
 arm/patch/per-stop ``all_models.pkl`` so the families concatenate on
-``[outcome, model, animal, day, epoch]``.
+``[outcome, model, animal, session_date, epoch]``.
 
 The four outcomes (``POPULATIONS``) are detected SWR, all non-local, and the
 non-local SWR / no-SWR split — the pooled ``non_local`` is the one-population
 null tested against its split.
+
+Inference note. The self-history block absorbs within-stop autocorrelation, so
+the per-bin likelihood is better calibrated than a naive independent-bin count
+model. Even so, a single session's coefficient standard errors are a
+within-session quantity, not the inferential unit: population claims come from
+the across-session distribution of the per-session coefficients, and the nested
+AIC / cross-validation / point-process goodness-of-fit comparison is what the
+ladder is read on. Do not quote one session's SE as a calibrated population
+uncertainty.
 
 Usage:
     uv run python scripts/rate/fit_per_bin_rate_models.py               # full, serial
@@ -70,6 +79,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     stop_own_missing,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
@@ -77,6 +89,7 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
@@ -88,7 +101,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 
@@ -226,7 +239,7 @@ def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
 
     Family B has no qvals merge. A stop is dropped for **own-predictor** reasons when
     ``immobility_time<=0`` or a stop-level required predictor is NaN (model-specific:
-    the reward-kernel rungs drop the ~7k stops missing ``reward_lag10``, the const rung
+    the reward-kernel rungs drop the ~7k stops missing ``known_reward_outcome_lag_10``, the const rung
     drops none). ``n_modeled`` is the fitter's actual distinct-modeled-stop count
     (``n_stops``); remaining survivors of skipped / gated sessions and any bin-level
     drops fall into ``n_excluded_session``. Reconciles by construction.
@@ -293,10 +306,12 @@ def main() -> None:
         assert_predictor_timing(c for c in _design_columns(spec) if c != "count")
 
     stop = read_table(RC / "stop_table.pkl")
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 

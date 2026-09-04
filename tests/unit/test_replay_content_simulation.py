@@ -44,10 +44,10 @@ class TestSingleEffectRecovery:
     @pytest.mark.parametrize(
         "predictor,truth",
         [
-            ("is_current", 1.0),
-            ("is_prev", 0.8),
-            ("is_next", 0.8),
-            ("is_last_rewarded", 0.6),
+            ("is_current_arm", 1.0),
+            ("is_prev_arm", 0.8),
+            ("is_next_arm", 0.8),
+            ("is_last_rewarded_arm", 0.6),
         ],
     )
     def test_single_predictor(self, predictor, truth):
@@ -76,10 +76,10 @@ class TestMixedScenario:
 
     def test_joint_recovery(self):
         beta = {
-            "is_current": 0.5,
-            "is_prev": 0.7,
-            "is_next": -0.4,
-            "is_last_rewarded": 0.3,
+            "is_current_arm": 0.5,
+            "is_prev_arm": 0.7,
+            "is_next_arm": -0.4,
+            "is_last_rewarded_arm": 0.3,
         }
         fit = _recover(beta, n_events=600, L_e=30, seed=11)
         for p, truth in beta.items():
@@ -93,10 +93,10 @@ class TestPowerScales:
     """Bigger n_events × L_e → tighter SE on the same truth."""
 
     def test_se_shrinks_with_more_data(self):
-        beta = {p: (1.0 if p == "is_current" else 0.0) for p in DEFAULT_PREDICTORS}
+        beta = {p: (1.0 if p == "is_current_arm" else 0.0) for p in DEFAULT_PREDICTORS}
         fit_small = _recover(beta, n_events=100, L_e=10, seed=3)
         fit_large = _recover(beta, n_events=800, L_e=40, seed=3)
-        assert fit_large["bse_is_current"] < fit_small["bse_is_current"]
+        assert fit_large["bse_is_current_arm"] < fit_small["bse_is_current_arm"]
 
 
 class TestContinuousPredictor:
@@ -104,38 +104,38 @@ class TestContinuousPredictor:
 
     def test_visit_recency(self):
         # negative coefficient: more-recently-visited arms get more replay
-        beta = {"is_current": 0.4, "visit_recency": -0.15}
+        beta = {"is_current_arm": 0.4, "visit_recency_trials": -0.15}
         fit = _recover(beta, n_events=500, L_e=30, seed=5)
-        z = _zscore(fit, "visit_recency", -0.15)
+        z = _zscore(fit, "visit_recency_trials", -0.15)
         assert abs(z) < 3, f"visit_recency z={z:.2f}"
 
     def test_novelty_is_coherent_with_recency_and_swr_interaction(self):
         df = simulate_with_event_covariates(
             {
-                "visit_recency": 0.0,
-                "arm_never_visited": 0.0,
-                "swr_x_arm_never_visited": 0.0,
+                "visit_recency_trials": 0.0,
+                "is_candidate_arm_never_visited": 0.0,
+                "swr_x_is_candidate_arm_never_visited": 0.0,
             },
             n_events=40,
             seed=17,
         )
-        assert df["arm_never_visited"].eq(1.0).any()
-        assert df["arm_never_visited"].eq(0.0).any()
+        assert df["is_candidate_arm_never_visited"].eq(1.0).any()
+        assert df["is_candidate_arm_never_visited"].eq(0.0).any()
         for _, event in df.groupby("event_id"):
             event = event.set_index("arm_id")
             np.testing.assert_array_equal(
-                event.loc[[6, 7, 8], "arm_never_visited"], 0.0
+                event.loc[[6, 7, 8], "is_candidate_arm_never_visited"], 0.0
             )
-            novelty = event.loc[range(6), "arm_never_visited"]
+            novelty = event.loc[range(6), "is_candidate_arm_never_visited"]
             assert novelty.isin([0.0, 1.0]).all()
             if novelty.eq(1.0).any() and novelty.eq(0.0).any():
                 assert (
-                    event.loc[novelty.index[novelty.eq(1.0)], "visit_recency"].min()
-                    > event.loc[novelty.index[novelty.eq(0.0)], "visit_recency"].max()
+                    event.loc[novelty.index[novelty.eq(1.0)], "visit_recency_trials"].min()
+                    > event.loc[novelty.index[novelty.eq(0.0)], "visit_recency_trials"].max()
                 )
         np.testing.assert_array_equal(
-            df["swr_x_arm_never_visited"],
-            df["is_swr"] * df["arm_never_visited"],
+            df["swr_x_is_candidate_arm_never_visited"],
+            df["is_swr"] * df["is_candidate_arm_never_visited"],
         )
 
 
@@ -150,7 +150,7 @@ class TestFractionalResponse:
 
     def test_integer_and_float_responses_agree(self):
         """Casting integer counts to float must not change β̂."""
-        beta = {"is_current": 0.8, "is_prev": 0.4}
+        beta = {"is_current_arm": 0.8, "is_prev_arm": 0.4}
         df = simulate_counts(beta, n_events=300, L_e=25, seed=101)
         fit_int = fit_conditional_poisson(df, predictors=list(beta))
 
@@ -177,7 +177,7 @@ class TestFractionalResponse:
         the all-zero event filter would drop every event, and the fit
         would return None.
         """
-        beta = {"is_current": 1.0}
+        beta = {"is_current_arm": 1.0}
         df = simulate_counts(beta, n_events=300, L_e=25, seed=102)
 
         scale = 0.3
@@ -194,13 +194,13 @@ class TestFractionalResponse:
         # β̂ is mathematically invariant to a positive scalar rescaling of
         # the response; numerical match is at the optimizer's convergence
         # tolerance, not machine epsilon.
-        assert fit_frac["coef_is_current"] == pytest.approx(
-            fit_int["coef_is_current"], rel=1e-4
+        assert fit_frac["coef_is_current_arm"] == pytest.approx(
+            fit_int["coef_is_current_arm"], rel=1e-4
         )
         # bse scales by 1/sqrt(scale) because the information matrix scales
         # linearly with the response.
-        expected_bse = fit_int["bse_is_current"] / np.sqrt(scale)
-        assert fit_frac["bse_is_current"] == pytest.approx(expected_bse, rel=1e-2)
+        expected_bse = fit_int["bse_is_current_arm"] / np.sqrt(scale)
+        assert fit_frac["bse_is_current_arm"] == pytest.approx(expected_bse, rel=1e-2)
 
 
 # ── Tier C tests: posterior/MAP-space simulation ──
@@ -231,7 +231,7 @@ class TestTierCRecoverySigmaZero:
     behave like Tier A (no spatial-smearing artifact)."""
 
     def test_recovery_matches_truth(self):
-        beta = {"is_current": 0.8, "is_prev": 0.5}
+        beta = {"is_current_arm": 0.8, "is_prev_arm": 0.5}
         long_df, diag = simulate_posterior_bumps(
             beta, n_events=400, L_e=25, sigma=0.0, seed=17
         )
@@ -250,29 +250,29 @@ class TestSpatialSmearingAttenuates:
     cannot expose."""
 
     def test_indicator_coef_shrinks_with_sigma(self):
-        beta = {"is_current": 1.5}
+        beta = {"is_current_arm": 1.5}
         # sigma=0: clean recovery
         df_clean, diag_clean = simulate_posterior_bumps(
             beta, n_events=600, L_e=30, sigma=0.0, seed=23
         )
-        fit_clean = fit_conditional_poisson(df_clean, predictors=["is_current"])
+        fit_clean = fit_conditional_poisson(df_clean, predictors=["is_current_arm"])
         # sigma=20 (arm length 50): substantial leakage to neighbors
         df_smeared, diag_smeared = simulate_posterior_bumps(
             beta, n_events=600, L_e=30, sigma=20.0, seed=23
         )
         fit_smeared = fit_conditional_poisson(
-            df_smeared, predictors=["is_current"]
+            df_smeared, predictors=["is_current_arm"]
         )
         assert diag_smeared["fraction_on_chosen"] < diag_clean["fraction_on_chosen"]
         # attenuation: smeared coef strictly smaller than clean coef
         assert (
-            fit_smeared["coef_is_current"] < fit_clean["coef_is_current"]
+            fit_smeared["coef_is_current_arm"] < fit_clean["coef_is_current_arm"]
         ), (
-            f"clean={fit_clean['coef_is_current']:.3f} "
-            f"smeared={fit_smeared['coef_is_current']:.3f}"
+            f"clean={fit_clean['coef_is_current_arm']:.3f} "
+            f"smeared={fit_smeared['coef_is_current_arm']:.3f}"
         )
         # And meaningfully less than truth
-        assert fit_smeared["coef_is_current"] < beta["is_current"]
+        assert fit_smeared["coef_is_current_arm"] < beta["is_current_arm"]
 
 
 # ── Full-pipeline tests: real compute_arm_count_hards → make_long_format_arm chain ──
@@ -282,41 +282,41 @@ class TestFullPipelineRecovery:
     """End-to-end simulation through the production transformation chain."""
 
     def test_pipeline_produces_expected_shape(self):
-        beta = {"is_current": 0.5}
+        beta = {"is_current_arm": 0.5}
         long_df, events, diag = simulate_full_pipeline(
             beta, n_events=50, L_e=20, sigma=0.0, seed=1
         )
         assert diag["n_events_used"] > 40
         # 9 rows per surviving event
         assert len(long_df) == diag["n_events_used"] * 9
-        assert {"event_id", "arm_id", "arm_count_hard", "is_current"}.issubset(
+        assert {"event_id", "arm_id", "arm_count_hard", "is_current_arm"}.issubset(
             long_df.columns
         )
 
     def test_recovers_past_arm_influence(self):
         """If replays preferentially visit the previously-departed arm, the
         full pipeline should recover a positive is_prev coefficient."""
-        beta = {"is_current": 0.0, "is_prev": 0.8, "is_next": 0.0}
+        beta = {"is_current_arm": 0.0, "is_prev_arm": 0.8, "is_next_arm": 0.0}
         long_df, _, _ = simulate_full_pipeline(
             beta, n_events=400, L_e=25, sigma=0.0, seed=11
         )
         fit = fit_conditional_poisson(long_df, predictors=list(beta))
         assert fit is not None
-        z_prev = (fit["coef_is_prev"] - 0.8) / fit["bse_is_prev"]
+        z_prev = (fit["coef_is_prev_arm"] - 0.8) / fit["bse_is_prev_arm"]
         assert abs(z_prev) < 3, f"is_prev z={z_prev:.2f}"
         # Other coefficients shouldn't spuriously inflate
-        assert abs(fit["coef_is_current"] / fit["bse_is_current"]) < 3
-        assert abs(fit["coef_is_next"] / fit["bse_is_next"]) < 3
+        assert abs(fit["coef_is_current_arm"] / fit["bse_is_current_arm"]) < 3
+        assert abs(fit["coef_is_next_arm"] / fit["bse_is_next_arm"]) < 3
 
     def test_recovers_future_arm_influence(self):
         """Symmetric: prospective replay (toward next arm) should recover."""
-        beta = {"is_current": 0.0, "is_prev": 0.0, "is_next": 0.8}
+        beta = {"is_current_arm": 0.0, "is_prev_arm": 0.0, "is_next_arm": 0.8}
         long_df, _, _ = simulate_full_pipeline(
             beta, n_events=400, L_e=25, sigma=0.0, seed=12
         )
         fit = fit_conditional_poisson(long_df, predictors=list(beta))
         assert fit is not None
-        z_next = (fit["coef_is_next"] - 0.8) / fit["bse_is_next"]
+        z_next = (fit["coef_is_next_arm"] - 0.8) / fit["bse_is_next_arm"]
         assert abs(z_next) < 3, f"is_next z={z_next:.2f}"
 
     def test_distinguishes_past_from_future(self):
@@ -328,7 +328,7 @@ class TestFullPipelineRecovery:
         have non-trivial probability of inverting under the joint sampling
         distribution even when each coefficient is well-estimated.
         """
-        beta = {"is_current": 0.3, "is_prev": 0.9, "is_next": 0.4}
+        beta = {"is_current_arm": 0.3, "is_prev_arm": 0.9, "is_next_arm": 0.4}
         long_df, _, _ = simulate_full_pipeline(
             beta, n_events=600, L_e=30, sigma=0.0, seed=13
         )
@@ -342,13 +342,13 @@ class TestFullPipelineRecovery:
         # The largest true effect must remain the largest fitted effect —
         # this is a much weaker (and well-powered) discrimination check
         # than ranking all three coefficients.
-        assert fit["coef_is_prev"] > max(
-            fit["coef_is_current"], fit["coef_is_next"]
+        assert fit["coef_is_prev_arm"] > max(
+            fit["coef_is_current_arm"], fit["coef_is_next_arm"]
         ), (
             f"is_prev (truth=0.9) failed to dominate: "
-            f"prev={fit['coef_is_prev']:.3f} "
-            f"current={fit['coef_is_current']:.3f} "
-            f"next={fit['coef_is_next']:.3f}"
+            f"prev={fit['coef_is_prev_arm']:.3f} "
+            f"current={fit['coef_is_current_arm']:.3f} "
+            f"next={fit['coef_is_next_arm']:.3f}"
         )
 
 
@@ -429,7 +429,7 @@ class TestAutocorrelationDoesNotBiasPointEstimate:
 
     @pytest.mark.slow
     def test_mean_coef_close_to_truth_with_high_rho(self):
-        beta = {"is_current": 0.7}
+        beta = {"is_current_arm": 0.7}
         coefs, _ = _replicated_fits(
             simulate_autocorrelated_counts,
             beta,
@@ -459,7 +459,7 @@ class TestSEUnderCoverageUnderAutocorrelation:
 
     @pytest.mark.slow
     def test_calibration_degrades_with_autocorrelation(self):
-        beta = {"is_current": 0.6}
+        beta = {"is_current_arm": 0.6}
         common = {"n_events": 120, "L_e": 20, "n_replicates": 40}
 
         coefs_iid, bses_iid = _replicated_fits(
@@ -498,15 +498,15 @@ class TestHardVsSoftAgreeAtSigmaZero:
     should give numerically identical β̂."""
 
     def test_match_at_sigma_zero(self):
-        beta = {"is_current": 0.6}
+        beta = {"is_current_arm": 0.6}
         hard, soft, _ = simulate_hard_vs_soft_counts(
             beta, n_events=300, L_e=20, sigma=0.0, seed=37
         )
         fit_hard = fit_conditional_poisson(hard, predictors=list(beta))
         fit_soft = fit_conditional_poisson(soft, predictors=list(beta))
         assert fit_hard is not None and fit_soft is not None
-        assert fit_hard["coef_is_current"] == pytest.approx(
-            fit_soft["coef_is_current"], rel=1e-3
+        assert fit_hard["coef_is_current_arm"] == pytest.approx(
+            fit_soft["coef_is_current_arm"], rel=1e-3
         )
 
 
@@ -531,7 +531,7 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
 
     def test_both_attenuate_and_record_relative_magnitudes(self):
         truth = 1.5
-        beta = {"is_current": truth}
+        beta = {"is_current_arm": truth}
         hard, soft, _ = simulate_hard_vs_soft_counts(
             beta, n_events=600, L_e=30, sigma=20.0, seed=41
         )
@@ -539,8 +539,8 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
         fit_soft = fit_conditional_poisson(soft, predictors=list(beta))
         assert fit_hard is not None and fit_soft is not None
         # Both paths attenuate (point estimate strictly below truth).
-        assert fit_hard["coef_is_current"] < truth
-        assert fit_soft["coef_is_current"] < truth
+        assert fit_hard["coef_is_current_arm"] < truth
+        assert fit_soft["coef_is_current_arm"] < truth
         # The empirical claim in the docstring is *directional*: under
         # this generative regime, hard MAP attenuates LESS than soft
         # posterior averaging, so ``hard_β̂`` sits between ``soft_β̂``
@@ -549,10 +549,10 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
         # ordering — exactly the case the docstring's "swapping MAP
         # for soft would *worsen* attenuation" claim hinges on.
         assert (
-            fit_hard["coef_is_current"] > fit_soft["coef_is_current"]
+            fit_hard["coef_is_current_arm"] > fit_soft["coef_is_current_arm"]
         ), (
-            f"hard β̂ = {fit_hard['coef_is_current']:.3f}, "
-            f"soft β̂ = {fit_soft['coef_is_current']:.3f}, "
+            f"hard β̂ = {fit_hard['coef_is_current_arm']:.3f}, "
+            f"soft β̂ = {fit_soft['coef_is_current_arm']:.3f}, "
             f"truth = {truth} — hard MAP must attenuate less than soft "
             "posterior averaging under this regime, otherwise the "
             "test's docstring claim no longer holds."
@@ -563,13 +563,13 @@ class TestUnbiasedAcrossSeeds:
     """Mean of repeated fits should be close to the truth (unbiasedness)."""
 
     def test_mean_coef_close_to_truth(self):
-        beta = {"is_current": 0.6}
+        beta = {"is_current_arm": 0.6}
         coefs = []
         for seed in range(20):
             df = simulate_counts(beta, n_events=200, L_e=20, seed=seed)
-            fit = fit_conditional_poisson(df, predictors=["is_current"])
+            fit = fit_conditional_poisson(df, predictors=["is_current_arm"])
             assert fit is not None
-            coefs.append(fit["coef_is_current"])
+            coefs.append(fit["coef_is_current_arm"])
         mean = float(np.mean(coefs))
         sem = float(np.std(coefs, ddof=1) / np.sqrt(len(coefs)))
         # mean within ~3 SEM of truth

@@ -23,7 +23,7 @@ from scripts.figures import generate_uncertainty_content_figure as figure_script
 def _horserace_frame(uncertainty_slope: float, *, animal: str = "rat") -> pd.DataFrame:
     """Event x arm frame where non-current-leaf content tracks uncertainty within arm.
 
-    Content on the five non-current leaf arms is ``0.2 + slope * arm_uncertainty_z``;
+    Content on the five non-current leaf arms is ``0.2 + slope * variance_z``;
     the current arm (0) and trunk arms (6-8) carry unrelated content that the
     estimator must exclude. Three control predictors (value / distance / recency)
     vary independently of uncertainty, so a correct within-arm fit recovers ``slope``
@@ -46,17 +46,17 @@ def _horserace_frame(uncertainty_slope: float, *, animal: str = "rat") -> pd.Dat
             rows.append(
                 {
                     "animal": animal,
-                    "day": 1,
+                    "session_date": 1,
                     "epoch": "e1",
                     "event_id": 100 + event,
-                    "arm": arm,
-                    "is_current": is_current,
+                    "candidate_arm": arm,
+                    "is_current_arm": is_current,
                     "is_swr": False,
                     "arm_fraction": fraction,
-                    "arm_uncertainty_z": uncertainty,
-                    "q_arm": value,
-                    "dist_to_arm": distance,
-                    "visit_recency": recency,
+                    "reward_belief_variance_candidate_arm_preoutcome_z": uncertainty,
+                    "reward_belief_mean_candidate_arm_preoutcome": value,
+                    "distance_to_candidate_arm_cm": distance,
+                    "visit_recency_trials": recency,
                 }
             )
     return pd.DataFrame(rows)
@@ -71,10 +71,16 @@ def test_within_arm_horserace_recovers_uncertainty_and_excludes_current_trunk():
     # 20 events x 5 non-current leaf arms; current (arm 0) and trunk (6-8) dropped
     assert int(fit_all["n_rows"].iloc[0]) == 100
     row = fit_all.iloc[0]
-    assert row["coef_arm_uncertainty_z"] == pytest.approx(0.1, abs=1e-6)
-    assert row["coef_q_arm_z"] == pytest.approx(0.0, abs=1e-6)
-    assert row["coef_dist_to_arm_z"] == pytest.approx(0.0, abs=1e-6)
-    assert row["coef_visit_recency_z"] == pytest.approx(0.0, abs=1e-6)
+    assert row[
+        "coef_reward_belief_variance_candidate_arm_preoutcome_z"
+    ] == pytest.approx(0.1, abs=1e-6)
+    assert row[
+        "coef_reward_belief_mean_candidate_arm_preoutcome_z"
+    ] == pytest.approx(0.0, abs=1e-6)
+    assert row["coef_distance_to_candidate_arm_cm_z"] == pytest.approx(
+        0.0, abs=1e-6
+    )
+    assert row["coef_visit_recency_trials_z"] == pytest.approx(0.0, abs=1e-6)
     assert np.isfinite(row["cond_number"])
 
 
@@ -82,7 +88,7 @@ def test_within_arm_horserace_skips_rank_deficient_session_without_crashing():
     # Make two predictors perfectly collinear (distance == value) so the within-arm
     # design is rank-deficient; the session must be dropped, not crash or emit garbage.
     frame = _horserace_frame(0.1)
-    frame["dist_to_arm"] = frame["q_arm"]
+    frame["distance_to_candidate_arm_cm"] = frame["reward_belief_mean_candidate_arm_preoutcome"]
     coefs = within_arm_horserace(frame, min_rows=10)
     assert coefs.empty  # every (session, population) design is rank-deficient -> skipped
 
@@ -100,17 +106,19 @@ def test_within_arm_horserace_recovers_per_population_slopes_on_mixed_swr():
             fraction = 0.9 if (arm > 5 or is_current) else 0.2 + slope * uncertainty
             rows.append(
                 {
-                    "animal": "rat", "day": 1, "epoch": "e1", "event_id": 100 + event,
-                    "arm": arm, "is_current": is_current, "is_swr": bool(is_swr),
-                    "arm_fraction": fraction, "arm_uncertainty_z": uncertainty,
-                    "q_arm": float(event % 5), "dist_to_arm": float((event * 7) % 11),
-                    "visit_recency": float((event * 3) % 13),
+                    "animal": "rat", "session_date": 1, "epoch": "e1", "event_id": 100 + event,
+                    "candidate_arm": arm, "is_current_arm": is_current, "is_swr": bool(is_swr),
+                    "arm_fraction": fraction, "reward_belief_variance_candidate_arm_preoutcome_z": uncertainty,
+                    "reward_belief_mean_candidate_arm_preoutcome": float(event % 5), "distance_to_candidate_arm_cm": float((event * 7) % 11),
+                    "visit_recency_trials": float((event * 3) % 13),
                 }
             )
     coefs = within_arm_horserace(pd.DataFrame(rows), min_rows=10)
 
     def _coef(pop):
-        return coefs[coefs["population"] == pop]["coef_arm_uncertainty_z"].iloc[0]
+        return coefs[coefs["population"] == pop][
+            "coef_reward_belief_variance_candidate_arm_preoutcome_z"
+        ].iloc[0]
 
     assert _coef("SWR") == pytest.approx(0.2, abs=1e-6)
     assert _coef("non_SWR") == pytest.approx(0.05, abs=1e-6)
@@ -130,7 +138,7 @@ def test_summarize_horserace_is_animal_balanced_and_signs_uncertainty_positive()
     summary = summarize_horserace(coefs)
     unc = summary[
         (summary["population"] == "all")
-        & (summary["predictor"] == "arm_uncertainty_z")
+        & (summary["predictor"] == "reward_belief_variance_candidate_arm_preoutcome_z")
     ].iloc[0]
     assert unc["median"] > 0
     assert unc["n_animals"] == 2
@@ -154,25 +162,25 @@ def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         stop_rows.append(
             {
                 "animal": "rat",
-                "day": 1,
+                "session_date": 1,
                 "epoch": "e1",
                 "stop_idx": stop_idx,
                 "stop_id": stop_id,
-                "immobility_time": exposure,
+                "immobility_duration_s": exposure,
             }
         )
         qval_row = {
             "stop_id": stop_id,
             "epoch": "e1",
             "trial_number_by_epoch": trial,
-            "arm": chosen_arm,
+            "chosen_arm": chosen_arm,
             "trial_reward": int(trial % 2 == 0),
             "in_poke": bool(stop_idx % 2),
-            "is_rewarding": False,
+            "pump_on_at_bout_mid": False,
         }
         # Each physical well has four ordered, trial-level uncertainty states.
         for arm in range(6):
-            qval_row[f"betadist_var{arm + 1}"] = 0.01 * (trial + 1) + arm * 1e-4
+            qval_row[f"reward_belief_variance_port_{arm}"] = 0.01 * (trial + 1) + arm * 1e-4
         qval_rows.append(qval_row)
 
     # Trial 0 has one event at each of its two stops. Trial 2 and 3 have one.
@@ -189,11 +197,11 @@ def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
             event_arm_rows.append(
                 {
                     "animal": "rat",
-                    "day": 1,
+                    "session_date": 1,
                     "epoch": "e1",
                     "event_id": event_id,
                     "stop_id": stop_id,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_count_hard": float(round(mass)),
                     "arm_count_soft": mass,
                     "arm_posterior_mass": mass,
@@ -213,16 +221,16 @@ def test_build_trial_leaf_table_aggregates_repeated_stops_once_per_trial():
     trial_leaf, audit = build_trial_leaf_table(event_arm, stops, qvals)
 
     assert len(trial_leaf) == 4 * 6
-    assert trial_leaf.groupby("trial_number_by_epoch")["arm"].nunique().eq(6).all()
+    assert trial_leaf.groupby("trial_number_by_epoch")["candidate_arm"].nunique().eq(6).all()
     assert audit["n_mapped_trials"] == 4
 
     trial0 = trial_leaf[trial_leaf["trial_number_by_epoch"] == 0]
     assert trial0["n_stops"].eq(2).all()
-    assert trial0["immobility_time"].eq(3.0).all()
+    assert trial0["immobility_duration_s"].eq(3.0).all()
     assert trial0["n_events"].eq(2).all()
     assert trial0["posterior_leaf_share"].sum() == pytest.approx(1.0)
-    assert trial0.loc[trial0["arm"] == 0, "posterior_mass"].item() == 3.0
-    assert trial0.loc[trial0["arm"] == 0, "posterior_mass_rate"].item() == 1.0
+    assert trial0.loc[trial0["candidate_arm"] == 0, "posterior_mass"].item() == 3.0
+    assert trial0.loc[trial0["candidate_arm"] == 0, "posterior_mass_rate"].item() == 1.0
 
 
 def test_build_trial_leaf_table_keeps_zero_event_trials_as_zero_rate():
@@ -240,7 +248,7 @@ def test_build_trial_leaf_table_keeps_zero_event_trials_as_zero_rate():
 
 def test_event_share_includes_trunk_content_in_denominator():
     event_arm, stops, qvals = _synthetic_inputs()
-    trunk = (event_arm["event_id"] == 100) & (event_arm["arm"] == 6)
+    trunk = (event_arm["event_id"] == 100) & (event_arm["candidate_arm"] == 6)
     event_arm.loc[trunk, ["arm_count_hard", "arm_count_soft", "arm_posterior_mass"]] = (
         4.0
     )
@@ -258,11 +266,15 @@ def test_build_trial_leaf_table_maps_leaf_uncertainty_and_chosen_arm_exactly():
     event_arm, stops, qvals = _synthetic_inputs()
 
     trial_leaf, _ = build_trial_leaf_table(event_arm, stops, qvals)
-    row = trial_leaf.query("trial_number_by_epoch == 2 and arm == 4").iloc[0]
+    row = trial_leaf.query(
+        "trial_number_by_epoch == 2 and candidate_arm == 4"
+    ).iloc[0]
 
-    assert row["arm_uncertainty"] == pytest.approx(0.0304)
+    assert row["reward_belief_variance_candidate_arm_preoutcome"] == pytest.approx(0.0304)
     assert not bool(row["is_chosen"])
-    chosen = trial_leaf.query("trial_number_by_epoch == 2 and arm == 2").iloc[0]
+    chosen = trial_leaf.query(
+        "trial_number_by_epoch == 2 and candidate_arm == 2"
+    ).iloc[0]
     assert bool(chosen["is_chosen"])
 
 
@@ -270,8 +282,8 @@ def test_assign_within_arm_quantiles_preserves_ties_and_marks_constants():
     frame = pd.DataFrame(
         {
             "session_id": ["s"] * 10,
-            "arm": [0] * 5 + [1] * 5,
-            "arm_uncertainty": [1.0, 1.0, 2.0, 3.0, 4.0] + [2.0] * 5,
+            "candidate_arm": [0] * 5 + [1] * 5,
+            "reward_belief_variance_candidate_arm_preoutcome": [1.0, 1.0, 2.0, 3.0, 4.0] + [2.0] * 5,
         }
     )
 
@@ -292,9 +304,9 @@ def test_hierarchical_profile_balances_animals_not_sessions():
                 {
                     "animal": "a",
                     "session_id": session,
-                    "arm": 0,
+                    "candidate_arm": 0,
                     "uncertainty_quartile": quartile,
-                    "arm_uncertainty": float(quartile),
+                    "reward_belief_variance_candidate_arm_preoutcome": float(quartile),
                     "value": value,
                     "is_chosen": False,
                 }
@@ -305,9 +317,9 @@ def test_hierarchical_profile_balances_animals_not_sessions():
             {
                 "animal": "b",
                 "session_id": "b1",
-                "arm": 0,
+                "candidate_arm": 0,
                 "uncertainty_quartile": quartile,
-                "arm_uncertainty": float(quartile),
+                "reward_belief_variance_candidate_arm_preoutcome": float(quartile),
                 "value": value,
                 "is_chosen": False,
             }
@@ -316,7 +328,7 @@ def test_hierarchical_profile_balances_animals_not_sessions():
 
     profile = hierarchical_quartile_profile(frame, numerator_col="value")
     overall = profile["overall"].set_index("uncertainty_quartile")
-    contrasts = paired_quartile_contrasts(profile["arm"])
+    contrasts = paired_quartile_contrasts(profile["candidate_arm"])
 
     assert overall.loc[4, "value"] == pytest.approx(4.0)
     assert contrasts["animal"].set_index("animal").loc["a", "contrast"] == 2.0
@@ -329,11 +341,11 @@ def test_rate_profile_uses_ratio_of_sums_not_mean_of_trial_rates():
         {
             "animal": ["a", "a"],
             "session_id": ["s", "s"],
-            "arm": [0, 0],
+            "candidate_arm": [0, 0],
             "uncertainty_quartile": [1, 1],
-            "arm_uncertainty": [0.1, 0.1],
+            "reward_belief_variance_candidate_arm_preoutcome": [0.1, 0.1],
             "posterior_mass": [10.0, 0.0],
-            "immobility_time": [1.0, 9.0],
+            "immobility_duration_s": [1.0, 9.0],
             "is_chosen": [False, False],
         }
     )
@@ -341,10 +353,10 @@ def test_rate_profile_uses_ratio_of_sums_not_mean_of_trial_rates():
     profile = hierarchical_quartile_profile(
         frame,
         numerator_col="posterior_mass",
-        denominator_col="immobility_time",
+        denominator_col="immobility_duration_s",
     )
 
-    assert profile["arm"]["value"].item() == pytest.approx(1.0)
+    assert profile["candidate_arm"]["value"].item() == pytest.approx(1.0)
 
 
 def test_builder_rejects_duplicate_qvalue_stop_ids():
@@ -357,7 +369,7 @@ def test_builder_rejects_duplicate_qvalue_stop_ids():
 
 def test_builder_rejects_inconsistent_trial_uncertainty_across_stops():
     event_arm, stops, qvals = _synthetic_inputs()
-    qvals.loc[qvals["stop_id"] == 11, "betadist_var1"] += 0.1
+    qvals.loc[qvals["stop_id"] == 11, "reward_belief_variance_port_0"] += 0.1
 
     with pytest.raises(ValueError, match="constant within session.*trial.*arm"):
         build_trial_leaf_table(event_arm, stops, qvals)
@@ -366,13 +378,13 @@ def test_builder_rejects_inconsistent_trial_uncertainty_across_stops():
 def test_builder_uses_float_responses_without_integer_coercion():
     event_arm, stops, qvals = _synthetic_inputs()
     event_arm.loc[
-        (event_arm["event_id"] == 100) & (event_arm["arm"] == 0),
+        (event_arm["event_id"] == 100) & (event_arm["candidate_arm"] == 0),
         "arm_posterior_mass",
     ] = 1.25
 
     trial_leaf, _ = build_trial_leaf_table(event_arm, stops, qvals)
 
-    got = trial_leaf.query("trial_number_by_epoch == 0 and arm == 0")[
+    got = trial_leaf.query("trial_number_by_epoch == 0 and candidate_arm == 0")[
         "posterior_mass"
     ].item()
     assert np.issubdtype(trial_leaf["posterior_mass"].dtype, np.floating)
@@ -381,7 +393,7 @@ def test_builder_uses_float_responses_without_integer_coercion():
 
 def test_builder_drops_zero_exposure_stops_and_reports_them():
     event_arm, stops, qvals = _synthetic_inputs()
-    stops.loc[stops["stop_id"] == 12, "immobility_time"] = 0.0
+    stops.loc[stops["stop_id"] == 12, "immobility_duration_s"] = 0.0
 
     trial_leaf, audit = build_trial_leaf_table(event_arm, stops, qvals)
 
@@ -394,17 +406,22 @@ def test_mu_summary_marks_fit_flags_and_balances_animal_medians():
     mu = pd.DataFrame(
         {
             "animal": ["a", "a", "b", "b"],
-            "day": [1, 2, 1, 2],
+            "session_date": [1, 2, 1, 2],
             "epoch": ["e", "e", "e", "e"],
-            "coef_arm_uncertainty_z": [0.0, 2.0, 4.0, 100.0],
-            "bse_arm_uncertainty_z": [0.1] * 4,
+            "coef_reward_belief_variance_candidate_arm_preoutcome_z": [
+                0.0,
+                2.0,
+                4.0,
+                100.0,
+            ],
+            "bse_reward_belief_variance_candidate_arm_preoutcome_z": [0.1] * 4,
             "converged": [True, True, True, True],
             "separated": [False, False, False, True],
         }
     )
 
     summary = summarize_mu_coefficients(mu)
-    sessions = summary["session"].set_index(["animal", "day"])
+    sessions = summary["session"].set_index(["animal", "session_date"])
     clean_animals = summary["animal"].query("cohort == 'clean'").set_index("animal")
     overall = summary["overall"].query("cohort == 'clean'").iloc[0]
 

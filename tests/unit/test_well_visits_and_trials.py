@@ -11,9 +11,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
+from continuum_swr_replay.analysis.replay.covariates import (
+    behavioral_location_from_port_experiences,
+    visit_recency_all_events,
+)
 from continuum_swr_replay.data_loaders.trials import (
+    align_port_experiences_to_task_records,
+    make_port_experiences_df,
     make_trials_df_from_well_visits,
     make_well_visits_df,
+    photogate_engagement_at_times,
 )
 
 # ============================================================================
@@ -80,7 +88,16 @@ def beam_breaks():
 @pytest.fixture
 def pump_events():
     """Reward delivered during the second poke (at well 2)."""
-    return pd.DataFrame({"start_time": [12.05]})
+    return pd.DataFrame({"start_time": [12.05], "event_name": ["Pump3"]})
+
+
+def _empty_pumps() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "start_time": pd.Series(dtype=float),
+            "event_name": pd.Series(dtype=str),
+        }
+    )
 
 
 # ============================================================================
@@ -112,6 +129,8 @@ class TestMakeWellVisitsDf:
             "to_patch",
             "is_patch_change",
             "trial_number",
+            "is_boundary_marker",
+            "is_observed_poke",
         ]
         for col in required:
             assert col in result.columns, f"Missing column: {col}"
@@ -185,19 +204,26 @@ class TestMakeWellVisitsDf:
         # At least one row should have is_reward=True
         assert result["is_reward"].any(), "No rewards detected"
 
-    def test_reward_on_time_uses_earliest_unsorted_pump(
+    def test_unsorted_pump_events_align_to_their_physical_pokes(
         self, beam_breaks, position_info, track_graph
     ):
         """Direct callers need not pre-sort pump events."""
-        pumps = pd.DataFrame({"start_time": [12.08, 12.05]})
+        pumps = pd.DataFrame(
+            {
+                "start_time": [12.35, 1.05],
+                "event_name": ["Pump3", "Pump1"],
+            }
+        )
 
         result = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
 
-        reward_times = result.loc[
-            result["is_reward"] & result["reward_on_time"].notna(),
-            "reward_on_time",
-        ]
-        assert reward_times.min() == pytest.approx(12.05)
+        reward_times = sorted(
+            result.loc[
+                result["is_reward"] & result["reward_on_time"].notna(),
+                "reward_on_time",
+            ].tolist()
+        )
+        assert reward_times == pytest.approx([1.05, 12.35])
 
     def test_patch_mapping_correct(
         self, beam_breaks, pump_events, position_info, track_graph
@@ -230,13 +256,131 @@ class TestMakeWellVisitsDf:
         self, beam_breaks, position_info, track_graph
     ):
         """With empty pump events, no visits should have is_reward=True."""
-        empty_pumps = pd.DataFrame({"start_time": pd.Series(dtype=float)})
+        empty_pumps = _empty_pumps()
 
         result = make_well_visits_df(
             beam_breaks, empty_pumps, position_info, track_graph
         )
 
         assert not result["is_reward"].any()
+
+    def test_pump_outside_physical_poke_is_audited_but_not_a_reward(
+        self, beam_breaks, position_info, track_graph
+    ):
+        """An unmatched hardware pulse cannot create a behavioral outcome."""
+        pumps = pd.DataFrame({"start_time": [6.0], "event_name": ["Pump3"]})
+
+        visits = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+
+        assert not visits["is_reward"].any()
+        # Pump at t=6.0 is mid-run between wells 0 and 2 -- a true transit orphan,
+        # inside no same-well visit window, so it is not recovered at collapse.
+        # The authoritative post-recovery audit lives on port_experiences.
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+        assert experiences.attrs["unmatched_pump_event_count"] == 1
+        assert experiences.attrs["unmatched_pump_event_times"] == (6.0,)
+        assert experiences.attrs["gap_recovered_pump_count"] == 0
+
+    def test_pump_without_any_physical_poke_cannot_create_a_visit(
+        self, position_info, track_graph
+    ):
+        """A reward event cannot create an otherwise absent visit or trial."""
+        empty_pokes = pd.DataFrame(columns=["start_time", "end_time", "event_name"])
+        pumps = pd.DataFrame({"start_time": [1.0], "event_name": ["Pump1"]})
+
+        visits = make_well_visits_df(empty_pokes, pumps, position_info, track_graph)
+
+        assert visits.empty
+
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+        assert experiences.empty
+        assert experiences.attrs["gap_recovered_pump_count"] == 0
+        assert experiences.attrs["unmatched_pump_event_count"] == 1
+        assert experiences.attrs["unmatched_pump_events"] == (("Pump1", 1.0),)
+        assert experiences.attrs["unmatched_pump_event_times"] == (1.0,)
+
+    def test_pump_at_ambiguous_poke_boundary_fails_loudly(
+        self, position_info, track_graph
+    ):
+        """One onset cannot be credited to two touching physical pokes."""
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [1.0, 1.1],
+                "end_time": [1.1, 1.2],
+                "event_name": ["Poke1", "Poke2"],
+            }
+        )
+        pumps = pd.DataFrame({"start_time": [1.1], "event_name": ["Pump1"]})
+
+        with pytest.raises(ValueError, match="matches=2"):
+            make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+
+    def test_pump_channel_must_match_the_physical_poke(
+        self, position_info, track_graph
+    ):
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [1.0, 3.0],
+                "end_time": [1.5, 3.5],
+                "event_name": ["Poke1", "Poke3"],
+            }
+        )
+        wrong_pump = pd.DataFrame({"start_time": [3.2], "event_name": ["Pump1"]})
+
+        with pytest.raises(ValueError, match="pump channel disagrees"):
+            make_well_visits_df(beam_breaks, wrong_pump, position_info, track_graph)
+
+    def test_two_pumps_in_one_physical_poke_fail_loudly(
+        self, position_info, track_graph
+    ):
+        """One task reward cannot be represented by two pump onsets."""
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [1.0],
+                "end_time": [2.0],
+                "event_name": ["Poke1"],
+            }
+        )
+        pumps = pd.DataFrame(
+            {
+                "start_time": [1.2, 1.4],
+                "event_name": ["Pump1", "Pump1"],
+            }
+        )
+
+        with pytest.raises(ValueError, match="multiple reward-pump onsets"):
+            make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+
+    def test_nonempty_pump_stream_requires_its_hardware_channel(
+        self, beam_breaks, position_info, track_graph
+    ):
+        with pytest.raises(KeyError, match="require an event_name"):
+            make_well_visits_df(
+                beam_breaks,
+                pd.DataFrame({"start_time": [12.05]}),
+                position_info,
+                track_graph,
+            )
+
+    def test_spyglass_multiindex_channels_are_preserved(
+        self, beam_breaks, pump_events, position_info, track_graph
+    ):
+        indexed_pokes = beam_breaks.assign(event_number=[1, 2, 1, 2]).set_index(
+            ["event_name", "event_number"]
+        )
+        indexed_pumps = pump_events.assign(event_number=[1]).set_index(
+            ["event_name", "event_number"]
+        )
+
+        visits = make_well_visits_df(
+            indexed_pokes, indexed_pumps, position_info, track_graph
+        )
+
+        physical = visits.loc[visits["is_observed_poke"]]
+        assert physical["from_well"].tolist() == [0, 0, 2, 2]
+        assert physical.loc[physical["is_reward"], "from_well"].tolist() == [2]
 
     def test_durations_non_negative(
         self, beam_breaks, pump_events, position_info, track_graph
@@ -334,7 +478,7 @@ class TestMakeTrialsDfFromWellVisits:
         for col in required:
             assert col in trials.columns, f"Missing column: {col}"
 
-    def test_outcome_clock_uses_pump_for_reward_and_poke_out_for_omission(
+    def test_outcome_clock_uses_pump_for_reward_and_feedback_boundary_for_omission(
         self, beam_breaks, pump_events, position_info, track_graph
     ):
         well_visits = make_well_visits_df(
@@ -353,3 +497,434 @@ class TestMakeTrialsDfFromWellVisits:
         )
         assert (trials["outcome_known_time"] >= trials["goal_arrival_time"]).all()
         assert (trials["outcome_known_time"] <= trials["end_time"]).all()
+
+
+class TestMakePortExperiencesDf:
+    """The initial port is an experience, not a synthetic movement trial."""
+
+    def test_initial_origin_then_every_destination(
+        self, beam_breaks, position_info, track_graph
+    ):
+        pumps = pd.DataFrame(
+            {
+                "start_time": [1.05, 12.05],
+                "event_name": ["Pump1", "Pump3"],
+            }
+        )
+        visits = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+        trials = make_trials_df_from_well_visits(visits)
+
+        experiences = make_port_experiences_df(visits, trials)
+
+        assert experiences["experience_id"].tolist() == [0, 1]
+        assert experiences["port"].tolist() == [0, 2]
+        assert experiences["is_initial_experience"].tolist() == [True, False]
+        assert experiences["outcome_observed"].tolist() == [True, True]
+        assert experiences["is_boundary_derived"].tolist() == [False, False]
+        assert experiences["is_reward"].tolist() == [True, True]
+        assert pd.isna(experiences.loc[0, "movement_trial_number"])
+        assert experiences.loc[1, "movement_trial_number"] == trials.index[0]
+        assert experiences.loc[0, "outcome_known_time"] == pytest.approx(1.05)
+        assert experiences.loc[1, "outcome_known_time"] == pytest.approx(12.05)
+        # Movement trials retain their original grain and numbering.
+        assert len(trials) == 1
+        assert trials.iloc[0]["from_well"] == 0
+        assert trials.iloc[0]["to_well"] == 2
+
+    def test_observed_initial_omission_uses_feedback_boundary(
+        self, beam_breaks, pump_events, position_info, track_graph
+    ):
+        # The fixture's only pump is at the destination, so the initial port
+        # experience is an omission.
+        visits = make_well_visits_df(
+            beam_breaks, pump_events, position_info, track_graph
+        )
+        trials = make_trials_df_from_well_visits(visits)
+
+        experiences = make_port_experiences_df(visits, trials)
+        initial_poke_start = visits.loc[visits["is_observed_poke"], "start_time"].min()
+        initial_visit_rows = visits.loc[
+            visits["is_observed_poke"] & visits["from_well"].eq(0)
+        ]
+        initial_visit_departure = initial_visit_rows["end_time"].max()
+
+        assert not experiences.loc[0, "is_reward"]
+        assert pd.isna(experiences.loc[0, "reward_on_time"])
+        assert experiences.loc[0, "outcome_known_time"] == pytest.approx(
+            min(
+                initial_poke_start + OMISSION_KNOWN_LATENCY_SEC,
+                initial_visit_departure,
+            )
+        )
+
+    def test_gap_pump_is_recovered_and_removed_from_unmatched_audit(
+        self, position_info, track_graph
+    ):
+        """A same-port gap pump belongs to the whole Comrie task visit."""
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [1.0, 10.0, 10.2],
+                "end_time": [1.1, 10.05, 10.4],
+                "event_name": ["Poke1", "Poke2", "Poke2"],
+            }
+        )
+        pumps = pd.DataFrame({"start_time": [10.1], "event_name": ["Pump2"]})
+
+        visits = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+
+        assert trials["is_reward"].tolist() == [True]
+        assert trials["reward_on_time"].tolist() == pytest.approx([10.1])
+        assert trials["outcome_known_time"].tolist() == pytest.approx([10.1])
+        assert experiences["is_reward"].tolist() == [False, True]
+        assert experiences.attrs["gap_recovered_pump_count"] == 1
+        assert experiences.attrs["unmatched_pump_event_count"] == 0
+        assert experiences.attrs["unmatched_pump_events"] == ()
+        assert experiences.attrs["unmatched_pump_event_times"] == ()
+
+    def test_single_observed_port_does_not_create_a_synthetic_trial(
+        self, position_info, track_graph
+    ):
+        """An epoch boundary is not a poke, visit, or movement trial."""
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [12.0, 12.3],
+                "end_time": [12.1, 12.4],
+                "event_name": ["Poke3", "Poke3"],
+            }
+        )
+        visits = make_well_visits_df(
+            beam_breaks,
+            pd.DataFrame({"start_time": [12.05], "event_name": ["Pump3"]}),
+            position_info,
+            track_graph,
+        )
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+
+        assert trials.empty
+        assert experiences.empty
+
+    def test_scientific_visit_table_contains_no_epoch_boundary_markers(
+        self, beam_breaks, pump_events, position_info, track_graph
+    ):
+        visits = make_well_visits_df(
+            beam_breaks, pump_events, position_info, track_graph
+        )
+
+        observed_pokes = visits.loc[visits["is_observed_poke"]]
+        derived_intervals = visits.loc[
+            (~visits["is_boundary_marker"]) & (~visits["is_observed_poke"])
+        ]
+
+        assert not visits["is_boundary_marker"].any()
+        assert not observed_pokes.empty
+        assert (observed_pokes["duration"] > 0.0).all()
+        assert not derived_intervals.empty
+        assert not derived_intervals["is_observed_poke"].any()
+
+    def test_single_observed_port_does_not_create_a_terminal_omission(
+        self, position_info, track_graph
+    ):
+        """No physical destination poke means there is no completed trip."""
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [1.0, 1.2],
+                "end_time": [1.1, 1.3],
+                "event_name": ["Poke1", "Poke1"],
+            }
+        )
+        visits = make_well_visits_df(
+            beam_breaks,
+            pd.DataFrame({"start_time": []}),
+            position_info,
+            track_graph,
+        )
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+
+        assert trials.empty
+        assert experiences.empty
+
+    def test_junction_epoch_start_does_not_backdate_first_observed_visit(
+        self, track_graph
+    ):
+        """Nearest-well geometry at the epoch edge cannot invent occupancy."""
+        time = np.arange(0.0, 20.0, 0.002)
+        x = np.full(time.size, 20.0)
+        y = np.full(time.size, 0.0)  # central junction before the first poke
+        at_well_2 = (time >= 12.0) & (time < 16.0)
+        x[at_well_2], y[at_well_2] = 20.0, 20.0
+        at_well_0 = time >= 16.0
+        x[at_well_0], y[at_well_0] = 0.0, 20.0
+        position = pd.DataFrame(
+            {"projected_x_position": x, "projected_y_position": y}, index=time
+        )
+        beam_breaks = pd.DataFrame(
+            {
+                "start_time": [12.0, 12.3, 16.0, 16.3],
+                "end_time": [12.1, 12.4, 16.1, 16.4],
+                "event_name": ["Poke3", "Poke3", "Poke1", "Poke1"],
+            }
+        )
+        visits = make_well_visits_df(
+            beam_breaks,
+            pd.DataFrame({"start_time": pd.Series(dtype=float)}),
+            position,
+            track_graph,
+        )
+        trials = make_trials_df_from_well_visits(visits)
+        experiences = make_port_experiences_df(visits, trials)
+
+        assert experiences["arrival_time"].tolist() == pytest.approx([12.0, 16.0])
+        assert not experiences["is_boundary_derived"].any()
+        assert experiences["outcome_observed"].all()
+
+        location = behavioral_location_from_port_experiences(
+            np.array([5.0, 12.05]), experiences
+        )
+        assert location.loc[5.0, "occupancy_state"] == "unknown"
+        assert pd.isna(location.loc[5.0, "occupancy_well_id"])
+        assert location.loc[12.05, "occupancy_well_id"] == 2.0
+
+        recency = visit_recency_all_events(
+            np.array([5.0, 12.05]), experiences, {well: well for well in range(6)}
+        )
+        assert np.isnan(recency[0]).all()
+        assert recency[1, 2] == 1.0
+
+    def test_rejects_missing_origin_occupancy(self):
+        trials = pd.DataFrame(
+            {
+                "from_well": [0],
+                "to_well": [2],
+                "to_patch": [2],
+                "goal_arrival_time": [10.0],
+                "end_time": [11.0],
+                "reward_on_time": [10.2],
+                "outcome_known_time": [10.2],
+                "is_reward": [True],
+            },
+            index=pd.Index([1], name="trial_number"),
+        )
+        visits = pd.DataFrame(
+            {
+                "trial_number": [1],
+                "start_time": [1.0],
+                "end_time": [10.0],
+                "from_well": [0],
+                "to_well": [2],
+                "is_run": [True],
+                "is_boundary_marker": [False],
+                "is_observed_poke": [False],
+                "reward_on_time": [np.nan],
+            }
+        )
+
+        with pytest.raises(ValueError, match="origin-port occupancy"):
+            make_port_experiences_df(visits, trials)
+
+
+# ============================================================================
+# Tests: DIO poke identity is authoritative over noisy tracking endpoints
+# ============================================================================
+
+
+def test_tracking_straddle_cannot_delete_or_relabel_a_physical_poke(track_graph):
+    """A Poke2 beam break remains well 1 even if tracking crosses toward well 2."""
+    time = np.arange(0.0, 10.0, 0.002)
+    x = np.zeros(time.size)
+    y = np.full(time.size, 20.0)  # well 0
+    at_poke_2_start = time >= 3.0
+    x[at_poke_2_start], y[at_poke_2_start] = 0.0, -20.0  # well 1
+    # Tracking moves away before the Poke2 beam-break interval ends. The DIO
+    # channel, not this endpoint sample, remains authoritative.
+    after_poke_2_midpoint = time >= 3.25
+    x[after_poke_2_midpoint], y[after_poke_2_midpoint] = 20.0, 20.0  # well 2
+    at_poke_4 = time >= 7.0
+    x[at_poke_4], y[at_poke_4] = 20.0, -20.0  # well 3
+    position = pd.DataFrame(
+        {"projected_x_position": x, "projected_y_position": y}, index=time
+    )
+    beam_breaks = pd.DataFrame(
+        {
+            "start_time": [1.0, 1.2, 3.0, 3.2, 7.0, 7.2],
+            "end_time": [1.1, 1.3, 3.1, 3.3, 7.1, 7.3],
+            "event_name": ["Poke1", "Poke1", "Poke2", "Poke2", "Poke4", "Poke4"],
+        }
+    )
+
+    visits = make_well_visits_df(
+        beam_breaks,
+        pd.DataFrame({"start_time": pd.Series(dtype=float)}),
+        position,
+        track_graph,
+    )
+    trials = make_trials_df_from_well_visits(visits)
+    experiences = make_port_experiences_df(visits, trials)
+
+    observed_pokes = visits.loc[visits["is_observed_poke"]]
+    assert observed_pokes[["from_well", "to_well"]].to_numpy().tolist() == [
+        [0, 0],
+        [0, 0],
+        [1, 1],
+        [1, 1],
+        [3, 3],
+        [3, 3],
+    ]
+    assert trials[["from_well", "to_well"]].to_numpy().tolist() == [
+        [0, 1],
+        [1, 3],
+    ]
+    assert experiences["port"].tolist() == [0, 1, 3]
+    assert experiences["n_physical_poke_bouts"].tolist() == [2, 2, 2]
+    assert trials["is_patch_change"].tolist() == [False, True]
+    assert experiences["patch"].ne(experiences["patch"].shift()).iloc[1:].tolist() == [
+        False,
+        True,
+    ]
+
+
+def test_unknown_poke_channel_fails_loudly(position_info, track_graph):
+    beam_breaks = pd.DataFrame(
+        {
+            "start_time": [1.0],
+            "end_time": [1.1],
+            "event_name": ["Poke7"],
+        }
+    )
+    with pytest.raises(ValueError, match="canonical physical poke channel"):
+        make_well_visits_df(
+            beam_breaks,
+            _empty_pumps(),
+            position_info,
+            track_graph,
+        )
+
+
+def test_same_port_repokes_form_one_comrie_task_experience(position_info, track_graph):
+    """Final exit, not first exit, starts the next movement trial."""
+    beam_breaks = pd.DataFrame(
+        {
+            "start_time": [0.0, 3.0, 10.0, 12.2, 20.0],
+            "end_time": [0.1, 4.0, 11.0, 13.2, 21.0],
+            "event_name": ["Poke1", "Poke1", "Poke2", "Poke2", "Poke3"],
+        }
+    )
+    pumps = pd.DataFrame({"start_time": [10.2], "event_name": ["Pump2"]})
+
+    visits = make_well_visits_df(beam_breaks, pumps, position_info, track_graph)
+    trials = make_trials_df_from_well_visits(visits)
+    experiences = make_port_experiences_df(visits, trials)
+
+    assert experiences["port"].tolist() == [0, 1, 2]
+    assert experiences["n_physical_poke_bouts"].tolist() == [2, 2, 1]
+    assert experiences["first_poke_in_time"].tolist() == [0.0, 10.0, 20.0]
+    assert experiences["first_poke_out_time"].tolist() == [0.1, 11.0, 21.0]
+    assert experiences["final_poke_out_time"].tolist() == [4.0, 13.2, 21.0]
+    # Same-port re-pokes remain one Comrie task visit. The omission clock is
+    # arrival + the maximum pump latency, capped only by the visit's final
+    # departure—not by a transient beam release between re-pokes.
+    assert experiences.loc[0, "outcome_known_time"] == pytest.approx(
+        OMISSION_KNOWN_LATENCY_SEC
+    )
+    assert trials["movement_start_time"].tolist() == [4.0, 13.2]
+    assert trials["destination_first_poke_in_time"].tolist() == [10.0, 20.0]
+    assert trials["destination_first_poke_out_time"].tolist() == [11.0, 21.0]
+    assert trials["end_time"].tolist() == [13.2, 21.0]
+
+    engagement = photogate_engagement_at_times(
+        np.array([0.05, 2.0, 3.5, 9.0, 10.5]), visits
+    )
+    assert engagement["is_photogate_engaged"].tolist() == [
+        True,
+        False,
+        True,
+        False,
+        True,
+    ]
+    assert engagement["photogate_port"].tolist()[:1] == [0.0]
+    assert pd.isna(engagement.loc[1, "photogate_port"])
+
+
+def test_censored_terminal_beam_sample_does_not_create_a_trial(
+    position_info, track_graph
+):
+    beam_breaks = pd.DataFrame(
+        {
+            "start_time": [1.0, 5.0],
+            "end_time": [2.0, 5.0],
+            "event_name": ["Poke1", "Poke3"],
+        }
+    )
+
+    visits = make_well_visits_df(
+        beam_breaks, _empty_pumps(), position_info, track_graph
+    )
+    trials = make_trials_df_from_well_visits(visits)
+    experiences = make_port_experiences_df(visits, trials)
+
+    assert trials.empty
+    assert experiences.empty
+
+
+def test_task_record_alignment_allows_only_audited_boundary_extras():
+    experiences = pd.DataFrame(
+        {
+            "experience_id": [0, 1, 2, 3],
+            "movement_trial_number": pd.array([pd.NA, 1, 2, 3], dtype="Int64"),
+            "is_initial_experience": [True, False, False, False],
+            "is_boundary_derived": [False] * 4,
+            "outcome_observed": [True] * 4,
+            "port": [5, 0, 2, 4],
+            "patch": [3, 1, 2, 3],
+            "arrival_time": [0.0, 10.0, 20.0, 30.0],
+            "departure_time": [1.0, 11.0, 21.0, 31.0],
+            "first_poke_in_time": [0.0, 10.0, 20.0, 30.0],
+            "final_poke_out_time": [1.0, 11.0, 21.0, 31.0],
+            "n_physical_poke_bouts": [1] * 4,
+            "reward_on_time": [np.nan, 10.2, np.nan, 30.2],
+            "outcome_known_time": [0.3, 10.2, 20.3, 30.2],
+            "is_reward": [False, True, False, True],
+        }
+    )
+    comrie = pd.DataFrame(
+        {
+            "trial_number_by_epoch": [0, 1, 2],
+            "leaf": [1, 3, 5],
+            "reward": [True, False, True],
+            "poke_in_ts": [10.0, 20.0, 30.0],
+            "poke_out_ts": [11.0, 21.0, 31.0],
+        }
+    )
+
+    aligned = align_port_experiences_to_task_records(experiences, comrie)
+
+    assert aligned["is_in_task_record"].tolist() == [False, True, True, True]
+    assert aligned["task_record_number"].tolist()[1:] == [0, 1, 2]
+    assert aligned.attrs["leading_physical_experiences"] == 1
+    assert aligned.attrs["trailing_physical_experiences"] == 0
+    assert aligned.attrs["max_abs_poke_time_difference_s"] == pytest.approx(0.0)
+
+
+def test_task_record_alignment_rejects_an_internal_behavior_mismatch():
+    experiences = pd.DataFrame(
+        {
+            "port": [0, 2, 4],
+            "is_reward": [True, False, True],
+            "arrival_time": [10.0, 20.0, 30.0],
+            "departure_time": [11.0, 21.0, 31.0],
+        }
+    )
+    comrie = pd.DataFrame(
+        {
+            "leaf": [1, 4, 5],
+            "reward": [True, False, True],
+            "poke_in_ts": [10.0, 20.0, 30.0],
+            "poke_out_ts": [11.0, 21.0, 31.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="contiguous port/reward sequence"):
+        align_port_experiences_to_task_records(experiences, comrie)

@@ -20,7 +20,20 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.tables import build_stop_table
+from continuum_swr_replay.analysis.replay.tables import (
+    build_stop_table as _build_stop_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def build_stop_table(dot, trials, graph, **kwargs):
+    return _build_stop_table(
+        dot,
+        trials,
+        port_experiences_from_trials(trials, prepend_initial=True),
+        graph,
+        **kwargs,
+    )
 
 
 def _two_well_track_graph() -> nx.Graph:
@@ -74,21 +87,22 @@ class TestBoutStartContextNoLeak:
         trials = _trials_starting_at_t1()
         graph = _two_well_track_graph()
         out = build_stop_table(
-            dot, trials, graph, speed_threshold=4.0, nonlocal_threshold=0.5,
+            dot,
+            trials,
+            graph,
+            speed_threshold=4.0,
+            nonlocal_threshold=0.5,
         )
         assert len(out) == 1
         row = out.iloc[0]
         # t=0 had no trial active — every trial-derived field must
         # be NaN, not inherited from the trial that started later.
-        assert pd.isna(row["is_after_reward"]), (
-            f"is_after_reward leaked: {row['is_after_reward']}"
+        assert pd.isna(row["is_rewarded_outcome"]), (
+            f"is_rewarded_outcome leaked: {row['is_rewarded_outcome']}"
         )
-        assert pd.isna(row["reward_outcome"]), (
-            f"reward_outcome leaked: {row['reward_outcome']}"
+        assert pd.isna(row["did_last_completed_trip_switch_patch"]), (
+            f"is_after_switch leaked: {row['did_last_completed_trip_switch_patch']}"
         )
-        assert pd.isna(row["is_after_switch"]), (
-            f"is_after_switch leaked: {row['is_after_switch']}"
-        )
-        assert pd.isna(row["current_arm"]), (
-            f"current_arm leaked: {row['current_arm']}"
+        assert pd.isna(row["occupancy_well_arm"]), (
+            f"occupancy_well_arm leaked: {row['occupancy_well_arm']}"
         )

@@ -86,6 +86,8 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
 )
 from continuum_swr_replay.analysis.replay._helpers import (
     immobility_bout_intervals,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
     trial_cutoff_times,
     trial_outcome_times,
 )
@@ -565,7 +567,8 @@ def _plot_2d_context(
     win = pos.loc[center - window_sec : center + window_sec]
 
     # Regression-aligned historical path: never substitute the nearest well
-    # for ``current_arm`` and never reveal an in-progress destination/outcome.
+    # for ``occupancy_well_arm`` and never reveal an in-progress
+    # destination/outcome.
     # The magenta event-position marker below independently shows where the
     # animal physically was.
     completed = _completed_trials_at(data["trials"], event_start)
@@ -675,7 +678,11 @@ def _plot_arm_content_bar(
         ax.set_xticks([])
         ax.set_yticks([])
         return
-    mass = arm_rows.set_index("arm")["arm_posterior_mass"].reindex(arms).fillna(0.0)
+    mass = (
+        arm_rows.set_index("candidate_arm")["arm_posterior_mass"]
+        .reindex(arms)
+        .fillna(0.0)
+    )
     bar_colors = [arm_colors.get(a, "lightgray") for a in arms]
     ax.bar(arms, mass.to_numpy(), color=bar_colors, edgecolor="black", linewidth=0.3)
     ax.set_xticks(arms)
@@ -688,7 +695,7 @@ def _plot_arm_content_bar(
     ax.set_ylim(0, ymax * 1.35)
     if et_row is not None:
         flags = {
-            "cur": et_row.get("current_arm"),
+            "cur": et_row.get("occupancy_well_arm"),
             "prev": et_row.get("prev_arm"),
             "next": et_row.get("next_arm"),
             "lastR": et_row.get("last_rewarded_arm"),
@@ -756,12 +763,13 @@ def _plot_trial_history(
     outcome is still pending; that trip is deliberately absent here.
 
     Marked up so the value covariates can be read directly:
-      - gold band over the **last 10 trials** = the ``cumulative_reward`` window.
-      - orange rings on each row's **last 10 visits** = the ``reward_rate_arm_k10``
-        window (k=10 visits to that arm).
+      - gold band over the **last 10 known-outcome trials** = the
+        ``reward_count_candidate_arm_last10_known_trials`` window.
+      - orange rings on each row's **last 10 visits** = the
+        ``reward_fraction_candidate_arm_last10_visits`` window.
       - right margin prints the per-arm pipeline values for this event:
-        ``vr`` (visit_recency, trials-ago), ``rr`` (reward_rate_arm_k10),
-        ``cum`` (cumulative_reward over 10 trials).
+        ``vr`` (``visit_recency_trials``), ``rr`` (prior-visit reward
+        fraction), and ``cum`` (known-outcome reward count over 10 trials).
     """
     ax.set_title("known-outcome reward history (→ event start)", fontsize=7)
     ax.set_yticks(range(6))
@@ -828,11 +836,11 @@ def _plot_trial_history(
             )
     n = len(window)
 
-    # cumulative_reward window: the last 10 trials (gold band).
+    # reward_count_candidate_arm_last10_known_trials window: the last 10 trials (gold band).
     band_lo = max(-0.5, n - 10 - 0.5)
     ax.axvspan(band_lo, n - 0.5, color="gold", alpha=0.12, zorder=0)
 
-    # reward_rate_arm_k10 window: ring each row's last 10 visits (orange).
+    # reward_fraction_candidate_arm_last10_visits window: ring each row's last 10 visits (orange).
     for w in range(6):
         cols_w = [p for p in xs if wells[p] == w]
         if cols_w:
@@ -851,7 +859,7 @@ def _plot_trial_history(
     # Right-margin per-arm covariate values (the exact pipeline values for this
     # event). Header column names spelled out; a key below explains them.
     if arm_rows is not None and len(arm_rows):
-        by_arm = arm_rows.set_index("arm")
+        by_arm = arm_rows.set_index("candidate_arm")
         xtext = n - 0.2
         ax.set_xlim(-0.5, n - 0.5 + 0.42 * max(n, 1))
         ax.annotate(
@@ -867,9 +875,9 @@ def _plot_trial_history(
             if w not in by_arm.index:
                 continue
             r = by_arm.loc[w]
-            vr = r.get("visit_recency")
-            rr = r.get("reward_rate_arm_k10")
-            cum = r.get("cumulative_reward")
+            vr = r.get("visit_recency_trials")
+            rr = r.get("reward_fraction_candidate_arm_last10_visits")
+            cum = r.get("reward_count_candidate_arm_last10_known_trials")
             vr_s = "·" if pd.isna(vr) else f"{vr:.0f}"
             rr_s = "·" if pd.isna(rr) else f"{rr:.2f}"
             cum_s = "·" if pd.isna(cum) else f"{cum:.0f}"
@@ -890,8 +898,8 @@ def _plot_trial_history(
     ax.annotate(
         "right column = vr / rr / cum:   "
         "vr = visit_recency [trials since last visit]   ·   "
-        "rr = reward_rate_arm_k10 [last 10 visits = orange rings]   ·   "
-        "cum = cumulative_reward [last 10 trials = gold band]",
+        "rr = reward_fraction_candidate_arm_last10_visits [last 10 visits = orange rings]   ·   "
+        "cum = reward_count_candidate_arm_last10_known_trials [last 10 trials = gold band]",
         (0.5, -0.42),
         xycoords="axes fraction",
         ha="center",
@@ -927,16 +935,18 @@ def _plot_trial_history(
 def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
     """Per-arm continuous/binary regressors the arm models use (M3-M5).
 
-    Rows show ``visit_recency_demeaned``, ``arm_never_visited``,
-    ``reward_rate_arm_k10``, and ``is_last_rewarded_elsewhere``; columns are
+    Rows show ``visit_recency_trials_event_leaf_centered``,
+    ``is_candidate_arm_never_visited``,
+    ``reward_fraction_candidate_arm_last10_visits``, and
+    ``is_last_rewarded_noncurrent_arm``; columns are
     arms 0-8. Each row is colored on its own scale (these regressors live on
     different units) with the actual value printed in each cell.
     """
     preds = [
-        ("visit_recency_demeaned", "visit_rec"),
-        ("arm_never_visited", "never_vis"),
-        ("reward_rate_arm_k10", "rew_rate"),
-        ("is_last_rewarded_elsewhere", "lastR_elsw"),
+        ("visit_recency_trials_event_leaf_centered", "visit_rec"),
+        ("is_candidate_arm_never_visited", "never_vis"),
+        ("reward_fraction_candidate_arm_last10_visits", "rew_rate"),
+        ("is_last_rewarded_noncurrent_arm", "lastR_elsw"),
     ]
     ax.set_title("per-arm regressors (M3–M5)", fontsize=7)
     arms = list(range(9))
@@ -954,7 +964,7 @@ def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
         ax.set_xticks([])
         ax.set_yticks([])
         return
-    indexed = arm_rows.set_index("arm")
+    indexed = arm_rows.set_index("candidate_arm")
     mat = np.vstack(
         [indexed[col].reindex(arms).to_numpy(dtype=float) for col, _ in preds]
     )
@@ -1014,7 +1024,7 @@ def _plot_patch_content_bar(
         ax.set_yticks([])
         return
     by_patch = (
-        arm_rows.assign(patch=arm_rows["arm"].map(TRACK_SEGMENT_TO_PATCH))
+        arm_rows.assign(patch=arm_rows["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH))
         .groupby("patch")["arm_posterior_mass"]
         .sum()
         .reindex(patches)
@@ -1351,7 +1361,7 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
         return (
             f"SWR event #{row['event_label']} · {row['duration_ms']:.0f} ms\n"
             "NOT in non-local regression (SWR with no non-local event)\n"
-            "enters stop-level models only (is_swr_stop / replay_frac_swr)\n"
+            "enters stop-level models only (is_swr_stop / replay_fraction_swr)\n"
             f"peak non-local prob in window: {row['peak_nonlocal_prob']:.2f}"
         )
     is_swr = cls in ("swr_contained", "swr_partial")
@@ -1365,7 +1375,7 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
     if et_row is None:
         return head + "\nNOT in canonical event table (failed in-event filter)"
     arms = (
-        f"arms:  location={_arm_set(et_row.get('current_arm'))}"
+        f"arms:  location={_arm_set(et_row.get('occupancy_well_arm'))}"
         f"  prev={_arm_set(et_row.get('prev_arm'))}"
         f"  next(post-hoc)={_arm_set(et_row.get('next_arm'))}"
         f"  last_rew={_arm_set(et_row.get('last_rewarded_arm'))}"
@@ -1377,18 +1387,21 @@ def _regression_footer(row: pd.Series, et_row: pd.Series | None) -> str:
         f"  is_mua={_truth_label(et_row.get('is_mua'))}"
     )
     ctx = (
-        f"ctx: after_switch={_truth_label(et_row.get('is_after_switch'))}"
-        f" after_reward={_truth_label(et_row.get('is_after_reward'))}"
-        f" after_omission={_truth_label(et_row.get('is_after_omission'))}"
+        f"ctx: after_switch={_truth_label(et_row.get('did_last_completed_trip_switch_patch'))}"
+        f" rewarded_outcome={_truth_label(et_row.get('is_rewarded_outcome'))}"
     )
-    tsr = et_row.get("time_since_reward")
-    tsr_str = (
-        f"{float(tsr):.1f}s"
-        if tsr is not None and not (isinstance(tsr, float) and np.isnan(tsr))
+    tsr = et_row.get("time_since_last_reward_s")
+    tsr_str = f"{float(tsr):.1f}s" if tsr is not None and not pd.isna(tsr) else "n/a"
+    outcome = et_row.get("is_rewarded_outcome")
+    outcome_str = (
+        "n/a"
+        if outcome is None or pd.isna(outcome)
+        else "rewarded"
+        if outcome == 1
+        else "omission"
+        if outcome == 0
         else "n/a"
     )
-    outcome = et_row.get("reward_outcome")
-    outcome_str = "rewarded" if outcome == 1 else "omission" if outcome == 0 else "n/a"
     rew = f"reward: outcome={outcome_str}  time_since_reward={tsr_str}"
     # Presence in event_table is not equivalent to membership in a fitted
     # model cohort: complete-case selection can still exclude an event (for
@@ -1447,8 +1460,8 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     )
     ax_2d = fig.add_subplot(gs_left[0])
     regression_event_start = (
-        float(et_row["event_start"])
-        if et_row is not None and pd.notna(et_row.get("event_start"))
+        float(et_row["event_start_s"])
+        if et_row is not None and pd.notna(et_row.get("event_start_s"))
         else float(row["plot_start"])
     )
     _plot_2d_context(
@@ -1530,7 +1543,8 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     ax_post.tick_params(labelleft=False)
 
     # Bottom: full-width trial reward-history grid, marked up with the
-    # value covariates (visit_recency / reward_rate_arm_k10 / cumulative_reward).
+    # value covariates (visit_recency_trials / reward_fraction_candidate_arm_last10_visits /
+    # reward_count_candidate_arm_last10_known_trials).
     _plot_trial_history(
         fig.add_subplot(outer[1]), ctx["data"], regression_event_start, arm_rows
     )
@@ -1573,6 +1587,7 @@ def render_epoch(
             dot,
             env,
             data["trials"],
+            data["port_experiences"],
             data["track_graph"],
             conditional_posterior=posterior,
         )
@@ -1581,6 +1596,7 @@ def render_epoch(
             dot,
             env,
             data["trials"],
+            data["port_experiences"],
             data["track_graph"],
             conditional_posterior=posterior,
         )

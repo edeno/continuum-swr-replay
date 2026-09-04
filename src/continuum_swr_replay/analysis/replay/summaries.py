@@ -53,6 +53,8 @@ from __future__ import annotations
 
 import numpy as np
 
+PROBABILITY_ROW_SUM_ATOL = 1e-5
+
 # ── Posterior collapse to arms ──
 
 
@@ -88,18 +90,61 @@ def posterior_to_arm_marginal(
     Raises
     ------
     ValueError
-        If any timebin's posterior lies entirely on junction bins. Such a
-        timebin carries no arm information, and filling it (uniform or
-        otherwise) would manufacture one -- see the guard below.
+        If the posterior is not a finite, nonnegative probability matrix on
+        real-arm bins; if edge labels are not one-dimensional integer IDs in
+        ``{-1, 0, ..., n_arms - 1}``; or if any timebin's posterior lies
+        entirely on junction bins. Junction-bin entries may be ``NaN`` because
+        decoder artifacts use those values for structural placeholders.
     """
-    conditional_posterior = np.asarray(conditional_posterior, dtype=float)
-    edge_id = np.asarray(edge_id, dtype=int)
+    raw_posterior = np.asarray(conditional_posterior)
+    if raw_posterior.ndim != 2:
+        raise ValueError(
+            "conditional_posterior must be 2-D with shape "
+            f"(n_timebins, n_position_bins); got {raw_posterior.shape}"
+        )
+    if np.iscomplexobj(raw_posterior):
+        raise ValueError("conditional_posterior probabilities must be real-valued")
+    try:
+        conditional_posterior = raw_posterior.astype(float, copy=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("conditional_posterior probabilities must be numeric") from exc
+
+    raw_edge_id = np.asarray(edge_id)
+    if raw_edge_id.ndim != 1:
+        raise ValueError(f"edge_id must be 1-D; got shape {raw_edge_id.shape}")
+    if np.iscomplexobj(raw_edge_id):
+        raise ValueError("edge_id values must be finite integers")
+    try:
+        edge_id_float = raw_edge_id.astype(float, copy=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("edge_id values must be finite integers") from exc
+    if (
+        not np.isfinite(edge_id_float).all()
+        or not np.equal(edge_id_float, np.floor(edge_id_float)).all()
+    ):
+        raise ValueError("edge_id values must be finite integers")
+    edge_id = edge_id_float.astype(np.int64, copy=False)
 
     if conditional_posterior.shape[1] != edge_id.shape[0]:
         raise ValueError(
             f"posterior shape {conditional_posterior.shape} does not match "
             f"edge_id length {edge_id.shape[0]}"
         )
+
+    invalid_negative = edge_id < -1
+    if invalid_negative.any():
+        invalid = np.unique(edge_id[invalid_negative]).tolist()
+        raise ValueError(
+            "edge_id values must use -1 for junctions and nonnegative integers "
+            f"for real arms; got invalid IDs {invalid}"
+        )
+
+    if n_arms is not None and (
+        isinstance(n_arms, (bool, np.bool_))
+        or not isinstance(n_arms, (int, np.integer))
+        or int(n_arms) <= 0
+    ):
+        raise ValueError(f"n_arms must be a positive integer; got {n_arms!r}")
 
     is_real = edge_id >= 0
     if not is_real.any():
@@ -110,13 +155,61 @@ def posterior_to_arm_marginal(
         )
     if n_arms is None:
         n_arms = int(edge_id[is_real].max()) + 1
-    if n_arms <= 0:
-        raise ValueError(f"n_arms must be positive; got {n_arms}")
+    else:
+        n_arms = int(n_arms)
+
+    out_of_range = edge_id[is_real] >= n_arms
+    if out_of_range.any():
+        invalid = np.unique(edge_id[is_real][out_of_range]).tolist()
+        raise ValueError(
+            f"real edge_id values {invalid} fall outside the canonical range "
+            f"0..{n_arms - 1} for n_arms={n_arms}"
+        )
+
+    real_mass = conditional_posterior[:, is_real]
+    if real_mass.shape[0]:
+        # Reductions avoid allocating decoder-sized boolean/copy arrays solely
+        # for validation. ``min``/``max`` propagate any NaN and expose either
+        # signed infinity, while the minimum also certifies nonnegativity.
+        real_min = float(real_mass.min())
+        real_max = float(real_mass.max())
+        if np.isnan(real_min) or np.isnan(real_max):
+            raise ValueError(
+                "conditional_posterior contains non-finite values on real-arm "
+                "bins; NaN is permitted only at junction placeholders "
+                "(edge_id == -1)"
+            )
+        if np.isinf(real_min) or np.isinf(real_max):
+            raise ValueError("conditional_posterior contains infinite values")
+        if real_min < 0:
+            raise ValueError("conditional_posterior contains negative probabilities")
+
+    junction_mass = conditional_posterior[:, ~is_real]
+    if np.isinf(junction_mass).any():
+        raise ValueError("conditional_posterior contains infinite values")
+    if (junction_mass < 0).any():
+        raise ValueError("conditional_posterior contains negative probabilities")
+
+    # The input is a conditional probability distribution, not an arbitrary
+    # score matrix. Decoder files are float32-backed and can accumulate several
+    # parts in 1e-6 of row-sum error across ~250 bins, hence the explicit 1e-5
+    # absolute tolerance. Structural junction NaNs carry zero probability mass.
+    input_row_sum = np.nansum(conditional_posterior, axis=1)
+    proper_rows = np.isclose(
+        input_row_sum, 1.0, rtol=0.0, atol=PROBABILITY_ROW_SUM_ATOL
+    )
+    if not proper_rows.all():
+        deviation = np.abs(input_row_sum[~proper_rows] - 1.0)
+        raise ValueError(
+            "conditional_posterior rows must sum to 1 within absolute "
+            f"tolerance {PROBABILITY_ROW_SUM_ATOL:g}; "
+            f"{int((~proper_rows).sum())}/{len(proper_rows)} row(s) fail "
+            f"(maximum absolute deviation {float(deviation.max()):.6g})"
+        )
 
     n_timebins = conditional_posterior.shape[0]
     arm_posterior = np.zeros((n_timebins, n_arms), dtype=float)
     real_edges = edge_id[is_real]
-    real_mass = conditional_posterior[:, is_real]  # (T, n_real_bins)
 
     # Explicit per-arm scatter. Iterating over arms (not timebins) keeps
     # this O(n_arms · T); n_arms = 9 in the bandit task so the cost is
@@ -332,3 +425,44 @@ def arm_posterior_mass(
     for a in range(n_arms):
         mass[:, a] = np.bincount(inv, weights=weighted[:, a], minlength=n_events)
     return unique, mass
+
+
+def arm_fraction_from_event_total(
+    arm_content: np.ndarray,
+    event_total: np.ndarray,
+    *,
+    denominator_floor: float | None = None,
+) -> np.ndarray:
+    """Normalize candidate-arm content by its event-matched total.
+
+    This is the shared denominator rule for MAP counts and marginalized
+    posterior mass. ``event_total`` must already be broadcast to candidate-arm
+    rows and describe the same included bins or weights as ``arm_content``.
+    Zero-total or unavailable rows are undefined (NaN), never fabricated zero.
+
+    ``denominator_floor`` clamps the divisor from below on the valid rows,
+    guarding against division by a vanishingly small (but positive) total. The
+    posterior-mass caller passes ``1e-10`` to preserve the pre-refactor
+    behavior; integer-count callers leave it unset (a positive count is never
+    smaller than the floor anyway).
+    """
+    content = np.asarray(arm_content, dtype=float)
+    total = np.asarray(event_total, dtype=float)
+    if content.shape != total.shape:
+        raise ValueError(
+            "arm_content and event_total must have identical shapes; "
+            f"got {content.shape} and {total.shape}"
+        )
+    finite_content = np.isfinite(content)
+    finite_total = np.isfinite(total)
+    if (content[finite_content] < 0).any():
+        raise ValueError("arm content must be nonnegative where finite")
+    if (total[finite_total] < 0).any():
+        raise ValueError("event totals must be nonnegative where finite")
+    output = np.full(content.shape, np.nan, dtype=float)
+    valid = finite_content & finite_total & (total > 0)
+    denominator = total[valid]
+    if denominator_floor is not None:
+        denominator = np.maximum(denominator, denominator_floor)
+    output[valid] = content[valid] / denominator
+    return output

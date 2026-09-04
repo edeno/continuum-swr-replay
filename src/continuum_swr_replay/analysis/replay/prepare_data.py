@@ -27,28 +27,34 @@ module)::
 **Skipping Spyglass for covariate-only changes** (``--from-cache``): the
 only per-session Spyglass fetch is ``trials`` + ``track_graph`` (the ~3 h
 cost of a full run). Every normal run pickles those to
-``replay_content/_session_cache/<session_id>.pkl``. With ``--from-cache``
+``replay_content/_session_cache/<cache-version>/<session_id>.pkl``. With ``--from-cache``
 the driver reads them back instead of querying Spyglass and re-runs the
 *same* table builders — so a change that only touches covariate code
 (e.g. a new/re-encoded predictor, a re-standardization, a new
 interaction) rebuilds the canonical tables in minutes with byte-for-byte
 parity on everything else. Sessions missing from the cache transparently
 fall back to Spyglass and are cached for next time, so no session is ever
-dropped. Caveat: ``--from-cache`` freezes ``trials``/``track_graph`` at
-the last full run; to pick up genuine upstream Spyglass changes
-(re-curation, new intervals) run a normal pass, which refreshes the cache.
+dropped. Cache paths are versioned by the behavioral derivation contract, so a
+definition change never overwrites or reinterprets the prior cache. Caveat:
+``--from-cache`` freezes ``trials``/``track_graph`` within that version; to pick
+up genuine upstream Spyglass changes (re-curation, new intervals) run a normal
+pass, which refreshes only the current version.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import pickle
 import re
+import tempfile
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 from pandas.errors import MergeError
 
 try:  # datajoint does not connect on import; guard so offline runs still work
@@ -84,8 +90,15 @@ from continuum_swr_replay.analysis.replay.tables import (
     build_stop_table,
 )
 from continuum_swr_replay.data_loaders.constants import NWB_FILES, WELL_ARMS
+from continuum_swr_replay.data_loaders.trials import (
+    validate_port_experience_pump_audit,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.table_io import (
+    parquet_path,
+    publish_canonical,
+    umask_file_mode,
+)
 from continuum_swr_replay.types import SessionDataKeys
 
 logging.basicConfig(
@@ -95,9 +108,21 @@ logging.basicConfig(
 )
 
 OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
-# Per-session cache of the only Spyglass-sourced inputs (trials + track_graph).
+# Per-session cache of the Spyglass-sourced behavioral context and track graph.
 # Populated on every full run; consumed by --from-cache to skip load_data.
 SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
+from continuum_swr_replay.analysis.replay.versions import (  # noqa: E402
+    BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
+)
+
+PORT_EXPERIENCE_CACHE_COLUMNS = (
+    "is_boundary_derived",
+    "outcome_observed",
+    "first_poke_in_time",
+    "first_poke_out_time",
+    "final_poke_out_time",
+    "n_physical_poke_bouts",
+)
 
 
 def find_sessions(max_per_animal: int | None = None):
@@ -157,18 +182,37 @@ def find_sessions(max_per_animal: int | None = None):
     return selected
 
 
-# Written by ``load_data`` since the outcome clock landed. Their absence dates a
-# cache entry to before it, and dates its reward-history covariates with it.
-OUTCOME_CLOCK_TRIAL_COLUMNS = ("reward_on_time", "outcome_known_time")
+# Written by ``load_data`` under the Comrie-aligned final-exit trial contract.
+# Their absence dates a cache entry to an earlier behavioral definition. The
+# versioned directory ensures those older inputs remain available for parity
+# comparisons rather than being overwritten or reinterpreted.
+OUTCOME_CLOCK_TRIAL_COLUMNS = (
+    "reward_on_time",
+    "outcome_known_time",
+    "movement_start_time",
+    "destination_first_poke_in_time",
+    "destination_first_poke_out_time",
+)
 
 
-def load_trials_track_graph(
+def behavioral_context_cache_path(
+    session: dict, *, cache_key: str | None = None
+) -> Path:
+    """Return the versioned cache path without mutating an older cache bundle."""
+    return (
+        SESSION_CACHE_DIR
+        / BEHAVIORAL_CONTEXT_CACHE_VERSION
+        / f"{cache_key or session['session_id']}.pkl"
+    )
+
+
+def load_behavioral_context(
     session: dict, *, from_cache: bool, cache_key: str | None = None
-) -> tuple[pd.DataFrame | None, object | None, bool]:
-    """Return ``(trials, track_graph, hit_cache)``, caching the Spyglass fetch.
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None, object | None, bool]:
+    """Return trials, port experiences, graph, and cache status.
 
-    ``trials`` + ``track_graph`` are the only per-session inputs pulled from
-    Spyglass (the ~3 h cost of a full run). They are pickled to
+    These behavioral inputs are pulled from Spyglass (the ~3 h cost of a full
+    run) and pickled to
     :data:`SESSION_CACHE_DIR` keyed by ``session_id`` so a covariate-only
     rebuild (``from_cache=True``) can skip ``load_data`` entirely.
 
@@ -176,47 +220,81 @@ def load_trials_track_graph(
     to Spyglass (and refreshes the cache) so a session is never dropped for a
     missing entry. ``from_cache=False`` always queries Spyglass and rewrites
     the cache, keeping it fresh after every real regen. ``hit_cache`` reports
-    whether the values came from the cache (vs Spyglass). ``trials`` /
-    ``track_graph`` are ``None`` when the session cannot be loaded.
+    whether the values came from the cache (vs Spyglass). The returned inputs
+    are ``None`` when the session cannot be loaded.
 
-    **Staleness is presence-only, with one exception.** The cache is otherwise
-    trusted whenever the pickle exists — there is no schema/version tag. So
-    ``--from-cache`` freezes not just Spyglass-side data (re-curation, new
-    intervals) but also ``load_data``'s own trial-derivation *code*: if that
-    logic changes, cached trials keep the old derivation silently. Run a full
-    (non-cache) pass to refresh after any such change; ``--from-cache`` is for
-    covariate-only work.
-
-    The exception is the outcome clock. An entry written before
-    ``reward_on_time`` / ``outcome_known_time`` existed makes every reward-history
-    covariate silently resolve at poke-out instead of pump onset, and that is
-    not visible in any output. Such an entry is treated as a cache miss, so the
-    session is re-fetched from Spyglass and fails loudly there if it cannot be
-    read -- which is the honest outcome, since a session whose NWB file will not
-    open cannot be rebuilt correctly from a stale cache either.
+    Cache paths and payloads are versioned by the behavioral derivation contract.
+    A new contract writes to a new subdirectory, preserving older caches for
+    explicit old/new comparison. Missing/mismatched versions or required columns
+    are treated as cache misses and re-fetched from Spyglass; they are never
+    silently interpreted under the current covariate definition.
     """
     # ``cache_key`` lets a sibling pipeline share this cache. trials and
     # track_graph are session facts, independent of which decoder produced the
     # posteriors, so the ContFrag prep reuses these entries under the NonLocal
     # session_id rather than paying for (or duplicating) its own Spyglass fetch.
-    cache_path = SESSION_CACHE_DIR / f"{cache_key or session['session_id']}.pkl"
+    cache_path = behavioral_context_cache_path(session, cache_key=cache_key)
     if from_cache and cache_path.exists():
         with open(cache_path, "rb") as f:
             cached = pickle.load(f)
-        stale = [
+        stale_trials = [
             column
             for column in OUTCOME_CLOCK_TRIAL_COLUMNS
             if column not in cached["trials"].columns
         ]
-        if stale:
+        cache_version = cached.get("cache_schema_version")
+        experiences = cached.get("port_experiences")
+        stale_experiences = (
+            list(PORT_EXPERIENCE_CACHE_COLUMNS)
+            if experiences is None
+            else [
+                column
+                for column in PORT_EXPERIENCE_CACHE_COLUMNS
+                if column not in experiences.columns
+            ]
+        )
+        pump_audit_error = None
+        if experiences is not None:
+            try:
+                validate_port_experience_pump_audit(experiences)
+            except (KeyError, ValueError) as exc:
+                pump_audit_error = str(exc)
+        if cache_version != BEHAVIORAL_CONTEXT_CACHE_VERSION:
+            logging.warning(
+                "session cache entry %s has behavioral-context version %r, "
+                "expected %r; ignoring it and re-fetching from Spyglass",
+                cache_path.name,
+                cache_version,
+                BEHAVIORAL_CONTEXT_CACHE_VERSION,
+            )
+        elif stale_trials:
             logging.warning(
                 "session cache entry %s predates the outcome clock (missing %s); "
                 "ignoring it and re-fetching from Spyglass",
                 cache_path.name,
-                ", ".join(stale),
+                ", ".join(stale_trials),
+            )
+        elif stale_experiences:
+            logging.warning(
+                "session cache entry %s predates the physical-poke experience "
+                "contract (missing %s); ignoring it and re-fetching from Spyglass",
+                cache_path.name,
+                ", ".join(stale_experiences),
+            )
+        elif pump_audit_error is not None:
+            logging.warning(
+                "session cache entry %s has invalid post-recovery pump audit "
+                "metadata (%s); ignoring it and re-fetching from Spyglass",
+                cache_path.name,
+                pump_audit_error,
             )
         else:
-            return cached["trials"], cached["track_graph"], True
+            return (
+                cached["trials"],
+                cached["port_experiences"],
+                cached["track_graph"],
+                True,
+            )
 
     # Imported lazily: `data_loaders` imports `spyglass.common` at module top
     # level, which opens a DataJoint connection. Keeping this out of module
@@ -226,15 +304,42 @@ def load_trials_track_graph(
     data = load_data(
         session["nwb_file_name"],
         session["epoch_name"],
-        include=frozenset({SessionDataKeys.TRIALS}),
+        include=frozenset({SessionDataKeys.TRIALS, SessionDataKeys.PORT_EXPERIENCES}),
     )
     trials = data.get("trials")
+    port_experiences = data.get("port_experiences")
     track_graph = data.get("track_graph")
-    if trials is not None and track_graph is not None:
-        SESSION_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        with open(cache_path, "wb") as f:
-            pickle.dump({"trials": trials, "track_graph": track_graph}, f)
-    return trials, track_graph, False
+    if trials is not None and port_experiences is not None and track_graph is not None:
+        validate_port_experience_pump_audit(port_experiences)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        # Atomic write: two sibling shards can target this shared cache dir, and
+        # a crash or concurrent write to the same path would otherwise leave a
+        # truncated pickle that the next read fails on. Write to a
+        # same-directory temp file and os.replace into place.
+        handle, tmp_name = tempfile.mkstemp(
+            dir=cache_path.parent, prefix=f".{cache_path.name}.", suffix=".tmp"
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(handle, "wb") as f:
+                pickle.dump(
+                    {
+                        "cache_schema_version": BEHAVIORAL_CONTEXT_CACHE_VERSION,
+                        "trials": trials,
+                        "port_experiences": port_experiences,
+                        "track_graph": track_graph,
+                    },
+                    f,
+                )
+            # mkstemp created tmp_path at 0600; restore the umask-respecting
+            # mode a plain write would have produced so other readers of the
+            # shared cache dir keep access (see table_io.umask_file_mode).
+            os.chmod(tmp_path, umask_file_mode())
+            os.replace(tmp_path, cache_path)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+    return trials, port_experiences, track_graph, False
 
 
 def _process_session(
@@ -252,7 +357,7 @@ def _process_session(
     ``event_sequence_table``, but a fully populated ``stop_table``
     that records the session's immobility bouts. ``stop_table.pkl``
     is documented to include zero-event bouts, and the rate model
-    fits ``n_events`` per stop over a denominator that must include
+    fits ``n_selected_events`` per stop over a denominator that must include
     those rows. Callers concatenate every non-``None`` return into
     the global canonical tables; ``pd.concat`` accepts the empty
     per-event frames without complaint.
@@ -276,12 +381,12 @@ def _process_session(
     with open(session["env_file"], "rb") as f:
         env = pickle.load(f)
 
-    # Trials + track_graph come from Spyglass (slow; the ~3 h/full-run cost),
+    # Behavioral context + track_graph come from Spyglass (slow; the ~3 h/full-run cost),
     # unless served from the per-session cache (--from-cache).
-    trials, track_graph, hit_cache = load_trials_track_graph(
+    trials, port_experiences, track_graph, hit_cache = load_behavioral_context(
         session, from_cache=from_cache
     )
-    if trials is None or track_graph is None:
+    if trials is None or port_experiences is None or track_graph is None:
         return None
     logging.info(
         "  %s %s: trials/track_graph from %s",
@@ -314,18 +419,24 @@ def _process_session(
     # builder's "**including zero-event bouts**" promise) keeps
     # zero-event sessions in the dataset. Returning early on an
     # empty event_table dropped those sessions silently and broke
-    # the downstream rate model, which models n_events per stop
+    # the downstream rate model, which models n_selected_events per stop
     # over a denominator that *must* include zero-event stops.
-    stop_table = build_stop_table(dot, trials, track_graph)
+    stop_table = build_stop_table(dot, trials, port_experiences, track_graph)
 
     event_table = build_event_table(
-        dot, env, trials, track_graph, conditional_posterior=posterior
+        dot,
+        env,
+        trials,
+        port_experiences,
+        track_graph,
+        conditional_posterior=posterior,
     )
     event_arm_table = build_event_arm_table(
         event_table,
         dot,
         env,
         trials,
+        port_experiences,
         track_graph,
         conditional_posterior=posterior,
         contingency=contingency,
@@ -344,7 +455,7 @@ def _process_session(
     # standalone post-hoc pass for the per-event columns.
     if event_sequence_table is not None and len(event_table) > 0:
         sess_keys = [
-            c for c in ("animal", "day", "epoch") if c in event_table.columns
+            c for c in ("animal", "session_date", "epoch") if c in event_table.columns
         ]
         retro = compute_retrospective_metrics(
             event_table, event_arm_table, event_sequence_table
@@ -368,18 +479,19 @@ def _assert_value_block_matches_source(
 ) -> None:
     """Fail if the built value block disagrees with the qvals table it came from.
 
-    ``q_arm`` / ``p_reward_arm`` / ``arm_uncertainty`` are baked into the
-    event-arm table from ``qvals_table.pkl`` at build time, so the dependency
-    runs qvals -> tables. Rebuilding the tables *before* refreshing qvals
-    silently leaves the value block one fit behind, and the SWR-contrast runner
-    then joins a fresh ``rpe`` onto a stale ``q_arm`` for the same stop. That
+    Candidate-arm reward-belief mean, task probability, and belief variance
+    are baked into the event-arm table from ``qvals_table`` at build time, so
+    the dependency runs qvals -> tables. Rebuilding the tables *before*
+    refreshing qvals silently leaves the value block one fit behind, and the
+    SWR-contrast runner then joins a fresh RPE onto a stale candidate-arm
+    belief mean for the same stop. That
     happened once (281 rows across 36 stops, all five animals) and nothing
     caught it -- the per-table standardization checks compare each table only
     against its own reference.
     """
     if contingency is None or event_arm_table.empty:
         return
-    port_cols = [f"q_port{i}" for i in range(6)]
+    port_cols = [f"reward_belief_mean_port_{i}" for i in range(6)]
     if not set(port_cols).issubset(contingency.columns):
         return
     if contingency["stop_id"].isna().any() or contingency["stop_id"].duplicated().any():
@@ -388,21 +500,25 @@ def _assert_value_block_matches_source(
             "before event-arm value validation"
         )
     leaf = event_arm_table.loc[
-        event_arm_table["arm"] <= 5, ["stop_id", "arm", "q_arm"]
+        event_arm_table["candidate_arm"] <= 5,
+        ["stop_id", "candidate_arm", "reward_belief_mean_candidate_arm_preoutcome"],
     ]
     source = contingency.set_index("stop_id")[port_cols]
     joined = leaf.join(source, on="stop_id")
     port_values = joined[port_cols].to_numpy(dtype=float)
     comparable = np.isfinite(port_values).all(axis=1) & np.isfinite(
-        joined["q_arm"].to_numpy(dtype=float)
+        joined["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(dtype=float)
     )
     if not comparable.any():
         return
     expected = port_values[
-        np.arange(len(joined)), joined["arm"].to_numpy(dtype=int)
+        np.arange(len(joined)), joined["candidate_arm"].to_numpy(dtype=int)
     ]
     mismatched = comparable & ~np.isclose(
-        expected, joined["q_arm"].to_numpy(dtype=float), rtol=0, atol=1e-9
+        expected,
+        joined["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(dtype=float),
+        rtol=0,
+        atol=1e-9,
     )
     if mismatched.any():
         bad_stops = joined.loc[mismatched, "stop_id"].nunique()
@@ -414,67 +530,180 @@ def _assert_value_block_matches_source(
         )
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument("--test", action="store_true", help="2 sessions per animal")
-    parser.add_argument("--max-per-animal", type=int, default=None)
-    parser.add_argument(
-        "--from-cache",
-        action="store_true",
-        help=(
-            "Covariate-only rebuild: read trials/track_graph from the "
-            "per-session cache instead of Spyglass (falls back to Spyglass "
-            "for uncached sessions). Rebuilds all tables via the same "
-            "builders in minutes. Freezes upstream at the last full run — "
-            "run without this flag to refresh the cache."
-        ),
-    )
-    args = parser.parse_args()
+def populate_behavioral_context_cache(
+    sessions: list[dict], *, from_cache: bool
+) -> None:
+    """Populate and validate versioned behavioral caches without building tables.
 
-    max_per_animal = 2 if args.test else args.max_per_animal
-    sessions = find_sessions(max_per_animal=max_per_animal)
-    logging.info(
-        "Found %d sessions (trials/track_graph source: %s)",
-        len(sessions),
-        "cache, Spyglass fallback" if args.from_cache else "Spyglass (refreshing cache)",
-    )
+    This is the safe parallelization boundary for a full regeneration: callers
+    may assign disjoint animal/session sets to independent processes because
+    every cache file has a unique session key. The scientific tables are still
+    assembled once, serially, after all expected caches exist.
+    """
+    failures: list[dict[str, str]] = []
+    for index, session in enumerate(sessions, start=1):
+        try:
+            trials, experiences, graph, hit_cache = load_behavioral_context(
+                session, from_cache=from_cache
+            )
+        except (FileNotFoundError, OSError, ValueError, _DataJointError) as exc:
+            failures.append(
+                {
+                    "nwb_file_name": session["nwb_file_name"],
+                    "epoch": session["epoch_name"],
+                    "reason": str(exc),
+                }
+            )
+            continue
+        if trials is None or experiences is None or graph is None:
+            failures.append(
+                {
+                    "nwb_file_name": session["nwb_file_name"],
+                    "epoch": session["epoch_name"],
+                    "reason": "behavioral context or track graph unavailable",
+                }
+            )
+            continue
+        logging.info(
+            "cache [%d/%d] %s %s: %s",
+            index,
+            len(sessions),
+            session["nwb_file_name"],
+            session["epoch_name"],
+            "validated existing entry" if hit_cache else "refreshed from Spyglass",
+        )
 
-    # Per-stop value artifact (per-arm nominal p(R) + per-arm model value),
-    # keyed by stop_id, from qvals_table (exact poke_out alignment -- no difflib).
-    # The event-arm builder maps p_reward_port/q_port -> the per-arm
-    # p_reward_arm / q_arm; q_port is now the beta-model belief per port (was
-    # leaky-Q). Absent -> those columns stay NaN.
-    contingency_path = OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
-    contingency = load_contingency(contingency_path)
+    if failures:
+        raise RuntimeError(
+            "behavioral cache build is incomplete: "
+            f"{len(failures)} of {len(sessions)} session(s) failed; "
+            f"sample={failures[:10]}"
+        )
 
-    # Warn if the output directory still holds artifacts from the
-    # legacy pipeline — silent coexistence lets downstream scripts
-    # accidentally read stale pickles.
-    for legacy_name in ("events.pkl", "long_count.pkl", "long_binary.pkl"):
-        legacy_path = OUTPUT_DIR / legacy_name
-        if legacy_path.exists():
-            logging.warning(
-                "legacy output %s still present — delete it to avoid "
-                "stale reads downstream",
-                legacy_path,
+
+_STOP_SPLIT_COLUMNS = frozenset(
+    {"n_nonlocal_swr_events", "n_nonlocal_non_swr_events"}
+)
+
+
+def _refuse_to_clobber_complete_stop_table(output_dir: Path) -> None:
+    """Raise if ``output_dir`` already holds a *complete* stop table.
+
+    A complete stop table carries the SWR split columns that only the full
+    build produces. The ``--stop-only`` bootstrap produces a split-less table,
+    so overwriting a complete one would silently downgrade it.
+    """
+    target = parquet_path(output_dir / "stop_table")
+    if not target.exists():
+        return
+    if _STOP_SPLIT_COLUMNS.issubset(pq.read_schema(target).names):
+        raise FileExistsError(
+            f"{target} is a complete stop table (has the SWR split); the "
+            "--stop-only bootstrap would overwrite it with a split-less table. "
+            "Point --output-dir at a staging directory instead."
+        )
+
+
+def build_stop_table_scope(
+    sessions: list[dict], *, from_cache: bool, output_dir: Path
+) -> pd.DataFrame:
+    """Build only the qvals-authoritative stop table for one scope.
+
+    Qvals requires current stop IDs/times, while the complete event-arm table
+    requires qvals before behavioral-model columns can be standardized. This
+    explicit bootstrap avoids publishing an all-NaN value block.
+    """
+    # Fail fast, before any session work: this bootstrap deliberately omits the
+    # SWR split (n_nonlocal_swr_events / n_nonlocal_non_swr_events), which the
+    # full build adds via add_nonlocal_swr_split once the event table exists.
+    # Writing it over a *complete* canonical stop table would downgrade that
+    # table and desynchronize it from the event/arm tables (the atomic-set
+    # invariant in CLAUDE.md), and every downstream rate fit would then KeyError
+    # on the missing split columns. Refuse rather than clobber.
+    _refuse_to_clobber_complete_stop_table(output_dir)
+
+    frames: list[pd.DataFrame] = []
+    failures: list[dict[str, str]] = []
+    for index, session in enumerate(sessions, start=1):
+        try:
+            dot = pd.read_pickle(session["dot_file"])
+            validate_dot_event_contract(dot)
+            trials, experiences, graph, hit_cache = load_behavioral_context(
+                session, from_cache=from_cache
+            )
+            if trials is None or experiences is None or graph is None:
+                raise ValueError("behavioral context or track graph unavailable")
+            frames.append(build_stop_table(dot, trials, experiences, graph))
+            logging.info(
+                "stop [%d/%d] %s %s: behavioral context from %s",
+                index,
+                len(sessions),
+                session["nwb_file_name"],
+                session["epoch_name"],
+                "cache" if hit_cache else "Spyglass",
+            )
+        except (FileNotFoundError, OSError, ValueError, _DataJointError) as exc:
+            failures.append(
+                {
+                    "nwb_file_name": session["nwb_file_name"],
+                    "epoch": session["epoch_name"],
+                    "reason": str(exc),
+                }
             )
 
-    t0 = time.time()
+    if failures:
+        raise RuntimeError(
+            "stop-only build is incomplete: "
+            f"{len(failures)} of {len(sessions)} session(s) failed; "
+            f"sample={failures[:10]}. No stop table was written."
+        )
+    stop_table = pd.concat(frames, ignore_index=True)
+    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
+        raise ValueError("stop-only build requires globally unique nonmissing stop_id")
+    observed_sessions = stop_table[
+        ["animal", "session_date", "epoch"]
+    ].drop_duplicates()
+    if len(observed_sessions) != len(sessions):
+        raise ValueError(
+            f"stop-only build retained {len(observed_sessions)} of "
+            f"{len(sessions)} expected sessions"
+        )
+    _refuse_to_clobber_complete_stop_table(output_dir)  # re-check after the slow build
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = publish_canonical(stop_table, output_dir, table="stop", basename="stop_table")
+    logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
+    return stop_table
+
+
+def _build_all_session_tables(
+    sessions: list[dict],
+    contingency: pd.DataFrame | None,
+    *,
+    from_cache: bool,
+    t0: float,
+) -> tuple[list, list, list, list]:
+    """Run every session through ``_process_session`` and collect its tables.
+
+    Data-gap failures (missing/corrupt input, unexpected shape) are skipped and
+    recorded; a code bug (``KeyError`` / ``AttributeError`` / ``AssertionError``)
+    propagates so a regression is not silently skipped across the run. If any
+    session failed, raise before returning so a partial corpus is never
+    assembled or written. Returns the per-session event / event-arm / stop /
+    event-sequence table lists.
+    """
     all_event_tables: list[pd.DataFrame] = []
     all_event_arm_tables: list[pd.DataFrame] = []
     all_stop_tables: list[pd.DataFrame] = []
     all_event_sequence_tables: list[pd.DataFrame] = []
 
+    session_failures: list[dict[str, str]] = []
     for i, session in enumerate(sessions):
         nwb = session["nwb_file_name"]
         epoch = session["epoch_name"]
 
         try:
             result = _process_session(
-                session, contingency=contingency, from_cache=args.from_cache
+                session, contingency=contingency, from_cache=from_cache
             )
         except MergeError:
             # A one-to-one merge violation (duplicate event_id from the
@@ -489,9 +718,19 @@ def main():
             # are propagated — they indicate a code bug and silent
             # skips would hide the regression across the run.
             logging.warning("skip %s %s: %s", nwb, epoch, e)
+            session_failures.append(
+                {"nwb_file_name": nwb, "epoch": epoch, "reason": str(e)}
+            )
             continue
 
         if result is None:
+            session_failures.append(
+                {
+                    "nwb_file_name": nwb,
+                    "epoch": epoch,
+                    "reason": "behavioral context or track graph unavailable",
+                }
+            )
             continue
 
         all_event_tables.append(result["event_table"])
@@ -511,14 +750,39 @@ def main():
                 int(remaining),
             )
 
-    if not all_event_tables:
-        logging.error("no sessions produced data")
-        return
+    if session_failures:
+        sample = session_failures[:10]
+        raise RuntimeError(
+            "canonical replay build is incomplete: "
+            f"{len(session_failures)} of {len(sessions)} session(s) failed; "
+            f"sample={sample}. No scientific tables were written."
+        )
+    return (
+        all_event_tables,
+        all_event_arm_tables,
+        all_stop_tables,
+        all_event_sequence_tables,
+    )
 
+
+def _assemble_canonical_tables(
+    all_event_tables: list,
+    all_event_arm_tables: list,
+    all_stop_tables: list,
+    all_event_sequence_tables: list,
+) -> tuple:
+    """Concatenate the per-session tables and derive the assembly-level columns.
+
+    Adds the non-local SWR split to the stop table, always materializes a
+    schema-complete event-sequence frame (empty if no session produced rows, so
+    the retrospective pass never hits a missing file), and projects the
+    deterministic event-patch table. Returns the five concatenated frames.
+    """
     event_table_all = pd.concat(all_event_tables, ignore_index=True)
     event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
     stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
-    # Add the canonical non-local SWR split (n_non_local_SWR / n_non_local_no_SWR)
+    # Add the canonical non-local SWR split
+    # (n_nonlocal_swr_events / n_nonlocal_non_swr_events)
     # from event_table.is_swr — an assembly-level join, like the retrospective
     # merge below, kept out of build_stop_table (which is event-table-independent).
     stop_table_all = add_nonlocal_swr_split(stop_table_all, event_table_all)
@@ -551,38 +815,27 @@ def main():
     event_patch_table_all = build_event_patch_table(
         event_table_all, event_arm_table_all
     )
-
-    session_cols = ["animal", "day", "epoch"]
-    logging.info(
-        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
-        len(event_table_all),
-        len(event_arm_table_all),
-        len(stop_table_all),
-        event_table_all.groupby(session_cols).ngroups,
+    return (
+        event_table_all,
+        event_arm_table_all,
+        event_patch_table_all,
+        stop_table_all,
+        event_sequence_table_all,
     )
 
-    # Cross-table invariant gate — run BEFORE saving, not after. A
-    # failed check means the concatenated frames disagree across
-    # tables; persisting them would publish an inconsistent dataset
-    # to downstream consumers. The full invariant sweep runs in
-    # tests/unit/test_replay_tables.py; this is a cheap end-to-end
-    # guard for the concat path.
-    sum_n_events = int(stop_table_all["n_events"].sum())
-    if sum_n_events != len(event_table_all):
-        logging.error(
-            "cross-table drift: Σ stop_table.n_events = %d, "
-            "len(event_table) = %d — refusing to write output",
-            sum_n_events,
-            len(event_table_all),
-        )
-        return
-    logging.info(
-        "cross-table invariant OK: Σ n_events == len(event_table) == %d",
-        len(event_table_all),
-    )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def _standardize_event_arm(
+    event_arm_table_all: pd.DataFrame, contingency: pd.DataFrame | None
+) -> pd.DataFrame:
+    """Attach the pooled-global ``_z`` columns and persist the reference.
 
+    The pooled standardization runs over the full concatenated table (a
+    per-session z would use the wrong mean/SD) and only on the six reward-site
+    leaves — structural trunk rows must not shrink the reference moments. The
+    reference is saved for reproducibility, a completeness guard asserts the
+    ``_z`` columns are present, and the value block is checked against the
+    contingency source. Returns the standardized event-arm table.
+    """
     # Pooled-GLOBAL standardization of the continuous per-arm covariates (<col>_z).
     # This is the persisted-table _z (folded in from the retired _add_standardized_cols
     # one-off); it MUST run here over the full concatenated table, not per session
@@ -593,7 +846,7 @@ def main():
     # All four quantities are learned/defined on the six reward-site arms.
     # Structural trunk rows remain in the model table, but they must not shrink
     # the scientific unit by contributing zeros to the reference moments.
-    leaf_support = event_arm_table_all["arm"].isin(WELL_ARMS)
+    leaf_support = event_arm_table_all["candidate_arm"].isin(WELL_ARMS)
     event_arm_table_all, z_reference = attach_standardized(
         event_arm_table_all,
         EVENT_ARM_STANDARDIZED_COLS,
@@ -613,21 +866,236 @@ def main():
         "standardized event_arm _z columns: %s",
         [f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
     )
+    return event_arm_table_all
 
-    for name, frame in (
-        ("event_table", event_table_all),
-        ("event_arm_table", event_arm_table_all),
-        ("event_patch_table", event_patch_table_all),
-        ("stop_table", stop_table_all),
-        ("event_sequence_table", event_sequence_table_all),
-    ):
+
+def _publish_canonical_tables(frames: tuple) -> None:
+    """Atomically publish each (basename, table_key, frame) via publish_canonical.
+
+    ``publish_canonical`` stamps the covariate schema and writes atomically, so
+    the tables cannot land unstamped; the per-table key selects the row-key
+    contract.
+    """
+    for basename, table_key, frame in frames:
         if frame is None:
-            logging.info("  %s: skipped (no data)", name)
+            logging.info("  %s: skipped (no data)", basename)
             continue
-        path = write_table(frame, OUTPUT_DIR / name)
-        logging.info("saved %s → %s (%d rows)", name, path, len(frame))
+        path = publish_canonical(frame, OUTPUT_DIR, table=table_key, basename=basename)
+        logging.info("saved %s → %s (%d rows)", basename, path, len(frame))
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--test", action="store_true", help="2 sessions per animal")
+    parser.add_argument("--max-per-animal", type=int, default=None)
+    parser.add_argument(
+        "--animal",
+        choices=("chimi", "j16", "peanut", "senor", "wilbur"),
+        default=None,
+        help="Restrict this invocation to one animal's sessions.",
+    )
+    parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help=(
+            "Populate and validate versioned behavioral caches, then exit "
+            "without assembling or writing scientific tables. Disjoint animals "
+            "may be run concurrently; follow with one serial --from-cache build."
+        ),
+    )
+    parser.add_argument(
+        "--stop-only",
+        action="store_true",
+        help=(
+            "Build only the canonical stop table needed to generate qvals, "
+            "then exit before posterior/event-arm construction."
+        ),
+    )
+    parser.add_argument(
+        "--from-cache",
+        action="store_true",
+        help=(
+            "Covariate-only rebuild: read trials/track_graph from the "
+            "per-session cache instead of Spyglass (falls back to Spyglass "
+            "for uncached sessions). Rebuilds all tables via the same "
+            "builders in minutes. Freezes upstream at the last full run — "
+            "run without this flag to refresh the cache."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=OUTPUT_DIR,
+        help=(
+            "Candidate replay-content root. Defaults to the production root; "
+            "pass an explicit staging directory for regeneration so existing "
+            "scientific artifacts are not overwritten."
+        ),
+    )
+    parser.add_argument(
+        "--behavior-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Override the behavioral-cache root. This permits disjoint table "
+            "shards to share one validated cache without copying it."
+        ),
+    )
+    parser.add_argument(
+        "--contingency-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Replay-content root providing qvals. Defaults to --output-dir; "
+            "set this when building per-animal shards."
+        ),
+    )
+    return parser
+
+
+def run_prepare_data(args: argparse.Namespace) -> None:
+    """Resolve the scope, build every session's tables, then assemble, verify,
+    standardize, and publish the canonical replay tables.
+
+    Reads as its pipeline: resolve scope -> (early cache/stop-only exits) ->
+    load contingency -> build per session -> assemble -> cross-table gate ->
+    standardize -> publish.
+    """
+    global OUTPUT_DIR, SESSION_CACHE_DIR
+
+    OUTPUT_DIR = args.output_dir.resolve()
+    SESSION_CACHE_DIR = (
+        args.behavior_cache_dir.resolve()
+        if args.behavior_cache_dir is not None
+        else OUTPUT_DIR / "_session_cache"
+    )
+    contingency_dir = (
+        args.contingency_dir.resolve()
+        if args.contingency_dir is not None
+        else OUTPUT_DIR
+    )
+
+    max_per_animal = 2 if args.test else args.max_per_animal
+    sessions = find_sessions(max_per_animal=max_per_animal)
+    if args.animal is not None:
+        sessions = [
+            session
+            for session in sessions
+            if session["session_id"].startswith(args.animal)
+        ]
+    if not sessions:
+        raise RuntimeError("no sessions matched the requested regeneration scope")
+    logging.info(
+        "Found %d sessions (trials/track_graph source: %s)",
+        len(sessions),
+        "cache, Spyglass fallback"
+        if args.from_cache
+        else "Spyglass (refreshing cache)",
+    )
+
+    if args.cache_only:
+        if args.stop_only:
+            raise ValueError("--cache-only and --stop-only are mutually exclusive")
+        populate_behavioral_context_cache(sessions, from_cache=args.from_cache)
+        logging.info(
+            "behavioral cache population complete for %d sessions", len(sessions)
+        )
+        return
+
+    if args.stop_only:
+        build_stop_table_scope(
+            sessions, from_cache=args.from_cache, output_dir=OUTPUT_DIR
+        )
+        return
+
+    # Per-stop value artifact (per-arm nominal p(R) + per-arm model value),
+    # keyed by stop_id, from qvals_table (exact stop-start alignment).
+    # The event-arm builder maps nominal task probability / reward-belief mean
+    # per port to the corresponding candidate-arm fields. The belief mean is
+    # the fitted Beta reward belief, not the separate local leaky-Q history.
+    # Absent qvals rows leave those fields NaN.
+    contingency_path = contingency_dir / "models_per_bin_rate" / "qvals_table.pkl"
+    contingency = load_contingency(contingency_path)
+
+    # Warn if the output directory still holds artifacts from the
+    # legacy pipeline — silent coexistence lets downstream scripts
+    # accidentally read stale pickles.
+    for legacy_name in ("events.pkl", "long_count.pkl", "long_binary.pkl"):
+        legacy_path = OUTPUT_DIR / legacy_name
+        if legacy_path.exists():
+            logging.warning(
+                "legacy output %s still present — delete it to avoid "
+                "stale reads downstream",
+                legacy_path,
+            )
+
+    t0 = time.time()
+    collected = _build_all_session_tables(
+        sessions, contingency, from_cache=args.from_cache, t0=t0
+    )
+    if not collected[0]:
+        logging.error("no sessions produced data")
+        return
+
+    (
+        event_table_all,
+        event_arm_table_all,
+        event_patch_table_all,
+        stop_table_all,
+        event_sequence_table_all,
+    ) = _assemble_canonical_tables(*collected)
+
+    session_cols = ["animal", "session_date", "epoch"]
+    logging.info(
+        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
+        len(event_table_all),
+        len(event_arm_table_all),
+        len(stop_table_all),
+        event_table_all.groupby(session_cols).ngroups,
+    )
+
+    # Cross-table invariant gate — run BEFORE saving, not after. A
+    # failed check means the concatenated frames disagree across
+    # tables; persisting them would publish an inconsistent dataset
+    # to downstream consumers. The full invariant sweep runs in
+    # tests/unit/test_replay_tables.py; this is a cheap end-to-end
+    # guard for the concat path.
+    sum_n_events = int(stop_table_all["n_selected_events"].sum())
+    if sum_n_events != len(event_table_all):
+        logging.error(
+            "cross-table drift: Σ stop_table.n_selected_events = %d, "
+            "len(event_table) = %d — refusing to write output",
+            sum_n_events,
+            len(event_table_all),
+        )
+        return
+    logging.info(
+        "cross-table invariant OK: Σ n_selected_events == len(event_table) == %d",
+        len(event_table_all),
+    )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    event_arm_table_all = _standardize_event_arm(event_arm_table_all, contingency)
+    _publish_canonical_tables(
+        (
+            ("event_table", "event", event_table_all),
+            ("event_arm_table", "event_arm", event_arm_table_all),
+            ("event_patch_table", "event_patch", event_patch_table_all),
+            ("stop_table", "stop", stop_table_all),
+            ("event_sequence_table", "event_sequence", event_sequence_table_all),
+        )
+    )
 
     logging.info("total time: %ds", int(time.time() - t0))
+
+
+def main() -> None:
+    parser = _build_arg_parser()
+    args = parser.parse_args()
+    run_prepare_data(args)
 
 
 if __name__ == "__main__":

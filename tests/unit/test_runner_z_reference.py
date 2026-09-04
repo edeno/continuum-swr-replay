@@ -16,6 +16,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    stamp_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.standardization import attach_standardized
 from scripts.content import fit_swr_contrast_content as mod
 
@@ -43,34 +46,34 @@ def test_full_reference_covers_arm_tsc_and_patch_cohort():
     n = 100
     ev = pd.DataFrame({
         **{c: rng.normal(size=n) for c in mod._ZSCALARS},
-        "time_since_stop": rng.uniform(0, 3, n),
+        "time_since_stop_start_s": rng.uniform(0, 3, n),
     })
     pt = pd.DataFrame({
-        "trials_since_switch": rng.normal(size=n),
-        "recent_switch_rate": rng.uniform(0, 1, n),
-        "time_since_stop": rng.uniform(0, 5, n),  # patch cohort: different values
+        "periswitch_index_trials": rng.normal(size=n),
+        "patch_switch_fraction_last5_completed_trips": rng.uniform(0, 1, n),
+        "time_since_stop_start_s": rng.uniform(0, 5, n),  # patch cohort: different values
     })
     ref = mod._fit_z_reference(ev, pt)
 
     assert set(ref["arm_event_scalars"]) == set(mod._ZSCALARS)
     assert "log1p_time_since_stop" in ref["arm_within_stop_time"]
     assert set(ref["patch_cohort"]) == {
-        "trials_since_switch", "recent_switch_rate", "log1p_time_since_stop"
+        "periswitch_index_trials", "patch_switch_fraction_last5_completed_trips", "log1p_time_since_stop"
     }
     # The patch within-stop-time uses log1p over the PATCH cohort (its own scope).
     import numpy as _np
     assert ref["patch_cohort"]["log1p_time_since_stop"]["mean"] == float(
-        _np.nanmean(_np.log1p(pt["time_since_stop"].to_numpy(float)))
+        _np.nanmean(_np.log1p(pt["time_since_stop_start_s"].to_numpy(float)))
     )
     # The reference reproduces the runner's own _z for a patch scalar.
     from continuum_swr_replay.analysis.replay.standardization import attach_standardized
     applied, _ = attach_standardized(
-        pt[["trials_since_switch"]].copy(), ["trials_since_switch"],
-        reference={"trials_since_switch": ref["patch_cohort"]["trials_since_switch"]},
+        pt[["periswitch_index_trials"]].copy(), ["periswitch_index_trials"],
+        reference={"periswitch_index_trials": ref["patch_cohort"]["periswitch_index_trials"]},
     )
     np.testing.assert_allclose(
-        applied["trials_since_switch_z"].to_numpy(),
-        mod._z(pt["trials_since_switch"].to_numpy(float)), atol=1e-12,
+        applied["periswitch_index_trials_z"].to_numpy(),
+        mod._z(pt["periswitch_index_trials"].to_numpy(float)), atol=1e-12,
     )
 
 
@@ -97,13 +100,19 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
     """The contrast runner cannot consume the shipped nine-arm uncertainty unit."""
     frame = pd.DataFrame(
         {
-            "arm_uncertainty": [1.0, 2.0],
-            "arm_uncertainty_z": [-1.0, 1.0],
+            "animal": ["a", "a"],
+            "session_date": [1, 1],
+            "epoch": ["01_r1", "01_r1"],
+            "event_id": [1, 1],
+            "candidate_arm": [0, 1],
+            "reward_belief_variance_candidate_arm_preoutcome": [1.0, 2.0],
+            "reward_belief_variance_candidate_arm_preoutcome_z": [-1.0, 1.0],
         }
     )
+    frame = stamp_covariate_schema(frame, table="event_arm")
     frame.to_pickle(tmp_path / "event_arm_table.pkl")
     (tmp_path / "standardization_reference.json").write_text(
-        json.dumps({"arm_uncertainty": {"mean": 1.5, "std": 0.5}})
+        json.dumps({"reward_belief_variance_candidate_arm_preoutcome": {"mean": 1.5, "std": 0.5}})
     )
     monkeypatch.setattr(mod, "RC", tmp_path)
 

@@ -17,11 +17,11 @@ from continuum_swr_replay.analysis.replay import per_bin_rate_model as pbrm
 
 def test_per_stop_rate_ladders_drop_the_switch_flag() -> None:
     for name in ("R1", "R2", "Rlag"):
-        assert "is_after_switch" not in ms.MODEL_PER_STOP_RATE[name].predictors
+        assert "did_last_completed_trip_switch_patch" not in ms.MODEL_PER_STOP_RATE[name].predictors
 
 
 def test_stop_covariates_drop_the_switch_flag() -> None:
-    assert "is_after_switch" not in ms.STOP_COVARIATES
+    assert "did_last_completed_trip_switch_patch" not in ms.STOP_COVARIATES
 
 
 def test_m8_switch_rung_is_gone() -> None:
@@ -31,8 +31,8 @@ def test_m8_switch_rung_is_gone() -> None:
 def test_no_per_bin_model_emits_the_switch_flag() -> None:
     """Neither the patsy formula nor the design-column builder may add it."""
     for name, spec in ms.MODEL_PER_BIN_RATE.items():
-        assert "is_after_switch" not in spec.formula(), name
-        assert "is_after_switch" not in pbrm._design_columns(spec), name
+        assert "did_last_completed_trip_switch_patch" not in spec.formula(), name
+        assert "did_last_completed_trip_switch_patch" not in pbrm._design_columns(spec), name
         assert spec.switch is False, name
 
 
@@ -57,16 +57,20 @@ def test_registry_and_model_specs_agree_switch_is_not_a_predictor() -> None:
     predictor; model_specs must not carry it in any fitted ladder. This pins
     the two files against drift -- if a future edit re-adds the flag to a
     ladder while leaving the registry note stale, one of these fails."""
-    entry = next(e for e in reg.REGISTRY if "is_after_switch" in e.current)
+    entry = next(
+        e
+        for e in reg.REGISTRY
+        if e.canonical == "did_last_completed_trip_switch_patch"
+    )
     assert entry.role == "provenance", "registry still calls the flag a predictor"
     fitted = (
         *ms.MODEL_PER_STOP_RATE.values(),
         *ms.MODEL_HIERARCHY.values(),
     )
     for spec in fitted:
-        assert "is_after_switch" not in getattr(spec, "predictors", ()), spec.name
+        assert "did_last_completed_trip_switch_patch" not in getattr(spec, "predictors", ()), spec.name
     for spec in ms.MODEL_PER_BIN_RATE.values():
-        assert "is_after_switch" not in spec.formula(), spec.name
+        assert "did_last_completed_trip_switch_patch" not in spec.formula(), spec.name
 
 
 def test_ladder_parent_chain_survives_m8_removal() -> None:

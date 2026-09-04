@@ -152,10 +152,10 @@ def test_trajectory_dynamics_forward_and_outback():
     np.testing.assert_array_equal(ids, [1, 2])
 
     # event 1: straight forward
-    np.testing.assert_allclose(out["path_length"], [20.0, 40.0])
-    np.testing.assert_allclose(out["net_displacement"], [20.0, 0.0])
-    np.testing.assert_allclose(out["start_position"], [0.0, 0.0])
-    np.testing.assert_allclose(out["end_position"], [20.0, 0.0])
+    np.testing.assert_allclose(out["path_length_cm"], [20.0, 40.0])
+    np.testing.assert_allclose(out["net_displacement_cm"], [20.0, 0.0])
+    np.testing.assert_allclose(out["replay_start_position_cm"], [0.0, 0.0])
+    np.testing.assert_allclose(out["replay_end_position_cm"], [20.0, 0.0])
     np.testing.assert_array_equal(out["start_arm"], [0, 6])
     np.testing.assert_array_equal(out["end_arm"], [1, 6])
     # tortuosity = path/net ; event 2 has net 0 -> NaN
@@ -164,7 +164,7 @@ def test_trajectory_dynamics_forward_and_outback():
     # event 2 reverses once (out then back)
     np.testing.assert_array_equal(out["n_reversals"], [0, 1])
     # spatial extent: event1 spans 0..20 (20cm), event2 spans 0..20 (20cm)
-    np.testing.assert_allclose(out["spatial_extent"], [20.0, 20.0])
+    np.testing.assert_allclose(out["spatial_extent_cm"], [20.0, 20.0])
     # patches: arms 0,1 -> patch 1 only; arms 6,8 -> patch1+patch3
     np.testing.assert_array_equal(out["n_patches_visited"], [1, 2])
     # pause_fraction: step_distance <= place_bin_size (2.0); ev1 [0,10,10]->1/3
@@ -221,10 +221,10 @@ def test_ahead_behind_direction_and_reach():
         decoded_arm=decoded_arm, current_arm=current_arm, time=time,
     )
     np.testing.assert_array_equal(ids, [1, 2])
-    np.testing.assert_allclose(out["ab_slope"], [10.0, -10.0])
+    np.testing.assert_allclose(out["ab_slope_cm_s"], [10.0, -10.0])
     np.testing.assert_array_equal(out["is_outbound"], [True, False])
-    np.testing.assert_allclose(out["max_ahead"], [20.0, 20.0])
-    np.testing.assert_allclose(out["max_behind"], [0.0, 0.0])
+    np.testing.assert_allclose(out["max_ahead_cm"], [20.0, 20.0])
+    np.testing.assert_allclose(out["max_behind_cm"], [0.0, 0.0])
     # event1: decoded != current at 2/3 bins ; event2: all equal -> 0
     np.testing.assert_allclose(out["remote_fraction"], [2 / 3, 0.0])
 
@@ -238,7 +238,7 @@ def test_ahead_behind_is_outbound_nan_when_slope_undefined():
         current_arm=np.array([0.0]),
         time=np.array([0.0]),
     )
-    assert np.isnan(out["ab_slope"][0])
+    assert np.isnan(out["ab_slope_cm_s"][0])
     assert np.isnan(out["is_outbound"][0])
 
 
@@ -350,4 +350,4 @@ def test_orchestrator_contfrag_2state_omits_nonlocal_only_columns():
     # continuous_prob_mean is produced and correct
     np.testing.assert_allclose(out["continuous_prob_mean"], [(0.7 + 0.6 + 0.8) / 3])
     # shared trajectory columns still present
-    assert "path_length" in out and "multimodal_fraction" in out
+    assert "path_length_cm" in out and "multimodal_fraction" in out

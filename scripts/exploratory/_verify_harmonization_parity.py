@@ -1,324 +1,237 @@
 #!/usr/bin/env python
-"""Key-aligned covariate-definition parity / verification gate.
+"""Fail-closed parity gate for the atomic covariate-name migration.
 
-Verifies that the covariate-definition migration (two-clock reward timing,
-per-arm-rate window 5->10, new value block, and table regeneration) changed
-*only* what it was meant to. Compares each regenerated canonical table against
-its pre-rebuild backup
-(``_prephase1_backup``) and checks four things:
+The baseline must be the immediate post-harmonization, pre-rename artifact set,
+not an older scientific-definition backup.  Each baseline frame is normalized
+exactly once through the table-scoped registry; the regenerated frame must
+already carry the current covariate contract stamp. The checker then requires identical row
+and session keys, columns, dtypes, missingness, and values.
 
-1. rebuild integrity   - every shared, unchanged-definition column reproduces
-   the backup (exact on int/bool/key columns, ``np.allclose`` on floats). Because
-   every model design matrix is a deterministic function of these table columns
-   (the fitters select/multiply columns; arm-FE / spline / raised-cosine bases are
-   deterministic from unchanged inputs), column identity here *is* the
-   design-matrix identity for the unchanged-definition covariates.
-2. rename-only identity - reserved for actual naming-only changes. The trial
-   reward rate is deliberately *not* in this category because its availability
-   now follows the outcome clock rather than destination arrival.
-3. changed covariates   - trial/per-arm reward rates, nominal/learned values,
-   their interactions, and patch analogues: old->new summary printed, no
-   equality assertion (these are *meant* to change).
-4. coverage             - added/dropped keys and sessions are reported explicitly;
-   unequal cohorts are aligned on scientific row keys rather than compared by
-   position.
-
-Exit non-zero if any asserted check fails. Run from the repo root:
-    uv run python scripts/exploratory/_verify_harmonization_parity.py
+No scientific change is allowlisted here.  Alias collapse and qvals numerical-
+path consolidation are themselves validated by ``finalize_covariate_schema``.
+Any remaining difference is a rename-migration failure.
 """
 
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    finalize_covariate_schema,
+    require_covariate_schema,
+    row_keys,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
 
+BASELINE_ROOT = Path(
+    os.environ.get(
+        "COVARIATE_RENAME_BASELINE",
+        "/tmp/continuum-covariate-rename-baseline-20260822",
+    )
+)
 RC = PROCESSED_DATA_DIR / "replay_content"
 CF = PROCESSED_DATA_DIR / "contfrag_replay_content"
-ATOL, RTOL = 1e-9, 1e-6
 
-# old name -> new name for genuine naming-only changes. This is intentionally
-# empty: reward_rate_trial_k10 also adopted the outcome-availability clock.
-RENAME_ONLY: dict[str, str] = {}
-CHANGED = {
-    "recent_trial_reward_rate": "reward_rate_trial_k10",  # timing + rename
-    "recent_reward_rate": "reward_rate_arm_k10",  # 5- -> 10-visit window
-    "nominal_reward_prob": "p_reward_arm",  # deferred-NaN -> populated
-    "swr_x_recent_reward_rate": "swr_x_reward_rate_arm_k10",  # derived from changed
-}
-# New columns with no backup counterpart (value block).
-NEW_COLS = {
-    "q_arm", "q_arm_patch", "p_reward_arm_patch", "reward_rate_arm_k10_patch",
-}
-SESSION_COLS = ["animal", "day", "epoch"]
-
-# Same-named columns whose definitions intentionally changed in the unified
-# location, timing, reward-history, and whole-event classification migration.
-# Every other shared column is equality-checked on exact scientific row keys.
-# Keeping this allowlist explicit makes a newly drifting column fail the gate
-# rather than disappear from a hand-picked eight-column "core".
-INTENTIONALLY_CHANGED_SAME_NAME = frozenset(
-    {
-        # Whole-window physical location and all derived context contrasts.
-        "current_arm",
-        "current_patch",
-        "prev_arm",
-        "prev_patch",
-        "next_arm",
-        "next_patch",
-        "last_rewarded_arm",
-        "is_current",
-        "is_prev",
-        "is_next",
-        "is_same_patch",
-        "is_last_rewarded",
-        "is_last_rewarded_elsewhere",
-        "current_x_last_rewarded",
-        "switch_x_current",
-        "switch_x_prev",
-        "omission_x_last_rewarded",
-        "time_x_current",
-        "time_x_prev",
-        "time_x_next",
-        # Arrival/outcome clocks and future-invariant history definitions.
-        "reward_outcome",
-        "is_after_reward",
-        "is_after_omission",
-        "is_after_switch",
-        "is_after_stay",
-        "is_stay",
-        "cumulative_reward",
-        "cumulative_reward_patch",
-        "visit_recency",
-        "visit_recency_demeaned",
-        "visit_recency_patch",
-        "swr_x_visit_recency_demeaned",
-        "time_since_port_entry",
-        "time_since_reward",
-        *{f"reward_lag{j}" for j in range(1, 11)},
-        # Physical-location distance/rank now uses the canonical mapping.
-        "dist_to_arm",
-        "arm_dist_rank",
-        # Whole-event SWR/MUA overlap and dependent indicators/counts.
-        "is_swr",
-        "is_mua",
-        "is_swr_stop",
-        "is_mua_stop",
-        "n_SWR",
-        "n_MUA",
-        "n_non_local_SWR",
-        "n_non_local_no_SWR",
-        "swr_x_current",
-        "swr_x_prev",
-        "swr_x_next",
-        "swr_x_last_rewarded",
-        "swr_x_is_last_rewarded_elsewhere",
-        "mua_x_current",
-        "mua_x_prev",
-        "mua_x_next",
-        "mua_x_last_rewarded",
-        "continuous_x_current",
-        "continuous_x_prev",
-        "continuous_x_next",
-        "continuous_x_last_rewarded",
-        # Patch projections of the changed arm/context definitions.
-        "is_current_patch",
-        "is_prev_patch",
-        "is_last_rewarded_patch",
-        "is_last_rewarded_patch_elsewhere",
-        "switch_x_current_patch",
-        "swr_x_current_patch",
-        "swr_x_prev_patch",
-        "swr_x_last_rewarded_patch_elsewhere",
-    }
+# label, registry table/grain, immediate pre-rename baseline, regenerated table
+TABLES: tuple[tuple[str, str, Path, Path], ...] = (
+    (
+        "replay event",
+        "event",
+        BASELINE_ROOT / "replay/event_table.parquet",
+        RC / "event_table.pkl",
+    ),
+    (
+        "replay event_arm",
+        "event_arm",
+        BASELINE_ROOT / "replay/event_arm_table.parquet",
+        RC / "event_arm_table.pkl",
+    ),
+    (
+        "replay event_patch",
+        "event_patch",
+        BASELINE_ROOT / "replay/event_patch_table.parquet",
+        RC / "event_patch_table.pkl",
+    ),
+    (
+        "replay stop",
+        "stop",
+        BASELINE_ROOT / "replay/stop_table.parquet",
+        RC / "stop_table.pkl",
+    ),
+    (
+        "replay qvals",
+        "qvals",
+        BASELINE_ROOT / "replay/qvals_table.parquet",
+        RC / "models_per_bin_rate/qvals_table.pkl",
+    ),
+    (
+        "contfrag SWR event_arm",
+        "event_arm",
+        BASELINE_ROOT / "contfrag/event_arm_table_swr_HPC.parquet",
+        CF / "event_arm_table_swr_HPC.pkl",
+    ),
+    (
+        "contfrag SWR event_patch",
+        "event_patch",
+        BASELINE_ROOT / "contfrag/event_patch_table_swr_HPC.parquet",
+        CF / "event_patch_table_swr_HPC.pkl",
+    ),
+    (
+        "contfrag SWR stop",
+        "stop",
+        BASELINE_ROOT / "contfrag/stop_table_swr_HPC.parquet",
+        CF / "stop_table_swr_HPC.pkl",
+    ),
+    (
+        "contfrag MUA event_arm",
+        "event_arm",
+        BASELINE_ROOT / "contfrag/event_arm_table_mua_HPC.parquet",
+        CF / "event_arm_table_mua_HPC.pkl",
+    ),
+    (
+        "contfrag MUA event_patch",
+        "event_patch",
+        BASELINE_ROOT / "contfrag/event_patch_table_mua_HPC.parquet",
+        CF / "event_patch_table_mua_HPC.pkl",
+    ),
+    (
+        "contfrag MUA stop",
+        "stop",
+        BASELINE_ROOT / "contfrag/stop_table_mua_HPC.parquet",
+        CF / "stop_table_mua_HPC.pkl",
+    ),
 )
 
-# (label, backup_path, new_path)
-TABLES = [
-    ("replay event_arm",
-     RC / "_prephase1_backup/event_arm_table.pkl", RC / "event_arm_table.pkl"),
-    ("replay event_patch",
-     RC / "_prephase1_backup/event_patch_table.pkl", RC / "event_patch_table.pkl"),
-    ("replay stop",
-     RC / "_prephase1_backup/stop_table.pkl", RC / "stop_table.pkl"),
-    ("contfrag SWR event_arm",
-     CF / "_prephase1_backup/event_arm_table_swr_HPC.pkl",
-     CF / "event_arm_table_swr_HPC.pkl"),
-    ("contfrag SWR event_patch",
-     CF / "_prephase1_backup/event_patch_table_swr_HPC.pkl",
-     CF / "event_patch_table_swr_HPC.pkl"),
-    ("contfrag SWR stop",
-     CF / "_prephase1_backup/stop_table_swr_HPC.pkl",
-     CF / "stop_table_swr_HPC.pkl"),
-    ("contfrag MUA event_arm",
-     CF / "_prephase1_backup/event_arm_table_mua_HPC.pkl",
-     CF / "event_arm_table_mua_HPC.pkl"),
-    ("contfrag MUA event_patch",
-     CF / "_prephase1_backup/event_patch_table_mua_HPC.pkl",
-     CF / "event_patch_table_mua_HPC.pkl"),
-    ("contfrag MUA stop",
-     CF / "_prephase1_backup/stop_table_mua_HPC.pkl",
-     CF / "stop_table_mua_HPC.pkl"),
-]
+
+def _infer_table(label: str) -> str:
+    for table in ("event_arm", "event_patch", "stop", "event", "qvals"):
+        if table in label:
+            return table
+    raise ValueError(f"cannot infer registry table/grain from label {label!r}")
 
 
-def _col_reproduces(bs: np.ndarray, ns: np.ndarray, is_float: bool) -> bool:
-    if is_float:
-        return bool(np.allclose(
-            bs.astype(float), ns.astype(float), atol=ATOL, rtol=RTOL, equal_nan=True
-        ))
-    return bool(
-        (pd.Series(bs).fillna("<NA>").values == pd.Series(ns).fillna("<NA>").values).all()
+def _exact_series_equal(old: pd.Series, new: pd.Series) -> tuple[bool, str]:
+    if old.dtype != new.dtype:
+        return False, f"dtype {old.dtype} -> {new.dtype}"
+    if not np.array_equal(old.isna().to_numpy(), new.isna().to_numpy()):
+        return False, "missingness mask differs"
+    if old.equals(new):
+        return True, ""
+    mismatch = ~(old.eq(new) | (old.isna() & new.isna()))
+    return False, f"{int(mismatch.sum())} value(s) differ"
+
+
+def verify_table(
+    label: str,
+    baseline_path: Path,
+    regenerated_path: Path,
+    *,
+    table: str | None = None,
+) -> bool:
+    """Compare one baseline/regenerated pair on exact canonical row keys."""
+    table = table or _infer_table(label)
+    baseline = finalize_covariate_schema(read_table(baseline_path), table=table)
+    regenerated = read_table(regenerated_path)
+    try:
+        require_covariate_schema(regenerated, table=table)
+    except (TypeError, ValueError) as exc:
+        print(f"\n=== {label} ===\n  [FAIL] regenerated schema: {exc}")
+        return False
+
+    keys = list(row_keys(table=table))
+    print(
+        f"\n=== {label} === baseline={baseline.shape} regenerated={regenerated.shape}"
     )
-
-
-def _summarize(col: pd.Series) -> str:
-    a = col.to_numpy(dtype=float)
-    finite = np.isfinite(a)
-    if not finite.any():
-        return "all-NaN"
-    return (f"NaN={np.mean(~finite) * 100:4.1f}%  "
-            f"range=[{np.nanmin(a):.3f},{np.nanmax(a):.3f}]  mean={np.nanmean(a):.3f}")
-
-
-def _row_keys(label: str, frame: pd.DataFrame) -> list[str]:
-    if "event_arm" in label:
-        candidates = [*SESSION_COLS, "event_id", "arm"]
-    elif "event_patch" in label:
-        candidates = [*SESSION_COLS, "event_id", "patch"]
-    elif "stop" in label:
-        candidates = [*SESSION_COLS, "stop_idx"]
-    else:  # pragma: no cover - TABLES is a closed registry
-        raise ValueError(f"no row-key contract declared for {label!r}")
-    missing = [column for column in candidates if column not in frame]
-    if missing:
-        raise ValueError(f"{label} is missing row-key columns {missing}")
-    return candidates
-
-
-def verify_table(label: str, bpath, npath) -> bool:
-    b = read_table(bpath)
-    n = read_table(npath)
     ok = True
-    print(f"\n=== {label} ===  backup {b.shape}  new {n.shape}")
-
-    keys = _row_keys(label, b)
-    if keys != _row_keys(label, n):  # pragma: no cover - deterministic
-        raise AssertionError("backup/new row-key contracts diverged")
-    if b.duplicated(keys).any() or n.duplicated(keys).any():
+    if baseline.duplicated(keys).any() or regenerated.duplicated(keys).any():
         print("  [FAIL] duplicate scientific row keys")
         return False
 
-    b_keyed = b.set_index(keys, verify_integrity=True).sort_index()
-    n_keyed = n.set_index(keys, verify_integrity=True).sort_index()
-    common = b_keyed.index.intersection(n_keyed.index)
-    dropped = b_keyed.index.difference(n_keyed.index)
-    added = n_keyed.index.difference(b_keyed.index)
-    shared_fraction = len(common) / max(max(len(b_keyed), len(n_keyed)), 1)
-    print(
-        f"  keys: shared={len(common)} ({shared_fraction:.1%} of larger table), "
-        f"dropped={len(dropped)}, added={len(added)}"
-    )
+    old = baseline.set_index(keys, verify_integrity=True).sort_index()
+    new = regenerated.set_index(keys, verify_integrity=True).sort_index()
+    dropped = old.index.difference(new.index)
+    added = new.index.difference(old.index)
     if len(dropped) or len(added):
-        print("  [FAIL] scientific row-key sets differ")
+        print(f"  [FAIL] row keys: dropped={len(dropped)}, added={len(added)}")
         ok = False
-
-    # 4. coverage
-    if len(b) != len(n):
-        print(f"  [FAIL] row count {len(b)} -> {len(n)}")
-        ok = False
-    if set(SESSION_COLS).issubset(b.columns) and set(SESSION_COLS).issubset(n.columns):
-        nb = b[SESSION_COLS].drop_duplicates().shape[0]
-        nn = n[SESSION_COLS].drop_duplicates().shape[0]
-        tag = "ok" if nb == nn else "FAIL"
-        print(f"  coverage: sessions {nb} -> {nn} [{tag}]; rows {len(b)} -> {len(n)}")
-        if nb != nn:
-            ok = False
-
-    # 1. rebuild integrity on key-aligned, unchanged-definition columns
-    changed_targets = {
-        new for old, new in CHANGED.items() if old != new
-    } | set(RENAME_ONLY.values()) | NEW_COLS | set(INTENTIONALLY_CHANGED_SAME_NAME)
-    shared_columns = sorted(
-        (set(b.columns) & set(n.columns)) - set(keys) - changed_targets
-    )
-    expected_removed = {
-        old for old, new in CHANGED.items() if old != new
-    } | set(RENAME_ONLY)
-    unexpected_removed = sorted(set(b.columns) - set(n.columns) - expected_removed)
-    if unexpected_removed:
-        ok = False
-        print(f"  [FAIL] shared-definition columns disappeared: {unexpected_removed}")
-    mism = []
-    for c in shared_columns:
-        is_float = (pd.api.types.is_float_dtype(b[c])
-                    or pd.api.types.is_float_dtype(n[c]))
-        if not _col_reproduces(
-            b_keyed.loc[common, c].to_numpy(),
-            n_keyed.loc[common, c].to_numpy(),
-            is_float,
-        ):
-            mism.append(c)
-    if mism:
-        ok = False
-        print(f"  [FAIL] rebuild-integrity: {len(mism)} shared col(s) differ: {mism}")
     else:
-        print(
-            f"  rebuild-integrity: {len(shared_columns)} key-aligned unchanged cols "
-            f"reproduce [ok]: {shared_columns}"
+        print(f"  row keys: {len(old)} exact [ok]")
+
+    session_cols = [c for c in ("animal", "session_date", "epoch") if c in baseline]
+    if session_cols:
+        old_sessions = (
+            baseline[session_cols].drop_duplicates().set_index(session_cols).index
         )
+        new_sessions = (
+            regenerated[session_cols].drop_duplicates().set_index(session_cols).index
+        )
+        lost_sessions = old_sessions.difference(new_sessions)
+        gained_sessions = new_sessions.difference(old_sessions)
+        if len(lost_sessions) or len(gained_sessions):
+            print(
+                f"  [FAIL] sessions: dropped={len(lost_sessions)}, "
+                f"added={len(gained_sessions)}"
+            )
+            ok = False
+        else:
+            print(f"  sessions: {len(old_sessions)} exact [ok]")
 
-    # 2. rename-only identity (values must be byte-identical)
-    for old, new in RENAME_ONLY.items():
-        if old in b.columns and new in n.columns:
-            is_float = pd.api.types.is_float_dtype(n[new])
-            if _col_reproduces(
-                b_keyed.loc[common, old].to_numpy(),
-                n_keyed.loc[common, new].to_numpy(),
-                is_float,
-            ):
-                print(f"  rename-only: {old} == {new} [ok]")
-            else:
-                ok = False
-                print(f"  [FAIL] rename-only {old} -> {new} changed values")
+    old_columns = list(old.columns)
+    new_columns = list(new.columns)
+    if old_columns != new_columns:
+        print(
+            "  [FAIL] canonical columns/order differ: "
+            f"removed={sorted(set(old_columns) - set(new_columns))}, "
+            f"added={sorted(set(new_columns) - set(old_columns))}"
+        )
+        return False
 
-    # 3. changed covariates: old -> new summary (no assert)
-    for old, new in CHANGED.items():
-        if old in b.columns and new in n.columns:
-            print(f"  changed: {old} [{_summarize(b_keyed.loc[common, old])}]")
-            print(f"        -> {new} [{_summarize(n_keyed.loc[common, new])}]")
-    changed_same = sorted(
-        set(b.columns) & set(n.columns) & set(INTENTIONALLY_CHANGED_SAME_NAME)
-    )
-    if changed_same:
-        print(f"  changed-in-place ({len(changed_same)}): {changed_same}")
-
-    # new value-block columns: present + finite-where-defined
-    for c in sorted(NEW_COLS):
-        if c in n.columns:
-            print(f"  new: {c} [{_summarize(n[c])}]")
+    common = old.index.intersection(new.index)
+    failures: list[str] = []
+    for column in old_columns:
+        equal, detail = _exact_series_equal(
+            old.loc[common, column], new.loc[common, column]
+        )
+        if not equal:
+            failures.append(f"{column} ({detail})")
+    if failures:
+        print(f"  [FAIL] {len(failures)} column(s) differ: {failures}")
+        ok = False
+    else:
+        print(f"  values/dtypes/missingness: {len(old_columns)} columns exact [ok]")
     return ok
 
 
 def main() -> int:
     all_ok = True
     n_verified = 0
-    for label, bpath, npath in TABLES:
-        if not (table_exists(bpath) and table_exists(npath)):
-            print(f"\n=== {label} ===  [skip] missing backup or new table")
+    for label, table, baseline_path, regenerated_path in TABLES:
+        if not table_exists(baseline_path) or not table_exists(regenerated_path):
+            print(
+                f"\n=== {label} === [FAIL] missing baseline or regenerated table: "
+                f"{baseline_path}, {regenerated_path}"
+            )
+            all_ok = False
             continue
         n_verified += 1
-        all_ok &= verify_table(label, bpath, npath)
+        all_ok &= verify_table(
+            label,
+            baseline_path,
+            regenerated_path,
+            table=table,
+        )
     if n_verified == 0:
-        print("\n[FAIL] no backup/new table pair was verified")
+        print("\n[FAIL] no baseline/regenerated table pair was verified")
         all_ok = False
     print("\n" + "=" * 60)
     print(
-        f"HARMONIZATION PARITY ({n_verified}/{len(TABLES)} tables):",
+        f"COVARIATE RENAME PARITY ({n_verified}/{len(TABLES)} tables):",
         "PASS" if all_ok else "FAIL",
     )
     return 0 if all_ok else 1

@@ -39,6 +39,7 @@ import logging
 import pickle
 import re
 import time
+from pathlib import Path
 
 import pandas as pd
 
@@ -54,13 +55,11 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
+from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
-from continuum_swr_replay.analysis.replay.prepare_data import (
-    load_trials_track_graph,
-)
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.table_io import publish_canonical
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,9 +68,7 @@ logging.basicConfig(
 )
 
 
-def contfrag_table_basenames(
-    event_source: str, brain_area: str
-) -> dict[str, str]:
+def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, str]:
     """Return the canonical ContFrag table basenames for one (source, area).
 
     The fitter resolves its inputs through the matching helper
@@ -86,6 +83,7 @@ def contfrag_table_basenames(
         "event_patch_table": f"event_patch_table_{src}_{brain_area}",
         "stop_table": f"stop_table_{src}_{brain_area}",
     }
+
 
 OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
 
@@ -205,16 +203,18 @@ def _process_session(
     # is keyed by the NonLocal session_id, which is this one without the
     # ``_contfrag`` suffix.
     cache_key = f"{nwb.replace('_.nwb', '')}_{epoch}_{brain_area}"
-    trials, track_graph, _ = load_trials_track_graph(
-        {
-            "nwb_file_name": nwb,
-            "epoch_name": epoch,
-            "session_id": cache_key,
-        },
-        from_cache=from_cache,
-        cache_key=cache_key,
+    trials, port_experiences, track_graph, _ = (
+        replay_prepare_data.load_behavioral_context(
+            {
+                "nwb_file_name": nwb,
+                "epoch_name": epoch,
+                "session_id": cache_key,
+            },
+            from_cache=from_cache,
+            cache_key=cache_key,
+        )
     )
-    if trials is None or track_graph is None:
+    if trials is None or port_experiences is None or track_graph is None:
         return None
 
     try:
@@ -235,6 +235,7 @@ def _process_session(
     stop_table = build_contfrag_stop_table(
         dot,
         trials,
+        port_experiences,
         track_graph,
         event_source=event_source,
         brain_area=brain_area,
@@ -244,6 +245,7 @@ def _process_session(
         dot,
         env,
         trials,
+        port_experiences,
         track_graph,
         event_source=event_source,
         brain_area=brain_area,
@@ -255,6 +257,7 @@ def _process_session(
         dot,
         env,
         trials,
+        port_experiences,
         track_graph,
         event_source=event_source,
         brain_area=brain_area,
@@ -293,6 +296,15 @@ def main():
     )
     parser.add_argument("--max-per-animal", type=int, default=None)
     parser.add_argument(
+        "--animal",
+        default=None,
+        help=(
+            "Restrict the build to one animal. Use with an isolated "
+            "--output-dir and assemble the disjoint shards with "
+            "assemble_contfrag_shards.py."
+        ),
+    )
+    parser.add_argument(
         "--event-source",
         type=str,
         default="SWR",
@@ -311,12 +323,42 @@ def main():
             "would corrupt downstream joins."
         ),
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=OUTPUT_DIR,
+        help=(
+            "Candidate ContFrag root. Pass an explicit staging directory so "
+            "existing scientific artifacts are not overwritten."
+        ),
+    )
+    parser.add_argument(
+        "--replay-content-dir",
+        type=Path,
+        default=PROCESSED_DATA_DIR / "replay_content",
+        help=(
+            "Replay-content root providing qvals and the version-matched "
+            "behavioral cache."
+        ),
+    )
     args = parser.parse_args()
+    output_dir = args.output_dir.resolve()
+    replay_content_dir = args.replay_content_dir.resolve()
+    replay_prepare_data.SESSION_CACHE_DIR = replay_content_dir / "_session_cache"
 
     max_per_animal = 2 if args.test else args.max_per_animal
-    sessions = find_sessions(
-        max_per_animal=max_per_animal, brain_area=args.brain_area
-    )
+    sessions = find_sessions(max_per_animal=max_per_animal, brain_area=args.brain_area)
+    if args.animal is not None:
+        sessions = [
+            session
+            for session in sessions
+            if session["nwb_file_name"].startswith(args.animal)
+        ]
+        if not sessions:
+            raise SystemExit(
+                f"no {args.brain_area} ContFrag sessions found for animal "
+                f"{args.animal!r}"
+            )
     event_source = args.event_source
     logging.info(
         "Found %d %s sessions, event_source=%s",
@@ -333,12 +375,7 @@ def main():
     # Shared per-stop value artifact (qvals_table, exact poke_out alignment).
     # ContFrag's own stop_id mixes in brain_area/event_source, so the builder
     # recomputes the plain (animal,day,epoch,stop_idx) hash for the join.
-    contingency_path = (
-        PROCESSED_DATA_DIR
-        / "replay_content"
-        / "models_per_bin_rate"
-        / "qvals_table.pkl"
-    )
+    contingency_path = replay_content_dir / "models_per_bin_rate" / "qvals_table.pkl"
     contingency = load_contingency(contingency_path)
 
     skipped: list[tuple[str, str, str]] = []
@@ -359,6 +396,13 @@ def main():
             continue
 
         if result is None:
+            # Behavioral context / track graph unavailable. This is a failure,
+            # not a benign skip: count it toward the fail-closed gate below so a
+            # dropped session cannot leave a complete-looking table set (mirrors
+            # the Replay driver in analysis/replay/prepare_data.py:main).
+            reason = "behavioral context or track graph unavailable"
+            logging.warning("skip %s %s: %s", nwb, epoch, reason)
+            skipped.append((nwb, epoch, reason))
             continue
 
         all_event_tables.append(result["event_table"])
@@ -384,6 +428,11 @@ def main():
         )
         for nwb, epoch, reason in skipped:
             logging.error("  skipped %s %s: %s", nwb, epoch, reason)
+        raise RuntimeError(
+            "ContFrag build is incomplete: "
+            f"{len(skipped)} of {len(sessions)} session(s) failed. "
+            "No scientific tables were written."
+        )
 
     if not all_event_tables:
         logging.error("no sessions produced data")
@@ -393,7 +442,7 @@ def main():
     event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
     stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
 
-    session_cols = ["animal", "day", "epoch"]
+    session_cols = ["animal", "session_date", "epoch"]
     logging.info(
         "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
         len(event_table_all),
@@ -402,18 +451,18 @@ def main():
         event_table_all.groupby(session_cols).ngroups,
     )
 
-    # Cross-table invariant: Σ stop_table.n_events == len(event_table)
-    sum_n_events = int(stop_table_all["n_events"].sum())
+    # Cross-table invariant: Σ stop_table.n_selected_events == len(event_table)
+    sum_n_events = int(stop_table_all["n_selected_events"].sum())
     if sum_n_events != len(event_table_all):
         logging.error(
-            "cross-table drift: Σ stop_table.n_events = %d, "
+            "cross-table drift: Σ stop_table.n_selected_events = %d, "
             "len(event_table) = %d — refusing to write output",
             sum_n_events,
             len(event_table_all),
         )
         return
     logging.info(
-        "cross-table invariant OK: Σ n_events == len(event_table) == %d",
+        "cross-table invariant OK: Σ n_selected_events == len(event_table) == %d",
         len(event_table_all),
     )
 
@@ -421,7 +470,7 @@ def main():
     # Built from the concatenated frames so event_id is globally unique
     # (the ContFrag hash already folds in brain_area + event_source),
     # which build_event_patch_table requires. Provenance is re-stamped
-    # because the helper only carries the animal/day/epoch session keys.
+    # because the helper carries the canonical session keys.
     event_patch_table_all = build_event_patch_table(
         event_table_all, event_arm_table_all
     )
@@ -433,18 +482,18 @@ def main():
         event_table_all.groupby(session_cols)["event_id"].nunique().sum(),
     )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     # Per-brain-area filenames so HPC and mPFC prep runs don't
     # overwrite each other. The basename helper is exposed so the
     # fitter contract can be unit-tested against this exact format.
     basenames = contfrag_table_basenames(event_source, args.brain_area)
-    for name, frame in (
-        (basenames["event_table"], event_table_all),
-        (basenames["event_arm_table"], event_arm_table_all),
-        (basenames["event_patch_table"], event_patch_table_all),
-        (basenames["stop_table"], stop_table_all),
+    for name, table_key, frame in (
+        (basenames["event_table"], "event", event_table_all),
+        (basenames["event_arm_table"], "event_arm", event_arm_table_all),
+        (basenames["event_patch_table"], "event_patch", event_patch_table_all),
+        (basenames["stop_table"], "stop", stop_table_all),
     ):
-        path = write_table(frame, OUTPUT_DIR / name)
+        path = publish_canonical(frame, output_dir, table=table_key, basename=name)
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
 
     logging.info("total time: %ds", int(time.time() - t0))

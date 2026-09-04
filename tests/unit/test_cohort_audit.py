@@ -99,8 +99,8 @@ def test_flags_do_not_reconcile():
 
 def test_drop_profile_early_session():
     dropped = pd.DataFrame({
-        "time_since_stop": [0.1, 0.2, 0.15, 0.3],
-        "reward_outcome": [0, 0, 0, 1],
+        "time_since_stop_start_s": [0.1, 0.2, 0.15, 0.3],
+        "is_rewarded_outcome": [0, 0, 0, 1],
     })
     prof = drop_profile(dropped)
     assert "median_tss=0.17" in prof or "median_tss=0.18" in prof
@@ -135,7 +135,7 @@ def _long(events_cols: dict, n_arms: int = 3) -> pd.DataFrame:
     rows = []
     for eid, cols in events_cols.items():
         for a in range(n_arms):
-            row = {"event_id": eid, "arm": a}
+            row = {"event_id": eid, "candidate_arm": a}
             for c, vals in cols.items():
                 row[c] = vals[a]
             rows.append(row)
@@ -150,20 +150,20 @@ def test_event_drop_buckets_common_cohort_and_qvals():
     # event 5: clean -> modeled
     df = _long({
         1: {"y": [1, 0, 0], "own": [float("nan"), 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm": [0.1, 0.2, 0.3]},
+            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
         2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm": [float("nan"), 0.2, 0.3]},
+            "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3]},
         3: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [float("nan"), 1, 1],
-            "q_arm": [0.1, 0.2, 0.3]},
+            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
         4: {"y": [0, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm": [0.1, 0.2, 0.3]},
+            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
         5: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "q_arm": [0.1, 0.2, 0.3]},
+            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
     })
     buckets = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own", "q_arm"],  # this rung uses own + value
-        union_predictors=["own", "other", "q_arm"],
+        own_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],  # this rung uses own + value
+        union_predictors=["own", "other", "reward_belief_mean_candidate_arm_preoutcome"],
     )
     assert buckets["n_drop_qvals_gap"] == 1  # event 2
     assert buckets["n_drop_own_predictor_missing"] == 1  # event 1
@@ -201,13 +201,13 @@ def test_event_drop_buckets_qvals_gap_only_for_own_value_covariate():
     """C2 regression: a base rung that does NOT use q_arm must NOT report a
     qvals_gap when a *later* rung's q_arm is the NaN cause — it is common-cohort."""
     df = _long({
-        1: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm": [float("nan"), 0.2, 0.3]},
-        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "q_arm": [0.1, 0.2, 0.3]},
+        1: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3]},
+        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
     })
     # Base rung uses only 'own'; q_arm belongs to another rung in the union.
     base = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own"], union_predictors=["own", "q_arm"],
+        own_predictors=["own"], union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
     )
     assert base["n_drop_qvals_gap"] == 0  # not this rung's value covariate
     assert base["n_drop_common_cohort_other"] == 1  # event 1, dropped for the value rung
@@ -215,7 +215,7 @@ def test_event_drop_buckets_qvals_gap_only_for_own_value_covariate():
     # The value rung that DOES use q_arm attributes the same event to qvals_gap.
     value = event_drop_buckets(
         df, event_col="event_id", response_col="y",
-        own_predictors=["own", "q_arm"], union_predictors=["own", "q_arm"],
+        own_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"], union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
     )
     assert value["n_drop_qvals_gap"] == 1
     assert value["n_drop_common_cohort_other"] == 0

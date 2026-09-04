@@ -9,6 +9,8 @@ it; and a missing table raises rather than returning something empty.
 
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 
 import numpy as np
@@ -17,8 +19,10 @@ import pytest
 
 from continuum_swr_replay.table_io import (
     parquet_path,
+    publish_canonical,
     read_table,
     table_exists,
+    umask_file_mode,
     write_table,
 )
 
@@ -138,13 +142,89 @@ def test_table_exists_finds_either_format_from_any_suffix(tmp_path, suffix):
 
 def test_empty_frame_with_schema_roundtrips_with_column_order(tmp_path):
     """The empty-fallback path writes a schema-only frame; order is a contract."""
-    cols = ["event_id", "animal", "arm", "prob"]
+    cols = ["event_id", "animal", "candidate_arm", "prob"]
     df = pd.DataFrame(columns=cols)
 
     loaded = read_table(write_table(df, tmp_path / "t"))
 
     assert list(loaded.columns) == cols
     assert len(loaded) == 0
+
+
+def test_written_table_is_group_readable(tmp_path):
+    """mkstemp forces 0600; the promoted table must keep the umask-normal mode.
+
+    The shared ``Processed-Data`` tree is read by other accounts, so an
+    owner-only canonical table breaks every non-owner reader with a
+    PermissionError. The atomic writer goes through ``mkstemp`` (0600) plus
+    ``os.replace`` (which preserves the mode), so without an explicit chmod the
+    file lands 0600 instead of the 0644 a plain ``to_parquet`` would produce.
+    """
+    old = os.umask(0o022)  # a normal, deterministic umask for the assertion
+    try:
+        path = write_table(pd.DataFrame({"x": [1, 2, 3]}), tmp_path / "t")
+    finally:
+        os.umask(old)
+
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert mode == 0o644, f"expected 0o644, got {oct(mode)}"
+
+
+def test_umask_file_mode_respects_umask():
+    """The helper returns 0666 masked by the current umask and restores it."""
+    old = os.umask(0o077)
+    try:
+        assert umask_file_mode() == 0o600
+        assert os.umask(0o022) == 0o077, "umask was not restored after the query"
+    finally:
+        os.umask(old)
+
+
+def _valid_stop_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "animal": ["chimi", "chimi"],
+            "session_date": [20200212, 20200212],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_id": [10, 11],
+            "n_selected_events": [1, 0],
+        }
+    )
+
+
+def test_publish_canonical_stamps_and_writes(tmp_path):
+    """publish_canonical stamps the schema and writes; equals a manual stamp+write."""
+    from continuum_swr_replay.analysis.replay.covariate_registry import (
+        stamp_covariate_schema,
+    )
+
+    frame = _valid_stop_frame()
+    path = publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
+    loaded = read_table(path)
+
+    assert loaded.attrs.get("covariate_schema_table") == "stop"
+    manual = stamp_covariate_schema(_valid_stop_frame(), table="stop")
+    assert loaded.attrs.get("covariate_schema_version") == manual.attrs.get(
+        "covariate_schema_version"
+    )
+    assert loaded.drop(columns=[]).equals(manual)
+
+
+def test_publish_canonical_rejects_duplicate_rows(tmp_path):
+    """A frame that violates the row-key contract must not be written."""
+    bad = _valid_stop_frame()
+    bad.loc[1, "stop_id"] = 10  # duplicate stop_id
+    with pytest.raises(ValueError):
+        publish_canonical(bad, tmp_path, table="stop", basename="stop_table")
+    assert not (tmp_path / "stop_table.parquet").exists()
+
+
+def test_publish_canonical_basename_override(tmp_path):
+    path = publish_canonical(
+        _valid_stop_frame(), tmp_path, table="stop", basename="renamed"
+    )
+    assert path == parquet_path(tmp_path / "renamed")
+    assert path.exists()
 
 
 CANONICAL_TABLE_NAMES = (

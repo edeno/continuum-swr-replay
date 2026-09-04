@@ -107,8 +107,8 @@ From here use `trials` / `track_graph` as if they came from
 `j1620210710_02_r1` with the pre-location-context tables — 299 events, 591 stops,
 2691 event-arm rows, and 13773 sequence rows. The historical “no NaN in
 `current_arm`” check is no longer valid: current tables deliberately leave
-`current_arm` missing for transit, mixed, and unknown windows and expose
-`location_state` / `physical_arm` instead.
+`occupancy_well_arm` missing for transit, mixed, and unknown windows and expose
+`occupancy_state` / `modal_observed_track_segment_id` instead.
 
 ## Cleanup
 

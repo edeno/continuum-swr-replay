@@ -16,11 +16,11 @@ def test_q_arm_source_is_beta():
     prov = mod._provenance(argparse.Namespace(max_per_animal=None), n_sessions=218)
 
     assert "beta" in prov["q_arm_source"].lower()
-    assert "q_arm" in prov["q_arm_source"]
+    assert "reward_belief_mean_candidate_arm_preoutcome" in prov["q_arm_source"]
     # The stale label must be gone.
     assert "harmonization deferred" not in prov["q_arm_source"]
 
-    # beta per-arm value is implemented (model_specs C4_armvalue = [*BASEc, "q_arm"]),
+    # beta per-arm value is implemented (model_specs C4_armvalue = [*BASEc, "reward_belief_mean_candidate_arm_preoutcome"]),
     # so it must no longer appear in the deferred list.
     deferred = " ".join(prov["deferred"]).lower()
     assert "per-arm q_arm" not in deferred

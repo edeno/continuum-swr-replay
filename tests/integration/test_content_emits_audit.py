@@ -39,13 +39,13 @@ def _synthetic_arm_events(n_sessions=3, n_events=12, qvals_gap_events=2, seed=0)
             qhmm_nan = e < qvals_gap_events
             for arm in range(N_ARMS):
                 rows.append({
-                    "animal": animal, "day": s, "epoch": "e",
-                    "event_id": eid, "arm": arm,
+                    "animal": animal, "session_date": s, "epoch": "e",
+                    "event_id": eid, "candidate_arm": arm,
                     "arm_count_hard": float(arm == chosen),
-                    "is_current": float(arm == current),
-                    "q_arm": np.nan if qhmm_nan else float(rng.normal()),
+                    "is_current_arm": float(arm == current),
+                    "reward_belief_mean_candidate_arm_preoutcome": np.nan if qhmm_nan else float(rng.normal()),
                     "is_swr": is_swr,
-                    "time_since_stop": float(rng.uniform(0, 3)),
+                    "time_since_stop_start_s": float(rng.uniform(0, 3)),
                 })
             eid += 1
     return pd.DataFrame(rows)
@@ -55,8 +55,8 @@ def test_run_emits_reconciling_cohort_audit(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "MIN_EVENTS", 3)
     ev = _synthetic_arm_events()
     ladder = {
-        "C0_base": (["is_current"], "split"),          # no value covariate
-        "C4_value": (["is_current", "q_arm"], "split"),  # value rung -> qvals gap
+        "C0_base": (["is_current_arm"], "split"),          # no value covariate
+        "C4_value": (["is_current_arm", "reward_belief_mean_candidate_arm_preoutcome"], "split"),  # value rung -> qvals gap
     }
     results, audits = mod._run(
         ev, ladder, response_col="arm_count_hard", n_categories=N_ARMS

@@ -4,9 +4,9 @@ ContFrag events come from external detectors (SWR/MUA), so a single event
 label can span real movement (an immobile → run → immobile sequence; for
 MUA, up to ~23 s — see ``docs/known_issues/degenerate_mua_events.md``).
 Such an event's immobile timebins fall in two immobility bouts, which under
-the old per-timebin inclusion rule made the stop-table ``n_events``
+the old per-timebin inclusion rule made the stop-table ``n_selected_events``
 double-count it relative to the (atomic) event table — breaking
-``Σ stop_table.n_events == len(event_table)`` and making
+``Σ stop_table.n_selected_events == len(event_table)`` and making
 ``prepare_contfrag_replay_content_data.py`` refuse to write output.
 
 The builders now include an event only if *every* timebin is immobile
@@ -24,10 +24,37 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import (
-    build_contfrag_event_arm_table,
-    build_contfrag_event_table,
-    build_contfrag_stop_table,
+    build_contfrag_event_arm_table as _build_contfrag_event_arm_table,
 )
+from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_event_table as _build_contfrag_event_table,
+)
+from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_stop_table as _build_contfrag_stop_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
+    return port_experiences_from_trials(trials, prepend_initial=True)
+
+
+def build_contfrag_event_table(dot, env, trials, graph, **kwargs):
+    return _build_contfrag_event_table(
+        dot, env, trials, _experiences(trials), graph, **kwargs
+    )
+
+
+def build_contfrag_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    return _build_contfrag_event_arm_table(
+        event_table, dot, env, trials, _experiences(trials), graph, **kwargs
+    )
+
+
+def build_contfrag_stop_table(dot, trials, graph, **kwargs):
+    return _build_contfrag_stop_table(
+        dot, trials, _experiences(trials), graph, **kwargs
+    )
 
 
 class _EnvStub:
@@ -151,29 +178,28 @@ def test_movement_spanning_event_excluded_invariant_holds():
     assert 1 not in set(ev["SWR_event"]), "movement-spanning event 1 must be excluded"
 
     # Cross-table invariant holds: the excluded event is counted nowhere.
-    assert int(stop["n_events"].sum()) == len(ev) == 1, (
-        f"Σ stop.n_events={int(stop['n_events'].sum())} != len(event_table)={len(ev)}"
+    assert int(stop["n_selected_events"].sum()) == len(ev) == 1, (
+        f"Σ stop.n_selected_events={int(stop['n_selected_events'].sum())} != len(event_table)={len(ev)}"
     )
     # Empty trial history is explicit rather than silently mapping the modal
     # physical arm onto a behavioral well. The same schema is present on both
     # canonical event-source tables.
-    assert ev["location_state"].tolist() == ["unknown"]
+    assert ev["occupancy_state"].tolist() == ["unknown"]
     assert ev["at_well"].isna().all()
-    assert ev["location_arm"].isna().all()
-    assert ev["current_arm"].isna().all()
-    assert ev["physical_arm"].tolist() == [0.0]
+    assert ev["occupancy_well_arm"].isna().all()
+    assert ev["modal_observed_track_segment_id"].tolist() == [0.0]
     for column in (
-        "location_state",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
-        "physical_arm",
+        "occupancy_well_id",
+        "occupancy_well_arm",
+        "modal_observed_track_segment_id",
         "nearest_well_distance_cm_max",
     ):
         assert column in stop.columns
     assert stop["completed_trial_id"].isna().all()
     assert stop["completed_trial_arm"].isna().all()
-    assert stop["recent_switch_rate"].isna().all()
+    assert stop["patch_switch_fraction_last5_completed_trips"].isna().all()
     assert stop["leaky_q_value_diff"].isna().all()
 
 
@@ -208,7 +234,7 @@ def test_every_external_event_source_rejects_one_bad_bin_atomically(
     assert event[event_col].tolist() == [2]
     assert arm["event_id"].nunique() == 1
     assert len(arm) == 9
-    assert int(stop["n_events"].sum()) == len(event) == 1
+    assert int(stop["n_selected_events"].sum()) == len(event) == 1
 
 
 @pytest.mark.parametrize(

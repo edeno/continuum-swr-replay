@@ -87,9 +87,9 @@ def test_onset_counts_match_dense(two_bout_dot):
     assert sparse_counts.get("SWR", 0) == 1
     assert sparse_counts.get("MUA", 0) == 1
     # the dense table counts the same onsets, just bucketed into bins.
-    assert int(dense["n_non_local"].sum()) == 3
-    assert int(dense["n_SWR"].sum()) == 1
-    assert int(dense["n_MUA"].sum()) == 1
+    assert int(dense["n_nonlocal_events"].sum()) == 3
+    assert int(dense["n_swr_events"].sum()) == 1
+    assert int(dense["n_mua_events"].sum()) == 1
 
 
 def test_t_since_pump_bridges_movement_gap(two_bout_dot):
@@ -121,9 +121,9 @@ def test_missing_mua_column_tolerated(two_bout_dot):
     onset = build_event_onset_table(dot, pumps)
     dense = build_stop_timebin_table(dot, pumps, bin_s=0.01)
     assert "MUA" not in set(onset["event_type"])
-    assert int(dense["n_MUA"].sum()) == 0
+    assert int(dense["n_mua_events"].sum()) == 0
     # the other event types are unaffected.
-    assert int(dense["n_non_local"].sum()) == 3
+    assert int(dense["n_nonlocal_events"].sum()) == 3
 
 
 def test_invalid_nonlocal_probability_labels_fail_loud():
@@ -221,9 +221,9 @@ def test_all_sources_exclude_a_movement_spanning_event_atomically():
     dense = build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
 
     for event_type, count_col in (
-        ("SWR", "n_SWR"),
-        ("non_local", "n_non_local"),
-        ("MUA", "n_MUA"),
+        ("SWR", "n_swr_events"),
+        ("non_local", "n_nonlocal_events"),
+        ("MUA", "n_mua_events"),
     ):
         assert int((onset["event_type"] == event_type).sum()) == 1
         assert int(dense[count_col].sum()) == 1
@@ -239,5 +239,5 @@ def test_empty_session_returns_schema(two_bout_dot):
     assert len(dense) == 0
     for col in ("stop_id", "event_type", "onset_time", "t_since_pump"):
         assert col in onset.columns
-    for col in ("stop_id", "n_SWR", "n_non_local", "n_MUA", "head_speed"):
+    for col in ("stop_id", "n_swr_events", "n_nonlocal_events", "n_mua_events", "head_speed"):
         assert col in dense.columns

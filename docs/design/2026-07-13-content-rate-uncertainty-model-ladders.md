@@ -114,7 +114,7 @@ A2 <- arm_count_hard ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere |
     event_id
@@ -124,7 +124,7 @@ A3 <- arm_count_hard ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm |
@@ -135,7 +135,7 @@ A4 <- arm_count_hard ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -147,7 +147,7 @@ A5 <- arm_count_hard ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -160,7 +160,7 @@ A6 <- arm_count_hard ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -206,51 +206,35 @@ P0 <- patch_count_hard ~
 
 P1 <- patch_count_hard ~
     factor(patch) +
-    is_current_patch +
-    is_prev_patch +
-    patch_dist_rank |
+    is_current_patch |
     event_id
 
 P2 <- patch_count_hard ~
     factor(patch) +
     is_current_patch +
-    is_prev_patch +
-    patch_dist_rank +
-    visit_recency_patch +
-    reward_rate_patch_k10 +
-    is_last_rewarded_patch_elsewhere |
+    reward_fraction_candidate_arm_last10_visits_patch |
     event_id
 
 P3 <- patch_count_hard ~
     factor(patch) +
     is_current_patch +
-    is_prev_patch +
-    patch_dist_rank +
-    visit_recency_patch +
-    reward_rate_patch_k10 +
-    is_last_rewarded_patch_elsewhere +
-    p_reward_patch +
-    q_patch + I(q_patch^2) |
+    reward_fraction_candidate_arm_last10_visits_patch +
+    swr_x_is_current_patch |
     event_id
 
-P4 <- patch_count_hard ~
+Pv <- patch_count_hard ~
     factor(patch) +
     is_current_patch +
-    is_prev_patch +
-    patch_dist_rank +
-    visit_recency_patch +
-    reward_rate_patch_k10 +
-    is_last_rewarded_patch_elsewhere +
-    p_reward_patch +
-    q_patch + I(q_patch^2) +
-    U_between |
+    reward_fraction_candidate_arm_last10_visits_patch +
+    task_reward_probability_candidate_arm_patch +
+    reward_belief_mean_candidate_arm_preoutcome_patch |
     event_id
 ```
 
 The primary patch comparison is:
 
 ```r
-P3 versus P4
+P2 versus Pv
 ```
 
 ## W. Within-patch well allocation
@@ -265,7 +249,7 @@ W0 <- arm_count_hard ~
     is_current +
     is_prev +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -277,7 +261,7 @@ W1 <- arm_count_hard ~
     is_current +
     is_prev +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -434,7 +418,7 @@ I_presence <- I(leaf_content_bins > 0) ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -453,7 +437,7 @@ I_amount <- leaf_content_bins ~
     is_current + is_prev +
     is_current_patch + is_prev_patch +
     arm_dist_rank +
-    visit_recency_demeaned +
+    visit_recency_trials_event_leaf_centered +
     reward_rate_arm_k10 +
     is_last_rewarded_elsewhere +
     p_reward_arm +
@@ -510,7 +494,7 @@ A5_SWR <- arm_count_hard ~
         is_current + is_prev +
         is_current_patch + is_prev_patch +
         arm_dist_rank +
-        visit_recency_demeaned +
+        visit_recency_trials_event_leaf_centered +
         reward_rate_arm_k10 +
         is_last_rewarded_elsewhere +
         p_reward_arm +

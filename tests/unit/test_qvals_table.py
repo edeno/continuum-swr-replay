@@ -1,48 +1,243 @@
-"""Unit tests for the pure (DB-free) helpers in the qvals_table loader.
+"""Unit tests for the pure (DB-free) helpers in the qvals-table loader.
 
-Covers ``_add_nominal_contingency`` — the per-port nominal value block and its
-leaf-range guard. These lock the identities every downstream consumer relies on
-(``attach_contingency_value_block`` maps ``p_reward_port{leaf-1}`` -> the chosen
-arm), which the range-only runtime verifier does not assert. The DataJoint-backed
-paths (``_fetch_model_df`` / ``build_animal``) are exercised by the slow runner
-smoke test, not here.
+Covers the authoritative timing/model trial join, stop-start broadcast, nominal
+per-port values, model-column adapter, outcome-availability clock, and persisted
+scientific identities.  DataJoint reads remain outside this unit boundary; the
+tests use real pandas frames through the same join and broadcast operations as
+the production builder.
 """
 
 import numpy as np
 import pandas as pd
 import pytest
 
-import continuum_swr_replay.analysis.behavior.qvals_table as qvals_table
 from continuum_swr_replay.analysis.behavior.qvals_table import (
+    KEYS,
+    REQUIRED_FITTED_MODEL_COVARIATES,
     _add_nominal_contingency,
+    _broadcast_trial_covariates_to_stops,
+    _join_model_to_trial_timebase,
+    _model_covariate_columns,
     _outcome_known_time,
     _validate_qvals_output,
     add_beta_belief_entropy,
     add_experienced_value_columns,
     assign_stops_to_trials,
+    canonicalize_behavior_model_columns,
     peri_switch_index,
 )
 from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
 
 
 def _valid_qvals_output() -> pd.DataFrame:
+    chosen_belief = np.array([0.3, 0.7])
+    trial_reward = np.array([0.0, 1.0])
+    rpe = trial_reward - chosen_belief
     frame = pd.DataFrame(
         {
             "stop_id": [1, 2],
-            "p_reward_current": [0.2, 0.8],
-            "q_chosen": [0.3, 0.7],
-            "beta_reward_entropy": [0.0, -0.1],
+            "task_reward_probability_chosen_arm": [0.2, 0.8],
+            "chosen_arm": [0, 1],
+            "reward_belief_mean_chosen_arm_preoutcome": chosen_belief,
+            "rpe_postoutcome": rpe,
+            "rpe_postoutcome_abs": np.abs(rpe),
+            "relative_value_switch_minus_stay_preoutcome": [0.1, -0.1],
+            "reward_belief_mean_update_l1_all_ports_postoutcome": [0.05, 0.06],
+            "reward_belief_mean_update_l1_alternative_patches_postoutcome": [
+                0.01,
+                0.02,
+            ],
+            "reward_belief_differential_entropy_leaf_mean_preoutcome": [0.0, -0.1],
             "outcome_known_time": [1.0, 2.0],
             "qvals_context_time": [0.5, 1.5],
-            "trial_reward": [0.0, 1.0],
+            "trial_reward": trial_reward,
         }
     )
-    for prefix in ("p_reward_port", "q_port"):
-        for arm in range(6):
-            frame[f"{prefix}{arm}"] = 0.1 * (arm + 1)
-    for arm in range(1, 7):
-        frame[f"betadist_var{arm}"] = 0.01 * arm
+    for arm in range(6):
+        frame[f"task_reward_probability_port_{arm}"] = 0.1 * (arm + 1)
+        frame[f"reward_belief_mean_port_{arm}"] = 0.1 * (arm + 1)
+        frame[f"reward_belief_variance_port_{arm}"] = 0.01 * (arm + 1)
     return frame
+
+
+def _trial_times(trial_numbers=(0, 1, 2)) -> pd.DataFrame:
+    """Complete behavior timing rows for one epoch."""
+    trial_numbers = list(trial_numbers)
+    n = len(trial_numbers)
+    leaf = np.arange(1, n + 1)
+    reward = np.asarray(trial_numbers) % 2
+    poke_out = 10.0 * (np.asarray(trial_numbers, dtype=float) + 1.0)
+    return pd.DataFrame(
+        {
+            "nwb_file_name": ["rat20200101_.nwb"] * n,
+            "epoch": [2] * n,
+            "trial_number_by_epoch": trial_numbers,
+            "poke_in_ts": poke_out - 2.0,
+            "poke_out_ts": poke_out,
+            "reward_on_ts": np.where(reward == 1, poke_out - 1.0, np.nan),
+            "reward_off_ts": np.where(reward == 1, poke_out - 0.5, np.nan),
+            "leaf": leaf,
+            "reward": reward,
+        }
+    )
+
+
+def _model_trials(trial_numbers=(0, 1, 2)) -> pd.DataFrame:
+    """Canonical model rows with every paper-fitted qvals covariate."""
+    trial_numbers = list(trial_numbers)
+    n = len(trial_numbers)
+    leaf = np.asarray(trial_numbers) + 1
+    reward = np.asarray(trial_numbers) % 2
+    chosen_mean = 0.2 + 0.1 * np.asarray(trial_numbers, dtype=float)
+    frame = pd.DataFrame(
+        {
+            "nwb_file_name": ["rat20200101_.nwb"] * n,
+            "epoch": [2] * n,
+            "trial_number_by_epoch": trial_numbers,
+            "leaf": leaf,
+            "reward": reward,
+            "chosen_arm": leaf - 1,
+            "reward_belief_mean_chosen_arm_preoutcome": chosen_mean,
+            "rpe_postoutcome": reward - chosen_mean,
+            "rpe_postoutcome_abs": np.abs(reward - chosen_mean),
+            "relative_value_switch_minus_stay_preoutcome": np.linspace(-0.1, 0.1, n),
+            "reward_belief_mean_update_l1_all_ports_postoutcome": np.full(n, 0.05),
+            "reward_belief_mean_update_l1_alternative_patches_postoutcome": np.full(
+                n, 0.01
+            ),
+            "reward_belief_differential_entropy_leaf_mean_preoutcome": np.full(n, -0.2),
+        }
+    )
+    for arm in range(6):
+        frame[f"reward_belief_mean_port_{arm}"] = 0.1 * (arm + 1)
+        frame[f"reward_belief_variance_port_{arm}"] = 0.01 * (arm + 1)
+    assert set(REQUIRED_FITTED_MODEL_COVARIATES).issubset(frame.columns)
+    return frame
+
+
+def test_required_fitted_model_covariates_are_not_silently_optional():
+    model = _model_trials().drop(columns=["rpe_postoutcome"])
+
+    with pytest.raises(ValueError, match="required fitted model covariates"):
+        _model_covariate_columns(model)
+
+
+def test_trial_join_rejects_duplicate_keys_in_either_source():
+    times = _trial_times()
+    model = _model_trials()
+    model_cols = _model_covariate_columns(model)
+
+    duplicate_times = pd.concat([times, times.iloc[[1]]], ignore_index=True)
+    with pytest.raises(ValueError, match="timing trial keys are duplicated"):
+        _join_model_to_trial_timebase(duplicate_times, model, model_cols)
+
+    duplicate_model = pd.concat([model, model.iloc[[1]]], ignore_index=True)
+    with pytest.raises(ValueError, match="model trial keys are duplicated"):
+        _join_model_to_trial_timebase(times, duplicate_model, model_cols)
+
+
+def test_trial_join_rejects_nonconsecutive_complete_timing_keys():
+    times = _trial_times((0, 2))
+    model = _model_trials((0, 2))
+
+    with pytest.raises(ValueError, match="timing trial numbers must be consecutive"):
+        _join_model_to_trial_timebase(times, model, _model_covariate_columns(model))
+
+
+def test_trial_join_rejects_model_only_trial_keys():
+    times = _trial_times((0, 1))
+    model = _model_trials((0, 1, 2))
+
+    with pytest.raises(ValueError, match="model-only trial keys"):
+        _join_model_to_trial_timebase(times, model, _model_covariate_columns(model))
+
+
+@pytest.mark.parametrize(
+    ("column", "bad", "message"),
+    [
+        ("leaf", 6, "leaf labels disagree"),
+        ("reward", 0, "reward labels disagree"),
+        ("rpe_postoutcome", 999.0, "rpe_postoutcome != reward -"),
+        ("rpe_postoutcome_abs", 999.0, "rpe_postoutcome_abs != abs"),
+    ],
+)
+def test_trial_join_rejects_cross_source_and_rpe_identity_failures(
+    column, bad, message
+):
+    times = _trial_times()
+    model = _model_trials()
+    model.loc[1, column] = bad
+
+    with pytest.raises(ValueError, match=message):
+        _join_model_to_trial_timebase(times, model, _model_covariate_columns(model))
+
+
+def test_internal_missing_model_trial_preserves_later_stop_alignment():
+    """A model gap keeps its timing interval and cannot shift trial 2 to trial 1."""
+    times = _trial_times()
+    model = _model_trials((0, 2))
+    model_cols = _model_covariate_columns(model)
+
+    joined = _join_model_to_trial_timebase(times, model, model_cols)
+
+    assert joined["trial_number_by_epoch"].tolist() == [0, 1, 2]
+    assert joined["_model_row_available"].tolist() == [True, False, True]
+    assert np.isnan(joined.loc[1, "reward_belief_mean_chosen_arm_preoutcome"])
+    assert joined.loc[2, "reward_belief_mean_chosen_arm_preoutcome"] == pytest.approx(
+        0.4
+    )
+    # The vendored code uses adjacent rows for these two fitted quantities.
+    # They must be blanked rather than silently bridging trial 0 -> trial 2.
+    assert np.isnan(joined.loc[0, "reward_belief_mean_update_l1_all_ports_postoutcome"])
+    assert np.isnan(joined.loc[2, "relative_value_switch_minus_stay_preoutcome"])
+    # Direct current-trial quantities remain valid on trial 2.
+    assert joined.loc[2, "rpe_postoutcome"] == pytest.approx(-0.4)
+    np.testing.assert_allclose(joined["poke_out_ts"], [10.0, 20.0, 30.0])
+    assert joined.attrs["timing_trials_without_model_by_session"] == [
+        {
+            "nwb_file_name": "rat20200101_.nwb",
+            "epoch": 2,
+            "n_timing_trials_without_model": 1,
+        }
+    ]
+
+    stops = pd.DataFrame(
+        {
+            "animal": ["rat", "rat"],
+            "session_date": ["20200101", "20200101"],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_id": ["missing-model-trial", "later-model-trial"],
+            "stop_start": [15.0, 25.0],
+            "stop_end": [16.0, 26.0],
+        }
+    )
+    out = _broadcast_trial_covariates_to_stops("rat", joined, model_cols, stops)
+
+    assert out["stop_id"].tolist() == ["later-model-trial"]
+    assert out["trial_number_by_epoch"].tolist() == [2]
+    assert out["reward_belief_mean_chosen_arm_preoutcome"].tolist() == [
+        pytest.approx(0.4)
+    ]
+    assert out.attrs["n_stops_missing_model_trial"] == 1
+
+
+def test_complete_trial_join_is_identical_to_legacy_inner_join():
+    """The hardening must not numerically alter complete, already-aligned data."""
+    times = _trial_times()
+    model = _model_trials()
+    model_cols = _model_covariate_columns(model)
+    expected = times.merge(
+        model[[*KEYS, "leaf", "reward", *model_cols]],
+        on=KEYS,
+        suffixes=("_time", "_val"),
+        validate="one_to_one",
+    )
+
+    actual = _join_model_to_trial_timebase(times, model, model_cols).drop(
+        columns="_model_row_available"
+    )
+
+    pd.testing.assert_frame_equal(actual, expected)
 
 
 def test_qvals_output_requires_unique_stop_ids():
@@ -55,7 +250,7 @@ def test_qvals_output_requires_unique_stop_ids():
 @pytest.mark.parametrize("bad", [np.nan, np.inf, -0.1, 1.1])
 def test_qvals_output_requires_finite_probabilities_in_unit_interval(bad):
     frame = _valid_qvals_output()
-    frame.loc[0, "q_port3"] = bad
+    frame.loc[0, "reward_belief_mean_port_3"] = bad
     with pytest.raises(ValueError, match="probability/value columns"):
         _validate_qvals_output(frame)
 
@@ -63,8 +258,8 @@ def test_qvals_output_requires_finite_probabilities_in_unit_interval(bad):
 @pytest.mark.parametrize(
     ("column", "bad", "message"),
     [
-        ("betadist_var2", 0.3, "posterior variances"),
-        ("beta_reward_entropy", 0.1, "entropy"),
+        ("reward_belief_variance_port_1", 0.3, "posterior variances"),
+        ("reward_belief_differential_entropy_leaf_mean_preoutcome", 0.1, "entropy"),
         ("outcome_known_time", np.inf, "times"),
         ("trial_reward", 0.5, "trial_reward"),
     ],
@@ -78,9 +273,24 @@ def test_qvals_output_validates_uncertainty_timing_and_reward(column, bad, messa
 
 
 @pytest.mark.parametrize(
+    ("column", "bad", "message"),
+    [
+        ("rpe_postoutcome", 0.0, "rpe_postoutcome != trial_reward -"),
+        ("rpe_postoutcome_abs", 0.0, "rpe_postoutcome_abs != abs"),
+    ],
+)
+def test_qvals_output_validates_exact_rpe_identities(column, bad, message):
+    frame = _valid_qvals_output()
+    frame.loc[0, column] = bad
+
+    with pytest.raises(ValueError, match=message):
+        _validate_qvals_output(frame)
+
+
+@pytest.mark.parametrize(
     ("rewarded", "reward_on", "expected"),
     (
-        (True, 12.5, 12.5),
+        (True, 10.2, 10.2),
         # Omission: poke_in + the latency by which a pump would have fired,
         # NOT poke-out. Poke-out is a behavioural boundary and lands a median
         # 880 ms after the information exists.
@@ -112,9 +322,10 @@ def test_omission_boundary_is_capped_at_poke_out():
 def test_omission_latency_exceeds_every_observed_reward_latency():
     """The boundary must not declare an omission while a pump could fire.
 
-    Max observed reward latency across 52,605 rewarded trials is 0.298 s.
+    Max observed reward latency across 18,753 rewarded task visits in the
+    refreshed 218-session behavioral cache is 0.2361 s.
     """
-    assert OMISSION_KNOWN_LATENCY_SEC > 0.298
+    assert OMISSION_KNOWN_LATENCY_SEC > 0.2361
 
 
 def test_outcome_known_time_rejects_missing_physical_boundary():
@@ -230,36 +441,40 @@ def test_add_nominal_contingency_adds_peri_switch():
     # leaves 1,1,1,3,3,1,1 -> patches 0,0,0,1,1,0,0 (switch at trial 3 and 5)
     t = _toy_times([1, 1, 1, 3, 3, 1, 1], [[50] * 6] * 7)
     out = _add_nominal_contingency(t)
-    assert out["trials_since_switch"].tolist() == [-3, -2, -1, 0, 1, 0, 1]
-    assert out["is_post_switch"].tolist() == [0, 0, 0, 1, 1, 1, 1]
+    assert out["periswitch_index_trials"].tolist() == [-3, -2, -1, 0, 1, 0, 1]
+    assert out["is_periswitch_post"].tolist() == [0, 0, 0, 1, 1, 1, 1]
 
 
 def test_per_port_identities_and_patch_value():
     # leaf 3; ports (pct) = [20,50,80,80,20,20] -> frac [.2,.5,.8,.8,.2,.2]
     t = _toy_times([3], [[20, 50, 80, 80, 20, 20]])
     out = _add_nominal_contingency(t)
-    # p_reward_port{i} == p_rew_leaf{i+1} / 100
+    # task_reward_probability_port_{i} == p_rew_leaf{i+1} / 100
     for i in range(6):
-        assert out[f"p_reward_port{i}"].iloc[0] == pytest.approx(
+        assert out[f"task_reward_probability_port_{i}"].iloc[0] == pytest.approx(
             [0.2, 0.5, 0.8, 0.8, 0.2, 0.2][i]
         )
-    # p_reward_current == p_reward_port[leaf-1]
-    assert out["p_reward_current"].iloc[0] == pytest.approx(
-        out["p_reward_port2"].iloc[0]
+    # task_reward_probability_chosen_arm == p_reward_port[leaf-1]
+    assert out["task_reward_probability_chosen_arm"].iloc[0] == pytest.approx(
+        out["task_reward_probability_port_2"].iloc[0]
     )
-    assert out["p_reward_best"].iloc[0] == pytest.approx(0.8)
+    assert out["task_reward_probability_best_arm"].iloc[0] == pytest.approx(0.8)
     # patch means (WELL_PATCH=[0,0,1,1,2,2]): {.35, .8, .2}; diff = .8 - .35
-    assert out["value_diff_patch"].iloc[0] == pytest.approx(0.45)
+    assert out["task_reward_probability_patch_mean_gap_best_vs_second"].iloc[
+        0
+    ] == pytest.approx(0.45)
 
 
-def test_p_reward_current_matches_chosen_arm_across_rows():
+def test_task_reward_probability_chosen_arm_matches_across_rows():
     leaves = [1, 4, 6]
     ports = [[80, 20, 20, 50, 20, 20]] * 3
     out = _add_nominal_contingency(_toy_times(leaves, ports))
-    port_mat = out[[f"p_reward_port{i}" for i in range(6)]].to_numpy()
+    port_mat = out[[f"task_reward_probability_port_{i}" for i in range(6)]].to_numpy()
     arm = out["leaf"].to_numpy() - 1
     expected = port_mat[np.arange(len(out)), arm]
-    np.testing.assert_allclose(out["p_reward_current"].to_numpy(), expected)
+    np.testing.assert_allclose(
+        out["task_reward_probability_chosen_arm"].to_numpy(), expected
+    )
 
 
 def test_trials_since_block_change_is_within_block_cumcount():
@@ -342,8 +557,8 @@ def test_stop_start_context_does_not_jump_to_midpoint_trial():
     assert assign_stops_to_trials(poke_out, stop_midpoint).tolist() == [1]
 
 
-def test_build_animal_assigns_qvals_from_stop_start_not_midpoint(monkeypatch):
-    """Pin the production caller, not only the pure interval helper."""
+def test_stop_broadcast_assigns_qvals_from_stop_start_not_midpoint():
+    """Pin the production broadcast caller using real pandas frames."""
     per_trial = pd.DataFrame(
         {
             "nwb_file_name": ["rat20200101_.nwb"] * 2,
@@ -354,20 +569,17 @@ def test_build_animal_assigns_qvals_from_stop_start_not_midpoint(monkeypatch):
             "reward_on_ts": [np.nan, 19.0],
             "reward_off_ts": [np.nan, 19.5],
             "reward_time": [0, 1],
-            "q_chosen": [0.1, 0.9],
+            "_model_row_available": [True, True],
+            "reward_belief_mean_chosen_arm_preoutcome": [0.1, 0.9],
         }
     )
     per_trial.attrs["leaf_agree"] = 1.0
+    per_trial.attrs["reward_agree"] = 1.0
     per_trial.attrs["entropy_cov"] = 1.0
-    monkeypatch.setattr(
-        qvals_table,
-        "_per_trial",
-        lambda animal, beh, rl: (per_trial, ["q_chosen"]),
-    )
     stops = pd.DataFrame(
         {
             "animal": ["rat"],
-            "day": ["20200101"],
+            "session_date": ["20200101"],
             "epoch": ["02_r1"],
             "stop_id": ["stop-0"],
             "stop_start": [9.0],
@@ -376,11 +588,18 @@ def test_build_animal_assigns_qvals_from_stop_start_not_midpoint(monkeypatch):
         }
     )
 
-    result = qvals_table.build_animal("rat", object(), object(), stops)
+    result = _broadcast_trial_covariates_to_stops(
+        "rat",
+        per_trial,
+        ["reward_belief_mean_chosen_arm_preoutcome"],
+        stops,
+    )
 
     assert result.loc[0, "trial_number_by_epoch"] == 0
     assert result.loc[0, "qvals_context_time"] == 9.0
-    assert result.loc[0, "q_chosen"] == pytest.approx(0.1)
+    assert result.loc[0, "reward_belief_mean_chosen_arm_preoutcome"] == pytest.approx(
+        0.1
+    )
     # Omission trial (poke_in 8.0, poke_out 10.0): the boundary is
     # poke_in + the omission latency, not poke-out.
     assert result.loc[0, "outcome_known_time"] == pytest.approx(
@@ -406,12 +625,31 @@ def test_experienced_value_picks_chosen_arm(reward, exp_rpe):
     # distinct Q per port so picking the wrong arm gives a different literal
     q = [0.11, 0.22, 0.33, 0.44, 0.55, 0.66]
     out = add_experienced_value_columns(_toy_vals([3], [reward], [q]))
-    assert out["arm"].iloc[0] == 2  # leaf 3 -> arm 2
+    assert out["arm"].iloc[0] == 2  # native realized arm: leaf 3 -> arm 2
     assert out["q_chosen"].iloc[0] == pytest.approx(0.33)  # Q3, not Q2/Q4
     assert out["q_port0"].iloc[0] == pytest.approx(0.11)
     assert out["q_port5"].iloc[0] == pytest.approx(0.66)
     assert out["rpe"].iloc[0] == pytest.approx(exp_rpe)
     assert out["rpe_abs"].iloc[0] == pytest.approx(abs(exp_rpe))
+
+
+def test_behavior_model_adapter_translates_native_realized_arm_and_beliefs():
+    """External model vocabulary changes only at the qvals ownership boundary."""
+    native = add_experienced_value_columns(
+        _toy_vals([3], [1], [[0.11, 0.22, 0.33, 0.44, 0.55, 0.66]])
+    )
+    for port in range(6):
+        native[f"betadist_mu{port + 1}"] = native[f"Q{port + 1}"]
+
+    canonical = canonicalize_behavior_model_columns(native)
+
+    assert canonical.loc[0, "chosen_arm"] == 2
+    assert canonical.loc[
+        0, "reward_belief_mean_chosen_arm_preoutcome"
+    ] == pytest.approx(0.33)
+    assert canonical.loc[0, "reward_belief_mean_port_2"] == pytest.approx(0.33)
+    assert "candidate_arm" not in canonical
+    assert not {"arm", "q_chosen", "Q3", "q_port2", "betadist_mu3"} & set(canonical)
 
 
 def test_rpe_is_surprise_relative_to_model_belief():
@@ -421,7 +659,7 @@ def test_rpe_is_surprise_relative_to_model_belief():
     out = add_experienced_value_columns(
         _toy_vals(leaves=[1, 6], rewards=[1, 1], q_rows=[q, q])
     )
-    rpe_low, rpe_high = out["rpe"].iloc[0], out["rpe"].iloc[1]  # arm0 q=.1, arm5 q=.9
+    rpe_low, rpe_high = out["rpe"].iloc[0], out["rpe"].iloc[1]
     assert rpe_low > rpe_high
     assert rpe_low == pytest.approx(0.9) and rpe_high == pytest.approx(0.1)
 

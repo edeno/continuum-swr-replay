@@ -21,16 +21,19 @@ def test_rejects_derived_post_outcome():
     not contain the source scalar, so a string heuristic would miss it)."""
     with pytest.raises(ValueError, match="post-outcome"):
         assert_predictor_timing(
-            ["update_x_current"]
-        )  # source global_mu_update_abs_postoutcome_sess
+            ["reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"]
+        )
     # ...but only when the source really is post-outcome; relval is safe.
     assert_predictor_timing(
-        ["relval_x_current"]
-    )  # switch_advantage_mu_preoutcome_sess -> no raise
+        ["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"]
+    )
 
 
 def test_rejects_derived_future_referencing():
-    for p in ("tss_x_current", "postsw_x_current"):
+    for p in (
+        "periswitch_index_trials_z_x_is_current_arm",
+        "is_periswitch_post_x_is_current_arm",
+    ):
         with pytest.raises(ValueError, match="future-referencing"):
             assert_predictor_timing([p])
 
@@ -38,32 +41,39 @@ def test_rejects_derived_future_referencing():
 def test_rate_swr_interaction_caught():
     """The patsy expansion of the S7/S9 is_swr*(...+rpe/update) rungs must resolve the
     post-outcome operand, not hide behind the is_swr gating factor."""
-    assert timing_of("is_swr:rpe") == ["rpe"]
+    assert timing_of("is_swr:rpe_postoutcome") == ["rpe_postoutcome"]
     with pytest.raises(ValueError, match="post-outcome"):
-        assert_predictor_timing(["is_swr:rpe"])
-    assert timing_of("is_swr:trials_since_switch") == ["trials_since_switch"]
+        assert_predictor_timing(["is_swr:rpe_postoutcome"])
+    assert timing_of("is_swr:periswitch_index_trials") == [
+        "periswitch_index_trials"
+    ]
     with pytest.raises(ValueError, match="future-referencing"):
-        assert_predictor_timing(["is_swr:trials_since_switch"])
+        assert_predictor_timing(["is_swr:periswitch_index_trials"])
 
 
 def test_post_outcome_fixable_by_retrospective_but_future_is_not():
     # POST_OUTCOME clears with retrospective gating...
-    assert_predictor_timing(["rpe"], retrospective=True)  # no raise
-    assert_predictor_timing(["update_x_current"], retrospective=True)  # no raise
+    assert_predictor_timing(["rpe_postoutcome"], retrospective=True)  # no raise
+    assert_predictor_timing(
+        ["reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"],
+        retrospective=True,
+    )
     # ...FUTURE_REFERENCING does NOT — a temporal gate can't fix it.
     with pytest.raises(ValueError, match="future-referencing"):
-        assert_predictor_timing(["trials_since_switch"], retrospective=True)
+        assert_predictor_timing(["periswitch_index_trials"], retrospective=True)
     with pytest.raises(ValueError, match="future-referencing"):
-        assert_predictor_timing(["tss_x_current"], retrospective=True)
+        assert_predictor_timing(
+            ["periswitch_index_trials_z_x_is_current_arm"], retrospective=True
+        )
     # Only descriptive clears future-referencing.
-    assert_predictor_timing(["trials_since_switch"], descriptive=True)  # no raise
+    assert_predictor_timing(["periswitch_index_trials"], descriptive=True)  # no raise
 
 
 @pytest.mark.parametrize(
     "predictor",
     [
-        "rpe_model",
-        "unchosen_patches_mu_update_abs_postoutcome_sess",
+        "rpe_postoutcome",
+        "reward_belief_mean_update_l1_alternative_patches_postoutcome",
     ],
 )
 def test_uncertainty_rate_post_outcome_names_require_retrospective_gate(predictor):
@@ -74,13 +84,11 @@ def test_uncertainty_rate_post_outcome_names_require_retrospective_gate(predicto
 
 def test_is_after_switch_is_safe():
     """Last-completed-trip switch status is past-only and never rejected."""
-    assert_predictor_timing(["is_after_switch"])  # no raise
-    assert timing_of("is_after_switch") == ["is_after_switch"]
+    assert_predictor_timing(["did_last_completed_trip_switch_patch"])  # no raise
+    assert timing_of("did_last_completed_trip_switch_patch") == ["did_last_completed_trip_switch_patch"]
 
 
-@pytest.mark.parametrize(
-    "predictor", ["reward_outcome", "is_after_reward", "is_after_omission"]
-)
+@pytest.mark.parametrize("predictor", ["is_rewarded_outcome", "is_omitted_outcome"])
 def test_completion_indexed_outcome_flags_still_require_a_gate(predictor):
     """Their finite values are meaningful only after outcome availability.
 
@@ -109,7 +117,12 @@ def test_eventual_choice_covariates_are_future_referencing(predictor):
 
 def test_descriptive_whitelists_both_leak_types():
     assert_predictor_timing(
-        ["rpe", "trials_since_switch", "update_x_current"], descriptive=True
+        [
+            "rpe_postoutcome",
+            "periswitch_index_trials",
+            "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+        ],
+        descriptive=True,
     )  # no raise
 
 

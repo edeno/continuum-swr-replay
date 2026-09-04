@@ -8,17 +8,11 @@ the replay content analysis pipeline.
 from ._helpers import (
     POPULATIONS,
     add_arm_fixed_effects,
-    add_trial_context,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
-    behavioral_location_at_times,
     nearest_well_distance_cm,
     raised_cosine_history_basis,
     single_arm_from_well,
-    summarize_behavioral_location,
-    trial_context_at_times,
-    trial_cutoff_times,
-    trial_outcome_times,
 )
 from .choice_prediction import (
     build_choice_dataset,
@@ -27,7 +21,17 @@ from .choice_prediction import (
     predict_arm_fractions,
 )
 from .cohort_selection import freeze_common_cohort
-from .covariates import UNCERTAINTY_COVARIATES, add_uncertainty_covariates
+from .covariates import (
+    UNCERTAINTY_COVARIATES,
+    add_trial_context,
+    add_uncertainty_covariates,
+    behavioral_location_at_times,
+    behavioral_location_from_port_experiences,
+    summarize_behavioral_location,
+    trial_context_at_times,
+    trial_cutoff_times,
+    trial_outcome_times,
+)
 from .fitting import (
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -136,6 +140,7 @@ __all__ = [
     "freeze_retrospective_cohort",
     "attach_is_swr_to_onsets",
     "behavioral_location_at_times",
+    "behavioral_location_from_port_experiences",
     "build_choice_dataset",
     "build_control_aligned_table",
     "build_event_arm_table",

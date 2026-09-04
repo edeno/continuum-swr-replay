@@ -26,6 +26,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -36,11 +39,17 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 def _global_sd(covariates):
     """Global (pooled) SD of each continuous covariate from its source table."""
-    from continuum_swr_replay.analysis.replay._helpers import add_uncertainty_covariates
+    from continuum_swr_replay.analysis.replay.covariates import (
+        add_uncertainty_covariates,
+    )
 
     arm = read_table(RC / "event_arm_table.pkl")
     qv = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(arm, table="event_arm")
+    require_covariate_schema(qv, table="qvals")
+    require_covariate_schema(stop, table="stop")
+    stop = add_uncertainty_covariates(stop)
     sd = {}
     for c in covariates:
         for src in (arm, qv, stop):
@@ -51,10 +60,10 @@ def _global_sd(covariates):
 
 
 SD = _global_sd([
-    "q_arm", "reward_rate_arm_k10", "p_reward_arm",
-    "switch_advantage_mu_preoutcome_sess", "rpe", "beta_reward_entropy",
-    "global_mu_update_abs_postoutcome_sess",
-    "trials_since_switch", "trials_since_block_change", "recent_switch_rate",
+    "reward_belief_mean_candidate_arm_preoutcome", "reward_fraction_candidate_arm_last10_visits", "task_reward_probability_candidate_arm",
+    "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+    "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
 ])
 ANIM = ["chimi", "j16", "peanut", "senor", "wilbur"]
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
@@ -68,10 +77,17 @@ def std_factor(term):
     render at raw scale under a "per 1 SD" axis (the migration renamed every rate/
     content term; this asserts each still resolves).
     """
-    BIN = {"is_current", "swr_x_current", "swr_x_prev",
-           "swr_x_is_last_rewarded_elsewhere", "reward_lag1",
-           "is_current_patch", "is_last_rewarded_patch_elsewhere",
-           "swr_x_current_patch", "swr_x_last_rewarded_patch_elsewhere"}
+    BIN = {
+        "is_current_arm",
+        "swr_x_is_current_arm",
+        "swr_x_is_prev_arm",
+        "swr_x_is_last_rewarded_noncurrent_arm",
+        "known_reward_outcome_lag_1",
+        "is_current_patch",
+        "is_last_rewarded_noncurrent_patch",
+        "swr_x_is_current_patch",
+        "swr_x_is_last_rewarded_noncurrent_patch",
+    }
     if term in BIN:
         return 1.0, True
     # per-arm / rate continuous covariates scaled by their global SD
@@ -158,18 +174,18 @@ handles = [plt.Line2D([], [], marker="o", ls="", color=CMAP[a], label=a) for a i
 R = pd.read_pickle(RC / "models_per_bin_rate" / "swr_contrast_rate.pkl")
 SWR, NON = "non_local_swr", "non_local_no_swr"
 rate_rows = [
-    ("reward lag-1 · SWR", "G0_base", SWR, "reward_lag1"),
-    ("reward lag-1 · nonSWR", "G0_base", NON, "reward_lag1"),
-    ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe"),
-    ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe"),
-    ("rel. value (beta) · SWR", "G4_value", SWR, "switch_advantage_mu_preoutcome_sess"),
-    ("rel. value (beta) · nonSWR", "G4_value", NON, "switch_advantage_mu_preoutcome_sess"),
-    ("belief-entropy (beta) · SWR", "G6_uncert", SWR, "beta_reward_entropy"),
-    ("belief-entropy (beta) · nonSWR", "G6_uncert", NON, "beta_reward_entropy"),
-    ("value-update (beta) · SWR", "G7_update", SWR, "global_mu_update_abs_postoutcome_sess"),
-    ("value-update (beta) · nonSWR", "G7_update", NON, "global_mu_update_abs_postoutcome_sess"),
-    ("switch-rate · SWR", "G3_switchrate", SWR, "recent_switch_rate"),
-    ("switch-rate · nonSWR", "G3_switchrate", NON, "recent_switch_rate"),
+    ("reward lag-1 · SWR", "G0_base", SWR, "known_reward_outcome_lag_1"),
+    ("reward lag-1 · nonSWR", "G0_base", NON, "known_reward_outcome_lag_1"),
+    ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe_postoutcome"),
+    ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe_postoutcome"),
+    ("rel. value (beta) · SWR", "G4_value", SWR, "relative_value_switch_minus_stay_preoutcome"),
+    ("rel. value (beta) · nonSWR", "G4_value", NON, "relative_value_switch_minus_stay_preoutcome"),
+    ("belief-entropy (beta) · SWR", "G6_uncert", SWR, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
+    ("belief-entropy (beta) · nonSWR", "G6_uncert", NON, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
+    ("value-update (beta) · SWR", "G7_update", SWR, "reward_belief_mean_update_l1_all_ports_postoutcome"),
+    ("value-update (beta) · nonSWR", "G7_update", NON, "reward_belief_mean_update_l1_all_ports_postoutcome"),
+    ("switch-rate · SWR", "G3_switchrate", SWR, "patch_switch_fraction_last5_completed_trips"),
+    ("switch-rate · nonSWR", "G3_switchrate", NON, "patch_switch_fraction_last5_completed_trips"),
 ]
 fig, ax = plt.subplots(figsize=(8.5, 6.6))
 forest(ax, R, rate_rows, "Rate ladder — is_swr contrast (standardized; all sessions + animal 95% CI)")
@@ -180,23 +196,38 @@ fig.savefig(OUT / "rate_swr_contrast_coefs.png", dpi=150)
 # ---- CONTENT ----
 C = pd.read_pickle(RC / "models" / "swr_contrast_content_arm.pkl")
 mod_rows = [
-    ("current-arm (C1)", "C1_current", "all", "is_current"),
-    ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_rate_arm_k10"),
-    ("value q_arm (C4)", "C4_armvalue", "all", "q_arm"),
-    ("RPE×current (C6)", "C6_rpe", "all", "rpe_x_current"),
-    ("rel.value×current (C7)", "C7_value", "all", "relval_x_current"),
-    ("entropy×current (C8)", "C8_uncert", "all", "entropy_x_current"),
-    ("update×current (C9)", "C9_update", "all", "update_x_current"),
-    ("periswitch×current (C10)", "C10_periswitch", "all", "tss_x_current"),
-    ("block×current (C11)", "C11_block", "all", "block_x_current"),
-    ("switchrate×current (C12)", "C12_switchrate", "all", "switchrate_x_current"),
+    ("current-arm (C1)", "C1_current", "all", "is_current_arm"),
+    ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_fraction_candidate_arm_last10_visits"),
+    ("value q_arm (C4)", "C4_armvalue", "all", "reward_belief_mean_candidate_arm_preoutcome"),
+    ("RPE×current (C6)", "C6_rpe", "all", "rpe_postoutcome_z_x_is_current_arm"),
+    ("rel.value×current (C7)", "C7_value", "all", "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"),
+    ("entropy×current (C8)", "C8_uncert", "all", "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"),
+    ("update×current (C9)", "C9_update", "all", "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"),
+    ("periswitch×current (C10)", "C10_periswitch", "all", "periswitch_index_trials_z_x_is_current_arm"),
+    ("block×current (C11)", "C11_block", "all", "trials_since_block_change_z_x_is_current_arm"),
+    ("switch fraction×current (C12)", "C12_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"),
 ]
 con_rows = [
-    ("swr × current (CS1)", "CS1_current", "all", "swr_x_current"),
-    ("swr × prev (CS2)", "CS2_prev", "all", "swr_x_prev"),
-    ("swr × last-rewarded (CS3)", "CS3_lastrew", "all", "swr_x_is_last_rewarded_elsewhere"),
-    ("swr × reward_rate (CS4)", "CS4_armreward", "all", "swr_x_reward_rate_arm_k10"),
-    ("swr × value (beta) (CS5)", "CS5_armvalue", "all", "swr_x_q_arm"),
+    ("swr × current (CS1)", "CS1_current", "all", "swr_x_is_current_arm"),
+    ("swr × prev (CS2)", "CS2_prev", "all", "swr_x_is_prev_arm"),
+    (
+        "swr × last-rewarded (CS3)",
+        "CS3_lastrew",
+        "all",
+        "swr_x_is_last_rewarded_noncurrent_arm",
+    ),
+    (
+        "swr × reward fraction (CS4)",
+        "CS4_armreward",
+        "all",
+        "swr_x_reward_fraction_candidate_arm_last10_visits",
+    ),
+    (
+        "swr × belief value (CS5)",
+        "CS5_armvalue",
+        "all",
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    ),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
 forest(axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)")
@@ -209,15 +240,13 @@ fig.savefig(OUT / "content_swr_contrast_coefs.png", dpi=150)
 P = pd.read_pickle(RC / "models" / "swr_contrast_content_patch.pkl")
 patch_mod_rows = [
     ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
-    ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_patch_elsewhere"),
-    ("lastrewpatch×tss (CP2)", "CP2_olddecay", "all", "lastrewpatch_x_tss"),
-    ("currentpatch×tss (CP3)", "CP3_newgrowth", "all", "currentpatch_x_tss"),
-    ("currentpatch×switchrate (CP4)", "CP4_switchrate", "all", "currentpatch_x_switchrate"),
+    ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_noncurrent_patch"),
+    ("current patch×peri-switch (CP3)", "CP3_newgrowth", "all", "periswitch_index_trials_z_x_is_current_patch"),
+    ("current patch×switch fraction (CP4)", "CP4_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"),
 ]
 patch_con_rows = [
-    ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_current_patch"),
-    ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_last_rewarded_patch_elsewhere"),
-    ("swr × lastrewpatch×tss (CPS3)", "CPS3_olddecay", "all", "swr_x_lastrewpatch_tss"),
+    ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_is_current_patch"),
+    ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_is_last_rewarded_noncurrent_patch"),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
 forest(axes[0], P, patch_mod_rows, "Content (patch) — dimension effects (all events, standardized)")

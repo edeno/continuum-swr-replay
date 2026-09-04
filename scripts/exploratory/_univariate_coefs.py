@@ -23,20 +23,27 @@ from continuum_swr_replay.analysis.replay._helpers import (
     ARM_FE_PREDICTORS,
     add_arm_fixed_effects,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
 RC = PROCESSED_DATA_DIR / "replay_content"
-SESSION = ["animal", "day", "epoch"]
+SESSION = list(SESSION_COLUMNS)
 
-ARM_P = ["is_current", "is_prev", "reward_rate_arm_k10", "visit_recency_demeaned",
-         "is_last_rewarded_elsewhere"]
-PATCH_P = ["is_current_patch", "is_last_rewarded_patch_elsewhere",
-           "reward_rate_arm_k10_patch"]
-RATE_P = ["reward_lag1", "is_after_switch", "reward_rate_trial_k10"]
+ARM_P = ["is_current_arm", "is_prev_arm", "reward_fraction_candidate_arm_last10_visits", "visit_recency_trials_event_leaf_centered",
+         "is_last_rewarded_noncurrent_arm"]
+PATCH_P = [
+    "is_current_patch",
+    "is_last_rewarded_noncurrent_patch",
+    "reward_fraction_candidate_arm_last10_visits_patch",
+]
+RATE_P = ["known_reward_outcome_lag_1", "reward_fraction_last10_known_trials"]
 
 
 def _univariate(table, predictors, fit_one):
@@ -73,7 +80,9 @@ def _pool(coefs_by_pred):
 
 def main():
     # Arm: arm FE + one predictor (conditional Poisson on arm counts).
-    arm_tbl = add_arm_fixed_effects(read_table(RC / "event_arm_table.pkl"))
+    arm_tbl = read_table(RC / "event_arm_table.pkl")
+    require_covariate_schema(arm_tbl, table="event_arm")
+    arm_tbl = add_arm_fixed_effects(arm_tbl)
     logging.info("arm univariate fits...")
     arm_uni = _pool(_univariate(
         arm_tbl, ARM_P,
@@ -82,6 +91,7 @@ def main():
 
     # Patch: one predictor alone (3-category conditional Poisson).
     patch_tbl = read_table(RC / "event_patch_table.pkl")
+    require_covariate_schema(patch_tbl, table="event_patch")
     logging.info("patch univariate fits...")
     patch_uni = _pool(_univariate(
         patch_tbl, PATCH_P,
@@ -90,6 +100,7 @@ def main():
 
     # Rate: intercept + one predictor (Poisson w/ log-immobility offset).
     stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
     logging.info("rate univariate fits...")
     rate_uni = _pool(_univariate(stop, RATE_P, lambda g, p: fit_rate_model(g, [p])))
 

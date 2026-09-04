@@ -2,32 +2,25 @@
 """Does reward / value / exploration drive current-arm content representation?
 
 TEMPORARY / exploratory. Adds behavioral covariates to the content (arm-hierarchy)
-model as interactions with ``is_current`` -- the only way scalar per-stop covariates
+model as interactions with ``is_current_arm`` -- the only way scalar per-stop covariates
 enter a conditional/multinomial-over-arms model (a constant-across-arms term cancels
 in the event normalization). Each interaction asks whether the current-arm content
 bias *sharpens* with the behavioral variable:
 
-  rew_x_current        = is_current * reward_lag1        (within-well outcome contrast)
-  nominalp_x_current   = is_current * p_reward_current   (current arm's SCHEDULED
-                                                          contingency -- experimenter-
-                                                          only, not a belief)
-  switchrate_x_current = is_current * recent_switch_rate (exploration; a 5-trial
-                                                          fraction, 0 on 64% of stops
-                                                          and 0.2 on 28%, so read the
-                                                          coefficient per 0.2)
+  known_reward_outcome_lag_1_x_is_current_arm
+  task_reward_probability_chosen_arm_x_is_current_arm
+  patch_switch_fraction_last5_completed_trips_x_is_current_arm
 
-These were previously called ``value_x_current`` and ``switch_x_current``. The latter
-collided with a persisted ``event_arm_table`` column of the same name meaning
-``is_after_switch * is_current``, which this script overwrote on the same frame; the
-overwritten construct is what paper/claims_table.md row 19f reports.
+The explicit product names prevent collisions with the retired immediate-switch
+interaction and make every fitted factor visible in coefficient tables.
 
-The within-well outcome contrast (rew_x_current) is the occupancy-confound-clean
+The within-well known-outcome interaction is the occupancy-confound-clean
 test: it compares rewarded vs omitted visits to the SAME current well (identifiable
 because the schedule is probabilistic), isolating the reward OUTCOME from the well's
 location and from the animal being there.
 
 Base = M5 content predictors (arm FE + is_current + is_prev + recent_reward_rate +
-visit_recency_demeaned + is_last_rewarded_elsewhere). Fit per session (conditional
+visit_recency_trials_event_leaf_centered + is_last_rewarded_elsewhere). Fit per session (conditional
 Poisson), SWR-split (all / with-SWR / non-SWR). Reports the interaction coefficients.
 
 Usage: python scripts/exploratory/_content_reward_interactions.py
@@ -41,53 +34,69 @@ from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
-    add_uncertainty_covariates,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SC = ["animal", "day", "epoch"]
-SCALARS = ["reward_lag1", "p_reward_current", "recent_switch_rate"]
-INTERACTIONS = ["rew_x_current", "nominalp_x_current", "switchrate_x_current"]
-REPORT = ["is_current", *INTERACTIONS]
+SC = list(SESSION_COLUMNS)
+SCALARS = [
+    "known_reward_outcome_lag_1",
+    "task_reward_probability_chosen_arm",
+    "patch_switch_fraction_last5_completed_trips",
+]
+INTERACTIONS = [
+    "known_reward_outcome_lag_1_x_is_current_arm",
+    "task_reward_probability_chosen_arm_x_is_current_arm",
+    "patch_switch_fraction_last5_completed_trips_x_is_current_arm",
+]
+REPORT = ["is_current_arm", *INTERACTIONS]
 
 
 def _assemble() -> pd.DataFrame:
     ev = read_table(RC / "event_arm_table.pkl")
+    require_covariate_schema(ev, table="event_arm")
     add_arm_fixed_effects(ev)
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    stop = add_uncertainty_covariates(stop)
     cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    ev = ev.merge(stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
+    require_covariate_schema(cont, table="qvals")
+    ev = ev.merge(stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]],
                   on="stop_id", how="left")
-    ev = ev.merge(cont[["stop_id", "p_reward_current"]], on="stop_id", how="left")
+    ev = ev.merge(cont[["stop_id", "task_reward_probability_chosen_arm"]], on="stop_id", how="left")
     # scalars are constant within an event (one stop per event), so dropping
     # NaN-scalar rows drops whole events cleanly.
     ev = ev.dropna(subset=SCALARS).reset_index(drop=True)
-    cur = ev["is_current"].to_numpy(dtype=float)
-    ev["rew_x_current"] = cur * ev["reward_lag1"].to_numpy(dtype=float)
-    # Named for what they are, and NOT for what the canonical table already
-    # calls something else. `switch_x_current` is a persisted column of
-    # event_arm_table meaning `is_after_switch x is_current` (binary, last
-    # completed trip changed patch); building a different construct under that
-    # name on the same frame silently overwrote it, and the overwritten version
-    # is what reached paper/claims_table.md row 19f.
-    #
-    # `p_reward_current` is the *scheduled* contingency the animal never
+    cur = ev["is_current_arm"].to_numpy(dtype=float)
+    ev["known_reward_outcome_lag_1_x_is_current_arm"] = (
+        cur * ev["known_reward_outcome_lag_1"].to_numpy(dtype=float)
+    )
+    # `task_reward_probability_chosen_arm` is the *scheduled* contingency the animal never
     # observes (covariate_dictionary F.0), so calling it "value" invites a
     # belief reading it does not support.
-    ev["nominalp_x_current"] = cur * ev["p_reward_current"].to_numpy(dtype=float)
+    ev["task_reward_probability_chosen_arm_x_is_current_arm"] = (
+        cur * ev["task_reward_probability_chosen_arm"].to_numpy(dtype=float)
+    )
     # recent_switch_rate is a 5-trial fraction that is exactly 0 on 64% of stops
     # and exactly 0.2 on 28%, so a per-unit coefficient extrapolates 5x beyond
     # the modal step; read it per 0.2, not per 1.
-    ev["switchrate_x_current"] = cur * ev["recent_switch_rate"].to_numpy(dtype=float)
+    ev["patch_switch_fraction_last5_completed_trips_x_is_current_arm"] = (
+        cur * ev["patch_switch_fraction_last5_completed_trips"].to_numpy(dtype=float)
+    )
     # duration control: within-stop time on the current arm (z(log1p), so the
     # 0-105 s range and the long-stop outliers don't dominate the conditioning).
-    tsc = np.log1p(ev["time_since_stop"].to_numpy(dtype=float))
+    tsc = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
     tsc = (tsc - tsc.mean()) / tsc.std()
-    ev["tsc_x_current"] = cur * tsc
+    time_interaction = "log1p_time_since_stop_start_s_z_x_is_current_arm"
+    ev[time_interaction] = cur * tsc
     return ev
 
 
@@ -136,12 +145,13 @@ def main() -> None:
         print(f"=== {label} ===")
         print(f"  {'term':<20}{'med coef':>10}{'%pos':>7}{'animals':>9}{'p':>10}")
         # base M5 + within-stop-time control: gives is_current and the drift term
-        base_tsc = _fit(sub, [*base, "tsc_x_current"])
-        _line(base_tsc, "is_current")
-        _line(base_tsc, "tsc_x_current")  # within-stop content drift off current
+        time_interaction = "log1p_time_since_stop_start_s_z_x_is_current_arm"
+        base_tsc = _fit(sub, [*base, time_interaction])
+        _line(base_tsc, "is_current_arm")
+        _line(base_tsc, time_interaction)
         # each behavioral interaction, CONTROLLED for within-stop time
         for inter in INTERACTIONS:
-            _line(_fit(sub, [*base, "tsc_x_current", inter]), inter)
+            _line(_fit(sub, [*base, time_interaction, inter]), inter)
         print()
 
 

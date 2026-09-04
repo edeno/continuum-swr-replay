@@ -9,19 +9,17 @@ mirror the covariates in the fitted model ladders so decoded content can be
 eyeballed against the predictors:
 
   Rate models (per-bout tracks)
-    reward = reward_outcome (this stop's own outcome), reward-history kernel
+    reward = is_rewarded_outcome (known outcome at stop entry), reward-history kernel
     (row k = reward outcome k stops back, built from the displayed stop
     sequence so it is column-aligned; approximates the rate models' trials-back
     reward_lag, which matches ~91% at lag 1),
-    after switch / after omission (R1), reward rate trial k10 (R2), and the
-    SWR-contrast value-state block (is_post_switch, trials_since_switch,
-    trials_since_block_change, recent_switch_rate, hmm_relative_value, hmm_rpe,
-    reward_entropy, hmm_value_update).
+    after switch / after omission, reward fraction over known trials, and the
+    SWR-contrast value-state block (peri-switch index, block index, recent
+    switch fraction, relative value, RPE, belief entropy, belief update).
   Content models (per-arm, cell-aligned to the content panel)
-    is_current (ring), is_prev / is_last_rewarded_elsewhere (arm strips),
-    reward_rate_arm_k10, visit_recency_demeaned, visit_recency (raw),
-    cumulative_reward, p_reward_arm, arm_dist_rank, q_arm (beta value),
-    q_arm (belief value; robustness construct).
+    is_current_arm (ring), previous / last-rewarded arm strips,
+    reward fraction, leaf-centered and raw visit recency, recent reward count,
+    task reward probability, candidate distance rank, and pre-outcome belief.
 
 Content magnitude is encoded as circle *alpha* (posterior-mass fraction), never
 size. arm_dist_rank is the identifiable geometric baseline used by the
@@ -60,6 +58,9 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
@@ -107,11 +108,11 @@ def build_figure(
     ----------
     sub : pd.DataFrame
         ``event_arm_table`` rows for one session (9 arms x n_bouts rows),
-        carrying ``non_local_event``, ``arm``, ``event_start``, ``stop_id``,
-        ``arm_fraction_posterior``, ``is_current`` and the per-arm covariate
+        carrying ``event_id``, ``candidate_arm``, ``event_start_s``, ``stop_id``,
+        ``arm_fraction_posterior``, ``is_current_arm`` and the per-arm covariate
         columns.
     sst : pd.DataFrame
-        ``stop_table`` rows for the same session with ``recent_switch_rate``
+        ``stop_table`` rows for the same session with the recent switch fraction
         (from ``add_uncertainty_covariates``) and the qvals value-state block
         already merged on ``stop_id``.
     title_stub : str
@@ -128,30 +129,30 @@ def build_figure(
     n_arms = len(ARM_ROW_ORDER)
 
     # Time-order the bouts; map each event to a column index.
-    order = sub.groupby("non_local_event")["event_start"].min().sort_values()
+    order = sub.groupby("event_id")["event_start_s"].min().sort_values()
     col_of_event = {ev: i for i, ev in enumerate(order.index)}
     sub = sub.copy()
-    sub["col"] = sub["non_local_event"].map(col_of_event)
+    sub["col"] = sub["event_id"].map(col_of_event)
     n_bouts = len(order)
     cols = np.arange(n_bouts)
 
     # y position per arm in the content panel (top row = first in ARM_ROW_ORDER).
     y_of_arm = {arm: (n_arms - 1 - i) for i, arm in enumerate(ARM_ROW_ORDER)}
-    sub["y"] = sub["arm"].map(y_of_arm)
+    sub["y"] = sub["candidate_arm"].map(y_of_arm)
 
     # Per-bout covariates (constant across arms), in column order. Binary tracks
     # keep raw 0/1/NaN (not a bool mask) so missing values render distinctly
     # rather than collapsing to "no".
-    evo = sub.groupby("non_local_event").first().reindex(order.index)
-    rew_col = evo["reward_outcome"].to_numpy(dtype=float)
+    evo = sub.groupby("event_id").first().reindex(order.index)
+    rew_col = evo["is_rewarded_outcome"].to_numpy(dtype=float)
     swr_col = evo["is_swr"].to_numpy(dtype=float)
-    switch_col = evo["is_after_switch"].to_numpy(dtype=float)
-    omit_col = evo["is_after_omission"].to_numpy(dtype=float)
+    switch_col = evo["did_last_completed_trip_switch_patch"].to_numpy(dtype=float)
+    omit_col = np.where(np.isfinite(rew_col), 1.0 - rew_col, np.nan)
     prev_arm_col = evo["prev_arm"].to_numpy(dtype=float)
     lastrew_arm_col = evo["last_rewarded_arm"].to_numpy(dtype=float)
 
     # Trial-level recent reward rate (rate model R2) lives at the stop level.
-    stop_rrt = sst.set_index("stop_id")["reward_rate_trial_k10"]
+    stop_rrt = sst.set_index("stop_id")["reward_fraction_last10_known_trials"]
     rrt_col = evo["stop_id"].map(stop_rrt).to_numpy(dtype=float)
 
     # Reward-history kernel, built from the displayed stop sequence so it is
@@ -159,7 +160,7 @@ def build_figure(
     # reward_lag is trials-back; on this stop/event axis trials and stops drift
     # apart past lag 1 (inter-trial stops), so a trials-back kernel cannot be
     # read positionally. Stops-back is aligned by construction and matches the
-    # trials-back reward_lag1 ~91% of the time.
+    # trials-back known_reward_outcome_lag_1 ~91% of the time.
     stop_seq = evo["stop_id"].to_numpy()          # per-event stop id, time order
     uniq_stops = list(dict.fromkeys(stop_seq))    # ordered unique stops
     pos_of = {s: i for i, s in enumerate(uniq_stops)}
@@ -180,14 +181,18 @@ def build_figure(
     def stop_scalar(col):
         return evo["stop_id"].map(sst.set_index("stop_id")[col]).to_numpy(dtype=float)
 
-    postsw_col = stop_scalar("is_post_switch")  # raw 0/1/NaN
-    tss_col = stop_scalar("trials_since_switch")
+    postsw_col = stop_scalar("is_periswitch_post")  # raw 0/1/NaN
+    tss_col = stop_scalar("periswitch_index_trials")
     tsbc_col = stop_scalar("trials_since_block_change")
-    rsr_col = stop_scalar("recent_switch_rate")
-    relval_col = stop_scalar("hmm_relative_value")
-    rpe_col = stop_scalar("hmm_rpe")
-    entropy_col = stop_scalar("reward_entropy")
-    vupdate_col = stop_scalar("hmm_value_update")
+    rsr_col = stop_scalar("patch_switch_fraction_last5_completed_trips")
+    relval_col = stop_scalar("relative_value_switch_minus_stay_preoutcome")
+    rpe_col = stop_scalar("rpe_postoutcome")
+    entropy_col = stop_scalar(
+        "reward_belief_differential_entropy_leaf_mean_preoutcome"
+    )
+    vupdate_col = stop_scalar(
+        "reward_belief_mean_update_l1_all_ports_postoutcome"
+    )
 
     # Immobility-period (stop) membership. Each column is one non-local event;
     # several may share a stop. Per-stop covariates are drawn once per stop as a
@@ -208,7 +213,7 @@ def build_figure(
 
     def cov_matrix(colname):
         """Pivot a per-arm covariate to (n_arms, n_bouts), rows in ARM_ROW_ORDER."""
-        piv = sub.pivot_table(index="arm", columns="non_local_event",
+        piv = sub.pivot_table(index="candidate_arm", columns="event_id",
                               values=colname, aggfunc="first")
         return piv.reindex(index=ARM_ROW_ORDER, columns=order.index).to_numpy()
 
@@ -245,15 +250,15 @@ def build_figure(
         # per-arm (content-aligned): spatial / arm structure
         ("armstrip", prev_arm_col, "prev arm", None, "stop"),
         ("armstrip", lastrew_arm_col, "last rew arm", None, "stop"),
-        ("cov", "arm_dist_rank", "arm dist rank (1=near)", ("magma_r", False), "stop"),
-        ("cov", "visit_recency_demeaned", "visit recency (dem)", ("PuOr", True), "stop"),
-        ("cov", "visit_recency", "visit recency (raw)", ("Purples", False), "stop"),
+        ("cov", "candidate_arm_distance_rank", "arm dist rank (1=near)", ("magma_r", False), "stop"),
+        ("cov", "visit_recency_trials_event_leaf_centered", "visit recency (dem)", ("PuOr", True), "stop"),
+        ("cov", "visit_recency_trials", "visit recency (raw)", ("Purples", False), "stop"),
         # per-arm: reward
-        ("cov", "reward_rate_arm_k10", "reward rate k10 (frac)", ("plasma", False), "stop"),
-        ("cov", "cumulative_reward", "cumul reward (n)", ("YlGn", False), "stop"),
-        ("cov", "p_reward_arm", "P(reward)", ("cividis", False), "stop"),
+        ("cov", "reward_fraction_candidate_arm_last10_visits", "reward rate k10 (frac)", ("plasma", False), "stop"),
+        ("cov", "reward_count_candidate_arm_last10_known_trials", "cumul reward (n)", ("YlGn", False), "stop"),
+        ("cov", "task_reward_probability_candidate_arm", "P(reward)", ("cividis", False), "stop"),
         # per-arm: value
-        ("cov", "q_arm", "belief value (P)", ("viridis", False), "stop"),
+        ("cov", "reward_belief_mean_candidate_arm_preoutcome", "belief value (P)", ("viridis", False), "stop"),
     ]
     hmap = {"binary": BINARY_H, "heatbout": HEAT_H, "kernel": KERNEL_H,
             "armstrip": STRIP_H, "content": CONTENT_H, "cov": COV_H}
@@ -308,11 +313,11 @@ def build_figure(
                     ax.axvspan(starts[g] - 0.5, ends[g] + 0.5, color="0.5",
                                alpha=0.10, lw=0, zorder=0)
             frac = sub["arm_fraction_posterior"].to_numpy().clip(0, 1)
-            cc = np.array([palette[a] for a in sub["arm"]], dtype=float)
+            cc = np.array([palette[a] for a in sub["candidate_arm"]], dtype=float)
             cc[:, 3] = frac
             ax.scatter(sub["col"], sub["y"], s=32, c=cc, edgecolors="none",
                        zorder=2, rasterized=True)
-            cur = sub[sub["is_current"] == 1]
+            cur = sub[sub["is_current_arm"] == 1]
             ax.scatter(cur["col"], cur["y"], s=46, facecolors="none",
                        edgecolors="black", linewidths=0.9, zorder=3, rasterized=True)
             for yb in (2.5, 5.5):
@@ -413,7 +418,7 @@ def build_figure(
 
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
-    # reward_outcome is a per-stop attribute (constant within an immobility period),
+    # The known reward outcome is a per-stop attribute.
     # so count rewarded PERIODS via to_stop; is_swr is genuinely per event.
     axes[0].set_title(
         f"{title_stub}  —  non-local bout covariate browser  "
@@ -462,6 +467,7 @@ def main() -> None:
     args = p.parse_args()
 
     event_arm = read_table(RC_DIR / "event_arm_table.pkl")
+    require_covariate_schema(event_arm, table="event_arm")
     # Stop table + RL value-state block, assembled as the SWR-contrast runners
     # do: recent_switch_rate via add_uncertainty_covariates (default
     # switch_window=5), the rest merged from qvals_table on stop_id. Two
@@ -470,15 +476,24 @@ def main() -> None:
     # absent from qvals are kept and shown masked, rather than dropped by the
     # rate runner's inner join; and covariates are shown raw, not z-scored as
     # the fitters standardize them.
-    stops = add_uncertainty_covariates(read_table(RC_DIR / "stop_table.pkl"))
+    stops = read_table(RC_DIR / "stop_table.pkl")
+    require_covariate_schema(stops, table="stop")
+    stops = add_uncertainty_covariates(stops)
     qvals = read_table(RC_DIR / "models_per_bin_rate" / "qvals_table.pkl")
-    value_state = ["trials_since_switch", "is_post_switch",
-                   "trials_since_block_change", "hmm_relative_value", "hmm_rpe",
-                   "reward_entropy", "hmm_value_update"]
+    require_covariate_schema(qvals, table="qvals")
+    value_state = [
+        "periswitch_index_trials",
+        "is_periswitch_post",
+        "trials_since_block_change",
+        "relative_value_switch_minus_stay_preoutcome",
+        "rpe_postoutcome",
+        "reward_belief_differential_entropy_leaf_mean_preoutcome",
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+    ]
     stops = stops.merge(qvals[["stop_id", *value_state]], on="stop_id", how="left")
 
     def slc(df):
-        return df[(df.animal == args.animal) & (df.day == args.day)
+        return df[(df.animal == args.animal) & (df.session_date == args.day)
                   & (df.epoch == args.epoch)]
 
     sub, sst = slc(event_arm), slc(stops)

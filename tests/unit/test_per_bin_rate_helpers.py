@@ -20,6 +20,9 @@ from continuum_swr_replay.analysis.replay import (
     attach_is_swr_to_onsets,
     raised_cosine_history_basis,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
 
@@ -43,11 +46,11 @@ def two_stop_design() -> tuple[pd.DataFrame, pd.DataFrame]:
     stops = pd.DataFrame(
         {
             "animal": ["x", "x"],
-            "day": [1, 1],
+            "session_date": [1, 1],
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
-            "immobility_time": [0.25, 0.85],
-            "reward_lag1": [1.0, 0.0],
+            "immobility_duration_s": [0.25, 0.85],
+            "known_reward_outcome_lag_1": [1.0, 0.0],
         }
     )
     onsets = pd.DataFrame(
@@ -90,8 +93,8 @@ def test_aggregate_exposure_and_lags(two_stop_design):
     assert s2.onset_lag1.tolist() == [0.0, 0.0, 0.0, 1.0, 0.0]
 
     # Per-stop covariate carried by stop_id.
-    assert (s1.reward_lag1 == 1.0).all()
-    assert (s2.reward_lag1 == 0.0).all()
+    assert (s1.known_reward_outcome_lag_1 == 1.0).all()
+    assert (s2.known_reward_outcome_lag_1 == 0.0).all()
 
 
 def test_aggregate_drops_zero_immobility():
@@ -99,10 +102,10 @@ def test_aggregate_drops_zero_immobility():
     stops = pd.DataFrame(
         {
             "animal": ["x", "x"],
-            "day": [1, 1],
+            "session_date": [1, 1],
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
-            "immobility_time": [0.0, 0.2],
+            "immobility_duration_s": [0.0, 0.2],
         }
     )
     onsets = pd.DataFrame({"stop_id": [2], "t_since_stop_onset": [0.05]})
@@ -120,10 +123,10 @@ def test_aggregate_nondivisible_tmax_keeps_final_window():
     stops = pd.DataFrame(
         {
             "animal": ["x"],
-            "day": [1],
+            "session_date": [1],
             "epoch": ["02_r1"],
             "stop_id": [1],
-            "immobility_time": [1.0],  # longer than tmax
+            "immobility_duration_s": [1.0],  # longer than tmax
         }
     )
     # onset in the final partial window [0.4, 0.45) -- dropped by the old path.
@@ -152,8 +155,8 @@ def test_raised_cosine_basis_shape_and_nonneg():
 def test_aggregate_history_basis_is_projection():
     """hist_rcos_k equals the onset_lag counts projected onto the basis."""
     stops = pd.DataFrame({
-        "animal": ["x"], "day": [1], "epoch": ["02_r1"], "stop_id": [1],
-        "immobility_time": [0.5],
+        "animal": ["x"], "session_date": [1], "epoch": ["02_r1"], "stop_id": [1],
+        "immobility_duration_s": [0.5],
     })
     onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.05, 0.20]})
     df = aggregate_to_timebins(
@@ -171,8 +174,8 @@ def test_aggregate_history_basis_is_projection():
 
 def test_history_basis_requires_lags():
     stops = pd.DataFrame({
-        "animal": ["x"], "day": [1], "epoch": ["02_r1"], "stop_id": [1],
-        "immobility_time": [0.5],
+        "animal": ["x"], "session_date": [1], "epoch": ["02_r1"], "stop_id": [1],
+        "immobility_duration_s": [0.5],
     })
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
     with pytest.raises(ValueError, match="self_history_lags"):
@@ -182,7 +185,7 @@ def test_history_basis_requires_lags():
 
 
 def test_reward_groupby_drops_nan_reward():
-    """Stops with NaN reward_lag1 vanish from a reward groupby.
+    """Stops with NaN known_reward_outcome_lag_1 vanish from a reward groupby.
 
     The reward GLMs rely on pandas' default ``dropna=True`` to reproduce the
     old explicit ``reward.notna()`` filter when collapsing the (stop x bin)
@@ -191,11 +194,11 @@ def test_reward_groupby_drops_nan_reward():
     stops = pd.DataFrame(
         {
             "animal": ["x", "x"],
-            "day": [1, 1],
+            "session_date": [1, 1],
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
-            "immobility_time": [0.3, 0.3],
-            "reward_lag1": [1.0, np.nan],
+            "immobility_duration_s": [0.3, 0.3],
+            "known_reward_outcome_lag_1": [1.0, np.nan],
         }
     )
     onsets = pd.DataFrame(
@@ -203,9 +206,9 @@ def test_reward_groupby_drops_nan_reward():
     )
     df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_lags=1)
     assert {1, 2} <= set(df.stop_id)  # both stops produce bins
-    cells = df.groupby(["reward_lag1", "binj"], as_index=False)["count"].sum()
-    assert cells["reward_lag1"].notna().all()  # NaN-reward stop excluded
-    assert set(cells["reward_lag1"]) == {1.0}
+    cells = df.groupby(["known_reward_outcome_lag_1", "binj"], as_index=False)["count"].sum()
+    assert cells["known_reward_outcome_lag_1"].notna().all()  # NaN-reward stop excluded
+    assert set(cells["known_reward_outcome_lag_1"]) == {1.0}
 
 
 # ── Real-session slice for attach_is_swr_to_onsets ──
@@ -224,9 +227,18 @@ def session_slice():
     onset = read_table(paths["event_onset_table"])
     event = read_table(paths["event_table"])
     stop = read_table(paths["stop_table"])
+    for frame, table in (
+        (onset, "event_onset"),
+        (event, "event"),
+        (stop, "stop"),
+    ):
+        try:
+            require_covariate_schema(frame, table=table)
+        except ValueError as exc:
+            pytest.skip(f"canonical artifacts require regeneration: {exc}")
 
     # Pick the session with the most non-local onsets for a meaningful slice.
-    sc = ["animal", "day", "epoch"]
+    sc = ["animal", "session_date", "epoch"]
     key = (
         onset[onset.event_type == "non_local"]
         .groupby(sc)
@@ -252,8 +264,8 @@ def test_attach_is_swr_match_rate(session_slice):
     # Non-local SWR / no-SWR onset counts match the stop-table split totals.
     n_swr = int((nl.is_swr == True).sum())  # noqa: E712
     n_no_swr = int((nl.is_swr == False).sum())  # noqa: E712
-    assert n_swr == int(stop_s["n_non_local_SWR"].sum())
-    assert n_no_swr == int(stop_s["n_non_local_no_SWR"].sum())
+    assert n_swr == int(stop_s["n_nonlocal_swr_events"].sum())
+    assert n_no_swr == int(stop_s["n_nonlocal_non_swr_events"].sum())
 
     # SWR/MUA onset rows are left untagged.
     assert tagged.loc[tagged.event_type != "non_local", "is_swr"].isna().all()
@@ -268,7 +280,7 @@ def test_attach_is_swr_requires_exact_nonlocal_partition():
         }
     )
     events = pd.DataFrame(
-        {"stop_id": [1], "event_start": [1.0], "is_swr": [True]}
+        {"stop_id": [1], "event_start_s": [1.0], "is_swr": [True]}
     )
 
     with pytest.raises(ValueError, match="exact.*partition|unmatched"):
@@ -280,7 +292,7 @@ def test_attach_is_swr_freezes_shared_sessions_then_is_strict_within_each():
     onsets = pd.DataFrame(
         {
             "animal": ["a", "a", "b"],
-            "day": [1, 1, 2],
+            "session_date": [1, 1, 2],
             "epoch": ["e", "e", "e"],
             "stop_id": [1, 1, 2],
             "event_type": ["non_local", "SWR", "non_local"],
@@ -290,10 +302,10 @@ def test_attach_is_swr_freezes_shared_sessions_then_is_strict_within_each():
     events = pd.DataFrame(
         {
             "animal": ["a"],
-            "day": [1],
+            "session_date": [1],
             "epoch": ["e"],
             "stop_id": [1],
-            "event_start": [1.0],
+            "event_start_s": [1.0],
             "is_swr": [True],
         }
     )
@@ -301,7 +313,7 @@ def test_attach_is_swr_freezes_shared_sessions_then_is_strict_within_each():
     with pytest.warns(RuntimeWarning, match="onset_only"):
         tagged = attach_is_swr_to_onsets(onsets, events)
 
-    assert tagged[["animal", "day", "epoch"]].drop_duplicates().to_records(
+    assert tagged[["animal", "session_date", "epoch"]].drop_duplicates().to_records(
         index=False
     ).tolist() == [("a", 1, "e")]
     nonlocal_rows = tagged[tagged["event_type"] == "non_local"]
@@ -317,7 +329,7 @@ def test_attach_is_swr_rejects_mismatch_inside_a_shared_session():
     onsets = pd.DataFrame(
         {
             "animal": ["a", "a"],
-            "day": [1, 1],
+            "session_date": [1, 1],
             "epoch": ["e", "e"],
             "stop_id": [1, 1],
             "event_type": ["non_local", "non_local"],
@@ -327,10 +339,10 @@ def test_attach_is_swr_rejects_mismatch_inside_a_shared_session():
     events = pd.DataFrame(
         {
             "animal": ["a"],
-            "day": [1],
+            "session_date": [1],
             "epoch": ["e"],
             "stop_id": [1],
-            "event_start": [1.0],
+            "event_start_s": [1.0],
             "is_swr": [True],
         }
     )
@@ -354,8 +366,8 @@ def test_aggregate_cross_history_lags():
     """
     stops = pd.DataFrame(
         {
-            "animal": ["x"], "day": [1], "epoch": ["02_r1"],
-            "stop_id": [1], "immobility_time": [1.0],
+            "animal": ["x"], "session_date": [1], "epoch": ["02_r1"],
+            "stop_id": [1], "immobility_duration_s": [1.0],
         }
     )
     # response (non-SWR) onsets in bins 3, 4
@@ -383,8 +395,8 @@ def test_aggregate_cross_history_lags():
 def test_aggregate_cross_history_requires_stream():
     """cross_history_lags without cross_onset_times is a loud error."""
     stops = pd.DataFrame(
-        {"animal": ["x"], "day": [1], "epoch": ["02_r1"],
-         "stop_id": [1], "immobility_time": [0.5]}
+        {"animal": ["x"], "session_date": [1], "epoch": ["02_r1"],
+         "stop_id": [1], "immobility_duration_s": [0.5]}
     )
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
     with pytest.raises(ValueError, match="cross_onset_times"):

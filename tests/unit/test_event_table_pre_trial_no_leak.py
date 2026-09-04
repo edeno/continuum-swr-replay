@@ -5,8 +5,8 @@ The implementation used ``safe_first`` (drop NaN before .iloc[0]) to
 extract those values, which silently surfaces the *next* trial's
 context for events whose first timebin fell before any trial began —
 e.g. an event spanning t=0..2 on a session whose first trial starts
-at t=1 inherited trial 1's ``is_after_reward`` / ``current_arm`` /
-``reward_outcome`` even though t=0 had no trial active.
+at t=1 inherited trial 1's ``is_rewarded_outcome`` / ``occupancy_well_arm`` /
+``is_rewarded_outcome`` even though t=0 had no trial active.
 
 Fix: replace ``safe_first`` with NaN-strict ``strict_first`` for the
 trial-derived fields so a before-trial event surfaces missing context
@@ -20,7 +20,21 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.tables import build_event_table
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_table as _build_event_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def build_event_table(dot, env, trials, graph, **kwargs):
+    return _build_event_table(
+        dot,
+        env,
+        trials,
+        port_experiences_from_trials(trials, prepend_initial=True),
+        graph,
+        **kwargs,
+    )
 
 
 def _two_well_track_graph() -> nx.Graph:
@@ -111,7 +125,7 @@ class TestEventStartContextNoLeak:
     def test_event_entirely_before_first_trial_yields_nan_context(self):
         """User repro: an event whose first (and every) timebin
         precedes the first trial used to inherit
-        ``is_after_reward=1.0``, ``reward_outcome=1.0``, and
+        ``is_rewarded_outcome=1.0`` and
         ``current_arm=0.0`` from the not-yet-started trial. Strict
         first-row extraction must surface NaN instead.
         """
@@ -120,19 +134,20 @@ class TestEventStartContextNoLeak:
         graph = _two_well_track_graph()
         env = _EnvStub()
         out = build_event_table(
-            dot, env, trials, graph,
-            speed_threshold=4.0, nonlocal_threshold=0.5,
+            dot,
+            env,
+            trials,
+            graph,
+            speed_threshold=4.0,
+            nonlocal_threshold=0.5,
         )
         assert len(out) == 1, f"expected 1 event row, got {len(out)}"
         row = out.iloc[0]
 
         for col in (
-            "is_after_reward",
-            "is_after_omission",
-            "is_after_switch",
-            "is_after_stay",
-            "reward_outcome",
-            "current_arm",
+            "is_rewarded_outcome",
+            "did_last_completed_trip_switch_patch",
+            "occupancy_well_arm",
             "prev_arm",
             "next_arm",
             "last_rewarded_arm",
@@ -145,6 +160,10 @@ class TestEventStartContextNoLeak:
                 "an event entirely before any trial start should have "
                 "NaN trial-derived context."
             )
+        # The collapsed legacy outcome spellings must never reappear as columns.
+        assert not {"is_after_reward", "is_after_omission", "reward_outcome"} & set(
+            out.columns
+        )
 
     def test_event_starting_before_trial_does_not_inherit_future_context(self):
         """Half-overlapping case: event spans t=0..2.0, first trial
@@ -167,16 +186,19 @@ class TestEventStartContextNoLeak:
         graph = _two_well_track_graph()
         env = _EnvStub()
         out = build_event_table(
-            dot, env, trials, graph,
-            speed_threshold=4.0, nonlocal_threshold=0.5,
+            dot,
+            env,
+            trials,
+            graph,
+            speed_threshold=4.0,
+            nonlocal_threshold=0.5,
         )
         assert len(out) == 1
         row = out.iloc[0]
         # The event's first timebin (t=0) is before the trial — strict
         # first-row extraction propagates NaN even though later bins
         # in the event have valid trial context.
-        assert pd.isna(row["is_after_reward"]), (
-            f"is_after_reward leaked: {row['is_after_reward']!r}"
+        assert pd.isna(row["is_rewarded_outcome"]), (
+            f"is_rewarded_outcome leaked: {row['is_rewarded_outcome']!r}"
         )
-        assert pd.isna(row["reward_outcome"])
-        assert pd.isna(row["current_arm"])
+        assert pd.isna(row["occupancy_well_arm"])

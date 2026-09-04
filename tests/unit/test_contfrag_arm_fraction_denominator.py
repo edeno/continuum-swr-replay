@@ -19,17 +19,65 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
 
 from continuum_swr_replay.analysis.contfrag.tables import (
-    build_contfrag_event_arm_table,
-    build_contfrag_event_table,
+    build_contfrag_event_arm_table as _build_contfrag_event_arm_table,
+)
+from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_event_table as _build_contfrag_event_table,
 )
 from continuum_swr_replay.analysis.replay.covariates import (
-    arm_never_visited_per_arm,
-    cumulative_reward_per_arm,
-    recent_reward_rate_per_arm,
-    visit_recency_per_arm,
+    arm_never_visited_per_arm as _arm_never_visited_per_arm,
 )
+from continuum_swr_replay.analysis.replay.covariates import (
+    recent_reward_rate_per_arm as _recent_reward_rate_per_arm,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    rolling_reward_count_per_arm as _rolling_reward_count_per_arm,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    visit_recency_per_arm as _visit_recency_per_arm,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def _experiences(trials):
+    return port_experiences_from_trials(trials, prepend_initial=True)
+
+
+def build_contfrag_event_table(dot, env, trials, graph, **kwargs):
+    return _build_contfrag_event_table(
+        dot, env, trials, _experiences(trials), graph, **kwargs
+    )
+
+
+def build_contfrag_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    return _build_contfrag_event_arm_table(
+        event_table,
+        dot,
+        env,
+        trials,
+        _experiences(trials),
+        graph,
+        **kwargs,
+    )
+
+
+def visit_recency_per_arm(time, trials, graph):
+    return _visit_recency_per_arm(time, _experiences(trials), graph)
+
+
+def arm_never_visited_per_arm(time, trials, graph):
+    return _arm_never_visited_per_arm(time, _experiences(trials), graph)
+
+
+def rolling_reward_count_per_arm(time, trials, graph):
+    return _rolling_reward_count_per_arm(time, _experiences(trials), graph)
+
+
+def recent_reward_rate_per_arm(time, trials, graph, k=10):
+    return _recent_reward_rate_per_arm(time, _experiences(trials), graph, k=k)
 
 
 class _EnvStub:
@@ -239,9 +287,36 @@ class TestContfragArmFractionDenominator:
         )
         # And the count split should match the input: arm 0 = 3/5,
         # arm 1 = 2/5, others 0.
-        by_arm = eat.set_index("arm")["arm_fraction"]
+        by_arm = eat.set_index("candidate_arm")["arm_fraction"]
         assert np.isclose(by_arm.loc[0], 3 / 5)
         assert np.isclose(by_arm.loc[1], 2 / 5)
+
+    def test_posterior_fraction_is_emitted_and_normalized(self, env, graph):
+        dot = _build_dot({0: 3, 1: 2}, junction_bins=5)
+        events = build_contfrag_event_table(
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
+        )
+        n_position_bins = len(env.place_bin_centers_nodes_df_["edge_id"])
+        posterior = xr.DataArray(
+            np.full((len(dot), n_position_bins), 1.0 / n_position_bins),
+            dims=("time", "position"),
+            coords={"time": dot.index.to_numpy()},
+        )
+        event_arms = build_contfrag_event_arm_table(
+            events,
+            dot,
+            env,
+            _empty_trials(),
+            graph,
+            event_source="SWR",
+            conditional_posterior=posterior,
+        )
+        assert "arm_fraction_posterior" in event_arms
+        assert event_arms["arm_fraction_posterior"].sum() == pytest.approx(1.0)
 
     def test_event_with_only_junction_bins_yields_nan_arm_fraction(self, env, graph):
         # All 5 in-event bins land on a junction → no real arms →
@@ -288,12 +363,14 @@ class TestContfragArmFractionDenominator:
         ev = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
         eat = build_contfrag_event_arm_table(
             ev, dot, env, trials, graph, event_source="SWR"
-        ).set_index("arm")
+        ).set_index("candidate_arm")
 
-        expected = np.array([0, 1, 1, 1, 1, 1, 0, 0, 0], dtype=float)
-        np.testing.assert_array_equal(eat.loc[range(9), "arm_never_visited"], expected)
+        expected = np.array([0, 0, 1, 1, 1, 1, 0, 0, 0], dtype=float)
         np.testing.assert_array_equal(
-            eat.loc[range(9), "swr_x_arm_never_visited"], expected
+            eat.loc[range(9), "is_candidate_arm_never_visited"], expected
+        )
+        np.testing.assert_array_equal(
+            eat.loc[range(9), "swr_x_is_candidate_arm_never_visited"], expected
         )
 
     def test_history_is_frozen_at_event_start_when_event_crosses_arrival(
@@ -317,13 +394,19 @@ class TestContfragArmFractionDenominator:
         )
 
         ev = build_contfrag_event_table(dot, env, trials, graph, event_source="SWR")
-        assert ev.iloc[0]["location_state"] == "mixed"
+        assert ev.iloc[0]["occupancy_state"] == "mixed"
         eat = build_contfrag_event_arm_table(
             ev, dot, env, trials, graph, event_source="SWR"
         )
 
-        assert eat["visit_recency"].isna().all()
-        assert eat["arm_never_visited"].isna().all()
+        by_arm = eat.set_index("candidate_arm")
+        # The event precedes the first movement destination, but the starting
+        # port is already a valid past experience. The destination remains
+        # novel, proving event-start rather than midpoint alignment.
+        assert by_arm.loc[1, "visit_recency_trials"] == 1.0
+        assert by_arm.loc[1, "is_candidate_arm_never_visited"] == 0.0
+        assert by_arm.loc[0, "visit_recency_trials"] == 2.0
+        assert by_arm.loc[0, "is_candidate_arm_never_visited"] == 1.0
 
     def test_batched_history_matches_scalar_reference_at_each_event_start(
         self, env, graph
@@ -341,17 +424,17 @@ class TestContfragArmFractionDenominator:
             events, dot, env, trials, graph, event_source="SWR"
         )
 
-        assert events["event_start"].tolist() == pytest.approx([0.05, 0.25, 0.45])
+        assert events["event_start_s"].tolist() == pytest.approx([0.05, 0.25, 0.45])
         np.testing.assert_array_equal(
-            event_arms["arm"].to_numpy().reshape(len(events), 9),
+            event_arms["candidate_arm"].to_numpy().reshape(len(events), 9),
             np.tile(np.arange(9), (len(events), 1)),
         )
 
         scalar_functions = {
-            "visit_recency": visit_recency_per_arm,
-            "arm_never_visited": arm_never_visited_per_arm,
-            "cumulative_reward": cumulative_reward_per_arm,
-            "reward_rate_arm_k10": lambda t, trials, graph: (
+            "visit_recency_trials": visit_recency_per_arm,
+            "is_candidate_arm_never_visited": arm_never_visited_per_arm,
+            "reward_count_candidate_arm_last10_known_trials": rolling_reward_count_per_arm,
+            "reward_fraction_candidate_arm_last10_visits": lambda t, trials, graph: (
                 recent_reward_rate_per_arm(t, trials, graph, k=10)
             ),
         }
@@ -359,20 +442,20 @@ class TestContfragArmFractionDenominator:
             expected = np.asarray(
                 [
                     [function(t, trials, graph)[arm] for arm in range(9)]
-                    for t in events["event_start"].to_numpy(dtype=float)
+                    for t in events["event_start_s"].to_numpy(dtype=float)
                 ]
             )
             actual = event_arms[column].to_numpy(dtype=float).reshape(len(events), 9)
             np.testing.assert_allclose(actual, expected, rtol=0.0, atol=0.0)
 
-        start_reward = cumulative_reward_per_arm(0.25, trials, graph)[2]
-        midpoint_reward = cumulative_reward_per_arm(0.26, trials, graph)[2]
+        start_reward = rolling_reward_count_per_arm(0.25, trials, graph)[2]
+        midpoint_reward = rolling_reward_count_per_arm(0.26, trials, graph)[2]
         assert start_reward == 0.0
         assert midpoint_reward == 1.0
         assert (
             event_arms.loc[
-                (event_arms["SWR_event"] == 2) & (event_arms["arm"] == 2),
-                "cumulative_reward",
+                (event_arms["SWR_event"] == 2) & (event_arms["candidate_arm"] == 2),
+                "reward_count_candidate_arm_last10_known_trials",
             ].item()
             == start_reward
         )

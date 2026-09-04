@@ -9,7 +9,7 @@ misread short-stop concentration as a pre-departure ramp).
 
 Groups (2x2): {non-SWR, SWR} x {content on / off the current arm}, where
 "on-current" = the event's dominant content arm (argmax arm_count_hard) equals
-the animal's current_arm.
+the animal's occupancy well arm.
 
 Writes to .claude/research/peri_departure_outputs/.
 """
@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table
 
@@ -34,20 +37,28 @@ def main() -> None:
     ea = read_table(RC / "event_arm_table.pkl")
     et = read_table(RC / "event_table.pkl")
     stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(ea, table="event_arm")
+    require_covariate_schema(et, table="event")
+    require_covariate_schema(stop, table="stop")
 
-    dom = ea.loc[ea.groupby("event_id")["arm_count_hard"].idxmax(),
-                 ["event_id", "arm"]].rename(columns={"arm": "dominant_arm"})
+    dom = ea.loc[
+        ea.groupby("event_id")["arm_count_hard"].idxmax(),
+        ["event_id", "candidate_arm"],
+    ].rename(columns={"candidate_arm": "dominant_arm"})
     ev = et.merge(dom, on="event_id", how="left")
-    ev["on_current"] = ev["dominant_arm"] == ev["current_arm"]
-    ev["grp"] = (np.where(ev["is_swr"], "SWR", "nonSWR") + " "
-                 + np.where(ev["on_current"], "on-current", "off-current"))
+    ev["on_current"] = ev["dominant_arm"] == ev["occupancy_well_arm"]
+    ev["grp"] = (
+        np.where(ev["is_swr"], "SWR", "nonSWR")
+        + " "
+        + np.where(ev["on_current"], "on-current", "off-current")
+    )
     ev = ev.merge(stop[["stop_id", "stop_end"]], on="stop_id", how="left")
-    ev["t_to_depart"] = ev["stop_end"] - ev["event_midpoint_time"]
+    ev["t_to_depart"] = ev["stop_end"] - ev["event_midpoint_s"]
 
     dt = 0.2
     edges = np.arange(0, 6 + dt, dt)
     centers = edges[:-1] + dt / 2
-    D = stop["immobility_time"].to_numpy()
+    D = stop["immobility_duration_s"].to_numpy()
     exposure = np.array([(D >= c).sum() for c in centers]) * dt  # stop-seconds/bin
 
     groups = {

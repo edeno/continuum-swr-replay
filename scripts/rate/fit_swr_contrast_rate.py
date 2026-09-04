@@ -20,11 +20,11 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
 Covariate blocks BASE/PERISWITCH/BLOCK/SWITCHRATE/VALUE/RPE/UNCERT/UPDATE/REWXTIME
 are defined below. The task
 dimensions are the paper's (Comrie et al.), all from the beta-bernoulli model:
-relative value (`switch_advantage_mu_preoutcome_sess`; Stay-vs-Switch ΔV), RPE
-(`rpe` = `reward - q_chosen`), belief entropy (`beta_reward_entropy`, mean per-leaf
-Beta differential entropy), global value update (`global_mu_update_abs_postoutcome_sess`);
-+ CONTEXT (peri-switch/
-block) from `qvals_table` and `recent_switch_rate` from `add_uncertainty_covariates`.
+`relative_value_switch_minus_stay_preoutcome`, `rpe_postoutcome`,
+`reward_belief_differential_entropy_leaf_mean_preoutcome`, and
+`reward_belief_mean_update_l1_all_ports_postoutcome`; plus peri-switch/block
+context from `qvals_table` and
+`patch_switch_fraction_last5_completed_trips` from the canonical stop table.
 One tidy row per (population, model, session), each carrying per-term coef + SE
 (``bse_*``) + p-value (``pval_*``); aggregate across sessions downstream (per-animal
 sign consistency primary, session signed-rank descriptive — see the content runner).
@@ -81,6 +81,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
@@ -97,6 +100,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
@@ -106,30 +110,32 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 
 # Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
 # dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
 _G_KEY = {
-    "G0_base": "reward_lag1", "G1_periswitch": "trials_since_switch",
-    "G2_block": "trials_since_block_change", "G3_switchrate": "recent_switch_rate",
-    "G4_value": "switch_advantage_mu_preoutcome_sess", "G5_rpe": "rpe",
-    "G6_uncert": "beta_reward_entropy", "G7_update": "global_mu_update_abs_postoutcome_sess",
+    "G0_base": "known_reward_outcome_lag_1", "G1_periswitch": "periswitch_index_trials",
+    "G2_block": "trials_since_block_change", "G3_switchrate": "patch_switch_fraction_last5_completed_trips",
+    "G4_value": "relative_value_switch_minus_stay_preoutcome", "G5_rpe": "rpe_postoutcome",
+    "G6_uncert": "reward_belief_differential_entropy_leaf_mean_preoutcome", "G7_update": "reward_belief_mean_update_l1_all_ports_postoutcome",
 }
 _S_KEY = {
-    "S1_rew1": "is_swr:reward_lag1", "S3_periswitch": "is_swr:trials_since_switch",
+    "S1_rew1": "is_swr:known_reward_outcome_lag_1",
+    "S3_periswitch": "is_swr:periswitch_index_trials",
     "S4_block": "is_swr:trials_since_block_change",
-    "S5_switchrate": "is_swr:recent_switch_rate",
-    "S6_value": "is_swr:switch_advantage_mu_preoutcome_sess", "S7_rpe": "is_swr:rpe",
-    "S8_uncert": "is_swr:beta_reward_entropy",
-    "S9_update": "is_swr:global_mu_update_abs_postoutcome_sess",
+    "S5_switchrate": "is_swr:patch_switch_fraction_last5_completed_trips",
+    "S6_value": "is_swr:relative_value_switch_minus_stay_preoutcome",
+    "S7_rpe": "is_swr:rpe_postoutcome",
+    "S8_uncert": "is_swr:reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "S9_update": "is_swr:reward_belief_mean_update_l1_all_ports_postoutcome",
 }
 # raw fit population -> friendly label shared with the content table
 _POP_LABEL = {"non_local": "all", "non_local_swr": "SWR", "non_local_no_swr": "nonSWR"}
 _RATE_CONT_COVARS = [
-    "trials_since_switch", "trials_since_block_change", "recent_switch_rate",
-    "switch_advantage_mu_preoutcome_sess", "rpe", "beta_reward_entropy",
-    "global_mu_update_abs_postoutcome_sess",
+    "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
+    "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
 ]
 RC = PROCESSED_DATA_DIR / "replay_content"
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
@@ -163,7 +169,7 @@ def _fit(
     n_events = int((df["count"] > 0).sum())
     if len(df) < MIN_BINS or n_events < MIN_EVENTS:
         return None, "too_few"
-    if "reward_lag1" in need_cols and df["reward_lag1"].nunique() < 2:
+    if "known_reward_outcome_lag_1" in need_cols and df["known_reward_outcome_lag_1"].nunique() < 2:
         return None, "no_reward_contrast"  # reward terms unidentified without contrast
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
@@ -236,17 +242,24 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(q, table="qvals")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    stop = add_uncertainty_covariates(stop)
     qcols = [
         "stop_id",
-        "trials_since_switch",
-        "is_post_switch",
+        "periswitch_index_trials",
+        "is_periswitch_post",
         "trials_since_block_change",
-        "switch_advantage_mu_preoutcome_sess",
-        "rpe",
-        "beta_reward_entropy",
-        "global_mu_update_abs_postoutcome_sess",
+        "relative_value_switch_minus_stay_preoutcome",
+        "rpe_postoutcome",
+        "reward_belief_differential_entropy_leaf_mean_preoutcome",
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
     ]
     missing = [c for c in qcols if c not in q.columns]
     if missing:
@@ -271,10 +284,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         len(stop),
         100 * len(stop) / n0,
     )
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
     n_qvals_dropped = int(n0 - len(stop))
@@ -296,7 +306,7 @@ def _cohort_records(
     ``n_drop_qvals_gap`` = the inner qvals-join drop (mechanism B, stops with no fitted
     value state, already removed in ``_load``); ``n_drop_own_predictor_missing`` =
     post-join stops with ``immobility<=0`` or a NaN stop-level required predictor
-    (e.g. ``reward_lag1``, model-specific); ``n_modeled`` = the fitter's distinct
+    (e.g. ``known_reward_outcome_lag_1``, model-specific); ``n_modeled`` = the fitter's distinct
     modeled-stop count (``n_stops``); the rest (bin-level drops, session gates) go to
     ``n_excluded_session``. Reconciles by construction.
     """
@@ -452,7 +462,10 @@ def main() -> None:
         # session signed-rank, BH-FDR, standardized per-SD columns). G-rungs are
         # relabeled non_local/_swr/_no_swr -> all/SWR/nonSWR to match the content table.
         qv = read_table(out_dir / "qvals_table.pkl")
-        st = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+        st = read_table(RC / "stop_table.pkl")
+        require_covariate_schema(qv, table="qvals")
+        require_covariate_schema(st, table="stop")
+        st = add_uncertainty_covariates(st)
         sd = {}
         for c in _RATE_CONT_COVARS:
             src = qv if c in qv.columns else st if c in st.columns else None

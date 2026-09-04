@@ -103,7 +103,7 @@ def main() -> None:
     # top 15 longest non-SWR events
     emit("Top 15 longest non-SWR non-local events:")
     cols = ["animal", "day", "epoch", "event_duration", "peak_nonlocal_prob",
-            "max_speed", "n_swrs_overlapping"]
+            "animal_max_speed_cm_s", "n_swrs_overlapping"]
     cols = [c for c in cols if c in nonswr.columns]
     top = nonswr.sort_values(d, ascending=False).head(15)[cols]
     emit(top.to_string(index=False))

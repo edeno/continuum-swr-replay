@@ -39,6 +39,9 @@ import re
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
@@ -124,7 +127,7 @@ def reconstruct_blocks(assignments: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         Columns ``block_number`` (0-indexed), ``contingency`` (the logged
         index), ``t_start_ms`` (the ``contingency`` line's timestamp), and
-        ``p_reward_port0..5`` (fractions). One row per distinct block.
+        ``task_reward_probability_port_0..5`` (fractions). One row per distinct block.
     """
     mask = assignments["name"].isin(
         ["contingency", *[f"leafProbs{i}" for i in range(1, 7)]]
@@ -154,7 +157,7 @@ def reconstruct_blocks(assignments: pd.DataFrame) -> pd.DataFrame:
             {
                 "contingency": int(contingency),
                 "t_start_ms": int(t_start_ms),
-                **{f"p_reward_port{p}": vec[p] for p in range(6)},
+                **{f"task_reward_probability_port_{p}": vec[p] for p in range(6)},
             }
         )
 
@@ -230,25 +233,25 @@ def solve_time_offset(
     return coarse_offset, float(np.median(resid[matched])) if matched.any() else np.inf, int(matched.sum())
 
 
-def _best_patch(p_reward: np.ndarray) -> int:
+def _best_patch(task_probability: np.ndarray) -> int:
     """Patch (1-3) with the highest two-port average nominal value.
 
-    ``p_reward`` is indexed by port 0..5; ports map to wells 0..5 ->
+    ``task_probability`` is indexed by port 0..5; ports map to wells 0..5 ->
     :data:`WELL_PATCH_MAPPING`. Patch value = mean of its two ports.
     """
     patch_means: dict[int, float] = {}
     for patch in (1, 2, 3):
         ports = [w for w, pa in WELL_PATCH_MAPPING.items() if pa == patch]
-        patch_means[patch] = float(np.mean([p_reward[w] for w in ports]))
+        patch_means[patch] = float(np.mean([task_probability[w] for w in ports]))
     return max(patch_means, key=patch_means.get)
 
 
-def _patch_value_diff(p_reward: np.ndarray) -> float:
+def _patch_value_diff(task_probability: np.ndarray) -> float:
     """Best-patch value minus second-best-patch value (>= 0)."""
     means = []
     for patch in (1, 2, 3):
         ports = [w for w, pa in WELL_PATCH_MAPPING.items() if pa == patch]
-        means.append(float(np.mean([p_reward[w] for w in ports])))
+        means.append(float(np.mean([task_probability[w] for w in ports])))
     means.sort(reverse=True)
     return means[0] - means[1]
 
@@ -264,7 +267,8 @@ def annotate_stops(
     ----------
     stops : pd.DataFrame
         One session's stops. Must carry ``stop_id``, ``stop_start`` (neural s),
-        ``current_arm`` (the port 0..5 the animal is at), and ``reward_outcome``.
+        ``occupancy_well_arm`` (the port 0..5 the animal is at), and
+        ``is_rewarded_outcome``.
     blocks : pd.DataFrame
         :func:`reconstruct_blocks` output for the session.
     offset : float
@@ -277,7 +281,7 @@ def annotate_stops(
         ``shared-contracts.md#contingency-table-schema`` columns.
     """
     block_start_sec = blocks["t_start_ms"].to_numpy(dtype=float) / 1000.0 + offset
-    port_cols = [f"p_reward_port{p}" for p in range(6)]
+    port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
     port_mat = blocks[port_cols].to_numpy(dtype=float)
 
     stop_start = stops["stop_start"].to_numpy(dtype=float)
@@ -300,28 +304,34 @@ def annotate_stops(
         b = int(active[i])
         if b < 0:  # stop precedes the first logged contingency -> no value
             continue
-        p_reward = port_mat[b]
-        current_arm = row["current_arm"]
+        task_probability = port_mat[b]
+        current_arm = row["occupancy_well_arm"]
         if pd.isna(current_arm):
             p_current = np.nan
-            rpe = np.nan
+            probability_error = np.nan
         else:
-            p_current = float(p_reward[int(current_arm)])
-            rpe = float(row["reward_outcome"]) - p_current
+            p_current = float(task_probability[int(current_arm)])
+            probability_error = float(row["is_rewarded_outcome"]) - p_current
         rec = {
             "stop_id": row["stop_id"],
             "block_number": int(blocks.loc[b, "block_number"]),
             "trials_since_block_change": int(rank_lookup[i]),
-            **{f"p_reward_port{p}": float(p_reward[p]) for p in range(6)},
-            "p_reward_current": p_current,
-            "p_reward_best": float(np.max(p_reward)),
+            **{
+                f"task_reward_probability_port_{p}": float(task_probability[p])
+                for p in range(6)
+            },
+            "task_reward_probability_chosen_arm": p_current,
+            "task_reward_probability_best_arm": float(np.max(task_probability)),
             "is_best_patch": (
                 False
                 if pd.isna(current_arm)
-                else WELL_PATCH_MAPPING[int(current_arm)] == _best_patch(p_reward)
+                else WELL_PATCH_MAPPING[int(current_arm)]
+                == _best_patch(task_probability)
             ),
-            "rpe": rpe,
-            "value_diff_patch": _patch_value_diff(p_reward),
+            "task_reward_probability_error_chosen_arm_postoutcome": probability_error,
+            "task_reward_probability_patch_mean_gap_best_vs_second": _patch_value_diff(
+                task_probability
+            ),
         }
         records.append(rec)
 
@@ -330,13 +340,13 @@ def annotate_stops(
 
 def _assert_invariants(table: pd.DataFrame) -> None:
     """Assert the schema invariants (do not weaken)."""
-    port_cols = [f"p_reward_port{p}" for p in range(6)]
+    port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
     vals = table[port_cols].to_numpy(dtype=float)
     finite = vals[np.isfinite(vals)]
     bad = sorted(set(np.round(finite, 3)) - VALID_P_REWARD)
     assert not bad, f"p_reward values outside the documented schedule: {bad}"
-    vd = table["value_diff_patch"].dropna().to_numpy()
-    assert (vd >= -1e-9).all(), "value_diff_patch must be >= 0"
+    vd = table["task_reward_probability_patch_mean_gap_best_vs_second"].dropna().to_numpy()
+    assert (vd >= -1e-9).all(), "task_reward_probability_patch_mean_gap_best_vs_second must be >= 0"
     assert table["stop_id"].is_unique, "one row per stop_id"
 
 
@@ -433,8 +443,9 @@ def main() -> None:
 
     rc = PROCESSED_DATA_DIR / "replay_content"
     stop_table = read_table(rc / "stop_table.pkl")
+    require_covariate_schema(stop_table, table="stop")
 
-    session_cols = ["animal", "day", "epoch"]
+    session_cols = ["animal", "session_date", "epoch"]
     sessions = stop_table[session_cols].drop_duplicates().sort_values(session_cols)
     if args.max_per_animal is not None:
         sessions = sessions.groupby("animal", sort=False).head(args.max_per_animal)
@@ -445,7 +456,7 @@ def main() -> None:
         nwb_file_name = f"{animal}{day}_.nwb"
         stops = stop_table[
             (stop_table["animal"] == animal)
-            & (stop_table["day"] == day)
+            & (stop_table["session_date"] == day)
             & (stop_table["epoch"] == epoch)
         ]
         try:
@@ -480,7 +491,7 @@ def main() -> None:
     out = out_dir / "contingency_table.pkl"
     contingency_table.to_pickle(out)
 
-    port_cols = [f"p_reward_port{p}" for p in range(6)]
+    port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
     hist = (
         contingency_table[port_cols]
         .stack()

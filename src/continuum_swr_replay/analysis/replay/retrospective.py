@@ -10,7 +10,7 @@ Five event-level metrics are computed across three comparison families:
 - ``chosen_arm_fraction``: per-event ``arm_fraction`` at ``arm == next_arm``.
 - ``ends_at_next``: does the last in-event MAP arm equal ``next_arm``?
 - ``contains_path_to_next``: does the event's MAP-arm trace cover the
-  geometric path from ``current_arm`` to ``next_arm``?
+  geometric path from ``occupancy_well_arm`` to ``next_arm``?
 - ``chosen_patch_fraction``: replay mass assigned to ``next_patch``.
 - ``ends_at_next_patch``: does the final MAP arm belong to ``next_patch``?
 
@@ -94,7 +94,7 @@ _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
 
 def _session_keys(df: pd.DataFrame) -> list[str]:
     """Session-key columns present in ``df``."""
-    return [c for c in ("animal", "day", "epoch") if c in df.columns]
+    return [c for c in ("animal", "session_date", "epoch") if c in df.columns]
 
 
 def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
@@ -105,7 +105,7 @@ def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
     bout may contain several visits with different future choices.
 
     ``completed_trial_id`` is what separates them. Keying on contiguous
-    ``current_arm`` runs alone would merge two visits to the *same* well within
+    ``occupancy_well_arm`` runs alone would merge two visits to the *same* well within
     one bout -- the intervening trip is invisible once transit events are
     filtered out -- and the only symptom would be a hard failure on the
     one-label-per-unit check. The completion-order ID advances across that
@@ -117,7 +117,7 @@ def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
         If ``completed_trial_id`` is absent, which marks a table built before
         the event schema carried per-event trial context.
     """
-    required = ("stop_id", "completed_trial_id", "current_arm")
+    required = ("stop_id", "completed_trial_id", "occupancy_well_arm")
     missing = [column for column in required if column not in event_table.columns]
     if missing:
         raise KeyError(
@@ -131,7 +131,7 @@ def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
             zip(
                 event_table["stop_id"],
                 event_table["completed_trial_id"],
-                event_table["current_arm"],
+                event_table["occupancy_well_arm"],
                 strict=True,
             )
         ),
@@ -148,7 +148,7 @@ def at_well_event_cohort(
     """Filter all three event tables to one explicit at-well event cohort.
 
     Canonical tables use the nullable ``at_well`` label. Legacy inputs without
-    that column are rejected: their ``current_arm`` may contain the retired
+    that column are rejected: their occupancy field may contain the retired
     destination-well fallback for in-transit events. The same event keys are
     applied to arm and sequence rows, preventing metric-specific denominators.
     """
@@ -159,14 +159,14 @@ def at_well_event_cohort(
             event_sequence_table.iloc[0:0].copy(),
         )
     missing = [
-        column for column in ("at_well", "current_arm") if column not in event_table
+        column for column in ("at_well", "occupancy_well_arm") if column not in event_table
     ]
     if missing:
         raise KeyError(
             "at-well retrospective cohort requires canonical location column(s) "
             f"{missing}; regenerate event tables"
         )
-    current = pd.to_numeric(event_table["current_arm"], errors="coerce")
+    current = pd.to_numeric(event_table["occupancy_well_arm"], errors="coerce")
     keep = pd.Series(np.isfinite(current), index=event_table.index)
     keep &= event_table["at_well"].eq(True).fillna(False)  # noqa: E712
     events = event_table.loc[keep].copy()
@@ -254,13 +254,13 @@ def _arm_fraction_at(
     ev = event_table.dropna(subset=[target_col]).copy()
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
-    ea = event_arm_table[[*sess_keys, "event_id", "arm", "arm_fraction"]]
+    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
+    ea = event_arm_table[[*sess_keys, "event_id", "candidate_arm", "arm_fraction"]]
 
     merged = ev.merge(
         ea,
         left_on=[*sess_keys, "event_id", target_col],
-        right_on=[*sess_keys, "event_id", "arm"],
+        right_on=[*sess_keys, "event_id", "candidate_arm"],
         how="left",
     )
     out_cols = [*sess_keys, "event_id"]
@@ -331,7 +331,7 @@ def _ends_at_arm(
     ev[target_col] = ev[target_col].astype(int)
 
     sess_keys = [
-        c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
+        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
     ]
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
@@ -410,7 +410,7 @@ def _contains_path(
     ev[target_col] = ev[target_col].astype(int)
 
     sess_keys = [
-        c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
+        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
     ]
     # Empty ``event_sequence_table`` is a legitimate input
     # (sessions can have events but no in-event timebins yet, e.g.
@@ -460,12 +460,13 @@ def contains_path_to_next(
     event_table: pd.DataFrame,
     event_sequence_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-event boolean: MAP-arm trace covers ``current_arm`` → ``next_arm``.
+    """Per-event boolean: MAP-arm trace covers ``occupancy_well_arm`` → ``next_arm``.
 
-    "Covers" means every arm in ``arm_path_well_to_well(current_arm, next_arm)``
-    appears in the event's ``decoded_arm_map``. This ignores ordering,
-    continuity, repeats, and off-path arms. Events with NaN
-    ``current_arm``/``next_arm`` are dropped.
+    "Covers" means every arm in
+    ``arm_path_well_to_well(occupancy_well_arm, next_arm)`` appears in the
+    event's ``decoded_arm_map``. This ignores ordering, continuity, repeats,
+    and off-path arms. Events with undefined occupancy or ``next_arm`` are
+    dropped.
 
     Returns
     -------
@@ -475,7 +476,7 @@ def contains_path_to_next(
     return _contains_path(
         event_table,
         event_sequence_table,
-        source_col="current_arm",
+        source_col="occupancy_well_arm",
         target_col="next_arm",
         out_col="contains_path_to_next",
     )
@@ -485,7 +486,7 @@ def contains_path_from_prev(
     event_table: pd.DataFrame,
     event_sequence_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-event boolean: MAP-arm trace covers ``prev_arm`` → ``current_arm``.
+    """Per-event boolean: MAP-arm trace covers ``prev_arm`` → ``occupancy_well_arm``.
 
     The retrospective mirror of :func:`contains_path_to_next`: whether the
     replay covers the route the animal just took (the just-left arm back to
@@ -495,7 +496,7 @@ def contains_path_from_prev(
         event_table,
         event_sequence_table,
         source_col="prev_arm",
-        target_col="current_arm",
+        target_col="occupancy_well_arm",
         out_col="contains_path_from_prev",
     )
 
@@ -528,10 +529,10 @@ def chosen_patch_fraction(
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
-    ea = event_arm_table[[*sess_keys, "event_id", "arm", "arm_fraction"]].copy()
+    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
+    ea = event_arm_table[[*sess_keys, "event_id", "candidate_arm", "arm_fraction"]].copy()
     # Map arm → patch via TRACK_SEGMENT_TO_PATCH.
-    ea["arm_patch"] = ea["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    ea["arm_patch"] = ea["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
 
     merged = ev.merge(ea, on=[*sess_keys, "event_id"], how="left")
     in_target_patch = merged["arm_patch"] == merged["next_patch"]
@@ -599,7 +600,7 @@ def ends_at_next_patch(
     ev["next_patch"] = ev["next_patch"].astype(int)
 
     sess_keys = [
-        c for c in ("animal", "day", "epoch") if c in event_sequence_table.columns
+        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
     ]
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
@@ -649,14 +650,14 @@ def compute_retrospective_metrics(
     Returns
     -------
     pd.DataFrame
-        One row per event with valid ``current_arm`` / ``next_arm`` /
+        One row per event with valid ``occupancy_well_arm`` / ``next_arm`` /
         ``next_patch``. Always includes ``chosen_arm_fraction``,
         ``ends_at_next``, ``contains_path_to_next``. Adds
         ``chosen_patch_fraction``, ``ends_at_next_patch`` when
         ``include_patch=True``, and the ``prev_arm`` mirror when
         ``include_prev=True``.
     """
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_table.columns]
+    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_table.columns]
     cf = chosen_arm_fraction(event_table, event_arm_table)
     en = ends_at_next(event_table, event_sequence_table)
     cp = contains_path_to_next(event_table, event_sequence_table)
@@ -825,7 +826,7 @@ def _observable_event_keys(
     if any(
         metric in {"chosen_arm_fraction", "chosen_patch_fraction"} for metric in metrics
     ):
-        if not {"arm", "arm_fraction"}.issubset(event_arm_table):
+        if not {"candidate_arm", "arm_fraction"}.issubset(event_arm_table):
             raise KeyError(
                 "Arm-fraction retrospective metrics require arm and arm_fraction"
             )
@@ -834,8 +835,8 @@ def _observable_event_keys(
             pd.to_numeric(arm["arm_fraction"], errors="coerce")
         )
         arm_observed = arm.groupby(key_cols, as_index=False).agg(
-            _n_arm_rows=("arm", "size"),
-            _arm_set=("arm", lambda values: frozenset(values)),
+            _n_arm_rows=("candidate_arm", "size"),
+            _arm_set=("candidate_arm", lambda values: frozenset(values)),
             _all_finite=("_finite_fraction", "all"),
         )
         arm_observed = arm_observed[
@@ -890,10 +891,10 @@ def _freeze_retrospective_cohort_with_audit(
     family = matching_families[0]
     n_events_input = int(len(event_table))
     required_event_columns = {
-        "current_arm",
+        "occupancy_well_arm",
         "next_arm",
         "stop_id",
-        "event_midpoint_time",
+        "event_midpoint_s",
     }
     if family == "patch":
         required_event_columns.update({"current_patch", "next_patch"})
@@ -916,20 +917,20 @@ def _freeze_retrospective_cohort_with_audit(
         event_table, event_arm_table, event_sequence_table
     )
     n_events_after_at_well = int(len(events))
-    numeric_current = pd.to_numeric(events["current_arm"], errors="coerce")
+    numeric_current = pd.to_numeric(events["occupancy_well_arm"], errors="coerce")
     invalid_current = ~numeric_current.isin(_VALID_WELL_ARMS)
     if invalid_current.any():
         raise ValueError(
             "Retrospective endpoints must be integer well arms 0..5; found "
             f"{int(invalid_current.sum())} invalid current_arm values"
         )
-    events["current_arm"] = numeric_current.astype(int)
+    events["occupancy_well_arm"] = numeric_current.astype(int)
     if events["stop_id"].isna().any():
         raise ValueError("Retrospective shuffle unit stop_id contains NaN")
-    midpoint = pd.to_numeric(events["event_midpoint_time"], errors="coerce")
+    midpoint = pd.to_numeric(events["event_midpoint_s"], errors="coerce")
     if not np.isfinite(midpoint).all():
         raise ValueError("Retrospective event_midpoint_time must be finite")
-    events["event_midpoint_time"] = midpoint.astype(float)
+    events["event_midpoint_s"] = midpoint.astype(float)
     # Derive visits before removing undefined future labels. Otherwise an
     # intervening visit with no next choice could disappear and collapse a
     # later return to the same arm into the earlier visit.
@@ -985,7 +986,7 @@ def _freeze_retrospective_cohort_with_audit(
         numeric_current_patch = pd.to_numeric(events["current_patch"], errors="coerce")
         numeric_patch = pd.to_numeric(events["next_patch"], errors="coerce")
         expected_current_patch = (
-            events["current_arm"].map(WELL_PATCH_MAPPING).astype(float)
+            events["occupancy_well_arm"].map(WELL_PATCH_MAPPING).astype(float)
         )
         expected_patch = events["next_arm"].map(WELL_PATCH_MAPPING).astype(float)
         invalid_current_patch = ~np.isfinite(
@@ -1017,7 +1018,7 @@ def _freeze_retrospective_cohort_with_audit(
     event_sequence = _restrict_family(event_sequence, observable_keys)
     n_events_after_observability = int(len(events))
 
-    events[_SHUFFLE_CURRENT_ARM] = events["current_arm"].astype(int)
+    events[_SHUFFLE_CURRENT_ARM] = events["occupancy_well_arm"].astype(int)
 
     if family == "arm":
         strata_cols = [_SHUFFLE_CURRENT_ARM]
@@ -1035,7 +1036,7 @@ def _freeze_retrospective_cohort_with_audit(
             (
                 len(arm_path_well_to_well(current, target))
                 for current, target in zip(
-                    events["current_arm"], events["next_arm"], strict=True
+                    events["occupancy_well_arm"], events["next_arm"], strict=True
                 )
             ),
             dtype=np.int64,
@@ -1205,9 +1206,10 @@ def retrospective_alignment_with_shuffle(
     """Real vs. shuffled alignment for one session.
 
     Each metric family gets its own visit-context cohort and calibrated null:
-    arm metrics condition on ``current_arm``; patch metrics condition on
-    ``current_patch``; path coverage conditions on ``current_arm``, exact route
-    length, and coarse duration. The statistic is real minus shuffled.
+    arm metrics condition on ``occupancy_well_arm``; patch metrics condition on
+    ``current_patch``; path coverage conditions on ``occupancy_well_arm``,
+    exact route length, and coarse duration. The statistic is real minus
+    shuffled.
 
     Metrics share a cohort only within their family. A family with no movable
     stratum reports zero events and NaN statistics without removing observable

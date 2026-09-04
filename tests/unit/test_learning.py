@@ -46,7 +46,7 @@ def _make_tables(
     path. When False, the event_arm_table omits them and the merge
     falls back to pulling them from event_table.
     """
-    sess = {"animal": "test", "day": 1, "epoch": "01_r1"}
+    sess = {"animal": "test", "session_date": 1, "epoch": "01_r1"}
 
     ev_rows = []
     ea_rows = []
@@ -56,7 +56,7 @@ def _make_tables(
                 **sess,
                 "stop_id": e["stop_id"],
                 "event_id": e["event_id"],
-                "current_arm": e["current_arm"],
+                "occupancy_well_arm": e["occupancy_well_arm"],
                 "prev_arm": e["prev_arm"],
                 "last_rewarded_arm": e["last_rewarded_arm"],
                 "is_swr": e.get("is_swr", False),
@@ -68,14 +68,14 @@ def _make_tables(
                 **sess,
                 "stop_id": e["stop_id"],
                 "event_id": e["event_id"],
-                "arm": arm,
+                "candidate_arm": arm,
                 "arm_fraction": e["arm_fracs"][arm],
-                "reward_rate_arm_k10": e.get("rrr", [np.nan] * 9)[arm],
+                "reward_fraction_candidate_arm_last10_visits": e.get("rrr", [np.nan] * 9)[arm],
                 "is_swr": e.get("is_swr", False),
                 "is_mua": e.get("is_mua", False),
             }
             if broadcast_role_cols_to_event_arm:
-                ea_row["current_arm"] = e["current_arm"]
+                ea_row["occupancy_well_arm"] = e["occupancy_well_arm"]
                 ea_row["prev_arm"] = e["prev_arm"]
                 ea_row["last_rewarded_arm"] = e["last_rewarded_arm"]
             ea_rows.append(ea_row)
@@ -102,7 +102,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
@@ -111,7 +111,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 101,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "arm_fracs": [0.30, 0.40, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
@@ -121,18 +121,16 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": False,
                     "is_mua_stop": False,
-                    "n_events": 2,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 2,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
@@ -160,7 +158,7 @@ class TestStopReplaySummary:
         # best_arm=0, patch=1 → 0.75
         assert row["frac_on_best_patch"] == pytest.approx(0.75)
         # Behavioral pass-throughs
-        assert int(row["is_after_reward"]) == 1
+        assert int(row["is_rewarded_outcome"]) == 1
         assert int(row["is_stay"]) == 1
         assert int(row["n_events_with_replay"]) == 2
 
@@ -170,18 +168,16 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": False,
                     "is_mua_stop": False,
-                    "n_events": 0,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 0,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
@@ -205,7 +201,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "is_swr": True,
@@ -215,7 +211,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 101,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "is_swr": False,
@@ -226,18 +222,16 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": True,
                     "is_mua_stop": False,
-                    "n_events": 2,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 2,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
@@ -253,7 +247,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     # Arm 5 appears first below and has larger replay mass,
@@ -265,26 +259,24 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 0,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 0,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": False,
                     "is_mua_stop": False,
-                    "n_events": 1,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 1,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
         event100 = ea[ea["event_id"] == 100]
         ea = pd.concat(
             [
-                event100[event100["arm"] == 5],
-                event100[event100["arm"] != 5],
+                event100[event100["candidate_arm"] == 5],
+                event100[event100["candidate_arm"] != 5],
             ],
             ignore_index=True,
         )
@@ -302,7 +294,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "is_swr": True,
@@ -312,7 +304,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 101,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "is_swr": False,
@@ -323,18 +315,16 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": True,
                     "is_mua_stop": False,
-                    "n_events": 2,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 2,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
@@ -378,7 +368,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
@@ -387,7 +377,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 101,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     # arm 0 (= current_arm) is NaN for this event.
@@ -402,18 +392,16 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": False,
                     "is_mua_stop": False,
-                    "n_events": 2,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 2,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
@@ -445,7 +433,7 @@ class TestStopReplaySummary:
                 {
                     "stop_id": 1,
                     "event_id": 100,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
                     "arm_fracs": [0.50, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.03, 0.02],
@@ -455,23 +443,21 @@ class TestStopReplaySummary:
             stops=[
                 {
                     "stop_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "prev_arm": 1,
                     "last_rewarded_arm": 1,
-                    "is_after_reward": 1,
-                    "is_after_omission": 0,
-                    "is_after_stay": 0,
-                    "is_after_switch": 0,
+                    "is_rewarded_outcome": 1,
+                    "did_last_completed_trip_switch_patch": 0,
                     "is_stay": 1,
                     "is_swr_stop": False,
                     "is_mua_stop": False,
-                    "n_events": 1,
-                    "immobility_time": 5.0,
+                    "n_selected_events": 1,
+                    "immobility_duration_s": 5.0,
                 },
             ],
         )
         # Sanity: confirm the fixture really lacks the role columns.
-        assert "current_arm" not in ea.columns
+        assert "occupancy_well_arm" not in ea.columns
         out = stop_replay_summary(st, ev, ea)
         row = out.iloc[0]
         assert row["frac_on_current"] == pytest.approx(0.50)
@@ -507,11 +493,11 @@ class TestFitIsStayLogistic:
         df = pd.DataFrame(
             {
                 "animal": "test",
-                "day": 1,
+                "session_date": 1,
                 "epoch": "01_r1",
                 "stop_id": np.arange(n_stops),
-                "is_after_omission": is_after_omission,
                 "frac_on_last_rewarded": frac,
+                "is_omitted_outcome": is_after_omission,
                 "is_stay": is_stay,
             }
         )
@@ -559,11 +545,11 @@ class TestFitIsStayPooledGEE:
                 rows.append(
                     {
                         "animal": f"a{s:03d}",
-                        "day": 1,
+                        "session_date": 1,
                         "epoch": "01_r1",
                         "stop_id": len(rows),
-                        "is_after_omission": outcome,
                         "frac_on_last_rewarded": frac,
+                        "is_omitted_outcome": outcome,
                         "is_stay": y,
                     }
                 )
@@ -586,11 +572,11 @@ class TestFitIsStayPooledGEE:
         df = pd.DataFrame(
             {
                 "animal": "a",
-                "day": 1,
+                "session_date": 1,
                 "epoch": "01_r1",
                 "stop_id": np.arange(100),
-                "is_after_omission": np.tile([0, 1], 50),
                 "frac_on_last_rewarded": np.linspace(0, 1, 100),
+                "is_omitted_outcome": np.tile([0, 1], 50),
                 "is_stay": np.ones(100, dtype=int),
             }
         )
@@ -616,11 +602,11 @@ class TestFitIsStayPooledGEE:
                 rows.append(
                     {
                         "animal": f"a{s:03d}",
-                        "day": 1,
+                        "session_date": 1,
                         "epoch": "01_r1",
                         "stop_id": stop_id,
+                        "is_omitted_outcome": int(rng.integers(0, 2)),
                         "is_stay": int(rng.integers(0, 2)),
-                        "is_after_omission": int(rng.integers(0, 2)),
                         # Constant across every stop ⇒ rank-deficient
                         # design.
                         "frac_on_last_rewarded": 0.5,

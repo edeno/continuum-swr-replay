@@ -31,7 +31,7 @@ def _toy_long_df(n_events: int, n_arms: int = 9) -> pd.DataFrame:
         for arm in range(n_arms):
             rows.append({
                 "event_id": ei,
-                "arm": arm,
+                "candidate_arm": arm,
                 "arm_count_hard": counts[arm],
             })
     return pd.DataFrame(rows)
@@ -51,7 +51,7 @@ class TestCvZeroCountFilter:
         zero_event_id = df_a["event_id"].max() + 1
         zero_rows = pd.DataFrame(
             [
-                {"event_id": zero_event_id, "arm": arm, "arm_count_hard": 0.0}
+                {"event_id": zero_event_id, "candidate_arm": arm, "arm_count_hard": 0.0}
                 for arm in range(9)
             ]
         )
@@ -86,7 +86,7 @@ def _toy_long_df_with_predictor(n_events: int, n_arms: int = 9) -> pd.DataFrame:
         for arm in range(n_arms):
             rows.append({
                 "event_id": ei,
-                "arm": arm,
+                "candidate_arm": arm,
                 "arm_count_hard": float(arm == chosen),
                 "pred": float(x[arm]),
             })

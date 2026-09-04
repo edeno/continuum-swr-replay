@@ -30,22 +30,13 @@ from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay.model_specs import BIN_S
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 LABEL = {"swr": "detected SWR", "non_local": "non-local (all)",
          "non_local_swr": "NL w/ SWR", "non_local_no_swr": "NL no-SWR"}
-REWARD_RATE_COEF_CANDIDATES = (
-    "coef_reward_rate_trial_k10",
-    "coef_recent_trial_reward_rate",
-)
-
-
-def _first_present(df: pd.DataFrame, candidates: tuple[str, ...]) -> str:
-    for col in candidates:
-        if col in df.columns:
-            return col
-    raise KeyError(f"none of {candidates} are present in all_models.pkl")
+REWARD_FRACTION_COEF = "coef_reward_fraction_last10_known_trials"
 
 
 def _one_sample(df: pd.DataFrame, model: str, coef: str, oc: str):
@@ -160,23 +151,28 @@ def main():
 
     section_baseline(df)
 
-    section_coef("2. REWARD LAG-1 (raw, uncontrolled)", "M1_rew1", "coef_reward_lag1")
+    section_coef("2. REWARD LAG-1 (raw, uncontrolled)", "M1_rew1", "coef_known_reward_outcome_lag_1")
     section_coef("2. REWARD LAG-1 (controlled: time+history+reward-kernel)",
-                 "M7_time_hist_rew", "coef_reward_lag1")
-    print("\n  paired NL-w/SWR vs NL-no-SWR (M7 reward_lag1):  "
-          + str(_paired(df, "M7_time_hist_rew", "coef_reward_lag1",
+                 "M7_time_hist_rew", "coef_known_reward_outcome_lag_1")
+    print("\n  paired NL-w/SWR vs NL-no-SWR (M7 known_reward_outcome_lag_1):  "
+          + str(_paired(df, "M7_time_hist_rew", "coef_known_reward_outcome_lag_1",
                         "non_local_swr", "non_local_no_swr")))
 
-    section_kernel("3. REWARD KERNEL (M7, controlled) — boost(lag1) then suppression",
-                   "M7_time_hist_rew", "reward_lag", 10)
+    section_kernel(
+        "3. REWARD KERNEL (M7, controlled) — boost(lag1) then suppression",
+        "M7_time_hist_rew",
+        "known_reward_outcome_lag_",
+        10,
+    )
 
     section_kernel("4. SELF-HISTORY KERNEL (M3_hist, raw)", "M3_hist", "onset_lag", 10)
     section_kernel("4. SELF-HISTORY KERNEL (M7, controlled)", "M7_time_hist_rew",
                    "onset_lag", 10)
     section_selfhistory("M7_time_hist_rew")
 
-    section_coef("5. RECENT REWARD RATE", "M2r_rewrate",
-                 _first_present(df, REWARD_RATE_COEF_CANDIDATES))
+    section_coef(
+        "5. RECENT REWARD FRACTION", "M2r_rewrate", REWARD_FRACTION_COEF
+    )
     section_ladder()
 
 

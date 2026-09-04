@@ -32,7 +32,7 @@ def _simulate_stops(
 
     For each stop i: ``immobility_time_i ~ Uniform(duration_range)``,
     rate ``λ_i = exp(log_intercept + Σ_k β_k * x_{i,k})``,
-    ``n_events_i ~ Poisson(λ_i * immobility_time_i)``.
+    ``n_selected_events_i ~ Poisson(λ_i * immobility_duration_s_i)``.
 
     Predictor values are i.i.d. Bernoulli(0.5) — uncorrelated across
     predictors, so coefficient recovery is identifiable.
@@ -50,12 +50,12 @@ def _simulate_stops(
         log_lambda += beta * x
 
     expected_count = np.exp(log_lambda) * immobility_time
-    n_events = rng.poisson(expected_count)
+    n_selected_events = rng.poisson(expected_count)
 
     df = pd.DataFrame(
         {
-            "n_events": n_events,
-            "immobility_time": immobility_time,
+            "n_selected_events": n_selected_events,
+            "immobility_duration_s": immobility_time,
             **columns,
         }
     )
@@ -148,17 +148,17 @@ class TestPredictorCoefficientRecovery:
             log_intercept=0.0,
             coefs={
                 "is_after_reward": np.log(2.0),
-                "is_after_switch": np.log(0.5),
+                "did_last_completed_trip_switch_patch": np.log(0.5),
             },
             seed=7,
         )
         fit = fit_per_stop_rate_model(
-            df, predictors=["is_after_reward", "is_after_switch"]
+            df, predictors=["is_after_reward", "did_last_completed_trip_switch_patch"]
         )
         assert fit is not None
         for name, truth in [
             ("is_after_reward", np.log(2.0)),
-            ("is_after_switch", np.log(0.5)),
+            ("did_last_completed_trip_switch_patch", np.log(0.5)),
         ]:
             z = (fit[f"coef_{name}"] - truth) / fit[f"bse_{name}"]
             assert abs(z) < 3.5, (
@@ -181,7 +181,7 @@ class TestImmobilityTimeOffset:
             duration_range=(10.0, 10.0), seed=0,
         )
         df_b = df_a.copy()
-        df_b["immobility_time"] *= 2.0
+        df_b["immobility_duration_s"] *= 2.0
         # Counts also need to double under the new "true" exposure for
         # the rate to stay the same; resimulate with the doubled time.
         df_b = _simulate_stops(
@@ -199,7 +199,7 @@ class TestImmobilityTimeOffset:
         """Stops with immobility_time == 0 would give log(0) = -inf as
         an offset and crash the GLM. They must be excluded silently."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
-        df.loc[:9, "immobility_time"] = 0.0  # 10 zero-duration stops
+        df.loc[:9, "immobility_duration_s"] = 0.0  # 10 zero-duration stops
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is not None
         assert fit["n_stops"] == 90  # 100 - 10 zero-duration
@@ -207,7 +207,7 @@ class TestImmobilityTimeOffset:
     def test_negative_immobility_time_excluded(self):
         """Negative offsets are excluded by the same ``> 0`` filter."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
-        df.loc[:4, "immobility_time"] = -1.0
+        df.loc[:4, "immobility_duration_s"] = -1.0
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit["n_stops"] == 95
 
@@ -308,7 +308,7 @@ class TestEdgeCases:
 
     def test_missing_response_column_returns_none(self):
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
-        df = df.drop(columns=["n_events"])
+        df = df.drop(columns=["n_selected_events"])
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is None
 
@@ -327,7 +327,7 @@ class TestEdgeCases:
     def test_n_events_total_matches_input_after_filtering(self):
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=5)
         fit = fit_per_stop_rate_model(df, predictors=[])
-        assert fit["n_events_total"] == int(df["n_events"].sum())
+        assert fit["n_events_total"] == int(df["n_selected_events"].sum())
 
 
 # ── Cross-validation ──

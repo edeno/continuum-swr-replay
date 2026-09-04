@@ -43,6 +43,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
     N_REWARD_LAGS,
@@ -59,14 +62,16 @@ plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
 
 RC_DIR = PROCESSED_DATA_DIR / "replay_content"
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_rate_fit_outputs"
-OUTCOMES = {"non_local": "n_non_local", "swr": "n_SWR",
-            "non_local_swr": "n_non_local_SWR", "non_local_no_swr": "n_non_local_no_SWR"}
+OUTCOMES = {
+    "non_local": "n_selected_events",
+    "swr": "n_swr_events",
+    "non_local_swr": "n_nonlocal_swr_events",
+    "non_local_no_swr": "n_nonlocal_non_swr_events",
+}
 
 # Non-reward-lag predictors -> track spec.
 RATE_PANEL = {
-    "is_after_switch": ("binary", "is_after_switch", "after switch"),
-    "is_after_omission": ("binary", "is_after_omission", "after omission"),
-    "reward_rate_trial_k10": ("heat", "reward_rate_trial_k10", "reward rate trial",
+    "reward_fraction_last10_known_trials": ("heat", "reward_fraction_last10_known_trials", "reward rate trial",
                               "viridis"),
 }
 
@@ -86,14 +91,14 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
     x = np.arange(n_stops)
 
     fit = fit_per_stop_rate_model(sub, predictors, response_col=response_col,
-                                  offset_col="immobility_time")
+                                  offset_col="immobility_duration_s")
     if fit is None:
         raise SystemExit(
             f"Rate model {model_name} did not fit for this session "
             "(too few stops / rank-deficient)."
         )
     # Predicted expected count: exp(intercept + X beta) * immobility_time.
-    expo = sub["immobility_time"].to_numpy(float)
+    expo = sub["immobility_duration_s"].to_numpy(float)
     eta = np.full(n_stops, fit["coef_intercept"], dtype=float)
     for p in predictors:
         eta = eta + fit[f"coef_{p}"] * sub[p].to_numpy(float)
@@ -103,8 +108,8 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
 
     # Panels: exposure, then model predictors (reward-lag kernel folded to one),
     # then observed-vs-predicted counts, then residual.
-    lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
-    panels = [("heat", "immobility_time", "immobility (s)", "cividis")]
+    lag_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)]
+    panels = [("heat", "immobility_duration_s", "immobility (s)", "cividis")]
     seen = set()
     for p in predictors:
         if p in lag_cols:
@@ -260,7 +265,8 @@ def main() -> None:
     args = p.parse_args()
 
     st = read_table(RC_DIR / "stop_table.pkl")
-    sub = st[(st.animal == args.animal) & (st.day == args.day)
+    require_covariate_schema(st, table="stop")
+    sub = st[(st.animal == args.animal) & (st.session_date == args.day)
              & (st.epoch == args.epoch)]
     if sub.empty:
         raise SystemExit(f"No stops for {args.animal} {args.day} {args.epoch}.")

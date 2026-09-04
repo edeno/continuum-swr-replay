@@ -28,18 +28,18 @@ _TRUNK_ARMS = frozenset({6, 7, 8})
 #: per-event columns produced identically for both scenarios (parity target).
 SHARED_TRAJECTORY_COLUMNS: tuple[str, ...] = (
     # trajectory_dynamics
-    "start_position", "end_position", "start_arm", "end_arm", "net_displacement",
-    "path_length", "tortuosity", "replay_speed_median", "replay_speed_p90",
-    "replay_speed_continuous_median", "step_distance_median", "step_distance_p90",
-    "step_distance_max", "spatial_extent", "n_reversals", "pause_fraction",
+    "replay_start_position_cm", "replay_end_position_cm", "start_arm", "end_arm", "net_displacement_cm",
+    "path_length_cm", "tortuosity", "replay_speed_median_cm_s", "replay_speed_p90_cm_s",
+    "replay_speed_continuous_median_cm_s", "step_distance_median_cm", "step_distance_p90_cm",
+    "step_distance_max_cm", "spatial_extent_cm", "n_reversals", "pause_fraction",
     "n_patches_visited", "crosses_trunk", "terminates_at_well", "compression_factor",
     # ahead_behind_summary
-    "mean_abs_ahead_behind", "max_ahead", "max_behind", "max_abs_ahead_behind",
-    "remote_fraction", "ab_slope", "is_outbound",
+    "mean_abs_ahead_behind_cm", "max_ahead_cm", "max_behind_cm", "max_abs_ahead_behind_cm",
+    "remote_fraction", "ab_slope_cm_s", "is_outbound",
     # uncertainty_extra
     "hpd_coverage_cm", "multimodal_fraction",
     # path_continuity
-    "path_continuity",
+    "path_continuity_fraction",
     # neural signal means (z-scored; the raw traces require re-loading data
     # that has drifted from the decode axis, so the stored per-session
     # z-scores are used directly)
@@ -183,16 +183,16 @@ def ahead_behind_summary(
 
     ab = grouped["ab"]
     out = {
-        "mean_abs_ahead_behind": ab.apply(lambda s: np.nanmean(np.abs(s))).to_numpy(),
-        "max_ahead": np.clip(ab.max().to_numpy(), 0.0, None),
-        "max_behind": np.clip(-ab.min().to_numpy(), 0.0, None),
-        "max_abs_ahead_behind": ab.apply(lambda s: np.nanmax(np.abs(s))).to_numpy(),
+        "mean_abs_ahead_behind_cm": ab.apply(lambda s: np.nanmean(np.abs(s))).to_numpy(),
+        "max_ahead_cm": np.clip(ab.max().to_numpy(), 0.0, None),
+        "max_behind_cm": np.clip(-ab.min().to_numpy(), 0.0, None),
+        "max_abs_ahead_behind_cm": ab.apply(lambda s: np.nanmax(np.abs(s))).to_numpy(),
         "remote_fraction": grouped.apply(_remote, include_groups=False).to_numpy(),
-        "ab_slope": grouped.apply(_slope, include_groups=False).to_numpy(),
+        "ab_slope_cm_s": grouped.apply(_slope, include_groups=False).to_numpy(),
     }
     # NaN (not False) where ab_slope is undefined (<2 finite points), so an
     # event with unknown direction is not silently counted as inbound.
-    slope = out["ab_slope"]
+    slope = out["ab_slope_cm_s"]
     out["is_outbound"] = np.where(np.isfinite(slope), (slope > 0).astype(float), np.nan)
     return np.array(list(grouped.groups.keys())), out
 
@@ -525,20 +525,20 @@ def trajectory_dynamics(
         tortuosity = np.where(net_disp > 0, path_length / net_disp, np.nan)
 
     out = {
-        "start_position": _per_event(_start_pos),
-        "end_position": _per_event(_end_pos),
+        "replay_start_position_cm": _per_event(_start_pos),
+        "replay_end_position_cm": _per_event(_end_pos),
         "start_arm": _per_event(_start_arm),
         "end_arm": _per_event(_end_arm),
-        "net_displacement": net_disp,
-        "path_length": path_length,
+        "net_displacement_cm": net_disp,
+        "path_length_cm": path_length,
         "tortuosity": tortuosity,
-        "replay_speed_median": _per_event(_nan_safe("map_speed", np.nanmedian)),
-        "replay_speed_p90": _per_event(_nan_safe("map_speed", _p90)),
-        "replay_speed_continuous_median": _per_event(_cont_speed_median),
-        "step_distance_median": _per_event(_nan_safe("step_distance", np.nanmedian)),
-        "step_distance_p90": _per_event(_nan_safe("step_distance", _p90)),
-        "step_distance_max": _per_event(_nan_safe("step_distance", np.nanmax)),
-        "spatial_extent": _per_event(_spatial_extent),
+        "replay_speed_median_cm_s": _per_event(_nan_safe("map_speed", np.nanmedian)),
+        "replay_speed_p90_cm_s": _per_event(_nan_safe("map_speed", _p90)),
+        "replay_speed_continuous_median_cm_s": _per_event(_cont_speed_median),
+        "step_distance_median_cm": _per_event(_nan_safe("step_distance", np.nanmedian)),
+        "step_distance_p90_cm": _per_event(_nan_safe("step_distance", _p90)),
+        "step_distance_max_cm": _per_event(_nan_safe("step_distance", np.nanmax)),
+        "spatial_extent_cm": _per_event(_spatial_extent),
         "n_reversals": _per_event(_n_reversals),
         "pause_fraction": _per_event(_pause_fraction),
         "n_patches_visited": _per_event(_n_patches),
@@ -548,7 +548,7 @@ def trajectory_dynamics(
     baseline = _per_event(lambda g: float(g["run_speed_baseline"].iloc[0]))
     with np.errstate(divide="ignore", invalid="ignore"):
         out["compression_factor"] = np.where(
-            baseline > 0, out["replay_speed_median"] / baseline, np.nan
+            baseline > 0, out["replay_speed_median_cm_s"] / baseline, np.nan
         )
     return ids, out
 
@@ -683,6 +683,6 @@ def compute_trajectory_rollups(
         .apply(lambda s: path_continuity(s.to_numpy(), adj))
         .to_numpy()
     )
-    out["path_continuity"] = pc
+    out["path_continuity_fraction"] = pc
 
     return out

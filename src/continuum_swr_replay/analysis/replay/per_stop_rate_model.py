@@ -2,23 +2,24 @@
 
 Tests whether the NUMBER of replay events per stop depends on
 behavioral context, independently of replay CONTENT. The response is
-``n_events`` (count of non-local events per stop); the offset is
+``n_selected_events`` (count of the table's selected event source per stop); the offset is
 ``log(immobility_time)`` so that coefficients are interpretable as
 multiplicative changes in event rate per second of immobility.
 
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``reward_lag1`` — does the newest outcome physically observable
+- **R1**: + ``known_reward_outcome_lag_1`` — does the newest outcome physically observable
   by bout start change the event rate? (The immediate-switch flag was
   removed: it is often constant within a session's complete-case cohort,
-  making the design rank-deficient.) ``reward_lag1`` is closed at the
+  making the design rank-deficient.) ``known_reward_outcome_lag_1`` is closed at the
   **outcome** clock: pump onset
   when rewarded, otherwise arrival plus ``OMISSION_KNOWN_LATENCY_SEC`` capped
-  at departure. Before an arrived trip reaches that boundary, lag 1 remains
+  at the collapsed task visit's final departure. Before an arrived trip reaches
+  that boundary, lag 1 remains
   the preceding known outcome; afterward it names the arrived trip. It is
   therefore past-only but not a fixed current- or previous-trial index.
-- **R2**: + ``reward_rate_trial_k10`` (rewarded fraction of the
+- **R2**: + ``reward_fraction_last10_known_trials`` (rewarded fraction of the
   last 10 trials) — does event rate track a deeper reward history,
   beyond the single previous trial?
 
@@ -52,10 +53,10 @@ logger = logging.getLogger(__name__)
 # Keeping this beside the fitter lets notebooks and scripts share one mapping
 # instead of independently spelling the stop-table column names.
 PER_STOP_RATE_OUTCOMES: dict[str, str] = {
-    "swr": "n_SWR",
-    "non_local": "n_non_local",
-    "non_local_swr": "n_non_local_SWR",
-    "non_local_no_swr": "n_non_local_no_SWR",
+    "swr": "n_swr_events",
+    "non_local": "n_selected_events",
+    "non_local_swr": "n_nonlocal_swr_events",
+    "non_local_no_swr": "n_nonlocal_non_swr_events",
 }
 
 
@@ -63,8 +64,8 @@ def fit_per_stop_rate_model(
     stop_table: pd.DataFrame,
     predictors: list[str],
     *,
-    response_col: str = "n_events",
-    offset_col: str = "immobility_time",
+    response_col: str = "n_selected_events",
+    offset_col: str = "immobility_duration_s",
     min_stops: int = 20,
 ) -> dict | None:
     """Fit a Poisson GLM on event counts per stop.
@@ -77,7 +78,7 @@ def fit_per_stop_rate_model(
         Columns to use as fixed effects. Empty list fits the
         intercept-only null (R0).
     response_col : str
-        Count column. Default ``n_events``.
+        Count column. Default ``n_selected_events``.
     offset_col : str
         Exposure column — ``log(offset_col)`` enters as an offset.
         Stops with ``offset_col <= 0`` are excluded (single-sample
@@ -186,8 +187,8 @@ def fit_per_stop_rate_model(
 def cross_validate_per_stop_rate_model(
     stop_table: pd.DataFrame,
     predictors: list[str],
-    response_col: str = "n_events",
-    offset_col: str = "immobility_time",
+    response_col: str = "n_selected_events",
+    offset_col: str = "immobility_duration_s",
     n_folds: int = 5,
     min_stops: int = 20,
     seed: int = 0,

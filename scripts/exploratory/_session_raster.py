@@ -5,7 +5,7 @@ between-trial view). Produces two figures for the same session:
   - session_raster_nonlocal.png : non-local w/ SWR (purple) + non-local no-SWR (blue)
 
 Rows = stops in the order they occurred; x = time-since-stop-onset; gray = the stop
-(immobility) window; left strip = reward_outcome (green=rewarded, gray=omitted);
+(immobility) window; left strip = is_rewarded_outcome (green=rewarded, gray=omitted);
 orange lines = patch-switch boundaries (blocks labeled). Event ticks are vlines one
 data-row tall, aligned 1:1 with the shaded window. Auto-picks a representative
 session unless --session animal,day,epoch is given.
@@ -24,16 +24,20 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 RC = P / "replay_content"
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 XMAX = 8.0
 
 
 def predict_marginals(x, y, durv, rl, tbins, rbins, n_folds=5):
-    """Per-session time-resolved Poisson GLM: count ~ bs(t_since_stop, df=4) + reward_lag1,
+    """Per-session time-resolved Poisson GLM: count ~ bs(t_since_stop, df=4) + known_reward_outcome_lag_1,
     offset=log(bin exposure). Returns in-sample AND 5-fold-cross-validated (out-of-fold,
     split by stop) predicted rate marginals, plus the CV Poisson deviance-explained vs a
     null (intercept+offset) model. Marginals are exposure-weighted events/s, comparable to
@@ -121,11 +125,11 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
         ax.text(-0.42, (lo + hi) / 2, f"P{int(cp[lo])}", va="center", ha="center",
                 fontsize=9, color="C1", weight="bold")
     # reward strip + shaded immobility window
-    rcolors = np.where(ss.reward_outcome.to_numpy() == 1, "C2", "0.7")
+    rcolors = np.where(ss.is_rewarded_outcome.to_numpy() == 1, "C2", "0.7")
     ax.barh(ss.row.to_numpy(), 0.12, left=-0.30, height=1.0, color=rcolors, zorder=2)
     ax.plot([], [], marker="s", ls="", color="C2", label="rewarded stop")
     ax.plot([], [], marker="s", ls="", color="0.7", label="omitted stop")
-    ax.barh(ss.row.to_numpy(), ss.immobility_time.clip(upper=XMAX).to_numpy(),
+    ax.barh(ss.row.to_numpy(), ss.immobility_duration_s.clip(upper=XMAX).to_numpy(),
             left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
     # event ticks (raster) + marginals: raw count, or exposure-corrected rate.
     # Rate divides each bin by its available immobile-seconds (top: the stop-window
@@ -135,8 +139,8 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     tbins = np.arange(0, XMAX + 0.2, 0.2)
     rbins = np.arange(0, len(ss) + 15, 15)
     rcz = 0.5 * (rbins[:-1] + rbins[1:])
-    durv = ss.immobility_time.to_numpy()
-    rl = ss.reward_lag1.fillna(0).to_numpy()
+    durv = ss.immobility_duration_s.to_numpy()
+    rl = ss.known_reward_outcome_lag_1.fillna(0).to_numpy()
     rowv = ss.row.to_numpy()
     if rate:
         top_expo = np.array([np.clip(durv - lo, 0, hi - lo).sum()
@@ -179,7 +183,7 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     h, lab = ax.get_legend_handles_labels()
     axleg.legend(h, lab, loc="center", fontsize=8, frameon=False)
     if model and rate:
-        title += ("\nmodel bs(t,df4)+reward_lag1 — solid=empirical, dashed=in-sample, "
+        title += ("\nmodel bs(t,df4)+known_reward_outcome_lag_1 — solid=empirical, dashed=in-sample, "
                   "dotted=CV · " + " · ".join(notes))
     fig.suptitle(title, x=0.5, y=0.998, fontsize=10)
     out = P.parent / ".claude" / "research" / "session_raster_outputs" / out_name
@@ -190,15 +194,19 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
 
 def main() -> None:
     onset = read_table(RC / "event_onset_table.pkl")
-    ev = read_table(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
+    ev = read_table(RC / "event_table.pkl")
+    st = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(onset, table="event_onset")
+    require_covariate_schema(ev, table="event")
+    require_covariate_schema(st, table="stop")
+    ev = ev[["stop_id", "event_start_s", "is_swr"]].copy()
+    ev["rank"] = ev.sort_values("event_start_s").groupby("stop_id").cumcount()
     nl = onset[onset.event_type == "non_local"].copy()
     nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
     nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
     swr = onset[onset.event_type == "SWR"]
     nl_swr = nl[nl.is_swr.eq(True)]
     nl_no = nl[nl.is_swr.eq(False)]
-    st = read_table(RC / "stop_table.pkl")
 
     # pick session: most non-SWR onsets among sessions with 100-700 stops.
     model = "--model" in sys.argv
@@ -208,7 +216,7 @@ def main() -> None:
         a, d, e = posargs[0].split(",")
         key = (a, int(d), e)
     else:
-        nstops = st[st.immobility_time > 0].groupby(SC).size().rename("nstops")
+        nstops = st[st.immobility_duration_s > 0].groupby(SC).size().rename("nstops")
         score = (
             nl_no.groupby(SC).size().rename("nnl").to_frame()
             .join(swr.groupby(SC).size().rename("nswr"))
@@ -220,7 +228,12 @@ def main() -> None:
     a, d, e = key
     print(f"session: {a} {d} {e}")
 
-    ss = st[(st.animal == a) & (st.day == d) & (st.epoch == e) & (st.immobility_time > 0)]
+    ss = st[
+        (st.animal == a)
+        & (st.session_date == d)
+        & (st.epoch == e)
+        & (st.immobility_duration_s > 0)
+    ]
     ss = ss.sort_values("stop_start").reset_index(drop=True)
     ss["row"] = np.arange(len(ss))
     row = ss.set_index("stop_id")["row"]

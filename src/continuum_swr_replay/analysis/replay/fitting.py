@@ -397,8 +397,8 @@ def fit_conditional_logit(
         return None
 
     arm_col = (
-        "arm"
-        if "arm" in long_df.columns
+        "candidate_arm"
+        if "candidate_arm" in long_df.columns
         else "arm_id"
         if "arm_id" in long_df.columns
         else None
@@ -542,8 +542,9 @@ def _warn_on_collinear_design(diagnostics: dict, predictors: list[str]) -> None:
     """Log when a design's coefficients should not be read separately.
 
     Warns rather than raises. Some collinearity here is structural and
-    intended -- ``arm_never_visited`` is 1 exactly where the pre-centering
-    ``visit_recency`` is maximal, so M4 carries the two together on purpose --
+    intended -- ``is_candidate_arm_never_visited`` is 1 exactly where the
+    pre-centering candidate-arm visit recency is maximal, so M4 carries the
+    two together on purpose --
     and refusing to fit would remove the rung rather than qualify it. The
     point is that the joint step stays interpretable while the individual
     coefficients do not, which is a reader's problem, not the fitter's.

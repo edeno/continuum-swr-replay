@@ -79,14 +79,14 @@ warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
 
 
 def convert_dio_events_to_start_stop_times(
-    event: pd.DataFrame, event_name: str
+    event: pd.Series | pd.DataFrame, event_name: str
 ) -> pd.DataFrame:
     """Convert DIO events to start/stop time format.
 
     Parameters
     ----------
-    event : pd.DataFrame
-        Event data with time index
+    event : pandas.Series or pandas.DataFrame
+        One DIO channel with a time index
     event_name : str
         Name of the event
 
@@ -96,14 +96,36 @@ def convert_dio_events_to_start_stop_times(
         DataFrame with start_time, end_time, event_name, and event_number columns
 
     """
-    start_indices = event.astype(bool).to_numpy().nonzero()[0]
-    end_indices = start_indices + 1
-    end_indices[end_indices >= len(event)] = len(event) - 1
+    values = np.asarray(event)
+    if values.ndim == 2 and values.shape[1] == 1:
+        values = values[:, 0]
+    if values.ndim != 1:
+        raise ValueError("one DIO channel must be a one-dimensional signal")
+    numeric = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+    if not np.isfinite(numeric).all() or not np.isin(numeric, (0.0, 1.0)).all():
+        raise ValueError("DIO channel values must be finite binary 0/1 samples")
+    timestamps = pd.to_numeric(pd.Index(event.index), errors="coerce").to_numpy(
+        dtype=float
+    )
+    if not np.isfinite(timestamps).all() or (
+        len(timestamps) > 1 and np.any(np.diff(timestamps) <= 0.0)
+    ):
+        raise ValueError("DIO timestamps must be finite and strictly increasing")
+
+    active = numeric.astype(bool)
+    start_indices = np.flatnonzero(active & ~np.r_[False, active[:-1]])
+    falling_indices = np.flatnonzero(~active & np.r_[False, active[:-1]])
+    end_indices = np.empty(len(start_indices), dtype=np.int64)
+    for event_number, start_index in enumerate(start_indices):
+        later_falls = falling_indices[falling_indices > start_index]
+        end_indices[event_number] = (
+            int(later_falls[0]) if later_falls.size else len(active) - 1
+        )
 
     event_times = pd.DataFrame(
         {
-            "start_time": event.iloc[start_indices].index,
-            "end_time": event.iloc[end_indices].index,
+            "start_time": timestamps[start_indices],
+            "end_time": timestamps[end_indices],
             "event_name": event_name,
             "event_number": np.arange(len(start_indices)) + 1,
         },

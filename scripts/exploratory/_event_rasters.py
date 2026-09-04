@@ -19,6 +19,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
@@ -29,8 +32,13 @@ N_ROWS = 1500  # stops sampled for the raster
 
 def main() -> None:
     onset = read_table(RC / "event_onset_table.pkl")
-    ev = read_table(RC / "event_table.pkl")[["stop_id", "event_start", "is_swr"]].copy()
-    ev["rank"] = ev.sort_values("event_start").groupby("stop_id").cumcount()
+    ev = read_table(RC / "event_table.pkl")
+    st = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(onset, table="event_onset")
+    require_covariate_schema(ev, table="event")
+    require_covariate_schema(st, table="stop")
+    ev = ev[["stop_id", "event_start_s", "is_swr"]].copy()
+    ev["rank"] = ev.sort_values("event_start_s").groupby("stop_id").cumcount()
     nl = onset[onset.event_type == "non_local"].copy()
     nl["rank"] = nl.sort_values("onset_time").groupby("stop_id").cumcount()
     nl = nl.merge(ev[["stop_id", "rank", "is_swr"]], on=["stop_id", "rank"], how="left")
@@ -39,8 +47,8 @@ def main() -> None:
         "SWR": onset[onset.event_type == "SWR"],
         "non-local NO SWR": nl[nl.is_swr.eq(False)],
     }
-    st = read_table(RC / "stop_table.pkl")[["stop_id", "immobility_time"]]
-    dur = st.set_index("stop_id")["immobility_time"]
+    st = st[["stop_id", "immobility_duration_s"]]
+    dur = st.set_index("stop_id")["immobility_duration_s"]
 
     # Sample stops that have >=1 onset of either population, sorted by duration.
     have = pd.Index(pops["SWR"].stop_id.unique()).union(pops["non-local NO SWR"].stop_id.unique())

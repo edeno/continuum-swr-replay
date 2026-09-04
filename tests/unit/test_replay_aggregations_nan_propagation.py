@@ -42,7 +42,7 @@ class TestStopPatchReplayNaNPropagation:
                     "epoch": "02_r1",
                     "event_id": 1,
                     "stop_id": 10,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_fraction": 1.0 / 9,
                     "residual_frac": np.nan,
                     "current_patch": 1,
@@ -67,8 +67,8 @@ class TestStopPatchReplayNaNPropagation:
         # User repro: ``current_patch`` is NaN for the only event,
         # so "current vs non-current" is undefined. The pre-fix code
         # made ``is_cp == False`` everywhere (NaN == anything is
-        # False), reporting ``replay_frac_current_patch == 0.0`` and
-        # piling the entire replay fraction into ``replay_frac_noncurrent``.
+        # False), reporting ``replay_fraction_current_patch == 0.0`` and
+        # piling the entire replay fraction into ``replay_fraction_noncurrent``.
         eat = pd.DataFrame(
             [
                 {
@@ -77,7 +77,7 @@ class TestStopPatchReplayNaNPropagation:
                     "epoch": "02_r1",
                     "event_id": 1,
                     "stop_id": 10,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_fraction": 1.0 / 9,
                     "current_patch": np.nan,
                 }
@@ -98,13 +98,13 @@ class TestStopPatchReplayNaNPropagation:
         out = stop_patch_replay(eat, et)
         # Both patch-relative summaries undefined when current_patch
         # is missing.
-        assert out["replay_frac_current_patch"].isna().all(), (
-            "replay_frac_current_patch should be NaN when current_patch "
-            f"is missing; got {out['replay_frac_current_patch'].tolist()}"
+        assert out["replay_fraction_current_patch"].isna().all(), (
+            "replay_fraction_current_patch should be NaN when current_patch "
+            f"is missing; got {out['replay_fraction_current_patch'].tolist()}"
         )
-        assert out["replay_frac_noncurrent"].isna().all(), (
-            f"replay_frac_noncurrent collapsed to "
-            f"{out['replay_frac_noncurrent'].tolist()} for an event with "
+        assert out["replay_fraction_noncurrent"].isna().all(), (
+            f"replay_fraction_noncurrent collapsed to "
+            f"{out['replay_fraction_noncurrent'].tolist()} for an event with "
             "missing current_patch — should be NaN, not the full "
             "replay fraction routed to non-current."
         )
@@ -112,13 +112,13 @@ class TestStopPatchReplayNaNPropagation:
     def test_all_nan_residuals_propagate_nan_to_per_stop_value(self):
         eat, et = self._eat_one_event_all_nan_residuals()
         out = stop_patch_replay(eat, et)
-        # The crucial property: ``replay_frac_residual_noncurrent``
+        # The crucial property: ``replay_fraction_residual_noncurrent``
         # must be NaN, not 0.0, for a stop whose only event was
         # dropped under the event-wise residual filter.
-        assert out["replay_frac_residual_noncurrent"].isna().all(), (
+        assert out["replay_fraction_residual_noncurrent"].isna().all(), (
             "stop_patch_replay materialised a fabricated 0.0 for a "
             f"stop whose only event had all-NaN residuals: "
-            f"{out['replay_frac_residual_noncurrent'].tolist()}"
+            f"{out['replay_fraction_residual_noncurrent'].tolist()}"
         )
 
 
@@ -136,7 +136,7 @@ class TestChosenPatchFractionNaNPropagation:
                     "day": 20200101,
                     "epoch": "02_r1",
                     "event_id": 1,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     # NaN on target-patch arms; arbitrary value on others.
                     "arm_fraction": np.nan if arm in target_arms else 0.0,
                 }
@@ -177,7 +177,7 @@ class TestChosenPatchFractionNaNPropagation:
                     "day": 20200101,
                     "epoch": "02_r1",
                     "event_id": 1,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     # Only arms 4, 5 (patch 3) — no patch-1 rows at all.
                     "arm_fraction": 0.5,
                 }
@@ -206,7 +206,7 @@ class TestChosenPatchFractionNaNPropagation:
     def test_empty_event_arm_table_yields_nan(self):
         eat = pd.DataFrame(
             columns=[
-                "animal", "day", "epoch", "event_id", "arm", "arm_fraction",
+                "animal", "day", "epoch", "event_id", "candidate_arm", "arm_fraction",
             ]
         )
         et = pd.DataFrame(
@@ -237,7 +237,7 @@ class TestChosenPatchFractionNaNPropagation:
                     "day": 20200101,
                     "epoch": "02_r1",
                     "event_id": 1,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_fraction": 0.0 if arm in target_arms else 0.5,
                 }
                 for arm in range(9)

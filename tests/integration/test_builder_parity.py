@@ -28,6 +28,9 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZED_COLS
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     load_reference,
@@ -45,10 +48,15 @@ _QVALS = _RC / "models_per_bin_rate" / "qvals_table.pkl"
 _QVALS_REF = _RC / "models_per_bin_rate" / "qvals_standardization_reference.json"
 
 
-def _require(path: Path):
+def _require(path: Path, *, table: str):
     if not table_exists(path):
         pytest.skip(f"materialized table not present: {path}")
-    return read_table(path)
+    frame = read_table(path)
+    try:
+        require_covariate_schema(frame, table=table)
+    except ValueError as error:
+        pytest.skip(f"materialized table requires canonical regeneration: {error}")
+    return frame
 
 
 @pytest.mark.parametrize(
@@ -57,7 +65,8 @@ def _require(path: Path):
 )
 def test_folded_standardization_reproduces_materialized_z(path, cols):
     """Recomputing the scientific reference gives the materialized transform."""
-    df = _require(path)
+    table = "event_arm" if path == _EVENT_ARM else "qvals"
+    df = _require(path, table=table)
     cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
     assert cols, f"no standardized columns to check in {path.name}"
     if path == _EVENT_ARM:
@@ -75,7 +84,7 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
         recomputed, _ = attach_standardized(
             df[cols].copy(),
             cols,
-            support_mask=df["arm"].isin(range(6)),
+            support_mask=df["candidate_arm"].isin(range(6)),
             support_label="leaf_arms",
         )
     else:
@@ -101,7 +110,8 @@ def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, col
     raw columns and match the materialized _z within atol=1e-10. Skips (does not pass)
     until the operational rebuild has written the reference — so an absent/stale
     reference cannot silently pass."""
-    df = _require(table_path)
+    table = "event_arm" if table_path == _EVENT_ARM else "qvals"
+    df = _require(table_path, table=table)
     if not ref_path.exists():
         pytest.skip(
             f"reference not written yet: {ref_path} (run the full builder rebuild)"
@@ -137,7 +147,7 @@ def test_frozen_reference_matches_on_one_session_slice():
     """F5: a full-table reference applied to ONE session's raw rows matches the
     materialized _z for those rows — a per-session recompute would NOT (different
     mean/SD). Uses the persisted reference when available, else the table-derived one."""
-    df = _require(_EVENT_ARM)
+    df = _require(_EVENT_ARM, table="event_arm")
     cols = [
         c for c in EVENT_ARM_STANDARDIZED_COLS
         if c in df.columns and f"{c}_z" in df.columns
@@ -156,11 +166,11 @@ def test_frozen_reference_matches_on_one_session_slice():
         _, reference = attach_standardized(
             df[cols].copy(),
             cols,
-            support_mask=df["arm"].isin(range(6)),
+            support_mask=df["candidate_arm"].isin(range(6)),
             support_label="leaf_arms",
         )
 
-    session_cols = ["animal", "day", "epoch"]
+    session_cols = ["animal", "session_date", "epoch"]
     first_key = df[session_cols].drop_duplicates().iloc[0]
     mask = (df[session_cols] == first_key).all(axis=1).to_numpy()
     slice_raw = df.loc[mask, cols].copy()

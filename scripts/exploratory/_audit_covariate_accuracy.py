@@ -8,9 +8,11 @@ characterizes what the fit drops. Run from the repo root:
     uv run python scripts/exploratory/_audit_covariate_accuracy.py
 
 Checks:
-  #1a Calibration -- nominal ``p_reward_current`` vs the *independent* DIO
-      ``reward_outcome`` (at-well stops). Aligned -> empirical tracks nominal.
-  #1b Behavioral validity -- model ``switch_advantage`` (ΔV) vs the animal's
+  #1a Calibration -- nominal ``task_reward_probability_chosen_arm`` vs the
+      *independent* DIO ``is_rewarded_outcome`` (at-well stops). Aligned ->
+      empirical tracks nominal.
+  #1b Behavioral validity -- model
+      ``relative_value_switch_minus_stay_preoutcome`` (ΔV) vs the animal's
       *actual* switch/stay. Correct + aligned -> ΔV higher on switch trials.
   #2  Leakage exposure -- fraction of events preceding reward delivery
       (``t_since_pump`` < 0), which would make post-outcome covariates
@@ -21,12 +23,12 @@ Checks:
       covariate / animal / within-epoch position.
 
 Non-RL covariates (the models fit far more than the qvals block):
-  - spatial ``current_arm`` cross-source agreement (event_arm vs stop_table);
+  - spatial ``occupancy_well_arm`` cross-source agreement (event-arm vs stop);
   - decode content (``arm_fraction_posterior`` / ``arm_fraction``) normalization
     + junction-bin / NaN integrity.
 Reward-kernel covariates are trial-referenced and covered by the invariant
 verifier + the #1a calibration (see _nonrl_checks docstring).
-  - reward_rate_arm_k10 independent reconstruction vs the stored column, gated
+  - prior-visit candidate-arm reward-fraction reconstruction vs the stored column, gated
     behind ``--reconstruct-arm-rate N`` (needs Spyglass trials; slow).
 
 Diagnostic (prints a report); does not exit non-zero.
@@ -42,6 +44,9 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -58,24 +63,32 @@ def _fur():
 
 
 def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:
-    key = df["animal"] + "_" + df["day"].astype(str) + "_" + df["epoch"]
+    key = (
+        df["animal"]
+        + "_"
+        + df["session_date"].astype(str)
+        + "_"
+        + df["epoch"]
+    )
     return df.assign(_k=key).groupby("_k")["stop_idx"].rank(pct=True)
 
 
 def main(reconstruct_n: int = 0) -> None:
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     st = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(q, table="qvals")
+    require_covariate_schema(st, table="stop")
     fur = _fur()
 
     # ---- #1a calibration: nominal p vs independent DIO reward ----
-    aw = q[["stop_id", "p_reward_current", "in_poke"]].merge(
-        st[["stop_id", "reward_outcome"]], on="stop_id", how="left"
+    aw = q[["stop_id", "task_reward_probability_chosen_arm", "in_poke"]].merge(
+        st[["stop_id", "is_rewarded_outcome"]], on="stop_id", how="left"
     )
     aw = aw[aw["in_poke"]].copy()
-    aw["reward_outcome"] = aw["reward_outcome"].astype(float)
-    cal = aw.groupby("p_reward_current")["reward_outcome"].agg(["size", "mean"])
+    aw["is_rewarded_outcome"] = aw["is_rewarded_outcome"].astype(float)
+    cal = aw.groupby("task_reward_probability_chosen_arm")["is_rewarded_outcome"].agg(["size", "mean"])
     x, y = cal.index.to_numpy(), cal["mean"].to_numpy()
-    print("=== #1a p_reward_current calibration vs DIO reward (at-well) ===")
+    print("=== #1a task_reward_probability_chosen_arm calibration vs DIO reward (at-well) ===")
     print(cal.round(3).to_string())
     print(
         f"  slope(emp~nominal)={np.polyfit(x, y, 1)[0]:.2f} (expect ~1.0), "
@@ -84,16 +97,16 @@ def main(reconstruct_n: int = 0) -> None:
 
     # ---- #1b ΔV predicts actual switch ----
     dv = (
-        q[["stop_id", "switch_advantage_mu_preoutcome_sess"]]
+        q[["stop_id", "relative_value_switch_minus_stay_preoutcome"]]
         .merge(st[["stop_id", "is_stay", "animal"]], on="stop_id", how="left")
-        .dropna(subset=["switch_advantage_mu_preoutcome_sess", "is_stay"])
+        .dropna(subset=["relative_value_switch_minus_stay_preoutcome", "is_stay"])
     )
     dv["is_switch"] = (~dv["is_stay"].astype(bool)).astype(float)
-    print("\n=== #1b ΔV (switch_advantage) predicts actual switch ===")
+    print("\n=== #1b ΔV (switch minus stay value) predicts actual switch ===")
     print(f"  {'animal':8s} {'n':>6s} {'dV|switch':>10s} {'dV|stay':>9s} {'r_pb':>7s}")
     for a, g in dv.groupby("animal"):
         v, s = (
-            g["switch_advantage_mu_preoutcome_sess"].to_numpy(),
+            g["relative_value_switch_minus_stay_preoutcome"].to_numpy(),
             g["is_switch"].to_numpy(),
         )
         r = np.corrcoef(v, s)[0, 1] if g["is_switch"].nunique() > 1 else np.nan
@@ -104,6 +117,7 @@ def main(reconstruct_n: int = 0) -> None:
 
     # ---- #2 leakage exposure ----
     ons = read_table(RC / "event_onset_table.pkl")
+    require_covariate_schema(ons, table="event_onset")
     rew = ons[ons["is_reward_stop"]]
     tsp = rew["t_since_pump"].dropna()
     print("\n=== #2 leakage exposure (events vs reward pump) ===")
@@ -129,10 +143,8 @@ def main(reconstruct_n: int = 0) -> None:
 
     # ---- #6b complete-case drop over fitted covariates ----
     stc = add_uncertainty_covariates(st)  # keeps animal/day/epoch/stop_idx from st
-    qcols = ["stop_id", *fur.VALUE_COVARIATES, "rpe", *fur.RL_COVARIATES]
-    d = stc.merge(
-        q[qcols].rename(columns={"rpe": "rpe_model"}), on="stop_id", how="inner"
-    )
+    qcols = ["stop_id", *fur.VALUE_COVARIATES, "rpe_postoutcome", *fur.RL_COVARIATES]
+    d = stc.merge(q[qcols], on="stop_id", how="inner")
     fitted = [c for c in fur.FITTED_COVARIATES if c in d]
     anynan = d[fitted].isna().any(axis=1)
     d["pos"] = _within_epoch_pos(d)
@@ -156,7 +168,7 @@ def main(reconstruct_n: int = 0) -> None:
 
 
 def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
-    """Independently reconstruct reward_rate_arm_k10 vs the stored column (Spyglass).
+    """Independently reconstruct candidate-arm prior-visit reward fraction.
 
     The per-arm rolling reward rate is trial-referenced (rewarded fraction of the
     last 10 visits to that arm), so a faithful check needs the trials table -- this
@@ -171,20 +183,29 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
 
     ea = read_table(RC / "event_arm_table.pkl")
     et = read_table(RC / "event_table.pkl")
-    tcol = next(c for c in et.columns if "midpoint" in c and "time" in c)
+    require_covariate_schema(ea, table="event_arm")
+    require_covariate_schema(et, table="event")
+    tcol = "event_midpoint_s"
     ea = ea.merge(
         et[["event_id", tcol]].rename(columns={tcol: "t"}), on="event_id", how="left"
     )
     print(
-        f"\n=== non-RL: reward_rate_arm_k10 independent reconstruction "
+        f"\n=== non-RL: candidate-arm reward-fraction reconstruction "
         f"({n_sessions} session(s), Spyglass) ==="
     )
     for _, s in (
-        ea[["animal", "day", "epoch"]].drop_duplicates().head(n_sessions).iterrows()
+        ea[["animal", "session_date", "epoch"]]
+        .drop_duplicates()
+        .head(n_sessions)
+        .iterrows()
     ):
-        sub = ea[(ea.animal == s.animal) & (ea.day == s.day) & (ea.epoch == s.epoch)]
+        sub = ea[
+            (ea.animal == s.animal)
+            & (ea.session_date == s.session_date)
+            & (ea.epoch == s.epoch)
+        ]
         d = load_data(
-            f"{s.animal}{int(s.day)}_.nwb",
+            f"{s.animal}{int(s.session_date)}_.nwb",
             s.epoch,
             include=frozenset({SessionDataKeys.TRIALS}),
         )
@@ -202,8 +223,8 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
         )
         reach = set(w2a.values())
         vis = {a: (cut[arm_of == a], rew[arm_of == a]) for a in range(9)}
-        got = sub["reward_rate_arm_k10"].to_numpy()
-        arms, ts = sub["arm"].to_numpy(), sub["t"].to_numpy()
+        got = sub["reward_fraction_candidate_arm_last10_visits"].to_numpy()
+        arms, ts = sub["candidate_arm"].to_numpy(), sub["t"].to_numpy()
         exp = np.full(len(sub), np.nan)
         for i in range(len(sub)):
             a, t = int(arms[i]), ts[i]
@@ -224,7 +245,7 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
         )
         nanm = (np.isnan(got) == np.isnan(exp)).mean()
         print(
-            f"  {s.animal} {int(s.day)} {s.epoch}: value-agree {100 * agree:.2f}% "
+            f"  {s.animal} {int(s.session_date)} {s.epoch}: value-agree {100 * agree:.2f}% "
             f"(n={both.sum()}), NaN-pattern {100 * nanm:.2f}%"
         )
 
@@ -232,25 +253,32 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
 def _nonrl_checks(st: pd.DataFrame) -> None:
     """Non-RL covariate ground-truth: the models fit far more than the qvals block.
 
-    Note: reward-kernel covariates (reward_lag{k}, last_rewarded_arm, is_after_*)
+    Note: reward-kernel covariates (known_reward_outcome_lag_{k},
+    last_rewarded_arm, and outcome indicators)
     are TRIAL-referenced (built from the trials table, not the stop sequence), and
     are already covered by _verify_covariate_invariants (reward_lag in {0,1},
-    reward_rate == mean(reward_lag1..10)) plus the #1a DIO-reward calibration of
-    their atom (reward_outcome). Checking them here against a stop-sequence oracle
+    reward fraction == mean(known_reward_outcome_lag_1..10)) plus the #1a
+    DIO-reward calibration of their atom (is_rewarded_outcome). Checking them
+    here against a stop-sequence oracle
     would mismatch on grain, not correctness -- so they are intentionally omitted.
     """
     ea = read_table(RC / "event_arm_table.pkl")
+    require_covariate_schema(ea, table="event_arm")
     print(
-        "\n=== non-RL: spatial current_arm cross-source (event_arm vs stop_table) ==="
+        "\n=== non-RL: occupancy_well_arm cross-source (event_arm vs stop_table) ==="
     )
     m = (
-        ea[["stop_id", "current_arm"]]
+        ea[["stop_id", "occupancy_well_arm"]]
         .drop_duplicates()
-        .merge(st[["stop_id", "current_arm"]], on="stop_id", suffixes=("_ea", "_st"))
+        .merge(
+            st[["stop_id", "occupancy_well_arm"]],
+            on="stop_id",
+            suffixes=("_ea", "_st"),
+        )
         .dropna()
     )
     print(
-        f"  agree {100 * (m['current_arm_ea'] == m['current_arm_st']).mean():.2f}% "
+        f"  agree {100 * (m['occupancy_well_arm_ea'] == m['occupancy_well_arm_st']).mean():.2f}% "
         f"(n={len(m)}); position-derived arm consistent across builders"
     )
 
@@ -269,7 +297,7 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
     )
     print(
         f"  arm_fraction_posterior NaN uniform per event (all-or-none): "
-        f"{100 * uni.mean():.1f}%; arm range {int(ea['arm'].min())}..{int(ea['arm'].max())} (must be 0..8)"
+        f"{100 * uni.mean():.1f}%; arm range {int(ea['candidate_arm'].min())}..{int(ea['candidate_arm'].max())} (must be 0..8)"
     )
 
 
@@ -280,7 +308,7 @@ if __name__ == "__main__":
         type=int,
         default=0,
         metavar="N",
-        help="also reconstruct reward_rate_arm_k10 on N sessions (Spyglass; slow)",
+        help="also reconstruct candidate-arm reward fraction on N sessions (Spyglass; slow)",
     )
     args = ap.parse_args()
     main(reconstruct_n=args.reconstruct_arm_rate)

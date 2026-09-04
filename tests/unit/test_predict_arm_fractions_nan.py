@@ -33,8 +33,8 @@ def _three_arm_event_table_with_nan_predictor() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "event_id": [1, 1, 1],
-            "arm": [0, 1, 2],
-            "is_current": [1.0, np.nan, 0.0],  # NaN at arm=1
+            "candidate_arm": [0, 1, 2],
+            "is_occupancy_well_arm": [1.0, np.nan, 0.0],  # NaN at arm=1
             "arm_fraction": [0.4, 0.3, 0.3],
         }
     )
@@ -47,8 +47,8 @@ def _two_event_table_one_clean_one_nan() -> pd.DataFrame:
         for arm, p in enumerate(predictor_vals):
             rows.append({
                 "event_id": event_id,
-                "arm": arm,
-                "is_current": p,
+                "candidate_arm": arm,
+                "is_occupancy_well_arm": p,
                 "arm_fraction": 0.5 if arm == 0 else 0.25,
             })
     return pd.DataFrame(rows)
@@ -58,7 +58,9 @@ class TestPredictArmFractionsNaN:
     def test_event_with_nan_predictor_is_dropped(self):
         eat = _three_arm_event_table_with_nan_predictor()
         out = predict_arm_fractions(
-            eat, fit_result={"coef_is_current": 0.0}, predictors=["is_current"]
+            eat,
+            fit_result={"coef_is_occupancy_well_arm": 0.0},
+            predictors=["is_occupancy_well_arm"],
         )
         # All three rows belong to the NaN event ⇒ all NaN, no
         # spurious 0.5/0.5 split over the surviving arms.
@@ -68,7 +70,9 @@ class TestPredictArmFractionsNaN:
     def test_clean_event_unaffected_when_paired_with_nan_event(self):
         eat = _two_event_table_one_clean_one_nan()
         out = predict_arm_fractions(
-            eat, fit_result={"coef_is_current": 0.0}, predictors=["is_current"]
+            eat,
+            fit_result={"coef_is_occupancy_well_arm": 0.0},
+            predictors=["is_occupancy_well_arm"],
         )
         clean = out[out["event_id"] == 1]
         nan_evt = out[out["event_id"] == 2]
@@ -95,24 +99,24 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
                 {
                     "event_id": 1,
                     "stop_id": 10,
-                    "arm": arm,
-                    "is_current": (np.nan if arm == 3 else 0.0),
+                    "candidate_arm": arm,
+                    "is_occupancy_well_arm": (np.nan if arm == 3 else 0.0),
                     "arm_fraction": 1.0 / 9,
-                    "visit_recency": 0.0,
-                    "arm_never_visited": 0.0,
-                    "cumulative_reward": 0.0,
-                    "reward_rate_arm_k10": 0.0,
-                    "q_arm": 0.5,
-                    "p_reward_arm": 0.5,
-                    "dist_to_arm": 0.0, "arm_dist_rank": 0.0,
-                    "is_same_patch": 0,
+                    "visit_recency_trials": 0.0,
+                    "is_candidate_arm_never_visited": 0.0,
+                    "reward_count_candidate_arm_last10_known_trials": 0.0,
+                    "reward_fraction_candidate_arm_last10_visits": 0.0,
+                    "reward_belief_mean_candidate_arm_preoutcome": 0.5,
+                    "task_reward_probability_candidate_arm": 0.5,
+                    "distance_to_candidate_arm_cm": 0.0, "candidate_arm_distance_rank": 0.0,
+                    "is_same_patch_as_current": 0,
                     "current_patch": 1,
                 }
                 for arm in range(9)
             ]
         )
         et = pd.DataFrame(
-            [{"event_id": 1, "current_patch": 1, "is_after_switch": 0}]
+            [{"event_id": 1, "current_patch": 1, "did_last_completed_trip_switch_patch": 0}]
         )
         st = pd.DataFrame(
             [
@@ -120,15 +124,13 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
                     "stop_id": 10,
                     "has_replay": True,
                     "next_arm": 0,
-                    "current_arm": 5,
-                    "location_state": "at_well",
+                    "occupancy_well_arm": 5,
+                    "occupancy_state": "at_well",
                     "at_well": True,
-                    "n_events": 1,
-                    "reward_outcome": 1.0,
-                    "is_after_reward": 1.0,
-                    "is_after_omission": 0.0,
+                    "n_selected_events": 1,
+                    "is_rewarded_outcome": 1.0,
                     "animal": "m",
-                    "day": 20200101,
+                    "session_date": 20200101,
                     "epoch": "02_r1",
                 }
             ]
@@ -141,13 +143,13 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
             event_table=tables["event_table"],
             event_arm_table=tables["event_arm_table"],
             stop_table=tables["stop_table"],
-            content_fit={"coef_is_current": 0.0},
-            content_predictors=["is_current"],
+            content_fit={"coef_is_occupancy_well_arm": 0.0},
+            content_predictors=["is_occupancy_well_arm"],
         )
         # Every arm in the only stop should carry NaN — no fabricated
         # zero. (If ``fillna(0.0)`` had run, every row would be 0.0.)
         if len(out) > 0:
-            assert out["replay_frac_residual"].isna().all(), (
+            assert out["replay_fraction_residual"].isna().all(), (
                 "build_residualized_choice_dataset filled NaN residuals "
                 "with 0.0 — that defeats the event-wise NaN filter"
             )
@@ -163,23 +165,23 @@ class TestFitChoiceModelStopLevelNaN:
         rows_a = [
             {
                 "stop_id": 100,
-                "arm": arm,
+                "candidate_arm": arm,
                 "chosen": int(arm == 0),
-                "visit_recency": float(arm),
-                "cumulative_reward": 0.0,
-                "is_same_patch": float(arm < 5),
+                "visit_recency_trials": float(arm),
+                "reward_count_candidate_arm_last10_known_trials": 0.0,
+                "is_same_patch_as_current": float(arm < 5),
             }
             for arm in range(9)
         ]
         rows_b = [
             {
                 "stop_id": 200,
-                "arm": arm,
+                "candidate_arm": arm,
                 "chosen": int(arm == 1),
                 # NaN at arm=3 of stop B.
-                "visit_recency": (np.nan if arm == 3 else float(arm)),
-                "cumulative_reward": 0.0,
-                "is_same_patch": float(arm < 5),
+                "visit_recency_trials": (np.nan if arm == 3 else float(arm)),
+                "reward_count_candidate_arm_last10_known_trials": 0.0,
+                "is_same_patch_as_current": float(arm < 5),
             }
             for arm in range(9)
         ]
@@ -199,11 +201,11 @@ class TestFitChoiceModelStopLevelNaN:
                         [
                             {
                                 "stop_id": stop_id,
-                                "arm": arm,
+                                "candidate_arm": arm,
                                 "chosen": int(arm == 0),
-                                "visit_recency": float(arm),
-                                "cumulative_reward": 0.0,
-                                "is_same_patch": float(arm < 5),
+                                "visit_recency_trials": float(arm),
+                                "reward_count_candidate_arm_last10_known_trials": 0.0,
+                                "is_same_patch_as_current": float(arm < 5),
                             }
                             for arm in range(9)
                         ]
@@ -213,7 +215,7 @@ class TestFitChoiceModelStopLevelNaN:
             )
 
         out = fit_choice_model(
-            choice_df, predictors=["visit_recency"], stop_col="stop_id"
+            choice_df, predictors=["visit_recency_trials"], stop_col="stop_id"
         )
         # Either the fit succeeded or returned None — both are fine
         # here. The crucial behavioral guarantee is that stop 200

@@ -19,6 +19,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_keys,
@@ -31,43 +32,39 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
 from ..replay._helpers import (
-    add_trial_context,
     align_count_matrix,
     align_posterior_to_dot,
     arm_to_patch,
     assert_event_label_alignment,
     assert_single_session_alignment,
     assign_bout,
-    attach_contingency_value_block,
-    build_well_to_arm_map,
-    eq_indicator,
-    eq_indicator_or_nan,
     hash_stop_id,
     immobility_bout_intervals,
     nearest_well_distance_cm,
-    recent_trial_reward_rate,
     safe_mode,
     single_arm_from_well,
     strict_first,
-    summarize_behavioral_location,
     time_since_stop,
 )
+from ..replay.covariate_registry import stamp_covariate_schema
 from ..replay.covariates import (
-    center_visit_recency_within_event,
-    cumulative_reward_all_events,
-    recent_reward_rate_all_events,
-    spline_visit_recency_within_event,
-    visit_recency_and_never_visited_all_events,
+    add_trial_context,
+    recent_trial_reward_rate,
+    summarize_behavioral_location,
 )
-from ..replay.model_specs import RECENCY_SPLINE_COLUMNS
-from ..replay.spatial import arm_dist_rank, dist_to_arm_from_well
-from ..replay.spatial_mapping import arm_to_well, map_estimate_to_arm
+from ..replay.covariates.candidate_arm import (
+    attach_candidate_arm_covariates,
+    broadcast_candidate_arms,
+)
+from ..replay.spatial_mapping import map_estimate_to_arm
 from ..replay.summaries import (
     arm_count_hard,
     arm_count_soft,
+    arm_fraction_from_event_total,
     arm_posterior_mass,
     posterior_to_arm_marginal,
 )
+from ..replay.table_contracts import validate_event_arm_table
 from ..replay.trajectory import (
     SHARED_TRAJECTORY_COLUMNS,
     compute_trajectory_rollups,
@@ -137,7 +134,7 @@ def _in_contfrag_event_mask(
     which owns the repo-wide definition. What was once a ContFrag-local
     choice — all-immobile rather than per-timebin or endpoints, so that
     movement-spanning events cannot straddle two immobility bouts and
-    break ``Σ stop.n_events == len(event_table)`` — is now the shared rule
+    break ``Σ stop.n_selected_events == len(event_table)`` — is now the shared rule
     for every event source. The degenerate multi-second ``MUA_event``
     labels in ``docs/known_issues/degenerate_mua_events.md`` are the
     motivating case.
@@ -173,7 +170,7 @@ def _hash_contfrag_event_id(
     event_source: str = "SWR",
     brain_area: str = "HPC",
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, event_label)``.
+    """63-bit stable hash of ``(animal, session_date, epoch, event_label)``.
 
     ``event_source`` and ``brain_area`` are mixed into the hash so a
     SWR/HPC event with label 7 and a MUA/HPC event with label 7 (or
@@ -182,7 +179,11 @@ def _hash_contfrag_event_id(
     every join keyed by ``event_id``.
     """
     event_col = _resolve_event_col(event_source)
-    keys = events[["animal", "day", "epoch", event_col]].copy()
+    # Read the session-date column by value; ``pd.util.hash_pandas_object``
+    # ignores column labels, so the id is identical whether the frame spells
+    # it ``session_date`` (canonical) or ``day`` (raw intermediate).
+    date_col = "session_date" if "session_date" in events.columns else "day"
+    keys = events[["animal", date_col, "epoch", event_col]].copy()
     keys["__event_source"] = event_source
     keys["__brain_area"] = brain_area
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
@@ -239,6 +240,7 @@ def build_contfrag_event_table(
     dot: pd.DataFrame,
     env,
     trials: pd.DataFrame,
+    port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
@@ -259,6 +261,10 @@ def build_contfrag_event_table(
     trials : pd.DataFrame
         Trial frame with ``start_time``, ``end_time``, ``to_well``,
         ``from_well``, ``is_reward``, ``is_patch_change``.
+    port_experiences : pd.DataFrame
+        Complete starting-port-plus-destinations occupancy stream. Visit
+        covariates use every occupancy; reward covariates use only observed
+        outcomes.
     track_graph : nx.Graph
         Session track graph.
     event_source : {"SWR", "MUA"}
@@ -294,7 +300,7 @@ def build_contfrag_event_table(
         if other_event_col in dot.columns
         else set()
     )
-    dot = add_trial_context(dot, trials)
+    dot = add_trial_context(dot, trials, port_experiences)
     dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
@@ -304,9 +310,9 @@ def build_contfrag_event_table(
     in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
     ev = dot.loc[in_event]
 
-    column_order = _contfrag_event_table_columns(event_source)
+    column_order = _contfrag_event_table_build_columns(event_source)
     if len(ev) == 0:
-        return pd.DataFrame(columns=column_order)
+        return stamp_covariate_schema(pd.DataFrame(columns=column_order), table="event")
 
     event_id_series = ev[event_col].to_numpy()
 
@@ -329,8 +335,10 @@ def build_contfrag_event_table(
             else pd.Series(dtype=float)
         )
         physical_arm = safe_mode(ts)
-        location = summarize_behavioral_location(g[["location_state", "location_well"]])
-        location_well = float(location["location_well"])
+        location = summarize_behavioral_location(
+            g[["occupancy_state", "occupancy_well_id"]]
+        )
+        location_well = float(location["occupancy_well_id"])
         location_arm = single_arm_from_well(location_well, track_graph)
         current_arm = location_arm
         # Trial-derived context columns are NaN at every dot timebin
@@ -347,13 +355,11 @@ def build_contfrag_event_table(
             strict_first(g["last_rewarded_well"]), track_graph
         )
 
-        is_after_switch = strict_first(g["is_after_switch"])
-        is_after_omission = strict_first(g["is_after_omission"])
-        is_after_reward = strict_first(g["is_after_reward"])
-        reward_outcome = strict_first(g["reward_outcome"])
-        is_after_stay = (
-            1.0 - is_after_switch if not np.isnan(is_after_switch) else np.nan
-        )
+        is_after_switch = strict_first(g["did_last_completed_trip_switch_patch"])
+        # reward_outcome and is_after_reward are the same source array; persist
+        # one canonical is_rewarded_outcome. Stay/omission complements derived
+        # downstream, not persisted.
+        is_rewarded_outcome = strict_first(g["is_rewarded_outcome"])
 
         # ContFrag-specific: state composition during event. Defer to
         # ``_summarize_event_state`` for NaN-safe semantics — the
@@ -387,9 +393,11 @@ def build_contfrag_event_table(
 
         record = {
             event_col: int(ev_id),
-            "event_start": float(times[0]),
-            "event_end": float(times[-1]),
-            "event_duration": float(times[-1] - times[0]),
+            "event_start_s": float(times[0]),
+            "event_end_s": float(times[-1]),
+            "event_duration_s": float(
+                times[-1] - times[0] + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
+            ),
             "is_swr": event_col == "SWR_event"
             or (animal, day, epoch, int(ev_id)) in other_overlap_keys,
             "is_mua": event_col == "MUA_event"
@@ -398,23 +406,19 @@ def build_contfrag_event_table(
             "fragmented_prob_mean": frag_mean,
             "dominant_state": dominant,
             "continuous_fraction": cont_frac,
-            "location_state": location["location_state"],
+            "occupancy_state": location["occupancy_state"],
             "at_well": location["at_well"],
-            "location_well": location_well,
-            "location_arm": location_arm,
-            "physical_arm": physical_arm,
-            "current_arm": current_arm,
+            "occupancy_well_id": location_well,
+            "modal_observed_track_segment_id": physical_arm,
+            "occupancy_well_arm": current_arm,
             "prev_arm": prev_arm,
             "next_arm": next_arm,
             "last_rewarded_arm": last_rewarded_arm,
             "current_patch": arm_to_patch(current_arm),
             "prev_patch": arm_to_patch(prev_arm),
             "next_patch": arm_to_patch(next_arm),
-            "is_after_switch": is_after_switch,
-            "is_after_omission": is_after_omission,
-            "is_after_reward": is_after_reward,
-            "is_after_stay": is_after_stay,
-            "reward_outcome": reward_outcome,
+            "did_last_completed_trip_switch_patch": is_after_switch,
+            "is_rewarded_outcome": is_rewarded_outcome,
             "is_stay": float(arm_to_patch(next_arm) == arm_to_patch(current_arm))
             if not (
                 np.isnan(arm_to_patch(next_arm)) or np.isnan(arm_to_patch(current_arm))
@@ -424,12 +428,13 @@ def build_contfrag_event_table(
             # Counts bins with no real-arm ``decoded_arm``; since
             # ``map_estimate_to_arm`` never returns a junction, that means
             # undecoded (NaN ``map_estimate``) bins, not junction MAPs.
-            "n_junction_bins": n_junction,
+            "n_undecoded_bins": n_junction,
             "n_unique_arms": int(arms_real.nunique()),
-            "event_midpoint_time": midpoint_time,
-            "time_since_port_entry": time_since_last_port_entry,
-            "time_since_last_port_entry": time_since_last_port_entry,
-            "time_since_reward": float(context_time - g["_last_reward_time"].iloc[0])
+            "event_midpoint_s": midpoint_time,
+            "time_since_last_well_arrival_s": time_since_last_port_entry,
+            "time_since_last_reward_s": float(
+                context_time - g["_last_reward_time"].iloc[0]
+            )
             if pd.notna(g["_last_reward_time"].iloc[0])
             else np.nan,
             "nearest_well_distance_cm_min": (
@@ -455,15 +460,15 @@ def build_contfrag_event_table(
         .median()
         .to_numpy()
     )
-    per_event["time_since_stop"] = tss_by_event
+    per_event["time_since_stop_start_s"] = tss_by_event
 
     # Posterior-dependent columns
     posterior_cols = (
         "posterior_peak_mean",
         "posterior_entropy_mean",
-        "posterior_hpd_width_50",
-        "posterior_hpd_width_80",
-        "posterior_hpd_width_95",
+        "posterior_hpd_arm_count_mean_coverage_50pct",
+        "posterior_hpd_arm_count_mean_coverage_80pct",
+        "posterior_hpd_arm_count_mean_coverage_95pct",
     )
     arm_posterior = None  # set below when conditional_posterior is supplied
     if conditional_posterior is None:
@@ -485,9 +490,9 @@ def build_contfrag_event_table(
         )
         per_event["posterior_peak_mean"] = peak
         per_event["posterior_entropy_mean"] = entropy
-        per_event["posterior_hpd_width_50"] = hpd[0.5]
-        per_event["posterior_hpd_width_80"] = hpd[0.8]
-        per_event["posterior_hpd_width_95"] = hpd[0.95]
+        per_event["posterior_hpd_arm_count_mean_coverage_50pct"] = hpd[0.5]
+        per_event["posterior_hpd_arm_count_mean_coverage_80pct"] = hpd[0.8]
+        per_event["posterior_hpd_arm_count_mean_coverage_95pct"] = hpd[0.95]
 
     # Trajectory rollups (shared with the Non-Local table). Gated on the
     # augmented data_over_time columns; continuous/fragmented_prob_mean come
@@ -513,14 +518,16 @@ def build_contfrag_event_table(
 
     # Identifiers + stable hashes
     per_event.insert(0, "animal", animal)
-    per_event.insert(1, "day", day)
+    per_event.insert(1, "session_date", day)
     per_event.insert(2, "epoch", epoch)
     per_event["event_source"] = event_source
     per_event["brain_area"] = brain_area
     per_event["event_id"] = _hash_contfrag_event_id(per_event, event_source, brain_area)
 
     # stop_id
-    stop_idx = assign_bout(per_event["event_start"].to_numpy(), bout_starts, bout_ends)
+    stop_idx = assign_bout(
+        per_event["event_start_s"].to_numpy(), bout_starts, bout_ends
+    )
     # The whole-event immobility filter guarantees every retained event sits
     # inside a bout, so a -1 here means that invariant broke upstream. Hashing
     # it would mint a stop_id matching no stop row -- an event silently orphaned
@@ -541,7 +548,7 @@ def build_contfrag_event_table(
         event_source=event_source,
     )
 
-    return per_event[column_order]
+    return stamp_covariate_schema(per_event[column_order], table="event")
 
 
 def build_contfrag_event_arm_table(
@@ -549,6 +556,7 @@ def build_contfrag_event_arm_table(
     dot: pd.DataFrame,
     env,
     trials: pd.DataFrame,
+    port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
@@ -563,7 +571,7 @@ def build_contfrag_event_arm_table(
     ----------
     event_table : pd.DataFrame
         Output of ``build_contfrag_event_table()``.
-    dot, env, trials, track_graph
+    dot, env, trials, port_experiences, track_graph
         Same as ``build_contfrag_event_table()``.
     event_source : {"SWR", "MUA"}
         Which external event detector defines event boundaries.
@@ -578,9 +586,11 @@ def build_contfrag_event_arm_table(
         Columns: see ``_contfrag_event_arm_table_columns()``.
     """
     event_col = _resolve_event_col(event_source)
-    column_order = _contfrag_event_arm_table_columns(event_source)
+    canonical_column_order = _contfrag_event_arm_table_build_columns(event_source)
     if len(event_table) == 0:
-        return pd.DataFrame(columns=column_order)
+        return stamp_covariate_schema(
+            pd.DataFrame(columns=canonical_column_order), table="event_arm"
+        )
 
     n_arms = len(ALL_ARMS)
     n_events = len(event_table)
@@ -600,7 +610,10 @@ def build_contfrag_event_arm_table(
     event_id_all = ev[event_col].to_numpy()
 
     assert_single_session_alignment(
-        dot, event_table, source_name=f"ContFrag {event_source} dot"
+        dot,
+        event_table,
+        source_name=f"ContFrag {event_source} dot",
+        target_session_cols=("animal", "session_date", "epoch"),
     )
     assert_event_label_alignment(
         event_id_all,
@@ -630,8 +643,7 @@ def build_contfrag_event_arm_table(
         mass_aligned = np.full((n_events, n_arms), np.nan)
 
     # Broadcast event-level fields to 9-per-event
-    long = event_table.loc[event_table.index.repeat(n_arms)].reset_index(drop=True)
-    long["arm"] = np.tile(ALL_ARMS, n_events)
+    long = broadcast_candidate_arms(event_table)
     long["arm_count_hard"] = hard_aligned.flatten()
     long["arm_count_soft"] = soft_aligned.flatten()
     long["arm_posterior_mass"] = mass_aligned.flatten()
@@ -644,182 +656,58 @@ def build_contfrag_event_arm_table(
     # also includes junction / missing-arm bins) silently shrinks the
     # fraction sum below 1 — the user verified a 5-real / 5-junction
     # event sums to 0.5.
-    n_real_long = long["n_timebins"].to_numpy() - long["n_junction_bins"].to_numpy()
-    with np.errstate(divide="ignore", invalid="ignore"):
-        frac = np.where(
-            n_real_long > 0,
-            long["arm_count_hard"].to_numpy() / np.maximum(n_real_long, 1),
-            np.nan,
-        )
-    long["arm_fraction"] = frac
-
-    # Binary indicators. is_current / is_same_patch propagate NaN where
-    # the animal's location is unobserved (event window not wholly at
-    # one well); the rest treat an absent reference as a true zero.
-    # Mirrors replay/tables.py -- see eq_indicator_or_nan.
-    arm_arr = long["arm"].to_numpy()
-    long["is_current"] = eq_indicator_or_nan(arm_arr, long["current_arm"].to_numpy())
-    long["is_prev"] = eq_indicator(arm_arr, long["prev_arm"].to_numpy())
-    long["is_next"] = eq_indicator(arm_arr, long["next_arm"].to_numpy())
-    long["is_last_rewarded"] = eq_indicator(
-        arm_arr, long["last_rewarded_arm"].to_numpy()
+    n_real_long = long["n_timebins"].to_numpy() - long["n_undecoded_bins"].to_numpy()
+    long["arm_fraction"] = arm_fraction_from_event_total(
+        long["arm_count_hard"].to_numpy(),
+        n_real_long,
     )
-    # M5/M6 identifiable reward-memory predictor: last-rewarded arm
-    # restricted to events where it is NOT the current arm. Mirrors
-    # replay/tables.py — see model_specs.py for the rationale.
-    long["is_last_rewarded_elsewhere"] = long["is_last_rewarded"].to_numpy() * (
-        1 - long["is_current"].to_numpy()
-    )
-    long["arm_patch_id"] = np.array([arm_to_patch(a) for a in arm_arr])
-    long["is_same_patch"] = eq_indicator_or_nan(
-        long["arm_patch_id"].to_numpy(), long["current_patch"].to_numpy()
+    long["arm_fraction_posterior"] = arm_fraction_from_event_total(
+        long["arm_posterior_mass"].to_numpy(),
+        long["n_timebins"].to_numpy(dtype=float),
     )
 
-    # Per-event spatial predictors. Distances still depend on the event's
-    # current location, but trial-history covariates are computed in batch
-    # below so the full trial frame is not rescanned for every event.
-    dist_vals = np.full(n_events * n_arms, np.nan)
-    rank_vals = np.full(n_events * n_arms, np.nan)
-
-    for pos, (_, ev_row) in enumerate(event_table.iterrows()):
-        base = pos * n_arms
-        current_arm_val = ev_row["current_arm"]
-        current_well = (
-            arm_to_well(current_arm_val, track_graph)
-            if not np.isnan(current_arm_val)
-            else np.nan
-        )
-        dists = dist_to_arm_from_well(current_well, track_graph)
-        dist_arr = np.array([dists[a] for a in ALL_ARMS])
-        ranks = arm_dist_rank(dist_arr)
-
-        for j in range(n_arms):
-            idx = base + j
-            dist_vals[idx] = dist_arr[j]
-            rank_vals[idx] = ranks[j]
-
-    # Match the event-level context cutoff: every model-facing history
-    # covariate is frozen at event start. A mixed event crossing goal arrival
-    # must not combine pre-arrival outcome context with post-arrival history.
-    event_times = event_table["event_start"].to_numpy(dtype=float)
-    vr_2d = np.full((n_events, n_arms), np.nan)
-    anv_2d = np.full((n_events, n_arms), np.nan)
-    cr_2d = np.full((n_events, n_arms), np.nan)
-    rrr_2d = np.full((n_events, n_arms), np.nan)
-    query_mask = ~np.isnan(event_times)
-    if len(trials) > 0 and query_mask.any():
-        well_to_arm = build_well_to_arm_map(track_graph)
-        query_times = event_times[query_mask]
-        vr_2d[query_mask], anv_2d[query_mask] = (
-            visit_recency_and_never_visited_all_events(query_times, trials, well_to_arm)
-        )
-        cr_2d[query_mask] = cumulative_reward_all_events(
-            query_times, trials, well_to_arm
-        )
-        # Canonical per-arm reward rate: rewarded fraction of the last ten
-        # visits to that arm (covariate_dictionary.md D1).
-        rrr_2d[query_mask] = recent_reward_rate_all_events(
-            query_times, trials, well_to_arm, k=10
-        )
-
-    vr_vals = vr_2d.reshape(-1)
-    anv_vals = anv_2d.reshape(-1)
-    cr_vals = cr_2d.reshape(-1)
-    rrr_vals = rrr_2d.reshape(-1)
-
-    long["dist_to_arm"] = dist_vals
-    long["arm_dist_rank"] = rank_vals
-    long["visit_recency"] = vr_vals
-    long["arm_never_visited"] = anv_vals
-    # Time-local relative recency among the six leaf arms. Centering within
-    # each event prevents future events from changing earlier model rows.
-    _recency_basis = spline_visit_recency_within_event(
-        long["visit_recency"].to_numpy(),
-        long["arm_never_visited"].to_numpy(),
-        long["is_current"].to_numpy(),
-        long["is_prev"].to_numpy(),
-        arm_arr,
-        long["event_id"].to_numpy(),
-    )
-    for _index, _column in enumerate(RECENCY_SPLINE_COLUMNS):
-        long[_column] = _recency_basis[:, _index]
-    long["visit_recency_demeaned"] = center_visit_recency_within_event(
-        vr_vals.reshape(n_events, n_arms), anv_vals.reshape(n_events, n_arms)
-    ).reshape(-1)
-    long["cumulative_reward"] = cr_vals
-    long["reward_rate_arm_k10"] = rrr_vals
-
-    # p_reward_arm / q_arm from the per-stop contingency artifact (shared with
-    # replay/tables.py via attach_contingency_value_block). ContFrag's own
-    # stop_id mixes in brain_area/event_source so SWR/MUA and per-area tables
-    # never collide on it; the contingency artifact, however, is keyed by the
-    # plain NonLocal-pipeline hash of (animal, day, epoch, stop_idx) shared
-    # across pipelines — so a join on ContFrag's stop_id matches nothing.
-    # Recompute the plain key from the natural keys (always present on the
-    # broadcast event_table) for the merge.
-    cont_key = hash_stop_id(
+    # ContFrag stop IDs include event-source/brain-area provenance, whereas the
+    # canonical qvals table is keyed by the plain Replay bout identity.
+    contingency_stop_id = hash_stop_id(
         long["animal"].to_numpy(),
-        long["day"].to_numpy(),
+        long["session_date"].to_numpy(),
         long["epoch"].to_numpy(),
         long["stop_idx"].to_numpy(),
     )
-    long["p_reward_arm"], long["q_arm"] = attach_contingency_value_block(
-        long["arm"].to_numpy(), cont_key, contingency
+    long = attach_candidate_arm_covariates(
+        long,
+        event_table=event_table,
+        port_experiences=port_experiences,
+        track_graph=track_graph,
+        contingency_stop_id=contingency_stop_id,
+        contingency=contingency,
+        include_belief_variance=False,
     )
-
-    # Interactions
-    tss = long["time_since_stop"].to_numpy()
-    is_swr_i = long["is_swr"].astype(int).to_numpy()
-    is_mua_i = long["is_mua"].astype(int).to_numpy()
-    is_after_switch_arr = long["is_after_switch"].to_numpy()
-    is_after_omission_arr = long["is_after_omission"].to_numpy()
-    ic = long["is_current"].to_numpy()
-    ip = long["is_prev"].to_numpy()
-    inx = long["is_next"].to_numpy()
-    ilr = long["is_last_rewarded"].to_numpy()
-
-    long["current_x_last_rewarded"] = ic * ilr
-    long["time_x_current"] = tss * ic
-    long["time_x_prev"] = tss * ip
-    long["time_x_next"] = tss * inx
-    long["swr_x_current"] = is_swr_i * ic
-    long["swr_x_prev"] = is_swr_i * ip
-    long["swr_x_next"] = is_swr_i * inx
-    long["swr_x_last_rewarded"] = is_swr_i * ilr
-    # M7 — SWR × value/memory interactions (mirrors replay/tables.py).
-    long["swr_x_reward_rate_arm_k10"] = (
-        is_swr_i * long["reward_rate_arm_k10"].to_numpy()
-    )
-    long["swr_x_visit_recency_demeaned"] = (
-        is_swr_i * long["visit_recency_demeaned"].to_numpy()
-    )
-    for _column in RECENCY_SPLINE_COLUMNS:
-        long[f"swr_x_{_column}"] = is_swr_i * long[_column].to_numpy()
-    long["swr_x_arm_never_visited"] = is_swr_i * long["arm_never_visited"].to_numpy()
-    long["swr_x_is_last_rewarded_elsewhere"] = (
-        is_swr_i * long["is_last_rewarded_elsewhere"].to_numpy()
-    )
-    long["mua_x_current"] = is_mua_i * ic
-    long["mua_x_prev"] = is_mua_i * ip
-    long["mua_x_next"] = is_mua_i * inx
-    long["mua_x_last_rewarded"] = is_mua_i * ilr
-    long["switch_x_current"] = is_after_switch_arr * ic
-    long["switch_x_prev"] = is_after_switch_arr * ip
-    long["omission_x_last_rewarded"] = is_after_omission_arr * ilr
 
     # ContFrag-specific interactions
     cont_mean = long["continuous_prob_mean"].to_numpy()
-    long["continuous_x_current"] = cont_mean * ic
-    long["continuous_x_prev"] = cont_mean * ip
-    long["continuous_x_next"] = cont_mean * inx
-    long["continuous_x_last_rewarded"] = cont_mean * ilr
+    long["continuous_replay_score_mean_x_is_current_arm"] = (
+        cont_mean * long["is_current_arm"].to_numpy()
+    )
+    long["continuous_replay_score_mean_x_is_prev_arm"] = (
+        cont_mean * long["is_prev_arm"].to_numpy()
+    )
+    long["continuous_replay_score_mean_x_is_next_arm"] = (
+        cont_mean * long["is_next_arm"].to_numpy()
+    )
+    long["continuous_x_last_rewarded"] = (
+        cont_mean * long["is_last_rewarded_arm"].to_numpy()
+    )
 
-    return long[column_order]
+    validate_event_arm_table(long, event_table=event_table)
+    canonical = stamp_covariate_schema(long, table="event_arm")
+    return canonical[canonical_column_order]
 
 
 def build_contfrag_stop_table(
     dot: pd.DataFrame,
     trials: pd.DataFrame,
+    port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
     *,
     event_source: str = "SWR",
@@ -837,6 +725,9 @@ def build_contfrag_stop_table(
         ContFrag data-over-time frame.
     trials : pd.DataFrame
         Trial frame from Spyglass.
+    port_experiences : pd.DataFrame
+        Complete starting-port-plus-destinations occupancy stream. Reward
+        covariates use only its physically observed outcomes.
     track_graph : nx.Graph
         Session track graph.
     event_source : {"SWR", "MUA"}
@@ -858,15 +749,15 @@ def build_contfrag_stop_table(
     event_col = _resolve_event_col(event_source)
 
     dot = _filter_contfrag_event_labels(dot, speed_threshold)
-    dot = add_trial_context(dot, trials)
+    dot = add_trial_context(dot, trials, port_experiences)
     dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
         dot, speed_col="head_speed", speed_threshold=speed_threshold
     )
-    column_order = list(_CONTFRAG_STOP_TABLE_COLUMNS)
+    column_order = list(_CONTFRAG_STOP_TABLE_BUILD_COLUMNS)
     if bout_starts.size == 0:
-        return pd.DataFrame(columns=column_order)
+        return stamp_covariate_schema(pd.DataFrame(columns=column_order), table="stop")
 
     n_bouts = bout_starts.size
     times = dot.index.to_numpy()
@@ -879,8 +770,10 @@ def build_contfrag_stop_table(
     per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
-    per_bout["immobility_time"] = bout_ends - bout_starts
-    per_bout["reward_rate_trial_k10"] = recent_trial_reward_rate(bout_starts, trials)
+    per_bout["immobility_duration_s"] = bout_ends - bout_starts
+    per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
+        bout_starts, port_experiences
+    )
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -898,11 +791,11 @@ def build_contfrag_stop_table(
     else:
         per_bout["is_mua_stop"] = False
 
-    # n_events: count each included event once, in the bout of its
+    # n_selected_events: count each included event once, in the bout of its
     # event_start — mirroring build_contfrag_event_table
     # (``stop_idx = assign_bout(event_start)``) and using the SAME
     # all-immobile inclusion mask, so the population matches the event
-    # table and ``Σ stop.n_events == len(event_table)`` holds by
+    # table and ``Σ stop.n_selected_events == len(event_table)`` holds by
     # construction. (All-immobile events cannot straddle bouts, but
     # counting by event_start keeps the two tables aligned regardless.)
     in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
@@ -925,47 +818,38 @@ def build_contfrag_stop_table(
             .to_numpy()
         )
     per_bout["has_replay"] = n_events_per_bout > 0
-    per_bout["n_events"] = n_events_per_bout
+    per_bout["n_selected_events"] = n_events_per_bout
 
     # Trial context at bout start. ``skipna=False`` is critical:
     # the default ``first()`` skips leading NaNs and surfaces the
     # first valid mid-bout row, leaking trial context into stops
     # that span a trial boundary (the post-boundary trial's
-    # ``is_after_reward`` / ``reward_outcome`` would attach to a
-    # bout whose actual start had no trial active).
+    # a later finite ``is_rewarded_outcome`` would attach to a bout whose
+    # actual start had no observable outcome).
     bout_first_row = grouped.first(skipna=False)
     for col in (
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
-        "recent_switch_rate",
+        "did_last_completed_trip_switch_patch",
+        "patch_switch_fraction_last5_completed_trips",
         "leaky_q_value_diff",
     ):
-        if col == "is_after_stay":
-            stay = np.where(
-                np.isnan(bout_first_row["is_after_switch"].to_numpy()),
-                np.nan,
-                1.0 - bout_first_row["is_after_switch"].to_numpy(),
-            )
-            per_bout["is_after_stay"] = (
-                pd.Series(stay).reindex(np.arange(n_bouts)).to_numpy()
-            )
-        else:
-            per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+        per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
+
+    # reward_outcome / is_after_reward are one source array; persist one
+    # canonical is_rewarded_outcome (stay/omission derived downstream).
+    per_bout["is_rewarded_outcome"] = (
+        bout_first_row["is_rewarded_outcome"].reindex(np.arange(n_bouts)).to_numpy()
+    )
 
     per_bout["completed_trial_id"] = pd.array(
         bout_first_row["completed_trial_id"].reindex(np.arange(n_bouts)),
         dtype="Int64",
     )
 
-    # Whole-window behavioral location plus modal physical segment. The legacy
-    # current_arm name is a compatibility alias of strict location_arm.
+    # Whole-window behavioral location plus modal physical segment. The
+    # at-well occupancy arm (occupancy_well_arm) is NaN off a single well.
     location_state_vals: list[str] = []
     at_well_vals: list[object] = []
     location_well_vals = np.full(n_bouts, np.nan)
-    location_arm_vals = np.full(n_bouts, np.nan)
     physical_arm_vals = np.full(n_bouts, np.nan)
     nearest_min_vals = np.full(n_bouts, np.nan)
     nearest_mean_vals = np.full(n_bouts, np.nan)
@@ -979,13 +863,14 @@ def build_contfrag_stop_table(
         physical_arm = (
             safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
         )
-        location = summarize_behavioral_location(g[["location_state", "location_well"]])
-        location_well = float(location["location_well"])
+        location = summarize_behavioral_location(
+            g[["occupancy_state", "occupancy_well_id"]]
+        )
+        location_well = float(location["occupancy_well_id"])
         location_arm = single_arm_from_well(location_well, track_graph)
-        location_state_vals.append(str(location["location_state"]))
+        location_state_vals.append(str(location["occupancy_state"]))
         at_well_vals.append(location["at_well"])
         location_well_vals[bi] = location_well
-        location_arm_vals[bi] = location_arm
         physical_arm_vals[bi] = physical_arm
         current_arm_vals[bi] = location_arm
         distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
@@ -1007,15 +892,14 @@ def build_contfrag_stop_table(
             strict_first(g["last_visited_well"]), track_graph
         )
 
-    per_bout["location_state"] = location_state_vals
+    per_bout["occupancy_state"] = location_state_vals
     per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
-    per_bout["location_well"] = location_well_vals
-    per_bout["location_arm"] = location_arm_vals
-    per_bout["physical_arm"] = physical_arm_vals
+    per_bout["occupancy_well_id"] = location_well_vals
+    per_bout["modal_observed_track_segment_id"] = physical_arm_vals
     per_bout["nearest_well_distance_cm_min"] = nearest_min_vals
     per_bout["nearest_well_distance_cm_mean"] = nearest_mean_vals
     per_bout["nearest_well_distance_cm_max"] = nearest_max_vals
-    per_bout["current_arm"] = current_arm_vals
+    per_bout["occupancy_well_arm"] = current_arm_vals
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals
@@ -1031,7 +915,7 @@ def build_contfrag_stop_table(
     )
 
     per_bout.insert(0, "animal", animal)
-    per_bout.insert(1, "day", day)
+    per_bout.insert(1, "session_date", day)
     per_bout.insert(2, "epoch", epoch)
     per_bout["event_source"] = event_source
     per_bout["brain_area"] = brain_area
@@ -1044,36 +928,34 @@ def build_contfrag_stop_table(
         event_source=event_source,
     )
 
-    return per_bout[column_order]
+    return stamp_covariate_schema(per_bout[column_order], table="stop")
 
 
 # ── Column definitions ──
 
 
-def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
-    """Canonical column order for ContFrag event table."""
+def _contfrag_event_table_build_columns(event_source: str = "SWR") -> list[str]:
+    """Internal pre-migration column order for a ContFrag event table."""
     event_col = _resolve_event_col(event_source)
     return [
         "animal",
-        "day",
+        "session_date",
         "epoch",
         "event_source",
         "brain_area",
         event_col,
         "event_id",
-        "event_start",
-        "event_end",
-        "event_duration",
-        "event_midpoint_time",
-        "time_since_stop",
-        "time_since_port_entry",
-        "time_since_last_port_entry",
-        "time_since_reward",
-        "location_state",
+        "event_start_s",
+        "event_end_s",
+        "event_duration_s",
+        "event_midpoint_s",
+        "time_since_stop_start_s",
+        "time_since_last_well_arrival_s",
+        "time_since_last_reward_s",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
-        "physical_arm",
+        "occupancy_well_id",
+        "modal_observed_track_segment_id",
         "nearest_well_distance_cm_min",
         "nearest_well_distance_cm_mean",
         "nearest_well_distance_cm_max",
@@ -1083,13 +965,10 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
         "fragmented_prob_mean",
         "dominant_state",
         "continuous_fraction",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
+        "did_last_completed_trip_switch_patch",
+        "is_rewarded_outcome",
         "is_stay",
-        "current_arm",
+        "occupancy_well_arm",
         "prev_arm",
         "next_arm",
         "last_rewarded_arm",
@@ -1099,10 +978,10 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
         "n_timebins",
         "posterior_peak_mean",
         "posterior_entropy_mean",
-        "posterior_hpd_width_50",
-        "posterior_hpd_width_80",
-        "posterior_hpd_width_95",
-        "n_junction_bins",
+        "posterior_hpd_arm_count_mean_coverage_50pct",
+        "posterior_hpd_arm_count_mean_coverage_80pct",
+        "posterior_hpd_arm_count_mean_coverage_95pct",
+        "n_undecoded_bins",
         "n_unique_arms",
         "stop_idx",
         "stop_id",
@@ -1112,10 +991,20 @@ def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
     ]
 
 
+def _contfrag_event_table_columns(event_source: str = "SWR") -> list[str]:
+    """Canonical persisted column order for a ContFrag event table."""
+    return list(
+        stamp_covariate_schema(
+            pd.DataFrame(columns=_contfrag_event_table_build_columns(event_source)),
+            table="event",
+        ).columns
+    )
+
+
 #: Canonical column order for ContFrag stop table.
-_CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
+_CONTFRAG_STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "animal",
-    "day",
+    "session_date",
     "epoch",
     "event_source",
     "brain_area",
@@ -1123,31 +1012,27 @@ _CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "stop_id",
     "stop_start",
     "stop_end",
-    "immobility_time",
-    "reward_rate_trial_k10",
+    "immobility_duration_s",
+    "reward_fraction_last10_known_trials",
     "is_swr_stop",
     "is_mua_stop",
     "has_replay",
-    "n_events",
-    "is_after_switch",
-    "is_after_omission",
-    "is_after_reward",
-    "is_after_stay",
-    "reward_outcome",
+    "n_selected_events",
+    "did_last_completed_trip_switch_patch",
+    "is_rewarded_outcome",
     "completed_trial_id",
     "completed_trial_arm",
-    "recent_switch_rate",
+    "patch_switch_fraction_last5_completed_trips",
     "leaky_q_value_diff",
     "is_stay",
-    "location_state",
+    "occupancy_state",
     "at_well",
-    "location_well",
-    "location_arm",
-    "physical_arm",
+    "occupancy_well_id",
+    "modal_observed_track_segment_id",
     "nearest_well_distance_cm_min",
     "nearest_well_distance_cm_mean",
     "nearest_well_distance_cm_max",
-    "current_arm",
+    "occupancy_well_arm",
     "prev_arm",
     "next_arm",
     "last_rewarded_arm",
@@ -1156,14 +1041,20 @@ _CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = (
     "next_patch",
 )
 
+_CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = tuple(
+    stamp_covariate_schema(
+        pd.DataFrame(columns=_CONTFRAG_STOP_TABLE_BUILD_COLUMNS), table="stop"
+    ).columns
+)
 
-def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
-    """Canonical column order for ContFrag event-arm table."""
+
+def _contfrag_event_arm_table_build_columns(event_source: str = "SWR") -> list[str]:
+    """Internal pre-migration column order for a ContFrag event-arm table."""
     event_col = _resolve_event_col(event_source)
     return [
         # Identifiers
         "animal",
-        "day",
+        "session_date",
         "epoch",
         "event_source",
         "brain_area",
@@ -1172,18 +1063,16 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "stop_idx",
         "stop_id",
         # Event-level context
-        "event_start",
-        "event_end",
-        "event_duration",
-        "time_since_stop",
-        "time_since_port_entry",
-        "time_since_last_port_entry",
-        "time_since_reward",
-        "location_state",
+        "event_start_s",
+        "event_end_s",
+        "event_duration_s",
+        "time_since_stop_start_s",
+        "time_since_last_well_arrival_s",
+        "time_since_last_reward_s",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
-        "physical_arm",
+        "occupancy_well_id",
+        "modal_observed_track_segment_id",
         "nearest_well_distance_cm_min",
         "nearest_well_distance_cm_mean",
         "nearest_well_distance_cm_max",
@@ -1193,13 +1082,10 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "fragmented_prob_mean",
         "dominant_state",
         "continuous_fraction",
-        "is_after_switch",
-        "is_after_omission",
-        "is_after_reward",
-        "is_after_stay",
-        "reward_outcome",
+        "did_last_completed_trip_switch_patch",
+        "is_rewarded_outcome",
         "is_stay",
-        "current_arm",
+        "occupancy_well_arm",
         "prev_arm",
         "next_arm",
         "last_rewarded_arm",
@@ -1208,60 +1094,69 @@ def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
         "next_patch",
         "n_timebins",
         # Per-arm identity
-        "arm",
+        "candidate_arm",
         "arm_patch_id",
         # Content responses
         "arm_count_hard",
         "arm_count_soft",
         "arm_posterior_mass",
         "arm_fraction",
+        "arm_fraction_posterior",
         # Binary indicators
-        "is_current",
-        "is_prev",
-        "is_next",
-        "is_last_rewarded",
-        "is_last_rewarded_elsewhere",
-        "is_same_patch",
+        "is_current_arm",
+        "is_prev_arm",
+        "is_next_arm",
+        "is_last_rewarded_arm",
+        "is_last_rewarded_noncurrent_arm",
+        "is_same_patch_as_current",
         # Spatial
-        "dist_to_arm",
-        "arm_dist_rank",
+        "distance_to_candidate_arm_cm",
+        "candidate_arm_distance_rank",
         # Reward / value
-        "visit_recency",
-        "visit_recency_demeaned",
-        "visit_recency_spline1_demeaned",
-        "visit_recency_spline2_demeaned",
-        "visit_recency_spline3_demeaned",
-        "arm_never_visited",
-        "cumulative_reward",
-        "reward_rate_arm_k10",
-        "p_reward_arm",
-        "q_arm",
+        "visit_recency_trials",
+        "visit_recency_trials_event_leaf_centered",
+        "visit_recency_trials_event_leaf_centered_spline_1",
+        "visit_recency_trials_event_leaf_centered_spline_2",
+        "visit_recency_trials_event_leaf_centered_spline_3",
+        "is_candidate_arm_never_visited",
+        "reward_count_candidate_arm_last10_known_trials",
+        "reward_fraction_candidate_arm_last10_visits",
+        "task_reward_probability_candidate_arm",
+        "reward_belief_mean_candidate_arm_preoutcome",
         # Interactions
-        "current_x_last_rewarded",
-        "time_x_current",
-        "time_x_prev",
-        "time_x_next",
-        "swr_x_current",
-        "swr_x_prev",
-        "swr_x_next",
-        "swr_x_last_rewarded",
-        "swr_x_reward_rate_arm_k10",
-        "swr_x_visit_recency_demeaned",
-        "swr_x_visit_recency_spline1_demeaned",
-        "swr_x_visit_recency_spline2_demeaned",
-        "swr_x_visit_recency_spline3_demeaned",
-        "swr_x_arm_never_visited",
-        "swr_x_is_last_rewarded_elsewhere",
-        "mua_x_current",
-        "mua_x_prev",
-        "mua_x_next",
-        "mua_x_last_rewarded",
-        "switch_x_current",
-        "switch_x_prev",
-        "omission_x_last_rewarded",
+        "is_current_arm_x_is_last_rewarded_arm",
+        "time_since_stop_start_s_x_is_current_arm",
+        "time_since_stop_start_s_x_is_prev_arm",
+        "time_since_stop_start_s_x_is_next_arm",
+        "swr_x_is_current_arm",
+        "swr_x_is_prev_arm",
+        "swr_x_is_next_arm",
+        "swr_x_is_last_rewarded_arm",
+        "swr_x_reward_fraction_candidate_arm_last10_visits",
+        "swr_x_visit_recency_trials_event_leaf_centered",
+        "swr_x_visit_recency_trials_event_leaf_centered_spline_1",
+        "swr_x_visit_recency_trials_event_leaf_centered_spline_2",
+        "swr_x_visit_recency_trials_event_leaf_centered_spline_3",
+        "swr_x_is_candidate_arm_never_visited",
+        "swr_x_is_last_rewarded_noncurrent_arm",
+        "mua_x_is_current_arm",
+        "mua_x_is_prev_arm",
+        "mua_x_is_next_arm",
+        "mua_x_is_last_rewarded_arm",
+        "is_omitted_outcome_x_is_last_rewarded_arm",
         # ContFrag-specific interactions
-        "continuous_x_current",
-        "continuous_x_prev",
-        "continuous_x_next",
+        "continuous_replay_score_mean_x_is_current_arm",
+        "continuous_replay_score_mean_x_is_prev_arm",
+        "continuous_replay_score_mean_x_is_next_arm",
         "continuous_x_last_rewarded",
     ]
+
+
+def _contfrag_event_arm_table_columns(event_source: str = "SWR") -> list[str]:
+    """Canonical persisted column order for a ContFrag event-arm table."""
+    return list(
+        stamp_covariate_schema(
+            pd.DataFrame(columns=_contfrag_event_arm_table_build_columns(event_source)),
+            table="event_arm",
+        ).columns
+    )

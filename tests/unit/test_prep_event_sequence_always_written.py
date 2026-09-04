@@ -46,14 +46,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PREPARE_DATA = REPO_ROOT / "src/continuum_swr_replay/analysis/replay/prepare_data.py"
 
 
-def _main_function_ast() -> ast.FunctionDef:
-    src = PREPARE_DATA.read_text()
-    tree = ast.parse(src)
-    return next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "main"
-    )
+def _main_function_ast() -> ast.Module:
+    """Parse the whole prepare_data module.
+
+    The assembly/publish logic these tests inspect lives in the extracted stage
+    helpers (``_assemble_canonical_tables`` / ``_publish_canonical_tables``), not
+    in ``main`` itself, so walk the module rather than a single function.
+    """
+    return ast.parse(PREPARE_DATA.read_text())
 
 
 def test_event_sequence_table_all_never_assigned_None_in_main():
@@ -84,28 +84,26 @@ def test_save_loop_includes_event_sequence_table_tuple():
     A regression that drops the ``event_sequence_table`` entry
     leaves the retrospective pass without a file to read, regardless of how
     correct the empty-fallback frame is."""
-    main_fn = _main_function_ast()
+    module = _main_function_ast()
     found = False
-    for node in ast.walk(main_fn):
-        if not isinstance(node, ast.For):
+    # The publish spec is a ``(basename, table_key, frame)`` tuple (basename
+    # first, frame last), passed to ``_publish_canonical_tables``. Find it
+    # wherever it is built in the module.
+    for node in ast.walk(module):
+        if not isinstance(node, ast.Tuple) or len(node.elts) < 2:
             continue
-        if not isinstance(node.iter, ast.Tuple):
-            continue
-        for elt in node.iter.elts:
-            if not isinstance(elt, ast.Tuple) or len(elt.elts) != 2:
-                continue
-            name_node, frame_node = elt.elts
-            if (
-                isinstance(name_node, ast.Constant)
-                and name_node.value == "event_sequence_table"
-                and isinstance(frame_node, ast.Name)
-                and frame_node.id == "event_sequence_table_all"
-            ):
-                found = True
-                break
+        name_node, frame_node = node.elts[0], node.elts[-1]
+        if (
+            isinstance(name_node, ast.Constant)
+            and name_node.value == "event_sequence_table"
+            and isinstance(frame_node, ast.Name)
+            and frame_node.id == "event_sequence_table_all"
+        ):
+            found = True
+            break
     assert found, (
-        "The saver-loop tuple in main() no longer contains "
-        '("event_sequence_table", event_sequence_table_all). '
+        "The publish spec no longer pairs "
+        '("event_sequence_table", ..., event_sequence_table_all); '
         "the retrospective pass's read will fail with FileNotFoundError."
     )
 

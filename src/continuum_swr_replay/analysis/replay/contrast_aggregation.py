@@ -30,16 +30,37 @@ from statsmodels.stats.multitest import multipletests
 # statement about the identified minority and is not emitted at all.
 MAX_UNIDENTIFIED_SHARE = 0.20
 
+# The per-row output schema, in emit order. Kept as a constant so an
+# all-gated-out run still returns a correctly-shaped (empty) frame rather than a
+# column-less one that KeyErrors on column selection. ``session_signrank_fdr_q``
+# is appended after the BH-FDR pass, so it is added by the caller/return, not here.
+_AGG_COLUMNS = (
+    "level", "model", "population", "term", "n_sessions", "n_animals",
+    "n_dropped", "n_sessions_flagged_nonconverged", "n_sessions_flagged_separated",
+    "coef_animal_median", "n_animals_pos", "coef_session_median",
+    "typical_session_se", "std_unit", "std_factor", "std_coef_animal_median",
+    "std_coef_session_median", "std_typical_session_se", "pct_positive_session",
+    "pct_sig_session", "session_signrank_p",
+)
+
 logger = logging.getLogger(__name__)
 
 # Binary predictors (per-category; not standardized). Full term names, including the
 # swr_x_ / is_swr: interaction forms used by the content and rate ladders.
-BINARY_TERMS = frozenset({
-    "is_current", "swr_x_current", "swr_x_prev", "swr_x_is_last_rewarded_elsewhere",
-    "is_current_patch", "is_last_rewarded_patch_elsewhere", "swr_x_current_patch",
-    "swr_x_last_rewarded_patch_elsewhere",
-    "reward_lag1", "is_swr:reward_lag1",
-})
+BINARY_TERMS = frozenset(
+    {
+        "is_current_arm",
+        "swr_x_is_current_arm",
+        "swr_x_is_prev_arm",
+        "swr_x_is_last_rewarded_noncurrent_arm",
+        "is_current_patch",
+        "is_last_rewarded_noncurrent_patch",
+        "swr_x_is_current_patch",
+        "swr_x_is_last_rewarded_noncurrent_patch",
+        "known_reward_outcome_lag_1",
+        "is_swr:known_reward_outcome_lag_1",
+    }
+)
 
 
 def std_factor(term: str, sd: dict) -> tuple[float, str]:
@@ -71,7 +92,7 @@ def aggregate_contrast(
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
-        Value for the ``level`` column ("arm" / "patch" / "rate").
+        Value for the ``level`` column ("candidate_arm" / "patch" / "rate").
     sd : dict, optional
         Covariate -> global SD, for the standardized (per-SD) columns.
     """
@@ -161,7 +182,12 @@ def aggregate_contrast(
         })
     df = pd.DataFrame(rows)
     if df.empty:
-        return df
+        # Every spec was gated out (all terms unidentified in too large a share
+        # of sessions). Return the full schema so callers that select columns
+        # (e.g. ``agg["population"].map(...)``) get an empty frame, not a
+        # KeyError -- a mostly-separated corpus is a valid, reportable "nothing
+        # identified", not a crash.
+        return pd.DataFrame(columns=[*_AGG_COLUMNS, "session_signrank_fdr_q"])
     n_dropped_total = int(df["n_dropped"].sum())
     if n_dropped_total:
         logger.info(

@@ -20,6 +20,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.spatial_mapping import map_estimate_to_arm
 from continuum_swr_replay.table_io import read_table
 
@@ -32,7 +35,8 @@ BIN_EDGES = np.arange(-3.0, 14.01, 0.5)
 
 def main():
     et = read_table(PD / "replay_content" / "event_table.pkl")
-    sessions = list(et.groupby(["animal", "day", "epoch"]))
+    require_covariate_schema(et, table="event")
+    sessions = list(et.groupby(["animal", "session_date", "epoch"]))
 
     # global binned accumulators: n and n_trunk per z-bin, for SWR and MUA
     nb = len(BIN_EDGES) - 1
@@ -82,7 +86,7 @@ def main():
         sp_mua = spearmanr(mua_z, is_trunk).statistic if is_trunk.std() else np.nan
 
         # WITHIN-EVENT: assign each timebin to the event window containing it
-        ev = es[["event_start", "event_end"]].to_numpy()
+        ev = es[["event_start_s", "event_end_s"]].to_numpy()
         order = np.argsort(ev[:, 0])
         ev = ev[order]
         starts = ev[:, 0]
@@ -110,7 +114,7 @@ def main():
                     we_sp_mua = spearmanr(df["zm_d"], df["tk_d"]).statistic
 
         per_session.append(
-            {"animal": a, "day": d, "epoch": e, "n_timebins": len(is_trunk),
+            {"animal": a, "session_date": d, "epoch": e, "n_timebins": len(is_trunk),
              "trunk_rate": float(is_trunk.mean()),
              "spearman_swr": sp_swr, "spearman_mua": sp_mua,
              "we_spearman_swr": we_sp_swr, "we_spearman_mua": we_sp_mua,

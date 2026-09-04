@@ -137,7 +137,7 @@ def main() -> None:
     # per-long-event detail
     cols = KEYS + ["event_duration", "n_bins", "mua_z_mean", "mua_z_max",
                    "nospike_max", "map_pos_std", "map_speed_mean", "hpd_mean",
-                   "frag_mean", "cont_mean", "max_speed"]
+                   "frag_mean", "cont_mean", "animal_max_speed_cm_s"]
     cols = [c for c in cols if c in long1.columns]
     detail = long1.sort_values("event_duration", ascending=False)[cols]
     emit("All >1s non-SWR events:")

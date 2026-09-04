@@ -6,7 +6,7 @@ binary response) to test whether arm-level replay content improves
 prediction of the animal's next destination above a behavior-only
 baseline.
 
-The key predictor is ``replay_frac`` — the mean ``arm_fraction``
+The key predictor is ``replay_fraction`` — the mean ``arm_fraction``
 across all events during a stop. This is the fraction of non-local
 content on each arm, averaged over replay events within the stop.
 It's known BEFORE the animal makes its next choice (replay happens
@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._fit_diagnostics import (
     capture_fit_warnings,
@@ -42,11 +43,11 @@ logger = logging.getLogger(__name__)
 # *choose* to visit a well, so these are the eligible alternatives in
 # the conditional-logit choice set. Trunk arms 6/7/8 connect patch
 # junctions and are transit-only — they can never be ``next_arm``,
-# they have no ``reward_rate_arm_k10``, and ``arm_path_well_to_well``
+# they have no ``reward_fraction_candidate_arm_last10_visits``, and ``arm_path_well_to_well``
 # already documents that trunk arms cannot be stop endpoints. The
 # learning-stage helpers use the same set under
 # ``StopSummaryConfig.well_arms`` for "best arm" lookups.
-_SESSION_COLS = ("animal", "day", "epoch")
+_SESSION_COLS = SESSION_COLUMNS
 
 
 def _require_session_unique_ids(
@@ -193,8 +194,8 @@ def build_residualized_choice_dataset(
     Returns
     -------
     pd.DataFrame
-        Choice dataset with ``replay_frac`` (raw) and
-        ``replay_frac_residual`` (content-model residualized) columns.
+        Choice dataset with ``replay_fraction`` (raw) and
+        ``replay_fraction_residual`` (content-model residualized) columns.
     """
     eat_resid = predict_arm_fractions(
         event_arm_table, content_fit, content_predictors, fraction_col=fraction_col
@@ -208,9 +209,9 @@ def build_residualized_choice_dataset(
     # partial-event aggregate — the same contamination
     # ``predict_arm_fractions`` was just hardened against.
     stop_arm_resid = (
-        eat_resid.groupby(["stop_id", "arm"])["residual_frac"]
+        eat_resid.groupby(["stop_id", "candidate_arm"])["residual_frac"]
         .apply(strict_mean)
-        .rename("replay_frac_residual")
+        .rename("replay_fraction_residual")
         .reset_index()
     )
 
@@ -221,8 +222,8 @@ def build_residualized_choice_dataset(
         return choice_df
 
     choice_df = choice_df.merge(
-        stop_arm_resid[["stop_id", "arm", "replay_frac_residual"]],
-        on=["stop_id", "arm"],
+        stop_arm_resid[["stop_id", "candidate_arm", "replay_fraction_residual"]],
+        on=["stop_id", "candidate_arm"],
         how="left",
     )
     # Do NOT ``fillna(0.0)`` — that fabricates a real zero from
@@ -231,7 +232,7 @@ def build_residualized_choice_dataset(
     # already drops any stop with a NaN required predictor, so
     # propagating NaN here is what makes the filter end-to-end.
     # Stops whose events were ALL filtered will have NaN
-    # ``replay_frac_residual`` for every arm and be dropped at
+    # ``replay_fraction_residual`` for every arm and be dropped at
     # fit time.
 
     return choice_df
@@ -249,7 +250,7 @@ def build_choice_dataset(
     For each stop that is explicitly labeled ``at_well``, has (a) at least
     one replay event and (b) a valid ``next_arm`` (known next destination),
     produces one row per candidate arm. The choice set is the well arms (leaf arms 0-5,
-    one per well) minus ``current_arm`` — the animal can only choose
+    one per well) minus ``occupancy_well_arm`` — the animal can only choose
     to visit a well, and consecutive pokes at the same port are never
     rewarded. Trunk arms (6/7/8) are transit-only — they connect
     patch junctions and can never be ``next_arm`` — so including them
@@ -271,23 +272,22 @@ def build_choice_dataset(
         One row per (stop, candidate arm). Columns:
 
         - ``stop_id`` — grouping key for conditional logistic
-        - ``arm`` — candidate arm ID
+        - ``candidate_arm`` — candidate arm ID
         - ``chosen`` — 1 if the animal chose this arm, 0 otherwise
-        - ``replay_frac`` — mean fraction across events in this stop
-        - ``visit_recency``, ``arm_never_visited``, ``reward_rate_arm_k10``,
-          learned ``q_arm``, nominal ``p_reward_arm``, ``dist_to_arm``,
-          ``is_same_patch``
+        - ``replay_fraction`` — mean fraction across events in this stop
+        - trial recency/novelty, recent reward fraction, reward-belief mean,
+          scheduled reward probability, graph distance, and same-patch status
           — behavioral baseline predictors (from the last event in
           the stop)
-        - ``n_events`` — number of replay events in this stop
-        - ``location_state``, ``at_well`` — explicit cohort provenance
-        - Session identifiers (``animal``, ``day``, ``epoch``)
+        - ``n_selected_events`` — number of non-local replay events in this stop
+        - ``occupancy_state``, ``at_well`` — explicit cohort provenance
+        - Session identifiers (``animal``, ``session_date``, ``epoch``)
     """
     # Choice analysis is the first downstream consumer that intentionally
-    # selects the at-well cohort. ``current_arm`` is additionally required so
-    # the ``arm != current_arm`` exclusion below removes exactly one arm from
+    # selects the at-well cohort. ``occupancy_well_arm`` is additionally
+    # required so the candidate exclusion below removes exactly one arm from
     # the WELL_ARMS candidate set
-    # (5 alternatives after the well-arm filter); when current_arm is
+    # (5 alternatives after the well-arm filter); when occupancy is
     # NaN the comparison evaluates True for every arm (IEEE 754),
     # silently inflating the choice set to all 6 well arms for those
     # stops.
@@ -300,7 +300,7 @@ def build_choice_dataset(
         event_arm_table, "stop_id", helper_name="build_choice_dataset"
     )
 
-    required_location = ["location_state", "at_well"]
+    required_location = ["occupancy_state", "at_well"]
     missing_location = [c for c in required_location if c not in stop_table.columns]
     if missing_location:
         raise KeyError(
@@ -316,7 +316,7 @@ def build_choice_dataset(
         replay_stops
         & at_well_stops
         & stop_table["next_arm"].notna()
-        & stop_table["current_arm"].notna()
+        & stop_table["occupancy_well_arm"].notna()
     )
     valid_stops = stop_table.loc[has_replay].copy()
     # The cohort shrinks with the immobility threshold and the trial
@@ -340,17 +340,17 @@ def build_choice_dataset(
         [
             "event_id",
             "stop_id",
-            "arm",
+            "candidate_arm",
             fraction_col,
-            "visit_recency",
-            "arm_never_visited",
-            "cumulative_reward",
-            "reward_rate_arm_k10",
-            "q_arm",
-            "p_reward_arm",
-            "dist_to_arm",
-            "arm_dist_rank",
-            "is_same_patch",
+            "visit_recency_trials",
+            "is_candidate_arm_never_visited",
+            "reward_count_candidate_arm_last10_known_trials",
+            "reward_fraction_candidate_arm_last10_visits",
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "task_reward_probability_candidate_arm",
+            "distance_to_candidate_arm_cm",
+            "candidate_arm_distance_rank",
+            "is_same_patch_as_current",
         ]
     ].copy()
 
@@ -360,18 +360,18 @@ def build_choice_dataset(
     # chosen-arm sanity check below cannot recover the missingness
     # once the NaN has been collapsed away.
     stop_arm = (
-        eat.groupby(["stop_id", "arm"])
+        eat.groupby(["stop_id", "candidate_arm"])
         .agg(
-            replay_frac=(fraction_col, strict_mean),
-            visit_recency=("visit_recency", "last"),
-            arm_never_visited=("arm_never_visited", "last"),
-            cumulative_reward=("cumulative_reward", "last"),
-            reward_rate_arm_k10=("reward_rate_arm_k10", "last"),
-            q_arm=("q_arm", "last"),
-            p_reward_arm=("p_reward_arm", "last"),
-            dist_to_arm=("dist_to_arm", "last"),
-            arm_dist_rank=("arm_dist_rank", "last"),
-            is_same_patch=("is_same_patch", "last"),
+            replay_fraction=(fraction_col, strict_mean),
+            visit_recency_trials=("visit_recency_trials", "last"),
+            is_candidate_arm_never_visited=("is_candidate_arm_never_visited", "last"),
+            reward_count_candidate_arm_last10_known_trials=("reward_count_candidate_arm_last10_known_trials", "last"),
+            reward_fraction_candidate_arm_last10_visits=("reward_fraction_candidate_arm_last10_visits", "last"),
+            reward_belief_mean_candidate_arm_preoutcome=("reward_belief_mean_candidate_arm_preoutcome", "last"),
+            task_reward_probability_candidate_arm=("task_reward_probability_candidate_arm", "last"),
+            distance_to_candidate_arm_cm=("distance_to_candidate_arm_cm", "last"),
+            candidate_arm_distance_rank=("candidate_arm_distance_rank", "last"),
+            is_same_patch_as_current=("is_same_patch_as_current", "last"),
         )
         .reset_index()
     )
@@ -379,44 +379,42 @@ def build_choice_dataset(
     # SWR-overlap-conditional replay fractions per (stop, arm). Each is
     # the mean ``arm_fraction`` restricted to events where ``is_swr`` is
     # True (or False) within the stop. A (stop, arm) with no SWR-overlap
-    # events at all gets NaN for ``replay_frac_swr`` — different from
+    # events at all gets NaN for ``replay_fraction_swr`` — different from
     # "0 SWR replay on this arm despite SWR events," which would be 0;
     # honest NaN lets the fitter drop those stops from any model using
     # the split predictors.
     if "is_swr" in event_arm_table.columns:
-        eat_swr = event_arm_table[["stop_id", "arm", fraction_col, "is_swr"]].copy()
+        eat_swr = event_arm_table[["stop_id", "candidate_arm", fraction_col, "is_swr"]].copy()
         swr_frac = (
             eat_swr[eat_swr["is_swr"]]
-            .groupby(["stop_id", "arm"])[fraction_col]
+            .groupby(["stop_id", "candidate_arm"])[fraction_col]
             .apply(strict_mean)
-            .rename("replay_frac_swr")
+            .rename("replay_fraction_swr")
             .reset_index()
         )
         non_swr_frac = (
             eat_swr[~eat_swr["is_swr"]]
-            .groupby(["stop_id", "arm"])[fraction_col]
+            .groupby(["stop_id", "candidate_arm"])[fraction_col]
             .apply(strict_mean)
-            .rename("replay_frac_non_swr")
+            .rename("replay_fraction_non_swr")
             .reset_index()
         )
-        stop_arm = stop_arm.merge(swr_frac, on=["stop_id", "arm"], how="left")
-        stop_arm = stop_arm.merge(non_swr_frac, on=["stop_id", "arm"], how="left")
+        stop_arm = stop_arm.merge(swr_frac, on=["stop_id", "candidate_arm"], how="left")
+        stop_arm = stop_arm.merge(non_swr_frac, on=["stop_id", "candidate_arm"], how="left")
 
     # Join with stop-level info.
     stop_info = valid_stops[
         [
             "stop_id",
             "animal",
-            "day",
+            "session_date",
             "epoch",
-            "location_state",
+            "occupancy_state",
             "at_well",
-            "current_arm",
+            "occupancy_well_arm",
             "next_arm",
-            "n_events",
-            "reward_outcome",
-            "is_after_reward",
-            "is_after_omission",
+            "n_selected_events",
+            "is_rewarded_outcome",
         ]
     ].copy()
 
@@ -430,12 +428,12 @@ def build_choice_dataset(
     # arm axis, so a future track-graph change can extend the
     # eligible-destination set in one place.
     choice_df = choice_df[
-        choice_df["arm"].isin(WELL_ARMS)
-        & (choice_df["arm"] != choice_df["current_arm"])
+        choice_df["candidate_arm"].isin(WELL_ARMS)
+        & (choice_df["candidate_arm"] != choice_df["occupancy_well_arm"])
     ].reset_index(drop=True)
 
     # Response: did the animal choose this arm?
-    choice_df["chosen"] = (choice_df["arm"] == choice_df["next_arm"]).astype(int)
+    choice_df["chosen"] = (choice_df["candidate_arm"] == choice_df["next_arm"]).astype(int)
 
     # Sanity: exactly one chosen arm per stop.
     chosen_per_stop = choice_df.groupby("stop_id")["chosen"].sum()
@@ -463,7 +461,7 @@ def fit_choice_model(
     choice_df : pd.DataFrame
         Output of :func:`build_choice_dataset`.
     predictors : list[str]
-        Arm-varying predictors (e.g., ``["replay_frac"]``).
+        Arm-varying predictors (e.g., ``["replay_fraction"]``).
     stop_col : str
         Grouping variable.
 

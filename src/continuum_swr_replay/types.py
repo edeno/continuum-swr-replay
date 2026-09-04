@@ -129,6 +129,7 @@ class SessionData(TypedDict, total=False):
     # Behavioral data
     well_visits: pd.DataFrame
     trials: pd.DataFrame
+    port_experiences: pd.DataFrame
     task_variables: pd.DataFrame
 
     # Metadata
@@ -202,6 +203,7 @@ class SessionDataKeys(StrEnum):
     # Behavioral data
     WELL_VISITS = "well_visits"
     TRIALS = "trials"
+    PORT_EXPERIENCES = "port_experiences"
     TASK_VARIABLES = "task_variables"
 
     # Metadata
@@ -268,6 +270,7 @@ class DataLoadingPreset:
             SessionDataKeys.LINEAR_EDGE_ORDER,
             SessionDataKeys.LINEAR_EDGE_SPACING,
             SessionDataKeys.TRIALS,
+            SessionDataKeys.PORT_EXPERIENCES,
             SessionDataKeys.TASK_VARIABLES,
             SessionDataKeys.WELL_VISITS,
             SessionDataKeys.BEAM_BREAKS,
@@ -280,6 +283,7 @@ class DataLoadingPreset:
     DECODING: frozenset[str] = NEURAL | frozenset(
         {
             SessionDataKeys.TRIALS,
+            SessionDataKeys.PORT_EXPERIENCES,
             SessionDataKeys.TASK_VARIABLES,
             SessionDataKeys.ELECTRODE_GROUP_INFO,
         }

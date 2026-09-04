@@ -26,7 +26,10 @@ have no columnar representation; those stay pickled.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -34,9 +37,87 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-__all__ = ["read_table", "write_table", "parquet_path", "table_exists"]
+__all__ = [
+    "read_table",
+    "write_table",
+    "publish_canonical",
+    "parquet_path",
+    "table_exists",
+    "umask_file_mode",
+    "sha256_file",
+]
+
+
+def sha256_file(path: str | Path, *, chunk_bytes: int = 1 << 20) -> str:
+    """Return the hex sha256 of a file, read in chunks (no whole-file load)."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(chunk_bytes), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
+
+
+def umask_file_mode() -> int:
+    """Return the file mode a normal umask-respecting create would produce.
+
+    ``tempfile.mkstemp`` hard-codes mode ``0o600`` regardless of the process
+    umask, and ``os.replace`` preserves that mode. Every atomic writer here goes
+    through ``mkstemp``, so without this the promoted file lands owner-only
+    (``-rw-------``) instead of the group-readable ``-rw-r--r--`` a plain
+    ``open(..., "wb")`` would have produced -- which silently breaks any
+    group/other reader of the shared ``Processed-Data`` tree. Reading the umask
+    is a get-and-restore (there is no read-only query), so the window in which
+    the umask is 0 is kept to these two lines.
+    """
+    umask = os.umask(0)
+    os.umask(umask)
+    return 0o666 & ~umask
+
+
+def publish_canonical(
+    frame: pd.DataFrame,
+    path: str | Path,
+    *,
+    table: str,
+    basename: str | None = None,
+) -> Path:
+    """Stamp, validate, and atomically write a canonical table.
+
+    The one supported way to persist a canonical table. ``table`` is the schema
+    key (``"event"``, ``"event_arm"``, ``"stop"``, ``"qvals"``, ...). The frame
+    is stamped with the covariate schema -- which also checks the registered row
+    keys are unique and nonmissing and the vocabulary is canonical
+    (``stamp_covariate_schema`` calls ``assert_canonical_vocabulary`` +
+    ``assert_unique_scientific_rows``) -- and then written atomically. A writer
+    that bypasses this and calls ``write_table`` directly on a canonical frame
+    persists an unstamped table that ``require_covariate_schema`` rejects
+    downstream at fit time; routing through here makes the stamp a property of
+    the write, not a convention each caller must remember.
+
+    ``basename`` writes to ``path / basename`` (for the source-tagged ContFrag
+    reducers that build the filename from an event source and brain area).
+
+    A frame already carrying the current stamp for this table (a caller that
+    stamped it and did not mutate it since) skips the re-validation -- the two
+    full-frame ``isna``/``duplicated`` passes in ``stamp_covariate_schema`` --
+    and is written as-is; the stamp is the record that it was validated.
+    """
+    # Function-local import: covariate_registry's consumers import table_io, so a
+    # module-level import here would close a cycle.
+    from continuum_swr_replay.analysis.replay.covariate_registry import (
+        COVARIATE_SCHEMA_VERSION,
+        stamp_covariate_schema,
+    )
+
+    already_stamped = (
+        frame.attrs.get("covariate_schema_version") == COVARIATE_SCHEMA_VERSION
+        and frame.attrs.get("covariate_schema_table") == table
+    )
+    stamped = frame if already_stamped else stamp_covariate_schema(frame, table=table)
+    target = Path(path) if basename is None else Path(path) / basename
+    return write_table(stamped, target)
 
 
 def parquet_path(path: str | Path) -> Path:
@@ -70,7 +151,26 @@ def write_table(frame: pd.DataFrame, path: str | Path, **kwargs: Any) -> Path:
     table = table.replace_schema_metadata(metadata)
 
     kwargs.setdefault("compression", "zstd")
-    pq.write_table(table, out, **kwargs)
+    # Atomic write: a crash or kill mid-write leaves the destination untouched
+    # rather than a truncated parquet that a later read would silently accept or
+    # loudly fail on. The temp file shares the destination directory so
+    # ``os.replace`` is a same-filesystem atomic rename. This matters for the
+    # multi-table regeneration reducers, where a half-written table would break
+    # the atomic event/stop table set.
+    handle, tmp_name = tempfile.mkstemp(
+        dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"
+    )
+    os.close(handle)
+    tmp = Path(tmp_name)
+    try:
+        pq.write_table(table, tmp, **kwargs)
+        # mkstemp created tmp at 0600; restore the umask-respecting mode a plain
+        # write would have produced before promoting it (see umask_file_mode).
+        os.chmod(tmp, umask_file_mode())
+        os.replace(tmp, out)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
     return out
 
 

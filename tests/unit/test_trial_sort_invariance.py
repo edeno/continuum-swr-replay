@@ -17,14 +17,55 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay._helpers import (
-    add_trial_context,
-    cumulative_reward_all_events,
-    lagged_trial_rewards,
-    recent_reward_rate_all_events,
-    recent_trial_reward_rate,
-    visit_recency_all_events,
+from continuum_swr_replay.analysis.replay.covariates import (
+    add_trial_context as _add_trial_context,
 )
+from continuum_swr_replay.analysis.replay.covariates import (
+    lagged_trial_rewards as _lagged_trial_rewards,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    recent_reward_rate_all_events as _recent_reward_rate_all_events,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    recent_trial_reward_rate as _recent_trial_reward_rate,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    rolling_reward_count_all_events as _rolling_reward_count_all_events,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    visit_recency_all_events as _visit_recency_all_events,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
+    return port_experiences_from_trials(trials, prepend_initial=False)
+
+
+def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
+    return _add_trial_context(
+        dot, trials, port_experiences_from_trials(trials, prepend_initial=True)
+    )
+
+
+def visit_recency_all_events(times, trials, well_to_arm):
+    return _visit_recency_all_events(times, _experiences(trials), well_to_arm)
+
+
+def rolling_reward_count_all_events(times, trials, well_to_arm):
+    return _rolling_reward_count_all_events(times, _experiences(trials), well_to_arm)
+
+
+def recent_reward_rate_all_events(times, trials, well_to_arm, k=10):
+    return _recent_reward_rate_all_events(times, _experiences(trials), well_to_arm, k)
+
+
+def recent_trial_reward_rate(times, trials, k=10):
+    return _recent_trial_reward_rate(times, _experiences(trials), k)
+
+
+def lagged_trial_rewards(times, trials, k=10):
+    return _lagged_trial_rewards(times, _experiences(trials), k)
 
 
 def _toy_trials(n: int = 6) -> pd.DataFrame:
@@ -63,8 +104,7 @@ class TestTrialSortInvariance:
             "current_well",
             "next_well",
             "last_rewarded_well",
-            "is_after_switch",
-            "is_after_reward",
+            "did_last_completed_trip_switch_patch",
         ):
             np.testing.assert_array_equal(
                 out_sorted[col].to_numpy(),
@@ -88,10 +128,10 @@ class TestTrialSortInvariance:
         shuffled = sorted_trials.iloc[[3, 0, 5, 1, 4, 2]].reset_index(drop=True)
         event_times = np.array([0.5, 2.5, 4.5])
 
-        out_sorted = cumulative_reward_all_events(
+        out_sorted = rolling_reward_count_all_events(
             event_times, sorted_trials, _well_to_arm()
         )
-        out_shuffled = cumulative_reward_all_events(
+        out_shuffled = rolling_reward_count_all_events(
             event_times, shuffled, _well_to_arm()
         )
         np.testing.assert_array_equal(out_sorted, out_shuffled)
@@ -117,7 +157,7 @@ class TestTrialSortInvariance:
 class TestNoPastTrialsContract:
     """All three trial-history helpers must agree that an event with
     no completed trial behind it has UNKNOWN history (NaN), not a
-    fabricated zero. Pre-fix ``cumulative_reward_all_events`` returned
+    fabricated zero. Pre-fix ``rolling_reward_count_all_events`` returned
     zeros for the no-past-trials case while its sibling helpers
     correctly returned NaN, letting M3 (+ ``cumulative_reward``) treat
     before-trial events as valid neutral observations.
@@ -128,7 +168,7 @@ class TestNoPastTrialsContract:
         # at 1.5s. Pre-fix returned all-zero cumulative_reward.
         event_times = np.array([0.5])
         trials = pd.DataFrame([{"end_time": 1.5, "to_well": 0, "is_reward": True}])
-        out = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        out = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         assert np.all(np.isnan(out)), (
             f"cumulative_reward returned {out} for an event with no "
             "past trials — should be all-NaN to match the contract "
@@ -141,7 +181,7 @@ class TestNoPastTrialsContract:
         trials = pd.DataFrame([{"end_time": 1.5, "to_well": 0, "is_reward": True}])
         w2a = _well_to_arm()
         vr = visit_recency_all_events(event_times, trials, w2a)
-        cr = cumulative_reward_all_events(event_times, trials, w2a)
+        cr = rolling_reward_count_all_events(event_times, trials, w2a)
         rrr = recent_reward_rate_all_events(event_times, trials, w2a)
         assert np.all(np.isnan(vr))
         assert np.all(np.isnan(cr))
@@ -153,7 +193,7 @@ class TestNoPastTrialsContract:
         # ``cutoffs == 0``, not applied universally).
         event_times = np.array([0.5, 2.0])  # before, then after
         trials = pd.DataFrame([{"end_time": 1.5, "to_well": 0, "is_reward": True}])
-        out = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        out = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         assert np.all(np.isnan(out[0]))
         # Event 1 is after a single rewarded trial to well 0 (arm 0).
         assert out[1, 0] == 1.0
@@ -167,8 +207,9 @@ class TestNoPastTrialsContract:
                     "start_time": 1.0,
                     "end_time": 3.0,
                     "goal_arrival_time": 2.0,
-                    # 0.2 s pump latency: within the real distribution (max
-                    # observed 0.298 s) and under OMISSION_KNOWN_LATENCY_SEC, so
+                    # 0.2 s pump latency: within the refreshed distribution
+                    # (max observed 0.2361 s) and under
+                    # OMISSION_KNOWN_LATENCY_SEC, so
                     # the fixture exercises the arrival-vs-pump gap without
                     # tripping the latency guard in _trial_outcome_times.
                     "reward_on_time": 2.2,
@@ -176,13 +217,13 @@ class TestNoPastTrialsContract:
                     "from_well": 0,
                     "to_well": 2,
                     "is_reward": True,
-                    "is_patch_change": False,
+                    "is_patch_change": True,
                 }
             ]
         )
         event_times = np.array([2.1, 2.2])
         vr = visit_recency_all_events(event_times, trials, _well_to_arm())
-        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
         trial_rate = recent_trial_reward_rate(event_times, trials)
         lags = lagged_trial_rewards(event_times, trials, k=1)
@@ -196,7 +237,7 @@ class TestNoPastTrialsContract:
         assert np.isnan(rrr[0]).all()
         assert np.isnan(trial_rate[0])
         assert np.isnan(lags[0, 0])
-        assert pd.isna(context.loc[2.1, "reward_outcome"])
+        assert pd.isna(context.loc[2.1, "is_rewarded_outcome"])
         assert pd.isna(context.loc[2.1, "last_rewarded_well"])
 
         # Equality at pump onset is eligible across every reward-history path.
@@ -204,7 +245,7 @@ class TestNoPastTrialsContract:
         assert rrr[1, 2] == 1.0
         assert trial_rate[1] == 1.0
         assert lags[1, 0] == 1.0
-        assert context.loc[2.2, "reward_outcome"] == 1.0
+        assert context.loc[2.2, "is_rewarded_outcome"] == 1.0
         assert context.loc[2.2, "last_rewarded_well"] == 2.0
 
     def test_history_cutoffs_falls_back_to_end_time_when_goal_arrival_time_missing(
@@ -218,7 +259,7 @@ class TestNoPastTrialsContract:
         event_times = np.array([0.5, 2.5, 4.5])
         # Just confirm they run and return the expected shape.
         vr = visit_recency_all_events(event_times, trials, _well_to_arm())
-        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
         assert vr.shape == (3, 9)
         assert cr.shape == (3, 9)
@@ -263,7 +304,7 @@ class TestNoPastTrialsContract:
                     "from_well": 1,
                     "to_well": 2,
                     "is_reward": True,
-                    "is_patch_change": False,
+                    "is_patch_change": True,
                 },
             ]
         )
@@ -283,7 +324,7 @@ class TestNoPastTrialsContract:
         # _last_reward_time uses the same arrival_times array → 1.0.
         assert dot["_last_reward_time"].iloc[0] == 1.0
         # And the history helpers must agree: trial 0 contributed.
-        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         vr = visit_recency_all_events(event_times, trials, _well_to_arm())
         assert cr[0, 1] == 1.0
         assert vr[0, 1] == 1.0  # 1 trial ago
@@ -319,7 +360,7 @@ class TestNoPastTrialsContract:
         # Event at t=2.0: trial 0 is past (cutoff=1.0 ≤ 2.0); trial 1
         # is future (cutoff=2.5 > 2.0).
         event_times = np.array([2.0])
-        cr = cumulative_reward_all_events(event_times, trials, _well_to_arm())
+        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
         # arm 1 is rewarded by trial 0 → 1; arm 2 is not yet rewarded.
         assert cr[0, 1] == 1.0
         assert cr[0, 2] == 0.0
@@ -330,7 +371,7 @@ class TestNoPastTrialsContract:
         # helpers' contract for the same case.
         event_times = np.array([1.0, 2.0, 3.0])
         empty_trials = pd.DataFrame({"end_time": [], "to_well": [], "is_reward": []})
-        out = cumulative_reward_all_events(event_times, empty_trials, _well_to_arm())
+        out = rolling_reward_count_all_events(event_times, empty_trials, _well_to_arm())
         assert np.all(np.isnan(out))
 
 

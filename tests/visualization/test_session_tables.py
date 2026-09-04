@@ -24,13 +24,14 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import to_rgba
 
 from continuum_swr_replay.analysis.replay._helpers import (
-    add_trial_context,
     single_arm_from_well,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    add_trial_context as _add_trial_context,
 )
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 from continuum_swr_replay.visualization.session_tables import (
     DEFAULT_PANELS,
-    _compute_mismatch_table,
     _PanelContext,
     _plot_arm_markers,
     _plot_mismatch_pointers,
@@ -38,6 +39,26 @@ from continuum_swr_replay.visualization.session_tables import (
     plot_session_tables,
     register_panel,
 )
+from continuum_swr_replay.visualization.session_tables import (
+    _compute_mismatch_table as _production_compute_mismatch_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
+    return port_experiences_from_trials(trials, prepend_initial=True)
+
+
+def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
+    return _add_trial_context(dot, trials, _experiences(trials))
+
+
+def _compute_mismatch_table(
+    event_table: pd.DataFrame, trials: pd.DataFrame, track_graph
+) -> pd.DataFrame:
+    return _production_compute_mismatch_table(
+        event_table, trials, _experiences(trials), track_graph
+    )
 
 
 def _bandit_graph() -> nx.Graph:
@@ -73,6 +94,7 @@ def _ctx_with_trials(
         event_sequence_table=pd.DataFrame(),
         stop_table=pd.DataFrame(),
         trials=trials,
+        port_experiences=_experiences(trials),
         track_graph=None,
         time_slice=slice(*window),
         arm_palette={},
@@ -90,7 +112,7 @@ class TestTrialRail:
                 "to_well": [3],
                 "from_well": [0],
                 "is_reward": [True],
-                "is_patch_change": [False],
+                "is_patch_change": [True],
             }
         )
         fig, ax = plt.subplots()
@@ -107,7 +129,7 @@ class TestTrialRail:
                 "to_well": [1, 3, 5],
                 "from_well": [0, 1, 3],
                 "is_reward": [False, True, False],
-                "is_patch_change": [False, True, False],
+                "is_patch_change": [False, True, True],
             }
         )
         fig, ax = plt.subplots()
@@ -130,7 +152,7 @@ class TestTrialRail:
                 "to_well": [4],
                 "from_well": [0],
                 "is_reward": [False],
-                "is_patch_change": [False],
+                "is_patch_change": [True],
             }
         )
         fig, ax = plt.subplots()
@@ -148,7 +170,7 @@ class TestTrialRail:
                 "to_well": [1, 3],
                 "from_well": [0, 1],
                 "is_reward": [False, False],
-                "is_patch_change": [False, False],
+                "is_patch_change": [False, True],
             }
         )
         fig, ax = plt.subplots()
@@ -245,6 +267,7 @@ def _ctx_for_debug(
         event_sequence_table=pd.DataFrame(),
         stop_table=pd.DataFrame(),
         trials=trials,
+        port_experiences=_experiences(trials),
         track_graph=_bandit_graph(),
         time_slice=slice(*window),
         arm_palette=patch_grouped_arm_palette(),
@@ -260,9 +283,9 @@ def _make_event_table(event_midpoint_times, next_arms, *, event_start_times=None
     return pd.DataFrame(
         {
             "event_id": list(range(len(event_midpoint_times))),
-            "event_start": event_start_times,
-            "event_midpoint_time": event_midpoint_times,
-            "current_arm": np.repeat(0.0, len(event_midpoint_times)),
+            "event_start_s": event_start_times,
+            "event_midpoint_s": event_midpoint_times,
+            "occupancy_well_arm": np.repeat(0.0, len(event_midpoint_times)),
             "prev_arm": np.repeat(1.0, len(event_midpoint_times)),
             "next_arm": next_arms,
             "last_rewarded_arm": np.repeat(2.0, len(event_midpoint_times)),
@@ -288,7 +311,7 @@ class TestComputeMismatchTable:
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
                 "is_reward": [False, True, False],
-                "is_patch_change": [False, False, True],
+                "is_patch_change": [True, False, False],
             }
         )
         event_starts = np.array([-1.0, 0.0, 9.999, 10.0, 19.999, 20.0, 30.0])
@@ -303,8 +326,8 @@ class TestComputeMismatchTable:
         event_table = pd.DataFrame(
             {
                 "event_id": np.arange(len(event_starts)),
-                "event_start": event_starts,
-                "event_midpoint_time": event_starts + 0.001,
+                "event_start_s": event_starts,
+                "event_midpoint_s": event_starts + 0.001,
                 "next_arm": expected_arms,
             }
         )
@@ -335,7 +358,7 @@ class TestComputeMismatchTable:
                 "from_well": [0, 3, 5],
                 "to_well": [3, 5, 3],
                 "is_reward": [True, True, False],
-                "is_patch_change": [True, False, True],
+                "is_patch_change": [True, True, True],
             }
         )
         mm = _compute_mismatch_table(event_table, trials, _bandit_graph())
@@ -356,7 +379,7 @@ class TestComputeMismatchTable:
                 "from_well": [0, 3],
                 "to_well": [3, 5],
                 "is_reward": [True, True],
-                "is_patch_change": [True, False],
+                "is_patch_change": [True, True],
             }
         )
         mm = _compute_mismatch_table(event_table, trials, _bandit_graph())
@@ -374,7 +397,7 @@ class TestComputeMismatchTable:
                 "from_well": [0, 3],
                 "to_well": [3, 5],
                 "is_reward": [True, True],
-                "is_patch_change": [True, False],
+                "is_patch_change": [True, True],
             }
         )
         mm = _compute_mismatch_table(event_table, trials, _bandit_graph())
@@ -392,7 +415,7 @@ class TestComputeMismatchTable:
                 "from_well": [0, 0, 1],
                 "to_well": [0, 1, 2],
                 "is_reward": [False, False, False],
-                "is_patch_change": [False, False, False],
+                "is_patch_change": [False, False, True],
             }
         )
 
@@ -410,7 +433,7 @@ class TestComputeMismatchTable:
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
                 "is_reward": [False, False, False],
-                "is_patch_change": [False, False, False],
+                "is_patch_change": [True, False, False],
             }
         )
 
@@ -429,7 +452,7 @@ class TestComputeMismatchTable:
                 "from_well": [0, 1],
                 "to_well": [1, 2],
                 "is_reward": [False, False],
-                "is_patch_change": [False, False],
+                "is_patch_change": [False, True],
             }
         )
 
@@ -443,8 +466,8 @@ class TestComputeMismatchTable:
             pd.DataFrame(
                 columns=[
                     "event_id",
-                    "event_start",
-                    "event_midpoint_time",
+                    "event_start_s",
+                    "event_midpoint_s",
                     "next_arm",
                 ]
             ),
@@ -484,7 +507,7 @@ class TestMismatchPointersPanel:
                 "from_well": [0, 3],
                 "to_well": [3, 5],
                 "is_reward": [True, True],
-                "is_patch_change": [True, False],
+                "is_patch_change": [True, True],
             }
         )
         ctx = _ctx_for_debug(event_table, trials, (0.0, 20.0))
@@ -504,7 +527,7 @@ class TestMismatchPointersPanel:
                 "from_well": [0, 3],
                 "to_well": [3, 5],
                 "is_reward": [True, True],
-                "is_patch_change": [True, False],
+                "is_patch_change": [True, True],
             }
         )
         ctx = _ctx_for_debug(event_table, trials, (0.0, 20.0))
@@ -571,6 +594,7 @@ def _ctx_for_covariates(
         event_sequence_table=empty,
         stop_table=empty if stop_table is None else stop_table,
         trials=empty,
+        port_experiences=_experiences(empty),
         track_graph=None,
         time_slice=slice(*window),
         arm_palette=patch_grouped_arm_palette(),
@@ -585,9 +609,9 @@ def _arm_table(values: dict[str, list[float]], n_events: int = 1) -> pd.DataFram
     n = 9 * n_events
     base = {
         "event_id": np.repeat(np.arange(n_events), 9),
-        "arm": np.tile(np.arange(9), n_events),
-        "event_start": np.repeat(np.arange(n_events, dtype=float), 9) + 1.0,
-        "event_end": np.repeat(np.arange(n_events, dtype=float), 9) + 1.5,
+        "candidate_arm": np.tile(np.arange(9), n_events),
+        "event_start_s": np.repeat(np.arange(n_events, dtype=float), 9) + 1.0,
+        "event_end_s": np.repeat(np.arange(n_events, dtype=float), 9) + 1.5,
     }
     for col, vals in values.items():
         assert len(vals) == n, f"{col}: expected {n} values"
@@ -668,9 +692,9 @@ def _public_plot_inputs() -> dict:
     event_table = pd.DataFrame(
         {
             "event_id": [0],
-            "event_start": [1.0],
-            "event_end": [1.5],
-            "event_midpoint_time": [1.25],
+            "event_start_s": [1.0],
+            "event_end_s": [1.5],
+            "event_midpoint_s": [1.25],
             "next_arm": [1.0],
         }
     )
@@ -689,10 +713,13 @@ def _public_plot_inputs() -> dict:
         "detector": SimpleNamespace(environments=[None]),
         "results": xr.Dataset(coords={"time": np.array([0.0, 10.0])}),
         "event_table": event_table,
-        "event_arm_table": _arm_table({"q_arm": [0.5] * 9}),
+        "event_arm_table": _arm_table(
+            {"reward_belief_mean_candidate_arm_preoutcome": [0.5] * 9}
+        ),
         "event_sequence_table": pd.DataFrame(),
         "stop_table": pd.DataFrame(),
         "trials": trials,
+        "port_experiences": _experiences(trials),
         "track_graph": _bandit_graph(),
     }
 
@@ -703,9 +730,13 @@ class TestBehavioralModelPanels:
         from continuum_swr_replay.visualization import session_tables as mod
 
         # All values low: an inferred scale would stretch them to full range.
-        eat = _arm_table({"q_arm": [0.1] * 8 + [0.2]})
+        eat = _arm_table(
+            {"reward_belief_mean_candidate_arm_preoutcome": [0.1] * 8 + [0.2]}
+        )
         fig, ax = plt.subplots()
-        mod._plot_q_arm(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_reward_belief_mean_candidate_arm(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
         (cbar_ax,) = [a for a in fig.axes if a is not ax]
         assert cbar_ax.get_ylim() == (0.0, 1.0)
         plt.close(fig)
@@ -714,9 +745,13 @@ class TestBehavioralModelPanels:
         """This fitted model keeps alpha,beta >= 1, so variance is <= 1/12."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"arm_uncertainty": [0.001] * 9})
+        eat = _arm_table(
+            {"reward_belief_variance_candidate_arm_preoutcome": [0.001] * 9}
+        )
         fig, ax = plt.subplots()
-        mod._plot_arm_uncertainty(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_reward_belief_variance_candidate_arm(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
         (cbar_ax,) = [a for a in fig.axes if a is not ax]
         assert cbar_ax.get_ylim() == pytest.approx((0.0, 1.0 / 12.0))
         plt.close(fig)
@@ -725,9 +760,17 @@ class TestBehavioralModelPanels:
         """Nominal vs believed are only comparable by eye on one scale."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"q_arm": [0.3] * 9, "p_reward_arm": [0.8] * 9})
+        eat = _arm_table(
+            {
+                "reward_belief_mean_candidate_arm_preoutcome": [0.3] * 9,
+                "task_reward_probability_candidate_arm": [0.8] * 9,
+            }
+        )
         lims = []
-        for plotter in (mod._plot_q_arm, mod._plot_p_reward_arm):
+        for plotter in (
+            mod._plot_reward_belief_mean_candidate_arm,
+            mod._plot_task_reward_probability_candidate_arm,
+        ):
             fig, ax = plt.subplots()
             plotter(ax, _ctx_for_covariates(event_arm_table=eat))
             (cbar_ax,) = [a for a in fig.axes if a is not ax]
@@ -742,15 +785,15 @@ class TestBehavioralModelPanels:
         values = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 0.0, 0.0, 0.0]
         eat = _arm_table(
             {
-                "q_arm": values,
-                "p_reward_arm": values,
-                "reward_rate_arm_k10": values,
+                "reward_belief_mean_candidate_arm_preoutcome": values,
+                "task_reward_probability_candidate_arm": values,
+                "reward_fraction_candidate_arm_last10_visits": values,
             }
         )
         mappings = []
         for plotter in (
-            mod._plot_q_arm,
-            mod._plot_p_reward_arm,
+            mod._plot_reward_belief_mean_candidate_arm,
+            mod._plot_task_reward_probability_candidate_arm,
             mod._plot_recent_reward_rate,
         ):
             fig, ax = plt.subplots()
@@ -767,9 +810,11 @@ class TestBehavioralModelPanels:
         """A trunk has no reward port/Beta posterior despite its stored zero."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"q_arm": [0.0] * 9})
+        eat = _arm_table({"reward_belief_mean_candidate_arm_preoutcome": [0.0] * 9})
         fig, ax = plt.subplots()
-        mod._plot_q_arm(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_reward_belief_mean_candidate_arm(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
 
         leaf_zero = _rectangles_centered_on(ax, 0)
         trunk_na = _rectangles_centered_on(ax, 6)
@@ -782,9 +827,17 @@ class TestBehavioralModelPanels:
     def test_missing_leaf_belief_has_an_explicit_cell(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"q_arm": [np.nan] + [0.25] * 5 + [0.0] * 3})
+        eat = _arm_table(
+            {
+                "reward_belief_mean_candidate_arm_preoutcome": [np.nan]
+                + [0.25] * 5
+                + [0.0] * 3
+            }
+        )
         fig, ax = plt.subplots()
-        mod._plot_q_arm(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_reward_belief_mean_candidate_arm(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
 
         missing = _rectangles_centered_on(ax, 0)
         observed = _rectangles_centered_on(ax, 1)
@@ -795,13 +848,17 @@ class TestBehavioralModelPanels:
 
 class TestDivergingCenter:
     def test_center_makes_limits_symmetric(self):
-        """visit_recency_demeaned must put 0 at the colormap midpoint."""
+        """visit_recency_trials_event_leaf_centered must put 0 at the colormap midpoint."""
         from continuum_swr_replay.visualization import session_tables as mod
 
         # Asymmetric data: -1 .. +9. Symmetric limits should be -9 .. +9.
-        eat = _arm_table({"visit_recency_demeaned": [-1.0] + [9.0] * 8})
+        eat = _arm_table(
+            {"visit_recency_trials_event_leaf_centered": [-1.0] + [9.0] * 8}
+        )
         fig, ax = plt.subplots()
-        mod._plot_visit_recency_demeaned(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_visit_recency_trials_event_leaf_centered(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
         (cbar_ax,) = [a for a in fig.axes if a is not ax]
         lo, hi = cbar_ax.get_ylim()
         assert lo == pytest.approx(-hi)
@@ -812,9 +869,11 @@ class TestDivergingCenter:
         """TwoSlopeNorm would raise here; symmetric widening must not."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"visit_recency_demeaned": [5.0] * 9})
+        eat = _arm_table({"visit_recency_trials_event_leaf_centered": [5.0] * 9})
         fig, ax = plt.subplots()
-        mod._plot_visit_recency_demeaned(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_visit_recency_trials_event_leaf_centered(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
         (cbar_ax,) = [a for a in fig.axes if a is not ax]
         lo, hi = cbar_ax.get_ylim()
         assert lo == pytest.approx(-5.0) and hi == pytest.approx(5.0)
@@ -823,9 +882,11 @@ class TestDivergingCenter:
     def test_all_zero_data_remain_symmetric_and_use_neutral_color(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"visit_recency_demeaned": [0.0] * 9})
+        eat = _arm_table({"visit_recency_trials_event_leaf_centered": [0.0] * 9})
         fig, ax = plt.subplots()
-        mod._plot_visit_recency_demeaned(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_visit_recency_trials_event_leaf_centered(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
 
         (cbar_ax,) = [a for a in fig.axes if a is not ax]
         lo, hi = cbar_ax.get_ylim()
@@ -847,12 +908,13 @@ class TestDivergingCenter:
         event_one = [-2.0, -1.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0]
         event_two = [-10.0, -5.0, 0.0, 5.0, 10.0, 4.0, 0.0, 0.0, 0.0]
         eat = _arm_table(
-            {"visit_recency_demeaned": [*event_one, *event_two]}, n_events=2
+            {"visit_recency_trials_event_leaf_centered": [*event_one, *event_two]},
+            n_events=2,
         )
         limits = []
         for window in ((0.5, 1.6), (1.9, 2.6)):
             fig, ax = plt.subplots()
-            mod._plot_visit_recency_demeaned(
+            mod._plot_visit_recency_trials_event_leaf_centered(
                 ax,
                 _ctx_for_covariates(event_arm_table=eat, window=window),
             )
@@ -867,9 +929,11 @@ class TestDivergingCenter:
         from continuum_swr_replay.visualization import session_tables as mod
 
         values = [-2.0, -1.0, 0.0, 1.0, 2.0, 100.0, 0.0, 0.0, 0.0]
-        eat = _arm_table({"visit_recency_demeaned": values})
+        eat = _arm_table({"visit_recency_trials_event_leaf_centered": values})
         fig, ax = plt.subplots()
-        mod._plot_visit_recency_demeaned(ax, _ctx_for_covariates(event_arm_table=eat))
+        mod._plot_visit_recency_trials_event_leaf_centered(
+            ax, _ctx_for_covariates(event_arm_table=eat)
+        )
 
         mappable = _colorbar_mappable(fig, ax)
         assert mappable.norm.vmin == pytest.approx(-mappable.norm.vmax)
@@ -885,7 +949,7 @@ class TestArmIndicatorPanels:
         """A measured 0 is a model row; NaN means the event is excluded."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"is_current": [1.0, 0.0] + [np.nan] * 7})
+        eat = _arm_table({"is_current_arm": [1.0, 0.0] + [np.nan] * 7})
         fig, ax = plt.subplots()
         mod._plot_is_current(ax, _ctx_for_covariates(event_arm_table=eat))
 
@@ -901,8 +965,12 @@ class TestArmIndicatorPanels:
         """Canonical builders store all-zero indicators for a NaN reference."""
         from continuum_swr_replay.visualization import session_tables as mod
 
-        missing_ref = _arm_table({"is_current": [0.0] * 9, "current_arm": [np.nan] * 9})
-        valid_ref = _arm_table({"is_current": [0.0] * 9, "current_arm": [5.0] * 9})
+        missing_ref = _arm_table(
+            {"is_current_arm": [0.0] * 9, "occupancy_well_arm": [np.nan] * 9}
+        )
+        valid_ref = _arm_table(
+            {"is_current_arm": [0.0] * 9, "occupancy_well_arm": [5.0] * 9}
+        )
         colors = []
         for eat in (missing_ref, valid_ref):
             fig, ax = plt.subplots()
@@ -916,7 +984,7 @@ class TestArmIndicatorPanels:
     def test_empty_window_shows_placeholder(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        eat = _arm_table({"is_prev": [1.0] * 9})
+        eat = _arm_table({"is_prev_arm": [1.0] * 9})
         ctx = _ctx_for_covariates(event_arm_table=eat, window=(100.0, 200.0))
         fig, ax = plt.subplots()
         mod._plot_is_prev(ax, ctx)
@@ -935,7 +1003,9 @@ class TestPatchPanels:
                 **values,
             }
         )
-        et = pd.DataFrame({"event_id": [0], "event_start": [1.0], "event_end": [1.5]})
+        et = pd.DataFrame(
+            {"event_id": [0], "event_start_s": [1.0], "event_end_s": [1.5]}
+        )
         return ept, et
 
     def test_missing_patch_table_raises_actionable_error(self):
@@ -943,28 +1013,32 @@ class TestPatchPanels:
 
         fig, ax = plt.subplots()
         with pytest.raises(ValueError, match="event_patch_table"):
-            mod._plot_q_arm_patch(ax, _ctx_for_covariates())
+            mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(
+                ax, _ctx_for_covariates()
+            )
         plt.close(fig)
 
     def test_unknown_patch_column_names_the_column(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        ept, et = self._patch_tables({"q_arm_patch": [0.1, 0.2, 0.3]})
+        column = "reward_belief_mean_candidate_arm_preoutcome_patch"
+        ept, et = self._patch_tables({column: [0.1, 0.2, 0.3]})
         ctx = _ctx_for_covariates(
-            event_patch_table=ept.drop(columns=["q_arm_patch"]), event_table=et
+            event_patch_table=ept.drop(columns=[column]), event_table=et
         )
         fig, ax = plt.subplots()
-        with pytest.raises(KeyError, match="q_arm_patch"):
-            mod._plot_q_arm_patch(ax, ctx)
+        with pytest.raises(KeyError, match=column):
+            mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(ax, ctx)
         plt.close(fig)
 
     def test_three_patch_rows_are_drawn(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        ept, et = self._patch_tables({"q_arm_patch": [0.1, 0.5, 0.9]})
+        column = "reward_belief_mean_candidate_arm_preoutcome_patch"
+        ept, et = self._patch_tables({column: [0.1, 0.5, 0.9]})
         ctx = _ctx_for_covariates(event_patch_table=ept, event_table=et)
         fig, ax = plt.subplots()
-        mod._plot_q_arm_patch(ax, ctx)
+        mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(ax, ctx)
         assert len(ax.patches) == 3
         assert ax.get_ylim() == (0.5, 3.5)
         plt.close(fig)
@@ -1009,41 +1083,46 @@ class TestPatchPanels:
     def test_orphan_patch_event_is_rejected(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        ept, et = self._patch_tables({"q_arm_patch": [0.1, 0.5, 0.9]})
-        orphan = pd.DataFrame({"event_id": [99], "patch": [1], "q_arm_patch": [0.4]})
+        column = "reward_belief_mean_candidate_arm_preoutcome_patch"
+        ept, et = self._patch_tables({column: [0.1, 0.5, 0.9]})
+        orphan = pd.DataFrame({"event_id": [99], "patch": [1], column: [0.4]})
         ept = pd.concat([ept, orphan], ignore_index=True)
         ctx = _ctx_for_covariates(event_patch_table=ept, event_table=et)
         fig, ax = plt.subplots()
         try:
             with pytest.raises(ValueError):
-                mod._plot_q_arm_patch(ax, ctx)
+                mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(ax, ctx)
         finally:
             plt.close(fig)
 
     def test_missing_patch_row_is_rejected(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        ept, et = self._patch_tables({"q_arm_patch": [0.1, 0.5, 0.9]})
+        ept, et = self._patch_tables(
+            {"reward_belief_mean_candidate_arm_preoutcome_patch": [0.1, 0.5, 0.9]}
+        )
         ctx = _ctx_for_covariates(
             event_patch_table=ept[ept["patch"] != 3], event_table=et
         )
         fig, ax = plt.subplots()
         try:
             with pytest.raises(ValueError):
-                mod._plot_q_arm_patch(ax, ctx)
+                mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(ax, ctx)
         finally:
             plt.close(fig)
 
     def test_duplicate_event_patch_row_is_rejected(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        ept, et = self._patch_tables({"q_arm_patch": [0.1, 0.5, 0.9]})
+        ept, et = self._patch_tables(
+            {"reward_belief_mean_candidate_arm_preoutcome_patch": [0.1, 0.5, 0.9]}
+        )
         ept = pd.concat([ept, ept.iloc[[0]]], ignore_index=True)
         ctx = _ctx_for_covariates(event_patch_table=ept, event_table=et)
         fig, ax = plt.subplots()
         try:
             with pytest.raises(ValueError):
-                mod._plot_q_arm_patch(ax, ctx)
+                mod._plot_reward_belief_mean_candidate_arm_preoutcome_patch(ax, ctx)
         finally:
             plt.close(fig)
 
@@ -1056,14 +1135,14 @@ class TestStopGrainPanels:
         cols = {
             "stop_start": np.arange(n_stops, dtype=float),
             "stop_end": np.arange(n_stops, dtype=float) + 0.5,
-            "reward_rate_trial_k10": np.full(n_stops, 0.4),
-            "is_after_switch": np.array([1.0, 0.0][:n_stops]),
+            "reward_fraction_last10_known_trials": np.full(n_stops, 0.4),
+            "did_last_completed_trip_switch_patch": np.array([1.0, 0.0][:n_stops]),
         }
         for j in range(1, N_REWARD_LAGS + 1):
             # Rewarded at odd lags only, and NaN on the second stop's lag 10
             # so the ragged-history case is exercised.
-            cols[f"reward_lag{j}"] = np.full(n_stops, float(j % 2))
-        cols["reward_lag10"] = np.array([0.0, np.nan][:n_stops])
+            cols[f"known_reward_outcome_lag_{j}"] = np.full(n_stops, float(j % 2))
+        cols["known_reward_outcome_lag_10"] = np.array([0.0, np.nan][:n_stops])
         return pd.DataFrame(cols)
 
     def test_reward_lag_kernel_draws_distinct_cells_for_reward_and_omission(self):
@@ -1109,7 +1188,7 @@ class TestStopGrainPanels:
             {
                 "stop_start": [0.0, 10.0, 20.0],
                 "stop_end": [2.0, 12.0, 22.0],
-                "reward_rate_trial_k10": [0.2, 0.8, np.nan],
+                "reward_fraction_last10_known_trials": [0.2, 0.8, np.nan],
             }
         )
         fig, ax = plt.subplots()
@@ -1129,9 +1208,9 @@ class TestStopGrainPanels:
     def test_missing_stop_column_raises(self):
         from continuum_swr_replay.visualization import session_tables as mod
 
-        st = self._stop_table().drop(columns=["reward_rate_trial_k10"])
+        st = self._stop_table().drop(columns=["reward_fraction_last10_known_trials"])
         fig, ax = plt.subplots()
-        with pytest.raises(KeyError, match="reward_rate_trial_k10"):
+        with pytest.raises(KeyError, match="reward_fraction_last10_known_trials"):
             mod._plot_reward_rate_trial_k10(ax, _ctx_for_covariates(stop_table=st))
         plt.close(fig)
 
@@ -1140,7 +1219,7 @@ class TestStopGrainPanels:
 
         st = self._stop_table(n_stops=2)
         fig, ax = plt.subplots()
-        mod._plot_is_after_switch_stop(ax, _ctx_for_covariates(stop_table=st))
+        mod._plot_last_completed_trip_switch(ax, _ctx_for_covariates(stop_table=st))
         assert len(ax.patches) == 2
         cells = sorted(ax.patches, key=lambda patch: patch.get_x())
         assert not np.allclose(cells[0].get_facecolor(), cells[1].get_facecolor())
@@ -1150,9 +1229,9 @@ class TestStopGrainPanels:
         from continuum_swr_replay.visualization import session_tables as mod
 
         st = self._stop_table(n_stops=2)
-        st.loc[1, "is_after_switch"] = np.nan
+        st.loc[1, "did_last_completed_trip_switch_patch"] = np.nan
         fig, ax = plt.subplots()
-        mod._plot_is_after_switch_stop(ax, _ctx_for_covariates(stop_table=st))
+        mod._plot_last_completed_trip_switch(ax, _ctx_for_covariates(stop_table=st))
 
         cells = sorted(ax.patches, key=lambda patch: patch.get_x())
         assert len(cells) == 2
@@ -1207,12 +1286,13 @@ class TestPanelGroupsAndRegistryIntegrity:
             # Documented exclusions: see the module docstring.
             return (
                 p in panels
-                or p.startswith("arm_fe_")  # drawn by arm_markers
-                or p == "is_after_switch"  # -> is_after_switch_stop
-                or p.startswith("reward_lag")  # -> reward_lag_kernel
+                or p.startswith("is_candidate_arm_")  # drawn by arm_markers
+                or p
+                == "did_last_completed_trip_switch_patch"  # -> is_after_switch_stop
+                or p.startswith("known_reward_outcome_lag_")  # -> reward-lag kernel
                 or p.startswith("swr_x_")  # base panel x is_swr row
                 or p.endswith("_z")  # affine rescale of the raw column
-                or p.startswith("replay_frac")  # choice grain, not a table input
+                or p.startswith("replay_fraction")  # choice grain, not a table input
             )
 
         unreachable = sorted(p for p in predictors if not reachable(p))
@@ -1259,18 +1339,20 @@ class TestPublicPlotSessionTables:
             }
         )
 
-        stop_table = build_stop_table(dot, trials, graph)
-        event_table = build_event_table(dot, env, trials, graph)
+        port_experiences = _experiences(trials)
+        stop_table = build_stop_table(dot, trials, port_experiences, graph)
+        event_table = build_event_table(dot, env, trials, port_experiences, graph)
         contingency = pd.DataFrame({"stop_id": stop_table["stop_id"]})
         for arm in range(6):
-            contingency[f"p_reward_port{arm}"] = 0.1 * (arm + 1)
-            contingency[f"q_port{arm}"] = 0.05 * (arm + 1)
-            contingency[f"betadist_var{arm + 1}"] = 0.005 * (arm + 1)
+            contingency[f"task_reward_probability_port_{arm}"] = 0.1 * (arm + 1)
+            contingency[f"reward_belief_mean_port_{arm}"] = 0.05 * (arm + 1)
+            contingency[f"reward_belief_variance_port_{arm}"] = 0.005 * (arm + 1)
         event_arm_table = build_event_arm_table(
             event_table,
             dot,
             env,
             trials,
+            port_experiences,
             graph,
             contingency=contingency,
         )
@@ -1287,7 +1369,11 @@ class TestPublicPlotSessionTables:
         }
         before = {name: frame.copy(deep=True) for name, frame in frames.items()}
 
-        panels = ("q_arm", "q_arm_patch", "reward_rate_trial_k10")
+        panels = (
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "reward_belief_mean_candidate_arm_preoutcome_patch",
+            "reward_fraction_last10_known_trials",
+        )
         fig, mismatch = plot_session_tables(
             data={"environment": env},
             detector=None,
@@ -1298,6 +1384,7 @@ class TestPublicPlotSessionTables:
             event_sequence_table=event_sequence_table,
             stop_table=stop_table,
             trials=trials,
+            port_experiences=port_experiences,
             track_graph=graph,
             time_window=(float(dot.index.min()), float(dot.index.max())),
             panels=panels,
@@ -1317,19 +1404,23 @@ class TestPublicPlotSessionTables:
         first_event_id = event_table["event_id"].iloc[0]
         arm_row = event_arm_table[
             event_arm_table["event_id"].eq(first_event_id)
-            & event_arm_table["arm"].eq(2)
+            & event_arm_table["candidate_arm"].eq(2)
         ].iloc[0]
         arm_cell = min(
             _rectangles_centered_on(arm_ax, 2), key=lambda cell: cell.get_x()
         )
-        assert arm_cell.get_x() == pytest.approx(arm_row["event_start"])
+        assert arm_cell.get_x() == pytest.approx(arm_row["event_start_s"])
         assert arm_cell.get_width() == pytest.approx(
-            arm_row["event_end"] - arm_row["event_start"]
+            arm_row["event_end_s"] - arm_row["event_start_s"]
         )
         arm_map = colorbar_mappables[0]
         assert np.allclose(
             arm_cell.get_facecolor(),
-            arm_map.cmap(arm_map.norm(float(arm_row["q_arm"]))),
+            arm_map.cmap(
+                arm_map.norm(
+                    float(arm_row["reward_belief_mean_candidate_arm_preoutcome"])
+                )
+            ),
         )
 
         patch_row = event_patch_table[
@@ -1340,24 +1431,30 @@ class TestPublicPlotSessionTables:
         patch_cell = min(
             _rectangles_centered_on(patch_ax, 1), key=lambda cell: cell.get_x()
         )
-        assert patch_cell.get_x() == pytest.approx(event_row["event_start"])
+        assert patch_cell.get_x() == pytest.approx(event_row["event_start_s"])
         assert patch_cell.get_width() == pytest.approx(
-            event_row["event_end"] - event_row["event_start"]
+            event_row["event_end_s"] - event_row["event_start_s"]
         )
         patch_map = colorbar_mappables[1]
         assert np.allclose(
             patch_cell.get_facecolor(),
-            patch_map.cmap(patch_map.norm(float(patch_row["q_arm_patch"]))),
+            patch_map.cmap(
+                patch_map.norm(
+                    float(
+                        patch_row["reward_belief_mean_candidate_arm_preoutcome_patch"]
+                    )
+                )
+            ),
         )
 
         expected_rate_segments = sorted(
             (
                 float(row.stop_start),
                 float(row.stop_end),
-                float(row.reward_rate_trial_k10),
+                float(row.reward_fraction_last10_known_trials),
             )
             for row in stop_table.itertuples()
-            if np.isfinite(row.reward_rate_trial_k10)
+            if np.isfinite(row.reward_fraction_last10_known_trials)
         )
         actual_rate_segments = sorted(
             _horizontal_segments_for_color(rate_ax, "#8c564b")
@@ -1370,7 +1467,7 @@ class TestPublicPlotSessionTables:
         fig, mismatch = plot_session_tables(
             **_public_plot_inputs(),
             time_window=(0.0, 4.0),
-            panels=("q_arm",),
+            panels=("reward_belief_mean_candidate_arm_preoutcome",),
         )
 
         assert fig.axes[0].get_ylabel() == "Beta belief q\npre-outcome"
@@ -1386,11 +1483,13 @@ class TestPublicPlotSessionTables:
             fig, _ = plot_session_tables(
                 **_public_plot_inputs(),
                 time_window=time_window,
-                panels=("q_arm",),
+                panels=("reward_belief_mean_candidate_arm_preoutcome",),
             )
             plt.close(fig)
 
-    @pytest.mark.parametrize("panels", [(), "q_arm"])
+    @pytest.mark.parametrize(
+        "panels", [(), "reward_belief_mean_candidate_arm_preoutcome"]
+    )
     def test_invalid_panels_raise(self, panels):
         with pytest.raises((TypeError, ValueError), match="panels"):
             plot_session_tables(**_public_plot_inputs(), panels=panels)
@@ -1408,7 +1507,7 @@ class TestPublicPlotSessionTables:
         fig, mismatch = plot_session_tables(
             **inputs,
             time_window=(0.0, 4.0),
-            panels=("q_arm",),
+            panels=("reward_belief_mean_candidate_arm_preoutcome",),
         )
 
         assert mismatch["match"].all()
@@ -1422,9 +1521,13 @@ class TestPublicPlotSessionTables:
             coords={"time": reference + np.array([0.0, 10.0])}
         )
         for frame_name, columns in (
-            ("event_table", ("event_start", "event_end", "event_midpoint_time")),
-            ("event_arm_table", ("event_start", "event_end")),
+            ("event_table", ("event_start_s", "event_end_s", "event_midpoint_s")),
+            ("event_arm_table", ("event_start_s", "event_end_s")),
             ("trials", ("start_time", "end_time")),
+            (
+                "port_experiences",
+                ("arrival_time", "departure_time", "outcome_known_time"),
+            ),
         ):
             frame = inputs[frame_name].copy()
             frame.loc[:, list(columns)] = frame.loc[:, list(columns)] + reference
@@ -1435,7 +1538,7 @@ class TestPublicPlotSessionTables:
         fig, _ = plot_session_tables(
             **inputs,
             time_window=(reference, reference + 4.0),
-            panels=("q_arm",),
+            panels=("reward_belief_mean_candidate_arm_preoutcome",),
             time_reference=reference,
             xlabel=xlabel,
             title=title,
@@ -1466,12 +1569,16 @@ class TestPublicPlotSessionTables:
         values = [0.1, 0.25, np.nan, 0.5, 0.75, 0.9, 0.0, 0.0, 0.0]
         inputs["event_arm_table"] = _arm_table(
             {
-                "q_arm": values,
-                "p_reward_arm": values,
-                "reward_rate_arm_k10": values,
+                "reward_belief_mean_candidate_arm_preoutcome": values,
+                "task_reward_probability_candidate_arm": values,
+                "reward_fraction_candidate_arm_last10_visits": values,
             }
         )
-        panels = ("q_arm", "p_reward_arm", "reward_rate_arm_k10")
+        panels = (
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "task_reward_probability_candidate_arm",
+            "reward_fraction_candidate_arm_last10_visits",
+        )
 
         fig, _ = plot_session_tables(
             **inputs,
@@ -1524,10 +1631,8 @@ class TestPublicPlotSessionTables:
 
         inputs = _public_plot_inputs()
         inputs["event_table"] = inputs["event_table"].assign(
-            is_after_reward=[np.nan],  # undefined -> hatched grey cell
-            is_after_omission=[0.0],  # observed False -> nothing drawn
-            is_after_switch=[0.0],
-            is_after_stay=[1.0],  # observed True -> colored cell
+            is_rewarded_outcome=[np.nan],  # both outcome complements undefined
+            did_last_completed_trip_switch_patch=[0.0],
             is_swr=[0.0],
             is_mua=[0.0],
         )
@@ -1541,11 +1646,13 @@ class TestPublicPlotSessionTables:
         missing = [
             p for p in ax.patches if np.allclose(p.get_facecolor(), missing_rgba)
         ]
-        assert len(missing) == 1, "the NaN flag must draw exactly one missing cell"
-        assert missing[0].get_hatch() == "///"
-        # Two cells total: one undefined, one True. The three observed-False
-        # flags must remain blank, so undefined cannot be confused with them.
-        assert len(ax.patches) == 2
+        assert len(missing) == 2, (
+            "an unknown outcome makes both exact complements undefined"
+        )
+        assert all(patch.get_hatch() == "///" for patch in missing)
+        # Three cells total: two undefined outcome complements and one derived
+        # stayed-in-patch True. The remaining observed-False flags stay blank.
+        assert len(ax.patches) == 3
         plt.close(fig)
 
     def test_shared_colorbar_never_overlaps_a_sibling_colorbar(self):
@@ -1558,10 +1665,18 @@ class TestPublicPlotSessionTables:
         inputs = _public_plot_inputs()
         values = [0.05] * 9
         inputs["event_arm_table"] = _arm_table(
-            {"q_arm": values, "p_reward_arm": values, "arm_uncertainty": values}
+            {
+                "reward_belief_mean_candidate_arm_preoutcome": values,
+                "task_reward_probability_candidate_arm": values,
+                "reward_belief_variance_candidate_arm_preoutcome": values,
+            }
         )
         # Deliberately non-adjacent: the grouped pair straddles a third panel.
-        panels = ("q_arm", "arm_uncertainty", "p_reward_arm")
+        panels = (
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "reward_belief_variance_candidate_arm_preoutcome",
+            "task_reward_probability_candidate_arm",
+        )
 
         fig, _ = plot_session_tables(**inputs, time_window=(0.0, 4.0), panels=panels)
         fig.canvas.draw()
@@ -1592,18 +1707,22 @@ class TestPublicPlotSessionTables:
         inputs["event_table"] = pd.DataFrame(
             {
                 "event_id": [0],
-                "event_start": [100.0],
-                "event_end": [100.15],  # 0.15 s event, as in real data
-                "event_midpoint_time": [100.075],
+                "event_start_s": [100.0],
+                "event_end_s": [100.15],  # 0.15 s event, as in real data
+                "event_midpoint_s": [100.075],
                 "next_arm": [1.0],
             }
         )
-        inputs["event_arm_table"] = _arm_table({"q_arm": [0.5] * 9}).assign(
-            event_start=100.0, event_end=100.15
-        )
+        inputs["event_arm_table"] = _arm_table(
+            {"reward_belief_mean_candidate_arm_preoutcome": [0.5] * 9}
+        ).assign(event_start_s=100.0, event_end_s=100.15)
 
         window = (0.0, 4000.0)
-        fig, _ = plot_session_tables(**inputs, time_window=window, panels=("q_arm",))
+        fig, _ = plot_session_tables(
+            **inputs,
+            time_window=window,
+            panels=("reward_belief_mean_candidate_arm_preoutcome",),
+        )
         expected = (window[1] - window[0]) * 0.002
 
         widths = {round(p.get_width(), 6) for p in fig.axes[0].patches}
@@ -1623,7 +1742,7 @@ class TestPublicPlotSessionTables:
         fig, _ = plot_session_tables(
             **inputs,
             time_window=(0.0, 4.0),
-            panels=("q_arm",),
+            panels=("reward_belief_mean_candidate_arm_preoutcome",),
             title="Session audit",
         )
         fig.canvas.draw()

@@ -12,29 +12,31 @@ argument. :data:`DEFAULT_PANELS` is a deliberately small
 ``plot_detector``-style overview; **every covariate panel is opt-in**, so
 a bare call shows none of them:
 
-* **Responses and decoder state** — ``arm_count_hard`` / ``arm_count_soft``
+* **Responses and decoder state** — ``arm_count_hard`` and the
+  non-local-probability-weighted MAP count ``arm_count_soft``
   / ``arm_fraction`` / ``arm_posterior_mass``, posterior heatmaps, and the
   derivation-debug rows (``arm_markers``, ``mismatch_pointers``).
 * **Arm-grain fitted covariates** (:data:`ARM_COVARIATE_PANELS`) — the
   arm-grain predictors, spanning the M ladder plus terms fit only by the
-  content-contrast (``arm_dist_rank``) and choice (``cumulative_reward``)
+  content-contrast (``candidate_arm_distance_rank``) and choice (``cumulative_reward``)
   models. It is *not* a faithful M-ladder design matrix in either
   direction: those two are in no M rung, and the ``arm_fe_*`` dummies
   carried by every rung from M0a have no panel (they are arm identity,
   which is already the y-axis). :data:`BEHAVIORAL_MODEL_PANELS` is the
-  narrower belief group — ``q_arm`` and ``arm_uncertainty`` from the
-  beta-bernoulli behavioral model, alongside the programmed
-  ``p_reward_arm`` they are read against.
+  narrower belief group — candidate-arm reward-belief mean and variance from
+  the beta-bernoulli behavioral model, alongside the programmed candidate-arm
+  reward probability they are read against.
 * **Patch-grain fitted covariates** (:data:`PATCH_COVARIATE_PANELS`) — the
   P-ladder predictors, plus ``is_prev_patch`` (patch-switch ladder only)
-  and the ``*_patch`` belief pair (``Pv`` only); ``visit_recency_patch``
-  has no panel. These require ``event_patch_table``.
+  and the canonical ``*_patch`` aggregates (``Pv`` only);
+  ``visit_recency_trials_patch`` has no panel. These require
+  ``event_patch_table``.
 * **Stop-grain fitted covariates** (:data:`RATE_COVARIATE_PANELS`) — the
   Family-A rate design matrix, keyed on stops rather than events.
 
-Note that ``p_reward_arm`` (and ``p_reward_arm_patch``) is the
-experimenter's *programmed* reward probability, while ``q_arm`` (and
-``q_arm_patch``) is the *fitted behavioral model's* belief. They are
+Note that the task-reward-probability patch aggregate is the experimenter's
+*programmed* reward probability, while the reward-belief-mean patch aggregate
+is the *fitted behavioral model's* belief. They are
 different quantities on the same scale; plotting them adjacent is the
 point.
 
@@ -45,10 +47,12 @@ already read off an existing one:
 * ``swr_x_*`` interactions are the elementwise product of ``is_swr`` with
   a base covariate. Read them as the base panel masked by the ``is_swr``
   row of ``context_flags``.
-* ``*_z`` columns (e.g. ``arm_uncertainty_z``) are affine rescalings of
+* ``*_z`` columns (for example,
+  ``reward_belief_variance_candidate_arm_preoutcome_z``) are affine rescalings of
   the raw column that is plotted; the spatial/temporal pattern is
   identical and only the color-bar units would differ.
-* ``replay_frac`` / ``replay_frac_swr`` / ``replay_frac_non_swr`` are
+* ``replay_fraction`` / ``replay_fraction_swr`` /
+  ``replay_fraction_non_swr`` are
   choice-grain columns built by ``build_choice_dataset``, not by the
   canonical table builders, so they are not reachable from this
   function's inputs. ``replay_frac_by_role`` covers the same quantity
@@ -115,8 +119,8 @@ _REWARDED_COLOR = "#0072B2"
 
 _MISMATCH_COLUMNS: tuple[str, ...] = (
     "event_id",
-    "event_start",
-    "event_midpoint_time",
+    "event_start_s",
+    "event_midpoint_s",
     "canonical_next_arm",
     "actual_next_to_well",
     "actual_next_arm",
@@ -159,6 +163,7 @@ class _PanelContext:
     event_sequence_table: pd.DataFrame
     stop_table: pd.DataFrame
     trials: pd.DataFrame
+    port_experiences: pd.DataFrame
     track_graph: Any
     time_slice: slice
     arm_palette: dict[int, tuple[float, float, float, float]]
@@ -496,7 +501,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
         )
 
     # Validate using the same helper as the canonical table builders.
-    trial_context_at_times(np.array([lo]), ordered)
+    trial_context_at_times(np.array([lo]), ordered, ctx.port_experiences)
     completion_times = trial_cutoff_times(ordered)
     if not np.isfinite(completion_times).all():
         raise ValueError("canonical trial cutoff times must be finite")
@@ -593,18 +598,19 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
 def _compute_mismatch_table(
     event_table: pd.DataFrame,
     trials: pd.DataFrame,
+    port_experiences: pd.DataFrame,
     track_graph: Any,
 ) -> pd.DataFrame:
     """Compare canonical ``next_arm`` against trials' actual next trip.
 
     Canonical trial context is sampled from the event's first retained
-    timebin, so the audit is evaluated at ``event_start`` (not the display
+    timebin, so the audit is evaluated at ``event_start_s`` (not the display
     midpoint). The recomputation delegates to the production
     :func:`trial_context_at_times` and :func:`single_arm_from_well` helpers;
     boundary, stable-sort, pre-first-trial, and session-tail semantics therefore
     cannot drift into a second visualization-only implementation.
 
-    ``event_midpoint_time`` is retained solely as the display coordinate
+    ``event_midpoint_s`` is retained solely as the display coordinate
     used by :func:`_plot_mismatch_pointers`.
 
     ``match`` is ``True`` when the canonical and actual arms are equal
@@ -615,7 +621,7 @@ def _compute_mismatch_table(
     _require_columns(
         event_table,
         "event_table",
-        ("event_id", "event_start", "event_midpoint_time", "next_arm"),
+        ("event_id", "event_start_s", "event_midpoint_s", "next_arm"),
     )
     if len(event_table) == 0:
         return pd.DataFrame(columns=_MISMATCH_COLUMNS)
@@ -632,11 +638,11 @@ def _compute_mismatch_table(
         ),
     )
 
-    event_starts = event_table["event_start"].to_numpy(dtype=float)
-    event_midpoints = event_table["event_midpoint_time"].to_numpy(dtype=float)
-    actual_to_well = trial_context_at_times(event_starts, trials)["next_well"].to_numpy(
-        dtype=float
-    )
+    event_starts = event_table["event_start_s"].to_numpy(dtype=float)
+    event_midpoints = event_table["event_midpoint_s"].to_numpy(dtype=float)
+    actual_to_well = trial_context_at_times(event_starts, trials, port_experiences)[
+        "next_well"
+    ].to_numpy(dtype=float)
     actual_arm = np.array(
         [single_arm_from_well(well, track_graph) for well in actual_to_well]
     )
@@ -649,8 +655,8 @@ def _compute_mismatch_table(
     return pd.DataFrame(
         {
             "event_id": event_table["event_id"].to_numpy(),
-            "event_start": event_starts,
-            "event_midpoint_time": event_midpoints,
+            "event_start_s": event_starts,
+            "event_midpoint_s": event_midpoints,
             "canonical_next_arm": canonical,
             "actual_next_to_well": actual_to_well,
             "actual_next_arm": actual_arm,
@@ -662,10 +668,10 @@ def _compute_mismatch_table(
 def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
     """Canonical arm references per event.
 
-    At each event's ``event_midpoint_time``, four markers in the
+    At each event's ``event_midpoint_s``, four markers in the
     arm-palette color:
 
-    - ``current_arm`` — filled circle
+    - ``occupancy_well_arm`` — filled circle
     - ``prev_arm`` — upward triangle ▲
     - ``next_arm`` — downward triangle ▼ (**post-hoc**)
     - ``last_rewarded_arm`` — star ★
@@ -675,7 +681,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
-    in_window = (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
+    in_window = (et["event_midpoint_s"] >= lo) & (et["event_midpoint_s"] <= hi)
     et = et.loc[in_window]
 
     for arm in _ALL_ARMS:
@@ -692,10 +698,10 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
             color="grey",
         )
     else:
-        times = et["event_midpoint_time"].to_numpy()
+        times = et["event_midpoint_s"].to_numpy()
         palette = ctx.arm_palette
         marker_spec = (
-            ("current_arm", "o", 36),
+            ("occupancy_well_arm", "o", 36),
             ("prev_arm", "^", 36),
             ("next_arm", "v", 36),
             ("last_rewarded_arm", "*", 60),
@@ -784,7 +790,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
     For every event in the window: a ▼ at the canonical
     ``event_table['next_arm']`` and a × at the arm recomputed from ``trials``
     through the production event-start context rule. Markers are displayed at
-    ``event_midpoint_time`` for alignment with the other event panels; that
+    ``event_midpoint_s`` for alignment with the other event panels; that
     midpoint is not used to select the next trial.
     A vertical connector between them — **red when the two disagree**,
     thin grey when they match.
@@ -797,9 +803,11 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
     public entry point.
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
-    mismatch = _compute_mismatch_table(ctx.event_table, ctx.trials, ctx.track_graph)
-    in_window = (mismatch["event_midpoint_time"] >= lo) & (
-        mismatch["event_midpoint_time"] <= hi
+    mismatch = _compute_mismatch_table(
+        ctx.event_table, ctx.trials, ctx.port_experiences, ctx.track_graph
+    )
+    in_window = (mismatch["event_midpoint_s"] >= lo) & (
+        mismatch["event_midpoint_s"] <= hi
     )
     view = mismatch.loc[in_window]
 
@@ -817,7 +825,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
             color="grey",
         )
     else:
-        times = view["event_midpoint_time"].to_numpy()
+        times = view["event_midpoint_s"].to_numpy()
         canonical = view["canonical_next_arm"].to_numpy(dtype=float)
         actual = view["actual_next_arm"].to_numpy(dtype=float)
         is_match = view["match"].to_numpy(dtype=bool)
@@ -1043,7 +1051,7 @@ def _draw_event_arm_heatmap(
     """Shared: per-(event, arm) value drawn as colored rectangles.
 
     ``event_arm_table`` has 9 rows per event; we draw each event-level
-    sample as a rectangle spanning ``[event_start, event_end]`` at arm
+    sample as a rectangle spanning ``[event_start_s, event_end_s]`` at arm
     height ± 0.5. The rectangle communicates event support, not a value
     continuously re-evaluated throughout the event. Color is ``cmap_name``
     normalized by ``(vmin, vmax)`` — when either is ``None`` it is inferred
@@ -1066,15 +1074,15 @@ def _draw_event_arm_heatmap(
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     # ``event_arm_table`` already carries the broadcast
-    # ``event_start`` / ``event_end`` per row (canonical
+    # ``event_start_s`` / ``event_end_s`` per row (canonical
     # schema), so no merge with ``event_table`` is needed.
     eat = ctx.event_arm_table
     _require_columns(
         eat,
         "event_arm_table",
-        ("event_start", "event_end", "arm", value_col),
+        ("event_start_s", "event_end_s", "candidate_arm", value_col),
     )
-    view = eat[(eat["event_start"] <= hi) & (eat["event_end"] >= lo)]
+    view = eat[(eat["event_start_s"] <= hi) & (eat["event_end_s"] >= lo)]
 
     _format_arm_axis(ax, label)
 
@@ -1091,12 +1099,12 @@ def _draw_event_arm_heatmap(
         return
 
     values = view[value_col].to_numpy(dtype=float)
-    arms = view["arm"].to_numpy(dtype=int)
+    arms = view["candidate_arm"].to_numpy(dtype=int)
     structural = np.isin(arms, tuple(structural_na_rows))
     finite = np.isfinite(values) & ~structural
     if scale_across_table:
         scale_values = eat[value_col].to_numpy(dtype=float)
-        scale_arms = eat["arm"].to_numpy(dtype=int)
+        scale_arms = eat["candidate_arm"].to_numpy(dtype=int)
         scale_finite = np.isfinite(scale_values) & ~np.isin(
             scale_arms, tuple(structural_na_rows)
         )
@@ -1143,8 +1151,8 @@ def _draw_event_arm_heatmap(
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
     cmap = plt.get_cmap(cmap_name)
 
-    starts = view["event_start"].to_numpy(dtype=float)
-    ends = view["event_end"].to_numpy(dtype=float)
+    starts = view["event_start_s"].to_numpy(dtype=float)
+    ends = view["event_end_s"].to_numpy(dtype=float)
     # Window-relative floor, matching every other interval-cell call site. A
     # fixed absolute floor renders sub-pixel on a full-session window (a 0.15 s
     # event over 2400 s is ~0.06 px), so continuous rows would come up blank
@@ -1219,9 +1227,9 @@ def _draw_event_arm_indicator(
     _require_columns(
         eat,
         "event_arm_table",
-        ("event_start", "event_end", "arm", value_col),
+        ("event_start_s", "event_end_s", "candidate_arm", value_col),
     )
-    view = eat[(eat["event_start"] <= hi) & (eat["event_end"] >= lo)]
+    view = eat[(eat["event_start_s"] <= hi) & (eat["event_end_s"] >= lo)]
 
     _format_arm_axis(ax, label)
 
@@ -1241,9 +1249,9 @@ def _draw_event_arm_indicator(
     values = _overlay_missing_references(values, view, reference_cols)
     _validate_binary(values, f"event_arm_table.{value_col}")
     finite = np.isfinite(values)
-    arms = view["arm"].to_numpy(dtype=float)
-    starts = view["event_start"].to_numpy(dtype=float)
-    ends = view["event_end"].to_numpy(dtype=float)
+    arms = view["candidate_arm"].to_numpy(dtype=float)
+    starts = view["event_start_s"].to_numpy(dtype=float)
+    ends = view["event_end_s"].to_numpy(dtype=float)
     colors = [color if value == 1.0 else _ZERO_CELL_COLOR for value in values[finite]]
     _add_interval_cells(
         ax,
@@ -1319,12 +1327,12 @@ def _plot_arm_fraction(ax: Axes, ctx: _PanelContext) -> None:
 # ── Per-arm predictor panels (trials → per-arm event-arm row) ──
 
 
-def _plot_visit_recency(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_visit_recency_trials(ax: Axes, ctx: _PanelContext) -> None:
     """Trials since the last destination visit; trunks are not destinations."""
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="visit_recency",
+        value_col="visit_recency_trials",
         cmap_name="viridis_r",
         vmin=1,
         vmax=None,
@@ -1348,7 +1356,7 @@ def _plot_cumulative_reward(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="cumulative_reward",
+        value_col="reward_count_candidate_arm_last10_known_trials",
         cmap_name="viridis",
         vmin=0,
         vmax=None,
@@ -1369,7 +1377,7 @@ def _plot_recent_reward_rate(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="reward_rate_arm_k10",
+        value_col="reward_fraction_candidate_arm_last10_visits",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -1390,11 +1398,12 @@ def _plot_recent_reward_rate(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_p_reward_arm(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_task_reward_probability_candidate_arm(ax: Axes, ctx: _PanelContext) -> None:
     """Programmed (nominal) reward probability per arm.
 
     Sampled once for each event from the active contingency block (per-arm
-    ``p_reward_port``); equals ``p_reward_current`` at the current arm.
+    ``task_reward_probability_port_*``); equals
+    ``task_reward_probability_chosen_arm`` at the occupied arm.
     Trunk arms are not reward sites, so they are masked here rather than
     colored — but the model-ready table encodes their placeholder as 0.0 and
     fits it; the mask is a reading aid, not an exclusion.
@@ -1402,7 +1411,7 @@ def _plot_p_reward_arm(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="p_reward_arm",
+        value_col="task_reward_probability_candidate_arm",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -1414,11 +1423,11 @@ def _plot_p_reward_arm(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_dist_to_arm(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_distance_to_candidate_arm(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="dist_to_arm",
+        value_col="distance_to_candidate_arm_cm",
         cmap_name="viridis_r",
         vmin=0,
         vmax=None,
@@ -1430,7 +1439,7 @@ def _plot_arm_dist_rank(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="arm_dist_rank",
+        value_col="candidate_arm_distance_rank",
         cmap_name="viridis_r",
         vmin=1,
         vmax=len(_ALL_ARMS),
@@ -1466,7 +1475,9 @@ def _make_recency_spline_panel(column: str, index: int):
     return _plot
 
 
-def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_visit_recency_trials_event_leaf_centered(
+    ax: Axes, ctx: _PanelContext
+) -> None:
     """Event-local centered visit recency — the column M4+ actually fits.
 
     At each event, the mean over visited leaf arms is subtracted from leaf-arm
@@ -1478,7 +1489,7 @@ def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="visit_recency_demeaned",
+        value_col="visit_recency_trials_event_leaf_centered",
         cmap_name="coolwarm",
         vmin=None,
         vmax=None,
@@ -1504,17 +1515,17 @@ def _plot_visit_recency_demeaned(ax: Axes, ctx: _PanelContext) -> None:
 
 # ── Behavioral-model (beta-bernoulli) per-arm belief panels ──
 #
-# ``q_arm`` and ``arm_uncertainty`` are the mean and variance of the SAME
-# per-leaf Beta posterior from the fitted behavioral model, so a
-# value+uncertainty read stays construct-coherent. Both are distinct from
-# ``p_reward_arm``, which is the experimenter's PROGRAMMED probability --
-# plotting them adjacent makes the nominal-vs-believed contrast readable.
+# The candidate-arm reward-belief mean and variance come from the SAME
+# per-leaf Beta belief state, so a value+uncertainty read stays
+# construct-coherent. Both are distinct from the experimenter's programmed
+# task reward probability; adjacent panels expose that nominal-vs-believed
+# contrast.
 
 
-def _plot_q_arm(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_reward_belief_mean_candidate_arm(ax: Axes, ctx: _PanelContext) -> None:
     """Behavioral-model value per arm (Beta posterior mean).
 
-    Bounded [0, 1] like ``p_reward_arm`` and drawn on the same colormap
+    Bounded [0, 1] like ``task_reward_probability_candidate_arm`` and drawn on the same colormap
     and scale so the two panels are directly comparable by eye. The value
     is sampled once for each event; the colored event-width cell does not
     imply within-event updating. Trunk arms are not reward sites, so they are
@@ -1525,7 +1536,7 @@ def _plot_q_arm(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="q_arm",
+        value_col="reward_belief_mean_candidate_arm_preoutcome",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -1537,11 +1548,12 @@ def _plot_q_arm(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_arm_uncertainty(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_reward_belief_variance_candidate_arm(ax: Axes, ctx: _PanelContext) -> None:
     """Behavioral-model belief uncertainty per arm (Beta posterior variance).
 
-    The variance counterpart of :func:`_plot_q_arm` from the same
-    posterior. In this fitted model, alpha and beta remain at least 1 and
+    The variance counterpart of
+    :func:`_plot_reward_belief_mean_candidate_arm` from the same belief
+    state. In this fitted model, alpha and beta remain at least 1 and
     forgetting pulls toward Beta(1, 1), so posterior variance is bounded by
     1/12. The scale is pinned there rather than inferred -- an inferred ceiling
     would make a low-uncertainty window look falsely uncertain. Values are
@@ -1553,7 +1565,7 @@ def _plot_arm_uncertainty(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_heatmap(
         ax,
         ctx,
-        value_col="arm_uncertainty",
+        value_col="reward_belief_variance_candidate_arm_preoutcome",
         cmap_name="magma",
         vmin=0.0,
         vmax=1.0 / 12.0,
@@ -1571,10 +1583,10 @@ def _plot_is_current(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_indicator(
         ax,
         ctx,
-        value_col="is_current",
+        value_col="is_current_arm",
         color="#1f77b4",
-        label="is_current",
-        reference_cols="current_arm",
+        label="is_current_arm",
+        reference_cols="occupancy_well_arm",
     )
 
 
@@ -1582,9 +1594,9 @@ def _plot_is_prev(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_indicator(
         ax,
         ctx,
-        value_col="is_prev",
+        value_col="is_prev_arm",
         color="#ff7f0e",
-        label="is_prev",
+        label="is_prev_arm",
         reference_cols="prev_arm",
     )
 
@@ -1593,10 +1605,10 @@ def _plot_is_last_rewarded_elsewhere(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_indicator(
         ax,
         ctx,
-        value_col="is_last_rewarded_elsewhere",
+        value_col="is_last_rewarded_noncurrent_arm",
         color="#2ca02c",
         label="is_last_rew.\nelsewhere",
-        reference_cols=("last_rewarded_arm", "current_arm"),
+        reference_cols=("last_rewarded_arm", "occupancy_well_arm"),
     )
 
 
@@ -1605,7 +1617,7 @@ def _plot_arm_never_visited(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_arm_indicator(
         ax,
         ctx,
-        value_col="arm_never_visited",
+        value_col="is_candidate_arm_never_visited",
         color="#7b3294",
         label="arm never\nvisited",
     )
@@ -1672,10 +1684,10 @@ def _plot_arm_mass_stackplot(ax: Axes, ctx: _PanelContext) -> None:
 # ○ ▲ ▼ ★ with the arm-palette). The visual vocabulary separation
 # signals "panel 9 = magnitude by role, panel 8 = arm identity".
 _ROLE_SPEC = (
-    ("current", "is_current", "s", "#708090"),  # square, slate
-    ("prev", "is_prev", "D", "#5f9ea0"),  # diamond, cadet blue
-    ("next (post-hoc)", "is_next", "P", "#cd5c5c"),  # plus, indian red
-    ("last_rewarded", "is_last_rewarded", "h", "#daa520"),  # hexagon, goldenrod
+    ("current", "is_current_arm", "s", "#708090"),  # square, slate
+    ("prev", "is_prev_arm", "D", "#5f9ea0"),  # diamond, cadet blue
+    ("next (post-hoc)", "is_next_arm", "P", "#cd5c5c"),  # plus, indian red
+    ("last_rewarded", "is_last_rewarded_arm", "h", "#daa520"),  # hexagon, goldenrod
 )
 
 
@@ -1685,7 +1697,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
     For each event: look up the ``arm_fraction`` of the row where
     ``is_current == 1``, ``is_prev == 1``, ``is_next == 1``, and
     ``is_last_rewarded == 1``. Plot four stems per event at
-    ``event_midpoint_time`` so the reader can immediately answer
+    ``event_midpoint_s`` so the reader can immediately answer
     "how much replay went to the future destination vs. where the
     animal came from vs. where it is now?"
 
@@ -1696,7 +1708,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     eat = ctx.event_arm_table
     et = ctx.event_table
-    in_window = (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
+    in_window = (et["event_midpoint_s"] >= lo) & (et["event_midpoint_s"] <= hi)
     et_w = et.loc[in_window]
 
     ax.set_ylabel("Replay Frac\n(by role)")
@@ -1724,7 +1736,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
         return
 
     # Small x-offset per role so stems don't overlap.
-    times = et_w["event_midpoint_time"].to_numpy()
+    times = et_w["event_midpoint_s"].to_numpy()
     dt = float(np.median(np.abs(np.diff(times)))) if len(times) > 1 else 1.0
     offsets = np.linspace(-0.08 * dt, 0.08 * dt, len(_ROLE_SPEC))
 
@@ -1781,7 +1793,7 @@ _EVENT_TYPE_COLORS = {
 
 
 def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
-    """One bar per event, spanning ``event_start → event_end``.
+    """One bar per event, spanning ``event_start_s → event_end_s``.
 
     Height = ``n_nonlocal_bins`` (event size). Fill color encodes
     event-type membership:
@@ -1797,7 +1809,7 @@ def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
-    view = et[(et["event_start"] <= hi) & (et["event_end"] >= lo)]
+    view = et[(et["event_start_s"] <= hi) & (et["event_end_s"] >= lo)]
 
     ax.set_ylabel("n_nonlocal\nbins")
 
@@ -1814,8 +1826,8 @@ def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
         ax.set_ylim(0, 1)
         return
 
-    starts = view["event_start"].to_numpy()
-    ends = view["event_end"].to_numpy()
+    starts = view["event_start_s"].to_numpy()
+    ends = view["event_end_s"].to_numpy()
     heights = view["n_nonlocal_bins"].to_numpy(dtype=float)
     is_swr = view["is_swr"].to_numpy(dtype=bool)
     is_mua = view["is_mua"].to_numpy(dtype=bool)
@@ -1841,7 +1853,7 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
     """Per-stop activity bars.
 
     For every stop in window: a vertical stem at the stop's center
-    from 0 to ``n_events``. A filled marker at the top means the
+    from 0 to ``n_selected_events``. A filled marker at the top means the
     stop had at least one non-local event (``has_replay=True``);
     hollow means zero-event. Small 'S' / 'M' letter labels above the
     stem flag ``is_swr_stop`` / ``is_mua_stop``.
@@ -1854,7 +1866,7 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
     st = ctx.stop_table
     view = st[(st["stop_start"] <= hi) & (st["stop_end"] >= lo)]
 
-    ax.set_ylabel("n_events\nper stop")
+    ax.set_ylabel("selected events\nper stop")
     ax.axhline(0, color="grey", linewidth=0.3, zorder=0)
 
     if len(view) == 0:
@@ -1871,7 +1883,7 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
         return
 
     mids = 0.5 * (view["stop_start"].to_numpy() + view["stop_end"].to_numpy())
-    n_events = view["n_events"].to_numpy(dtype=float)
+    n_events = view["n_selected_events"].to_numpy(dtype=float)
     has_replay = view["has_replay"].to_numpy(dtype=bool)
     is_swr_stop = view["is_swr_stop"].to_numpy(dtype=bool)
     is_mua_stop = view["is_mua_stop"].to_numpy(dtype=bool)
@@ -1935,8 +1947,8 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
 def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
     """Event-level boolean context flags as a binary heatmap.
 
-    Six flag rows (``is_after_reward``, ``is_after_omission``,
-    ``is_after_switch``, ``is_after_stay``, ``is_swr``, ``is_mua``)
+    Six flag rows (rewarded, omitted, switched patch, stayed in patch,
+    ``is_swr``, ``is_mua``)
     displayed as filled cells per event: colored when True, white
     when False. The heatmap encoding is more legible than ``|``
     ticks at this density because flag co-occurrence within a single
@@ -1952,14 +1964,23 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
     view = et[
-        (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
-    ].sort_values("event_midpoint_time")
+        (et["event_midpoint_s"] >= lo) & (et["event_midpoint_s"] <= hi)
+    ].sort_values("event_midpoint_s")
+
+    # Canonical persisted tables store one primitive per exact complement.
+    # Derive the display-only complements without changing missingness.
+    view = view.assign(
+        is_omitted_outcome=1.0 - view["is_rewarded_outcome"],
+        did_last_completed_trip_stay_in_patch=(
+            1.0 - view["did_last_completed_trip_switch_patch"]
+        ),
+    )
 
     flag_specs = (
-        ("is_after_reward", "#2ca02c"),
-        ("is_after_omission", "#d62728"),
-        ("is_after_switch", "#9467bd"),
-        ("is_after_stay", "#8c564b"),
+        ("is_rewarded_outcome", "#2ca02c"),
+        ("is_omitted_outcome", "#d62728"),
+        ("did_last_completed_trip_switch_patch", "#9467bd"),
+        ("did_last_completed_trip_stay_in_patch", "#8c564b"),
         ("is_swr", COLORS["SWR"]),
         ("is_mua", COLORS["MUA"]),
     )
@@ -1983,8 +2004,8 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
 
     _require_columns(view, "event_table", flag_names)
     n_events = len(view)
-    starts = view["event_start"].to_numpy(dtype=float)
-    ends = view["event_end"].to_numpy(dtype=float)
+    starts = view["event_start_s"].to_numpy(dtype=float)
+    ends = view["event_end_s"].to_numpy(dtype=float)
     min_width = max((hi - lo) * 0.003, 1e-6)
 
     for row_idx, (flag, color) in enumerate(flag_specs):
@@ -2019,7 +2040,7 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
 # ── Patch-grain panels (the P0–P4 ladder's design matrix) ──
 #
 # ``event_patch_table`` carries three rows per event but, unlike
-# ``event_arm_table``, does NOT broadcast ``event_start`` / ``event_end``.
+# ``event_arm_table``, does NOT broadcast ``event_start_s`` / ``event_end_s``.
 # Timing therefore has to come from ``event_table`` via a validated
 # ``event_id`` join, which the helper below prepares once per figure.
 
@@ -2051,7 +2072,7 @@ def _patch_view_with_times(ctx: _PanelContext, value_col: str) -> pd.DataFrame:
         _require_columns(
             ctx.event_table,
             "event_table",
-            ("event_id", "event_start", "event_end"),
+            ("event_id", "event_start_s", "event_end_s"),
         )
         if ept[["event_id", "patch"]].isna().any().any():
             raise ValueError("event_patch_table event_id and patch must be non-missing")
@@ -2095,12 +2116,12 @@ def _patch_view_with_times(ctx: _PanelContext, value_col: str) -> pd.DataFrame:
             if column in ctx.event_table.columns
         ]
         times = ctx.event_table[
-            ["event_id", "event_start", "event_end", *context_columns]
+            ["event_id", "event_start_s", "event_end_s", *context_columns]
         ]
         # Event-level context is authoritative here; avoid suffixing if an
         # external patch table happens to carry stale broadcast copies.
         patch_rows = ept.drop(
-            columns=["event_start", "event_end", *context_columns],
+            columns=["event_start_s", "event_end_s", *context_columns],
             errors="ignore",
         )
         ctx._event_patch_with_times = patch_rows.merge(
@@ -2114,7 +2135,7 @@ def _patch_view_with_times(ctx: _PanelContext, value_col: str) -> pd.DataFrame:
     if value_col not in merged.columns:
         raise KeyError(f"event_patch_table has no column {value_col!r}")
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
-    return merged[(merged["event_start"] <= hi) & (merged["event_end"] >= lo)]
+    return merged[(merged["event_start_s"] <= hi) & (merged["event_end_s"] >= lo)]
 
 
 def _draw_event_patch_heatmap(
@@ -2161,8 +2182,8 @@ def _draw_event_patch_heatmap(
     if binary_color is not None:
         values = _overlay_missing_references(values, view, reference_cols)
     patches = view["patch"].to_numpy()
-    starts = view["event_start"].to_numpy()
-    ends = view["event_end"].to_numpy()
+    starts = view["event_start_s"].to_numpy()
+    ends = view["event_end_s"].to_numpy()
 
     if binary_color is None:
         finite = np.isfinite(values)
@@ -2229,12 +2250,14 @@ def _draw_event_patch_heatmap(
         ax.figure.colorbar(sm, ax=ax, shrink=0.7, pad=0.01, aspect=10)
 
 
-def _plot_q_arm_patch(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_reward_belief_mean_candidate_arm_preoutcome_patch(
+    ax: Axes, ctx: _PanelContext
+) -> None:
     """Event-sampled behavioral-model value aggregated to patch."""
     _draw_event_patch_heatmap(
         ax,
         ctx,
-        value_col="q_arm_patch",
+        value_col="reward_belief_mean_candidate_arm_preoutcome_patch",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -2242,12 +2265,14 @@ def _plot_q_arm_patch(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_p_reward_arm_patch(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_task_reward_probability_candidate_arm_patch(
+    ax: Axes, ctx: _PanelContext
+) -> None:
     """Event-sampled programmed reward probability aggregated to patch."""
     _draw_event_patch_heatmap(
         ax,
         ctx,
-        value_col="p_reward_arm_patch",
+        value_col="task_reward_probability_candidate_arm_patch",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -2255,12 +2280,14 @@ def _plot_p_reward_arm_patch(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_reward_rate_arm_k10_patch(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_reward_fraction_candidate_arm_last10_visits_patch(
+    ax: Axes, ctx: _PanelContext
+) -> None:
     """Mean recent reward rate across the patch's two reward-site arms."""
     _draw_event_patch_heatmap(
         ax,
         ctx,
-        value_col="reward_rate_arm_k10_patch",
+        value_col="reward_fraction_candidate_arm_last10_visits_patch",
         cmap_name=_PROBABILITY_CMAP,
         vmin=0.0,
         vmax=1.0,
@@ -2268,7 +2295,9 @@ def _plot_reward_rate_arm_k10_patch(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_cumulative_reward_patch(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_reward_count_candidate_arm_last10_known_trials_patch(
+    ax: Axes, ctx: _PanelContext
+) -> None:
     """Rewards on this patch over the last ten completed trials.
 
     A count of recent rewarded exposure, not a rate: it is the sum over
@@ -2278,7 +2307,7 @@ def _plot_cumulative_reward_patch(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_patch_heatmap(
         ax,
         ctx,
-        value_col="cumulative_reward_patch",
+        value_col="reward_count_candidate_arm_last10_known_trials_patch",
         cmap_name="viridis",
         vmin=0,
         vmax=None,
@@ -2300,11 +2329,11 @@ def _plot_is_current_patch(ax: Axes, ctx: _PanelContext) -> None:
     )
 
 
-def _plot_is_last_rewarded_patch_elsewhere(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_is_last_rewarded_noncurrent_patch(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_patch_heatmap(
         ax,
         ctx,
-        value_col="is_last_rewarded_patch_elsewhere",
+        value_col="is_last_rewarded_noncurrent_patch",
         cmap_name="",
         vmin=None,
         vmax=None,
@@ -2360,7 +2389,7 @@ def _plot_reward_lag_kernel(ax: Axes, ctx: _PanelContext) -> None:
     The missing-history cells identify rows excluded from a model that uses
     that lag; this plotting diagnostic does not alter any fitting cohort.
     """
-    lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
+    lag_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)]
     view = _stop_view(ctx, lag_cols)
 
     ax.set_ylabel("reward lag\n(trials back)")
@@ -2421,12 +2450,12 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
 
     The value averages the available most-recent trials (maximum ten) at
     stop start and is missing only before the first completed trial. R2 uses
-    this smoothed history together with ``reward_lag1``; Rlag instead uses
+    this smoothed history together with ``known_reward_outcome_lag_1``; Rlag instead uses
     the ten lag outcomes separately. On their production ladder-wide common
     cohort, R2 is an eight-degree-of-freedom constrained submodel of Rlag; all
     rungs use the exact same stop IDs.
     """
-    view = _stop_view(ctx, ["reward_rate_trial_k10"])
+    view = _stop_view(ctx, ["reward_fraction_last10_known_trials"])
     ax.set_ylabel("reward fraction\nprior ≤10 trials")
     ax.set_ylim(-0.05, 1.05)
     ax.axhline(0.0, color="grey", linewidth=0.3, zorder=0)
@@ -2445,7 +2474,7 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
 
     starts = view["stop_start"].to_numpy(dtype=float)
     ends = view["stop_end"].to_numpy(dtype=float)
-    vals = view["reward_rate_trial_k10"].to_numpy(dtype=float)
+    vals = view["reward_fraction_last10_known_trials"].to_numpy(dtype=float)
     finite = np.isfinite(vals)
     missing = ~finite
     if missing.any():
@@ -2493,10 +2522,10 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
         )
 
 
-def _plot_is_after_switch_stop(ax: Axes, ctx: _PanelContext) -> None:
+def _plot_last_completed_trip_switch(ax: Axes, ctx: _PanelContext) -> None:
     """Per-stop patch-switch context with explicit zero/missing states."""
-    view = _stop_view(ctx, ["is_after_switch"])
-    ax.set_ylabel("is_after\nswitch")
+    view = _stop_view(ctx, ["did_last_completed_trip_switch_patch"])
+    ax.set_ylabel("last trip\nswitched patch")
     ax.set_ylim(-0.5, 0.5)
     ax.set_yticks([])
 
@@ -2515,8 +2544,8 @@ def _plot_is_after_switch_stop(ax: Axes, ctx: _PanelContext) -> None:
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     starts = view["stop_start"].to_numpy(dtype=float)
     ends = view["stop_end"].to_numpy(dtype=float)
-    vals = view["is_after_switch"].to_numpy(dtype=float)
-    _validate_binary(vals, "stop_table.is_after_switch")
+    vals = view["did_last_completed_trip_switch_patch"].to_numpy(dtype=float)
+    _validate_binary(vals, "stop_table.did_last_completed_trip_switch_patch")
     finite = np.isfinite(vals)
     _add_interval_cells(
         ax,
@@ -2556,13 +2585,13 @@ def _draw_event_scalar_stem(
 ) -> None:
     """Stem plot of a per-event scalar against time.
 
-    One value per event at ``event_midpoint_time``: a thin vertical
+    One value per event at ``event_midpoint_s``: a thin vertical
     line from ``baseline`` to the value, plus a dot at the top. Works
     for any column of ``event_table`` whose dtype is numeric.
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
-    in_window = (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
+    in_window = (et["event_midpoint_s"] >= lo) & (et["event_midpoint_s"] <= hi)
     view = et.loc[in_window]
 
     if ylim is not None:
@@ -2582,7 +2611,7 @@ def _draw_event_scalar_stem(
         )
         return
 
-    times = view["event_midpoint_time"].to_numpy()
+    times = view["event_midpoint_s"].to_numpy()
     values = view[value_col].to_numpy(dtype=float)
     finite = np.isfinite(values)
     if not finite.any():
@@ -2646,8 +2675,8 @@ def _plot_hpd_widths(ax: Axes, ctx: _PanelContext) -> None:
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     et = ctx.event_table
-    in_window = (et["event_midpoint_time"] >= lo) & (et["event_midpoint_time"] <= hi)
-    view = et.loc[in_window].sort_values("event_midpoint_time")
+    in_window = (et["event_midpoint_s"] >= lo) & (et["event_midpoint_s"] <= hi)
+    view = et.loc[in_window].sort_values("event_midpoint_s")
 
     ax.set_ylim(0.8, len(_ALL_ARMS) + 0.2)
     ax.set_ylabel("HPD width\n50/80/95")
@@ -2664,11 +2693,11 @@ def _plot_hpd_widths(ax: Axes, ctx: _PanelContext) -> None:
         )
         return
 
-    times = view["event_midpoint_time"].to_numpy()
+    times = view["event_midpoint_s"].to_numpy()
     specs = (
-        ("posterior_hpd_width_50", 0.8, "#a6cee3", "50"),
-        ("posterior_hpd_width_80", 1.3, "#1f78b4", "80"),
-        ("posterior_hpd_width_95", 1.8, "#08306b", "95"),
+        ("posterior_hpd_arm_count_mean_coverage_50pct", 0.8, "#a6cee3", "50"),
+        ("posterior_hpd_arm_count_mean_coverage_80pct", 1.3, "#1f78b4", "80"),
+        ("posterior_hpd_arm_count_mean_coverage_95pct", 1.8, "#08306b", "95"),
     )
     for col, lw, color, label in specs:
         vals = view[col].to_numpy(dtype=float)
@@ -2706,7 +2735,7 @@ def _plot_time_since_stop(ax: Axes, ctx: _PanelContext) -> None:
     _draw_event_scalar_stem(
         ax,
         ctx,
-        value_col="time_since_stop",
+        value_col="time_since_stop_start_s",
         ylabel="time_since\nstop [s]",
         ylim=None,
         baseline=0.0,
@@ -2735,82 +2764,82 @@ _PANEL_REGISTRY: dict[str, Callable[[Axes, _PanelContext], None]] = {
     "posterior_entropy_mean": _plot_posterior_entropy_mean,
     "hpd_widths": _plot_hpd_widths,
     "n_nonlocal_bins": _plot_n_nonlocal_bins,
-    "time_since_stop": _plot_time_since_stop,
-    "visit_recency": _plot_visit_recency,
-    "cumulative_reward": _plot_cumulative_reward,
-    "reward_rate_arm_k10": _plot_recent_reward_rate,
-    "p_reward_arm": _plot_p_reward_arm,
-    "dist_to_arm": _plot_dist_to_arm,
-    "arm_dist_rank": _plot_arm_dist_rank,
+    "time_since_stop_start_s": _plot_time_since_stop,
+    "visit_recency_trials": _plot_visit_recency_trials,
+    "reward_count_candidate_arm_last10_known_trials": _plot_cumulative_reward,
+    "reward_fraction_candidate_arm_last10_visits": _plot_recent_reward_rate,
+    "task_reward_probability_candidate_arm": _plot_task_reward_probability_candidate_arm,
+    "distance_to_candidate_arm_cm": _plot_distance_to_candidate_arm,
+    "candidate_arm_distance_rank": _plot_arm_dist_rank,
     "arm_mass_stackplot": _plot_arm_mass_stackplot,
     "replay_frac_by_role": _plot_replay_frac_by_role,
     "event_bars": _plot_event_bars,
     "stop_activity": _plot_stop_activity,
     "context_flags": _plot_context_flags,
     # Behavioral-model (beta-bernoulli) beliefs, arm grain.
-    "q_arm": _plot_q_arm,
-    "arm_uncertainty": _plot_arm_uncertainty,
+    "reward_belief_mean_candidate_arm_preoutcome": _plot_reward_belief_mean_candidate_arm,
+    "reward_belief_variance_candidate_arm_preoutcome": _plot_reward_belief_variance_candidate_arm,
     # Remaining fitted arm-grain predictors.
-    "visit_recency_demeaned": _plot_visit_recency_demeaned,
+    "visit_recency_trials_event_leaf_centered": _plot_visit_recency_trials_event_leaf_centered,
     **{
         _c: _make_recency_spline_panel(_c, _i + 1)
         for _i, _c in enumerate(RECENCY_SPLINE_COLUMNS)
     },
-    "arm_never_visited": _plot_arm_never_visited,
-    "is_current": _plot_is_current,
-    "is_prev": _plot_is_prev,
-    "is_last_rewarded_elsewhere": _plot_is_last_rewarded_elsewhere,
+    "is_candidate_arm_never_visited": _plot_arm_never_visited,
+    "is_current_arm": _plot_is_current,
+    "is_prev_arm": _plot_is_prev,
+    "is_last_rewarded_noncurrent_arm": _plot_is_last_rewarded_elsewhere,
     # Patch ladder (P0–P4) design matrix.
-    "q_arm_patch": _plot_q_arm_patch,
-    "p_reward_arm_patch": _plot_p_reward_arm_patch,
-    "reward_rate_arm_k10_patch": _plot_reward_rate_arm_k10_patch,
-    "cumulative_reward_patch": _plot_cumulative_reward_patch,
+    "reward_belief_mean_candidate_arm_preoutcome_patch": _plot_reward_belief_mean_candidate_arm_preoutcome_patch,
+    "task_reward_probability_candidate_arm_patch": _plot_task_reward_probability_candidate_arm_patch,
+    "reward_fraction_candidate_arm_last10_visits_patch": _plot_reward_fraction_candidate_arm_last10_visits_patch,
+    "reward_count_candidate_arm_last10_known_trials_patch": _plot_reward_count_candidate_arm_last10_known_trials_patch,
     "is_current_patch": _plot_is_current_patch,
-    "is_last_rewarded_patch_elsewhere": _plot_is_last_rewarded_patch_elsewhere,
+    "is_last_rewarded_noncurrent_patch": _plot_is_last_rewarded_noncurrent_patch,
     "is_prev_patch": _plot_is_prev_patch,
     # Family-A per-stop rate design matrix.
     "reward_lag_kernel": _plot_reward_lag_kernel,
-    "reward_rate_trial_k10": _plot_reward_rate_trial_k10,
-    "is_after_switch_stop": _plot_is_after_switch_stop,
+    "reward_fraction_last10_known_trials": _plot_reward_rate_trial_k10,
+    "did_last_completed_trip_switch_patch": _plot_last_completed_trip_switch,
 }
 
 # Panel groups for convenient dispatch — the covariate panels are opt-in
 # because ``DEFAULT_PANELS`` stays a detector-style overview.
 BEHAVIORAL_MODEL_PANELS: tuple[str, ...] = (
-    "p_reward_arm",
-    "q_arm",
-    "arm_uncertainty",
+    "task_reward_probability_candidate_arm",
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_belief_variance_candidate_arm_preoutcome",
 )
 ARM_COVARIATE_PANELS: tuple[str, ...] = (
-    "is_current",
-    "is_prev",
-    "is_last_rewarded_elsewhere",
-    "visit_recency_demeaned",
+    "is_current_arm",
+    "is_prev_arm",
+    "is_last_rewarded_noncurrent_arm",
+    "visit_recency_trials_event_leaf_centered",
     *RECENCY_SPLINE_COLUMNS,
-    "arm_never_visited",
-    "reward_rate_arm_k10",
-    "cumulative_reward",
-    "arm_dist_rank",
-    # p_reward_arm and q_arm share a colorbar group, so they must stay
-    # adjacent: a shared bar spans the block of axes it serves, and an
-    # unrelated panel sitting between them would be drawn over.
-    "p_reward_arm",
-    "q_arm",
-    "arm_uncertainty",
+    "is_candidate_arm_never_visited",
+    "reward_fraction_candidate_arm_last10_visits",
+    "reward_count_candidate_arm_last10_known_trials",
+    "candidate_arm_distance_rank",
+    # Programmed reward probability and reward-belief mean share a colorbar
+    # group, so they must stay adjacent: a shared bar spans the block of axes
+    # it serves, and an unrelated panel between them would be drawn over.
+    "task_reward_probability_candidate_arm",
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_belief_variance_candidate_arm_preoutcome",
 )
 PATCH_COVARIATE_PANELS: tuple[str, ...] = (
     "is_current_patch",
     "is_prev_patch",
-    "is_last_rewarded_patch_elsewhere",
-    "reward_rate_arm_k10_patch",
-    "cumulative_reward_patch",
-    "p_reward_arm_patch",
-    "q_arm_patch",
+    "is_last_rewarded_noncurrent_patch",
+    "reward_fraction_candidate_arm_last10_visits_patch",
+    "reward_count_candidate_arm_last10_known_trials_patch",
+    "task_reward_probability_candidate_arm_patch",
+    "reward_belief_mean_candidate_arm_preoutcome_patch",
 )
 RATE_COVARIATE_PANELS: tuple[str, ...] = (
     "reward_lag_kernel",
-    "reward_rate_trial_k10",
-    "is_after_switch_stop",
+    "reward_fraction_last10_known_trials",
+    "did_last_completed_trip_switch_patch",
 )
 
 _EVENT_INTERVAL_CELL_PANELS = frozenset(
@@ -2819,33 +2848,33 @@ _EVENT_INTERVAL_CELL_PANELS = frozenset(
         "arm_count_soft",
         "arm_posterior_mass",
         "arm_fraction",
-        "visit_recency",
-        "cumulative_reward",
-        "reward_rate_arm_k10",
-        "p_reward_arm",
-        "dist_to_arm",
-        "arm_dist_rank",
-        "visit_recency_demeaned",
-    *RECENCY_SPLINE_COLUMNS,
-        "arm_never_visited",
-        "q_arm",
-        "arm_uncertainty",
-        "is_current",
-        "is_prev",
-        "is_last_rewarded_elsewhere",
+        "visit_recency_trials",
+        "reward_count_candidate_arm_last10_known_trials",
+        "reward_fraction_candidate_arm_last10_visits",
+        "task_reward_probability_candidate_arm",
+        "distance_to_candidate_arm_cm",
+        "candidate_arm_distance_rank",
+        "visit_recency_trials_event_leaf_centered",
+        *RECENCY_SPLINE_COLUMNS,
+        "is_candidate_arm_never_visited",
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "reward_belief_variance_candidate_arm_preoutcome",
+        "is_current_arm",
+        "is_prev_arm",
+        "is_last_rewarded_noncurrent_arm",
         *PATCH_COVARIATE_PANELS,
     }
 )
 _STRUCTURAL_NA_PANELS = frozenset(
     {
-        "visit_recency",
-        "cumulative_reward",
-        "reward_rate_arm_k10",
-        "p_reward_arm",
-        "visit_recency_demeaned",
-    *RECENCY_SPLINE_COLUMNS,
-        "q_arm",
-        "arm_uncertainty",
+        "visit_recency_trials",
+        "reward_count_candidate_arm_last10_known_trials",
+        "reward_fraction_candidate_arm_last10_visits",
+        "task_reward_probability_candidate_arm",
+        "visit_recency_trials_event_leaf_centered",
+        *RECENCY_SPLINE_COLUMNS,
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "reward_belief_variance_candidate_arm_preoutcome",
     }
 )
 
@@ -2858,10 +2887,10 @@ def _add_figure_semantic_legend(fig: Figure, panel_names: tuple[str, ...]) -> No
         selected
         & {
             "reward_lag_kernel",
-            "is_after_switch_stop",
+            "did_last_completed_trip_switch_patch",
             # Both draw hatched missing-input cells and so need the key; without
             # them a hatched band renders with nothing explaining it.
-            "reward_rate_trial_k10",
+            "reward_fraction_last10_known_trials",
             "context_flags",
         }
     )
@@ -2975,36 +3004,36 @@ _PANEL_HEIGHTS: dict[str, float] = {
     "posterior_entropy_mean": 1.0,
     "hpd_widths": 1.0,
     "n_nonlocal_bins": 1.0,
-    "time_since_stop": 1.0,
-    "visit_recency": 1.4,
-    "cumulative_reward": 1.4,
-    "reward_rate_arm_k10": 1.4,
-    "p_reward_arm": 1.4,
-    "dist_to_arm": 1.4,
-    "arm_dist_rank": 1.4,
+    "time_since_stop_start_s": 1.0,
+    "visit_recency_trials": 1.4,
+    "reward_count_candidate_arm_last10_known_trials": 1.4,
+    "reward_fraction_candidate_arm_last10_visits": 1.4,
+    "task_reward_probability_candidate_arm": 1.4,
+    "distance_to_candidate_arm_cm": 1.4,
+    "candidate_arm_distance_rank": 1.4,
     "arm_mass_stackplot": 1.4,
     "replay_frac_by_role": 1.2,
     "event_bars": 1.2,
     "stop_activity": 1.2,
     "context_flags": 1.4,
-    "q_arm": 1.4,
-    "arm_uncertainty": 1.4,
-    "visit_recency_demeaned": 1.4,
+    "reward_belief_mean_candidate_arm_preoutcome": 1.4,
+    "reward_belief_variance_candidate_arm_preoutcome": 1.4,
+    "visit_recency_trials_event_leaf_centered": 1.4,
     **dict.fromkeys(RECENCY_SPLINE_COLUMNS, 1.4),
-    "arm_never_visited": 1.4,
-    "is_current": 1.4,
-    "is_prev": 1.4,
-    "is_last_rewarded_elsewhere": 1.4,
-    "q_arm_patch": 1.0,
-    "p_reward_arm_patch": 1.0,
-    "reward_rate_arm_k10_patch": 1.0,
-    "cumulative_reward_patch": 1.0,
+    "is_candidate_arm_never_visited": 1.4,
+    "is_current_arm": 1.4,
+    "is_prev_arm": 1.4,
+    "is_last_rewarded_noncurrent_arm": 1.4,
+    "reward_belief_mean_candidate_arm_preoutcome_patch": 1.0,
+    "task_reward_probability_candidate_arm_patch": 1.0,
+    "reward_fraction_candidate_arm_last10_visits_patch": 1.0,
+    "reward_count_candidate_arm_last10_known_trials_patch": 1.0,
     "is_current_patch": 1.0,
-    "is_last_rewarded_patch_elsewhere": 1.0,
+    "is_last_rewarded_noncurrent_patch": 1.0,
     "is_prev_patch": 1.0,
     "reward_lag_kernel": 1.6,
-    "reward_rate_trial_k10": 1.0,
-    "is_after_switch_stop": 0.5,
+    "reward_fraction_last10_known_trials": 1.0,
+    "did_last_completed_trip_switch_patch": 0.5,
 }
 
 
@@ -3130,9 +3159,9 @@ def _validate_event_intervals(event_table: pd.DataFrame) -> None:
         "event_table",
         (
             "event_id",
-            "event_start",
-            "event_end",
-            "event_midpoint_time",
+            "event_start_s",
+            "event_end_s",
+            "event_midpoint_s",
             "next_arm",
         ),
     )
@@ -3141,9 +3170,9 @@ def _validate_event_intervals(event_table: pd.DataFrame) -> None:
         or event_table["event_id"].duplicated().any()
     ):
         raise ValueError("event_table.event_id must be unique and non-missing")
-    starts = event_table["event_start"].to_numpy(dtype=float)
-    ends = event_table["event_end"].to_numpy(dtype=float)
-    midpoints = event_table["event_midpoint_time"].to_numpy(dtype=float)
+    starts = event_table["event_start_s"].to_numpy(dtype=float)
+    ends = event_table["event_end_s"].to_numpy(dtype=float)
+    midpoints = event_table["event_midpoint_s"].to_numpy(dtype=float)
     if not (
         np.isfinite(starts).all()
         and np.isfinite(ends).all()
@@ -3151,9 +3180,9 @@ def _validate_event_intervals(event_table: pd.DataFrame) -> None:
     ):
         raise ValueError("event_table event intervals and midpoints must be finite")
     if np.any(ends < starts):
-        raise ValueError("event_table.event_end must be at or after event_start")
+        raise ValueError("event_table.event_end_s must be at or after event_start_s")
     if np.any((midpoints < starts) | (midpoints > ends)):
-        raise ValueError("event_table.event_midpoint_time must lie inside each event")
+        raise ValueError("event_table.event_midpoint_s must lie inside each event")
 
 
 def plot_session_tables(
@@ -3167,6 +3196,7 @@ def plot_session_tables(
     *,
     event_patch_table: pd.DataFrame | None = None,
     trials: pd.DataFrame | None = None,
+    port_experiences: pd.DataFrame | None = None,
     track_graph: Any = None,
     time_window: tuple[float, float] | None = None,
     panels: Sequence[str] = DEFAULT_PANELS,
@@ -3188,7 +3218,8 @@ def plot_session_tables(
         ``hse_times``, ``ripple_times``, ``multiunit_rate_zscore``,
         ``zscored_ripple_consensus_trace`` — the same keys
         :func:`plot_detector` consumes. ``trials`` and ``track_graph``
-        may be here or passed separately.
+        may be here or passed separately. Canonical behavioral-context panels
+        also require ``port_experiences``.
     detector, results
         Fitted detector and decoding results — same roles as in
         :func:`plot_detector`. ``results`` may be a Dataset or DataArray as
@@ -3206,6 +3237,10 @@ def plot_session_tables(
         :data:`PATCH_COVARIATE_PANELS`; every other panel ignores it.
     trials : pd.DataFrame, optional
         Trial DataFrame; falls back to ``data['trials']`` when absent.
+    port_experiences : pd.DataFrame, optional
+        Canonical starting-port-plus-destinations experience stream; falls
+        back to ``data['port_experiences']``. This is deliberately distinct
+        from movement trials and is required to reproduce history covariates.
     time_window : (float, float), optional
         ``(start_time, end_time)`` in seconds. Default: full session.
     panels : sequence of str
@@ -3230,8 +3265,8 @@ def plot_session_tables(
     fig : matplotlib.figure.Figure
     mismatch_table : pd.DataFrame
         Comparison between stored canonical ``next_arm`` and trial context
-        recomputed at ``event_start`` through the production context and
-        well-to-arm helpers. ``event_midpoint_time`` is retained as the
+        recomputed at ``event_start_s`` through the production context and
+        well-to-arm helpers. ``event_midpoint_s`` is retained as the
         plotting coordinate.
     """
     panel_names = _validated_panels(panels)
@@ -3252,6 +3287,14 @@ def plot_session_tables(
             raise KeyError(
                 "trials not provided and not present in ``data``; "
                 "pass ``trials=`` explicitly."
+            )
+    if port_experiences is None:
+        port_experiences = data.get("port_experiences")
+        if port_experiences is None:
+            raise KeyError(
+                "port_experiences not provided and not present in ``data``; "
+                "regenerate behavioral inputs or pass ``port_experiences=`` "
+                "explicitly."
             )
     if track_graph is None:
         track_graph = data.get("track_graph")
@@ -3278,6 +3321,7 @@ def plot_session_tables(
         event_sequence_table=event_sequence_table,
         stop_table=stop_table,
         trials=trials,
+        port_experiences=port_experiences,
         track_graph=track_graph,
         time_slice=time_slice,
         arm_palette=patch_grouped_arm_palette(),
@@ -3375,13 +3419,14 @@ def plot_session_tables(
     # Event-cell panels already encode support with their own cell widths and
     # deliberately skip the redundant gray overlay.
     et_windowed = event_table[
-        (event_table["event_start"] <= t_end) & (event_table["event_end"] >= t_start)
+        (event_table["event_start_s"] <= t_end)
+        & (event_table["event_end_s"] >= t_start)
     ]
     if len(et_windowed) > 0:
         event_starts = np.maximum(
-            et_windowed["event_start"].to_numpy(dtype=float), t_start
+            et_windowed["event_start_s"].to_numpy(dtype=float), t_start
         )
-        event_ends = np.minimum(et_windowed["event_end"].to_numpy(dtype=float), t_end)
+        event_ends = np.minimum(et_windowed["event_end_s"].to_numpy(dtype=float), t_end)
         # One axes-coordinate collection replaces one ``axvspan`` artist per
         # event and panel. This keeps full-session covariate groups tractable
         # while preserving the same event-span geometry and alpha.
@@ -3412,7 +3457,9 @@ def plot_session_tables(
     # regardless of panel selection (useful for headless CI / audit).
     mismatch_table = ctx._mismatch_table
     if mismatch_table is None:
-        mismatch_table = _compute_mismatch_table(event_table, trials, track_graph)
+        mismatch_table = _compute_mismatch_table(
+            event_table, trials, port_experiences, track_graph
+        )
 
     if save_path is not None:
         fig.savefig(save_path, dpi=150, bbox_inches="tight")

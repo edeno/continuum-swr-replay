@@ -15,7 +15,8 @@ this continuous quantity). This script asks, across non-local events:
 
 The model contains the current trial's RPE, so its fit cohort is restricted to
 events beginning at or after ``outcome_known_time`` (reward onset for rewarded
-trials; latest possible pump latency, capped at departure, for omissions).
+trials; latest possible pump latency, capped at the collapsed task visit's final
+departure, for omissions).
 Distribution and duration
 descriptives remain summaries of all non-local events.
 
@@ -39,31 +40,35 @@ import pandas as pd
 from scipy.stats import skew, wilcoxon
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
-from continuum_swr_replay.analysis.replay._helpers import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
 PREDICTORS = [
-    "reward_lag1",
-    "p_reward_current",
-    "rpe",
-    "recent_switch_rate",
-    "value_diff_patch",
-    "q_current",
-    "time_since_stop",
+    "known_reward_outcome_lag_1",
+    "task_reward_probability_chosen_arm",
+    "rpe_postoutcome",
+    "patch_switch_fraction_last5_completed_trips",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
+    "reward_belief_mean_chosen_arm_preoutcome",
+    "time_since_stop_start_s",
 ]
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
-POST_OUTCOME_GATE_RULE = "event_start >= outcome_known_time"
+POST_OUTCOME_GATE_RULE = "event_start_s >= outcome_known_time"
 
 
 def _bimodality_coef(x: np.ndarray) -> float:
@@ -77,17 +82,26 @@ def _bimodality_coef(x: np.ndarray) -> float:
 
 def _assemble() -> pd.DataFrame:
     ev = read_table(RC / "event_table.pkl")
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
-    # qvals_table (exact stop-start alignment). rpe/q_current are now the
-    # beta-model experienced value (rpe = R - q_chosen, q_current = q_chosen),
-    # replacing the retired difflib nominal-rpe / leaky-Q.
+    stop = read_table(RC / "stop_table.pkl")
+    # qvals_table (exact stop-start alignment). These are the behavioral
+    # model's experienced value and RPE, replacing retired nominal/leaky-Q
+    # stand-ins. Keep their canonical names through fitting and persistence.
     cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    cont = cont.rename(columns={"q_chosen": "q_current"})
+    require_covariate_schema(ev, table="event")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(cont, table="qvals")
+    stop = add_uncertainty_covariates(stop)
     # Many events per stop, one row per stop on both right-hand tables.
     # Without validate= a duplicated stop_id would silently multiply
     # events into the per-event OLS instead of raising.
     df = ev.merge(
-        stop[["stop_id", "reward_lag1", "recent_switch_rate"]],
+        stop[
+            [
+                "stop_id",
+                "known_reward_outcome_lag_1",
+                "patch_switch_fraction_last5_completed_trips",
+            ]
+        ],
         on="stop_id",
         how="left",
         validate="many_to_one",
@@ -98,10 +112,10 @@ def _assemble() -> pd.DataFrame:
                 "stop_id",
                 "outcome_known_time",
                 "trial_reward",
-                "p_reward_current",
-                "rpe",
-                "value_diff_patch",
-                "q_current",
+                "task_reward_probability_chosen_arm",
+                "rpe_postoutcome",
+                "task_reward_probability_patch_mean_gap_best_vs_second",
+                "reward_belief_mean_chosen_arm_preoutcome",
             ]
         ],
         on="stop_id",
@@ -120,7 +134,7 @@ def _post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     Parameters
     ----------
     df : pd.DataFrame
-        Event-grain frame carrying ``event_start`` and ``outcome_known_time``.
+        Event-grain frame carrying ``event_start_s`` and ``outcome_known_time``.
 
     Returns
     -------
@@ -129,7 +143,7 @@ def _post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     eligible : np.ndarray, shape (n_events,)
         Finite *and* starting at/after the outcome boundary.
     """
-    required = (*SC, "event_start", "outcome_known_time", "trial_reward")
+    required = (*SC, "event_start_s", "outcome_known_time", "trial_reward")
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise KeyError(
@@ -137,7 +151,7 @@ def _post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
             f"{missing}. Regenerate event_table.pkl and qvals_table.pkl."
         )
 
-    event_start = df["event_start"].to_numpy(dtype=float)
+    event_start = df["event_start_s"].to_numpy(dtype=float)
     boundary = df["outcome_known_time"].to_numpy(dtype=float)
     raw_trial_reward = df["trial_reward"]
     trial_reward = pd.to_numeric(raw_trial_reward, errors="coerce").to_numpy(
@@ -278,10 +292,10 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
 _QVALS_PREDICTORS = (
     "outcome_known_time",
     "trial_reward",
-    "p_reward_current",
-    "rpe",
-    "value_diff_patch",
-    "q_current",
+    "task_reward_probability_chosen_arm",
+    "rpe_postoutcome",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
+    "reward_belief_mean_chosen_arm_preoutcome",
 )
 
 
@@ -291,13 +305,13 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     attributes them to ``n_drop_qvals_gap`` (mechanism B), the other predictor/response
     NaNs to own, and the <30-event session gate to excluded."""
     n_in = len(df)
-    # Raises if the timing columns are absent, so ``event_start`` below
+    # Raises if the timing columns are absent, so ``event_start_s`` below
     # needs no membership guard: reaching this point means it exists.
     _, eligible, selected, _ = _balanced_post_outcome_selection(df)
     qp = [c for c in _QVALS_PREDICTORS if c in df.columns]
     op = [
         c
-        for c in (*PREDICTORS, POWER_COL, "event_start")
+        for c in (*PREDICTORS, POWER_COL, "event_start_s")
         if c not in qp and c in df.columns
     ]
     qmask = (
@@ -374,11 +388,11 @@ def main() -> None:
     for c, cnt in zip((edges[:-1] + edges[1:]) / 2, h, strict=True):
         print(f"    {c:+5.1f} | {'#' * int(40 * cnt / h.max())}")
 
-    d = df[["event_duration", POWER_COL]].dropna()
+    d = df[["event_duration_s", POWER_COL]].dropna()
     print(
-        f"\n=== duration confound: corr(power, event_duration) ="
-        f" {np.corrcoef(d.event_duration, d[POWER_COL])[0, 1]:+.3f}"
-        f"  (log-dur {np.corrcoef(np.log(d.event_duration), d[POWER_COL])[0, 1]:+.3f}) ==="
+        f"\n=== duration confound: corr(power, event_duration_s) ="
+        f" {np.corrcoef(d.event_duration_s, d[POWER_COL])[0, 1]:+.3f}"
+        f"  (log-dur {np.corrcoef(np.log(d.event_duration_s), d[POWER_COL])[0, 1]:+.3f}) ==="
     )
 
     coefs = fit_power_model(df)

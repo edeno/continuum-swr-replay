@@ -45,6 +45,9 @@ from matplotlib.lines import Line2D
 
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.choice_prediction import predict_arm_fractions
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
@@ -65,12 +68,12 @@ DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_model_fit_outputs"
 # ring in the observed panel; "swr" folds into a single per-event SWR track;
 # arm_fe_* are the row identity (no panel).
 COV_PANEL = {
-    "is_prev": ("armstrip", "prev_arm", "prev arm"),
-    "is_last_rewarded_elsewhere": ("armstrip", "last_rewarded_arm", "last rew arm"),
-    "reward_rate_arm_k10": ("cov", "reward_rate_arm_k10", "reward rate k10", ("plasma", False)),
-    "visit_recency_demeaned": ("cov", "visit_recency_demeaned", "visit recency", ("PuOr", True)),
-    "p_reward_arm": ("cov", "p_reward_arm", "P(reward)", ("cividis", False)),
-    "q_arm": ("cov", "q_arm", "beta value", ("RdBu_r", True)),
+    "is_prev_arm": ("armstrip", "prev_arm", "prev arm"),
+    "is_last_rewarded_noncurrent_arm": ("armstrip", "last_rewarded_arm", "last rew arm"),
+    "reward_fraction_candidate_arm_last10_visits": ("cov", "reward_fraction_candidate_arm_last10_visits", "reward rate k10", ("plasma", False)),
+    "visit_recency_trials_event_leaf_centered": ("cov", "visit_recency_trials_event_leaf_centered", "visit recency", ("PuOr", True)),
+    "task_reward_probability_candidate_arm": ("cov", "task_reward_probability_candidate_arm", "P(reward)", ("cividis", False)),
+    "reward_belief_mean_candidate_arm_preoutcome": ("cov", "reward_belief_mean_candidate_arm_preoutcome", "beta value", ("RdBu_r", True)),
 }
 
 
@@ -107,7 +110,7 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
     pf["col"] = pf["non_local_event"].map(col_of)
     n_bouts = len(order)
     y_of_arm = {a: (n_arms - 1 - i) for i, a in enumerate(ARM_ROW_ORDER)}
-    pf["y"] = pf["arm"].map(y_of_arm)
+    pf["y"] = pf["candidate_arm"].map(y_of_arm)
     evo = pf.groupby("non_local_event").first().reindex(order.index)
 
     # Stop structure for per-stop cells + boundary separators.
@@ -123,7 +126,7 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
         return a[..., starts]
 
     def arm_matrix(col, per_event):
-        piv = pf.pivot_table(index="arm", columns="non_local_event", values=col,
+        piv = pf.pivot_table(index="candidate_arm", columns="non_local_event", values=col,
                              aggfunc="first")
         m = piv.reindex(index=ARM_ROW_ORDER, columns=order.index).to_numpy()
         return m if per_event else to_stop(m)
@@ -131,7 +134,7 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
     # Assemble the panel list: SWR track (if any swr_x_* predictor), the arm/cov
     # predictor panels (in model order, deduped), then obs / predicted / residual.
     uses_swr = any(p.startswith("swr_x") for p in predictors)
-    show_ring = "is_current" in predictors
+    show_ring = "is_current_arm" in predictors
     panels, seen = [], set()
     if uses_swr:
         panels.append(("swr",))
@@ -233,12 +236,12 @@ def build_figure(sub: pd.DataFrame, model_name: str, title_stub: str):
                     ax.axvspan(starts[g] - 0.5, ends[g] + 0.5, color="0.5",
                                alpha=0.10, lw=0, zorder=0)
             frac = pf["arm_fraction"].to_numpy().clip(0, 1)
-            cc = np.array([palette[a] for a in pf["arm"]], dtype=float)
+            cc = np.array([palette[a] for a in pf["candidate_arm"]], dtype=float)
             cc[:, 3] = frac
             ax.scatter(pf["col"], pf["y"], s=32, c=cc, edgecolors="none", zorder=2,
                        rasterized=True)
             if show_ring:
-                cur = pf[pf["is_current"] == 1]
+                cur = pf[pf["is_current_arm"] == 1]
                 ax.scatter(cur["col"], cur["y"], s=46, facecolors="none",
                            edgecolors="black", linewidths=0.9, zorder=3,
                            rasterized=True)
@@ -330,7 +333,8 @@ def main() -> None:
     args = p.parse_args()
 
     ev = read_table(RC_DIR / "event_arm_table.pkl")
-    sub = ev[(ev.animal == args.animal) & (ev.day == args.day)
+    require_covariate_schema(ev, table="event_arm")
+    sub = ev[(ev.animal == args.animal) & (ev.session_date == args.day)
              & (ev.epoch == args.epoch)]
     if sub.empty:
         raise SystemExit(f"No rows for {args.animal} {args.day} {args.epoch}.")

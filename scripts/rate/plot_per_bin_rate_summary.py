@@ -25,6 +25,9 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SPLINE_KNOTS,
     TMAX,
@@ -48,17 +51,7 @@ LADDER = ["M0_const", "M1_rew1", "M2_rewhist", "M2r_rewrate", "M3_hist",
 POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
-REWARD_RATE_COEF_CANDIDATES = (
-    "coef_reward_rate_trial_k10",
-    "coef_recent_trial_reward_rate",
-)
-
-
-def _first_present(df: pd.DataFrame, candidates: tuple[str, ...]) -> str:
-    for col in candidates:
-        if col in df.columns:
-            return col
-    raise KeyError(f"none of {candidates} are present in all_models.pkl")
+REWARD_FRACTION_COEF = "coef_reward_fraction_last10_known_trials"
 
 
 def _coef(df, model, oc, coef):
@@ -78,7 +71,7 @@ def _timecourse(stop, onsets, oc, dt=0.1, tmax=4.0):
     t = t[(t >= 0) & (t < tmax)]
     edges = np.arange(0, tmax + dt, dt)
     num, _ = np.histogram(t, edges)
-    immob = stop["immobility_time"].to_numpy()
+    immob = stop["immobility_duration_s"].to_numpy()
     immob = immob[immob > 0]
     denom = np.array([np.clip(immob - e, 0, dt).sum() for e in edges[:-1]])
     rate = num / np.where(denom > 0, denom, np.nan)
@@ -87,7 +80,7 @@ def _timecourse(stop, onsets, oc, dt=0.1, tmax=4.0):
 
 def _survival(stop, tmax=4.0, dt=0.1):
     """Fraction of stops still immobile at each tc (the support of the curve)."""
-    immob = stop["immobility_time"].to_numpy()
+    immob = stop["immobility_duration_s"].to_numpy()
     immob = immob[immob > 0]
     tc = np.arange(dt / 2, tmax, dt)
     return tc, np.array([(immob > t).mean() for t in tc])
@@ -138,7 +131,7 @@ def _panel_fitted_timecourse(ax, df, stop):
     scols = sorted(
         c for c in df.columns
         if c.startswith("coef_bs(tc, knots=") and c.endswith("]")
-        and "reward_lag1:" not in c
+        and "known_reward_outcome_lag_1:" not in c
     )
     for oc in POPS4:
         s = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
@@ -170,7 +163,7 @@ def _panel_baseline(ax, df):
 
 
 def _panel_reward1(ax, df):
-    data = [np.exp(_coef(df, "M7_time_hist_rew", oc, "coef_reward_lag1")) for oc in POPS3]
+    data = [np.exp(_coef(df, "M7_time_hist_rew", oc, "coef_known_reward_outcome_lag_1")) for oc in POPS3]
     bp = ax.boxplot(data, labels=SHORT, showfliers=False, patch_artist=True)
     for patch, oc in zip(bp["boxes"], POPS3, strict=True):
         patch.set_facecolor(STYLE[oc][1])
@@ -184,7 +177,7 @@ def _panel_reward1(ax, df):
 def _panel_reward_kernel(ax, df):
     lags = np.arange(1, 11)
     for oc in POPS4:
-        rr = [np.exp(_coef(df, "M7_time_hist_rew", oc, f"coef_reward_lag{j}").median())
+        rr = [np.exp(_coef(df, "M7_time_hist_rew", oc, f"coef_known_reward_outcome_lag_{j}").median())
               for j in lags]
         ax.plot(lags, rr, marker="o", color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
     ax.axhline(1, color="0.5", ls=":")
@@ -229,7 +222,7 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [("M2r_rewrate", _first_present(df, REWARD_RATE_COEF_CANDIDATES))]
+    blocks = [("M2r_rewrate", REWARD_FRACTION_COEF)]
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
             rr = np.exp(_coef(df, model, oc, coef).median())
@@ -245,10 +238,12 @@ def _panel_covar(ax, df):
 def main() -> None:
     df = pd.read_pickle(RC / "models_per_bin_rate" / "all_models.pkl")
     stop = read_table(RC / "stop_table.pkl")
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     FIGS.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplot_mosaic(
         [["time", "rate", "rew1", "ladder"],
@@ -265,7 +260,7 @@ def main() -> None:
     # Derive the cohort from the data actually plotted. A hardcoded count
     # silently misreports the corpus whenever a session fails to regenerate
     # (attach_is_swr_to_onsets excludes non-shared sessions).
-    n_sessions = onsets[["animal", "day", "epoch"]].drop_duplicates().shape[0]
+    n_sessions = onsets[["animal", "session_date", "epoch"]].drop_duplicates().shape[0]
     fig.suptitle(
         "Per-bin replay-rate ladder (Family B): fitted effects by event type, "
         f"{n_sessions} sessions",

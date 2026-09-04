@@ -9,13 +9,13 @@ next:
 - ``chosen_arm_fraction`` — replay mass on ``next_arm``
 - ``ends_at_next``        — last in-event MAP arm equals ``next_arm``
 - ``contains_path_to_next`` — MAP-arm trace covers the geometric path
-  from ``current_arm`` to ``next_arm``
+  from ``occupancy_well_arm`` to ``next_arm``
 - ``chosen_patch_fraction`` — replay mass on ``next_patch``
 - ``ends_at_next_patch`` — final MAP arm belongs to ``next_patch``
 
 Each metric is compared against a within-session, visit-context future-label
 shuffle over ``--n-shuffles`` draws. A visit context is a contiguous
-``current_arm`` run within ``stop_id`` because one long immobility bout can span
+``occupancy_well_arm`` run within ``stop_id`` because one long immobility bout can span
 a trial boundary or return to an earlier arm. Arm metrics condition on current
 arm, patch metrics on current patch, and path coverage on current arm, route
 length, and coarse duration. Each family has its own cohort and denominator.
@@ -42,7 +42,11 @@ from continuum_swr_replay.analysis.replay import (
     at_well_event_cohort,
     retrospective_alignment_with_shuffle,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
@@ -54,7 +58,7 @@ logging.basicConfig(
 INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 
 
 def _family_unit_counts(
@@ -152,6 +156,9 @@ def main() -> None:
     event_table = read_table(INPUT_DIR / "event_table.pkl")
     event_arm_table = read_table(INPUT_DIR / "event_arm_table.pkl")
     event_sequence_table = read_table(INPUT_DIR / "event_sequence_table.pkl")
+    require_covariate_schema(event_table, table="event")
+    require_covariate_schema(event_arm_table, table="event_arm")
+    require_covariate_schema(event_sequence_table, table="event_sequence")
     logging.info(
         "events=%d  event_arm rows=%d  event_seq rows=%d  sessions=%d",
         len(event_table),
@@ -197,20 +204,20 @@ def main() -> None:
     n_no_movable = 0
     sessions = sorted(event_table.groupby(SESSION_COLS).groups.keys())
     for i, sess_key in enumerate(sessions):
-        animal, day, epoch = sess_key
+        animal, session_date, epoch = sess_key
         ev_s = event_table[
             (event_table["animal"] == animal)
-            & (event_table["day"] == day)
+            & (event_table["session_date"] == session_date)
             & (event_table["epoch"] == epoch)
         ]
         ea_s = event_arm_table[
             (event_arm_table["animal"] == animal)
-            & (event_arm_table["day"] == day)
+            & (event_arm_table["session_date"] == session_date)
             & (event_arm_table["epoch"] == epoch)
         ]
         es_s = event_sequence_table[
             (event_sequence_table["animal"] == animal)
-            & (event_sequence_table["day"] == day)
+            & (event_sequence_table["session_date"] == session_date)
             & (event_sequence_table["epoch"] == epoch)
         ]
         t0 = time.time()
@@ -232,7 +239,7 @@ def main() -> None:
                 "Retaining %s/%s/%s with status=%s; families without two "
                 "movable visit contexts report NaN metrics (%s)",
                 animal,
-                day,
+                session_date,
                 epoch,
                 retrospective_status,
                 family_unit_counts,
@@ -242,7 +249,7 @@ def main() -> None:
         result.update(
             {
                 "animal": animal,
-                "day": day,
+                "session_date": session_date,
                 "epoch": epoch,
                 "subset": label,
                 "retrospective_status": retrospective_status,

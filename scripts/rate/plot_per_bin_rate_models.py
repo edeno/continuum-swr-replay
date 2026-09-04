@@ -12,7 +12,7 @@ self-history + reward kernel), so every effect is shown controlled for the
 within-stop time course and the same-event clustering:
 
 * ``reward_kernel_per_bin_rate.png`` -- the reward rate-ratio kernel
-  (reward_lag1..10) per population and the lag-1 dissociation between
+  (known_reward_outcome_lag_1..10) per population and the lag-1 dissociation between
   SWR-coupled and non-SWR non-local events.
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
   (onset_lag1..10): refractory (<1) at short lags, bursty (>1) at ~100 ms.
@@ -37,11 +37,12 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     N_REWARD_LAGS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 RC = P / "replay_content"
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 MODEL = "M7_time_hist_rew"
 
 # outcome key -> (display label, colour)
@@ -68,7 +69,7 @@ def _kernel(
 
 
 def plot_reward_kernel(m7: pd.DataFrame) -> None:
-    ker = _kernel(m7, "reward_lag", N_REWARD_LAGS)
+    ker = _kernel(m7, "known_reward_outcome_lag_", N_REWARD_LAGS)
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
 
     ax = axes[0]
@@ -92,7 +93,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
 
     ax = axes[1]
     order = ["swr", "non_local_swr", "non_local_no_swr"]
-    data = [np.exp(m7[m7.outcome == oc]["coef_reward_lag1"].dropna()) for oc in order]
+    data = [np.exp(m7[m7.outcome == oc]["coef_known_reward_outcome_lag_1"].dropna()) for oc in order]
     bp = ax.boxplot(data, labels=["SWR", "NL\nw/SWR", "NL\nNO SWR"],
                     showfliers=False, patch_artist=True)
     for patch, oc in zip(bp["boxes"], order, strict=True):
@@ -103,17 +104,17 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     ax.set_ylim(0, 5)
 
     # paired dissociation annotation: non_local_swr vs non_local_no_swr
-    a = m7[m7.outcome == "non_local_swr"][SC + ["coef_reward_lag1"]]
-    b = m7[m7.outcome == "non_local_no_swr"][SC + ["coef_reward_lag1"]]
+    a = m7[m7.outcome == "non_local_swr"][SC + ["coef_known_reward_outcome_lag_1"]]
+    b = m7[m7.outcome == "non_local_no_swr"][SC + ["coef_known_reward_outcome_lag_1"]]
     mrg = a.merge(b, on=SC, suffixes=("_s", "_n")).dropna()
     if len(mrg) < 2:
         raise SystemExit(
             f"Only {len(mrg)} paired sessions for the SWR/no-SWR dissociation; "
             "run fit_per_bin_rate_models.py over more sessions first."
         )
-    diff = mrg.coef_reward_lag1_s - mrg.coef_reward_lag1_n
+    diff = mrg.coef_known_reward_outcome_lag_1_s - mrg.coef_known_reward_outcome_lag_1_n
     pa = mrg.assign(d=diff).groupby("animal")["d"].median()
-    pval = wilcoxon(mrg.coef_reward_lag1_s, mrg.coef_reward_lag1_n).pvalue
+    pval = wilcoxon(mrg.coef_known_reward_outcome_lag_1_s, mrg.coef_known_reward_outcome_lag_1_n).pvalue
     ax.set_title(f"Immediate reward effect by population\n"
                  f"NL-SWR > NL-no-SWR: {(diff > 0).mean():.0%} of {len(mrg)}, "
                  f"{(pa > 0).sum()}/{mrg.animal.nunique()} animals, p={pval:.1e}")
@@ -124,7 +125,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     plt.close(fig)
     print(f"saved {out}")
     for oc in order:
-        v = m7[m7.outcome == oc]["coef_reward_lag1"].dropna()
+        v = m7[m7.outcome == oc]["coef_known_reward_outcome_lag_1"].dropna()
         print(f"  {POP_STYLE[oc][0]:18s}: lag1 RR={np.exp(v.median()):.2f} (n={len(v)})")
 
 

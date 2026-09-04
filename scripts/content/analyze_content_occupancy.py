@@ -61,6 +61,9 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
@@ -208,10 +211,11 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     if not table_exists(f):
         return None
     ea = read_table(f)
+    require_covariate_schema(ea, table="event_arm")
     if animal is not None and "animal" in ea.columns:
         ea = ea[ea["animal"] == animal]
     ea = ea.assign(group=np.where(ea["is_swr"].astype(bool), "SWR", "nonSWR"))
-    occ = ea.groupby(["group", "arm"])["arm_posterior_mass"].sum().unstack(0)
+    occ = ea.groupby(["group", "candidate_arm"])["arm_posterior_mass"].sum().unstack(0)
     return occ / occ.sum()
 
 

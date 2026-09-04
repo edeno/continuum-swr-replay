@@ -44,19 +44,19 @@ class TestInteractionRecovery:
     # test could select different simulation draws and mask
     # regressions that only fail at one seed.
     _INTERACTION_SEEDS = {
-        "swr_x_current": 1154,
-        "switch_x_prev": 9541,
-        "current_x_last_rewarded": 1911,
-        "omission_x_last_rewarded": 4273,
+        "swr_x_is_current_arm": 1154,
+        "swr_x_is_prev_arm": 9541,
+        "is_current_arm_x_is_last_rewarded_arm": 1911,
+        "is_omitted_outcome_x_is_last_rewarded_arm": 4273,
     }
 
     @pytest.mark.parametrize(
         "interaction,base",
         [
-            ("swr_x_current", "is_current"),
-            ("switch_x_prev", "is_prev"),
-            ("current_x_last_rewarded", "is_last_rewarded"),
-            ("omission_x_last_rewarded", "is_last_rewarded"),
+            ("swr_x_is_current_arm", "is_current_arm"),
+            ("swr_x_is_prev_arm", "is_prev_arm"),
+            ("is_current_arm_x_is_last_rewarded_arm", "is_last_rewarded_arm"),
+            ("is_omitted_outcome_x_is_last_rewarded_arm", "is_last_rewarded_arm"),
         ],
     )
     def test_recover_single_interaction(self, interaction, base):
@@ -83,10 +83,10 @@ class TestVIFForInteractions:
 
     def test_vif_under_five(self):
         truth = {
-            "is_current": 0.5,
-            "is_prev": 0.3,
-            "swr_x_current": 0.4,
-            "switch_x_prev": 0.2,
+            "is_current_arm": 0.5,
+            "is_prev_arm": 0.3,
+            "swr_x_is_current_arm": 0.4,
+            "swr_x_is_prev_arm": 0.2,
         }
         df = simulate_with_event_covariates(truth, n_events=600, L_e=30, seed=99)
         fit = fit_conditional_poisson(df, predictors=list(truth))
@@ -124,13 +124,13 @@ class TestSelectionPicksTruthM2:
 
     def test_bic_does_not_prefer_overfit(self):
         truth = {
-            "is_current": 0.6,
-            "is_prev": 0.7,
+            "is_current_arm": 0.6,
+            "is_prev_arm": 0.7,
             # Everything beyond M2 set to 0
-            "is_last_rewarded_elsewhere": 0.0,
-            "visit_recency_demeaned": 0.0,
-            "reward_rate_arm_k10": 0.0,
-            "dist_to_arm": 0.0,
+            "is_last_rewarded_noncurrent_arm": 0.0,
+            "visit_recency_trials_event_leaf_centered": 0.0,
+            "reward_fraction_candidate_arm_last10_visits": 0.0,
+            "distance_to_candidate_arm_cm": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=7)
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3", "M4", "M5"])
@@ -147,15 +147,15 @@ class TestSelectionUpgradesWhenTruthIsLarger:
 
     def test_selection_finds_reward_predictor(self):
         truth = {
-            "is_current": 0.5,
-            "is_prev": 0.4,
+            "is_current_arm": 0.5,
+            "is_prev_arm": 0.4,
             # Reward signal enters the hierarchy at M3. It used to be carried
             # here by ``is_last_rewarded_elsewhere``, which is no longer in any
             # rung -- a truth the ladder cannot represent would make this test
             # assert that selection detects a predictor nobody fits.
-            "reward_rate_arm_k10": 0.6,
-            "visit_recency_demeaned": 0.0,
-            "is_last_rewarded_elsewhere": 0.0,
+            "reward_fraction_candidate_arm_last10_visits": 0.6,
+            "visit_recency_trials_event_leaf_centered": 0.0,
+            "is_last_rewarded_noncurrent_arm": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3", "M4", "M5"])
@@ -169,9 +169,9 @@ class TestSelectionUpgradesWhenTruthIsLarger:
 
     def test_m3_strictly_better_than_m2_by_lrt(self):
         truth = {
-            "is_current": 0.5,
-            "is_prev": 0.4,
-            "reward_rate_arm_k10": 0.6,
+            "is_current_arm": 0.5,
+            "is_prev_arm": 0.4,
+            "reward_fraction_candidate_arm_last10_visits": 0.6,
         }
         df = simulate_with_event_covariates(truth, n_events=800, L_e=25, seed=42)
         fits = _fit_hierarchy(df, ["M2", "M3"])
@@ -188,10 +188,10 @@ class TestSelectionUnderNull:
 
     def test_bic_picks_null_when_truth_is_null(self):
         truth = {
-            "is_current": 0.0,
-            "is_prev": 0.0,
-            "is_last_rewarded": 0.0,
-            "current_x_last_rewarded": 0.0,
+            "is_current_arm": 0.0,
+            "is_prev_arm": 0.0,
+            "is_last_rewarded_arm": 0.0,
+            "is_current_arm_x_is_last_rewarded_arm": 0.0,
         }
         df = simulate_with_event_covariates(truth, n_events=500, L_e=20, seed=123)
         fits = _fit_hierarchy(df, ["M0", "M1", "M2", "M3"])

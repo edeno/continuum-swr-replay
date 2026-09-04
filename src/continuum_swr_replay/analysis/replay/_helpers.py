@@ -1,9 +1,8 @@
 """Shared helpers for event-table builders.
 
 These utilities are used by both the NonLocal (``tables.py``) and
-ContFrag (``contfrag/tables.py``) table builders. They handle
-trial-context annotation, immobility-bout detection, spatial
-arm/well/patch mappings, and generic DataFrame helpers.
+ContFrag (``contfrag/tables.py``) table builders. Trial clocks, behavioral
+context, and behavioral-history covariates live in :mod:`.covariates`.
 """
 
 from __future__ import annotations
@@ -17,251 +16,15 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    OMISSION_KNOWN_LATENCY_SEC,
 )
-from continuum_swr_replay.data_loaders.constants import (
-    TRACK_SEGMENT_TO_PATCH,
-    WELL_PATCH_MAPPING,
-)
+from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
 
 logger = logging.getLogger(__name__)
-
-# ── Trial-derived context ──
-
-
-_LOCATION_STATES = ("at_well", "in_transit", "mixed", "unknown")
-
-
-def _validate_well_values(values: np.ndarray, column: str) -> None:
-    """Require finite integral IDs from the canonical six-well task."""
-    valid = np.asarray(tuple(WELL_PATCH_MAPPING), dtype=float)
-    if not np.isfinite(values).all():
-        raise ValueError(f"trial {column} values must be finite")
-    if not np.equal(values, np.floor(values)).all() or not np.isin(values, valid).all():
-        raise ValueError(
-            f"trial {column} values must be canonical integral well IDs "
-            f"{tuple(WELL_PATCH_MAPPING)}"
-        )
-
-
-def _prepare_trials_for_context(
-    trials: pd.DataFrame,
-    *,
-    required_columns: tuple[str, ...] = (),
-) -> tuple[pd.DataFrame, np.ndarray]:
-    """Validate and order trials by their canonical destination-arrival time.
-
-    A trip reaches its destination at ``goal_arrival_time``, with the
-    established per-row ``end_time`` fallback. Sorting by that clock is
-    essential for location and visit history. Reward history uses the separate
-    outcome clock returned by :func:`_trial_outcome_times`.
-    """
-    if trials.empty:
-        return trials.copy(), np.array([], dtype=float)
-
-    base_columns = {"start_time", "end_time", "to_well", *required_columns}
-    missing = sorted(base_columns.difference(trials.columns))
-    if missing:
-        raise KeyError(f"trial context requires columns {missing}")
-
-    prepared = trials.copy()
-    starts = prepared["start_time"].to_numpy(dtype=float)
-    ends = prepared["end_time"].to_numpy(dtype=float)
-    cutoffs = _trial_arrival_times(prepared)
-    to_wells = prepared["to_well"].to_numpy(dtype=float)
-
-    if not np.isfinite(starts).all():
-        raise ValueError("trial start_time values must be finite")
-    if not np.isfinite(ends).all():
-        raise ValueError("trial end_time values must be finite")
-    if not np.isfinite(cutoffs).all():
-        raise ValueError("trial destination-arrival cutoffs must be finite")
-    _validate_well_values(to_wells, "to_well")
-    if np.any(cutoffs < starts):
-        raise ValueError("a trial destination arrival occurs before its start")
-    if np.any(cutoffs > ends):
-        raise ValueError("a trial destination arrival occurs after its end_time")
-
-    order = np.argsort(cutoffs, kind="stable")
-    prepared = prepared.iloc[order].reset_index(drop=True)
-    cutoffs = cutoffs[order]
-    starts = starts[order]
-
-    # Consecutive trips may meet at a boundary.  They may not overlap: an
-    # animal cannot be in two transit intervals at once.  This check also
-    # catches trial orders that disagree between departure and completion.
-    if len(prepared) > 1 and np.any(starts[1:] < cutoffs[:-1]):
-        raise ValueError("trial transit intervals overlap")
-
-    return prepared, cutoffs
-
-
-def behavioral_location_at_times(
-    times: np.ndarray,
-    trials: pd.DataFrame,
-) -> pd.DataFrame:
-    """Classify timestamps from trip departure/arrival intervals.
-
-    ``[start_time, completion_cutoff)`` is ``"in_transit"``.  From the
-    completion cutoff through the next trip's start is ``"at_well"`` at the
-    completed trial's destination.  Consequently, exact arrival is at-well
-    and exact departure is in-transit.  Times before the first departure are
-    ``"unknown"``.  The final dwell extends beyond the last recorded trial.
-
-    The returned columns are ``location_state`` (categorical), ``at_well``
-    (nullable boolean), and ``location_well`` (nullable ``Float64``).
-
-    **These are task states, not positions, and the names undersell that.**
-    Two different questions are answered by two similarly-named columns:
-
-    * ``location_well`` / ``location_arm`` / ``current_arm`` (the last two are
-      the same quantity, aliased) -- *which well is the animal visiting?* It is
-      derived from trip intervals, not from tracked position, and is **NaN
-      during a trip**: the destination is never named before the animal reaches
-      it, which is what keeps it usable as a predictor.
-    * ``physical_arm`` (built in ``tables.py``) -- *which track segment does the
-      tracked position fall on?* Always defined, trunks included.
-
-    They are allowed to disagree, and do on 46 of 59,374 at-well events (0.077%,
-    measured 2026-08-19): the animal is still inside its well-visit interval
-    while its tracked position is a mean 48.4 cm away (max 82.3 cm), usually on
-    the adjoining trunk. Both labels are right about their own construct.
-    Neither is a fallback for the other, so a cohort that needs occupancy
-    off-well must say which one it means rather than defaulting.
-
-    ``"in_transit"`` names the **trip interval, not the animal's motion**, and
-    this reliably misleads. Every event in the modelled cohort is speed-gated
-    immobility; off-well events have a median speed of 1.35 cm/s. An
-    ``in_transit`` event is an animal *standing still partway through a trip*,
-    not a running animal. The reason the content models exclude those events is
-    narrow -- the well-visit construct is undefined there, so ``is_current`` and
-    everything derived from it is NaN -- and not that the animal was moving.
-    """
-    sample_times = np.asarray(times, dtype=float)
-    if sample_times.ndim != 1:
-        raise ValueError("times must be a one-dimensional sequence")
-    if not np.isfinite(sample_times).all():
-        raise ValueError("times must contain only finite timestamps")
-
-    index = pd.Index(sample_times, name="time")
-    if trials.empty:
-        return pd.DataFrame(
-            {
-                "location_state": pd.Categorical(
-                    ["unknown"] * len(sample_times), categories=_LOCATION_STATES
-                ),
-                "at_well": pd.array([pd.NA] * len(sample_times), dtype="boolean"),
-                "location_well": pd.array([pd.NA] * len(sample_times), dtype="Float64"),
-            },
-            index=index,
-        )
-
-    prepared, cutoffs = _prepare_trials_for_context(trials)
-    starts = prepared["start_time"].to_numpy(dtype=float)
-    to_wells = prepared["to_well"].to_numpy(dtype=float)
-
-    started_idx = np.searchsorted(starts, sample_times, side="right") - 1
-    has_started = started_idx >= 0
-    clipped = np.clip(started_idx, 0, len(prepared) - 1)
-    is_transit = has_started & (sample_times < cutoffs[clipped])
-    is_at_well = has_started & ~is_transit
-
-    state = np.full(len(sample_times), "unknown", dtype=object)
-    state[is_transit] = "in_transit"
-    state[is_at_well] = "at_well"
-    at_well = pd.array([pd.NA] * len(sample_times), dtype="boolean")
-    at_well[is_transit] = False
-    at_well[is_at_well] = True
-    location_well = pd.array([pd.NA] * len(sample_times), dtype="Float64")
-    location_well[is_at_well] = to_wells[clipped[is_at_well]]
-
-    return pd.DataFrame(
-        {
-            "location_state": pd.Categorical(state, categories=_LOCATION_STATES),
-            "at_well": at_well,
-            "location_well": location_well,
-        },
-        index=index,
-    )
-
-
-def summarize_behavioral_location(
-    states: pd.DataFrame | pd.Series | np.ndarray | list[str],
-    wells: pd.Series | np.ndarray | list[float] | None = None,
-) -> dict[str, object]:
-    """Roll time-resolved location labels up over one complete window.
-
-    A window is ``at_well`` only when every sampled bin is at the same well.
-    It is ``in_transit`` only when every bin is in transit, ``unknown`` when
-    empty or wholly unknown, and ``mixed`` whenever states differ or an
-    at-well window spans multiple wells.  ``at_well`` is nullable only for an
-    unknown window; mixed windows are explicitly false.
-    """
-    if isinstance(states, pd.DataFrame):
-        if wells is not None:
-            raise ValueError("wells must be omitted when states is a DataFrame")
-        required = {"location_state", "location_well"}
-        missing = sorted(required.difference(states.columns))
-        if missing:
-            raise KeyError(f"location frame requires columns {missing}")
-        wells = states["location_well"]
-        states = states["location_state"]
-
-    state_values = np.asarray(states, dtype=object)
-    if state_values.ndim != 1:
-        raise ValueError("location states must be one-dimensional")
-    if wells is None:
-        well_values = np.full(len(state_values), np.nan)
-    else:
-        well_values = pd.to_numeric(pd.Series(wells), errors="coerce").to_numpy(
-            dtype=float, na_value=np.nan
-        )
-        if well_values.ndim != 1 or len(well_values) != len(state_values):
-            raise ValueError("location states and wells must have equal lengths")
-
-    if len(state_values) == 0:
-        return {
-            "location_state": "unknown",
-            "at_well": pd.NA,
-            "location_well": np.nan,
-        }
-
-    allowed = set(_LOCATION_STATES) - {"mixed"}
-    observed_states = set(state_values.tolist())
-    invalid = observed_states.difference(allowed)
-    if invalid:
-        raise ValueError(f"invalid time-resolved location states: {sorted(invalid)}")
-
-    if observed_states == {"unknown"}:
-        return {
-            "location_state": "unknown",
-            "at_well": pd.NA,
-            "location_well": np.nan,
-        }
-    if observed_states == {"in_transit"}:
-        return {
-            "location_state": "in_transit",
-            "at_well": False,
-            "location_well": np.nan,
-        }
-    if observed_states == {"at_well"}:
-        unique_wells = np.unique(well_values[np.isfinite(well_values)])
-        if len(unique_wells) == 1 and np.isfinite(well_values).all():
-            return {
-                "location_state": "at_well",
-                "at_well": True,
-                "location_well": float(unique_wells[0]),
-            }
-
-    return {
-        "location_state": "mixed",
-        "at_well": False,
-        "location_well": np.nan,
-    }
-
+_SESSION_COLS = list(SESSION_COLUMNS)
 
 def nearest_well_distance_cm(
     dot: pd.DataFrame,
@@ -336,233 +99,6 @@ def nearest_well_distance_cm(
         displacement = positions[valid, None, :] - well_positions[None, :, :]
         output[valid] = np.linalg.norm(displacement, axis=2).min(axis=1)
     return output
-
-
-def add_trial_context(
-    dot: pd.DataFrame,
-    trials: pd.DataFrame,
-) -> pd.DataFrame:
-    """Attach per-timebin trial-derived columns to ``dot`` (in place, returned).
-
-    Destination and switch context is indexed by the most recent trip that
-    reached its goal at or before ``t``. Reward-bearing context uses a second
-    clock and stays unknown until that same trip's outcome is observable. An
-    in-progress trip cannot expose its destination, reward, or switch outcome
-    through these columns. ``next_well`` is the
-    sole forward-looking column: it names a destination the animal has not
-    reached yet, so it is a response variable, never a causal predictor.
-    (Elsewhere in this codebase "retrospective" means past-referenced -- see
-    ``retrospective.py`` -- so it is deliberately not used for ``next_well``.)
-
-    Columns added
-    -------------
-    - ``prev_well``, ``current_well``, ``last_visited_well`` (past-only)
-    - ``next_well`` (forward-looking: the not-yet-reached destination)
-    - ``last_rewarded_well`` — advances only when a reward is observable
-    - ``completed_trial_id`` — zero-based completion-order ID regenerated
-      within the session (not an index copied from the source trial table)
-    - ``recent_switch_rate`` — canonical five-completed-trial rolling switch
-      rate through the identified trial, computed from the full trial stream
-    - ``leaky_q_value_diff`` — canonical alpha-0.3 pre-update Q margin for the
-      identified trial, computed while updating on every completed trial
-    - ``is_after_switch`` — last completed trip's ``is_patch_change``
-    - ``is_after_omission`` — current arrived trip's omission, NaN until known
-    - ``is_after_reward`` — current arrived trip's reward, NaN until known
-    - ``reward_outcome`` — current arrived trip's outcome, NaN until known
-    - ``completed_trial_reward`` — the same outcome, ungated (post-outcome;
-      descriptive constructs only, never a predictor)
-    - ``location_state``, ``at_well``, ``location_well``
-    """
-    dot_times = np.asarray(dot.index.values, dtype=float)
-    if dot_times.ndim != 1 or not np.isfinite(dot_times).all():
-        raise ValueError("dot index must contain only finite timestamps")
-
-    location = behavioral_location_at_times(dot_times, trials)
-    for column in location.columns:
-        dot[column] = location[column].array
-
-    if trials.empty:
-        for col in (
-            "prev_well",
-            "current_well",
-            "last_visited_well",
-            "next_well",
-            "last_rewarded_well",
-            "reward_outcome",
-            "completed_trial_reward",
-            "is_after_reward",
-            "is_after_omission",
-            "is_after_switch",
-            "_goal_arrival_time",
-            "_last_reward_time",
-            "recent_switch_rate",
-            "leaky_q_value_diff",
-        ):
-            dot[col] = np.nan
-        dot["completed_trial_id"] = pd.array([pd.NA] * len(dot), dtype="Int64")
-        return dot
-
-    trials, arrival_times = _prepare_trials_for_context(
-        trials,
-        required_columns=("from_well", "is_reward", "is_patch_change"),
-    )
-    outcome_times = _trial_outcome_times(trials)
-    n_trials = len(trials)
-    trial_start_times = trials["start_time"].to_numpy(dtype=float)
-    to_wells = trials["to_well"].to_numpy(dtype=float)
-    from_wells = trials["from_well"].to_numpy(dtype=float)
-    reward_values = trials["is_reward"].to_numpy(dtype=float)
-    patch_change_values = trials["is_patch_change"].to_numpy(dtype=float)
-    _validate_well_values(from_wells, "from_well")
-    for name, values in (
-        ("is_reward", reward_values),
-        ("is_patch_change", patch_change_values),
-    ):
-        if not np.isfinite(values).all() or not np.isin(values, (0.0, 1.0)).all():
-            raise ValueError(f"trial {name} values must be finite binary values")
-    is_reward = reward_values.astype(bool)
-    is_patch_change = patch_change_values.astype(bool)
-    if np.any(np.diff(outcome_times) < 0):
-        raise ValueError("trial outcome-known times must be nondecreasing")
-    if n_trials > 1 and np.any(outcome_times[:-1] > arrival_times[1:]):
-        raise ValueError(
-            "a trial outcome remains unknown after the next destination arrival"
-        )
-
-    # Local import avoids the module's deliberate re-export cycle: covariates
-    # imports low-level trial helpers from this module, while this call needs
-    # the canonical scientific definition owned by covariates. The function is
-    # invoked only after both modules have finished importing.
-    from .covariates import canonical_trial_uncertainty_history
-
-    trial_switch_rate, trial_q_margin = canonical_trial_uncertainty_history(
-        to_wells,
-        reward_values,
-        patch_change_values,
-    )
-
-    completed_idx = np.searchsorted(arrival_times, dot_times, side="right") - 1
-    has_completed = completed_idx >= 0
-    completed_clipped = np.clip(completed_idx, 0, n_trials - 1)
-    # This ID is deliberately regenerated after canonical completion-time
-    # sorting. Source trial indices are not stable across loaders, whereas a
-    # zero-based completion order is the visit identity needed by downstream
-    # history covariates. Before the first observed completion it is unknown.
-    completed_trial_id = pd.array(completed_idx, dtype="Int64")
-    completed_trial_id[~has_completed] = pd.NA
-    dot["completed_trial_id"] = completed_trial_id
-    dot["recent_switch_rate"] = np.where(
-        has_completed, trial_switch_rate[completed_clipped], np.nan
-    )
-    dot["leaky_q_value_diff"] = np.where(
-        has_completed, trial_q_margin[completed_clipped], np.nan
-    )
-
-    dot["prev_well"] = np.where(has_completed, from_wells[completed_clipped], np.nan)
-    last_visited = np.where(has_completed, to_wells[completed_clipped], np.nan)
-    dot["last_visited_well"] = last_visited
-    # Compatibility alias: unlike the previous implementation, current_well
-    # is now strictly past-only and never means an in-progress destination.
-    dot["current_well"] = last_visited
-
-    started_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
-    next_idx = completed_idx + 1
-    next_valid = (started_idx >= 0) & (next_idx < n_trials)
-    next_clipped = np.clip(next_idx, 0, n_trials - 1)
-    dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
-
-    # Reward identity is not available merely because the animal arrived.
-    # Advance this history at the physical outcome clock: exact pump onset for
-    # newly generated rewarded trials, the canonical latency/departure boundary
-    # for omissions, or the explicit
-    # conservative end-time fallback documented by _trial_outcome_times.
-    reward_timestamps = outcome_times[is_reward]
-    rewarded_wells = to_wells[is_reward]
-    if len(reward_timestamps) > 0:
-        rew_idx = np.searchsorted(reward_timestamps, dot_times, side="right") - 1
-        rew_idx_clipped = np.clip(rew_idx, 0, None)
-        dot["last_rewarded_well"] = np.where(
-            rew_idx >= 0, rewarded_wells[rew_idx_clipped], np.nan
-        )
-    else:
-        dot["last_rewarded_well"] = np.nan
-
-    dot["_goal_arrival_time"] = np.where(
-        has_completed, arrival_times[completed_clipped], np.nan
-    )
-
-    if len(reward_timestamps) > 0:
-        dot["_last_reward_time"] = np.where(
-            rew_idx >= 0, reward_timestamps[rew_idx_clipped], np.nan
-        )
-    else:
-        dot["_last_reward_time"] = np.nan
-
-    current_outcome_known = has_completed & (
-        dot_times >= outcome_times[completed_clipped]
-    )
-    current_reward = np.where(
-        current_outcome_known,
-        is_reward[completed_clipped].astype(float),
-        np.nan,
-    )
-    dot["reward_outcome"] = current_reward
-    dot["is_after_reward"] = current_reward
-    dot["is_after_omission"] = np.where(
-        current_outcome_known, 1.0 - current_reward, np.nan
-    )
-    # The completed trip's realized outcome, NOT gated on when it became
-    # observable. The gated columns above are the ones a predictor may use;
-    # this one exists for constructs that are *about* the outcome the animal
-    # just experienced and are already barred from predictive use for another
-    # reason. ``wsls_deviation`` is the case: it pairs this outcome with
-    # ``is_stay``, the eventual outbound choice, so it is future-referencing
-    # whatever the outcome clock does, and gating it at the bout start only
-    # made it undefined at every at-well stop.
-    dot["completed_trial_reward"] = np.where(
-        has_completed, is_reward[completed_clipped].astype(float), np.nan
-    )
-    dot["is_after_switch"] = np.where(
-        has_completed, is_patch_change[completed_clipped].astype(float), np.nan
-    )
-
-    return dot
-
-
-def trial_context_at_times(
-    times: np.ndarray,
-    trials: pd.DataFrame,
-) -> pd.DataFrame:
-    """Evaluate the canonical trial context at arbitrary timestamps.
-
-    This is the read-only, timestamp-oriented entry point for consumers that
-    need the exact same boundary, sorting, and missing-value semantics as
-    :func:`add_trial_context` without constructing a decoder-sized ``dot``
-    frame.  The returned frame is newly allocated; ``trials`` is not mutated.
-
-    Parameters
-    ----------
-    times : array-like
-        Timestamps at which to sample trial context.
-    trials : pandas.DataFrame
-        Canonical trial table accepted by :func:`add_trial_context`.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per input timestamp, indexed by time, with the columns written
-        by :func:`add_trial_context`.
-    """
-    sample_times = np.asarray(times, dtype=float)
-    if sample_times.ndim != 1:
-        raise ValueError("times must be a one-dimensional sequence")
-    if not np.isfinite(sample_times).all():
-        raise ValueError("times must contain only finite timestamps")
-    sampled = pd.DataFrame(index=pd.Index(sample_times, name="time"))
-    return add_trial_context(sampled, trials)
-
-
-# ── Immobility-bout helpers ──
 
 
 def immobility_bout_starts(
@@ -730,8 +266,16 @@ def hash_event_id(
     events: pd.DataFrame,
     event_col: str = "non_local_event",
 ) -> np.ndarray:
-    """63-bit stable hash of ``(animal, day, epoch, event_col)``."""
-    keys = events[["animal", "day", "epoch", event_col]]
+    """63-bit stable hash of ``(animal, <session date>, epoch, event_col)``.
+
+    The session-date column is read by value, so the hash is identical whether
+    the frame spells it ``session_date`` (canonical, repository-owned tables) or
+    ``day`` (the intermediate classified event table, not covariate-stamped).
+    ``pd.util.hash_pandas_object`` ignores column labels, so the two spellings
+    hash to the same id and still match across the event/classified merge.
+    """
+    date_col = "session_date" if "session_date" in events.columns else "day"
+    keys = events[["animal", date_col, "epoch", event_col]]
     return (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
 
 
@@ -818,7 +362,7 @@ def eq_indicator_or_nan(values: np.ndarray, reference: np.ndarray) -> np.ndarray
 
     The missing-data counterpart of :func:`eq_indicator`, for indicators
     whose reference can be *unobserved* rather than merely absent.
-    ``current_arm`` is NaN whenever an event window is not wholly at one
+    ``occupancy_well_arm`` is NaN whenever an event window is not wholly at one
     well (``in_transit``, ``mixed``, ``unknown``); the animal still
     occupies some arm, we just cannot say which.  Encoding that as 0 on
     every arm would assert "not the current arm" for all nine, which is
@@ -923,6 +467,7 @@ def assert_single_session_alignment(
     *,
     source_name: str,
     session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
+    target_session_cols: tuple[str, ...] | None = None,
 ) -> None:
     """Require source and target frames to name the same single session.
 
@@ -931,23 +476,27 @@ def assert_single_session_alignment(
     to overlap, so builders validate the natural session key before aligning
     response matrices.
     """
+    target_cols = target_session_cols or session_cols
+    if len(target_cols) != len(session_cols):
+        raise ValueError("source and target session keys must have equal arity")
     missing_source = [column for column in session_cols if column not in source]
-    missing_target = [column for column in session_cols if column not in target]
+    missing_target = [column for column in target_cols if column not in target]
     if missing_source or missing_target:
         raise KeyError(
             f"session alignment for {source_name} requires columns "
-            f"{session_cols}; missing from source={missing_source}, "
+            f"source={session_cols}, target={target_cols}; "
+            f"missing from source={missing_source}, "
             f"target={missing_target}"
         )
     if source.loc[:, list(session_cols)].isna().any().any() or target.loc[
-        :, list(session_cols)
+        :, list(target_cols)
     ].isna().any().any():
         raise ValueError(
             f"session alignment for {source_name} requires nonmissing natural keys"
         )
 
     source_keys = source.loc[:, list(session_cols)].drop_duplicates()
-    target_keys = target.loc[:, list(session_cols)].drop_duplicates()
+    target_keys = target.loc[:, list(target_cols)].drop_duplicates()
     if len(source_keys) != 1 or len(target_keys) != 1:
         raise ValueError(
             f"session alignment for {source_name} requires exactly one session "
@@ -964,7 +513,7 @@ def assert_single_session_alignment(
 
 def add_arm_fixed_effects(
     df: pd.DataFrame,
-    arm_col: str = "arm",
+    arm_col: str = "candidate_arm",
 ) -> pd.DataFrame:
     """Add the arm fixed-effect dummy columns named by ``ARM_FE_PREDICTORS``.
 
@@ -982,7 +531,7 @@ def add_arm_fixed_effects(
     df : pd.DataFrame
         Long-format event-arm frame. Must carry ``arm_col``.
     arm_col : str
-        Integer arm-id column (``"arm"`` in the canonical event-arm
+        Integer arm-id column (``"candidate_arm"`` in the canonical event-arm
         table, ``"arm_id"`` in simulator output).
 
     Returns
@@ -1022,167 +571,6 @@ def build_well_to_arm_map(track_graph: nx.Graph) -> dict[int, int]:
 # ── Vectorized batch helpers (operate on all events at once) ──
 
 
-def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
-    """Per-trial destination-arrival timestamps for visit/location history.
-
-    Uses ``goal_arrival_time`` (the moment the animal *arrives at* the
-    goal well -- poke-in, which precedes reward delivery) when available,
-    falling back to ``end_time`` per row when ``goal_arrival_time`` is NaN,
-    and per frame when the column is absent. This clock controls destination,
-    visit-recency, and switch history only. Reward-bearing history must use
-    :func:`_trial_outcome_times` instead.
-    """
-    if "goal_arrival_time" in trials.columns:
-        cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
-        end = trials["end_time"].to_numpy(dtype=float)
-        if np.isinf(cutoff).any():
-            raise ValueError(
-                "goal_arrival_time contains infinity; corrupted physical timing "
-                "must not silently fall back to end_time"
-            )
-        missing = np.isnan(cutoff)
-        return np.where(missing, end, cutoff)
-    return trials["end_time"].to_numpy(dtype=float)
-
-
-def _trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
-    """Backward-compatible alias for the destination-arrival clock.
-
-    New code should name the intended clock explicitly with
-    :func:`_trial_arrival_times` or :func:`_trial_outcome_times`.
-    """
-    return _trial_arrival_times(trials)
-
-
-def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
-    """Per-trial timestamp at which reward versus omission is observable.
-
-    Newly generated trial tables carry ``outcome_known_time``: first pump onset
-    for a rewarded trial and ``min(arrival + OMISSION_KNOWN_LATENCY_SEC,
-    end_time)`` for an omission. Older or
-    manually constructed frames lack that field; for those frames ``end_time``
-    is an explicit conservative fallback for both outcomes. This fallback can
-    delay rewarded history, but it cannot expose reward before delivery.
-
-    Every returned value must be finite and lie within
-    ``[destination_arrival, end_time]``. Invalid explicit timestamps raise
-    rather than silently falling back to another clock.
-    """
-    if len(trials) == 0:
-        return np.array([], dtype=float)
-    if "end_time" not in trials.columns:
-        raise KeyError("trial outcome timing requires end_time")
-
-    end = trials["end_time"].to_numpy(dtype=float)
-    arrival = _trial_arrival_times(trials)
-    reward = None
-    if "is_reward" in trials.columns:
-        reward = trials["is_reward"].to_numpy(dtype=float)
-        if not np.isfinite(reward).all() or not np.isin(reward, (0.0, 1.0)).all():
-            raise ValueError("trial is_reward values must be finite binary values")
-
-    reward_column = next(
-        (
-            column
-            for column in ("reward_on_time", "reward_on_ts")
-            if column in trials.columns
-        ),
-        None,
-    )
-    expected_from_physical_clock = None
-    if reward_column is not None:
-        if reward is None:
-            raise KeyError(
-                f"{reward_column} requires is_reward to identify rewarded trials"
-            )
-        reward_on = trials[reward_column].to_numpy(dtype=float)
-        rewarded = reward.astype(bool)
-        if (~np.isfinite(reward_on[rewarded])).any():
-            raise ValueError("rewarded trials must have finite reward-on timestamps")
-        if np.isfinite(reward_on[~rewarded]).any():
-            raise ValueError("omission trials cannot carry reward-on timestamps")
-        # The omission boundary is only sound while no pump can still fire after
-        # it. OMISSION_KNOWN_LATENCY_SEC was set just above the largest reward
-        # latency in the corpus (0.298 s of a 0.30 s constant -- 2 ms of
-        # headroom), so a new animal, a hardware change, or simply more trials
-        # can exceed it. Past that point an omission is declared while a reward
-        # could still arrive, and every reward-history covariate in the affected
-        # window is silently wrong. Fail here instead.
-        observed_latency = reward_on[rewarded] - arrival[rewarded]
-        if observed_latency.size and observed_latency.max() > OMISSION_KNOWN_LATENCY_SEC:
-            raise ValueError(
-                f"reward latency {observed_latency.max():.3f}s exceeds "
-                f"OMISSION_KNOWN_LATENCY_SEC={OMISSION_KNOWN_LATENCY_SEC}s, so the "
-                "omission boundary would declare 'no reward' while a pump could "
-                "still fire. Re-derive the constant from the reward-latency "
-                "distribution over the current corpus."
-            )
-        # Must mirror the canonical derivation in
-        # ``data_loaders.trials.make_trials_df_from_well_visits`` and
-        # ``qvals_table._outcome_known_time``: pump onset when rewarded, else
-        # arrival plus the omission latency, capped at ``end_time``. Recomputing
-        # the *old* poke-out rule here made this validator reject every trials
-        # frame built under the current one -- so a non-cache rebuild, the only
-        # way to refresh a stale session cache, crashed on its first session.
-        expected_from_physical_clock = np.where(
-            rewarded,
-            reward_on,
-            np.minimum(arrival + OMISSION_KNOWN_LATENCY_SEC, end),
-        )
-
-    if "outcome_known_time" in trials.columns:
-        outcome = trials["outcome_known_time"].to_numpy(dtype=float)
-        if expected_from_physical_clock is not None and not np.allclose(
-            outcome,
-            expected_from_physical_clock,
-            rtol=0.0,
-            atol=1e-9,
-            equal_nan=True,
-        ):
-            raise ValueError(
-                "outcome_known_time conflicts with reward-on/end-time semantics"
-            )
-    elif expected_from_physical_clock is not None:
-        outcome = expected_from_physical_clock
-    else:
-        outcome = end.copy()
-
-    invalid = (
-        ~np.isfinite(end)
-        | ~np.isfinite(arrival)
-        | ~np.isfinite(outcome)
-        | (outcome < arrival)
-        | (outcome > end)
-    )
-    if invalid.any():
-        bad = tuple(np.flatnonzero(invalid)[:10])
-        raise ValueError(
-            "trial outcome-known times must be finite and lie between "
-            f"destination arrival and end_time; invalid row(s): {bad}"
-        )
-    return outcome
-
-
-def trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
-    """Return the canonical destination-arrival cutoff for each trial.
-
-    This public compatibility wrapper is for visit/location history. Reward
-    history uses :func:`trial_outcome_times`.
-    """
-    return _trial_arrival_times(trials)
-
-
-def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
-    """Return the canonical reward/omission availability time per trial."""
-    return _trial_outcome_times(trials)
-
-
-_SESSION_COLS = ["animal", "day", "epoch"]
-
-
-# ── Per-bin event-rate aggregation ──
-
-
 def attach_is_swr_to_onsets(
     onset_df: pd.DataFrame, event_table: pd.DataFrame
 ) -> pd.DataFrame:
@@ -1190,7 +578,7 @@ def attach_is_swr_to_onsets(
 
     First freezes the intersection of natural session keys carried by both
     tables, then matches each non-local onset to its ``event_table`` event by
-    exact ``(session, stop_id, onset_time == event_start)`` identity. Within
+        exact ``(session, stop_id, onset_time == event_start_s)`` identity. Within
     every retained session the sources must be a complete one-to-one partition.
     Sessions present in only one artifact are excluded as an explicit
     regeneration/build-coverage gap rather than blocking valid shared sessions.
@@ -1202,7 +590,7 @@ def attach_is_swr_to_onsets(
         Event-onset rows. Must carry ``stop_id``, ``event_type``, and
         ``onset_time``.
     event_table : pd.DataFrame
-        Per-event table. Must carry ``stop_id``, ``event_start``, ``is_swr``.
+        Per-event table. Must carry ``stop_id``, ``event_start_s``, ``is_swr``.
 
     Returns
     -------
@@ -1312,7 +700,7 @@ def attach_is_swr_to_onsets(
     # and because the shifted ranks still all find *a* row, the match-rate
     # guard below stays silent through it. Matching on time contains the
     # failure to the row that is actually missing.
-    ev = event_shared[[*merge_keys, "event_start", "is_swr"]].copy()
+    ev = event_shared[[*merge_keys, "event_start_s", "is_swr"]].copy()
     nl = out[out["event_type"] == "non_local"].copy()
     if has_session_keys:
         onset_counts = nl.groupby(_SESSION_COLS, sort=False).size()
@@ -1333,7 +721,7 @@ def attach_is_swr_to_onsets(
         )
     nl["_onset_order"] = np.arange(len(nl))
     merged = nl.merge(
-        ev.rename(columns={"event_start": "onset_time"}),
+        ev.rename(columns={"event_start_s": "onset_time"}),
         on=[*merge_keys, "onset_time"],
         how="left",
         suffixes=("", "_ev"),
@@ -1416,9 +804,10 @@ def aggregate_to_timebins(
     Parameters
     ----------
     stop_table : pd.DataFrame
-        Per-stop table (unique ``stop_id``). Must carry ``animal``, ``day``,
-        ``epoch``, ``stop_id``, ``immobility_time``, plus any ``reward_lag{j}``
-        and ``stop_covariates`` columns requested.
+        Per-stop table (unique ``stop_id``). Must carry ``animal``,
+        ``session_date``, ``epoch``, ``stop_id``, ``immobility_duration_s``,
+        plus any ``known_reward_outcome_lag_{j}`` and ``stop_covariates``
+        columns requested.
     onset_times : pd.DataFrame
         Event-onset rows for ONE population (already filtered). Must carry
         ``stop_id`` and ``t_since_stop_onset``.
@@ -1427,7 +816,7 @@ def aggregate_to_timebins(
     tmax : float
         Right-truncation; bins beyond ``tmax`` are dropped.
     reward_lags : int
-        Number of ``reward_lag{j}`` columns to carry from ``stop_table``.
+        Number of ``known_reward_outcome_lag_{j}`` columns to carry from ``stop_table``.
     self_history_lags : int
         Number of ``onset_lag{j}`` self-history columns to build (same-
         population onset counts ``j`` bins back, within stop, reset at the
@@ -1444,9 +833,9 @@ def aggregate_to_timebins(
     Returns
     -------
     pd.DataFrame
-        Columns: ``animal``, ``day``, ``epoch``, ``stop_id``, ``binj``,
+        Columns: ``animal``, ``session_date``, ``epoch``, ``stop_id``, ``binj``,
         ``tc`` (bin-center s = time since stop onset), ``exposure`` (s of
-        immobility in the bin), ``reward_lag1..reward_lags``, each name in
+        immobility in the bin), ``known_reward_outcome_lag_1..reward_lags``, each name in
         ``stop_covariates``, ``count`` (population onsets in the bin),
         ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
         ``hist_rcos_0..self_history_basis-1``.
@@ -1457,14 +846,14 @@ def aggregate_to_timebins(
         raise ValueError("cross_history_basis requires cross_history_lags > 0")
     if cross_history_lags and cross_onset_times is None:
         raise ValueError("cross_history_lags requires cross_onset_times")
-    reward_cols = [f"reward_lag{j}" for j in range(1, reward_lags + 1)]
+    reward_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, reward_lags + 1)]
     carry = reward_cols + list(stop_covariates)
 
-    s = stop_table[stop_table["immobility_time"] > 0]
+    s = stop_table[stop_table["immobility_duration_s"] > 0]
     # ceil, not int: when tmax is not a multiple of bin_s, int() drops the final
     # partial window [floor(tmax/bin_s)*bin_s, tmax) so onsets there are lost.
     nmax = int(np.ceil(tmax / bin_s))
-    nbin = np.minimum(np.ceil(s["immobility_time"].to_numpy() / bin_s), nmax).astype(
+    nbin = np.minimum(np.ceil(s["immobility_duration_s"].to_numpy() / bin_s), nmax).astype(
         int
     )
     idx = np.repeat(np.arange(len(s)), nbin)
@@ -1473,14 +862,14 @@ def aggregate_to_timebins(
         if len(s)
         else np.empty(0, dtype=int)
     )
-    cols = [*_SESSION_COLS, "stop_id", "immobility_time", *carry]
+    cols = [*_SESSION_COLS, "stop_id", "immobility_duration_s", *carry]
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
     # bin width, clipped by both the stop's immobility end and tmax (the final
     # bin of a stop longer than tmax is exposed only up to tmax, not bin_s).
     out["exposure"] = np.minimum(
-        bin_s, np.minimum(out["immobility_time"], tmax) - binj * bin_s
+        bin_s, np.minimum(out["immobility_duration_s"], tmax) - binj * bin_s
     )
     out = out[out["exposure"] > 1e-4]
 
@@ -1542,7 +931,7 @@ def aggregate_to_timebins(
                 out[f"cross_hist_rcos_{k}"] = xproj[:, k]
         out = out.drop(columns=["cross_count"])
 
-    out = out.drop(columns=["immobility_time"])
+    out = out.drop(columns=["immobility_duration_s"])
     return out.reset_index(drop=True)
 
 
@@ -1557,29 +946,3 @@ POPULATIONS = {
         (o.event_type == "non_local") & (o.is_swr == False)  # noqa: E712
     ],
 }
-
-
-# ── Scalar per-event wrappers (preserve existing API) ──
-
-
-# Behavioral covariate definitions were extracted to covariates.py; they are
-# re-exported here so existing ``from ..._helpers import <name>`` call sites keep
-# resolving. covariates.py imports the explicit arrival/outcome clocks and
-# build_well_to_arm_map from this module, so _helpers must finish loading first
-# (it does: the package __init__ imports _helpers before covariates).
-from .covariates import (  # noqa: E402,F401
-    UNCERTAINTY_COVARIATES,
-    _leaky_q_value_diff,
-    _omission_streak,
-    add_uncertainty_covariates,
-    attach_arm_uncertainty,
-    attach_contingency_value_block,
-    cumulative_reward_all_events,
-    cumulative_reward_per_arm,
-    lagged_trial_rewards,
-    recent_reward_rate_all_events,
-    recent_reward_rate_per_arm,
-    recent_trial_reward_rate,
-    visit_recency_all_events,
-    visit_recency_per_arm,
-)

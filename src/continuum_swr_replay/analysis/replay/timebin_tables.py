@@ -33,6 +33,7 @@ from ..hippocampus.event_immobility import (
     validate_nonlocal_event_probability_contract,
 )
 from ._helpers import assign_bout, hash_stop_id, immobility_bout_intervals
+from .covariate_registry import stamp_covariate_schema
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
 
@@ -125,7 +126,7 @@ def build_event_onset_table(
             pd.DataFrame(
                 {
                     "animal": animal,
-                    "day": day,
+                    "session_date": day,
                     "epoch": epoch,
                     "stop_idx": bidx,
                     "event_type": etype,
@@ -137,17 +138,19 @@ def build_event_onset_table(
             )
         )
     cols = [
-        "animal", "day", "epoch", "stop_id", "stop_idx", "event_type",
+        "animal", "session_date", "epoch", "stop_id", "stop_idx", "event_type",
         "onset_time", "t_since_stop_onset", "t_since_pump", "is_reward_stop",
         "isi_within_stop",
     ]
     if not frames:
-        return pd.DataFrame(columns=cols)
+        return stamp_covariate_schema(
+            pd.DataFrame(columns=cols), table="event_onset"
+        )
     out = pd.concat(frames, ignore_index=True)
     out["stop_id"] = hash_stop_id(animal, day, epoch, out["stop_idx"].to_numpy())
     out = out.sort_values(["event_type", "stop_id", "onset_time"]).reset_index(drop=True)
     out["isi_within_stop"] = out.groupby(["event_type", "stop_id"])["onset_time"].diff()
-    return out[cols]
+    return stamp_covariate_schema(out[cols], table="event_onset")
 
 
 def build_stop_timebin_table(
@@ -179,12 +182,14 @@ def build_stop_timebin_table(
     bout_starts, bout_ends = immobility_bout_intervals(dot)
     n_bouts = bout_starts.size
     cols = [
-        "animal", "day", "epoch", "stop_id", "bin_in_stop",
+        "animal", "session_date", "epoch", "stop_id", "bin_in_stop",
         "t_since_stop_onset", "t_since_pump", "is_reward_stop",
-        "n_SWR", "n_non_local", "n_MUA", "head_speed",
+        "n_swr_events", "n_nonlocal_events", "n_mua_events", "head_speed",
     ]
     if n_bouts == 0:
-        return pd.DataFrame(columns=cols)
+        return stamp_covariate_schema(
+            pd.DataFrame(columns=cols), table="stop_timebin"
+        )
 
     # Variable bins-per-bout; build the (bout, within-bin) index for every bin.
     n_bins = np.maximum(1, np.ceil((bout_ends - bout_starts) / bin_s).astype(int))
@@ -218,19 +223,20 @@ def build_stop_timebin_table(
 
     pump_times = np.sort(np.asarray(pump_times, dtype=float))
     reward_mask = _reward_bout_mask(pump_times, bout_starts, bout_ends)
-    return pd.DataFrame(
+    out = pd.DataFrame(
         {
             "animal": animal,
-            "day": day,
+            "session_date": day,
             "epoch": epoch,
             "stop_id": hash_stop_id(animal, day, epoch, bout_of_bin),
             "bin_in_stop": within.astype(np.int32),
             "t_since_stop_onset": (bin_center - bout_starts[bout_of_bin]).astype(np.float32),
             "t_since_pump": _time_since_pump(bin_center, pump_times).astype(np.float32),
             "is_reward_stop": reward_mask[bout_of_bin],
-            "n_SWR": counts["SWR"],
-            "n_non_local": counts["non_local"],
-            "n_MUA": counts["MUA"],
+            "n_swr_events": counts["SWR"],
+            "n_nonlocal_events": counts["non_local"],
+            "n_mua_events": counts["MUA"],
             "head_speed": speed_mean.astype(np.float32),
         }
     )[cols]
+    return stamp_covariate_schema(out, table="stop_timebin")

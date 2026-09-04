@@ -46,7 +46,7 @@ def _stop_replay_per_patch(
     from .choice_prediction import _require_session_unique_ids
 
     eat = event_arm_table.copy()
-    eat["_patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    eat["_patch"] = eat["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
 
     # Bring ``stop_id`` in BEFORE the uniqueness guards. The guards
     # are no-ops when ``id_col`` is absent from the frame, so checking
@@ -139,7 +139,7 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     immediate predecessor in chronological stop order was not also a
     switch. Returns ``None`` when no rows have ``is_stay`` defined.
 
-    Sorting by ``[animal, day, epoch, stop_idx]`` before the
+    Sorting by ``[animal, session_date, epoch, stop_idx]`` before the
     ``groupby(...).shift(1)`` is load-bearing: it makes ``shift`` walk
     chronological stop order rather than caller row order, and the
     ``groupby`` on session keys prevents the cross-session boundary
@@ -154,11 +154,11 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     if len(valid) == 0:
         return None
     valid = valid.sort_values(
-        ["animal", "day", "epoch", "stop_idx"]
+        ["animal", "session_date", "epoch", "stop_idx"]
     ).reset_index(drop=True)
     valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
     valid["prev_is_switch"] = (
-        valid.groupby(["animal", "day", "epoch"])["is_switch"]
+        valid.groupby(["animal", "session_date", "epoch"])["is_switch"]
         .shift(1)
         .fillna(0)
         .astype(int)
@@ -195,7 +195,7 @@ def build_switch_aligned_table(
         Canonical event-arm table (9 rows per event).
     content_fit : dict, optional
         Fitted content model for residualization. If provided along
-        with *content_predictors*, adds ``replay_frac_residual_noncurrent``.
+        with *content_predictors*, adds ``replay_fraction_residual_noncurrent``.
     content_predictors : list[str], optional
         Predictors used in *content_fit*.
     max_lag : int
@@ -207,15 +207,15 @@ def build_switch_aligned_table(
         One row per (episode, lag) for stops with replay. Columns:
 
         - ``episode_id`` — unique switching episode identifier
-        - ``animal``, ``day``, ``epoch`` — session identifiers
+        - ``animal``, ``session_date``, ``epoch`` — session identifiers
         - ``switch_stop_idx`` — stop_idx of the switch
         - ``stop_idx``, ``stop_id`` — the replay stop
         - ``lag`` — stops before switch (negative; -1 = immediately before)
         - ``current_patch`` — patch the animal was in during the run
-        - ``replay_frac_current_patch`` — fraction of replay on current patch
-        - ``replay_frac_noncurrent`` — fraction on non-current patches
-        - ``n_events`` — events in this stop
-        - ``replay_frac_residual_noncurrent`` — (if content model provided)
+        - ``replay_fraction_current_patch`` — fraction of replay on current patch
+        - ``replay_fraction_noncurrent`` — fraction on non-current patches
+        - ``n_selected_events`` — events in this stop
+        - ``replay_fraction_residual_noncurrent`` — (if content model provided)
     """
     st = stop_table.copy()
 
@@ -251,18 +251,18 @@ def build_switch_aligned_table(
         sw_stop_idx = sw_row["stop_idx"]
         current_patch = sw_row["current_patch"]
         animal = sw_row["animal"]
-        day = sw_row["day"]
+        session_date = sw_row["session_date"]
         epoch = sw_row["epoch"]
 
         # Restrict to the switch's own session — stop_idx is only
         # session-local, so without this filter a switch in (animal A,
-        # day D, epoch E) could match preceding stops from any other
+        # session_date D, epoch E) could match preceding stops from any other
         # session that happens to have a stop_idx within the lag
         # window. Lines 116-118 then write the switch's session keys
         # onto every row, masking the cross-session contamination.
         preceding = st[
             (st["animal"] == animal)
-            & (st["day"] == day)
+            & (st["session_date"] == session_date)
             & (st["epoch"] == epoch)
             & (st["stop_idx"] < sw_stop_idx)
             & (st["stop_idx"] >= sw_stop_idx - max_lag)
@@ -282,19 +282,19 @@ def build_switch_aligned_table(
             row = {
                 "episode_id": ep_i,
                 "animal": animal,
-                "day": day,
+                "session_date": session_date,
                 "epoch": epoch,
                 "switch_stop_idx": int(sw_stop_idx),
                 "stop_idx": int(ps_row["stop_idx"]),
                 "stop_id": sid,
                 "lag": lag,
                 "current_patch": current_patch,
-                "replay_frac_current_patch": frac_cp,
-                "replay_frac_noncurrent": frac_nc,
-                "n_events": int(ps_row["n_events"]),
+                "replay_fraction_current_patch": frac_cp,
+                "replay_fraction_noncurrent": frac_nc,
+                "n_selected_events": int(ps_row["n_selected_events"]),
             }
             if residual_nc is not None:
-                row["replay_frac_residual_noncurrent"] = residual_nc
+                row["replay_fraction_residual_noncurrent"] = residual_nc
             rows.append(row)
 
     if not rows:
@@ -371,20 +371,20 @@ def build_control_aligned_table(
     if len(switch_episodes) == 0:
         return pd.DataFrame()
     ep_meta = switch_episodes.groupby("episode_id").first()[
-        ["animal", "day", "epoch", "current_patch", "switch_stop_idx"]
+        ["animal", "session_date", "epoch", "current_patch", "switch_stop_idx"]
     ]
 
     rows = []
     for ep_id, meta in ep_meta.iterrows():
         animal = meta["animal"]
-        day = meta["day"]
+        session_date = meta["session_date"]
         epoch = meta["epoch"]
         patch = meta["current_patch"]
         sw_idx = meta["switch_stop_idx"]
 
         session_stays = st[
             (st["animal"] == animal)
-            & (st["day"] == day)
+            & (st["session_date"] == session_date)
             & (st["epoch"] == epoch)
             & (st["is_stay"] == 1)
             & (
@@ -416,7 +416,7 @@ def build_control_aligned_table(
         # very switch dynamics it's meant to baseline against.
         preceding = st[
             (st["animal"] == animal)
-            & (st["day"] == day)
+            & (st["session_date"] == session_date)
             & (st["epoch"] == epoch)
             & (st["is_stay"] == 1)
             & (st["stop_idx"] < anchor_stop_idx)
@@ -435,19 +435,19 @@ def build_control_aligned_table(
             row = {
                 "episode_id": ep_id,
                 "animal": animal,
-                "day": day,
+                "session_date": session_date,
                 "epoch": epoch,
                 "switch_stop_idx": int(anchor_stop_idx),
                 "stop_idx": int(ps_row["stop_idx"]),
                 "stop_id": sid,
                 "lag": lag,
                 "current_patch": patch,
-                "replay_frac_current_patch": frac_cp,
-                "replay_frac_noncurrent": frac_nc,
-                "n_events": int(ps_row["n_events"]),
+                "replay_fraction_current_patch": frac_cp,
+                "replay_fraction_noncurrent": frac_nc,
+                "n_selected_events": int(ps_row["n_selected_events"]),
             }
             if residual_nc is not None:
-                row["replay_frac_residual_noncurrent"] = residual_nc
+                row["replay_fraction_residual_noncurrent"] = residual_nc
             rows.append(row)
 
     if not rows:
@@ -476,8 +476,8 @@ def stop_patch_replay(
         (default, MAP-based) or ``"arm_fraction_posterior"``.
 
     Returns a DataFrame indexed by ``stop_id`` with columns:
-    ``replay_frac_current_patch``, ``replay_frac_noncurrent``, and
-    optionally ``replay_frac_residual_noncurrent`` if
+    ``replay_fraction_current_patch``, ``replay_fraction_noncurrent``, and
+    optionally ``replay_fraction_residual_noncurrent`` if
     ``residual_frac`` is present in *event_arm_table*.
     """
     # Both ``stop_id`` and ``event_id`` must be globally unique across
@@ -497,7 +497,7 @@ def stop_patch_replay(
     eat = event_arm_table.copy()
 
     # Map arms to patches
-    eat["_patch"] = eat["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    eat["_patch"] = eat["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
 
     # current_patch is already in event_arm_table; fall back to merge.
     if "current_patch" not in eat.columns:
@@ -507,8 +507,8 @@ def stop_patch_replay(
     # Flag arms in the current patch. ``NaN == anything`` is False
     # in pandas/numpy, so a missing ``current_patch`` would silently
     # mark every arm as "non-current" and shovel the whole event's
-    # replay fraction into ``replay_frac_noncurrent`` while reporting
-    # ``replay_frac_current_patch == 0.0``. The current-vs-non-current
+    # replay fraction into ``replay_fraction_noncurrent`` while reporting
+    # ``replay_fraction_current_patch == 0.0``. The current-vs-non-current
     # split is undefined when the current patch is unknown, so route
     # those rows to NaN explicitly: NaN × (anything) propagates
     # through the ``skipna=False`` per-event sum below.
@@ -534,11 +534,11 @@ def stop_patch_replay(
     # ``build_residualized_choice_dataset``).
     event_agg = pd.DataFrame(
         {
-            "replay_frac_current_patch": (
+            "replay_fraction_current_patch": (
                 eat.groupby(["stop_id", "event_id"])["_frac_cp"]
                 .apply(strict_sum)
             ),
-            "replay_frac_noncurrent": (
+            "replay_fraction_noncurrent": (
                 eat.groupby(["stop_id", "event_id"])["_frac_nc"]
                 .apply(strict_sum)
             ),
@@ -548,7 +548,7 @@ def stop_patch_replay(
     # Average across events within each stop, NaN-aware.
     result = (
         event_agg.groupby("stop_id")[
-            ["replay_frac_current_patch", "replay_frac_noncurrent"]
+            ["replay_fraction_current_patch", "replay_fraction_noncurrent"]
         ]
         .agg(strict_mean)
     )
@@ -561,13 +561,13 @@ def stop_patch_replay(
         event_resid = (
             eat.groupby(["stop_id", "event_id"])["_resid_nc"]
             .apply(strict_sum)
-            .rename("replay_frac_residual_noncurrent")
+            .rename("replay_fraction_residual_noncurrent")
             .to_frame()
         )
         resid_agg = (
-            event_resid.groupby("stop_id")["replay_frac_residual_noncurrent"]
+            event_resid.groupby("stop_id")["replay_fraction_residual_noncurrent"]
             .apply(strict_mean)
-            .rename("replay_frac_residual_noncurrent")
+            .rename("replay_fraction_residual_noncurrent")
             .to_frame()
         )
         result = result.join(resid_agg)

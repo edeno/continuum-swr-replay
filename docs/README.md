@@ -33,6 +33,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [task_description.md](task_description.md) — *reference*: behavioral task / recording setup.
 - [cached_trials_for_testing.md](cached_trials_for_testing.md) — *reference*: test-fixture trial cache.
 - [design/](design/) — *design specs*: per-analysis design documents.
+  - [design/model_history.md](design/model_history.md) — *design journal*: why each
+    replay-content model rung carries the predictors it does (reversed reasoning
+    and retracted numbers included). The machine-readable catalog is
+    `analysis/replay/model_specs.py`; this is the record of how it got that way.
+  - [design/builder_test_floor.md](design/builder_test_floor.md) — *reference*: the
+    measured value-level test coverage of the covariate builders and the target,
+    kept honest by `scripts/qa/mutation_check.py`.
   - [design/2026-07-13-content-rate-uncertainty-model-ladders.md](design/2026-07-13-content-rate-uncertainty-model-ladders.md)
     — proposed Aim-1 content-allocation, replay-occurrence, event-size, and
     marginal-content ladders in R formula notation.
@@ -44,7 +51,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
     checksum we don't control. Proceed with 215; don't gate on recovery.
   - [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
-    cross-substitute the stop-level vs bin-level `n_SWR`/`n_MUA` count.
+    cross-substitute the stop-level vs bin-level `n_swr_events`/`n_mua_events` count.
   - [current_arm_trunk_fallback.md](known_issues/current_arm_trunk_fallback.md) —
     historical diagnosis of the destination fallback; fixed by explicit
     behavioral-location labels and past-only context (regeneration pending).

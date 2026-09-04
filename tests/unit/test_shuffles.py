@@ -109,9 +109,9 @@ class TestStopLabelShuffle:
         epochs — never the intended null, but easy to do by accident
         if a caller passes the concatenated multi-session table."""
         stops = self._stops_from_dicts([
-            {"animal": "a", "day": 1, "epoch": "02_r1", "is_after_reward": True},
-            {"animal": "a", "day": 1, "epoch": "02_r1", "is_after_reward": False},
-            {"animal": "b", "day": 1, "epoch": "02_r1", "is_after_reward": True},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": False},
+            {"animal": "b", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
         ])
         with pytest.raises(ValueError, match="session"):
             stop_label_shuffle(stops, rng=np.random.default_rng(0))
@@ -120,37 +120,37 @@ class TestStopLabelShuffle:
         """The set of label values per column is unchanged — only
         which stop has which label changes."""
         stops = self._stops_from_dicts([
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "is_after_reward": True, "current_arm": 0},
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "is_after_reward": True, "current_arm": 1},
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "is_after_reward": False, "current_arm": 2},
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "is_after_reward": False, "current_arm": 3},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "is_rewarded_outcome": True, "occupancy_well_arm": 0},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "is_rewarded_outcome": True, "occupancy_well_arm": 1},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "is_rewarded_outcome": False, "occupancy_well_arm": 2},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "is_rewarded_outcome": False, "occupancy_well_arm": 3},
         ])
         out = stop_label_shuffle(stops, rng=np.random.default_rng(11))
 
-        assert sorted(out["is_after_reward"].tolist()) == sorted(
-            stops["is_after_reward"].tolist()
+        assert sorted(out["is_rewarded_outcome"].tolist()) == sorted(
+            stops["is_rewarded_outcome"].tolist()
         )
-        assert sorted(out["current_arm"].tolist()) == sorted(
-            stops["current_arm"].tolist()
+        assert sorted(out["occupancy_well_arm"].tolist()) == sorted(
+            stops["occupancy_well_arm"].tolist()
         )
 
     def test_non_specified_columns_unchanged(self):
         """Only the columns in the ``columns`` argument are shuffled.
         Other columns (e.g. session keys) must remain row-aligned."""
         stops = self._stops_from_dicts([
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "stop_id": 100, "is_after_reward": True},
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "stop_id": 200, "is_after_reward": False},
-            {"animal": "a", "day": 1, "epoch": "02_r1",
-             "stop_id": 300, "is_after_reward": False},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "stop_id": 100, "is_rewarded_outcome": True},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "stop_id": 200, "is_rewarded_outcome": False},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1",
+             "stop_id": 300, "is_rewarded_outcome": False},
         ])
         out = stop_label_shuffle(
-            stops, columns=("is_after_reward",), rng=np.random.default_rng(0)
+            stops, columns=("is_rewarded_outcome",), rng=np.random.default_rng(0)
         )
         np.testing.assert_array_equal(out["stop_id"], stops["stop_id"])
         np.testing.assert_array_equal(out["animal"], stops["animal"])
@@ -158,8 +158,8 @@ class TestStopLabelShuffle:
     def test_input_table_not_modified(self):
         """Returns a copy; caller's frame is untouched."""
         stops = self._stops_from_dicts([
-            {"animal": "a", "day": 1, "epoch": "02_r1", "is_after_reward": True},
-            {"animal": "a", "day": 1, "epoch": "02_r1", "is_after_reward": False},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": False},
         ])
         before = stops.copy()
         _ = stop_label_shuffle(stops, rng=np.random.default_rng(0))
@@ -170,15 +170,15 @@ class TestStopLabelShuffle:
         skipped — typical when an analysis doesn't compute a particular
         contextual variable."""
         stops = self._stops_from_dicts([
-            {"animal": "a", "day": 1, "epoch": "02_r1", "current_arm": 0},
-            {"animal": "a", "day": 1, "epoch": "02_r1", "current_arm": 1},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "occupancy_well_arm": 0},
+            {"animal": "a", "session_date": 1, "epoch": "02_r1", "occupancy_well_arm": 1},
         ])
         out = stop_label_shuffle(
-            stops, columns=("current_arm", "missing_col"),
+            stops, columns=("occupancy_well_arm", "missing_col"),
             rng=np.random.default_rng(0),
         )
         assert "missing_col" not in out.columns
-        assert sorted(out["current_arm"].tolist()) == [0, 1]
+        assert sorted(out["occupancy_well_arm"].tolist()) == [0, 1]
 
 
 class TestNextArmCircularShift:
@@ -187,7 +187,7 @@ class TestNextArmCircularShift:
     def _events(self, n, *, with_next_arm=True):
         rng = np.random.default_rng(0)
         rows = {
-            "event_midpoint_time": np.arange(n, dtype=float),
+            "event_midpoint_s": np.arange(n, dtype=float),
         }
         if with_next_arm:
             rows["next_arm"] = rng.integers(0, 9, size=n)
@@ -219,12 +219,12 @@ class TestNextArmCircularShift:
             ), f"seed {seed}: shift was 0 (identity)"
 
     def test_shifts_only_specified_columns(self):
-        """Only the post-hoc columns roll; ``event_midpoint_time``
+        """Only the post-hoc columns roll; ``event_midpoint_s``
         stays sorted because the function sorts by it before shifting."""
         events = self._events(10)
         out = next_arm_circular_shift(events, rng=np.random.default_rng(13))
         np.testing.assert_array_equal(
-            out["event_midpoint_time"].to_numpy(), events["event_midpoint_time"].to_numpy()
+            out["event_midpoint_s"].to_numpy(), events["event_midpoint_s"].to_numpy()
         )
 
     def test_input_table_not_modified(self):
@@ -245,9 +245,9 @@ class TestNextArmCircularShift:
         events = pd.DataFrame(
             {
                 "animal": ["a", "a", "b", "b"],
-                "day": [1, 1, 1, 1],
+                "session_date": [1, 1, 1, 1],
                 "epoch": ["02_r1", "02_r1", "02_r1", "02_r1"],
-                "event_midpoint_time": [0.0, 1.0, 0.5, 1.5],
+                "event_midpoint_s": [0.0, 1.0, 0.5, 1.5],
                 "next_arm": [0, 1, 2, 3],
             }
         )
@@ -270,21 +270,21 @@ class TestNextArmCircularShift:
         events = pd.DataFrame(
             [
                 {
-                    "event_midpoint_time": 0.0,
+                    "event_midpoint_s": 0.0,
                     "current_patch": 1.0,
                     "next_arm": 0,
                     "next_patch": 2.0,
                     "is_stay": 0.0,
                 },
                 {
-                    "event_midpoint_time": 1.0,
+                    "event_midpoint_s": 1.0,
                     "current_patch": 2.0,
                     "next_arm": 1,
                     "next_patch": 1.0,
                     "is_stay": 0.0,
                 },
                 {
-                    "event_midpoint_time": 2.0,
+                    "event_midpoint_s": 2.0,
                     "current_patch": 1.0,
                     "next_arm": 2,
                     "next_patch": 1.0,
@@ -318,14 +318,14 @@ class TestNextArmCircularShift:
         events = pd.DataFrame(
             [
                 {
-                    "event_midpoint_time": 0.0,
+                    "event_midpoint_s": 0.0,
                     "current_patch": 1.0,
                     "next_arm": 0,
                     "next_patch": 2.0,
                     "is_stay": 0.0,
                 },
                 {
-                    "event_midpoint_time": 1.0,
+                    "event_midpoint_s": 1.0,
                     "current_patch": np.nan,
                     "next_arm": 1,
                     "next_patch": 1.0,

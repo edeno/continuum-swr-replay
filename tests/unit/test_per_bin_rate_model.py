@@ -34,7 +34,7 @@ def make_per_bin_rate_design(
 ) -> pd.DataFrame:
     """Simulate an ``aggregate_to_timebins``-shaped design with known truth.
 
-    Half the stops are rewarded (``reward_lag1 == 1``); rewarded bins draw their
+    Half the stops are rewarded (``known_reward_outcome_lag_1 == 1``); rewarded bins draw their
     onset count from a Poisson with ``base_rate * reward_effect`` (times the
     optional ``time_profile(tc)``), so the true per-bin reward rate ratio is
     ``reward_effect`` and the true time course is ``time_profile``.
@@ -53,8 +53,8 @@ def make_per_bin_rate_design(
     return pd.DataFrame(
         recs,
         columns=[
-            "animal", "day", "epoch", "stop_id", "binj", "tc",
-            "exposure", "reward_lag1", "count",
+            "animal", "session_date", "epoch", "stop_id", "binj", "tc",
+            "exposure", "known_reward_outcome_lag_1", "count",
         ],
     )
 
@@ -70,22 +70,22 @@ def test_formula_strings():
     rewhist = m["M2_rewhist"].formula()
     assert "bs(tc" not in rewhist
     for j in range(1, 11):
-        assert f"reward_lag{j}" in rewhist
+        assert f"known_reward_outcome_lag_{j}" in rewhist
 
     full = m["M7_time_hist_rew"].formula()
     assert spline in full
     for j in range(1, 11):
-        assert f"reward_lag{j}" in full
+        assert f"known_reward_outcome_lag_{j}" in full
         assert f"onset_lag{j}" in full
 
-    assert f"reward_lag1:{spline}" in m["M9_rew_x_time"].formula()
+    assert f"known_reward_outcome_lag_1:{spline}" in m["M9_rew_x_time"].formula()
 
     # Raised-cosine self-history variants use hist_rcos_*, not onset_lag dummies.
     m3r = m["M3r_histcos"].formula()
     assert "hist_rcos_0" in m3r and "onset_lag1" not in m3r
     m7r = m["M7r_time_histcos_rew"].formula()
     assert "hist_rcos_0" in m7r and "onset_lag1" not in m7r
-    assert spline in m7r and "reward_lag1" in m7r
+    assert spline in m7r and "known_reward_outcome_lag_1" in m7r
     # The dummy models still use onset_lag (kernel-shape readout preserved).
     assert "onset_lag1" in m["M7_time_hist_rew"].formula()
 
@@ -140,7 +140,7 @@ def test_recovers_known_reward_effect():
     design = make_per_bin_rate_design(reward_effect=2.0, base_rate=0.08, seed=1)
     fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE["M1_rew1"])
     assert fit is not None
-    assert fit["rr_reward_lag1"] == pytest.approx(2.0, rel=0.10)
+    assert fit["rr_known_reward_outcome_lag_1"] == pytest.approx(2.0, rel=0.10)
 
 
 def test_spline_captures_time_peak():
@@ -157,7 +157,7 @@ def test_spline_captures_time_peak():
     fit = fit_per_bin_rate_model(design, spec)
     assert fit is not None
     # No planted reward effect.
-    assert fit["rr_reward_lag1"] == pytest.approx(1.0, rel=0.12)
+    assert fit["rr_known_reward_outcome_lag_1"] == pytest.approx(1.0, rel=0.12)
     # Spline captures the peak: predicted near the peak tc exceeds the edges.
     pred = fit["predicted"]
     binj = design.loc[pred.index, "binj"].to_numpy()
@@ -180,8 +180,8 @@ def test_separation_no_crash():
             recs.append(("sim", 1, "02_r1", s, b, (b + 0.5) * 0.015, 0.015,
                          float(s % 2), onset_lag1, count))
     design = pd.DataFrame(recs, columns=[
-        "animal", "day", "epoch", "stop_id", "binj", "tc", "exposure",
-        "reward_lag1", "onset_lag1", "count"])
+        "animal", "session_date", "epoch", "stop_id", "binj", "tc", "exposure",
+        "known_reward_outcome_lag_1", "onset_lag1", "count"])
     spec = PerBinRateModelSpec(
         "hist1", False, 0, False, 1, False, False, "test", None
     )
@@ -287,8 +287,8 @@ def test_cross_history_recovers_planted_excitation():
     stop_ids = np.arange(n_stops)
     stops = pd.DataFrame(
         {
-            "animal": "x", "day": 1, "epoch": "02_r1",
-            "stop_id": stop_ids, "immobility_time": nbin * bin_s,
+            "animal": "x", "session_date": 1, "epoch": "02_r1",
+            "stop_id": stop_ids, "immobility_duration_s": nbin * bin_s,
         }
     )
     cross_rows, resp_rows = [], []

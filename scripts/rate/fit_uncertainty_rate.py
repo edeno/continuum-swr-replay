@@ -7,7 +7,8 @@ SWR-coupled vs non-SWR non-local events, controlling for the within-stop time
 course, raised-cosine self-history, the reward kernel, and the recent reward
 rate. Rate-only -- replay direction is out of scope.
 
-Per session: load ``stop_table``; validate its canonical ``recent_switch_rate``
+Per session: load ``stop_table``; validate its canonical
+``patch_switch_fraction_last5_completed_trips``
 and derive stop-local summaries (:func:`add_uncertainty_covariates`); inner-merge
 the nominal value + real
 behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
@@ -16,7 +17,7 @@ animal; attach the canonical ``is_swr`` to the onsets.
 Because the fitted block contains current-trip RPE/value updates, retain only
 physical response bins whose left edge is at or after ``outcome_known_time``
 (reward onset for rewarded trials; latest possible pump latency, capped at
-departure, for omissions).
+the collapsed task visit's final departure, for omissions).
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
 fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
@@ -70,6 +71,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     stop_own_missing,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
@@ -80,6 +84,7 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
@@ -90,40 +95,41 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 # Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
 # p_rew_leaf/contingency_count, exactly stop-start-aligned) rather than the difflib
 # contingency_table_csv -- so every covariate the model fits shares one alignment.
 VALUE_COVARIATES = (
-    "p_reward_current",
-    "value_diff_patch",
+    "task_reward_probability_chosen_arm",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
     "trials_since_block_change",
 )
 
 # Nominal / model-free block (per-unit; these covariates are O(1) and are the
 # task schedule + raw behavior, NOT the behavioral model). We prefer the real
-# model over stand-ins, so the leaky-Q q_current is replaced by the model DeltaV
-# (switch_advantage) and the nominal rpe by rpe_model below. value_diff_patch is
+# model over stand-ins, so the leaky-Q comparison is replaced by the model DeltaV
+# and nominal-RPE stand-ins by the model's canonical RPE below.
+# task_reward_probability_patch_mean_gap_best_vs_second is
 # KEPT: it is the nominal best-minus-second patch value from the schedule and is
 # orthogonal to the model DeltaV (r=-0.04), so it carries independent information
 # (an earlier drop assuming redundancy was wrong). Excluded for collinearity:
-# wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with reward_lag1).
+# wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with known_reward_outcome_lag_1).
 CURATED_COVARIATES = (
-    "p_reward_current",
-    "value_diff_patch",
-    "recent_switch_rate",
+    "task_reward_probability_chosen_arm",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
+    "patch_switch_fraction_last5_completed_trips",
     "trials_since_block_change",
 )
 
-# Real behavioral-model reward-prediction error, used INSTEAD of the nominal rpe
-# stand-in (rpe_model vs old nominal rpe: r=0.71 -- the model version matters).
+# Real behavioral-model reward-prediction error, used instead of the retired
+# nominal-RPE stand-in (the two had r=0.71, so the model version matters).
 # q_chosen (model chosen-port value) is deliberately NOT fit: it is r=0.90
 # collinear with the DeltaV decision variable (switch_advantage), which carries
 # the model's value signal here. O(1) scale, so per-unit like the nominal block.
 MODEL_VALUE_COVARIATES = (
-    "rpe_model",  # reward - q_chosen (model reward-prediction error)
+    "rpe_postoutcome",  # reward - chosen-arm pre-outcome belief
 )
 
 # Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf;
@@ -131,10 +137,10 @@ MODEL_VALUE_COVARIATES = (
 # entropy, absolute value-update magnitudes. z-scored below (disparate/tiny scale)
 # -> per-SD rate ratios.
 RL_COVARIATES = (
-    "switch_advantage_mu_preoutcome_sess",  # DeltaV = Switch - Stay value
-    "beta_reward_entropy",  # belief uncertainty (mean per-leaf Beta differential entropy)
-    "global_mu_update_abs_postoutcome_sess",  # |value update| summed over all ports
-    "unchosen_patches_mu_update_abs_postoutcome_sess",  # |update| over alternative patches
+    "relative_value_switch_minus_stay_preoutcome",  # DeltaV = Switch - Stay value
+    "reward_belief_differential_entropy_leaf_mean_preoutcome",  # belief uncertainty (mean per-leaf Beta differential entropy)
+    "reward_belief_mean_update_l1_all_ports_postoutcome",  # |value update| summed over all ports
+    "reward_belief_mean_update_l1_alternative_patches_postoutcome",  # |update| over alternative patches
 )
 
 # What the model actually fits + reports (nominal + model value + RL DVs).
@@ -148,9 +154,10 @@ POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
 # shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
-# reward_rate is OFF: reward_rate_trial_k10 (the reward_rate covariate) is exactly the mean of
-# reward_lag1..10 (corr 1.000, VIF inf), so including it with the reward kernel
-# makes the reward block rank-deficient; the kernel alone carries reward history.
+# Recent reward fraction is OFF: ``reward_fraction_last10_known_trials`` is
+# exactly the mean of known_reward_outcome_lag_1..10 (corr 1.000, VIF inf), so
+# including it with the reward kernel makes the block rank-deficient; the kernel
+# alone carries reward history.
 MU_UNCERTAINTY = PerBinRateModelSpec(
     "MU_uncertainty",
     True,  # time spline
@@ -167,7 +174,7 @@ MU_UNCERTAINTY = PerBinRateModelSpec(
 
 
 def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:
-    """Drop each animal's first (exposure) session by (day, epoch) order."""
+    """Drop each animal's first (exposure) session by (session_date, epoch) order."""
     first = (
         stop_table[SESSION_COLS]
         .drop_duplicates()
@@ -538,10 +545,12 @@ def main() -> None:
 
     t0 = time.perf_counter()
     stop = read_table(RC / "stop_table.pkl")
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
 
     # add_uncertainty_covariates validates the upstream recent_switch_rate (the
     # only model-free covariate still fit) and derives stop-local summaries. Its
@@ -550,20 +559,21 @@ def main() -> None:
     stop = add_uncertainty_covariates(stop, switch_window=args.switch_window)
     # Nominal schedule + real model covariates, ALL from qvals_table -- one
     # exactly stop-start-aligned source (retires the difflib contingency_table_csv
-    # for this model). qvals' `rpe` (R - q_chosen) -> rpe_model. Inner join: keep
+    # for this model). Keep qvals' canonical RPE name. Inner join: keep
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
     qvals = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    require_covariate_schema(qvals, table="qvals")
     qcols = qvals[
         [
             "stop_id",
             "outcome_known_time",
             "trial_reward",
             *VALUE_COVARIATES,
-            "rpe",
+            "rpe_postoutcome",
             *RL_COVARIATES,
         ]
-    ].rename(columns={"rpe": "rpe_model"})
+    ]
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
@@ -584,7 +594,7 @@ def main() -> None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
     # z-score the RL decision variables AFTER the drop/subset so the per-SD scale
     # is the SD of exactly the rows that get fit (disparate/tiny scale: DeltaV
-    # ~0.2, updates ~0.05). The nominal block + rpe_model stay per-unit.
+    # ~0.2, updates ~0.05). The nominal block + RPE stay per-unit.
     for c in RL_COVARIATES:
         frac_valid = stop[c].notna().mean()
         if frac_valid < 0.7:

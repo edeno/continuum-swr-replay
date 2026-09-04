@@ -1,7 +1,7 @@
 """Phase-4 fast path: ``--from-cache`` rebuilds are byte-identical to a Spyglass run.
 
 The unit tests in ``test_prepare_data_cache.py`` pin the cache *seam*
-(:func:`load_trials_track_graph`) with fake inputs. This slow test closes the
+(:func:`load_behavioral_context`) with fake inputs. This slow test closes the
 end-to-end gap the reviewer flagged: it runs the *whole* :func:`_process_session`
 (all four table builders) twice for one real session — once populating the cache from
 Spyglass (``from_cache=False``), once served entirely from the cache
@@ -34,9 +34,14 @@ def test_process_session_cache_parity(tmp_path, monkeypatch):
 
     # Isolate the cache so the test never touches the canonical _session_cache.
     monkeypatch.setattr(pdm, "SESSION_CACHE_DIR", tmp_path)
-    cont = load_contingency(
-        pdm.OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
-    )
+    try:
+        cont = load_contingency(
+            pdm.OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
+        )
+    except ValueError as exc:
+        if "legacy or mismatched covariate schema" not in str(exc):
+            raise
+        pytest.skip(f"materialized qvals requires canonical regeneration: {exc}")
 
     try:
         cold = pdm._process_session(session, contingency=cont, from_cache=False)
@@ -46,7 +51,7 @@ def test_process_session_cache_parity(tmp_path, monkeypatch):
         pytest.skip("session could not be loaded (missing trials/track_graph)")
 
     # Cache must now exist; warm pass reads it (no Spyglass).
-    assert (tmp_path / f"{session['session_id']}.pkl").exists()
+    assert pdm.behavioral_context_cache_path(session).exists()
     warm = pdm._process_session(session, contingency=cont, from_cache=True)
     assert warm is not None
 

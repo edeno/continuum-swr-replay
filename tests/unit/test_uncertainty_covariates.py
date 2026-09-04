@@ -19,7 +19,8 @@ import pytest
 from continuum_swr_replay.analysis.replay import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.covariates import (
     CANONICAL_SWITCH_WINDOW,
-    canonical_trial_uncertainty_history,
+    canonical_port_value_history,
+    canonical_trial_switch_history,
 )
 from continuum_swr_replay.table_io import read_table, table_exists
 
@@ -35,7 +36,7 @@ _SPEC.loader.exec_module(fur)
 
 
 def _frame(rows: list[dict]) -> pd.DataFrame:
-    base = {"animal": "a", "day": 1, "epoch": "02_r1"}
+    base = {"animal": "a", "session_date": 1, "epoch": "02_r1"}
     out = []
     for i, r in enumerate(rows):
         rec = {**base, "stop_idx": i}
@@ -45,11 +46,9 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     # default the columns the helper reads if a test omits them
     for col in (
         "is_stay",
-        "is_after_reward",
-        "is_after_omission",
-        "reward_outcome",
+        "is_rewarded_outcome",
         "completed_trial_reward",
-        "current_arm",
+        "occupancy_well_arm",
     ):
         if col not in df:
             df[col] = 0.0
@@ -58,31 +57,49 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     else:
         df["completed_trial_id"] = pd.array(df["completed_trial_id"], dtype="Int64")
     if "completed_trial_arm" not in df:
-        df["completed_trial_arm"] = df["current_arm"]
+        df["completed_trial_arm"] = df["occupancy_well_arm"]
     has_completed = df["completed_trial_id"].notna()
-    if "recent_switch_rate" not in df:
-        df["recent_switch_rate"] = np.where(has_completed, 0.0, np.nan)
+    if "patch_switch_fraction_last5_completed_trips" not in df:
+        df["patch_switch_fraction_last5_completed_trips"] = np.where(
+            has_completed, 0.0, np.nan
+        )
     if "leaky_q_value_diff" not in df:
         df["leaky_q_value_diff"] = np.where(has_completed, 0.0, np.nan)
     for j in range(1, 11):
-        if f"reward_lag{j}" not in df:
-            df[f"reward_lag{j}"] = np.nan
+        if f"known_reward_outcome_lag_{j}" not in df:
+            df[f"known_reward_outcome_lag_{j}"] = np.nan
     # Real stop-table frames carry an explicit regenerated completed-trial ID.
     # Most tests do not exercise switch history, so use a valid neutral default.
     if "prev_arm" not in df:
         df["prev_arm"] = np.arange(len(df), dtype=float)
-    if "is_after_switch" not in df:
-        df["is_after_switch"] = 0.0
+    if "did_last_completed_trip_switch_patch" not in df:
+        df["did_last_completed_trip_switch_patch"] = 0.0
     return df
 
 
 def test_omission_streak():
     df = _frame(
         [
-            {"reward_lag1": 0.0, "reward_lag2": 0.0, "reward_lag3": 1.0},  # 2
-            {"reward_lag1": 1.0, "reward_lag2": 0.0, "reward_lag3": 0.0},  # 0
-            {"reward_lag1": 0.0, "reward_lag2": np.nan, "reward_lag3": np.nan},  # 1
-            {"reward_lag1": 0.0, "reward_lag2": 0.0, "reward_lag3": 0.0},  # 3
+            {
+                "known_reward_outcome_lag_1": 0.0,
+                "known_reward_outcome_lag_2": 0.0,
+                "known_reward_outcome_lag_3": 1.0,
+            },  # 2
+            {
+                "known_reward_outcome_lag_1": 1.0,
+                "known_reward_outcome_lag_2": 0.0,
+                "known_reward_outcome_lag_3": 0.0,
+            },  # 0
+            {
+                "known_reward_outcome_lag_1": 0.0,
+                "known_reward_outcome_lag_2": np.nan,
+                "known_reward_outcome_lag_3": np.nan,
+            },  # 1
+            {
+                "known_reward_outcome_lag_1": 0.0,
+                "known_reward_outcome_lag_2": 0.0,
+                "known_reward_outcome_lag_3": 0.0,
+            },  # 3
         ]
     )
     out = add_uncertainty_covariates(df)
@@ -90,21 +107,23 @@ def test_omission_streak():
 
 
 def test_omission_streak_requires_exact_contiguous_binary_lag_schema():
-    missing = _frame([{}]).drop(columns=["reward_lag4"])
+    missing = _frame([{}]).drop(columns=["known_reward_outcome_lag_4"])
     with pytest.raises(KeyError, match="exact contiguous"):
         add_uncertainty_covariates(missing)
 
-    unexpected = _frame([{}]).assign(reward_lag11=0.0)
+    unexpected = _frame([{}]).assign(known_reward_outcome_lag_11=0.0)
     with pytest.raises(KeyError, match="unexpected"):
         add_uncertainty_covariates(unexpected)
 
-    nonbinary = _frame([{"reward_lag4": 2.0}])
+    nonbinary = _frame([{"known_reward_outcome_lag_4": 2.0}])
     with pytest.raises(ValueError, match="binary"):
         add_uncertainty_covariates(nonbinary)
 
 
 def test_omission_streak_schema_does_not_depend_on_dataframe_column_order():
-    frame = _frame([{"reward_lag1": 0.0, "reward_lag2": 1.0}])
+    frame = _frame(
+        [{"known_reward_outcome_lag_1": 0.0, "known_reward_outcome_lag_2": 1.0}]
+    )
     reordered = frame[list(reversed(frame.columns))]
 
     out = add_uncertainty_covariates(reordered)
@@ -116,14 +135,30 @@ def test_recent_switch_rate_no_leakage():
     # The completed trip's switch status is already past context at each stop.
     df = _frame(
         [
-            {"is_after_switch": 0.0, "recent_switch_rate": 0.0, "is_stay": 1.0},
-            {"is_after_switch": 1.0, "recent_switch_rate": 0.5, "is_stay": 0.0},
-            {"is_after_switch": 1.0, "recent_switch_rate": 2 / 3, "is_stay": 0.0},
-            {"is_after_switch": 0.0, "recent_switch_rate": 0.5, "is_stay": 1.0},
+            {
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 0.0,
+                "is_stay": 1.0,
+            },
+            {
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 0.5,
+                "is_stay": 0.0,
+            },
+            {
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 2 / 3,
+                "is_stay": 0.0,
+            },
+            {
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 0.5,
+                "is_stay": 1.0,
+            },
         ]
     )
     out = add_uncertainty_covariates(df, switch_window=5).sort_values("stop_idx")
-    rates = out["recent_switch_rate"].to_numpy()
+    rates = out["patch_switch_fraction_last5_completed_trips"].to_numpy()
     assert rates[0] == pytest.approx(0.0)
     assert rates[1] == pytest.approx(0.5)
     assert rates[2] == pytest.approx(2 / 3)
@@ -141,43 +176,43 @@ def test_recent_switch_rate_is_computed_once_per_completed_visit():
             {
                 "completed_trial_id": 0,
                 "prev_arm": 3.0,
-                "is_after_switch": 0.0,
-                "recent_switch_rate": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 0.0,
                 "is_stay": 0.0,
             },
             {
                 "completed_trial_id": 0,
                 "prev_arm": 3.0,
-                "is_after_switch": 0.0,
-                "recent_switch_rate": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 0.0,
                 "is_stay": 0.0,
             },
             {
                 "completed_trial_id": 1,
                 "prev_arm": 2.0,
-                "is_after_switch": 1.0,
-                "recent_switch_rate": 0.5,
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 0.5,
                 "is_stay": 1.0,
             },
             {
                 "completed_trial_id": 1,
                 "prev_arm": 2.0,
-                "is_after_switch": 1.0,
-                "recent_switch_rate": 0.5,
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 0.5,
                 "is_stay": 1.0,
             },
             {
                 "completed_trial_id": 2,
                 "prev_arm": 0.0,
-                "is_after_switch": 0.0,
-                "recent_switch_rate": 1 / 3,
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 1 / 3,
                 "is_stay": 0.0,
             },
             {
                 "completed_trial_id": 2,
                 "prev_arm": 0.0,
-                "is_after_switch": 0.0,
-                "recent_switch_rate": 1 / 3,
+                "did_last_completed_trip_switch_patch": 0.0,
+                "patch_switch_fraction_last5_completed_trips": 1 / 3,
                 "is_stay": 0.0,
             },
         ]
@@ -186,7 +221,7 @@ def test_recent_switch_rate_is_computed_once_per_completed_visit():
     out = add_uncertainty_covariates(df, switch_window=5)
 
     np.testing.assert_allclose(
-        out["recent_switch_rate"].to_numpy(),
+        out["patch_switch_fraction_last5_completed_trips"].to_numpy(),
         np.array([0.0, 0.0, 0.5, 0.5, 1 / 3, 1 / 3]),
         equal_nan=True,
     )
@@ -199,25 +234,25 @@ def test_recent_switch_rate_ignores_eventual_choice_within_visit():
             {
                 "completed_trial_id": 0,
                 "prev_arm": 3.0,
-                "is_after_switch": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
                 "is_stay": 0.0,
             },
             {
                 "completed_trial_id": 0,
                 "prev_arm": 3.0,
-                "is_after_switch": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
                 "is_stay": 0.0,
             },
             {
                 "completed_trial_id": 1,
                 "prev_arm": 2.0,
-                "is_after_switch": 1.0,
+                "did_last_completed_trip_switch_patch": 1.0,
                 "is_stay": 1.0,
             },
             {
                 "completed_trial_id": 1,
                 "prev_arm": 2.0,
-                "is_after_switch": 1.0,
+                "did_last_completed_trip_switch_patch": 1.0,
                 "is_stay": 1.0,
             },
         ]
@@ -225,8 +260,12 @@ def test_recent_switch_rate_ignores_eventual_choice_within_visit():
     changed_future = df.copy()
     changed_future.loc[changed_future["prev_arm"] == 3.0, "is_stay"] = 1.0
 
-    original = add_uncertainty_covariates(df)["recent_switch_rate"]
-    changed = add_uncertainty_covariates(changed_future)["recent_switch_rate"]
+    original = add_uncertainty_covariates(df)[
+        "patch_switch_fraction_last5_completed_trips"
+    ]
+    changed = add_uncertainty_covariates(changed_future)[
+        "patch_switch_fraction_last5_completed_trips"
+    ]
 
     np.testing.assert_allclose(original, changed, equal_nan=True)
 
@@ -237,30 +276,32 @@ def test_recent_switch_rate_leaves_only_true_carry_in_rows_unknown():
             {
                 "completed_trial_id": pd.NA,
                 "completed_trial_arm": np.nan,
-                "reward_outcome": np.nan,
+                "is_rewarded_outcome": np.nan,
                 "completed_trial_reward": np.nan,
-                "is_after_switch": np.nan,
+                "did_last_completed_trip_switch_patch": np.nan,
             },
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 2.0,
-                "reward_outcome": 1.0,
+                "is_rewarded_outcome": 1.0,
                 "completed_trial_reward": 1.0,
-                "is_after_switch": 1.0,
-                "recent_switch_rate": 1.0,
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 1.0,
             },
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 2.0,
-                "reward_outcome": 1.0,
+                "is_rewarded_outcome": 1.0,
                 "completed_trial_reward": 1.0,
-                "is_after_switch": 1.0,
-                "recent_switch_rate": 1.0,
+                "did_last_completed_trip_switch_patch": 1.0,
+                "patch_switch_fraction_last5_completed_trips": 1.0,
             },
         ]
     )
 
-    rates = add_uncertainty_covariates(df)["recent_switch_rate"].to_numpy()
+    rates = add_uncertainty_covariates(df)[
+        "patch_switch_fraction_last5_completed_trips"
+    ].to_numpy()
 
     np.testing.assert_allclose(rates, [np.nan, 1.0, 1.0], equal_nan=True)
 
@@ -269,9 +310,9 @@ def test_recent_switch_rate_leaves_only_true_carry_in_rows_unknown():
     ("column", "replacement"),
     [
         ("completed_trial_arm", 2.0),
-        ("reward_outcome", 0.0),
-        ("is_after_switch", 1.0),
-        ("recent_switch_rate", 1.0),
+        ("is_rewarded_outcome", 0.0),
+        ("did_last_completed_trip_switch_patch", 1.0),
+        ("patch_switch_fraction_last5_completed_trips", 1.0),
         ("leaky_q_value_diff", 1.0),
     ],
 )
@@ -280,14 +321,14 @@ def test_completed_trial_context_must_be_constant_within_id(column, replacement)
         {
             "completed_trial_id": 0,
             "completed_trial_arm": 1.0,
-            "reward_outcome": 1.0,
-            "is_after_switch": 0.0,
+            "is_rewarded_outcome": 1.0,
+            "did_last_completed_trip_switch_patch": 0.0,
         },
         {
             "completed_trial_id": 0,
             "completed_trial_arm": 1.0,
-            "reward_outcome": 1.0,
-            "is_after_switch": 0.0,
+            "is_rewarded_outcome": 1.0,
+            "did_last_completed_trip_switch_patch": 0.0,
         },
     ]
     rows[1][column] = replacement
@@ -299,8 +340,8 @@ def test_completed_trial_context_must_be_constant_within_id(column, replacement)
 def test_completed_trial_outcome_can_transition_once_from_unknown_to_known():
     frame = _frame(
         [
-            {"completed_trial_id": 0, "reward_outcome": np.nan},
-            {"completed_trial_id": 0, "reward_outcome": 1.0},
+            {"completed_trial_id": 0, "is_rewarded_outcome": np.nan},
+            {"completed_trial_id": 0, "is_rewarded_outcome": 1.0},
         ]
     )
 
@@ -312,23 +353,31 @@ def test_completed_trial_outcome_can_transition_once_from_unknown_to_known():
 def test_completed_trial_outcome_availability_cannot_regress():
     frame = _frame(
         [
-            {"completed_trial_id": 0, "reward_outcome": 1.0},
-            {"completed_trial_id": 0, "reward_outcome": np.nan},
+            {"completed_trial_id": 0, "is_rewarded_outcome": 1.0},
+            {"completed_trial_id": 0, "is_rewarded_outcome": np.nan},
         ]
     )
-    with pytest.raises(ValueError, match="reward_outcome"):
+    with pytest.raises(ValueError, match="is_rewarded_outcome"):
         add_uncertainty_covariates(frame)
 
 
 def test_completed_trial_id_gaps_are_valid_but_order_must_be_nondecreasing():
     gap = _frame(
         [
-            {"completed_trial_id": 0, "recent_switch_rate": 0.0},
-            {"completed_trial_id": 2, "recent_switch_rate": 2 / 3},
+            {
+                "completed_trial_id": 0,
+                "patch_switch_fraction_last5_completed_trips": 0.0,
+            },
+            {
+                "completed_trial_id": 2,
+                "patch_switch_fraction_last5_completed_trips": 2 / 3,
+            },
         ]
     )
     out = add_uncertainty_covariates(gap)
-    np.testing.assert_allclose(out["recent_switch_rate"], [0.0, 2 / 3])
+    np.testing.assert_allclose(
+        out["patch_switch_fraction_last5_completed_trips"], [0.0, 2 / 3]
+    )
 
     reversed_ids = _frame(
         [
@@ -356,7 +405,9 @@ def test_completed_trial_ids_must_be_nonnegative():
         add_uncertainty_covariates(_frame([{"completed_trial_id": -1}]))
 
 
-@pytest.mark.parametrize("column", ["recent_switch_rate", "leaky_q_value_diff"])
+@pytest.mark.parametrize(
+    "column", ["patch_switch_fraction_last5_completed_trips", "leaky_q_value_diff"]
+)
 @pytest.mark.parametrize("bad_value", [-0.1, 1.1, np.nan, np.inf])
 def test_canonical_history_covariates_must_be_finite_probabilities(column, bad_value):
     df = _frame([{column: bad_value}])
@@ -367,10 +418,10 @@ def test_canonical_history_covariates_must_be_finite_probabilities(column, bad_v
 def test_wsls_deviation_truth_table():
     df = _frame(
         [
-            {"completed_trial_reward": 1.0, "is_stay": 1.0},   # win-stay   -> 0
-            {"completed_trial_reward": 0.0, "is_stay": 0.0},   # lose-shift -> 0
-            {"completed_trial_reward": 1.0, "is_stay": 0.0},   # win-shift  -> 1
-            {"completed_trial_reward": 0.0, "is_stay": 1.0},   # lose-stay  -> 1
+            {"completed_trial_reward": 1.0, "is_stay": 1.0},  # win-stay   -> 0
+            {"completed_trial_reward": 0.0, "is_stay": 0.0},  # lose-shift -> 0
+            {"completed_trial_reward": 1.0, "is_stay": 0.0},  # win-shift  -> 1
+            {"completed_trial_reward": 0.0, "is_stay": 1.0},  # lose-stay  -> 1
         ]
     )
     out = add_uncertainty_covariates(df)
@@ -381,8 +432,8 @@ def test_wsls_deviation_survives_the_bout_start_outcome_gate():
     """The covariate must be defined where win-stay/lose-shift means something.
 
     An at-well bout begins at arrival, before the trip's outcome exists, so
-    the gated ``is_after_reward`` / ``is_after_omission`` are missing on every
-    at-well stop. Reading the realized outcome instead keeps the covariate
+    the gated ``is_rewarded_outcome`` is missing on every at-well stop.
+    Reading the realized outcome instead keeps the covariate
     defined; reading the gated flags would make it NaN throughout.
     """
     df = _frame(
@@ -393,9 +444,7 @@ def test_wsls_deviation_survives_the_bout_start_outcome_gate():
     )
     # Exactly the state of a regenerated at-well stop: outcome not yet known
     # at the frozen context time.
-    df["is_after_reward"] = np.nan
-    df["is_after_omission"] = np.nan
-    df["reward_outcome"] = np.nan
+    df["is_rewarded_outcome"] = np.nan
 
     out = add_uncertainty_covariates(df)
 
@@ -412,16 +461,16 @@ def test_wsls_deviation_no_prior_is_nan():
                 "completed_trial_id": pd.NA,
                 "completed_trial_arm": np.nan,
                 "completed_trial_reward": np.nan,
-                "reward_outcome": np.nan,
-                "is_after_switch": np.nan,
+                "is_rewarded_outcome": np.nan,
+                "did_last_completed_trip_switch_patch": np.nan,
                 "is_stay": 1.0,
             },
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 2.0,
-                "reward_outcome": 1.0,
+                "is_rewarded_outcome": 1.0,
                 "completed_trial_reward": 1.0,
-                "is_after_switch": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
                 "is_stay": 1.0,
             },  # win-stay -> 0
         ]
@@ -430,6 +479,29 @@ def test_wsls_deviation_no_prior_is_nan():
     vals = out["wsls_deviation"].to_numpy()
     assert np.isnan(vals[0])
     assert vals[1] == 0.0
+
+
+def test_missing_final_completed_reward_is_rejected():
+    df = _frame(
+        [
+            {
+                "completed_trial_id": 0,
+                "completed_trial_arm": 1.0,
+                "completed_trial_reward": 1.0,
+                "is_stay": 1.0,
+            },
+            {
+                "completed_trial_id": 1,
+                "completed_trial_arm": 2.0,
+                "completed_trial_reward": np.nan,
+                "is_rewarded_outcome": np.nan,
+                "is_stay": 0.0,
+            },
+        ]
+    )
+
+    with pytest.raises(ValueError, match="completed_trial_reward must be finite"):
+        add_uncertainty_covariates(df)
 
 
 @pytest.mark.parametrize(
@@ -453,19 +525,19 @@ def test_add_uncertainty_preserves_canonical_leaky_q_margin():
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 0.0,
-                "reward_outcome": 1.0,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.0,
             },
             {
                 "completed_trial_id": 1,
                 "completed_trial_arm": 0.0,
-                "reward_outcome": 1.0,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.15,
             },
             {
                 "completed_trial_id": 2,
                 "completed_trial_arm": 1.0,
-                "reward_outcome": 0.0,
+                "is_rewarded_outcome": 0.0,
                 "leaky_q_value_diff": 0.255,
             },
         ]
@@ -475,14 +547,26 @@ def test_add_uncertainty_preserves_canonical_leaky_q_margin():
 
 
 def test_leaky_q_value_diff_recurrence():
-    switch_rate, margins = canonical_trial_uncertainty_history(
-        np.array([0.0, 0.0, 1.0]),
-        np.array([1.0, 1.0, 0.0]),
-        np.array([0.0, 1.0, 1.0]),
+    experiences = pd.DataFrame(
+        {
+            "experience_id": [0, 1, 2],
+            "movement_trial_number": pd.array([pd.NA, 1, 2], dtype="Int64"),
+            "is_initial_experience": [True, False, False],
+            "is_boundary_derived": [False, False, False],
+            "outcome_observed": [True, True, True],
+            "port": [0, 0, 1],
+            "patch": [1, 1, 1],
+            "arrival_time": [0.0, 2.0, 4.0],
+            "departure_time": [1.5, 3.5, 5.5],
+            "reward_on_time": [1.0, 3.0, np.nan],
+            "outcome_known_time": [1.0, 3.0, 5.0],
+            "is_reward": [1, 1, 0],
+        }
     )
-    np.testing.assert_allclose(switch_rate, [0.0, 0.5, 2 / 3])
     # alpha=.3: Q0 .5→.65→.755, with every margin evaluated pre-update.
-    np.testing.assert_allclose(margins, [0.0, 0.15, 0.255])
+    np.testing.assert_allclose(
+        canonical_port_value_history(experiences), [0.0, 0.15, 0.255]
+    )
 
 
 def test_switch_rate_window_truncates_at_the_canonical_length():
@@ -493,10 +577,7 @@ def test_switch_rate_window_truncates_at_the_canonical_length():
     Seven switch outcomes can: the trailing mean is 3/5 only at width 5
     (4/6 at 6, 2/4 at 4).
     """
-    n = 7
-    switch_rate, _ = canonical_trial_uncertainty_history(
-        np.zeros(n),
-        np.ones(n),
+    switch_rate = canonical_trial_switch_history(
         np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0]),
     )
     assert CANONICAL_SWITCH_WINDOW == 5
@@ -509,36 +590,36 @@ def test_canonical_leaky_q_is_broadcast_once_per_explicit_completed_trial():
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 0.0,
-                "current_arm": np.nan,
-                "reward_outcome": 1.0,
+                "occupancy_well_arm": np.nan,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.0,
             },
             {
                 "completed_trial_id": 0,
                 "completed_trial_arm": 0.0,
-                "current_arm": 4.0,
-                "reward_outcome": 1.0,
+                "occupancy_well_arm": 4.0,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.0,
             },
             {
                 "completed_trial_id": 1,
                 "completed_trial_arm": 0.0,
-                "current_arm": 3.0,
-                "reward_outcome": 1.0,
+                "occupancy_well_arm": 3.0,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.15,
             },
             {
                 "completed_trial_id": 1,
                 "completed_trial_arm": 0.0,
-                "current_arm": np.nan,
-                "reward_outcome": 1.0,
+                "occupancy_well_arm": np.nan,
+                "is_rewarded_outcome": 1.0,
                 "leaky_q_value_diff": 0.15,
             },
             {
                 "completed_trial_id": 2,
                 "completed_trial_arm": 1.0,
-                "current_arm": 5.0,
-                "reward_outcome": 0.0,
+                "occupancy_well_arm": 5.0,
+                "is_rewarded_outcome": 0.0,
                 "leaky_q_value_diff": 0.255,
             },
         ]
@@ -562,13 +643,13 @@ def test_noncanonical_history_parameters_require_full_trials(kwargs, match):
 
 
 def test_missing_canonical_history_columns_requires_regeneration():
-    df = _frame([{}]).drop(columns=["recent_switch_rate"])
+    df = _frame([{}]).drop(columns=["patch_switch_fraction_last5_completed_trips"])
     with pytest.raises(KeyError, match="regenerate stop_table"):
         add_uncertainty_covariates(df)
 
 
 def test_empty_legacy_table_still_requires_canonical_schema():
-    legacy = pd.DataFrame(columns=["animal", "day", "epoch", "stop_idx"])
+    legacy = pd.DataFrame(columns=["animal", "session_date", "epoch", "stop_idx"])
     with pytest.raises(KeyError, match="regenerate stop_table"):
         add_uncertainty_covariates(legacy)
 
@@ -576,8 +657,8 @@ def test_empty_legacy_table_still_requires_canonical_schema():
 def test_no_mutation():
     df = _frame(
         [
-            {"current_arm": 0.0, "reward_outcome": 1.0, "is_stay": 1.0},
-            {"current_arm": 1.0, "reward_outcome": 0.0, "is_stay": 0.0},
+            {"occupancy_well_arm": 0.0, "is_rewarded_outcome": 1.0, "is_stay": 1.0},
+            {"occupancy_well_arm": 1.0, "is_rewarded_outcome": 0.0, "is_stay": 0.0},
         ]
     )
     before = df.copy(deep=True)
@@ -587,7 +668,7 @@ def test_no_mutation():
     assert len(out) == len(df)
     for col in (
         "omission_streak",
-        "recent_switch_rate",
+        "patch_switch_fraction_last5_completed_trips",
         "wsls_deviation",
         "leaky_q_value_diff",
     ):
@@ -597,14 +678,22 @@ def test_no_mutation():
 def test_visit_context_is_validated_per_session_not_pooled():
     """Each session's completed-trial sequence restarts independently.
 
-    Two epochs of the same animal/day each number their completed trials
+    Two epochs of the same animal/session_date each number their completed trials
     from zero. Validating the pooled frame would see the second epoch's
     IDs step backwards and reject an ordinary stop table, so the session
     grouping is load-bearing rather than incidental.
     """
     rows = [
-        {"current_arm": 0.0, "completed_trial_id": 0, "recent_switch_rate": 0.0},
-        {"current_arm": 1.0, "completed_trial_id": 1, "recent_switch_rate": 0.5},
+        {
+            "occupancy_well_arm": 0.0,
+            "completed_trial_id": 0,
+            "patch_switch_fraction_last5_completed_trips": 0.0,
+        },
+        {
+            "occupancy_well_arm": 1.0,
+            "completed_trial_id": 1,
+            "patch_switch_fraction_last5_completed_trips": 0.5,
+        },
     ]
     first = _frame(rows)
     second = _frame(rows)
@@ -616,7 +705,9 @@ def test_visit_context_is_validated_per_session_not_pooled():
     assert len(out) == len(pooled)
     # Both epochs keep their own history, unshifted by the other's.
     for epoch in ("02_r1", "04_r2"):
-        got = out.loc[out["epoch"] == epoch, "recent_switch_rate"].tolist()
+        got = out.loc[
+            out["epoch"] == epoch, "patch_switch_fraction_last5_completed_trips"
+        ].tolist()
         assert got == [0.0, 0.5], epoch
 
 
@@ -624,13 +715,13 @@ def test_drop_first_session_per_animal():
     st = pd.DataFrame(
         {
             "animal": ["a", "a", "b"],
-            "day": [1, 2, 1],
+            "session_date": [1, 2, 1],
             "epoch": ["02_r1", "02_r1", "02_r1"],
             "stop_id": [0, 1, 2],
         }
     )
     out = fur._drop_first_session_per_animal(st)
-    # a's first session (day 1) and b's only session (day 1) dropped.
+    # a's first session (session_date 1) and b's only session (session_date 1) dropped.
     assert set(out["stop_id"]) == {1}
 
 
@@ -778,24 +869,29 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
     stop = pd.DataFrame(
         {
             "animal": ["a", "a"],
-            "day": [1, 1],
+            "session_date": [1, 1],
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
-            "immobility_time": [0.06, 0.06],
+            "immobility_duration_s": [0.06, 0.06],
             "stop_start": [10.0, 20.0],
             "outcome_known_time": [10.0, 20.0],
             "trial_reward": [1.0, 0.0],
-            "reward_rate_trial_k10": [0.5, 0.5],
-            "is_after_switch": [0.0, 0.0],
-            **{f"reward_lag{j}": [float(j % 2), float(j % 2)] for j in range(1, 11)},
+            "reward_fraction_last10_known_trials": [0.5, 0.5],
+            "did_last_completed_trip_switch_patch": [0.0, 0.0],
+            **{
+                f"known_reward_outcome_lag_{j}": [float(j % 2), float(j % 2)]
+                for j in range(1, 11)
+            },
             **{column: [0.1, 0.2] for column in fur.FITTED_COVARIATES},
         }
     )
-    stop.loc[stop["trial_reward"] == 0.0, "p_reward_current"] = invalid_value
+    stop.loc[stop["trial_reward"] == 0.0, "task_reward_probability_chosen_arm"] = (
+        invalid_value
+    )
     onsets = pd.DataFrame(
         {
             "animal": ["a", "a", "a"],
-            "day": [1, 1, 1],
+            "session_date": [1, 1, 1],
             "epoch": ["02_r1", "02_r1", "02_r1"],
             "stop_id": [1, 1, 1],
             "t_since_stop_onset": [0.01, 0.02, 0.03],
@@ -851,7 +947,7 @@ def test_runner_smoke():
     canonical_columns = {
         "completed_trial_id",
         "completed_trial_arm",
-        "recent_switch_rate",
+        "patch_switch_fraction_last5_completed_trips",
         "leaky_q_value_diff",
         "completed_trial_reward",
     }
@@ -882,10 +978,10 @@ def test_runner_smoke():
             "outcome_known_time",
             "trial_reward",
             *fur.VALUE_COVARIATES,
-            "rpe",
+            "rpe_postoutcome",
             *fur.RL_COVARIATES,
         ]
-    ].rename(columns={"rpe": "rpe_model"})
+    ]
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     stop = fur._drop_first_session_per_animal(stop)
     stop = fur._subset_max_per_animal(stop, 1)
@@ -900,4 +996,4 @@ def test_runner_smoke():
         assert f"coef_{cov}" in models.columns
         assert f"rr_{cov}" in models.columns
     # reward kernel is also present (the controlled-for block).
-    assert f"coef_reward_lag{N_REWARD_LAGS}" in models.columns
+    assert f"coef_known_reward_outcome_lag_{N_REWARD_LAGS}" in models.columns

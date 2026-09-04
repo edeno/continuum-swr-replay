@@ -42,10 +42,10 @@ from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
 
 DEFAULT_PREDICTORS: tuple[str, ...] = (
-    "is_current",
-    "is_prev",
-    "is_next",
-    "is_last_rewarded",
+    "is_current_arm",
+    "is_prev_arm",
+    "is_next_arm",
+    "is_last_rewarded_arm",
 )
 
 
@@ -54,31 +54,53 @@ DEFAULT_PREDICTORS: tuple[str, ...] = (
 # the same way ``add_interaction_columns`` and ``add_temporal_interactions``
 # do in the production pipeline.
 _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
-    "swr_x_current": ("is_current", "is_swr"),
-    "swr_x_prev": ("is_prev", "is_swr"),
-    "swr_x_next": ("is_next", "is_swr"),
-    "swr_x_last_rewarded": ("is_last_rewarded", "is_swr"),
-    "swr_x_reward_rate_arm_k10": ("reward_rate_arm_k10", "is_swr"),
-    "swr_x_visit_recency_demeaned": ("visit_recency_demeaned", "is_swr"),
-    "swr_x_arm_never_visited": ("arm_never_visited", "is_swr"),
-    "swr_x_is_last_rewarded_elsewhere": ("is_last_rewarded_elsewhere", "is_swr"),
-    "mua_x_last_rewarded": ("is_last_rewarded", "is_mua"),
-    "switch_x_current": ("is_current", "is_after_switch"),
-    "switch_x_prev": ("is_prev", "is_after_switch"),
-    "omission_x_last_rewarded": ("is_last_rewarded", "is_after_omission"),
-    "time_x_current": ("is_current", "time_since_stop"),
-    "time_x_prev": ("is_prev", "time_since_stop"),
-    "time_x_next": ("is_next", "time_since_stop"),
+    "swr_x_is_current_arm": ("is_current_arm", "is_swr"),
+    "swr_x_is_prev_arm": ("is_prev_arm", "is_swr"),
+    "swr_x_is_next_arm": ("is_next_arm", "is_swr"),
+    "swr_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_swr"),
+    "swr_x_reward_fraction_candidate_arm_last10_visits": (
+        "reward_fraction_candidate_arm_last10_visits",
+        "is_swr",
+    ),
+    "swr_x_visit_recency_trials_event_leaf_centered": ("visit_recency_trials_event_leaf_centered", "is_swr"),
+    "swr_x_is_candidate_arm_never_visited": (
+        "is_candidate_arm_never_visited",
+        "is_swr",
+    ),
+    "swr_x_is_last_rewarded_noncurrent_arm": (
+        "is_last_rewarded_noncurrent_arm",
+        "is_swr",
+    ),
+    "mua_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_mua"),
+    "is_omitted_outcome_x_is_last_rewarded_arm": (
+        "is_last_rewarded_arm",
+        "is_omitted_outcome",
+    ),
+    "time_since_stop_start_s_x_is_current_arm": (
+        "is_current_arm",
+        "time_since_stop_start_s",
+    ),
+    "time_since_stop_start_s_x_is_prev_arm": (
+        "is_prev_arm",
+        "time_since_stop_start_s",
+    ),
+    "time_since_stop_start_s_x_is_next_arm": (
+        "is_next_arm",
+        "time_since_stop_start_s",
+    ),
 }
 
 # Arm-level × arm-level interactions (both factors vary across arms).
 _ARM_ARM_INTERACTIONS: dict[str, tuple[str, str]] = {
-    "current_x_last_rewarded": ("is_current", "is_last_rewarded"),
+    "is_current_arm_x_is_last_rewarded_arm": (
+        "is_current_arm",
+        "is_last_rewarded_arm",
+    ),
 }
 
-_BASE_BINARY = ("is_current", "is_prev", "is_next", "is_last_rewarded")
-_CONTINUOUS_ARM = ("visit_recency", "cumulative_reward", "dist_to_arm")
-_EVENT_LEVEL = ("is_swr", "is_after_switch", "is_after_omission", "time_since_stop")
+_BASE_BINARY = ("is_current_arm", "is_prev_arm", "is_next_arm", "is_last_rewarded_arm")
+_CONTINUOUS_ARM = ("visit_recency_trials", "reward_count_candidate_arm_last10_known_trials", "distance_to_candidate_arm_cm")
+_EVENT_LEVEL = ("is_swr", "is_omitted_outcome", "time_since_stop_start_s")
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -135,10 +157,11 @@ def sample_arm_design(
     — matching the real-data convention that ``well_to_arm_set`` only
     returns leaf arms.
 
-    Continuous predictors (``visit_recency``, ``cumulative_reward``,
-    ``reward_rate_arm_k10``, ``dist_to_arm``) are sampled from plausible
-    ranges if requested. Arm fixed-effect dummies (``arm_fe_0`` …
-    ``arm_fe_7``) are added when requested — constant across events.
+    Continuous predictors (candidate-arm visit recency, recent reward count,
+    prior-visit reward fraction, and graph distance) are sampled from
+    plausible ranges if requested. Arm fixed-effect dummies
+    (``is_candidate_arm_0`` …
+    ``is_candidate_arm_7``) are added when requested — constant across events.
     """
     n_arms = len(ALL_ARMS)
     leaf_arms = np.array([0, 1, 2, 3, 4, 5])
@@ -152,37 +175,37 @@ def sample_arm_design(
     rewarded = rng.choice(leaf_arms, size=n_events)
 
     arm_grid = np.arange(n_arms)[None, :]  # (1, n_arms)
-    feature_cols["is_current"] = (arm_grid == current[:, None]).astype(float)
-    feature_cols["is_prev"] = (arm_grid == prev[:, None]).astype(float)
-    feature_cols["is_next"] = (arm_grid == nxt[:, None]).astype(float)
-    feature_cols["is_last_rewarded"] = (arm_grid == rewarded[:, None]).astype(float)
+    feature_cols["is_current_arm"] = (arm_grid == current[:, None]).astype(float)
+    feature_cols["is_prev_arm"] = (arm_grid == prev[:, None]).astype(float)
+    feature_cols["is_next_arm"] = (arm_grid == nxt[:, None]).astype(float)
+    feature_cols["is_last_rewarded_arm"] = (arm_grid == rewarded[:, None]).astype(float)
     # Last-rewarded arm restricted to where it is not the current arm
     # (the identifiable, non-collinear reward-memory predictor for M5/M6).
-    feature_cols["is_last_rewarded_elsewhere"] = feature_cols["is_last_rewarded"] * (
-        1.0 - feature_cols["is_current"]
+    feature_cols["is_last_rewarded_noncurrent_arm"] = feature_cols["is_last_rewarded_arm"] * (
+        1.0 - feature_cols["is_current_arm"]
     )
 
     # Continuous: independent across events and arms with arbitrary scale.
     if any(
         name in predictors
-        for name in ("visit_recency", "visit_recency_demeaned", "arm_never_visited")
+        for name in ("visit_recency_trials", "visit_recency_trials_event_leaf_centered", "is_candidate_arm_never_visited")
     ):
         vr, never_visited = _sample_visit_history(n_events, rng)
-        if "visit_recency" in predictors:
-            feature_cols["visit_recency"] = vr
-        if "visit_recency_demeaned" in predictors:
-            feature_cols["visit_recency_demeaned"] = center_visit_recency_within_event(
+        if "visit_recency_trials" in predictors:
+            feature_cols["visit_recency_trials"] = vr
+        if "visit_recency_trials_event_leaf_centered" in predictors:
+            feature_cols["visit_recency_trials_event_leaf_centered"] = center_visit_recency_within_event(
                 vr, never_visited
             )
-        if "arm_never_visited" in predictors:
-            feature_cols["arm_never_visited"] = never_visited
-    if "cumulative_reward" in predictors:
-        feature_cols["cumulative_reward"] = rng.uniform(0, 5, size=(n_events, n_arms))
-    if "reward_rate_arm_k10" in predictors:
+        if "is_candidate_arm_never_visited" in predictors:
+            feature_cols["is_candidate_arm_never_visited"] = never_visited
+    if "reward_count_candidate_arm_last10_known_trials" in predictors:
+        feature_cols["reward_count_candidate_arm_last10_known_trials"] = rng.uniform(0, 5, size=(n_events, n_arms))
+    if "reward_fraction_candidate_arm_last10_visits" in predictors:
         # Rewarded fraction of recent visits — a rate in [0, 1].
-        feature_cols["reward_rate_arm_k10"] = rng.uniform(0, 1, size=(n_events, n_arms))
-    if "dist_to_arm" in predictors:
-        feature_cols["dist_to_arm"] = rng.uniform(0, 100, size=(n_events, n_arms))
+        feature_cols["reward_fraction_candidate_arm_last10_visits"] = rng.uniform(0, 1, size=(n_events, n_arms))
+    if "distance_to_candidate_arm_cm" in predictors:
+        feature_cols["distance_to_candidate_arm_cm"] = rng.uniform(0, 100, size=(n_events, n_arms))
 
     # Arm fixed-effect dummies: arm_fe_k = 1 on arm k, identical across
     # events (the static per-arm baseline the FE model controls for).
@@ -292,14 +315,13 @@ def simulate_with_event_covariates(
 
     Extends ``simulate_counts`` to support the full predictor vocabulary
     used by ``model_specs.MODEL_HIERARCHY`` — including the continuous
-    arm-varying predictors (``visit_recency``, ``cumulative_reward``,
-    ``reward_rate_arm_k10``, ``dist_to_arm``), the arm fixed-effect
-    dummies (``arm_fe_0`` … ``arm_fe_7``), and the event×arm interaction
-    columns (``swr_x_*``, ``switch_x_*``, ``omission_x_last_rewarded``,
-    ``time_x_*``).
+    arm-varying predictors (visit recency, recent reward history, and
+    candidate-arm distance), the arm fixed-effect
+    dummies (``is_candidate_arm_0`` … ``is_candidate_arm_7``), and the event×arm interaction
+    columns (``swr_x_*`` and canonical base-term products).
 
     Per event we sample event-level covariates (``is_swr``,
-    ``is_after_switch``, ``is_after_omission``, ``time_since_stop``) and
+    ``is_omitted_outcome`` and ``time_since_stop_start_s``) and
     arm-varying base predictors as in ``sample_arm_design``. Interaction
     columns are then constructed by element-wise product of their base
     arm-varying predictor and their event-level scalar — exactly the
@@ -327,24 +349,24 @@ def simulate_with_event_covariates(
     rewarded = rng.choice(leaf, size=n_events)
     arm_grid = np.arange(n_arms)[None, :]
     arm_features: dict[str, np.ndarray] = {
-        "is_current": (arm_grid == current[:, None]).astype(float),
-        "is_prev": (arm_grid == prev[:, None]).astype(float),
-        "is_next": (arm_grid == nxt[:, None]).astype(float),
-        "is_last_rewarded": (arm_grid == rewarded[:, None]).astype(float),
-        "visit_recency": visit_recency,
-        "arm_never_visited": arm_never_visited,
-        "cumulative_reward": rng.uniform(0, 5, size=(n_events, n_arms)),
-        "reward_rate_arm_k10": rng.uniform(0, 1, size=(n_events, n_arms)),
-        "dist_to_arm": rng.uniform(0, 100, size=(n_events, n_arms)),
+        "is_current_arm": (arm_grid == current[:, None]).astype(float),
+        "is_prev_arm": (arm_grid == prev[:, None]).astype(float),
+        "is_next_arm": (arm_grid == nxt[:, None]).astype(float),
+        "is_last_rewarded_arm": (arm_grid == rewarded[:, None]).astype(float),
+        "visit_recency_trials": visit_recency,
+        "is_candidate_arm_never_visited": arm_never_visited,
+        "reward_count_candidate_arm_last10_known_trials": rng.uniform(0, 5, size=(n_events, n_arms)),
+        "reward_fraction_candidate_arm_last10_visits": rng.uniform(0, 1, size=(n_events, n_arms)),
+        "distance_to_candidate_arm_cm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
     # M5/M6 reward-memory predictor: last-rewarded arm where it is not
     # the current arm (disjoint support from is_current by construction).
-    arm_features["is_last_rewarded_elsewhere"] = arm_features["is_last_rewarded"] * (
-        1.0 - arm_features["is_current"]
+    arm_features["is_last_rewarded_noncurrent_arm"] = arm_features["is_last_rewarded_arm"] * (
+        1.0 - arm_features["is_current_arm"]
     )
     # M4 visit-recency predictor: time-local relative recency among leaf arms.
-    arm_features["visit_recency_demeaned"] = center_visit_recency_within_event(
-        arm_features["visit_recency"], arm_features["arm_never_visited"]
+    arm_features["visit_recency_trials_event_leaf_centered"] = center_visit_recency_within_event(
+        arm_features["visit_recency_trials"], arm_features["is_candidate_arm_never_visited"]
     )
     # Arm fixed-effect dummies: constant across events, so a fit
     # recovers their coefficients at 0 unless the generative truth
@@ -356,9 +378,8 @@ def simulate_with_event_covariates(
     event_scalars: dict[str, np.ndarray] = {
         "is_swr": (rng.random(n_events) < 0.5).astype(float),
         "is_mua": (rng.random(n_events) < 0.5).astype(float),
-        "is_after_switch": (rng.random(n_events) < 0.3).astype(float),
-        "is_after_omission": (rng.random(n_events) < 0.3).astype(float),
-        "time_since_stop": rng.uniform(0, 5, size=n_events),
+        "is_omitted_outcome": (rng.random(n_events) < 0.3).astype(float),
+        "time_since_stop_start_s": rng.uniform(0, 5, size=n_events),
     }
     event_broadcast: dict[str, np.ndarray] = {
         k: np.tile(v[:, None], (1, n_arms)) for k, v in event_scalars.items()
@@ -981,10 +1002,10 @@ def simulate_full_pipeline(
     n_arms = len(ALL_ARMS)
     arm_grid = np.arange(n_arms)[None, :]
     feature_cols: dict[str, np.ndarray] = {
-        "is_current": (arm_grid == current_well[:, None]).astype(float),
-        "is_prev": (arm_grid == prev_well[:, None]).astype(float),
-        "is_next": (arm_grid == next_well[:, None]).astype(float),
-        "is_last_rewarded": (arm_grid == rewarded_well[:, None]).astype(float),
+        "is_current_arm": (arm_grid == current_well[:, None]).astype(float),
+        "is_prev_arm": (arm_grid == prev_well[:, None]).astype(float),
+        "is_next_arm": (arm_grid == next_well[:, None]).astype(float),
+        "is_last_rewarded_arm": (arm_grid == rewarded_well[:, None]).astype(float),
     }
     missing = [p for p in predictor_list if p not in feature_cols]
     if missing:
@@ -1028,7 +1049,7 @@ def simulate_full_pipeline(
                     "prev_trial_from_well": float(prev_well[e]),
                     "next_trial_to_well": float(next_well[e]),
                     "last_rewarded_well": float(rewarded_well[e]),
-                    "is_after_switch": 0.0,
+                    "did_last_completed_trip_switch_patch": 0.0,
                     "is_after_omission": 0.0,
                 }
             )

@@ -18,6 +18,7 @@ from continuum_swr_replay.analysis.replay.simulation import make_synthetic_env
 from continuum_swr_replay.analysis.replay.summaries import (
     arm_count_hard,
     arm_count_soft,
+    arm_fraction_from_event_total,
     arm_map_from_posterior,
     arm_posterior_mass,
     n_nonlocal_bins,
@@ -26,10 +27,98 @@ from continuum_swr_replay.analysis.replay.summaries import (
     posterior_to_arm_marginal,
 )
 
+
+def test_arm_fraction_from_event_total_uses_matching_support() -> None:
+    np.testing.assert_allclose(
+        arm_fraction_from_event_total(
+            np.array([2.0, 1.0, np.nan, 0.0]),
+            np.array([4.0, 4.0, 4.0, 0.0]),
+        ),
+        [0.5, 0.25, np.nan, np.nan],
+        equal_nan=True,
+    )
+
+
+def test_arm_fraction_from_event_total_rejects_shape_and_negative_values() -> None:
+    with pytest.raises(ValueError, match="identical shapes"):
+        arm_fraction_from_event_total(np.ones(2), np.ones(3))
+    with pytest.raises(ValueError, match="nonnegative"):
+        arm_fraction_from_event_total(np.array([-1.0]), np.array([1.0]))
+
+
 # ── posterior_to_arm_marginal ──
 
 
 class TestPosteriorToArmMarginal:
+    @pytest.mark.parametrize(
+        "posterior",
+        [
+            np.array([0.5, 0.5]),
+            np.ones((1, 2, 1)) / 2,
+        ],
+    )
+    def test_rejects_non_matrix_posterior(self, posterior):
+        """A malformed axis layout must not fail later with an incidental error."""
+        with pytest.raises(ValueError, match="must be 2-D"):
+            posterior_to_arm_marginal(posterior, np.array([0, 1]), n_arms=2)
+
+    def test_rejects_non_vector_edge_ids(self):
+        posterior = np.array([[0.5, 0.5]])
+        with pytest.raises(ValueError, match="edge_id must be 1-D"):
+            posterior_to_arm_marginal(posterior, np.array([[0, 1]]), n_arms=2)
+
+    @pytest.mark.parametrize(
+        ("posterior", "message"),
+        [
+            (np.array([[np.nan, 1.0]]), "non-finite values on real-arm bins"),
+            (np.array([[np.inf, 0.0]]), "infinite values"),
+            (np.array([[1.1, -0.1]]), "negative probabilities"),
+        ],
+    )
+    def test_rejects_invalid_probability_values(self, posterior, message):
+        """Invalid values previously produced plausible but invalid arm masses."""
+        with pytest.raises(ValueError, match=message):
+            posterior_to_arm_marginal(posterior, np.array([0, 1]), n_arms=2)
+
+    def test_allows_nan_only_on_junction_placeholders(self):
+        """Real decoder artifacts store NaN at structural junction positions."""
+        posterior = np.array([[0.75, 0.25, np.nan]])
+        arm_post = posterior_to_arm_marginal(posterior, np.array([0, 1, -1]), n_arms=2)
+        np.testing.assert_allclose(arm_post, [[0.75, 0.25]])
+
+    def test_rejects_improper_probability_row_mass(self):
+        """Do not silently turn an unnormalised score row into probabilities."""
+        posterior = np.array([[0.2, 0.2]])
+        with pytest.raises(ValueError, match="rows must sum to 1"):
+            posterior_to_arm_marginal(posterior, np.array([0, 1]), n_arms=2)
+
+    def test_accepts_small_probability_row_roundoff(self):
+        """Float32-scale summation error is not a scientific contract failure."""
+        posterior = np.array([[0.500004, 0.500004]])
+        arm_post = posterior_to_arm_marginal(posterior, np.array([0, 1]), n_arms=2)
+        np.testing.assert_allclose(arm_post, [[0.5, 0.5]])
+
+    @pytest.mark.parametrize(
+        ("edge_id", "message"),
+        [
+            (np.array([0.0, 1.5]), "finite integers"),
+            (np.array([0, -2]), "-1 for junctions"),
+            (np.array([0, 2]), "outside the canonical range"),
+        ],
+    )
+    def test_rejects_invalid_edge_ids(self, edge_id, message):
+        """Bad edge labels must not be truncated, dropped, or renormalized away."""
+        posterior = np.array([[0.5, 0.5]])
+        with pytest.raises(ValueError, match=message):
+            posterior_to_arm_marginal(posterior, edge_id, n_arms=2)
+
+    @pytest.mark.parametrize("n_arms", [0, -1, 2.5, True])
+    def test_rejects_invalid_n_arms(self, n_arms):
+        with pytest.raises(ValueError, match="positive integer"):
+            posterior_to_arm_marginal(
+                np.array([[0.5, 0.5]]), np.array([0, 1]), n_arms=n_arms
+            )
+
     def test_sums_to_one_per_timebin(self):
         # 5 timebins, 10 position bins, 3 arms (edge_ids 0,0,0,1,1,1,2,2,-1,-1)
         edge_id = np.array([0, 0, 0, 1, 1, 1, 2, 2, -1, -1])
@@ -77,9 +166,7 @@ class TestPosteriorToArmMarginal:
 
     def test_single_bin_per_arm(self):
         edge_id = np.array([0, 1, 2])
-        posterior = np.array(
-            [[0.7, 0.2, 0.1], [0.1, 0.1, 0.8]], dtype=float
-        )
+        posterior = np.array([[0.7, 0.2, 0.1], [0.1, 0.1, 0.8]], dtype=float)
         arm_post = posterior_to_arm_marginal(posterior, edge_id, n_arms=3)
         np.testing.assert_allclose(arm_post, posterior)
 
@@ -111,9 +198,7 @@ class TestLengthMeasures:
     def test_n_nonlocal_bins_counts_above_threshold(self):
         nonlocal_prob = np.array([0.9, 0.5, 0.85, 0.81, 0.2, 0.95])
         event_id = np.array([1, 1, 1, 2, 2, 2])
-        event_ids, counts = n_nonlocal_bins(
-            nonlocal_prob, event_id, threshold=0.8
-        )
+        event_ids, counts = n_nonlocal_bins(nonlocal_prob, event_id, threshold=0.8)
         np.testing.assert_array_equal(event_ids, [1, 2])
         # Event 1: 0.9, 0.85 above; 0.5 below → count 2
         # Event 2: 0.81, 0.95 above; 0.2 below → count 2
@@ -239,9 +324,7 @@ class TestArmPosteriorMass:
         nonlocal_prob = np.array([0.9, 0.5, 0.85, 0.81, 0.2, 0.95])
         event_id = np.array([0, 0, 0, 1, 1, 1])
 
-        _, soft = arm_count_soft(
-            nonlocal_prob, arm_map, event_id, n_arms=n_arms
-        )
+        _, soft = arm_count_soft(nonlocal_prob, arm_map, event_id, n_arms=n_arms)
         _, mass = arm_posterior_mass(nonlocal_prob, arm_post, event_id)
         np.testing.assert_allclose(mass, soft)
 
@@ -251,9 +334,5 @@ class TestArmPosteriorMass:
 
 class TestArmMapFromPosterior:
     def test_argmax(self):
-        arm_post = np.array(
-            [[0.1, 0.7, 0.2], [0.4, 0.3, 0.3], [0.1, 0.1, 0.8]]
-        )
-        np.testing.assert_array_equal(
-            arm_map_from_posterior(arm_post), [1, 0, 2]
-        )
+        arm_post = np.array([[0.1, 0.7, 0.2], [0.4, 0.3, 0.3], [0.1, 0.1, 0.8]])
+        np.testing.assert_array_equal(arm_map_from_posterior(arm_post), [1, 0, 2])

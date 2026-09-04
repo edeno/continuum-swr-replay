@@ -54,19 +54,22 @@ _QUASI_SEP_ABS = 10.0
 # 2056-stop tail with no fitted beta value state. When one of these is a model's
 # required predictor, an event/stop it drops is attributed to ``n_drop_qvals_gap`` (with
 # priority over generic own-predictor missingness), keeping mechanism B distinguishable
-# from mechanism A (e.g. ``reward_rate_arm_k10``'s early-session NaN). The beta ``q_arm``,
-# beta ``q_arm`` and nominal ``p_reward_arm`` share one identical missingness mask
+# from mechanism A (e.g. candidate-arm reward history's early-session NaN).
+# Candidate-arm belief mean, variance, and task probability share one identical missingness mask
 # (verified: 8064 event-arm rows / 896 events); the stop-level beta scalars and their
-# ``_x_current`` interactions come off the same qvals table and share the tail.
+# current-arm interactions come off the same qvals table and share the tail.
 QVALS_GAP_COLS = frozenset({
     # per-arm value / contingency (identical missingness)
-    "q_arm", "p_reward_arm",
-    "swr_x_q_arm",
+    "reward_belief_mean_candidate_arm_preoutcome", "task_reward_probability_candidate_arm",
+    "swr_x_reward_belief_mean_candidate_arm_preoutcome",
     # stop-level beta scalars from qvals_table (same trailing tail)
-    "rpe", "switch_advantage_mu_preoutcome_sess", "beta_reward_entropy",
-    "global_mu_update_abs_postoutcome_sess",
-    # content _x_current interactions built from those scalars
-    "rpe_x_current", "relval_x_current", "entropy_x_current", "update_x_current",
+    "rpe_postoutcome", "relative_value_switch_minus_stay_preoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+    # content current-arm interactions built from those scalars
+    "rpe_postoutcome_z_x_is_current_arm",
+    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
 })
 
 
@@ -215,7 +218,7 @@ def event_drop_buckets(
     }
 
 
-def stop_own_missing(stop_df, required_cols, *, immobility_col="immobility_time"):
+def stop_own_missing(stop_df, required_cols, *, immobility_col="immobility_duration_s"):
     """Boolean mask over ``stop_df`` rows dropped for *own-predictor* reasons.
 
     Mirrors what the rate fitters remove at the stop level BEFORE fitting: a stop with
@@ -244,11 +247,13 @@ def drop_profile(dropped: pd.DataFrame) -> str:
     if len(dropped) == 0:
         return "no drops"
     parts = []
-    if "time_since_stop" in dropped:
-        parts.append(f"median_tss={dropped['time_since_stop'].median():.2f}")
-    if "reward_outcome" in dropped:
-        parts.append(f"rewarded_frac={dropped['reward_outcome'].mean():.3f}")
-    for vcol in ("q_arm", "switch_advantage_mu_preoutcome_sess"):
+    if "time_since_stop_start_s" in dropped:
+        parts.append(f"median_tss={dropped['time_since_stop_start_s'].median():.2f}")
+    if "is_rewarded_outcome" in dropped:
+        parts.append(
+            f"rewarded_frac={dropped['is_rewarded_outcome'].mean():.3f}"
+        )
+    for vcol in ("reward_belief_mean_candidate_arm_preoutcome", "relative_value_switch_minus_stay_preoutcome"):
         if vcol in dropped:
             parts.append(f"{vcol}_median={dropped[vcol].median():.3f}")
     return "; ".join(parts) if parts else f"n_dropped={len(dropped)}"

@@ -14,9 +14,10 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 
 # (config label, models dir, models to report)
 CONFIGS = [
@@ -29,12 +30,12 @@ CONFIGS = [
 ]
 # documented expectations (from claims_table.md) to flag
 EXPECT = {
-    "is_current": "+ large (current-arm bias)",
-    "is_last_rewarded_elsewhere": "- (avoid last-rewarded; ~-1.66, non-SWR)",
-    "reward_rate_arm_k10": "~0 n.s. (NOT value-selective, non-SWR)",
-    "is_prev": "context",
-    "swr_x_current": "SWR x current (broadening)",
-    "swr_x_prev": "SWR x prev",
+    "is_current_arm": "+ large (current-arm bias)",
+    "is_last_rewarded_noncurrent_arm": "- (avoid last-rewarded; ~-1.66, non-SWR)",
+    "reward_fraction_candidate_arm_last10_visits": "~0 n.s. (NOT value-selective, non-SWR)",
+    "is_prev_arm": "context",
+    "swr_x_is_current_arm": "SWR x current (broadening)",
+    "swr_x_is_prev_arm": "SWR x previous",
     "is_current_patch": "+ (patch current)",
     "is_prev_patch": "- post-switch",
 }

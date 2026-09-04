@@ -5,7 +5,7 @@ TEMPORARY / exploratory (underscore-prefixed). Which curated covariate adds the
 most predictive power over the M7r base, and what is the best combination?
 
 Base model = M7r (time spline + reward kernel + raised-cosine self-history), with
-NO recent_trial_reward_rate (== mean of reward_lag1..10, perfectly collinear).
+NO recent_trial_reward_rate (== mean of known_reward_outcome_lag_1..10, perfectly collinear).
 Candidates = the curated, near-orthogonal set (all VIF <= 1.07).
 
 Two importance measures per covariate, both parallel over sessions:
@@ -53,29 +53,38 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
 )
 from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
-# Value cols merged from qvals_table (exact poke_out alignment). rpe/q_current
-# are the beta-model experienced value (rpe = R - q_chosen; q_current = q_chosen).
-VALUE_COLS = ("p_reward_current", "rpe", "value_diff_patch",
-              "trials_since_block_change", "q_current")
+# Value columns merged from qvals_table at exact stop-start alignment. Preserve
+# their canonical scientific names through fitting and persisted diagnostics.
+VALUE_COLS = (
+    "task_reward_probability_chosen_arm",
+    "rpe_postoutcome",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
+    "trials_since_block_change",
+    "reward_belief_mean_chosen_arm_preoutcome",
+)
 # Focused head-to-head: nominal (true current) vs subjective (model belief) value,
 # plus the robust exploration axis. leaky_q / trials_since_block dropped (null);
 # q_rpe retired (leaky-Q artifact; model rpe already == R - q_chosen).
 CANDIDATES = (
-    "p_reward_current",
-    "rpe",
-    "q_current",
-    "recent_switch_rate",
-    "value_diff_patch",
+    "task_reward_probability_chosen_arm",
+    "rpe_postoutcome",
+    "reward_belief_mean_chosen_arm_preoutcome",
+    "patch_switch_fraction_last5_completed_trips",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
 )
 
 
@@ -126,9 +135,11 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    stop = add_uncertainty_covariates(stop)
     cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    cont = cont.rename(columns={"q_chosen": "q_current"})
+    require_covariate_schema(cont, table="qvals")
     stop = stop.merge(
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
     )
@@ -138,10 +149,11 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     merged = stop.merge(first, on=SESSION_COLS, how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     return stop, onsets
 
 

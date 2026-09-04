@@ -49,14 +49,18 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 
 # Both directions: (response population, cross/predictor population).
 DIRECTIONS = {
@@ -178,10 +182,12 @@ def main() -> None:
     args = p.parse_args()
 
     stop = read_table(RC / "stop_table.pkl")
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (
             stop[SESSION_COLS].drop_duplicates()

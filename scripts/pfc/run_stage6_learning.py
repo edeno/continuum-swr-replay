@@ -7,7 +7,7 @@ and runs:
 1. :func:`stop_replay_summary` — per-stop replay-content aggregates.
 2. :func:`fit_is_stay_logistic_per_session` — for each role in
    ``{current, prev, last_rewarded, best}``, fit
-   ``is_stay ~ is_after_omission * frac_on_<role>`` per session.
+   ``is_stay ~ is_omitted_outcome * frac_on_<role>`` per session.
 
 Outputs (next to the input tables):
 
@@ -31,12 +31,17 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    COVARIATE_SCHEMA_VERSION,
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.learning import (
     fit_is_stay_logistic_per_session,
     fit_is_stay_pooled_gee,
     stop_replay_summary,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
@@ -53,7 +58,7 @@ GEE_PATH = INPUT_DIR / "stage6_is_stay_pooled_gee.pkl"
 ARM_ROLES = ("current", "prev", "last_rewarded", "best")
 PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
 ROLES = ARM_ROLES + PATCH_ROLES
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 
 
 def _content_col_for(role: str, stratum: str) -> str:
@@ -89,6 +94,9 @@ def main() -> None:
         st = read_table(INPUT_DIR / "stop_table.pkl")
         ev = read_table(INPUT_DIR / "event_table.pkl")
         ea = read_table(INPUT_DIR / "event_arm_table.pkl")
+        require_covariate_schema(st, table="stop")
+        require_covariate_schema(ev, table="event")
+        require_covariate_schema(ea, table="event_arm")
         logging.info(
             "  stops=%d  events=%d  event_arm rows=%d",
             len(st),
@@ -96,11 +104,20 @@ def main() -> None:
             len(ea),
         )
         summary = stop_replay_summary(st, ev, ea)
+        summary.attrs["input_covariate_schema_version"] = COVARIATE_SCHEMA_VERSION
         summary.to_pickle(SUMMARY_PATH)
         logging.info("  saved %d rows → %s", len(summary), SUMMARY_PATH)
     else:
         logging.info("Loading cached stop_replay_summary from %s", SUMMARY_PATH)
         summary = pd.read_pickle(SUMMARY_PATH)
+        if (
+            summary.attrs.get("input_covariate_schema_version")
+            != COVARIATE_SCHEMA_VERSION
+        ):
+            raise ValueError(
+                "stop_replay_summary uses a legacy covariate schema; rerun with "
+                "--rebuild-summary before fitting Stage 6"
+            )
 
     logging.info(
         "Stops with replay events: %d / %d",
@@ -126,7 +143,7 @@ def main() -> None:
         coefs = fit_is_stay_logistic_per_session(
             usable,
             content_col=col,
-            outcome_col="is_after_omission",
+            outcome_col="is_omitted_outcome",
             target_col="is_stay",
             min_stops=args.min_stops,
         )
@@ -139,7 +156,7 @@ def main() -> None:
         gee_result = fit_is_stay_pooled_gee(
             usable,
             content_col=col,
-            outcome_col="is_after_omission",
+            outcome_col="is_omitted_outcome",
             target_col="is_stay",
         )
         gee_result.update({"role": role, "content_stratum": args.content_stratum})

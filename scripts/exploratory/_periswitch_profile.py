@@ -3,12 +3,12 @@
 
 Extends ``_periswitch_rate.py`` from a pre/post binary to a temporal profile.
 Stops are immobility bouts (many per trial), so per session we reconstruct a
-trial index (maximal runs of constant ``current_arm`` = well visits), mark
+trial index (maximal runs of constant ``occupancy_well_arm`` = well visits), mark
 switch trials (``current_patch`` changes between consecutive trials), compute
 each trial's SIGNED distance to the nearest switch trial (− = before, + =
 after), map it back to the stops, and fit a pooled Poisson GEE of the per-stop
 event rate across distance bins −3…+3 (baseline = ``far``, |d|≥4), adjusted
-for ``is_after_omission`` and clustered on session.
+for ``is_omitted_outcome`` and clustered on session.
 
 Output: scratch/periswitch_profile.png + printed rate ratios per distance bin.
 """
@@ -29,6 +29,9 @@ import statsmodels.api as sm
 from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -61,19 +64,19 @@ def _signed_dist_to_switch(is_switch: np.ndarray) -> np.ndarray:
 
 def prep(stop: pd.DataFrame) -> pd.DataFrame:
     df = stop.copy()
-    df = df[(df["immobility_time"] > 0) & df["current_patch"].notna()
-            & df["current_arm"].notna()].copy()
+    df = df[(df["immobility_duration_s"] > 0) & df["current_patch"].notna()
+            & df["occupancy_well_arm"].notna()].copy()
     df["session"] = (
-        df["animal"].astype(str) + df["day"].astype(str) + "_" + df["epoch"].astype(str)
+        df["animal"].astype(str) + df["session_date"].astype(str) + "_" + df["epoch"].astype(str)
     )
-    df["after_omission"] = df["is_after_omission"].astype(float).fillna(0).astype(int)
-    df["log_off"] = np.log(df["immobility_time"].to_numpy(dtype=float))
+    df["after_omission"] = (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
+    df["log_off"] = np.log(df["immobility_duration_s"].to_numpy(dtype=float))
     # Global order by (session, time) so positional indices line up per group.
     df = df.sort_values(["session", "stop_start"]).reset_index(drop=True)
 
     dist = np.empty(len(df), dtype=np.int64)
     for _, g in df.groupby("session", sort=False):
-        arm = g["current_arm"].to_numpy()
+        arm = g["occupancy_well_arm"].to_numpy()
         patch = g["current_patch"].to_numpy()
         new_trial = np.r_[True, arm[1:] != arm[:-1]]
         trial = np.cumsum(new_trial) - 1  # per-stop trial index
@@ -89,7 +92,9 @@ def prep(stop: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    df = prep(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    df = prep(stop)
     logging.info("%d stops, %d sessions", len(df), df["session"].nunique())
     print("stops per distance bin:")
     print(df["bin"].value_counts().to_string())

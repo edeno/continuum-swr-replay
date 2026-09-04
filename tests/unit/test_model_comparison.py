@@ -23,7 +23,7 @@ def _make_comparison_df(daic_values):
     return pd.DataFrame(
         {
             "animal": ["a"] * n,
-            "day": list(range(n)),
+            "session_date": list(range(n)),
             "epoch": ["02_r1"] * n,
             "delta_aic": daic_values,
             "delta_bic": daic_values,
@@ -39,7 +39,7 @@ def _make_fit_results(*, ll, aic, bic, n_params, n_events=100, n_sessions=1, ll_
     return pd.DataFrame(
         {
             "animal": ["a"] * n_sessions,
-            "day": list(range(n_sessions)),
+            "session_date": list(range(n_sessions)),
             "epoch": ["02_r1"] * n_sessions,
             ll_col: [ll] * n_sessions,
             "aic": [aic] * n_sessions,
@@ -120,7 +120,7 @@ class TestCompareNestedModels:
         parent = pd.DataFrame(
             {
                 "animal": ["a", "a"],
-                "day": [1, 2],
+                "session_date": [1, 2],
                 "epoch": ["02_r1", "02_r1"],
                 "llf": [-50, -55],
                 "aic": [100, 110],
@@ -132,7 +132,7 @@ class TestCompareNestedModels:
         child = pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "llf": [-44],
                 "aic": [90],
@@ -143,7 +143,7 @@ class TestCompareNestedModels:
         )
         cmp = compare_nested_models(parent, child)
         assert len(cmp) == 1
-        assert cmp.iloc[0]["day"] == 1
+        assert cmp.iloc[0]["session_date"] == 1
 
 
 # ── summarize_comparison ──
@@ -186,7 +186,7 @@ class TestSummarizeComparison:
         df = pd.DataFrame(
             {
                 "animal": ["a"] * 5,
-                "day": list(range(5)),
+                "session_date": list(range(5)),
                 "epoch": ["02_r1"] * 5,
                 "delta_aic": [1.0] * 5,
                 "delta_bic": [1.0] * 5,

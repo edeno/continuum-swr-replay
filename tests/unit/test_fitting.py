@@ -39,14 +39,14 @@ def _make_long_df(event_arm_counts, predictor_values=None):
         for arm, count in enumerate(counts):
             row = {
                 "event_id": ev + 1,
-                "arm": arm,
+                "candidate_arm": arm,
                 "arm_count_hard": count,
-                "is_prev": 1.0 if arm == 0 else 0.0,
+                "is_prev_arm": 1.0 if arm == 0 else 0.0,
             }
             rows.append(row)
     df = pd.DataFrame(rows)
     if predictor_values is not None:
-        df["is_prev"] = np.asarray(predictor_values).ravel()
+        df["is_prev_arm"] = np.asarray(predictor_values).ravel()
     return df
 
 
@@ -65,7 +65,7 @@ def test_fit_conditional_logit_filters_zero_count_events():
             [4, 1, 0],  # event 6
         ]
     )
-    result = fit_conditional_logit(long_df, predictors=["is_prev"])
+    result = fit_conditional_logit(long_df, predictors=["is_prev_arm"])
     assert result is not None, "logit fit returned None on valid input"
     assert result["n_events"] == 5, (
         f"zero-count event not filtered: n_events={result['n_events']} "
@@ -86,7 +86,7 @@ def test_fit_conditional_poisson_filters_zero_count_events():
             [4, 1, 0],
         ]
     )
-    result = fit_conditional_poisson(long_df, predictors=["is_prev"])
+    result = fit_conditional_poisson(long_df, predictors=["is_prev_arm"])
     assert result is not None
     assert result["n_events"] == 5
 
@@ -109,7 +109,7 @@ def test_null_model_filters_zero_count_events_like_non_null_model():
         ]
     )
     null = fit_conditional_poisson(long_df, predictors=[], n_categories=3)
-    child = fit_conditional_poisson(long_df, predictors=["is_prev"], n_categories=3)
+    child = fit_conditional_poisson(long_df, predictors=["is_prev_arm"], n_categories=3)
     assert null["n_events"] == child["n_events"] == 5
     assert null["n_rows"] == 15
 
@@ -163,7 +163,7 @@ def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
 
     monkeypatch.setattr(fitting_mod, "ConditionalLogit", FakeConditionalLogit)
 
-    result = fit_conditional_logit(long_df, predictors=["is_prev"])
+    result = fit_conditional_logit(long_df, predictors=["is_prev_arm"])
     assert result is not None
     event1_y = captured["y"][captured["groups"] == 1]
     # Event 1 rows are ordered arm 1, arm 0, arm 2. Lowest-arm tie-break
@@ -179,14 +179,14 @@ def test_rank_deficient_design_is_rejected():
     # 6 events, 3 arms; arm 0 carries the count so the dominant-arm logit
     # is well defined; all events non-zero count.
     long_df = _make_long_df([[3, 1, 1]] * 6)
-    long_df["is_prev_dup"] = long_df["is_prev"]  # exact duplicate -> rank 1 of 2
+    long_df["is_prev_dup"] = long_df["is_prev_arm"]  # exact duplicate -> rank 1 of 2
 
-    preds = ["is_prev", "is_prev_dup"]
+    preds = ["is_prev_arm", "is_prev_dup"]
     assert fit_conditional_poisson(long_df, predictors=preds) is None
     assert fit_conditional_logit(long_df, predictors=preds) is None
 
     # Sanity: the single non-duplicated predictor is full-rank and fits.
-    assert fit_conditional_poisson(long_df, predictors=["is_prev"]) is not None
+    assert fit_conditional_poisson(long_df, predictors=["is_prev_arm"]) is not None
 
 
 def test_within_group_constant_predictor_is_rejected():

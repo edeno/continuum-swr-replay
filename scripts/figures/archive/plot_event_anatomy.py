@@ -117,13 +117,13 @@ ax.invert_yaxis()
 legend_elements = [
     mpatches.Patch(facecolor="gold", edgecolor="black", label="replay_here = 1 (modal arm)"),
     plt.Line2D([0], [0], marker="o", color="w", markeredgecolor="#1b9e77",
-               markeredgewidth=2.5, markersize=10, markerfacecolor="none", label="is_current"),
+               markeredgewidth=2.5, markersize=10, markerfacecolor="none", label="is_current_arm"),
     plt.Line2D([0], [0], marker="^", color="w", markeredgecolor="#7570b3",
-               markeredgewidth=1.5, markersize=8, markerfacecolor="none", label="is_prev"),
+               markeredgewidth=1.5, markersize=8, markerfacecolor="none", label="is_prev_arm"),
     plt.Line2D([0], [0], marker="v", color="w", markeredgecolor="#d95f02",
-               markeredgewidth=1.5, markersize=8, markerfacecolor="none", label="is_next"),
+               markeredgewidth=1.5, markersize=8, markerfacecolor="none", label="is_next_arm"),
     plt.Line2D([0], [0], marker="*", color="#e7298a", markersize=10,
-               linestyle="none", label="is_last_rewarded"),
+               linestyle="none", label="is_last_rewarded_arm"),
 ]
 for pid, col in PATCH_COLORS.items():
     legend_elements.append(
@@ -143,8 +143,8 @@ bar_width = 0.35
 x_pos = np.arange(len(ALL_ARMS))
 
 # visit_recency (cap at 50 for display)
-vr = focus_long["visit_recency"].clip(upper=50).values
-cr = focus_long["cumulative_reward"].values
+vr = focus_long["visit_recency_trials"].clip(upper=50).values
+cr = focus_long["reward_count_candidate_arm_last10_known_trials"].values
 
 bars1 = ax.bar(x_pos - bar_width / 2, vr, bar_width, color="#4e79a7",
                alpha=0.7, label="visit_recency (trials ago, capped at 50)")
@@ -201,7 +201,7 @@ ax.axvspan(target - 2.5, target + 2.5, alpha=0.1, color="gold",
 ax.axvline(target, color="gold", linewidth=1.5, linestyle="--", alpha=0.6)
 
 # Mark switch and omission events
-if "is_after_switch" in long_window.columns:
+if "did_last_completed_trip_switch_patch" in long_window.columns:
     switches = long_window[long_window.is_after_switch == 1.0]
     if len(switches) > 0:
         ax.plot(switches.non_local_event.values,

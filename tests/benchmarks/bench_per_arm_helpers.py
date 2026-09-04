@@ -51,10 +51,12 @@ def _run_scalar(func, event_times, trials, track_graph):
 def main():
     from continuum_swr_replay.analysis.replay._helpers import (
         build_well_to_arm_map,
-        cumulative_reward_all_events,
-        cumulative_reward_per_arm,
+    )
+    from continuum_swr_replay.analysis.replay.covariates import (
         recent_reward_rate_all_events,
         recent_reward_rate_per_arm,
+        rolling_reward_count_all_events,
+        rolling_reward_count_per_arm,
         visit_recency_all_events,
         visit_recency_per_arm,
     )
@@ -66,9 +68,9 @@ def main():
     w2a = build_well_to_arm_map(graph)
 
     funcs = [
-        ("visit_recency", visit_recency_per_arm, visit_recency_all_events),
-        ("cumulative_reward", cumulative_reward_per_arm, cumulative_reward_all_events),
-        ("reward_rate_arm_k10", recent_reward_rate_per_arm, recent_reward_rate_all_events),
+        ("visit_recency_trials", visit_recency_per_arm, visit_recency_all_events),
+        ("reward_count_candidate_arm_last10_known_trials", rolling_reward_count_per_arm, rolling_reward_count_all_events),
+        ("reward_fraction_candidate_arm_last10_visits", recent_reward_rate_per_arm, recent_reward_rate_all_events),
     ]
 
     for name, scalar_fn, batch_fn in funcs:

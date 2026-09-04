@@ -13,11 +13,11 @@ one-row-per-(outcome, model, session) table mirroring the arm/patch
 The response is fit on four per-stop count outcomes (tagged by ``outcome``),
 all read directly from the canonical ``stop_table`` columns:
 
-- ``swr``              -> ``n_SWR``              : detected ripples (LFP) — the
+- ``swr``              -> ``n_swr_events``              : detected ripples (LFP) — the
                                                   Ambrose-2016 positive control.
-- ``non_local``        -> ``n_non_local``        : all non-local decoding events.
-- ``non_local_swr``    -> ``n_non_local_SWR``    : non-local events overlapping a SWR.
-- ``non_local_no_swr`` -> ``n_non_local_no_SWR`` : non-local events without a SWR.
+- ``non_local``        -> ``n_selected_events``        : all non-local decoding events.
+- ``non_local_swr``    -> ``n_nonlocal_swr_events``    : non-local events overlapping a SWR.
+- ``non_local_no_swr`` -> ``n_nonlocal_non_swr_events`` : non-local events without a SWR.
 
 Fitting each MODEL_PER_STOP_RATE model on each outcome is an outcome *variant* of the specs,
 not a new model. Replicates the canonical SWR-rate-vs-reward result (reward /
@@ -38,6 +38,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -51,12 +54,13 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
 RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
@@ -97,7 +101,7 @@ def fit_per_stop_rate_hierarchy(
                 a["n_in"] += len(group)
                 avail = [
                     c
-                    for c in (response_col, "immobility_time", *preds)
+                    for c in (response_col, "immobility_duration_s", *preds)
                     if c in group.columns
                 ]
                 bad = (
@@ -105,8 +109,8 @@ def fit_per_stop_rate_hierarchy(
                     if avail
                     else pd.Series(False, index=group.index)
                 )
-                if "immobility_time" in group.columns:
-                    bad = bad | (group["immobility_time"] <= 0)
+                if "immobility_duration_s" in group.columns:
+                    bad = bad | (group["immobility_duration_s"] <= 0)
                 a["n_own"] += int(bad.sum())
 
                 res = fit_per_stop_rate_model(group, preds, response_col=response_col)
@@ -153,22 +157,24 @@ def fit_per_stop_rate_hierarchy(
 
 
 def main() -> None:
-    # Causal-hygiene gate: R1/R2 now use reward_lag1 (past-only), so the
+    # Causal-hygiene gate: R1/R2 now use known_reward_outcome_lag_1 (past-only), so the
     # per-stop ladder is pre-outcome throughout; a future leak fails loud.
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
 
     stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
     missing = [c for c in RESPONSE_COLS.values() if c not in stop.columns]
     if missing:
         raise SystemExit(
             f"stop_table missing outcome columns {missing}; "
             "regenerate it first (scripts/decoding/regenerate_stop_table.py)."
         )
-    lag_cols = [f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)]
+    lag_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)]
     if any(c not in stop.columns for c in lag_cols):
         logger.warning(
-            "stop_table lacks reward_lag columns — the Rlag model will be SKIPPED "
+            "stop_table lacks canonical known-outcome lag columns — the Rlag "
+            "model will be SKIPPED "
             "(every session returns None). Regenerate the stop_table first."
         )
     logger.info(

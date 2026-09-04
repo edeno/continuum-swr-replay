@@ -8,8 +8,10 @@ patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
 
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,
-is_swr) enter ONLY as interactions with arm-features (``:is_current``). Per-arm
-covariates (``reward_rate_arm_k10``, ``q_arm``, ``is_last_rewarded_elsewhere``)
+SWR status) enter ONLY as interactions with arm features. Per-arm covariates
+(``reward_fraction_candidate_arm_last10_visits``,
+``reward_belief_mean_candidate_arm_preoutcome``,
+``is_last_rewarded_noncurrent_arm``)
 enter as main effects.
 
 Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
@@ -27,7 +29,8 @@ The Wilcoxon signed-rank across sessions is reported as a **descriptive** consis
 statistic ONLY — sessions within an animal are not independent, so it is not a valid
 population p-value — with a Benjamini-Hochberg FDR across the rung family per population.
 ``typical_session_se`` is the median within-session SE, not the aggregate's uncertainty.
-Per-arm value uses the beta-bernoulli construct (``q_arm``). A provenance sidecar (git hash,
+Per-arm value uses the beta-bernoulli construct
+(``reward_belief_mean_candidate_arm_preoutcome``). A provenance sidecar (git hash,
 params) is written. DEFERRED follow-ups (in the provenance): the **hierarchical Poisson
 with animal random effects** that would replace the descriptive session signed-rank with
 rigorous population inference; a common complete-case cohort; and within-group-centered
@@ -53,7 +56,6 @@ from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
-    add_uncertainty_covariates,
 )
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     QVALS_GAP_COLS,
@@ -66,9 +68,13 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     specs_from_ladder,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
@@ -93,6 +99,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
     load_reference,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 # Quasi-separated coefficients legitimately overflow exp() when rate ratios are formed
@@ -105,19 +112,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 MIN_EVENTS = 18
 
 
 # event-level scalars z-scored (so :is_current coefs are per-SD & comparable)
 _ZSCALARS = [
-    "rpe",
-    "switch_advantage_mu_preoutcome_sess",
-    "beta_reward_entropy",
-    "global_mu_update_abs_postoutcome_sess",
-    "trials_since_switch",
+    "rpe_postoutcome",
+    "relative_value_switch_minus_stay_preoutcome",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+    "periswitch_index_trials",
     "trials_since_block_change",
-    "recent_switch_rate",
+    "patch_switch_fraction_last5_completed_trips",
 ]
 
 
@@ -128,6 +135,7 @@ def _z(x: np.ndarray) -> np.ndarray:
 
 def _assemble_arm() -> pd.DataFrame:
     ev = read_table(RC / "event_arm_table.pkl")
+    require_covariate_schema(ev, table="event_arm")
     reference_path = RC / "standardization_reference.json"
     if not reference_path.exists():
         raise FileNotFoundError(
@@ -137,7 +145,7 @@ def _assemble_arm() -> pd.DataFrame:
     try:
         assert_standardized_matches_reference(
             ev,
-            ("arm_uncertainty",),
+            ("reward_belief_variance_candidate_arm_preoutcome",),
             load_reference(reference_path),
             support_label="leaf_arms",
         )
@@ -148,21 +156,24 @@ def _assemble_arm() -> pd.DataFrame:
             f"reference before fitting: {exc}"
         ) from exc
     add_arm_fixed_effects(ev)
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    stop = add_uncertainty_covariates(stop)
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    require_covariate_schema(q, table="qvals")
     ev = ev.merge(
-        stop[["stop_id", "reward_lag1", "recent_switch_rate"]], on="stop_id", how="left"
+        stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left"
     )
     ev = ev.merge(
         q[
             [
                 "stop_id",
-                "rpe",
-                "switch_advantage_mu_preoutcome_sess",
-                "beta_reward_entropy",
-                "global_mu_update_abs_postoutcome_sess",
-                "trials_since_switch",
-                "is_post_switch",
+                "rpe_postoutcome",
+                "relative_value_switch_minus_stay_preoutcome",
+                "reward_belief_differential_entropy_leaf_mean_preoutcome",
+                "reward_belief_mean_update_l1_all_ports_postoutcome",
+                "periswitch_index_trials",
+                "is_periswitch_post",
                 "trials_since_block_change",
             ]
         ],
@@ -171,63 +182,100 @@ def _assemble_arm() -> pd.DataFrame:
     )
     for c in _ZSCALARS:
         ev[c + "_z"] = _z(ev[c].to_numpy(dtype=float))
-    cur = ev["is_current"].to_numpy(dtype=float)
+    cur = ev["is_current_arm"].to_numpy(dtype=float)
     swr = ev["is_swr"].to_numpy(dtype=float)
-    # state-modulation interactions (event-scalar_z : is_current)
-    ev["rpe_x_current"] = cur * ev["rpe_z"]
-    ev["relval_x_current"] = cur * ev["switch_advantage_mu_preoutcome_sess_z"]
-    ev["entropy_x_current"] = cur * ev["beta_reward_entropy_z"]
-    ev["update_x_current"] = cur * ev["global_mu_update_abs_postoutcome_sess_z"]
+    # State-modulation interactions spell out both canonical factors.
+    ev["rpe_postoutcome_z_x_is_current_arm"] = cur * ev["rpe_postoutcome_z"]
+    ev["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"] = cur * ev[
+        "relative_value_switch_minus_stay_preoutcome_z"
+    ]
+    ev[
+        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"
+    ] = cur * ev[
+        "reward_belief_differential_entropy_leaf_mean_preoutcome_z"
+    ]
+    ev[
+        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"
+    ] = cur * ev[
+        "reward_belief_mean_update_l1_all_ports_postoutcome_z"
+    ]
     # context interactions
-    ev["tss_x_current"] = cur * ev["trials_since_switch_z"]
-    ev["postsw_x_current"] = cur * ev["is_post_switch"].to_numpy(dtype=float)
-    ev["tsspostsw_x_current"] = (
-        cur * ev["trials_since_switch_z"] * ev["is_post_switch"].to_numpy(dtype=float)
+    ev["periswitch_index_trials_z_x_is_current_arm"] = (
+        cur * ev["periswitch_index_trials_z"]
     )
-    ev["block_x_current"] = cur * ev["trials_since_block_change_z"]
-    ev["switchrate_x_current"] = cur * ev["recent_switch_rate_z"]
+    ev["is_periswitch_post_x_is_current_arm"] = (
+        cur * ev["is_periswitch_post"].to_numpy(dtype=float)
+    )
+    ev["periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm"] = (
+        cur
+        * ev["periswitch_index_trials_z"]
+        * ev["is_periswitch_post"].to_numpy(dtype=float)
+    )
+    ev["trials_since_block_change_z_x_is_current_arm"] = (
+        cur * ev["trials_since_block_change_z"]
+    )
+    ev["patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"] = cur * ev[
+        "patch_switch_fraction_last5_completed_trips_z"
+    ]
     # within-stop-time duration control (z(log1p t) : is_current)
-    tsc = np.log1p(ev["time_since_stop"].to_numpy(dtype=float))
-    ev["tsc_x_current"] = cur * _z(tsc)
-    # is_swr:q_arm contrast (the one swr_x_* not pre-materialized)
-    ev["swr_x_q_arm"] = swr * ev["q_arm"].to_numpy(dtype=float)
-    # is_swr:arm_uncertainty contrast, on the standardized column (pooled-global
-    # arm_uncertainty_z from the table — raw betadist_var is too small-scale to fit).
-    ev["swr_x_arm_uncertainty_z"] = swr * ev["arm_uncertainty_z"].to_numpy(dtype=float)
+    tsc = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
+    ev["log1p_time_since_stop_start_s_z_x_is_current_arm"] = cur * _z(tsc)
+    # SWR interactions inherit the canonical base-covariate spelling.
+    ev["swr_x_reward_belief_mean_candidate_arm_preoutcome"] = swr * ev[
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ].to_numpy(dtype=float)
+    ev["swr_x_reward_belief_variance_candidate_arm_preoutcome_z"] = swr * ev[
+        "reward_belief_variance_candidate_arm_preoutcome_z"
+    ].to_numpy(dtype=float)
     return ev
 
 
 def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     pt = read_table(RC / "event_patch_table.pkl")
+    require_covariate_schema(pt, table="event_patch")
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
     e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
     pt = pt.merge(e2s, on="event_id", how="left")
     # time_since_stop is event-level (constant across arms/patches within an event);
-    # carry it for the within-stop-time duration control (currentpatch_x_tsc).
-    e2t = arm_ev[["event_id", "time_since_stop"]].drop_duplicates("event_id")
+    # carry it for the within-stop-time duration control.
+    e2t = arm_ev[["event_id", "time_since_stop_start_s"]].drop_duplicates("event_id")
     pt = pt.merge(e2t, on="event_id", how="left")
-    stop = add_uncertainty_covariates(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    stop = add_uncertainty_covariates(stop)
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    pt = pt.merge(stop[["stop_id", "recent_switch_rate"]], on="stop_id", how="left")
-    pt = pt.merge(q[["stop_id", "trials_since_switch"]], on="stop_id", how="left")
-    pt["trials_since_switch_z"] = _z(pt["trials_since_switch"].to_numpy(float))
-    pt["recent_switch_rate_z"] = _z(pt["recent_switch_rate"].to_numpy(float))
+    require_covariate_schema(q, table="qvals")
+    pt = pt.merge(stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left")
+    pt = pt.merge(q[["stop_id", "periswitch_index_trials"]], on="stop_id", how="left")
+    pt["periswitch_index_trials_z"] = _z(
+        pt["periswitch_index_trials"].to_numpy(float)
+    )
+    pt["patch_switch_fraction_last5_completed_trips_z"] = _z(
+        pt["patch_switch_fraction_last5_completed_trips"].to_numpy(float)
+    )
     cp = pt["is_current_patch"].to_numpy(float)
-    lr = pt["is_last_rewarded_patch_elsewhere"].to_numpy(float)
     swr = pt["is_swr"].to_numpy(float)
-    pt["currentpatch_x_tss"] = cp * pt["trials_since_switch_z"]
-    # within-stop-time duration control (z(log1p t) : is_current_patch), the patch
-    # analog of the arm tsc_x_current — used to time-control the SWR patch contrast.
-    pt["currentpatch_x_tsc"] = cp * _z(np.log1p(pt["time_since_stop"].to_numpy(float)))
-    pt["lastrewpatch_x_tss"] = lr * pt["trials_since_switch_z"]
-    pt["currentpatch_x_switchrate"] = cp * pt["recent_switch_rate_z"]
-    pt["swr_x_current_patch"] = swr * cp
-    pt["swr_x_lastrewpatch_tss"] = swr * lr * pt["trials_since_switch_z"]
+    pt["periswitch_index_trials_z_x_is_current_patch"] = (
+        cp * pt["periswitch_index_trials_z"]
+    )
+    # Patch analogue of the arm within-stop-time control.
+    pt["log1p_time_since_stop_start_s_z_x_is_current_patch"] = cp * _z(
+        np.log1p(pt["time_since_stop_start_s"].to_numpy(float))
+    )
+    pt["patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"] = cp * pt[
+        "patch_switch_fraction_last5_completed_trips_z"
+    ]
+    pt["swr_x_is_current_patch"] = swr * cp
     return pt
 
 
 # Event-level columns carried for the cohort-audit drop profile (mechanism A vs B).
-_PROFILE_COLS = ("time_since_stop", "reward_outcome", "q_arm", "switch_advantage_mu_preoutcome_sess")
+_PROFILE_COLS = (
+    "time_since_stop_start_s",
+    "is_rewarded_outcome",
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "relative_value_switch_minus_stay_preoutcome",
+)
 
 
 def _fit_session(
@@ -345,7 +393,7 @@ def _run(
             fit_categories = n_categories
             fit_preds = preds
             if leaf_only:
-                pop_frame = pop_frame[pop_frame["arm"] < LEAF_ONLY_N_CATEGORIES]
+                pop_frame = pop_frame[pop_frame["candidate_arm"] < LEAF_ONLY_N_CATEGORIES]
                 fit_categories = LEAF_ONLY_N_CATEGORIES
                 fit_preds = leaf_only_predictors(preds)
             for keys, g in pop_frame.groupby(SC, sort=False):
@@ -470,24 +518,24 @@ def _fit_z_reference(ev: pd.DataFrame, pt: pd.DataFrame) -> dict:
 
     Every standardization the runner computes has its mean/SD recorded so the run's
     standardized coefficients are reproducible: the arm-cohort event scalars
-    (``_ZSCALARS``), the arm within-stop-time control (``tsc_x_current``), and the
+    (``_ZSCALARS``), the canonical arm within-stop-time interaction, and the
     *separate* patch cohort (``trials_since_switch`` / ``recent_switch_rate`` /
     within-stop time — a different scope than the same-named arm-cohort entries). This
     is the runner's OWN scope, distinct from the persisted-table pooled-global ``_z``,
     and is persisted (not repointed) so no coefficient changes.
     """
     ref = {"arm_event_scalars": _z_reference(ev, _ZSCALARS)}
-    if "time_since_stop" in ev.columns:
+    if "time_since_stop_start_s" in ev.columns:
         ref["arm_within_stop_time"] = {
-            "log1p_time_since_stop": _moment(np.log1p(ev["time_since_stop"].to_numpy(float)))
+            "log1p_time_since_stop": _moment(np.log1p(ev["time_since_stop_start_s"].to_numpy(float)))
         }
     patch = {}
-    for c in ("trials_since_switch", "recent_switch_rate"):
+    for c in ("periswitch_index_trials", "patch_switch_fraction_last5_completed_trips"):
         if c in pt.columns:
             patch[c] = _moment(pt[c].to_numpy(dtype=float))
-    if "time_since_stop" in pt.columns:
+    if "time_since_stop_start_s" in pt.columns:
         patch["log1p_time_since_stop"] = _moment(
-            np.log1p(pt["time_since_stop"].to_numpy(float))
+            np.log1p(pt["time_since_stop_start_s"].to_numpy(float))
         )
     ref["patch_cohort"] = patch
     return ref
@@ -516,7 +564,10 @@ def _provenance(
         "are not independent); primary population evidence is per-animal sign "
         "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
         "per population is applied to the descriptive session signed-rank p.",
-        "q_arm_source": "beta-bernoulli per-arm value (q_arm)",
+        "q_arm_source": (
+            "beta-bernoulli per-arm value "
+            "(reward_belief_mean_candidate_arm_preoutcome)"
+        ),
         "deferred": [
             "mixed conditional logit with animal random effects (the rigorous "
             "population inference; supersedes the descriptive session signed-rank p). "
@@ -615,12 +666,12 @@ def main() -> None:
     # provenance sidecar. SDs are the global (pooled) SD of the raw per-arm covariates.
     sd_arm = {
         c: float(np.nanstd(ev[c].to_numpy(dtype=float)))
-        for c in ("q_arm", "reward_rate_arm_k10", "p_reward_arm")
+        for c in ("reward_belief_mean_candidate_arm_preoutcome", "reward_fraction_candidate_arm_last10_visits", "task_reward_probability_candidate_arm")
         if c in ev.columns
     }
     agg = pd.concat(
         [
-            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "arm", sd_arm),
+            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "candidate_arm", sd_arm),
             _aggregate(patch, PATCH_LADDER, PATCH_KEY_TERM, "patch", {}),
         ],
         ignore_index=True,

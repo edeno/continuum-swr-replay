@@ -30,8 +30,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.data_loaders.utils import get_labels
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
-DEFAULT_EVENT_GROUP_COLS = ("animal", "day", "epoch")
+DEFAULT_EVENT_GROUP_COLS = SESSION_COLUMNS_DAY
 
 
 class EventDefinitionError(ValueError):

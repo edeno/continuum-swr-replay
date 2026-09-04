@@ -49,7 +49,7 @@ def test_freeze_common_cohort_drops_whole_unit_for_nonpositive_offset():
         {
             "stop_id": [1, 2, 2, 3, 4],
             "n_events": [0, 1, 1, 2, 3],
-            "immobility_time": [1.0, 1.0, 0.0, -0.5, 2.0],
+            "immobility_duration_s": [1.0, 1.0, 0.0, -0.5, 2.0],
         }
     )
 
@@ -57,7 +57,7 @@ def test_freeze_common_cohort_drops_whole_unit_for_nonpositive_offset():
         frame,
         unit_col="stop_id",
         required_cols=("n_events",),
-        offset_col="immobility_time",
+        offset_col="immobility_duration_s",
     )
 
     assert tuple(cohort["stop_id"]) == (1, 4)

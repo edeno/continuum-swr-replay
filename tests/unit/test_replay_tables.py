@@ -19,12 +19,53 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 )
 from continuum_swr_replay.analysis.replay.tables import (
     EVENT_ARM_STANDARDIZED_COLS,
-    build_event_arm_table,
     build_event_patch_table,
     build_event_sequence_table,
-    build_event_table,
-    build_stop_table,
 )
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_arm_table as _build_event_arm_table,
+)
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_table as _build_event_table,
+)
+from continuum_swr_replay.analysis.replay.tables import (
+    build_stop_table as _build_stop_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def build_event_table(dot, env, trials, graph, **kwargs):
+    return _build_event_table(
+        dot,
+        env,
+        trials,
+        port_experiences_from_trials(trials, prepend_initial=True),
+        graph,
+        **kwargs,
+    )
+
+
+def build_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    return _build_event_arm_table(
+        event_table,
+        dot,
+        env,
+        trials,
+        port_experiences_from_trials(trials, prepend_initial=True),
+        graph,
+        **kwargs,
+    )
+
+
+def build_stop_table(dot, trials, graph, **kwargs):
+    return _build_stop_table(
+        dot,
+        trials,
+        port_experiences_from_trials(trials, prepend_initial=True),
+        graph,
+        **kwargs,
+    )
+
 
 # ── Fixtures ──
 
@@ -178,10 +219,14 @@ def _location_contract_session():
         {
             "start_time": [1.0, 6.5],
             "goal_arrival_time": [3.0, 8.0],
-            "end_time": [3.0, 8.0],
+            # The first destination dwell lasts until the next departure; the
+            # final dwell lasts through this toy session's last timestamp.
+            "end_time": [6.5, 9.0],
             "from_well": [0, 1],
             "to_well": [1, 2],
             "is_reward": [False, True],
+            "reward_on_time": [np.nan, 8.1],
+            "outcome_known_time": [3.3, 8.1],
             "is_patch_change": [False, True],
         }
     )
@@ -202,48 +247,42 @@ def test_event_and_stop_tables_label_location_without_filtering_events():
     event_patches = build_event_patch_table(events, event_arms)
 
     assert events["non_local_event"].tolist() == [1, 2, 3]
-    assert events["location_state"].tolist() == [
+    assert events["occupancy_state"].tolist() == [
         "in_transit",
         "at_well",
         "mixed",
     ]
     assert events["at_well"].tolist() == [False, True, False]
     np.testing.assert_allclose(
-        events["location_well"], [np.nan, 1.0, np.nan], equal_nan=True
+        events["occupancy_well_id"], [np.nan, 1.0, np.nan], equal_nan=True
     )
     np.testing.assert_allclose(
-        events["location_arm"], [np.nan, 1.0, np.nan], equal_nan=True
+        events["occupancy_well_arm"], [np.nan, 1.0, np.nan], equal_nan=True
     )
-    np.testing.assert_allclose(
-        events["current_arm"], events["location_arm"], equal_nan=True
-    )
-    assert events["physical_arm"].tolist() == [7.0, 1.0, 7.0]
+    assert events["modal_observed_track_segment_id"].tolist() == [7.0, 1.0, 7.0]
     assert (events["nearest_well_distance_cm_max"] == 0.0).all()
-    assert events["time_since_last_port_entry"].dropna().ge(0).all()
-    np.testing.assert_allclose(
-        events["time_since_port_entry"],
-        events["time_since_last_port_entry"],
-        equal_nan=True,
-    )
+    assert events["time_since_last_well_arrival_s"].dropna().ge(0).all()
     mixed_history = event_arms.loc[
-        event_arms["non_local_event"].eq(3) & event_arms["arm"].eq(2)
+        event_arms["non_local_event"].eq(3) & event_arms["candidate_arm"].eq(2)
     ].iloc[0]
     mixed_event = events.loc[events["non_local_event"].eq(3)].iloc[0]
-    assert mixed_event["time_since_last_port_entry"] == pytest.approx(4.8)
-    assert pd.isna(mixed_event["time_since_reward"])
-    assert mixed_history["arm_never_visited"] == 1.0
-    assert mixed_history["visit_recency"] == 2.0
+    assert mixed_event["time_since_last_well_arrival_s"] == pytest.approx(4.8)
+    assert pd.isna(mixed_event["time_since_last_reward_s"])
+    assert mixed_history["is_candidate_arm_never_visited"] == 1.0
+    # Initial origin experience + the first destination are both in history,
+    # so a still-unvisited arm carries the right-censoring value 3.
+    assert mixed_history["visit_recency_trials"] == 3.0
 
     # Each event is its own immobility bout in this fixture, so the stop and
     # event labels should agree exactly and no cohort row is lost.
-    assert stops["location_state"].tolist() == events["location_state"].tolist()
+    assert stops["occupancy_state"].tolist() == events["occupancy_state"].tolist()
     assert stops["at_well"].tolist() == events["at_well"].tolist()
     assert stops["completed_trial_id"].tolist() == [pd.NA, 0, 0]
     np.testing.assert_allclose(
         stops["completed_trial_arm"], [np.nan, 1.0, 1.0], equal_nan=True
     )
     np.testing.assert_allclose(
-        stops["recent_switch_rate"].to_numpy(dtype=float),
+        stops["patch_switch_fraction_last5_completed_trips"].to_numpy(dtype=float),
         [np.nan, 0.0, 0.0],
         equal_nan=True,
     )
@@ -252,11 +291,11 @@ def test_event_and_stop_tables_label_location_without_filtering_events():
         [np.nan, 0.0, 0.0],
         equal_nan=True,
     )
-    assert int(stops["n_events"].sum()) == len(events) == 3
+    assert int(stops["n_selected_events"].sum()) == len(events) == 3
     for table, rows_per_event in ((event_arms, 9), (event_patches, 3)):
         assert len(table) == len(events) * rows_per_event
-        states = table.groupby("event_id", sort=False)["location_state"].first()
-        expected = events.set_index("event_id")["location_state"].reindex(states.index)
+        states = table.groupby("event_id", sort=False)["occupancy_state"].first()
+        expected = events.set_index("event_id")["occupancy_state"].reindex(states.index)
         pd.testing.assert_series_equal(states, expected, check_names=False)
 
 
@@ -303,12 +342,15 @@ def test_physical_trunk_is_kept_separate_from_at_well_location_arm():
     trials = pd.DataFrame(
         {
             "start_time": [0.0],
-            "end_time": [1.0],
+            "goal_arrival_time": [1.0],
+            "end_time": [10.0],
             "from_well": [0],
             "to_well": [3],
             "from_patch": [1],
             "to_patch": [2],
             "is_reward": [True],
+            "reward_on_time": [1.0],
+            "outcome_known_time": [1.0],
             "is_patch_change": [True],
         }
     )
@@ -317,12 +359,9 @@ def test_physical_trunk_is_kept_separate_from_at_well_location_arm():
 
     et = build_event_table(dot, env, trials, graph)
     assert len(et) == 2
-    assert (et["location_state"] == "at_well").all()
-    assert (et["location_arm"] == 3).all()
-    assert (et["current_arm"] == 3).all(), (
-        f"location-arm compatibility alias failed — got {et['current_arm'].tolist()}"
-    )
-    assert (et["physical_arm"] == 7).all()
+    assert (et["occupancy_state"] == "at_well").all()
+    assert (et["occupancy_well_arm"] == 3).all()
+    assert (et["modal_observed_track_segment_id"] == 7).all()
 
 
 def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
@@ -351,7 +390,7 @@ def test_event_arm_table_respects_non_default_event_table_index(tiny_session):
     # Per-event per-arm predictor columns populated for every event.
     # Before the fix these were NaN (or IndexError) for everything
     # past the first session's rows.
-    for col in ("dist_to_arm", "arm_dist_rank"):
+    for col in ("distance_to_candidate_arm_cm", "candidate_arm_distance_rank"):
         # ``dist_to_arm`` is NaN when current_arm is NaN — accept that,
         # but require the number of non-NaN rows to match the baseline.
         assert eat_shifted[col].notna().sum() == eat_baseline[col].notna().sum(), (
@@ -379,15 +418,15 @@ def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_sessi
 
     eat = build_event_arm_table(et, dot, env, trials, graph)
     event_ids = et["event_id"].tolist()
-    first = eat[eat["event_id"] == event_ids[0]].set_index("arm")
-    second = eat[eat["event_id"] == event_ids[1]].set_index("arm")
+    first = eat[eat["event_id"] == event_ids[0]].set_index("candidate_arm")
+    second = eat[eat["event_id"] == event_ids[1]].set_index("candidate_arm")
 
     np.testing.assert_array_equal(
-        first.loc[range(9), "arm_never_visited"].to_numpy(),
-        [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+        first.loc[range(9), "is_candidate_arm_never_visited"].to_numpy(),
+        [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
     )
     np.testing.assert_array_equal(
-        second.loc[range(9), "arm_never_visited"].to_numpy(),
+        second.loc[range(9), "is_candidate_arm_never_visited"].to_numpy(),
         [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
     )
     for frame in (first, second):
@@ -395,20 +434,24 @@ def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_sessi
         # that is zero. Including the never-visited arms -- whose value is
         # the right-censoring fill rather than a measured recency -- would
         # drag the visited arms by an arbitrary amount.
-        novelty = frame.loc[range(6), "arm_never_visited"].to_numpy()
-        demeaned = frame.loc[range(6), "visit_recency_demeaned"].to_numpy()
+        novelty = frame.loc[range(6), "is_candidate_arm_never_visited"].to_numpy()
+        demeaned = frame.loc[
+            range(6), "visit_recency_trials_event_leaf_centered"
+        ].to_numpy()
         assert demeaned[novelty == 0.0].mean() == pytest.approx(0.0)
         # The censored arms stay above every visited arm rather than
         # pulling them negative.
         assert demeaned[novelty == 1.0].min() > demeaned[novelty == 0.0].max()
         np.testing.assert_array_equal(
-            frame.loc[range(6, 9), "visit_recency_demeaned"].to_numpy(),
+            frame.loc[
+                range(6, 9), "visit_recency_trials_event_leaf_centered"
+            ].to_numpy(),
             [0.0, 0.0, 0.0],
         )
         np.testing.assert_array_equal(
-            frame["swr_x_arm_never_visited"].to_numpy(),
+            frame["swr_x_is_candidate_arm_never_visited"].to_numpy(),
             frame["is_swr"].astype(int).to_numpy()
-            * frame["arm_never_visited"].to_numpy(),
+            * frame["is_candidate_arm_never_visited"].to_numpy(),
         )
 
 
@@ -432,7 +475,12 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     eat = build_event_arm_table(et, dot, env, trials, graph)
 
     # value-block columns are emitted (present even without a contingency)
-    for col in ("reward_rate_arm_k10", "p_reward_arm", "q_arm", "arm_uncertainty"):
+    for col in (
+        "reward_fraction_candidate_arm_last10_visits",
+        "task_reward_probability_candidate_arm",
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "reward_belief_variance_candidate_arm_preoutcome",
+    ):
         assert col in eat.columns
 
     # every Mv predictor (bar the fit-time arm fixed effects) resolves
@@ -451,28 +499,37 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     if len(stop_ids):
         cont = pd.DataFrame({"stop_id": stop_ids})
         for i in range(6):
-            cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
-            cont[f"q_port{i}"] = 0.05 * (i + 1)
-            cont[f"betadist_var{i + 1}"] = 0.01 * (i + 1)  # beta variance (1-indexed)
+            cont[f"task_reward_probability_port_{i}"] = 0.1 * (i + 1)
+            cont[f"reward_belief_mean_port_{i}"] = 0.05 * (i + 1)
+            cont[f"reward_belief_variance_port_{i}"] = 0.01 * (i + 1)
         eat_c = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
         present = eat_c["stop_id"].isin(stop_ids)
-        leaf = present & (eat_c["arm"] < 6)
-        arm_j = eat_c.loc[leaf, "arm"].to_numpy()
+        leaf = present & (eat_c["candidate_arm"] < 6)
+        arm_j = eat_c.loc[leaf, "candidate_arm"].to_numpy()
         np.testing.assert_allclose(
-            eat_c.loc[leaf, "p_reward_arm"].to_numpy(), 0.1 * (arm_j + 1)
+            eat_c.loc[leaf, "task_reward_probability_candidate_arm"].to_numpy(),
+            0.1 * (arm_j + 1),
         )
         np.testing.assert_allclose(
-            eat_c.loc[leaf, "q_arm"].to_numpy(), 0.05 * (arm_j + 1)
+            eat_c.loc[leaf, "reward_belief_mean_candidate_arm_preoutcome"].to_numpy(),
+            0.05 * (arm_j + 1),
         )
         # arm_uncertainty routes leaf arm j to betadist_var{j+1} (variance counterpart)
         np.testing.assert_allclose(
-            eat_c.loc[leaf, "arm_uncertainty"].to_numpy(), 0.01 * (arm_j + 1)
+            eat_c.loc[
+                leaf, "reward_belief_variance_candidate_arm_preoutcome"
+            ].to_numpy(),
+            0.01 * (arm_j + 1),
         )
         # trunk arms (6-8) are not reward sites -> structural 0.0 for a present stop
-        trunk = present & (eat_c["arm"] >= 6)
-        assert (eat_c.loc[trunk, "p_reward_arm"] == 0.0).all()
-        assert (eat_c.loc[trunk, "q_arm"] == 0.0).all()
-        assert (eat_c.loc[trunk, "arm_uncertainty"] == 0.0).all()
+        trunk = present & (eat_c["candidate_arm"] >= 6)
+        assert (eat_c.loc[trunk, "task_reward_probability_candidate_arm"] == 0.0).all()
+        assert (
+            eat_c.loc[trunk, "reward_belief_mean_candidate_arm_preoutcome"] == 0.0
+        ).all()
+        assert (
+            eat_c.loc[trunk, "reward_belief_variance_candidate_arm_preoutcome"] == 0.0
+        ).all()
 
 
 def test_value_block_absent_stop_drops_all_arms(tiny_session):
@@ -488,18 +545,20 @@ def test_value_block_absent_stop_drops_all_arms(tiny_session):
     covered = stop_ids[: max(1, len(stop_ids) // 2)]  # contingency covers only some
     cont = pd.DataFrame({"stop_id": covered})
     for i in range(6):
-        cont[f"p_reward_port{i}"] = 0.1 * (i + 1)
-        cont[f"q_port{i}"] = 0.05 * (i + 1)
-        cont[f"betadist_var{i + 1}"] = 0.01 * (i + 1)
+        cont[f"task_reward_probability_port_{i}"] = 0.1 * (i + 1)
+        cont[f"reward_belief_mean_port_{i}"] = 0.05 * (i + 1)
+        cont[f"reward_belief_variance_port_{i}"] = 0.01 * (i + 1)
     eat = build_event_arm_table(et, dot, env, trials, graph, contingency=cont)
 
     absent = eat[eat["stop_id"].notna() & ~eat["stop_id"].isin(covered)]
     assert len(absent), "fixture produced no absent-stop rows"
-    assert absent["p_reward_arm"].isna().all()  # uniform NaN, not 0.0
-    assert absent["q_arm"].isna().all()
-    assert absent["arm_uncertainty"].isna().all()
-    present_leaf = eat[eat["stop_id"].isin(covered) & (eat["arm"] < 6)]
-    assert present_leaf["p_reward_arm"].notna().all()
+    assert (
+        absent["task_reward_probability_candidate_arm"].isna().all()
+    )  # uniform NaN, not 0.0
+    assert absent["reward_belief_mean_candidate_arm_preoutcome"].isna().all()
+    assert absent["reward_belief_variance_candidate_arm_preoutcome"].isna().all()
+    present_leaf = eat[eat["stop_id"].isin(covered) & (eat["candidate_arm"] < 6)]
+    assert present_leaf["task_reward_probability_candidate_arm"].notna().all()
 
 
 # ── Schema / dtype tests ──
@@ -511,35 +570,68 @@ class TestEventTableSchema:
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         for col in (
             "animal",
-            "day",
+            "session_date",
             "epoch",
             "non_local_event",
             "event_id",
             "stop_idx",
             "stop_id",
-            "event_start",
-            "event_end",
-            "event_duration",
-            "time_since_stop",
+            "event_start_s",
+            "event_end_s",
+            "event_duration_s",
+            "time_since_stop_start_s",
             "is_swr",
             "is_mua",
             "whole_event_speed_eligible",
-            "current_arm",
+            "occupancy_well_arm",
             "prev_arm",
             "next_arm",
             "last_rewarded_arm",
             "n_nonlocal_bins",
-            "nonlocal_weight_sum",
-            "posterior_mass_total",
+            "nonlocal_probability_sum",
             "posterior_peak_mean",
             "posterior_entropy_mean",
-            "posterior_hpd_width_50",
-            "posterior_hpd_width_80",
-            "posterior_hpd_width_95",
-            "n_junction_bins",
+            "posterior_hpd_arm_count_mean_coverage_50pct",
+            "posterior_hpd_arm_count_mean_coverage_80pct",
+            "posterior_hpd_arm_count_mean_coverage_95pct",
+            "n_undecoded_bins",
             "n_unique_arms",
         ):
             assert col in et.columns, f"missing canonical column: {col}"
+
+    def test_posterior_rollups_are_wired_with_valid_values(
+        self, tiny_session_with_posterior
+    ):
+        """Posterior columns carry valid, structurally-consistent values.
+
+        Presence alone would survive a silent swap of the same-typed arrays
+        threaded into ``_attach_posterior_rollups`` (nonlocal_prob / event ids /
+        in-event mask). These value invariants — finite, peak in (0, 1], entropy
+        non-negative, and HPD width monotonically non-decreasing in coverage —
+        catch such a mis-wiring, which presence checks cannot.
+        """
+        dot, env, trials, graph, post = tiny_session_with_posterior
+        et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
+
+        peak = et["posterior_peak_mean"].to_numpy(dtype=float)
+        entropy = et["posterior_entropy_mean"].to_numpy(dtype=float)
+        hpd50 = et["posterior_hpd_arm_count_mean_coverage_50pct"].to_numpy(dtype=float)
+        hpd80 = et["posterior_hpd_arm_count_mean_coverage_80pct"].to_numpy(dtype=float)
+        hpd95 = et["posterior_hpd_arm_count_mean_coverage_95pct"].to_numpy(dtype=float)
+
+        for name, arr in (
+            ("peak", peak),
+            ("entropy", entropy),
+            ("hpd50", hpd50),
+            ("hpd80", hpd80),
+            ("hpd95", hpd95),
+        ):
+            assert np.isfinite(arr).all(), f"{name} has non-finite values: {arr}"
+        assert ((peak > 0.0) & (peak <= 1.0)).all(), peak
+        assert (entropy >= 0.0).all(), entropy
+        # Higher HPD coverage can only widen (or hold) the credible arm set.
+        assert (hpd50 <= hpd80 + 1e-9).all(), (hpd50, hpd80)
+        assert (hpd80 <= hpd95 + 1e-9).all(), (hpd80, hpd95)
 
     def test_bool_columns_are_bool(self, tiny_session):
         dot, env, trials, graph = tiny_session
@@ -726,23 +818,32 @@ class TestEventTableInvariants:
         # Event 1 covers slice(20,30) = 10 bins. Event 2 covers 10 bins.
         np.testing.assert_array_equal(et["n_nonlocal_bins"].to_numpy(), [10, 10])
 
-    def test_nonlocal_weight_sum_equals_sum_of_nonlocal_prob(self, tiny_session):
+    def test_nonlocal_probability_sum_equals_sum_of_nonlocal_prob(self, tiny_session):
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         # Non-Local_Continuous_prob = 0.9 × 10 bins = 9.0 per event.
-        np.testing.assert_allclose(et["nonlocal_weight_sum"].to_numpy(), [9.0, 9.0])
+        np.testing.assert_allclose(
+            et["nonlocal_probability_sum"].to_numpy(), [9.0, 9.0]
+        )
 
-    def test_legacy_and_label_timing_share_one_atomic_window(self, tiny_session):
+    def test_event_timing_uses_one_atomic_window(self, tiny_session):
         dot, env, trials, graph = tiny_session
         event = build_event_table(dot, env, trials, graph)
-
-        for canonical, alias in (
-            ("event_start", "label_event_start"),
-            ("event_end", "label_event_end"),
-            ("event_duration", "label_event_duration"),
-            ("event_midpoint_time", "label_event_midpoint_time"),
-        ):
-            np.testing.assert_array_equal(event[canonical], event[alias])
+        grouped = dot.loc[dot["non_local_event"] > 0].groupby("non_local_event")
+        expected_start = grouped.apply(lambda frame: frame.index.min())
+        expected_end = grouped.apply(lambda frame: frame.index.max())
+        np.testing.assert_array_equal(event["event_start_s"], expected_start)
+        np.testing.assert_array_equal(event["event_end_s"], expected_end)
+        np.testing.assert_allclose(
+            event["event_duration_s"],
+            expected_end - expected_start + 1.0 / 500.0,  # +final-bin width (500 Hz)
+        )
+        assert not {
+            "event_start",
+            "label_event_start",
+            "event_end",
+            "label_event_end",
+        } & set(event.columns)
 
     @pytest.mark.parametrize("external_col", ["SWR_event", "MUA_event"])
     def test_movement_spanning_external_event_is_excluded(
@@ -783,26 +884,28 @@ class TestEventTableInvariants:
 
         stop = build_stop_table(dot, trials, graph)
 
-        count_col = "n_SWR" if external_col == "SWR_event" else "n_MUA"
+        count_col = "n_swr_events" if external_col == "SWR_event" else "n_mua_events"
         assert stop[count_col].sum() == 0
 
     def test_nonlocal_prob_within_unit_interval(self, tiny_session):
         # ``nonlocal_prob`` values in [0, 1]. Exposed here via
-        # ``nonlocal_weight_sum`` / ``n_nonlocal_bins``, which must be
+        # ``nonlocal_probability_sum`` / ``n_nonlocal_bins``, which must be
         # between 0 and 1 when averaged.
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
-        avg = et["nonlocal_weight_sum"] / et["n_nonlocal_bins"]
+        avg = et["nonlocal_probability_sum"] / et["n_nonlocal_bins"]
         assert ((avg >= 0) & (avg <= 1)).all()
 
     def test_hpd_width_monotonic_50_80_95(self, tiny_session_with_posterior):
         dot, env, trials, graph, post = tiny_session_with_posterior
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         assert (
-            et["posterior_hpd_width_50"] <= et["posterior_hpd_width_80"] + 1e-9
+            et["posterior_hpd_arm_count_mean_coverage_50pct"]
+            <= et["posterior_hpd_arm_count_mean_coverage_80pct"] + 1e-9
         ).all()
         assert (
-            et["posterior_hpd_width_80"] <= et["posterior_hpd_width_95"] + 1e-9
+            et["posterior_hpd_arm_count_mean_coverage_80pct"]
+            <= et["posterior_hpd_arm_count_mean_coverage_95pct"] + 1e-9
         ).all()
 
     def test_posterior_peak_mean_within_unit_interval(
@@ -819,19 +922,19 @@ class TestEventTableInvariants:
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         assert (et["posterior_entropy_mean"] >= 0).all()
 
-    def test_posterior_mass_total_equals_nonlocal_weight_sum(
+    def test_nonlocal_probability_sum_is_preserved_with_posterior(
         self, tiny_session_with_posterior
     ):
         """Under the renormalize convention in
         :func:`summaries.posterior_to_arm_marginal`, junction mass is
-        redistributed over real arms so ``posterior_mass_total`` and
-        ``nonlocal_weight_sum`` must be identical.
+        redistributed over real arms, and the stored event total remains the
+        canonical non-local probability sum.
         """
         dot, env, trials, graph, post = tiny_session_with_posterior
         et = build_event_table(dot, env, trials, graph, conditional_posterior=post)
         np.testing.assert_allclose(
-            et["posterior_mass_total"].to_numpy(),
-            et["nonlocal_weight_sum"].to_numpy(),
+            et["nonlocal_probability_sum"].to_numpy(),
+            [9.0, 9.0],
             atol=1e-12,
         )
 
@@ -876,7 +979,7 @@ class TestEventArmTableInvariants:
         )
         sum_hard = eat.groupby("event_id")["arm_count_hard"].sum()
         n_bins = et.set_index("event_id")["n_nonlocal_bins"].loc[sum_hard.index]
-        n_junc = et.set_index("event_id")["n_junction_bins"].loc[sum_hard.index]
+        n_junc = et.set_index("event_id")["n_undecoded_bins"].loc[sum_hard.index]
         np.testing.assert_array_equal(sum_hard.to_numpy(), (n_bins - n_junc).to_numpy())
 
     def test_arm_fraction_sums_to_1_when_no_junction_bins(self, tiny_session):
@@ -885,7 +988,7 @@ class TestEventArmTableInvariants:
         eat = build_event_arm_table(et, dot, env, trials, graph)
         # Our synthetic ``map_estimate`` always lands on a real arm,
         # so n_junction_bins is 0 and arm_fraction sums to exactly 1.
-        assert (et["n_junction_bins"] == 0).all()
+        assert (et["n_undecoded_bins"] == 0).all()
         frac_sum = eat.groupby("event_id")["arm_fraction"].sum()
         np.testing.assert_allclose(frac_sum.to_numpy(), 1.0, atol=1e-12)
 
@@ -908,7 +1011,7 @@ class TestEventArmTableInvariants:
 
         # Event 1 now has junction bins; event 2 does not.
         ev1 = et[et["non_local_event"] == 1].iloc[0]
-        assert ev1["n_junction_bins"] == 5
+        assert ev1["n_undecoded_bins"] == 5
         assert ev1["n_nonlocal_bins"] == 10
 
         frac_sum = eat.groupby("non_local_event")["arm_fraction"].sum()
@@ -931,7 +1034,7 @@ class TestEventArmTableInvariants:
         event_2_sum = eat[eat["non_local_event"] == 2]["arm_fraction"].sum()
         assert np.isclose(event_2_sum, 1.0)
 
-    def test_sum_arm_posterior_mass_equals_posterior_mass_total(
+    def test_sum_arm_posterior_mass_equals_nonlocal_probability_sum(
         self, tiny_session_with_posterior
     ):
         dot, env, trials, graph, post = tiny_session_with_posterior
@@ -940,7 +1043,7 @@ class TestEventArmTableInvariants:
             et, dot, env, trials, graph, conditional_posterior=post
         )
         sum_mass = eat.groupby("event_id")["arm_posterior_mass"].sum()
-        pmt = et.set_index("event_id")["posterior_mass_total"].loc[sum_mass.index]
+        pmt = et.set_index("event_id")["nonlocal_probability_sum"].loc[sum_mass.index]
         np.testing.assert_allclose(sum_mass.to_numpy(), pmt.to_numpy(), atol=1e-10)
 
     def test_is_current_indicator_is_valid(self, tiny_session):
@@ -950,7 +1053,7 @@ class TestEventArmTableInvariants:
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
-        assert eat["is_current"].isna().all()
+        assert eat["is_current_arm"].isna().all()
 
     def test_is_current_is_one_hot_at_well_and_missing_off_well(self):
         """``is_current`` is defined only where the animal's location is.
@@ -963,28 +1066,30 @@ class TestEventArmTableInvariants:
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
 
-        state = et.set_index("event_id")["location_state"].to_dict()
+        state = et.set_index("event_id")["occupancy_state"].to_dict()
         by_event = dict(eat.groupby("event_id").__iter__())
         assert len(by_event) == 3
 
         seen = set()
         for event_id, g in by_event.items():
-            ic = g["is_current"].to_numpy(dtype=float)
+            ic = g["is_current_arm"].to_numpy(dtype=float)
             seen.add(state[event_id])
             if state[event_id] == "at_well":
                 # Well 1 is degree-1, so it touches exactly arm 1.
                 assert np.isfinite(ic).all()
                 assert ic.sum() == 1.0
-                assert g.loc[g["is_current"] == 1.0, "arm"].tolist() == [1]
+                assert g.loc[g["is_current_arm"] == 1.0, "candidate_arm"].tolist() == [
+                    1
+                ]
                 # The elsewhere-residual stays defined here.
-                assert g["is_last_rewarded_elsewhere"].notna().all()
+                assert g["is_last_rewarded_noncurrent_arm"].notna().all()
             else:
                 assert np.isnan(ic).all(), (
                     f"{state[event_id]} leaked a numeric is_current"
                 )
-                assert g["is_same_patch"].isna().all()
-                assert g["is_last_rewarded_elsewhere"].isna().all()
-                assert g["swr_x_current"].isna().all()
+                assert g["is_same_patch_as_current"].isna().all()
+                assert g["is_last_rewarded_noncurrent_arm"].isna().all()
+                assert g["swr_x_is_current_arm"].isna().all()
         assert seen == {"in_transit", "at_well", "mixed"}
 
     def test_dist_to_arm_nonnegative_and_rank_1_is_min(self, tiny_session):
@@ -992,12 +1097,15 @@ class TestEventArmTableInvariants:
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
         for _, g in eat.groupby("event_id"):
-            finite = g.dropna(subset=["dist_to_arm"])
+            finite = g.dropna(subset=["distance_to_candidate_arm_cm"])
             if finite.empty:
                 continue
-            assert (finite["dist_to_arm"] >= 0).all()
-            rank_1 = finite[finite["arm_dist_rank"] == 1]
-            assert rank_1["dist_to_arm"].min() == finite["dist_to_arm"].min()
+            assert (finite["distance_to_candidate_arm_cm"] >= 0).all()
+            rank_1 = finite[finite["candidate_arm_distance_rank"] == 1]
+            assert (
+                rank_1["distance_to_candidate_arm_cm"].min()
+                == finite["distance_to_candidate_arm_cm"].min()
+            )
 
     def test_interactions_zero_where_indicator_zero(self, tiny_session):
         dot, env, trials, graph = tiny_session
@@ -1009,9 +1117,9 @@ class TestEventArmTableInvariants:
         # factor; the asymmetric check is enough to catch broadcast
         # drift.
         for prod, indicator_col in (
-            ("time_x_current", "is_current"),
-            ("swr_x_current", "is_current"),
-            ("mua_x_prev", "is_prev"),
+            ("time_since_stop_start_s_x_is_current_arm", "is_current_arm"),
+            ("swr_x_is_current_arm", "is_current_arm"),
+            ("mua_x_is_prev_arm", "is_prev_arm"),
         ):
             p = eat[prod].to_numpy(dtype=float)
             ind = eat[indicator_col].to_numpy(dtype=float)
@@ -1038,42 +1146,34 @@ class TestCrossTable:
         st = build_stop_table(dot, trials, graph)
         assert set(et["stop_id"]).issubset(set(st["stop_id"]))
 
-    def test_stop_table_n_events_matches_event_table_groupby(self, tiny_session):
+    def test_stop_table_selected_event_count_matches_event_table_groupby(
+        self, tiny_session
+    ):
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         st = build_stop_table(dot, trials, graph)
-        # Every stop's ``n_events`` equals the number of event_table
+        # Every stop's selected-event count equals the number of event_table
         # rows for that stop_id.
         from_events = et.groupby("stop_id").size()
-        from_stops = st.set_index("stop_id")["n_events"]
+        from_stops = st.set_index("stop_id")["n_selected_events"]
         joined = from_events.align(from_stops, join="left")[0].fillna(0).astype(int)
         for stop_id, n in joined.items():
             if stop_id in from_stops.index:
                 assert from_stops[stop_id] == n
 
-    def test_sum_n_events_equals_event_table_length(self, tiny_session):
+    def test_sum_selected_events_equals_event_table_length(self, tiny_session):
         dot, env, trials, graph = tiny_session
         et = build_event_table(dot, env, trials, graph)
         st = build_stop_table(dot, trials, graph)
-        assert int(st["n_events"].sum()) == len(et)
+        assert int(st["n_selected_events"].sum()) == len(et)
 
-    def test_n_non_local_is_identical_to_n_events(self, tiny_session):
-        """The two stop-level count columns must never diverge.
-
-        ``n_events`` is the response column the per-stop rate models fit and
-        the only count name the ContFrag stop table carries; ``n_non_local``
-        is the newer repo-wide name. Both are written from the same array,
-        and consumers pick whichever they know
-        (``tables.py`` reads ``out.get("n_non_local", out.get("n_events"))``),
-        so a divergence would silently change which count a model saw. Only
-        ``n_events`` was pinned, so setting ``n_non_local`` to something else
-        passed the whole suite.
-        """
+    def test_stop_table_has_one_selected_event_count(self, tiny_session):
+        """One scientific quantity has one persisted count column."""
         dot, env, trials, graph = tiny_session
         st = build_stop_table(dot, trials, graph)
-        pd.testing.assert_series_equal(
-            st["n_non_local"], st["n_events"], check_names=False
-        )
+        assert "n_selected_events" in st
+        assert "n_events" not in st
+        assert "n_non_local" not in st
 
     def test_event_sequence_row_count_equals_sum_n_nonlocal_bins(
         self, tiny_session_with_posterior
@@ -1187,14 +1287,14 @@ class TestTrajectoryRollupWiring:
         np.testing.assert_allclose(et["theta_z"], 0.5)  # from theta_power_zscore
         np.testing.assert_allclose(et["hpd_coverage_cm"], 12.0)
         # compression_factor = median(map_speed) / run_speed_baseline = 5/50
-        np.testing.assert_allclose(et["replay_speed_median"], 5.0)
+        np.testing.assert_allclose(et["replay_speed_median_cm_s"], 5.0)
         np.testing.assert_allclose(et["compression_factor"], 0.1)
         # each event sits on a single leaf arm -> one patch, terminates at well
         np.testing.assert_array_equal(et["n_patches_visited"], [1, 1])
         np.testing.assert_array_equal(et["crosses_trunk"], [False, False])
         np.testing.assert_array_equal(et["terminates_at_well"], [True, True])
         # path_length is the sum of the (constant 1.0) step_distance over bins
-        assert (et["path_length"] > 0).all()
+        assert (et["path_length_cm"] > 0).all()
 
     def test_unaugmented_dot_emits_nan_trajectory_columns(self):
         """A pre-augmentation dot still yields the columns, as NaN."""
@@ -1215,7 +1315,7 @@ class TestTrajectoryRollupWiring:
         et = build_event_table(dot, env, trials, _bandit_graph())
         for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
             assert col in et.columns
-        assert et["path_length"].isna().all()
+        assert et["path_length_cm"].isna().all()
         assert et["ripple_power_z"].isna().all()
 
 
@@ -1241,10 +1341,9 @@ class TestMutationSurvivorGuards:
         stops = build_stop_table(dot, trials, graph)
         defined = stops["is_stay"].notna()
         assert defined.any(), "fixture must produce at least one defined is_stay"
-        same_patch = (
-            stops.loc[defined, "current_patch"].to_numpy(dtype=float)
-            == stops.loc[defined, "next_patch"].to_numpy(dtype=float)
-        )
+        same_patch = stops.loc[defined, "current_patch"].to_numpy(
+            dtype=float
+        ) == stops.loc[defined, "next_patch"].to_numpy(dtype=float)
         np.testing.assert_array_equal(
             stops.loc[defined, "is_stay"].to_numpy(dtype=float),
             same_patch.astype(float),
@@ -1267,7 +1366,7 @@ class TestMutationSurvivorGuards:
         assert len(differing), "fixture must contain prev_arm != next_arm"
         for event_id, row in differing.iterrows():
             g = eat[eat["event_id"] == event_id]
-            marked = g.loc[g["is_prev"] == 1.0, "arm"].tolist()
+            marked = g.loc[g["is_prev_arm"] == 1.0, "candidate_arm"].tolist()
             assert marked == [int(row["prev_arm"])], (
                 f"is_prev marked {marked}, expected prev_arm {row['prev_arm']}"
             )
@@ -1294,16 +1393,18 @@ class TestMutationSurvivorGuards:
         et = build_event_table(dot, env, trials, graph)
         eat = build_event_arm_table(et, dot, env, trials, graph)
 
-        current = eat["is_current"].to_numpy(dtype=float)
-        last_rew = eat["is_last_rewarded"].to_numpy(dtype=float)
+        current = eat["is_current_arm"].to_numpy(dtype=float)
+        last_rew = eat["is_last_rewarded_arm"].to_numpy(dtype=float)
         assert ((current == 1.0) & (last_rew == 1.0)).any(), (
             "fixture has no row where the current arm is also the last "
             "rewarded arm; the test would pass against an inverted factor"
         )
-        both = (eat["is_current"] == 1.0) & (eat["is_last_rewarded_elsewhere"] == 1.0)
+        both = (eat["is_current_arm"] == 1.0) & (
+            eat["is_last_rewarded_noncurrent_arm"] == 1.0
+        )
         assert not both.any(), "elsewhere overlaps the current arm"
         np.testing.assert_allclose(
-            eat["is_last_rewarded_elsewhere"].to_numpy(dtype=float),
+            eat["is_last_rewarded_noncurrent_arm"].to_numpy(dtype=float),
             last_rew * (1.0 - current),
             equal_nan=True,
         )
@@ -1327,14 +1428,14 @@ class TestMutationSurvivorGuards:
 
         swr = eat["is_swr"].astype(float).to_numpy()
         mua = eat["is_mua"].astype(float).to_numpy()
-        base = eat["is_current"].to_numpy(dtype=float)
+        base = eat["is_current_arm"].to_numpy(dtype=float)
         discriminating = (swr != mua) & np.isfinite(base) & (base != 0.0)
         assert discriminating.any(), (
             "fixture cannot distinguish is_swr from is_mua; the test would "
             "pass against a swapped gate"
         )
         np.testing.assert_allclose(
-            eat["swr_x_current"].to_numpy(dtype=float),
+            eat["swr_x_is_current_arm"].to_numpy(dtype=float),
             swr * base,
             equal_nan=True,
         )
@@ -1343,7 +1444,7 @@ class TestMutationSurvivorGuards:
         """Anchoring on ``stop_end`` lets the covariate see trials that
         resolved *during* the bout -- a future leak on ~3.6% of real stops.
         """
-        from continuum_swr_replay.analysis.replay._helpers import (
+        from continuum_swr_replay.analysis.replay.covariates import (
             recent_trial_reward_rate,
         )
 
@@ -1351,10 +1452,11 @@ class TestMutationSurvivorGuards:
         stops = build_stop_table(dot, trials, graph)
         starts = stops["stop_start"].to_numpy(dtype=float)
         ends = stops["stop_end"].to_numpy(dtype=float)
-        from_start = recent_trial_reward_rate(starts, trials)
-        from_end = recent_trial_reward_rate(ends, trials)
+        experiences = port_experiences_from_trials(trials, prepend_initial=True)
+        from_start = recent_trial_reward_rate(starts, experiences)
+        from_end = recent_trial_reward_rate(ends, experiences)
         np.testing.assert_allclose(
-            stops["reward_rate_trial_k10"].to_numpy(dtype=float),
+            stops["reward_fraction_last10_known_trials"].to_numpy(dtype=float),
             from_start,
             equal_nan=True,
         )
@@ -1377,20 +1479,16 @@ class TestMutationSurvivorGuards:
         dot, env, trials, graph = _location_contract_session()
         stops = build_stop_table(dot, trials, graph)
 
-        both = stops[["is_after_stay", "is_stay"]].dropna()
+        both = stops[["did_last_completed_trip_switch_patch", "is_stay"]].dropna()
         assert len(both), "fixture must define both columns on some stop"
         # The fixture's first trip stays in patch 1 and the second leaves it,
         # so a stop between them has is_after_stay=1 and is_stay=0.
-        assert (both["is_after_stay"] != both["is_stay"]).any(), (
+        derived_stay = 1.0 - both["did_last_completed_trip_switch_patch"]
+        assert (derived_stay != both["is_stay"]).any(), (
             "fixture cannot distinguish the two columns; the test would pass "
             "against a swapped assignment"
         )
-        # Each must equal its own definition, not the other's.
-        defined = stops["is_after_switch"].notna()
-        np.testing.assert_allclose(
-            stops.loc[defined, "is_after_stay"].to_numpy(dtype=float),
-            1.0 - stops.loc[defined, "is_after_switch"].to_numpy(dtype=float),
-        )
+        assert "is_after_stay" not in stops.columns
         stay_defined = stops["is_stay"].notna()
         np.testing.assert_allclose(
             stops.loc[stay_defined, "is_stay"].to_numpy(dtype=float),
@@ -1406,11 +1504,10 @@ class TestMutationSurvivorGuards:
         """
         dot, env, trials, graph = _location_contract_session()
         stops = build_stop_table(dot, trials, graph)
-        duration = (
-            stops["stop_end"].to_numpy(dtype=float)
-            - stops["stop_start"].to_numpy(dtype=float)
-        )
+        duration = stops["stop_end"].to_numpy(dtype=float) - stops[
+            "stop_start"
+        ].to_numpy(dtype=float)
         np.testing.assert_allclose(
-            stops["immobility_time"].to_numpy(dtype=float), duration
+            stops["immobility_duration_s"].to_numpy(dtype=float), duration
         )
-        assert (stops["immobility_time"] > 0).all()
+        assert (stops["immobility_duration_s"] > 0).all()

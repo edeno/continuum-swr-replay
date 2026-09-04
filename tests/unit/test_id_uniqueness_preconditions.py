@@ -37,17 +37,17 @@ def _two_session_event_arm_table_colliding_event_ids() -> pd.DataFrame:
             rows.append(
                 {
                     "animal": animal,
-                    "day": day,
+                    "session_date": day,
                     "epoch": "02_r1",
                     "event_id": 1,  # collision across sessions
                     "stop_id": 1,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_fraction": 1.0 / 9,
-                    "visit_recency": 0.0,
-                    "cumulative_reward": 0.0,
-                    "reward_rate_arm_k10": 0.0,
-                    "dist_to_arm": 0.0,
-                    "is_same_patch": 0,
+                    "visit_recency_trials": 0.0,
+                    "reward_count_candidate_arm_last10_known_trials": 0.0,
+                    "reward_fraction_candidate_arm_last10_visits": 0.0,
+                    "distance_to_candidate_arm_cm": 0.0,
+                    "is_same_patch_as_current": 0,
                     "current_patch": 1,
                 }
             )
@@ -57,9 +57,9 @@ def _two_session_event_arm_table_colliding_event_ids() -> pd.DataFrame:
 class TestPredictArmFractionsPrecondition:
     def test_session_local_event_ids_raise(self):
         eat = _two_session_event_arm_table_colliding_event_ids()
-        fit = {"coef_visit_recency": 0.0}
+        fit = {"coef_visit_recency_trials": 0.0}
         with pytest.raises(ValueError, match="globally unique across sessions"):
-            predict_arm_fractions(eat, fit, predictors=["visit_recency"])
+            predict_arm_fractions(eat, fit, predictors=["visit_recency_trials"])
 
 
 class TestBuildChoiceDatasetPrecondition:
@@ -70,14 +70,14 @@ class TestBuildChoiceDatasetPrecondition:
             rows.append(
                 {
                     "animal": animal,
-                    "day": day,
+                    "session_date": day,
                     "epoch": "02_r1",
                     "stop_id": 1,
                     "has_replay": True,
                     "next_arm": 0,
-                    "current_arm": 1,
+                    "occupancy_well_arm": 1,
                     "n_events": 1,
-                    "reward_outcome": "rewarded",
+                    "is_rewarded_outcome": "rewarded",
                 }
             )
         return pd.DataFrame(rows)
@@ -113,11 +113,11 @@ class TestBuildEventPatchTablePrecondition:
         eat = _two_session_event_arm_table_colliding_event_ids()
         # Add an arm_count_hard column the patch table aggregates.
         eat["arm_count_hard"] = 1.0
-        eat["is_same_patch"] = 0
-        eat["visit_recency"] = 0.0
-        eat["cumulative_reward"] = 0.0
+        eat["is_same_patch_as_current"] = 0
+        eat["visit_recency_trials"] = 0.0
+        eat["reward_count_candidate_arm_last10_known_trials"] = 0.0
         et = (
-            eat[["animal", "day", "epoch", "event_id"]]
+            eat[["animal", "session_date", "epoch", "event_id"]]
             .drop_duplicates()
             .assign(
                 last_rewarded_arm=np.nan,
@@ -145,17 +145,17 @@ class TestPreconditionPassesOnUniqueIds:
                 rows.append(
                     {
                         "animal": animal,
-                        "day": day,
+                        "session_date": day,
                         "epoch": "02_r1",
                         "event_id": 1 + eid_offset,
                         "stop_id": 1 + sid_offset,
-                        "arm": arm,
+                        "candidate_arm": arm,
                         "arm_fraction": 1.0 / 9,
-                        "visit_recency": 0.0,
-                        "cumulative_reward": 0.0,
-                        "reward_rate_arm_k10": 0.0,
-                        "dist_to_arm": 0.0,
-                        "is_same_patch": 0,
+                        "visit_recency_trials": 0.0,
+                        "reward_count_candidate_arm_last10_known_trials": 0.0,
+                        "reward_fraction_candidate_arm_last10_visits": 0.0,
+                        "distance_to_candidate_arm_cm": 0.0,
+                        "is_same_patch_as_current": 0,
                         "current_patch": 1,
                     }
                 )
@@ -164,8 +164,8 @@ class TestPreconditionPassesOnUniqueIds:
 
     def test_predict_arm_fractions_accepts_unique_ids(self):
         eat = self._unique_id_event_arm_table()
-        fit = {"coef_visit_recency": 0.0}
-        out = predict_arm_fractions(eat, fit, predictors=["visit_recency"])
+        fit = {"coef_visit_recency_trials": 0.0}
+        out = predict_arm_fractions(eat, fit, predictors=["visit_recency_trials"])
         # Each event's predicted_frac sums to 1 within its 9 arms.
         per_event_sum = out.groupby("event_id")["predicted_frac"].sum()
         np.testing.assert_allclose(per_event_sum.to_numpy(), 1.0, atol=1e-9)

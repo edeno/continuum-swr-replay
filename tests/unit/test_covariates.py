@@ -1,17 +1,11 @@
-"""Tests for the covariate module extraction.
-
-Phase-0 of the covariate harmonization moved the behavioral covariate
-definitions out of ``_helpers`` into ``covariates`` with a re-export shim. This
-checks the move is transparent: every moved name resolves to the *same object*
-whether imported from ``covariates``, from the ``_helpers`` shim, or (for the
-public ones) off the package namespace.
-"""
+"""Behavioral-covariate package ownership and public-import contracts."""
 
 from __future__ import annotations
 
 import logging
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,12 +13,17 @@ import pytest
 
 import continuum_swr_replay.analysis.replay as replay_pkg
 from continuum_swr_replay.analysis.replay import _helpers, covariates
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    stamp_covariate_schema,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
-# Names that moved to covariates.py and are re-exported from _helpers.
-SHIMMED_NAMES = [
+# Scientific definitions must have one owning module.  ``_helpers`` is for
+# generic table-building mechanics; it must not re-export covariate functions.
+HISTORY_NAMES = [
     "UNCERTAINTY_COVARIATES",
     "visit_recency_all_events",
-    "cumulative_reward_all_events",
+    "rolling_reward_count_all_events",
     "recent_reward_rate_all_events",
     "recent_trial_reward_rate",
     "lagged_trial_rewards",
@@ -32,20 +31,46 @@ SHIMMED_NAMES = [
     "_omission_streak",
     "add_uncertainty_covariates",
     "visit_recency_per_arm",
-    "cumulative_reward_per_arm",
+    "rolling_reward_count_per_arm",
     "recent_reward_rate_per_arm",
 ]
 
-# Public covariate names also exposed on the package namespace.
-PUBLIC_NAMES = ["UNCERTAINTY_COVARIATES", "add_uncertainty_covariates"]
+CONTEXT_NAMES = [
+    "add_trial_context",
+    "behavioral_location_at_times",
+    "behavioral_location_from_port_experiences",
+    "summarize_behavioral_location",
+    "trial_context_at_times",
+]
+
+CLOCK_NAMES = ["trial_cutoff_times", "trial_outcome_times"]
+
+# Names exposed from ``analysis.replay`` before the ownership cleanup remain
+# available there and now resolve through the covariates package.
+PUBLIC_NAMES = [
+    "UNCERTAINTY_COVARIATES",
+    "add_uncertainty_covariates",
+    *CONTEXT_NAMES,
+    *CLOCK_NAMES,
+]
 
 
-def test_shim_reexports_same_objects():
-    """Each moved name is the identical object via covariates and via _helpers."""
-    for name in SHIMMED_NAMES:
-        via_cov = getattr(covariates, name)
-        via_helpers = getattr(_helpers, name)
-        assert via_cov is via_helpers, f"{name} differs between covariates and _helpers"
+def test_covariate_definitions_have_one_owner():
+    """Package exports are identical to their coherent owning submodules."""
+    from continuum_swr_replay.analysis.replay.covariates import clocks, context, history
+
+    for name in HISTORY_NAMES:
+        assert getattr(covariates, name) is getattr(history, name)
+    for name in CONTEXT_NAMES:
+        assert getattr(covariates, name) is getattr(context, name)
+    for name in CLOCK_NAMES:
+        assert getattr(covariates, name) is getattr(clocks, name)
+
+
+def test_helpers_has_no_covariate_reexport_shim():
+    """The generic helper module must not regain scientific covariate ownership."""
+    for name in (*HISTORY_NAMES, *CONTEXT_NAMES, *CLOCK_NAMES):
+        assert not hasattr(_helpers, name), f"_helpers unexpectedly re-exports {name}"
 
 
 def test_public_names_resolve_via_package():
@@ -61,28 +86,54 @@ def test_q_learner_lives_in_covariates():
     assert callable(covariates._fit_alpha)
 
 
-def test_covariates_imports_standalone_no_deadlock():
-    """Importing ``covariates`` first in a *fresh* interpreter must not deadlock.
+def test_unobserved_initial_occupancy_is_rejected_as_noncanonical():
+    trials = pd.DataFrame(
+        {
+            "start_time": [1.0],
+            "goal_arrival_time": [2.0],
+            "end_time": [3.0],
+            "from_well": [0],
+            "to_well": [1],
+            "is_reward": [True],
+            "reward_on_time": [2.2],
+            "outcome_known_time": [2.2],
+            "is_patch_change": [False],
+        }
+    )
+    experiences = port_experiences_from_trials(
+        trials, prepend_initial=True, initial_reward=None
+    )
 
-    ``_helpers`` and ``covariates`` form a re-export cycle (covariates imports
-    ``_trial_cutoff_times`` / ``build_well_to_arm_map`` back from ``_helpers``).
-    A subprocess is required to make ``covariates`` the entry import: within this
-    test process both modules are already cached, so an inline import would only
-    re-assert identity, not the load order. The shim resolves because importing
-    the submodule first runs the package ``__init__``, which loads ``_helpers``
-    before ``.covariates``.
-    """
+    with pytest.raises(ValueError, match="physical poke"):
+        covariates.canonical_port_value_history(experiences)
+
+
+def test_covariates_imports_standalone_without_cycle():
+    """Every covariate submodule imports in a fresh interpreter in either order."""
     code = (
-        "from continuum_swr_replay.analysis.replay.covariates import "
-        "recent_reward_rate_all_events as a;"
-        "from continuum_swr_replay.analysis.replay._helpers import "
-        "recent_reward_rate_all_events as b;"
-        "assert a is b"
+        "from continuum_swr_replay.analysis.replay.covariates.context import "
+        "add_trial_context as context_fn;"
+        "from continuum_swr_replay.analysis.replay.covariates.history import "
+        "recent_reward_rate_all_events as history_fn;"
+        "from continuum_swr_replay.analysis.replay.covariates.clocks import "
+        "trial_outcome_times as clock_fn;"
+        "from continuum_swr_replay.analysis.replay import covariates;"
+        "assert covariates.add_trial_context is context_fn;"
+        "assert covariates.recent_reward_rate_all_events is history_fn;"
+        "assert covariates.trial_outcome_times is clock_fn"
     )
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_helpers_source_does_not_import_covariates_package():
+    """Static guard against recreating the former two-way import dependency."""
+    helper_path = Path(_helpers.__file__)
+    source = helper_path.read_text()
+    assert "from .covariates" not in source
+    assert "import .covariates" not in source
 
 
 # ── q_all_arm (per-arm leaky-Q rollout) ──
@@ -128,8 +179,9 @@ def _toy_contingency(stop_id):
     """One contingency row: ports 0..5 = 0.0,0.2,0.4,0.6,0.8,1.0; q = p/2."""
     row = {"stop_id": stop_id}
     for i in range(6):
-        row[f"p_reward_port{i}"] = i * 0.2
-        row[f"q_port{i}"] = i * 0.1
+        row[f"task_reward_probability_port_{i}"] = i * 0.2
+        row[f"reward_belief_mean_port_{i}"] = i * 0.1
+        row[f"reward_belief_variance_port_{i}"] = 0.01 * (i + 1)
     return pd.DataFrame([row])
 
 
@@ -187,7 +239,7 @@ def test_value_block_rejects_noncanonical_arm_ids(bad_arm):
 
 
 def test_load_contingency_present_returns_frame(tmp_path, caplog):
-    df = pd.DataFrame({"stop_id": [1, 2, 3]})
+    df = stamp_covariate_schema(pd.DataFrame({"stop_id": [1, 2, 3]}), table="qvals")
     path = tmp_path / "qvals_table.pkl"
     df.to_pickle(path)
     with caplog.at_level(logging.INFO):
@@ -221,7 +273,9 @@ def test_value_block_rejects_duplicate_stop_id():
     """A duplicate scientific key is an alignment failure, not a warning."""
     a = _toy_contingency(111)
     b = _toy_contingency(111)
-    b.loc[0, "p_reward_port0"] = 0.9  # conflicting value for the same stop
+    b.loc[0, "task_reward_probability_port_0"] = (
+        0.9  # conflicting value for the same stop
+    )
     cont = pd.concat([a, b], ignore_index=True)
     with pytest.raises(ValueError, match="duplicate stop_id"):
         covariates.attach_contingency_value_block(np.array([0]), np.array([111]), cont)
@@ -229,7 +283,7 @@ def test_value_block_rejects_duplicate_stop_id():
 
 def test_value_block_rejects_partially_missing_matched_row():
     cont = _toy_contingency(111)
-    cont.loc[0, "q_port4"] = np.nan
+    cont.loc[0, "reward_belief_mean_port_4"] = np.nan
 
     with pytest.raises(ValueError, match="finite"):
         covariates.attach_contingency_value_block(
@@ -237,21 +291,35 @@ def test_value_block_rejects_partially_missing_matched_row():
         )
 
 
-@pytest.mark.parametrize(("column", "bad"), [("p_reward_port2", 1.1), ("q_port3", -0.1)])
+@pytest.mark.parametrize(
+    ("column", "bad"),
+    [
+        ("task_reward_probability_port_2", 1.1),
+        ("reward_belief_mean_port_3", -0.1),
+    ],
+)
 def test_value_block_rejects_out_of_range_probability_or_q(column, bad):
     cont = _toy_contingency(111)
     cont.loc[0, column] = bad
 
     with pytest.raises(ValueError, match=r"\[0, 1\]"):
-        covariates.attach_contingency_value_block(
-            np.array([0]), np.array([111]), cont
-        )
+        covariates.attach_contingency_value_block(np.array([0]), np.array([111]), cont)
+
+
+def test_value_block_reports_finiteness_before_range_on_mixed_violation():
+    """A row both out-of-range and non-finite reports the finiteness problem
+    first (a NaN is a worse corruption than an out-of-range value). Pins the
+    check ordering so a future DRY pass cannot silently flip it.
+    """
+    cont = _toy_contingency(111)
+    cont.loc[0, "task_reward_probability_port_2"] = 1.5  # out of [0, 1]
+    cont.loc[0, "reward_belief_mean_port_3"] = np.nan  # non-finite
+    with pytest.raises(ValueError, match="finite reward-belief means"):
+        covariates.attach_contingency_value_block(np.array([0]), np.array([111]), cont)
 
 
 def test_uncertainty_block_rejects_duplicate_stop_id():
     cont = _toy_contingency(111)
-    for i in range(1, 7):
-        cont[f"betadist_var{i}"] = 0.01 * i
     cont = pd.concat([cont, cont], ignore_index=True)
 
     with pytest.raises(ValueError, match="duplicate stop_id"):
@@ -260,9 +328,7 @@ def test_uncertainty_block_rejects_duplicate_stop_id():
 
 def test_uncertainty_block_rejects_invalid_beta_variance():
     cont = _toy_contingency(111)
-    for i in range(1, 7):
-        cont[f"betadist_var{i}"] = 0.01 * i
-    cont.loc[0, "betadist_var4"] = 0.3
+    cont.loc[0, "reward_belief_variance_port_3"] = 0.3
 
     with pytest.raises(ValueError, match=r"\[0, 0.25\]"):
         covariates.attach_arm_uncertainty(np.array([0]), np.array([111]), cont)
@@ -331,13 +397,14 @@ def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
     event_times = np.array([7.0, 9.0, 19.0, 30.0])
     well_to_arm = {well: well for well in range(6)}
 
-    recency = covariates.visit_recency_all_events(event_times, trials, well_to_arm)
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+    recency = covariates.visit_recency_all_events(event_times, experiences, well_to_arm)
     never_visited = covariates.arm_never_visited_all_events(
-        event_times, trials, well_to_arm
+        event_times, experiences, well_to_arm
     )
     combined_recency, combined_never_visited = (
         covariates.visit_recency_and_never_visited_all_events(
-            event_times, trials, well_to_arm
+            event_times, experiences, well_to_arm
         )
     )
 
@@ -365,18 +432,138 @@ def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
     assert recency.shape == never_visited.shape == (len(event_times), 9)
 
 
+def test_initial_port_experience_seeds_visit_and_reward_history():
+    """History starts with the origin experience, not the first destination."""
+    experiences = pd.DataFrame(
+        {
+            "experience_id": [0, 1],
+            "movement_trial_number": pd.array([pd.NA, 1], dtype="Int64"),
+            "is_initial_experience": [True, False],
+            "is_boundary_derived": [False, False],
+            "outcome_observed": [True, True],
+            "port": [3, 2],
+            "patch": [2, 2],
+            "arrival_time": [0.0, 10.0],
+            "departure_time": [2.0, 12.0],
+            "reward_on_time": [1.0, np.nan],
+            "outcome_known_time": [1.0, 10.3],
+            "is_reward": [True, False],
+        }
+    )
+    well_to_arm = {well: well for well in range(6)}
+
+    recency, novel = covariates.visit_recency_and_never_visited_all_events(
+        np.array([1.5, 10.1]), experiences, well_to_arm
+    )
+    reward_fraction = covariates.recent_reward_rate_all_events(
+        np.array([1.5, 10.1]), experiences, well_to_arm, k=10
+    )
+
+    assert recency[0, 3] == 1.0
+    assert novel[0, 3] == 0.0
+    assert reward_fraction[0, 3] == 1.0
+    assert recency[1, 2] == 1.0
+    assert recency[1, 3] == 2.0
+    assert novel[1, 3] == 0.0
+    # The destination omission is unresolved at 10.1; only the initial reward
+    # contributes to reward history.
+    assert reward_fraction[1, 3] == 1.0
+
+
+def _seed_experiences() -> pd.DataFrame:
+    """Two experiences: an initial rewarded port 3, then an omission at port 2.
+
+    The initial outcome is known at t=1.0; the destination outcome only at
+    t=10.3. A query at t=1.5 therefore has exactly one known outcome — the
+    initial one — which the destination-only (pre-migration) history would have
+    missed entirely.
+    """
+    return pd.DataFrame(
+        {
+            "experience_id": [0, 1],
+            "movement_trial_number": pd.array([pd.NA, 1], dtype="Int64"),
+            "is_initial_experience": [True, False],
+            "is_boundary_derived": [False, False],
+            "outcome_observed": [True, True],
+            "port": [3, 2],
+            "patch": [2, 2],
+            "arrival_time": [0.0, 10.0],
+            "departure_time": [2.0, 12.0],
+            "reward_on_time": [1.0, np.nan],
+            "outcome_known_time": [1.0, 10.3],
+            "is_reward": [True, False],
+        }
+    )
+
+
+def test_initial_experience_counts_in_rolling_reward_count():
+    """``reward_count_candidate_arm_last10_known_trials`` counts the initial
+    reward: without it, a query before the first movement would see zero."""
+    experiences = _seed_experiences()
+    well_to_arm = {well: well for well in range(6)}
+    counts = covariates.rolling_reward_count_all_events(
+        np.array([1.5, 10.5]), experiences, well_to_arm, window=10
+    )
+    # At t=1.5 only the initial reward (arm 3) is known.
+    assert counts[0, 3] == 1.0
+    assert counts[0, 2] == 0.0
+    # At t=10.5 the destination omission (arm 2) is now known but adds no reward.
+    assert counts[1, 3] == 1.0
+    assert counts[1, 2] == 0.0
+
+
+def test_initial_experience_counts_in_stop_reward_fraction():
+    """``reward_fraction_last10_known_trials`` (arm-agnostic) includes the
+    initial experience as the earliest known outcome."""
+    experiences = _seed_experiences()
+    frac = covariates.recent_trial_reward_rate(np.array([1.5, 10.5]), experiences, k=10)
+    # Only the initial reward is known at 1.5 -> 1/1.
+    assert frac[0] == 1.0
+    # Initial reward + destination omission known at 10.5 -> 1/2.
+    assert frac[1] == 0.5
+
+
+def test_initial_experience_is_the_first_reward_lag():
+    """``known_reward_outcome_lag_1`` is the initial outcome until a later
+    experience resolves, then it advances to the newer known outcome."""
+    experiences = _seed_experiences()
+    lags = covariates.lagged_trial_rewards(np.array([1.5, 10.5]), experiences, k=10)
+    # At 1.5 the only known outcome is the initial reward.
+    assert lags[0, 0] == 1.0
+    assert np.isnan(lags[0, 1])
+    # At 10.5 the most recent known outcome is the destination omission (0.0),
+    # and the initial reward is one lag back.
+    assert lags[1, 0] == 0.0
+    assert lags[1, 1] == 1.0
+
+
+def test_port_experience_reward_clock_disagreement_fails_loudly():
+    trials = _single_arm_trials(2, rewarded_indices={0})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+    rewarded = experiences["is_reward"].to_numpy(dtype=bool)
+    experiences.loc[rewarded, "reward_on_time"] += 0.01
+
+    with pytest.raises(ValueError, match="reward_on_time equal"):
+        covariates.recent_trial_reward_rate(np.array([100.0]), experiences)
+
+
 def test_recency_and_never_visited_ignore_appended_future_trials():
     """Appending trials after an event cannot retroactively change covariates."""
     trials = _single_arm_trials(5, rewarded_indices=set())
     event_times = np.array([15.0])  # only trial 0 (arrival 8 s) has completed
     well_to_arm = {well: well for well in range(6)}
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
 
     for function in (
         covariates.visit_recency_all_events,
         covariates.arm_never_visited_all_events,
     ):
-        short = function(event_times, trials.iloc[:2], well_to_arm)
-        long = function(event_times, trials, well_to_arm)
+        short = function(
+            event_times,
+            port_experiences_from_trials(trials.iloc[:2], prepend_initial=False),
+            well_to_arm,
+        )
+        long = function(event_times, experiences, well_to_arm)
         np.testing.assert_array_equal(short, long)
 
 
@@ -444,6 +631,7 @@ def test_centering_rejects_mismatched_never_visited_shape():
 def test_recency_rejects_incomplete_leaf_topology():
     """A missing leaf mapping is invalid, not a structural trunk zero."""
     trials = _single_arm_trials(1, rewarded_indices=set())
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
     incomplete = {well: well for well in range(5)}
 
     for function in (
@@ -451,12 +639,13 @@ def test_recency_rejects_incomplete_leaf_topology():
         covariates.arm_never_visited_all_events,
     ):
         with pytest.raises(ValueError, match="cover every canonical"):
-            function(np.array([20.0]), trials, incomplete)
+            function(np.array([20.0]), experiences, incomplete)
 
 
 def test_recency_rejects_wrong_well_keys_despite_complete_arm_values():
     """A fake well cannot substitute for a missing canonical reward site."""
     trials = _single_arm_trials(1, rewarded_indices=set())
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
     wrong_well = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 99: 5}
 
     for function in (
@@ -464,15 +653,15 @@ def test_recency_rejects_wrong_well_keys_despite_complete_arm_values():
         covariates.arm_never_visited_all_events,
     ):
         with pytest.raises(ValueError, match="reward-site well"):
-            function(np.array([20.0]), trials, wrong_well)
+            function(np.array([20.0]), experiences, wrong_well)
 
 
-def test_cumulative_reward_counts_only_the_last_ten_trials():
-    """``cumulative_reward_all_events`` is a rolling k=10 window, not a total.
+def test_rolling_reward_count_counts_only_the_last_ten_trials():
+    """``rolling_reward_count_all_events`` is a rolling k=10 window, not a total.
 
-    The name says "cumulative" but the helper subtracts the cumsum 10 trials
-    back, so a reward older than that must not be counted. Nothing pinned the
-    window: changing it from 10 to 5 left the whole suite green, because the
+    The helper subtracts the cumsum 10 trials back, so a reward older than that
+    must not be counted. Nothing pinned the window: changing it from 10 to 5
+    left the whole suite green, because the
     builder fixture's ``trials`` frame is empty and every trial-derived column
     comes out NaN.
 
@@ -484,8 +673,10 @@ def test_cumulative_reward_counts_only_the_last_ten_trials():
     trials = _single_arm_trials(12, rewarded_indices={0, 2})
     event_times = np.array([200.0])  # after every trip
 
-    out = covariates.cumulative_reward_all_events(
-        event_times, trials, well_to_arm={0: 0, 1: 1}
+    out = covariates.rolling_reward_count_all_events(
+        event_times,
+        port_experiences_from_trials(trials, prepend_initial=False),
+        well_to_arm={0: 0, 1: 1},
     )
 
     assert out[0, 0] == 1.0, (
@@ -494,16 +685,72 @@ def test_cumulative_reward_counts_only_the_last_ten_trials():
     )
 
 
-def test_cumulative_reward_window_is_ten_not_a_running_total():
+def test_rolling_reward_count_window_is_ten_not_a_running_total():
     """A reward far outside the window contributes nothing, however old."""
     trials = _single_arm_trials(30, rewarded_indices={0, 1, 2})
-    out = covariates.cumulative_reward_all_events(
-        np.array([400.0]), trials, well_to_arm={0: 0, 1: 1}
+    out = covariates.rolling_reward_count_all_events(
+        np.array([400.0]),
+        port_experiences_from_trials(trials, prepend_initial=False),
+        well_to_arm={0: 0, 1: 1},
     )
     assert out[0, 0] == 0.0, (
         f"all three rewards are >10 trials back, so the window is empty; got "
         f"{out[0, 0]}"
     )
+
+
+def test_rolling_reward_count_fills_unchanged_column():
+    """The renamed helper produces unchanged values under its frozen column.
+
+    Two guarantees the honesty rename must preserve:
+
+    1. **Output values unchanged.** On a deterministic fixture the helper
+       returns the expected rolling reward counts -- the rename touched the
+       name, not the arithmetic.
+    2. **Binding unchanged.** The registry still names this function as the
+       producer of the frozen persisted column
+       ``reward_count_candidate_arm_last10_known_trials`` (shipped in
+       ``event_arm_table.pkl``), so the rename can't silently detach the
+       function from the column it fills.
+    """
+    # Three completed trips to well 0 (arm 0), rewarded on trips 0 and 2, with
+    # an event after all three. The 10-trial window covers all three trips, so
+    # arm 0's count is 2 and every other arm is a structural 0 (history exists,
+    # no reward there) -- not NaN.
+    trials = _single_arm_trials(3, rewarded_indices={0, 2})
+    out = covariates.rolling_reward_count_all_events(
+        np.array([200.0]),
+        port_experiences_from_trials(trials, prepend_initial=False),
+        well_to_arm={0: 0, 1: 1},
+    )
+    assert out.shape[0] == 1
+    assert out[0, 0] == 2.0, out[0, 0]
+    assert np.all(out[0, 1:] == 0.0), out[0, 1:]
+
+    definition = covariates.definition_for(
+        "reward_count_candidate_arm_last10_known_trials"
+    )
+    assert definition.producer == (
+        "covariates.history.rolling_reward_count_all_events"
+    ), definition.producer
+
+
+def test_no_caller_uses_old_reward_count_name():
+    """The pre-rename names must appear nowhere in the source tree.
+
+    Guards against a caller (or a re-added deprecation alias) reintroducing the
+    misleading ``cumulative_reward_*`` names. The needles are assembled from
+    fragments so this test's own text does not match them.
+    """
+    needles = ("cumulative_reward" + "_all_events", "cumulative_reward" + "_per_arm")
+    repo_root = Path(__file__).resolve().parents[2]
+    offenders: list[str] = []
+    for root in ("src", "scripts", "tests"):
+        for path in (repo_root / root).rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            if any(needle in text for needle in needles):
+                offenders.append(str(path.relative_to(repo_root)))
+    assert not offenders, f"old reward-count name still present in: {offenders}"
 
 
 class TestAlignCountMatrix:
@@ -569,9 +816,7 @@ class TestEventLabelAlignment:
         target = pd.DataFrame({"animal": ["b"], "day": [1], "epoch": ["e"]})
 
         with pytest.raises(ValueError, match="session alignment failed"):
-            _helpers.assert_single_session_alignment(
-                source, target, source_name="dot"
-            )
+            _helpers.assert_single_session_alignment(source, target, source_name="dot")
 
         _helpers.assert_single_session_alignment(
             source,
@@ -615,13 +860,14 @@ def test_reward_rate_arm_window_is_ten_visits_not_five():
         }
     )
     w2a = {i: i for i in range(6)}
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
     rate = covariates.recent_reward_rate_all_events(
-        np.array([11.9]), trials, w2a, k=10
+        np.array([11.9]), experiences, w2a, k=10
     )
     # Last 10 visits = trials 2..11, all omitted -> 0.0. A k=5 window also
     # gives 0.0, so include the earlier query that separates them.
     early = covariates.recent_reward_rate_all_events(
-        np.array([6.9]), trials, w2a, k=10
+        np.array([6.9]), experiences, w2a, k=10
     )
     # By t=6.9 seven visits have completed: 2 rewarded of 7 -> 2/7 at k=10,
     # but 0/5 at k=5.
@@ -652,13 +898,14 @@ def test_reward_rate_arm_counts_only_resolved_visits():
         }
     )
     w2a = {i: i for i in range(6)}
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
     # Query after visit 0's outcome (6.0) but before visit 1's (16.0).
     between = covariates.recent_reward_rate_all_events(
-        np.array([12.0]), trials, w2a, k=10
+        np.array([12.0]), experiences, w2a, k=10
     )
     assert between[0, 1] == pytest.approx(0.0), "unresolved visit's reward leaked"
     # Once visit 1 resolves, it counts: 1 of 2 rewarded.
     after = covariates.recent_reward_rate_all_events(
-        np.array([16.0]), trials, w2a, k=10
+        np.array([16.0]), experiences, w2a, k=10
     )
     assert after[0, 1] == pytest.approx(0.5)

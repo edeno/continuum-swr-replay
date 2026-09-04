@@ -11,7 +11,7 @@ session:
   tautological with the per-stop non-local/SWR event count)
 - MODEL_PATCH_SWITCH PS0-PS3 for non-local events; PS0-PS2 for
   source-restricted SWR/MUA events
-- Choice-prediction conditional logit (replay_frac vs behavioral baseline)
+- Choice-prediction conditional logit (replay_fraction vs behavioral baseline)
 - Switch-aligned replay content (frac on/off current patch by lag)
 
 The arm hierarchy (M0-M6 / M0-M5) is fit by ``fit_replay_content_models.py``
@@ -55,6 +55,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -62,6 +65,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
@@ -76,7 +80,7 @@ for noisy in (
 ):
     logging.getLogger(noisy).setLevel(logging.CRITICAL)
 
-SESS = ["animal", "day", "epoch"]
+SESS = list(SESSION_COLUMNS)
 
 # event source -> (input directory, table-name stem). ``None`` stem means
 # the non-local replay-content tables (HPC clusterless only, no suffix).
@@ -188,6 +192,14 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     ]:
         path = d / f"{base}{suffix}.pkl"
         tables[short] = read_table(path)
+        require_covariate_schema(
+            tables[short],
+            table={
+                "event_table": "event",
+                "event_arm_table": "event_arm",
+                "stop_table": "stop",
+            }[short],
+        )
         logger.info("loaded %s: %d rows", path.name, len(tables[short]))
     return tables
 
@@ -423,11 +435,11 @@ def fit_patch_switch(
     patch_table: pd.DataFrame, event_arm_table: pd.DataFrame, event_source: str
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Fit source-appropriate switch patch models on switch events only."""
-    sw = event_arm_table.groupby("event_id")["is_after_switch"].first()
+    sw = event_arm_table.groupby("event_id")["did_last_completed_trip_switch_patch"].first()
     switch_patch = patch_table.merge(
-        sw.rename("is_after_switch"), left_on="event_id", right_index=True, how="left"
+        sw.rename("did_last_completed_trip_switch_patch"), left_on="event_id", right_index=True, how="left"
     )
-    switch_patch = switch_patch[switch_patch["is_after_switch"] == 1]
+    switch_patch = switch_patch[switch_patch["did_last_completed_trip_switch_patch"] == 1]
     switch_models = _patch_switch_models_for_source(event_source)
     _assert_ladder_timing(switch_models, ladder="patch switch")
     return _fit_per_session_common_cohort(
@@ -440,7 +452,7 @@ def fit_patch_switch(
         response_col="patch_count_hard",
         drop_zero_response=True,
         min_units=10,
-        selection_filter="is_after_switch == 1",
+        selection_filter="did_last_completed_trip_switch_patch == 1",
     )
 
 
@@ -454,9 +466,9 @@ def fit_per_stop_rate_hierarchy(
         lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
         analysis="rate_hierarchy",
         unit_col="stop_id",
-        required_base=["n_events", "immobility_time"],
-        response_col="n_events",
-        offset_col="immobility_time",
+        required_base=["n_selected_events", "immobility_duration_s"],
+        response_col="n_selected_events",
+        offset_col="immobility_duration_s",
         min_units=20,
     )
 

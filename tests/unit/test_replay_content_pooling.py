@@ -56,7 +56,7 @@ class TestPoolingWhenAnimalsShareTruth:
     fits in mean."""
 
     def test_pooled_recovery_with_shared_beta(self):
-        beta = {"is_current": 0.5, "is_prev": 0.7}
+        beta = {"is_current_arm": 0.5, "is_prev_arm": 0.7}
         df = _pool_animals(
             per_animal_betas=[beta, beta, beta],
             n_events_per_animal=300,
@@ -73,7 +73,7 @@ class TestPoolingWhenAnimalsShareTruth:
         """Pooling 3 animals' worth of data should yield ~sqrt(3)× tighter
         SEs than a single-animal fit, since events are independent under
         the shared truth."""
-        beta = {"is_current": 0.7}
+        beta = {"is_current_arm": 0.7}
         single = simulate_counts(beta, n_events=300, L_e=20, seed=11)
         pooled = _pool_animals(
             per_animal_betas=[beta] * 3,
@@ -83,7 +83,7 @@ class TestPoolingWhenAnimalsShareTruth:
         )
         fit_single = fit_conditional_poisson(single, predictors=list(beta))
         fit_pooled = fit_conditional_poisson(pooled, predictors=list(beta))
-        ratio = fit_pooled["bse_is_current"] / fit_single["bse_is_current"]
+        ratio = fit_pooled["bse_is_current_arm"] / fit_single["bse_is_current_arm"]
         # Expect ~1/sqrt(3) ≈ 0.58. Allow generous tolerance.
         assert 0.45 < ratio < 0.75, (
             f"pooled/single SE ratio = {ratio:.2f}; expected ~0.58"
@@ -98,9 +98,9 @@ class TestPooledFitRecoversWeightedAverage:
 
     def test_recovers_arithmetic_mean_with_equal_sample_sizes(self):
         per_animal = [
-            {"is_current": 0.3},
-            {"is_current": 0.6},
-            {"is_current": 0.9},
+            {"is_current_arm": 0.3},
+            {"is_current_arm": 0.6},
+            {"is_current_arm": 0.9},
         ]
         df = _pool_animals(
             per_animal_betas=per_animal,
@@ -108,13 +108,13 @@ class TestPooledFitRecoversWeightedAverage:
             L_e=20,
             seed=23,
         )
-        fit = fit_conditional_poisson(df, predictors=["is_current"])
+        fit = fit_conditional_poisson(df, predictors=["is_current_arm"])
         assert fit is not None
-        true_mean = float(np.mean([b["is_current"] for b in per_animal]))
+        true_mean = float(np.mean([b["is_current_arm"] for b in per_animal]))
         # Should be close to the mean (0.6) within a few SE.
-        z = (fit["coef_is_current"] - true_mean) / fit["bse_is_current"]
+        z = (fit["coef_is_current_arm"] - true_mean) / fit["bse_is_current_arm"]
         assert abs(z) < 3, (
-            f"pooled β = {fit['coef_is_current']:.3f}, "
+            f"pooled β = {fit['coef_is_current_arm']:.3f}, "
             f"animal mean = {true_mean:.3f}, z = {z:.2f}"
         )
 
@@ -145,7 +145,7 @@ class TestPooledSEUnderHeterogeneity:
         coefs, bses = [], []
         for _r in range(n_replicates):
             per_animal = [
-                {"is_current": float(rng.normal(mu, tau))} for _ in range(n_animals)
+                {"is_current_arm": float(rng.normal(mu, tau))} for _ in range(n_animals)
             ]
             df = _pool_animals(
                 per_animal_betas=per_animal,
@@ -153,11 +153,11 @@ class TestPooledSEUnderHeterogeneity:
                 L_e=20,
                 seed=int(rng.integers(0, 1e9)),
             )
-            fit = fit_conditional_poisson(df, predictors=["is_current"])
+            fit = fit_conditional_poisson(df, predictors=["is_current_arm"])
             if fit is None:
                 continue
-            coefs.append(fit["coef_is_current"])
-            bses.append(fit["bse_is_current"])
+            coefs.append(fit["coef_is_current_arm"])
+            bses.append(fit["bse_is_current_arm"])
 
         coefs = np.asarray(coefs)
         bses = np.asarray(bses)

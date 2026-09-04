@@ -118,7 +118,7 @@ def get_confident_times(
             "start_time": confident_times[:, 0],
             "end_time": confident_times[:, 1],
             "duration": confident_times[:, 1] - confident_times[:, 0],
-            "max_speed": max_speed,
+            "animal_max_speed_cm_s": max_speed,
         },
         index=index,
     )

@@ -20,6 +20,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -31,7 +34,7 @@ _RC = PROCESSED_DATA_DIR / "replay_content"
 _EVENT_ARM = _RC / "event_arm_table.pkl"
 _EVENT_ARM_REF = _RC / "standardization_reference.json"
 
-_ENCODED_COL = "reward_rate_arm_k10"
+_ENCODED_COL = "reward_fraction_candidate_arm_last10_visits"
 
 
 def _require(path: Path):
@@ -50,6 +53,10 @@ def _require_table(path: Path):
 
 def _load():
     ea = read_table(_require_table(_EVENT_ARM))
+    try:
+        require_covariate_schema(ea, table="event_arm")
+    except ValueError as error:
+        pytest.skip(f"materialized table requires canonical regeneration: {error}")
     ref = load_reference(_require(_EVENT_ARM_REF))
     return ea, ref
 
@@ -66,7 +73,7 @@ def test_reference_matches_encoded_table_moments():
         pytest.skip(
             "materialized reference predates leaf-support scaling; regenerate tables"
         )
-    leaf = ea["arm"].isin(range(6))
+    leaf = ea["candidate_arm"].isin(range(6))
     x = ea.loc[leaf, _ENCODED_COL].to_numpy(dtype=float)
     assert ref[_ENCODED_COL]["support"] == "leaf_arms"
     assert ref[_ENCODED_COL]["n_reference_rows"] == int(np.isfinite(x).sum())

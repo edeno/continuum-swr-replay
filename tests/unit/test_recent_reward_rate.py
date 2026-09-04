@@ -7,8 +7,19 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.replay import trial_outcome_times
 from continuum_swr_replay.analysis.replay.covariates import (
-    recent_reward_rate_all_events,
+    recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def recent_reward_rate_all_events(times, trials, well_to_arm, k=10):
+    return _recent_reward_rate_all_events(
+        times,
+        port_experiences_from_trials(trials, prepend_initial=False),
+        well_to_arm,
+        k,
+    )
+
 
 # 6 leaf wells -> arms 0..5; trunk arms 6,7,8 are never trial destinations.
 _WELL_TO_ARM = {w: w for w in range(6)}

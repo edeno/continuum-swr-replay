@@ -1,7 +1,7 @@
 # Covariate naming specification
 
-**Status:** approved specification; implementation pending. **Version:** 1.1.
-**Date:** 2026-08-21.
+**Status:** implemented analysis-facing naming contract; artifact regeneration pending.
+**Version:** 1.3. **Date:** 2026-08-24.
 
 The canonical naming specification for columns across `event_arm_table`,
 `stop_table`, `qvals_table`, and `event_table`. Every definition below was
@@ -17,9 +17,49 @@ The pass surfaced a problem underneath the naming: the tables carry
 **duplicate, dead, and invariant columns** that a rename cannot fix. Those,
 and the migration discipline, are as important as the names.
 
-These names have not yet been applied to generated schemas. Implementation
-must follow the [migration contract](#migration-contract); until that
-migration is complete, current artifacts retain their legacy column names.
+Repository-owned builders and consumers now use this vocabulary and stamp
+persisted frames with schema version
+`covariate_contract_v2_initial_port_experience`. Version 2 distinguishes the
+starting-port-inclusive history definition from the earlier destination-only
+history even though most column names are unchanged. The stamp certifies
+canonical names plus nonmissing, unique registered row keys; it does **not**
+certify table-specific candidate support, dtypes, value ranges, or model
+eligibility. Those remain explicit producer/fitter contracts. The registry API is
+table-scoped: a spelling is interpreted only together with its row grain. This
+is essential for names such as `arm`, which denotes a choice-set row in
+`event_arm` but the realized destination in qvals. Existing materialized
+artifacts still retain their legacy schemas and are intentionally rejected;
+they must be regenerated before analyses or figures are rerun.
+
+### Implementation and verification status
+
+- Canonical persisted frames are stamped with
+  `covariate_schema_version =
+  "covariate_contract_v2_initial_port_experience"`, their explicit table
+  grain, and `covariate_schema_scope =
+  "canonical_names_and_unique_row_keys_v1"`. Canonical readers fail before
+  fitting or plotting when that stamp, the naming vocabulary, or registered
+  row identity is absent or mismatched. Table-specific scientific validators
+  separately own candidate support, dtypes, ranges, and estimand eligibility.
+- `rename_map`, `plan_rename`, `apply_rename`, and numerical-path
+  canonicalization require an explicit `table=` argument. The qvals realized
+  destination is `chosen_arm`; only an `event_arm` choice-set row becomes
+  `candidate_arm`.
+- External behavioral-model code retains its native vocabulary. One qvals
+  ingestion adapter validates numerical duplicates and translates them into
+  repository-owned names.
+- The parity gate at
+  `scripts/exploratory/_verify_harmonization_parity.py` normalizes only the
+  frozen legacy side, then requires exact row/session keys, column order,
+  dtypes, missing masks, and values. Missing pairs and zero executed
+  comparisons fail.
+- Offline real-session smoke evidence on 2026-08-22 used the cached
+  `chimi20200213_02_r1_HPC` decoder/trial inputs. Relative to the frozen
+  immediate pre-rename artifacts, regenerated output preserved exactly 1,714
+  event rows, 15,426 event-arm rows, and 2,239 stop rows, with no added/dropped
+  keys and zero mismatches across respectively 96, 75, and 44 shared raw
+  columns. Global standardized columns and the full 215-session artifact set
+  remain regeneration gates rather than inferred successes.
 
 ---
 
@@ -339,6 +379,14 @@ explicitly rather than infer it from a suffix.
 | `best_other_patch_mean_mu_preoutcome_sess` | `switch_value_preoutcome` | The manuscript term. The registry records that Switch is the maximum of the two alternative-patch mean reward beliefs. |
 | `global_leaf_var_sum_preoutcome_sess` / `prev_global_variance` | `reward_belief_variance_leaf_sum_preoutcome` | Sum of the six leaf-port reward-belief variances. |
 | `global_mu_update_abs_postoutcome_sess` | `reward_belief_mean_update_l1_all_ports_postoutcome` | Sum of absolute reward-belief mean changes over all six ports: an L1 aggregate, not a generic update. |
+| `chosen_leaf_mu_update_abs_postoutcome_sess` | `reward_belief_mean_update_chosen_arm_postoutcome_abs` | Absolute scalar update at the realized chosen arm. |
+| `chosen_patch_mu_update_abs_postoutcome_sess` | `reward_belief_mean_update_l1_chosen_patch_postoutcome` | L1 update over the two ports in the chosen patch. |
+| `unchosen_patches_mu_update_abs_postoutcome_sess` | `reward_belief_mean_update_l1_alternative_patches_postoutcome` | L1 update over the four ports belonging to the two alternative patches. |
+| `global_mu_update_signed_postoutcome_sess` | `reward_belief_mean_update_sum_all_ports_postoutcome` | Signed sum of reward-belief mean changes over all six ports. |
+| `chosen_leaf_var_preoutcome_sess` | `reward_belief_variance_chosen_arm_preoutcome` | Pre-outcome Beta variance at the realized chosen arm. |
+| `p_reward_current` | `task_reward_probability_chosen_arm` | Programmed reward probability selected by the realized destination; “current” was temporally ambiguous. |
+| `p_reward_best` | `task_reward_probability_best_arm` | Maximum programmed reward probability across the six reward arms. |
+| `value_diff_patch` | `task_reward_probability_patch_mean_gap_best_vs_second` | Best minus second-best patch-mean programmed reward probability. |
 | `rpe` / `rpe_abs` | `rpe_postoutcome` / `rpe_postoutcome_abs` | `rpe` is standard; availability precedes the absolute-value transform under the naming grammar. |
 | `q_chosen` | `reward_belief_mean_chosen_arm_preoutcome` | Consistent with the candidate-arm reward-belief column. |
 | `beta_reward_entropy` | `reward_belief_differential_entropy_leaf_mean_preoutcome` | Mean of six per-leaf Beta differential entropies. It can be negative and is not categorical Shannon entropy; the registry records the Beta family. |
@@ -364,6 +412,17 @@ cumulative count.
 | `time_since_stop`, `time_since_reward` | `time_since_stop_start_s`, `time_since_last_reward_s` | Names the reference time and unit rather than only appending a suffix. |
 | `time_since_port_entry` / `time_since_last_port_entry` | `time_since_last_well_arrival_s` | Byte-identical aliases of elapsed time since `_goal_arrival_time`; "well arrival" matches the producing clock. |
 | `immobility_time` | `immobility_duration_s` | Verified `stop_end − stop_start` — a duration, not a timestamp. |
+| `n_events` / `n_non_local` | `n_selected_events` | One count for the event source selected by the table build; Replay selects non-local events, while ContFrag records its explicit `event_source`. |
+| `n_SWR`, `n_MUA` | `n_swr_events`, `n_mua_events` | Lowercase acronym spelling and explicit event-count nouns. |
+| `n_non_local_SWR`, `n_non_local_no_SWR` | `n_nonlocal_swr_events`, `n_nonlocal_non_swr_events` | Non-local event counts partitioned by strict SWR overlap. |
+
+The qvals artifact also retains three upstream diagnostic fields whose scientific
+meaning is not sufficiently documented to rename honestly:
+`prev_local_variance`, `upcoming_leaf_variance`, and `next_choice_variance`.
+They are not fitted predictors and are explicitly outside the v1 canonical
+analysis vocabulary. They remain visible as migration debt rather than receiving
+plausible but invented names; downstream scientific code must not treat the
+naming stamp as endorsement of those diagnostics.
 
 ---
 
@@ -388,9 +447,9 @@ subjects, same words.
 
 ## Transforms and interactions — legibility
 
-**Make `_z` honest.** Verified against `model_specs.py`: `arm_uncertainty_z`
-enters the ladders standardized while `q_arm`, `p_reward_arm`, and
-`reward_rate_arm_k10` enter **raw**. Canonical source-table columns retain
+**Make `_z` honest.** The pre-migration uncertainty feature entered the ladders
+standardized while candidate-arm belief mean, task reward probability, and
+recent reward fraction entered **raw**. Canonical source-table columns retain
 their raw scientific names and values. Any generated standardized design
 feature receives the `_z` suffix and records its centering population, scale,
 support, and training/fitting scope in the registry. A standardized feature
@@ -403,7 +462,11 @@ of the naming migration.
 | `visit_recency_spline1_demeaned` | `visit_recency_trials_event_leaf_centered_spline_1` | "demeaned" is too vague: the transform is centering across visited leaf candidates *within an event* (`_center_visit_recency_within_event`), not a generic demean. Suffix order: base, transform, basis index. |
 | `swr_x_visit_recency_spline1_demeaned` | `swr_x_visit_recency_trials_event_leaf_centered_spline_1` | Interaction inherits the renamed base. |
 | `arm_fe_0 … arm_fe_7` | `is_candidate_arm_0 … is_candidate_arm_7`, with `reference_arm = 8` recorded in the registry | **Correctness fix.** `arm_fe_k` = 1 iff `arm == k` for k in 0–7, with **arm 8 the dropped reference** (`model_specs.py:153`, tuple at `:159`); they are generated at fit time, not stored. Renumbering to 1–8 would mislabel every indicator or silently move the reference. Retain 0-based arm identity and record the reference level explicitly rather than in a suffix. |
-| `swr_x_*`, `mua_x_*`, `time_x_*` | *unchanged* | Consistent, greppable, reads as a product. |
+| `swr_x_<base>`, `mua_x_<base>`, `time_x_<base>` | modifier retained; `<base>` uses its canonical name | Consistent, greppable, and prevents an interaction from preserving a retired base name. |
+| `rpe_x_current` | `rpe_postoutcome_z_x_is_current_arm` | Exposes outcome timing, standardization, and the exact spatial predicate. |
+| `relval_x_current` | `relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm` | Uses the manuscript construct and preserves its sign convention. |
+| `tsc_x_current` | `log1p_time_since_stop_start_s_z_x_is_current_arm` | Exposes the log transform, seconds, standardization, and product. |
+| `replay_frac*` | `replay_fraction*` | Fractions use the full word everywhere, including choice-model derivatives. |
 
 ---
 
@@ -413,7 +476,7 @@ The pass was not all corrections — most of the scheme held, and one
 cross-table risk came back clean.
 
 - **Classification flags agree across tables.** `is_swr`, `is_mua`, `is_stay`,
-  `is_after_*`, `reward_outcome` are computed once in `event_table` and
+  outcome-availability flags, and `is_rewarded_outcome` are computed once in `event_table` and
   broadcast unchanged into `event_arm_table` — same name, same meaning. The
   only deliberate difference, `stop_table`'s `is_swr_stop`/`is_mua_stop`, is
   correctly given a distinct name (see
@@ -424,7 +487,7 @@ cross-table risk came back clean.
 - **The good patterns to copy.** The window encoded by
   `reward_rate_arm_k10` is retained, with its inaccurate `rate` and `k10`
   vocabulary corrected to `reward_fraction_candidate_arm_last10_visits`;
-  `swr_x_*` reads as a product; `_cm` and `_z` are honest where present.
+  interaction names read as products; `_cm` and `_z` are honest where present.
 
 ---
 
@@ -464,10 +527,10 @@ The steps:
    exact nullable identities (`stay = 1 − switch`, `omission = 1 − reward`),
    and verify that every removed diagnostic survives in the named audit or
    artifact metadata destination.
-8. **Canonicalize the two numerical-path duplicate families in their own
-   commit.** Compare `q_port`/`betadist_mu` and the global-variance pair under
-   tolerances declared *before* the migration result is inspected (for the
-   current float64 probability-scale path, `atol=1e-15`, `rtol=1e-12`), while
+8. **Verify numerical-path consolidation separately within the atomic schema
+   migration.** Compare `q_port`/`betadist_mu` and the global-variance pair
+   under tolerances declared *before* the migration result is inspected (for
+   the current float64 probability-scale path, `atol=1e-15`, `rtol=1e-12`), while
    requiring identical keys, missing masks, support, and downstream design
    rows. This is not labeled a pure rename.
 9. **Verify consumer and model parity.** After applying the old→new name map,
@@ -485,12 +548,12 @@ separate, numerically invariant commit so that any coefficient or cohort
 change is attributable to the scientific recomputation rather than the schema
 migration.
 
-### Also worth fixing regardless of any rename
+### Definition defects resolved alongside the naming boundary
 
-- `covariates.py:550` docstring says `reward_lag1` is "the immediate previous
-  trial"; the data contradicts it (lag1 is on the outcome clock).
-- `uncertainty.py:152` docstring calls the HPD quantity a width "near
-  `n_arms`", reinforcing the integer-count misreading.
+- Known-outcome lags are documented on the outcome-availability clock, not as
+  fixed trial-relative lags.
+- Posterior HPD arm support is documented as a probability-weighted mean arm
+  count, not a geometric width or integer count.
 
 ---
 

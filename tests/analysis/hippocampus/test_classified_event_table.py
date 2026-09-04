@@ -39,10 +39,10 @@ EXPECTED_CLASSIFIED_COLUMNS = [
     "event_end",
     "event_duration",
     "event_midpoint_time",
-    "max_speed",
-    "mean_speed",
-    "start_speed",
-    "end_speed",
+    "animal_max_speed_cm_s",
+    "animal_mean_speed_cm_s",
+    "animal_start_speed_cm_s",
+    "animal_end_speed_cm_s",
     "whole_event_speed_eligible",
     "endpoints_speed_below_thresh",
     "peak_nonlocal_prob",
@@ -277,17 +277,17 @@ def test_peak_prob(dot):
 def test_max_speed_vs_endpoints(dot):
     table = build_classified_nonlocal_event_table(dot, speed_threshold=SPEED_THRESHOLD)
     ev = _row(table, "01_r1", 6)
-    assert ev["max_speed"] > SPEED_THRESHOLD
-    assert ev["start_speed"] < SPEED_THRESHOLD
-    assert ev["end_speed"] < SPEED_THRESHOLD
+    assert ev["animal_max_speed_cm_s"] > SPEED_THRESHOLD
+    assert ev["animal_start_speed_cm_s"] < SPEED_THRESHOLD
+    assert ev["animal_end_speed_cm_s"] < SPEED_THRESHOLD
     assert not ev["whole_event_speed_eligible"]
     # Retained as a diagnostic only; endpoints no longer define the cohort.
     assert ev["endpoints_speed_below_thresh"]
     # mean_speed is the within-window mean (not median/max/sum); derive the
     # expected value independently from the fixture's speed profile.
     s1_event6 = dot.loc[(dot["epoch"] == "01_r1") & (dot["non_local_event"] == 6)]
-    assert ev["mean_speed"] == pytest.approx(s1_event6["head_speed"].mean())
-    assert ev["mean_speed"] != pytest.approx(ev["max_speed"])  # genuinely averaged
+    assert ev["animal_mean_speed_cm_s"] == pytest.approx(s1_event6["head_speed"].mean())
+    assert ev["animal_mean_speed_cm_s"] != pytest.approx(ev["animal_max_speed_cm_s"])  # genuinely averaged
 
 
 def test_timing_columns(dot):
@@ -295,7 +295,7 @@ def test_timing_columns(dot):
     ev = _row(table, "01_r1", 1)  # samples [100, 110] -> 11 bins
     assert ev["event_start"] == pytest.approx(100 * DT)
     assert ev["event_end"] == pytest.approx(110 * DT)
-    assert ev["event_duration"] == pytest.approx(10 * DT)
+    assert ev["event_duration"] == pytest.approx(11 * DT)  # (n_bins) * DT, incl. final bin
     # Midpoint is times[len(times) // 2] -> 11 bins picks index 5 = sample 105.
     assert ev["event_midpoint_time"] == pytest.approx(105 * DT)
 
@@ -304,8 +304,8 @@ def test_single_timebin_event_collapse(dot):
     table = build_classified_nonlocal_event_table(dot)
     ev = _row(table, "01_r1", 7)
     assert ev["event_start"] == ev["event_end"]
-    assert ev["event_duration"] == pytest.approx(0.0)
-    assert ev["max_speed"] == ev["mean_speed"] == ev["start_speed"] == ev["end_speed"]
+    assert ev["event_duration"] == pytest.approx(DT)  # single-bin event spans one bin width
+    assert ev["animal_max_speed_cm_s"] == ev["animal_mean_speed_cm_s"] == ev["animal_start_speed_cm_s"] == ev["animal_end_speed_cm_s"]
 
 
 def test_multiple_sessions_no_leak(dot):

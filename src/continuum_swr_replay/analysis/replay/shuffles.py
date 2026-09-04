@@ -76,12 +76,9 @@ def stop_label_shuffle(
     stop_table: pd.DataFrame,
     *,
     columns: tuple[str, ...] = (
-        "is_after_reward",
-        "is_after_omission",
-        "is_after_switch",
-        "is_after_stay",
-        "reward_outcome",
-        "current_arm",
+        "is_rewarded_outcome",
+        "did_last_completed_trip_switch_patch",
+        "occupancy_well_arm",
         "prev_arm",
         "last_rewarded_arm",
         "current_patch",
@@ -117,7 +114,7 @@ def stop_label_shuffle(
     # Guard: stop_table must be a single session. Cross-session
     # shuffle would swap labels between sessions, which is never
     # the intent (reviewer flag #10).
-    session_cols = ["animal", "day", "epoch"]
+    session_cols = ["animal", "session_date", "epoch"]
     available = [c for c in session_cols if c in stop_table.columns]
     if available:
         n_sessions = stop_table[available].drop_duplicates().shape[0]
@@ -210,7 +207,7 @@ def next_arm_circular_shift(
     """
     if rng is None:
         rng = np.random.default_rng()
-    session_cols = ["animal", "day", "epoch"]
+    session_cols = ["animal", "session_date", "epoch"]
     available = [c for c in session_cols if c in event_table.columns]
     if available:
         n_sessions = event_table[available].drop_duplicates().shape[0]
@@ -220,7 +217,7 @@ def next_arm_circular_shift(
                 "pass one session at a time to avoid cross-session label "
                 "contamination."
             )
-    out = event_table.sort_values("event_midpoint_time", kind="stable").copy()
+    out = event_table.sort_values("event_midpoint_s", kind="stable").copy()
     if out.empty:
         return out
 
@@ -263,7 +260,7 @@ def next_arm_circular_shift(
     unit_rows = out.drop_duplicates(unit_col, keep="first")[
         [unit_col, *required_unit_columns]
     ].copy()
-    unit_time = grouped["event_midpoint_time"].min()
+    unit_time = grouped["event_midpoint_s"].min()
     unit_rows["_unit_time"] = unit_rows[unit_col].map(unit_time)
     unit_rows = unit_rows.sort_values("_unit_time", kind="stable").reset_index(
         drop=True

@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    stamp_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     save_reference,
@@ -23,19 +26,18 @@ def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
     frame = pd.DataFrame(
         {
             "animal": "a",
-            "day": 1,
+            "session_date": 1,
             "epoch": "02_r1",
             "event_id": event_ids,
-            "arm": arms,
+            "candidate_arm": arms,
             "arm_count_hard": (arms == (event_ids % 9)).astype(float),
-            "location_state": "at_well",
+            "occupancy_state": "at_well",
             "at_well": True,
-            "location_well": 0.0,
-            "location_arm": 0.0,
-            "current_arm": 0.0,
-            "is_current": (arms == 0).astype(float),
-            "visit_recency_demeaned": 0.0,
-            "arm_never_visited": 0.0,
+            "occupancy_well_id": 0.0,
+            "occupancy_well_arm": 0.0,
+            "is_current_arm": (arms == 0).astype(float),
+            "visit_recency_trials_event_leaf_centered": 0.0,
+            "is_candidate_arm_never_visited": 0.0,
         }
     )
     requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
@@ -44,7 +46,7 @@ def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
             if predictor.startswith("arm_fe_") or predictor in frame:
                 continue
             frame[predictor] = 0.0
-    return frame
+    return stamp_covariate_schema(frame, table="event_arm")
 
 
 def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
@@ -54,18 +56,18 @@ def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
     frame = pd.DataFrame(
         {
             "animal": "a",
-            "day": 1,
+            "session_date": 1,
             "epoch": "02_r1",
             "event_id": event_ids,
             "patch": patches,
             "patch_count_hard": (patches == ((event_ids % 3) + 1)).astype(float),
-            "location_state": "at_well",
+            "occupancy_state": "at_well",
             "at_well": True,
-            "location_well": 0.0,
-            "location_arm": 0.0,
+            "occupancy_well_id": 0.0,
+            "occupancy_well_arm": 0.0,
             "is_current_patch": (patches == 1).astype(float),
-            "visit_recency_patch": 0.0,
-            "arm_never_visited_patch": 0.0,
+            "visit_recency_trials_patch": 0.0,
+            "is_patch_never_visited": 0.0,
         }
     )
     requested = runner.default_content_model_names(runner.MODEL_PATCH)
@@ -74,7 +76,25 @@ def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
             if predictor in frame:
                 continue
             frame[predictor] = 0.0
-    return frame
+    return stamp_covariate_schema(frame, table="event_patch")
+
+
+def test_complete_bundle_creates_explicit_output_parent(tmp_path):
+    """A nested staging target must publish without caller-created parents."""
+    output_dir = tmp_path / "candidate" / "models"
+    result = pd.DataFrame({"animal": ["a"], "model": ["M0"]})
+
+    runner._write_complete_output_bundle(
+        output_dir=output_dir,
+        model_results={"M0": result},
+        combined=result,
+        cohort_audits=[],
+        comparison=pd.DataFrame(),
+        logit_results={},
+    )
+
+    assert (output_dir / "M0.pkl").exists()
+    assert (output_dir / "all_models.pkl").exists()
 
 
 def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch):
@@ -83,11 +103,11 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
     input_dir.mkdir()
     stale = _canonical_arm_table().drop(
         columns=[
-            "location_state",
+            "occupancy_state",
             "at_well",
-            "location_well",
-            "location_arm",
-            "arm_never_visited",
+            "occupancy_well_id",
+            "occupancy_well_arm",
+            "is_candidate_arm_never_visited",
         ]
     )
     stale.to_pickle(input_dir / "event_arm_table.pkl")
@@ -136,8 +156,8 @@ def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
     )
 
     assert model_names == requested
-    assert "arm_never_visited" in predictors
-    assert "arm_fe_0" in prepared
+    assert "is_candidate_arm_never_visited" in predictors
+    assert "is_candidate_arm_0" in prepared
     assert response_col == "arm_count_hard"
     assert event_col == "event_id"
 
@@ -176,7 +196,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
         return pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
@@ -204,7 +224,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
 def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().drop(columns="swr_x_current").to_pickle(
+    _canonical_arm_table().drop(columns="swr_x_is_current_arm").to_pickle(
         input_dir / "event_arm_table.pkl"
     )
 
@@ -219,7 +239,7 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
         ["fit_replay_content_models.py", "--models", "M5,M6"],
     )
 
-    with pytest.raises(ValueError, match=r"M6=.*swr_x_current"):
+    with pytest.raises(ValueError, match=r"M6=.*swr_x_is_current_arm"):
         runner.main()
 
     assert not (input_dir / "models").exists()
@@ -232,17 +252,17 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     frame = _canonical_arm_table()
-    frame["arm_uncertainty"] = np.where(frame["arm"].lt(6), frame["arm"] + 1.0, 0.0)
-    frame, legacy = attach_standardized(frame, ["arm_uncertainty"])
+    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0)
+    frame, legacy = attach_standardized(frame, ["reward_belief_variance_candidate_arm_preoutcome"])
     frame.to_pickle(input_dir / "event_arm_table.pkl")
     # Simulate the shipped pre-fix sidecar: right mean/SD keys, no scientific
     # support metadata, and moments computed over all nine candidates.
     (input_dir / "standardization_reference.json").write_text(
         json.dumps(
             {
-                "arm_uncertainty": {
-                    "mean": legacy["arm_uncertainty"]["mean"],
-                    "std": legacy["arm_uncertainty"]["std"],
+                "reward_belief_variance_candidate_arm_preoutcome": {
+                    "mean": legacy["reward_belief_variance_candidate_arm_preoutcome"]["mean"],
+                    "std": legacy["reward_belief_variance_candidate_arm_preoutcome"]["std"],
                 }
             }
         )
@@ -262,18 +282,18 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
 
 def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
     frame = _canonical_arm_table()
-    frame["arm_uncertainty"] = np.where(frame["arm"].lt(6), frame["arm"] + 1.0, 0.0)
+    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0)
     frame, reference = attach_standardized(
         frame,
-        ["arm_uncertainty"],
-        support_mask=frame["arm"].lt(6),
+        ["reward_belief_variance_candidate_arm_preoutcome"],
+        support_mask=frame["candidate_arm"].lt(6),
         support_label="leaf_arms",
     )
     save_reference(reference, tmp_path / "standardization_reference.json")
 
     runner._validate_requested_standardization(
         frame,
-        union_predictors=("arm_uncertainty_z",),
+        union_predictors=("reward_belief_variance_candidate_arm_preoutcome_z",),
         input_dir=tmp_path,
         table_label="fresh event_arm_table",
     )
@@ -285,10 +305,10 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     input_dir.mkdir()
     frame = _canonical_arm_table()
     event_mask = frame["event_id"].eq(0)
-    frame.loc[event_mask, "location_state"] = "in_transit"
+    frame.loc[event_mask, "occupancy_state"] = "in_transit"
     frame.loc[event_mask, "at_well"] = False
-    frame.loc[event_mask, ["location_well", "location_arm", "current_arm"]] = np.nan
-    frame.loc[event_mask, "is_current"] = 0.0
+    frame.loc[event_mask, ["occupancy_well_id", "occupancy_well_arm"]] = np.nan
+    frame.loc[event_mask, "is_current_arm"] = 0.0
     frame.to_pickle(input_dir / "event_arm_table.pkl")
 
     def _fit_must_not_run(*args, **kwargs):
@@ -304,14 +324,14 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     assert not (input_dir / "models").exists()
 
 
-def test_arm_current_indicator_must_match_location_arm():
+def test_arm_current_indicator_must_match_occupancy_well_arm():
     frame = _canonical_arm_table()
     event_mask = frame["event_id"].eq(0)
-    frame.loc[event_mask, "is_current"] = (
-        frame.loc[event_mask, "arm"].eq(1).astype(float)
+    frame.loc[event_mask, "is_current_arm"] = (
+        frame.loc[event_mask, "candidate_arm"].eq(1).astype(float)
     )
 
-    with pytest.raises(ValueError, match="must match location_arm"):
+    with pytest.raises(ValueError, match="must match occupancy_well_arm"):
         runner.prepare_canonical_fit_request(
             frame,
             hierarchy=runner.MODEL_HIERARCHY,
@@ -332,9 +352,9 @@ def test_unknown_location_events_are_accepted_with_null_at_well():
     frame = _canonical_arm_table()
     event_mask = frame["event_id"].eq(0)
     frame["at_well"] = frame["at_well"].astype("boolean")
-    frame.loc[event_mask, "location_state"] = "unknown"
+    frame.loc[event_mask, "occupancy_state"] = "unknown"
     frame.loc[event_mask, "at_well"] = pd.NA
-    for column in ("location_well", "location_arm", "current_arm", "is_current"):
+    for column in ("occupancy_well_id", "occupancy_well_arm", "is_current_arm"):
         frame.loc[event_mask, column] = np.nan
 
     request = runner.prepare_canonical_fit_request(
@@ -357,10 +377,14 @@ def test_at_well_null_pattern_must_track_location_state(state, at_well_value):
     frame = _canonical_arm_table()
     event_mask = frame["event_id"].eq(0)
     frame["at_well"] = frame["at_well"].astype("boolean")
-    frame.loc[event_mask, "location_state"] = state
+    frame.loc[event_mask, "occupancy_state"] = state
     frame.loc[event_mask, "at_well"] = at_well_value
     if state != "at_well":
-        for column in ("location_well", "location_arm", "current_arm", "is_current"):
+        for column in (
+            "occupancy_well_id",
+            "occupancy_well_arm",
+            "is_current_arm",
+        ):
             frame.loc[event_mask, column] = np.nan
 
     with pytest.raises(ValueError, match="inconsistent with location_state"):
@@ -373,14 +397,14 @@ def test_at_well_null_pattern_must_track_location_state(state, at_well_value):
         )
 
 
-def test_patch_current_indicator_must_match_mapped_location_arm():
+def test_patch_current_indicator_must_match_mapped_occupancy_well_arm():
     frame = _canonical_patch_table()
     event_mask = frame["event_id"].eq(0)
     frame.loc[event_mask, "is_current_patch"] = (
         frame.loc[event_mask, "patch"].eq(2).astype(float)
     )
 
-    with pytest.raises(ValueError, match="mapped location_arm"):
+    with pytest.raises(ValueError, match="mapped occupancy_well_arm"):
         runner.prepare_canonical_fit_request(
             frame,
             hierarchy=runner.MODEL_PATCH,
@@ -393,11 +417,11 @@ def test_patch_current_indicator_must_match_mapped_location_arm():
 def test_location_reference_must_be_constant_across_candidate_rows():
     """Row-varying references cannot make a corrupt one-hot look valid."""
     frame = _canonical_arm_table()
-    corrupt_row = frame["event_id"].eq(0) & frame["arm"].eq(1)
+    corrupt_row = frame["event_id"].eq(0) & frame["candidate_arm"].eq(1)
     # This row still has is_current=0 and arm=1, so the later row-wise
     # indicator check would pass (1 != 2) unless the event-level reference is
     # first required to be constant.
-    frame.loc[corrupt_row, ["location_arm", "current_arm"]] = 2.0
+    frame.loc[corrupt_row, "occupancy_well_arm"] = 2.0
 
     with pytest.raises(ValueError, match="event context.*changes"):
         runner.prepare_canonical_fit_request(
@@ -426,9 +450,9 @@ def test_response_counts_must_be_finite_nonnegative_integers(bad_count):
 
 def test_each_session_event_requires_the_exact_candidate_set():
     frame = _canonical_arm_table()
-    frame.loc[frame.index[0], "arm"] = 1
+    frame.loc[frame.index[0], "candidate_arm"] = 1
 
-    with pytest.raises(ValueError, match="exactly the expected arm candidates"):
+    with pytest.raises(ValueError, match="exactly the expected candidate_arm candidates"):
         runner.prepare_canonical_fit_request(
             frame,
             hierarchy=runner.MODEL_HIERARCHY,
@@ -449,7 +473,7 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
         return pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
@@ -484,7 +508,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
         return pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
@@ -531,7 +555,7 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
         return pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique() - 1],
@@ -629,7 +653,7 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
         return pd.DataFrame(
             {
                 "animal": ["a"],
-                "day": [1],
+                "session_date": [1],
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
@@ -675,7 +699,7 @@ def _one_session_primary_result(long_df, model_name):
     return pd.DataFrame(
         {
             "animal": ["a"],
-            "day": [1],
+            "session_date": [1],
             "epoch": ["02_r1"],
             "model": [model_name],
             "n_events": [long_df["event_id"].nunique()],

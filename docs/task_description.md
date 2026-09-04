@@ -52,7 +52,8 @@ them. It combines spatial memory with probabilistic decision-making.
   canonical rule** — they are **shaping** (all-ports p=1.0 then all-0.5, the first run
   session), **early-training** sessions (configs with no 0.8 anywhere, e.g.
   [0.5,0.5,0.5,0.2,0.5,0.2]), and **special sessions** using probabilities outside
-  {0.2,0.5,0.8} (e.g. {0.1,0.3,0.4,0.6,0.9}). So `q_arm`/`p_reward_arm`/`value_diff_patch`
+  {0.2,0.5,0.8} (e.g. {0.1,0.3,0.4,0.6,0.9}). So candidate-arm reward-belief
+  mean, task reward probability, and `task_reward_probability_patch_mean_gap_best_vs_second`
   are computed over a mix of canonical and non-canonical contingencies unless sessions
   are explicitly filtered (they are **not** currently — only technical exclusions apply;
   see `data_loaders/constants.py`).
@@ -63,9 +64,12 @@ them. It combines spatial memory with probabilistic decision-making.
 
 ### Trial and block structure
 
-- A **trial** is defined as the period from departure at one port to
-  departure at another (different) port. It encompasses the run between
-  ports and the reward outcome at the destination.
+- A **trial** is defined as the period from the **final photogate exit** at one
+  port to the final photogate exit at another (different) port. Consecutive
+  re-pokes at the same port remain one task port experience; the destination
+  clock is its first poke-in and the departure clock is its final poke-out.
+  This matches the StateScript parsing in Comrie's analysis and encompasses
+  both the run between ports and the reward outcome at the destination.
 - **Contingency blocks**: reward probabilities change covertly every 60
   trials (n=4 animals) or 80 trials (n=1 animal), or at a 20-minute
   time cap (rarely hit).

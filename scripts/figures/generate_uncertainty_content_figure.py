@@ -169,16 +169,16 @@ def _example_matrices(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     selected = trial[
         trial["animal"].astype(str).eq(str(audit["example_animal"]))
-        & trial["day"].astype(str).eq(str(audit["example_day"]))
+        & trial["session_date"].astype(str).eq(str(audit["example_session_date"]))
         & trial["epoch"].astype(str).eq(str(audit["example_epoch"]))
     ].copy()
     if selected.empty:
         raise ValueError("representative session is absent from trial_leaf_table")
     uncertainty = selected.pivot(
-        index="arm", columns="trial_number_by_epoch", values="arm_uncertainty"
+        index="candidate_arm", columns="trial_number_by_epoch", values="reward_belief_variance_candidate_arm_preoutcome"
     ).sort_index()
     content = selected.pivot(
-        index="arm", columns="trial_number_by_epoch", values="posterior_event_share"
+        index="candidate_arm", columns="trial_number_by_epoch", values="posterior_event_share"
     ).reindex(index=uncertainty.index, columns=uncertainty.columns)
     context = selected.drop_duplicates("trial_number_by_epoch").set_index(
         "trial_number_by_epoch"
@@ -254,10 +254,10 @@ def _plot_timeline(
     ax_uncertainty.tick_params(labelbottom=False)
     ax_content.set_xlabel("behavioral trial", labelpad=6)
     animal = str(audit["example_animal"])
-    day = str(audit["example_day"])
+    session_date = str(audit["example_session_date"])
     epoch = str(audit["example_epoch"])
     ax_uncertainty.set_title(
-        f"Pre-outcome reward-belief uncertainty — {animal}, {day}, {epoch}",
+        f"Pre-outcome reward-belief uncertainty — {animal}, {session_date}, {epoch}",
         loc="left",
         pad=4,
     )
@@ -372,7 +372,10 @@ def _plot_mu_coefficients(
         jitter = np.linspace(-0.18, 0.18, len(subset))
         clean = subset["fit_quality"].eq("clean").to_numpy()
         ax.scatter(
-            subset.loc[clean, "coef_arm_uncertainty_z"],
+            subset.loc[
+                clean,
+                "coef_reward_belief_variance_candidate_arm_preoutcome_z",
+            ],
             base + jitter[clean],
             s=5,
             color="#a9a9a9",
@@ -381,7 +384,10 @@ def _plot_mu_coefficients(
             rasterized=True,
         )
         ax.scatter(
-            subset.loc[~clean, "coef_arm_uncertainty_z"],
+            subset.loc[
+                ~clean,
+                "coef_reward_belief_variance_candidate_arm_preoutcome_z",
+            ],
             base + jitter[~clean],
             s=7,
             color="#cfcfcf",
@@ -787,12 +793,17 @@ def _plot_horserace(ax: plt.Axes, horserace_summary: pd.DataFrame) -> None:
     is positive; distance flips negative, value/recency are ~null — the confound
     defense for the Mu uncertainty effect.
     """
-    order = ["arm_uncertainty_z", "q_arm_z", "dist_to_arm_z", "visit_recency_z"]
+    order = [
+        "reward_belief_variance_candidate_arm_preoutcome_z",
+        "reward_belief_mean_candidate_arm_preoutcome_z",
+        "distance_to_candidate_arm_cm_z",
+        "visit_recency_trials_z",
+    ]
     labels = {
-        "arm_uncertainty_z": "belief\nuncertainty",
-        "q_arm_z": "beta value",
-        "dist_to_arm_z": "distance",
-        "visit_recency_z": "visit recency",
+        "reward_belief_variance_candidate_arm_preoutcome_z": "belief\nuncertainty",
+        "reward_belief_mean_candidate_arm_preoutcome_z": "beta value",
+        "distance_to_candidate_arm_cm_z": "distance",
+        "visit_recency_trials_z": "visit recency",
     }
     table = horserace_summary[horserace_summary["population"] == "all"].set_index(
         "predictor"
@@ -803,7 +814,7 @@ def _plot_horserace(ax: plt.Axes, horserace_summary: pd.DataFrame) -> None:
         if predictor not in table.index:
             continue
         row = table.loc[predictor]
-        color = "#CC6677" if predictor == "arm_uncertainty_z" else "#999999"
+        color = "#CC6677" if predictor == "reward_belief_variance_candidate_arm_preoutcome_z" else "#999999"
         ax.barh(yi, row["median"], color=color, height=0.62, zorder=2)
         stars = (
             "***"
@@ -940,7 +951,7 @@ def _write_caption(output_dir: Path, audit: dict) -> None:
 posterior allocation of decoded replay content among six reward wells. Hollow
 squares mark the chosen well and orange circles mark rewarded choices; gray
 cells indicate trials without replay. The
-session ({audit["example_animal"]}, {audit["example_day"]},
+session ({audit["example_animal"]}, {audit["example_session_date"]},
 {audit["example_epoch"]}) was selected by an association-blind cohort-medoid
 rule. **C, conditional allocation.** Within each session and physical well,
 trials were divided into uncertainty quartiles using all mapped trial

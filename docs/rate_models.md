@@ -22,10 +22,11 @@ one-population null tested against its split.
 ## Family A — per-stop rate (the literature-comparable layer)
 
 - **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` most-recent-known reward,
-  `R2` + recent reward rate, `Rlag` lagged reward kernel `reward_lag1..10`) in
+  `R2` + recent reward fraction, `Rlag` lagged reward kernel
+  `known_reward_outcome_lag_1..10`) in
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay/model_specs.py).
 
-> **Timing definition:** `reward_lag1` is the newest outcome physically known at
+> **Timing definition:** `known_reward_outcome_lag_1` is the newest outcome physically known at
 > bout start. After the arrived trip's feedback boundary it names that trip;
 > before the boundary it remains the preceding known outcome. It is therefore
 > past-only but is not a fixed "current" or "previous" trial index. Lags 2–10
@@ -63,15 +64,15 @@ offset. Its limitation is exactly that offset — see below.
   | model | adds |
   | --- | --- |
   | `M0_const` | homogeneous Poisson baseline (`count ~ 1`) |
-  | `M1_rew1` | most-recent-known reward at bout start (`reward_lag1`) |
-  | `M2_rewhist` | reward history kernel (`reward_lag1..10`) |
+  | `M1_rew1` | most-recent-known reward at bout start (`known_reward_outcome_lag_1`) |
+  | `M2_rewhist` | reward history kernel (`known_reward_outcome_lag_1..10`) |
   | `M2r_rewrate` | continuous recent reward rate (alt encoding) |
   | `M3_hist` | self-history / autoregression (`onset_lag1..10`) |
   | `M4_hist_rew` | self-history + reward history |
   | `M5_time` | within-stop time course (spline) |
   | `M6_time_hist` | time + self-history |
   | `M7_time_hist_rew` | time + self-history + reward history (**the full additive model**) |
-  | `M9_rew_x_time` | + `reward_lag1 × bs(tc)` interaction (does reward modulate the time course?) |
+  | `M9_rew_x_time` | + `known_reward_outcome_lag_1 × bs(tc)` interaction (does reward modulate the time course?) |
 
   The reward×time interaction (`M9`) is **built and
   fit**, not deferred.
@@ -110,19 +111,21 @@ that asks whether replay rate tracks the animal's *behavioral-model* value and
 uncertainty beyond the time/reward/history controls. It is the M7r base
 (time spline + reward kernel + raised-cosine self-history) plus a curated block:
 
-- **nominal (per-unit):** `p_reward_current`, `value_diff_patch`,
-  `recent_switch_rate`, `trials_since_block_change`.
-- **model value (per-unit):** `rpe_model` = `reward − q_chosen` from the fitted
-  RL model (`qvals_table.parquet`), used *instead of* the contingency-table nominal
-  `rpe` (r≈0.71).
+- **nominal/history (per-unit):** `task_reward_probability_chosen_arm`, `task_reward_probability_patch_mean_gap_best_vs_second`,
+  `patch_switch_fraction_last5_completed_trips`,
+  `trials_since_block_change`.
+- **model value (per-unit):** `rpe_postoutcome` = `reward − reward_belief_mean_chosen_arm_preoutcome` from the fitted
+  RL model (`qvals_table.parquet`), represented canonically as
+  `rpe_postoutcome`.
 - **RL decision variables (z-scored → per-SD rate ratios):** `switch_advantage`
   (ΔV = switch − stay value), `reward_entropy` (HMM outcome uncertainty), and the
   absolute value-update magnitudes (`global`, `unchosen_patches`). See
   [behavior_model_covariates.md](behavior_model_covariates.md).
 
 Collinearity is controlled: `q_chosen` is dropped (r≈0.90 with ΔV, VIF 6.4);
-`leaky_q_value_diff` and the leaky `q_current` stand-ins are dropped; nominal
-`rpe` is replaced by `rpe_model`; `value_diff_patch` is kept (r≈−0.04 with ΔV —
+`leaky_q_value_diff` and nominal-RPE stand-ins are dropped;
+`rpe_postoutcome` is the behavioral-model RPE;
+`task_reward_probability_patch_mean_gap_best_vs_second` is kept (r≈−0.04 with ΔV —
 independent nominal information). Final panel VIF ≤ 1.86, max |r| = 0.64. Fit
 over the three populations `swr` / `non_local_swr` / `non_local_no_swr` (the
 pooled `non_local` null is not fit here).
@@ -138,7 +141,7 @@ gating, in **both** estimators:
   `is_swr_stop` result, not this one.) This magnitude is a leakage + dwell upper
   bound — `is_after_omission` is built from the trial *start*, so it can encode
   the not-yet-delivered outcome on approach stops; the current causal spec uses
-  the past-only `reward_lag1` instead (see the phase-4 causal-hygiene note above).
+  the past-only `known_reward_outcome_lag_1` instead (see the causal-hygiene note above).
 - **Family B (per-bin):** the lag-1 reward dissociation above, controlling for
   dwell, the within-stop time course, reward history, and event clustering.
 
@@ -223,7 +226,7 @@ What the ladder actually shows (218 sessions):
   session sits at 0.83 — within the 1.36 5% band — with only ~14% of sessions
   exceeding it (vs 5% expected). So the dramatic single-session excursions are
   largely chance, and the drift is at most a weak aggregate bias, ~20% of which
-  is spatial composition (it shrinks under `current_arm`/`current_patch`
+  is spatial composition (it shrinks under `occupancy_well_arm` / current-patch
   control). Treat it as **a preliminary signal, not a result.** If pursued, the
   principled handling is a **state-space / SS-GLM** baseline drifting in
   wall-clock time (gap-aware across the inter-stop runs), whose latent trajectory
@@ -252,7 +255,8 @@ What the ladder actually shows (218 sessions):
   outcome.** `MU_uncertainty` carries the current trial's realized outcome, so
   `fit_uncertainty_rate` keeps only bins whose left edge is at or after
   `outcome_known_time`. That boundary is pump onset on a rewarded trip but the
-  conservative omission boundary (arrival + 0.30 s, capped at departure) on an
+  conservative omission boundary (arrival + 0.30 s, capped at the collapsed
+  task visit's final departure) on an
   omitted trip. The two outcome classes can therefore retain different portions
   of the stop and are audited separately before fitting.
 

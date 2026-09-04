@@ -28,7 +28,7 @@ def test_source_restricted_patch_models_drop_swr_interactions():
 
     assert tuple(compare._patch_models_for_source("SWR")) == ("P0", "P1", "P2")
     assert tuple(compare._patch_models_for_source("MUA")) == ("P0", "P1", "P2")
-    # P3 is the swr_x_current_patch rung; under an event-source restriction
+    # P3 is the swr_x_is_current_patch rung; under an event-source restriction
     # is_swr is constant, so it collapses onto the main effect.
     assert "P3" not in compare._patch_models_for_source("SWR")
     assert "P3" in compare._patch_models_for_source("non_local")
@@ -106,7 +106,7 @@ def test_common_cohort_drops_whole_units_for_union_predictors_and_zero_response(
     table = pd.DataFrame(
         {
             "animal": ["a"] * 9,
-            "day": [1] * 9,
+            "session_date": [1] * 9,
             "epoch": ["e"] * 9,
             "event_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
             "patch_count_hard": [1, 0, 0, 0, 0, 0, 1, 0, 0],
@@ -143,7 +143,7 @@ def test_common_cohort_success_tags_all_models_with_same_hash():
     table = pd.DataFrame(
         {
             "animal": ["a"] * 6,
-            "day": [1] * 6,
+            "session_date": [1] * 6,
             "epoch": ["e"] * 6,
             "event_id": [1, 1, 1, 2, 2, 2],
             "patch_count_hard": [1, 0, 0, 0, 1, 0],
@@ -186,7 +186,7 @@ def test_common_cohort_drops_session_if_any_model_fails():
     table = pd.DataFrame(
         {
             "animal": ["a"] * 6,
-            "day": [1] * 6,
+            "session_date": [1] * 6,
             "epoch": ["e"] * 6,
             "event_id": [1, 1, 1, 2, 2, 2],
             "patch_count_hard": [1, 0, 0, 0, 1, 0],

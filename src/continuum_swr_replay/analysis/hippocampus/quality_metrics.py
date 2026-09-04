@@ -80,6 +80,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 from .event_immobility import (
     filter_event_labels_by_speed,
@@ -88,7 +89,7 @@ from .event_immobility import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GROUP_COLS = ["animal", "day", "epoch"]
+_DEFAULT_GROUP_COLS = list(SESSION_COLUMNS_DAY)
 
 
 def compute_local_decoding_error(

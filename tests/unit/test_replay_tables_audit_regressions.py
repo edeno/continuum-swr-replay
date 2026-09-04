@@ -23,14 +23,21 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay._helpers import add_trial_context
-from continuum_swr_replay.analysis.replay.covariates import visit_recency_all_events
+from continuum_swr_replay.analysis.replay.covariates import (
+    add_trial_context as _add_trial_context,
+)
+from continuum_swr_replay.analysis.replay.covariates import (
+    visit_recency_all_events as _visit_recency_all_events,
+)
 from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.analysis.replay.tables import (
-    build_event_arm_table,
-    build_event_table,
+    build_event_arm_table as _build_event_arm_table,
+)
+from continuum_swr_replay.analysis.replay.tables import (
+    build_event_table as _build_event_table,
 )
 from continuum_swr_replay.table_io import read_table, table_exists
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 from .test_replay_tables import (
     _bandit_graph,
@@ -38,6 +45,30 @@ from .test_replay_tables import (
     _tiny_dot_with_two_events,
     _tiny_posterior,
 )
+
+
+def _experiences(trials: pd.DataFrame, *, initial: bool = True) -> pd.DataFrame:
+    return port_experiences_from_trials(trials, prepend_initial=initial)
+
+
+def build_event_table(dot, env, trials, graph, **kwargs):
+    return _build_event_table(dot, env, trials, _experiences(trials), graph, **kwargs)
+
+
+def build_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    return _build_event_arm_table(
+        event_table, dot, env, trials, _experiences(trials), graph, **kwargs
+    )
+
+
+def visit_recency_all_events(event_times, trials, well_to_arm):
+    return _visit_recency_all_events(
+        event_times, _experiences(trials, initial=False), well_to_arm
+    )
+
+
+def add_trial_context(dot, trials):
+    return _add_trial_context(dot, trials, _experiences(trials))
 
 
 @pytest.fixture
@@ -86,10 +117,10 @@ def test_arm_count_hard_is_pinned_per_arm_not_only_per_event_sum(
         et, dot, env, trials, graph, conditional_posterior=posterior
     )
 
-    et = et.sort_values("event_start")
+    et = et.sort_values("event_start_s")
     counts = (
-        eat.set_index(["event_id", "arm"])["arm_count_hard"]
-        .unstack("arm")
+        eat.set_index(["event_id", "candidate_arm"])["arm_count_hard"]
+        .unstack("candidate_arm")
         .loc[et["event_id"].to_numpy()]
         .to_numpy()
     )
@@ -113,10 +144,10 @@ def test_arm_fraction_is_pinned_per_arm(audit_session):
         et, dot, env, trials, graph, conditional_posterior=posterior
     )
 
-    et = et.sort_values("event_start")
+    et = et.sort_values("event_start_s")
     frac = (
-        eat.set_index(["event_id", "arm"])["arm_fraction"]
-        .unstack("arm")
+        eat.set_index(["event_id", "candidate_arm"])["arm_fraction"]
+        .unstack("candidate_arm")
         .loc[et["event_id"].to_numpy()]
     )
     assert frac.to_numpy().argmax(axis=1).tolist() == [1, 3]
@@ -141,14 +172,14 @@ def test_is_swr_and_is_mua_values_are_pinned_not_only_dtype(
     dot, env, trials, graph, posterior = audit_session
     et = build_event_table(
         dot, env, trials, graph, conditional_posterior=posterior
-    ).sort_values("event_start")
+    ).sort_values("event_start_s")
 
     assert et["is_swr"].tolist() == [True, False]
     assert et["is_mua"].tolist() == [False, True]
 
 
 def test_swr_interactions_follow_the_is_swr_flag(audit_session):
-    """``swr_x_current`` must be ``is_swr * is_current``, arm by arm.
+    """The canonical current-arm SWR interaction is exact, arm by arm.
 
     Pins the interaction block against an ``is_swr`` inversion propagating
     silently into the design matrix.
@@ -161,8 +192,8 @@ def test_swr_interactions_follow_the_is_swr_flag(audit_session):
 
     is_swr = eat["event_id"].map(et.set_index("event_id")["is_swr"]).astype(float)
     np.testing.assert_array_equal(
-        eat["swr_x_current"].to_numpy(),
-        (is_swr * eat["is_current"]).to_numpy(),
+        eat["swr_x_is_current_arm"].to_numpy(),
+        (is_swr * eat["is_current_arm"]).to_numpy(),
     )
 
 
@@ -226,8 +257,8 @@ def test_trial_context_is_not_taken_from_the_in_progress_trip():
 
     out = add_trial_context(dot, trials)
 
-    assert np.isnan(out["is_after_switch"].iloc[0])
-    assert np.isnan(out["reward_outcome"].iloc[0])
+    assert np.isnan(out["did_last_completed_trip_switch_patch"].iloc[0])
+    assert np.isnan(out["is_rewarded_outcome"].iloc[0])
 
 
 def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
@@ -247,14 +278,21 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     if not reference_path.exists():
         pytest.skip("leaf-support standardization reference not available")
     reference = load_reference(reference_path)
-    if reference.get("arm_uncertainty", {}).get("support") != "leaf_arms":
+    if (
+        reference.get("reward_belief_variance_candidate_arm_preoutcome", {}).get(
+            "support"
+        )
+        != "leaf_arms"
+    ):
         pytest.skip(
             "materialized arm_uncertainty_z predates leaf-support scaling; "
             "regenerate canonical tables"
         )
 
     eat = read_table(tables)
-    leaf = eat.loc[eat["arm"] < 6, "arm_uncertainty_z"].to_numpy()
+    leaf = eat.loc[
+        eat["candidate_arm"] < 6, "reward_belief_variance_candidate_arm_preoutcome_z"
+    ].to_numpy()
     np.testing.assert_allclose(np.nanstd(leaf), 1.0, rtol=0.05)
 
 
@@ -271,7 +309,7 @@ def test_rate_ladder_rungs_share_a_cohort():
     """Rungs compared by AIC must be fit on the same rows.
 
     ``per_bin_rate_model`` drops NaNs against each rung's *own* predictor list,
-    so reward-bearing rungs (which need ``reward_lag10``) lose the ~7% of stops
+    so reward-bearing rungs (which need ``known_reward_outcome_lag_10``) lose the ~7% of stops
     occurring before a session's 10th trial. AIC scales with n, so the smaller
     cohort gains mechanically. ``freeze_common_cohort`` exists for exactly this
     and is called by ``scripts/content/`` but by nothing in ``scripts/rate/``.

@@ -42,13 +42,17 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     attach_is_swr_to_onsets,
     fit_per_bin_rate_model,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 RC = P / "replay_content"
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
-SC = ["animal", "day", "epoch"]
+SC = list(SESSION_COLUMNS)
 LADDER = list(MODEL_PER_BIN_RATE)  # M0_const .. M9_rew_x_time, in ladder order
 FULL = "M7_time_hist_rew"
 
@@ -194,10 +198,12 @@ def main() -> None:
 
     # --- example-session diagnostic quartets (inline refit) ---
     stop = read_table(RC / "stop_table.pkl")
-    onsets = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_table = read_table(RC / "event_onset_table.pkl")
+    event_table = read_table(RC / "event_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    require_covariate_schema(onset_table, table="event_onset")
+    require_covariate_schema(event_table, table="event")
+    onsets = attach_is_swr_to_onsets(onset_table, event_table)
     full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(subset=["n_events"])
     if full_nl.empty:
         print("No fitted non_local M7 sessions; skipping example quartets.")

@@ -5,10 +5,11 @@ Two stop-level analyses:
 1. :func:`stop_replay_summary` — collapse per-event ``arm_fraction`` to
    one row per stop with the fraction that fell on each task-relevant
    role: current, previous, last-rewarded, and "best" (arm with highest
-   ``reward_rate_arm_k10`` at event time). All four also have SWR-only
+   ``reward_fraction_candidate_arm_last10_visits`` at event time). All four
+   also have SWR-only
    and MUA-only variants for the SWR/MUA-as-moderator analyses.
 2. :func:`fit_is_stay_logistic_per_session` — per-session logistic
-   regression of ``is_stay`` on ``is_after_omission * frac_on_<role>``.
+   regression of ``is_stay`` on ``is_omitted_outcome * frac_on_<role>``.
    Returns coefficients suitable for cross-session aggregation
    (Wilcoxon, sign agreement).
 
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 # Roles whose ``arm_fraction`` we track at the stop level. Each role
 # maps to the column on ``event_table`` that names the arm to query.
 _ROLES: dict[str, str] = {
-    "current": "current_arm",
+    "current": "occupancy_well_arm",
     "prev": "prev_arm",
     "last_rewarded": "last_rewarded_arm",
 }
@@ -56,7 +57,7 @@ class StopSummaryConfig:
     ----------
     well_arms : tuple[int, ...]
         Arm IDs eligible for "best" lookup. Trunk arms are excluded
-        because they have no ``reward_rate_arm_k10``.
+        because they have no candidate-arm reward-fraction history.
     """
 
     well_arms: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
@@ -76,9 +77,9 @@ def _select_arm_fractions(
     ``event_table``, which is where it originates) telling us which
     arm to look up per event.
     """
-    sess_keys = [c for c in ("animal", "day", "epoch") if c in event_arm_table.columns]
-    keep = event_arm_table[[*sess_keys, "event_id", "arm", arm_col, "arm_fraction"]]
-    matched = keep[keep["arm"] == keep[arm_col]]
+    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
+    keep = event_arm_table[[*sess_keys, "event_id", "candidate_arm", arm_col, "arm_fraction"]]
+    matched = keep[keep["candidate_arm"] == keep[arm_col]]
     return matched[[*sess_keys, "event_id", "arm_fraction"]].rename(
         columns={"arm_fraction": f"frac_on_{arm_col}"}
     )
@@ -87,36 +88,36 @@ def _select_arm_fractions(
 def _per_event_best_arm(
     event_arm_table: pd.DataFrame, well_arms: tuple[int, ...]
 ) -> pd.DataFrame:
-    """Per-event arm with the highest ``reward_rate_arm_k10``.
+    """Per-event arm with the highest prior-visit reward fraction.
 
     Only well arms are considered (trunk arms have no rate). Ties
     resolved by taking the lowest arm id.
     """
-    sess_keys = ["animal", "day", "epoch"]
-    well_only = event_arm_table[event_arm_table["arm"].isin(well_arms)]
+    sess_keys = ["animal", "session_date", "epoch"]
+    well_only = event_arm_table[event_arm_table["candidate_arm"].isin(well_arms)]
     # Keep only events where at least one well arm has a non-NaN rate.
-    valid = well_only.dropna(subset=["reward_rate_arm_k10"])
+    valid = well_only.dropna(subset=["reward_fraction_candidate_arm_last10_visits"])
     if valid.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "best_arm"])
     best = (
         valid.sort_values(
-            [*sess_keys, "event_id", "reward_rate_arm_k10", "arm"],
+            [*sess_keys, "event_id", "reward_fraction_candidate_arm_last10_visits", "candidate_arm"],
             ascending=[True, True, True, True, False, True],
         )
         .groupby([*sess_keys, "event_id"], sort=False)
-        .head(1)[[*sess_keys, "event_id", "arm"]]
-        .rename(columns={"arm": "best_arm"})
+        .head(1)[[*sess_keys, "event_id", "candidate_arm"]]
+        .rename(columns={"candidate_arm": "best_arm"})
     )
     return best.reset_index(drop=True)
 
 
 def _frac_on_best(event_arm_table: pd.DataFrame, best: pd.DataFrame) -> pd.DataFrame:
     """Per-event ``arm_fraction`` at ``arm == best_arm``."""
-    sess_keys = ["animal", "day", "epoch"]
+    sess_keys = ["animal", "session_date", "epoch"]
     if best.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "frac_on_best"])
     merged = event_arm_table.merge(best, on=[*sess_keys, "event_id"], how="inner")
-    matched = merged[merged["arm"] == merged["best_arm"]]
+    matched = merged[merged["candidate_arm"] == merged["best_arm"]]
     return matched[[*sess_keys, "event_id", "arm_fraction"]].rename(
         columns={"arm_fraction": "frac_on_best"}
     )
@@ -144,11 +145,11 @@ def stop_replay_summary(
     - ``frac_on_<role>_non_swr``: same, restricted to ``is_swr == False``.
     - ``frac_on_<role>_mua``: same, restricted to ``is_mua == True``.
 
-    Plus pass-through behavioral columns from ``stop_table``:
-    ``is_after_reward, is_after_omission, is_after_stay, is_after_switch,
-    is_stay, is_swr_stop, is_mua_stop, n_events, immobility_time``.
+    Plus pass-through behavioral columns from ``stop_table``. The source event
+    count is ``n_selected_events``; the summary exposes the more specific
+    derived name ``n_events_with_replay``.
     """
-    sess_keys = ["animal", "day", "epoch"]
+    sess_keys = ["animal", "session_date", "epoch"]
 
     # Short-circuit when there are no events at all: stop_table flows
     # straight through with all frac_on_<role> columns as NaN.
@@ -167,24 +168,23 @@ def stop_replay_summary(
             [
                 *sess_keys,
                 "stop_id",
-                "current_arm",
+                "occupancy_well_arm",
                 "prev_arm",
                 "last_rewarded_arm",
-                "is_after_reward",
-                "is_after_omission",
-                "is_after_stay",
-                "is_after_switch",
+                "is_rewarded_outcome",
+                "did_last_completed_trip_switch_patch",
                 "is_stay",
                 "is_swr_stop",
                 "is_mua_stop",
-                "n_events",
-                "immobility_time",
+                "n_selected_events",
+                "immobility_duration_s",
             ]
         ].copy()
         for label in ("", "_swr", "_non_swr", "_mua"):
             for r in role_labels:
                 out[f"frac_on_{r}{label}"] = np.nan
-        out["n_events_with_replay"] = out["n_events"].astype("Int64")
+        out["n_events_with_replay"] = out["n_selected_events"].astype("Int64")
+        out["is_omitted_outcome"] = 1.0 - out["is_rewarded_outcome"]
         return out
 
     # ── Per-event arm fractions for each role.
@@ -230,7 +230,7 @@ def stop_replay_summary(
     # prev_arm in ~90% of trials, but next_patch == current_patch in
     # ~88% of trials, leaving the cross-patch trials uncontaminated.
     ea_p = ea.copy()
-    ea_p["_arm_patch"] = ea_p["arm"].map(TRACK_SEGMENT_TO_PATCH)
+    ea_p["_arm_patch"] = ea_p["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
     # Use a NaN-aware sum (``skipna=False``) so a per-event-per-patch
     # group whose target arms have any NaN ``arm_fraction`` propagates
     # NaN to the patch-level total. The default ``.sum()`` is
@@ -347,18 +347,16 @@ def stop_replay_summary(
         [
             *sess_keys,
             "stop_id",
-            "current_arm",
+            "occupancy_well_arm",
             "prev_arm",
             "last_rewarded_arm",
-            "is_after_reward",
-            "is_after_omission",
-            "is_after_stay",
-            "is_after_switch",
+            "is_rewarded_outcome",
+            "did_last_completed_trip_switch_patch",
             "is_stay",
             "is_swr_stop",
             "is_mua_stop",
-            "n_events",
-            "immobility_time",
+            "n_selected_events",
+            "immobility_duration_s",
         ]
     ].copy()
     for agg in agg_dfs:
@@ -370,7 +368,8 @@ def stop_replay_summary(
     # is NaN (strict aggregation above). Treat ``frac_on_<role>``
     # being NaN as the per-role missing-data signal — don't try to
     # back out a per-role contributor count from this column.
-    summary["n_events_with_replay"] = summary["n_events"].astype("Int64")
+    summary["n_events_with_replay"] = summary["n_selected_events"].astype("Int64")
+    summary["is_omitted_outcome"] = 1.0 - summary["is_rewarded_outcome"]
 
     return summary
 
@@ -384,14 +383,14 @@ def fit_is_stay_logistic_per_session(
     stop_summary: pd.DataFrame,
     *,
     content_col: str = "frac_on_last_rewarded",
-    outcome_col: str = "is_after_omission",
+    outcome_col: str = "is_omitted_outcome",
     target_col: str = "is_stay",
     min_stops: int = 30,
 ) -> pd.DataFrame:
     """Per-session logistic: ``is_stay ~ outcome * content_col``.
 
     Causal-hygiene note: ``outcome_col`` defaults to
-    ``is_after_omission`` — a POST_OUTCOME covariate — but that is **valid here
+    ``is_omitted_outcome`` — a POST_OUTCOME covariate — but that is **valid here
     and deliberately unchanged**: the modeled unit is the stay/leave *decision*,
     which happens AFTER the current trial's outcome by construction (the animal
     decides where to go next having already seen the reward/omission). So this is
@@ -414,7 +413,7 @@ def fit_is_stay_logistic_per_session(
     content_col : str
         Name of the replay-content column to interact with the outcome.
     outcome_col : str
-        Binary 0/1 column (e.g., ``is_after_omission``).
+        Binary 0/1 column (e.g., ``is_omitted_outcome``).
     target_col : str
         Binary 0/1 column to predict (default ``is_stay``).
     min_stops : int
@@ -429,7 +428,7 @@ def fit_is_stay_logistic_per_session(
     """
     import statsmodels.api as sm
 
-    sess_keys = ["animal", "day", "epoch"]
+    sess_keys = ["animal", "session_date", "epoch"]
     out_rows = []
     for sess_key, g in stop_summary.groupby(sess_keys, dropna=False):
         animal, day, epoch = sess_key
@@ -513,7 +512,7 @@ def fit_is_stay_pooled_gee(
     stop_summary: pd.DataFrame,
     *,
     content_col: str,
-    outcome_col: str = "is_after_omission",
+    outcome_col: str = "is_omitted_outcome",
     target_col: str = "is_stay",
 ) -> dict:
     """Pooled cross-session GEE: ``is_stay ~ outcome * content_col``.
@@ -554,7 +553,7 @@ def fit_is_stay_pooled_gee(
     from statsmodels.genmod.families import Binomial
     from statsmodels.genmod.generalized_estimating_equations import GEE
 
-    sess_keys = ["animal", "day", "epoch"]
+    sess_keys = ["animal", "session_date", "epoch"]
     sub = stop_summary.dropna(subset=[content_col, outcome_col, target_col]).copy()
 
     base = {

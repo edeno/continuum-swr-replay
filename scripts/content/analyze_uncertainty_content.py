@@ -22,6 +22,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
     load_reference,
@@ -86,16 +89,16 @@ def _add_result_metadata(
 
 
 def _select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
-    animal, day, epoch = DEFAULT_EXAMPLE_SESSION
+    animal, session_date, epoch = DEFAULT_EXAMPLE_SESSION
     present = (
         trial_leaf["animal"].astype(str).eq(animal)
-        & trial_leaf["day"].astype(str).eq(day)
+        & trial_leaf["session_date"].astype(str).eq(session_date)
         & trial_leaf["epoch"].astype(str).eq(epoch)
     )
     if present.any():
         return {
             "animal": animal,
-            "day": day,
+            "session_date": session_date,
             "epoch": epoch,
             "selection": "association-blind cohort medoid selected before plotting",
         }
@@ -105,13 +108,13 @@ def _select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
     # uncertainty-content association enters this rule.
     trial = trial_leaf.drop_duplicates(["session_id", "trial_number_by_epoch"])
     counts = trial.groupby(
-        ["animal", "day", "epoch", "session_id"], as_index=False
+        ["animal", "session_date", "epoch", "session_id"], as_index=False
     ).agg(
         n_trials=("trial_number_by_epoch", "nunique"),
         n_events=("n_events", "sum"),
     )
     uncertainty_range = (
-        trial_leaf.groupby(["session_id", "arm"], observed=True)["arm_uncertainty"]
+        trial_leaf.groupby(["session_id", "candidate_arm"], observed=True)["reward_belief_variance_candidate_arm_preoutcome"]
         .agg(lambda x: x.max() - x.min())
         .groupby("session_id")
         .median()
@@ -132,7 +135,7 @@ def _select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
     selected = counts.sort_values(["distance", "session_id"]).iloc[0]
     return {
         "animal": str(selected["animal"]),
-        "day": str(selected["day"]),
+        "session_date": str(selected["session_date"]),
         "epoch": str(selected["epoch"]),
         "selection": "fallback robust medoid; association not used",
     }
@@ -254,11 +257,14 @@ def main() -> None:
     event_arm = read_table(event_arm_path)
     stops = read_table(stop_path)
     qvals = read_table(qvals_path)
+    require_covariate_schema(event_arm, table="event_arm")
+    require_covariate_schema(stops, table="stop")
+    require_covariate_schema(qvals, table="qvals")
     mu = pd.read_pickle(mu_path)
     try:
         assert_standardized_matches_reference(
             event_arm,
-            ("arm_uncertainty",),
+            ("reward_belief_variance_candidate_arm_preoutcome",),
             load_reference(standardization_path),
             support_label="leaf_arms",
         )
@@ -345,7 +351,7 @@ def main() -> None:
                     "response": response,
                     "scope": scope,
                     "numerator": mass,
-                    "denominator": "immobility_time",
+                    "denominator": "immobility_duration_s",
                 }
             )
 
@@ -371,7 +377,7 @@ def main() -> None:
                     level=level,
                 )
             )
-        contrasts = paired_quartile_contrasts(profile["arm"])
+        contrasts = paired_quartile_contrasts(profile["candidate_arm"])
         for level, frame in contrasts.items():
             if frame.empty:
                 continue

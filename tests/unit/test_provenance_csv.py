@@ -2,15 +2,16 @@
 
 `.claude/docs/reviews/06_covariate_provenance.csv` is treated as the authoritative
 per-covariate timing source that the covariate-timing enforcement reads. Two staleness
-items must be corrected in it:
+items must be kept explicit in it:
 
-  (a) the ``q_arm`` / ``q_arm_hmm`` / ``p_reward_arm`` rows must record that they share
+  (a) candidate-arm belief mean / variance / task-probability rows must record that they share
       *identical* missingness (8064 event-arm rows / 896 events, verified), so no reader
-      treats beta ``q_arm`` as a fuller-cohort proxy (the F3 issue);
-  (b) each derived ``*_x_current`` / ``swr_x_*`` interaction row must carry a
+      one value column as a fuller-cohort proxy;
+  (b) each derived canonical product / ``swr_x_*`` interaction row must carry a
       ``time_availability`` consistent with the timing class of its *source* covariate,
       so a post-outcome or future-referencing operand cannot hide behind the interaction
-      name (e.g. ``update_x_current`` inherits ``hmm_value_update``'s post-outcome flag).
+      name (for example the current-arm belief-update product inherits its
+      post-outcome source's timing).
 """
 
 from __future__ import annotations
@@ -29,34 +30,40 @@ CSV_PATH = (
 )
 
 # Value covariates that share one identical missingness mask (verified in-table).
-_IDENTICAL_MISSINGNESS_ROWS = ("q_arm", "q_arm_hmm", "p_reward_arm")
+_IDENTICAL_MISSINGNESS_ROWS = (
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_belief_variance_candidate_arm_preoutcome",
+    "task_reward_probability_candidate_arm",
+)
 
 # Derived interactions whose source covariate is post-outcome (valid only once the
 # current trip's reward is known).
-_POST_OUTCOME_DERIVED = ("rpe_x_current", "update_x_current")
+_POST_OUTCOME_DERIVED = (
+    "rpe_postoutcome_z_x_is_current_arm",
+    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+)
 
 # Derived interactions whose source references a not-yet-occurred switch/choice — no
 # within-stop temporal gate makes them predictive-safe.
 _FUTURE_DERIVED = (
-    "tss_x_current",
-    "postsw_x_current",
-    "tsspostsw_x_current",
-    "swr_x_next",
+    "periswitch_index_trials_z_x_is_current_arm",
+    "is_periswitch_post_x_is_current_arm",
+    "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
+    "swr_x_is_next_arm",
 )
 
 # Derived interactions built from backward/pre-outcome-safe source covariates.
 _SAFE_DERIVED = (
-    "swr_x_current",
-    "swr_x_prev",
-    "swr_x_last_rewarded",
-    "swr_x_reward_rate_arm_k10",
-    "swr_x_visit_recency_demeaned",
-    "swr_x_q_arm",
-    "swr_x_q_arm_hmm",
-    "relval_x_current",
-    "block_x_current",
-    "switchrate_x_current",
-    "tsc_x_current",
+    "swr_x_is_current_arm",
+    "swr_x_is_prev_arm",
+    "swr_x_is_last_rewarded_arm",
+    "swr_x_reward_fraction_candidate_arm_last10_visits",
+    "swr_x_visit_recency_trials_event_leaf_centered",
+    "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    "trials_since_block_change_z_x_is_current_arm",
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+    "log1p_time_since_stop_start_s_z_x_is_current_arm",
 )
 
 

@@ -38,6 +38,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 # Single source of truth: the curated covariate set + populations are defined in
 # the fitter; import them so the plot axes match exactly what was fit.
@@ -51,7 +52,7 @@ POPULATIONS = _fit.POPULATIONS_TO_FIT
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 COVARIATES = _fit.CURATED_COVARIATES
 
 

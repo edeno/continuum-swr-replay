@@ -99,23 +99,23 @@ def _make_event_table(events: list[dict]) -> pd.DataFrame:
     # Fill columns retrospective.py expects but tests don't always set
     for col, default in {
         "animal": "test",
-        "day": 1,
+        "session_date": 1,
         "epoch": "01_r1",
-        "event_midpoint_time": np.nan,
+        "event_midpoint_s": np.nan,
         "at_well": True,
         "n_nonlocal_bins": 4,
     }.items():
         if col not in df.columns:
             df[col] = default
-    if "event_midpoint_time" in df.columns and df["event_midpoint_time"].isna().all():
-        df["event_midpoint_time"] = np.arange(len(df), dtype=float)
+    if "event_midpoint_s" in df.columns and df["event_midpoint_s"].isna().all():
+        df["event_midpoint_s"] = np.arange(len(df), dtype=float)
     if "stop_id" not in df.columns:
         df["stop_id"] = df["event_id"]
     if "completed_trial_id" not in df.columns:
         # One completed trip per event unless a test models a shared visit.
         df["completed_trial_id"] = np.arange(len(df), dtype=float)
     if "current_patch" not in df.columns:
-        df["current_patch"] = pd.to_numeric(df["current_arm"], errors="coerce").map(
+        df["current_patch"] = pd.to_numeric(df["occupancy_well_arm"], errors="coerce").map(
             WELL_PATCH_MAPPING
         )
     return df
@@ -132,10 +132,10 @@ def _make_event_arm_table(
             rows.append(
                 {
                     "animal": "test",
-                    "day": 1,
+                    "session_date": 1,
                     "epoch": "01_r1",
                     "event_id": ev_id,
-                    "arm": arm,
+                    "candidate_arm": arm,
                     "arm_fraction": f,
                 }
             )
@@ -150,7 +150,7 @@ def _make_event_sequence_table(per_event_arm_seq: dict[int, list[int]]) -> pd.Da
             rows.append(
                 {
                     "animal": "test",
-                    "day": 1,
+                    "session_date": 1,
                     "epoch": "01_r1",
                     "event_id": ev_id,
                     "t_in_event": t,
@@ -170,8 +170,8 @@ class TestChosenArmFraction:
     def test_picks_arm_fraction_at_next_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
-                {"event_id": 2, "current_arm": 3, "next_arm": 0},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 3, "next_arm": 0},
             ]
         )
         ea = _make_event_arm_table(
@@ -189,8 +189,8 @@ class TestChosenArmFraction:
     def test_drops_events_with_nan_next_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": np.nan},
-                {"event_id": 2, "current_arm": 3, "next_arm": 0},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": np.nan},
+                {"event_id": 2, "occupancy_well_arm": 3, "next_arm": 0},
             ]
         )
         ea = _make_event_arm_table(
@@ -213,7 +213,7 @@ class TestEndsAtNext:
     def test_last_bin_matches_next_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
             ]
         )
         # last in-event bin is arm 3 → True
@@ -224,7 +224,7 @@ class TestEndsAtNext:
     def test_last_bin_mismatches_next_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
             ]
         )
         # last in-event bin is arm 0 → False
@@ -233,7 +233,7 @@ class TestEndsAtNext:
         assert bool(out.loc[1, "ends_at_next"]) is False
 
     def test_singleton_event(self):
-        ev = _make_event_table([{"event_id": 1, "current_arm": 0, "next_arm": 0}])
+        ev = _make_event_table([{"event_id": 1, "occupancy_well_arm": 0, "next_arm": 0}])
         es = _make_event_sequence_table({1: [0]})
         out = ends_at_next(ev, es).set_index("event_id")
         assert bool(out.loc[1, "ends_at_next"]) is True
@@ -251,8 +251,8 @@ class TestEndsAtNext:
         """
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
-                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 0, "next_arm": 3},
             ]
         )
         # Only event 1 has a sequence; event 2's _last_arm is NaN
@@ -277,8 +277,8 @@ class TestEndsAtNext:
 
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
-                {"event_id": 2, "current_arm": 0, "next_arm": 3},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 0, "next_arm": 3},
             ]
         )
         es = _make_event_sequence_table({1: [0, 6, 7, 3]})
@@ -300,7 +300,7 @@ class TestContainsPathToNext:
     def test_full_path_present(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 2},
             ]
         )
         # 0→2 path = {0,2,6,7}; sequence covers all four arms (in any order).
@@ -311,7 +311,7 @@ class TestContainsPathToNext:
     def test_missing_one_path_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 2},
             ]
         )
         # Missing trunk 7 → False.
@@ -321,7 +321,7 @@ class TestContainsPathToNext:
 
     def test_set_membership_does_not_require_order_or_continuity(self):
         """Coverage is deliberately a set metric, not a trajectory metric."""
-        ev = _make_event_table([{"event_id": 1, "current_arm": 0, "next_arm": 2}])
+        ev = _make_event_table([{"event_id": 1, "occupancy_well_arm": 0, "next_arm": 2}])
         # Required set is {0, 2, 6, 7}.  It appears out of route order,
         # interleaved with unrelated arms, and with duplicates.  All of those
         # details are intentionally irrelevant to path-arm set coverage.
@@ -334,7 +334,7 @@ class TestContainsPathToNext:
     def test_same_patch_path_short(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 1},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 1},
             ]
         )
         # 0→1 path = {0,1}; sequence with both arms suffices.
@@ -347,8 +347,8 @@ class TestContainsPathToNext:
         # must include arm 3 at least once for the metric to be True.
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 3, "next_arm": 3},
-                {"event_id": 2, "current_arm": 3, "next_arm": 3},
+                {"event_id": 1, "occupancy_well_arm": 3, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 3, "next_arm": 3},
             ]
         )
         es = _make_event_sequence_table(
@@ -372,7 +372,7 @@ class TestChosenPatchFraction:
         # next_patch == 2 → arms {2, 3, 7}; sum their arm_fractions.
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         ea = _make_event_arm_table(
@@ -388,8 +388,8 @@ class TestChosenPatchFraction:
     def test_drops_events_with_nan_next_patch(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 0, "next_patch": np.nan},
-                {"event_id": 2, "current_arm": 3, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 0, "next_patch": np.nan},
+                {"event_id": 2, "occupancy_well_arm": 3, "next_arm": 3, "next_patch": 2},
             ]
         )
         ea = _make_event_arm_table(
@@ -412,7 +412,7 @@ class TestEndsAtNextPatch:
         # next_patch=2 (arms {2,3,7}); last bin arm=3 → ends in patch 2 → True
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         es = _make_event_sequence_table({1: [0, 6, 7, 3]})
@@ -423,7 +423,7 @@ class TestEndsAtNextPatch:
         # next_patch=2; last bin arm=4 (patch 3) → False
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         es = _make_event_sequence_table({1: [0, 6, 7, 4]})
@@ -434,7 +434,7 @@ class TestEndsAtNextPatch:
         # last bin arm=7 (trunk for patch 2); ends_at_next_patch=2 → True
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         es = _make_event_sequence_table({1: [0, 6, 9, 7]})
@@ -455,8 +455,8 @@ class TestEndsAtNextPatch:
         """
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
-                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         es = _make_event_sequence_table(
@@ -491,8 +491,8 @@ class TestEndsAtNextPatch:
 
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3, "next_patch": 2},
-                {"event_id": 2, "current_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
+                {"event_id": 2, "occupancy_well_arm": 0, "next_arm": 3, "next_patch": 2},
             ]
         )
         es = _make_event_sequence_table({1: [0, 6, 7, 3], 2: [0, 6, 7, 9]})
@@ -514,8 +514,8 @@ class TestComputeRetrospectiveMetrics:
     def test_joins_three_metrics(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 3},
-                {"event_id": 2, "current_arm": 3, "next_arm": 4},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 3, "next_arm": 4},
             ]
         )
         ea = _make_event_arm_table(
@@ -542,21 +542,21 @@ class TestComputeRetrospectiveMetrics:
         ev = pd.DataFrame(
             columns=[
                 "animal",
-                "day",
+                "session_date",
                 "epoch",
                 "event_id",
-                "current_arm",
+                "occupancy_well_arm",
                 "next_arm",
                 "next_patch",
             ]
         )
         ea = pd.DataFrame(
-            columns=["animal", "day", "epoch", "event_id", "arm", "arm_fraction"]
+            columns=["animal", "session_date", "epoch", "event_id", "candidate_arm", "arm_fraction"]
         )
         es = pd.DataFrame(
             columns=[
                 "animal",
-                "day",
+                "session_date",
                 "epoch",
                 "event_id",
                 "t_in_event",
@@ -566,7 +566,7 @@ class TestComputeRetrospectiveMetrics:
 
         out = compute_retrospective_metrics(ev, ea, es)
         assert out.empty
-        assert {"animal", "day", "epoch", "event_id"}.issubset(out.columns)
+        assert {"animal", "session_date", "epoch", "event_id"}.issubset(out.columns)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -576,7 +576,7 @@ class TestComputeRetrospectiveMetrics:
 
 class TestRetrospectiveAlignmentWithShuffle:
     def test_rejects_legacy_location_schema(self):
-        ev = _make_event_table([{"event_id": 1, "current_arm": 0, "next_arm": 1}]).drop(
+        ev = _make_event_table([{"event_id": 1, "occupancy_well_arm": 0, "next_arm": 1}]).drop(
             columns="at_well"
         )
         ea = _make_event_arm_table({1: [1.0] + [0.0] * 8})
@@ -589,14 +589,14 @@ class TestRetrospectiveAlignmentWithShuffle:
             [
                 {
                     "event_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 1,
                     "next_patch": 1,
                     "at_well": True,
                 },
                 {
                     "event_id": 2,
-                    "current_arm": np.nan,
+                    "occupancy_well_arm": np.nan,
                     "next_arm": 2,
                     "next_patch": 2,
                     "at_well": False,
@@ -637,14 +637,14 @@ class TestRetrospectiveAlignmentWithShuffle:
             [
                 {
                     "event_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 1,
                     "next_patch": 1,
                     "at_well": True,
                 },
                 {
                     "event_id": 2,
-                    "current_arm": np.nan,
+                    "occupancy_well_arm": np.nan,
                     "next_arm": 2,
                     "next_patch": 2,
                     "at_well": pd.NA,
@@ -674,13 +674,13 @@ class TestRetrospectiveAlignmentWithShuffle:
             [
                 {
                     "event_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 2,
                     "next_patch": 2,
                 },
                 {
                     "event_id": 2,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 4,
                     "next_patch": 3,
                 },
@@ -719,8 +719,8 @@ class TestRetrospectiveAlignmentWithShuffle:
         """Endpoint-only inference does not require a decoded sequence row."""
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 0, "next_arm": 0},
-                {"event_id": 2, "current_arm": 0, "next_arm": 1},
+                {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 0},
+                {"event_id": 2, "occupancy_well_arm": 0, "next_arm": 1},
             ]
         )
         ea = _make_event_arm_table(
@@ -750,13 +750,13 @@ class TestRetrospectiveAlignmentWithShuffle:
             [
                 {
                     "event_id": 1,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 0,
                     "next_patch": 1,
                 },
                 {
                     "event_id": 2,
-                    "current_arm": 0,
+                    "occupancy_well_arm": 0,
                     "next_arm": 0,
                     "next_patch": np.nan,
                 },
@@ -783,7 +783,7 @@ class TestRetrospectiveAlignmentWithShuffle:
     def test_metrics_selection_does_not_touch_unrequested_sequence_path(self):
         """Arm-only inference works with no sequence-table schema at all."""
         events = [
-            {"event_id": event_id, "current_arm": 0, "next_arm": next_arm}
+            {"event_id": event_id, "occupancy_well_arm": 0, "next_arm": next_arm}
             for event_id, next_arm in enumerate((1, 2, 3, 4))
         ]
         ev = _make_event_table(events)
@@ -816,15 +816,15 @@ class TestRetrospectiveAlignmentWithShuffle:
         strata, so the scientifically honest result is exclusion.
         """
         events = [
-            {"event_id": 0, "current_arm": 0, "next_arm": 1, "next_patch": 1},
-            {"event_id": 1, "current_arm": 0, "next_arm": 1, "next_patch": 1},
-            {"event_id": 2, "current_arm": 2, "next_arm": 3, "next_patch": 2},
-            {"event_id": 3, "current_arm": 2, "next_arm": 3, "next_patch": 2},
+            {"event_id": 0, "occupancy_well_arm": 0, "next_arm": 1, "next_patch": 1},
+            {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 1, "next_patch": 1},
+            {"event_id": 2, "occupancy_well_arm": 2, "next_arm": 3, "next_patch": 2},
+            {"event_id": 3, "occupancy_well_arm": 2, "next_arm": 3, "next_patch": 2},
         ]
         ev = _make_event_table(events)
         ea = _make_event_arm_table(
             {
-                row["event_id"]: [float(arm == row["current_arm"]) for arm in range(9)]
+                row["event_id"]: [float(arm == row["occupancy_well_arm"]) for arm in range(9)]
                 for row in events
             }
         )
@@ -855,21 +855,21 @@ class TestRetrospectiveAlignmentWithShuffle:
         # ``current_arm`` alone reads them as one contiguous run, because the
         # intervening trip leaves no at-well event behind.
         events = [
-            {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+            {"event_id": 0, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 1,
              "completed_trial_id": 5.0},
-            {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+            {"event_id": 1, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 1,
              "completed_trial_id": 5.0},
-            {"event_id": 2, "stop_id": 10, "current_arm": 2, "next_arm": 3,
+            {"event_id": 2, "stop_id": 10, "occupancy_well_arm": 2, "next_arm": 3,
              "completed_trial_id": 6.0},
-            {"event_id": 3, "stop_id": 10, "current_arm": 2, "next_arm": 3,
+            {"event_id": 3, "stop_id": 10, "occupancy_well_arm": 2, "next_arm": 3,
              "completed_trial_id": 6.0},
-            {"event_id": 4, "stop_id": 10, "current_arm": 0, "next_arm": 4,
+            {"event_id": 4, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 4,
              "completed_trial_id": 7.0},
-            {"event_id": 5, "stop_id": 10, "current_arm": 0, "next_arm": 4,
+            {"event_id": 5, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 4,
              "completed_trial_id": 7.0},
-            {"event_id": 6, "stop_id": 11, "current_arm": 0, "next_arm": 2,
+            {"event_id": 6, "stop_id": 11, "occupancy_well_arm": 0, "next_arm": 2,
              "completed_trial_id": 8.0},
-            {"event_id": 7, "stop_id": 12, "current_arm": 2, "next_arm": 4,
+            {"event_id": 7, "stop_id": 12, "occupancy_well_arm": 2, "next_arm": 4,
              "completed_trial_id": 9.0},
         ]
         ev = _make_event_table(events)
@@ -898,9 +898,9 @@ class TestRetrospectiveAlignmentWithShuffle:
         """An unobservable event cannot hide conflicting labels in a visit."""
         ev = _make_event_table(
             [
-                {"event_id": 0, "stop_id": 10, "current_arm": 0, "next_arm": 1,
+                {"event_id": 0, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 1,
                  "completed_trial_id": 3.0},
-                {"event_id": 1, "stop_id": 10, "current_arm": 0, "next_arm": 2,
+                {"event_id": 1, "stop_id": 10, "occupancy_well_arm": 0, "next_arm": 2,
                  "completed_trial_id": 3.0},
             ]
         )
@@ -923,25 +923,25 @@ class TestRetrospectiveAlignmentWithShuffle:
         events = [
             {
                 "event_id": 0,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "next_arm": 1,
                 "next_patch": 1,
             },
             {
                 "event_id": 1,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "next_arm": 1,
                 "next_patch": 1,
             },
             {
                 "event_id": 2,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "next_arm": 2,
                 "next_patch": 2,
             },
             {
                 "event_id": 3,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "next_arm": 4,
                 "next_patch": 3,
             },
@@ -1024,13 +1024,13 @@ class TestRetrospectiveAlignmentWithShuffle:
         events = [
             {
                 "event_id": 0,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "next_arm": 2,
                 "next_patch": 2,
             },
             {
                 "event_id": 1,
-                "current_arm": 1,
+                "occupancy_well_arm": 1,
                 "next_arm": 4,
                 "next_patch": 3,
             },
@@ -1058,11 +1058,11 @@ class TestRetrospectiveAlignmentWithShuffle:
 
     def test_reports_singleton_and_deterministic_visit_exclusions(self):
         events = [
-            {"event_id": 0, "current_arm": 0, "next_arm": 2},
-            {"event_id": 1, "current_arm": 0, "next_arm": 4},
-            {"event_id": 2, "current_arm": 1, "next_arm": 3},
-            {"event_id": 3, "current_arm": 2, "next_arm": 3},
-            {"event_id": 4, "current_arm": 2, "next_arm": 3},
+            {"event_id": 0, "occupancy_well_arm": 0, "next_arm": 2},
+            {"event_id": 1, "occupancy_well_arm": 0, "next_arm": 4},
+            {"event_id": 2, "occupancy_well_arm": 1, "next_arm": 3},
+            {"event_id": 3, "occupancy_well_arm": 2, "next_arm": 3},
+            {"event_id": 4, "occupancy_well_arm": 2, "next_arm": 3},
         ]
         ev = _make_event_table(events)
         ea = _make_event_arm_table(
@@ -1106,8 +1106,8 @@ class TestRetrospectiveAlignmentWithShuffle:
                         {
                             "event_id": event_id,
                             "stop_id": stop_id,
-                            "event_midpoint_time": float(event_id),
-                            "current_arm": current_arm,
+                            "event_midpoint_s": float(event_id),
+                            "occupancy_well_arm": current_arm,
                             "route_length": 4,
                             "length_bin": length_bin,
                             "next_arm": target,
@@ -1122,7 +1122,7 @@ class TestRetrospectiveAlignmentWithShuffle:
             events,
             columns=("next_arm",),
             unit_col="stop_id",
-            strata_cols=("current_arm", "route_length", "length_bin"),
+            strata_cols=("occupancy_well_arm", "route_length", "length_bin"),
             variation_cols=("next_arm",),
             require_movement=True,
             rng=np.random.default_rng(0),
@@ -1132,11 +1132,11 @@ class TestRetrospectiveAlignmentWithShuffle:
         original_by_stop = events.groupby("stop_id")["next_arm"].first()
         shuffled_by_stop = shuffled.groupby("stop_id")["next_arm"].first()
         assert original_by_stop.ne(shuffled_by_stop).all()
-        np.testing.assert_array_equal(shuffled["current_arm"], events["current_arm"])
+        np.testing.assert_array_equal(shuffled["occupancy_well_arm"], events["occupancy_well_arm"])
         np.testing.assert_array_equal(shuffled["route_length"], events["route_length"])
         np.testing.assert_array_equal(shuffled["length_bin"], events["length_bin"])
         for current_arm, length_bin, targets in strata:
-            in_stratum = shuffled["current_arm"].eq(current_arm) & shuffled[
+            in_stratum = shuffled["occupancy_well_arm"].eq(current_arm) & shuffled[
                 "length_bin"
             ].eq(length_bin)
             assert set(shuffled.loc[in_stratum, "next_arm"]) == set(targets)
@@ -1156,9 +1156,9 @@ class TestRetrospectiveAlignmentWithShuffle:
             events.append(
                 {
                     "event_id": i,
-                    "current_arm": current_arm,
+                    "occupancy_well_arm": current_arm,
                     "next_arm": next_arm,
-                    "event_midpoint_time": float(i),
+                    "event_midpoint_s": float(i),
                 }
             )
             arm_fracs = [0.05] * 9
@@ -1171,7 +1171,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         ea = _make_event_arm_table(per_arm_fracs)
         # Sequence table not used for chosen_arm_fraction.
         es = _make_event_sequence_table(
-            {i: [events[i]["current_arm"]] for i in range(n_events)}
+            {i: [events[i]["occupancy_well_arm"]] for i in range(n_events)}
         )
 
         result = retrospective_alignment_with_shuffle(
@@ -1200,8 +1200,8 @@ class TestPrevArmMirror:
     def test_chosen_arm_fraction_prev_picks_prev_arm(self):
         ev = _make_event_table(
             [
-                {"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3},
-                {"event_id": 2, "current_arm": 0, "prev_arm": 3, "next_arm": 0},
+                {"event_id": 1, "occupancy_well_arm": 3, "prev_arm": 0, "next_arm": 3},
+                {"event_id": 2, "occupancy_well_arm": 0, "prev_arm": 3, "next_arm": 0},
             ]
         )
         ea = _make_event_arm_table(
@@ -1216,7 +1216,7 @@ class TestPrevArmMirror:
 
     def test_ends_at_prev_last_bin_matches_prev_arm(self):
         ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+            [{"event_id": 1, "occupancy_well_arm": 3, "prev_arm": 0, "next_arm": 3}]
         )
         es = _make_event_sequence_table({1: [3, 7, 6, 0]})  # ends at arm 0 (prev)
         out = ends_at_prev(ev, es).set_index("event_id")
@@ -1229,7 +1229,7 @@ class TestPrevArmMirror:
     def test_contains_path_from_prev_covers_prev_to_current(self):
         # prev=0, current=3 -> cross-patch path {0,3,6,7} (leaves + trunks)
         ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+            [{"event_id": 1, "occupancy_well_arm": 3, "prev_arm": 0, "next_arm": 3}]
         )
         path = sorted(arm_path_well_to_well(0, 3))
         es_full = _make_event_sequence_table({1: path})
@@ -1256,7 +1256,7 @@ class TestPrevArmMirror:
             [
                 {
                     "event_id": 1,
-                    "current_arm": 3,
+                    "occupancy_well_arm": 3,
                     "prev_arm": 0,
                     "next_arm": 3,
                     "next_patch": 2,
@@ -1278,7 +1278,7 @@ class TestPrevArmMirror:
 
     def test_ends_at_prev_missing_sequence_records_false_bool(self):
         ev = _make_event_table(
-            [{"event_id": 1, "current_arm": 3, "prev_arm": 0, "next_arm": 3}]
+            [{"event_id": 1, "occupancy_well_arm": 3, "prev_arm": 0, "next_arm": 3}]
         )
         es = _make_event_sequence_table({2: [0, 1]})  # rows for event 2, not 1
         out = ends_at_prev(ev, es).set_index("event_id")

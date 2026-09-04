@@ -53,7 +53,11 @@ from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta
 from .position import get_position_info
 from .spikes import filter_spike_times, get_electrode_group_info, get_spike_data
 from .task_variables import make_task_variables
-from .trials import make_trials_df_from_well_visits, make_well_visits_df
+from .trials import (
+    make_port_experiences_df,
+    make_trials_df_from_well_visits,
+    make_well_visits_df,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +74,12 @@ def _process_spike_data(
     """
     from ..types import SessionDataKeys
 
-    spike_data["spike_times"], spike_data["spike_waveform_features"] = filter_spike_times(
-        spike_data["spike_times"],
-        spike_data["spike_waveform_features"],
-        position_index,
+    spike_data["spike_times"], spike_data["spike_waveform_features"] = (
+        filter_spike_times(
+            spike_data["spike_times"],
+            spike_data["spike_waveform_features"],
+            position_index,
+        )
     )
     if should_load(SessionDataKeys.SPIKE_TIMES):
         result["spike_times"] = spike_data["spike_times"]
@@ -148,6 +154,7 @@ def _process_behavioral_data(
     if not (
         should_load(SessionDataKeys.WELL_VISITS)
         or should_load(SessionDataKeys.TRIALS)
+        or should_load(SessionDataKeys.PORT_EXPERIENCES)
         or should_load(SessionDataKeys.TASK_VARIABLES)
     ):
         return
@@ -162,11 +169,20 @@ def _process_behavioral_data(
     if should_load(SessionDataKeys.WELL_VISITS):
         result["well_visits"] = well_visits
 
-    if should_load(SessionDataKeys.TRIALS) or should_load(SessionDataKeys.TASK_VARIABLES):
+    if (
+        should_load(SessionDataKeys.TRIALS)
+        or should_load(SessionDataKeys.PORT_EXPERIENCES)
+        or should_load(SessionDataKeys.TASK_VARIABLES)
+    ):
         trials_df = make_trials_df_from_well_visits(well_visits)
 
         if should_load(SessionDataKeys.TRIALS):
             result["trials"] = trials_df
+
+        if should_load(SessionDataKeys.PORT_EXPERIENCES):
+            result["port_experiences"] = make_port_experiences_df(
+                well_visits, trials_df
+            )
 
         if should_load(SessionDataKeys.TASK_VARIABLES):
             task_variables_df = make_task_variables(
@@ -404,6 +420,7 @@ def load_data(
             SessionDataKeys.LIGHT_EVENTS,
             SessionDataKeys.WELL_VISITS,
             SessionDataKeys.TRIALS,
+            SessionDataKeys.PORT_EXPERIENCES,
             SessionDataKeys.TASK_VARIABLES,
         ]
     ):

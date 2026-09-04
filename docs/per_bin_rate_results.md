@@ -18,7 +18,7 @@ the earlier data-driven-knot run, conclusions unchanged. Regenerate with
 (`scripts/rate/plot_per_bin_rate_models.py`, `scripts/rate/plot_model_checking.py`).
 
 Effects are reported **per event-type population**: detected SWR (LFP ripples,
-`n_SWR`), all non-local decoding events, and the non-local split by SWR overlap
+`n_swr_events`), all non-local decoding events, and the non-local split by SWR overlap
 (`non_local_swr` / `non_local_no_swr`). "RR" = rate ratio = `exp(coef)`;
 summaries are across-session medians with per-animal sign consistency (n/5) and a
 signed-rank p. Every effect is *conditional on the first 4 s of each stop*.

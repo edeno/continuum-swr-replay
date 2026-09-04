@@ -20,13 +20,15 @@ import warnings
 
 import matplotlib
 import numpy as np
-import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets  # noqa: E402
+from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
@@ -38,14 +40,16 @@ COLORS = {"detected SWR": "k", "non-local w/ SWR": "C3", "non-local NO SWR": "C0
 
 
 def main() -> None:
-    dense = pd.read_parquet(RC / "stop_timebin_table.parquet", columns=["t_since_pump"])
+    dense = read_table(RC / "stop_timebin_table.pkl")
+    require_covariate_schema(dense, table="stop_timebin")
     exp_h, _ = np.histogram(dense.t_since_pump.dropna().to_numpy(), TBINS)
     sec = exp_h * BIN_S  # seconds of immobility exposure per t-bin
 
-    onset = attach_is_swr_to_onsets(
-        read_table(RC / "event_onset_table.pkl"),
-        read_table(RC / "event_table.pkl"),
-    )
+    onset_source = read_table(RC / "event_onset_table.pkl")
+    events = read_table(RC / "event_table.pkl")
+    require_covariate_schema(onset_source, table="event_onset")
+    require_covariate_schema(events, table="event")
+    onset = attach_is_swr_to_onsets(onset_source, events)
     nl = onset[onset.event_type == "non_local"]
 
     pops = {

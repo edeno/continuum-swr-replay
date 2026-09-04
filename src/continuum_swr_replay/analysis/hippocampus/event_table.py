@@ -51,7 +51,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 from .event_detection import (
     classify_swr_overlap,
@@ -73,7 +75,7 @@ from .event_immobility import (
 # dependency direction (replay builds on hippocampus) stays at module
 # scope; only this upward reference is deferred to call time.
 
-_SESSION_COLS = ["animal", "day", "epoch"]
+_SESSION_COLS = list(SESSION_COLUMNS_DAY)
 
 _REQUIRED_DOT_COLUMNS = (
     "animal",
@@ -98,10 +100,10 @@ _CLASSIFIED_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
     "event_end",
     "event_duration",
     "event_midpoint_time",
-    "max_speed",
-    "mean_speed",
-    "start_speed",
-    "end_speed",
+    "animal_max_speed_cm_s",
+    "animal_mean_speed_cm_s",
+    "animal_start_speed_cm_s",
+    "animal_end_speed_cm_s",
     "whole_event_speed_eligible",
     "endpoints_speed_below_thresh",
     "peak_nonlocal_prob",
@@ -294,12 +296,14 @@ def build_classified_nonlocal_event_table(
                     "non_local_event": int(ev_id),
                     "event_start": float(times[0]),
                     "event_end": float(times[-1]),
-                    "event_duration": float(times[-1] - times[0]),
+                    "event_duration": float(
+                        times[-1] - times[0] + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
+                    ),
                     "event_midpoint_time": float(times[len(times) // 2]),
-                    "max_speed": float(speed.max()),
-                    "mean_speed": float(speed.mean()),
-                    "start_speed": start_speed,
-                    "end_speed": end_speed,
+                    "animal_max_speed_cm_s": float(speed.max()),
+                    "animal_mean_speed_cm_s": float(speed.mean()),
+                    "animal_start_speed_cm_s": start_speed,
+                    "animal_end_speed_cm_s": end_speed,
                     "whole_event_speed_eligible": event_speeds_are_immobile(
                         speed.to_numpy(dtype=float),
                         speed_threshold=speed_threshold,

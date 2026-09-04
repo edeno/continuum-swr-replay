@@ -14,6 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.table_io import read_table
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -81,11 +84,11 @@ def test_block_reconstruction():
     assert list(blocks["t_start_ms"]) == [1000, 2000]  # the contingency-line ts
     # percent -> fraction
     b0 = blocks.iloc[0]
-    assert b0["p_reward_port0"] == 0.8
-    assert b0["p_reward_port2"] == 0.2
+    assert b0["task_reward_probability_port_0"] == 0.8
+    assert b0["task_reward_probability_port_2"] == 0.2
     b1 = blocks.iloc[1]
-    assert b1["p_reward_port0"] == 0.2
-    assert b1["p_reward_port2"] == 0.8
+    assert b1["task_reward_probability_port_0"] == 0.2
+    assert b1["task_reward_probability_port_2"] == 0.8
 
 
 def test_poke_times():
@@ -99,8 +102,8 @@ def _synth_stops():
         {
             "stop_id": [10, 11, 12],
             "stop_start": [1.5, 1.9, 2.5],  # neural s (offset already applied)
-            "current_arm": [0, 2, 2],  # port 0 (p=0.8 then 0.2), port 2
-            "reward_outcome": [1.0, 0.0, 1.0],
+            "occupancy_well_arm": [0, 2, 2],  # port 0 (p=0.8 then 0.2), port 2
+            "is_rewarded_outcome": [1.0, 0.0, 1.0],
         }
     )
 
@@ -111,30 +114,31 @@ def test_value_invariants():
     table = ssc.annotate_stops(_synth_stops(), blocks, offset=0.0)
     ssc._assert_invariants(table)
 
-    port_cols = [f"p_reward_port{p}" for p in range(6)]
+    port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
     vals = table[port_cols].to_numpy()
     assert set(np.round(vals[np.isfinite(vals)], 3)).issubset(ssc.VALID_P_REWARD)
-    assert (table["value_diff_patch"] >= 0).all()
+    assert (table["task_reward_probability_patch_mean_gap_best_vs_second"] >= 0).all()
 
-    # rpe == reward_outcome - p_reward_current, row by row
+    # This diagnostic is outcome minus the programmed task probability, not
+    # the behavioral model's reward prediction error.
     by_id = table.set_index("stop_id")
-    assert by_id.loc[10, "p_reward_current"] == 0.8  # block 0, port 0
-    assert by_id.loc[10, "rpe"] == pytest.approx(1.0 - 0.8)
-    assert by_id.loc[11, "p_reward_current"] == 0.2  # block 0, port 2
-    assert by_id.loc[11, "rpe"] == pytest.approx(0.0 - 0.2)
-    assert by_id.loc[12, "p_reward_current"] == 0.8  # block 1, port 2
-    assert by_id.loc[12, "rpe"] == pytest.approx(1.0 - 0.8)
+    assert by_id.loc[10, "task_reward_probability_chosen_arm"] == 0.8  # block 0, port 0
+    assert by_id.loc[10, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(1.0 - 0.8)
+    assert by_id.loc[11, "task_reward_probability_chosen_arm"] == 0.2  # block 0, port 2
+    assert by_id.loc[11, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(0.0 - 0.2)
+    assert by_id.loc[12, "task_reward_probability_chosen_arm"] == 0.8  # block 1, port 2
+    assert by_id.loc[12, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(1.0 - 0.8)
     # trials_since_block_change resets at the block boundary
     assert by_id.loc[10, "trials_since_block_change"] == 0
     assert by_id.loc[11, "trials_since_block_change"] == 1
     assert by_id.loc[12, "trials_since_block_change"] == 0
 
 
-def test_p_reward_best_and_best_patch():
+def test_task_reward_probability_best_and_best_patch():
     blocks = ssc.reconstruct_blocks(ssc.parse_assignments(_SYNTH_LOG))
     table = ssc.annotate_stops(_synth_stops(), blocks, offset=0.0).set_index("stop_id")
     # block 0 ports: [.8 .5 .2 .8 .2 .5] -> best port = .8
-    assert table.loc[10, "p_reward_best"] == 0.8
+    assert table.loc[10, "task_reward_probability_best_arm"] == 0.8
     # block 0 patch means: P1=(.8+.5)/2=.65, P2=(.2+.8)/2=.5, P3=(.2+.5)/2=.35
     # -> best patch = 1 (ports 0,1). stop 10 at port 0 -> is_best_patch True.
     assert bool(table.loc[10, "is_best_patch"]) is True
@@ -159,8 +163,8 @@ def test_stop_before_first_block_is_dropped():
         {
             "stop_id": [99],
             "stop_start": [0.2],  # before block 0 start (1.0 s)
-            "current_arm": [0],
-            "reward_outcome": [1.0],
+            "occupancy_well_arm": [0],
+            "is_rewarded_outcome": [1.0],
         }
     )
     table = ssc.annotate_stops(stops, blocks, offset=0.0)
@@ -177,6 +181,10 @@ def test_real_session_parse():
     stop_table = read_table(
         PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
     )
+    try:
+        require_covariate_schema(stop_table, table="stop")
+    except ValueError as exc:
+        pytest.skip(f"canonical stop table requires regeneration: {exc}")
     # >= 3 sessions across >= 2 animals that exist in stop_table.
     targets = [
         ("chimi", 20200213, "02_r1"),
@@ -187,7 +195,7 @@ def test_real_session_parse():
     for animal, day, epoch in targets:
         stops = stop_table[
             (stop_table["animal"] == animal)
-            & (stop_table["day"] == day)
+            & (stop_table["session_date"] == day)
             & (stop_table["epoch"] == epoch)
         ]
         if stops.empty:
@@ -208,6 +216,6 @@ def test_real_session_parse():
     # decoded, so it has no rows in stop_table.
     first_content, _, _ = ssc._load_session_inputs("chimi20200212_.nwb", "02_r1")
     first_blocks = ssc.reconstruct_blocks(ssc.parse_assignments(first_content))
-    port_cols = [f"p_reward_port{p}" for p in range(6)]
+    port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
     assert (first_blocks.iloc[0][port_cols] == 1.0).all()
     assert (first_blocks.iloc[1][port_cols] == 0.5).all()

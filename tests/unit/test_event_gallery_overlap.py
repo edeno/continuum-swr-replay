@@ -96,7 +96,7 @@ def test_gallery_footer_formats_unknown_boolean_context_as_na():
     )
     event = pd.Series(
         {
-            "current_arm": pd.NA,
+            "occupancy_well_arm": pd.NA,
             "prev_arm": pd.NA,
             "next_arm": pd.NA,
             "last_rewarded_arm": pd.NA,
@@ -104,11 +104,9 @@ def test_gallery_footer_formats_unknown_boolean_context_as_na():
             "prev_patch": pd.NA,
             "next_patch": pd.NA,
             "is_mua": pd.NA,
-            "is_after_switch": np.nan,
-            "is_after_reward": pd.NA,
-            "is_after_omission": np.nan,
-            "time_since_reward": np.nan,
-            "reward_outcome": np.nan,
+            "did_last_completed_trip_switch_patch": np.nan,
+            "is_rewarded_outcome": pd.NA,
+            "time_since_last_reward_s": np.nan,
         }
     )
 
@@ -116,5 +114,4 @@ def test_gallery_footer_formats_unknown_boolean_context_as_na():
 
     assert "is_mua=n/a" in footer
     assert "after_switch=n/a" in footer
-    assert "after_reward=n/a" in footer
-    assert "after_omission=n/a" in footer
+    assert "rewarded_outcome=n/a" in footer

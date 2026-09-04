@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.replay.learning import stop_replay_summary
 def _toy_inputs() -> dict[str, pd.DataFrame]:
     """One stop, one event. Target patch (1) arms 0/1/6 all NaN,
     other arms have explicit zero."""
-    sess = {"animal": "m", "day": 1, "epoch": "e"}
+    sess = {"animal": "m", "session_date": 1, "epoch": "e"}
     target_arms = {0, 1, 6}  # patch 1
     eat = pd.DataFrame(
         [
@@ -27,12 +27,12 @@ def _toy_inputs() -> dict[str, pd.DataFrame]:
                 **sess,
                 "event_id": 1,
                 "stop_id": 10,
-                "arm": arm,
+                "candidate_arm": arm,
                 "arm_fraction": np.nan if arm in target_arms else 0.0,
                 # ``stop_replay_summary`` reads ``recent_reward_rate``
                 # to pick the per-event "best" arm; supply zeros so
                 # the helper finds *some* well arm with a finite rate.
-                "reward_rate_arm_k10": 0.0,
+                "reward_fraction_candidate_arm_last10_visits": 0.0,
             }
             for arm in range(9)
         ]
@@ -43,7 +43,7 @@ def _toy_inputs() -> dict[str, pd.DataFrame]:
                 **sess,
                 "event_id": 1,
                 "stop_id": 10,
-                "current_arm": 0,        # patch 1 — the NaN patch
+                "occupancy_well_arm": 0,        # patch 1 — the NaN patch
                 "prev_arm": 0,
                 "next_arm": 0,
                 "last_rewarded_arm": 0,
@@ -57,18 +57,16 @@ def _toy_inputs() -> dict[str, pd.DataFrame]:
             {
                 **sess,
                 "stop_id": 10,
-                "current_arm": 0,
+                "occupancy_well_arm": 0,
                 "prev_arm": 0,
                 "last_rewarded_arm": 0,
-                "is_after_reward": 0.0,
-                "is_after_omission": 0.0,
-                "is_after_stay": 0.0,
-                "is_after_switch": 0.0,
+                "is_rewarded_outcome": 0.0,
+                "did_last_completed_trip_switch_patch": 0.0,
                 "is_stay": 0.0,
                 "is_swr_stop": False,
                 "is_mua_stop": False,
-                "n_events": 1,
-                "immobility_time": 1.0,
+                "n_selected_events": 1,
+                "immobility_duration_s": 1.0,
             }
         ]
     )

@@ -8,13 +8,25 @@ against; the harmonization refactor brings the code to this spec.
 
 **Status: definitions implemented; canonical tables and model artifacts require
 regeneration before paper results are updated.** The covariate
-definitions live in `analysis/replay/covariates.py`; the per-arm value block
-(`reward_rate_arm_k10` at k=10, `p_reward_arm`, `q_arm`) is emitted by the event
-builders from the per-stop contingency artifact (`p_reward_port`/`q_port`,
-per-animal fitted α in `contingency_csv_alpha.json`); the value rungs are `Mv`
-(arm) / `Pv` (patch); `q_current` enters the MU/coupling runners; the choice
-baseline includes learned `q_arm`, recent reward rate, recency/novelty, and
-`arm_dist_rank`. Existing coefficients predate the location and
+definitions live in the `analysis/replay/covariates/` package: `clocks.py`
+owns arrival/outcome timing, `context.py` owns time-local trial and location
+labels, `history.py` owns reward, visit, switch, and local leaky-Q history,
+and `candidate_arm.py` is the single shared Replay/ContFrag implementation of
+the nine-arm predictor block. `definitions.py` provides the machine-readable
+scientific catalog (units, grain, clock, support, missingness, and producer),
+while `analysis/replay/table_contracts.py` (one level above the `covariates/`
+package) validates complete candidate sets, response conservation, and
+all-or-none leaf support at producer/reducer boundaries. The
+package `__init__.py` is the stable public import surface. The candidate-arm
+value block (`reward_fraction_candidate_arm_last10_visits`,
+`task_reward_probability_candidate_arm`, and
+`reward_belief_mean_candidate_arm_preoutcome`) is emitted by the event
+builders from the canonical per-stop qvals artifact. The local leaky-Q
+comparison uses the fixed α documented below; the value rungs are `Mv`
+(arm) / `Pv` (patch); `reward_belief_mean_chosen_arm_preoutcome` enters the
+MU/coupling runners; the choice
+baseline includes the learned candidate-arm reward belief, recent reward
+fraction, recency/novelty, and `candidate_arm_distance_rank`. Existing coefficients predate the location and
 two-clock history contracts and must not be treated as results from these
 definitions.
 
@@ -26,7 +38,7 @@ conditional/multinomial model, so it cannot be a main effect there. Hence:
 | estimator | family | scalar covariates (reward / value / switch) | arm- or patch-relative covariates |
 |---|---|---|---|
 | **absolute** | per-bin rate (B), per-stop rate (A), coupling/power | **main effects** | — |
-| **conditional (content)** | arm hierarchy, patch hierarchy | only as **`× is_current`** (or `× role`) interactions | **main effects** |
+| **conditional (content)** | arm hierarchy, patch hierarchy | only as **`× is_current_arm`** (or another explicit role) interactions | **main effects** |
 | **conditional (choice)** | next-arm logit | (cancel — omit) | **main effects** over the choice set |
 
 "Parallel" therefore means **same construct, same window and units**, entered in
@@ -43,52 +55,55 @@ Named by **scope + window** so the same word never hides a different definition.
 
 | canonical name | definition | window (N=10) | scope | units | enters |
 |---|---|---|---|---|---|
-| `reward_lag{1..10}` | outcome of the j-th most recent trial whose outcome was observable by the query time | 10 known outcomes, per-lag | all-arm (per-trial) | binary | rate A (Rlag), rate B, MU, coupling — main effects |
-| `reward_rate_trial_k10` | rewarded fraction of the last 10 trials with known outcomes | 10 known outcomes | all-arm | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
-| `reward_rate_arm_k10` | rewarded fraction of the last 10 **visits to that arm**; an unvisited leaf (no prior visit, but the session has prior trials) is encoded `0.0`, while the explicit `arm_never_visited` term separates novelty from an observed zero. Trunk arms are structurally `0.0`; no-prior-trials rows are NaN. | 10 arm-visits | per-arm | fraction | content (main effect), choice (main effect); rate/coupling via `× is_current` |
+| `known_reward_outcome_lag_{1..10}` | outcome of the j-th most recent port experience whose outcome was observable by the query time; experience 0 enters only when its outcome was physically observed | 10 known outcomes, per-lag | all-port | binary | rate A (Rlag), rate B, MU, coupling — main effects |
+| `reward_fraction_last10_known_trials` | rewarded fraction of the last 10 outcome-known port experiences; experience 0 enters only when its outcome was physically observed | 10 known outcomes | all-port | fraction | rate A (R2), standalone only — **never co-fit with the kernel** (it is the kernel's mean → VIF ∞) |
+| `reward_fraction_candidate_arm_last10_visits` | rewarded fraction of the last 10 **visits to that candidate arm**; an unvisited leaf is encoded `0.0`, while `is_candidate_arm_never_visited` separates novelty from an observed zero. Trunk arms are structurally `0.0`; rows before any known port outcome are NaN. | 10 arm-visits | candidate arm | fraction | content and choice main effect; rate/coupling via current-arm interaction |
 
-Change from prior code (implemented): the per-arm rate was **5-visit**
-(`recent_reward_rate`) and is now **10-visit** (`reward_rate_arm_k10`). The all-arm
-10-trial rate (`recent_trial_reward_rate`) was renamed `reward_rate_trial_k10`. Trunk
-arms keep the structural `0.0`; never-visited leaf arms are `0.0` plus
-`arm_never_visited = 1`.
+The candidate-arm fraction uses a **10-visit** window. The all-port fraction
+uses the last 10 outcome-known port experiences. The persisted column names
+retain “trial” for artifact continuity, but their canonical source is an
+explicit experience stream: starting-port occupancy first, then one destination
+per complete physical poke-to-poke movement. Epoch boundaries do not establish
+occupancy and enter neither visit nor reward history. No synthetic movement
+trial, visit, or outcome is inserted. Trunk arms keep the structural `0.0`;
+never-visited leaf arms are `0.0` plus
+`is_candidate_arm_never_visited = 1`.
 
 ### 2. Value — both nominal and experienced, available to every family
 
 | canonical name | definition | scope | source | enters |
 |---|---|---|---|---|
-| `p_reward_current` | nominal contingency p(reward) of the current arm | scalar | `qvals_table` (DataJoint) | rate/coupling main effect |
-| `value_diff_patch` | nominal **patch**-level best-minus-second-best: the gap between the highest and second-highest patch mean p(reward). Always >= 0; a global scalar per trial, entered as a main effect only (never `× is_current_patch`) | scalar | `qvals_table` (nominal schedule) | rate/coupling main effect |
-| `p_reward_arm` | nominal contingency p(reward) of **each** arm | per-arm | `qvals_table` (DataJoint) | content value rung; retained as a separate choice sensitivity rather than co-fit with learned Q |
-| `q_current` | beta-model **belief** (value) of the current/chosen arm (`q_chosen` = `Q{leaf}`) | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | rate/coupling main effect |
-| `q_arm` | beta-model **belief** of **each** arm (`q_port{i}` = `Q{i+1}`) | per-arm | behavior model (`beta_stable_withleaf`) | content value main effect and the primary Stage-5A choice-value control, matching the manuscript's Beta–Bernoulli decision model. (The HMM `q_arm_hmm` construct was **retired 2026-07-13**.) |
-| `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** for the most recently completed trial (α=0.3), computed over the full trial stream and broadcast to its stops | scalar | `canonical_trial_uncertainty_history` | **retained comparison** (MU only) |
+| `task_reward_probability_chosen_arm` | nominal contingency p(reward) of the realized destination arm; defined once that choice is known | scalar | `qvals_table` (DataJoint) | post-choice rate/coupling main effect |
+| `task_reward_probability_patch_mean_gap_best_vs_second` | nominal **patch**-level best-minus-second-best: the gap between the highest and second-highest patch mean p(reward). Always >= 0; a global scalar per trial, entered as a main effect only (never `× is_current_patch`) | scalar | `qvals_table` (nominal schedule) | rate/coupling main effect |
+| `task_reward_probability_candidate_arm` | nominal contingency p(reward) of each candidate arm | candidate arm | `qvals_table` | content value rung; retained as a separate choice sensitivity rather than co-fit with learned belief |
+| `reward_belief_mean_chosen_arm_preoutcome` | Beta-model reward-probability belief selected at the realized destination arm; the belief state itself precedes the outcome, but selecting this scalar requires the choice to be known | scalar | behavior model (`qvals_table`, `beta_stable_withleaf`) | post-choice rate/coupling main effect |
+| `reward_belief_mean_candidate_arm_preoutcome` | Beta-model reward-probability belief mean for each candidate arm | candidate arm | behavior model (`beta_stable_withleaf`) | content value main effect and primary Stage-5A choice-value control |
+| `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** at the most recently arrived physical movement destination (α=0.3); every earlier observed port outcome updates the state | scalar | `canonical_port_value_history` | **retained comparison** (MU only) |
 
-Changes (implemented): `p_reward_arm` **replaced the formerly-deferred
-`nominal_reward_prob` column** and is now populated (`nominal_reward_prob`→`p_reward_arm`
-in the `tables.py` schema + the viz registry, no orphan). `q_current`/`q_arm` are the
-experienced-value covariate — now the **beta-model belief** (`beta_stable_withleaf`),
-not a local leaky-Q learner: all value covariates were migrated to `qvals_table.parquet`
-(DataJoint, assigned at canonical stop start; retires the difflib contingency CSV). The
-model's per-port `Q{i}` populate `q_port{i}` → `q_arm`, and `Q{leaf}` = `q_chosen` →
-`q_current`. **`leaky_q_value_diff` is NOT this** — it is a *different*, still-local
-construct (one pre-update best-minus-second margin per completed trial, α=0.3,
-computed over every completed trial in `covariates.py`, persisted on stop rows,
-and then broadcast to events by `stop_id`), kept as a reported MU-only comparison. `value_diff_patch`
+Migration note: the old event-arm names `p_reward_arm` and `q_arm` became
+`task_reward_probability_candidate_arm` and
+`reward_belief_mean_candidate_arm_preoutcome`; the formerly deferred
+`nominal_reward_prob` field was removed. The model's native per-port values are
+adapted to `reward_belief_mean_port_{0..5}`, and the chosen value is exposed as
+`reward_belief_mean_chosen_arm_preoutcome`. **`leaky_q_value_diff` is NOT this** — it is a different local
+construct (one pre-update best-minus-second margin per arrived movement destination, α=0.3,
+computed from the complete starting-port-plus-destinations experience stream in `covariates/history.py`, persisted on stop rows,
+and then broadcast to events by `stop_id`), kept as a reported MU-only comparison. `task_reward_probability_patch_mean_gap_best_vs_second`
 (nominal) remains a scalar
-rate/coupling covariate. **`rpe` is now the model RPE everywhere** (`reward − q_chosen`,
+rate/coupling covariate. **`rpe_postoutcome` is the model RPE everywhere**
+(`reward − reward_belief_mean_chosen_arm_preoutcome`,
 from `qvals_table.parquet`; see [behavior_model_covariates.md](behavior_model_covariates.md)) —
-after the migration every consumer (MU-uncertainty as `rpe_model`, plus `fit_swr_power`
-and `_covariate_ranking`) uses the model RPE, not a nominal one.
+after the migration every consumer (`fit_uncertainty_rate`, `fit_swr_power`, and
+`_covariate_ranking`) uses this canonical model RPE, not a nominal stand-in.
 
 ### 3. Exploration — canonical continuous + retained binary comparison
 
 | canonical name | definition | window | units | enters |
 |---|---|---|---|---|
-| `recent_switch_rate` | rolling mean of `is_patch_change` over the last (up to) 5 completed trials, including the most recently completed trial | 5 completed trials | fraction | **canonical** cross-family: rate/coupling main effect; content via `× is_current` |
-| `is_after_switch` | the most recently completed trip changed patch | 1 completed trial | binary | **retired as a fitted predictor** (2026-08-21, superseding D4): often constant within a session's complete-case cohort, which makes the design rank-deficient. Kept as a table column only, to define the dedicated switch cohort. See `docs/design/2026-08-21-covariate-naming-scheme.md`. |
-| `omission_streak` | leading consecutive omissions: count of leading 0s in `reward_lag1, reward_lag2, …`, stopping at the first 1. A `NaN` lag truncates the count. **`NaN` when `reward_lag1` itself is unresolved** — with no known most-recent outcome there is nothing to count from, and returning 0 would be indistinguishable from "the last trial was rewarded" (1,359 / 107,400 stops, the earliest of each session) | up to 10 known outcomes | count | model-free uncertainty block; excluded from the MU rate fit for collinearity with `reward_lag1` |
-| `wsls_deviation` | 0 on win-stay or lose-shift, 1 on win-shift or lose-stay. Reads `completed_trial_reward` (the trip's *realized* outcome, ungated) paired with `is_stay`. `NaN` where no trip has completed or the outbound choice is unresolved | 1 completed trial | binary | **descriptive only** — embeds the eventual choice, so future-referencing however the outcome is clocked |
+| `patch_switch_fraction_last5_completed_trips` | rolling mean of patch change over the last (up to) 5 completed trips, including the most recently completed trip | 5 completed trips | fraction | cross-family rate/coupling main effect; content via current-arm interaction |
+| `did_last_completed_trip_switch_patch` | the most recently completed trip changed patch | 1 completed trip | binary | behavioral metadata and dedicated switch-cohort selector; **retired as a fitted predictor** because it is often constant within a session cohort |
+| `omission_streak` | leading consecutive omissions in `known_reward_outcome_lag_1, known_reward_outcome_lag_2, …`, stopping at the first reward; a NaN truncates the count and unresolved lag 1 yields NaN | up to 10 known outcomes | count | model-free uncertainty block; excluded from the MU rate fit for collinearity with lag 1 |
+| `wsls_deviation` | 0 on win-stay or lose-shift, 1 on win-shift or lose-stay. Reads `completed_trial_reward` (the trip's *realized* outcome, ungated) paired with `is_stay`. `NaN` where no trip has completed, the outcome was not observed, or the outbound choice is unresolved | 1 completed trial | binary | **descriptive only** — embeds the eventual choice, so future-referencing however the outcome is clocked |
 
 (D4 (2026-06-29) kept both; **superseded 2026-08-21**: `recent_switch_rate` (now
 `patch_switch_fraction_last5_completed_trips`) remains the canonical graded covariate, but
@@ -96,27 +111,38 @@ and `_covariate_ranking`) uses the model RPE, not a nominal one.
 
 ### 4. Spatial / role — already consistent, no change
 
-**Two occupancy columns, two constructs.** `location_arm` (aliased as
-`current_arm`) is a *task state*: which well the animal is visiting, derived
+**Two spatial constructs.** `occupancy_well_arm` is a *task state*: which well
+the animal is visiting, derived
 from trip intervals, and **NaN during a trip** — the destination is never named
-before arrival, which is what makes it safe as a predictor. `physical_arm` is a
-*position*: the modal track segment the tracking falls on, always defined,
+before arrival, which is what makes it safe as a predictor.
+`modal_observed_track_segment_id` is a *position*: the modal track segment the
+tracking falls on, always defined,
 trunks included. They disagree on 46 of 59,374 at-well events (0.077%), where
 the animal is still inside its well-visit interval but a mean 48.4 cm from the
 well. Neither is a fallback for the other; a cohort needing occupancy off-well
 must state which construct it means.
 
+**Per-builder event windows.** The event-window-derived task-state fields
+(`occupancy_well_arm`, `current_patch`, `is_stay`, `prev_arm`/`next_arm`/
+`last_rewarded_arm`, `is_rewarded_outcome`) are computed by each builder over
+*its own* event window, not joined from a shared source. NonLocal and ContFrag
+events are genuinely different windows inside the same immobility bout, so on a
+handful of shared stops the two builders' values legitimately differ (~0.01-0.37%
+of shared stops, e.g. 58/15,763 for `occupancy_well_arm`). This is expected, not a
+bug — do not treat these as a single canonical stop-level value across builders.
+
 **Scope and support traps, measured 2026-08-19.** Six covariates whose names promise
 more than the data delivers:
 
-- **`is_post_switch = 0` does not mean "no switch yet".** It means the *nearest* switch
-  is ahead rather than behind (`trials_since_switch >= 0`). Of the 35.1% of trials
+- **`is_periswitch_post = 0` does not mean "no switch yet".** It means the
+  *nearest* switch is ahead rather than behind (`periswitch_index_trials < 0`).
+  Of the 35.1% of trials
   labelled 0, **94.75% already had a switch earlier in the session**. It is a
   nearest-neighbour tie-break, not a causal ordering flag.
-- **`trials_since_switch` is signed and clipped.** 35.1% of trials are negative
+- **`periswitch_index_trials` is signed and clipped.** 35.1% of trials are negative
   (counting down to a *future* switch) and **26.9% sit exactly on the ±20 clip**, so a
   linear slope is fit partly on a saturation plateau.
-- **`arm_dist_rank` is ranked over all nine arms**, but the choice set drops the current
+- **`candidate_arm_distance_rank` is ranked over all nine arms**, but the choice set drops the current
   arm and the trunks, leaving only ranks **{2, 6, 8}**. In that set the 2→6 step spans
   **108 cm** of real distance and the 6→8 step spans **1.3 cm** — entered linearly, a
   third of its slope is assigned to a 1 cm difference. Do not read its coefficient as a
@@ -128,38 +154,30 @@ more than the data delivers:
 - **`patch_count_hard` includes the patch's trunk**, and trunk arms carry **24.1%** of
   all decoded MAP bins — so every patch-level coefficient is partly about corridor
   representation.
-- **Choice-model `replay_frac` does not sum to 1** over the candidate set: mean
+- **Choice-model `replay_fraction` does not sum to 1** over the candidate set: mean
   **0.49**, because `arm_fraction` is normalised over nine arms and the choice set keeps
   five. The excluded current arm alone holds mean 0.24.
 
-**Per-SD support: leaf-only is PENDING, not shipped.** The builder code now
-estimates `q_arm_z`, `p_reward_arm_z`, `reward_rate_arm_k10_z`, and
-`arm_uncertainty_z` from leaf rows only — structural-zero trunks cannot shrink the
-unit of a leaf-defined value or uncertainty effect — but **the materialized tables
-and `standardization_reference.json` still carry all-nine-arm moments.** Verified
-2026-08-20: each stored `_z` reproduces exactly under nine-arm moments and not under
-leaf-only, and the reference JSON has no `support` key. Until the canonical tables
-are regenerated, every persisted `_z`, and every coefficient quoted per 1 SD from
-one, is on the **nine-arm** unit. To restate a shipped coefficient on the leaf
-support, divide by the ratio below:
+**Per-SD support: leaf-only is SHIPPED.** The candidate-arm belief mean, task
+probability, reward fraction, and belief variance are standardized from leaf rows
+only — structural-zero trunks cannot shrink the unit of a leaf-defined value or
+uncertainty effect. This is materialized: as of the 2026-08-21 leaf-support
+regeneration (re-promoted with the 2026-08-25 initial-port-experience corpus),
+`standardization_reference.json` carries `"support": "leaf_arms"` on all four
+columns and every persisted `_z` reproduces exactly under the **leaf** moments
+(e.g. `reward_belief_variance_candidate_arm_preoutcome` std = 0.021175 = leaf SD,
+n_reference_rows = 390120 = the leaf-row count). **Every shipped `_z`, and every
+coefficient quoted per 1 SD from one, is already on the leaf-support unit — do not
+apply any nine-arm→leaf conversion.** (Historical note: before 2026-08-21 the
+persisted `_z` used all-nine-arm moments; coefficients quoted from that era read
+~2.09× / ~1.62× / ~1.17× / ~1.02× larger for the four columns above,
+respectively, and must be divided by those ratios to compare to a current
+leaf-support coefficient. The current tables need no such conversion.) The raw
+SWR × candidate-arm belief-mean interaction stays on probability units, so it
+still must not be compared numerically to a standardized uncertainty coefficient
+without an explicit SD conversion.
 
-| column | nine-arm SD | leaf SD | divide by |
-|---|---|---|---|
-| `q_arm` | 0.249373 | 0.119117 | **2.094** |
-| `arm_uncertainty` | 0.034305 | 0.021199 | **1.618** |
-| `p_reward_arm` | 0.280519 | 0.239836 | 1.170 |
-| `reward_rate_arm_k10` | 0.306641 | 0.300561 | 1.020 |
-
-Of these, only `arm_uncertainty_z` is consumed by the fitted ladders (the other
-three enter raw), so in practice the shipped uncertainty coefficients are
-overstated by 1.618x. Raw `swr_x_q_arm` remains on probability units, so it still
-must not be compared numerically to a standardized uncertainty coefficient without
-an explicit SD conversion. The standard content runner, SWR-contrast content
-runner, uncertainty analysis, and uncertainty figure loader now fail closed on
-this legacy reference/result bundle; they require regeneration before publishing a
-leaf-support coefficient or figure.
-
-**`switch_advantage_mu_preoutcome_sess` (ΔV) is Switch − Stay**, confirmed against the
+**`relative_value_switch_minus_stay_preoutcome` (ΔV) is Switch − Stay**, confirmed against the
 manuscript (`references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`, Methods): Stay is
 the *upcoming* port within the patch, Switch is the greater of the two alternative patches'
 mean port values, and the difference is taken *"without accounting for the cost of Switching
@@ -168,8 +186,11 @@ carrying a finite value (r = 1.000000); 102,975 counts *stop rows*, not distinct
 Use the `_mu` variant, not `_Qstem`: the latter is on the decision-value scale and is
 negative on 99.90% of rows (99 positive, max +0.755) because it carries the stay bonus.
 ΔV is ~ −(the current arm's stay value): r = −0.952 with
-`stay_sibling_mu_preoutcome_sess`, −0.890 with `q_chosen`, with near-identical SD
-(0.158). A **positive** `relval_x_current` therefore means content sharpens onto the
+`stay_value_preoutcome`, −0.890 with
+`reward_belief_mean_chosen_arm_preoutcome`, with near-identical SD
+(0.158). A positive
+`relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm` coefficient
+therefore means content sharpens onto the
 current arm when that arm's value is **low**. Earlier labels called it "Stay-vs-Switch",
 which inverts the reading; corrected 2026-08-19, though one stale label remains in
 `scripts/rate/fit_swr_contrast_rate.py:23`.
@@ -178,17 +199,17 @@ which inverts the reading; corrected 2026-08-19, though one stale label remains 
 modelled cohort is speed-gated immobility throughout, and off-well events have
 a median speed of 1.35 cm/s — they are animals standing still partway through a
 trip. The content models exclude them because the well-visit construct is
-undefined there (so `is_current` and everything derived from it is NaN), not
+undefined there (so `is_current_arm` and everything derived from it is NaN), not
 because of motion. The at-well cohort is stated explicitly in the runner rather
 than emerging from that NaN pattern.
 
 
-`is_current`, `is_current_patch`, `is_prev`, `is_prev_patch`,
-`is_last_rewarded_elsewhere` / `is_last_rewarded_patch_elsewhere` (disjoint
-support), `arm_fe_{0..7}` (content baseline), `arm_dist_rank` (choice baseline,
-replaces `dist_to_arm` for identifiability). Definitions unchanged.
+`is_current_arm`, `is_current_patch`, `is_prev_arm`, `is_prev_patch`,
+`is_last_rewarded_noncurrent_arm` / `is_last_rewarded_noncurrent_patch`
+(disjoint support), `is_candidate_arm_{0..7}` (content baseline), and
+`candidate_arm_distance_rank` (choice baseline). Definitions are unchanged.
 
-Both `_elsewhere` columns are **pooled-only as of 2026-08-18**: they are built
+Both noncurrent last-rewarded indicators are **pooled-only as of 2026-08-18**: they are built
 and feed the pooled SWR-contrast rungs, but no per-session ladder rung uses
 them. They fire on 6.1% (arm) and 2.9% (patch) of events and are perfectly
 separated in roughly half the sessions, which made every rung in a
@@ -205,44 +226,47 @@ rate — not the location-cohort rule — is the ceiling on their support.
 
 `bs(tc)` (fixed knots (1,2,3) s, [0,4]), the reward-lag kernel, `onset_lag{j}` /
 `hist_rcos` self-history. These are per-bin within-stop terms and live only in the
-rate families; conditional models access within-stop time only as `tsc_x_current`
-(`× is_current`) when a within-stop content effect is tested.
+rate families; conditional models access within-stop time only through an
+explicit current-arm interaction when a within-stop content effect is tested.
 
 ## C. Per-family covariate matrix (target)
 
 | construct | rate B (per-bin) | rate A (per-stop) | coupling | content (arm/patch) | choice |
 |---|---|---|---|---|---|
-| reward kernel `reward_lag{j}` | main | main (Rlag) | main | `× is_current` | — |
-| `reward_rate_trial_k10` | (M2r standalone) | main (R2) | — | — | — |
-| `reward_rate_arm_k10` | `× is_current` | — | `× is_current` | **main** | **main** |
-| `p_reward_current` / `p_reward_arm` | main / `×is_current` | — | main | **`p_reward_arm` main** | nominal-value sensitivity |
-| `q_current` / `q_arm` | main | — | main | **`q_arm` main** | **`q_arm` main** |
-| `rpe`, `value_diff_patch` | main | — | main | (nominal via interaction if tested) | — |
-| `recent_switch_rate` | main | main | main | `× is_current` | (main if predictive) |
-| `is_after_switch` | — (retired) | — (retired) | cohort selector only | — (retired) | — |
-| spatial role / `arm_fe` | — | — | — | main | choice-set + `arm_dist_rank` |
-| `bs(tc)`, self-history | main | — | — | `tsc_x_current` only | — |
+| `known_reward_outcome_lag_{j}` | main | main (Rlag) | main | current-arm interaction if tested | — |
+| `reward_fraction_last10_known_trials` | M2r standalone | main (R2) | — | — | — |
+| `reward_fraction_candidate_arm_last10_visits` | current-arm interaction | — | current-arm interaction | **main** | **main** |
+| current-arm task probability / `task_reward_probability_candidate_arm` | main | — | main | candidate-arm main | nominal-value sensitivity |
+| chosen-arm / candidate-arm reward-belief mean | main | — | main | candidate-arm main | candidate-arm main |
+| `rpe_postoutcome`, `task_reward_probability_patch_mean_gap_best_vs_second` | main after timing gate | — | main after timing gate | interaction if tested | — |
+| `patch_switch_fraction_last5_completed_trips` | main | main | main | current-arm interaction | optional main |
+| `did_last_completed_trip_switch_patch` | — | — | cohort selector only | — | — |
+| spatial role / `is_candidate_arm_{0..7}` | — | — | — | main | choice set + `candidate_arm_distance_rank` |
+| `bs(tc)`, self-history | main | — | — | `log1p_time_since_stop_start_s_z_x_is_current_arm` only | — |
 
 ## D. Decisions of record (2026-06-29)
 
-- **D1** — recent-reward-rate window standardized to **N = 10** in each construct's
-  natural unit: `reward_rate_trial_k10` (10 trials, all-arm) and `reward_rate_arm_k10`
+- **D1** — recent-reward window standardized to **N = 10** in each construct's
+  natural unit: `reward_fraction_last10_known_trials` (10 known outcomes) and
+  `reward_fraction_candidate_arm_last10_visits`
   (10 visits, per-arm). Per-arm window changes 5→10. **Caveat:** "10" is not the same
   *real-time* span (a single arm is visited far less often than trials elapse) — it is
   10 in each construct's own unit, not 10 in time.
-- **D2** — add **per-arm nominal value** `p_reward_arm` to content and retain it
+- **D2** — add candidate-arm nominal value
+  `task_reward_probability_candidate_arm` to content and retain it
   for an explicit choice sensitivity — by
   **replacing the formerly-deferred `nominal_reward_prob` column** (renamed and now
   populated), not a new parallel column.
-- **D3** — **add** the experienced-value covariate `q_current` / `q_arm` (now the
-  **beta-model belief** from `qvals_table`, not a local leaky-Q learner) as canonical,
+- **D3** — add the chosen/candidate-arm Beta reward-belief mean from qvals,
+  not a local leaky-Q learner, as canonical,
   and **keep `leaky_q_value_diff`** (the completed-trial pre-update margin, a
   different local construct) as a *reported comparison*. (Revised from "drop":
   the two are different
   algorithms, and the margin is deliberately kept in the MU dissociation table.)
-- **D4** — exploration canonical = **`recent_switch_rate`**; keep `is_after_switch`
-  as the immediate-binary comparison. **Superseded 2026-08-21:** `is_after_switch` is
-  retired as a fitted predictor (rank deficiency); kept only as a cohort selector.
+- **D4** — exploration canonical =
+  `patch_switch_fraction_last5_completed_trips`.
+  `did_last_completed_trip_switch_patch` is retired as a fitted predictor
+  (rank deficiency) and kept only as metadata/cohort selector.
 - **D5** — adopt the **entry-rule contract** (§A) as the standing rule.
 
 ## E. Notes / non-goals
@@ -269,26 +293,43 @@ the event it predicts. Classification of the covariates fitted by the rate model
 
 | covariate | class | available before event? |
 |---|---|---|
-| `p_reward_current`, `p_reward_arm`, `value_diff_patch`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
-| `q_current` / `q_arm`, `switch_advantage_*_preoutcome_sess`, Beta `*_mu`/`*_var` `preoutcome` | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
-| destination/visit recency, `is_after_switch`, `recent_switch_rate` | **arrival clock** | yes — destination and inbound patch change become known at goal arrival |
-| reward lags/rates/counts, last-rewarded well | **outcome clock** | yes — advance at first pump onset (reward) or at the latest possible pump latency after arrival, capped at departure (omission) |
-| `beta_reward_entropy` | beta belief entropy (mean per-leaf Beta differential entropy) | yes (pre-outcome posterior) |
-| `rpe` (= reward − q_chosen), `*_mu_update_abs_postoutcome_sess` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
-| `reward_outcome`, `is_after_reward`, `is_after_omission` | most recently arrived trip's outcome | finite **only after** that outcome is observable; otherwise NaN |
+| `task_reward_probability_candidate_arm`, `task_reward_probability_patch_mean_gap_best_vs_second`, `trials_since_block_change` | nominal schedule | yes — fixed by the block, known at trial start |
+| `task_reward_probability_chosen_arm`, `reward_belief_mean_chosen_arm_preoutcome` | chosen-arm-selected schedule/belief | **only after the destination choice is known**; current rate/coupling uses conservatively post-outcome-gated rows |
+| candidate-arm reward-belief means, `relative_value_switch_minus_stay_preoutcome`, and reward-belief variance | model, **pre-outcome** belief (row *t* = belief entering trial *t*) | yes |
+| destination/visit recency, `did_last_completed_trip_switch_patch`, `patch_switch_fraction_last5_completed_trips` | **arrival clock** | yes — destination and inbound patch change become known at goal arrival |
+| reward lags/rates/counts, last-rewarded well | **outcome clock** | yes — advance at first pump onset (reward) or at the latest possible pump latency after arrival, capped at the collapsed task visit's final poke-out (omission) |
+| `reward_belief_differential_entropy_leaf_mean_preoutcome` | mean per-leaf Beta differential entropy | yes (pre-outcome posterior) |
+| `rpe_postoutcome`, `reward_belief_mean_update_l1_all_ports_postoutcome` | model, **post-outcome** (uses the current trial's realized reward) | **only if the event follows reward delivery** |
+| `is_rewarded_outcome` (omission derived as `1 - reward`) | most recently arrived trip's outcome | finite **only after** that outcome is observable; otherwise NaN |
 | `is_stay`, `wsls_deviation` | eventual outbound choice | no — future-referencing; descriptive use only |
-| `completed_trial_reward` | completed trip's realized outcome, **ungated** | no — post-outcome; exists only so `wsls_deviation` can name the outcome the animal just experienced |
+| `completed_trial_reward` | completed physical trip's realized outcome, **ungated** | no — post-outcome; exists only so `wsls_deviation` can name the outcome the animal just experienced |
 
 **Arrival is not the outcome boundary.** Canonical trials therefore carry two
-clocks. `goal_arrival_time` controls destination, visit, and inbound-switch
-history. `outcome_known_time` is the first pump onset for a rewarded trial. For
+clocks. `destination_first_poke_in_time` controls destination, visit, and
+inbound-switch history (`goal_arrival_time` is a temporary compatibility alias).
+Consecutive same-port re-pokes are one task experience, matching Comrie: arrival
+is its first poke-in and departure is its final poke-out. This task-port context
+is deliberately broader than literal photogate engagement during each bout.
+`outcome_known_time` is the first pump onset for a rewarded trial. For
 an omission it is destination arrival + `OMISSION_KNOWN_LATENCY_SEC` (0.30 s),
-capped at destination departure; this exceeds every observed reward latency and
-does not condition the boundary on the animal's full dwell duration. Between
+capped at the destination task visit's **final** poke-out. A later same-port
+physical re-poke does not create a new task experience. A delayed pump anywhere
+inside that whole visit is credited to the same experience, matching Comrie's
+visit parser; therefore a transient beam release cannot establish an omission.
+The 0.30-s latency exceeds every observed rewarded-visit pump latency and does
+not otherwise condition the boundary on the animal's dwell duration. Between
 arrival and that boundary, arrival-derived fields are populated while all
 current reward-bearing fields remain NaN. Older/manual trial frames without a
 physical outcome column use `end_time` for both outcomes: conservative for
 rewards, but never anticipatory.
+
+Experience 0 is the recorded origin poke preceding the first complete movement.
+A recorded pump gives it an exact reward-on clock; a physical poke without a
+pump supplies an observed omission at the same operational feedback boundary
+used for destination visits. An epoch boundary supplies neither occupancy nor
+outcome. Likewise, movement after the final physical poke is not a completed
+trial. This prevents left- or right-censored epoch fragments from being
+manufactured as visits or omissions.
 
 Outcome-bearing fields remain in `POST_OUTCOME` in `covariate_timing.py` because
 their finite values semantically encode the realized current outcome. A model
@@ -313,9 +354,9 @@ distinction matters for what a coefficient licenses you to claim:
 
 | class | covariates | a coefficient means |
 | --- | --- | --- |
-| **experienced** | `is_current`, `is_prev`, `dist_to_arm`, `time_since_stop`, `reward_lag{j}`, `omission_streak`, `cumulative_reward`, `reward_rate_arm_k10`, `last_rewarded_arm`, `is_after_switch`, `visit_recency`, `arm_never_visited` | content covaries with something the animal directly underwent |
-| **inferred** (model belief) | `q_arm`, `q_current`, `arm_uncertainty`, `beta_reward_entropy`, `switch_advantage_mu_preoutcome_sess`, `leaky_q_value_diff`, `rpe`, `global_mu_update_*` | content covaries with a *hypothesised* internal state, conditional on the belief model being right |
-| **scheduled** (experimenter-only) | `p_reward_arm`, `p_reward_current`, `value_diff_patch`, `trials_since_block_change` | content covaries with the **programmed contingency** |
+| **experienced** | current/previous arm indicators, distance, stop time, known reward lags, omission streak, reward count/fraction, last-rewarded arm, completed-trip switch, visit recency, novelty | content covaries with something the animal directly underwent |
+| **inferred** (model belief) | candidate/chosen-arm reward-belief means and variance, Beta differential entropy, relative value, local leaky-Q margin, RPE, and belief updates | content covaries with a *hypothesised* internal state, conditional on the belief model being right |
+| **scheduled** (experimenter-only) | candidate/current-arm task reward probability, `task_reward_probability_patch_mean_gap_best_vs_second`, `trials_since_block_change` | content covaries with the **programmed contingency** |
 
 The third row is the one that gets over-claimed. The animal never observes a
 block boundary or a nominal p(reward); it only ever holds a noisy estimate. A
@@ -325,15 +366,17 @@ represents trials-since-block-change. Report these as schedule effects, and if
 the claim is about representation, use the inferred-belief covariates instead.
 
 (Timing itself is fine in all three: `trials_since_block_change` is a
-backward `cumcount` within a block, unlike `trials_since_switch`, which is
+backward `cumcount` within a block, unlike `periswitch_index_trials`, which is
 signed toward the nearest switch — including future ones — and is therefore
 future-referencing.)
 
 ### F.1 Two clocks can coexist in one design row
 
-The value block (`q_arm`, `p_reward_arm`, `arm_uncertainty`) is the belief
-*entering* the trial, so it is pre-outcome by construction. The reward-history
-block (`cumulative_reward`, `reward_rate_arm_k10`, `reward_lag{j}`) advances on
+The candidate-arm reward-belief mean/variance and task-probability block is
+fixed on the qvals row entering the trial. The reward-history block
+(`reward_count_candidate_arm_last10_known_trials`,
+`reward_fraction_candidate_arm_last10_visits`, and
+`known_reward_outcome_lag_{j}`) advances on
 the outcome clock. On **83.9 % of events** (54,537 / 65,020 matched) the event starts after its
 trial's `outcome_known_time`, and 54,451 of those trials were rewarded — so
 within a single design row the two blocks summarise history through
@@ -341,18 +384,23 @@ within a single design row the two blocks summarise history through
 
 > **That 83.9 % must be re-derived.** It was measured against the *previous*
 > omission boundary (destination poke-out). The boundary is now poke-in +
-> `OMISSION_KNOWN_LATENCY_SEC`, which is earlier by a median 0.87 s, so more
+> `OMISSION_KNOWN_LATENCY_SEC`, capped at the collapsed visit's final poke-out;
+> it is earlier by a median 0.87 s, so more
 > events clear it and the share will move — upward. The qualitative claim (the
 > two blocks close at different endpoints, differing by the just-received
 > reward) is unaffected; only the number is stale.
 
 This is not leakage: the value block carries strictly *less* recent
 information than the reward block, never more. It is verified pre-update —
-`q_port[chosen]` moves +0.078 after a reward and −0.091 after an omission on
-the following trial, and `rpe == trial_reward − q_chosen` exactly.
+the chosen entry in `reward_belief_mean_port_{0..5}` moves +0.078 after a reward
+and −0.091 after an omission on the following trial, and
+`rpe_postoutcome == trial_reward − reward_belief_mean_chosen_arm_preoutcome`
+exactly.
 
-It is an interpretation hazard. A coefficient on `q_arm` read against one on
-`reward_rate_arm_k10` is not "value vs. reward history at the same moment";
+It is an interpretation hazard. A coefficient on
+`reward_belief_mean_candidate_arm_preoutcome` read against one on
+`reward_fraction_candidate_arm_last10_visits` is not "value vs. reward history
+at the same moment";
 the value term is one outcome behind. Say so when the two appear in the same
 rung (M v, C4/CS5, C13/CS6).
 
@@ -360,12 +408,12 @@ A related, smaller offset: the value block is frozen at `stop_start` (it is
 joined by `stop_id` from the per-stop qvals artifact) while every other
 event-arm history covariate is frozen at `event_start`. Median gap 2.39 s. The
 practical impact is small — qvals' assigned arm equals the event's own
-`current_arm` on 100.00 % of at-well events whose stop is `mixed` — but the
+`occupancy_well_arm` on 100.00 % of at-well events whose stop is `mixed` — but the
 two are not the same instant.
 
 ### F.2 Scope condition: the at-well cohort is not SWR-neutral
 
-`is_current` is undefined off-well, so every rung containing it fits the
+`is_current_arm` is undefined off-well, so every rung containing it fits the
 at-well cohort (see
 [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md)).
 That exclusion is **not balanced across the SWR contrast**: it removes
@@ -388,66 +436,76 @@ Two consequences to state wherever those contrasts are reported:
    per-animal consistency checks — the "5/5 animals" statements — compare
    differentially restricted populations.
 
-### F.3 `time_since_stop` and `tc` are different quantities
+### F.3 `time_since_stop_start_s` and `tc` are different quantities
 
-`event_table.time_since_stop` is the **median over the event's bins**, i.e.
+`event_table.time_since_stop_start_s` is the **median over the event's bins**, i.e.
 the event *midpoint* minus `stop_start`. The Family-B design's `tc` is the bin
 centre, and `event_onset_table.t_since_stop_onset` is the event *start* minus
 `stop_start`. They agree on **0 of 65,913 events**, differing by exactly
-`event_duration / 2` (median 31 ms, max 1.71 s). Negligible for
-`time_x_current`-style interactions, but they are not one construct.
+`event_duration_s / 2` (median 31 ms, max 1.71 s). Negligible for
+time-by-current-arm interactions, but they are not one construct.
 
 ## G. Base covariate reference
 
 Definitions for the base (non-interaction) covariates on the canonical tables.
-Interactions (`swr_x_*`, `mua_x_*`, `time_x_*`, `switch_x_*`, `current_x_*`,
-`omission_x_*`) are products of a base covariate with a modifier (`is_swr`,
-`is_mua`, the time-course, `is_after_switch`, `is_current`, `is_after_omission`)
+Interactions are products of a canonical base covariate with a modifier
+(`is_swr`, `is_mua`, the time course, a current-arm role, or a derived omission)
 and are not catalogued separately. `_patch` variants aggregate the per-arm column
-to the 3 patches. Value/RL covariates (`p_reward_*`, `q_*`, `rpe`, ΔV, entropy,
-Beta `*_mu`/`*_var`, `stem_*_p`) are in
+to the 3 patches. Value/RL covariates (task reward probability, reward-belief
+mean/variance, RPE, relative value, entropy, and choice probability) are in
 [`behavior_model_covariates.md`](behavior_model_covariates.md).
 
 **Spatial / trajectory** (per event-arm):
-- `location_state` / `at_well` / `location_well` — whole-window behavioral
+- `occupancy_state` / `at_well` / `occupancy_well_id` — whole-window behavioral
   location. An event is `at_well` only if every bin is at the same well;
   `in_transit`, `mixed`, and `unknown` events remain in the canonical tables so
-  analyses can filter them explicitly. `physical_arm` is the modal observed
-  track segment, including trunks. `current_arm` is a compatibility alias of
-  `location_arm` and is NaN off-well; there is no trunk-to-destination fallback.
+  analyses can filter them explicitly. `modal_observed_track_segment_id` is
+  the modal observed track segment, including trunks.
+  `occupancy_well_arm` is NaN off-well; there is no
+  trunk-to-destination fallback.
   9.10 % of events are off-well on the regenerated tables — see
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
-- `is_current`, `is_prev`, `is_next` — arm equals the animal's at-well /
-  previous-trial-origin / upcoming-trial-destination arm. `is_next` is **future-referenced**
+- `is_current_arm`, `is_prev_arm`, `is_next_arm` — candidate arm equals the
+  animal's at-well / previous-trip-origin / upcoming-trip-destination arm.
+  `is_next_arm` is **future-referenced**
   (the destination the animal will run to); used only where a spec includes it, and
   interpreted as forward representation, not a causal predictor.
-  `is_current` is **NaN** (not 0) wherever `current_arm` is, so any spec
+  `is_current_arm` is **NaN** (not 0) wherever `occupancy_well_arm` is, so any spec
   containing it is fit on the at-well cohort by complete-case selection. That
   is the only cohort in which "the current arm" is defined — it is not an
-  optional sensitivity subset. `is_prev` / `is_next` / `is_last_rewarded`
+  optional sensitivity subset. `is_prev_arm` / `is_next_arm` /
+  `is_last_rewarded_arm`
   instead encode an absent reference as 0, because "no previous trip" genuinely
   means no arm qualifies.
-- `is_same_patch` — arm shares a patch with `current_arm`; NaN wherever
-  `is_current` is.
-- `dist_to_arm` — track-graph distance from the animal's current position to the arm
-  (0 at the current arm); `arm_dist_rank` is its within-event min-rank.
+- `is_same_patch_as_current` — candidate arm shares a patch with
+  `occupancy_well_arm`; NaN wherever current occupancy is undefined.
+- `distance_to_candidate_arm_cm` — track-graph distance from the animal's
+  current position to the candidate arm; `candidate_arm_distance_rank` is its
+  within-event min-rank.
 
-**Reward / value history** (per event-arm, from the trial sequence):
-- `cumulative_reward` — number of rewards received at that arm among the prior
-  (up to) 10 outcome-known trials; this is a finite-window count, not a
+**Reward / value history** (per event-arm, from the port-experience sequence):
+- The canonical stream starts with the port occupied before the first movement,
+  followed by one destination experience per movement. Spatial visit history
+  advances at each experience's arrival. Reward history advances only when its
+  outcome is physically available. Movement trials remain a separate table and
+  are not renumbered or padded.
+- `reward_count_candidate_arm_last10_known_trials` — number of rewards
+  received at that candidate arm among the prior
+  (up to) 10 outcome-known port experiences; this is a finite-window count, not a
   session-to-date cumulative total.
-- `visit_recency` — **trials-ago** since the animal last visited that arm (a discrete
+- `visit_recency_trials` — **port experiences ago** since the animal last visited that
+  candidate arm (a discrete
   trial count, not elapsed time), measured at the **event start** using only
-  trials completed by then. A reachable arm not yet visited receives the
-  time-local right-censored value `n_completed_trials + 1`;
-  `arm_never_visited` separately marks that state. Appending future trials
+  port arrivals completed by then. A reachable arm not yet visited receives the
+  time-local right-censored value `n_arrived_experiences + 1`;
+  `is_candidate_arm_never_visited` separately marks that state. Appending future trials
   therefore cannot change an earlier event's recency. **Trunk arms carry a
   structural `0.0`** once any history exists — they are not reward sites, so
   "trials since last visit" is undefined for them and zero is a placeholder,
   not "just visited". Any aggregation over arms must mask trunks first
-  (`visit_recency_patch` takes its minimum over leaf arms only for exactly
+  (`visit_recency_trials_patch` takes its minimum over leaf arms only for exactly
   this reason).
-  `visit_recency_demeaned` subtracts the mean across the **visited** leaf arms
+  `visit_recency_trials_event_leaf_centered` subtracts the mean across the **visited** leaf arms
   within that same event (trunks remain structural zero). Never-visited arms
   are excluded from that mean: their value is set by the censoring rule rather
   than measured, and including it would displace every other arm in the event.
@@ -458,39 +516,44 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
   leaf still carries `n_completed + 1` minus the visited mean, which on the
   regenerated tables is 18,897 / 395,478 leaf rows (4.78 %) with mean +9.66 and
   max +163.5 against ~0 for visited arms. Every shipped rung pairs
-  `visit_recency_demeaned` with `arm_never_visited`, which absorbs that state —
+  `visit_recency_trials_event_leaf_centered` with
+  `is_candidate_arm_never_visited`, which absorbs that state —
   a rung using the former without the latter would estimate roughly 5 % of its
   slope off the censoring rule. Pair them.
 - **Trunk-arm convention (applies to the value block too).** Trunk arms 6/7/8
-  are not reward sites. `reward_rate_arm_k10` and `visit_recency` document their
-  structural `0.0`; `q_arm`, `p_reward_arm` and `arm_uncertainty` follow the
+  are not reward sites. Candidate-arm reward fraction and visit recency
+  document their structural `0.0`; candidate-arm belief mean, task probability,
+  and belief variance follow the
   identical convention (structural `0.0` for a mapped stop, `NaN` when the stop
   has no qvals row at all) even though it was previously stated only for the
   first two. Any aggregation over arms must mask trunks first — a structural
   zero entering a `min` or a `mean` is silently wrong, which is why
-  `visit_recency_patch` takes its minimum over leaf arms only.
-- `arm_never_visited` — 1.0 where the animal has never visited that leaf arm by
+  `visit_recency_trials_patch` takes its minimum over leaf arms only.
+- `is_candidate_arm_never_visited` — 1.0 where the animal has never visited that leaf arm by
   the event start, else 0.0; trunk arms 0.0. Carries the right-censored state
-  that `visit_recency`'s fill value can only approximate, and enters M4+,
-  `BASEc`, and the choice ladder alongside `visit_recency_demeaned`. Because a
+  that `visit_recency_trials`'s fill value can only approximate, and enters M4+,
+  `BASEc`, and the choice ladder alongside `visit_recency_trials_event_leaf_centered`. Because a
   never-visited arm always holds the maximum pre-centering recency, the two
   move together by construction — check conditioning before reading their
   coefficients separately.
-- `visit_recency_patch` / `arm_never_visited_patch` — per-patch aggregates,
+- `visit_recency_trials_patch` / `is_patch_never_visited` — per-patch aggregates,
   both taken as the **minimum over the patch's two leaf arms** (trunks
   excluded). A patch is novel only if both its leaves are novel.
-- `reward_rate_arm_k10` — rewarded fraction of the last 10 outcome-known visits to that arm
+- `reward_fraction_candidate_arm_last10_visits` — rewarded fraction of the
+  last 10 outcome-known visits to that candidate arm, including the starting
+  port when it is that arm,
   (trunk arms 0.0; a leaf arm not yet visited is also encoded 0.0, *not* NaN —
-  only rows with no prior trials at all stay NaN). See §2.
+  only rows with no physically known port outcome stay NaN). See §2.
 
 **Recent-trial context** (per stop, broadcast to the stop's events):
-- `reward_outcome` / `is_after_reward` / `is_after_omission` — the most recently
-  arrived trip's outcome, exact complements once known and all NaN while that
-  outcome is pending.
-- `is_after_stay` / `is_after_switch` — the completed inbound transition stayed
-  in / switched patch (exact complements; available at destination arrival).
+- `is_rewarded_outcome` — the most recently arrived trip's outcome, nullable
+  until feedback is known; omission is derived as its complement with the same
+  missingness.
+- `did_last_completed_trip_switch_patch` — whether the completed inbound
+  transition switched patch (available at destination arrival); stay is
+  derived only where needed.
 - `is_stay` — whether the later outbound trip stays within the patch. This is a
-  future-referencing response, not the same construct as `is_after_stay`.
+  future-referencing response, not the completed inbound-trip construct.
 
 **Event / state indicators** (per event):
 - `is_swr` — event overlaps a sharp-wave ripple (strict positive-duration overlap;
@@ -499,28 +562,39 @@ Beta `*_mu`/`*_var`, `stem_*_p`) are in
 - `non_local_event` — the event is a non-local (replay) event.
 
 **Timing / exposure** (per event unless noted):
-- `immobility_time` — stop (immobility bout) duration; the **`log(immobility_time)`
+- `immobility_duration_s` — stop (immobility bout) duration; the
+  **`log(immobility_duration_s)`
   exposure offset** in the rate models (per stop).
-- `time_since_stop` — time from the immobility-bout onset to the event.
-- `time_since_last_port_entry` — time from the most recent well/port entry
-  completed by the event start to the event start. `time_since_port_entry` is
-  a compatibility alias. An arrival during an event never enters this value.
-  Both are nonnegative when present; an in-progress trip's future arrival is
+- `time_since_stop_start_s` — time from the immobility-bout onset to the event.
+- `time_since_last_well_arrival_s` — time from the most recent well arrival
+  completed by the event start to the event start. An arrival during an event
+  never enters this value. It is nonnegative when present; an in-progress trip's future arrival is
   never used.
-- `time_since_reward` — time from the last reward available by event start to
+- `time_since_last_reward_s` — time from the last reward available by event start to
   the event start.
-- `event_duration`, `event_start`, `event_end`, `event_midpoint_time` — the event's
-  span and boundary/mid timestamps.
+- `event_duration_s`, `event_start_s`, `event_end_s`, `event_midpoint_s` — the event's
+  boundary/mid timestamps and inclusive decoded duration:
+  `event_end_s - event_start_s + 1 / DEFAULT_SAMPLING_FREQUENCY_HZ`. Thus a
+  one-bin event has one-bin duration rather than zero.
 
 **Decode content** (per event-arm; the content-model response family):
-- `arm_fraction` — MAP-based: fraction of the event's real-arm timebins whose decoded
-  MAP arm is this arm (junction bins excluded; sums to 1 over the 9 arms).
+- `arm_fraction` — MAP-based: fraction of decoded timebins assigned to this arm;
+  a MAP coordinate exactly at a junction is assigned to its nearest real arm by
+  the hard decoder mapping (sums to 1 over the 9 arms when MAP is finite).
 - `arm_fraction_posterior` — posterior-mass-based: this arm's summed posterior mass
-  over the total real-arm mass (also sums to 1).
-- `arm_posterior_mass` / `arm_count_soft` / `arm_count_hard` — unnormalized posterior
-  mass / soft (posterior-weighted) and hard (MAP) timebin counts per arm.
-- `replay_frac` — mean `arm_fraction` across the events in the stop (choice dataset);
-  `replay_frac_swr` / `replay_frac_non_swr` restrict to the stop's SWR / non-SWR events.
+  over the total real-arm mass (also sums to 1). **Builder-specific denominator:**
+  the NonLocal builder normalizes by `nonlocal_probability_sum` (probability-weighted
+  mass); ContFrag, which has no non-local-probability concept, normalizes by
+  `n_timebins` (bin-count mass). Both sum to 1 over the nine arms, but the column
+  means probability-weighted mass in NonLocal and bin-count mass in ContFrag — do
+  not compare the two builders' values as the same quantity.
+- `arm_posterior_mass` — summed non-local-probability-weighted posterior mass.
+- `arm_count_soft` — non-local-probability-weighted count of timebins whose
+  **MAP** arm is this arm; despite the historical “soft” name, it is not a full
+  posterior-mass allocation.
+- `arm_count_hard` — count of timebins whose MAP arm is this arm.
+- `replay_fraction` — mean `arm_fraction` across the events in the stop (choice dataset);
+  `replay_fraction_swr` / `replay_fraction_non_swr` restrict to the stop's SWR / non-SWR events.
 
 **Self-history** (per-bin rate design; built at fit time, not stored):
 - `tc` — time (s) since stop onset for each bin; entered via a `bs(tc)` spline (the

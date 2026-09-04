@@ -8,7 +8,18 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay._helpers import recent_trial_reward_rate
+from continuum_swr_replay.analysis.replay.covariates import (
+    recent_trial_reward_rate as _recent_trial_reward_rate,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+
+
+def recent_trial_reward_rate(times, trials, k=10):
+    return _recent_trial_reward_rate(
+        times,
+        port_experiences_from_trials(trials, prepend_initial=False),
+        k,
+    )
 
 
 def _trials(end_times, is_reward) -> pd.DataFrame:

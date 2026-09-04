@@ -36,6 +36,9 @@ import statsmodels.api as sm
 from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -47,16 +50,16 @@ SCRATCH = Path("scratch")
 
 def prep(stop: pd.DataFrame) -> pd.DataFrame:
     df = stop.copy()
-    df = df[df["immobility_time"] > 0].copy()
+    df = df[df["immobility_duration_s"] > 0].copy()
     for c in ("current_patch", "prev_patch", "next_patch"):
         df = df[df[c].notna()]
     df["pre_switch"] = (df["next_patch"] != df["current_patch"]).astype(int)
     df["post_switch"] = (df["current_patch"] != df["prev_patch"]).astype(int)
-    df["after_omission"] = df["is_after_omission"].astype(float).fillna(0).astype(int)
+    df["after_omission"] = (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
     df["session"] = (
-        df["animal"].astype(str) + df["day"].astype(str) + "_" + df["epoch"].astype(str)
+        df["animal"].astype(str) + df["session_date"].astype(str) + "_" + df["epoch"].astype(str)
     )
-    df["log_off"] = np.log(df["immobility_time"].to_numpy(dtype=float))
+    df["log_off"] = np.log(df["immobility_duration_s"].to_numpy(dtype=float))
     return df
 
 
@@ -79,7 +82,9 @@ def rr_table(res, terms):
 
 
 def main():
-    df = prep(read_table(RC / "stop_table.pkl"))
+    stop = read_table(RC / "stop_table.pkl")
+    require_covariate_schema(stop, table="stop")
+    df = prep(stop)
     n_sess = df["session"].nunique()
     logging.info(
         "%d stops, %d sessions | pre_switch=%d post_switch=%d after_omission=%d",

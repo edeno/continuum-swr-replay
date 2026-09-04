@@ -43,7 +43,7 @@ def compare_nested_models(
         One row per session with delta_aic, delta_bic, lr_stat, lr_pvalue.
     """
     if session_cols is None:
-        session_cols = ["animal", "day", "epoch"]
+        session_cols = ["animal", "session_date", "epoch"]
 
     # Accept both "ll" (legacy binomial) and "llf" (conditional Poisson)
     ll_col = "llf" if "llf" in parent_results.columns else "ll"

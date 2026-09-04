@@ -62,11 +62,11 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     cols = ["count"]
     if spec.time_spline or spec.reward_time_interaction:
         cols.append("tc")
-    cols += [f"reward_lag{j}" for j in range(1, spec.reward_lags + 1)]
+    cols += [f"known_reward_outcome_lag_{j}" for j in range(1, spec.reward_lags + 1)]
     if spec.reward_time_interaction and spec.reward_lags == 0:
-        cols.append("reward_lag1")
+        cols.append("known_reward_outcome_lag_1")
     if spec.reward_rate:
-        cols.append("reward_rate_trial_k10")
+        cols.append("reward_fraction_last10_known_trials")
     if spec.self_history_basis:
         cols += [f"hist_rcos_{k}" for k in range(spec.self_history_basis)]
     else:
@@ -141,11 +141,11 @@ def fit_per_bin_rate_model(
             spec.name, len(df), n_events, min_bins, min_events,
         )
         return None
-    # Reward coefficients are unidentified without contrast in reward_lag1.
+    # Reward coefficients are unidentified without contrast in known_reward_outcome_lag_1.
     if (spec.reward_lags >= 1 or spec.reward_time_interaction) and (
-        df["reward_lag1"].nunique() < 2
+        df["known_reward_outcome_lag_1"].nunique() < 2
     ):
-        logger.debug("%s: <2 reward_lag1 levels, reward terms unidentified", spec.name)
+        logger.debug("%s: <2 known_reward_outcome_lag_1 levels, reward terms unidentified", spec.name)
         return None
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))

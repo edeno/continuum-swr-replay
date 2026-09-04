@@ -174,6 +174,24 @@ The 6-well environment is organized into 3 patches:
 WELL_ARMS: tuple[int, ...] = tuple(sorted(WELL_PATCH_MAPPING))
 """Leaf arm IDs that terminate at the six reward wells, in canonical order."""
 
+POKE_EVENT_TO_WELL: dict[str, int] = {f"Poke{well + 1}": well for well in WELL_ARMS}
+"""Map the six physical beam-break DIO channels to zero-based reward wells.
+
+The DIO channel identifies which port was poked. Tracked position is a useful
+quality-control measurement, but it is not authoritative at a poke boundary:
+the position estimate can move onto an adjoining segment while the beam remains
+broken. Keeping this mapping explicit prevents that tracking noise from
+creating or deleting behavioral trials.
+"""
+
+PUMP_EVENT_TO_WELL: dict[str, int] = {f"Pump{well + 1}": well for well in WELL_ARMS}
+"""Map reward-pump DIO channels to their zero-based reward wells.
+
+Reward assignment is valid only when the pump channel matches the photogate
+channel containing the pump onset.  Keeping this map separate from the poke
+map makes that acquisition invariant explicit and testable.
+"""
+
 TRACK_SEGMENT_TO_PATCH = {
     0: 1,
     1: 1,

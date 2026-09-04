@@ -3,9 +3,10 @@
 
 Per session: load ``dot`` + pump-event times, build the sparse event-onset
 table and the dense 4 ms stop-timebin table (see
-``analysis.replay.timebin_tables``), concatenate, and save:
+``analysis.replay.timebin_tables``), concatenate, stamp with the canonical
+covariate schema, and save:
 
-- ``event_onset_table.pkl``      (sparse, ~one row per onset)
+- ``event_onset_table.parquet``  (sparse, ~one row per onset)
 - ``stop_timebin_table.parquet`` (dense, ~one row per (stop, 4 ms bin))
 
 Usage:
@@ -29,7 +30,8 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table  # noqa: E402
+from continuum_swr_replay.session_keys import n_sessions  # noqa: E402
+from continuum_swr_replay.table_io import publish_canonical  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -53,7 +55,11 @@ def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
 def validate(onset: pd.DataFrame, dense: pd.DataFrame) -> None:
     # Dense onset totals reconstruct the sparse onset counts. Both derive from
     # the same _event_onset_times + assign_bout, so they must agree exactly.
-    for etype, col in [("SWR", "n_SWR"), ("non_local", "n_non_local"), ("MUA", "n_MUA")]:
+    for etype, col in [
+        ("SWR", "n_swr_events"),
+        ("non_local", "n_nonlocal_events"),
+        ("MUA", "n_mua_events"),
+    ]:
         a = int((onset.event_type == etype).sum())
         b = int(dense[col].sum())
         assert a == b, f"{etype}: onset rows {a} != dense {col} sum {b}"
@@ -83,29 +89,49 @@ def main() -> None:
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
     logger.info("building time-binned tables for %d sessions...", len(sessions))
-    onsets, denses, t0 = [], [], time.time()
+    onsets, denses, failures, t0 = [], [], [], time.time()
     for i, s in enumerate(sessions):
         try:
             o, d = build_one(s)
         except Exception as e:  # noqa: BLE001
-            logger.warning("skip %s %s: %s", s["nwb_file_name"], s["epoch_name"], e)
+            failures.append((s["nwb_file_name"], s["epoch_name"], str(e)))
             continue
-        if len(d):
-            onsets.append(o)
-            denses.append(d)
+        if not len(d):
+            failures.append((s["nwb_file_name"], s["epoch_name"], "no stop bins"))
+            continue
+        onsets.append(o)
+        denses.append(d)
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
+
+    # Fail closed. These tables are joined to event/stop tables on stop keys and
+    # feed every Family-B rate fit; a silently dropped session would ship a
+    # timebin table covering fewer sessions than its siblings, which no
+    # downstream fitter (they only check the schema stamp) would catch.
+    if failures:
+        raise RuntimeError(
+            f"{len(failures)} of {len(sessions)} session(s) failed to build a "
+            f"timebin table; sample={failures[:10]}. Nothing was written."
+        )
     onset = pd.concat(onsets, ignore_index=True)
     dense = pd.concat(denses, ignore_index=True)
+    for label, frame in (("event_onset", onset), ("stop_timebin", dense)):
+        n = n_sessions(frame)
+        if n != len(sessions):
+            raise RuntimeError(
+                f"{label} table has {n} sessions; expected {len(sessions)}"
+            )
     validate(onset, dense)
 
     if args.no_save:
         logger.info("--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense))
         return
-    write_table(onset, RC / "event_onset_table")
-    dense.to_parquet(RC / "stop_timebin_table.parquet", compression="zstd", index=False)
+    # publish_canonical stamps + writes atomically; the one canonical write door.
+    publish_canonical(onset, RC, table="event_onset", basename="event_onset_table")
+    publish_canonical(dense, RC, table="stop_timebin", basename="stop_timebin_table")
     logger.info(
-        "saved %d onsets -> event_onset_table.pkl, %d bins -> stop_timebin_table.parquet",
+        "saved %d onsets -> event_onset_table.parquet, "
+        "%d bins -> stop_timebin_table.parquet",
         len(onset), len(dense),
     )
 

@@ -12,99 +12,19 @@ Single source of truth for the four model families, each a dict of
 - ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
   choice (different estimator again).
 
-The design notes below concern the conditional-Poisson **arm and
-patch** hierarchies. Their defining constraint: only arm-varying
-predictors are identifiable — event-level constants (time_since_stop,
-is_swr, etc.) cancel in the within-event normalization and appear
-only as interactions with arm-varying predictors. That rule does NOT
-apply to ``MODEL_PER_STOP_RATE`` (ordinary Poisson, carries an intercept) or
-``MODEL_CHOICE``; see their own sections.
+Defining constraint for the conditional-Poisson **arm and patch**
+hierarchies: only arm-varying predictors are identifiable — event-level
+constants (time since stop start, is_swr, etc.) cancel in the within-event
+normalization and appear only as interactions with arm-varying predictors.
+That rule does NOT apply to ``MODEL_PER_STOP_RATE`` (ordinary Poisson, carries
+an intercept) or ``MODEL_CHOICE``; see their own sections.
 
-Design decisions informed by exploratory analysis on 7 j16 sessions:
-
-- Arm fixed effects (``arm_fe_0`` … ``arm_fe_7``, 8 dummies with arm
-  8 as reference) enter as a baseline model ``M0a`` and are carried
-  by every richer model. They absorb each arm's static replay
-  occupancy so ``is_current`` / ``is_prev`` / ``is_last_rewarded``
-  measure bias *above* an arm's own baseline rather than being
-  inflated by it — important in camp-heavy sessions where the
-  animal sits at one well and ``is_current`` then concentrates on a
-  single arm. See :data:`ARM_FE_PREDICTORS`.
-- ``reward_rate_arm_k10`` (rewarded fraction of the last 10 visits to
-  an arm) is used as the reward-history predictor at M3/M4 rather
-  than ``cumulative_reward`` (a raw reward *count*). The count
-  conflates value with visit frequency — a frequently-visited arm
-  scores high even at a mediocre reward rate — so its M3 coefficient
-  partly re-encodes spatial recency. ``reward_rate_arm_k10`` is a
-  true rate. Once any trial has completed, a never-visited leaf is
-  encoded as 0.0 rather than NaN; M4 adds ``arm_never_visited`` so
-  that right-censored novelty is distinguishable from an observed
-  zero reward rate. Events before the first completed trial remain
-  unknown and are removed by complete-case selection.
-- M4 uses an event-local recency *spline* rather than a
-  session-wide transformation. At each event, the mean recency over
-  the *visited* reward-site arms is subtracted from every leaf-arm
-  recency; never-visited leaves are excluded from that mean because
-  their ``n_completed + 1`` value is a censoring rule, not a measured
-  recency. ``arm_never_visited`` carries that state separately and
-  trunk arms remain structural zero. Appending future events cannot
-  change an earlier design row, and the coefficient represents
-  relative recency within the event above the arm-FE baseline.
-- Reward memory has NO rung in the per-session arm ladder. Neither
-  form of the last-rewarded indicator is usable here: the raw
-  ``is_last_rewarded`` correlates 0.919 with ``is_current`` (it marks
-  the same arm on 93.2% of location-resolved events), and the
-  ``is_last_rewarded_elsewhere`` residual has support on only 6.1% of
-  events and is perfectly separated in 99 of 208 sessions. Both
-  survive in the pooled SWR-contrast rungs (C5_lastrew, CS3_lastrew),
-  where pooling across sessions supplies the variation a per-session
-  fit lacks.
-
-  History, because the reasoning reversed twice and the intermediate
-  numbers are still quoted elsewhere. The "elsewhere" residual was
-  introduced to break a ~98% overlap between ``is_last_rewarded`` and
-  ``is_current``. On 2026-08-17 that overlap was measured at 33.7% and
-  the residual at 58.2% of events, which read as the collinearity
-  having dissolved. Both figures were artifacts: they came from tables
-  where an unresolved location made ``is_current`` 0 rather than NaN,
-  so every in-transit event silently counted the last-rewarded arm as
-  "elsewhere". Off-well events are 9.1% of the corpus and carry
-  ``is_last_rewarded`` on 93.4% of themselves. Once they are NaN, the
-  overlap is 93.2% and the residual 6.1% -- the original ~98% regime,
-  essentially intact. **Do not cite the 33.7% or 58.2% figures.**
-- **M3 is the only rung carrying ``reward_rate_arm_k10`` without
-  ``arm_never_visited``.** A never-visited leaf is encoded ``0.0`` there,
-  identical to "visited and never rewarded", and M4 adds the disambiguator.
-  So the M3->M4 step is not a pure novelty test: part of it is M4 cleaning up
-  an encoding M3 was already using ambiguously. The nesting is deliberate and
-  the step is a valid likelihood comparison, but do not report it as
-  "replay tracks novelty" on its own -- cite ``arm_never_visited``'s own
-  coefficient for that.
-- ``is_next`` excluded: the alternation structure makes
-  ``prev_arm == next_arm`` on **84.5%** of the events where both are
-  defined (measured 2026-08-18; an earlier ">90%" here was never
-  re-derived). They separate on 15.5% of events, but **98.4% of those
-  are also patch switches**, so the separating population is the same
-  event class ``is_prev`` plus ``is_after_switch`` already indexes --
-  which is why the exclusion still stands on the corrected number.
-- ``current_x_last_rewarded`` excluded: VIF 97-100 with both
-  ``is_current`` and ``is_last_rewarded``. Measured under the ~98%
-  overlap regime, which the 93.2% figure above shows still holds, so
-  the exclusion stands.
-- ``dist_to_arm`` and ``is_same_patch`` excluded: proven
-  uninformative (null when estimated independently; VIF 28 and 12
-  with ``is_current``). The spatial effect is binary "here vs
-  not here," not a distance gradient.
-- SWR modulation is split across two rungs: M5 adds the spatial
-  interactions (``swr_x_current``, ``swr_x_prev``), and M6 adds the
-  reward-rate and relative-recency interactions. Superseded note: an
-  elsewhere-reward-memory interaction was once a third term here and
-  was removed, because
-  ``is_last_rewarded_elsewhere`` itself has support on only ~2% of
-  events, so convergence and uncertainty require real-data
-  re-validation after canonical table regeneration.
-- MUA interactions are a separate analysis (split, not interaction)
-  to avoid the same collinearity.
+The design-decision narrative — why each rung carries the predictors it does,
+which predictors are excluded and why, and the reversed reasoning and retracted
+numbers that are part of the audit trail — lives in
+``docs/design/model_history.md``. This module is the machine-readable catalog;
+that document is the record of how it got this way. Per-rung reasoning that
+sits next to a specific ``ModelSpec`` stays inline below.
 """
 
 from __future__ import annotations
@@ -149,14 +69,14 @@ __all__ = [
 
 # ── Arm fixed effects ──
 #
-# Eight indicator columns ``arm_fe_0`` … ``arm_fe_7`` (``arm_fe_k`` =
+# Eight indicator columns ``is_candidate_arm_0`` … ``is_candidate_arm_7`` (``arm_fe_k`` =
 # 1 iff ``arm == k``). Arm 8 is the dropped reference category — with
 # all nine dummies the set is collinear with the conditional
 # likelihood's per-event normalization. These are generated at fit
 # time from the canonical ``arm`` column by
 # ``_helpers.add_arm_fixed_effects`` (they are not stored in the
 # canonical event-arm table).
-ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"arm_fe_{a}" for a in range(8))
+ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"is_candidate_arm_{a}" for a in range(8))
 
 
 @dataclass(frozen=True)
@@ -248,10 +168,10 @@ def default_content_model_names(
 # per-session conditional fit does not have.
 #
 # SWR interactions enter at M5 / M6. M5 carries the *spatial* × SWR
-# interactions (swr_x_current, swr_x_prev) — does the local/previous
+# interactions (``swr_x_is_current_arm``, ``swr_x_is_prev_arm``) — does the local/previous
 # bias differ for SWR-overlapping events? M6 adds the *value* × SWR
-# interactions (swr_x_reward_rate_arm_k10,
-# swr_x_visit_recency_demeaned) — does the reward structure of replay
+# interactions (``swr_x_reward_fraction_candidate_arm_last10_visits`` and the
+# centered-recency spline interactions) — does the reward structure of replay
 # differ on SWR events? Splitting M5 from M6 lets the nested LR cleanly
 # separate "spatial is SWR-modulated" from "reward is SWR-modulated".
 #
@@ -290,52 +210,69 @@ def default_content_model_names(
 # 0.386 because recency is right-skewed (median 21 on the support, max 198). If
 # per-session instability in these columns becomes a problem, the log1p scale is
 # the first thing to try: only these two constants change.
+# Interior knot positions (in trial counts) and clamp bounds for the natural
+# cubic spline on visit recency. The two knots (12, 40 trials) place flexibility
+# across the bulk of the recency distribution; the bounds (3, 200) clamp
+# extreme/right-censored recencies before the basis is evaluated. Values are
+# empirical (chosen for the observed recency distribution), not derived — retune
+# them together if the recency scale changes.
 RECENCY_SPLINE_KNOTS: tuple[float, float] = (12.0, 40.0)
 RECENCY_SPLINE_BOUNDS: tuple[float, float] = (3.0, 200.0)
 RECENCY_SPLINE_COLUMNS: tuple[str, ...] = (
-    "visit_recency_spline1_demeaned",
-    "visit_recency_spline2_demeaned",
-    "visit_recency_spline3_demeaned",
+    "visit_recency_trials_event_leaf_centered_spline_1",
+    "visit_recency_trials_event_leaf_centered_spline_2",
+    "visit_recency_trials_event_leaf_centered_spline_3",
 )
 
 
-_M1 = (*ARM_FE_PREDICTORS, "is_current")
-_M2 = (*_M1, "is_prev")
-# An unvisited leaf has ``reward_rate_arm_k10 == 0`` (encoded, not NaN) so its
-# event is retained. M4 adds ``arm_never_visited`` alongside time-local recency,
+_M1 = (*ARM_FE_PREDICTORS, "is_current_arm")
+_M2 = (*_M1, "is_prev_arm")
+# An unvisited leaf has ``reward_fraction_candidate_arm_last10_visits == 0``
+# (encoded, not NaN) so its event is retained. M4 adds
+# ``is_candidate_arm_never_visited`` alongside time-local recency,
 # separating novelty from an observed zero reward rate while preserving nesting.
-_M3 = (*_M2, "reward_rate_arm_k10")
-_M4 = (*_M3, *RECENCY_SPLINE_COLUMNS, "arm_never_visited")
-_M5 = (*_M4, "swr_x_current", "swr_x_prev")
+_M3 = (*_M2, "reward_fraction_candidate_arm_last10_visits")
+_M4 = (*_M3, *RECENCY_SPLINE_COLUMNS, "is_candidate_arm_never_visited")
+_M5 = (*_M4, "swr_x_is_current_arm", "swr_x_is_prev_arm")
 _M6 = (
     *_M5,
-    "swr_x_reward_rate_arm_k10",
+    "swr_x_reward_fraction_candidate_arm_last10_visits",
     *(f"swr_x_{_c}" for _c in RECENCY_SPLINE_COLUMNS),
 )
-# Value block: per-arm nominal value (p_reward_arm) + per-arm beta-model value
-# (q_arm, the beta-bernoulli per-leaf belief mean) as conditional main effects on the
-# M4 spatial/recency base (covariate_dictionary.md D2/D3). The beta q_arm is the
+# Value block: candidate-arm task reward probability + candidate-arm
+# beta-model reward-belief mean as conditional main effects on the M4
+# spatial/recency base (covariate_dictionary.md D2/D3). The beta belief mean is the
 # single value construct shared with the is_swr rate ladder's beta value covariates.
-# Additive in *spec* — but because p_reward_arm/
-# q_arm are NaN for stops absent from the contingency, co-fitting Mv in the same
+# Additive in *spec* — but because both value columns are NaN for stops absent
+# from qvals, co-fitting Mv in the same
 # run restricts the shared complete-case event set, so it is excluded from the default
 # model list along with the other belief-dependent rungs (see
 # BELIEF_DEPENDENT_CONTENT_MODELS). Request them explicitly on their own matched
 # cohort: --models M4,Mv,Mu,Mvu (arm) or --models P3,Pv (patch).
-_Mv = (*_M4, "p_reward_arm", "q_arm")
+_Mv = (
+    *_M4,
+    "task_reward_probability_candidate_arm",
+    "reward_belief_mean_candidate_arm_preoutcome",
+)
 
-# Beta-belief exploration block: per-arm belief UNCERTAINTY (arm_uncertainty =
-# betadist_var) added on the M4 spatial/recency base. Mvu pairs it with the beta
-# per-arm VALUE (q_arm) so value+uncertainty come from the SAME Beta posterior — a
-# construct-coherent exploit-vs-explore contrast (one behavioral model). arm_uncertainty is added AFTER
-# visit_recency (M4) so its coefficient is the recency-independent effect (docs: beta
-# variance is +0.54 correlated with visit_recency by construction, but the effect
+# Beta-belief exploration block: candidate-arm reward-belief variance added on
+# the M4 spatial/recency base. Mvu pairs it with the candidate-arm belief mean,
+# so value+uncertainty come from the same Beta posterior — a construct-coherent
+# exploit-vs-explore contrast (one behavioral model). Variance is added after
+# centered candidate-arm visit recency (M4) so its coefficient is the
+# recency-independent effect (docs: Beta variance is +0.54 correlated with
+# visit recency by construction, but the effect
 # survives orthogonalization). See docs/behavior_models.md.
-# Standardized (arm_uncertainty_z): raw betadist_var has SD ~0.02, ~5-6x smaller than
-# q_arm, which makes the per-session covariance singular; the _z form uses one
+# Standardized as ``reward_belief_variance_candidate_arm_preoutcome_z``: raw
+# Beta variance has SD ~0.02, ~5-6x smaller than the belief mean, which makes
+# the per-session covariance singular; the _z form uses one
 # pooled SD over the six reward-site arms (not structural-zero trunks).
-_Mu = (*_M4, "arm_uncertainty_z")
-_Mvu = (*_M4, "q_arm", "arm_uncertainty_z")
+_Mu = (*_M4, "reward_belief_variance_candidate_arm_preoutcome_z")
+_Mvu = (
+    *_M4,
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_belief_variance_candidate_arm_preoutcome_z",
+)
 
 MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "M0": ModelSpec(
@@ -392,21 +329,24 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
     "Mv": ModelSpec(
         name="Mv",
         predictors=_Mv,
-        description="+ per-arm nominal value (p_reward_arm) + per-arm "
-        "beta model value (q_arm)",
+        description=(
+            "+ candidate-arm task reward probability + beta reward-belief mean"
+        ),
         parent="M4",
     ),
     "Mu": ModelSpec(
         name="Mu",
         predictors=_Mu,
-        description="+ per-arm beta belief uncertainty (arm_uncertainty; exploration)",
+        description="+ candidate-arm beta reward-belief variance (exploration)",
         parent="M4",
     ),
     "Mvu": ModelSpec(
         name="Mvu",
         predictors=_Mvu,
-        description="+ beta per-arm value (q_arm) AND belief uncertainty "
-        "(construct-coherent exploit-vs-explore)",
+        description=(
+            "+ candidate-arm beta reward-belief mean AND variance "
+            "(construct-coherent exploit-vs-explore)"
+        ),
         parent="Mu",
     ),
 }
@@ -422,7 +362,8 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 #
 # Predictors use ``_patch`` suffix to distinguish from the arm-level
 # versions — e.g., ``is_current_patch`` (= is the animal in this
-# patch?) and ``reward_rate_arm_k10_patch`` (= mean recent reward rate
+# patch?) and ``reward_fraction_candidate_arm_last10_visits_patch``
+# (= mean recent reward fraction
 # across the two reward-site arms in the patch). This mirrors the arm
 # ladder's rate definition and avoids reintroducing a visit-frequency
 # confound through an accumulated reward count.
@@ -480,16 +421,19 @@ MODEL_PATCH: dict[str, ModelSpec] = {
     ),
     "P2": ModelSpec(
         name="P2",
-        predictors=("is_current_patch", "reward_rate_arm_k10_patch"),
-        description="+ patch-level recent reward rate",
+        predictors=(
+            "is_current_patch",
+            "reward_fraction_candidate_arm_last10_visits_patch",
+        ),
+        description="+ patch aggregate of candidate-arm recent reward fraction",
         parent="P1",
     ),
     "P3": ModelSpec(
         name="P3",
         predictors=(
             "is_current_patch",
-            "reward_rate_arm_k10_patch",
-            "swr_x_current_patch",
+            "reward_fraction_candidate_arm_last10_visits_patch",
+            "swr_x_is_current_patch",
         ),
         description="+ SWR × current-patch interaction",
         parent="P2",
@@ -498,12 +442,12 @@ MODEL_PATCH: dict[str, ModelSpec] = {
         name="Pv",
         predictors=(
             "is_current_patch",
-            "reward_rate_arm_k10_patch",
-            "p_reward_arm_patch",
-            "q_arm_patch",
+            "reward_fraction_candidate_arm_last10_visits_patch",
+            "task_reward_probability_candidate_arm_patch",
+            "reward_belief_mean_candidate_arm_preoutcome_patch",
         ),
-        description="+ per-patch nominal value (p_reward_arm_patch) + "
-        "per-patch model value (q_arm_patch, Q)",
+        description="+ patch aggregates of task reward probability and "
+        "pre-outcome reward-belief mean",
         parent="P2",
     ),
 }
@@ -522,7 +466,7 @@ MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P2)
 
 # ── Post-switch patch model ──
 #
-# Fit ONLY on events where is_after_switch == 1. On switch trials
+# Fit ONLY on events where ``did_last_completed_trip_switch_patch == 1``. On switch trials
 # current_patch ≠ prev_patch, so they are identifiable (correlation
 # ≈ -0.5, VIF < 2). On stay trials these are collinear (r = 0.95,
 # VIF > 20) and must not be combined.
@@ -559,8 +503,8 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
         predictors=(
             "is_current_patch",
             "is_prev_patch",
-            "swr_x_current_patch",
-            "swr_x_prev_patch",
+            "swr_x_is_current_patch",
+            "swr_x_is_prev_patch",
         ),
         description="+ SWR × patch interactions (switch events only)",
         parent="PS2",
@@ -571,8 +515,9 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # ── Rate models ──
 #
 # A DIFFERENT estimator from the arm/patch hierarchies: an ordinary
-# Poisson on the per-stop event count (``n_events``) with a
-# ``log(immobility_time)`` offset, fit by ``per_stop_rate_model.fit_per_stop_rate_model``.
+# Poisson on the selected per-stop event count (``n_selected_events``) with a
+# ``log(immobility_duration_s)`` offset, fit by
+# ``per_stop_rate_model.fit_per_stop_rate_model``.
 # It carries an intercept, so — unlike the conditional Poisson —
 # stop-level constants do NOT cancel and ``is_after_*`` are valid
 # main effects.
@@ -583,17 +528,18 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 # trial-relative relationship to the bout-start reward-history covariates.
 #
 # R1 uses the newest outcome observable by bout start. R2 adds
-# ``reward_rate_trial_k10``
+# ``reward_fraction_last10_known_trials``
 # (rewarded fraction of the last 10 trials) — the stop-level analog
-# of the content hierarchy's reward-history axis (``reward_rate_arm_k10``
+# of the content hierarchy's reward-history axis
+# (``reward_fraction_candidate_arm_last10_visits``
 # at M3). R2 vs R1 tests whether replay *occurrence* tracks a deeper
 # reward history, not just the newest known outcome; it is
 # also the confound check for whether an M3 content effect is partly
-# a rate effect. ``visit_recency`` has no stop-level analog (every
+# a rate effect. Candidate-arm visit recency has no stop-level analog (every
 # trial visits some arm), so the rate hierarchy stops at R2.
 #
 # The hierarchy intentionally stops at R2. An ``is_swr_stop`` term
-# (1 if any timebin in the stop had an SWR) was dropped: ``n_events``
+# (1 if any timebin in the stop had an SWR) was dropped: ``n_selected_events``
 # counts non-local events, which overlap SWRs heavily by construction,
 # so ``is_swr_stop`` is largely tautological with the response and says
 # little about whether SWRs *drive* replay occurrence. The SWR-vs-non-SWR
@@ -611,7 +557,7 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     ),
     "R1": ModelSpec(
         name="R1",
-        # ``reward_lag1`` is the most recent outcome already observable at
+        # ``known_reward_outcome_lag_1`` is the most recent outcome already observable at
         # bout start. It can be the arrived trip's outcome after its physical
         # feedback boundary or the preceding known outcome before that boundary;
         # it is past-only, but not a fixed trial-relative index.
@@ -622,15 +568,15 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
         # rejects the whole session. See the naming spec's "Immediate switch
         # is not a nuisance adjustment" section; a dedicated switch analysis
         # uses ``patch_switch_fraction_last5_completed_trips`` instead.
-        predictors=("reward_lag1",),
+        predictors=("known_reward_outcome_lag_1",),
         description="+ most-recent-known reward at bout start",
         parent="R0",
     ),
     "R2": ModelSpec(
         name="R2",
         predictors=(
-            "reward_lag1",
-            "reward_rate_trial_k10",
+            "known_reward_outcome_lag_1",
+            "reward_fraction_last10_known_trials",
         ),
         description="+ recent reward history (rewarded fraction, last 10 trials)",
         parent="R1",
@@ -640,8 +586,8 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 # ── Lagged reward-kernel rate model ──
 #
 # A non-nested reparameterization of R2: instead of one most-recent-known
-# indicator (``reward_lag1``) plus a smoothed window
-# (``reward_rate_trial_k10``) — which overlap (lag-1 sits inside the window)
+# indicator (``known_reward_outcome_lag_1``) plus a smoothed window
+# (``reward_fraction_last10_known_trials``) — which overlap (lag-1 sits inside the window)
 # and conflate two timescales — model the reward outcome at each of the last
 # ``N_REWARD_LAGS`` trials as its own predictor. Reading the per-lag rate-ratio
 # kernel describes successive outcomes known by bout start. Lag 1 is the newest
@@ -654,7 +600,9 @@ MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     name="Rlag",
     # Immediate-switch flag removed (see R1) -- a constant switch column within
     # a session's complete-case cohort makes this design rank-deficient.
-    predictors=tuple(f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)),
+    predictors=tuple(
+        f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)
+    ),
     description="Lagged reward kernel: 10 most-recent-known outcomes",
     parent="R0",
 )
@@ -669,7 +617,7 @@ MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
 #
 # fit on the canonical (stop x bin) design from
 # :func:`_helpers.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
-# row per stop, ``log(immobility_time)`` dwell offset), every model here is one
+# row per stop, ``log(immobility_duration_s)`` dwell offset), every model here is one
 # row per (stop, ``BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
 # offset, so the within-stop time course is modelled explicitly by a spline
 # rather than averaged into a per-stop dwell correction.
@@ -698,7 +646,7 @@ N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos mo
 # aggregate_to_timebins. Shared by the fitter orchestrator and the
 # model-checking plotter so the inline refit matches the persisted fits.
 # The immediate-switch term was retired with the M8 rung (see R1).
-STOP_COVARIATES = ("reward_rate_trial_k10",)
+STOP_COVARIATES = ("reward_fraction_last10_known_trials",)
 
 
 @dataclass(frozen=True)
@@ -718,22 +666,23 @@ class PerBinRateModelSpec:
     time_spline : bool
         Include the fixed-knot ``bs(tc, ...)`` within-stop time-course spline.
     reward_lags : int
-        Number of ``reward_lag{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
+        Number of ``known_reward_outcome_lag_{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
         trial outcomes; omission == ``1 - reward`` (same regressor).
     reward_rate : bool
-        Include ``reward_rate_trial_k10`` (continuous; an alternative
+        Include ``reward_fraction_last10_known_trials`` (continuous; an alternative
         encoding of reward history to the lag kernel).
     self_history_lags : int
         Number of ``onset_lag{j}`` terms (0 or ``N_HISTORY_LAGS``); the
         within-stop autoregressive / refractoriness block.
     switch : bool
         Retired and must stay ``False``. The per-bin switch main-effect
-        extension (M8) was removed because ``is_after_switch`` is often
+        extension (M8) was removed because
+        ``did_last_completed_trip_switch_patch`` is often
         constant within a session's complete-case cohort, which makes the
         design rank-deficient. No shipped spec sets this, and ``formula`` no
         longer reads it.
     reward_time_interaction : bool
-        Include ``reward_lag1 : bs(tc, ...)`` — does reward modulate
+        Include ``known_reward_outcome_lag_1 : bs(tc, ...)`` — does reward modulate
         the time course?
     description : str
         Human-readable description.
@@ -778,7 +727,8 @@ class PerBinRateModelSpec:
         if self.switch:
             raise ValueError(
                 "PerBinRateModelSpec.switch is retired: the per-bin switch "
-                "main effect (M8) was removed because is_after_switch is often "
+                "main effect (M8) was removed because "
+                "did_last_completed_trip_switch_patch is often "
                 "constant within a session's complete-case cohort. Do not "
                 "re-enable it; use a dedicated switch analysis instead."
             )
@@ -788,9 +738,11 @@ class PerBinRateModelSpec:
         terms: list[str] = []
         if self.time_spline:
             terms.append(_SPLINE)
-        terms += [f"reward_lag{j}" for j in range(1, self.reward_lags + 1)]
+        terms += [
+            f"known_reward_outcome_lag_{j}" for j in range(1, self.reward_lags + 1)
+        ]
         if self.reward_rate:
-            terms.append("reward_rate_trial_k10")
+            terms.append("reward_fraction_last10_known_trials")
         if self.self_history_basis:
             terms += [f"hist_rcos_{k}" for k in range(self.self_history_basis)]
         else:
@@ -799,157 +751,159 @@ class PerBinRateModelSpec:
             terms += [f"cross_hist_rcos_{k}" for k in range(self.cross_history_basis)]
         else:
             terms += [f"cross_lag{j}" for j in range(1, self.cross_history_lags + 1)]
-        # ``switch`` is retired (see the field docstring); is_after_switch is
-        # never added to a per-bin model.
+        # ``switch`` is retired (see the field docstring); the completed-trip
+        # switch flag is never added to a per-bin model.
         if self.reward_time_interaction:
-            terms.append(f"reward_lag1:{_SPLINE}")
+            terms.append(f"known_reward_outcome_lag_1:{_SPLINE}")
         terms += list(self.extra_covariates)
         return "count ~ " + (" + ".join(terms) if terms else "1")
 
 
-# (time, rewL, rate, hist, switch, interact)
 _N = N_REWARD_LAGS
+# Each spec is built with keyword arguments so the toggle each model turns on is
+# readable in place (which term the rung adds vs. its parent), rather than being
+# decoded from argument position. ``switch`` is retired and stays False.
 MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M0_const": PerBinRateModelSpec(
-        "M0_const",
-        False,
-        0,
-        False,
-        0,
-        False,
-        False,
-        "homogeneous Poisson baseline",
-        None,
+        name="M0_const",
+        time_spline=False,
+        reward_lags=0,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="homogeneous Poisson baseline",
+        parent=None,
     ),
     "M1_rew1": PerBinRateModelSpec(
-        "M1_rew1",
-        False,
-        1,
-        False,
-        0,
-        False,
-        False,
-        "+ most-recent-known reward at bout start (reward_lag1)",
-        "M0_const",
+        name="M1_rew1",
+        time_spline=False,
+        reward_lags=1,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ most-recent-known reward at bout start (known_reward_outcome_lag_1)",
+        parent="M0_const",
     ),
     "M2_rewhist": PerBinRateModelSpec(
-        "M2_rewhist",
-        False,
-        _N,
-        False,
-        0,
-        False,
-        False,
-        "+ reward history kernel (reward_lag1..10)",
-        "M1_rew1",
+        name="M2_rewhist",
+        time_spline=False,
+        reward_lags=_N,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ reward history kernel (known_reward_outcome_lag_1..10)",
+        parent="M1_rew1",
     ),
     "M2r_rewrate": PerBinRateModelSpec(
-        "M2r_rewrate",
-        False,
-        0,
-        True,
-        0,
-        False,
-        False,
-        "+ recent reward rate (continuous; alt to kernel)",
-        "M0_const",
+        name="M2r_rewrate",
+        time_spline=False,
+        reward_lags=0,
+        reward_rate=True,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ recent reward rate (continuous; alt to kernel)",
+        parent="M0_const",
     ),
     "M3_hist": PerBinRateModelSpec(
-        "M3_hist",
-        False,
-        0,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ self-history (autoregressive)",
-        "M0_const",
+        name="M3_hist",
+        time_spline=False,
+        reward_lags=0,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ self-history (autoregressive)",
+        parent="M0_const",
     ),
     "M4_hist_rew": PerBinRateModelSpec(
-        "M4_hist_rew",
-        False,
-        _N,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ self-history + reward history",
-        "M3_hist",
+        name="M4_hist_rew",
+        time_spline=False,
+        reward_lags=_N,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ self-history + reward history",
+        parent="M3_hist",
     ),
     "M5_time": PerBinRateModelSpec(
-        "M5_time",
-        True,
-        0,
-        False,
-        0,
-        False,
-        False,
-        "+ time-since-stop (spline)",
-        "M0_const",
+        name="M5_time",
+        time_spline=True,
+        reward_lags=0,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time-since-stop (spline)",
+        parent="M0_const",
     ),
     "M6_time_hist": PerBinRateModelSpec(
-        "M6_time_hist",
-        True,
-        0,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ time + self-history",
-        "M5_time",
+        name="M6_time_hist",
+        time_spline=True,
+        reward_lags=0,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time + self-history",
+        parent="M5_time",
     ),
     "M7_time_hist_rew": PerBinRateModelSpec(
-        "M7_time_hist_rew",
-        True,
-        _N,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ time + self-history + reward history",
-        "M6_time_hist",
+        name="M7_time_hist_rew",
+        time_spline=True,
+        reward_lags=_N,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time + self-history + reward history",
+        parent="M6_time_hist",
     ),
     # M8_full_switch (the per-bin switch main-effect extension) was retired:
-    # is_after_switch is often constant within a session's complete-case
+    # The completed-trip switch flag is often constant within a session's complete-case
     # cohort, making the design rank-deficient. See the naming spec's
     # "Immediate switch is not a nuisance adjustment" section. Nothing parents
     # off it (M9 parents off M7), so removal leaves the ladder intact.
     "M9_rew_x_time": PerBinRateModelSpec(
-        "M9_rew_x_time",
-        True,
-        _N,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        True,
-        "M7 + reward x time interaction",
-        "M7_time_hist_rew",
+        name="M9_rew_x_time",
+        time_spline=True,
+        reward_lags=_N,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=True,
+        description="M7 + reward x time interaction",
+        parent="M7_time_hist_rew",
     ),
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
     "M3r_histcos": PerBinRateModelSpec(
-        "M3r_histcos",
-        False,
-        0,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ self-history (raised-cosine basis)",
-        "M0_const",
+        name="M3r_histcos",
+        time_spline=False,
+        reward_lags=0,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ self-history (raised-cosine basis)",
+        parent="M0_const",
         self_history_basis=N_HISTORY_BASIS,
     ),
     "M7r_time_histcos_rew": PerBinRateModelSpec(
-        "M7r_time_histcos_rew",
-        True,
-        _N,
-        False,
-        N_HISTORY_LAGS,
-        False,
-        False,
-        "+ time + raised-cosine self-history + reward history",
-        "M5_time",
+        name="M7r_time_histcos_rew",
+        time_spline=True,
+        reward_lags=_N,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time + raised-cosine self-history + reward history",
+        parent="M5_time",
         self_history_basis=N_HISTORY_BASIS,
     ),
 }
@@ -963,43 +917,44 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 # baseline.
 #
 # These three are not a single linear nested chain: ``C_full`` nests
-# both ``C_behavior`` (+ ``replay_frac``) and ``C_replay_only``
+# both ``C_behavior`` (+ ``replay_fraction``) and ``C_replay_only``
 # (+ the behavioural block). ``parent`` encodes the primary test —
 # ``C_full`` vs ``C_behavior``, i.e. does replay add predictive power
 # beyond behaviour — while ``C_replay_only`` is a standalone
 # replay-only reference (``parent=None``).
 #
 # Two predictors are deliberately excluded from the behavioural block:
-# - ``is_same_patch``: a coarse binary of ``dist_to_arm`` (same-patch
+# - ``is_same_patch``: a coarse binary of ``distance_to_candidate_arm_cm`` (same-patch
 #   arms are close); the two were near-collinear (VIF > 700).
-# - ``dist_to_arm`` itself: the animal chose the closest arm in ~95-99%
+# - ``distance_to_candidate_arm_cm`` itself: the animal chose the closest arm in ~95-99%
 #   of stops (median 0.99 in sessions that previously failed to fit),
 #   producing quasi-separation that crashed ``ConditionalLogit.fit`` in
 #   ~25% of sessions. Dropping it restores identifiability across all
 #   sessions and de-saturates the baseline so ``C_full`` vs
 #   ``C_behavior`` has room to detect a replay effect. Trade-off: the
 #   replay coefficient is no longer cleanly controlled for distance,
-#   and ``replay_frac`` is correlated with low ``dist_to_arm`` (replay
+#   and ``replay_fraction`` is correlated with low candidate-arm distance (replay
 #   biases toward the current/closest arm), so a positive
-#   ``replay_frac`` coefficient could partly launder distance. A
+#   ``replay_fraction`` coefficient could partly launder distance. A
 #   switch-style restriction (fit only on stops where the animal did
 #   not pick the closest arm) is the principled alternative; defer.
 # Callers should still drop any column absent from the choice dataset
 # before fitting.
 
 _CHOICE_BEHAVIOR = (
-    "visit_recency",
-    "arm_never_visited",
-    "reward_rate_arm_k10",
-    "q_arm",
-    "arm_dist_rank",  # ranked choice-set distance (identifiable; replaces the
-    # quasi-separating raw dist_to_arm as the geometric baseline, dictionary §4)
+    "visit_recency_trials",
+    "is_candidate_arm_never_visited",
+    "reward_fraction_candidate_arm_last10_visits",
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "candidate_arm_distance_rank",  # ranked choice-set distance (identifiable; replaces the
+    # quasi-separating raw candidate-arm distance as the geometric baseline,
+    # dictionary §4)
 )
 
 MODEL_CHOICE: dict[str, ModelSpec] = {
     "C_replay_only": ModelSpec(
         name="C_replay_only",
-        predictors=("replay_frac",),
+        predictors=("replay_fraction",),
         description="Replay content only",
         parent=None,
     ),
@@ -1011,13 +966,17 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
     ),
     "C_full": ModelSpec(
         name="C_full",
-        predictors=(*_CHOICE_BEHAVIOR, "replay_frac"),
+        predictors=(*_CHOICE_BEHAVIOR, "replay_fraction"),
         description="Behavioural baseline + replay content",
         parent="C_behavior",
     ),
     "C_full_swr_split": ModelSpec(
         name="C_full_swr_split",
-        predictors=(*_CHOICE_BEHAVIOR, "replay_frac_swr", "replay_frac_non_swr"),
+        predictors=(
+            *_CHOICE_BEHAVIOR,
+            "replay_fraction_swr",
+            "replay_fraction_non_swr",
+        ),
         description=(
             "Behavioural baseline + SWR-overlap and non-SWR replay separately"
         ),
@@ -1033,35 +992,40 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
 # Reuses the module-level _SPLINE / N_REWARD_LAGS / N_HISTORY_BASIS defined above.
 
 # --- Rate is_swr-contrast ladder (per-bin Poisson: G0-G8 stratified, S0-S10 contrast) ---
-_REWK_PREV = " + ".join(f"reward_lag{j}" for j in range(2, N_REWARD_LAGS + 1))
+_REWK_PREV = " + ".join(
+    f"known_reward_outcome_lag_{j}" for j in range(2, N_REWARD_LAGS + 1)
+)
 _HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
 _BLOCK_F = {
-    "BASE": f"{_SPLINE} + reward_lag1 + {_REWK_PREV} + {_HISTCOS}",
-    "PERISWITCH": "trials_since_switch + is_post_switch + trials_since_switch:is_post_switch",
+    "BASE": f"{_SPLINE} + known_reward_outcome_lag_1 + {_REWK_PREV} + {_HISTCOS}",
+    "PERISWITCH": (
+        "periswitch_index_trials + is_periswitch_post + "
+        "periswitch_index_trials:is_periswitch_post"
+    ),
     "BLOCK": "trials_since_block_change",
-    "SWITCHRATE": "recent_switch_rate",
+    "SWITCHRATE": "patch_switch_fraction_last5_completed_trips",
     # beta relative value DeltaV. Sign convention: Switch - Stay; ~= -(current stay value), r = -0.952 with stay_sibling_mu_preoutcome_sess and -0.890 with q_chosen, so a POSITIVE coefficient means the current option's value is LOW.
     # An earlier "Stay-vs-Switch" label here had it backwards.
-    "VALUE": "switch_advantage_mu_preoutcome_sess",
-    "RPE": "rpe",  # beta reward prediction error (reward - q_chosen)
-    "UNCERT": "beta_reward_entropy",  # beta belief entropy (per-leaf Beta differential entropy)
-    "UPDATE": "global_mu_update_abs_postoutcome_sess",  # beta value-update magnitude
-    "REWXTIME": f"reward_lag1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
+    "VALUE": "relative_value_switch_minus_stay_preoutcome",
+    "RPE": "rpe_postoutcome",  # beta reward prediction error (reward - q_chosen)
+    "UNCERT": "reward_belief_differential_entropy_leaf_mean_preoutcome",  # beta belief entropy (per-leaf Beta differential entropy)
+    "UPDATE": "reward_belief_mean_update_l1_all_ports_postoutcome",  # beta value-update magnitude
+    "REWXTIME": f"known_reward_outcome_lag_1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
 }
 _BLOCK_COLS = {
     "BASE": [
         "tc",
-        *[f"reward_lag{j}" for j in range(1, N_REWARD_LAGS + 1)],
+        *[f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)],
         *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)],
     ],
-    "PERISWITCH": ["trials_since_switch", "is_post_switch"],
+    "PERISWITCH": ["periswitch_index_trials", "is_periswitch_post"],
     "BLOCK": ["trials_since_block_change"],
-    "SWITCHRATE": ["recent_switch_rate"],
-    "VALUE": ["switch_advantage_mu_preoutcome_sess"],
-    "RPE": ["rpe"],
-    "UNCERT": ["beta_reward_entropy"],
-    "UPDATE": ["global_mu_update_abs_postoutcome_sess"],
-    "REWXTIME": ["reward_lag1", "tc"],
+    "SWITCHRATE": ["patch_switch_fraction_last5_completed_trips"],
+    "VALUE": ["relative_value_switch_minus_stay_preoutcome"],
+    "RPE": ["rpe_postoutcome"],
+    "UNCERT": ["reward_belief_differential_entropy_leaf_mean_preoutcome"],
+    "UPDATE": ["reward_belief_mean_update_l1_all_ports_postoutcome"],
+    "REWXTIME": ["known_reward_outcome_lag_1", "tc"],
 }
 SWR_CONTRAST_RATE_STOP_COVARS = tuple(
     c
@@ -1105,7 +1069,7 @@ def _s_specs():
     )
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
-        "S1_rew1": (f"{base} + is_swr + is_swr:reward_lag1", ["BASE"]),
+        "S1_rew1": (f"{base} + is_swr + is_swr:known_reward_outcome_lag_1", ["BASE"]),
         "S2_base": (f"is_swr * ({base})", ["BASE"]),
         "S3_periswitch": (f"is_swr * ({base} + {peri})", ["BASE", "PERISWITCH"]),
         "S4_block": (f"is_swr * ({base} + {blk})", ["BASE", "BLOCK"]),
@@ -1124,71 +1088,129 @@ SWR_CONTRAST_RATE_S_SPECS = _s_specs()
 
 # --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
 # name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)
-ARMFE = [f"arm_fe_{a}" for a in range(8)]
-# ``arm_dist_rank`` is deliberately absent. It takes five tied values over a
-# fixed track topology, its rank-1 level is *identical* to ``is_current``
+ARMFE = [f"is_candidate_arm_{a}" for a in range(8)]
+# ``candidate_arm_distance_rank`` is deliberately absent. It takes five tied
+# values over a fixed track topology, its rank-1 level is *identical* to
+# ``is_current_arm``
 # (agreement 1.000000 across 59,374 location-resolved events), and it ranks last
 # in unique likelihood of any covariate here. Carrying it collapsed the
 # current-arm coefficient from +0.705 (5/5 animals) to +0.102 (3/5) and doubled
-# its standard error, making every C*/CS* ``is_current`` non-comparable with
+# its standard error, making every C*/CS* ``is_current_arm`` non-comparable with
 # ``M1``/``C1_current``. Its removal leaves the SWR interactions untouched
-# (``swr_x_q_arm`` -2.390 -> -2.407). This also restores consistency with the
-# module docstring above, which excludes ``dist_to_arm`` and ``is_same_patch``
-# on the same grounds -- ``arm_dist_rank`` re-imported most of their content.
+# (the SWR × candidate-arm belief-mean coefficient changed -2.390 -> -2.407).
+# This also restores consistency with the
+# module docstring above, which excludes ``distance_to_candidate_arm_cm`` and
+# ``is_same_patch``
+# on the same grounds -- candidate-arm distance rank re-imported most of their
+# content.
 BASEc = [
     *ARMFE,
-    "is_current",
-    "is_prev",
+    "is_current_arm",
+    "is_prev_arm",
     *RECENCY_SPLINE_COLUMNS,
-    "arm_never_visited",
+    "is_candidate_arm_never_visited",
 ]
-_TSC = "tsc_x_current"
+_TSC = "log1p_time_since_stop_start_s_z_x_is_current_arm"
 SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C0_armfe": (ARMFE, "split"),
-    "C1_current": ([*ARMFE, "is_current"], "split"),
+    "C1_current": ([*ARMFE, "is_current_arm"], "split"),
     "C2_base": (BASEc, "split"),
-    "C3_armreward": ([*BASEc, "reward_rate_arm_k10"], "split"),
-    "C4_armvalue": ([*BASEc, "q_arm"], "split"),
-    "C5_lastrew": ([*BASEc, "is_last_rewarded_elsewhere"], "split"),
-    "C6_rpe": ([*BASEc, _TSC, "rpe_x_current"], "split"),
-    "C7_value": ([*BASEc, _TSC, "relval_x_current"], "split"),
-    "C8_uncert": ([*BASEc, _TSC, "entropy_x_current"], "split"),
-    "C9_update": ([*BASEc, _TSC, "update_x_current"], "split"),
-    "C10_periswitch": (
-        [*BASEc, _TSC, "tss_x_current", "postsw_x_current", "tsspostsw_x_current"],
+    "C3_armreward": ([*BASEc, "reward_fraction_candidate_arm_last10_visits"], "split"),
+    "C4_armvalue": ([*BASEc, "reward_belief_mean_candidate_arm_preoutcome"], "split"),
+    "C5_lastrew": ([*BASEc, "is_last_rewarded_noncurrent_arm"], "split"),
+    "C6_rpe": ([*BASEc, _TSC, "rpe_postoutcome_z_x_is_current_arm"], "split"),
+    "C7_value": (
+        [
+            *BASEc,
+            _TSC,
+            "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+        ],
         "split",
     ),
-    "C11_block": ([*BASEc, _TSC, "block_x_current"], "split"),
-    "C12_switchrate": ([*BASEc, _TSC, "switchrate_x_current"], "split"),
-    # CS1 is time-controlled: tsc_x_current (within-stop-time duration) is included
-    # UNCONDITIONALLY so swr_x_current is the SWR-specific current-arm effect BEYOND
-    # the general time course (SWR and non-SWR events differ in stop-time). CS1nt is
-    # the uncontrolled sensitivity twin (both report the same swr_x_current key term).
-    "CS1_current": ([*BASEc, "tsc_x_current", "swr_x_current"], "pooled"),
-    "CS1nt_current": ([*BASEc, "swr_x_current"], "pooled"),
-    "CS2_prev": ([*BASEc, "swr_x_prev"], "pooled"),
+    "C8_uncert": (
+        [
+            *BASEc,
+            _TSC,
+            "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+        ],
+        "split",
+    ),
+    "C9_update": (
+        [
+            *BASEc,
+            _TSC,
+            "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+        ],
+        "split",
+    ),
+    "C10_periswitch": (
+        [
+            *BASEc,
+            _TSC,
+            "periswitch_index_trials_z_x_is_current_arm",
+            "is_periswitch_post_x_is_current_arm",
+            "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
+        ],
+        "split",
+    ),
+    "C11_block": (
+        [*BASEc, _TSC, "trials_since_block_change_z_x_is_current_arm"],
+        "split",
+    ),
+    "C12_switchrate": (
+        [
+            *BASEc,
+            _TSC,
+            "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+        ],
+        "split",
+    ),
+    # CS1 includes the within-stop-time current-arm interaction
+    # UNCONDITIONALLY so ``swr_x_is_current_arm`` is the SWR-specific
+    # current-arm effect BEYOND the general time course (SWR and non-SWR events
+    # differ in stop-time). CS1nt is the uncontrolled sensitivity twin; both
+    # report the same canonical interaction term.
+    "CS1_current": ([*BASEc, _TSC, "swr_x_is_current_arm"], "pooled"),
+    "CS1nt_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
+    "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
     "CS3_lastrew": (
-        [*BASEc, "is_last_rewarded_elsewhere", "swr_x_is_last_rewarded_elsewhere"],
+        [
+            *BASEc,
+            "is_last_rewarded_noncurrent_arm",
+            "swr_x_is_last_rewarded_noncurrent_arm",
+        ],
         "pooled",
     ),
     "CS4_armreward": (
-        [*BASEc, "reward_rate_arm_k10", "swr_x_reward_rate_arm_k10"],
+        [
+            *BASEc,
+            "reward_fraction_candidate_arm_last10_visits",
+            "swr_x_reward_fraction_candidate_arm_last10_visits",
+        ],
         "pooled",
     ),
-    "CS5_armvalue": ([*BASEc, "q_arm", "swr_x_q_arm"], "pooled"),
+    "CS5_armvalue": (
+        [
+            *BASEc,
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+        ],
+        "pooled",
+    ),
     # Discriminant vs Gillespie et al. 2021 (Neuron): their previous-goal
     # enrichment (Fig 8) is the reduction the graded-value avoidance must survive.
     # CS5b adds the previous-goal analog (is_last_rewarded_elsewhere + its SWR
-    # interaction) on top of CS5, so the swr_x_q_arm key term is read as the
+    # interaction) on top of CS5, so the
+    # ``swr_x_reward_belief_mean_candidate_arm_preoutcome`` term is read as the
     # value effect net of previous-goal. Fitted values are reported in
     # paper/claims_table.md (row 19f) — do not duplicate numbers here.
     "CS5b_valuevsprevgoal": (
         [
             *BASEc,
-            "q_arm",
-            "swr_x_q_arm",
-            "is_last_rewarded_elsewhere",
-            "swr_x_is_last_rewarded_elsewhere",
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+            "is_last_rewarded_noncurrent_arm",
+            "swr_x_is_last_rewarded_noncurrent_arm",
         ],
         "pooled",
     ),
@@ -1197,75 +1219,95 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # C13 (split): independent uncertainty coefficient on the SWR-only
     # and non-SWR-only subsets. CS6 (pooled): main = non-SWR effect, swr_x_ = the
     # formal SWR-vs-non-SWR difference. Mirrors the C4/CS5 value pair.
-    "C13_armuncert": ([*BASEc, "arm_uncertainty_z"], "split"),
+    "C13_armuncert": (
+        [*BASEc, "reward_belief_variance_candidate_arm_preoutcome_z"],
+        "split",
+    ),
     "CS6_armuncert": (
-        [*BASEc, "arm_uncertainty_z", "swr_x_arm_uncertainty_z"],
+        [
+            *BASEc,
+            "reward_belief_variance_candidate_arm_preoutcome_z",
+            "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+        ],
         "pooled",
     ),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
-    "C1_current": "is_current",
-    "C2_base": "is_current",
-    "C3_armreward": "reward_rate_arm_k10",
-    "C4_armvalue": "q_arm",
-    "C5_lastrew": "is_last_rewarded_elsewhere",
-    "C6_rpe": "rpe_x_current",
-    "C7_value": "relval_x_current",
-    "C8_uncert": "entropy_x_current",
-    "C9_update": "update_x_current",
-    "C10_periswitch": "tss_x_current",
-    "C11_block": "block_x_current",
-    "C12_switchrate": "switchrate_x_current",
-    "CS1_current": "swr_x_current",
-    "CS1nt_current": "swr_x_current",
-    "CS2_prev": "swr_x_prev",
-    "CS3_lastrew": "swr_x_is_last_rewarded_elsewhere",
-    "CS4_armreward": "swr_x_reward_rate_arm_k10",
-    "CS5_armvalue": "swr_x_q_arm",
-    "CS5b_valuevsprevgoal": "swr_x_q_arm",
-    "C13_armuncert": "arm_uncertainty_z",
-    "CS6_armuncert": "swr_x_arm_uncertainty_z",
+    "C1_current": "is_current_arm",
+    "C2_base": "is_current_arm",
+    "C3_armreward": "reward_fraction_candidate_arm_last10_visits",
+    "C4_armvalue": "reward_belief_mean_candidate_arm_preoutcome",
+    "C5_lastrew": "is_last_rewarded_noncurrent_arm",
+    "C6_rpe": "rpe_postoutcome_z_x_is_current_arm",
+    "C7_value": "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    "C8_uncert": "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+    "C9_update": "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+    "C10_periswitch": "periswitch_index_trials_z_x_is_current_arm",
+    "C11_block": "trials_since_block_change_z_x_is_current_arm",
+    "C12_switchrate": "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+    "CS1_current": "swr_x_is_current_arm",
+    "CS1nt_current": "swr_x_is_current_arm",
+    "CS2_prev": "swr_x_is_prev_arm",
+    "CS3_lastrew": "swr_x_is_last_rewarded_noncurrent_arm",
+    "CS4_armreward": "swr_x_reward_fraction_candidate_arm_last10_visits",
+    "CS5_armvalue": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "CS5b_valuevsprevgoal": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "C13_armuncert": "reward_belief_variance_candidate_arm_preoutcome_z",
+    "CS6_armuncert": "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
 }
 BASEc_PATCH = [
     "is_current_patch",
     "is_prev_patch",
-    "visit_recency_patch",
-    "arm_never_visited_patch",
+    "visit_recency_trials_patch",
+    "is_patch_never_visited",
 ]
 # ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18. Both crossed
-# ``is_last_rewarded_patch_elsewhere`` with a ``trials_since_switch`` term, and
+# ``is_last_rewarded_noncurrent_patch`` with a peri-switch term, and
 # the indicator correlates -0.96/-0.97 with its own interaction, so the design
 # was rank-deficient in 83 and 87 of 215 sessions. What survived the |coef|<10
 # filter was selection on the estimate: CP2 reported +4.83 with a typical
 # session SE of 7,313, against +0.36 on the sessions that were actually
 # identified. A 3%-support indicator crossed with a time term is not estimable
 # per session in a 3-alternative model.
-_LR_PATCH = "is_last_rewarded_patch_elsewhere"
+_LR_PATCH = "is_last_rewarded_noncurrent_patch"
 SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP0_base": (BASEc_PATCH, "split"),
     "CP1_lastrew": ([*BASEc_PATCH, _LR_PATCH], "split"),
-    "CP3_newgrowth": ([*BASEc_PATCH, "currentpatch_x_tss"], "split"),
-    "CP4_switchrate": ([*BASEc_PATCH, "currentpatch_x_switchrate"], "split"),
-    # Time-controlled (currentpatch_x_tsc, within-stop-time) + uncontrolled twin,
+    "CP3_newgrowth": (
+        [*BASEc_PATCH, "periswitch_index_trials_z_x_is_current_patch"],
+        "split",
+    ),
+    "CP4_switchrate": (
+        [
+            *BASEc_PATCH,
+            "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
+        ],
+        "split",
+    ),
+    # Time-controlled current-patch contrast + uncontrolled twin,
     # mirroring the arm CS1/CS1nt pair.
     "CPS1_current": (
-        [*BASEc_PATCH, "currentpatch_x_tsc", "swr_x_current_patch"],
+        [
+            *BASEc_PATCH,
+            "log1p_time_since_stop_start_s_z_x_is_current_patch",
+            "swr_x_is_current_patch",
+        ],
         "pooled",
     ),
-    "CPS1nt_current": ([*BASEc_PATCH, "swr_x_current_patch"], "pooled"),
+    "CPS1nt_current": ([*BASEc_PATCH, "swr_x_is_current_patch"], "pooled"),
     "CPS2_lastrew": (
-        [*BASEc_PATCH, _LR_PATCH, "swr_x_last_rewarded_patch_elsewhere"],
+        [*BASEc_PATCH, _LR_PATCH, "swr_x_is_last_rewarded_noncurrent_patch"],
         "pooled",
     ),
 }
 SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
     "CP0_base": "is_current_patch",
     "CP1_lastrew": _LR_PATCH,
-    "CP3_newgrowth": "currentpatch_x_tss",
-    "CP4_switchrate": "currentpatch_x_switchrate",
-    "CPS1_current": "swr_x_current_patch",
-    "CPS1nt_current": "swr_x_current_patch",
-    "CPS2_lastrew": "swr_x_last_rewarded_patch_elsewhere",
+    "CP3_newgrowth": "periswitch_index_trials_z_x_is_current_patch",
+    "CP4_switchrate": "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
+    "CPS1_current": "swr_x_is_current_patch",
+    "CPS1nt_current": "swr_x_is_current_patch",
+    "CPS2_lastrew": "swr_x_is_last_rewarded_noncurrent_patch",
 }
 SWR_CONTRAST_CONTENT_BASEC = BASEc
 SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
@@ -1273,7 +1315,8 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 # ── Phase-4 causal-hygiene: descriptive-rung allowlists ──
 #
 # These rungs carry a POST_OUTCOME (RPE / value-update — embeds the current reward) or
-# FUTURE_REFERENCING (trials_since_switch / is_post_switch — signs toward the NEXT switch)
+# FUTURE_REFERENCING (``periswitch_index_trials`` / ``is_periswitch_post`` —
+# signs toward the NEXT switch)
 # covariate that CANNOT be a forward predictor. They are RETAINED
 # under an explicit *descriptive* claim (a value/RPE *association*, or a *peri-switch
 # alignment*), NOT gated. The runners call ``assert_predictor_timing(descriptive=True)``
@@ -1283,7 +1326,8 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
 # Contrast rungs fitted over the six leaf arms only, not all nine.
 #
 # The trunk arms carry a structural zero for every leaf-derived belief covariate
-# (`q_arm`, `p_reward_arm`, `arm_uncertainty`), so including them adds rows that
+# (candidate-arm reward-belief mean, task reward probability, and
+# reward-belief variance), so including them adds rows that
 # say nothing about those covariates while manufacturing collinearity between
 # them. Their persisted z units are now defined over the six reward-site arms;
 # the nine-arm design still retains trunk response rows, but structural zeros no
@@ -1305,10 +1349,12 @@ LEAF_ONLY_CONTRAST_RUNGS = frozenset(
 )
 LEAF_ONLY_N_CATEGORIES = 6
 # Arm fixed effects for a leaf-only fit: five dummies for six leaves, arm 5 the
-# reference. The nine-arm set (arm_fe_0..7) is rank-deficient once the trunks are
-# gone -- arm_fe_6 and arm_fe_7 are then identically zero -- so a leaf-only rung
+# reference. The nine-arm set (is_candidate_arm_0..7) is rank-deficient once the trunks are
+# gone -- is_candidate_arm_6 and is_candidate_arm_7 are then identically zero -- so a leaf-only rung
 # carrying it does not fit at all.
-LEAF_ONLY_ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"arm_fe_{i}" for i in range(5))
+LEAF_ONLY_ARM_FE_PREDICTORS: tuple[str, ...] = tuple(
+    f"is_candidate_arm_{i}" for i in range(5)
+)
 
 
 def leaf_only_predictors(predictors) -> list[str]:

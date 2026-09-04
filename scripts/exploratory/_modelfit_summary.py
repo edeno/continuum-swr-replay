@@ -39,41 +39,41 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 SCRATCH = Path("scratch")
-SESSION = ["animal", "day", "epoch"]
+SESSION = list(SESSION_COLUMNS)
 
 ARM_ORDER = ["M0", "M0a", "M1", "M2", "M3", "M4", "M5", "M6", "M7"]
 # Predictor introduced at each arm model (for the coefficient forest at M7).
 ARM_PREDICTORS = [
-    "is_current",
-    "is_prev",
-    "reward_rate_arm_k10",
-    "visit_recency_demeaned",
-    "is_last_rewarded_elsewhere",
-    "swr_x_current",
-    "swr_x_prev",
-    "swr_x_reward_rate_arm_k10",
-    "swr_x_visit_recency_demeaned",
-    "swr_x_is_last_rewarded_elsewhere",
+    "is_current_arm",
+    "is_prev_arm",
+    "reward_fraction_candidate_arm_last10_visits",
+    "visit_recency_trials_event_leaf_centered",
+    "is_last_rewarded_noncurrent_arm",
+    "swr_x_is_current_arm",
+    "swr_x_is_prev_arm",
+    "swr_x_reward_fraction_candidate_arm_last10_visits",
+    "swr_x_visit_recency_trials_event_leaf_centered",
+    "swr_x_is_last_rewarded_noncurrent_arm",
 ]
 PATCH_ORDER = ["P0", "P1", "P2", "P3", "P4"]
 PATCH_PREDICTORS = [
     "is_current_patch",
-    "is_last_rewarded_patch_elsewhere",
-    "reward_rate_arm_k10_patch",
-    "swr_x_current_patch",
-    "swr_x_last_rewarded_patch_elsewhere",
+    "is_last_rewarded_noncurrent_patch",
+    "reward_fraction_candidate_arm_last10_visits_patch",
+    "swr_x_is_current_patch",
+    "swr_x_is_last_rewarded_noncurrent_patch",
 ]
 RATE_ORDER = ["R0", "R1", "R2"]
 RATE_PREDICTORS = [
-    "reward_lag1",
-    "is_after_switch",
-    "reward_rate_trial_k10",
+    "known_reward_outcome_lag_1",
+    "reward_fraction_last10_known_trials",
 ]
 
 
@@ -236,7 +236,7 @@ def main():
     patch = load_patch_fits()
     rate = load_rate_fits()
     n = {k: v.groupby(SESSION).ngroups for k, v in
-         (("arm", arm), ("patch", patch), ("rate", rate))}
+         (("candidate_arm", arm), ("patch", patch), ("rate", rate))}
     logging.info("epochs — arm %(arm)d, patch %(patch)d, rate %(rate)d", n)
 
     fig, axs = plt.subplots(3, 3, figsize=(16, 13), dpi=150,
@@ -260,7 +260,7 @@ def main():
         panel_trajectory(axs[r, 0], df, metric, order, ylabel, higher_better=True)
         panel_step_delta(axs[r, 1], df, metric, order, higher_better=True)
         panel_coef_heatmap(axs[r, 2], df, coef_models, preds, heat_title)
-        which = {"arm": "arm", "patch": "patch", "rate": "rate"}[tag.split()[0].lower()]
+        which = {"candidate_arm": "candidate_arm", "patch": "patch", "rate": "rate"}[tag.split()[0].lower()]
         axs[r, 0].annotate(f"{tag}  (n={n[which]} epochs)", (-0.15, 1.13),
                            xycoords="axes fraction", fontsize=12, fontweight="bold")
 

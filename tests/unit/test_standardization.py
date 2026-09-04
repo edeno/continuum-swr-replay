@@ -166,11 +166,11 @@ def test_support_mask_sets_reference_on_scientific_support():
     """Structural-zero trunk rows must not set a leaf-identified coefficient unit."""
     df = pd.DataFrame(
         {
-            "arm": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+            "candidate_arm": [0, 1, 2, 3, 4, 5, 6, 7, 8],
             "uncertainty": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0, 0.0],
         }
     )
-    leaf = df["arm"].lt(6).to_numpy()
+    leaf = df["candidate_arm"].lt(6).to_numpy()
     out, ref = attach_standardized(
         df,
         ["uncertainty"],
@@ -207,9 +207,9 @@ def test_empty_support_fails_without_emitting_nan_reference():
 
 def test_completeness_guard_uses_same_scientific_support():
     frame = pd.DataFrame(
-        {"arm": list(range(9)), "q": [0.5] * 6 + [0.0, 0.0, 0.0]}
+        {"candidate_arm": list(range(9)), "q": [0.5] * 6 + [0.0, 0.0, 0.0]}
     )
-    leaf = frame["arm"].lt(6)
+    leaf = frame["candidate_arm"].lt(6)
     attach_standardized(frame, ["q"], support_mask=leaf)
 
     assert frame["q_z"].isna().all()
@@ -220,11 +220,11 @@ def test_materialized_z_must_match_frozen_scientific_support():
     """Correct names cannot hide moments computed on the wrong candidate rows."""
     raw = pd.DataFrame(
         {
-            "arm": list(range(9)),
+            "candidate_arm": list(range(9)),
             "uncertainty": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0, 0.0],
         }
     )
-    leaf = raw["arm"].lt(6)
+    leaf = raw["candidate_arm"].lt(6)
     current, reference = attach_standardized(
         raw.copy(),
         ["uncertainty"],

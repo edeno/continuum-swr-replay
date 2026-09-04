@@ -8,6 +8,16 @@ Loads the master long-format dataset from analysis/replay/prepare_data.py,
 fits per-session models for each model in the hierarchy, compares nested
 models via AIC (primary) and LRT, and saves results.
 
+Inference note — read the standard errors honestly. On the default
+``--grain timebin`` fit, a single session's coefficient standard errors are
+OPTIMISTIC: the ~32 autocorrelated per-event timebins are treated as
+independent draws, so one session's SEs are too small by roughly 5x. A
+per-session SE is therefore not a calibrated uncertainty. Population inference
+comes from the across-session distribution of the per-session coefficients
+(the sign-rank / FDR aggregation over sessions), never from a single fit's SE;
+``--grain event`` collapses each event to one observation for an honest
+per-session n, at the cost of the within-event distribution.
+
 Usage:
     uv run python scripts/content/fit_replay_content_models.py                # base ladder
     uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2
@@ -23,6 +33,7 @@ import tempfile
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -38,6 +49,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
+)
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
@@ -60,6 +74,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PATCH,
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWR,
+    ModelSpec,
     default_content_model_names,
 )
 from continuum_swr_replay.analysis.replay.standardization import (
@@ -72,6 +87,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table, table_exists
 
 # Map event source to model hierarchy and input directory
@@ -115,7 +131,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-SESSION_COLS = ["animal", "day", "epoch"]
+SESSION_COLS = list(SESSION_COLUMNS)
 
 # A canonical content table carries more than whichever columns one requested
 # model happens to use. These fields distinguish the current location-aware,
@@ -125,35 +141,34 @@ _CANONICAL_SCHEMA_COLUMNS = {
     "arm": (
         *SESSION_COLS,
         "event_id",
-        "arm",
+        "candidate_arm",
         "arm_count_hard",
-        "location_state",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
-        "current_arm",
-        "is_current",
-        "visit_recency_demeaned",
-        "arm_never_visited",
+        "occupancy_well_id",
+        "occupancy_well_arm",
+        "is_current_arm",
+        "visit_recency_trials_event_leaf_centered",
+        "is_candidate_arm_never_visited",
     ),
     "patch": (
         *SESSION_COLS,
         "event_id",
         "patch",
         "patch_count_hard",
-        "location_state",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
+        "occupancy_well_id",
+        "occupancy_well_arm",
         "is_current_patch",
-        "visit_recency_patch",
-        "arm_never_visited_patch",
+        "visit_recency_trials_patch",
+        "is_patch_never_visited",
     ),
 }
 
 _LOCATION_STATES = frozenset({"at_well", "in_transit", "mixed", "unknown"})
 _CANDIDATE_COLUMNS = {
-    "arm": ("arm", ALL_ARMS),
+    "arm": ("candidate_arm", ALL_ARMS),
     "patch": ("patch", tuple(sorted(set(TRACK_SEGMENT_TO_PATCH.values())))),
 }
 
@@ -266,20 +281,18 @@ def _validate_canonical_table_contract(
 
     context_cols = [
         *SESSION_COLS,
-        "location_state",
+        "occupancy_state",
         "at_well",
-        "location_well",
-        "location_arm",
+        "occupancy_well_id",
+        "occupancy_well_arm",
     ]
-    if hierarchy_kind == "arm":
-        context_cols.append("current_arm")
     if (by_event[context_cols].nunique(dropna=False) != 1).any(axis=None):
         raise ValueError(
             f"Canonical content table {table_label} has event context that "
             "changes across candidate rows"
         )
 
-    state = long_df["location_state"]
+    state = long_df["occupancy_state"]
     invalid_states = sorted(set(state.dropna().unique()) - _LOCATION_STATES)
     if state.isna().any() or invalid_states:
         raise ValueError(
@@ -305,7 +318,7 @@ def _validate_canonical_table_contract(
     # A current candidate is scientifically defined only for whole-window
     # at-well events. Numeric zeros off-well would retain those events in the
     # common cohort and silently change the estimand.
-    current_col = "is_current" if hierarchy_kind == "arm" else "is_current_patch"
+    current_col = "is_current_arm" if hierarchy_kind == "arm" else "is_current_patch"
     current = long_df[current_col]
     if not current.dropna().isin([0.0, 1.0]).all():
         raise ValueError(
@@ -327,7 +340,7 @@ def _validate_canonical_table_contract(
             f"{current_col} candidate for every at-well event"
         )
 
-    for location_col in ("location_well", "location_arm"):
+    for location_col in ("occupancy_well_id", "occupancy_well_arm"):
         if (
             long_df.loc[at_well, location_col].isna().any()
             or long_df.loc[~at_well, location_col].notna().any()
@@ -336,27 +349,17 @@ def _validate_canonical_table_contract(
                 f"Canonical content table {table_label} must define "
                 f"{location_col} only for at-well events"
             )
-    if hierarchy_kind == "arm":
-        same_current_reference = long_df["current_arm"].eq(long_df["location_arm"]) | (
-            long_df["current_arm"].isna() & long_df["location_arm"].isna()
-        )
-        if not same_current_reference.all():
-            raise ValueError(
-                f"Canonical content table {table_label} requires current_arm to "
-                "equal location_arm, including off-well missingness"
-            )
-
     current_reference = (
-        long_df["location_arm"]
+        long_df["occupancy_well_arm"]
         if hierarchy_kind == "arm"
-        else long_df["location_arm"].map(TRACK_SEGMENT_TO_PATCH)
+        else long_df["occupancy_well_arm"].map(TRACK_SEGMENT_TO_PATCH)
     )
     expected_current = long_df[candidate_col].eq(current_reference).astype(float)
     if not current.loc[at_well].eq(expected_current.loc[at_well]).all():
         relation = (
-            "location_arm"
+            "occupancy_well_arm"
             if hierarchy_kind == "arm"
-            else "the mapped location_arm patch"
+            else "the mapped occupancy_well_arm patch"
         )
         raise ValueError(
             f"Canonical content table {table_label}: {current_col} must match "
@@ -380,10 +383,14 @@ def _validate_canonical_table_contract(
         )
 
     novelty_col = (
-        "arm_never_visited" if hierarchy_kind == "arm" else "arm_never_visited_patch"
+        "is_candidate_arm_never_visited"
+        if hierarchy_kind == "arm"
+        else "is_patch_never_visited"
     )
     recency_col = (
-        "visit_recency_demeaned" if hierarchy_kind == "arm" else "visit_recency_patch"
+        "visit_recency_trials_event_leaf_centered"
+        if hierarchy_kind == "arm"
+        else "visit_recency_trials_patch"
     )
     novelty = long_df[novelty_col]
     if not novelty.dropna().isin([0.0, 1.0]).all():
@@ -415,7 +422,7 @@ def resolve_contfrag_paths(
     Pure helper extracted so the prep ↔ fitter filename contract has a
     direct unit-test target. ``event_source`` is one of
     ``"non_local"`` / ``"SWR"`` / ``"MUA"``; ``hierarchy_kind`` is
-    ``"arm"`` / ``"patch"``.
+    ``"candidate_arm"`` / ``"patch"``.
 
     Non-local fits stay unsuffixed (their prep is single-area /
     single-source). ContFrag fits append ``_{brain_area}`` to the
@@ -463,7 +470,7 @@ def prepare_canonical_fit_request(
         required_schema = _CANONICAL_SCHEMA_COLUMNS[hierarchy_kind]
     except KeyError as exc:
         raise ValueError(
-            f"hierarchy_kind must be 'arm' or 'patch', got {hierarchy_kind!r}"
+            f"hierarchy_kind must be 'candidate_arm' or 'patch', got {hierarchy_kind!r}"
         ) from exc
 
     missing_schema = [column for column in required_schema if column not in long_df]
@@ -725,7 +732,9 @@ def _validate_and_match_fit_results(
                 logging.warning(
                     "%s: CV scored %d of %d sessions (%.0f%%); coefficients keep "
                     "the full cohort, held-out comparisons use the scored subset",
-                    model_name, int(scored.sum()), len(result),
+                    model_name,
+                    int(scored.sum()),
+                    len(result),
                     100 * scored.mean(),
                 )
             cv_counts = result.loc[scored, list(_CV_COUNT_COLUMNS)].apply(
@@ -863,6 +872,7 @@ def _write_complete_output_bundle(
     logit_results: Mapping[str, pd.DataFrame],
 ) -> None:
     """Stage every artifact, then replace the output directory as one bundle."""
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
     staged_dir = Path(
         tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
     )
@@ -973,7 +983,7 @@ def print_model_results(
         )
 
 
-def main():
+def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1024,7 +1034,7 @@ def main():
         default="arm",
         choices=["arm", "patch"],
         help=(
-            "Resolution: 'arm' (9 arms, M0-M7) or 'patch' (3 patches, "
+            "Resolution: 'arm' (9 candidate arms, M0-M7) or 'patch' (3 patches, "
             "P0-P4). Patch fits use event_patch_table.pkl and "
             "patch_count_hard."
         ),
@@ -1056,8 +1066,52 @@ def main():
             "partitioned per area."
         ),
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Explicit candidate-table root. Defaults to the canonical root for "
+            "--event-source. Use this for staging validation."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Exact model-output directory. Defaults to the source/hierarchy "
+            "subdirectory under --input-dir. Existing outputs are replaced only "
+            "after the complete requested bundle validates."
+        ),
+    )
+    return parser
 
+
+class _RunConfig(NamedTuple):
+    """Resolved paths, model hierarchy, and requested rung names for one run."""
+
+    hierarchy: dict[str, ModelSpec]
+    input_dir: Path
+    output_dir: Path
+    table_name: str
+    model_names: Sequence[str]
+
+
+class _ContentCohort(NamedTuple):
+    """The loaded, subset, and complete-case-frozen fitting cohort."""
+
+    long_df: pd.DataFrame
+    long_df_prefilter: pd.DataFrame
+    valid_model_names: Sequence[str]
+    union_predictors: Sequence[str]
+    response_col: str
+    event_col: str
+    n_events_before_complete_case: int
+
+
+def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
+    """Resolve the hierarchy, input/output paths, and requested model names."""
     # Select hierarchy and input paths based on event source. The
     # --hierarchy flag overrides the model dict and table name when
     # 'patch' is selected; the input directory follows the event source.
@@ -1089,7 +1143,11 @@ def main():
         args.event_source, args.brain_area, args.hierarchy
     )
 
-    input_dir = PROCESSED_DATA_DIR / source_config["input_dir_name"]
+    input_dir = (
+        args.input_dir.resolve()
+        if args.input_dir is not None
+        else PROCESSED_DATA_DIR / source_config["input_dir_name"]
+    )
     output_dir = input_dir / output_subdir
 
     # SWR subset: restrict to is_swr=True or =False events. Within a
@@ -1117,6 +1175,9 @@ def main():
     if args.grain == "event":
         output_dir = output_dir.with_name(f"{output_dir.name}_event_grain")
         logging.info("grain = event (one observation per event) -> %s", output_dir)
+    if args.output_dir is not None:
+        output_dir = args.output_dir.resolve()
+        logging.info("explicit model output -> %s", output_dir)
 
     # Determine which models to fit
     if args.models:
@@ -1128,6 +1189,25 @@ def main():
         # explicitly on their own matched cohort (e.g. --models M5,Mv,Mu,Mvu or
         # --models P3,Pv).
         model_names = list(default_content_model_names(hierarchy))
+
+    return _RunConfig(
+        hierarchy=hierarchy,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        table_name=table_name,
+        model_names=model_names,
+    )
+
+
+def _load_and_filter_cohort(
+    args: argparse.Namespace, config: _RunConfig
+) -> _ContentCohort:
+    """Load the canonical table, apply the SWR subset and at-well cohort, and
+    freeze the common complete-case event set."""
+    hierarchy = config.hierarchy
+    input_dir = config.input_dir
+    table_name = config.table_name
+    model_names = config.model_names
 
     # Canonical inputs are mandatory. The former implicit ``long_count.pkl``
     # fallback could fit M0-M3 from a stale schema and write those partial
@@ -1149,6 +1229,9 @@ def main():
 
     logging.info("Loading %s...", canonical_path)
     long_df = read_table(canonical_path)
+    require_covariate_schema(
+        long_df, table="event_arm" if args.hierarchy == "arm" else "event_patch"
+    )
     (
         long_df,
         valid_model_names,
@@ -1210,8 +1293,8 @@ def main():
     # The restriction is not balanced across the SWR contrast (3.3% of SWR
     # events are off-well against 13.0% of non-SWR) -- expected, since SWR
     # events concentrate at wells -- so the cohort belongs in Methods.
-    if "location_state" in long_df.columns:
-        at_well = long_df["location_state"].eq("at_well")
+    if "occupancy_state" in long_df.columns:
+        at_well = long_df["occupancy_state"].eq("at_well")
         n_before_events = long_df[event_col].nunique()
         long_df = long_df.loc[at_well].reset_index(drop=True)
         logging.info(
@@ -1279,6 +1362,27 @@ def main():
         long_df[event_col].nunique(),
     )
 
+    return _ContentCohort(
+        long_df=long_df,
+        long_df_prefilter=long_df_prefilter,
+        valid_model_names=valid_model_names,
+        union_predictors=union_predictors,
+        response_col=response_col,
+        event_col=event_col,
+        n_events_before_complete_case=n_before,
+    )
+
+
+def _fit_content_ladder(
+    args: argparse.Namespace, config: _RunConfig, cohort: _ContentCohort
+) -> dict[str, pd.DataFrame]:
+    """Fit every requested rung per session and validate the matched ladder."""
+    hierarchy = config.hierarchy
+    long_df = cohort.long_df
+    valid_model_names = cohort.valid_model_names
+    response_col = cohort.response_col
+    event_col = cohort.event_col
+
     # Fit every requested rung into memory. Nothing under ``output_dir`` is
     # created or modified until the whole ladder and its shared cohort pass
     # integrity checks, so a late empty/failed rung cannot leave mixed results.
@@ -1330,6 +1434,118 @@ def main():
         len(model_results),
         shared_session_count,
     )
+
+    return model_results
+
+
+def _fit_conditional_logit_robustness(
+    args: argparse.Namespace,
+    config: _RunConfig,
+    cohort: _ContentCohort,
+    model_results: dict[str, pd.DataFrame],
+) -> dict[str, pd.DataFrame]:
+    """Optional conditional-logit robustness fits on the dominant arm.
+
+    Returns an empty mapping unless ``--logit`` is set; otherwise fits each
+    rung per session on the primary ladder's shared-session cohort and
+    validates that the logit sessions match it exactly.
+    """
+    hierarchy = config.hierarchy
+    long_df = cohort.long_df
+    valid_model_names = cohort.valid_model_names
+    response_col = cohort.response_col
+    event_col = cohort.event_col
+
+    # Conditional-logit robustness results are also collected before the output
+    # bundle is staged. Restrict them to the primary ladder's shared sessions.
+    shared_sessions = set(
+        next(iter(model_results.values()))[SESSION_COLS].itertuples(
+            index=False, name=None
+        )
+    )
+    long_session_index = pd.MultiIndex.from_frame(long_df[SESSION_COLS])
+    matched_long_df = long_df.loc[long_session_index.isin(shared_sessions)]
+    logit_outputs: dict[str, pd.DataFrame] = {}
+    if args.logit:
+        logging.info("Fitting conditional logit robustness checks...")
+        expected_logit_models = tuple(
+            model_name
+            for model_name in valid_model_names
+            if hierarchy[model_name].predictors
+        )
+        for model_name in expected_logit_models:
+            spec = hierarchy[model_name]
+            predictors = list(spec.predictors)
+
+            model_logit_results = []
+            for keys, group in matched_long_df.groupby(SESSION_COLS):
+                # Forward the resolved response column. Patch fits use
+                # ``patch_count_hard``; without this, the logit call
+                # silently fell back to ``arm_count_hard`` (the
+                # ``fit_conditional_logit`` default), found no such
+                # column on patch tables, and returned ``None`` for
+                # every session — producing an empty ``logit/`` dir
+                # with no robustness outputs.
+                r = fit_conditional_logit(
+                    group,
+                    predictors=predictors,
+                    event_col=event_col,
+                    response_col=response_col,
+                )
+                if r is None:
+                    raise RuntimeError(
+                        "Requested conditional-logit robustness fit failed for "
+                        f"{model_name}/{tuple(keys)}; no output will be published"
+                    )
+                r["model"] = model_name
+                for col, val in zip(SESSION_COLS, keys, strict=True):
+                    r[col] = val
+                model_logit_results.append(r)
+
+            logit_outputs[model_name] = pd.DataFrame(model_logit_results)
+
+        if expected_logit_models:
+            logit_outputs = _validate_and_match_fit_results(
+                logit_outputs,
+                requested_model_names=expected_logit_models,
+                cohort=matched_long_df,
+                event_col=event_col,
+            )
+            for model_name, logit_df in logit_outputs.items():
+                logit_sessions = set(
+                    logit_df[SESSION_COLS].itertuples(index=False, name=None)
+                )
+                if logit_sessions != shared_sessions:
+                    raise RuntimeError(
+                        "Requested conditional-logit robustness fits do not match "
+                        f"the primary cohort for {model_name}; no output will be "
+                        "published"
+                    )
+                logging.info(
+                    "  %s logit: %d matched sessions staged",
+                    model_name,
+                    len(logit_df),
+                )
+
+    return logit_outputs
+
+
+def _audit_compare_and_publish(
+    args: argparse.Namespace,
+    config: _RunConfig,
+    cohort: _ContentCohort,
+    model_results: dict[str, pd.DataFrame],
+) -> None:
+    """Build the cohort audit, run nested comparisons and optional conditional-
+    logit robustness fits, then stage and publish the complete output bundle."""
+    hierarchy = config.hierarchy
+    output_dir = config.output_dir
+    long_df_prefilter = cohort.long_df_prefilter
+    valid_model_names = cohort.valid_model_names
+    union_predictors = cohort.union_predictors
+    response_col = cohort.response_col
+    event_col = cohort.event_col
+    n_before = cohort.n_events_before_complete_case
 
     # Build every audit record only after the model frames have been restricted
     # to the exact same successfully fitted session cohort.
@@ -1436,76 +1652,9 @@ def main():
                     f"{wp:>11}"
                 )
 
-    # Conditional-logit robustness results are also collected before the output
-    # bundle is staged. Restrict them to the primary ladder's shared sessions.
-    shared_sessions = set(
-        next(iter(model_results.values()))[SESSION_COLS].itertuples(
-            index=False, name=None
-        )
+    logit_outputs = _fit_conditional_logit_robustness(
+        args, config, cohort, model_results
     )
-    long_session_index = pd.MultiIndex.from_frame(long_df[SESSION_COLS])
-    matched_long_df = long_df.loc[long_session_index.isin(shared_sessions)]
-    logit_outputs: dict[str, pd.DataFrame] = {}
-    if args.logit:
-        logging.info("Fitting conditional logit robustness checks...")
-        expected_logit_models = tuple(
-            model_name
-            for model_name in valid_model_names
-            if hierarchy[model_name].predictors
-        )
-        for model_name in expected_logit_models:
-            spec = hierarchy[model_name]
-            predictors = list(spec.predictors)
-
-            model_logit_results = []
-            for keys, group in matched_long_df.groupby(SESSION_COLS):
-                # Forward the resolved response column. Patch fits use
-                # ``patch_count_hard``; without this, the logit call
-                # silently fell back to ``arm_count_hard`` (the
-                # ``fit_conditional_logit`` default), found no such
-                # column on patch tables, and returned ``None`` for
-                # every session — producing an empty ``logit/`` dir
-                # with no robustness outputs.
-                r = fit_conditional_logit(
-                    group,
-                    predictors=predictors,
-                    event_col=event_col,
-                    response_col=response_col,
-                )
-                if r is None:
-                    raise RuntimeError(
-                        "Requested conditional-logit robustness fit failed for "
-                        f"{model_name}/{tuple(keys)}; no output will be published"
-                    )
-                r["model"] = model_name
-                for col, val in zip(SESSION_COLS, keys, strict=True):
-                    r[col] = val
-                model_logit_results.append(r)
-
-            logit_outputs[model_name] = pd.DataFrame(model_logit_results)
-
-        if expected_logit_models:
-            logit_outputs = _validate_and_match_fit_results(
-                logit_outputs,
-                requested_model_names=expected_logit_models,
-                cohort=matched_long_df,
-                event_col=event_col,
-            )
-            for model_name, logit_df in logit_outputs.items():
-                logit_sessions = set(
-                    logit_df[SESSION_COLS].itertuples(index=False, name=None)
-                )
-                if logit_sessions != shared_sessions:
-                    raise RuntimeError(
-                        "Requested conditional-logit robustness fits do not match "
-                        f"the primary cohort for {model_name}; no output will be "
-                        "published"
-                    )
-                logging.info(
-                    "  %s logit: %d matched sessions staged",
-                    model_name,
-                    len(logit_df),
-                )
 
     # Only now, after all requested fits and derived artifacts are valid, write
     # to a sibling staging directory and swap the complete directory into place.
@@ -1524,6 +1673,20 @@ def main():
     )
 
     logging.info("Done!")
+
+
+def run_content_fit(args: argparse.Namespace) -> None:
+    """Load the content tables, fit the ladder, compare, and publish the bundle."""
+    config = _resolve_run_config(args)
+    cohort = _load_and_filter_cohort(args, config)
+    model_results = _fit_content_ladder(args, config, cohort)
+    _audit_compare_and_publish(args, config, cohort, model_results)
+
+
+def main() -> None:
+    parser = _build_arg_parser()
+    args = parser.parse_args()
+    run_content_fit(args)
 
 
 if __name__ == "__main__":

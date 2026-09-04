@@ -32,10 +32,14 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.table_io import read_table
 
 # Colour code for each arm (0..8). Patches share families:
 # arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
@@ -72,8 +76,16 @@ def make_figure(
     m3_fits: pd.DataFrame,
     output_dir: Path,
 ) -> None:
+    event_row = events.loc[events["non_local_event"] == event_id]
+    if len(event_row) != 1:
+        raise ValueError(
+            f"expected one session-local non_local_event={event_id}, "
+            f"found {len(event_row)}"
+        )
+    local_event = int(event_row["non_local_event"].iloc[0])
+    canonical_event_id = event_row["event_id"].iloc[0]
     # Pull the event we're going to feature, and a window around it.
-    ev_rows = dot[dot["non_local_event"] == event_id]
+    ev_rows = dot[dot["non_local_event"] == local_event]
     t_start = ev_rows.index.min()
     t_end = ev_rows.index.max()
     pad = max(1.0, 1.5 * (t_end - t_start))
@@ -81,36 +93,37 @@ def make_figure(
     win_t = win.index.values - t_start  # seconds relative to event onset
 
     # Get the per-arm count vector for this event from the saved long_count.
-    lc_event = long_count[long_count["non_local_event"] == event_id].sort_values("arm_id")
-    counts = lc_event.set_index("arm_id")["arm_count"].reindex(range(9), fill_value=0)
-    track_seg = int(events[events["non_local_event"] == event_id]["track_segment_id"].iloc[0])
+    lc_event = long_count[long_count["event_id"] == canonical_event_id].sort_values(
+        "candidate_arm"
+    )
+    counts = lc_event.set_index("candidate_arm")["arm_count_hard"].reindex(
+        range(9), fill_value=0
+    )
+    track_seg = int(event_row["modal_observed_track_segment_id"].iloc[0])
 
     # Indicator columns from the long_count for the long-format mini-table.
     indicator_cols = [
-        "arm_id",
-        "arm_count",
-        "is_current",
-        "is_prev",
-        "is_next",
-        "is_last_rewarded",
+        "candidate_arm",
+        "arm_count_hard",
+        "is_current_arm",
+        "is_prev_arm",
+        "is_next_arm",
+        "is_last_rewarded_arm",
     ]
     long_table = lc_event[indicator_cols].copy()
-    long_table["arm_id"] = long_table["arm_id"].astype(int)
-    long_table["arm_count"] = long_table["arm_count"].astype(int)
+    long_table["candidate_arm"] = long_table["candidate_arm"].astype(int)
+    long_table["arm_count_hard"] = long_table["arm_count_hard"].astype(int)
     for c in long_table.columns[2:]:
         long_table[c] = long_table[c].astype(int)
 
     # Per-session M3 coefficients across all 218 sessions.
     coef_cols = [
-        "coef_is_current",
-        "coef_is_prev",
-        "coef_is_next",
-        "coef_is_last_rewarded",
-        "coef_visit_recency",
-        "coef_cumulative_reward",
+        "coef_is_current_arm",
+        "coef_is_prev_arm",
+        "coef_reward_fraction_candidate_arm_last10_visits",
     ]
     coef_long = m3_fits[coef_cols].rename(
-        columns=lambda c: c.replace("coef_", "")
+        columns=lambda c: c.removeprefix("coef_")
     )
 
     # ── Layout: 3 rows × 2 cols ──
@@ -156,7 +169,7 @@ def make_figure(
     for ev_in_win, g in nl_in_window.groupby("non_local_event"):
         s = g.index.min() - t_start
         e = g.index.max() - t_start
-        is_featured = ev_in_win == event_id
+        is_featured = ev_in_win == local_event
         ax.axvspan(
             s, e, color="#3b6ea5" if is_featured else "#cccccc",
             alpha=0.4 if is_featured else 0.25,
@@ -271,7 +284,7 @@ def make_figure(
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1, 1.25)
-    # Color arm_id cells by arm color for visual link
+    # Color candidate-arm cells by arm color for visual link
     for row in range(len(table_data)):
         arm = int(table_data[row, 0])
         cell = table[(row + 1, 0)]
@@ -358,25 +371,25 @@ def main() -> None:
     args = parser.parse_args()
 
     dot, env = load_session(args.animal, args.day, args.epoch)
-    long_count = pd.read_pickle(
-        Path("Processed-Data/replay_content/long_count.pkl")
+    long_count = read_table(
+        PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.pkl"
     )
-    events = pd.read_pickle(
-        Path("Processed-Data/replay_content/events.pkl")
-    )
+    events = read_table(PROCESSED_DATA_DIR / "replay_content" / "event_table.pkl")
+    require_covariate_schema(long_count, table="event_arm")
+    require_covariate_schema(events, table="event")
     m3_fits = pd.read_pickle(
         Path("Processed-Data/replay_content/models/M3.pkl")
     )
 
     sess_mask = (
         (long_count["animal"] == args.animal)
-        & (long_count["day"] == args.day)
+        & (long_count["session_date"] == args.day)
         & (long_count["epoch"] == args.epoch)
     )
     long_count = long_count[sess_mask]
     events = events[
         (events["animal"] == args.animal)
-        & (events["day"] == args.day)
+        & (events["session_date"] == args.day)
         & (events["epoch"] == args.epoch)
     ]
 

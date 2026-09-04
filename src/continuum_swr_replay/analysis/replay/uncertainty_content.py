@@ -30,14 +30,16 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
+
 from .covariate_timing import assert_predictor_timing
 
 LOGGER = logging.getLogger(__name__)
 
 LEAF_ARMS: tuple[int, ...] = tuple(range(6))
-SESSION_COLUMNS: tuple[str, ...] = ("animal", "day", "epoch")
+SESSION_COLUMNS: tuple[str, ...] = SESSION_COLUMNS
 UNCERTAINTY_COLUMNS: tuple[str, ...] = tuple(
-    f"betadist_var{arm + 1}" for arm in LEAF_ARMS
+    f"reward_belief_variance_port_{arm}" for arm in LEAF_ARMS
 )
 RESPONSE_COLUMNS: Mapping[str, str] = {
     "arm_count_hard": "hard_count",
@@ -80,7 +82,7 @@ def _session_id(frame: pd.DataFrame) -> pd.Series:
     return (
         frame["animal"].astype(str)
         + "/"
-        + frame["day"].astype(str)
+        + frame["session_date"].astype(str)
         + "/"
         + frame["epoch"].astype(str)
     )
@@ -107,7 +109,7 @@ def assign_within_arm_quantiles(
     frame: pd.DataFrame,
     *,
     n_quantiles: int = 4,
-    uncertainty_col: str = "arm_uncertainty",
+    uncertainty_col: str = "reward_belief_variance_candidate_arm_preoutcome",
     output_col: str = "uncertainty_quartile",
 ) -> pd.DataFrame:
     """Assign tie-preserving uncertainty quantiles within session x well.
@@ -120,7 +122,7 @@ def assign_within_arm_quantiles(
         raise ValueError("n_quantiles must be at least 2")
     _require_columns(
         frame,
-        {"session_id", "arm", uncertainty_col},
+        {"session_id", "candidate_arm", uncertainty_col},
         "uncertainty frame",
     )
 
@@ -139,7 +141,7 @@ def assign_within_arm_quantiles(
         return result
 
     out[output_col] = (
-        out.groupby(["session_id", "arm"], observed=True, group_keys=False)[
+        out.groupby(["session_id", "candidate_arm"], observed=True, group_keys=False)[
             uncertainty_col
         ]
         .apply(_midpoint_quantile)
@@ -173,46 +175,44 @@ def build_trial_leaf_table(
         *SESSION_COLUMNS,
         "event_id",
         "stop_id",
-        "arm",
+        "candidate_arm",
         *RESPONSE_COLUMNS.keys(),
     }
     stop_required = {
         *SESSION_COLUMNS,
         "stop_id",
         "stop_idx",
-        "immobility_time",
+        "immobility_duration_s",
     }
     qval_required = {
         "stop_id",
         "epoch",
         "trial_number_by_epoch",
-        "arm",
+        "chosen_arm",
         "trial_reward",
         "in_poke",
-        "is_rewarding",
+        "pump_on_at_bout_mid",
         *UNCERTAINTY_COLUMNS,
     }
     _require_columns(event_arm_table, event_required, "event_arm_table")
     _require_columns(stop_table, stop_required, "stop_table")
     _require_columns(qvals_table, qval_required, "qvals_table")
-    _require_unique(event_arm_table, ["event_id", "arm"], "event_arm_table")
+    _require_unique(event_arm_table, ["event_id", "candidate_arm"], "event_arm_table")
     _require_unique(stop_table, ["stop_id"], "stop_table")
     _require_unique(qvals_table, ["stop_id"], "qvals_table")
 
-    stop_columns = [*SESSION_COLUMNS, "stop_id", "stop_idx", "immobility_time"]
+    stop_columns = [*SESSION_COLUMNS, "stop_id", "stop_idx", "immobility_duration_s"]
     qval_columns = [
         "stop_id",
         "epoch",
         "trial_number_by_epoch",
-        "arm",
+        "chosen_arm",
         "trial_reward",
         "in_poke",
-        "is_rewarding",
+        "pump_on_at_bout_mid",
         *UNCERTAINTY_COLUMNS,
     ]
-    qvals = qvals_table[qval_columns].rename(
-        columns={"epoch": "qvals_epoch", "arm": "chosen_arm"}
-    )
+    qvals = qvals_table[qval_columns].rename(columns={"epoch": "qvals_epoch"})
     mapped_stops_all = stop_table[stop_columns].merge(
         qvals,
         on="stop_id",
@@ -227,7 +227,7 @@ def build_trial_leaf_table(
             "stop_table and qvals_table epoch labels disagree for "
             f"{int(epoch_mismatch.sum())} mapped stops"
         )
-    nonpositive_exposure = mapped_stops_all["immobility_time"] <= 0
+    nonpositive_exposure = mapped_stops_all["immobility_duration_s"] <= 0
     zero_exposure_stop_ids = set(mapped_stops_all.loc[nonpositive_exposure, "stop_id"])
     event_stop_ids = set(event_arm_table["stop_id"])
     invalid_event_stops = zero_exposure_stop_ids & event_stop_ids
@@ -251,32 +251,32 @@ def build_trial_leaf_table(
             "session_id",
             "stop_id",
             "stop_idx",
-            "immobility_time",
+            "immobility_duration_s",
             "trial_number_by_epoch",
             "chosen_arm",
             "trial_reward",
             "in_poke",
-            "is_rewarding",
+            "pump_on_at_bout_mid",
         ],
         value_vars=list(UNCERTAINTY_COLUMNS),
         var_name="uncertainty_source",
-        value_name="arm_uncertainty",
+        value_name="reward_belief_variance_candidate_arm_preoutcome",
     )
-    long_stops["arm"] = (
-        long_stops["uncertainty_source"].str.extract(r"(\d+)$")[0].astype(int) - 1
-    )
+    long_stops["candidate_arm"] = long_stops["uncertainty_source"].str.extract(
+        r"(\d+)$"
+    )[0].astype(int)
     long_stops = long_stops.drop(columns="uncertainty_source")
 
-    leaf_events = event_arm_table[event_arm_table["arm"].isin(LEAF_ARMS)].copy()
+    leaf_events = event_arm_table[event_arm_table["candidate_arm"].isin(LEAF_ARMS)].copy()
     content_by_stop_arm = (
-        leaf_events.groupby(["stop_id", "arm"], observed=True, as_index=False)
+        leaf_events.groupby(["stop_id", "candidate_arm"], observed=True, as_index=False)
         .agg(
             **{output: (source, "sum") for source, output in RESPONSE_COLUMNS.items()},
             n_events=("event_id", "nunique"),
         )
         .astype(dict.fromkeys(RESPONSE_COLUMNS.values(), float))
     )
-    _require_unique(content_by_stop_arm, ["stop_id", "arm"], "content summary")
+    _require_unique(content_by_stop_arm, ["stop_id", "candidate_arm"], "content summary")
     content_by_stop_total = (
         event_arm_table.groupby("stop_id", observed=True, as_index=False)
         .agg(
@@ -295,7 +295,7 @@ def build_trial_leaf_table(
 
     stop_leaf = long_stops.merge(
         content_by_stop_arm,
-        on=["stop_id", "arm"],
+        on=["stop_id", "candidate_arm"],
         how="left",
         validate="one_to_one",
     )
@@ -319,8 +319,8 @@ def build_trial_leaf_table(
     )
     _assert_constant(
         stop_leaf,
-        ["session_id", "trial_number_by_epoch", "arm"],
-        ["arm_uncertainty"],
+        ["session_id", "trial_number_by_epoch", "candidate_arm"],
+        ["reward_belief_variance_candidate_arm_preoutcome"],
         "belief uncertainty",
     )
     _assert_constant(
@@ -336,18 +336,18 @@ def build_trial_leaf_table(
                 *SESSION_COLUMNS,
                 "session_id",
                 "trial_number_by_epoch",
-                "arm",
+                "candidate_arm",
             ],
             observed=True,
             as_index=False,
         )
         .agg(
-            arm_uncertainty=("arm_uncertainty", "first"),
+            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "first"),
             chosen_arm=("chosen_arm", "first"),
             trial_reward=("trial_reward", "first"),
             any_in_poke=("in_poke", "max"),
-            any_rewarding=("is_rewarding", "max"),
-            immobility_time=("immobility_time", "sum"),
+            any_rewarding=("pump_on_at_bout_mid", "max"),
+            immobility_duration_s=("immobility_duration_s", "sum"),
             n_stops=("stop_id", "nunique"),
             n_events=("n_events", "sum"),
             hard_count=("hard_count", "sum"),
@@ -357,12 +357,12 @@ def build_trial_leaf_table(
             soft_count_total=("soft_count_total", "sum"),
             posterior_mass_total=("posterior_mass_total", "sum"),
         )
-        .sort_values([*SESSION_COLUMNS, "trial_number_by_epoch", "arm"])
+        .sort_values([*SESSION_COLUMNS, "trial_number_by_epoch", "candidate_arm"])
         .reset_index(drop=True)
     )
     if (
         not trial_leaf.groupby(["session_id", "trial_number_by_epoch"], observed=True)[
-            "arm"
+            "candidate_arm"
         ]
         .nunique()
         .eq(len(LEAF_ARMS))
@@ -372,7 +372,7 @@ def build_trial_leaf_table(
     _assert_constant(
         trial_leaf,
         ["session_id", "trial_number_by_epoch"],
-        ["immobility_time", "n_stops", "n_events", "chosen_arm", "trial_reward"],
+        ["immobility_duration_s", "n_stops", "n_events", "chosen_arm", "trial_reward"],
         "trial aggregate",
     )
     _assert_constant(
@@ -383,7 +383,7 @@ def build_trial_leaf_table(
     )
 
     trial_leaf["has_replay"] = trial_leaf["n_events"] > 0
-    trial_leaf["is_chosen"] = trial_leaf["arm"] == trial_leaf["chosen_arm"]
+    trial_leaf["is_chosen"] = trial_leaf["candidate_arm"] == trial_leaf["chosen_arm"]
     trial_keys = ["session_id", "trial_number_by_epoch"]
     for base in response_names:
         denominator = trial_leaf.groupby(trial_keys, observed=True)[base].transform(
@@ -416,7 +416,7 @@ def build_trial_leaf_table(
         trial_leaf[LEAF_FRACTION_COLUMNS[base]] = leaf_fraction
         trial_leaf[f"{base}_rate"] = trial_leaf[base].to_numpy(
             dtype=float
-        ) / trial_leaf["immobility_time"].to_numpy(dtype=float)
+        ) / trial_leaf["immobility_duration_s"].to_numpy(dtype=float)
 
     trial_leaf = assign_within_arm_quantiles(trial_leaf)
 
@@ -472,8 +472,8 @@ def hierarchical_quartile_profile(
     required = {
         "animal",
         "session_id",
-        "arm",
-        "arm_uncertainty",
+        "candidate_arm",
+        "reward_belief_variance_candidate_arm_preoutcome",
         "is_chosen",
         quartile_col,
         numerator_col,
@@ -493,21 +493,21 @@ def hierarchical_quartile_profile(
     data = data[finite]
     if data.empty:
         empty = pd.DataFrame()
-        return {"arm": empty, "session": empty, "animal": empty, "overall": empty}
+        return {"candidate_arm": empty, "session": empty, "animal": empty, "overall": empty}
 
-    arm_keys = ["animal", "session_id", "arm", quartile_col]
+    arm_keys = ["animal", "session_id", "candidate_arm", quartile_col]
     grouped = data.groupby(arm_keys, observed=True)
     if denominator_col is None:
         arm_profile = grouped.agg(
             value=(numerator_col, "mean"),
-            arm_uncertainty=("arm_uncertainty", "mean"),
+            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
             n_trials=(numerator_col, "size"),
         ).reset_index()
     else:
         sums = grouped.agg(
             numerator=(numerator_col, "sum"),
             denominator=(denominator_col, "sum"),
-            arm_uncertainty=("arm_uncertainty", "mean"),
+            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
             n_trials=(numerator_col, "size"),
         ).reset_index()
         sums["value"] = sums["numerator"] / sums["denominator"]
@@ -517,15 +517,15 @@ def hierarchical_quartile_profile(
         ["animal", "session_id", quartile_col], observed=True, as_index=False
     ).agg(
         value=("value", "mean"),
-        arm_uncertainty=("arm_uncertainty", "mean"),
-        n_arms=("arm", "nunique"),
+        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+        n_arms=("candidate_arm", "nunique"),
         n_trials=("n_trials", "sum"),
     )
     animal_profile = session_profile.groupby(
         ["animal", quartile_col], observed=True, as_index=False
     ).agg(
         value=("value", "mean"),
-        arm_uncertainty=("arm_uncertainty", "mean"),
+        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
         n_sessions=("session_id", "nunique"),
     )
     overall_profile = animal_profile.groupby(
@@ -533,11 +533,11 @@ def hierarchical_quartile_profile(
     ).agg(
         value=("value", "mean"),
         sem=("value", lambda x: x.std(ddof=1) / np.sqrt(len(x))),
-        arm_uncertainty=("arm_uncertainty", "mean"),
+        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
         n_animals=("animal", "nunique"),
     )
     return {
-        "arm": arm_profile,
+        "candidate_arm": arm_profile,
         "session": session_profile,
         "animal": animal_profile,
         "overall": overall_profile,
@@ -554,10 +554,10 @@ def paired_quartile_contrasts(
     """Compute high-minus-low contrasts, paired within physical well."""
     _require_columns(
         arm_profile,
-        {"animal", "session_id", "arm", quartile_col, "value"},
+        {"animal", "session_id", "candidate_arm", quartile_col, "value"},
         "arm profile",
     )
-    index = ["animal", "session_id", "arm"]
+    index = ["animal", "session_id", "candidate_arm"]
     wide = arm_profile.pivot_table(
         index=index,
         columns=quartile_col,
@@ -566,10 +566,10 @@ def paired_quartile_contrasts(
     )
     if low not in wide.columns or high not in wide.columns:
         empty = pd.DataFrame()
-        return {"arm": empty, "session": empty, "animal": empty, "overall": empty}
+        return {"candidate_arm": empty, "session": empty, "animal": empty, "overall": empty}
     arm = (wide[high] - wide[low]).dropna().rename("contrast").reset_index()
     session = arm.groupby(["animal", "session_id"], observed=True, as_index=False).agg(
-        contrast=("contrast", "mean"), n_arms=("arm", "nunique")
+        contrast=("contrast", "mean"), n_arms=("candidate_arm", "nunique")
     )
     animal = session.groupby("animal", observed=True, as_index=False).agg(
         contrast=("contrast", "mean"), n_sessions=("session_id", "nunique")
@@ -581,15 +581,18 @@ def paired_quartile_contrasts(
             "n_animals": [animal["animal"].nunique()],
         }
     )
-    return {"arm": arm, "session": session, "animal": animal, "overall": overall}
+    return {"candidate_arm": arm, "session": session, "animal": animal, "overall": overall}
 
 
 def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Prepare transparent all-session and fit-quality-clean Mu summaries."""
+    predictor = "reward_belief_variance_candidate_arm_preoutcome_z"
+    coefficient = f"coef_{predictor}"
+    standard_error = f"bse_{predictor}"
     required = {
         *SESSION_COLUMNS,
-        "coef_arm_uncertainty_z",
-        "bse_arm_uncertainty_z",
+        coefficient,
+        standard_error,
         "converged",
         "separated",
     }
@@ -611,7 +614,7 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
         animal = (
             subset.groupby("animal", observed=True, as_index=False)
             .agg(
-                coefficient=("coef_arm_uncertainty_z", "median"),
+                coefficient=(coefficient, "median"),
                 n_sessions=("session_id", "nunique"),
             )
             .assign(cohort=cohort)
@@ -627,10 +630,10 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
 
 
 HORSERACE_PREDICTORS: tuple[str, ...] = (
-    "arm_uncertainty_z",  # per-leaf Beta belief variance (pre-standardized in the table)
-    "q_arm",  # beta belief value (z-scored here)
-    "dist_to_arm",  # geometry parallel (z-scored here)
-    "visit_recency",  # recency parallel (z-scored here)
+    "reward_belief_variance_candidate_arm_preoutcome_z",  # per-leaf Beta belief variance (pre-standardized in the table)
+    "reward_belief_mean_candidate_arm_preoutcome",  # beta belief value (z-scored here)
+    "distance_to_candidate_arm_cm",  # geometry parallel (z-scored here)
+    "visit_recency_trials",  # recency parallel (z-scored here)
 )
 
 
@@ -671,14 +674,16 @@ def within_arm_horserace(
     and geometry, so the uncertainty coefficient is identified from *within-arm*
     variation over the session — the confound-free frame in which beta value and
     beta uncertainty separate cleanly (they are collinear only against the arm
-    dummies). ``arm_uncertainty_z`` is pre-standardized over the six reward-site
+    dummies). ``reward_belief_variance_candidate_arm_preoutcome_z`` is
+    pre-standardized over the six reward-site
     leaf arms in the pooled event-arm table; the other predictors use this
     analysis's non-current-leaf subset, so their SD populations still differ.
 
     Parameters
     ----------
     event_arm : pd.DataFrame
-        Event x arm rows with ``animal``/``day``/``epoch``, ``event_id``, ``arm``
+        Event x arm rows with ``animal``/``session_date``/``epoch``,
+        ``event_id``, ``candidate_arm``
         (0-5 leaf, 6-8 trunk), ``is_current``, ``is_swr``, the ``response`` column,
         and each ``predictors`` column.
     predictors : tuple of str
@@ -702,10 +707,10 @@ def within_arm_horserace(
     # reported without complaint. ``predictors`` is gated rather than the module
     # constant so a caller-supplied override is checked too.
     assert_predictor_timing(predictors)
-    needed = {"animal", "day", "epoch", "event_id", "arm", "is_current", "is_swr",
+    needed = {"animal", "session_date", "epoch", "event_id", "candidate_arm", "is_current_arm", "is_swr",
               response, *predictors}
     _require_columns(event_arm, needed, "event-arm table")
-    frame = event_arm[(event_arm["arm"] <= 5) & (event_arm["is_current"] == 0)].copy()
+    frame = event_arm[(event_arm["candidate_arm"] <= 5) & (event_arm["is_current_arm"] == 0)].copy()
     frame["session_id"] = _session_id(frame)
 
     design_cols: list[str] = []
@@ -735,11 +740,11 @@ def within_arm_horserace(
             ["animal", "session_id"], observed=True, sort=False
         ):
             n_seen += 1
-            fit = group[["arm", response, *design_cols]].dropna()
-            if fit["arm"].nunique() < 2 or len(fit) < min_rows:
+            fit = group[["candidate_arm", response, *design_cols]].dropna()
+            if fit["candidate_arm"].nunique() < 2 or len(fit) < min_rows:
                 n_too_few += 1
                 continue
-            demeaned = fit[[response, *design_cols]] - fit.groupby(fit["arm"])[
+            demeaned = fit[[response, *design_cols]] - fit.groupby(fit["candidate_arm"])[
                 [response, *design_cols]
             ].transform("mean")
             design = demeaned[design_cols].to_numpy()

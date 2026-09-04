@@ -14,6 +14,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    require_covariate_schema,
+)
 from continuum_swr_replay.table_io import read_table
 
 PD = Path("Processed-Data")
@@ -23,12 +26,14 @@ TRUNK = {6, 7, 8}
 def main():
     eat = read_table(PD / "replay_content" / "event_arm_table.pkl")
     et = read_table(PD / "replay_content" / "event_table.pkl")
+    require_covariate_schema(eat, table="event_arm")
+    require_covariate_schema(et, table="event")
 
     # trunk share + n_unique_arms (recompute n_unique from arms with mass)
     eat = eat.dropna(subset=["arm_count_hard"]).copy()
     tot = eat.groupby("event_id")["arm_count_hard"].transform("sum")
     eat = eat[tot > 0].copy()
-    eat["is_trunk"] = eat["arm"].isin(TRUNK)
+    eat["is_trunk"] = eat["candidate_arm"].isin(TRUNK)
     grp = eat.groupby("event_id")
     trunk = grp.apply(
         lambda g: g.loc[g.is_trunk, "arm_count_hard"].sum() / g["arm_count_hard"].sum(),
@@ -42,7 +47,7 @@ def main():
     et = et.merge(per_event, on="event_id", how="inner")
 
     rows = []
-    sessions = list(et.groupby(["animal", "day", "epoch"]))
+    sessions = list(et.groupby(["animal", "session_date", "epoch"]))
     t0 = time.time()
     for i, ((a, d, e), es) in enumerate(sessions):
         fn = PD / f"{a}{d}_{e}_HPC_80_data_over_time.pkl"
@@ -54,13 +59,13 @@ def main():
         sw = dot["SWR_zscore"].values
         mu = dot["MUA_zscore"].values
         for _, r in es.iterrows():
-            lo = np.searchsorted(idx, r.event_start)
-            hi = np.searchsorted(idx, r.event_end, side="right")
+            lo = np.searchsorted(idx, r.event_start_s)
+            hi = np.searchsorted(idx, r.event_end_s, side="right")
             if hi <= lo:
                 continue
             rows.append(
                 {
-                    "event_id": r.event_id, "animal": a, "day": d, "epoch": e,
+                    "event_id": r.event_id, "animal": a, "session_date": d, "epoch": e,
                     "is_swr": bool(r.is_swr), "is_mua": bool(r.is_mua),
                     "trunk_share": r.trunk_share,
                     "n_arms_with_mass": r.n_arms_with_mass,
