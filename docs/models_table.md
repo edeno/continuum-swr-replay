@@ -43,8 +43,10 @@ Every per-session fit carries `converged` / `separated` status flags, the
 `|`-joined `separated_terms` naming which coefficients are unidentified, one
 `sd_<term>` per coefficient, and an `n_convergence_warnings` count
 (`analysis.replay._fit_diagnostics`). Separation is judged **per term** — a term
-is separated when its SE is non-finite or `> 1e3`, when its SE per SD of its own
-predictor reaches `1.0`, or (for a zero-SD column) when `|coef| >= 10` — and the
+is separated when its SE is non-finite or `> 1e3`, when `SE × the SD of its own
+predictor` reaches `1.0` (the SE read on the effect scale, i.e. `SE >= 1 / SD`),
+or — for a zero-SD column, which cannot be judged on that scale — when
+`|coef| >= 10`. The
 structural nuisance terms `Intercept` and `reward_history_incomplete`
 (`NUISANCE_TERMS`) are excluded from the judgment entirely, since a blown-up
 baseline or structural-missingness coefficient says nothing about whether the
@@ -317,9 +319,10 @@ Comparing a coefficient across the three populations = the descriptive dissociat
 
 ### B. `is_swr` contrast — pooled two non-local streams (design B)
 `is_swr:X` coefficients are the SWR-vs-non-SWR dissociation tests. Every `S`
-formula below is emitted as `is_swr * (…) + reward_history_incomplete`: the
-structural-missingness indicator is a plain main effect and is never expanded
-against `is_swr`, so no `is_swr:reward_history_incomplete` term exists.
+formula below appends `+ reward_history_incomplete` **outside** the `is_swr`
+expansion, so no `is_swr:reward_history_incomplete` term exists; `S0_rate` and
+`S1_rew` are not full `is_swr *` expansions by design (they carry the `is_swr`
+main effect, and `S1` one named interaction, against an additive `BASE`).
 
 | model | formula (`count ~ … + offset(log exposure)`) | question |
 |---|---|---|

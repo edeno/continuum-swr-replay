@@ -193,7 +193,8 @@ The new ladder carries one reward rung (`R1`: three basis features plus the stru
 
 Separation is now judged per coefficient, and the structural nuisance terms (`Intercept`, `reward_history_incomplete`) are excluded from the judgment. Both sides below are the SAME specification and the same cohort; only the flag differs. Under the fit-level flag one blown-up nuisance or self-history coefficient voided the whole fit — it voided the cross-validation metric and dropped the session for every term in the aggregation.
 
-**Two mechanisms can exclude a session from a term's aggregate, and they are not interchangeable.** (i) The **per-term separation flag**: the fitter named that coefficient in `separated_terms` because its SE is non-finite, above `1e3`, or at least as large as the predictor's own SD — the coefficient is genuinely not identified. (ii) The **`|coef| >= 10` backstop** in `aggregate_contrast`: a coefficient that ran away without tripping the flag is excluded on its magnitude alone. The tables below report the flag (i) share per term; the per-emitted-term drop table further down mixes both, and the two are separated there.
+
+**Two mechanisms can exclude a session from a term's aggregate, and they are not interchangeable.** (i) The **per-term separation flag** (`analysis.replay._fit_diagnostics`): the fitters name a coefficient in `separated_terms` when its standard error is non-finite or above `1e3`, or when `SE × the predictor's own SD` reaches `1.0` — the standard error measured on the effect scale, so the threshold is `SE >= 1 / SD` — with `|coef| >= 10` substituted for a column of zero SD, which cannot be judged on that scale. (ii) The **`|coef| >= 10` backstop** in `aggregate_contrast`: a coefficient that ran away without tripping the flag is excluded on its magnitude alone. The per-term table below reports mechanism (i); the per-emitted-term table at the end of this section reports both, decomposed.
 
 
 ### Family B — flagged fits and CV validity per rung
@@ -241,7 +242,7 @@ The per-stop family carries the same rule; `pct_cv_scored` is the share of sessi
 
 ### is_swr-contrast — separated share per term (after)
 
-Share of the session-fits that carry each term in which THAT term is flagged unidentified by mechanism (i), the per-term separation flag. Terms never flagged are omitted. The `|coef| >= 10` backstop is not counted here. Before the change there was no per-term information: a fit was flagged as a whole.
+Share of the session-fits that carry each term in which THAT term is flagged by mechanism (i), the per-term separation flag; the `|coef| >= 10` backstop is not counted here. Terms never flagged are omitted. Before the change there was no per-term information: a fit was flagged as a whole.
 
 | term | n_fits_with_term | pct_separated |
 | --- | --- | --- |
@@ -308,46 +309,47 @@ One row per (model, population, term) that survived the unidentified-share gate.
 | nonSWR | primary | 0 | 6 |
 
 
-### is_swr-contrast — sessions dropped per emitted term (after)
+### is_swr-contrast — sessions excluded per emitted term (after)
 
-Per aggregated term, the share of the sessions fitted for it that were excluded from the aggregate — by either mechanism, the per-term separation flag or the `|coef| >= 10` backstop. A term whose share exceeds the unidentified-share gate emits no row and is absent here.
+Per aggregated term, the share of the sessions fitted for it that were excluded from the aggregate by either mechanism, and the split between them: `n_flag_only` and `n_both` carry the separation flag, `n_backstop_only` is the magnitude backstop alone. A term whose share exceeds the unidentified-share gate emits no row and is absent here.
 
-**Which mechanism produced these drops.** Only the peri-switch rungs are flag-driven: `G1_periswitch` (24 of 24 for SWR, 17 of 19 for nonSWR, 11 of 13 for all — the remainder tripping both) and `S3_periswitch` (19 of 21 by the flag, 2 both). Every other row in the table — `G0_base`, `G3_switchrate`, `G6_uncert`, `G7_update`, and all of `S5`–`S9` — is **entirely** the `|coef| >= 10` backstop, with zero sessions flagged for the term. So the 32 sessions on `S8_uncert` and the 11 on `S9_update` are runaway magnitudes the fitter did not flag, not coefficients the fitter reported as unidentified; read "dropped" in this table as "excluded from the aggregate", not as "the fitter judged it separated":
 
-| model | population | cohort | term | n_fitted | n_dropped | pct_dropped |
-| --- | --- | --- | --- | --- | --- | --- |
-| S8_uncert | contrast | primary | is_swr:reward_belief_differential_entropy_leaf_mean_preoutcome | 213 | 32 | 15.0 |
-| G1_periswitch | SWR | primary | periswitch_index_trials | 217 | 24 | 11.1 |
-| S3_periswitch | contrast | primary | is_swr:periswitch_index_trials | 211 | 21 | 10.0 |
-| G1_periswitch | nonSWR | primary | periswitch_index_trials | 218 | 19 | 8.7 |
-| G1_periswitch | all | primary | periswitch_index_trials | 218 | 13 | 6.0 |
-| S9_update | contrast | post_outcome | is_swr:reward_belief_mean_update_l1_all_ports_postoutcome | 212 | 11 | 5.2 |
-| G6_uncert | SWR | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 215 | 11 | 5.1 |
-| G6_uncert | nonSWR | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 218 | 10 | 4.6 |
-| G7_update | SWR | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 216 | 9 | 4.2 |
-| G7_update | nonSWR | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 218 | 3 | 1.4 |
-| G6_uncert | all | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 218 | 3 | 1.4 |
-| S7_rpe | contrast | post_outcome | is_swr:rpe_postoutcome | 213 | 1 | 0.5 |
-| S6_value | contrast | primary | is_swr:relative_value_switch_minus_stay_preoutcome | 215 | 1 | 0.5 |
-| S5_switchrate | contrast | primary | is_swr:patch_switch_fraction_last5_completed_trips | 215 | 1 | 0.5 |
-| G3_switchrate | SWR | primary | patch_switch_fraction_last5_completed_trips | 216 | 1 | 0.5 |
-| G0_base | SWR | primary | reward_history_rcos_0 | 216 | 1 | 0.5 |
-| G7_update | all | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 218 | 1 | 0.5 |
-| G4_value | SWR | primary | relative_value_switch_minus_stay_preoutcome | 217 | 0 | 0.0 |
-| G4_value | nonSWR | primary | relative_value_switch_minus_stay_preoutcome | 218 | 0 | 0.0 |
-| G3_switchrate | nonSWR | primary | patch_switch_fraction_last5_completed_trips | 218 | 0 | 0.0 |
-| G2_block | nonSWR | primary | trials_since_block_change | 218 | 0 | 0.0 |
-| G3_switchrate | all | primary | patch_switch_fraction_last5_completed_trips | 218 | 0 | 0.0 |
-| G2_block | all | primary | trials_since_block_change | 218 | 0 | 0.0 |
-| G2_block | SWR | primary | trials_since_block_change | 216 | 0 | 0.0 |
-| G0_base | all | primary | reward_history_rcos_0 | 218 | 0 | 0.0 |
-| G0_base | nonSWR | primary | reward_history_rcos_0 | 218 | 0 | 0.0 |
-| G4_value | all | primary | relative_value_switch_minus_stay_preoutcome | 218 | 0 | 0.0 |
-| S1_rew | contrast | primary | is_swr:reward_history_rcos_0 | 218 | 0 | 0.0 |
-| S4_block | contrast | primary | is_swr:trials_since_block_change | 213 | 0 | 0.0 |
-| G5_rpe | nonSWR | post_outcome | rpe_postoutcome | 218 | 0 | 0.0 |
-| G5_rpe | all | post_outcome | rpe_postoutcome | 217 | 0 | 0.0 |
-| G5_rpe | SWR | post_outcome | rpe_postoutcome | 216 | 0 | 0.0 |
+**Which mechanism produced these exclusions.** Of the 17 emitted rows that lost at least one session, 4 are driven by the per-term separation flag: `G1_periswitch`/all (13 of 13), `G1_periswitch`/SWR (24 of 24), `G1_periswitch`/nonSWR (19 of 19), `S3_periswitch`/contrast (21 of 21). The other 13 are **entirely** the `|coef| >= 10` backstop (`G0_base`, `G3_switchrate`, `G6_uncert`, `G7_update`, `S5_switchrate`, `S6_value`, `S7_rpe`, `S8_uncert`, `S9_update`) — runaway magnitudes the fitters did not flag. Read `n_dropped` as "excluded from the aggregate", not as "the fitters judged this term separated".
+
+| model | population | cohort | term | n_fitted | n_dropped | pct_dropped | n_flag_only | n_both | n_backstop_only |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S8_uncert | contrast | primary | is_swr:reward_belief_differential_entropy_leaf_mean_preoutcome | 213 | 32 | 15.0 | 0 | 0 | 32 |
+| G1_periswitch | SWR | primary | periswitch_index_trials | 217 | 24 | 11.1 | 24 | 0 | 0 |
+| S3_periswitch | contrast | primary | is_swr:periswitch_index_trials | 211 | 21 | 10.0 | 19 | 2 | 0 |
+| G1_periswitch | nonSWR | primary | periswitch_index_trials | 218 | 19 | 8.7 | 17 | 2 | 0 |
+| G1_periswitch | all | primary | periswitch_index_trials | 218 | 13 | 6.0 | 11 | 2 | 0 |
+| S9_update | contrast | post_outcome | is_swr:reward_belief_mean_update_l1_all_ports_postoutcome | 212 | 11 | 5.2 | 0 | 0 | 11 |
+| G6_uncert | SWR | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 215 | 11 | 5.1 | 0 | 0 | 11 |
+| G6_uncert | nonSWR | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 218 | 10 | 4.6 | 0 | 0 | 10 |
+| G7_update | SWR | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 216 | 9 | 4.2 | 0 | 0 | 9 |
+| G7_update | nonSWR | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 218 | 3 | 1.4 | 0 | 0 | 3 |
+| G6_uncert | all | primary | reward_belief_differential_entropy_leaf_mean_preoutcome | 218 | 3 | 1.4 | 0 | 0 | 3 |
+| S7_rpe | contrast | post_outcome | is_swr:rpe_postoutcome | 213 | 1 | 0.5 | 0 | 0 | 1 |
+| S6_value | contrast | primary | is_swr:relative_value_switch_minus_stay_preoutcome | 215 | 1 | 0.5 | 0 | 0 | 1 |
+| S5_switchrate | contrast | primary | is_swr:patch_switch_fraction_last5_completed_trips | 215 | 1 | 0.5 | 0 | 0 | 1 |
+| G3_switchrate | SWR | primary | patch_switch_fraction_last5_completed_trips | 216 | 1 | 0.5 | 0 | 0 | 1 |
+| G0_base | SWR | primary | reward_history_rcos_0 | 216 | 1 | 0.5 | 0 | 0 | 1 |
+| G7_update | all | post_outcome | reward_belief_mean_update_l1_all_ports_postoutcome | 218 | 1 | 0.5 | 0 | 0 | 1 |
+| G4_value | SWR | primary | relative_value_switch_minus_stay_preoutcome | 217 | 0 | 0.0 | 0 | 0 | 0 |
+| G4_value | nonSWR | primary | relative_value_switch_minus_stay_preoutcome | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G3_switchrate | nonSWR | primary | patch_switch_fraction_last5_completed_trips | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G2_block | nonSWR | primary | trials_since_block_change | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G3_switchrate | all | primary | patch_switch_fraction_last5_completed_trips | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G2_block | all | primary | trials_since_block_change | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G2_block | SWR | primary | trials_since_block_change | 216 | 0 | 0.0 | 0 | 0 | 0 |
+| G0_base | all | primary | reward_history_rcos_0 | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G0_base | nonSWR | primary | reward_history_rcos_0 | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G4_value | all | primary | relative_value_switch_minus_stay_preoutcome | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| S1_rew | contrast | primary | is_swr:reward_history_rcos_0 | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| S4_block | contrast | primary | is_swr:trials_since_block_change | 213 | 0 | 0.0 | 0 | 0 | 0 |
+| G5_rpe | nonSWR | post_outcome | rpe_postoutcome | 218 | 0 | 0.0 | 0 | 0 | 0 |
+| G5_rpe | all | post_outcome | rpe_postoutcome | 217 | 0 | 0.0 | 0 | 0 | 0 |
+| G5_rpe | SWR | post_outcome | rpe_postoutcome | 216 | 0 | 0.0 | 0 | 0 | 0 |
 
 
 ## Sessions fitted per rung

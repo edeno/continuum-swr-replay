@@ -132,6 +132,16 @@ offset. Its limitation is exactly that offset — see below.
   (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`); the
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
+
+  Every runner that writes a fitted artifact writes an `<artifact>.provenance.json`
+  sidecar beside it recording the git hash, the estimator, the command line, and
+  the SHA-256 / mtime / covariate-schema version of each input table. Readers
+  re-hash those inputs and **refuse a stale fit** — one whose input tables have
+  changed since it was written — unless `--allow-stale` is passed, so a plot or
+  a summary cannot silently describe a fit of an older table. Re-deriving the
+  `is_swr`-contrast aggregate after an aggregation rule changes does not need a
+  refit: `scripts/rate/fit_swr_contrast_rate.py --aggregate-only` rebuilds the
+  audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7`, the reconstructed reward kernel at lag 1 dissociates —
   `non_local_swr ≈ 1.38` > `swr ≈ 1.18` > `non_local_no_swr ≈ 0.91` — while the
@@ -246,8 +256,10 @@ Every rate/content/choice fit additionally carries `converged` / `separated`
 status flags, the `|`-joined `separated_terms` naming the unidentified
 coefficients, a `sd_<term>` per coefficient, and an `n_convergence_warnings`
 count (from `analysis.replay._fit_diagnostics`). Separation is judged **per
-term** (non-finite SE, SE `> 1e3`, SE per predictor SD `>= 1.0`, or `|coef| >=
-10` on a zero-SD column), and the structural nuisance terms `Intercept` and
+term**: the SE is non-finite or `> 1e3`, or `SE × the SD of its own predictor`
+reaches `1.0` — the SE read on the effect scale, so the threshold is
+`SE >= 1 / SD` — with `|coef| >= 10` standing in for a zero-SD column, which
+cannot be judged on that scale. The structural nuisance terms `Intercept` and
 `reward_history_incomplete` (`NUISANCE_TERMS`) are excluded from the judgment:
 the indicator marks the handful of stops with fewer than two known outcomes,
 which in most sessions carry no events at all, so its coefficient runs to `-inf`

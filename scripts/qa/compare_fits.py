@@ -19,8 +19,10 @@ of the reward-free time model, and the size of the fitted cohort:
 * Family A (per-stop Poisson) reward step: the new ``R1`` against ``R0``,
   read beside the old ``R2`` and ``Rlag`` against ``R0``.
 * What the per-term separation flag changed: flagged-fit share, cross-validation
-  validity, per-term separated share, and audited aggregate rows. That comparison
-  has its own "before" — the immediately preceding refit of the SAME
+  validity, per-term separated share, audited aggregate rows, and — per emitted
+  aggregate row — the split between the two mechanisms that exclude a session
+  (the separation flag vs the ``|coef| >= 10`` magnitude backstop). That
+  comparison has its own "before" — the immediately preceding refit of the SAME
   specification, fit under the fit-level flag.
 
 Usage:
@@ -39,7 +41,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.replay._fit_diagnostics import (
+    SEPARATION_COEF_ABS,
+)
 from continuum_swr_replay.analysis.replay._helpers import reconstruct_reward_kernels
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    separated_for_term,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
@@ -605,6 +613,155 @@ def audited_term_drop_table(audited: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+# The audited aggregate relabels the stratified populations to match the content
+# table; the per-session fits keep the fitter's own names.
+_AUDITED_POP_TO_FIT = {
+    "all": "non_local",
+    "SWR": "non_local_swr",
+    "nonSWR": "non_local_no_swr",
+    "contrast": "contrast",
+}
+
+
+def drop_mechanism_table(contrast: pd.DataFrame, audited: pd.DataFrame) -> pd.DataFrame:
+    """Split each emitted row's excluded sessions into the two mechanisms.
+
+    ``aggregate_contrast`` excludes a session from a term's aggregate for either
+    of two reasons, and they mean different things. (i) The fitters named the
+    term in ``separated_terms`` — the effect-scale separation flag, i.e. the
+    coefficient is not identified. (ii) The coefficient ran away past the
+    ``|coef| >= 10`` backstop without tripping that flag. Reporting only the
+    total invites reading a backstop exclusion as a separation diagnosis, so the
+    two are counted separately here, recomputed from the per-session fits with
+    the same predicates the aggregation uses.
+
+    Parameters
+    ----------
+    contrast : pd.DataFrame
+        Per-session is_swr-contrast fits (``model``, ``population``, ``cohort``,
+        ``coef_<term>``, ``separated_terms``).
+    audited : pd.DataFrame
+        The audited aggregate, one row per (model, population, cohort, term).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``model``, ``population``, ``cohort``, ``term``, ``n_flag_only``,
+        ``n_both``, ``n_backstop_only``.
+
+    Raises
+    ------
+    ValueError
+        If a row's term is absent from the fits, or the recomputed total
+        disagrees with the audited ``n_dropped`` — either means this table is
+        describing different sessions from the aggregate it annotates.
+    """
+    columns = [
+        "model",
+        "population",
+        "cohort",
+        "term",
+        "n_flag_only",
+        "n_both",
+        "n_backstop_only",
+    ]
+    if audited.empty or contrast.empty:
+        return pd.DataFrame(columns=columns)
+    rows = []
+    for row in audited.itertuples(index=False):
+        pop = _AUDITED_POP_TO_FIT.get(row.population, row.population)
+        sub = contrast[
+            (contrast["model"] == row.model)
+            & (contrast["population"] == pop)
+            & (contrast["cohort"] == row.cohort)
+        ]
+        ccol = f"coef_{row.term}"
+        if ccol not in sub.columns:
+            raise ValueError(
+                f"{row.model}/{row.population}/{row.cohort}: the per-session fits "
+                f"carry no {ccol}"
+            )
+        present = sub[ccol].notna()
+        flagged = separated_for_term(sub, row.term) & present
+        backstop = (sub[ccol].abs() >= SEPARATION_COEF_ABS) & present
+        counts = {
+            "n_flag_only": int((flagged & ~backstop).sum()),
+            "n_both": int((flagged & backstop).sum()),
+            "n_backstop_only": int((backstop & ~flagged).sum()),
+        }
+        total = sum(counts.values())
+        if total != int(row.n_dropped):
+            raise ValueError(
+                f"{row.model}/{row.population}/{row.cohort}/{row.term}: "
+                f"recomputed {total} excluded sessions but the audited row "
+                f"reports {row.n_dropped}"
+            )
+        rows.append(
+            {
+                "model": row.model,
+                "population": row.population,
+                "cohort": row.cohort,
+                "term": row.term,
+                **counts,
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _drop_mechanism_prose(mechanism: pd.DataFrame) -> str:
+    """One paragraph naming which emitted rows the separation flag drove.
+
+    Parameters
+    ----------
+    mechanism : pd.DataFrame
+        Output of :func:`drop_mechanism_table`.
+
+    Returns
+    -------
+    str
+        Markdown paragraph.
+    """
+    if mechanism.empty:
+        return "No aggregate row was emitted, so there is nothing to attribute.\n"
+    dropped = mechanism[
+        mechanism[["n_flag_only", "n_both", "n_backstop_only"]].sum(axis=1) > 0
+    ]
+    if dropped.empty:
+        return (
+            "**Which mechanism produced these exclusions.** No emitted row lost a "
+            "single session: neither the separation flag nor the "
+            f"`|coef| >= {SEPARATION_COEF_ABS:.0f}` backstop fired.\n"
+        )
+    by_flag = dropped[(dropped["n_flag_only"] + dropped["n_both"]) > 0]
+    by_backstop = dropped[(dropped["n_flag_only"] + dropped["n_both"]) == 0]
+    parts = [
+        "**Which mechanism produced these exclusions.** Of the "
+        f"{len(dropped)} emitted rows that lost at least one session, "
+        f"{len(by_flag)} are driven by the per-term separation flag"
+    ]
+    if len(by_flag):
+        named = ", ".join(
+            f"`{r.model}`/{r.population} "
+            f"({r.n_flag_only + r.n_both} of "
+            f"{r.n_flag_only + r.n_both + r.n_backstop_only})"
+            for r in by_flag.itertuples(index=False)
+        )
+        parts.append(f": {named}")
+    parts.append(
+        f". The other {len(by_backstop)} are **entirely** the "
+        f"`|coef| >= {SEPARATION_COEF_ABS:.0f}` backstop"
+    )
+    if len(by_backstop):
+        models = ", ".join(f"`{m}`" for m in sorted(set(by_backstop["model"])))
+        parts.append(f" ({models})")
+    parts.append(
+        " — runaway magnitudes the fitters did not flag. Read `n_dropped` as "
+        '"excluded from the aggregate", not as "the fitters judged this term '
+        'separated".\n'
+    )
+    return "".join(parts)
+
+
 def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     """The markdown section describing what the per-term separation flag changed.
 
@@ -633,6 +790,21 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
         "the cross-validation metric and dropped the session for every term in "
         "the aggregation.\n"
     )
+    add(
+        "\n**Two mechanisms can exclude a session from a term's aggregate, and "
+        "they are not interchangeable.** (i) The **per-term separation flag** "
+        "(`analysis.replay._fit_diagnostics`): the fitters name a coefficient in "
+        "`separated_terms` when its standard error is non-finite or above `1e3`, "
+        "or when `SE × the predictor's own SD` reaches `1.0` — the standard error "
+        "measured on the effect scale, so the threshold is `SE >= 1 / SD` — with "
+        f"`|coef| >= {SEPARATION_COEF_ABS:.0f}` substituted for a column of zero "
+        "SD, which cannot be judged on that scale. (ii) The "
+        f"**`|coef| >= {SEPARATION_COEF_ABS:.0f}` backstop** in "
+        "`aggregate_contrast`: a coefficient that ran away without tripping the "
+        "flag is excluded on its magnitude alone. The per-term table below "
+        "reports mechanism (i); the per-emitted-term table at the end of this "
+        "section reports both, decomposed.\n"
+    )
     add("\n### Family B — flagged fits and CV validity per rung\n")
     add(
         "`pct_cv_scored` is the share of session-fits whose `cv_bits_per_event` "
@@ -660,8 +832,10 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     add("\n### is_swr-contrast — separated share per term (after)\n")
     add(
         "Share of the session-fits that carry each term in which THAT term is "
-        "unidentified. Terms never flagged are omitted. Before the change there "
-        "was no per-term information: a fit was flagged as a whole.\n"
+        "flagged by mechanism (i), the per-term separation flag; the "
+        f"`|coef| >= {SEPARATION_COEF_ABS:.0f}` backstop is not counted here. "
+        "Terms never flagged are omitted. Before the change there was no "
+        "per-term information: a fit was flagged as a whole.\n"
     )
     add(_md(term_separation_table(frames["new_contrast"]), "{:.1f}"))
     add("\n### is_swr-contrast — audited aggregate rows\n")
@@ -674,13 +848,22 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
         "whether the covariate's slope differs between them:\n"
     )
     add(_md(audited_row_table(frames["old_audited"], frames["new_audited"])))
-    add("\n### is_swr-contrast — sessions dropped per emitted term (after)\n")
+    add("\n### is_swr-contrast — sessions excluded per emitted term (after)\n")
+    mechanism = drop_mechanism_table(frames["new_contrast"], frames["new_audited"])
     add(
         "Per aggregated term, the share of the sessions fitted for it that were "
-        "dropped as unidentified. A term whose share exceeds the "
-        "unidentified-share gate emits no row and is absent here:\n"
+        "excluded from the aggregate by either mechanism, and the split between "
+        "them: `n_flag_only` and `n_both` carry the separation flag, "
+        "`n_backstop_only` is the magnitude backstop alone. A term whose share "
+        "exceeds the unidentified-share gate emits no row and is absent here.\n"
     )
-    add(_md(audited_term_drop_table(frames["new_audited"]), "{:.1f}"))
+    add("\n" + _drop_mechanism_prose(mechanism))
+    drops = audited_term_drop_table(frames["new_audited"])
+    if not drops.empty and not mechanism.empty:
+        drops = drops.merge(
+            mechanism, on=["model", "population", "cohort", "term"], how="left"
+        )
+    add(_md(drops, "{:.1f}"))
     return "\n".join(lines)
 
 
