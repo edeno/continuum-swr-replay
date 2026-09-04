@@ -60,7 +60,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
     POPULATIONS,
     TMAX,
     add_uncertainty_covariates,
@@ -115,13 +114,13 @@ SESSION_COLS = list(SESSION_COLUMNS)
 # Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
 # dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
 _G_KEY = {
-    "G0_base": "known_reward_outcome_lag_1", "G1_periswitch": "periswitch_index_trials",
+    "G0_base": "reward_history_rcos_0", "G1_periswitch": "periswitch_index_trials",
     "G2_block": "trials_since_block_change", "G3_switchrate": "patch_switch_fraction_last5_completed_trips",
     "G4_value": "relative_value_switch_minus_stay_preoutcome", "G5_rpe": "rpe_postoutcome",
     "G6_uncert": "reward_belief_differential_entropy_leaf_mean_preoutcome", "G7_update": "reward_belief_mean_update_l1_all_ports_postoutcome",
 }
 _S_KEY = {
-    "S1_rew1": "is_swr:known_reward_outcome_lag_1",
+    "S1_rew": "is_swr:reward_history_rcos_0",
     "S3_periswitch": "is_swr:periswitch_index_trials",
     "S4_block": "is_swr:trials_since_block_change",
     "S5_switchrate": "is_swr:patch_switch_fraction_last5_completed_trips",
@@ -169,7 +168,10 @@ def _fit(
     n_events = int((df["count"] > 0).sum())
     if len(df) < MIN_BINS or n_events < MIN_EVENTS:
         return None, "too_few"
-    if "known_reward_outcome_lag_1" in need_cols and df["known_reward_outcome_lag_1"].nunique() < 2:
+    if (
+        "reward_history_rcos_0" in need_cols
+        and df["reward_history_rcos_0"].nunique() < 2
+    ):
         return None, "no_reward_contrast"  # reward terms unidentified without contrast
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
@@ -206,7 +208,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict]:
             POPULATIONS[pop](onsets_g),
             bin_s=BIN_S,
             tmax=TMAX,
-            reward_lags=N_REWARD_LAGS,
+            reward_basis=True,
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARS,
@@ -306,7 +308,7 @@ def _cohort_records(
     ``n_drop_qvals_gap`` = the inner qvals-join drop (mechanism B, stops with no fitted
     value state, already removed in ``_load``); ``n_drop_own_predictor_missing`` =
     post-join stops with ``immobility<=0`` or a NaN stop-level required predictor
-    (e.g. ``known_reward_outcome_lag_1``, model-specific); ``n_modeled`` = the fitter's distinct
+    (e.g. ``reward_history_rcos_0``, model-specific); ``n_modeled`` = the fitter's distinct
     modeled-stop count (``n_stops``); the rest (bin-level drops, session gates) go to
     ``n_excluded_session``. Reconciles by construction.
     """

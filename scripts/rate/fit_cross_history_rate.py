@@ -40,8 +40,8 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
     POPULATIONS,
+    REWARD_HISTORY_N_BASIS,
     TMAX,
     PerBinRateModelSpec,
     aggregate_to_timebins,
@@ -74,15 +74,15 @@ def _spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
     only (no reward_rate stop covariate), so the design needs no regenerated
     stop covariate and builds on the current tables."""
     return PerBinRateModelSpec(
-        name,
-        True,  # time spline
-        N_REWARD_LAGS,  # reward kernel
-        False,  # reward_rate off
-        N_HISTORY_LAGS,  # self-history window
-        False,  # no switch term
-        False,  # no reward x time interaction
-        "non-local cross-history coupling",
-        None,
+        name=name,
+        time_spline=True,
+        reward_basis=REWARD_HISTORY_N_BASIS,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="non-local cross-history coupling",
+        parent=None,
         self_history_basis=N_HISTORY_BASIS,
         cross_history_lags=N_HISTORY_LAGS if cross else 0,
         cross_history_basis=N_HISTORY_BASIS if cross else 0,
@@ -101,7 +101,7 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
     common = {
         "bin_s": BIN_S,
         "tmax": TMAX,
-        "reward_lags": N_REWARD_LAGS,
+        "reward_basis": True,
         "self_history_lags": N_HISTORY_LAGS,
         "self_history_basis": N_HISTORY_BASIS,
     }

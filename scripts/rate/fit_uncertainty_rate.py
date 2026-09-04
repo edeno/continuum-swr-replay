@@ -56,7 +56,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
+    REWARD_HISTORY_N_BASIS,
     STOP_COVARIATES,
     TMAX,
     PerBinRateModelSpec,
@@ -154,20 +154,16 @@ POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
 # M7r + the curated uncertainty/value block, instantiated in the runner so the
 # shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
-# Recent reward fraction is OFF: ``reward_fraction_last10_known_trials`` is
-# exactly the mean of known_reward_outcome_lag_1..10 (corr 1.000, VIF inf), so
-# including it with the reward kernel makes the block rank-deficient; the kernel
-# alone carries reward history.
 MU_UNCERTAINTY = PerBinRateModelSpec(
-    "MU_uncertainty",
-    True,  # time spline
-    N_REWARD_LAGS,  # reward kernel
-    False,  # recent reward rate OFF (perfectly collinear with the kernel)
-    N_HISTORY_LAGS,
-    False,  # no switch term (recent_switch_rate carries the switch signal)
-    False,  # no reward x time interaction
-    "curated uncertainty/value beyond time/reward/history",
-    "M7r_time_histcos_rew",
+    name="MU_uncertainty",
+    time_spline=True,
+    reward_basis=REWARD_HISTORY_N_BASIS,
+    reward_rate=False,
+    self_history_lags=N_HISTORY_LAGS,
+    switch=False,  # recent_switch_rate carries the switch signal
+    reward_time_interaction=False,
+    description="curated uncertainty/value beyond time/reward/history",
+    parent="M7r_time_histcos_rew",
     self_history_basis=N_HISTORY_BASIS,
     extra_covariates=FITTED_COVARIATES,
 )
@@ -401,7 +397,7 @@ def fit_uncertainty_rate(
                 POPULATIONS[outcome](onsets_g),
                 bin_s=BIN_S,
                 tmax=TMAX,
-                reward_lags=N_REWARD_LAGS,
+                reward_basis=True,
                 self_history_lags=N_HISTORY_LAGS,
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,

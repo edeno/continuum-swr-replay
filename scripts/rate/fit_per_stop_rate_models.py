@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Fit the per-stop replay-rate hierarchy (R0-R2 + Rlag) and persist it.
+"""Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
 
 The rate models are ordinary Poisson GLMs on per-stop event counts with a
 ``log(immobility_time)`` offset (see ``per_stop_rate_model.fit_per_stop_rate_model``) — a
 different model family from the conditional arm/patch hierarchies, so they
-live outside ``fit_replay_content_models.py``. This script fits R0-R2 + Rlag
+live outside ``fit_replay_content_models.py``. This script fits R0-R1
 per session from the saved ``stop_table.pkl``, adds K-fold cross-validated
 per-stop log-likelihood (``cross_validate_per_stop_rate_model``), and saves a tidy
 one-row-per-(outcome, model, session) table mirroring the arm/patch
@@ -46,7 +46,8 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
-    N_REWARD_LAGS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
 )
 from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,
@@ -69,7 +70,7 @@ RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 def fit_per_stop_rate_hierarchy(
     stop_table: pd.DataFrame, run_cv: bool = True
 ) -> tuple[pd.DataFrame, list[dict]]:
-    """One row per (outcome, model, session): R0-R2 + Rlag fit stats, coefs, CV-LL.
+    """One row per (outcome, model, session): R0-R1 fit stats, coefs, CV-LL.
 
     Also returns one stop-grain cohort-audit record per (model, outcome): dropna /
     immobility<=0 stops go to ``n_drop_own_predictor_missing``; a skipped session's
@@ -157,7 +158,7 @@ def fit_per_stop_rate_hierarchy(
 
 
 def main() -> None:
-    # Causal-hygiene gate: R1/R2 now use known_reward_outcome_lag_1 (past-only), so the
+    # Causal-hygiene gate: R1 uses the past-only reward-history basis, so the
     # per-stop ladder is pre-outcome throughout; a future leak fails loud.
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
@@ -170,12 +171,12 @@ def main() -> None:
             f"stop_table missing outcome columns {missing}; "
             "regenerate it first (scripts/decoding/regenerate_stop_table.py)."
         )
-    lag_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)]
-    if any(c not in stop.columns for c in lag_cols):
-        logger.warning(
-            "stop_table lacks canonical known-outcome lag columns — the Rlag "
-            "model will be SKIPPED "
-            "(every session returns None). Regenerate the stop_table first."
+    basis_cols = [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE]
+    missing_basis = [c for c in basis_cols if c not in stop.columns]
+    if missing_basis:
+        raise SystemExit(
+            f"stop_table missing reward-history basis columns {missing_basis}; "
+            "regenerate it first (scripts/decoding/regenerate_stop_table.py)."
         )
     logger.info(
         "Fitting rate hierarchy %s (+CV) x %s over %d sessions...",

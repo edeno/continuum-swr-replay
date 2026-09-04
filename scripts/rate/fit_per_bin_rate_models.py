@@ -64,7 +64,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     MODEL_PER_BIN_RATE,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
     POPULATIONS,
     STOP_COVARIATES,
     TMAX,
@@ -132,7 +131,7 @@ def _fit_one_session(
             selector(onsets_g),
             bin_s=BIN_S,
             tmax=TMAX,
-            reward_lags=N_REWARD_LAGS,
+            reward_basis=True,
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
@@ -239,7 +238,7 @@ def _cohort_records(models: pd.DataFrame, stop: pd.DataFrame) -> list[dict]:
 
     Family B has no qvals merge. A stop is dropped for **own-predictor** reasons when
     ``immobility_time<=0`` or a stop-level required predictor is NaN (model-specific:
-    the reward-kernel rungs drop the ~7k stops missing ``known_reward_outcome_lag_10``, the const rung
+    the reward-history rungs drop stops with a NaN basis feature, the const rung
     drops none). ``n_modeled`` is the fitter's actual distinct-modeled-stop count
     (``n_stops``); remaining survivors of skipped / gated sessions and any bin-level
     drops fall into ``n_excluded_session``. Reconciles by construction.

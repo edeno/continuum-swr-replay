@@ -34,7 +34,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     MODEL_PER_BIN_RATE,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
     POPULATIONS,
     STOP_COVARIATES,
     TMAX,
@@ -110,7 +109,7 @@ def _refit_session(
     pop = POPULATIONS[outcome](onsets[om])
     design = aggregate_to_timebins(
         stops_g, pop, bin_s=BIN_S, tmax=TMAX,
-        reward_lags=N_REWARD_LAGS, self_history_lags=N_HISTORY_LAGS,
+        reward_basis=True, self_history_lags=N_HISTORY_LAGS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
     )
     fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE[FULL])
