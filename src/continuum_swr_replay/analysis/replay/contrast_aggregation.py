@@ -119,26 +119,23 @@ def aggregate_contrast(
         if ccol not in s_all.columns:
             continue
         present = s_all[ccol].notna()
-        # Identifiability filter. The |coef| bound alone is selection ON the
-        # estimate: over a set of unidentified fits it keeps exactly the ones
-        # whose runaway estimate happened to land under the threshold, which is
-        # how CS3_lastrew came to report -2.72 next to a typical session SE of
-        # 2,428 (the identified sessions give -0.77). Drop a session when the
-        # fit is flagged separated, or when the standard error is large relative
-        # to the estimate -- a coefficient known only to within an order of
-        # magnitude carries no information about its own sign.
-        finite_se = s_all[scol] if scol in s_all.columns else None
-        unstable = (
-            (finite_se > 10 * s_all[ccol].abs()) & finite_se.notna()
-            if finite_se is not None
-            else pd.Series(False, index=s_all.index)
-        )
+        # Identifiability filter. ``separated`` is the rule: it is measured on
+        # the effect scale (SE per SD of the predictor), which is what
+        # non-identification actually shows up in. ``|coef| < 10`` is a backstop
+        # for fits that carry no flag (older result tables, or an estimate that
+        # ran away without tripping the flag); on its own it is selection ON the
+        # estimate, keeping whichever unidentified fits happened to land under
+        # the threshold, which is how CS3_lastrew came to report -2.72 next to a
+        # typical session SE of 2,428 (the identified sessions give -0.77).
+        # Precision is deliberately NOT a criterion: the retired
+        # ``SE > 10 * |coef|`` rule dropped identified sessions whose effect was
+        # near zero, biasing the surviving median away from zero.
         flagged = (
             s_all["separated"] == True  # noqa: E712 (NaN must not count)
             if "separated" in s_all.columns
             else pd.Series(False, index=s_all.index)
         )
-        kept = present & (s_all[ccol].abs() < 10) & ~unstable & ~flagged
+        kept = present & (s_all[ccol].abs() < 10) & ~flagged
         n_dropped = int((present & ~kept).sum())
         s = s_all[kept]
         if len(s) < 5:

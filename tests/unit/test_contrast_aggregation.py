@@ -1,14 +1,24 @@
-"""Unit conventions of the shared contrast aggregation's ``std_factor``.
+"""Unit conventions and session-drop rule of the shared contrast aggregation.
 
-Three mutually exclusive labels, in the order ``std_factor`` resolves them:
-binary per-category predictors, the reward-history basis features (weighted
-reward fractions, so their coefficients are per unit of the fraction), and
-continuous covariates scaled by their pooled SD.
+``std_factor`` resolves three mutually exclusive labels, in order: binary
+per-category predictors, the reward-history basis features (weighted reward
+fractions, so their coefficients are per unit of the fraction), and continuous
+covariates scaled by their pooled SD.
+
+``aggregate_contrast`` drops a session fit only when it is unidentified: the
+``separated`` flag is the effect-scale identifiability rule, with ``|coef| < 10``
+as a backstop. Precision alone is not a drop criterion.
 """
 
 from __future__ import annotations
 
-from continuum_swr_replay.analysis.replay.contrast_aggregation import std_factor
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    aggregate_contrast,
+    std_factor,
+)
 from continuum_swr_replay.analysis.replay.model_specs import REWARD_HISTORY_COLUMNS
 
 SD = {"rpe_postoutcome": 2.0, "reward_history_rcos_0": 0.25}
@@ -34,3 +44,72 @@ def test_continuous_covariate_is_scaled_by_its_pooled_sd() -> None:
 
 def test_unknown_term_is_assumed_z_scored_at_fit_time() -> None:
     assert std_factor("rpe_postoutcome_z_x_is_current_arm", SD) == (1.0, "per_SD")
+
+
+def _session_fits(**overrides) -> pd.DataFrame:
+    """Eight identified sessions across two animals for one (model, population)."""
+    n = 8
+    fits = pd.DataFrame(
+        {
+            "model": ["G5_rpe"] * n,
+            "population": ["non_local"] * n,
+            "animal": ["a"] * 4 + ["b"] * 4,
+            "coef_rpe_postoutcome": [0.30, 0.35, 0.25, 0.40, 0.20, 0.45, 0.28, 0.33],
+            "bse_rpe_postoutcome": [0.10] * n,
+            "pval_rpe_postoutcome": [0.01] * n,
+            "separated": [False] * n,
+            "converged": [True] * n,
+        }
+    )
+    for column, values in overrides.items():
+        fits[column] = values
+    return fits
+
+
+SPECS = [("G5_rpe", "non_local", "rpe_postoutcome")]
+
+
+def test_imprecise_but_identified_session_is_kept() -> None:
+    """A near-zero coefficient with an ordinary SE is a small effect, not separation.
+
+    coef 0.01 with SE 0.5 satisfies the retired ``SE > 10 * |coef|`` rule, which
+    dropped every session whose effect happened to be near zero -- selection on
+    the estimate, biasing the surviving median away from zero.
+    """
+    fits = _session_fits()
+    fits.loc[0, "coef_rpe_postoutcome"] = 0.01
+    fits.loc[0, "bse_rpe_postoutcome"] = 0.5
+
+    out = aggregate_contrast(fits, SPECS, level="rate")
+
+    assert len(out) == 1
+    row = out.iloc[0]
+    assert row["n_sessions"] == 8
+    assert row["n_dropped"] == 0
+    assert row["coef_session_median"] == pytest.approx(0.305)
+
+
+def test_separated_session_is_dropped() -> None:
+    """The separation flag is the identifiability rule and still drops the fit."""
+    fits = _session_fits()
+    fits.loc[0, "separated"] = True
+
+    out = aggregate_contrast(fits, SPECS, level="rate")
+
+    row = out.iloc[0]
+    assert row["n_sessions"] == 7
+    assert row["n_dropped"] == 1
+    assert row["n_sessions_flagged_separated"] == 1
+    assert row["coef_session_median"] == pytest.approx(0.33)
+
+
+def test_runaway_coefficient_is_still_dropped_by_the_backstop() -> None:
+    """|coef| >= 10 remains a backstop for fits with no separation flag."""
+    fits = _session_fits()
+    fits.loc[0, "coef_rpe_postoutcome"] = 42.0
+
+    out = aggregate_contrast(fits, SPECS, level="rate")
+
+    row = out.iloc[0]
+    assert row["n_sessions"] == 7
+    assert row["n_dropped"] == 1
