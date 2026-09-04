@@ -11,10 +11,11 @@ Both figures read the full model ``M7_time_hist_rew`` (time spline +
 self-history + reward kernel), so every effect is shown controlled for the
 within-stop time course and the same-event clustering:
 
-* ``reward_kernel_per_bin_rate.png`` -- the reward rate-ratio kernel
+* ``reward_kernel_basis.png`` -- the reward rate-ratio kernel over lags 1-10
   reconstructed from the three raised-cosine basis coefficients per
-  population, and the immediate-component dissociation between SWR-coupled and
-  non-SWR non-local events.
+  population (per-session median and IQR, with the per-animal medians drawn
+  through them), and the immediate-component dissociation between
+  SWR-coupled and non-SWR non-local events.
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
   (onset_lag1..10): refractory (<1) at short lags, bursty (>1) at ~100 ms.
 
@@ -82,9 +83,15 @@ def _kernel(
     out = {}
     for oc in POP_STYLE:
         d = df[df.outcome == oc]
-        med = np.array([np.exp(d[f"coef_{prefix}{j}"].median()) for j in range(1, n + 1)])
-        lo = np.array([np.exp(d[f"coef_{prefix}{j}"].quantile(0.25)) for j in range(1, n + 1)])
-        hi = np.array([np.exp(d[f"coef_{prefix}{j}"].quantile(0.75)) for j in range(1, n + 1)])
+        med = np.array(
+            [np.exp(d[f"coef_{prefix}{j}"].median()) for j in range(1, n + 1)]
+        )
+        lo = np.array(
+            [np.exp(d[f"coef_{prefix}{j}"].quantile(0.25)) for j in range(1, n + 1)]
+        )
+        hi = np.array(
+            [np.exp(d[f"coef_{prefix}{j}"].quantile(0.75)) for j in range(1, n + 1)]
+        )
         out[oc] = (med, lo, hi)
     return out
 
@@ -104,13 +111,39 @@ def _reward_kernel_weights() -> np.ndarray:
     return B / B.sum(axis=1, keepdims=True)
 
 
-def _reconstructed_kernels(m7: pd.DataFrame, outcome: str) -> np.ndarray:
-    """Per-session reconstructed log-rate kernel over lags 1..10, shape (n_sess, n_lags)."""
-    coefs = m7[m7.outcome == outcome][
-        [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
-    ].to_numpy(dtype=float)
-    coefs = coefs[~np.isnan(coefs).any(axis=1)]
-    return coefs @ _reward_kernel_weights()
+def _reconstructed_kernels(
+    m7: pd.DataFrame, outcome: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-session reconstructed log-rate kernel over lags 1..10 for one population.
+
+    Parameters
+    ----------
+    m7 : pd.DataFrame
+        Tidy per-session rows of the full model, one row per (outcome, session).
+    outcome : str
+        Event-type population key.
+
+    Returns
+    -------
+    animals : np.ndarray, shape (n_sessions,)
+        Animal of each retained session, for the per-animal medians.
+    kernels : np.ndarray, shape (n_sessions, n_lags)
+        Log-rate contribution of a reward at each lag 1..10.
+    """
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    fitted = m7.loc[m7.outcome == outcome, ["animal", *columns]].dropna()
+    coefs = fitted[columns].to_numpy(dtype=float)
+    return fitted["animal"].to_numpy(), coefs @ _reward_kernel_weights()
+
+
+def _animal_median_kernels(
+    animals: np.ndarray, kernels: np.ndarray
+) -> dict[str, np.ndarray]:
+    """Median kernel per animal, so each animal weighs once in the display."""
+    return {
+        animal: np.median(kernels[animals == animal], axis=0)
+        for animal in np.unique(animals)
+    }
 
 
 def plot_reward_kernel(m7: pd.DataFrame) -> None:
@@ -120,16 +153,40 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for i, oc in enumerate(["swr", "non_local_swr", "non_local_no_swr"]):
         label, col = POP_STYLE[oc]
-        kernels = np.exp(_reconstructed_kernels(m7, oc))
+        animals, log_kernels = _reconstructed_kernels(m7, oc)
+        kernels = np.exp(log_kernels)
+        offset = 0.05 * (i - 1)
+        # Per-animal medians first, so the across-session summary reads on top.
+        for animal_kernel in _animal_median_kernels(animals, log_kernels).values():
+            ax.plot(
+                lags + offset,
+                np.exp(animal_kernel),
+                color=col,
+                lw=0.8,
+                alpha=0.35,
+                zorder=1,
+            )
         med = np.median(kernels, axis=0)
         lo, hi = np.percentile(kernels, [25, 75], axis=0)
-        ax.errorbar(lags + 0.05 * (i - 1), med, yerr=[med - lo, hi - med],
-                    marker="o", color=col, label=label, capsize=3, lw=2)
+        ax.errorbar(
+            lags + offset,
+            med,
+            yerr=[med - lo, hi - med],
+            marker="o",
+            color=col,
+            label=label,
+            capsize=3,
+            lw=2,
+            zorder=3,
+        )
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xlabel("reward lag (trials back)")
     ax.set_ylabel("rate ratio (per-session median, IQR)")
-    ax.set_title("Reward kernel (per-bin, time + self-history controlled)\n"
-                 "reconstructed from the raised-cosine basis coefficients")
+    ax.set_title(
+        "Reward kernel (per-bin, time + self-history controlled)\n"
+        "basis reconstruction: bold = per-session median (IQR), "
+        "thin = per-animal medians"
+    )
     ax.set_xticks(lags)
     # A few near-separated sessions give extreme whiskers; clip the display so
     # the kernel shape is readable. The robust per-session medians are unaffected.
@@ -139,8 +196,12 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     ax = axes[1]
     order = ["swr", "non_local_swr", "non_local_no_swr"]
     data = [np.exp(m7[m7.outcome == oc][IMMEDIATE_COEF].dropna()) for oc in order]
-    bp = ax.boxplot(data, labels=["SWR", "NL\nw/SWR", "NL\nNO SWR"],
-                    showfliers=False, patch_artist=True)
+    bp = ax.boxplot(
+        data,
+        labels=["SWR", "NL\nw/SWR", "NL\nNO SWR"],
+        showfliers=False,
+        patch_artist=True,
+    )
     for patch, oc in zip(bp["boxes"], order, strict=True):
         patch.set_facecolor(POP_STYLE[oc][1])
         patch.set_alpha(0.4)
@@ -160,18 +221,22 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     diff = mrg[f"{IMMEDIATE_COEF}_s"] - mrg[f"{IMMEDIATE_COEF}_n"]
     pa = mrg.assign(d=diff).groupby("animal")["d"].median()
     pval = wilcoxon(mrg[f"{IMMEDIATE_COEF}_s"], mrg[f"{IMMEDIATE_COEF}_n"]).pvalue
-    ax.set_title(f"Immediate reward effect by population\n"
-                 f"NL-SWR > NL-no-SWR: {(diff > 0).mean():.0%} of {len(mrg)}, "
-                 f"{(pa > 0).sum()}/{mrg.animal.nunique()} animals, p={pval:.1e}")
+    ax.set_title(
+        f"Immediate reward effect by population\n"
+        f"NL-SWR > NL-no-SWR: {(diff > 0).mean():.0%} of {len(mrg)}, "
+        f"{(pa > 0).sum()}/{mrg.animal.nunique()} animals, p={pval:.1e}"
+    )
 
     fig.tight_layout()
-    out = FIGS / "reward_kernel_per_bin_rate.png"
+    out = FIGS / "reward_kernel_basis.png"
     fig.savefig(out, dpi=150)
     plt.close(fig)
     print(f"saved {out}")
     for oc in order:
         v = m7[m7.outcome == oc][IMMEDIATE_COEF].dropna()
-        print(f"  {POP_STYLE[oc][0]:18s}: immediate RR={np.exp(v.median()):.2f} (n={len(v)})")
+        print(
+            f"  {POP_STYLE[oc][0]:18s}: immediate RR={np.exp(v.median()):.2f} (n={len(v)})"
+        )
 
 
 def plot_selfhistory(m7: pd.DataFrame) -> None:
@@ -181,8 +246,15 @@ def plot_selfhistory(m7: pd.DataFrame) -> None:
     for oc in ["swr", "non_local", "non_local_swr", "non_local_no_swr"]:
         label, col = POP_STYLE[oc]
         med, lo, hi = ker[oc]
-        ax.errorbar(lagms, med, yerr=[med - lo, hi - med], marker="o",
-                    color=col, label=label, capsize=3)
+        ax.errorbar(
+            lagms,
+            med,
+            yerr=[med - lo, hi - med],
+            marker="o",
+            color=col,
+            label=label,
+            capsize=3,
+        )
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xlabel("time lag (ms)")
     ax.set_ylabel("self-history rate ratio (per-session median, IQR)")

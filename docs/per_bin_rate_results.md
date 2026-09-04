@@ -3,17 +3,19 @@
 Quantitative readout of the per-bin conditional-intensity ladder
 (`MODEL_PER_BIN_RATE`, see [rate_models.md](rate_models.md) for the methods),
 fit per session over **218 sessions** and persisted in
-`models_per_bin_rate/all_models.pkl` (13 models, `BIN_S = 0.015`, `TMAX = 4 s`).
-Numbers below are the **fixed-knot-spline** run (the time-course spline uses
-fixed shared knots so its coefficients are cross-session comparable and the
-fitted curve is reconstructable — see §1b); spline-model values shifted <2% from
-the earlier data-driven-knot run, conclusions unchanged. Regenerate with
+`models_per_bin_rate/all_models.pkl` (10 models, `BIN_S = 0.015`, `TMAX = 4 s`).
+Numbers below are the **reward-basis** run (2026-09-04): the reward block is the
+three-bump raised-cosine basis over the last ten known outcomes
+(`reward_history_rcos_0..2` plus the `reward_history_incomplete` nuisance
+indicator), replacing the ten per-lag reward indicators. The time-course spline
+uses fixed shared knots so its coefficients are cross-session comparable and the
+fitted curve is reconstructable (see §1b). Regenerate with
 `uv run python scripts/rate/summarize_per_bin_rate_models.py`.
 
 **Figures:** the six-panel visual companion is
 `paper/figures/per_bin_rate_ladder_summary.png`
 (`scripts/rate/plot_per_bin_rate_summary.py`); detailed kernel / GOF figures are
-`reward_kernel_per_bin_rate.png`, `selfhistory_autocorr.png`,
+`reward_kernel_basis.png`, `selfhistory_autocorr.png`,
 `model_checking_ladder.png`, `model_checking_example_{rich,sparse}.png`
 (`scripts/rate/plot_per_bin_rate_models.py`, `scripts/rate/plot_model_checking.py`).
 
@@ -26,19 +28,19 @@ signed-rank p. Every effect is *conditional on the first 4 s of each stop*.
 ## 1. Baseline rate (M0_const)
 
 Events per second of immobility (`exp(intercept)`), all pairwise differences
-significant (paired Wilcoxon p ≤ 1e-5):
+significant (paired Wilcoxon p ≤ 3e-5):
 
 | population | rate (events/s) | IQR |
 | --- | --- | --- |
-| non-local (all) | **0.405** | 0.314–0.550 |
-| detected SWR | 0.285 | 0.223–0.340 |
-| non-local, no SWR | 0.234 | 0.162–0.308 |
+| non-local (all) | **0.406** | 0.314–0.551 |
+| detected SWR | 0.283 | 0.223–0.340 |
+| non-local, no SWR | 0.235 | 0.162–0.308 |
 | non-local, w/ SWR | **0.181** | 0.128–0.244 |
 
 Ordering: **non-local (all) > detected SWR > NL-no-SWR > NL-w/SWR.** The non-local
-split is additive (0.181 + 0.234 ≈ 0.405), so **SWR-coupled non-local events are
-the rarest type**; of the 0.285/s detected SWRs, ~0.181/s coincide with a
-non-local event (~63%), and ~45% of non-local events coincide with an SWR.
+split is roughly additive (0.181 + 0.235 ≈ 0.406), so **SWR-coupled non-local events
+are the rarest type**; of the 0.283/s detected SWRs, ~0.181/s coincide with a
+non-local event (~64%), and ~45% of non-local events coincide with an SWR.
 (Detected-SWR vs non-local is a cross-modality comparison — LFP vs decoder — so
 read the within-non-local split as the clean contrast.)
 
@@ -48,8 +50,7 @@ The dominant structure: replay rate rises over the first ~1.5–2 s of a stop th
 plateaus (panels A0/A1 of the summary figure). The spline uses **fixed shared
 knots** (`SPLINE_KNOTS=(1,2,3)`, bounds `[0,4]`), so the fitted `λ(tc)` curve is
 **reconstructable from the saved coefficients** (`exp(intercept + bs(tc)·β)`) and
-the spline coefficients are comparable across sessions — neither was true with
-the previous data-driven (per-session quantile) knots.
+the spline coefficients are comparable across sessions.
 
 **Duration caveat (important):** stop durations are very unequal and *endogenous*
 — rewarded stops are ~3.5× longer, so at large `tc` only the long (≈rewarded)
@@ -62,98 +63,123 @@ removed, but the principled fix — modelling the stop *departure hazard* jointl
 with the rate — is the [joint-replay-departure](../.claude/docs/plans/joint-replay-departure/PLAN.md)
 plan.
 
-## 2. Reward on the previous trial (lag-1)
+## 2. Immediate reward component (basis bump 0)
 
-Both non-local subtypes are reward-responsive, and the effect is **much smaller
-for non-SWR** — raw and after full control:
+`reward_history_rcos_0` is the bump-weighted reward *fraction* over roughly the
+last seven outcomes (weights 1.00, 0.79, 0.54, … at lags 1–7), so its coefficient
+is **per unit of that fraction** — a 0→1 contrast, not a single-trial indicator.
+It is not comparable to the retired lag-1 indicator's RR, and the three basis
+coefficients are strongly collinear (pairwise r 0.53–0.89), so read the *kernel
+reconstruction* in §3 for the per-lag effect and treat the single-coefficient RRs
+below as a within-population contrast only.
 
-| population | RR raw (M1) | RR controlled (M7) | animals (M7) |
-| --- | --- | --- | --- |
-| detected SWR | 2.58 | 1.41 | 5/5 |
-| non-local (all) | 2.62 | 1.50 | 5/5 |
-| non-local, w/ SWR | **6.31** | **3.93** | 5/5 |
-| non-local, no SWR | **1.77** | **1.11** | 5/5 |
+| population | RR raw (M1_rew) | RR controlled (M7) | %pos (M7) | animals (M7) |
+| --- | --- | --- | --- | --- |
+| detected SWR | 11.8 | 3.13 | 75% | 5/5 |
+| non-local (all) | 10.6 | 1.82 | 63% | 5/5 |
+| non-local, w/ SWR | **57.1** | **6.52** | 83% | 5/5 |
+| non-local, no SWR | **4.0** | **0.82** | 44% | 5/5 |
 
-Controlled = M7 (within-stop time spline + self-history + reward kernel). The
-paired NL-w/SWR > NL-no-SWR dissociation is **86% of sessions, 5/5 animals,
-p = 1.2e-28**. After full control the non-SWR lag-1 effect is barely above 1
-(1.11; significant across animals, p = 3.2e-3, but only 57% of sessions
-positive) — i.e. most of the apparent non-SWR reward response is absorbed by the
-within-stop time course / clustering, whereas the SWR-coupled response remains
-large (3.93) — so non-SWR is *weakly reward-elevated*, not reward-independent.
+Controlled = M7 (within-stop time spline + self-history + reward basis). The
+paired NL-w/SWR > NL-no-SWR dissociation is **80% of sessions, 5/5 animals,
+p = 2.5e-23** (n = 217 paired sessions). After full control the non-SWR immediate
+component is at or below 1 (0.82, p = 0.11 across sessions), whereas the
+SWR-coupled response remains large — the same dissociation the per-lag
+specification reported, with the non-SWR side now indistinguishable from no
+immediate reward response.
 
-## 3. Reward history kernel, lags 2–10 (M7)
+## 3. Reward kernel, lags 1–10 (M7, reconstructed from the basis)
 
-Beyond the lag-1 boost, recent reward **suppresses** the rate, and this part is
-**shared** across populations (RR ≈ 0.85–0.97 per lag, ~0.6× cumulative):
+The per-lag log-rate contribution is `Σ_k coef_k · B[k, lag] / Σ_lag B[k, lag]`
+(row-normalized basis), evaluated per session and summarized as the median RR:
 
-| population | lag1 | lag2 | lag3 | lag4 | lag5 | … | lag10 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| detected SWR | 1.45 | 0.95 | 0.87 | 0.91 | 0.95 | … | 0.97 |
-| non-local, w/ SWR | 3.95 | 0.90 | 0.87 | 0.92 | 0.95 | … | 1.03 |
-| non-local, no SWR | 1.12 | 0.86 | 0.90 | 0.93 | 0.94 | … | 0.95 |
+| population | lag1 | lag2 | lag3 | lag4 | lag5 | lag6 | lag7 | lag8 | lag9 | lag10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| detected SWR | 1.23 | 1.03 | 0.96 | 0.93 | 0.93 | 0.94 | 0.96 | 0.98 | 1.00 | 1.03 |
+| non-local (all) | 1.08 | 0.96 | 0.93 | 0.92 | 0.93 | 0.94 | 0.96 | 0.98 | 0.99 | 1.01 |
+| non-local, w/ SWR | **1.43** | 1.09 | 0.96 | 0.91 | 0.91 | 0.92 | 0.95 | 0.98 | 1.01 | 1.05 |
+| non-local, no SWR | **0.90** | 0.89 | 0.90 | 0.92 | 0.94 | 0.95 | 0.97 | 0.98 | 0.98 | 0.99 |
 
-So the reward kernel is **boost (lag-1, dissociates) then suppression (lags 2–10,
-shared)**. The lag≥2 suppression is a recent-reward effect; whether it is an
-RPE/relative-reward signal vs satiety/adaptation is not established here (the GLM
-uses past binary outcomes, not a prediction error).
+So the reward kernel is **boost at lag 1 (dissociates: 1.43 SWR-coupled vs 0.90
+non-SWR) then mild suppression over lags 2–7 (RR ≈ 0.89–0.96, shared across
+populations) returning to ~1 by lag 10**. The smooth basis cannot represent a
+lag-specific spike, so the lag-1 boost is smaller here than the per-lag
+specification reported; the *ordering and the dissociation are unchanged*. The
+lag≥2 suppression is a recent-reward effect; whether it is an RPE/relative-reward
+signal vs satiety/adaptation is not established here (the GLM uses past binary
+outcomes, not a prediction error).
 
 ## 4. Self-history (within-stop autocorrelation)
 
 Same qualitative shape for all types — **refractory** at short lags, **bursty**
-at ~100 ms — but the **microstructure dissociates** (M7, controlled):
+at ~100–135 ms — but the **microstructure dissociates** (M7, controlled):
 
 | population | refractory window (RR<1) | burst peak RR | @ lag |
 | --- | --- | --- | --- |
-| detected SWR | ≤60 ms | **2.41** | 135 ms |
-| non-local (all) | ≤60 ms | 2.04 | 105 ms |
-| non-local, w/ SWR | ≤75 ms | 2.09 | 105 ms |
-| non-local, no SWR | **≤150 ms** | **1.54** | 135 ms |
+| detected SWR | ≤60 ms | **2.77** | 135 ms |
+| non-local (all) | ≤60 ms | 2.13 | 105 ms |
+| non-local, w/ SWR | ≤75 ms | 2.41 | 135 ms |
+| non-local, no SWR | **≤150 ms** | **1.82** | 135 ms |
 
 **SWR-coupled events are tightly bursty** (short refractory, strong ~100 ms
 clustering); **non-SWR non-local events are more refractory and weakly bursty**
-(longest dead time ≤150 ms, flattest bump 1.54×). Read the *shape* from the
+(longest dead time ≤150 ms, flattest bump 1.82×). Read the *shape* from the
 lag-dummy models (M3_hist / M7); use the raised-cosine models (M3r/M7r) for
-prediction/CV — the dummy kernel overfits held-out (see §6).
+prediction/CV (see §6).
 
-## 5. Reward-rate and switch (exploratory uncertainty dissociations)
+## 5. Behavioral-state covariates
 
-| covariate | detected SWR | NL w/ SWR | NL no-SWR |
-| --- | --- | --- | --- |
-| recent reward rate (M2r) | 0.91 (n.s.) | **1.28** (p=1e-5) | **0.89** (p=1e-2) |
-| patch switch (M8) | 0.82 | **0.76** | **1.16** |
+The exploratory recent-reward-rate (`M2r_rewrate`) and patch-switch
+(`M8_full_switch`) rungs are no longer part of `MODEL_PER_BIN_RATE`. Those
+covariates are now fit in the dedicated per-bin ladders, on their own frozen
+cohorts and with the post-outcome gating they need:
 
-Both point the same way: **non-SWR non-local rate is elevated in low-reward /
-exploratory states; SWR-coupled rate is elevated in high-reward / exploitative
-states** (paired NL-w/SWR vs NL-no-SWR: reward-rate p=2e-6, switch p=6e-8). These
-are model-free behavioral proxies; the task-grounded value/RPE/block test is the
-`nonswr-uncertainty-rate` plan.
+- `MU_uncertainty` (`scripts/rate/fit_uncertainty_rate.py` →
+  `models_per_bin_rate/uncertainty_rate.pkl`) — task value / uncertainty / switch-rate
+  covariates per population.
+- The `is_swr` contrast ladder (`scripts/rate/fit_swr_contrast_rate.py` →
+  `models_per_bin_rate/swr_contrast_rate.pkl`) — the same covariates as an
+  SWR-vs-non-SWR contrast.
+
+Do **not** carry the retired M2r/M8 numbers forward from an earlier revision of
+this document: those rungs were fit on a different reward block and a different
+cohort.
 
 ## 6. Model ladder (fit summary, outcome = non-local)
 
+Median AIC across sessions, held-out bits/event from the per-session CV (0 = the
+constant model), and the share of sessions whose time-rescaling KS curve stays
+inside the band:
+
 | model | median AIC | CV bits/event | KS-in-band |
 | --- | --- | --- | --- |
-| M0_const | 2320 | 0.000 | 0.50 |
-| M1_rew1 | 2285 | +0.045 | 0.41 |
-| M2_rewhist | 2156 | +0.026 | 0.38 |
-| M3_hist (dummy) | 2312 | **−0.245** | 0.39 |
-| M3r_histcos | 2308 | +0.033 | 0.40 |
-| M5_time | 2249 | **+0.228** | 0.86 |
-| M7_time_hist_rew (dummy) | 2107 | −0.108 | 0.91 |
-| **M7r_time_histcos_rew** | **2105** | **+0.199** | 0.91 |
-| M8_full_switch | 2107 | −0.167 | 0.91 |
-| M9_rew_x_time | 2115 | −0.407 | 0.90 |
+| M0_const | 2321 | 0.000 | 0.49 |
+| M1_rew | 2305 | 0.004 | 0.46 |
+| M3_hist (dummy) | 2312 | 0.061 | 0.40 |
+| M3r_histcos | 2309 | 0.052 | 0.39 |
+| M4_hist_rew | 2302 | 0.071 | 0.41 |
+| M5_time | 2250 | **0.226** | 0.86 |
+| M6_time_hist | 2253 | 0.079 | 0.85 |
+| M7_time_hist_rew (dummy history) | 2253 | 0.094 | 0.88 |
+| **M7r_time_histcos_rew** | **2244** | 0.198 | 0.87 |
+| M9_rew_x_time | 2259 | 0.099 | 0.88 |
 
-- **The time spline calibrates the process** (KS-in-band jumps 0.50→0.86 at M5).
-- **The lag-dummy self-history overfits** (M3/M7 CV negative); **the raised-cosine
-  basis fixes it** — `M7r` recovers a positive CV (+0.199 vs M7-dummy's −0.108) and
-  has the **lowest AIC (2105)** in the ladder.
-- **But M5_time is the best-generalizing model** (CV +0.228, the highest in the
-  ladder). `M7r` has the lowest AIC but does **not** beat M5 on held-out CV
-  (+0.199 < +0.228) — i.e. reward + raised-cosine history add inferential signal
-  but **negligible held-out bits** over the within-stop time course (M7r − M5 =
-  −0.010, only 46% of sessions improve). Use **M5_time as the parsimonious
+- **The time spline calibrates the process** (KS-in-band jumps 0.49 → 0.86 at M5).
+- **The raised-cosine self-history basis beats the lag dummies on held-out data**
+  (`M7r` 0.198 vs `M7` 0.094 bits/event) and has the **lowest AIC (2244)** in the
+  ladder.
+- **M5_time is still the best-generalizing model** (CV 0.226, the highest in the
+  ladder). `M7r` has the lowest AIC but does **not** beat M5 on held-out CV — i.e.
+  reward + raised-cosine history add inferential signal but **negligible held-out
+  bits** over the within-stop time course. Use **M5_time as the parsimonious
   predictive model**; **M7r for the full additive coefficient read**.
-- M8 (switch) and M9 (reward×time) add nothing on CV (and M9 separates on ~9% of
-  sessions). See [rate_models.md](rate_models.md) for the GOF/dispersion caveats
-  and the preliminary within-session drift.
+- **The reward block is now a small AIC step.** Per session, `M1_rew − M0_const`
+  has a median ΔAIC of −5.0 (non-local) to −1.6 (detected SWR), and
+  `M7_time_hist_rew − M6_time_hist` is ≈ 0 to +2.8 — the four-parameter smooth
+  reward block does not pay for itself once the time course and self-history are
+  in the model, even though its immediate component is a large, consistent effect
+  (§2). The retired eleven-parameter per-lag block bought ~100–160 AIC points on
+  the same cohorts; see
+  [audits/2026-09-04-rate-refit-comparison.md](audits/2026-09-04-rate-refit-comparison.md).
+- M9 (reward×time) adds nothing on CV. See [rate_models.md](rate_models.md) for
+  the GOF/dispersion caveats and the preliminary within-session drift.

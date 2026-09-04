@@ -25,11 +25,13 @@ omission, recent reward history) on detected ripples, then asks whether the
 non-SWR non-local events share those rate effects.
 
 Usage:
-    uv run python scripts/rate/fit_per_stop_rate_models.py
+    uv run python scripts/rate/fit_per_stop_rate_models.py                    # full
+    uv run python scripts/rate/fit_per_stop_rate_models.py --max-per-animal 1  # smoke
 """
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 
@@ -220,7 +222,25 @@ def fit_per_stop_rate_hierarchy(
     return pd.DataFrame(rows), records
 
 
+def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Keep only the first ``n`` sessions per animal (smoke mode)."""
+    keep = (
+        stop_table[SESSION_COLS].drop_duplicates().groupby("animal", sort=False).head(n)
+    )
+    return stop_table.merge(keep, on=SESSION_COLS)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--max-per-animal",
+        type=int,
+        default=None,
+        help="Smoke mode: keep only the first N sessions per animal.",
+    )
+    parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
+    args = parser.parse_args()
+
     # Causal-hygiene gate: R1 uses the past-only reward-history basis, so the
     # per-stop ladder is pre-outcome throughout; a future leak fails loud.
     for spec in MODEL_PER_STOP_RATE.values():
@@ -244,20 +264,24 @@ def main() -> None:
             f"stop_table missing reward-history basis columns {missing_basis}; "
             "regenerate it first (scripts/decoding/regenerate_stop_table.py)."
         )
+    if args.max_per_animal is not None:
+        stop = _subset_max_per_animal(stop, args.max_per_animal)
     logger.info(
-        "Fitting rate hierarchy %s (+CV) x %s over %d sessions...",
+        "Fitting rate hierarchy %s (CV=%s) x %s over %d sessions...",
         list(MODEL_PER_STOP_RATE),
+        not args.no_cv,
         list(RESPONSE_COLS),
         stop.groupby(SESSION_COLS).ngroups,
     )
-    rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=True)
+    rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=not args.no_cv)
 
     out_dir = RC / "models_per_stop_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / "all_models.pkl"
+    sfx = "_smoke" if args.max_per_animal else ""
+    out = out_dir / f"all_models{sfx}.pkl"
     rate.to_pickle(out)
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
-    write_cohort_audit(cohort_audits, out_dir / "all_models_cohort_audit.csv")
+    write_cohort_audit(cohort_audits, out_dir / f"all_models{sfx}_cohort_audit.csv")
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",
         len(rate),

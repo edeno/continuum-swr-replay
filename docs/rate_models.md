@@ -82,7 +82,7 @@ offset. Its limitation is exactly that offset — see below.
   (`--workers N` fans sessions over processes) →
   `Processed-Data/replay_content/models_per_bin_rate/all_models.pkl`. Plot with
   `scripts/rate/plot_per_bin_rate_models.py`
-  (→ `reward_kernel_per_bin_rate.png`, `selfhistory_autocorr.png`); the
+  (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`); the
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
