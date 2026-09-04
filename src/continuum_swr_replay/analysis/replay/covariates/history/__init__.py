@@ -42,6 +42,8 @@ from .reward_history import (
     recent_reward_rate_all_events,
     recent_reward_rate_per_arm,
     recent_trial_reward_rate,
+    reward_basis_from_lags,
+    reward_history_basis_features,
     rolling_reward_count_all_events,
     rolling_reward_count_per_arm,
 )
@@ -92,6 +94,8 @@ __all__ = [
     "recent_reward_rate_all_events",
     "recent_reward_rate_per_arm",
     "recent_trial_reward_rate",
+    "reward_basis_from_lags",
+    "reward_history_basis_features",
     "rolling_reward_count_all_events",
     "rolling_reward_count_per_arm",
     "spline_visit_recency_within_event",

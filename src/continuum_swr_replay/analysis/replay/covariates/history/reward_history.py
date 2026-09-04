@@ -6,7 +6,14 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay._helpers import build_well_to_arm_map
+from continuum_swr_replay.analysis.replay._helpers import (
+    build_well_to_arm_map,
+    raised_cosine_history_basis,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
+)
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
 )
@@ -274,6 +281,83 @@ def lagged_trial_rewards(
         valid = idx >= 0
         out[valid, j - 1] = is_reward[idx[valid]]
     return out
+
+
+def reward_basis_from_lags(lags: np.ndarray, basis: np.ndarray) -> np.ndarray:
+    """Project a lag matrix onto raised-cosine bumps, normalized per bump.
+
+    Each output is the bump-weighted mean over the *available* (finite) lags,
+    ``sum_j B[k, j] * lags[:, j] / sum_j B[k, j]``, so a query with only part of
+    the history is still on the reward-fraction scale rather than being shrunk
+    toward zero by the missing lags.
+
+    Parameters
+    ----------
+    lags : np.ndarray, shape (n_query, n_lags)
+        Per-lag reward outcomes (0/1), ``NaN`` where the lag is not known.
+    basis : np.ndarray, shape (n_basis, n_lags)
+        Bump weights; ``basis[k, j]`` is the weight of lag ``j + 1`` in bump
+        ``k``.
+
+    Returns
+    -------
+    np.ndarray, shape (n_query, n_basis)
+        Normalized projections; ``NaN`` where no lag in the bump's support is
+        finite.
+    """
+    finite = np.isfinite(lags)
+    values = np.where(finite, lags, 0.0)  # (n_query, n_lags)
+    num = values @ basis.T  # (n_query, n_basis)
+    den = finite.astype(float) @ basis.T  # (n_query, n_basis)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = num / den
+    out[den <= 0] = np.nan
+    return out
+
+
+def reward_history_basis_features(
+    query_times: np.ndarray,
+    port_experiences: pd.DataFrame,
+    *,
+    n_lags: int = REWARD_HISTORY_N_LAGS,
+    n_basis: int = REWARD_HISTORY_N_BASIS,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Smooth reward-history features over the last ``n_lags`` known outcomes.
+
+    The regularized replacement for the ``n_lags`` collinear per-lag dummies of
+    :func:`lagged_trial_rewards`: the same outcome clock and the same lag
+    vector, projected onto log-spaced raised-cosine bumps. Each feature is a
+    weighted reward fraction in ``[0, 1]``, so its coefficient is per unit rate.
+    Bump 0 is the immediate component; later bumps average progressively older
+    outcomes.
+
+    Parameters
+    ----------
+    query_times : np.ndarray, shape (n_query,)
+        Times (s) at which to evaluate -- immobility-bout start times.
+    port_experiences : pd.DataFrame
+        Canonical experience stream with physical outcome clocks.
+    n_lags : int
+        Number of port-experience lags spanned.
+    n_basis : int
+        Number of raised-cosine bumps.
+
+    Returns
+    -------
+    features : np.ndarray, shape (n_query, n_basis)
+        Normalized reward-history features. Entries whose bump has no known lag
+        in its support are zero-filled (they are undefined, not reward-free).
+    incomplete : np.ndarray, shape (n_query,)
+        ``1.0`` where any feature was undefined and zero-filled -- fewer than
+        two known outcomes, since the slowest bump carries no weight at lag 1 --
+        else ``0.0``. A structural-missingness indicator, not a behavioral
+        quantity: it enters rate models as a nuisance main effect so the
+        zero-filled rows do not masquerade as reward-free history.
+    """
+    lags = lagged_trial_rewards(query_times, port_experiences, k=n_lags)
+    raw = reward_basis_from_lags(lags, raised_cosine_history_basis(n_lags, n_basis))
+    incomplete = np.isnan(raw).any(axis=1).astype(float)
+    return np.nan_to_num(raw, nan=0.0), incomplete
 
 
 def rolling_reward_count_per_arm(

@@ -45,9 +45,14 @@ from .covariates import (
     add_trial_context,
     lagged_trial_rewards,
     recent_trial_reward_rate,
+    reward_history_basis_features,
     summarize_behavioral_location,
 )
-from .model_specs import N_REWARD_LAGS
+from .model_specs import (
+    N_REWARD_LAGS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 
 
 def build_stop_table(
@@ -145,6 +150,16 @@ def build_stop_table(
     lag_rewards = lagged_trial_rewards(bout_starts, port_experiences, N_REWARD_LAGS)
     for j in range(N_REWARD_LAGS):
         per_bout[f"known_reward_outcome_lag_{j + 1}"] = lag_rewards[:, j]
+
+    # Smooth reward kernel: the same known-outcome lag vector projected onto
+    # log-spaced raised-cosine bumps, plus the structural-missingness flag for
+    # stops whose slowest bump had no known outcome to average.
+    reward_history, reward_history_incomplete = reward_history_basis_features(
+        bout_starts, port_experiences
+    )
+    for j, column in enumerate(REWARD_HISTORY_COLUMNS):
+        per_bout[column] = reward_history[:, j]
+    per_bout[REWARD_HISTORY_INCOMPLETE] = reward_history_incomplete
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -303,8 +318,6 @@ def build_stop_table(
     return stamp_covariate_schema(per_bout[column_order], table="stop")
 
 
-
-
 def add_nonlocal_swr_split(
     stop_table: pd.DataFrame, event_table: pd.DataFrame
 ) -> pd.DataFrame:
@@ -375,5 +388,3 @@ def add_nonlocal_swr_split(
     split_cols = ["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]
     out[split_cols] = out[split_cols].fillna(0).astype(np.int64)
     return out
-
-

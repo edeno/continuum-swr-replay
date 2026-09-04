@@ -22,7 +22,13 @@ from enum import StrEnum
 
 import pandas as pd
 
-from ..model_specs import N_HISTORY_BASIS, N_HISTORY_LAGS, N_REWARD_LAGS
+from ..model_specs import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    N_REWARD_LAGS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 
 
 class Availability(StrEnum):
@@ -741,6 +747,51 @@ for lag in range(1, N_REWARD_LAGS + 1):
             missingness=f"fewer than {lag} outcomes are known",
         )
     )
+
+for bump, name in enumerate(REWARD_HISTORY_COLUMNS):
+    _DEFINITIONS.append(
+        _definition(
+            name,
+            f"Raised-cosine reward-history component {bump} at stop start: the "
+            "known-outcome lag vector averaged under bump "
+            f"{bump} of a log-spaced basis, normalized over the lags actually "
+            "known. Component 0 weights the most recent outcomes; later "
+            "components weight progressively older ones.",
+            grain=_STOP,
+            units="weighted reward fraction",
+            clock=QueryClock.STOP_START,
+            availability=Availability.PRE_OUTCOME,
+            support="all stops",
+            producer="covariates.history.reward_history_basis_features",
+            window=(
+                "log-spaced raised-cosine bump over the last 10 known outcomes, "
+                "normalized over the available lags"
+            ),
+            missingness=(
+                "none; undefined bumps are zero-filled and flagged by "
+                f"{REWARD_HISTORY_INCOMPLETE}"
+            ),
+        )
+    )
+
+_DEFINITIONS.append(
+    _definition(
+        REWARD_HISTORY_INCOMPLETE,
+        "Structural-missingness nuisance term: 1 for stops with fewer than two "
+        "known reward outcomes, whose slowest raised-cosine component had no "
+        "outcome in its support and was zero-filled. It separates a zero-filled "
+        "unknown history from a genuinely reward-free one; it is not a "
+        "behavioral quantity and is never reported.",
+        grain=_STOP,
+        units="binary indicator",
+        clock=QueryClock.STOP_START,
+        availability=Availability.PRE_OUTCOME,
+        support="all stops",
+        producer="covariates.history.reward_history_basis_features",
+        window="the last 10 known outcomes",
+        missingness="none",
+    )
+)
 
 for lag in range(1, N_HISTORY_LAGS + 1):
     for prefix, description in (

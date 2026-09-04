@@ -51,6 +51,10 @@ __all__ = [
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
     "PerBinRateModelSpec",
+    "REWARD_HISTORY_COLUMNS",
+    "REWARD_HISTORY_INCOMPLETE",
+    "REWARD_HISTORY_N_BASIS",
+    "REWARD_HISTORY_N_LAGS",
     "SPLINE_KNOTS",
     "STOP_COVARIATES",
     "SWR_CONTRAST_CONTENT_ARM_KEY_TERM",
@@ -606,6 +610,25 @@ MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
     description="Lagged reward kernel: 10 most-recent-known outcomes",
     parent="R0",
 )
+
+# ── Reward-history raised-cosine basis ──
+#
+# The smooth replacement for the ten per-lag dummies: the same known-outcome lag
+# vector projected onto log-spaced raised-cosine bumps, each normalized over the
+# lags actually known at the query time. Features are weighted reward fractions
+# in [0, 1] (coefficients per unit rate, not per SD); feature 0 is the immediate
+# component. ``REWARD_HISTORY_INCOMPLETE`` flags stops whose slowest bump has no
+# known outcome in its support (fewer than two known outcomes) and whose features
+# were therefore zero-filled -- a structural-missingness nuisance main effect, not
+# a behavioral quantity to report.
+REWARD_HISTORY_N_LAGS = 10
+REWARD_HISTORY_N_BASIS = 3
+REWARD_HISTORY_COLUMNS = (
+    "reward_history_rcos_0",
+    "reward_history_rcos_1",
+    "reward_history_rcos_2",
+)
+REWARD_HISTORY_INCOMPLETE = "reward_history_incomplete"
 
 
 # ── Per-bin conditional-intensity ladder (Family B) ──

@@ -909,3 +909,132 @@ def test_reward_rate_arm_counts_only_resolved_visits():
         np.array([16.0]), experiences, w2a, k=10
     )
     assert after[0, 1] == pytest.approx(0.5)
+
+
+# ── Reward-history raised-cosine features ──
+
+
+def _reward_basis() -> np.ndarray:
+    """The (3, 10) log-spaced raised-cosine kernel the features project onto."""
+    return _helpers.raised_cosine_history_basis(10, 3)
+
+
+def test_reward_history_features_are_bump_weighted_means_of_the_lag_vector():
+    """With ten known outcomes every bump has full support, so each feature is
+    the plain weighted mean of the lag vector -- the definition the coefficient
+    is read against. A transposed or unnormalized projection changes the value.
+    """
+    # Rewarded on trials 0, 3, 4, 7 -> a non-monotone lag vector, so a bump
+    # mix-up cannot be masked by a flat history.
+    trials = _single_arm_trials(10, rewarded_indices={0, 3, 4, 7})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+    query = np.array([100.0])  # after every outcome (last is known at 99.0)
+
+    features, incomplete = covariates.reward_history_basis_features(query, experiences)
+    lags = covariates.lagged_trial_rewards(query, experiences, k=10)
+    assert np.isfinite(lags).all()
+
+    basis = _reward_basis()
+    expected = (basis @ lags[0]) / basis.sum(axis=1)
+    np.testing.assert_allclose(features[0], expected)
+    # The most recent outcome (trial 9, omitted) dominates bump 0 and the
+    # oldest (trial 0, rewarded) dominates bump 2.
+    assert features[0, 0] < features[0, 2]
+    assert incomplete[0] == 0.0
+
+
+def test_one_known_outcome_defines_only_the_two_recent_bumps():
+    """Bump 2 has zero weight at lag 1, so a single known outcome leaves it
+    undefined: it must be zero-filled and flagged, never silently 0 as a
+    reward-free history.
+    """
+    trials = _single_arm_trials(1, rewarded_indices={0})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+
+    features, incomplete = covariates.reward_history_basis_features(
+        np.array([9.5]), experiences
+    )
+    assert features[0, 0] == pytest.approx(1.0)
+    assert features[0, 1] == pytest.approx(1.0)
+    assert features[0, 2] == 0.0
+    assert incomplete[0] == 1.0
+
+
+def test_second_known_outcome_completes_the_slow_bump():
+    """Bump 2's earliest support is lag 2, so with exactly two known outcomes it
+    equals the *second* most recent outcome -- not the most recent one.
+    """
+    # Trial 0 rewarded, trial 1 omitted: lag 1 = 0, lag 2 = 1.
+    trials = _single_arm_trials(2, rewarded_indices={0})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+
+    features, incomplete = covariates.reward_history_basis_features(
+        np.array([19.5]), experiences
+    )
+    lags = covariates.lagged_trial_rewards(np.array([19.5]), experiences, k=10)
+    assert lags[0, 0] == 0.0 and lags[0, 1] == 1.0
+    assert features[0, 2] == pytest.approx(1.0)
+    assert incomplete[0] == 0.0
+
+
+def test_query_before_any_known_outcome_is_all_zero_and_flagged():
+    """No history at all is zero-filled, and only the indicator distinguishes it
+    from a genuinely reward-free history.
+    """
+    trials = _single_arm_trials(3, rewarded_indices={0, 1, 2})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+
+    features, incomplete = covariates.reward_history_basis_features(
+        np.array([0.5]), experiences
+    )
+    np.testing.assert_array_equal(features[0], np.zeros(3))
+    assert incomplete[0] == 1.0
+
+
+def test_reward_history_features_are_weighted_rates_in_the_unit_interval():
+    """Features are reward *fractions*, so coefficients are per unit rate. Any
+    value outside [0, 1] means the normalization was dropped.
+    """
+    trials = _single_arm_trials(12, rewarded_indices={1, 2, 5, 8, 11})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+    query = np.arange(9.5, 120.0, 10.0)
+
+    features, _ = covariates.reward_history_basis_features(query, experiences)
+    assert features.min() >= 0.0
+    assert features.max() <= 1.0
+    # The fixture must exercise both ends, or the bound test is vacuous.
+    assert features.max() > 0.5
+
+
+def test_reward_history_features_advance_on_the_outcome_clock():
+    """Inside the arrival-to-feedback gap the pending outcome is not yet known;
+    reading it would leak the current trip's reward into its own stop.
+    """
+    # Trials 0 and 1 omitted, trial 2 rewarded. Arrival at 28.0, outcome at 29.0.
+    trials = _single_arm_trials(3, rewarded_indices={2})
+    experiences = port_experiences_from_trials(trials, prepend_initial=False)
+
+    in_gap, _ = covariates.reward_history_basis_features(np.array([28.5]), experiences)
+    after, _ = covariates.reward_history_basis_features(np.array([29.5]), experiences)
+    # Before feedback the history is two omissions; after, the reward enters
+    # as the newest lag and carries bump 0's full weight.
+    basis = _reward_basis()
+    np.testing.assert_allclose(in_gap[0], np.zeros(3), atol=1e-12)
+    np.testing.assert_allclose(after[0, 0], basis[0, 0] / basis[0, :3].sum())
+    assert after[0, 0] > 0.4
+
+
+def test_reward_basis_from_lags_is_nan_only_where_a_bump_has_no_support():
+    """Partial history must not poison the bumps that *do* have finite support;
+    a row-wise NaN rule would drop every feature whenever any lag is missing.
+    """
+    basis = _reward_basis()
+    lags = np.full((2, 10), np.nan)
+    lags[0, 0] = 1.0  # only lag 1 known -> bump 2 (zero weight at lag 1) undefined
+    lags[1, 9] = 1.0  # only lag 10 known -> bump 0 (zero weight at lag 10) undefined
+
+    out = covariates.reward_basis_from_lags(lags, basis)
+    np.testing.assert_allclose(out[0, :2], 1.0)
+    assert np.isnan(out[0, 2])
+    assert np.isnan(out[1, 0])
+    np.testing.assert_allclose(out[1, 1:], 1.0)

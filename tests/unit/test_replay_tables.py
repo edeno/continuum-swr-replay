@@ -1498,6 +1498,45 @@ class TestMutationSurvivorGuards:
             ).astype(float),
         )
 
+    def test_stop_table_reward_history_features_match_the_stop_start_clock(self):
+        """The persisted basis columns must be the same projection the models
+        read, evaluated at ``stop_start``. Anchoring on ``stop_end`` or writing
+        the bumps in the wrong column order would leave plausible numbers.
+        """
+        from continuum_swr_replay.analysis.replay.covariates import (
+            reward_history_basis_features,
+        )
+        from continuum_swr_replay.analysis.replay.model_specs import (
+            REWARD_HISTORY_COLUMNS,
+            REWARD_HISTORY_INCOMPLETE,
+        )
+
+        dot, env, trials, graph = _location_contract_session()
+        stops = build_stop_table(dot, trials, graph)
+        experiences = port_experiences_from_trials(trials, prepend_initial=True)
+        starts = stops["stop_start"].to_numpy(dtype=float)
+        expected, expected_incomplete = reward_history_basis_features(
+            starts, experiences
+        )
+
+        for column_index, column in enumerate(REWARD_HISTORY_COLUMNS):
+            np.testing.assert_allclose(
+                stops[column].to_numpy(dtype=float), expected[:, column_index]
+            )
+        np.testing.assert_allclose(
+            stops[REWARD_HISTORY_INCOMPLETE].to_numpy(dtype=float),
+            expected_incomplete,
+        )
+        # Zero-filled undefined bumps are indistinguishable from a reward-free
+        # history without the flag, so the fixture must carry both states.
+        assert set(np.unique(expected_incomplete)) == {0.0, 1.0}
+        from_end, _ = reward_history_basis_features(
+            stops["stop_end"].to_numpy(dtype=float), experiences
+        )
+        assert not np.allclose(expected, from_end), (
+            "fixture does not straddle a trial outcome; test cannot discriminate"
+        )
+
     def test_immobility_time_is_positive_bout_duration(self):
         """The Family-A offset is ``log(immobility_time)``; a sign flip makes
         every offset NaN downstream while the table itself looks populated.

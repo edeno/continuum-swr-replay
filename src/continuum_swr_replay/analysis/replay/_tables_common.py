@@ -23,7 +23,11 @@ from continuum_swr_replay.data_loaders.constants import (
 )
 
 from .covariate_registry import stamp_covariate_schema
-from .model_specs import N_REWARD_LAGS
+from .model_specs import (
+    N_REWARD_LAGS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 from .spatial_mapping import map_estimate_to_arm
 from .trajectory import (
     NONLOCAL_ONLY_COLUMNS,
@@ -39,8 +43,6 @@ EVENT_ARM_STANDARDIZED_COLS = (
     "task_reward_probability_candidate_arm",
     "reward_belief_variance_candidate_arm_preoutcome",
 )
-
-
 
 
 def _prepare_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
@@ -122,8 +124,6 @@ def _filter_external_event_labels(
 
 
 # ── Public API ──
-
-
 
 
 #: Canonical column order for ``event_table``.
@@ -242,6 +242,8 @@ _STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "prev_patch",
     "next_patch",
     *[f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)],
+    *REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
 )
 
 _STOP_TABLE_COLUMNS: tuple[str, ...] = tuple(
