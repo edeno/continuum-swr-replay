@@ -203,7 +203,9 @@ def _fit(
             ).fit()
     except _EXPECTED as e:
         return None, type(e).__name__
-    status = fit_status(res, "glm")
+    status = fit_status(
+        res, "glm", predictor_sd=np.asarray(res.model.exog, dtype=float).std(axis=0)
+    )
     out = {f"coef_{k}": v for k, v in res.params.items()}
     # Within-session coefficient uncertainty: carry SE + p per term so downstream
     # aggregation can weight/annotate (mirrors the content contrast runner). These
@@ -292,6 +294,62 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     return keys, rows, skips, cohort_drops
 
 
+POST_OUTCOME_COVARIATES = (
+    "rpe_postoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+)
+
+
+def _mask_post_outcome_covariates(
+    stop: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """NaN the post-outcome covariates on stops that begin before the outcome.
+
+    ``rpe_postoutcome`` and ``reward_belief_mean_update_l1_all_ports_postoutcome``
+    are defined only once the trial's outcome is known (``outcome_known_time``).
+    A stop whose ``stop_start`` precedes that instant spans the pre-outcome
+    interval, so attaching the trial's post-outcome value to it would let the
+    model condition on information the animal did not yet have. Those values are
+    set to NaN here, before the ladder's common-cohort freeze, so the freeze --
+    not a silent per-rung drop inside the fitter -- decides which rows the
+    ladder is fit on.
+
+    Parameters
+    ----------
+    stop : pd.DataFrame
+        Post-qvals-join stop table; must carry ``stop_start``,
+        ``outcome_known_time``, ``occupancy_state``, and both post-outcome
+        covariates.
+
+    Returns
+    -------
+    gated : pd.DataFrame
+        Copy of ``stop`` with the post-outcome covariates set to NaN on
+        pre-outcome stops.
+    n_masked_by_state : pd.Series
+        Number of masked stops per ``occupancy_state`` category.
+    """
+    required = ("stop_start", "outcome_known_time", "occupancy_state")
+    missing = [
+        c for c in (*required, *POST_OUTCOME_COVARIATES) if c not in stop.columns
+    ]
+    if missing:
+        raise ValueError(
+            f"post-outcome gate needs {missing} on the joined stop table "
+            "(stop_start + occupancy_state from the stop table, "
+            "outcome_known_time from qvals_table)"
+        )
+    stop_start = stop["stop_start"].to_numpy(dtype=float)
+    outcome_known = stop["outcome_known_time"].to_numpy(dtype=float)
+    pre_outcome = stop_start < outcome_known
+    gated = stop.copy()
+    gated.loc[pre_outcome, list(POST_OUTCOME_COVARIATES)] = np.nan
+    n_masked_by_state = (
+        stop.loc[pre_outcome, "occupancy_state"].value_counts().astype(int)
+    )
+    return gated, n_masked_by_state
+
+
 def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
     stop = read_table(RC / "stop_table.pkl")
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
@@ -304,6 +362,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
     stop = add_uncertainty_covariates(stop)
     qcols = [
         "stop_id",
+        "outcome_known_time",
         "periswitch_index_trials",
         "is_periswitch_post",
         "trials_since_block_change",
@@ -334,6 +393,14 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
         n0,
         len(stop),
         100 * len(stop) / n0,
+    )
+    stop, n_masked_by_state = _mask_post_outcome_covariates(stop)
+    logger.info(
+        "post-outcome gate: %d stop(s) start before the outcome is known; "
+        "%s set to NaN (by occupancy_state: %s)",
+        int(n_masked_by_state.sum()),
+        ", ".join(POST_OUTCOME_COVARIATES),
+        n_masked_by_state.to_dict(),
     )
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
