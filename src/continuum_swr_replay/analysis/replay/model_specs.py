@@ -516,101 +516,6 @@ MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
 }
 
 
-# ── Rate models ──
-#
-# A DIFFERENT estimator from the arm/patch hierarchies: an ordinary
-# Poisson on the selected per-stop event count (``n_selected_events``) with a
-# ``log(immobility_duration_s)`` offset, fit by
-# ``per_stop_rate_model.fit_per_stop_rate_model``.
-# It carries an intercept, so — unlike the conditional Poisson —
-# stop-level constants do NOT cancel and ``is_after_*`` are valid
-# main effects.
-#
-# ``predictors=()`` for R0 means intercept-only (the offset is always
-# included by the fitter). Current-outcome indicators are intentionally absent
-# from R1: they are post-outcome quantities and do not have a stable
-# trial-relative relationship to the bout-start reward-history covariates.
-#
-# R1 uses the newest outcome observable by bout start. R2 adds
-# ``reward_fraction_last10_known_trials``
-# (rewarded fraction of the last 10 trials) — the stop-level analog
-# of the content hierarchy's reward-history axis
-# (``reward_fraction_candidate_arm_last10_visits``
-# at M3). R2 vs R1 tests whether replay *occurrence* tracks a deeper
-# reward history, not just the newest known outcome; it is
-# also the confound check for whether an M3 content effect is partly
-# a rate effect. Candidate-arm visit recency has no stop-level analog (every
-# trial visits some arm), so the rate hierarchy stops at R2.
-#
-# The hierarchy intentionally stops at R2. An ``is_swr_stop`` term
-# (1 if any timebin in the stop had an SWR) was dropped: ``n_selected_events``
-# counts non-local events, which overlap SWRs heavily by construction,
-# so ``is_swr_stop`` is largely tautological with the response and says
-# little about whether SWRs *drive* replay occurrence. The SWR-vs-non-SWR
-# question is answered at the event level (the ``swr_x_*`` content
-# interactions / SWR-split fits), not via the per-stop rate. A future
-# R-level term (+ ``trials_since_block_change``, ``block_number``) is
-# deferred until the contingency-block loader is wired.
-
-MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
-    "R0": ModelSpec(
-        name="R0",
-        predictors=(),
-        description="Null (intercept-only baseline event rate)",
-        parent=None,
-    ),
-    "R1": ModelSpec(
-        name="R1",
-        # ``known_reward_outcome_lag_1`` is the most recent outcome already observable at
-        # bout start. It can be the arrived trip's outcome after its physical
-        # feedback boundary or the preceding known outcome before that boundary;
-        # it is past-only, but not a fixed trial-relative index.
-        #
-        # The immediate-switch flag was removed from this general-purpose
-        # reward-history ladder: it is often constant within a session's
-        # complete-case cohort, which makes the design rank-deficient and
-        # rejects the whole session. See the naming spec's "Immediate switch
-        # is not a nuisance adjustment" section; a dedicated switch analysis
-        # uses ``patch_switch_fraction_last5_completed_trips`` instead.
-        predictors=("known_reward_outcome_lag_1",),
-        description="+ most-recent-known reward at bout start",
-        parent="R0",
-    ),
-    "R2": ModelSpec(
-        name="R2",
-        predictors=(
-            "known_reward_outcome_lag_1",
-            "reward_fraction_last10_known_trials",
-        ),
-        description="+ recent reward history (rewarded fraction, last 10 trials)",
-        parent="R1",
-    ),
-}
-
-# ── Lagged reward-kernel rate model ──
-#
-# A non-nested reparameterization of R2: instead of one most-recent-known
-# indicator (``known_reward_outcome_lag_1``) plus a smoothed window
-# (``reward_fraction_last10_known_trials``) — which overlap (lag-1 sits inside the window)
-# and conflate two timescales — model the reward outcome at each of the last
-# ``N_REWARD_LAGS`` trials as its own predictor. Reading the per-lag rate-ratio
-# kernel describes successive outcomes known by bout start. Lag 1 is the newest
-# known outcome, not uniformly the current or previous trial: the mapping changes
-# when the arrived trip crosses its physical outcome boundary. All lags are
-# past-only, but coefficient labels must not imply a fixed trial index.
-N_REWARD_LAGS = 10
-
-MODEL_PER_STOP_RATE["Rlag"] = ModelSpec(
-    name="Rlag",
-    # Immediate-switch flag removed (see R1) -- a constant switch column within
-    # a session's complete-case cohort makes this design rank-deficient.
-    predictors=tuple(
-        f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)
-    ),
-    description="Lagged reward kernel: 10 most-recent-known outcomes",
-    parent="R0",
-)
-
 # ── Reward-history raised-cosine basis ──
 #
 # The smooth replacement for the ten per-lag dummies: the same known-outcome lag
@@ -630,6 +535,81 @@ REWARD_HISTORY_COLUMNS = (
 )
 REWARD_HISTORY_INCOMPLETE = "reward_history_incomplete"
 
+# Span of the reward-history basis: the number of persisted known-outcome lag
+# columns the bumps are built over (``reward_basis_from_lags``).
+N_REWARD_LAGS = REWARD_HISTORY_N_LAGS
+
+
+# ── Rate models ──
+#
+# A DIFFERENT estimator from the arm/patch hierarchies: an ordinary
+# Poisson on the selected per-stop event count (``n_selected_events``) with a
+# ``log(immobility_duration_s)`` offset, fit by
+# ``per_stop_rate_model.fit_per_stop_rate_model``.
+# It carries an intercept, so — unlike the conditional Poisson —
+# stop-level constants do NOT cancel and ``is_after_*`` are valid
+# main effects.
+#
+# ``predictors=()`` for R0 means intercept-only (the offset is always
+# included by the fitter). Current-outcome indicators are intentionally absent
+# from R1: they are post-outcome quantities and do not have a stable
+# trial-relative relationship to the bout-start reward-history covariates.
+#
+# R1 carries the whole reward history in three numbers: the known-outcome lag
+# vector projected onto the log-spaced raised-cosine basis
+# (``REWARD_HISTORY_COLUMNS``), plus the structural-missingness indicator
+# ``REWARD_HISTORY_INCOMPLETE``. It is the stop-level analog of the content
+# hierarchy's reward-history axis (``reward_fraction_candidate_arm_last10_visits``
+# at M3): R1 vs R0 tests whether replay *occurrence* tracks reward history at
+# all, and is the confound check for whether an M3 content effect is partly a
+# rate effect. The basis replaces both the single newest-outcome indicator and
+# the overlapping window-10 fraction — one smooth kernel instead of two
+# encodings of the same history at two timescales. Candidate-arm visit recency
+# has no stop-level analog (every trial visits some arm), so the rate hierarchy
+# stops at R1.
+#
+# The hierarchy intentionally stops at R1. An ``is_swr_stop`` term
+# (1 if any timebin in the stop had an SWR) was dropped: ``n_selected_events``
+# counts non-local events, which overlap SWRs heavily by construction,
+# so ``is_swr_stop`` is largely tautological with the response and says
+# little about whether SWRs *drive* replay occurrence. The SWR-vs-non-SWR
+# question is answered at the event level (the ``swr_x_*`` content
+# interactions / SWR-split fits), not via the per-stop rate. A future
+# R-level term (+ ``trials_since_block_change``, ``block_number``) is
+# deferred until the contingency-block loader is wired.
+
+MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
+    "R0": ModelSpec(
+        name="R0",
+        predictors=(),
+        description="Null (intercept-only baseline event rate)",
+        parent=None,
+    ),
+    "R1": ModelSpec(
+        name="R1",
+        # The reward-history basis is closed at the **outcome** clock: the
+        # lag vector holds outcomes already observable at bout start, so lag 1
+        # can be the arrived trip's outcome after its physical feedback
+        # boundary or the preceding known outcome before it. Past-only, but not
+        # a fixed trial-relative index.
+        #
+        # ``reward_history_incomplete`` is the structural-missingness nuisance
+        # main effect for stops whose slowest bump has no known outcome in its
+        # support (fewer than two known outcomes, features zero-filled). It is
+        # fit, never reported.
+        #
+        # The immediate-switch flag was removed from this general-purpose
+        # reward-history ladder: it is often constant within a session's
+        # complete-case cohort, which makes the design rank-deficient and
+        # rejects the whole session. See the naming spec's "Immediate switch
+        # is not a nuisance adjustment" section; a dedicated switch analysis
+        # uses ``patch_switch_fraction_last5_completed_trips`` instead.
+        predictors=(*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE),
+        description="+ reward history (raised-cosine basis over the last 10 known outcomes)",
+        parent="R0",
+    ),
+}
+
 
 # ── Per-bin conditional-intensity ladder (Family B) ──
 #
@@ -645,10 +625,10 @@ REWARD_HISTORY_INCOMPLETE = "reward_history_incomplete"
 # offset, so the within-stop time course is modelled explicitly by a spline
 # rather than averaged into a per-stop dwell correction.
 #
-# The four blocks (time-since-stop spline, self-history/autoregressive, reward
-# [lag-1 / kernel / continuous rate], switch) toggle independently so each
-# block's contribution is readable with and without the time course, plus the
-# reward x time interaction. ALL models share one bin width ``BIN_S`` so the
+# The three blocks (time-since-stop spline, self-history/autoregressive,
+# reward-history basis) toggle independently so each block's contribution is
+# readable with and without the time course, plus the reward x time
+# interaction. ALL models share one bin width ``BIN_S`` so the
 # ladder is nested and AIC / CV / deviance / GOF are directly comparable (fine
 # bins are required anyway for the self-history term and time-rescaling GOF).
 BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
@@ -664,12 +644,13 @@ SPLINE_KNOTS = (1.0, 2.0, 3.0)
 _SPLINE = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX})"
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
 N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
-# Per-stop covariates the ladder needs beyond the reward/self-history lags
-# (M2r's continuous reward rate) — carried into the per-bin design by
+# Per-stop covariates the shipped ladder needs beyond the reward-history basis
+# and the self-history lags — carried into the per-bin design by
 # aggregate_to_timebins. Shared by the fitter orchestrator and the
-# model-checking plotter so the inline refit matches the persisted fits.
-# The immediate-switch term was retired with the M8 rung (see R1).
-STOP_COVARIATES = ("reward_fraction_last10_known_trials",)
+# model-checking plotter so the inline refit matches the persisted fits. Empty:
+# the reward-history basis is requested by ``reward_basis``, not as a covariate,
+# and the immediate-switch term was retired with the M8 rung (see R1).
+STOP_COVARIATES: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -688,12 +669,15 @@ class PerBinRateModelSpec:
         Short identifier (e.g. ``"M0_const"``).
     time_spline : bool
         Include the fixed-knot ``bs(tc, ...)`` within-stop time-course spline.
-    reward_lags : int
-        Number of ``known_reward_outcome_lag_{j}`` terms (0, 1, or ``N_REWARD_LAGS``). Past
-        trial outcomes; omission == ``1 - reward`` (same regressor).
+    reward_basis : int
+        Number of reward-history raised-cosine features (0 or
+        ``REWARD_HISTORY_N_BASIS``). When > 0 the rung carries
+        ``REWARD_HISTORY_COLUMNS`` plus the structural-missingness nuisance
+        main effect ``REWARD_HISTORY_INCOMPLETE``. Features are weighted
+        fractions of past known outcomes; omission == ``1 - reward``.
     reward_rate : bool
-        Include ``reward_fraction_last10_known_trials`` (continuous; an alternative
-        encoding of reward history to the lag kernel).
+        Include ``reward_fraction_last10_known_trials`` (continuous). No shipped
+        rung sets it; the column must then be supplied via ``stop_covariates``.
     self_history_lags : int
         Number of ``onset_lag{j}`` terms (0 or ``N_HISTORY_LAGS``); the
         within-stop autoregressive / refractoriness block.
@@ -705,8 +689,8 @@ class PerBinRateModelSpec:
         design rank-deficient. No shipped spec sets this, and ``formula`` no
         longer reads it.
     reward_time_interaction : bool
-        Include ``known_reward_outcome_lag_1 : bs(tc, ...)`` — does reward modulate
-        the time course?
+        Include ``reward_history_rcos_0 : bs(tc, ...)`` — does the immediate
+        reward-history component modulate the time course?
     description : str
         Human-readable description.
     parent : str | None
@@ -715,7 +699,7 @@ class PerBinRateModelSpec:
 
     name: str
     time_spline: bool
-    reward_lags: int
+    reward_basis: int
     reward_rate: bool
     self_history_lags: int
     switch: bool
@@ -747,6 +731,12 @@ class PerBinRateModelSpec:
     extra_covariates: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if self.reward_basis not in (0, REWARD_HISTORY_N_BASIS):
+            raise ValueError(
+                "PerBinRateModelSpec.reward_basis must be 0 or "
+                f"{REWARD_HISTORY_N_BASIS} (the shipped reward-history basis "
+                f"width); got {self.reward_basis}."
+            )
         if self.switch:
             raise ValueError(
                 "PerBinRateModelSpec.switch is retired: the per-bin switch "
@@ -761,9 +751,11 @@ class PerBinRateModelSpec:
         terms: list[str] = []
         if self.time_spline:
             terms.append(_SPLINE)
-        terms += [
-            f"known_reward_outcome_lag_{j}" for j in range(1, self.reward_lags + 1)
-        ]
+        if self.reward_basis:
+            terms += [
+                *REWARD_HISTORY_COLUMNS[: self.reward_basis],
+                REWARD_HISTORY_INCOMPLETE,
+            ]
         if self.reward_rate:
             terms.append("reward_fraction_last10_known_trials")
         if self.self_history_basis:
@@ -777,12 +769,12 @@ class PerBinRateModelSpec:
         # ``switch`` is retired (see the field docstring); the completed-trip
         # switch flag is never added to a per-bin model.
         if self.reward_time_interaction:
-            terms.append(f"known_reward_outcome_lag_1:{_SPLINE}")
+            terms.append(f"{REWARD_HISTORY_COLUMNS[0]}:{_SPLINE}")
         terms += list(self.extra_covariates)
         return "count ~ " + (" + ".join(terms) if terms else "1")
 
 
-_N = N_REWARD_LAGS
+_NB = REWARD_HISTORY_N_BASIS
 # Each spec is built with keyword arguments so the toggle each model turns on is
 # readable in place (which term the rung adds vs. its parent), rather than being
 # decoded from argument position. ``switch`` is retired and stays False.
@@ -790,7 +782,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M0_const": PerBinRateModelSpec(
         name="M0_const",
         time_spline=False,
-        reward_lags=0,
+        reward_basis=0,
         reward_rate=False,
         self_history_lags=0,
         switch=False,
@@ -798,43 +790,21 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="homogeneous Poisson baseline",
         parent=None,
     ),
-    "M1_rew1": PerBinRateModelSpec(
-        name="M1_rew1",
+    "M1_rew": PerBinRateModelSpec(
+        name="M1_rew",
         time_spline=False,
-        reward_lags=1,
+        reward_basis=_NB,
         reward_rate=False,
         self_history_lags=0,
         switch=False,
         reward_time_interaction=False,
-        description="+ most-recent-known reward at bout start (known_reward_outcome_lag_1)",
-        parent="M0_const",
-    ),
-    "M2_rewhist": PerBinRateModelSpec(
-        name="M2_rewhist",
-        time_spline=False,
-        reward_lags=_N,
-        reward_rate=False,
-        self_history_lags=0,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ reward history kernel (known_reward_outcome_lag_1..10)",
-        parent="M1_rew1",
-    ),
-    "M2r_rewrate": PerBinRateModelSpec(
-        name="M2r_rewrate",
-        time_spline=False,
-        reward_lags=0,
-        reward_rate=True,
-        self_history_lags=0,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ recent reward rate (continuous; alt to kernel)",
+        description="+ reward history (raised-cosine basis over the last 10 known outcomes)",
         parent="M0_const",
     ),
     "M3_hist": PerBinRateModelSpec(
         name="M3_hist",
         time_spline=False,
-        reward_lags=0,
+        reward_basis=0,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -845,7 +815,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M4_hist_rew": PerBinRateModelSpec(
         name="M4_hist_rew",
         time_spline=False,
-        reward_lags=_N,
+        reward_basis=_NB,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -856,7 +826,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M5_time": PerBinRateModelSpec(
         name="M5_time",
         time_spline=True,
-        reward_lags=0,
+        reward_basis=0,
         reward_rate=False,
         self_history_lags=0,
         switch=False,
@@ -867,7 +837,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M6_time_hist": PerBinRateModelSpec(
         name="M6_time_hist",
         time_spline=True,
-        reward_lags=0,
+        reward_basis=0,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -878,7 +848,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M7_time_hist_rew": PerBinRateModelSpec(
         name="M7_time_hist_rew",
         time_spline=True,
-        reward_lags=_N,
+        reward_basis=_NB,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -894,7 +864,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M9_rew_x_time": PerBinRateModelSpec(
         name="M9_rew_x_time",
         time_spline=True,
-        reward_lags=_N,
+        reward_basis=_NB,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -908,7 +878,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M3r_histcos": PerBinRateModelSpec(
         name="M3r_histcos",
         time_spline=False,
-        reward_lags=0,
+        reward_basis=0,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -920,7 +890,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     "M7r_time_histcos_rew": PerBinRateModelSpec(
         name="M7r_time_histcos_rew",
         time_spline=True,
-        reward_lags=_N,
+        reward_basis=_NB,
         reward_rate=False,
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
@@ -1015,12 +985,10 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
 # Reuses the module-level _SPLINE / N_REWARD_LAGS / N_HISTORY_BASIS defined above.
 
 # --- Rate is_swr-contrast ladder (per-bin Poisson: G0-G8 stratified, S0-S10 contrast) ---
-_REWK_PREV = " + ".join(
-    f"known_reward_outcome_lag_{j}" for j in range(2, N_REWARD_LAGS + 1)
-)
+_REWBASIS = " + ".join(REWARD_HISTORY_COLUMNS)
 _HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
 _BLOCK_F = {
-    "BASE": f"{_SPLINE} + known_reward_outcome_lag_1 + {_REWK_PREV} + {_HISTCOS}",
+    "BASE": f"{_SPLINE} + {_REWBASIS} + {_HISTCOS}",
     "PERISWITCH": (
         "periswitch_index_trials + is_periswitch_post + "
         "periswitch_index_trials:is_periswitch_post"
@@ -1033,12 +1001,14 @@ _BLOCK_F = {
     "RPE": "rpe_postoutcome",  # beta reward prediction error (reward - q_chosen)
     "UNCERT": "reward_belief_differential_entropy_leaf_mean_preoutcome",  # beta belief entropy (per-leaf Beta differential entropy)
     "UPDATE": "reward_belief_mean_update_l1_all_ports_postoutcome",  # beta value-update magnitude
-    "REWXTIME": f"known_reward_outcome_lag_1:{_SPLINE}",  # reward x within-stop time course (dwell-shape)
+    # immediate reward-history component x within-stop time course (dwell-shape)
+    "REWXTIME": f"{REWARD_HISTORY_COLUMNS[0]}:{_SPLINE}",
 }
 _BLOCK_COLS = {
     "BASE": [
         "tc",
-        *[f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)],
+        *REWARD_HISTORY_COLUMNS,
+        REWARD_HISTORY_INCOMPLETE,
         *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)],
     ],
     "PERISWITCH": ["periswitch_index_trials", "is_periswitch_post"],
@@ -1048,7 +1018,7 @@ _BLOCK_COLS = {
     "RPE": ["rpe_postoutcome"],
     "UNCERT": ["reward_belief_differential_entropy_leaf_mean_preoutcome"],
     "UPDATE": ["reward_belief_mean_update_l1_all_ports_postoutcome"],
-    "REWXTIME": ["known_reward_outcome_lag_1", "tc"],
+    "REWXTIME": [REWARD_HISTORY_COLUMNS[0], "tc"],
 }
 SWR_CONTRAST_RATE_STOP_COVARS = tuple(
     c
@@ -1066,6 +1036,9 @@ def _blocks_cols(blocks):
 
 
 def _g_specs():
+    """Stratified rungs. ``REWARD_HISTORY_INCOMPLETE`` is appended as a plain
+    main effect (it is a structural-missingness nuisance, never a dimension the
+    ladder reports)."""
     ladders = {
         "G0_base": ["BASE"],
         "G1_periswitch": ["BASE", "PERISWITCH"],
@@ -1077,10 +1050,14 @@ def _g_specs():
         "G7_update": ["BASE", "UPDATE"],
         "G8_rewxtime": ["BASE", "REWXTIME"],
     }
-    return {n: (_blocks_formula(b), _blocks_cols(b)) for n, b in ladders.items()}
+    return {
+        n: (f"{_blocks_formula(b)} + {REWARD_HISTORY_INCOMPLETE}", _blocks_cols(b))
+        for n, b in ladders.items()
+    }
 
 
 def _s_specs():
+    """is_swr-contrast rungs; see :func:`_g_specs` for the indicator."""
     b = _BLOCK_F
     base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
     val, rpe, unc, upd, rxt = (
@@ -1092,7 +1069,10 @@ def _s_specs():
     )
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
-        "S1_rew1": (f"{base} + is_swr + is_swr:known_reward_outcome_lag_1", ["BASE"]),
+        "S1_rew": (
+            f"{base} + is_swr + is_swr:{REWARD_HISTORY_COLUMNS[0]}",
+            ["BASE"],
+        ),
         "S2_base": (f"is_swr * ({base})", ["BASE"]),
         "S3_periswitch": (f"is_swr * ({base} + {peri})", ["BASE", "PERISWITCH"]),
         "S4_block": (f"is_swr * ({base} + {blk})", ["BASE", "BLOCK"]),
@@ -1103,7 +1083,13 @@ def _s_specs():
         "S9_update": (f"is_swr * ({base} + {upd})", ["BASE", "UPDATE"]),
         "S10_rewxtime": (f"is_swr * ({base} + {rxt})", ["BASE", "REWXTIME"]),
     }
-    return {n: (f, _blocks_cols(bl)) for n, (f, bl) in raw.items()}
+    # The missingness indicator is appended OUTSIDE the ``is_swr * (...)``
+    # expansion: it is a nuisance main effect, and an is_swr:incomplete
+    # interaction would report a contrast of structural missingness.
+    return {
+        n: (f"{f} + {REWARD_HISTORY_INCOMPLETE}", _blocks_cols(bl))
+        for n, (f, bl) in raw.items()
+    }
 
 
 SWR_CONTRAST_RATE_G_SPECS = _g_specs()

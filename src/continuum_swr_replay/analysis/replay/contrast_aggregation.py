@@ -57,8 +57,6 @@ BINARY_TERMS = frozenset(
         "is_last_rewarded_noncurrent_patch",
         "swr_x_is_current_patch",
         "swr_x_is_last_rewarded_noncurrent_patch",
-        "known_reward_outcome_lag_1",
-        "is_swr:known_reward_outcome_lag_1",
     }
 )
 

@@ -50,7 +50,10 @@ def two_stop_design() -> tuple[pd.DataFrame, pd.DataFrame]:
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
             "immobility_duration_s": [0.25, 0.85],
-            "known_reward_outcome_lag_1": [1.0, 0.0],
+            "reward_history_rcos_0": [1.0, 0.0],
+            "reward_history_rcos_1": [0.8, 0.2],
+            "reward_history_rcos_2": [0.6, 0.4],
+            "reward_history_incomplete": [0.0, 0.0],
         }
     )
     onsets = pd.DataFrame(
@@ -65,7 +68,7 @@ def two_stop_design() -> tuple[pd.DataFrame, pd.DataFrame]:
 def test_aggregate_exposure_and_lags(two_stop_design):
     stops, onsets = two_stop_design
     df = aggregate_to_timebins(
-        stops, onsets, bin_s=0.1, tmax=0.5, reward_lags=1, self_history_lags=1
+        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True, self_history_lags=1
     )
 
     s1 = df[df.stop_id == 1].sort_values("binj")
@@ -92,9 +95,15 @@ def test_aggregate_exposure_and_lags(two_stop_design):
     assert s1.onset_lag1.tolist() == [0.0, 1.0, 1.0]
     assert s2.onset_lag1.tolist() == [0.0, 0.0, 0.0, 1.0, 0.0]
 
-    # Per-stop covariate carried by stop_id.
-    assert (s1.known_reward_outcome_lag_1 == 1.0).all()
-    assert (s2.known_reward_outcome_lag_1 == 0.0).all()
+    # Per-stop covariates carried by stop_id: every basis feature plus the
+    # structural-missingness indicator.
+    assert (s1.reward_history_rcos_0 == 1.0).all()
+    assert (s1.reward_history_rcos_1 == 0.8).all()
+    assert (s1.reward_history_rcos_2 == 0.6).all()
+    assert (s2.reward_history_rcos_0 == 0.0).all()
+    assert (s2.reward_history_rcos_1 == 0.2).all()
+    assert (s2.reward_history_rcos_2 == 0.4).all()
+    assert (df.reward_history_incomplete == 0.0).all()
 
 
 def test_aggregate_drops_zero_immobility():
@@ -185,7 +194,7 @@ def test_history_basis_requires_lags():
 
 
 def test_reward_groupby_drops_nan_reward():
-    """Stops with NaN known_reward_outcome_lag_1 vanish from a reward groupby.
+    """Stops with a NaN reward-history feature vanish from a reward groupby.
 
     The reward GLMs rely on pandas' default ``dropna=True`` to reproduce the
     old explicit ``reward.notna()`` filter when collapsing the (stop x bin)
@@ -198,17 +207,20 @@ def test_reward_groupby_drops_nan_reward():
             "epoch": ["02_r1", "02_r1"],
             "stop_id": [1, 2],
             "immobility_duration_s": [0.3, 0.3],
-            "known_reward_outcome_lag_1": [1.0, np.nan],
+            "reward_history_rcos_0": [1.0, np.nan],
+            "reward_history_rcos_1": [1.0, np.nan],
+            "reward_history_rcos_2": [1.0, np.nan],
+            "reward_history_incomplete": [0.0, 0.0],
         }
     )
     onsets = pd.DataFrame(
         {"stop_id": [1, 2], "t_since_stop_onset": [0.05, 0.05]}
     )
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_lags=1)
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
     assert {1, 2} <= set(df.stop_id)  # both stops produce bins
-    cells = df.groupby(["known_reward_outcome_lag_1", "binj"], as_index=False)["count"].sum()
-    assert cells["known_reward_outcome_lag_1"].notna().all()  # NaN-reward stop excluded
-    assert set(cells["known_reward_outcome_lag_1"]) == {1.0}
+    cells = df.groupby(["reward_history_rcos_0", "binj"], as_index=False)["count"].sum()
+    assert cells["reward_history_rcos_0"].notna().all()  # NaN-reward stop excluded
+    assert set(cells["reward_history_rcos_0"]) == {1.0}
 
 
 # ── Real-session slice for attach_is_swr_to_onsets ──

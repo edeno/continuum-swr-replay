@@ -20,7 +20,7 @@ def _reconciles(rec: dict) -> bool:
     return rec["n_in"] - sum(rec[f] for f in DROP_FIELDS) == rec["n_modeled"]
 
 
-def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardlag_nan=3, seed=0):
+def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardbasis_nan=3, seed=0):
     rng = np.random.default_rng(seed)
     frames = []
     for animal, session_date in [("a", 1), ("b", 2)]:
@@ -32,17 +32,19 @@ def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardlag_nan=3, seed=0)
                 "epoch": "e",
                 "immobility_duration_s": rng.uniform(5, 30, n),
                 **{
-                    f"known_reward_outcome_lag_{j}": rng.integers(0, 2, n).astype(float)
-                    for j in range(1, 11)
+                    f"reward_history_rcos_{k}": rng.uniform(0, 1, n)
+                    for k in range(3)
                 },
+                "reward_history_incomplete": 0.0,
             }
         )
         frames.append(df)
     stop = pd.concat(frames, ignore_index=True)
     stop.loc[: n_immobility_bad - 1, "immobility_duration_s"] = 0.0  # immobility<=0 own-drop
     stop.loc[
-        n_immobility_bad : n_immobility_bad + n_rewardlag_nan - 1, "known_reward_outcome_lag_1"
-    ] = np.nan  # known_reward_outcome_lag_1 NaN own-drop (only reward-using models)
+        n_immobility_bad : n_immobility_bad + n_rewardbasis_nan - 1,
+        "reward_history_rcos_0",
+    ] = np.nan  # basis-feature NaN own-drop (only reward-using models)
     return stop
 
 
@@ -51,7 +53,7 @@ def test_per_bin_records_attribute_own_drops():
 
     stop = _stop_table()
     total = len(stop)
-    # Synthetic models: M0_const and M1_rew1 fit on 'non_local' for both sessions.
+    # Synthetic models: M0_const and M1_rew fit on 'non_local' for both sessions.
     models = pd.DataFrame(
         [
             {
@@ -64,7 +66,7 @@ def test_per_bin_records_attribute_own_drops():
                 "converged": True,
                 "separated": False,
             }
-            for m in ("M0_const", "M1_rew1")
+            for m in ("M0_const", "M1_rew")
             for a, d in [("a", 1), ("b", 2)]
         ]
     )
@@ -73,10 +75,10 @@ def test_per_bin_records_attribute_own_drops():
 
     by = {(r["model"], r["population"]): r for r in recs}
     m0 = by[("M0_const", "non_local")]
-    m1 = by[("M1_rew1", "non_local")]
-    # Const rung uses no reward lag -> own drops are only the immobility<=0 stops.
+    m1 = by[("M1_rew", "non_local")]
+    # Const rung uses no reward history -> own drops are only the immobility<=0 stops.
     assert m0["n_drop_own_predictor_missing"] == 2
-    # Reward rung additionally drops the known_reward_outcome_lag_1 NaN stops.
+    # Reward rung additionally drops the NaN basis-feature stops.
     assert m1["n_drop_own_predictor_missing"] == 5
     # n_modeled is the fitter's stop count (2 sessions x 15), not "all stops of session".
     assert m0["n_modeled"] == 30
@@ -110,7 +112,7 @@ def test_contrast_records_attribute_qvals_and_own():
 
     g0 = {(r["model"], r["population"]): r for r in recs}[("G0_base", "all")]
     assert g0["n_drop_qvals_gap"] == 7  # the inner-join drop (mechanism B)
-    # G0_base's need includes known_reward_outcome_lag_1 -> immobility(2) + known_reward_outcome_lag_1 NaN(3) = 5 own.
+    # G0_base's need includes reward_history_rcos_0 -> immobility(2) + NaN feature(3) = 5 own.
     assert g0["n_drop_own_predictor_missing"] == 5
     assert g0["n_modeled"] == 24  # 2 sessions x 12, the fitter's stop count
     assert g0["n_in"] == len(stop) + 7
@@ -132,9 +134,10 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
                     "epoch": "e",
                     "immobility_duration_s": rng.uniform(5, 30, 15),
                     **{
-                        f"known_reward_outcome_lag_{j}": rng.integers(0, 2, 15).astype(float)
-                        for j in range(1, 11)
+                        f"reward_history_rcos_{k}": rng.uniform(0, 1, 15)
+                        for k in range(3)
                     },
+                    "reward_history_incomplete": 0.0,
                 }
             )
             for a, d in [("a", 2), ("b", 3)]
@@ -368,9 +371,10 @@ def test_per_stop_hierarchy_records_reconcile():
                     "n_selected_events": rng.poisson(2, n).astype(float),
                     "immobility_duration_s": rng.uniform(5, 30, n),
                     **{
-                        f"known_reward_outcome_lag_{j}": rng.integers(0, 2, n).astype(float)
-                        for j in range(1, 11)
+                        f"reward_history_rcos_{k}": rng.uniform(0, 1, n)
+                        for k in range(3)
                     },
+                    "reward_history_incomplete": 0.0,
                     "is_after_omission": rng.integers(0, 2, n).astype(float),
                     "did_last_completed_trip_switch_patch": rng.integers(0, 2, n).astype(float),
                     "recent_trial_reward_rate": rng.uniform(0, 1, n),

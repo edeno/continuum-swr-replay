@@ -9,22 +9,23 @@ multiplicative changes in event rate per second of immobility.
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):
 
 - **R0**: intercept only — baseline event rate.
-- **R1**: + ``known_reward_outcome_lag_1`` — does the newest outcome physically observable
-  by bout start change the event rate? (The immediate-switch flag was
-  removed: it is often constant within a session's complete-case cohort,
-  making the design rank-deficient.) ``known_reward_outcome_lag_1`` is closed at the
-  **outcome** clock: pump onset
-  when rewarded, otherwise arrival plus ``OMISSION_KNOWN_LATENCY_SEC`` capped
-  at the collapsed task visit's final departure. Before an arrived trip reaches
-  that boundary, lag 1 remains
-  the preceding known outcome; afterward it names the arrived trip. It is
-  therefore past-only but not a fixed current- or previous-trial index.
-- **R2**: + ``reward_fraction_last10_known_trials`` (rewarded fraction of the
-  last 10 trials) — does event rate track a deeper reward history,
-  beyond the single previous trial?
+- **R1**: + the reward-history raised-cosine basis
+  (``reward_history_rcos_0..2``) and its structural-missingness indicator
+  ``reward_history_incomplete`` — does the event rate track recent reward
+  history? (The immediate-switch flag was removed: it is often constant within
+  a session's complete-case cohort, making the design rank-deficient.) The
+  features are weighted fractions of the outcomes already known at bout start;
+  each known outcome is closed at the **outcome** clock: pump onset when
+  rewarded, otherwise arrival plus ``OMISSION_KNOWN_LATENCY_SEC`` capped at the
+  collapsed task visit's final departure. Before an arrived trip reaches that
+  boundary, the newest known outcome remains the preceding one; afterward it
+  names the arrived trip. The basis is therefore past-only but not a fixed
+  current- or previous-trial index. ``reward_history_incomplete`` is a nuisance
+  main effect (fit, never reported) for stops with fewer than two known
+  outcomes, whose features are zero-filled.
 
-A future R3 (+ ``trials_since_block_change``, ``block_number``) is
-deferred until the contingency-block loader is wired. Fitting R0-R2
+A future R2 (+ ``trials_since_block_change``, ``block_number``) is
+deferred until the contingency-block loader is wired. Fitting R0-R1
 separately on SWR-only / MUA-only / neither stops is an analysis
 variant, not a separate model.
 

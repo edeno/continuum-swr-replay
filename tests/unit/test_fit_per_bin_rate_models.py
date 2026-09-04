@@ -40,13 +40,17 @@ def _toy_tables(n_stops_per_session: int = 24, seed: int = 0):
     for animal, session_date, epoch in [("a", 1, "02_r1"), ("b", 1, "02_r1")]:
         for _ in range(n_stops_per_session):
             immob = float(rng.uniform(0.3, 0.7))
-            reward = float(sid % 2)
+            # Every twelfth stop is structurally incomplete: features zero-filled,
+            # indicator 1, baseline rate (the persisted stop-table contract).
+            incomplete = float(sid % 12 == 0)
+            reward = 0.0 if incomplete else float(sid % 2)
             stop_rows.append({
                 "animal": animal, "session_date": session_date, "epoch": epoch, "stop_id": sid,
                 "immobility_duration_s": immob,
-                **{f"known_reward_outcome_lag_{j}": float(rng.integers(0, 2)) for j in range(1, 11)},
-                "known_reward_outcome_lag_1": reward,
-                "reward_fraction_last10_known_trials": float(rng.uniform(0, 1)),
+                "reward_history_rcos_0": reward,
+                "reward_history_rcos_1": 0.0 if incomplete else float(rng.uniform(0, 1)),
+                "reward_history_rcos_2": 0.0 if incomplete else float(rng.uniform(0, 1)),
+                "reward_history_incomplete": incomplete,
                 "did_last_completed_trip_switch_patch": float(rng.integers(0, 2)),
             })
             # onset times within the stop; rewarded stops get more events.
@@ -75,7 +79,7 @@ def test_tidy_schema():
     assert len(out) > 0
     expected_cols = {
         "outcome", "model", "animal", "session_date", "epoch",
-        "rr_known_reward_outcome_lag_1", "n_bins", "n_events", "aic", "deviance", "dispersion",
+        "rr_reward_history_rcos_0", "n_bins", "n_events", "aic", "deviance", "dispersion",
         "ks_statistic", "ks_within_band",
         "cv_ll_per_bin_mean", "cv_bits_per_event", "cv_n_folds",
     }
@@ -88,7 +92,14 @@ def test_tidy_schema():
     # The core (always-identifiable) models must be present for every outcome.
     for outcome in POPULATIONS:
         sub_models = set(out[out.outcome == outcome]["model"])
-        assert {"M0_const", "M1_rew1", "M5_time"} <= sub_models
+        assert {"M0_const", "M1_rew", "M5_time"} <= sub_models
+
+    # The planted immediate-reward effect (12 vs 6 Hz) is recovered by the
+    # reward-history rung as a rate ratio near 2 on the immediate component.
+    m1 = out[(out.model == "M1_rew") & (out.outcome == "non_local")]
+    rr = m1["rr_reward_history_rcos_0"].dropna()
+    assert len(rr) == 2  # both sessions
+    assert rr.between(1.5, 2.7).all()
 
     # 'predicted' (the per-bin Series) must not leak into the tidy table.
     assert "predicted" not in out.columns

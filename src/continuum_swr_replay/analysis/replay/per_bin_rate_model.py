@@ -16,10 +16,10 @@ A is the simple, literature-comparable dwell-offset rate; Family B is the
 confound-free conditional intensity that can be checked as a point process
 (time-rescaling KS, rescaled-ISI independence) via :func:`per_bin_rate_gof`.
 
-The ladder (``MODEL_PER_BIN_RATE`` in ``model_specs.py``) toggles four blocks
-(time spline, self-history, reward [lag-1 / kernel / continuous rate], switch)
-plus the reward x time interaction, all at one bin width (``BIN_S``) so the
-models are nested and AIC / CV / deviance / GOF are directly comparable.
+The ladder (``MODEL_PER_BIN_RATE`` in ``model_specs.py``) toggles three blocks
+(time spline, self-history, reward-history raised-cosine basis) plus the
+reward x time interaction, all at one bin width (``BIN_S``) so the models are
+nested and AIC / CV / deviance / GOF are directly comparable.
 """
 
 from __future__ import annotations
@@ -38,7 +38,11 @@ from ._fit_diagnostics import (
     count_fit_quality_warnings,
     fit_status,
 )
-from .model_specs import PerBinRateModelSpec
+from .model_specs import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+    PerBinRateModelSpec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +66,10 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     cols = ["count"]
     if spec.time_spline or spec.reward_time_interaction:
         cols.append("tc")
-    cols += [f"known_reward_outcome_lag_{j}" for j in range(1, spec.reward_lags + 1)]
-    if spec.reward_time_interaction and spec.reward_lags == 0:
-        cols.append("known_reward_outcome_lag_1")
+    if spec.reward_basis:
+        cols += [*REWARD_HISTORY_COLUMNS[: spec.reward_basis], REWARD_HISTORY_INCOMPLETE]
+    if spec.reward_time_interaction and not spec.reward_basis:
+        cols.append(REWARD_HISTORY_COLUMNS[0])
     if spec.reward_rate:
         cols.append("reward_fraction_last10_known_trials")
     if spec.self_history_basis:
@@ -113,8 +118,9 @@ def fit_per_bin_rate_model(
         ``dispersion`` (= ``deviance / df_resid``), and ``predicted`` (the
         per-bin fitted mean count as a ``pd.Series`` indexed by the retained
         design rows, for :func:`per_bin_rate_gof`). ``None`` if columns are
-        missing, too few bins/events, fewer than two reward levels when reward
-        terms are present, or statsmodels raises a genuine numerical failure
+        missing, too few bins/events, fewer than two distinct
+        ``reward_history_rcos_0`` values when reward terms are present, or
+        statsmodels raises a genuine numerical failure
         (rank deficiency / convergence error -> caught -> ``None``, never a
         crash).
 
@@ -141,11 +147,13 @@ def fit_per_bin_rate_model(
             spec.name, len(df), n_events, min_bins, min_events,
         )
         return None
-    # Reward coefficients are unidentified without contrast in known_reward_outcome_lag_1.
-    if (spec.reward_lags >= 1 or spec.reward_time_interaction) and (
-        df["known_reward_outcome_lag_1"].nunique() < 2
+    # Reward coefficients are unidentified without contrast in the immediate
+    # reward-history component.
+    immediate = REWARD_HISTORY_COLUMNS[0]
+    if (spec.reward_basis or spec.reward_time_interaction) and (
+        df[immediate].nunique() < 2
     ):
-        logger.debug("%s: <2 known_reward_outcome_lag_1 levels, reward terms unidentified", spec.name)
+        logger.debug("%s: <2 %s levels, reward terms unidentified", spec.name, immediate)
         return None
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))

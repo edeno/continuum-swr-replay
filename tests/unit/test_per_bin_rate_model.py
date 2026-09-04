@@ -14,6 +14,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import (
     MODEL_PER_BIN_RATE,
+    REWARD_HISTORY_N_BASIS,
     PerBinRateModelSpec,
     aggregate_to_timebins,
     cross_validate_per_bin_rate_model,
@@ -34,27 +35,36 @@ def make_per_bin_rate_design(
 ) -> pd.DataFrame:
     """Simulate an ``aggregate_to_timebins``-shaped design with known truth.
 
-    Half the stops are rewarded (``known_reward_outcome_lag_1 == 1``); rewarded bins draw their
-    onset count from a Poisson with ``base_rate * reward_effect`` (times the
-    optional ``time_profile(tc)``), so the true per-bin reward rate ratio is
-    ``reward_effect`` and the true time course is ``time_profile``.
+    Half the complete stops have the immediate reward-history component at 1
+    (``reward_history_rcos_0 == 1``); their bins draw their onset count from a
+    Poisson with ``base_rate * reward_effect`` (times the optional
+    ``time_profile(tc)``), so the true per-bin rate ratio on
+    ``reward_history_rcos_0`` is ``reward_effect`` and the true time course is
+    ``time_profile``. The slower components carry independent noise and every
+    tenth stop is structurally incomplete (features zero-filled, indicator 1,
+    baseline rate), mirroring the persisted stop-table contract.
     """
     rng = np.random.default_rng(seed)
     recs = []
     for s in range(n_stops):
-        reward = float(s % 2)
+        incomplete = float(s % 10 == 0)
+        reward = 0.0 if incomplete else float(s % 2)
+        rcos1 = 0.0 if incomplete else float(rng.uniform(0, 1))
+        rcos2 = 0.0 if incomplete else float(rng.uniform(0, 1))
         for b in range(n_bins):
             tc = (b + 0.5) * bin_s
             tp = time_profile(tc) if time_profile is not None else 1.0
             mu = base_rate * tp * (reward_effect if reward else 1.0)
             recs.append(
-                ("sim", 1, "02_r1", s, b, tc, bin_s, reward, int(rng.poisson(mu)))
+                ("sim", 1, "02_r1", s, b, tc, bin_s, reward, rcos1, rcos2,
+                 incomplete, int(rng.poisson(mu)))
             )
     return pd.DataFrame(
         recs,
         columns=[
             "animal", "session_date", "epoch", "stop_id", "binj", "tc",
-            "exposure", "known_reward_outcome_lag_1", "count",
+            "exposure", "reward_history_rcos_0", "reward_history_rcos_1",
+            "reward_history_rcos_2", "reward_history_incomplete", "count",
         ],
     )
 
@@ -67,25 +77,27 @@ def test_formula_strings():
     assert m["M0_const"].formula() == "count ~ 1"
     assert m["M5_time"].formula() == f"count ~ {spline}"
 
-    rewhist = m["M2_rewhist"].formula()
+    rewhist = m["M1_rew"].formula()
     assert "bs(tc" not in rewhist
-    for j in range(1, 11):
-        assert f"known_reward_outcome_lag_{j}" in rewhist
+    for k in range(3):
+        assert f"reward_history_rcos_{k}" in rewhist
+    assert "reward_history_incomplete" in rewhist
 
     full = m["M7_time_hist_rew"].formula()
     assert spline in full
+    for k in range(3):
+        assert f"reward_history_rcos_{k}" in full
     for j in range(1, 11):
-        assert f"known_reward_outcome_lag_{j}" in full
         assert f"onset_lag{j}" in full
 
-    assert f"known_reward_outcome_lag_1:{spline}" in m["M9_rew_x_time"].formula()
+    assert f"reward_history_rcos_0:{spline}" in m["M9_rew_x_time"].formula()
 
     # Raised-cosine self-history variants use hist_rcos_*, not onset_lag dummies.
     m3r = m["M3r_histcos"].formula()
     assert "hist_rcos_0" in m3r and "onset_lag1" not in m3r
     m7r = m["M7r_time_histcos_rew"].formula()
     assert "hist_rcos_0" in m7r and "onset_lag1" not in m7r
-    assert spline in m7r and "known_reward_outcome_lag_1" in m7r
+    assert spline in m7r and "reward_history_rcos_0" in m7r
     # The dummy models still use onset_lag (kernel-shape readout preserved).
     assert "onset_lag1" in m["M7_time_hist_rew"].formula()
 
@@ -101,7 +113,7 @@ def test_extra_covariates_formula():
     spec = PerBinRateModelSpec(
         base.name,
         base.time_spline,
-        base.reward_lags,
+        base.reward_basis,
         base.reward_rate,
         base.self_history_lags,
         base.switch,
@@ -124,7 +136,7 @@ def test_extra_covariates_formula():
     same = PerBinRateModelSpec(
         base.name,
         base.time_spline,
-        base.reward_lags,
+        base.reward_basis,
         base.reward_rate,
         base.self_history_lags,
         base.switch,
@@ -138,9 +150,9 @@ def test_extra_covariates_formula():
 
 def test_recovers_known_reward_effect():
     design = make_per_bin_rate_design(reward_effect=2.0, base_rate=0.08, seed=1)
-    fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE["M1_rew1"])
+    fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE["M1_rew"])
     assert fit is not None
-    assert fit["rr_known_reward_outcome_lag_1"] == pytest.approx(2.0, rel=0.10)
+    assert fit["rr_reward_history_rcos_0"] == pytest.approx(2.0, rel=0.10)
 
 
 def test_spline_captures_time_peak():
@@ -152,12 +164,12 @@ def test_spline_captures_time_peak():
         reward_effect=1.0, base_rate=0.06, time_profile=bump, n_bins=60, seed=2
     )
     spec = PerBinRateModelSpec(
-        "time_rew1", True, 1, False, 0, False, False, "test", None
+        "time_rew", True, REWARD_HISTORY_N_BASIS, False, 0, False, False, "test", None
     )
     fit = fit_per_bin_rate_model(design, spec)
     assert fit is not None
     # No planted reward effect.
-    assert fit["rr_known_reward_outcome_lag_1"] == pytest.approx(1.0, rel=0.12)
+    assert fit["rr_reward_history_rcos_0"] == pytest.approx(1.0, rel=0.12)
     # Spline captures the peak: predicted near the peak tc exceeds the edges.
     pred = fit["predicted"]
     binj = design.loc[pred.index, "binj"].to_numpy()
@@ -181,7 +193,7 @@ def test_separation_no_crash():
                          float(s % 2), onset_lag1, count))
     design = pd.DataFrame(recs, columns=[
         "animal", "session_date", "epoch", "stop_id", "binj", "tc", "exposure",
-        "known_reward_outcome_lag_1", "onset_lag1", "count"])
+        "reward_history_rcos_0", "onset_lag1", "count"])
     spec = PerBinRateModelSpec(
         "hist1", False, 0, False, 1, False, False, "test", None
     )
@@ -193,7 +205,7 @@ def test_separation_no_crash():
 def test_cv_folds_score_and_beat_constant():
     design = make_per_bin_rate_design(reward_effect=2.5, base_rate=0.08, seed=4)
     cv = cross_validate_per_bin_rate_model(
-        design, MODEL_PER_BIN_RATE["M1_rew1"], n_folds=10
+        design, MODEL_PER_BIN_RATE["M1_rew"], n_folds=10
     )
     assert cv is not None
     assert cv["cv_n_folds"] == 10
@@ -222,7 +234,7 @@ def test_cv_one_bad_fold_invalidates_metric(monkeypatch):
     monkeypatch.setattr(pbm, "fit_status", fake_fit_status)
     design = make_per_bin_rate_design(reward_effect=2.5, base_rate=0.08, seed=4)
     cv = cross_validate_per_bin_rate_model(
-        design, MODEL_PER_BIN_RATE["M1_rew1"], n_folds=5
+        design, MODEL_PER_BIN_RATE["M1_rew"], n_folds=5
     )
     assert cv is not None  # fold NOT dropped
     assert cv["cv_n_folds"] == 5

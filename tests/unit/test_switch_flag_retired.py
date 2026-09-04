@@ -3,7 +3,7 @@
 ``is_after_switch`` is often constant within a session's complete-case cohort,
 which makes the design rank-deficient and rejects the whole session. The
 naming spec ("Immediate switch is not a nuisance adjustment") therefore removes
-it from R1/R2/Rlag, from the per-bin stop covariates, and retires the M8
+it from R1, from the per-bin stop covariates, and retires the M8
 per-bin switch main-effect rung -- while preserving the *dedicated* post-switch
 patch analysis, which uses the flag to define a cohort, not as a coefficient.
 """
@@ -16,7 +16,7 @@ from continuum_swr_replay.analysis.replay import per_bin_rate_model as pbrm
 
 
 def test_per_stop_rate_ladders_drop_the_switch_flag() -> None:
-    for name in ("R1", "R2", "Rlag"):
+    for name in ("R0", "R1"):
         assert "did_last_completed_trip_switch_patch" not in ms.MODEL_PER_STOP_RATE[name].predictors
 
 
@@ -42,7 +42,7 @@ def test_constructing_a_switch_spec_fails_loud() -> None:
 
     with pytest.raises(ValueError, match="retired"):
         ms.PerBinRateModelSpec(
-            "bad", True, 1, False, 0, True, False, "switch on", "M0_const"
+            "bad", True, 0, False, 0, True, False, "switch on", "M0_const"
         )
 
 

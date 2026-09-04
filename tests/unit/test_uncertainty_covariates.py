@@ -879,9 +879,10 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
             "reward_fraction_last10_known_trials": [0.5, 0.5],
             "did_last_completed_trip_switch_patch": [0.0, 0.0],
             **{
-                f"known_reward_outcome_lag_{j}": [float(j % 2), float(j % 2)]
-                for j in range(1, 11)
+                f"reward_history_rcos_{k}": [0.4 + 0.1 * k, 0.5 - 0.1 * k]
+                for k in range(3)
             },
+            "reward_history_incomplete": [0.0, 0.0],
             **{column: [0.1, 0.2] for column in fur.FITTED_COVARIATES},
         }
     )
@@ -930,7 +931,7 @@ def test_runner_smoke():
     uncertainty/value coefficient across the three populations.
     """
     from continuum_swr_replay.analysis.replay import (
-        N_REWARD_LAGS,
+        REWARD_HISTORY_COLUMNS,
         attach_is_swr_to_onsets,
     )
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -995,5 +996,6 @@ def test_runner_smoke():
     for cov in fur.CURATED_COVARIATES:
         assert f"coef_{cov}" in models.columns
         assert f"rr_{cov}" in models.columns
-    # reward kernel is also present (the controlled-for block).
-    assert f"coef_known_reward_outcome_lag_{N_REWARD_LAGS}" in models.columns
+    # reward-history basis is also present (the controlled-for block).
+    for column in REWARD_HISTORY_COLUMNS:
+        assert f"coef_{column}" in models.columns

@@ -20,7 +20,11 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
-from .model_specs import ARM_FE_PREDICTORS
+from .model_specs import (
+    ARM_FE_PREDICTORS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 from .spatial_mapping import well_to_arm_set
 
 logger = logging.getLogger(__name__)
@@ -786,7 +790,7 @@ def aggregate_to_timebins(
     *,
     bin_s: float,
     tmax: float,
-    reward_lags: int = 0,
+    reward_basis: bool = False,
     self_history_lags: int = 0,
     self_history_basis: int = 0,
     cross_onset_times: pd.DataFrame | None = None,
@@ -806,8 +810,8 @@ def aggregate_to_timebins(
     stop_table : pd.DataFrame
         Per-stop table (unique ``stop_id``). Must carry ``animal``,
         ``session_date``, ``epoch``, ``stop_id``, ``immobility_duration_s``,
-        plus any ``known_reward_outcome_lag_{j}`` and ``stop_covariates``
-        columns requested.
+        plus the reward-history basis columns (when ``reward_basis``) and any
+        ``stop_covariates`` columns requested.
     onset_times : pd.DataFrame
         Event-onset rows for ONE population (already filtered). Must carry
         ``stop_id`` and ``t_since_stop_onset``.
@@ -815,8 +819,10 @@ def aggregate_to_timebins(
         Bin width in seconds.
     tmax : float
         Right-truncation; bins beyond ``tmax`` are dropped.
-    reward_lags : int
-        Number of ``known_reward_outcome_lag_{j}`` columns to carry from ``stop_table``.
+    reward_basis : bool
+        Carry the reward-history basis features ``REWARD_HISTORY_COLUMNS`` and
+        the structural-missingness indicator ``REWARD_HISTORY_INCOMPLETE`` from
+        ``stop_table``.
     self_history_lags : int
         Number of ``onset_lag{j}`` self-history columns to build (same-
         population onset counts ``j`` bins back, within stop, reset at the
@@ -835,7 +841,8 @@ def aggregate_to_timebins(
     pd.DataFrame
         Columns: ``animal``, ``session_date``, ``epoch``, ``stop_id``, ``binj``,
         ``tc`` (bin-center s = time since stop onset), ``exposure`` (s of
-        immobility in the bin), ``known_reward_outcome_lag_1..reward_lags``, each name in
+        immobility in the bin), the reward-history basis columns (if
+        ``reward_basis``), each name in
         ``stop_covariates``, ``count`` (population onsets in the bin),
         ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
         ``hist_rcos_0..self_history_basis-1``.
@@ -846,7 +853,9 @@ def aggregate_to_timebins(
         raise ValueError("cross_history_basis requires cross_history_lags > 0")
     if cross_history_lags and cross_onset_times is None:
         raise ValueError("cross_history_lags requires cross_onset_times")
-    reward_cols = [f"known_reward_outcome_lag_{j}" for j in range(1, reward_lags + 1)]
+    reward_cols = (
+        [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE] if reward_basis else []
+    )
     carry = reward_cols + list(stop_covariates)
 
     s = stop_table[stop_table["immobility_duration_s"] > 0]
