@@ -28,6 +28,7 @@ from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._fit_diagnostics import (
+    NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
@@ -525,7 +526,14 @@ def fit_choice_model(
     except Exception:
         logger.warning("ConditionalLogit failed for %s", predictors)
         return None
-    status = fit_status(result, "conditional", caught=caught)
+    predictor_sd = X.std(axis=0)
+    status = fit_status(
+        result,
+        "conditional",
+        caught=caught,
+        term_names=predictors,
+        nuisance_terms=NUISANCE_TERMS,
+    )
 
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
@@ -539,7 +547,13 @@ def fit_choice_model(
         "n_rows": len(df),
         "n_params": len(predictors),
         "llf": float(result.llf),
+        **{
+            f"sd_{name}": float(sd)
+            for name, sd in zip(predictors, predictor_sd, strict=True)
+        },
         "converged": status["converged"],
         "separated": status["separated"],
+        # "|"-joined so the tuple survives a round trip through pickle and CSV.
+        "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
     }

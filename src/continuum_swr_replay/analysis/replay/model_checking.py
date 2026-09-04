@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
 
-from ._fit_diagnostics import capture_fit_warnings, fit_status
+from ._fit_diagnostics import NUISANCE_TERMS, capture_fit_warnings, fit_status
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,12 @@ def cross_validate_conditional_poisson(
             except Exception:
                 return None
             status = fit_status(
-                result, "conditional", caught=caught, predictor_sd=X_train.std(axis=0)
+                result,
+                "conditional",
+                caught=caught,
+                predictor_sd=X_train.std(axis=0),
+                term_names=predictors,
+                nuisance_terms=NUISANCE_TERMS,
             )
             n_nonconverged += status["converged"] is False
             n_separated += status["separated"]
