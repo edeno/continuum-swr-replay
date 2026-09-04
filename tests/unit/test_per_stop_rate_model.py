@@ -195,21 +195,27 @@ class TestImmobilityTimeOffset:
             z = (np.log(fit["rr_intercept"]) - np.log(true_rate)) / fit["bse_intercept"]
             assert abs(z) < 3
 
-    def test_zero_duration_stops_excluded(self):
-        """Stops with immobility_time == 0 would give log(0) = -inf as
-        an offset and crash the GLM. They must be excluded silently."""
+    def test_zero_duration_stops_are_refused(self):
+        """Stops with immobility_time == 0 would give log(0) = -inf as an
+        offset. The fitter refuses them instead of silently subsetting: which
+        stops a rung is fit to is the cohort freeze's decision, not the
+        fitter's, or the ladder's rungs stop sharing a cohort."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         df.loc[:9, "immobility_duration_s"] = 0.0  # 10 zero-duration stops
-        fit = fit_per_stop_rate_model(df, predictors=[])
-        assert fit is not None
-        assert fit["n_stops"] == 90  # 100 - 10 zero-duration
+        with pytest.raises(ValueError, match="10 stop"):
+            fit_per_stop_rate_model(df, predictors=[])
+        # With those stops removed by the caller, the fit proceeds on the rest.
+        fit = fit_per_stop_rate_model(
+            df[df.immobility_duration_s > 0], predictors=[]
+        )
+        assert fit["n_stops"] == 90
 
-    def test_negative_immobility_time_excluded(self):
-        """Negative offsets are excluded by the same ``> 0`` filter."""
+    def test_negative_immobility_time_is_refused(self):
+        """Negative offsets trip the same ``> 0`` contract."""
         df = _simulate_stops(n_stops=100, log_intercept=0.0, seed=0)
         df.loc[:4, "immobility_duration_s"] = -1.0
-        fit = fit_per_stop_rate_model(df, predictors=[])
-        assert fit["n_stops"] == 95
+        with pytest.raises(ValueError, match="5 stop"):
+            fit_per_stop_rate_model(df, predictors=[])
 
 
 # ── Edge cases ──
@@ -312,16 +318,23 @@ class TestEdgeCases:
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is None
 
-    def test_nan_rows_dropped_before_fit(self):
-        """Rows with NaN in any required column are dropped (rather
-        than crashing the GLM with 'invalid value' errors)."""
+    def test_nan_rows_are_refused_not_dropped(self):
+        """A NaN in a required column is refused, naming the column and count.
+
+        Dropping it here would fit this rung on 90 stops while the rung without
+        that predictor keeps all 100, which is exactly the split cohort the
+        ladder must not have.
+        """
         df = _simulate_stops(
             n_stops=100, log_intercept=0.0,
             coefs={"is_after_reward": 0.0}, seed=0,
         )
         df.loc[:9, "is_after_reward"] = np.nan
-        fit = fit_per_stop_rate_model(df, predictors=["is_after_reward"])
-        assert fit is not None
+        with pytest.raises(ValueError, match="'is_after_reward': 10"):
+            fit_per_stop_rate_model(df, predictors=["is_after_reward"])
+        fit = fit_per_stop_rate_model(
+            df[df.is_after_reward.notna()], predictors=["is_after_reward"]
+        )
         assert fit["n_stops"] == 90
 
     def test_n_events_total_matches_input_after_filtering(self):

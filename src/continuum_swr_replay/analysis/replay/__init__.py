@@ -76,6 +76,7 @@ from .model_specs import (
 from .per_bin_rate_model import (
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
 from .per_stop_rate_model import PER_STOP_RATE_OUTCOMES, fit_per_stop_rate_model
@@ -179,6 +180,7 @@ __all__ = [
     "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
     "freeze_common_cohort",
+    "freeze_per_bin_cohort",
     "next_arm_circular_shift",
     "nearest_well_distance_cm",
     "per_bin_rate_gof",

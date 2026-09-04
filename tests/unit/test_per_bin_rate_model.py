@@ -332,3 +332,67 @@ def test_cross_history_recovers_planted_excitation():
     assert fit["coef_cross_lag2"] > 0
     # and stronger than the un-planted later lag
     assert fit["coef_cross_lag1"] > fit["coef_cross_lag4"]
+
+
+def test_freeze_per_bin_cohort_makes_rungs_share_rows():
+    """Freezing puts every rung of a ladder on the same rows; unfrozen raises.
+
+    A covariate that only ONE rung uses is missing on a tenth of the stops. Per
+    rung NaN-dropping would fit that rung on 90% of the bins and the others on
+    100%, so their AIC / deviance would not be comparable. The frozen cohort
+    removes those stops once, for the whole ladder.
+    """
+    from continuum_swr_replay.analysis.replay import freeze_per_bin_cohort
+
+    design = make_per_bin_rate_design(n_stops=300, n_bins=40, seed=7)
+    rng = np.random.default_rng(7)
+    design["extra_cov"] = rng.normal(size=len(design))
+    design.loc[design["stop_id"] % 10 == 0, "extra_cov"] = np.nan
+
+    with_extra = PerBinRateModelSpec(
+        "M_extra", True, REWARD_HISTORY_N_BASIS, False, 0, False, False,
+        "test", None, extra_covariates=("extra_cov",),
+    )
+    ladder = [
+        MODEL_PER_BIN_RATE["M0_const"],
+        MODEL_PER_BIN_RATE["M1_rew"],
+        with_extra,
+    ]
+
+    frozen, report = freeze_per_bin_cohort(design, ladder)
+    assert frozen.attrs["per_bin_cohort_frozen"] is True
+    assert report["n_stops_before"] == 300
+    assert report["n_stops_after"] == 270  # the 30 stops with a NaN covariate
+    assert report["n_bins_before"] == 300 * 40
+    assert report["n_bins_after"] == 270 * 40
+    assert report["n_event_bins_after"] == int((frozen["count"] > 0).sum())
+    assert report["n_event_bins_after"] < report["n_event_bins_before"]
+    assert "extra_cov" in report["required_columns"]
+    assert len(design) == 300 * 40  # the input frame is not mutated
+
+    fits = {spec.name: fit_per_bin_rate_model(frozen, spec) for spec in ladder}
+    assert all(fit is not None for fit in fits.values())
+    assert {fit["n_bins"] for fit in fits.values()} == {270 * 40}
+    assert {fit["n_stops"] for fit in fits.values()} == {270}
+
+    # The unfrozen design is refused rather than silently subset.
+    with pytest.raises(ValueError, match="extra_cov"):
+        fit_per_bin_rate_model(design, with_extra)
+    with pytest.raises(ValueError, match="extra_cov"):
+        cross_validate_per_bin_rate_model(design, with_extra, n_folds=5)
+
+    # A zero-exposure bin is refused too (log(0) offset), and the freeze removes it.
+    bad = frozen.copy()
+    bad.loc[0, "exposure"] = 0.0
+    with pytest.raises(ValueError, match="exposure <= 0"):
+        fit_per_bin_rate_model(bad, MODEL_PER_BIN_RATE["M0_const"])
+    assert freeze_per_bin_cohort(bad, ladder)[1]["n_bins_after"] == 270 * 40 - 1
+
+
+def test_freeze_per_bin_cohort_requires_its_columns():
+    """A design that cannot carry the ladder is a configuration error."""
+    from continuum_swr_replay.analysis.replay import freeze_per_bin_cohort
+
+    design = make_per_bin_rate_design(n_stops=20, n_bins=5, seed=0)
+    with pytest.raises(KeyError, match="onset_lag1"):
+        freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M3_hist"]])

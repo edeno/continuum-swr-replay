@@ -207,3 +207,47 @@ class TestSummarizeComparison:
         )
         result = summarize_comparison(comparisons, "M0", "M1")
         assert result["n_sessions"] == 6
+
+
+def test_mismatched_n_bins_invalidates():
+    """Per-bin rungs fit on different bin counts are not comparable.
+
+    AIC / BIC / deviance all scale with the number of rows, so a rung fit to
+    fewer bins wins mechanically. ``n_bins`` (Family B) and ``n_stops``
+    (Family A) are guarded exactly like ``n_events``.
+    """
+    def rows(*, aic, bic, ll, n_params, n_bins, n_stops):
+        return pd.DataFrame(
+            {
+                "animal": ["a"],
+                "session_date": [1],
+                "epoch": ["02_r1"],
+                "llf": [ll],
+                "aic": [aic],
+                "bic": [bic],
+                "n_params": [n_params],
+                "n_bins": [n_bins],
+                "n_stops": [n_stops],
+            }
+        )
+
+    parent = rows(aic=100, bic=110, ll=-50, n_params=2, n_bins=7387816, n_stops=1000)
+    child = rows(aic=90, bic=105, ll=-44, n_params=4, n_bins=6466795, n_stops=1000)
+    invalid = compare_nested_models(parent, child).iloc[0]
+    for col in ("delta_aic", "delta_bic", "lr_stat", "lr_pvalue"):
+        assert np.isnan(invalid[col]), f"{col} must be NaN on mismatched n_bins"
+
+    # A stop-count mismatch alone (Family A) invalidates too.
+    child_stops = rows(
+        aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=940
+    )
+    assert np.isnan(compare_nested_models(parent, child_stops).iloc[0]["delta_aic"])
+
+    # Matched bins and stops leave the arithmetic intact.
+    child_ok = rows(
+        aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=1000
+    )
+    valid = compare_nested_models(parent, child_ok).iloc[0]
+    assert valid["delta_aic"] == 10.0
+    assert valid["delta_bic"] == 5.0
+    assert valid["lr_stat"] == 12.0

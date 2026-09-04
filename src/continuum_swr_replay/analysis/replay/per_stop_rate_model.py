@@ -81,9 +81,9 @@ def fit_per_stop_rate_model(
     response_col : str
         Count column. Default ``n_selected_events``.
     offset_col : str
-        Exposure column — ``log(offset_col)`` enters as an offset.
-        Stops with ``offset_col <= 0`` are excluded (single-sample
-        bouts where ``immobility_time == 0``).
+        Exposure column — ``log(offset_col)`` enters as an offset. Every stop
+        must carry ``offset_col > 0``; zero-duration bouts belong to the
+        cohort freeze, not to this fitter.
     min_stops : int
         Minimum number of valid stops to attempt fitting.
 
@@ -93,6 +93,15 @@ def fit_per_stop_rate_model(
         Coefficients (``coef_*``), standard errors (``bse_*``),
         p-values (``pval_*``), rate ratios (``rr_*`` = exp(coef)),
         plus fit statistics. None if fitting fails.
+
+    Raises
+    ------
+    ValueError
+        If any required column carries a missing value, or any stop has
+        ``offset_col <= 0``. The fitter never subsets: rung-specific dropping
+        is what splits a ladder into several cohorts, so the caller freezes one
+        cohort per session with
+        :func:`cohort_selection.freeze_common_cohort` before fitting.
     """
     required = [response_col, offset_col] + predictors
     missing = [c for c in required if c not in stop_table.columns]
@@ -101,10 +110,22 @@ def fit_per_stop_rate_model(
         return None
 
     df = stop_table[required].copy()
-    df = df.dropna(subset=required)
-
-    # Exclude zero-duration stops (log(0) = -inf).
-    df = df[df[offset_col] > 0].reset_index(drop=True)
+    nan_cols = {c: int(df[c].isna().sum()) for c in required if df[c].isna().any()}
+    if nan_cols:
+        raise ValueError(
+            f"per-stop rate design has missing values in {nan_cols}; freeze the "
+            "ladder's common cohort with freeze_common_cohort() before fitting "
+            "(the fitter must not subset, or the rungs stop sharing a cohort)."
+        )
+    n_bad_offset = int((df[offset_col] <= 0).sum())
+    if n_bad_offset:
+        raise ValueError(
+            f"per-stop rate design has {n_bad_offset} stop(s) with "
+            f"{offset_col} <= 0 (log offset undefined); freeze the ladder's "
+            "common cohort with freeze_common_cohort(offset_col=...) before "
+            "fitting."
+        )
+    df = df.reset_index(drop=True)
 
     if len(df) < min_stops:
         return None

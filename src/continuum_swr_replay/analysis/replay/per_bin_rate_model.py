@@ -20,11 +20,21 @@ The ladder (``MODEL_PER_BIN_RATE`` in ``model_specs.py``) toggles three blocks
 (time spline, self-history, reward-history raised-cosine basis) plus the
 reward x time interaction, all at one bin width (``BIN_S``) so the models are
 nested and AIC / CV / deviance / GOF are directly comparable.
+
+Nested comparability also requires one cohort: every rung of a ladder must be
+fit to the SAME (stop, bin) rows, because AIC / deviance / held-out likelihood
+all scale with the number of rows. :func:`freeze_per_bin_cohort` selects that
+cohort once, over the union of every rung's design columns, before any rung is
+fit; :func:`fit_per_bin_rate_model` and
+:func:`cross_validate_per_bin_rate_model` then *raise* on an incomplete design
+instead of quietly dropping rows per rung (which is what split the ladder into
+several cohorts).
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -86,6 +96,113 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     return list(dict.fromkeys(cols))  # de-duplicate, preserve order
 
 
+def freeze_per_bin_cohort(
+    design: pd.DataFrame,
+    specs: Iterable[PerBinRateModelSpec],
+    *,
+    extra_columns: Sequence[str] = (),
+) -> tuple[pd.DataFrame, dict]:
+    """Freeze ONE (stop x bin) cohort for a whole per-bin ladder.
+
+    Keeps the bins that are complete for the **union** of every spec's design
+    columns (plus ``count``, ``exposure`` and any ``extra_columns``) and that
+    carry a positive exposure. Because every rung is then fit to exactly these
+    rows, ``n_bins`` / ``n_stops`` are equal across the ladder and the nested
+    AIC / CV / deviance comparison is valid. Callers must freeze BEFORE the
+    first fit: :func:`fit_per_bin_rate_model` and
+    :func:`cross_validate_per_bin_rate_model` raise rather than subset.
+
+    Parameters
+    ----------
+    design : pd.DataFrame
+        One (session, population) :func:`_helpers.aggregate_to_timebins` output,
+        shape ``(n_bins, n_columns)``. Must carry ``stop_id``, ``count``,
+        ``exposure`` and every required design column.
+    specs : iterable of PerBinRateModelSpec
+        The ladder whose rungs share the cohort. May be empty when the required
+        columns are given directly through ``extra_columns`` (the contrast
+        ladder names its columns per rung rather than through a spec object).
+    extra_columns : sequence of str
+        Additional required columns, e.g. the ``is_swr`` tag of the stacked
+        contrast design or a rung's covariate list.
+
+    Returns
+    -------
+    frozen : pd.DataFrame
+        A copy of the retained rows with a fresh integer index and
+        ``attrs["per_bin_cohort_frozen"] = True``. ``design`` is never mutated.
+    report : dict
+        ``n_bins_before`` / ``n_bins_after``, ``n_stops_before`` /
+        ``n_stops_after``, ``n_event_bins_before`` / ``n_event_bins_after``
+        (bins with ``count > 0``), and the ``required_columns`` tuple the
+        selection used.
+
+    Raises
+    ------
+    KeyError
+        If any required column is absent from ``design`` — a design that cannot
+        carry the ladder is a configuration error, not a data drop.
+    """
+    required = ["count", "exposure"]
+    for spec in specs:
+        required += _design_columns(spec)
+    required += list(extra_columns)
+    required = list(dict.fromkeys(required))
+
+    missing = [c for c in (*required, "stop_id") if c not in design.columns]
+    if missing:
+        raise KeyError(
+            f"freeze_per_bin_cohort missing required column(s): {missing}"
+        )
+
+    keep = design[required].notna().all(axis=1) & (design["exposure"] > 0)
+    frozen = design.loc[keep].reset_index(drop=True)
+    frozen.attrs["per_bin_cohort_frozen"] = True
+    report = {
+        "n_bins_before": int(len(design)),
+        "n_bins_after": int(len(frozen)),
+        "n_stops_before": int(design["stop_id"].nunique()),
+        "n_stops_after": int(frozen["stop_id"].nunique()),
+        "n_event_bins_before": int((design["count"] > 0).sum()),
+        "n_event_bins_after": int((frozen["count"] > 0).sum()),
+        "required_columns": tuple(required),
+    }
+    return frozen, report
+
+
+def require_frozen_per_bin_design(
+    design: pd.DataFrame, needed: Sequence[str], *, name: str
+) -> None:
+    """Raise unless every ``needed`` column is complete and ``exposure > 0``.
+
+    The per-bin fitters never subset their input: silently dropping rows per
+    rung is what splits a ladder into several cohorts. Callers freeze the
+    cohort once with :func:`freeze_per_bin_cohort` and pass the frozen design
+    to every rung.
+
+    Raises
+    ------
+    ValueError
+        If any ``needed`` column has a missing value, or any row has
+        ``exposure <= 0``.
+    """
+    nan_cols = [c for c in needed if design[c].isna().any()]
+    if nan_cols:
+        counts = {c: int(design[c].isna().sum()) for c in nan_cols}
+        raise ValueError(
+            f"{name}: per-bin design has missing values in {counts}; freeze the "
+            "ladder's common cohort with freeze_per_bin_cohort() before fitting "
+            "(the fitters must not subset, or the rungs stop sharing a cohort)."
+        )
+    n_bad = int((design["exposure"] <= 0).sum())
+    if n_bad:
+        raise ValueError(
+            f"{name}: per-bin design has {n_bad} row(s) with exposure <= 0; "
+            "freeze the ladder's common cohort with freeze_per_bin_cohort() "
+            "before fitting."
+        )
+
+
 def fit_per_bin_rate_model(
     design: pd.DataFrame,
     spec: PerBinRateModelSpec,
@@ -98,14 +215,15 @@ def fit_per_bin_rate_model(
     Parameters
     ----------
     design : pd.DataFrame
-        One session's :func:`_helpers.aggregate_to_timebins` output. Must carry
-        ``count``, ``exposure``, ``stop_id``, ``binj`` plus the columns the
-        spec's formula references.
+        One session's :func:`_helpers.aggregate_to_timebins` output, already
+        frozen by :func:`freeze_per_bin_cohort`, shape ``(n_bins, n_columns)``.
+        Must carry ``count``, ``exposure``, ``stop_id``, ``binj`` plus the
+        columns the spec's formula references, all complete.
     spec : PerBinRateModelSpec
         The model to fit. ``spec.formula()`` is fit with a ``log(exposure)``
         offset.
     min_bins : int
-        Minimum number of (NaN-dropped) bins required to attempt a fit.
+        Minimum number of bins required to attempt a fit.
     min_events : int
         Minimum number of event bins (``count > 0``) required.
 
@@ -116,13 +234,20 @@ def fit_per_bin_rate_model(
         (``rr = exp(coef)``) for every fitted term, plus ``n_bins``,
         ``n_events``, ``n_params``, ``llf``, ``aic``, ``deviance``,
         ``dispersion`` (= ``deviance / df_resid``), and ``predicted`` (the
-        per-bin fitted mean count as a ``pd.Series`` indexed by the retained
-        design rows, for :func:`per_bin_rate_gof`). ``None`` if columns are
+        per-bin fitted mean count as a ``pd.Series`` indexed by the design
+        rows, for :func:`per_bin_rate_gof`). ``None`` if columns are
         missing, too few bins/events, fewer than two distinct
         ``reward_history_rcos_0`` values when reward terms are present, or
         statsmodels raises a genuine numerical failure
         (rank deficiency / convergence error -> caught -> ``None``, never a
         crash).
+
+    Raises
+    ------
+    ValueError
+        If the design is not frozen: any needed column carries a missing value,
+        or any row has ``exposure <= 0``. The fitter never subsets, so a rung
+        cannot silently end up on a smaller cohort than its ladder.
 
     Notes
     -----
@@ -138,8 +263,8 @@ def fit_per_bin_rate_model(
         logger.warning("Missing columns for %s: %s", spec.name, missing)
         return None
 
-    df = design[[*needed, "stop_id", "binj"]].dropna(subset=needed)
-    df = df[df["exposure"] > 0]
+    require_frozen_per_bin_design(design, needed, name=spec.name)
+    df = design[[*needed, "stop_id", "binj"]]
     n_events = int((df["count"] > 0).sum())
     if len(df) < min_bins or n_events < min_events:
         logger.debug(
@@ -230,6 +355,13 @@ def cross_validate_per_bin_rate_model(
         held-out ``ll_model - ll_M0_const`` over all held-out bins, divided by
         ``n_events * ln 2``), and ``cv_n_folds``. ``None`` if too few
         bins/stops or any fold fails.
+
+    Raises
+    ------
+    ValueError
+        If the design is not frozen (see :func:`fit_per_bin_rate_model`); the
+        held-out score of one rung is only comparable to another's when both
+        score the same rows.
     """
     from scipy.stats import poisson
     from sklearn.model_selection import KFold
@@ -242,8 +374,10 @@ def cross_validate_per_bin_rate_model(
     # binj is the integer bin index (never NaN from aggregate_to_timebins); it
     # is kept only to preserve temporal order, so it is excluded from the NaN
     # check while every modelled column (including stop_id) must be present.
-    df = design[needed].dropna(subset=[c for c in needed if c != "binj"])
-    df = df[df["exposure"] > 0].reset_index(drop=True)
+    require_frozen_per_bin_design(
+        design, [c for c in needed if c != "binj"], name=f"CV {spec.name}"
+    )
+    df = design[needed].reset_index(drop=True)
     if len(df) < min_bins:
         logger.debug("CV %s: too few bins (%d < %d)", spec.name, len(df), min_bins)
         return None

@@ -41,6 +41,10 @@ def compare_nested_models(
     -------
     pd.DataFrame
         One row per session with delta_aic, delta_bic, lr_stat, lr_pvalue.
+        ``delta_aic`` / ``delta_bic`` / ``lr_stat`` / ``lr_pvalue`` are NaN for
+        any session whose parent and child report different ``n_events``,
+        ``n_bins``, or ``n_stops`` — rungs fit to different rows are not
+        comparable.
     """
     if session_cols is None:
         session_cols = ["animal", "session_date", "epoch"]
@@ -48,10 +52,16 @@ def compare_nested_models(
     # Accept both "ll" (legacy binomial) and "llf" (conditional Poisson)
     ll_col = "llf" if "llf" in parent_results.columns else "ll"
 
-    fit_cols = [ll_col, "aic", "bic", "n_params"]
-    # Include n_events if available (for LRT validity check)
-    if "n_events" in parent_results.columns and "n_events" in child_results.columns:
-        fit_cols = fit_cols + ["n_events"]
+    # Cohort-size columns present in BOTH frames are carried through so the
+    # guard below can invalidate a comparison whose rungs were fit to different
+    # rows. Which one is the unit depends on the family: events (conditional
+    # arm/patch), bins (per-bin conditional intensity), stops (per-stop rate).
+    count_cols = [
+        col
+        for col in ("n_events", "n_bins", "n_stops")
+        if col in parent_results.columns and col in child_results.columns
+    ]
+    fit_cols = [ll_col, "aic", "bic", "n_params", *count_cols]
 
     merged = parent_results[session_cols + fit_cols].merge(
         child_results[session_cols + fit_cols],
@@ -77,20 +87,28 @@ def compare_nested_models(
         merged["lr_stat"].clip(lower=0), df=merged["df_diff"].clip(lower=1)
     )
 
-    # Invalidate all comparison metrics when parent and child used
-    # different event counts (indicates the caller did not pre-filter
-    # to a common complete-case event set).
-    if "n_events_parent" in merged.columns and "n_events_child" in merged.columns:
-        different_n = merged["n_events_parent"] != merged["n_events_child"]
+    # Invalidate all comparison metrics when parent and child used different
+    # numbers of events, bins, or stops (the caller did not freeze one cohort
+    # for the ladder before fitting). AIC / BIC / deviance all scale with the
+    # number of rows, so a rung fit to fewer rows wins mechanically.
+    if count_cols:
+        different_n = pd.Series(False, index=merged.index)
+        mismatched: list[str] = []
+        for col in count_cols:
+            differs = merged[f"{col}_parent"] != merged[f"{col}_child"]
+            if differs.any():
+                mismatched.append(f"{col} ({int(differs.sum())})")
+            different_n = different_n | differs
         if different_n.any():
             import logging
 
             logging.warning(
-                "%d/%d sessions have mismatched event counts between "
-                "parent and child — invalidating comparisons. "
-                "Pre-filter to a common event set before fitting.",
-                different_n.sum(),
+                "%d/%d sessions have mismatched cohort sizes between parent and "
+                "child [%s] — invalidating comparisons. Freeze one cohort for "
+                "the ladder before fitting.",
+                int(different_n.sum()),
                 len(merged),
+                ", ".join(mismatched),
             )
         for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
             merged.loc[different_n, col] = np.nan
