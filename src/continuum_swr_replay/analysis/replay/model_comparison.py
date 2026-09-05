@@ -16,6 +16,12 @@ from scipy.stats import chi2, wilcoxon
 
 from .model_specs import MODEL_HIERARCHY
 
+# Fit-scale metadata carried from the per-session frames onto the comparison and
+# its summary: which estimator produced the numbers and which response column it
+# was fit on. Both must agree between parent and child for a comparison to mean
+# anything, so ``summarize_comparison`` refuses a step where they do not.
+METADATA_COLUMNS = ("estimator", "response_col")
+
 
 def compare_nested_models(
     parent_results: pd.DataFrame,
@@ -61,7 +67,16 @@ def compare_nested_models(
         for col in ("n_events", "n_bins", "n_stops")
         if col in parent_results.columns and col in child_results.columns
     ]
-    fit_cols = [ll_col, "aic", "bic", "n_params", *count_cols]
+    # The scale the two rungs were fit at travels with the comparison. A delta
+    # AIC means one thing when each event contributed a single observation and
+    # another when it contributed thirty autocorrelated timebins, and a summary
+    # that does not carry the estimator cannot say which.
+    meta_cols = [
+        col
+        for col in METADATA_COLUMNS
+        if col in parent_results.columns and col in child_results.columns
+    ]
+    fit_cols = [ll_col, "aic", "bic", "n_params", *count_cols, *meta_cols]
 
     merged = parent_results[session_cols + fit_cols].merge(
         child_results[session_cols + fit_cols],
@@ -116,6 +131,32 @@ def compare_nested_models(
     return merged
 
 
+def _comparison_metadata(
+    comparison_df: pd.DataFrame, parent_name: str, child_name: str
+) -> dict:
+    """Fit-scale metadata shared by a comparison's parent and child.
+
+    Returns one value per column in :data:`METADATA_COLUMNS`, or ``None`` where
+    the frames carried none (legacy artifacts fit before the estimator was
+    recorded).
+    """
+    metadata: dict = {}
+    for column in METADATA_COLUMNS:
+        values: set = set()
+        for side in ("parent", "child"):
+            suffixed = f"{column}_{side}"
+            if suffixed in comparison_df.columns:
+                values |= set(comparison_df[suffixed].dropna().unique())
+        if len(values) > 1:
+            raise ValueError(
+                f"{parent_name} -> {child_name}: rungs report different "
+                f"{column} values {sorted(map(str, values))}; their information "
+                "criteria are on different scales and cannot be differenced"
+            )
+        metadata[column] = values.pop() if values else None
+    return metadata
+
+
 def summarize_comparison(
     comparison_df: pd.DataFrame,
     parent_name: str,
@@ -136,10 +177,28 @@ def summarize_comparison(
     -------
     dict
         Summary statistics including median delta-AIC, fraction of sessions
-        preferring each model, and Wilcoxon test on delta-AIC.
+        preferring each model, the Wilcoxon test on delta-AIC, and the
+        ``estimator`` / ``response_col`` the two rungs were fit with. The
+        estimator is what says at which grain ``delta_aic_*``, ``child_better_aic``
+        and ``lrt_significant`` are stated -- per event on a fraction or
+        dominant-choice fit, per decoded timebin on a count fit -- so a reader
+        cannot pool the two scales by accident.
+
+    Raises
+    ------
+    ValueError
+        If the parent and child rungs report different estimators or response
+        columns: their information criteria are then on different scales and
+        their difference is not a model comparison.
     """
+    metadata = _comparison_metadata(comparison_df, parent_name, child_name)
     if len(comparison_df) == 0:
-        return {"parent": parent_name, "child": child_name, "n_sessions": 0}
+        return {
+            "parent": parent_name,
+            "child": child_name,
+            "n_sessions": 0,
+            **metadata,
+        }
 
     daic = comparison_df["delta_aic"]
     dbic = comparison_df["delta_bic"]
@@ -148,6 +207,7 @@ def summarize_comparison(
     result = {
         "parent": parent_name,
         "child": child_name,
+        **metadata,
         "n_sessions": len(comparison_df),
         "df_diff": int(comparison_df["df_diff"].median()),
         "delta_aic_median": float(daic.median()),

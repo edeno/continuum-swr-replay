@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.model_comparison import (
     compare_nested_models,
@@ -251,3 +252,69 @@ def test_mismatched_n_bins_invalidates():
     assert valid["delta_aic"] == 10.0
     assert valid["delta_bic"] == 5.0
     assert valid["lr_stat"] == 12.0
+
+
+# ── Fit-scale metadata ──
+
+
+class TestEstimatorTravelsWithTheComparison:
+    """A delta-AIC is only readable next to the scale it was computed at.
+
+    On the fraction response an event is one observation; on the counts it is
+    ~32 autocorrelated timebins. The summary therefore carries the estimator and
+    the response column, and refuses a step whose two rungs disagree on either.
+    """
+
+    @staticmethod
+    def _rungs(estimator="conditional_poisson_fraction", response="arm_fraction"):
+        parent = _make_fit_results(
+            ll=-10.0, aic=24.0, bic=26.0, n_params=2, n_sessions=6
+        )
+        child = _make_fit_results(ll=-7.0, aic=20.0, bic=23.0, n_params=3, n_sessions=6)
+        for frame in (parent, child):
+            frame["estimator"] = estimator
+            frame["response_col"] = response
+        return parent, child
+
+    def test_summary_reports_the_estimator_and_response(self):
+        parent, child = self._rungs()
+
+        result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")
+
+        assert result["estimator"] == "conditional_poisson_fraction"
+        assert result["response_col"] == "arm_fraction"
+        assert result["delta_aic_median"] == 4.0
+
+    def test_summary_of_a_count_ladder_reports_the_count_estimator(self):
+        parent, child = self._rungs("conditional_poisson_count", "arm_count_hard")
+
+        result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")
+
+        assert result["estimator"] == "conditional_poisson_count"
+        assert result["response_col"] == "arm_count_hard"
+
+    def test_rungs_fit_at_different_scales_are_refused(self):
+        parent, child = self._rungs()
+        child["estimator"] = "conditional_poisson_count"
+        child["response_col"] = "arm_count_hard"
+        comparison = compare_nested_models(parent, child)
+
+        with pytest.raises(ValueError, match="different estimator values"):
+            summarize_comparison(comparison, "M0", "M1")
+
+    def test_legacy_frames_without_the_metadata_report_none(self):
+        parent = _make_fit_results(
+            ll=-10.0, aic=24.0, bic=26.0, n_params=2, n_sessions=6
+        )
+        child = _make_fit_results(ll=-7.0, aic=20.0, bic=23.0, n_params=3, n_sessions=6)
+
+        result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")
+
+        assert result["estimator"] is None
+        assert result["response_col"] is None
+
+    def test_empty_comparison_still_carries_the_metadata_keys(self):
+        result = summarize_comparison(pd.DataFrame(), "M0", "M1")
+
+        assert result["estimator"] is None
+        assert result["response_col"] is None
