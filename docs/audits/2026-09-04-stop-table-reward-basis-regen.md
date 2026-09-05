@@ -211,6 +211,12 @@ design. Declaring a column a table does not carry is harmless, so this one
 declaration is safe to apply to the whole multi-table gate rather than per
 table.
 
+The declaration list grows with every column added after the baseline was
+frozen, and every declaration must be repeated on every run. `patch_fraction`
+joined it on 2026-09-05 (see
+[2026-09-05-event-patch-fraction-regen.md](2026-09-05-event-patch-fraction-regen.md));
+the current full list lives in the gate script's own docstring.
+
 ## The added columns
 
 ```

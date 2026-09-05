@@ -19,11 +19,16 @@ Usage:
         --candidate Processed-Data/replay_content \
         --baseline  Processed-Data/replay_content/_golden_baseline_v5
 
-    # stop_table gained the reward-history basis since the baseline was frozen
+    # Columns gained since ``_golden_baseline_v5_v4cache`` was frozen: the
+    # stop table's reward-history basis and the event-patch table's allocation
+    # fraction. Declaring a column a table does not carry is harmless, so this
+    # one declaration covers the whole multi-table gate. Every declaration must
+    # be repeated on every run -- omitting one makes the gate fail, by design.
     uv run python scripts/qa/compare_to_golden_baseline.py \
         --baseline Processed-Data/replay_content/_golden_baseline_v5_v4cache \
         --expected-added-columns reward_history_rcos_0 reward_history_rcos_1 \
-                                 reward_history_rcos_2 reward_history_incomplete
+                                 reward_history_rcos_2 reward_history_incomplete \
+                                 patch_fraction
 """
 
 from __future__ import annotations
