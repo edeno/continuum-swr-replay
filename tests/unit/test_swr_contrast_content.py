@@ -412,3 +412,138 @@ def test_every_ladder_predictor_reaches_the_assembled_design(
     assert set(built) <= set(designed.columns)
     missing = predictors - set(designed.columns)
     assert not missing, f"ladder predictors absent from the design: {sorted(missing)}"
+
+
+# --- Leaf-only rungs: response support ----------------------------------------
+
+
+def _nine_arm_cohort() -> pd.DataFrame:
+    """Two events x nine arms; each spends a third of its mass on a trunk arm."""
+    rows = []
+    for index, event in enumerate(("a", "b")):
+        counts = np.zeros(9)
+        counts[index] = 6.0
+        counts[index + 1] = 2.0
+        counts[6] = 4.0
+        for arm in range(9):
+            rows.append(
+                {
+                    "animal": "chimi",
+                    "session_date": "20200212",
+                    "epoch": "02_r1",
+                    "event_id": event,
+                    "candidate_arm": arm,
+                    "arm_fraction": counts[arm] / counts.sum(),
+                    "is_swr": index == 0,
+                    "reward_belief_mean_candidate_arm_preoutcome_z": float(arm),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _fit_row() -> dict:
+    return {
+        "coef_reward_belief_mean_candidate_arm_preoutcome_z": 0.1,
+        "bse_reward_belief_mean_candidate_arm_preoutcome_z": 0.05,
+        "sd_reward_belief_mean_candidate_arm_preoutcome_z": 1.0,
+        "pval_reward_belief_mean_candidate_arm_preoutcome_z": 0.5,
+        "separated_terms": "",
+        "n_events": 2,
+        "n_params": 1,
+        "estimator": "conditional_poisson_fraction",
+        "converged": True,
+        "separated": False,
+        "n_convergence_warnings": 0,
+    }
+
+
+def test_leaf_only_rungs_are_fit_on_leaf_renormalized_fractions(monkeypatch):
+    """The trunk share is not balanced across the contrast, so it cannot set the
+    weight an event carries: leaf-only rungs get unit mass over the six leaves,
+    while the nine-arm rungs in the same run keep the table's own fractions."""
+    seen = []
+
+    def _capture(g, predictors, *, response_col, n_categories):
+        seen.append((n_categories, g.copy()))
+        return _fit_row(), mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
+
+    monkeypatch.setattr(mod, "_fit_session", _capture)
+    term = "reward_belief_mean_candidate_arm_preoutcome_z"
+    ladder = {
+        "C4_armvalue": ([term], "pooled"),
+        "C1_nine_arm": ([term], "pooled"),
+    }
+
+    res, _audits = mod._run(
+        _nine_arm_cohort(), ladder, response_col="arm_fraction", n_categories=9
+    )
+
+    fitted = dict(seen)
+    assert set(fitted) == {6, 9}
+    leaf = fitted[6]
+    assert sorted(leaf["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
+    assert np.allclose(
+        leaf.groupby("event_id")["arm_fraction"].sum().to_numpy(), 1.0, atol=1e-12
+    )
+    # Event "a" held 6/12 and 2/12 on leaves and 4/12 on a trunk.
+    a_leaf = leaf[leaf["event_id"].eq("a")].set_index("candidate_arm")["arm_fraction"]
+    assert a_leaf[0] == pytest.approx(0.75)
+    assert a_leaf[1] == pytest.approx(0.25)
+
+    nine = fitted[9]
+    assert sorted(nine["candidate_arm"].unique()) == list(range(9))
+    a_nine = nine[nine["event_id"].eq("a")].set_index("candidate_arm")["arm_fraction"]
+    assert a_nine[0] == pytest.approx(0.5)
+    assert a_nine[6] == pytest.approx(1 / 3)
+
+    renormalized = res.set_index("model")["response_renormalized"]
+    assert bool(renormalized["C4_armvalue"]) is True
+    assert bool(renormalized["C1_nine_arm"]) is False
+
+
+def test_leaf_only_count_rungs_keep_their_timebin_counts(monkeypatch):
+    """A count response is already weighted by decoded timebins; leave it alone."""
+    seen = []
+
+    def _capture(g, predictors, *, response_col, n_categories):
+        seen.append(g.copy())
+        return None, mod._audit(2, 0, 0, 0, 2, 0, "too_few", g.iloc[0:0])
+
+    monkeypatch.setattr(mod, "_fit_session", _capture)
+    cohort = _nine_arm_cohort()
+    cohort["arm_count_hard"] = cohort["arm_fraction"] * 12.0
+    term = "reward_belief_mean_candidate_arm_preoutcome_z"
+
+    mod._run(
+        cohort,
+        {"C4_armvalue": ([term], "pooled")},
+        response_col="arm_count_hard",
+        n_categories=9,
+    )
+
+    leaf = seen[0]
+    expected = cohort[cohort["candidate_arm"] < 6]["arm_count_hard"].to_numpy()
+    assert np.array_equal(leaf["arm_count_hard"].to_numpy(), expected)
+
+
+def test_provenance_names_the_rungs_whose_response_was_rescaled():
+    import argparse
+
+    from continuum_swr_replay.analysis.replay.model_specs import (
+        LEAF_ONLY_CONTRAST_RUNGS,
+    )
+
+    def _args(response: str) -> argparse.Namespace:
+        return argparse.Namespace(
+            max_per_animal=None, response=response, outcome_stratum="all"
+        )
+
+    assert mod._provenance(_args("fraction"), n_sessions=1)[
+        "response_renormalized_rungs"
+    ] == sorted(LEAF_ONLY_CONTRAST_RUNGS)
+    assert (
+        mod._provenance(_args("hard_count"), n_sessions=1)[
+            "response_renormalized_rungs"
+        ]
+        == []
+    )

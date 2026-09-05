@@ -73,6 +73,7 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
 )
 from continuum_swr_replay.analysis.replay.content_response import (
     RESPONSE_CHOICES,
+    renormalize_fraction_over_candidates,
     resolve_response_column,
     validate_fraction_response,
 )
@@ -675,6 +676,54 @@ def restrict_to_leaf_arms(long_df: pd.DataFrame) -> pd.DataFrame:
     return long_df.loc[leaves].reset_index(drop=True)
 
 
+def leaf_only_cohort(
+    long_df: pd.DataFrame,
+    *,
+    response_col: str,
+    response: str,
+    event_col: str = "event_id",
+) -> tuple[pd.DataFrame, bool]:
+    """Restrict a cohort to the leaf arms and put its response on that support.
+
+    A fraction is a share of the event's whole nine-arm mass, and the
+    conditional likelihood weights an event by the total it carries, so keeping
+    the persisted fractions after dropping the trunk rows would weight an event
+    by its leaf share. That share is not balanced across the comparisons these
+    ladders exist for -- SWR events put a substantially larger part of their
+    bins on the trunks than non-SWR events do -- so it is rescaled to unit mass
+    over the six leaves. A count response is left alone: weighting an event by
+    its number of decoded timebins is what the count response means.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format event x candidate-arm cohort, all nine arms.
+    response_col : str
+        The resolved response column.
+    response : str
+        The ``--response`` value the column came from, one of
+        :data:`RESPONSE_CHOICES`.
+    event_col : str, optional
+        Event grouping key.
+
+    Returns
+    -------
+    pd.DataFrame
+        The leaf-arm rows, with the response rescaled when it is a fraction.
+    bool
+        Whether the response was rescaled, for the fit rows and the provenance.
+    """
+    leaves = restrict_to_leaf_arms(long_df)
+    if response != "fraction":
+        return leaves, False
+    return (
+        renormalize_fraction_over_candidates(
+            leaves, response_col=response_col, event_col=event_col
+        ),
+        True,
+    )
+
+
 def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
     """Name -> path of every table one content-ladder fit is built from.
 
@@ -1142,13 +1191,16 @@ def _write_complete_output_bundle(
     fit_inputs: Mapping[str, object],
     estimator: str,
     cli: Sequence[str],
+    response_renormalized: bool = False,
 ) -> None:
     """Stage every artifact, then replace the output directory as one bundle.
 
     Every pickle gets a provenance sidecar naming the table the fit read, its
-    SHA-256 as of the read, and the estimator that produced it, so a reader can
-    refuse a fit whose input has moved since. The sidecars are written into the
-    staging directory, so they are swapped in atomically with the pickles they
+    SHA-256 as of the read, the estimator that produced it, and whether the
+    response was rescaled to the fitted candidate set, so a reader can refuse a
+    fit whose input has moved since and can tell a leaf-only fraction from the
+    table's own nine-arm one. The sidecars are written into the staging
+    directory, so they are swapped in atomically with the pickles they
     describe -- a bundle can never be published without them.
     """
     output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -1159,7 +1211,13 @@ def _write_complete_output_bundle(
 
     def _write(frame: pd.DataFrame, path: Path) -> None:
         frame.to_pickle(path)
-        write_fit_provenance(path, dict(fit_inputs), estimator, cli)
+        write_fit_provenance(
+            path,
+            dict(fit_inputs),
+            estimator,
+            cli,
+            extra={"response_renormalized": bool(response_renormalized)},
+        )
 
     try:
         for model_name, result in model_results.items():
@@ -1540,6 +1598,7 @@ class _ContentCohort(NamedTuple):
     event_col: str
     n_events_before_complete_case: int
     fit_inputs: dict[str, object]
+    response_renormalized: bool
 
 
 def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
@@ -1784,14 +1843,23 @@ def _load_and_filter_cohort(
     # complete-case freeze so the cohort is the set of events the leaf-only
     # likelihood can actually use -- an event with no leaf mass left has a zero
     # response and is dropped there, and named as such in the audit.
+    response_renormalized = False
     if args.leaf_only:
         n_before_rows = len(long_df)
-        long_df = restrict_to_leaf_arms(long_df)
+        long_df, response_renormalized = leaf_only_cohort(
+            long_df,
+            response_col=response_col,
+            response=args.response,
+            event_col=event_col,
+        )
         logging.info(
-            "candidate set = %d leaf arms: %d -> %d rows",
+            "candidate set = %d leaf arms: %d -> %d rows (%s rescaled to unit "
+            "mass per event: %s)",
             LEAF_ONLY_N_CATEGORIES,
             n_before_rows,
             len(long_df),
+            response_col,
+            response_renormalized,
         )
 
     # Pre-filter to common complete-case event set: drop entire events
@@ -1861,6 +1929,7 @@ def _load_and_filter_cohort(
         event_col=event_col,
         n_events_before_complete_case=n_before,
         fit_inputs=fit_inputs,
+        response_renormalized=response_renormalized,
     )
 
 
@@ -1906,6 +1975,10 @@ def _fit_content_ladder(
 
         elapsed = time.time() - t0
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
+        # Whether the response these numbers were fit on was rescaled to the
+        # fitted candidate set travels with the numbers: a leaf-only fraction
+        # fit is not on the same response as the nine-arm bundle's.
+        mdf["response_renormalized"] = cohort.response_renormalized
         fit_results[model_name] = mdf
 
     model_results = _validate_and_match_fit_results(
@@ -1991,6 +2064,7 @@ def _fit_conditional_logit_robustness(
                     )
                 r["model"] = model_name
                 r["response_col"] = response_col
+                r["response_renormalized"] = cohort.response_renormalized
                 for col, val in zip(SESSION_COLS, keys, strict=True):
                     r[col] = val
                 model_logit_results.append(r)
@@ -2178,6 +2252,7 @@ def _audit_compare_and_publish(
         fit_inputs=cohort.fit_inputs,
         estimator=str(estimator),
         cli=sys.argv,
+        response_renormalized=cohort.response_renormalized,
     )
     logging.info(
         "Published %d model files and complete audit bundle to %s",

@@ -607,3 +607,171 @@ def test_parser_defaults_to_the_nine_arm_candidate_set() -> None:
     parser = mod._build_arg_parser()
     assert parser.parse_args([]).leaf_only is False
     assert parser.parse_args(["--leaf-only"]).leaf_only is True
+
+
+# ── Leaf-only response renormalization ──
+
+
+def _table_with_trunk_mass(trunk_only_event: str | None = None) -> pd.DataFrame:
+    """Three events; each puts a third of its mass on the trunk arms.
+
+    ``trunk_only_event`` puts *all* of one event's mass on the trunks, leaving
+    it nothing on the leaves.
+    """
+    trunks = [arm for arm in ALL_ARMS if arm >= len(WELL_ARMS)]
+    rows = []
+    for index in range(3):
+        event = f"e{index}"
+        current = index % len(WELL_ARMS)
+        counts = np.zeros(len(ALL_ARMS))
+        if event == trunk_only_event:
+            counts[trunks] = 4.0
+        else:
+            counts[current] = 6.0
+            counts[(current + 1) % len(WELL_ARMS)] = 2.0
+            counts[trunks[0]] = 4.0
+        fractions = counts / counts.sum()
+        for arm in ALL_ARMS:
+            rows.append(
+                {
+                    "animal": "chimi",
+                    "session_date": "20200212",
+                    "epoch": "02_r1",
+                    "event_id": event,
+                    "candidate_arm": arm,
+                    "arm_count_hard": counts[arm],
+                    "arm_fraction": fractions[arm],
+                    "is_current_arm": float(arm == current),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_leaf_fractions_are_rescaled_to_unit_mass_per_event() -> None:
+    """Without this an event's weight is its leaf share, not one observation."""
+    table = _table_with_trunk_mass()
+    leaves, renormalized = mod.leaf_only_cohort(
+        table, response_col="arm_fraction", response="fraction"
+    )
+
+    assert renormalized is True
+    sums = leaves.groupby("event_id")["arm_fraction"].sum()
+    assert np.allclose(sums.to_numpy(), 1.0, atol=1e-12)
+    # e0 held 6/12 and 2/12 on two leaves and 4/12 on a trunk; over the leaves
+    # that is 0.75 and 0.25.
+    e0 = leaves[leaves["event_id"].eq("e0")].set_index("candidate_arm")["arm_fraction"]
+    assert e0[0] == pytest.approx(0.75)
+    assert e0[1] == pytest.approx(0.25)
+    assert e0[2] == pytest.approx(0.0)
+
+
+def test_leaf_only_count_response_keeps_its_timebin_counts() -> None:
+    table = _table_with_trunk_mass()
+    leaves, renormalized = mod.leaf_only_cohort(
+        table, response_col="arm_count_hard", response="hard_count"
+    )
+
+    assert renormalized is False
+    expected = table[table["candidate_arm"] < 6]["arm_count_hard"].to_numpy()
+    assert np.array_equal(leaves["arm_count_hard"].to_numpy(), expected)
+    assert leaves.groupby("event_id")["arm_count_hard"].sum().eq(8.0).all()
+
+
+def test_event_with_only_trunk_mass_becomes_a_zero_response_drop() -> None:
+    """It has no leaf allocation to fit, and the audit must say so."""
+    leaves, _renormalized = mod.leaf_only_cohort(
+        _table_with_trunk_mass(trunk_only_event="e1"),
+        response_col="arm_fraction",
+        response="fraction",
+    )
+
+    e1 = leaves[leaves["event_id"].eq("e1")]["arm_fraction"]
+    assert e1.isna().all()
+    assert mod._zero_response_event_ids(
+        leaves, event_col="event_id", response_col="arm_fraction"
+    ) == {"e1"}
+
+    buckets = event_drop_buckets(
+        leaves,
+        event_col="event_id",
+        response_col="arm_fraction",
+        own_predictors=["is_current_arm"],
+        union_predictors=["is_current_arm"],
+    )
+    assert buckets["n_drop_zero_response"] == 1
+    assert buckets["dropped_event_ids"] == {"e1"}
+    # The other two events keep unit mass.
+    kept = leaves[~leaves["event_id"].eq("e1")]
+    assert np.allclose(kept.groupby("event_id")["arm_fraction"].sum(), 1.0, atol=1e-12)
+
+
+def test_partially_defined_event_has_no_total_to_rescale_by() -> None:
+    table = _table_with_trunk_mass()
+    table.loc[
+        table["event_id"].eq("e0") & table["candidate_arm"].eq(2), "arm_fraction"
+    ] = np.nan
+
+    with pytest.raises(ValueError, match="not summing to 1.0"):
+        mod.leaf_only_cohort(table, response_col="arm_fraction", response="fraction")
+
+
+def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
+    table = tmp_path / "event_arm_table.pkl"
+    write_table(_canonical_arm_table(), table)
+    frame = pd.DataFrame({"model": ["X"], "coef_is_current_arm": [0.5]})
+    output_dir = tmp_path / "models_leaf"
+
+    mod._write_complete_output_bundle(
+        output_dir=output_dir,
+        model_results={"X": frame},
+        combined=frame,
+        cohort_audits=[],
+        comparison=pd.DataFrame(),
+        logit_results={},
+        fit_inputs=record_inputs({"event_arm_table": table}),
+        estimator="conditional_poisson_fraction",
+        cli=["fit_replay_content_models.py", "--leaf-only"],
+        response_renormalized=True,
+    )
+
+    record = json.loads((output_dir / "all_models.provenance.json").read_text())
+    assert record["response_renormalized"] is True
+
+
+def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None:
+    """End to end on simulated data: six-category null, and the rows say so."""
+    sim = _simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
+    long_df, renormalized = mod.leaf_only_cohort(
+        sim, response_col="arm_fraction", response="fraction"
+    )
+    complete = long_df.groupby("event_id")["arm_fraction"].transform(
+        lambda values: values.notna().all()
+    )
+    long_df = long_df[complete].reset_index(drop=True)
+
+    config = mod._RunConfig(
+        hierarchy=_ARM_LADDER,
+        input_dir=Path("/tmp/content-in"),
+        output_dir=Path("/tmp/content-in/models_leaf"),
+        table_name="event_arm_table",
+        model_names=["X"],
+    )
+    cohort = mod._ContentCohort(
+        long_df=long_df,
+        long_df_prefilter=sim,
+        valid_model_names=["X"],
+        union_predictors=["is_current_arm"],
+        response_col="arm_fraction",
+        event_col="event_id",
+        n_events_before_complete_case=int(sim["event_id"].nunique()),
+        fit_inputs={},
+        response_renormalized=renormalized,
+    )
+
+    results = mod._fit_content_ladder(_args(leaf_only=True, cv=False), config, cohort)
+
+    fitted = results["X"]
+    assert fitted["response_renormalized"].tolist() == [True]
+    n_events = int(fitted["n_events"].iloc[0])
+    # Unit mass per event against a six-category uniform null.
+    assert fitted["llf_null"].iloc[0] == pytest.approx(-n_events * np.log(6))

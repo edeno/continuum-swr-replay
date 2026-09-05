@@ -30,6 +30,7 @@ from pandas.api.types import is_bool_dtype, is_numeric_dtype
 __all__ = [
     "RESPONSE_CHOICES",
     "FRACTION_SUM_TOLERANCE",
+    "renormalize_fraction_over_candidates",
     "resolve_response_column",
     "validate_fraction_response",
 ]
@@ -168,3 +169,111 @@ def validate_fraction_response(
             f"whose {response_col} does not sum to 1.0 within {tolerance:g}; "
             f"worst is event {worst!r} at {per_event.loc[worst, 'sum']:.12g}"
         )
+
+
+def renormalize_fraction_over_candidates(
+    frame: pd.DataFrame,
+    *,
+    response_col: str,
+    event_col: str = "event_id",
+    tolerance: float = FRACTION_SUM_TOLERANCE,
+) -> pd.DataFrame:
+    """Rescale a fraction response to unit mass over the candidates still present.
+
+    The persisted fractions are shares of an event's whole non-local mass over
+    all nine arms (or three patches). A fit that conditions on a subset of the
+    candidates -- the six leaf arms -- keeps only part of that mass, and the
+    conditional likelihood weights an event by the total it carries. Left
+    unrescaled, an event that spent bins on the dropped candidates would count
+    for less than one observation, and that loss is not balanced across the
+    comparisons the ladders are for: SWR events put a substantially larger share
+    of their bins on the trunks than non-SWR events do, so an unrescaled
+    leaf-only fit would systematically downweight them. Dividing by the retained
+    per-event total restores one observation of unit mass per event, and asks
+    the intended question -- how the event distributed itself *among the
+    retained candidates*.
+
+    An event whose retained mass is zero has no allocation left to describe: its
+    response becomes NaN on every candidate, which the cohort freeze removes as
+    a zero-response drop (and the cohort audit records under
+    ``n_drop_zero_response``). An event that was already all-missing stays
+    all-missing.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Long-format candidate rows, already restricted to the retained
+        candidate set, one row per event x candidate.
+    response_col : str
+        The fraction column to rescale, e.g. ``arm_fraction``.
+    event_col : str, optional
+        Event grouping key.
+    tolerance : float, optional
+        How far a rescaled event's candidates may sum from 1.0.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of ``frame`` whose ``response_col`` sums to 1.0 within
+        ``tolerance`` for every event with retained mass, and is NaN for every
+        candidate of every other event.
+
+    Raises
+    ------
+    ValueError
+        If the column is absent or non-numeric, or if any event's rescaled
+        candidates fail to sum to 1.0 within ``tolerance`` -- which is what a
+        partially defined event (some candidates NaN, some not) produces, since
+        such an event has no total to divide by.
+    """
+    if response_col not in frame.columns:
+        raise ValueError(
+            f"Cannot renormalize {response_col!r} over the retained candidates: "
+            f"the frame has no such column (columns are {list(frame.columns)})"
+        )
+    series = frame[response_col]
+    if not is_numeric_dtype(series) or is_bool_dtype(series):
+        raise ValueError(
+            f"Cannot renormalize {response_col!r}: it must be numeric, got dtype "
+            f"{series.dtype}"
+        )
+
+    values = series.to_numpy(dtype=float)
+    events = frame[event_col].to_numpy()
+    per_event = (
+        pd.DataFrame({event_col: events, "_value": values})
+        .groupby(event_col, observed=True, sort=False)["_value"]
+        # skipna=False: an event with a missing candidate has no defined total,
+        # so it cannot be rescaled and must not be silently treated as if its
+        # observed candidates were the whole allocation.
+        .agg(size="size", count="count", total=lambda v: v.sum(skipna=False))
+    )
+    all_missing = per_event["count"].eq(0)
+    zero_mass = ~all_missing & per_event["total"].eq(0.0)
+
+    totals = per_event["total"].reindex(events).to_numpy(dtype=float)
+    # 0/0 and x/NaN are the undefined events, blanked immediately below.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rescaled = values / totals
+    undefined = (all_missing | zero_mass).reindex(events).to_numpy(dtype=bool)
+    rescaled[undefined] = np.nan
+
+    check = (
+        pd.DataFrame({event_col: events, "_value": rescaled})
+        .groupby(event_col, observed=True, sort=False)["_value"]
+        .agg(lambda v: v.sum(skipna=False))
+    )
+    off = ~(all_missing | zero_mass) & ~((check - 1.0).abs() <= tolerance)
+    if off.any():
+        worst = list(off.index[off][:3])
+        raise ValueError(
+            f"Renormalizing {response_col} over the retained candidates left "
+            f"{int(off.sum())} event(s) not summing to 1.0 within {tolerance:g} "
+            f"(e.g. {worst}, sums {[float(check[event]) for event in worst]}); "
+            "an event whose response is defined on only some of its retained "
+            "candidates has no total to divide by"
+        )
+
+    out = frame.copy()
+    out[response_col] = rescaled
+    return out

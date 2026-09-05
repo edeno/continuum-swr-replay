@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -152,6 +153,7 @@ def write_fit_provenance(
     inputs: dict[str, Path] | dict[str, InputRecord],
     estimator: str,
     cli: list[str],
+    extra: Mapping[str, object] | None = None,
 ) -> Path:
     """Write the provenance sidecar for a fitted artifact.
 
@@ -167,11 +169,20 @@ def write_fit_provenance(
         The estimator that produced the fits (e.g. ``"poisson_glm"``).
     cli : list of str
         The command line that produced the artifact, typically ``sys.argv``.
+    extra : Mapping of str to object, optional
+        Further JSON-serializable facts about how the fit was produced, merged
+        into the record (e.g. whether the response was rescaled to the fitted
+        candidate set). Keys the record already defines are refused.
 
     Returns
     -------
     Path
         The sidecar path written.
+
+    Raises
+    ------
+    ValueError
+        If ``extra`` would overwrite a field the sidecar defines itself.
     """
     artifact = Path(artifact_path)
     record = {
@@ -185,6 +196,14 @@ def write_fit_provenance(
         },
         "cli": list(cli),
     }
+    if extra:
+        clashes = sorted(set(extra) & set(record))
+        if clashes:
+            raise ValueError(
+                f"provenance extras {clashes} would overwrite the sidecar's own "
+                "fields; name them differently"
+            )
+        record.update(extra)
     out = fit_provenance_path(artifact)
     out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
     return out

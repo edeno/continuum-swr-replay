@@ -82,6 +82,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 )
 from continuum_swr_replay.analysis.replay.content_response import (
     RESPONSE_CHOICES,
+    renormalize_fraction_over_candidates,
     resolve_response_column,
     validate_fraction_response,
 )
@@ -662,10 +663,23 @@ def _run(
             pop_frame = splits[pop]
             fit_categories = n_categories
             fit_preds = preds
+            renormalized = False
             if leaf_only:
                 pop_frame = pop_frame[pop_frame["candidate_arm"] < LEAF_ONLY_N_CATEGORIES]
                 fit_categories = LEAF_ONLY_N_CATEGORIES
                 fit_preds = leaf_only_predictors(preds)
+                # A fraction is a share of the event's whole nine-arm mass, and
+                # the conditional likelihood weights an event by the total it
+                # carries, so dropping the trunks unrescaled would weight an
+                # event by its leaf share -- and SWR events put far more of
+                # their bins on the trunks than non-SWR events do, which is the
+                # very contrast being estimated. Rescale to unit mass over the
+                # six leaves. Counts keep their timebin weighting by design.
+                renormalized = response_col.endswith("_fraction")
+                if renormalized:
+                    pop_frame = renormalize_fraction_over_candidates(
+                        pop_frame, response_col=response_col
+                    )
             for keys, g in pop_frame.groupby(SC, sort=False):
                 sessions_in += 1
                 r, a = _fit_session(
@@ -707,6 +721,9 @@ def _run(
                         # which grain its llf/AIC/SEs are stated.
                         "estimator": r.get("estimator"),
                         "response_col": response_col,
+                        # True where the trunk rows were dropped and the
+                        # remaining fractions rescaled to unit mass per event.
+                        "response_renormalized": renormalized,
                         # fit-diagnostics flags (additive; drive the aggregation's
                         # session-level nonconverged/separated counts).
                         "converged": r.get("converged"),
@@ -809,6 +826,12 @@ def _provenance(
         "are not independent); primary population evidence is per-animal sign "
         "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
         "per population is applied to the descriptive session signed-rank p.",
+        # Leaf-only rungs condition on the six leaf arms, so on the fraction
+        # response their allocation is rescaled to unit mass over those six;
+        # every other rung is fit on the table's own nine-arm fractions.
+        "response_renormalized_rungs": (
+            sorted(LEAF_ONLY_CONTRAST_RUNGS) if args.response == "fraction" else []
+        ),
         "q_arm_source": (
             "beta-bernoulli per-arm value "
             "(reward_belief_mean_candidate_arm_preoutcome)"
