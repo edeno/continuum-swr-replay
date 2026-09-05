@@ -1055,7 +1055,6 @@ CONTENT_BUNDLES = (
     "models_patch_swr_F",
 )
 DEFAULT_CONTENT_BACKUP_ROOT = RC / "_pre_fix_backup_20260905"
-CONTENT_SC = ["animal", "session_date", "epoch"]
 # Terms carried by every rung above M0a purely to absorb each arm's static
 # occupancy. Sorted last so the scientific terms lead the coefficient table.
 CONTENT_NUISANCE_PREFIX = "is_candidate_arm_"
@@ -1170,7 +1169,7 @@ def content_scale_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
                 if "response_col" in frame.columns
                 else "(unstated)"
             ),
-            "n_sessions": int(frame.groupby(CONTENT_SC).ngroups) if len(frame) else 0,
+            "n_sessions": int(frame.groupby(SC).ngroups) if len(frame) else 0,
             "n_rungs": int(frame["model"].nunique()) if len(frame) else 0,
         }
 
