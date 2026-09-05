@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import re
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -352,10 +353,17 @@ def _suffixed_side(
     unsuffixed so the two sides merge on them, and tag everything else with which
     fit it came from. Columns absent from ``df`` are simply not carried, so a
     frame that predates a column joins without a KeyError.
+
+    An EMPTY side still contributes its suffixed columns, with no rows, so the
+    join leaves them all-NaN rather than dropping them: a side that produced
+    nothing is a result to display (that stratum or fit is empty), and a table
+    that silently loses its columns hides it.
     """
     keys = list(keys)
     if df.empty:
-        return pd.DataFrame(columns=keys)
+        return pd.DataFrame(
+            columns=[*keys, *(f"{c}{suffix}" for c in cols if c not in keys)]
+        )
     have = [c for c in cols if c in df.columns]
     return df[have].rename(columns={c: f"{c}{suffix}" for c in have if c not in keys})
 
@@ -1131,6 +1139,16 @@ SUPERSEDED_CONTENT_BUNDLES = {
         "within-event distribution as well. Backed up, not refit."
     ),
 }
+# Why a particular bundle's two sides hold no rung in common. This is bundle
+# history, not something the rung sets themselves can establish, so it is stated
+# here and passed to the (otherwise neutral) note builder.
+DISJOINT_BUNDLE_NOTES = {
+    "models": (
+        "A partial run had published into this canonical directory before the "
+        "partial-ladder guard existed, so there is no count-response fit of the "
+        "refitted rungs to compare against."
+    ),
+}
 DEFAULT_CONTENT_BACKUP_ROOT = RC / "_pre_fix_backup_20260905"
 # Terms carried by every rung above M0a purely to absorb each arm's static
 # occupancy. Sorted last so the scientific terms lead the coefficient table.
@@ -1394,6 +1412,33 @@ def content_separation_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
+_NT_TWIN_RUNG = re.compile(r"^(CP?S\d+)nt(_.*)$")
+
+
+def rung_sort_key(model: str) -> tuple[str, int]:
+    """Sort key placing an ``nt`` twin immediately after its controlled rung.
+
+    A twin's ``swr_x_`` coefficient is the TOTAL SWR effect and its controlled
+    rung's is the length-adjusted (direct) one; the pair is only readable side
+    by side, and plain alphabetical order separates them (``CS5b`` sorts between
+    ``CS5_armvalue`` and ``CS5nt_armvalue``).
+
+    Parameters
+    ----------
+    model : str
+        Rung name.
+
+    Returns
+    -------
+    (str, int)
+        The controlled rung's name, and 0 for it / 1 for its twin.
+    """
+    match = _NT_TWIN_RUNG.match(model)
+    if match is None:
+        return (model, 0)
+    return (f"{match.group(1)}{match.group(2)}", 1)
+
+
 def contrast_audited_table(
     old: pd.DataFrame, new: pd.DataFrame, terms: set[str] | None = None
 ) -> pd.DataFrame:
@@ -1413,11 +1458,11 @@ def contrast_audited_table(
         "coef_session_median",
         "typical_session_se",
         "se_source",
-        # The per-SD unit travels with the standardized coefficient. Ruling 5
-        # moved the arm belief terms' SD onto leaf-arm support (e.g.
-        # reward_belief_mean_candidate_arm_preoutcome 0.2493 -> 0.1190), so a
-        # std_coef before and a std_coef after are stated per DIFFERENT SD and
-        # must not be differenced without reading these two columns.
+        # The per-SD unit travels with the standardized coefficient. The arm
+        # belief terms' SD moved onto leaf-arm support, so a std_coef before and
+        # a std_coef after are stated per DIFFERENT SD and must not be
+        # differenced without reading these two columns; the sizes are in the
+        # std_factor columns themselves, not repeated here.
         "std_unit",
         "std_factor",
         "std_coef_animal_median",
@@ -1429,7 +1474,14 @@ def contrast_audited_table(
     )
     if terms is not None:
         merged = merged[merged["term"].isin(terms)]
-    return merged.sort_values(keys).reset_index(drop=True)
+    # Each rung next to its ``nt`` twin: the direct and total SWR effects of one
+    # term are read as a pair, not from two ends of the table.
+    return (
+        merged.assign(_rung_order=merged["model"].map(rung_sort_key))
+        .sort_values(["level", "_rung_order", "population", "term"])
+        .drop(columns="_rung_order")
+        .reset_index(drop=True)
+    )
 
 
 def contrast_design_delta_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
@@ -1490,23 +1542,35 @@ def contrast_stratum_table(
     ]
     merged: pd.DataFrame | None = None
     for name, df in strata.items():
-        if df.empty:
-            continue
-        side = _suffixed_side(df[df["term"].isin(terms)], keys, wanted, f"_{name}")
+        # An empty stratum keeps its (all-NaN) columns rather than vanishing from
+        # the table: "this stratum fitted nothing" is the finding.
+        rows = df if df.empty else df[df["term"].isin(terms)]
+        side = _suffixed_side(rows, keys, wanted, f"_{name}")
         merged = side if merged is None else merged.merge(side, on=keys, how="outer")
     if merged is None:
         return pd.DataFrame()
     return merged.sort_values(keys).reset_index(drop=True)
 
 
-def _disjoint_rungs_note(old: pd.DataFrame, new: pd.DataFrame) -> str:
+def _disjoint_rungs_note(old: pd.DataFrame, new: pd.DataFrame, note: str = "") -> str:
     """Prose when a bundle's two sides share no rung, naming what each side holds.
 
-    Derived, not asserted: the canonical ``models/`` bundle was overwritten by a
-    partial belief run before the partial-ladder guard existed, so its "before"
-    holds Mv/Mu/Mvu and its "after" the M0-M6 default ladder. Every per-rung row
-    in such a bundle reads ``0 before / N after`` and would otherwise look like a
-    cohort collapse.
+    The note states only what the frames show: which rungs each side holds and
+    that nothing in the bundle is a before/after comparison. WHY they are
+    disjoint is a fact about a particular bundle's history, not something the
+    rung sets can establish, so the caller supplies it.
+
+    Parameters
+    ----------
+    old, new : pandas.DataFrame
+        The two sides' per-session fits; ``model`` names the rung.
+    note : str, optional
+        Bundle-specific explanation of the disjointness, appended verbatim.
+
+    Returns
+    -------
+    str
+        The note, or ``""`` when the sides share a rung (or either is empty).
     """
     if old.empty or new.empty:
         return ""
@@ -1516,12 +1580,10 @@ def _disjoint_rungs_note(old: pd.DataFrame, new: pd.DataFrame) -> str:
         return ""
     return (
         "**No rung is present on both sides of this bundle**, so every row below "
-        f"reads `0 before` or `0 after` and nothing here is a before/after "
-        f"comparison. The pre-fix bundle holds {', '.join(sorted(old_rungs))}; "
-        f"the refit holds {', '.join(sorted(new_rungs))}. A partial run had "
-        "published into this canonical directory before the partial-ladder guard "
-        "existed, so there is no count-response fit of the refitted rungs to "
-        "compare against.\n"
+        "reads `0 before` or `0 after` and nothing here is a before/after "
+        f"comparison: the two sides fitted disjoint rung sets. The pre-fix bundle "
+        f"holds {', '.join(sorted(old_rungs))}; the refit holds "
+        f"{', '.join(sorted(new_rungs))}." + (f" {note}" if note else "") + "\n"
     )
 
 
@@ -1539,6 +1601,8 @@ def _stratum_power_note(table: pd.DataFrame, strata: Sequence[str]) -> str:
             continue
         counts = pd.to_numeric(table[col], errors="coerce").dropna()
         if counts.empty:
+            # The stratum's column is present but carries no fitted row at all.
+            parts.append(f"`{name}` 0 sessions")
             continue
         parts.append(
             f"`{name}` {int(counts.min())}-{int(counts.max())} "
@@ -1552,6 +1616,39 @@ def _stratum_power_note(table: pd.DataFrame, strata: Sequence[str]) -> str:
         + ". A stratum whose rungs rest on a handful of sessions is reported for "
         "completeness and is not population evidence.\n"
     )
+
+
+# The arm covariate whose per-SD unit moved onto leaf-arm support. Named once so
+# the header prose reads the sizes from the fits rather than restating them.
+_ARM_BELIEF_COVARIATE = "reward_belief_mean_candidate_arm_preoutcome"
+
+
+def _per_sd_units(frame: pd.DataFrame, covariate: str) -> str:
+    """The per-SD unit(s) ``frame`` states ``covariate``'s coefficients in.
+
+    Read from the audited rows' own ``std_factor`` so the prose cannot state a
+    unit the fits do not use.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        An audited contrast table (``term``, ``std_factor``).
+    covariate : str
+        The bare covariate; its ``swr_x_`` product is matched too.
+
+    Returns
+    -------
+    str
+        The distinct factors, formatted; ``"not fitted"`` when the covariate has
+        no row (an empty side, or a fit that never carried the term).
+    """
+    if frame.empty or "std_factor" not in frame.columns:
+        return "not fitted"
+    rows = frame[frame["term"].isin({covariate, f"swr_x_{covariate}"})]
+    factors = pd.to_numeric(rows["std_factor"], errors="coerce").dropna().unique()
+    if not len(factors):
+        return "not fitted"
+    return ", ".join(f"{value:.4f}" for value in sorted(factors))
 
 
 def build_content_report(
@@ -1595,16 +1692,23 @@ def build_content_report(
         "after, so the before/after ΔAIC columns are **different scales** and "
         "must never be differenced or read as an effect change.\n"
     )
+    before_unit = _per_sd_units(
+        contrast.get("audited_before", pd.DataFrame()), _ARM_BELIEF_COVARIATE
+    )
+    after_unit = _per_sd_units(
+        contrast.get("audited_after", pd.DataFrame()), _ARM_BELIEF_COVARIATE
+    )
     add(
         "**The per-SD unit also changed for the arm belief terms.** Their SDs are "
         "now taken over the leaf arms only -- the trunks are a structural zero for "
         "every one of them, so nine-arm rows measured a spread the fitted rows "
-        "never see. `reward_belief_mean_candidate_arm_preoutcome` moved from "
-        "0.2493 (all rows) to 0.1190 (leaf arms), a factor of 2.1. A "
-        "`std_coef_*_before` and a `std_coef_*_after` are therefore stated per "
-        "DIFFERENT SD: the `std_unit` / `std_factor` columns below carry each "
-        "side's unit, and the std_coef columns **must not be differenced across "
-        "the change**. Compare the raw `coef_*` columns instead.\n"
+        f"never see. `{_ARM_BELIEF_COVARIATE}` is stated per {before_unit} (all "
+        f"rows) before and per {after_unit} (leaf arms) after, read from the "
+        "fits' own `std_factor`. A `std_coef_*_before` and a `std_coef_*_after` "
+        "are therefore stated per DIFFERENT SD: the `std_unit` / `std_factor` "
+        "columns below carry each side's unit, and the std_coef columns **must "
+        "not be differenced across the change**. Compare the raw `coef_*` "
+        "columns instead.\n"
     )
     add("## Inputs\n")
     rows = []
@@ -1631,7 +1735,9 @@ def build_content_report(
 
     for name, (old, new, old_cmp, new_cmp) in bundles.items():
         add(f"\n## Bundle `{name}`\n")
-        disjoint = _disjoint_rungs_note(old, new)
+        disjoint = _disjoint_rungs_note(
+            old, new, note=DISJOINT_BUNDLE_NOTES.get(name, "")
+        )
         if disjoint:
             add(disjoint)
         add("### Response and cohort\n")

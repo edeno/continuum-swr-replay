@@ -29,6 +29,7 @@ from scripts.qa.compare_fits import (
     contrast_audited_table,
     contrast_design_delta_table,
     contrast_stratum_table,
+    rung_sort_key,
 )
 
 TERM = "is_current_arm"
@@ -439,6 +440,24 @@ def test_a_bundle_whose_rungs_do_not_overlap_says_so():
     assert _disjoint_rungs_note(new, new) == ""
 
 
+def test_the_disjointness_note_states_no_cause_the_frames_cannot_show():
+    """WHY two sides are disjoint is bundle history, supplied by the caller.
+
+    The rung sets establish only THAT they are disjoint; asserting a cause for
+    every bundle would attribute one bundle's history to all of them.
+    """
+    old = _old().assign(model="Mu")
+    new = _new().assign(model="M1")
+
+    derived = _disjoint_rungs_note(old, new)
+    explained = _disjoint_rungs_note(old, new, note="A partial run published here.")
+
+    assert "fitted disjoint rung sets" in derived
+    assert "partial" not in derived
+    assert explained.startswith(derived.rstrip("\n"))
+    assert "A partial run published here." in explained
+
+
 def test_a_thin_stratum_reports_how_many_sessions_it_rests_on():
     table = pd.DataFrame(
         [
@@ -454,6 +473,20 @@ def test_a_thin_stratum_reports_how_many_sessions_it_rests_on():
     assert "not population evidence" in note
 
 
+def test_an_empty_stratum_stays_in_the_table_and_reports_zero_sessions():
+    """A stratum that fitted nothing is a finding, not a column to drop."""
+    audited = _audited(std_factor=8.4, coef=0.24)
+    terms = {"swr_x_reward_belief_mean_candidate_arm_preoutcome"}
+
+    table = contrast_stratum_table({"all": audited, "omitted": pd.DataFrame()}, terms)
+
+    assert "n_sessions_omitted" in table.columns
+    assert "coef_animal_median_omitted" in table.columns
+    assert table["n_sessions_omitted"].isna().all()
+    assert table.loc[0, "coef_animal_median_all"] == pytest.approx(0.24)
+    assert "`omitted` 0 sessions" in _stratum_power_note(table, ["all", "omitted"])
+
+
 def test_a_missing_label_renders_as_an_em_dash_not_the_string_nan():
     """An outer join leaves NaN in label columns; "nan" reads as a value."""
     frame = pd.DataFrame([{"se_source_after": np.nan, "n_sessions_after": np.nan}])
@@ -462,3 +495,29 @@ def test_a_missing_label_renders_as_an_em_dash_not_the_string_nan():
 
     assert "nan" not in rendered
     assert rendered.count("—") == 2
+
+
+def test_each_rung_prints_next_to_its_uncontrolled_twin():
+    """The direct and total SWR effects of one term are read as a pair.
+
+    Alphabetically ``CS5b_valuevsprevgoal`` falls between ``CS5_armvalue`` and
+    its twin, which would put the pair on either side of a third rung.
+    """
+    term = "swr_x_reward_belief_mean_candidate_arm_preoutcome"
+    rungs = ["CS5nt_armvalue", "CS5b_valuevsprevgoal", "CS5_armvalue", "CS1_current"]
+    audited = pd.concat(
+        [_audited(std_factor=8.4, coef=0.2).assign(model=name) for name in rungs],
+        ignore_index=True,
+    ).assign(term=term)
+
+    table = contrast_audited_table(audited, audited, {term})
+
+    assert list(table["model"]) == [
+        "CS1_current",
+        "CS5_armvalue",
+        "CS5nt_armvalue",
+        "CS5b_valuevsprevgoal",
+    ]
+    assert rung_sort_key("CS5nt_armvalue") == ("CS5_armvalue", 1)
+    assert rung_sort_key("CPS1nt_current") == ("CPS1_current", 1)
+    assert rung_sort_key("C13_armuncert") == ("C13_armuncert", 0)
