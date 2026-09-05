@@ -28,6 +28,10 @@ own ``_hard_count`` directory.
 Any run that is not the full default ladder is fit on its own complete-case
 cohort, so it publishes into a directory keyed by the rungs it requested
 (``models_M5-Mv-Mu-Mvu/``) rather than into the canonical ``models/`` bundle.
+``--leaf-only`` conditions on the six leaf arms rather than all nine candidates
+-- the Beta-belief covariates are structural zeros on the trunks -- which is a
+six-category likelihood and so gets its own ``_leaf`` bundle; the belief rungs'
+parents must be requested in the same run to keep the AIC comparisons nested.
 Every pickle in a published bundle carries a ``.provenance.json`` sidecar naming
 the table it was fit on and that table's SHA-256 as of the read, which the
 figure and summary scripts check before reading the fit.
@@ -37,6 +41,7 @@ Usage:
     uv run python scripts/content/fit_replay_content_models.py --response hard_count
     uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
     uv run python scripts/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
+    uv run python scripts/content/fit_replay_content_models.py --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu
     uv run python scripts/content/fit_replay_content_models.py --cv           # + CV
     uv run python scripts/content/fit_replay_content_models.py --logit        # + logit robustness
 """
@@ -93,6 +98,7 @@ from continuum_swr_replay.analysis.replay.model_comparison import (
     run_full_hierarchy_comparison,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
+    LEAF_ONLY_N_CATEGORIES,
     MODEL_HIERARCHY,
     MODEL_HIERARCHY_MUA,
     MODEL_HIERARCHY_SWR,
@@ -101,6 +107,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PATCH_SWR,
     ModelSpec,
     default_content_model_names,
+    leaf_only_predictors,
 )
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
@@ -503,13 +510,14 @@ def canonical_output_subdir(
     swr_subset: str,
     grain: str,
     response: str = "fraction",
+    leaf_only: bool = False,
 ) -> str:
     """Directory name a FULL-ladder run of one configuration publishes into.
 
     The base name comes from :func:`resolve_contfrag_paths`; the SWR subset, the
-    event grain and the response scale each append a suffix, in that order, so
-    an event-grain subset run has its own bundle rather than publishing over the
-    timebin one.
+    event grain, the response scale and the candidate set each append a suffix,
+    in that order, so an event-grain subset run has its own bundle rather than
+    publishing over the timebin one.
 
     Parameters
     ----------
@@ -528,12 +536,28 @@ def canonical_output_subdir(
         suffix. A count fit states its likelihood, AIC and SEs at the timebin
         grain rather than the event grain, so its rungs are not comparable with
         a fraction bundle's and must not replace them.
+    leaf_only : bool, optional
+        Whether the fit conditions on the six leaf arms instead of all nine
+        candidates. A six-category conditional likelihood is on a different
+        scale from a nine-category one, so a leaf-only ladder gets its own
+        ``_leaf`` bundle.
 
     Returns
     -------
     str
         The bundle directory name, relative to the run's input directory.
+
+    Raises
+    ------
+    ValueError
+        If ``leaf_only`` is requested for the patch hierarchy, which has no
+        leaf subset.
     """
+    if leaf_only and hierarchy_kind == "patch":
+        raise ValueError(
+            "leaf_only is an arm-hierarchy candidate set; the three patches are "
+            "not arms and have no leaf subset."
+        )
     _table_name, subdir = resolve_contfrag_paths(
         event_source, brain_area, hierarchy_kind
     )
@@ -543,6 +567,8 @@ def canonical_output_subdir(
         subdir = f"{subdir}_event_grain"
     if response != "fraction":
         subdir = f"{subdir}_{response}"
+    if leaf_only:
+        subdir = f"{subdir}_leaf"
     return subdir
 
 
@@ -555,14 +581,98 @@ def canonical_output_subdirs() -> frozenset[str]:
     the CLI choice tuples, so it cannot drift from the names full runs produce.
     """
     return frozenset(
-        canonical_output_subdir(source, area, hierarchy_kind, subset, grain, response)
+        canonical_output_subdir(
+            source, area, hierarchy_kind, subset, grain, response, leaf_only
+        )
         for source in EVENT_SOURCE_CHOICES
         for area in BRAIN_AREA_CHOICES
         for hierarchy_kind in HIERARCHY_CHOICES
         for subset in SWR_SUBSET_CHOICES
         for grain in GRAIN_CHOICES
         for response in RESPONSE_CHOICES
+        # The patch hierarchy has no leaf-only variant to guard.
+        for leaf_only in ((False,) if hierarchy_kind == "patch" else (False, True))
     )
+
+
+def fit_n_categories(hierarchy_kind: str, leaf_only: bool) -> int:
+    """Number of candidate categories the conditional likelihood conditions on.
+
+    The null likelihood, pseudo-R² and cross-validation baselines are all stated
+    against uniform allocation over this many slots, so it must match the rows
+    actually fitted: nine arms, three patches, or the six leaf arms.
+
+    Parameters
+    ----------
+    hierarchy_kind : str
+        One of :data:`HIERARCHY_CHOICES`.
+    leaf_only : bool
+        Whether the trunk-arm rows were dropped from the cohort.
+
+    Returns
+    -------
+    int
+        ``3`` for the patch hierarchy, ``6`` for a leaf-only arm fit, ``9``
+        otherwise.
+    """
+    if hierarchy_kind == "patch":
+        return 3
+    return LEAF_ONLY_N_CATEGORIES if leaf_only else 9
+
+
+def rung_predictors(spec: ModelSpec, leaf_only: bool) -> list[str]:
+    """Predictors one rung is fitted with, under the run's candidate set.
+
+    On a leaf-only fit the arm dummies for arms 5-7 are identically zero (arm 5
+    becomes the reference and the two trunk dummies have no rows left), so the
+    design is rank-deficient unless they are dropped.
+
+    Parameters
+    ----------
+    spec : ModelSpec
+        The rung's specification.
+    leaf_only : bool
+        Whether the fit conditions on the six leaf arms.
+
+    Returns
+    -------
+    list[str]
+        Column names for this rung's design matrix.
+    """
+    predictors = list(spec.predictors)
+    return leaf_only_predictors(predictors) if leaf_only else predictors
+
+
+def restrict_to_leaf_arms(long_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep only the six leaf-arm candidate rows of every event.
+
+    The trunk rows are dropped, not folded into the leaves: each retained row
+    keeps the allocation it had over the nine candidates, so an event whose
+    replay ran along a trunk contributes correspondingly less mass to the
+    conditional likelihood.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format event × candidate-arm frame carrying ``candidate_arm``.
+
+    Returns
+    -------
+    pd.DataFrame
+        The leaf-arm rows, with a fresh index.
+
+    Raises
+    ------
+    ValueError
+        If ``candidate_arm`` is absent.
+    """
+    if "candidate_arm" not in long_df.columns:
+        raise ValueError(
+            "A leaf-only fit needs the candidate_arm column to identify the leaf "
+            f"rows; columns are {list(long_df.columns)}."
+        )
+    leaves = long_df["candidate_arm"] < LEAF_ONLY_N_CATEGORIES
+    return long_df.loc[leaves].reset_index(drop=True)
 
 
 def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
@@ -1346,6 +1456,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--leaf-only",
+        action="store_true",
+        help=(
+            "Condition on the six leaf arms instead of all nine candidates. "
+            "The Beta-belief covariates (Mv/Mu/Mvu) are structural zeros on the "
+            "three trunks, which inflates their within-event collinearity when "
+            "the trunks are carried; fitting them leaf-only requires their "
+            "parent rungs to be leaf-only too, so request the whole chain in "
+            "one run (--leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu). The "
+            "arm dummies for arms 5-7 are dropped (arm 5 is the reference) and "
+            "the null baseline becomes log(6). Arm hierarchy only; publishes to "
+            "a '_leaf' output directory."
+        ),
+    )
+    parser.add_argument(
         "--swr-subset",
         type=str,
         default="all",
@@ -1423,6 +1548,12 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     # --hierarchy flag overrides the model dict and table name when
     # 'patch' is selected; the input directory follows the event source.
     source_config = _EVENT_SOURCE_CONFIG[args.event_source]
+    if args.leaf_only and args.hierarchy == "patch":
+        raise ValueError(
+            "--leaf-only restricts the nine candidate arms to the six leaves; "
+            "the patch hierarchy's three candidates are patches, not arms, and "
+            "have no leaf subset. Drop --leaf-only or use --hierarchy arm."
+        )
     if args.hierarchy == "patch":
         override = _PATCH_OVERRIDES[args.event_source]
         hierarchy = override["hierarchy"]
@@ -1478,7 +1609,12 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         args.swr_subset,
         args.grain,
         args.response,
+        args.leaf_only,
     )
+    if args.leaf_only:
+        logging.info(
+            "candidate set = %d leaf arms -> %s", LEAF_ONLY_N_CATEGORIES, output_dir
+        )
     if args.response != "fraction":
         logging.info("response = %s -> %s", args.response, output_dir)
     if args.grain == "event":
@@ -1644,6 +1780,20 @@ def _load_and_filter_cohort(
             100 * long_df[event_col].nunique() / max(n_before_events, 1),
         )
 
+    # Candidate set: the six leaf arms, when asked for. Applied before the
+    # complete-case freeze so the cohort is the set of events the leaf-only
+    # likelihood can actually use -- an event with no leaf mass left has a zero
+    # response and is dropped there, and named as such in the audit.
+    if args.leaf_only:
+        n_before_rows = len(long_df)
+        long_df = restrict_to_leaf_arms(long_df)
+        logging.info(
+            "candidate set = %d leaf arms: %d -> %d rows",
+            LEAF_ONLY_N_CATEGORIES,
+            n_before_rows,
+            len(long_df),
+        )
+
     # Pre-filter to common complete-case event set: drop entire events
     # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
     # Keep the pre-filter frame for the cohort audit (per-model drop attribution).
@@ -1730,17 +1880,18 @@ def _fit_content_ladder(
     fit_results: dict[str, pd.DataFrame] = {}
     for model_name in valid_model_names:
         spec = hierarchy[model_name]
-        predictors = list(spec.predictors)
+        predictors = rung_predictors(spec, args.leaf_only)
         cv_label = " + CV" if args.cv else ""
         logging.info(
             "Fitting %s (%d predictors%s)...", model_name, len(predictors), cv_label
         )
         t0 = time.time()
 
-        # Patch hierarchy collapses 9 arms to 3 patches; the null /
-        # pseudo-R² / CV baselines must use log(3) instead of log(9)
-        # for P0–P3 to be on the right chance footing.
-        n_categories = 3 if args.hierarchy == "patch" else 9
+        # Patch hierarchy collapses 9 arms to 3 patches and --leaf-only drops
+        # the 9 arms to 6 leaves; the null / pseudo-R² / CV baselines must use
+        # log(3) or log(6) instead of log(9) for those fits to be on the right
+        # chance footing.
+        n_categories = fit_n_categories(args.hierarchy, args.leaf_only)
 
         mdf = fit_model_per_session(
             long_df,
@@ -1816,7 +1967,7 @@ def _fit_conditional_logit_robustness(
         )
         for model_name in expected_logit_models:
             spec = hierarchy[model_name]
-            predictors = list(spec.predictors)
+            predictors = rung_predictors(spec, args.leaf_only)
 
             model_logit_results = []
             for keys, group in matched_long_df.groupby(SESSION_COLS):
@@ -1919,7 +2070,7 @@ def _audit_compare_and_publish(
         long_df_prefilter, event_col=event_col, response_col=response_col
     )
     for model_name, mdf in model_results.items():
-        predictors = list(hierarchy[model_name].predictors)
+        predictors = rung_predictors(hierarchy[model_name], args.leaf_only)
 
         # Cohort-audit record (grain=event, common complete-case cohort). Attribute
         # the union-filter drops to this rung's own vs the other rungs' predictors.

@@ -1377,11 +1377,14 @@ SWR_CONTRAST_CONTENT_BASEC_PATCH_NT = BASEc_PATCH_NT
 # the nine-arm design still retains trunk response rows, but structural zeros no
 # longer determine the scale of value/uncertainty coefficients.
 #
-# Restricted to the standalone contrast rungs. The arm-ladder belief rungs
-# (Mv/Mu/Mvu) are nested -- their parents are M4 and Mu, fitted over nine arms --
-# and changing the candidate set changes the conditional likelihood, so a
-# leaf-only Mv could not be compared to a nine-arm M4 by ΔAIC. Making those
-# leaf-only would require a leaf-only parent rung as well.
+# Restricted to the standalone contrast rungs, which are fitted one rung at a
+# time and so can switch candidate sets individually. The arm-ladder belief
+# rungs (Mv/Mu/Mvu) are nested -- their parents are M4 and Mu -- and changing
+# the candidate set changes the conditional likelihood, so a leaf-only Mv
+# cannot be compared to a nine-arm M4 by ΔAIC. They are instead compared to
+# leaf-only M0-M4 fitted in the same run: ``fit_replay_content_models.py
+# --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu`` restricts the whole chain
+# to the six leaves, so every rung in it shares one six-category likelihood.
 LEAF_ONLY_CONTRAST_RUNGS = frozenset(
     {
         "C4_armvalue",

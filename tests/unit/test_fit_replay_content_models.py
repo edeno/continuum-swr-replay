@@ -45,6 +45,7 @@ def _args(**overrides) -> argparse.Namespace:
         "swr_subset": "all",
         "grain": "timebin",
         "response": "fraction",
+        "leaf_only": False,
         "input_dir": Path("/tmp/content-in"),
         "output_dir": None,
         "models": None,
@@ -506,3 +507,103 @@ def test_zero_response_events_cover_undefined_and_empty_allocations() -> None:
     assert mod._zero_response_event_ids(
         frame, event_col="event_id", response_col="arm_fraction"
     ) == {"b", "c"}
+
+
+# ── Leaf-only candidate set ──
+
+
+def test_leaf_only_run_publishes_to_its_own_bundle() -> None:
+    """A six-arm fit is a different likelihood, so it gets a different bundle."""
+    config = mod._resolve_run_config(_args(leaf_only=True))
+    assert config.output_dir == Path("/tmp/content-in/models_leaf")
+    assert "models_leaf" in mod.canonical_output_subdirs()
+    assert "models_swr_T_leaf" in mod.canonical_output_subdirs()
+    assert "models_hard_count_leaf" in mod.canonical_output_subdirs()
+
+
+def test_leaf_only_fits_six_candidates_not_nine() -> None:
+    assert mod.fit_n_categories("arm", leaf_only=True) == 6
+    assert mod.fit_n_categories("arm", leaf_only=False) == 9
+    assert mod.fit_n_categories("patch", leaf_only=False) == 3
+
+
+def test_leaf_only_drops_the_trunk_arm_fixed_effects_from_every_rung() -> None:
+    """Arms 6 and 7 are identically zero on leaves; the ladder must not carry them."""
+    for name, spec in mod.MODEL_HIERARCHY.items():
+        predictors = mod.rung_predictors(spec, leaf_only=True)
+        assert "is_candidate_arm_5" not in predictors, name
+        assert "is_candidate_arm_6" not in predictors, name
+        assert "is_candidate_arm_7" not in predictors, name
+        # Everything that is not a dropped arm dummy survives, in order.
+        assert predictors == [
+            p
+            for p in spec.predictors
+            if p
+            not in {
+                "is_candidate_arm_5",
+                "is_candidate_arm_6",
+                "is_candidate_arm_7",
+            }
+        ], name
+        assert mod.rung_predictors(spec, leaf_only=False) == list(spec.predictors)
+
+    arm_fe = mod.rung_predictors(mod.MODEL_HIERARCHY["M0a"], leaf_only=True)
+    assert arm_fe == [f"is_candidate_arm_{i}" for i in range(5)]
+
+
+def test_leaf_only_cohort_keeps_the_six_leaf_rows_of_every_event() -> None:
+    table = _canonical_arm_table(n_events=3)
+    leaves = mod.restrict_to_leaf_arms(table)
+
+    assert sorted(leaves["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
+    assert leaves.groupby("event_id").size().eq(6).all()
+    assert len(leaves) == 18
+    # The trunk mass is dropped, not redistributed: every retained row keeps its
+    # nine-arm fraction.
+    merged = leaves.merge(
+        table, on=["event_id", "candidate_arm"], suffixes=("_leaf", "_all")
+    )
+    assert (merged["arm_fraction_leaf"] == merged["arm_fraction_all"]).all()
+
+
+def test_leaf_only_cohort_needs_the_candidate_arm_column() -> None:
+    with pytest.raises(ValueError, match="candidate_arm"):
+        mod.restrict_to_leaf_arms(
+            _canonical_arm_table().drop(columns=["candidate_arm"])
+        )
+
+
+def test_leaf_only_is_refused_on_the_patch_hierarchy() -> None:
+    """Patches are not arms; there is no leaf subset of the three patches."""
+    with pytest.raises(ValueError, match="--leaf-only"):
+        mod._resolve_run_config(_args(hierarchy="patch", leaf_only=True))
+    with pytest.raises(ValueError, match="leaf"):
+        mod.canonical_output_subdir(
+            "non_local", "HPC", "patch", "all", "timebin", "fraction", leaf_only=True
+        )
+
+
+def test_leaf_only_subset_may_not_target_a_canonical_bundle() -> None:
+    with pytest.raises(ValueError, match="canonical models_leaf/ bundle"):
+        mod._resolve_run_config(
+            _args(
+                leaf_only=True,
+                models="M4,Mv",
+                output_dir=Path("/tmp/content-in/models_leaf"),
+            )
+        )
+
+
+def test_leaf_only_subset_run_is_keyed_off_the_leaf_directory() -> None:
+    config = mod._resolve_run_config(
+        _args(leaf_only=True, models="M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu")
+    )
+    assert config.output_dir == Path(
+        "/tmp/content-in/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu"
+    )
+
+
+def test_parser_defaults_to_the_nine_arm_candidate_set() -> None:
+    parser = mod._build_arg_parser()
+    assert parser.parse_args([]).leaf_only is False
+    assert parser.parse_args(["--leaf-only"]).leaf_only is True
