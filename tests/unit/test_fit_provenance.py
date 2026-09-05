@@ -457,6 +457,29 @@ def test_content_ladder_readers_gate_the_canonical_bundle():
     assert figures.ALL_MODELS == bundle / "all_models.pkl"
 
 
+def test_uncertainty_reader_defaults_to_the_bundle_the_belief_chain_writes():
+    """``Mu`` lives in the leaf-only partial-ladder bundle, not ``models/``.
+
+    The expected directory is resolved by running the fitter's own CLI
+    resolution for the documented invocation, so the reader's default tracks
+    wherever the runner publishes the chain.
+    """
+    fitter = _load_script(CONTENT / "fit_replay_content_models.py")
+    uncertainty = _load_script(CONTENT / "analyze_uncertainty_content.py")
+    runner_args = fitter._build_arg_parser().parse_args(
+        ["--leaf-only", "--models", ",".join(fitter.BELIEF_CHAIN_MODEL_NAMES)]
+    )
+    expected = fitter._resolve_run_config(runner_args).output_dir
+
+    resolved = uncertainty.resolve_models_dir(uncertainty.DEFAULT_DATA_DIR)
+
+    assert resolved == expected
+    assert resolved.name != "models"
+    assert uncertainty.resolve_models_dir(
+        uncertainty.DEFAULT_DATA_DIR, Path("/tmp/mine")
+    ) == Path("/tmp/mine")
+
+
 @pytest.mark.parametrize(
     "reader",
     [

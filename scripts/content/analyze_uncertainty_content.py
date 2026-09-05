@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
 )
+from continuum_swr_replay.analysis.replay.model_specs import LEAF_ONLY_N_CATEGORIES
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
     load_reference,
@@ -43,6 +45,15 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
+
+# Sibling-script import: the Mu bundle name is derived from the fitting runner's
+# own helpers, so this reader cannot drift from where the belief chain publishes
+# Mu.pkl. Run as a script, only this file's directory is on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.content.fit_replay_content_models import (  # noqa: E402
+    belief_chain_output_subdir,
+)
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_DATA_DIR = PROCESSED_DATA_DIR / "replay_content"
@@ -79,6 +90,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for derived uncertainty-content tables.",
     )
     parser.add_argument(
+        "--models-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Bundle directory holding Mu.pkl. Defaults to the directory the "
+            "leaf-only belief chain publishes into, derived from the fitting "
+            "runner itself (currently "
+            f"{belief_chain_output_subdir()}/, relative to --data-dir)."
+        ),
+    )
+    parser.add_argument(
         "--cohort",
         choices=["mu", "all"],
         default="mu",
@@ -97,6 +119,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _parse_args() -> argparse.Namespace:
     return build_parser().parse_args()
+
+
+def resolve_models_dir(data_dir: Path, models_dir: Path | None = None) -> Path:
+    """Bundle directory holding the ``Mu.pkl`` this reader summarizes.
+
+    ``Mu`` is fit only by the leaf-only belief chain, which publishes into its
+    own partial-ladder bundle rather than ``models/``. The name is taken from
+    the fitting runner's own helper so the reader cannot be left pointing at a
+    directory the fitter no longer writes.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Replay-content artifact directory.
+    models_dir : Path or None, optional
+        Explicit override from ``--models-dir``.
+
+    Returns
+    -------
+    Path
+        Directory expected to contain ``Mu.pkl``.
+    """
+    if models_dir is not None:
+        return models_dir
+    return data_dir / belief_chain_output_subdir()
 
 
 def _add_result_metadata(
@@ -244,8 +291,10 @@ def _write_summary(
         "- Fit-quality-clean Mu animal-median coefficient: "
         f"{mu_clean['coefficient']:.3f} log relative-weight units; "
         f"exp(beta)={mu_clean['relative_weight']:.2f}.",
-        "- Mu is a nine-arm, hard-MAP conditional-Poisson model conditioned on an "
-        "observed replay event; it does not estimate event generation.",
+        f"- Mu is a {LEAF_ONLY_N_CATEGORIES}-leaf conditional-Poisson model "
+        "conditioned on an observed replay event, with each event's response "
+        "renormalized to unit mass over the leaves; it does not estimate event "
+        "generation.",
         "",
         "## Claim boundary",
         "",
@@ -269,7 +318,8 @@ def main() -> None:
     stop_path = args.data_dir / "stop_table.pkl"
     qvals_path = args.data_dir / "models_per_bin_rate" / "qvals_table.pkl"
     standardization_path = args.data_dir / "standardization_reference.json"
-    mu_path = args.data_dir / "models" / "Mu.pkl"
+    models_dir = resolve_models_dir(args.data_dir, args.models_dir)
+    mu_path = models_dir / "Mu.pkl"
     for path in [event_arm_path, stop_path, qvals_path]:
         if not table_exists(path):
             raise FileNotFoundError(path)
@@ -322,6 +372,12 @@ def main() -> None:
         {
             "analysis_cohort": args.cohort,
             "arm_standardization_support": "leaf_arms",
+            # The Mu fit summarized here is the leaf-only belief chain: its
+            # conditional likelihood conditions on the six reward-site arms, and
+            # each event's response is renormalized to unit mass over them.
+            "mu_bundle": str(models_dir),
+            "mu_n_categories": LEAF_ONLY_N_CATEGORIES,
+            "mu_response_renormalized": True,
             "n_analysis_sessions": int(trial_leaf["session_id"].nunique()),
             "n_analysis_trials": int(
                 trial_leaf[["session_id", "trial_number_by_epoch"]]

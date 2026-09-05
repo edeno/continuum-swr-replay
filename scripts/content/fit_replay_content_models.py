@@ -596,6 +596,70 @@ def canonical_output_subdirs() -> frozenset[str]:
     )
 
 
+# The leaf-only belief chain, as documented in the module usage block above and
+# in docs/models_table.md: M0-M4 refit on the six leaves alongside Mv/Mu/Mvu so
+# every rung shares one six-category conditional likelihood.
+BELIEF_CHAIN_MODEL_NAMES: tuple[str, ...] = (
+    "M0",
+    "M0a",
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "Mv",
+    "Mu",
+    "Mvu",
+)
+
+
+def partial_ladder_subdir(canonical_subdir: str, model_names: Sequence[str]) -> str:
+    """Bundle name for a run that fits ``model_names`` rather than a full ladder.
+
+    A partial ladder is fit on its own complete-case cohort, so it is keyed by
+    the rungs it fits and never written next to (or over) a canonical bundle.
+
+    Parameters
+    ----------
+    canonical_subdir : str
+        The name :func:`canonical_output_subdir` gives the same configuration.
+    model_names : Sequence[str]
+        The requested rungs, in ladder order.
+
+    Returns
+    -------
+    str
+        The bundle directory name, relative to the run's input directory.
+    """
+    return f"{canonical_subdir}_{'-'.join(model_names)}"
+
+
+def belief_chain_output_subdir() -> str:
+    """Bundle directory the leaf-only belief chain (``Mv``/``Mu``/``Mvu``) writes.
+
+    Derived from the same helpers the runner uses, so a reader of ``Mu.pkl``
+    cannot drift from where ``fit_replay_content_models.py --leaf-only --models
+    M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu`` publishes it.
+
+    Returns
+    -------
+    str
+        The bundle directory name, relative to ``PROCESSED_DATA_DIR /
+        "replay_content"``.
+    """
+    return partial_ladder_subdir(
+        canonical_output_subdir(
+            event_source="non_local",
+            brain_area="HPC",  # ignored for non_local (see resolve_contfrag_paths)
+            hierarchy_kind="arm",
+            swr_subset="all",
+            grain="timebin",
+            response="fraction",
+            leaf_only=True,
+        ),
+        BELIEF_CHAIN_MODEL_NAMES,
+    )
+
+
 def fit_n_categories(hierarchy_kind: str, leaf_only: bool) -> int:
     """Number of candidate categories the conditional likelihood conditions on.
 
@@ -1714,7 +1778,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         logging.info("explicit model output -> %s", output_dir)
     elif is_partial_ladder:
         output_dir = canonical_dir.with_name(
-            f"{canonical_dir.name}_{'-'.join(model_names)}"
+            partial_ladder_subdir(canonical_dir.name, model_names)
         )
         logging.info("partial ladder (%s) -> %s", ", ".join(model_names), output_dir)
 
