@@ -1,0 +1,7 @@
+response,design,n_sessions,median_coef,n_animals_pos,per_animal,median_se,se_col
+arm_count_hard,NT,218,-0.9795791904435212,0,"{'chimi': -1.235, 'j16': -0.996, 'peanut': -0.629, 'senor': -0.26, 'wilbur': -1.93}",1.7450021295343745,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
+arm_count_hard,NT+TSC,217,-1.0277899934845045,0,"{'chimi': -1.291, 'j16': -0.873, 'peanut': -0.655, 'senor': -0.357, 'wilbur': -1.875}",1.7710083825564986,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
+arm_count_hard,full,218,-0.3977477356704149,1,"{'chimi': -0.904, 'j16': -0.398, 'peanut': -0.02, 'senor': 0.147, 'wilbur': -0.76}",1.812364058894549,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
+arm_fraction,NT,216,-0.5503666200816919,1,"{'chimi': -0.666, 'j16': -0.651, 'peanut': 0.028, 'senor': -0.116, 'wilbur': -1.452}",1.4476635855573254,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
+arm_fraction,NT+TSC,216,-0.524138591822576,0,"{'chimi': -0.845, 'j16': -0.395, 'peanut': -0.071, 'senor': -0.115, 'wilbur': -1.451}",1.466275950380843,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
+arm_fraction,full,216,-0.114483666083022,3,"{'chimi': -0.379, 'j16': 0.237, 'peanut': 0.539, 'senor': 0.271, 'wilbur': -1.322}",1.4947339474006318,bse_cluster_swr_x_reward_belief_mean_candidate_arm_preoutcome
