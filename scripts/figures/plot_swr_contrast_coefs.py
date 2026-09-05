@@ -30,7 +30,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.contrast_aggregation import PER_UNIT_TERMS
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    PER_UNIT_TERMS,
+    SEPARATION_COEF_ABS,
+    separated_for_term,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -58,6 +62,17 @@ SWR_CONTRAST_RATE_INPUTS = {
     "event_table": RC / "event_table.pkl",
 }
 
+SWR_CONTRAST_CONTENT_ARM = RC / "models" / "swr_contrast_content_arm.pkl"
+SWR_CONTRAST_CONTENT_PATCH = RC / "models" / "swr_contrast_content_patch.pkl"
+# The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
+# same way as the rate half.
+SWR_CONTRAST_CONTENT_INPUTS = {
+    "event_arm_table": RC / "event_arm_table.pkl",
+    "event_patch_table": RC / "event_patch_table.pkl",
+    "stop_table": RC / "stop_table.pkl",
+    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Command-line parser (also the provenance gate's opt-out)."""
@@ -75,11 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 # This script runs top to bottom at import; the gate has to fire here, ahead of
 # the first table read, rather than inside a main() it does not have.
+_ALLOW_STALE = build_parser().parse_args().allow_stale
 require_fresh_inputs(
-    SWR_CONTRAST_RATE,
-    SWR_CONTRAST_RATE_INPUTS,
-    allow_stale=build_parser().parse_args().allow_stale,
+    SWR_CONTRAST_RATE, SWR_CONTRAST_RATE_INPUTS, allow_stale=_ALLOW_STALE
 )
+for _content_fit in (SWR_CONTRAST_CONTENT_ARM, SWR_CONTRAST_CONTENT_PATCH):
+    require_fresh_inputs(
+        _content_fit, SWR_CONTRAST_CONTENT_INPUTS, allow_stale=_ALLOW_STALE
+    )
 
 
 def _global_sd(covariates):
@@ -176,7 +194,19 @@ def sessions(df, mod, pop, term):
             f"Row would render blank."
         )
     g = g.dropna(subset=[c])
-    g = g[g[c].abs() < 10]
+    # Identifiability filter, matching contrast_aggregation.aggregate_contrast so
+    # the figure shows exactly the sessions the audited table aggregates. A term
+    # the fitter named as separated is dropped; so is a coefficient whose effect
+    # over one SD of its own predictor runs away. Judging the raw coefficient
+    # instead dropped identified sessions whose predictor has a small SD and kept
+    # unidentified ones whose predictor has a large one.
+    sdcol = f"sd_{term}"
+    runaway = (
+        g[c].abs() * g[sdcol] >= SEPARATION_COEF_ABS
+        if sdcol in g.columns
+        else g[c].abs() >= SEPARATION_COEF_ABS
+    )
+    g = g[~runaway & ~separated_for_term(g, term)]
     f, _ = std_factor(term)
     return {a: g.loc[g.animal == a, c].to_numpy() * f for a in ANIM if (g.animal == a).any()}
 
@@ -256,7 +286,7 @@ fig.tight_layout()
 fig.savefig(OUT / "rate_swr_contrast_coefs.png", dpi=150)
 
 # ---- CONTENT ----
-C = pd.read_pickle(RC / "models" / "swr_contrast_content_arm.pkl")
+C = pd.read_pickle(SWR_CONTRAST_CONTENT_ARM)
 mod_rows = [
     ("current-arm (C1)", "C1_current", "all", "is_current_arm"),
     ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_fraction_candidate_arm_last10_visits"),
@@ -299,7 +329,7 @@ fig.tight_layout()
 fig.savefig(OUT / "content_swr_contrast_coefs.png", dpi=150)
 
 # ---- CONTENT: PATCH ladder ----
-P = pd.read_pickle(RC / "models" / "swr_contrast_content_patch.pkl")
+P = pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH)
 patch_mod_rows = [
     ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
     ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_noncurrent_patch"),

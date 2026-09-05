@@ -6,8 +6,10 @@ run_behavior_prediction.py, generates publication-quality figures.
 
 Usage:
     uv run python scripts/content/generate_replay_content_figures.py
+    uv run python scripts/content/generate_replay_content_figures.py --allow-stale
 """
 
+import argparse
 import logging
 import pickle
 from pathlib import Path
@@ -20,6 +22,9 @@ import pandas as pd
 import seaborn as sns
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    require_fresh_inputs,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
@@ -39,17 +44,38 @@ logging.basicConfig(
 
 figure_utilities.set_figure_defaults(context="paper")
 
-MODEL_DIR = PROCESSED_DATA_DIR / "replay_content" / "models"
+RC = PROCESSED_DATA_DIR / "replay_content"
+MODEL_DIR = RC / "models"
+ALL_MODELS = MODEL_DIR / "all_models.pkl"
+# The table fit_replay_content_models.py fit the canonical arm bundle on.
+# Checked against each artifact's provenance sidecar before plotting, so a
+# figure cannot be rendered from coefficients that predate the table on disk.
+ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
 OUTPUT_DIR = Path("paper/figures/replay_content")
 
 
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Plot the fit even if its input tables have changed since it was "
+            "fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
 def main():
+    args = build_parser().parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── Load results ──
-    all_models_path = MODEL_DIR / "all_models.pkl"
+    all_models_path = ALL_MODELS
     comparison_path = MODEL_DIR / "model_comparison.pkl"
-    behavior_path = PROCESSED_DATA_DIR / "replay_content" / "behavior_prediction.pkl"
+    behavior_path = RC / "behavior_prediction.pkl"
 
     if not all_models_path.exists():
         logging.error(
@@ -57,11 +83,17 @@ def main():
         )
         return
 
+    require_fresh_inputs(
+        all_models_path, ALL_MODELS_INPUTS, allow_stale=args.allow_stale
+    )
     all_results = pd.read_pickle(all_models_path)
     logging.info("Loaded %d model fits", len(all_results))
 
     # ── Figure 1: Model hierarchy comparison ──
     if comparison_path.exists():
+        require_fresh_inputs(
+            comparison_path, ALL_MODELS_INPUTS, allow_stale=args.allow_stale
+        )
         comparison = pd.read_pickle(comparison_path)
         fig = plot_model_hierarchy_comparison(comparison)
         if fig is not None:
@@ -98,7 +130,7 @@ def main():
     if behavior_path.exists():
         cv_results = pd.read_pickle(behavior_path)
         # Determine chance level from data
-        bout_path = PROCESSED_DATA_DIR / "replay_content" / "bout_data.pkl"
+        bout_path = RC / "bout_data.pkl"
         chance = 1 / 6  # default
         if bout_path.exists():
             bout_data = pd.read_pickle(bout_path)

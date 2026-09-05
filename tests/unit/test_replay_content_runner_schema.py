@@ -12,6 +12,7 @@ import pytest
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import check_fit_provenance
 from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     save_reference,
@@ -41,6 +42,9 @@ def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
             "event_id": event_ids,
             "candidate_arm": arms,
             "arm_count_hard": (arms == (event_ids % 9)).astype(float),
+            # One decoded bin per event, so the allocation fraction is the
+            # count: each event puts all of its mass on one arm.
+            "arm_fraction": (arms == (event_ids % 9)).astype(float),
             "occupancy_state": "at_well",
             "at_well": True,
             "occupancy_well_id": 0.0,
@@ -71,6 +75,7 @@ def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
             "event_id": event_ids,
             "patch": patches,
             "patch_count_hard": (patches == ((event_ids % 3) + 1)).astype(float),
+            "patch_fraction": (patches == ((event_ids % 3) + 1)).astype(float),
             "occupancy_state": "at_well",
             "at_well": True,
             "occupancy_well_id": 0.0,
@@ -101,6 +106,9 @@ def test_complete_bundle_creates_explicit_output_parent(tmp_path):
         cohort_audits=[],
         comparison=pd.DataFrame(),
         logit_results={},
+        fit_inputs={},
+        estimator="conditional_poisson_fraction",
+        cli=["fit_replay_content_models.py"],
     )
 
     assert (output_dir / "M0.pkl").exists()
@@ -168,7 +176,7 @@ def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
     assert model_names == requested
     assert "is_candidate_arm_never_visited" in predictors
     assert "is_candidate_arm_0" in prepared
-    assert response_col == "arm_count_hard"
+    assert response_col == "arm_fraction"
     assert event_col == "event_id"
 
 
@@ -210,6 +218,8 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
+                "estimator": ["conditional_poisson_fraction"],
+                "response_col": ["arm_fraction"],
                 "converged": [True],
                 "separated": [False],
             }
@@ -487,6 +497,8 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
+                "estimator": ["conditional_poisson_fraction"],
+                "response_col": ["arm_fraction"],
             }
         )
 
@@ -522,6 +534,8 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
+                "estimator": ["conditional_poisson_fraction"],
+                "response_col": ["arm_fraction"],
             }
         )
 
@@ -569,6 +583,8 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique() - 1],
+                "estimator": ["conditional_poisson_fraction"],
+                "response_col": ["arm_fraction"],
             }
         )
 
@@ -601,6 +617,8 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
                     **dict(zip(runner.SESSION_COLS, keys, strict=True)),
                     "model": model_name,
                     "n_events": group["event_id"].nunique(),
+                    "estimator": "conditional_poisson_fraction",
+                    "response_col": "arm_fraction",
                 }
             )
         return pd.DataFrame(rows)
@@ -667,6 +685,8 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
                 "epoch": ["02_r1"],
                 "model": [model_name],
                 "n_events": [long_df["event_id"].nunique()],
+                "estimator": ["conditional_poisson_fraction"],
+                "response_col": ["arm_fraction"],
             }
         )
 
@@ -713,6 +733,8 @@ def _one_session_primary_result(long_df, model_name):
             "epoch": ["02_r1"],
             "model": [model_name],
             "n_events": [long_df["event_id"].nunique()],
+            "estimator": ["conditional_poisson_fraction"],
+            "response_col": ["arm_fraction"],
         }
     )
 
@@ -759,7 +781,10 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
     monkeypatch.setattr(
         runner,
         "fit_conditional_logit",
-        lambda group, **kwargs: {"n_events": group["event_id"].nunique()},
+        lambda group, **kwargs: {
+            "n_events": group["event_id"].nunique(),
+            "estimator": "conditional_logit_dominant",
+        },
     )
     monkeypatch.setattr(
         sys,
@@ -774,3 +799,52 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
     logit = pd.read_pickle(output_dir / "logit" / "M1_logit.pkl")
     assert logit["model"].tolist() == ["M1"]
     assert logit["n_events"].tolist() == [2]
+
+
+def test_published_bundle_carries_the_hash_of_the_table_it_was_fit_on(
+    tmp_path, monkeypatch
+):
+    """The sidecar is what lets a reader refuse a fit whose table has moved."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    table = input_dir / "event_arm_table.pkl"
+    _canonical_arm_table().to_pickle(table)
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    runner.main()
+
+    output_dir = _partial_ladder_dir(input_dir, "M0")
+    inputs = {"event_arm_table": table}
+    assert check_fit_provenance(output_dir / "all_models.pkl", inputs) == []
+    assert check_fit_provenance(output_dir / "M0.pkl", inputs) == []
+    record = json.loads((output_dir / "all_models.provenance.json").read_text())
+    assert record["estimator"] == "conditional_poisson_fraction"
+
+    table.write_bytes(table.read_bytes() + b"\n")
+    assert check_fit_provenance(output_dir / "all_models.pkl", inputs) == [
+        "event_arm_table"
+    ]
+
+
+def test_count_run_publishes_beside_the_fraction_bundle(tmp_path, monkeypatch):
+    """A count fit is on a different scale, so it gets a different directory."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fit_replay_content_models.py", "--models", "M0", "--response", "hard_count"],
+    )
+
+    runner.main()
+
+    fraction_bundle = _partial_ladder_dir(input_dir, "M0")
+    count_bundle = input_dir / "models_hard_count_M0"
+    assert not fraction_bundle.exists()
+    assert (count_bundle / "all_models.pkl").exists()
+    result = pd.read_pickle(count_bundle / "all_models.pkl")
+    assert result["estimator"].unique().tolist() == ["conditional_poisson_count"]
+    assert result["response_col"].unique().tolist() == ["arm_count_hard"]

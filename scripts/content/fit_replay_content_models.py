@@ -18,12 +18,23 @@ comes from the across-session distribution of the per-session coefficients
 ``--grain event`` collapses each event to one observation for an honest
 per-session n, at the cost of the within-event distribution.
 
+The shipped response is the per-event allocation FRACTION (``arm_fraction`` /
+``patch_fraction``): each event contributes one observation of unit mass, so the
+likelihood, AIC and standard errors are stated at the event grain rather than
+weighting an event by its number of decoded timebins. ``--response hard_count``
+fits the counts instead, for the retired-count comparison, and publishes to its
+own ``_hard_count`` directory.
+
 Any run that is not the full default ladder is fit on its own complete-case
 cohort, so it publishes into a directory keyed by the rungs it requested
 (``models_M5-Mv-Mu-Mvu/``) rather than into the canonical ``models/`` bundle.
+Every pickle in a published bundle carries a ``.provenance.json`` sidecar naming
+the table it was fit on and that table's SHA-256 as of the read, which the
+figure and summary scripts check before reading the fit.
 
 Usage:
     uv run python scripts/content/fit_replay_content_models.py                # base ladder
+    uv run python scripts/content/fit_replay_content_models.py --response hard_count
     uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
     uv run python scripts/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
     uv run python scripts/content/fit_replay_content_models.py --cv           # + CV
@@ -33,6 +44,7 @@ Usage:
 import argparse
 import logging
 import shutil
+import sys
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
@@ -54,11 +66,20 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
 )
+from continuum_swr_replay.analysis.replay.content_response import (
+    RESPONSE_CHOICES,
+    resolve_response_column,
+    validate_fraction_response,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_logit,
@@ -241,8 +262,15 @@ def _validate_canonical_table_contract(
     *,
     hierarchy_kind: str,
     table_label: object,
+    response_col: str | None = None,
 ) -> None:
-    """Validate location and novelty semantics that identify current tables."""
+    """Validate location and novelty semantics that identify current tables.
+
+    ``response_col`` is the column this run will actually fit. The hard counts
+    are validated unconditionally because they are part of the canonical schema;
+    a fraction response is additionally held to its own contract (defined for
+    every candidate of an event or for none of it, and summing to 1.0).
+    """
     if long_df.empty:
         raise ValueError(f"Canonical content table {table_label} is empty")
     if long_df[[*SESSION_COLS, "event_id"]].isna().any(axis=None):
@@ -370,8 +398,8 @@ def _validate_canonical_table_contract(
             f"{relation} exactly"
         )
 
-    response_col = "arm_count_hard" if hierarchy_kind == "arm" else "patch_count_hard"
-    response = long_df[response_col]
+    count_col = "arm_count_hard" if hierarchy_kind == "arm" else "patch_count_hard"
+    response = long_df[count_col]
     numeric_response = pd.to_numeric(response, errors="coerce").to_numpy(dtype=float)
     invalid_response = (
         not pd.api.types.is_numeric_dtype(response.dtype)
@@ -382,8 +410,15 @@ def _validate_canonical_table_contract(
     )
     if invalid_response:
         raise ValueError(
-            f"Canonical content table {table_label} requires {response_col} to "
+            f"Canonical content table {table_label} requires {count_col} to "
             "contain finite nonnegative integer counts"
+        )
+    if response_col is not None and response_col != count_col:
+        validate_fraction_response(
+            long_df,
+            response_col,
+            event_col="event_id",
+            table_label=table_label,
         )
 
     novelty_col = (
@@ -467,12 +502,14 @@ def canonical_output_subdir(
     hierarchy_kind: str,
     swr_subset: str,
     grain: str,
+    response: str = "fraction",
 ) -> str:
     """Directory name a FULL-ladder run of one configuration publishes into.
 
-    The base name comes from :func:`resolve_contfrag_paths`; the SWR subset and
-    the event grain each append a suffix, in that order, so an event-grain
-    subset run has its own bundle rather than publishing over the timebin one.
+    The base name comes from :func:`resolve_contfrag_paths`; the SWR subset, the
+    event grain and the response scale each append a suffix, in that order, so
+    an event-grain subset run has its own bundle rather than publishing over the
+    timebin one.
 
     Parameters
     ----------
@@ -486,6 +523,11 @@ def canonical_output_subdir(
         One of :data:`SWR_SUBSET_CHOICES`; ``"all"`` adds no suffix.
     grain : str
         One of :data:`GRAIN_CHOICES`; ``"timebin"`` adds no suffix.
+    response : str, optional
+        One of :data:`RESPONSE_CHOICES`; the shipped ``"fraction"`` adds no
+        suffix. A count fit states its likelihood, AIC and SEs at the timebin
+        grain rather than the event grain, so its rungs are not comparable with
+        a fraction bundle's and must not replace them.
 
     Returns
     -------
@@ -499,6 +541,8 @@ def canonical_output_subdir(
         subdir = f"{subdir}_swr_{swr_subset}"
     if grain == "event":
         subdir = f"{subdir}_event_grain"
+    if response != "fraction":
+        subdir = f"{subdir}_{response}"
     return subdir
 
 
@@ -511,13 +555,37 @@ def canonical_output_subdirs() -> frozenset[str]:
     the CLI choice tuples, so it cannot drift from the names full runs produce.
     """
     return frozenset(
-        canonical_output_subdir(source, area, hierarchy_kind, subset, grain)
+        canonical_output_subdir(source, area, hierarchy_kind, subset, grain, response)
         for source in EVENT_SOURCE_CHOICES
         for area in BRAIN_AREA_CHOICES
         for hierarchy_kind in HIERARCHY_CHOICES
         for subset in SWR_SUBSET_CHOICES
         for grain in GRAIN_CHOICES
+        for response in RESPONSE_CHOICES
     )
+
+
+def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
+    """Name -> path of every table one content-ladder fit is built from.
+
+    The ladder reads a single canonical candidate table, resolved from the event
+    source and hierarchy. Recorded in the provenance sidecar of every artifact
+    the run publishes, and re-derived by the readers of those artifacts, so a
+    regenerated table cannot be read through a fit that predates it.
+
+    Parameters
+    ----------
+    input_dir : Path
+        The run's candidate-table root.
+    table_name : str
+        Table stem from :func:`resolve_contfrag_paths`.
+
+    Returns
+    -------
+    dict of str to Path
+        ``{table_name: <input_dir>/<table_name>.pkl}``.
+    """
+    return {table_name: Path(input_dir) / f"{table_name}.pkl"}
 
 
 def prepare_canonical_fit_request(
@@ -527,6 +595,7 @@ def prepare_canonical_fit_request(
     model_names: Sequence[str],
     hierarchy_kind: str,
     table_label: object,
+    response: str = "fraction",
 ) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...], str, str]:
     """Validate one complete canonical fit request before fitting or writing.
 
@@ -536,8 +605,14 @@ def prepare_canonical_fit_request(
     stale table therefore cannot fit the subset of an otherwise nested ladder
     that it happens to satisfy.
 
+    ``response`` selects the allocation the ladder is fit on: the shipped
+    per-event ``"fraction"`` or the timebin ``"hard_count"``. The resolved
+    column is validated here, on the whole loaded table, so a table that cannot
+    express the requested response fails before the first fit rather than
+    halfway through the ladder.
+
     Returns a prepared copy of the table, the unchanged requested model names,
-    their predictor union, and the canonical response/event column names.
+    their predictor union, and the resolved response/event column names.
     """
     try:
         required_schema = _CANONICAL_SCHEMA_COLUMNS[hierarchy_kind]
@@ -553,10 +628,12 @@ def prepare_canonical_fit_request(
             "current-location/novelty schema column(s) "
             f"{missing_schema}. Regenerate it with the current prepare script."
         )
+    response_col = resolve_response_column(hierarchy_kind, response)
     _validate_canonical_table_contract(
         long_df,
         hierarchy_kind=hierarchy_kind,
         table_label=table_label,
+        response_col=response_col,
     )
 
     requested = tuple(model_names)
@@ -618,7 +695,6 @@ def prepare_canonical_fit_request(
             }
         )
     )
-    response_col = "patch_count_hard" if hierarchy_kind == "patch" else "arm_count_hard"
     return prepared, requested, predictors, response_col, "event_id"
 
 
@@ -645,14 +721,20 @@ def fit_model_per_session(
     run_cv : bool
         If True, also run event-based cross-validation per session.
     response_col : str
-        Column name for the count response.
+        Column name for the response: the per-event allocation fraction
+        (``arm_fraction`` / ``patch_fraction``) or the timebin counts
+        (``arm_count_hard`` / ``patch_count_hard``).
     event_col : str
         Column name for the event grouping key.
 
     Returns
     -------
     pd.DataFrame
-        One row per session with coefficients and fit statistics.
+        One row per session with coefficients and fit statistics, plus the
+        ``estimator`` the fitter used and the ``response_col`` it was fit on --
+        the two facts that say at which grain the row's ``llf`` / ``aic`` /
+        ``bse_`` are stated, so a fraction and a count fit cannot be pooled by
+        a later reader that sees only coefficients.
     """
     results = []
 
@@ -723,6 +805,7 @@ def fit_model_per_session(
                 r.update(dict.fromkeys(_CV_RESULT_COLUMNS, np.nan))
 
         r["model"] = model_name
+        r["response_col"] = response_col
         for col, val in zip(SESSION_COLS, keys, strict=True):
             r[col] = val
 
@@ -765,7 +848,10 @@ def _validate_and_match_fit_results(
 
     for model_name in requested:
         result = fit_results[model_name]
-        required = [*SESSION_COLS, "model", "n_events"]
+        # ``estimator`` and ``response_col`` are integrity columns: without them
+        # a published bundle does not say at which grain its llf/AIC/SEs are
+        # stated, and a fraction bundle is indistinguishable from a count one.
+        required = [*SESSION_COLS, "model", "n_events", "estimator", "response_col"]
         missing_columns = [column for column in required if column not in result]
         if missing_columns:
             raise RuntimeError(
@@ -943,28 +1029,85 @@ def _write_complete_output_bundle(
     cohort_audits: list[dict],
     comparison: pd.DataFrame,
     logit_results: Mapping[str, pd.DataFrame],
+    fit_inputs: Mapping[str, object],
+    estimator: str,
+    cli: Sequence[str],
 ) -> None:
-    """Stage every artifact, then replace the output directory as one bundle."""
+    """Stage every artifact, then replace the output directory as one bundle.
+
+    Every pickle gets a provenance sidecar naming the table the fit read, its
+    SHA-256 as of the read, and the estimator that produced it, so a reader can
+    refuse a fit whose input has moved since. The sidecars are written into the
+    staging directory, so they are swapped in atomically with the pickles they
+    describe -- a bundle can never be published without them.
+    """
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     staged_dir = Path(
         tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
     )
+    cli = list(cli)
+
+    def _write(frame: pd.DataFrame, path: Path) -> None:
+        frame.to_pickle(path)
+        write_fit_provenance(path, dict(fit_inputs), estimator, cli)
+
     try:
         for model_name, result in model_results.items():
-            result.to_pickle(staged_dir / f"{model_name}.pkl")
-        combined.to_pickle(staged_dir / "all_models.pkl")
+            _write(result, staged_dir / f"{model_name}.pkl")
+        _write(combined, staged_dir / "all_models.pkl")
         write_cohort_audit(cohort_audits, staged_dir / "all_models_cohort_audit.csv")
         if not comparison.empty:
-            comparison.to_pickle(staged_dir / "model_comparison.pkl")
+            _write(comparison, staged_dir / "model_comparison.pkl")
         if logit_results:
             logit_dir = staged_dir / "logit"
             logit_dir.mkdir()
             for model_name, result in logit_results.items():
-                result.to_pickle(logit_dir / f"{model_name}_logit.pkl")
+                _write(result, logit_dir / f"{model_name}_logit.pkl")
         _publish_staged_directory(staged_dir, output_dir)
     finally:
         if staged_dir.exists():
             shutil.rmtree(staged_dir)
+
+
+# How a fit's likelihood-based numbers should be read, by estimator. A count
+# fit spends one observation per decoded timebin, of which an event supplies a
+# median of ~32 that are near-copies of each other, so its llf/AIC/BIC are on a
+# scale the data do not support. A fraction or dominant-choice fit spends one
+# observation per event; its likelihood is a quasi-likelihood (the response is
+# not a count), so AIC and LRT differences on it are event-scale quasi
+# quantities rather than exact information criteria.
+_SCALE_LABELS = {
+    "conditional_poisson_fraction": "event-scale (quasi)",
+    "conditional_logit_dominant": "event-scale (quasi)",
+    "conditional_poisson_count": "timebin-scale",
+}
+_DEFAULT_SCALE_LABEL = "unlabelled scale"
+
+
+def scale_label(estimator: object) -> str:
+    """Return how likelihood-based numbers from ``estimator`` must be read.
+
+    Parameters
+    ----------
+    estimator : object
+        An estimator name from a fit result, or anything else (an absent or
+        mixed column) for which no scale can be claimed.
+
+    Returns
+    -------
+    str
+        ``"event-scale (quasi)"``, ``"timebin-scale"``, or
+        ``"unlabelled scale"`` when the estimator is unknown.
+    """
+    return _SCALE_LABELS.get(estimator, _DEFAULT_SCALE_LABEL)
+
+
+def _frame_estimator(frame: pd.DataFrame) -> object:
+    """The single estimator a frame's rows were fit with, else ``None``."""
+    if "estimator" not in frame.columns:
+        return None
+    values = set(frame["estimator"].dropna().unique())
+    return values.pop() if len(values) == 1 else None
 
 
 def print_model_results(
@@ -981,7 +1124,8 @@ def print_model_results(
     print(f"{model_name}: {spec.description}")
     print(f"{'=' * 60}")
 
-    print(f"\nFit quality (n={len(mdf)} sessions):")
+    estimator = _frame_estimator(mdf)
+    print(f"\nFit quality (n={len(mdf)} sessions; {scale_label(estimator)}):")
     for metric in ["aic", "bic", "llf"]:
         if metric in mdf.columns:
             vals = mdf[metric].dropna()
@@ -1056,6 +1200,78 @@ def print_model_results(
         )
 
 
+def format_comparison_table(comparison: pd.DataFrame) -> list[str]:
+    """Render the nested-comparison headline block, one string per line.
+
+    What the headline may show depends on the scale the rungs were fit at. On a
+    count response every event contributes ~32 autocorrelated timebins as if
+    they were independent draws, so the per-session counts of AIC wins and of
+    significant likelihood-ratio tests are anticonservative by roughly that
+    factor: they are kept in ``model_comparison.pkl`` for auditing but are not
+    printed as a headline result. On the fraction (and on the dominant-choice
+    logit) an event is one observation, so the same counts are printed, marked
+    as the event-scale quasi-likelihood quantities they are.
+
+    Parameters
+    ----------
+    comparison : pd.DataFrame
+        Output of ``run_full_hierarchy_comparison``; one row per step.
+
+    Returns
+    -------
+    list of str
+        Lines to print. Empty when there is nothing to compare.
+    """
+    if comparison.empty:
+        return []
+    estimator = _frame_estimator(comparison)
+    label = scale_label(estimator)
+    event_scale = label.startswith("event-scale")
+
+    lines = [
+        "=" * 60,
+        f"MODEL COMPARISON (positive ΔAIC = child better; {label})",
+        "=" * 60,
+        "",
+    ]
+    header = f"  {'Step':<12} {'ΔAIC animal':>12} {'animals':>8} {'ΔAIC sess':>11}"
+    if event_scale:
+        header += f" {'Child wins':>12} {'LRT sig':>10}"
+    header += f" {'sess p':>11}"
+    lines.append(header)
+    lines.append(f"  {'-' * (len(header) - 2)}")
+
+    for _, row in comparison.iterrows():
+        step = f"{row['parent']}→{row['child']}"
+        wp = f"{row['wilcoxon_p']:.2e}" if pd.notna(row["wilcoxon_p"]) else "—"
+        am = row.get("delta_aic_animal_median", float("nan"))
+        am_str = f"{am:.1f}" if pd.notna(am) else "—"
+        agree = (
+            f"{int(row.get('n_animals_child_better', 0))}/"
+            f"{int(row.get('n_animals', 0))}"
+            if row.get("n_animals", 0)
+            else "—"
+        )
+        line = f"  {step:<12} {am_str:>12} {agree:>8} {row['delta_aic_median']:>11.1f}"
+        if event_scale:
+            line += (
+                f" {row['child_better_aic']:>8}/{row['n_sessions']:<3}"
+                f" {row['lrt_significant']:>6}/{row['n_sessions']:<3}"
+            )
+        line += f" {wp:>11}"
+        lines.append(line)
+
+    if event_scale:
+        lines.append("  Child wins / LRT sig are event-scale quasi-likelihood counts.")
+    else:
+        lines.append(
+            "  Per-session child_better_aic / lrt_significant are timebin-scale "
+            "(events' bins counted as independent draws); they stay in "
+            "model_comparison.pkl and are not reported here."
+        )
+    return lines
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -1110,6 +1326,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Resolution: 'arm' (9 candidate arms, M0-M7) or 'patch' (3 patches, "
             "P0-P4). Patch fits use event_patch_table.pkl and "
             "patch_count_hard."
+        ),
+    )
+    parser.add_argument(
+        "--response",
+        type=str,
+        default="fraction",
+        choices=list(RESPONSE_CHOICES),
+        help=(
+            "Per-event response. 'fraction' (default, shipped) fits "
+            "arm_fraction / patch_fraction, so every event contributes one "
+            "observation of unit mass and the likelihood, AIC and SEs are at "
+            "the event grain. 'hard_count' fits arm_count_hard / "
+            "patch_count_hard, which weights an event by its number of decoded "
+            "timebins and treats those autocorrelated bins as independent "
+            "draws; it is kept for the retired-count comparison and writes to "
+            "a '_hard_count' output directory so the two never overwrite each "
+            "other."
         ),
     )
     parser.add_argument(
@@ -1181,6 +1414,7 @@ class _ContentCohort(NamedTuple):
     response_col: str
     event_col: str
     n_events_before_complete_case: int
+    fit_inputs: dict[str, object]
 
 
 def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
@@ -1243,7 +1477,10 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         args.hierarchy,
         args.swr_subset,
         args.grain,
+        args.response,
     )
+    if args.response != "fraction":
+        logging.info("response = %s -> %s", args.response, output_dir)
     if args.grain == "event":
         logging.info("grain = event (one observation per event) -> %s", output_dir)
 
@@ -1308,7 +1545,8 @@ def _load_and_filter_cohort(
     # Canonical inputs are mandatory. The former implicit ``long_count.pkl``
     # fallback could fit M0-M3 from a stale schema and write those partial
     # results into the canonical ``models/`` directory.
-    canonical_path = input_dir / f"{table_name}.pkl"
+    fit_input_paths = content_fit_inputs(input_dir, table_name)
+    canonical_path = fit_input_paths[table_name]
     legacy_path = input_dir / "long_count.pkl"
     if not table_exists(canonical_path):
         legacy_note = (
@@ -1325,6 +1563,10 @@ def _load_and_filter_cohort(
 
     logging.info("Loading %s...", canonical_path)
     long_df = read_table(canonical_path)
+    # Hash the table now, while the fit is reading it: the ladder runs long
+    # enough that the table could be regenerated before the bundle is written,
+    # and a sidecar hashed at write time would certify bytes the fit never saw.
+    fit_inputs = record_inputs(fit_input_paths)
     require_covariate_schema(
         long_df, table="event_arm" if args.hierarchy == "arm" else "event_patch"
     )
@@ -1340,7 +1582,9 @@ def _load_and_filter_cohort(
         model_names=model_names,
         hierarchy_kind=args.hierarchy,
         table_label=canonical_path,
+        response=args.response,
     )
+    logging.info("response = %s (%s)", response_col, args.response)
     _validate_requested_standardization(
         long_df,
         union_predictors=union_predictors,
@@ -1466,6 +1710,7 @@ def _load_and_filter_cohort(
         response_col=response_col,
         event_col=event_col,
         n_events_before_complete_case=n_before,
+        fit_inputs=fit_inputs,
     )
 
 
@@ -1594,6 +1839,7 @@ def _fit_conditional_logit_robustness(
                         f"{model_name}/{tuple(keys)}; no output will be published"
                     )
                 r["model"] = model_name
+                r["response_col"] = response_col
                 for col, val in zip(SESSION_COLS, keys, strict=True):
                     r[col] = val
                 model_logit_results.append(r)
@@ -1626,6 +1872,22 @@ def _fit_conditional_logit_robustness(
     return logit_outputs
 
 
+def _zero_response_event_ids(
+    long_df: pd.DataFrame, *, event_col: str, response_col: str
+) -> set:
+    """Events whose response is undefined on every row, or sums to nothing.
+
+    ``min_count=1`` keeps an all-missing event's total missing rather than
+    letting pandas report it as 0.0, so "the response could not be computed for
+    this event" and "the response is zero everywhere" both land here and neither
+    is mistaken for a fitted event.
+    """
+    totals = long_df.groupby(event_col, observed=True, sort=False)[response_col].sum(
+        min_count=1
+    )
+    return set(totals.index[~(totals > 0)])
+
+
 def _audit_compare_and_publish(
     args: argparse.Namespace,
     config: _RunConfig,
@@ -1648,6 +1910,14 @@ def _audit_compare_and_publish(
     cohort_audits: list[dict] = []
     population = getattr(args, "swr_subset", None) or "all"
     sessions_in = long_df_prefilter.groupby(SESSION_COLS).ngroups
+    # Events whose response is undefined or sums to nothing: on the fraction
+    # response these are the all-junction events, which carry NaN on every
+    # candidate. The cohort freeze removes them; the audit must also SAY so,
+    # under n_drop_zero_response, or a reader cannot tell an event the response
+    # could not describe from one no model wanted.
+    zero_response_events = _zero_response_event_ids(
+        long_df_prefilter, event_col=event_col, response_col=response_col
+    )
     for model_name, mdf in model_results.items():
         predictors = list(hierarchy[model_name].predictors)
 
@@ -1671,6 +1941,15 @@ def _audit_compare_and_publish(
                 "n_drop_zero_response",
             )
         )
+        unaccounted = zero_response_events - buckets["dropped_event_ids"]
+        if unaccounted or buckets["n_drop_zero_response"] > len(zero_response_events):
+            raise RuntimeError(
+                f"Cohort audit for {model_name} does not account for the "
+                f"{len(zero_response_events)} event(s) whose {response_col} is "
+                f"undefined or sums to zero ({len(unaccounted)} unaccounted, "
+                f"n_drop_zero_response={buckets['n_drop_zero_response']}); no "
+                "output will be published"
+            )
         dropped = long_df_prefilter[
             long_df_prefilter[event_col].isin(buckets["dropped_event_ids"])
         ].drop_duplicates(event_col)
@@ -1720,37 +1999,21 @@ def _audit_compare_and_publish(
     if len(model_results) >= 2:
         logging.info("Running nested model comparisons...")
         comparison = run_full_hierarchy_comparison(combined, hierarchy=hierarchy)
-        if len(comparison) > 0:
-            print(f"\n{'=' * 60}")
-            print("MODEL COMPARISON (positive ΔAIC = child better)")
-            print(f"{'=' * 60}")
-            print(
-                f"\n  {'Step':<12} {'ΔAIC animal':>12} {'animals':>8} "
-                f"{'ΔAIC sess':>11} {'Child wins':>12} {'LRT sig':>10} {'sess p':>11}"
-            )
-            print(f"  {'-' * 78}")
-            for _, row in comparison.iterrows():
-                step = f"{row['parent']}→{row['child']}"
-                wp = f"{row['wilcoxon_p']:.2e}" if pd.notna(row["wilcoxon_p"]) else "—"
-                am = row.get("delta_aic_animal_median", float("nan"))
-                am_str = f"{am:.1f}" if pd.notna(am) else "—"
-                agree = (
-                    f"{int(row.get('n_animals_child_better', 0))}/"
-                    f"{int(row.get('n_animals', 0))}"
-                    if row.get("n_animals", 0)
-                    else "—"
-                )
-                print(
-                    f"  {step:<12} {am_str:>12} {agree:>8} "
-                    f"{row['delta_aic_median']:>11.1f} "
-                    f"{row['child_better_aic']:>8}/{row['n_sessions']:<3} "
-                    f"{row['lrt_significant']:>6}/{row['n_sessions']:<3} "
-                    f"{wp:>11}"
-                )
+        headline = format_comparison_table(comparison)
+        if headline:
+            print("\n" + "\n".join(headline))
 
     logit_outputs = _fit_conditional_logit_robustness(
         args, config, cohort, model_results
     )
+
+    estimator = _frame_estimator(combined)
+    if estimator is None:
+        raise RuntimeError(
+            "Combined fit does not carry a single estimator label; the bundle's "
+            "provenance could not say how its numbers were produced, so no "
+            "output will be published"
+        )
 
     # Only now, after all requested fits and derived artifacts are valid, write
     # to a sibling staging directory and swap the complete directory into place.
@@ -1761,6 +2024,9 @@ def _audit_compare_and_publish(
         cohort_audits=cohort_audits,
         comparison=comparison,
         logit_results=logit_outputs,
+        fit_inputs=cohort.fit_inputs,
+        estimator=str(estimator),
+        cli=sys.argv,
     )
     logging.info(
         "Published %d model files and complete audit bundle to %s",

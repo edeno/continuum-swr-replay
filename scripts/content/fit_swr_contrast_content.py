@@ -30,8 +30,11 @@ statistic ONLY — sessions within an animal are not independent, so it is not a
 population p-value — with a Benjamini-Hochberg FDR across the rung family per population.
 ``typical_session_se`` is the median within-session SE, not the aggregate's uncertainty.
 Per-arm value uses the beta-bernoulli construct
-(``reward_belief_mean_candidate_arm_preoutcome``). A provenance sidecar (git hash,
-params) is written. DEFERRED follow-ups (in the provenance): the **hierarchical Poisson
+(``reward_belief_mean_candidate_arm_preoutcome``). The response is the per-event
+allocation fraction (``--response hard_count`` refits the timebin counts into
+separate ``_hard_count`` artifacts). A provenance sidecar (git hash, params) is
+written, plus a ``.provenance.json`` beside each fitted pickle recording the
+tables it was fit on. DEFERRED follow-ups (in the provenance): the **hierarchical Poisson
 with animal random effects** that would replace the descriptive session signed-rank with
 rigorous population inference; a common complete-case cohort; and within-group-centered
 VIF (`fitting.py` uses the raw design).
@@ -48,6 +51,7 @@ import datetime
 import json
 import logging
 import subprocess
+import sys
 import warnings
 
 import numpy as np
@@ -64,6 +68,11 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     term_diagnostics,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.content_response import (
+    RESPONSE_CHOICES,
+    resolve_response_column,
+    validate_fraction_response,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     specs_from_ladder,
@@ -75,7 +84,14 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
-from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
+from continuum_swr_replay.analysis.replay.fitting import (
+    fit_conditional_poisson,
+    poisson_estimator_name,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
     LEAF_ONLY_CONTRAST_RUNGS,
@@ -115,6 +131,17 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 SC = list(SESSION_COLUMNS)
 MIN_EVENTS = 18
 
+# The tables every fit in this family is built from. Their hashes go into the
+# provenance sidecar of each artifact written here, and the readers of those
+# artifacts check the same mapping, so a regenerated table cannot be read
+# through coefficients that predate it.
+FIT_INPUTS = {
+    "event_arm_table": RC / "event_arm_table.pkl",
+    "event_patch_table": RC / "event_patch_table.pkl",
+    "stop_table": RC / "stop_table.pkl",
+    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+}
+
 
 # event-level scalars z-scored (so :is_current coefs are per-SD & comparable)
 _ZSCALARS = [
@@ -134,7 +161,7 @@ def _z(x: np.ndarray) -> np.ndarray:
 
 
 def _assemble_arm() -> pd.DataFrame:
-    ev = read_table(RC / "event_arm_table.pkl")
+    ev = read_table(FIT_INPUTS["event_arm_table"])
     require_covariate_schema(ev, table="event_arm")
     reference_path = RC / "standardization_reference.json"
     if not reference_path.exists():
@@ -156,10 +183,10 @@ def _assemble_arm() -> pd.DataFrame:
             f"reference before fitting: {exc}"
         ) from exc
     add_arm_fixed_effects(ev)
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(FIT_INPUTS["stop_table"])
     require_covariate_schema(stop, table="stop")
     stop = add_uncertainty_covariates(stop)
-    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")
     ev = ev.merge(
         stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left"
@@ -231,7 +258,7 @@ def _assemble_arm() -> pd.DataFrame:
 
 
 def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
-    pt = read_table(RC / "event_patch_table.pkl")
+    pt = read_table(FIT_INPUTS["event_patch_table"])
     require_covariate_schema(pt, table="event_patch")
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
     e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
@@ -240,10 +267,10 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> pd.DataFrame:
     # carry it for the within-stop-time duration control.
     e2t = arm_ev[["event_id", "time_since_stop_start_s"]].drop_duplicates("event_id")
     pt = pt.merge(e2t, on="event_id", how="left")
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(FIT_INPUTS["stop_table"])
     require_covariate_schema(stop, table="stop")
     stop = add_uncertainty_covariates(stop)
-    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")
     pt = pt.merge(stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left")
     pt = pt.merge(q[["stop_id", "periswitch_index_trials"]], on="stop_id", how="left")
@@ -417,13 +444,26 @@ def _run(
                         "model": name,
                         "population": pop,
                         **dict(zip(SC, keys, strict=True)),
+                        # ``sd_<term>`` travels with the coefficients because the
+                        # aggregation's identifiability backstop is read on the
+                        # effect scale (|coef| x sd). Without it a runaway fit is
+                        # judged by its raw coefficient, which drops identified
+                        # sessions whose predictor has a small SD and keeps
+                        # unidentified ones whose predictor has a large one.
                         **{
                             k: v
                             for k, v in r.items()
-                            if k.startswith(("coef_", "bse_", "pval_"))
+                            if k.startswith(("coef_", "bse_", "pval_", "sd_"))
                         },
+                        # Per-term separation flags, so a fit whose self-history
+                        # coefficient ran away is not dropped for every term.
+                        "separated_terms": r.get("separated_terms"),
                         "n_events": r["n_events"],
                         "n_params": r["n_params"],
+                        # Which allocation the row was fit on, and therefore at
+                        # which grain its llf/AIC/SEs are stated.
+                        "estimator": r.get("estimator"),
+                        "response_col": response_col,
                         # fit-diagnostics flags (additive; drive the aggregation's
                         # session-level nonconverged/separated counts).
                         "converged": r.get("converged"),
@@ -589,7 +629,25 @@ def main() -> None:
         default=None,
         help="smoke: keep first N sessions per animal",
     )
+    ap.add_argument(
+        "--response",
+        type=str,
+        default="fraction",
+        choices=list(RESPONSE_CHOICES),
+        help=(
+            "Per-event response. 'fraction' (default, shipped) fits "
+            "arm_fraction / patch_fraction, so each event contributes one "
+            "observation of unit mass. 'hard_count' fits the timebin counts, "
+            "weighting an event by its length and treating its autocorrelated "
+            "bins as independent draws; it writes '_hard_count' artifacts so "
+            "the two never overwrite each other."
+        ),
+    )
     args = ap.parse_args()
+    arm_response = resolve_response_column("arm", args.response)
+    patch_response = resolve_response_column("patch", args.response)
+    estimator = poisson_estimator_name(arm_response)
+    rsfx = "" if args.response == "fraction" else f"_{args.response}"
 
     # Causal-hygiene gate: every rung's predictors must be pre-outcome, OR the
     # rung must be an explicitly-declared descriptive rung (RPE/value association or
@@ -600,10 +658,22 @@ def main() -> None:
                 preds, descriptive=(name in DESCRIPTIVE_CONTENT_RUNGS)
             )
 
-    sfx = "_smoke" if args.max_per_animal is not None else ""
+    sfx = ("_smoke" if args.max_per_animal is not None else "") + rsfx
     (RC / "models").mkdir(parents=True, exist_ok=True)
     ev = _assemble_arm()
     pt = _assemble_patch(ev)
+    # Hash the tables now, while they are the ones being fit: the ladder runs
+    # for long enough that a table could be regenerated before the artifacts are
+    # written, and a sidecar hashed at write time would certify bytes no fit saw.
+    fit_inputs = record_inputs(FIT_INPUTS)
+    if args.response == "fraction":
+        validate_fraction_response(
+            ev, arm_response, table_label=FIT_INPUTS["event_arm_table"]
+        )
+        validate_fraction_response(
+            pt, patch_response, table_label=FIT_INPUTS["event_patch_table"]
+        )
+    logger.info("response = %s / %s (%s)", arm_response, patch_response, estimator)
     # Capture the run's COMPLETE fit-time _z reference (arm event scalars + arm/patch
     # within-stop-time + patch-cohort scalars) over the FULL cohorts, before any smoke
     # subset, so every standardized coefficient is reproducible.
@@ -624,8 +694,10 @@ def main() -> None:
         ev["event_id"].nunique(),
         ev.groupby(SC).ngroups,
     )
-    arm, arm_audit = _run(ev, ARM_LADDER, response_col="arm_count_hard", n_categories=9)
-    arm.to_pickle(RC / "models" / f"swr_contrast_content_arm{sfx}.pkl")
+    arm, arm_audit = _run(ev, ARM_LADDER, response_col=arm_response, n_categories=9)
+    arm_path = RC / "models" / f"swr_contrast_content_arm{sfx}.pkl"
+    arm.to_pickle(arm_path)
+    write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv)
 
     logger.info(
         "PATCH ladder: %d rows, %d events, %d sessions",
@@ -634,9 +706,11 @@ def main() -> None:
         pt.groupby(SC).ngroups,
     )
     patch, patch_audit = _run(
-        pt, PATCH_LADDER, response_col="patch_count_hard", n_categories=3
+        pt, PATCH_LADDER, response_col=patch_response, n_categories=3
     )
-    patch.to_pickle(RC / "models" / f"swr_contrast_content_patch{sfx}.pkl")
+    patch_path = RC / "models" / f"swr_contrast_content_patch{sfx}.pkl"
+    patch.to_pickle(patch_path)
+    write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv)
 
     # Cohort-audit table (one row per model x population; reconciles n_in - Σdrops =
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
@@ -676,7 +750,9 @@ def main() -> None:
         ],
         ignore_index=True,
     )
-    agg.to_pickle(RC / "models" / f"swr_contrast_content_audited{sfx}.pkl")
+    audited_path = RC / "models" / f"swr_contrast_content_audited{sfx}.pkl"
+    agg.to_pickle(audited_path)
+    write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv)
     prov = _provenance(args, ev.groupby(SC).ngroups, fit_z_reference)
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)

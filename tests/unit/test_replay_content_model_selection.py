@@ -18,6 +18,7 @@ generative story.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.replay.fitting import (
@@ -200,3 +201,57 @@ class TestSelectionUnderNull:
             f"BIC picked {winner}; expected M0. "
             f"BICs: {[(n, round(f['bic'], 2)) for n, f in fits.items()]}"
         )
+
+
+class TestFractionResponseRecovery:
+    """The shipped response is the per-event allocation, not the timebin counts.
+
+    Dividing an event's counts by its own total removes the event-length
+    weighting but leaves the allocation intact, so a planted current-arm
+    preference must come back at the same value. The uncertainty is read from
+    the event-clustered SE: the model SE describes a design in which each event
+    contributed one draw and nothing within it varied, which is not the design
+    the simulator produced.
+    """
+
+    @staticmethod
+    def _as_fraction(df):
+        df = df.copy()
+        total = df.groupby("event_id")["arm_count_hard"].transform("sum")
+        df["arm_fraction"] = df["arm_count_hard"] / total
+        return df
+
+    def test_planted_allocation_effect_is_recovered_on_the_fraction(self):
+        truth = {"is_current_arm": 0.8, "is_prev_arm": 0.4}
+        df = self._as_fraction(
+            simulate_with_event_covariates(truth, n_events=600, L_e=30, seed=311)
+        )
+
+        fit = fit_conditional_poisson(
+            df, predictors=list(truth), response_col="arm_fraction"
+        )
+
+        assert fit is not None
+        assert fit["estimator"] == "conditional_poisson_fraction"
+        for predictor, value in truth.items():
+            se = fit[f"bse_cluster_{predictor}"]
+            assert se > 0
+            z = (fit[f"coef_{predictor}"] - value) / se
+            assert abs(z) < 3.0, (
+                f"{predictor}: coef={fit[f'coef_{predictor}']:.3f} truth={value} "
+                f"clustered se={se:.3f} z={z:.2f}"
+            )
+
+    def test_fraction_null_is_the_event_scale_uniform_allocation(self):
+        df = self._as_fraction(
+            simulate_with_event_covariates(
+                {"is_current_arm": 0.8}, n_events=200, L_e=25, seed=311
+            )
+        )
+
+        fit = fit_conditional_poisson(
+            df, predictors=["is_current_arm"], response_col="arm_fraction"
+        )
+
+        assert fit["n_events"] == 200
+        assert fit["llf_null"] == pytest.approx(-200 * np.log(9))

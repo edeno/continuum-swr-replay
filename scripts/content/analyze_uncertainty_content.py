@@ -10,6 +10,7 @@ Usage
 -----
 uv run python scripts/content/analyze_uncertainty_content.py
 uv run python scripts/content/analyze_uncertainty_content.py --cohort all
+uv run python scripts/content/analyze_uncertainty_content.py --allow-stale
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
@@ -46,7 +50,18 @@ DEFAULT_OUTPUT_DIR = DEFAULT_DATA_DIR / "uncertainty_content"
 DEFAULT_EXAMPLE_SESSION = ("wilbur", "20210329", "08_r4")
 
 
-def _parse_args() -> argparse.Namespace:
+def mu_inputs(data_dir: Path) -> dict[str, Path]:
+    """The table fit_replay_content_models.py fit ``models/Mu.pkl`` on.
+
+    Checked against the fit's provenance sidecar before the coefficients are
+    summarized, so an uncertainty result cannot be built from a rung that
+    predates the event-arm table it is being described against.
+    """
+    return {"event_arm_table": data_dir / "event_arm_table.pkl"}
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line parser (also the provenance gate's opt-out)."""
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -69,7 +84,19 @@ def _parse_args() -> argparse.Namespace:
         default="mu",
         help="Use sessions represented in Mu.pkl (default) or all mapped sessions.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Summarize the Mu fit even if its input table has changed since it "
+            "was fit (or it carries no provenance sidecar at all)."
+        ),
+    )
+    return parser
+
+
+def _parse_args() -> argparse.Namespace:
+    return build_parser().parse_args()
 
 
 def _add_result_metadata(
@@ -260,6 +287,9 @@ def main() -> None:
     require_covariate_schema(event_arm, table="event_arm")
     require_covariate_schema(stops, table="stop")
     require_covariate_schema(qvals, table="qvals")
+    require_fresh_inputs(
+        mu_path, mu_inputs(args.data_dir), allow_stale=args.allow_stale
+    )
     mu = pd.read_pickle(mu_path)
     try:
         assert_standardized_matches_reference(

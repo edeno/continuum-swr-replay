@@ -31,6 +31,7 @@ from continuum_swr_replay.table_io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RATE = REPO_ROOT / "scripts" / "rate"
+CONTENT = REPO_ROOT / "scripts" / "content"
 FIGURES = REPO_ROOT / "scripts" / "figures"
 
 
@@ -277,10 +278,11 @@ def _read_table_paths(path: Path, constants: dict[str, object]) -> set[Path]:
 # Each fitter and the readers of the artifacts it writes, with the module-level
 # name each one declares its input mapping under.
 FITTERS = [
-    "fit_per_bin_rate_models",
-    "fit_per_stop_rate_models",
-    "fit_swr_contrast_rate",
-    "fit_uncertainty_rate",
+    RATE / "fit_per_bin_rate_models.py",
+    RATE / "fit_per_stop_rate_models.py",
+    RATE / "fit_swr_contrast_rate.py",
+    RATE / "fit_uncertainty_rate.py",
+    CONTENT / "fit_swr_contrast_content.py",
 ]
 # (reader, name of its input mapping, the fitter that writes what it reads).
 # ``plot_swr_contrast_coefs`` draws its figures at import, so its constants are
@@ -289,28 +291,37 @@ READERS = [
     (
         RATE / "summarize_per_bin_rate_models.py",
         "ALL_MODELS_INPUTS",
-        "fit_per_bin_rate_models",
+        RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_per_bin_rate_models.py",
         "ALL_MODELS_INPUTS",
-        "fit_per_bin_rate_models",
+        RATE / "fit_per_bin_rate_models.py",
     ),
-    (RATE / "plot_model_checking.py", "ALL_MODELS_INPUTS", "fit_per_bin_rate_models"),
+    (
+        RATE / "plot_model_checking.py",
+        "ALL_MODELS_INPUTS",
+        RATE / "fit_per_bin_rate_models.py",
+    ),
     (
         RATE / "plot_per_bin_rate_summary.py",
         "ALL_MODELS_INPUTS",
-        "fit_per_bin_rate_models",
+        RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_uncertainty_rate.py",
         "UNCERTAINTY_RATE_INPUTS",
-        "fit_uncertainty_rate",
+        RATE / "fit_uncertainty_rate.py",
     ),
     (
         FIGURES / "plot_swr_contrast_coefs.py",
         "SWR_CONTRAST_RATE_INPUTS",
-        "fit_swr_contrast_rate",
+        RATE / "fit_swr_contrast_rate.py",
+    ),
+    (
+        FIGURES / "plot_swr_contrast_coefs.py",
+        "SWR_CONTRAST_CONTENT_INPUTS",
+        CONTENT / "fit_swr_contrast_content.py",
     ),
 ]
 RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
@@ -321,7 +332,7 @@ RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
 )
 def test_readers_check_the_same_inputs_the_fitter_recorded(reader, mapping, fitter):
     """A reader checking a different table set than the fitter recorded is blind."""
-    expected = _load_script(RATE / f"{fitter}.py").FIT_INPUTS
+    expected = _load_script(fitter).FIT_INPUTS
     declared = (
         _module_constants(reader)
         if reader.name in RUNS_AT_IMPORT
@@ -372,7 +383,68 @@ def test_contrast_figure_gates_the_rate_artifact():
     )
 
 
-@pytest.mark.parametrize("fitter", FITTERS)
+def test_contrast_figure_gates_both_content_artifacts():
+    """The content half draws from two pickles; both are gated, not just one."""
+    constants = _module_constants(FIGURES / "plot_swr_contrast_coefs.py")
+    fitter = _load_script(CONTENT / "fit_swr_contrast_content.py")
+
+    assert constants["SWR_CONTRAST_CONTENT_ARM"] == (
+        fitter.RC / "models" / "swr_contrast_content_arm.pkl"
+    )
+    assert constants["SWR_CONTRAST_CONTENT_PATCH"] == (
+        fitter.RC / "models" / "swr_contrast_content_patch.pkl"
+    )
+
+
+def test_content_ladder_readers_check_the_table_the_ladder_records():
+    """The ladder resolves its input from the CLI, so readers rebuild the map.
+
+    ``fit_replay_content_models.py`` reads one candidate table whose path
+    depends on the event source and hierarchy, so it has no module-level
+    ``FIT_INPUTS``. Its readers declare the canonical arm mapping instead, and
+    that declaration is checked against the helper the fitter itself uses.
+    """
+    fitter = _load_script(CONTENT / "fit_replay_content_models.py")
+    expected = fitter.content_fit_inputs(
+        fitter.PROCESSED_DATA_DIR / "replay_content", "event_arm_table"
+    )
+    figures = _load_script(CONTENT / "generate_replay_content_figures.py")
+    uncertainty = _load_script(CONTENT / "analyze_uncertainty_content.py")
+
+    assert figures.ALL_MODELS_INPUTS == expected
+    assert uncertainty.mu_inputs(uncertainty.DEFAULT_DATA_DIR) == expected
+
+
+def test_content_ladder_readers_gate_the_canonical_bundle():
+    """The gated artifacts live in the directory a full fraction run publishes."""
+    fitter = _load_script(CONTENT / "fit_replay_content_models.py")
+    figures = _load_script(CONTENT / "generate_replay_content_figures.py")
+    bundle = (
+        fitter.PROCESSED_DATA_DIR
+        / "replay_content"
+        / (fitter.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin"))
+    )
+
+    assert figures.MODEL_DIR == bundle
+    assert figures.ALL_MODELS == bundle / "all_models.pkl"
+
+
+@pytest.mark.parametrize(
+    "reader",
+    [
+        CONTENT / "generate_replay_content_figures.py",
+        CONTENT / "analyze_uncertainty_content.py",
+    ],
+    ids=lambda path: path.stem,
+)
+def test_content_readers_default_to_refusing_a_stale_fit(reader):
+    module = _load_script(reader)
+
+    assert module.build_parser().parse_args([]).allow_stale is False
+    assert module.build_parser().parse_args(["--allow-stale"]).allow_stale is True
+
+
+@pytest.mark.parametrize("fitter", FITTERS, ids=lambda path: path.stem)
 def test_fitters_record_every_table_they_read(fitter):
     """The declared mapping is the whole set of tables the runner loads.
 
@@ -380,7 +452,6 @@ def test_fitters_record_every_table_they_read(fitter):
     out of the sidecar, so the fit would pass the reader gate after that table
     was regenerated.
     """
-    script = RATE / f"{fitter}.py"
-    constants = _module_constants(script)
+    constants = _module_constants(fitter)
 
-    assert _read_table_paths(script, constants) == set(constants["FIT_INPUTS"].values())
+    assert _read_table_paths(fitter, constants) == set(constants["FIT_INPUTS"].values())
