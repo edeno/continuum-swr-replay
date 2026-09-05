@@ -12,6 +12,7 @@ Usage:
 import argparse
 import logging
 import pickle
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -34,6 +35,16 @@ from continuum_swr_replay.visualization.replay_content_plots import (
     plot_coefficient_forest,
     plot_model_hierarchy_comparison,
     plot_pseudo_r2_progression,
+)
+
+# Sibling-script import: the estimator -> scale mapping lives with the fitter
+# that writes the estimator column. Run as a script, only this file's directory
+# is on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.content.fit_replay_content_models import (  # noqa: E402
+    _frame_estimator,
+    scale_label,
 )
 
 logging.basicConfig(
@@ -95,7 +106,9 @@ def main():
             comparison_path, ALL_MODELS_INPUTS, allow_stale=args.allow_stale
         )
         comparison = pd.read_pickle(comparison_path)
-        fig = plot_model_hierarchy_comparison(comparison)
+        fig = plot_model_hierarchy_comparison(
+            comparison, scale_label=scale_label(_frame_estimator(comparison))
+        )
         if fig is not None:
             path = OUTPUT_DIR / "model_hierarchy_comparison.png"
             fig.savefig(path, dpi=300)

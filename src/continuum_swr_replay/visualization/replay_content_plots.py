@@ -22,6 +22,7 @@ from continuum_swr_replay.parameters import COLORS
 def plot_model_hierarchy_comparison(
     comparison_df: pd.DataFrame,
     ax: plt.Axes | None = None,
+    scale_label: str | None = None,
 ) -> plt.Figure | None:
     """Plot ΔAIC across the model hierarchy.
 
@@ -34,6 +35,11 @@ def plot_model_hierarchy_comparison(
         Output of run_full_hierarchy_comparison.
     ax : plt.Axes | None
         Axes to plot on. If None, creates a new figure.
+    scale_label : str | None
+        How the plotted ΔAIC must be read, from the fit's estimator (e.g.
+        ``"event-scale (quasi)"`` for a fraction fit, ``"timebin-scale"`` for a
+        count fit). Named on the axis when given: the two scales are not
+        comparable, and a fraction fit's AIC is a quasi-likelihood quantity.
 
     Returns
     -------
@@ -71,7 +77,11 @@ def plot_model_hierarchy_comparison(
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set_xticks(range(len(steps)))
     ax.set_xticklabels(steps, rotation=45, ha="right")
-    ax.set_ylabel("ΔAIC (positive = child better)")
+    ax.set_ylabel(
+        "ΔAIC (positive = child better)"
+        if scale_label is None
+        else f"ΔAIC, {scale_label} (positive = child better)"
+    )
     ax.set_title("Model Hierarchy Comparison")
 
     # Annotate with child-wins / total

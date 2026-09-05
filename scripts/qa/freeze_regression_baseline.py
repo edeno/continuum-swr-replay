@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -26,6 +27,16 @@ import pyarrow.parquet as pq
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import parquet_path, sha256_file
 from continuum_swr_replay.table_parity import CANONICAL_TABLE_BASENAMES
+
+# Sibling-script import: the leaf bundle's name is derived from the fitting
+# runner's own helper rather than spelled out here, so the freeze cannot go on
+# skipping a ladder whose directory name changed. Run as a script, only this
+# file's directory is on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.content.fit_replay_content_models import (  # noqa: E402
+    belief_chain_output_subdir,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -38,9 +49,16 @@ _TABLE_RELPATHS = {
     )
     for name in CANONICAL_TABLE_BASENAMES
 }
+# Every fitted bundle the baseline is supposed to cover. ``models_event_grain``
+# is not among them: the event-grain ladder is no longer refit (the fraction
+# ladder serves its purpose) and survives only in backups, so freezing it would
+# copy a stale bundle into a fresh baseline. The leaf-only belief chain's
+# directory is derived, not spelled out, because it is keyed by the rungs it
+# fits.
 _MODEL_DIRS = (
     "models", "models_swr_T", "models_swr_F", "models_patch",
-    "models_patch_swr_T", "models_patch_swr_F", "models_event_grain",
+    "models_patch_swr_T", "models_patch_swr_F",
+    belief_chain_output_subdir(),
     "models_per_stop_rate", "models_per_bin_rate", "uncertainty_content",
     "event_source_comparison",
 )
@@ -51,7 +69,11 @@ def freeze(label: str) -> Path:
     if out.exists():
         raise FileExistsError(f"{out} already exists; refusing to overwrite a baseline")
     out.mkdir(parents=True)
-    manifest: dict[str, object] = {"tables": {}, "model_dirs": []}
+    manifest: dict[str, object] = {
+        "tables": {},
+        "model_dirs": [],
+        "missing_model_dirs": [],
+    }
 
     for name, relpath in _TABLE_RELPATHS.items():
         src = parquet_path(RC / relpath)
@@ -66,10 +88,20 @@ def freeze(label: str) -> Path:
 
     for model_dir in _MODEL_DIRS:
         src = RC / model_dir
-        if src.exists():
-            shutil.copytree(src, out / model_dir)
-            manifest["model_dirs"].append(model_dir)
-            logger.info("froze model dir %s", model_dir)
+        if not src.exists():
+            # Named, not silent: a baseline missing a ladder is a baseline a
+            # later comparison cannot check that ladder against, and the freeze
+            # is the only place that fact is visible.
+            manifest["missing_model_dirs"].append(model_dir)
+            logger.warning(
+                "model dir %s is absent from %s; the baseline will not cover it",
+                model_dir,
+                RC,
+            )
+            continue
+        shutil.copytree(src, out / model_dir)
+        manifest["model_dirs"].append(model_dir)
+        logger.info("froze model dir %s", model_dir)
 
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     # Make the baseline read-only so a stray regeneration cannot overwrite it.
