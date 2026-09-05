@@ -46,6 +46,8 @@ def _make_event_table():
             "session_date": [20200101],
             "epoch": ["01_r1"],
             "event_id": [1],
+            "n_nonlocal_bins": [4],
+            "n_undecoded_bins": [4],
             "last_rewarded_arm": [np.nan],
             "prev_patch": [np.nan],
             "did_last_completed_trip_switch_patch": [0],

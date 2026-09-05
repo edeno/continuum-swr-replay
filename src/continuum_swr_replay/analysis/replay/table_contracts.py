@@ -194,9 +194,27 @@ def _require_uniform_leaf_support(frame: pd.DataFrame) -> None:
             )
 
 
-def _require_fraction_normalization(frame: pd.DataFrame) -> None:
-    """Require each observed arm-fraction family to cover all arms and sum one."""
-    for column in ("arm_fraction", "arm_fraction_posterior"):
+def _require_fraction_normalization(
+    frame: pd.DataFrame,
+    *,
+    columns: tuple[str, ...],
+    n_candidates: int,
+    table_name: str,
+) -> None:
+    """Require each observed fraction family to cover the candidate set and sum one.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Candidate-grain table, one row per (event, candidate).
+    columns : tuple of str
+        Fraction column names to check; absent ones are skipped.
+    n_candidates : int
+        Size of the candidate set an event must cover (9 arms, 3 patches).
+    table_name : str
+        Table label used in the raised messages.
+    """
+    for column in columns:
         if column not in frame:
             continue
         numeric = pd.to_numeric(frame[column], errors="coerce")
@@ -209,10 +227,10 @@ def _require_fraction_normalization(frame: pd.DataFrame) -> None:
             .groupby(frame["event_id"], sort=False)
             .sum()
         )
-        partial = support[(support != 0) & (support != len(ALL_ARMS))]
+        partial = support[(support != 0) & (support != n_candidates)]
         if not partial.empty:
             raise ValueError(
-                f"event_arm has partial candidate support for {column!r} in "
+                f"{table_name} has partial candidate support for {column!r} in "
                 f"event_id(s) {partial.index.tolist()[:5]}"
             )
         totals = numeric.groupby(frame["event_id"], sort=False).sum(min_count=1)
@@ -268,7 +286,12 @@ def validate_event_arm_table(
         _require_event_set_matches(frame, event_table, table_name="event_arm")
     _require_response_conservation(frame)
     _require_uniform_leaf_support(frame)
-    _require_fraction_normalization(frame)
+    _require_fraction_normalization(
+        frame,
+        columns=("arm_fraction", "arm_fraction_posterior"),
+        n_candidates=len(ALL_ARMS),
+        table_name="event_arm",
+    )
 
 
 def validate_event_patch_table(
@@ -298,3 +321,13 @@ def validate_event_patch_table(
             raise ValueError(
                 "patch_count_hard must be finite, nonnegative integer counts"
             )
+    # patch_fraction is patch_count_hard over the event's real-arm bin total, so
+    # it obeys the same allocation contract as arm_fraction: all three patches
+    # observed or none (an event with no real-arm bins), and a unit sum where
+    # observed.
+    _require_fraction_normalization(
+        frame,
+        columns=("patch_fraction",),
+        n_candidates=len(_PATCHES),
+        table_name="event_patch",
+    )

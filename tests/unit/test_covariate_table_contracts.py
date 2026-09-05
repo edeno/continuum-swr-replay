@@ -130,6 +130,7 @@ def _event_patch_table() -> pd.DataFrame:
             "event_id": np.repeat([10, 11], 3),
             "patch": np.tile([1, 2, 3], 2),
             "patch_count_hard": [1, 0, 0, 0, 1, 0],
+            "patch_fraction": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         }
     )
 
@@ -143,3 +144,35 @@ def test_event_patch_contract_rejects_duplicate_patch_replacement() -> None:
     table.loc[(table["event_id"] == 10) & (table["patch"] == 3), "patch"] = 2
     with pytest.raises(ValueError, match="patch set"):
         validate_event_patch_table(table, event_table=_event_table())
+
+
+def test_event_patch_contract_rejects_partial_or_unnormalized_patch_fraction() -> None:
+    partial = _event_patch_table()
+    partial.loc[
+        (partial["event_id"] == 10) & (partial["patch"] == 1), "patch_fraction"
+    ] = np.nan
+    with pytest.raises(ValueError, match="partial candidate support"):
+        validate_event_patch_table(partial, event_table=_event_table())
+
+    unnormalized = _event_patch_table()
+    unnormalized.loc[unnormalized["event_id"] == 10, "patch_fraction"] = 0.1
+    with pytest.raises(ValueError, match="sum to one"):
+        validate_event_patch_table(unnormalized, event_table=_event_table())
+
+
+def test_event_patch_contract_rejects_out_of_range_patch_fraction() -> None:
+    table = _event_patch_table()
+    table.loc[
+        (table["event_id"] == 10) & (table["patch"] == 2), "patch_fraction"
+    ] = -0.5
+    table.loc[(table["event_id"] == 10) & (table["patch"] == 3), "patch_fraction"] = 0.5
+    with pytest.raises(ValueError, match=r"must lie in \[0, 1\]"):
+        validate_event_patch_table(table, event_table=_event_table())
+
+
+def test_event_patch_contract_accepts_all_nan_patch_fraction_for_one_event() -> None:
+    """An event with no real-arm bins has an undefined fraction for all patches."""
+    table = _event_patch_table()
+    table.loc[table["event_id"] == 10, "patch_count_hard"] = 0
+    table.loc[table["event_id"] == 10, "patch_fraction"] = np.nan
+    validate_event_patch_table(table, event_table=_event_table())

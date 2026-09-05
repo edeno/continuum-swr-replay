@@ -224,14 +224,16 @@ def build_event_patch_table(
 ) -> pd.DataFrame:
     """Collapse event-arm table to event-patch level (3 rows per event).
 
-    Sums ``arm_count_hard`` across arms within each patch, and
-    aggregates per-arm predictors to patch level. The result is ready
-    for patch-level conditional Poisson fitting (``MODEL_PATCH``).
+    Sums ``arm_count_hard`` across arms within each patch, normalizes it
+    to ``patch_fraction`` over the event's real-arm bins, and aggregates
+    per-arm predictors to patch level. The result is ready for
+    patch-level conditional Poisson fitting (``MODEL_PATCH``).
 
     Parameters
     ----------
     event_table : pd.DataFrame
-        Canonical event table (for ``last_rewarded_arm`` → patch mapping).
+        Canonical event table (for ``last_rewarded_arm`` → patch mapping and
+        the ``n_nonlocal_bins`` / ``n_undecoded_bins`` fraction denominator).
     event_arm_table : pd.DataFrame
         Canonical event-arm table (9 rows per event).
 
@@ -240,7 +242,7 @@ def build_event_patch_table(
     pd.DataFrame
         3 rows per event (one per patch), with columns:
         ``event_id``, ``patch``, ``patch_count_hard``,
-        ``is_current_patch``, ``is_prev_patch``,
+        ``patch_fraction``, ``is_current_patch``, ``is_prev_patch``,
         ``is_last_rewarded_patch``, ``is_last_rewarded_noncurrent_patch``,
         canonical patch-level reward/value/recency aggregates, and canonical
         SWR-by-patch-role products.
@@ -308,6 +310,37 @@ def build_event_patch_table(
             eat[f"_leaf_{col}"] = eat[col].where(leaf)
             agg_spec[out_col] = (f"_leaf_{col}", "mean")
     patch_eat = eat.groupby(["event_id", "patch"]).agg(**agg_spec).reset_index()
+
+    # patch_fraction: the event's share of decoded content allocated to this
+    # patch. Same denominator as ``arm_fraction`` in build_event_arm_table --
+    # the in-event timebins whose MAP landed on a real arm -- so a patch
+    # fraction is exactly the sum of its three arms' fractions and an event's
+    # three patch fractions sum to one. NaN when the event has no real-arm bin.
+    # Both bin counts are event-grain and only ``n_nonlocal_bins`` survives onto
+    # the canonical arm table, so the denominator is carried from event_table
+    # rather than reconstructed from the response's own total.
+    missing_bins = [
+        column
+        for column in ("n_nonlocal_bins", "n_undecoded_bins")
+        if column not in event_table.columns
+    ]
+    if missing_bins:
+        raise ValueError(
+            "build_event_patch_table requires canonical event_table columns "
+            f"{missing_bins}; patch_fraction has no denominator without them"
+        )
+    real_bins_per_event = (
+        pd.to_numeric(event_table["n_nonlocal_bins"], errors="coerce")
+        - pd.to_numeric(event_table["n_undecoded_bins"], errors="coerce")
+    ).set_axis(event_table["event_id"])
+    patch_eat.insert(
+        patch_eat.columns.get_loc("patch_count_hard") + 1,
+        "patch_fraction",
+        arm_fraction_from_event_total(
+            patch_eat["patch_count_hard"].to_numpy(dtype=float),
+            real_bins_per_event.reindex(patch_eat["event_id"]).to_numpy(dtype=float),
+        ),
+    )
     leaf_history = (
         eat.loc[leaf]
         .groupby(["event_id", "patch"])

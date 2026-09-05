@@ -834,6 +834,21 @@ for basis in range(N_HISTORY_BASIS):
 
 _DEFINITIONS.append(
     _definition(
+        "patch_fraction",
+        "Share of the event's real-arm decoded timebins allocated to this patch.",
+        grain="event × candidate_patch",
+        units="fraction",
+        clock=QueryClock.EVENT_RESPONSE,
+        availability=Availability.PRE_OUTCOME,
+        support="all three task patches",
+        producer="replay.tables_arm_patch.build_event_patch_table",
+        window="all in-event timebins whose MAP estimate lands on a real arm",
+        missingness="event has no real-arm bins",
+    )
+)
+
+_DEFINITIONS.append(
+    _definition(
         "tc",
         "Response-bin time relative to immobility-stop start.",
         grain="stop × response bin",

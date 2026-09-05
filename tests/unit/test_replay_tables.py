@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.replay.tables import (
 from continuum_swr_replay.analysis.replay.tables import (
     build_stop_table as _build_stop_table,
 )
+from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 
@@ -1033,6 +1034,100 @@ class TestEventArmTableInvariants:
         # Event 2 is untouched and still sums to 1.
         event_2_sum = eat[eat["non_local_event"] == 2]["arm_fraction"].sum()
         assert np.isclose(event_2_sum, 1.0)
+
+    def test_patch_fraction_equals_count_over_real_arm_bins(self, tiny_session):
+        """``patch_fraction`` is the patch's share of the event's real-arm bins."""
+        dot, env, trials, graph = tiny_session
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        ept = build_event_patch_table(et, eat)
+
+        denominator = (
+            (et["n_nonlocal_bins"] - et["n_undecoded_bins"])
+            .set_axis(et["event_id"])
+            .reindex(ept["event_id"])
+            .to_numpy(dtype=float)
+        )
+        np.testing.assert_allclose(
+            ept["patch_fraction"].to_numpy(dtype=float),
+            ept["patch_count_hard"].to_numpy(dtype=float) / denominator,
+            rtol=0.0,
+            atol=1e-12,
+        )
+        frac_sum = ept.groupby("event_id")["patch_fraction"].sum()
+        np.testing.assert_allclose(frac_sum.to_numpy(), 1.0, atol=1e-12)
+
+    def test_patch_fraction_denominator_excludes_undecoded_bins(self, tiny_session):
+        """Undecoded (junction) bins leave the numerator, so they must leave the
+        denominator too — otherwise the fractions deflate below one."""
+        dot, env, trials, graph = tiny_session
+        event_1_rows = dot.index[dot["non_local_event"] == 1]
+        dot.loc[event_1_rows[:5], "map_estimate"] = np.nan
+
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        ept = build_event_patch_table(et, eat)
+
+        ev1 = et[et["non_local_event"] == 1].iloc[0]
+        assert ev1["n_nonlocal_bins"] == 10
+        assert ev1["n_undecoded_bins"] == 5
+
+        ev1_patches = ept[ept["event_id"] == ev1["event_id"]]
+        np.testing.assert_allclose(
+            ev1_patches["patch_fraction"].to_numpy(dtype=float),
+            ev1_patches["patch_count_hard"].to_numpy(dtype=float) / 5.0,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            ept.groupby("event_id")["patch_fraction"].sum().to_numpy(), 1.0, atol=1e-12
+        )
+
+    def test_patch_fraction_nan_for_all_junction_event(self, tiny_session):
+        """No real-arm bin means a zero denominator: NaN, never 0/0 or inf."""
+        dot, env, trials, graph = tiny_session
+        event_1_rows = dot.index[dot["non_local_event"] == 1]
+        dot.loc[event_1_rows, "map_estimate"] = np.nan
+
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        ept = build_event_patch_table(et, eat)
+
+        ev1_id = et.loc[et["non_local_event"] == 1, "event_id"].iloc[0]
+        ev2_id = et.loc[et["non_local_event"] == 2, "event_id"].iloc[0]
+        ev1_patches = ept[ept["event_id"] == ev1_id]
+        assert len(ev1_patches) == 3
+        assert ev1_patches["patch_fraction"].isna().all()
+        assert (ev1_patches["patch_count_hard"] == 0).all()
+        assert np.isclose(
+            ept.loc[ept["event_id"] == ev2_id, "patch_fraction"].sum(), 1.0
+        )
+
+    def test_patch_fraction_equals_sum_of_its_arm_fractions(self, tiny_session):
+        """A patch's fraction is the sum over its two leaf arms and its trunk."""
+        dot, env, trials, graph = tiny_session
+        et = build_event_table(dot, env, trials, graph)
+        eat = build_event_arm_table(et, dot, env, trials, graph)
+        ept = build_event_patch_table(et, eat)
+
+        arm_patch = eat["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
+        expected = (
+            eat.groupby([eat["event_id"], arm_patch.rename("patch")])["arm_fraction"]
+            .sum()
+            .rename("expected")
+        )
+        merged = ept.merge(
+            expected.reset_index(), on=["event_id", "patch"], validate="one_to_one"
+        )
+        assert len(merged) == len(ept)
+        # Each patch draws on exactly three arms (two leaves + one trunk).
+        assert sorted(TRACK_SEGMENT_TO_PATCH) == list(range(9))
+        arms_per_patch = pd.Series(TRACK_SEGMENT_TO_PATCH).value_counts().to_dict()
+        assert arms_per_patch == {1: 3, 2: 3, 3: 3}
+        np.testing.assert_allclose(
+            merged["patch_fraction"].to_numpy(dtype=float),
+            merged["expected"].to_numpy(dtype=float),
+            atol=1e-12,
+        )
 
     def test_sum_arm_posterior_mass_equals_nonlocal_probability_sum(
         self, tiny_session_with_posterior
