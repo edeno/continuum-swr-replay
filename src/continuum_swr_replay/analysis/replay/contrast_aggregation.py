@@ -22,7 +22,9 @@ in [0, 1], so their coefficients are reported per unit of the fraction (factor 1
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -74,6 +76,53 @@ BINARY_TERMS = frozenset(
 PER_UNIT_TERMS = frozenset(
     [*REWARD_HISTORY_COLUMNS, *(f"is_swr:{c}" for c in REWARD_HISTORY_COLUMNS)]
 )
+
+
+def load_per_sd_scale(provenance_path: str | Path, cohort: str) -> dict[str, float]:
+    """Per-SD units a fitted contrast table states its coefficients in.
+
+    The fitters freeze one pooled SD per raw-scale covariate, over the row
+    support the rungs carrying it are fitted on (the six leaf arms for the arm
+    cohort), and persist it in the run's provenance record. Readers must take
+    the unit from there rather than recomputing an SD of their own: the same
+    covariate measured over all nine candidate arms has a 2.1x larger SD,
+    because the three trunks are structural zeros, and a figure recomputing it
+    would restate every effect in a unit the audited table does not use.
+
+    Parameters
+    ----------
+    provenance_path : str or Path
+        The runner's provenance JSON (``*_provenance.json``).
+    cohort : str
+        Key within ``per_sd_scale`` (``"arm_cohort"`` / ``"patch_cohort"``).
+
+    Returns
+    -------
+    dict of str to float
+        Covariate -> frozen SD, ready to pass as ``aggregate_contrast``'s ``sd``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the provenance record is absent.
+    KeyError
+        If it carries no ``per_sd_scale`` entry for ``cohort`` -- a record
+        predating the frozen units, whose fits are in an unknown one.
+    """
+    path = Path(provenance_path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} is required for the per-SD unit the fit's coefficients are "
+            "stated in; re-run the fitter to write it."
+        )
+    scale = json.loads(path.read_text()).get("per_sd_scale") or {}
+    if cohort not in scale:
+        raise KeyError(
+            f"{path} records no per_sd_scale[{cohort!r}]. It predates the frozen "
+            "per-SD units, so the unit its coefficients are stated in is unknown; "
+            "re-run the fitter rather than recomputing an SD here."
+        )
+    return {cov: float(value) for cov, value in scale[cohort].items()}
 
 
 def std_factor(term: str, sd: dict) -> tuple[float, str]:

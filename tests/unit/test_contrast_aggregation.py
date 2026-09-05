@@ -14,11 +14,16 @@ frames that carry no ``sd_`` column). Precision alone is not a drop criterion.
 
 from __future__ import annotations
 
+import ast
+import json
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
+    load_per_sd_scale,
     std_factor,
 )
 from continuum_swr_replay.analysis.replay.model_specs import REWARD_HISTORY_COLUMNS
@@ -373,3 +378,80 @@ def test_se_source_is_model_when_most_sessions_have_no_clustered_se() -> None:
     # One clustered 0.30 and seven model 0.10 -> median 0.10.
     assert row["typical_session_se"] == pytest.approx(0.10)
     assert row["se_source"] == "model"
+
+
+# ── Per-SD units come from the fit, not from a reader's own recomputation ──
+
+_ARM_UNITS = {
+    "reward_belief_mean_candidate_arm_preoutcome": 0.11898572753538102,
+    "reward_fraction_candidate_arm_last10_visits": 0.29973092444891863,
+    "task_reward_probability_candidate_arm": 0.23976509313715935,
+}
+_CONTRAST_FIGURE = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "figures"
+    / "plot_swr_contrast_coefs.py"
+)
+
+
+def _provenance_file(tmp_path: Path, record: dict) -> Path:
+    path = tmp_path / "swr_contrast_content_provenance.json"
+    path.write_text(json.dumps(record))
+    return path
+
+
+def test_persisted_units_are_returned_and_used_verbatim(tmp_path: Path) -> None:
+    """The reader's standardization factor IS the fit's frozen SD, to the bit."""
+    path = _provenance_file(
+        tmp_path,
+        {"per_sd_scale": {"arm_cohort": _ARM_UNITS, "patch_cohort": {}}},
+    )
+
+    sd = load_per_sd_scale(path, "arm_cohort")
+
+    assert sd == _ARM_UNITS
+    for covariate, unit in _ARM_UNITS.items():
+        assert std_factor(covariate, sd) == (unit, "per_SD")
+        assert std_factor(f"swr_x_{covariate}", sd) == (unit, "per_SD")
+    assert load_per_sd_scale(path, "patch_cohort") == {}
+
+
+def test_a_record_without_the_frozen_units_is_refused(tmp_path: Path) -> None:
+    """A fit in an unknown unit must fail, not fall back to a recomputed SD."""
+    with pytest.raises(KeyError, match="per_sd_scale"):
+        load_per_sd_scale(
+            _provenance_file(tmp_path, {"per_sd_scale": {}}), "arm_cohort"
+        )
+    with pytest.raises(KeyError, match="per_sd_scale"):
+        load_per_sd_scale(_provenance_file(tmp_path, {}), "arm_cohort")
+    with pytest.raises(FileNotFoundError):
+        load_per_sd_scale(tmp_path / "absent.json", "arm_cohort")
+
+
+def test_the_contrast_figure_takes_its_arm_units_from_the_fit() -> None:
+    """No recomputation path survives in the figure for the per-arm covariates.
+
+    The figure's own ``_global_sd`` pools over all nine candidate arms, where the
+    three trunks are structural zeros for every per-arm belief covariate, so a
+    recomputed unit is 2.1x the audited table's per-leaf-arm one.
+    """
+    tree = ast.parse(_CONTRAST_FIGURE.read_text())
+    recomputed = {
+        element.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_global_sd"
+        for argument in node.args
+        if isinstance(argument, ast.List)
+        for element in argument.elts
+        if isinstance(element, ast.Constant)
+    }
+    called = {
+        getattr(node.func, "id", None)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    }
+
+    assert recomputed, "the rate ladder's own SDs are still computed in the figure"
+    assert not recomputed & set(_ARM_UNITS)
+    assert "load_per_sd_scale" in called

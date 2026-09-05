@@ -12,8 +12,10 @@ weighted reward fractions in [0, 1] (marked with a double dagger); their coeffic
 are per unit of the fraction -- the effect of a fully rewarded recent history versus a
 fully unrewarded one -- and are likewise not standardized.
 
-Covariate SDs are computed here directly from the source tables (global/pooled),
-so the figure is self-contained. Content state-modulation rungs (rpe/relval/entropy/
+Per-arm covariate SDs are read from the content fit's provenance record, so this
+figure states its arm effects in exactly the per-leaf-arm SD unit the audited
+table uses; the rate ladder's per-stop covariate SDs are computed here from the
+source tables. Content state-modulation rungs (rpe/relval/entropy/
 update/tss/block/switchrate x current) are already z-scored at fit time, so their
 standardization factor is 1.0.
 
@@ -33,6 +35,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     PER_UNIT_TERMS,
     SEPARATION_COEF_ABS,
+    load_per_sd_scale,
     separated_for_term,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (
@@ -61,6 +64,15 @@ SWR_CONTRAST_RATE_INPUTS = {
     "event_onset_table": RC / "event_onset_table.pkl",
     "event_table": RC / "event_table.pkl",
 }
+
+# The per-SD units the audited contrast table states its arm coefficients in.
+# They are frozen by the fitter over the six leaf arms and are NOT recomputable
+# here: the same covariates measured over all nine candidates have a 2.1x larger
+# SD (the trunks are structural zeros), which would shrink every per-SD arm
+# effect in this figure by that factor relative to the audited table.
+SWR_CONTRAST_CONTENT_PROVENANCE = (
+    RC / "models" / "swr_contrast_content_provenance.json"
+)
 
 SWR_CONTRAST_CONTENT_ARM = RC / "models" / "swr_contrast_content_arm.pkl"
 SWR_CONTRAST_CONTENT_PATCH = RC / "models" / "swr_contrast_content_patch.pkl"
@@ -122,12 +134,17 @@ def _global_sd(covariates):
     return sd
 
 
-SD = _global_sd([
-    "reward_belief_mean_candidate_arm_preoutcome", "reward_fraction_candidate_arm_last10_visits", "task_reward_probability_candidate_arm",
-    "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
-    "reward_belief_mean_update_l1_all_ports_postoutcome",
-    "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
-])
+# Rate-ladder covariates: per-stop quantities with no candidate-arm support
+# question, so their pooled SD is computed here from the source tables. The
+# per-arm covariates come from the fit's own frozen units instead.
+SD = {
+    **_global_sd([
+        "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+        "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
+    ]),
+    **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
+}
 ANIM = ["chimi", "j16", "peanut", "senor", "wilbur"]
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 RNG = np.random.default_rng(0)
