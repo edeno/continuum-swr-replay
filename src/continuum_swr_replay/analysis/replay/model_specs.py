@@ -64,7 +64,9 @@ __all__ = [
     "SWR_CONTRAST_CONTENT_ARM_KEY_TERM",
     "SWR_CONTRAST_CONTENT_ARM_LADDER",
     "SWR_CONTRAST_CONTENT_BASEC",
+    "SWR_CONTRAST_CONTENT_BASEC_NT",
     "SWR_CONTRAST_CONTENT_BASEC_PATCH",
+    "SWR_CONTRAST_CONTENT_BASEC_PATCH_NT",
     "SWR_CONTRAST_CONTENT_PATCH_KEY_TERM",
     "SWR_CONTRAST_CONTENT_PATCH_LADDER",
     "SWR_CONTRAST_RATE_G_SPECS",
@@ -1141,7 +1143,7 @@ ARMFE = [f"is_candidate_arm_{a}" for a in range(8)]
 # ``is_same_patch``
 # on the same grounds -- candidate-arm distance rank re-imported most of their
 # content.
-BASEc = [
+BASEc_NT = [
     *ARMFE,
     "is_current_arm",
     "is_prev_arm",
@@ -1149,6 +1151,15 @@ BASEc = [
     "is_candidate_arm_never_visited",
 ]
 _TSC = "log1p_time_since_stop_start_s_z_x_is_current_arm"
+# Event-length control. SWR-coupled events run ~1.8x longer than non-SWR ones, and a
+# longer trajectory visits more arms, so an uncontrolled ``swr_x_is_current_arm``
+# partly reads "longer events leave the current arm". z(log n_nonlocal_bins) crossed
+# with the current and previous arm indicators removes that channel from every rung
+# built on the base; the ``nt`` twins below keep BASEc_NT as the uncontrolled
+# sensitivity fit.
+_LENC = "log_n_nonlocal_bins_z_x_is_current_arm"
+_LENP = "log_n_nonlocal_bins_z_x_is_prev_arm"
+BASEc = [*BASEc_NT, _TSC, _LENC, _LENP]
 SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C0_armfe": (ARMFE, "split"),
     "C1_current": ([*ARMFE, "is_current_arm"], "split"),
@@ -1156,11 +1167,10 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C3_armreward": ([*BASEc, "reward_fraction_candidate_arm_last10_visits"], "split"),
     "C4_armvalue": ([*BASEc, "reward_belief_mean_candidate_arm_preoutcome"], "split"),
     "C5_lastrew": ([*BASEc, "is_last_rewarded_noncurrent_arm"], "split"),
-    "C6_rpe": ([*BASEc, _TSC, "rpe_postoutcome_z_x_is_current_arm"], "split"),
+    "C6_rpe": ([*BASEc, "rpe_postoutcome_z_x_is_current_arm"], "split"),
     "C7_value": (
         [
             *BASEc,
-            _TSC,
             "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
         ],
         "split",
@@ -1168,7 +1178,6 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C8_uncert": (
         [
             *BASEc,
-            _TSC,
             "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
         ],
         "split",
@@ -1176,7 +1185,6 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C9_update": (
         [
             *BASEc,
-            _TSC,
             "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
         ],
         "split",
@@ -1184,7 +1192,6 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C10_periswitch": (
         [
             *BASEc,
-            _TSC,
             "periswitch_index_trials_z_x_is_current_arm",
             "is_periswitch_post_x_is_current_arm",
             "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
@@ -1192,24 +1199,23 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
         "split",
     ),
     "C11_block": (
-        [*BASEc, _TSC, "trials_since_block_change_z_x_is_current_arm"],
+        [*BASEc, "trials_since_block_change_z_x_is_current_arm"],
         "split",
     ),
     "C12_switchrate": (
         [
             *BASEc,
-            _TSC,
             "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
         ],
         "split",
     ),
-    # CS1 includes the within-stop-time current-arm interaction
-    # UNCONDITIONALLY so ``swr_x_is_current_arm`` is the SWR-specific
-    # current-arm effect BEYOND the general time course (SWR and non-SWR events
-    # differ in stop-time). CS1nt is the uncontrolled sensitivity twin; both
-    # report the same canonical interaction term.
-    "CS1_current": ([*BASEc, _TSC, "swr_x_is_current_arm"], "pooled"),
-    "CS1nt_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
+    # CS1 inherits the within-stop-time and event-length current-arm interactions
+    # from BASEc UNCONDITIONALLY, so ``swr_x_is_current_arm`` is the SWR-specific
+    # current-arm effect BEYOND the general time course and BEYOND event length
+    # (SWR and non-SWR events differ in both). CS1nt is the uncontrolled
+    # sensitivity twin; both report the same canonical interaction term.
+    "CS1_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
+    "CS1nt_current": ([*BASEc_NT, "swr_x_is_current_arm"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
     "CS3_lastrew": (
         [
@@ -1293,12 +1299,17 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C13_armuncert": "reward_belief_variance_candidate_arm_preoutcome_z",
     "CS6_armuncert": "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
 }
-BASEc_PATCH = [
+BASEc_PATCH_NT = [
     "is_current_patch",
     "is_prev_patch",
     "visit_recency_trials_patch",
     "is_patch_never_visited",
 ]
+# Patch analogues of the arm within-stop-time and event-length controls (see BASEc).
+_TSC_PATCH = "log1p_time_since_stop_start_s_z_x_is_current_patch"
+_LENC_PATCH = "log_n_nonlocal_bins_z_x_is_current_patch"
+_LENP_PATCH = "log_n_nonlocal_bins_z_x_is_prev_patch"
+BASEc_PATCH = [*BASEc_PATCH_NT, _TSC_PATCH, _LENC_PATCH, _LENP_PATCH]
 # ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18. Both crossed
 # ``is_last_rewarded_noncurrent_patch`` with a peri-switch term, and
 # the indicator correlates -0.96/-0.97 with its own interaction, so the design
@@ -1322,17 +1333,10 @@ SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
         ],
         "split",
     ),
-    # Time-controlled current-patch contrast + uncontrolled twin,
-    # mirroring the arm CS1/CS1nt pair.
-    "CPS1_current": (
-        [
-            *BASEc_PATCH,
-            "log1p_time_since_stop_start_s_z_x_is_current_patch",
-            "swr_x_is_current_patch",
-        ],
-        "pooled",
-    ),
-    "CPS1nt_current": ([*BASEc_PATCH, "swr_x_is_current_patch"], "pooled"),
+    # Time- and length-controlled current-patch contrast (both inherited from
+    # BASEc_PATCH) + uncontrolled twin, mirroring the arm CS1/CS1nt pair.
+    "CPS1_current": ([*BASEc_PATCH, "swr_x_is_current_patch"], "pooled"),
+    "CPS1nt_current": ([*BASEc_PATCH_NT, "swr_x_is_current_patch"], "pooled"),
     "CPS2_lastrew": (
         [*BASEc_PATCH, _LR_PATCH, "swr_x_is_last_rewarded_noncurrent_patch"],
         "pooled",
@@ -1348,7 +1352,9 @@ SWR_CONTRAST_CONTENT_PATCH_KEY_TERM = {
     "CPS2_lastrew": "swr_x_is_last_rewarded_noncurrent_patch",
 }
 SWR_CONTRAST_CONTENT_BASEC = BASEc
+SWR_CONTRAST_CONTENT_BASEC_NT = BASEc_NT
 SWR_CONTRAST_CONTENT_BASEC_PATCH = BASEc_PATCH
+SWR_CONTRAST_CONTENT_BASEC_PATCH_NT = BASEc_PATCH_NT
 
 # ── Phase-4 causal-hygiene: descriptive-rung allowlists ──
 #

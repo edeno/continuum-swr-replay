@@ -13,7 +13,10 @@ from scripts.content import fit_swr_contrast_content as mod
 
 
 def test_q_arm_source_is_beta():
-    prov = mod._provenance(argparse.Namespace(max_per_animal=None), n_sessions=218)
+    args = argparse.Namespace(
+        max_per_animal=None, response="fraction", outcome_stratum="all"
+    )
+    prov = mod._provenance(args, n_sessions=218)
 
     assert "beta" in prov["q_arm_source"].lower()
     assert "reward_belief_mean_candidate_arm_preoutcome" in prov["q_arm_source"]

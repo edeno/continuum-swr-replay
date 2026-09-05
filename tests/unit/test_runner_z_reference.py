@@ -1,10 +1,11 @@
 """F2: the contrast runner persists its fit-time _z reference and it is reproducible.
 
-The is_swr-contrast content runner standardizes its event scalars over the *event
-cohort* at fit time (its own scope, distinct from the builder's pooled-global table
-_z). The runner is NOT repointed at the builder _z; instead it persists the
-run's own means/SDs into the provenance so the standardized coefficients are
-reproducible. This locks that in.
+The is_swr-contrast content runner standardizes over its *fit cohort* (its own scope,
+distinct from the builder's pooled-global table _z) through the shared
+``attach_standardized`` entry point. The runner is NOT repointed at the builder _z;
+instead it persists the run's own means/SDs -- into the provenance and into a
+``<artifact-stem>.z_reference.json`` sidecar -- so the standardized coefficients are
+reproducible. This locks that in, plus the separation of the arm and patch scopes.
 """
 
 from __future__ import annotations
@@ -19,79 +20,106 @@ import pytest
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.standardization import attach_standardized
+from continuum_swr_replay.analysis.replay.standardization import (
+    attach_standardized,
+    load_reference,
+    save_reference,
+)
 from scripts.content import fit_swr_contrast_content as mod
+
+
+def _args(**overrides) -> argparse.Namespace:
+    params = {"max_per_animal": None, "response": "fraction", "outcome_stratum": "all"}
+    params.update(overrides)
+    return argparse.Namespace(**params)
+
+
+def _patch_frame(n_events: int = 8, seed: int = 0) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n_patches = 3
+    patches = np.tile(np.arange(n_patches), n_events)
+    return pd.DataFrame(
+        {
+            "event_id": np.repeat(np.arange(n_events), n_patches),
+            "n_nonlocal_bins": np.repeat(rng.integers(1, 90, size=n_events), n_patches),
+            "time_since_stop_start_s": np.repeat(
+                rng.uniform(0.1, 8.0, size=n_events), n_patches
+            ),
+            "is_current_patch": (patches == 0).astype(float),
+            "is_prev_patch": (patches == 1).astype(float),
+            "is_swr": np.repeat(rng.random(n_events) < 0.5, n_patches),
+            "periswitch_index_trials": np.repeat(rng.normal(size=n_events), n_patches),
+            "patch_switch_fraction_last5_completed_trips": np.repeat(
+                rng.uniform(size=n_events), n_patches
+            ),
+        }
+    )
 
 
 def test_provenance_includes_fit_time_z_reference():
     rng = np.random.default_rng(0)
-    frame = pd.DataFrame({
-        "hmm_rpe": rng.normal(size=200),
-        "reward_entropy": rng.normal(2.0, 0.5, size=200),
-    })
-    ref = mod._z_reference(frame, ["hmm_rpe", "reward_entropy"])
-    prov = mod._provenance(argparse.Namespace(max_per_animal=None), 218, ref)
+    frame = pd.DataFrame({"periswitch_index_trials": rng.normal(size=200)})
+    _, reference = attach_standardized(
+        frame.copy(),
+        ["periswitch_index_trials"],
+        support_label="fit_cohort_all_rows",
+    )
+    prov = mod._provenance(_args(), 218, {"patch_cohort": reference})
 
-    assert prov["fit_time_z_reference"] == ref
-    for c in ("hmm_rpe", "reward_entropy"):
-        assert ref[c]["mean"] == float(np.nanmean(frame[c].to_numpy()))
-        assert ref[c]["std"] == float(np.nanstd(frame[c].to_numpy()))
+    assert prov["fit_time_z_reference"] == {"patch_cohort": reference}
+    moments = reference["periswitch_index_trials"]
+    assert moments["mean"] == float(np.nanmean(frame.to_numpy()))
+    assert moments["std"] == float(np.nanstd(frame.to_numpy()))
+    assert moments["support"] == "fit_cohort_all_rows"
 
 
-def test_full_reference_covers_arm_tsc_and_patch_cohort():
-    """The persisted reference must cover EVERY standardization the run computes: arm
-    event scalars, the arm/patch within-stop-time control, and the SEPARATE patch
-    cohort scalars (a different scope than the same-named arm entries)."""
-    rng = np.random.default_rng(0)
-    n = 100
-    ev = pd.DataFrame({
-        **{c: rng.normal(size=n) for c in mod._ZSCALARS},
-        "time_since_stop_start_s": rng.uniform(0, 3, n),
-    })
-    pt = pd.DataFrame({
-        "periswitch_index_trials": rng.normal(size=n),
-        "patch_switch_fraction_last5_completed_trips": rng.uniform(0, 1, n),
-        "time_since_stop_start_s": rng.uniform(0, 5, n),  # patch cohort: different values
-    })
-    ref = mod._fit_z_reference(ev, pt)
-
-    assert set(ref["arm_event_scalars"]) == set(mod._ZSCALARS)
-    assert "log1p_time_since_stop" in ref["arm_within_stop_time"]
-    assert set(ref["patch_cohort"]) == {
-        "periswitch_index_trials", "patch_switch_fraction_last5_completed_trips", "log1p_time_since_stop"
+def test_declared_sources_cover_every_standardization_the_runner_makes():
+    """A new fit-time ``_z`` must be declared, or its moments go unrecorded."""
+    assert set(mod._ARM_Z_SOURCES) == set(mod._ZSCALARS) | {
+        "log1p_time_since_stop_start_s",
+        "log_n_nonlocal_bins",
     }
-    # The patch within-stop-time uses log1p over the PATCH cohort (its own scope).
-    import numpy as _np
-    assert ref["patch_cohort"]["log1p_time_since_stop"]["mean"] == float(
-        _np.nanmean(_np.log1p(pt["time_since_stop_start_s"].to_numpy(float)))
+    assert set(mod._PATCH_Z_SOURCES) == {
+        "periswitch_index_trials",
+        "patch_switch_fraction_last5_completed_trips",
+        "log1p_time_since_stop_start_s",
+        "log_n_nonlocal_bins",
+    }
+
+
+def test_patch_cohort_is_its_own_standardization_scope():
+    """The patch reference is estimated on patch rows, not inherited from the arms."""
+    _, reference = mod._attach_patch_design_columns(_patch_frame())
+    frame = _patch_frame()
+    for source in ("periswitch_index_trials", "log_n_nonlocal_bins"):
+        values = (
+            np.log(frame["n_nonlocal_bins"].to_numpy(dtype=float))
+            if source == "log_n_nonlocal_bins"
+            else frame[source].to_numpy(dtype=float)
+        )
+        assert reference[source]["mean"] == float(np.nanmean(values))
+        assert reference[source]["std"] == float(np.nanstd(values))
+
+
+def test_reference_round_trips_through_the_sidecar(tmp_path):
+    """Reloading the persisted sidecar reproduces the fit's ``_z`` exactly."""
+    designed, reference = mod._attach_patch_design_columns(_patch_frame())
+    path = mod._z_reference_path(tmp_path / "swr_contrast_content_patch.pkl")
+    save_reference(reference, path)
+
+    assert path.name == "swr_contrast_content_patch.z_reference.json"
+    replayed, _ = attach_standardized(
+        designed.loc[:, list(mod._PATCH_Z_SOURCES)].copy(),
+        list(mod._PATCH_Z_SOURCES),
+        reference=load_reference(path),
+        support_label="fit_cohort_all_rows",
     )
-    # The reference reproduces the runner's own _z for a patch scalar.
-    from continuum_swr_replay.analysis.replay.standardization import attach_standardized
-    applied, _ = attach_standardized(
-        pt[["periswitch_index_trials"]].copy(), ["periswitch_index_trials"],
-        reference={"periswitch_index_trials": ref["patch_cohort"]["periswitch_index_trials"]},
-    )
-    np.testing.assert_allclose(
-        applied["periswitch_index_trials_z"].to_numpy(),
-        mod._z(pt["periswitch_index_trials"].to_numpy(float)), atol=1e-12,
-    )
-
-
-def test_reference_reproduces_runner_z():
-    """Re-applying the persisted reference reproduces the runner's own _z() output."""
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame({"hmm_rpe": rng.normal(3.0, 2.0, size=150)})
-    ref = mod._z_reference(frame, ["hmm_rpe"])
-
-    applied, _ = attach_standardized(frame.copy(), ["hmm_rpe"], reference=ref)
-    runner_z = mod._z(frame["hmm_rpe"].to_numpy(dtype=float))
-    np.testing.assert_allclose(applied["hmm_rpe_z"].to_numpy(), runner_z, atol=1e-12)
-
-
-def test_z_reference_skips_absent_columns():
-    frame = pd.DataFrame({"hmm_rpe": [1.0, 2.0, 3.0]})
-    ref = mod._z_reference(frame, ["hmm_rpe", "not_a_column"])
-    assert set(ref) == {"hmm_rpe"}
+    for source in mod._PATCH_Z_SOURCES:
+        np.testing.assert_allclose(
+            replayed[f"{source}_z"].to_numpy(),
+            designed[f"{source}_z"].to_numpy(),
+            atol=1e-12,
+        )
 
 
 def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
@@ -112,7 +140,14 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
     frame = stamp_covariate_schema(frame, table="event_arm")
     frame.to_pickle(tmp_path / "event_arm_table.pkl")
     (tmp_path / "standardization_reference.json").write_text(
-        json.dumps({"reward_belief_variance_candidate_arm_preoutcome": {"mean": 1.5, "std": 0.5}})
+        json.dumps(
+            {
+                "reward_belief_variance_candidate_arm_preoutcome": {
+                    "mean": 1.5,
+                    "std": 0.5,
+                }
+            }
+        )
     )
     monkeypatch.setattr(mod, "RC", tmp_path)
 
@@ -124,6 +159,9 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
     ("values", "message"),
     [([np.nan, np.nan], "no finite values"), ([1.0, np.inf], "infinity")],
 )
-def test_fit_time_reference_rejects_invalid_support(values, message):
+def test_fit_time_standardization_rejects_invalid_support(values, message):
     with pytest.raises(ValueError, match=message):
-        mod._moment(np.asarray(values))
+        mod._standardize(
+            pd.DataFrame({"periswitch_index_trials": values}),
+            ["periswitch_index_trials"],
+        )

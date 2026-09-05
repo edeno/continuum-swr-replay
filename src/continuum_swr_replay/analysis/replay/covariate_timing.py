@@ -114,6 +114,16 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
         "time_since_stop_start_s",
         "is_current_arm",
     ],
+    # Event-length control: z(log n_nonlocal_bins) crossed with the arm/patch
+    # indicator it modulates. Both factors are exposed so neither hides.
+    "log_n_nonlocal_bins_z_x_is_current_arm": [
+        "n_nonlocal_bins",
+        "is_current_arm",
+    ],
+    "log_n_nonlocal_bins_z_x_is_prev_arm": [
+        "n_nonlocal_bins",
+        "is_prev_arm",
+    ],
     # pre-materialized swr_x_* columns used directly in the CS-rungs (model_specs.py)
     "swr_x_is_current_arm": ["is_current_arm"],
     "swr_x_is_prev_arm": ["is_prev_arm"],
@@ -158,6 +168,14 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "log1p_time_since_stop_start_s_z_x_is_current_patch": [
         "time_since_stop_start_s",
         "is_current_patch",
+    ],
+    "log_n_nonlocal_bins_z_x_is_current_patch": [
+        "n_nonlocal_bins",
+        "is_current_patch",
+    ],
+    "log_n_nonlocal_bins_z_x_is_prev_patch": [
+        "n_nonlocal_bins",
+        "is_prev_patch",
     ],
     "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch": [
         "patch_switch_fraction_last5_completed_trips"

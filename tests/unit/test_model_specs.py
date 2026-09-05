@@ -189,3 +189,64 @@ def test_aggregation_never_emits_a_row_for_the_missingness_indicator() -> None:
     agg = aggregate_contrast(res, specs, level="rate")
     assert ms.REWARD_HISTORY_INCOMPLETE not in set(agg["term"])
     assert set(agg["term"]) == {"is_swr:reward_history_rcos_0"}
+
+
+# --- Content ladder: event-length and within-stop-time controls ---
+
+_ARM_CONTROLS = (
+    "log1p_time_since_stop_start_s_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_prev_arm",
+)
+_PATCH_CONTROLS = (
+    "log1p_time_since_stop_start_s_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_prev_patch",
+)
+
+
+def _rungs_built_on(ladder: dict, base: list[str]) -> dict[str, list[str]]:
+    """Ladder rungs whose predictors extend ``base`` (the spatial-baseline rungs
+    C0/C1 do not, and the ``nt`` twins are the deliberately uncontrolled ones)."""
+    return {
+        name: preds
+        for name, (preds, _scope) in ladder.items()
+        if set(base) <= set(preds) and not name.endswith("nt_current")
+    }
+
+
+def test_content_arm_rungs_carry_the_length_and_time_controls() -> None:
+    rungs = _rungs_built_on(ms.SWR_CONTRAST_CONTENT_ARM_LADDER, ms.BASEc_NT)
+    assert "CS1_current" in rungs and "CS5_armvalue" in rungs and "C2_base" in rungs
+    for name, preds in rungs.items():
+        for control in _ARM_CONTROLS:
+            assert control in preds, f"{name} is missing {control}"
+        assert len(preds) == len(set(preds)), f"{name} repeats a predictor"
+
+
+def test_content_patch_rungs_carry_the_length_and_time_controls() -> None:
+    rungs = _rungs_built_on(ms.SWR_CONTRAST_CONTENT_PATCH_LADDER, ms.BASEc_PATCH_NT)
+    assert "CPS1_current" in rungs and "CP0_base" in rungs
+    for name, preds in rungs.items():
+        for control in _PATCH_CONTROLS:
+            assert control in preds, f"{name} is missing {control}"
+        assert len(preds) == len(set(preds)), f"{name} repeats a predictor"
+
+
+def test_uncontrolled_twins_keep_the_base_without_the_controls() -> None:
+    arm_nt = ms.SWR_CONTRAST_CONTENT_ARM_LADDER["CS1nt_current"][0]
+    patch_nt = ms.SWR_CONTRAST_CONTENT_PATCH_LADDER["CPS1nt_current"][0]
+
+    assert arm_nt == [*ms.BASEc_NT, "swr_x_is_current_arm"]
+    assert patch_nt == [*ms.BASEc_PATCH_NT, "swr_x_is_current_patch"]
+    for control in _ARM_CONTROLS:
+        assert control not in arm_nt
+    for control in _PATCH_CONTROLS:
+        assert control not in patch_nt
+
+
+def test_base_minus_the_controls_is_the_uncontrolled_base() -> None:
+    assert [p for p in ms.BASEc if p not in _ARM_CONTROLS] == ms.BASEc_NT
+    assert ms.BASEc == [*ms.BASEc_NT, *_ARM_CONTROLS]
+    assert [p for p in ms.BASEc_PATCH if p not in _PATCH_CONTROLS] == ms.BASEc_PATCH_NT
+    assert ms.BASEc_PATCH == [*ms.BASEc_PATCH_NT, *_PATCH_CONTROLS]

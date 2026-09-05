@@ -1,0 +1,247 @@
+"""Design-column, standardization, and cohort contracts of the SWR-contrast content runner.
+
+The runner's pure helpers are exercised directly on synthetic frames; ``main`` is
+never executed (it reads the canonical tables). Three contracts are pinned:
+
+* the event-length control (``z(log n_nonlocal_bins)`` crossed with the current /
+  previous arm-or-patch indicator) equals the product of its two factors;
+* the persisted standardization reference reproduces every ``<col>_z`` the fit used;
+* the outcome strata partition the events whose current outcome is known, and events
+  with an unknown outcome are excluded from both strata and counted by ``is_swr``.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.replay.standardization import attach_standardized
+from scripts.content import fit_swr_contrast_content as mod
+
+
+def _z(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    return (values - np.nanmean(values)) / np.nanstd(values)
+
+
+@pytest.fixture
+def arm_frame() -> pd.DataFrame:
+    """Six events x three arms carrying every raw source the arm design needs."""
+    rng = np.random.default_rng(0)
+    n_events, n_arms = 6, 3
+    events = np.repeat(np.arange(n_events), n_arms)
+    arms = np.tile(np.arange(n_arms), n_events)
+    frame = pd.DataFrame(
+        {
+            "event_id": events,
+            "candidate_arm": arms,
+            "n_nonlocal_bins": np.repeat([12, 45, 3, 1, 80, 25], n_arms),
+            "time_since_stop_start_s": np.repeat(
+                [0.5, 2.0, 7.5, 1.0, 3.25, 0.75], n_arms
+            ),
+            "is_current_arm": (arms == 0).astype(float),
+            "is_prev_arm": (arms == 1).astype(float),
+            "is_swr": np.repeat([True, False, True, False, True, False], n_arms),
+            "is_periswitch_post": np.repeat([1.0, 0.0, 1.0, 0.0, 1.0, 0.0], n_arms),
+            "reward_belief_mean_candidate_arm_preoutcome": rng.normal(
+                size=n_events * n_arms
+            ),
+            "reward_belief_variance_candidate_arm_preoutcome_z": rng.normal(
+                size=n_events * n_arms
+            ),
+        }
+    )
+    for column in mod._ZSCALARS:
+        frame[column] = np.repeat(rng.normal(size=n_events), n_arms)
+    return frame
+
+
+@pytest.fixture
+def patch_frame() -> pd.DataFrame:
+    """Six events x three patches carrying every raw source the patch design needs."""
+    rng = np.random.default_rng(1)
+    n_events, n_patches = 6, 3
+    events = np.repeat(np.arange(n_events), n_patches)
+    patches = np.tile(np.arange(n_patches), n_events)
+    return pd.DataFrame(
+        {
+            "event_id": events,
+            "patch": patches,
+            "n_nonlocal_bins": np.repeat([9, 30, 4, 61, 15, 2], n_patches),
+            "time_since_stop_start_s": np.repeat(
+                [1.5, 0.25, 4.0, 2.5, 6.0, 0.5], n_patches
+            ),
+            "is_current_patch": (patches == 0).astype(float),
+            "is_prev_patch": (patches == 2).astype(float),
+            "is_swr": np.repeat([True, False, True, False, True, False], n_patches),
+            "periswitch_index_trials": np.repeat(rng.normal(size=n_events), n_patches),
+            "patch_switch_fraction_last5_completed_trips": np.repeat(
+                rng.uniform(size=n_events), n_patches
+            ),
+        }
+    )
+
+
+def test_arm_length_products_are_the_standardized_log_length_times_the_indicator(
+    arm_frame,
+):
+    designed, _reference = mod._attach_arm_design_columns(arm_frame)
+
+    expected_z = _z(np.log(arm_frame["n_nonlocal_bins"].to_numpy(dtype=float)))
+    np.testing.assert_allclose(
+        designed["log_n_nonlocal_bins_z"].to_numpy(), expected_z, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        designed["log_n_nonlocal_bins_z_x_is_current_arm"].to_numpy(),
+        expected_z * arm_frame["is_current_arm"].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        designed["log_n_nonlocal_bins_z_x_is_prev_arm"].to_numpy(),
+        expected_z * arm_frame["is_prev_arm"].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+    # The control is only nonzero on the arm it modulates.
+    assert (
+        designed.loc[
+            arm_frame["is_current_arm"] == 0, "log_n_nonlocal_bins_z_x_is_current_arm"
+        ]
+        == 0
+    ).all()
+
+
+def test_patch_length_products_are_the_standardized_log_length_times_the_indicator(
+    patch_frame,
+):
+    designed, _reference = mod._attach_patch_design_columns(patch_frame)
+
+    expected_z = _z(np.log(patch_frame["n_nonlocal_bins"].to_numpy(dtype=float)))
+    np.testing.assert_allclose(
+        designed["log_n_nonlocal_bins_z_x_is_current_patch"].to_numpy(),
+        expected_z * patch_frame["is_current_patch"].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        designed["log_n_nonlocal_bins_z_x_is_prev_patch"].to_numpy(),
+        expected_z * patch_frame["is_prev_patch"].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        designed["log1p_time_since_stop_start_s_z_x_is_current_patch"].to_numpy(),
+        _z(np.log1p(patch_frame["time_since_stop_start_s"].to_numpy(dtype=float)))
+        * patch_frame["is_current_patch"].to_numpy(dtype=float),
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    ("helper", "frame_name", "sources"),
+    [
+        ("_attach_arm_design_columns", "arm_frame", mod._ARM_Z_SOURCES),
+        ("_attach_patch_design_columns", "patch_frame", mod._PATCH_Z_SOURCES),
+    ],
+)
+def test_persisted_reference_reproduces_every_standardized_column(
+    helper, frame_name, sources, request
+):
+    frame = request.getfixturevalue(frame_name)
+    designed, reference = getattr(mod, helper)(frame.copy())
+
+    assert set(reference) == set(sources)
+    for source in sources:
+        assert reference[source]["support"] == "fit_cohort_all_rows"
+    replayed, _ = attach_standardized(
+        designed.loc[:, list(sources)].copy(),
+        list(sources),
+        reference=reference,
+        support_label="fit_cohort_all_rows",
+    )
+    for source in sources:
+        np.testing.assert_array_equal(
+            replayed[f"{source}_z"].to_numpy(), designed[f"{source}_z"].to_numpy()
+        )
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_event_length_below_one_bin_is_refused(arm_frame, bad):
+    arm_frame.loc[3, "n_nonlocal_bins"] = bad
+    with pytest.raises(ValueError, match="n_nonlocal_bins"):
+        mod._attach_arm_design_columns(arm_frame)
+
+
+def test_event_length_missing_is_refused(arm_frame):
+    arm_frame.loc[3, "n_nonlocal_bins"] = np.nan
+    with pytest.raises(ValueError, match="n_nonlocal_bins"):
+        mod._attach_arm_design_columns(arm_frame)
+
+
+@pytest.fixture
+def outcome_frame() -> pd.DataFrame:
+    """Five events x two arms: two rewarded, two omitted, one unknown outcome."""
+    return pd.DataFrame(
+        {
+            "event_id": np.repeat([10, 11, 12, 13, 14], 2),
+            "candidate_arm": np.tile([0, 1], 5),
+            "is_rewarded_outcome": np.repeat([1.0, 0.0, 1.0, np.nan, 0.0], 2),
+            "is_swr": np.repeat([True, False, True, True, False], 2),
+        }
+    )
+
+
+def test_outcome_strata_partition_the_known_outcome_events(outcome_frame):
+    rewarded, _ = mod.select_outcome_stratum(outcome_frame, "rewarded")
+    omitted, _ = mod.select_outcome_stratum(outcome_frame, "omitted")
+    everything, _ = mod.select_outcome_stratum(outcome_frame, "all")
+
+    rewarded_events = set(rewarded["event_id"])
+    omitted_events = set(omitted["event_id"])
+    assert rewarded_events == {10, 12}
+    assert omitted_events == {11, 14}
+    assert not rewarded_events & omitted_events
+    # The unknown-outcome event is in neither stratum but survives "all".
+    assert rewarded_events | omitted_events == {10, 11, 12, 14}
+    assert set(everything["event_id"]) == {10, 11, 12, 13, 14}
+    assert len(rewarded) == 4
+    assert len(everything) == len(outcome_frame)
+
+
+def test_outcome_stratum_audit_counts_unknown_outcome_by_swr(outcome_frame):
+    _, audit = mod.select_outcome_stratum(outcome_frame, "rewarded")
+
+    assert audit["stratum"] == "rewarded"
+    assert audit["n_events_in"] == 5
+    assert audit["n_events_kept"] == 2
+    assert audit["n_events_unknown_outcome"] == 1
+    assert audit["n_events_unknown_outcome_swr"] == 1
+    assert audit["n_events_unknown_outcome_non_swr"] == 0
+
+    _, all_audit = mod.select_outcome_stratum(outcome_frame, "all")
+    assert all_audit["n_events_kept"] == 5
+    assert all_audit["n_events_unknown_outcome"] == 1
+
+
+def test_unknown_outcome_stratum_is_refused(outcome_frame):
+    with pytest.raises(ValueError, match="outcome stratum"):
+        mod.select_outcome_stratum(outcome_frame, "rewarded_only")
+
+
+@pytest.mark.parametrize(
+    ("max_per_animal", "response", "stratum", "expected"),
+    [
+        (None, "fraction", "all", ""),
+        (None, "fraction", "rewarded", "_rewarded"),
+        (None, "fraction", "omitted", "_omitted"),
+        (None, "hard_count", "rewarded", "_hard_count_rewarded"),
+        (1, "hard_count", "omitted", "_smoke_hard_count_omitted"),
+    ],
+)
+def test_artifact_suffix_records_smoke_response_and_stratum(
+    max_per_animal, response, stratum, expected
+):
+    import argparse
+
+    args = argparse.Namespace(
+        max_per_animal=max_per_animal, response=response, outcome_stratum=stratum
+    )
+    assert mod._artifact_suffix(args) == expected

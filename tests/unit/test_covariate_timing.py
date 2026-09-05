@@ -173,3 +173,28 @@ def test_every_ladder_predictor_resolvable():
         if bad:
             unresolved[p] = bad
     assert not unresolved, f"predictors with atoms outside KNOWN_ATOMS: {unresolved}"
+
+
+@pytest.mark.parametrize(
+    ("predictor", "expected_atoms"),
+    [
+        (
+            "log_n_nonlocal_bins_z_x_is_current_arm",
+            ["n_nonlocal_bins", "is_current_arm"],
+        ),
+        ("log_n_nonlocal_bins_z_x_is_prev_arm", ["n_nonlocal_bins", "is_prev_arm"]),
+        (
+            "log_n_nonlocal_bins_z_x_is_current_patch",
+            ["n_nonlocal_bins", "is_current_patch"],
+        ),
+        (
+            "log_n_nonlocal_bins_z_x_is_prev_patch",
+            ["n_nonlocal_bins", "is_prev_patch"],
+        ),
+    ],
+)
+def test_event_length_products_resolve_to_pre_outcome_atoms(predictor, expected_atoms):
+    """The event-length control exposes both factors and neither leaks the outcome."""
+    assert timing_of(predictor) == expected_atoms
+    assert set(expected_atoms) <= KNOWN_ATOMS
+    assert_predictor_timing([predictor])

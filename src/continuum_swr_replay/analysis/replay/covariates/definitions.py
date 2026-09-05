@@ -517,6 +517,17 @@ _DEFINITIONS.extend(
             missingness="response time or stop start unavailable",
         ),
         _definition(
+            "n_nonlocal_bins",
+            "Number of decoder time bins the non-local event spans.",
+            grain="event",
+            units="decoder bins",
+            clock=QueryClock.EVENT_RESPONSE,
+            availability=Availability.PRE_OUTCOME,
+            support="all non-local events; at least one bin by construction",
+            producer="replay.tables_event.build_event_table",
+            missingness="never missing on a materialized event",
+        ),
+        _definition(
             "trials_since_block_change",
             "Number of completed trials since the current reward-probability block began.",
             grain=_TRIAL_STOP,
