@@ -1054,11 +1054,17 @@ def main() -> None:
     agg = pd.concat(
         [
             _aggregate(
-                arm, ARM_LADDER, ARM_KEY_TERM, "candidate_arm",
+                arm,
+                ARM_LADDER,
+                ARM_KEY_TERM,
+                "candidate_arm",
                 per_sd_scale["arm_cohort"],
             ),
             _aggregate(
-                patch, PATCH_LADDER, PATCH_KEY_TERM, "patch",
+                patch,
+                PATCH_LADDER,
+                PATCH_KEY_TERM,
+                "patch",
                 per_sd_scale["patch_cohort"],
             ),
         ],

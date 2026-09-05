@@ -13,7 +13,9 @@ animals a frequentist p is barely meaningful, so the sign consistency IS the cla
 within an animal are not independent), with a BH-FDR across the rungs sharing a
 population (``session_signrank_fdr_q``). ``typical_session_se`` is the median
 per-session SE, not the aggregate's uncertainty; it is the event-clustered SE
-wherever the fitters wrote one (``se_source``). Continuous-predictor coefficients
+wherever the fitters wrote one (``se_source``). ``pct_sig_session`` is read on
+that same SE (a per-session Wald z), so the row's dispersion and its
+significance count share one definition of uncertainty. Continuous-predictor coefficients
 also carry a standardized (per-1-SD) form (``std_*``); binary predictors are
 per-category; and the reward-history basis features are weighted reward fractions
 in [0, 1], so their coefficients are reported per unit of the fraction (factor 1.0,
@@ -38,18 +40,36 @@ from .model_specs import REWARD_HISTORY_COLUMNS
 # statement about the identified minority and is not emitted at all.
 MAX_UNIDENTIFIED_SHARE = 0.20
 
+# Two-sided normal critical value at alpha = 0.05, for the per-session Wald test.
+_WALD_Z_TWO_SIDED_05 = 1.959963984540054
+
 # The per-row output schema, in emit order. Kept as a constant so an
 # all-gated-out run still returns a correctly-shaped (empty) frame rather than a
 # column-less one that KeyErrors on column selection. ``session_signrank_fdr_q``
 # is appended after the BH-FDR pass, so it is added by the caller/return, not here.
 _AGG_COLUMNS = (
-    "level", "model", "population", "term", "n_sessions", "n_animals",
-    "n_dropped", "n_sessions_flagged_nonconverged", "n_sessions_flagged_separated",
-    "coef_animal_median", "n_animals_pos", "coef_session_median",
-    "typical_session_se", "se_source", "std_unit", "std_factor",
-    "std_coef_animal_median", "std_coef_session_median",
-    "std_typical_session_se", "pct_positive_session",
-    "pct_sig_session", "session_signrank_p",
+    "level",
+    "model",
+    "population",
+    "term",
+    "n_sessions",
+    "n_animals",
+    "n_dropped",
+    "n_sessions_flagged_nonconverged",
+    "n_sessions_flagged_separated",
+    "coef_animal_median",
+    "n_animals_pos",
+    "coef_session_median",
+    "typical_session_se",
+    "se_source",
+    "std_unit",
+    "std_factor",
+    "std_coef_animal_median",
+    "std_coef_session_median",
+    "std_typical_session_se",
+    "pct_positive_session",
+    "pct_sig_session",
+    "session_signrank_p",
 )
 
 logger = logging.getLogger(__name__)
@@ -185,8 +205,8 @@ def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
     )
 
 
-def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
-    """Median per-session SE for ``term``, and which SE that median is made of.
+def session_se(fits: pd.DataFrame, term: str) -> tuple[pd.Series | None, str]:
+    """Per-session SE for ``term``, and which SE it is made of.
 
     The event-clustered SE (``bse_cluster_<term>``) is preferred wherever the
     fitters wrote a finite one. On a fraction response the model SE describes a
@@ -204,16 +224,17 @@ def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
 
     Returns
     -------
-    (float, str)
-        Median SE (NaN when neither column is present), and ``"cluster"`` when
-        more than half of the sessions contributed a clustered SE, else
-        ``"model"``. In practice the mix is all-or-nothing: a frame either
-        predates the clustered column or carries it for every session.
+    (pandas.Series or None, str)
+        The per-session SE (None when neither column is present), and
+        ``"cluster"`` when more than half of the sessions contributed a
+        clustered SE, else ``"model"``. In practice the mix is all-or-nothing:
+        a frame either predates the clustered column or carries it for every
+        session.
     """
     model = fits.get(f"bse_{term}")
     cluster = fits.get(f"bse_cluster_{term}")
     if cluster is None:
-        return (np.nan, "model") if model is None else (float(model.median()), "model")
+        return (None, "model") if model is None else (model, "model")
     from_cluster = np.isfinite(cluster.to_numpy(dtype=float))
     chosen = (
         cluster.where(from_cluster)
@@ -221,7 +242,51 @@ def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
         else cluster.where(from_cluster, model)
     )
     source = "cluster" if from_cluster.sum() > len(fits) / 2 else "model"
-    return float(chosen.median()), source
+    return chosen, source
+
+
+def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
+    """Median of :func:`session_se`, and which SE that median is made of."""
+    se, source = session_se(fits, term)
+    return (np.nan if se is None else float(se.median())), source
+
+
+def pct_significant_sessions(
+    coef: pd.Series, se: pd.Series | None, pvals: pd.Series | None
+) -> float:
+    """Share of sessions whose ``term`` is significant at 0.05, two-sided.
+
+    Read on the SAME standard error ``typical_session_se`` reports, so the
+    aggregate's dispersion and its significance count answer to one definition
+    of uncertainty. That is the event-clustered SE wherever the fitters wrote
+    one; the fitted model ``pval_`` is the fallback for a frame that carries no
+    SE at all. The two are not interchangeable: on the shipped content fits
+    ``bse_cluster / bse`` runs 0.73-0.94, so the model-p version was
+    conservative -- it undercounted significant sessions by using a wider SE
+    than the clustered one the same row's ``typical_session_se`` quotes.
+
+    Parameters
+    ----------
+    coef : pandas.Series
+        Per-session coefficients.
+    se : pandas.Series or None
+        Per-session SE from :func:`session_se`, aligned with ``coef``.
+    pvals : pandas.Series or None
+        Per-session model p-values, used only when ``se`` is None.
+
+    Returns
+    -------
+    float
+        Share in [0, 1], or NaN when neither a usable SE nor a p-value exists.
+    """
+    if se is not None:
+        z = np.abs(coef.to_numpy(dtype=float) / se.to_numpy(dtype=float))
+        usable = np.isfinite(z)
+        if usable.any():
+            return float((z[usable] > _WALD_Z_TWO_SIDED_05).mean())
+    if pvals is None:
+        return np.nan
+    return float((pvals < 0.05).mean())
 
 
 def aggregate_contrast(
@@ -299,7 +364,10 @@ def aggregate_contrast(
             )
             continue
         coef = s[ccol]
-        session_se, se_source = typical_session_se(s, term)
+        se_per_session, se_source = session_se(s, term)
+        session_se_median = (
+            np.nan if se_per_session is None else float(se_per_session.median())
+        )
         per_animal = s.groupby("animal")[ccol].median()
         srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
@@ -315,30 +383,34 @@ def aggregate_contrast(
             int((s_all["separated"] == True).sum())  # noqa: E712
             if "separated" in s_all.columns else 0
         )
-        rows.append({
-            "level": level,
-            "model": model,
-            "population": pop,
-            "term": term,
-            "n_sessions": len(s),
-            "n_animals": int(per_animal.size),
-            "n_dropped": n_dropped,
-            "n_sessions_flagged_nonconverged": n_nonconverged,
-            "n_sessions_flagged_separated": n_separated,
-            "coef_animal_median": float(per_animal.median()),
-            "n_animals_pos": int((per_animal > 0).sum()),
-            "coef_session_median": float(coef.median()),
-            "typical_session_se": session_se,
-            "se_source": se_source,
-            "std_unit": unit,
-            "std_factor": factor,
-            "std_coef_animal_median": float(per_animal.median()) * factor,
-            "std_coef_session_median": float(coef.median()) * factor,
-            "std_typical_session_se": session_se * factor,
-            "pct_positive_session": float((coef > 0).mean()),
-            "pct_sig_session": float((s[pcol] < 0.05).mean()) if pcol in s else np.nan,
-            "session_signrank_p": srp,
-        })
+        rows.append(
+            {
+                "level": level,
+                "model": model,
+                "population": pop,
+                "term": term,
+                "n_sessions": len(s),
+                "n_animals": int(per_animal.size),
+                "n_dropped": n_dropped,
+                "n_sessions_flagged_nonconverged": n_nonconverged,
+                "n_sessions_flagged_separated": n_separated,
+                "coef_animal_median": float(per_animal.median()),
+                "n_animals_pos": int((per_animal > 0).sum()),
+                "coef_session_median": float(coef.median()),
+                "typical_session_se": session_se_median,
+                "se_source": se_source,
+                "std_unit": unit,
+                "std_factor": factor,
+                "std_coef_animal_median": float(per_animal.median()) * factor,
+                "std_coef_session_median": float(coef.median()) * factor,
+                "std_typical_session_se": session_se_median * factor,
+                "pct_positive_session": float((coef > 0).mean()),
+                "pct_sig_session": pct_significant_sessions(
+                    coef, se_per_session, s[pcol] if pcol in s else None
+                ),
+                "session_signrank_p": srp,
+            }
+        )
     df = pd.DataFrame(rows)
     if df.empty:
         # Every spec was gated out (all terms unidentified in too large a share

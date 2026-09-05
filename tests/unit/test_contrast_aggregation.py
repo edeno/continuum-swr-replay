@@ -380,6 +380,48 @@ def test_se_source_is_model_when_most_sessions_have_no_clustered_se() -> None:
     assert row["se_source"] == "model"
 
 
+# ── Which SE the per-session significance count is read on ──
+
+
+def test_pct_sig_session_is_read_on_the_clustered_se() -> None:
+    """The count answers to the same SE ``typical_session_se`` reports.
+
+    Coefficients 0.30..0.45 against a clustered SE of 0.20 give |z| between 1.0
+    and 2.25, so only the two largest clear 1.96 -- while the model p-values
+    say all eight are significant. Reporting the model count next to a
+    clustered SE would describe two different designs in one row.
+    """
+    fits = _session_fits(bse_cluster_rpe_postoutcome=[0.20] * 8)
+
+    row = aggregate_contrast(fits, SPECS, level="rate", sd=SD).iloc[0]
+
+    assert row["se_source"] == "cluster"
+    assert row["pct_sig_session"] == pytest.approx(2 / 8)
+
+
+def test_pct_sig_session_falls_back_to_the_model_pvalue() -> None:
+    """A frame with no SE column at all keeps the fitted p-value count."""
+    fits = _session_fits().drop(columns=["bse_rpe_postoutcome"])
+    fits.loc[fits.index[:3], "pval_rpe_postoutcome"] = 0.20
+
+    row = aggregate_contrast(fits, SPECS, level="rate", sd=SD).iloc[0]
+
+    assert row["se_source"] == "model"
+    assert row["pct_sig_session"] == pytest.approx(5 / 8)
+
+
+def test_pct_sig_session_uses_the_model_se_when_no_cluster_column_exists() -> None:
+    """Legacy frames carry ``bse_`` only; the Wald test is read on that."""
+    fits = _session_fits()
+    assert "bse_cluster_rpe_postoutcome" not in fits.columns
+
+    row = aggregate_contrast(fits, SPECS, level="rate", sd=SD).iloc[0]
+
+    # SE 0.10 against coefficients 0.20-0.45: every |z| clears 1.96.
+    assert row["se_source"] == "model"
+    assert row["pct_sig_session"] == pytest.approx(1.0)
+
+
 # ── Per-SD units come from the fit, not from a reader's own recomputation ──
 
 _ARM_UNITS = {
