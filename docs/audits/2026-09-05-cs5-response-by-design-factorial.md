@@ -25,8 +25,19 @@ Designs: `NT` = `BASEc_NT` (pre-fix base, no within-stop-time or length terms); 
 is not separated and `|coef| × sd < 10` (the aggregation's rule). Per-session failures logged by the
 fitter (statsmodels covariance unavailable) are the usual excluded sessions.
 
-Reading: the within-stop-time term changes nothing. The event-length control and the fraction
-response each remove roughly half of the count-response effect on their own; together the
-interaction is centred near zero with a 3/5 animal split. The old avoidance was carried by two
-channels the refit closes: longer (SWR) events leave the typically high-value current arm, and
-per-bin counts overstated precision. Raw table: `2026-09-05-cs5-response-by-design-factorial.csv`.
+Reading: the within-stop-time term changes nothing. The event-length adjustment and the fraction
+response each remove roughly half of the count-response effect, and they act **approximately
+additively**: length moves the coefficient +0.58 within the count response and +0.43 within the
+fraction response, the response moves it +0.43 on the `NT` design and +0.29 on the full one, so the
+additive prediction from `count/NT` is −0.98 + 0.58 + 0.43 = +0.03 against the observed −0.11. The
+two changes are not the same thing measured twice, and neither is a "channel being closed": the
+response change fixes a weighting/inference defect (one draw per event instead of L autocorrelated
+bins), while the length products change the ESTIMAND — a `full`-design coefficient is the SWR effect
+net of event length (direct), a `NT` one is the total SWR effect, and length is plausibly a mediator
+(SWR → longer replay → the trajectory leaves the typically high-value current arm). Both are shipped:
+`CS5_armvalue` and `CS5nt_armvalue` report the two.
+
+Caveat on the sign flip. The 0/5 → 3/5 change rests on per-animal medians of |0.24–0.54| against
+per-session clustered SEs of 1.5–1.8, and chimi and wilbur are negative in every cell of the
+factorial. Read the table as "the count-response avoidance does not survive either change", not as
+evidence of a positive effect. Raw table: `2026-09-05-cs5-response-by-design-factorial.csv`.

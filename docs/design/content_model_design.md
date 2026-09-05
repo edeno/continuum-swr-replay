@@ -100,19 +100,43 @@ Population inference is unchanged in kind: across-session medians and per-animal
 sign consistency were the primary evidence before and remain so — they were the
 quantities the pseudo-replication did *not* affect.
 
-### Event length as a covariate, not just a weight
+### Event length as a covariate: which estimand each rung reports
 
-Taking length out of the response does not take it out of the science. A longer
-trajectory visits more arms, so an uncontrolled `swr_x_is_current_arm` partly
-reads "longer events leave the current arm" rather than "SWR content is less
-current-arm-locked". The `is_swr`-contrast content base (`BASEc`) therefore
-carries `z(log n_nonlocal_bins)` crossed with the indicators it modulates —
-`log_n_nonlocal_bins_z:is_current_arm` and `…:is_prev_arm` — unconditionally, so
-every rung built on the base reports its SWR interaction *beyond* event length.
-The `nt` twins (`BASEc_NT`, e.g. `CS1nt_current`) omit them and are the
-uncontrolled sensitivity fits, reported as a sensitivity check and never as the
-headline. `log1p_time_since_stop_start_s_z:is_current_arm` does the same job for
-the within-stop time course, which also differs between the two streams.
+Taking length out of the response does not take it out of the science, and
+putting it back in as a covariate is not a neutral "control". `n_nonlocal_bins`
+is measured **after** `is_swr` and differs with it (SWR events run ~1.7× longer),
+so it is post-treatment: conditioning on it estimates the SWR effect *at fixed
+event length*, and length may be a mediator on the causal path
+(SWR → longer replay → the trajectory leaves the current arm) rather than a
+nuisance. Both readings are shipped, as a pair, and neither supersedes the other:
+
+- **`BASEc` rungs (`CS1`, `CS4`, `CS5`, `CS6`, …) — the DIRECT effect.** The base
+  carries `z(log n_nonlocal_bins)` crossed with the indicators it modulates
+  (`log_n_nonlocal_bins_z:is_current_arm`, `…:is_prev_arm`) unconditionally, so
+  every `swr_x_…` coefficient on them is the SWR effect **net of event length**
+  (a post-treatment adjustment).
+- **`nt` twins (`BASEc_NT`: `CS1nt_current`, `CS4nt_armreward`,
+  `CS5nt_armvalue`, `CS6nt_armuncert`, `CPS1nt_current`) — the TOTAL effect.**
+  Same key term, same scope, same candidate set; they omit the length products,
+  so their `swr_x_…` coefficient carries whatever runs through length as well.
+
+A claims re-derivation must report the two side by side and say which estimand a
+number is; a difference between them is the length pathway's contribution, not
+evidence that one of the fits is wrong.
+`log1p_time_since_stop_start_s_z:is_current_arm` is in the base on the same
+terms, for the within-stop time course, which also differs between the streams.
+
+### What the leaf-only rungs condition away
+
+The leaf-only rungs (`C4`, `C13`, `CS5`, `CS5b`, `CS6`, and the `CS5nt`/`CS6nt`
+twins) fit the six reward-site arms and renormalize each event's response to unit
+mass over them, so an event with **no** leaf mass has no response and is dropped.
+That is 8,134 of 65,913 events (12.3 %), and they are not a random subset: their
+SWR share is 0.449 against 0.401 in the cohort overall, and their median length
+is 24 bins against 33 for the events that are kept. Among the events that are kept, pre-renormalization median
+leaf mass is 0.88 for SWR events and 1.00 for non-SWR ones — the renormalization
+therefore rescales SWR events more. Read the leaf-only coefficients as statements
+about events that reached a reward site at all.
 
 ## RATE ↔ CONTENT correspondence
 | | rate | content |
