@@ -258,7 +258,16 @@ likelihood (null baseline `log(6)`, not `log(9)`), the arm dummies for arms 5–
 are dropped (arm 5 becomes the reference), and the fraction response is
 renormalised to unit mass over the six leaves — without that, an event would be
 weighted by its leaf share, and SWR events put far more of their bins on the
-trunks. Leaf-only fits publish to their own `_leaf` bundle for that reason.
+trunks. Leaf-only fits publish to their own bundle for that reason.
+
+**Where it lands.** The documented invocation swaps `M5`/`M6` for the belief
+rungs, so it is a partial ladder as well as leaf-only and the two naming rules
+compound: the bundle is
+`Processed-Data/replay_content/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/`, keyed
+by the rungs requested — **not** a bare `models_leaf/`. A bare `_leaf` bundle
+would require fitting the full default ladder leaf-only, which no shipped
+invocation does (the belief rungs are the reason to fit leaf-only at all, and
+they are not in the default ladder).
 
 ## Content — patch
 `fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
