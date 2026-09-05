@@ -57,6 +57,63 @@ Consequence for the `is_swr` dissociation:
   separation-prone (cf. rate S10). Dissociation for these comes from fitting the
   ladder PER is_swr split {all, SWR, non-SWR} and comparing coefficients.
 
+## Why the response is a per-event FRACTION, not a timebin count
+
+The conditional-Poisson likelihood on `arm_count_hard` is
+`Σ_e [ Σ_a c_ea·η_ea − L_e·log Σ_a exp(η_ea) ]`: it reads an event's `L_e`
+decoded bins as `L_e` independent categorical draws. The decoder runs at 500 Hz,
+so `L_e` is a bin count, and the bins are not independent — a replay is a smooth
+trajectory. Measured on the 65,913-event canonical cohort: median 32 bins per
+event (SWR 45, non-SWR 26), **66 % of events keep one MAP arm for the entire
+event**, `P(arm_t = arm_{t−1})` mean 0.935, median 1 run per event, and Pearson
+dispersion of `M4` at the (event, arm) grain ≈ 28.
+
+The consequences were measured directly by refitting real sessions through the
+same fitter with one draw per event instead of hard counts: standard errors on
+`reward_fraction_candidate_arm_last10_visits` moved from 0.07–0.12 to 0.40–0.73
+(**~6×**), and `ΔAIC(M3 vs M2)` collapsed from 10–317 to −2.0…+6.7 — that is,
+the count response was manufacturing decisive model-selection evidence out of
+autocorrelated bins. Point estimates moved too (e.g. −0.43 → −0.03, −2.03 →
+−0.81), because a count response weights an event by its duration and by how
+much it mixed across arms.
+
+Two of those are scientific problems, not just inferential ones. **Duration
+weighting is confounded with the contrast being estimated**: SWR-coupled events
+run ~1.8× longer than non-SWR ones, so a count response silently gives SWR
+events more say in every coefficient, including `swr_x_…`. And a per-session
+`pval_`, `lrt_significant` or `child_better_aic` read off the timebin grain is
+not a calibrated statement about anything.
+
+**The response is therefore `arm_fraction` / `patch_fraction`:** each event
+contributes one observation of unit mass, so the likelihood, AIC, BIC and SEs
+are stated per event and every event counts once regardless of length. Alongside
+the model SE the fitters write an event-clustered sandwich SE
+(`bse_cluster_<term>`), which is what the audited aggregation reads: on a
+fraction response the model SE describes a design in which nothing varied within
+an event, while the clustered SE reflects the events' own variability. AIC-scale
+numbers on a fraction response are quasi-likelihood quantities and are labelled
+as such; they are **not** comparable with a count bundle's. The count response is
+retained behind `--response hard_count` (own `_hard_count/` bundle) for the
+discriminative-model comparison and for the before/after audit.
+
+Population inference is unchanged in kind: across-session medians and per-animal
+sign consistency were the primary evidence before and remain so — they were the
+quantities the pseudo-replication did *not* affect.
+
+### Event length as a covariate, not just a weight
+
+Taking length out of the response does not take it out of the science. A longer
+trajectory visits more arms, so an uncontrolled `swr_x_is_current_arm` partly
+reads "longer events leave the current arm" rather than "SWR content is less
+current-arm-locked". The `is_swr`-contrast content base (`BASEc`) therefore
+carries `z(log n_nonlocal_bins)` crossed with the indicators it modulates —
+`log_n_nonlocal_bins_z:is_current_arm` and `…:is_prev_arm` — unconditionally, so
+every rung built on the base reports its SWR interaction *beyond* event length.
+The `nt` twins (`BASEc_NT`, e.g. `CS1nt_current`) omit them and are the
+uncontrolled sensitivity fits, reported as a sensitivity check and never as the
+headline. `log1p_time_since_stop_start_s_z:is_current_arm` does the same job for
+the within-stop time course, which also differs between the two streams.
+
 ## RATE ↔ CONTENT correspondence
 | | rate | content |
 |---|---|---|

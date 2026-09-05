@@ -1053,7 +1053,26 @@ CONTENT_BUNDLES = (
     "models_swr_F",
     "models_patch_swr_T",
     "models_patch_swr_F",
+    # The leaf-only belief chain. A partial ladder, so it publishes to a
+    # rung-keyed directory named after the documented invocation
+    # (--leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu) and has no
+    # count-response counterpart to compare against.
+    "models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu",
 )
+# Bundles deliberately NOT refit, with the reason, so their absence from the
+# comparison is a recorded decision rather than an oversight.
+SUPERSEDED_CONTENT_BUNDLES = {
+    "models_event_grain": (
+        "`--grain event` collapses each event to its dominant arm and fits a "
+        "conditional LOGIT, using the response column only to take that argmax. "
+        "`arm_fraction` is a within-event monotone rescaling of "
+        "`arm_count_hard`, so the argmax -- and therefore the whole fit -- is "
+        "unchanged by the response switch: refitting would reproduce the backed "
+        "up coefficients. Its purpose, an honest per-session n at the event "
+        "grain, is now served by the default fraction ladder, which keeps the "
+        "within-event distribution as well. Backed up, not refit."
+    ),
+}
 DEFAULT_CONTENT_BACKUP_ROOT = RC / "_pre_fix_backup_20260905"
 # Terms carried by every rung above M0a purely to absorb each arm's static
 # occupancy. Sorted last so the scientific terms lead the coefficient table.
@@ -1192,8 +1211,14 @@ def content_rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.Data
     merged = _counts(old, "_before").merge(
         _counts(new, "_after"), on="model", how="outer"
     )
-    merged[["n_sessions_before", "n_sessions_after"]] = (
-        merged[["n_sessions_before", "n_sessions_after"]].fillna(0).astype(int)
+    count_columns = ["n_sessions_before", "n_sessions_after"]
+    # An empty side contributes an object-dtype column, so coerce before
+    # filling: a bare fillna on object dtype is a deprecated silent downcast.
+    merged[count_columns] = (
+        merged[count_columns]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0)
+        .astype(int)
     )
     return merged.sort_values("model").reset_index(drop=True)
 
@@ -1318,6 +1343,48 @@ def contrast_audited_table(
     return merged.sort_values(keys).reset_index(drop=True)
 
 
+def contrast_design_delta_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Per rung: terms fitted on only one side of the contrast comparison.
+
+    The ladder bundles changed response and nothing else, but the ``is_swr``
+    contrast ladder also gained design terms in the same round (the event-length
+    products, and rungs that did not exist before). A before/after difference on
+    a rung listed here is therefore NOT attributable to the response change
+    alone, and the audit must say so rather than let the reader assume one cause.
+    Rungs whose design is identical on both sides are omitted.
+    """
+    rows = []
+    models = sorted(
+        set(old.get("model", pd.Series(dtype=object)))
+        | set(new.get("model", pd.Series(dtype=object)))
+    )
+    for model in models:
+        o = old[old.model == model] if len(old) else old
+        n = new[new.model == model] if len(new) else new
+        o_terms = set(_content_terms(o.dropna(axis=1, how="all"))) if len(o) else set()
+        n_terms = set(_content_terms(n.dropna(axis=1, how="all"))) if len(n) else set()
+        if not len(o):
+            rows.append(
+                {"model": model, "only_before": "(rung not fit)", "only_after": ""}
+            )
+            continue
+        if not len(n):
+            rows.append(
+                {"model": model, "only_before": "", "only_after": "(rung not fit)"}
+            )
+            continue
+        if o_terms == n_terms:
+            continue
+        rows.append(
+            {
+                "model": model,
+                "only_before": ", ".join(sorted(o_terms - n_terms)) or "—",
+                "only_after": ", ".join(sorted(n_terms - o_terms)) or "—",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def contrast_stratum_table(
     strata: dict[str, pd.DataFrame], terms: set[str]
 ) -> pd.DataFrame:
@@ -1399,6 +1466,8 @@ def build_content_report(
     add(_md(pd.DataFrame(rows)))
     if missing_note:
         add(f"\n{missing_note}\n")
+    for name, reason in SUPERSEDED_CONTENT_BUNDLES.items():
+        add(f"\n**`{name}` was not refit.** {reason}\n")
 
     for name, (old, new, old_cmp, new_cmp) in bundles.items():
         add(f"\n## Bundle `{name}`\n")
@@ -1426,8 +1495,20 @@ def build_content_report(
         add(_md(content_separation_table(old, new), floatfmt="{:.0f}"))
 
     add("\n## SWR-content contrast (audited aggregate)\n")
+    design_delta = contrast_design_delta_table(
+        contrast.get("fits_before", pd.DataFrame()),
+        contrast.get("fits_after", pd.DataFrame()),
+    )
+    if not design_delta.empty:
+        add(
+            "**The contrast ladder also changed DESIGN, not only response.** The "
+            "rungs below were fit on different term sets before and after, so a "
+            "before/after difference on any of them is not attributable to the "
+            "response change alone. Read them as a refit of a changed model.\n"
+        )
+        add(_md(design_delta))
     add(
-        "The key terms of the `is_swr` contrast ladder, before and after. "
+        "\nThe key terms of the `is_swr` contrast ladder, before and after. "
         "`typical_session_se` is annotated with `se_source`: `model` for a "
         "count-response fit that had no clustered SE, `cluster` where the "
         "event-clustered sandwich was available.\n"
@@ -1510,6 +1591,13 @@ def collect_content_inputs(
             inputs[f"swr-content audited ({label})"] = path
         else:
             missing.append(f"SWR-content audited ({label}): `{path}` absent")
+        # The per-session fits, for the design-delta check: the audited
+        # aggregate carries one row per term and cannot say which terms a rung
+        # was fit with.
+        fits = root / "models" / "swr_contrast_content_arm.pkl"
+        contrast[f"fits_{label}"] = _read_optional(fits)
+        if fits.exists():
+            inputs[f"swr-content arm fits ({label})"] = fits
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
         path = new_root / "models" / f"swr_contrast_content_audited{sfx}.pkl"

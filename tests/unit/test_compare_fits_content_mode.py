@@ -23,6 +23,7 @@ from scripts.qa.compare_fits import (
     content_scale_table,
     content_separation_table,
     content_term_table,
+    contrast_design_delta_table,
     contrast_stratum_table,
 )
 
@@ -245,3 +246,37 @@ def test_the_report_states_that_the_aic_scales_differ(tmp_path):
     assert "conditional_poisson_fraction" in report
     # The one-sided artifacts are named rather than silently absent.
     assert "swr_contrast_content_audited.pkl" in report
+
+
+def test_a_rung_whose_design_changed_is_named_before_its_coefficients_are_read():
+    """A rung that gained a control term is not a pure response comparison."""
+    old = _fits({"a": [0.5, 0.6]}, response=None, bse=0.05, bse_cluster=None).assign(
+        model="CS1_current"
+    )
+    new = old.assign(**{"coef_log_n_nonlocal_bins_z_x_is_current_arm": 0.2})
+    new = new.assign(response_col="arm_fraction")
+
+    table = content_term_table(old, new)  # coefficients still join fine
+    delta = contrast_design_delta_table(old, new)
+
+    assert TERM in set(table["term"])
+    assert len(delta) == 1
+    assert delta.loc[0, "model"] == "CS1_current"
+    assert "log_n_nonlocal_bins_z_x_is_current_arm" in delta.loc[0, "only_after"]
+    assert delta.loc[0, "only_before"] == "—"
+
+
+def test_identical_designs_produce_no_design_delta_rows():
+    assert contrast_design_delta_table(_old(), _new()).empty
+
+
+def test_a_rung_absent_before_is_marked_not_fit():
+    old = _old().assign(model="CS1_current")
+    new = pd.concat(
+        [old.assign(response_col="arm_fraction"), _new().assign(model="CS5b_new")],
+        ignore_index=True,
+    )
+
+    delta = contrast_design_delta_table(old, new).set_index("model")
+
+    assert delta.loc["CS5b_new", "only_before"] == "(rung not fit)"

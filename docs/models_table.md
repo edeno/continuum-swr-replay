@@ -30,14 +30,30 @@ Per-family fit conventions:
 | Per-bin rate (B) | Poisson GLM | `count` (onsets per 15 ms bin) | log | `log(exposure)` | per session × population {swr, non_local_swr, non_local_no_swr} |
 | MU uncertainty | Poisson GLM | `count` | log | `log(exposure)` | per session × 3 populations |
 | Per-stop rate (A) | Poisson GLM | `n_selected_events` per stop | log | `log(immobility_duration_s)` | per session |
-| Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | `arm_count_hard` | log | — | per session × is_swr split {all, T, F} |
-| Content patch | conditional Poisson over 3 patches/event | `patch_count_hard` | log | — | per session × {all, T, F} |
+| Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | `arm_fraction` (per-event allocation fraction) | log | — | per session × is_swr split {all, T, F}; SEs event-clustered |
+| Content patch | conditional Poisson over 3 patches/event | `patch_fraction` | log | — | per session × {all, T, F}; SEs event-clustered |
 | Choice | conditional logit over candidate arms/stop ≡ `clogit(…, strata(stop))` | `chosen` | logit | — | per event-source |
 | SWR power | OLS (`lm`) | `ripple_power_z` (event-level) | identity | — | per session; predictors z-scored |
 
 `M0`/`P0` are the null (intercept-only, no arm/patch terms); candidate-arm fixed
 effects first enter at `M0a`/`P1`. "conditional Poisson over arms within event" is fit
 as Poisson with per-event fixed effects — the multinomial/`clogit` equivalent.
+
+**Content response = the per-event allocation fraction.** Each event contributes
+one observation of unit mass (`arm_fraction` sums to 1 over its nine arms,
+`patch_fraction` over its three patches), so a content fit's likelihood, AIC,
+BIC and standard errors are stated **per event**, not per decoded timebin. Every
+content fit carries the `estimator` (`conditional_poisson_fraction`) and
+`response_col` it was produced with, and nested comparisons refuse to mix the
+two. Alongside the model SE, the fitters write an event-clustered sandwich SE
+(`bse_cluster_<term>`), which is the SE the audited aggregation reads: on a
+fraction response the model SE describes a design in which nothing varied within
+an event. The timebin **count** response (`arm_count_hard` / `patch_count_hard`)
+is retained behind `--response hard_count`, publishing to its own
+`*_hard_count/` bundle, for the discriminative-model comparison and for the
+before/after audit — it weights an event by its number of decoded timebins and
+treats those autocorrelated bins as independent draws, so its AIC scale is not
+comparable with a fraction bundle's.
 
 Every per-session fit carries `converged` / `separated` status flags, the
 `|`-joined `separated_terms` naming which coefficients are unidentified, one
@@ -195,39 +211,64 @@ R1    n_selected_events ~ REWBASIS
 The runner accepts only the current canonical table schema and validates every
 requested rung before fitting. A stale/legacy table or one missing any requested
 predictor aborts the complete request; models are never warning-skipped into a
-partial ladder. Candidate identities, current-location indicators, and hard-count
-responses are checked as scientific invariants. All rungs are then restricted to
+partial ladder. Candidate identities, current-location indicators, and the
+response's per-event unit mass are checked as scientific invariants. All rungs are then restricted to
 the same successfully fitted session/event cohort and published as one staged
 directory bundle, so a late failed rung cannot leave mixed-generation outputs.
 
 ```r
-M0   arm_count ~ 1                        # null (uniform over arms) | strata(event_id)
-M0a  arm_count ~ ARMFE
-M1   arm_count ~ ARMFE + is_current_arm
-M2   arm_count ~ ARMFE + is_current_arm + is_prev_arm
-M3   arm_count ~ ARMFE + is_current_arm + is_prev_arm
+M0   arm_fraction ~ 1                     # null (uniform over arms) | strata(event_id)
+M0a  arm_fraction ~ ARMFE
+M1   arm_fraction ~ ARMFE + is_current_arm
+M2   arm_fraction ~ ARMFE + is_current_arm + is_prev_arm
+M3   arm_fraction ~ ARMFE + is_current_arm + is_prev_arm
                  + reward_fraction_candidate_arm_last10_visits
-M4   arm_count ~ [M3 terms] + visit_recency_trials_event_leaf_centered_spline_1
+M4   arm_fraction ~ [M3 terms] + visit_recency_trials_event_leaf_centered_spline_1
                  + visit_recency_trials_event_leaf_centered_spline_2
                  + visit_recency_trials_event_leaf_centered_spline_3
                  + is_candidate_arm_never_visited
-M5   arm_count ~ [M4 terms] + swr_x_is_current_arm + swr_x_is_prev_arm
-M6   arm_count ~ [M5 terms]
+M5   arm_fraction ~ [M4 terms] + swr_x_is_current_arm + swr_x_is_prev_arm
+M6   arm_fraction ~ [M5 terms]
                  + swr_x_reward_fraction_candidate_arm_last10_visits
                  + swr_x_visit_recency_trials_event_leaf_centered_spline_{1..3}
-Mv   arm_count ~ [M4 terms] + task_reward_probability_candidate_arm
+Mv   arm_fraction ~ [M4 terms] + task_reward_probability_candidate_arm
                  + reward_belief_mean_candidate_arm_preoutcome
+Mu   arm_fraction ~ [M4 terms] + reward_belief_variance_candidate_arm_preoutcome_z
+Mvu  arm_fraction ~ [M4 terms] + task_reward_probability_candidate_arm
+                 + reward_belief_mean_candidate_arm_preoutcome
+                 + reward_belief_variance_candidate_arm_preoutcome_z
 ```
+
+`M0`–`M6` are the default ladder (`models/`). The belief rungs `Mv` / `Mu` /
+`Mvu` depend on the qvals covariates, which are NaN on the unmapped-stop tail, so
+they are **not** in the default run — including them there would shrink the
+shared complete-case cohort for the whole base ladder. Request them with their
+parents in one run, on their own matched cohort.
+
+**Leaf-only belief chain.** The Beta-belief covariates are structural zeros on
+the three trunk arms, so the belief rungs are fitted over the six leaves:
+
+```
+--leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu
+```
+
+The whole chain must be requested in one run so the AIC comparisons stay nested
+on one candidate set. A leaf-only fit is a **six**-category conditional
+likelihood (null baseline `log(6)`, not `log(9)`), the arm dummies for arms 5–7
+are dropped (arm 5 becomes the reference), and the fraction response is
+renormalised to unit mass over the six leaves — without that, an event would be
+weighted by its leaf share, and SWR events put far more of their bins on the
+trunks. Leaf-only fits publish to their own `_leaf` bundle for that reason.
 
 ## Content — patch
 `fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
 
 ```r
-P0   patch_count ~ 1                       # null | strata(event_id)
-P1   patch_count ~ is_current_patch
-P2   patch_count ~ is_current_patch + reward_fraction_candidate_arm_last10_visits_patch
-P3   patch_count ~ [P2 terms] + swr_x_is_current_patch
-Pv   patch_count ~ [P2 terms] + task_reward_probability_candidate_arm_patch
+P0   patch_fraction ~ 1                    # null | strata(event_id)
+P1   patch_fraction ~ is_current_patch
+P2   patch_fraction ~ is_current_patch + reward_fraction_candidate_arm_last10_visits_patch
+P3   patch_fraction ~ [P2 terms] + swr_x_is_current_patch
+Pv   patch_fraction ~ [P2 terms] + task_reward_probability_candidate_arm_patch
                             + reward_belief_mean_candidate_arm_preoutcome_patch
 ```
 
@@ -385,6 +426,78 @@ just its level. The per-bin design + `offset(log exposure)` already removes the 
 rate); BASE's additive `reward_history_rcos_0 + bs(tc)` still assumes a
 shared profile shape, and
 this rung is what tests that assumption directly.
+
+### C. `is_swr` contrast — replay CONTENT (`SWR_CONTRAST_CONTENT_ARM_LADDER` / `_PATCH_LADDER`)
+
+Conditional Poisson on `arm_fraction` over the nine candidate arms within an
+event (`patch_fraction` over three patches for the `CP`/`CPS` twins), one fit per
+session, event-clustered SEs. Runner: `scripts/content/fit_swr_contrast_content.py`.
+
+```
+ARMFE  := is_candidate_arm_0 + … + is_candidate_arm_7
+RECSPL := visit_recency_trials_event_leaf_centered_spline_{1,2,3}
+             + is_candidate_arm_never_visited
+_TSC   := log1p_time_since_stop_start_s_z:is_current_arm    # within-stop time course
+_LENC  := log_n_nonlocal_bins_z:is_current_arm              # event-length control
+_LENP  := log_n_nonlocal_bins_z:is_prev_arm
+BASEc_NT := ARMFE + is_current_arm + is_prev_arm + RECSPL
+BASEc    := BASEc_NT + _TSC + _LENC + _LENP
+```
+
+**Why `BASEc` carries the two length products and `_TSC`.** SWR-coupled events
+run ~1.8× longer than non-SWR ones, and a longer trajectory visits more arms, so
+an uncontrolled `swr_x_is_current_arm` partly reads "longer events leave the
+current arm" rather than "SWR content is less current-arm-locked"; `_TSC` removes
+the same channel for the within-stop time course, which also differs between the
+two streams. Both enter `BASEc` **unconditionally**, so every rung built on the
+base reports its SWR interaction *beyond* event length and *beyond* the general
+time course. The `nt` twins (`CS1nt_current`, on `BASEc_NT`) are the uncontrolled
+sensitivity fits and report the same canonical interaction term — read them as a
+sensitivity check, never as the headline.
+
+**Split vs pooled.** A `split` rung is fit three times (`all` / SWR-only /
+non-SWR-only) and the dissociation is the comparison across those populations. A
+`pooled` rung fits both streams together, so its `swr_x_…` coefficient is the
+formal SWR-vs-non-SWR difference.
+
+| model | added to `BASEc` | scope | key term |
+|---|---|---|---|
+| `C0_armfe` | (`ARMFE` only) | split | — |
+| `C1_current` | (`ARMFE` +) `is_current_arm` | split | `is_current_arm` |
+| `C2_base` | — | split | `is_current_arm` |
+| `C3_armreward` | `reward_fraction_candidate_arm_last10_visits` | split | that term |
+| `C4_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` | split | that term |
+| `C5_lastrew` | `is_last_rewarded_noncurrent_arm` | split | that term |
+| `C6_rpe` | `rpe_postoutcome_z:is_current_arm` | split | that term |
+| `C7_value` | `relative_value_switch_minus_stay_preoutcome_z:is_current_arm` | split | that term |
+| `C8_uncert` | `reward_belief_differential_entropy_leaf_mean_preoutcome_z:is_current_arm` | split | that term |
+| `C9_update` | `reward_belief_mean_update_l1_all_ports_postoutcome_z:is_current_arm` | split | that term |
+| `C10_periswitch` | `PERISWITCH` terms × `is_current_arm` | split | `periswitch_index_trials_z:is_current_arm` |
+| `C11_block` | `trials_since_block_change_z:is_current_arm` | split | that term |
+| `C12_switchrate` | `patch_switch_fraction_last5_completed_trips_z:is_current_arm` | split | that term |
+| `C13_armuncert` | `reward_belief_variance_candidate_arm_preoutcome_z` | split | that term |
+| `CS1_current` | `swr_x_is_current_arm` | pooled | `swr_x_is_current_arm` |
+| `CS1nt_current` | on `BASEc_NT`: `swr_x_is_current_arm` | pooled | `swr_x_is_current_arm` |
+| `CS2_prev` | `swr_x_is_prev_arm` | pooled | that term |
+| `CS3_lastrew` | `is_last_rewarded_noncurrent_arm` + its `swr_x_` | pooled | `swr_x_is_last_rewarded_noncurrent_arm` |
+| `CS4_armreward` | `reward_fraction_candidate_arm_last10_visits` + its `swr_x_` | pooled | `swr_x_reward_fraction_candidate_arm_last10_visits` |
+| `CS5_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` + its `swr_x_` | pooled | `swr_x_reward_belief_mean_candidate_arm_preoutcome` |
+| `CS5b_valuevsprevgoal` | `CS5` + `is_last_rewarded_noncurrent_arm` + its `swr_x_` | pooled | `swr_x_reward_belief_mean_candidate_arm_preoutcome` |
+| `CS6_armuncert` | `reward_belief_variance_candidate_arm_preoutcome_z` + its `swr_x_` | pooled | `swr_x_reward_belief_variance_candidate_arm_preoutcome_z` |
+
+**Leaf-only rungs.** `C4_armvalue`, `C13_armuncert`, `CS5_armvalue`,
+`CS5b_valuevsprevgoal` and `CS6_armuncert` condition on the six leaf arms
+(`LEAF_ONLY_CONTRAST_RUNGS`): their belief covariates are structural zeros on the
+trunks, `is_candidate_arm_6/7` become identically zero, and the fraction response
+is renormalised to unit mass over the leaves so an SWR event is not downweighted
+for putting more of its bins on a trunk. The per-SD units the audited table
+reports these coefficients in are likewise taken over the leaf arms only.
+
+**Outcome strata.** The whole ladder is refit within `--outcome-stratum
+rewarded` and `omitted` (an event whose current outcome is not yet known is in
+neither), writing `_rewarded` / `_omitted` artifacts. The per-SD units and the
+fit-time `_z` reference are frozen over the pooled cohort first, so a stratified
+refit states its effects in the same unit as the pooled one.
 
 ## Phase-2 refit classification
 

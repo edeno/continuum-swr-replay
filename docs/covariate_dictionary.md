@@ -597,8 +597,35 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   **MAP** arm is this arm; despite the historical “soft” name, it is not a full
   posterior-mass allocation.
 - `arm_count_hard` — count of timebins whose MAP arm is this arm.
+- `patch_fraction` — the patch analogue of `arm_fraction`: the event's share of
+  decoded content allocated to this patch, over the same denominator (the
+  in-event timebins whose MAP landed on a real arm). A patch fraction is exactly
+  the sum of its three arms' fractions, and an event's three patch fractions sum
+  to one; NaN when the event has no real-arm bin. `patch_count_hard` is the
+  corresponding timebin count.
 - `replay_fraction` — mean `arm_fraction` across the events in the stop (choice dataset);
   `replay_fraction_swr` / `replay_fraction_non_swr` restrict to the stop's SWR / non-SWR events.
+
+`arm_fraction` / `patch_fraction` are the **shipped content-model response**: each
+event contributes one observation of unit mass, so the likelihood, AIC and
+standard errors are stated per event. `arm_count_hard` / `patch_count_hard` weight
+an event by its number of decoded timebins and are retained only for the
+count-response comparison (`--response hard_count`).
+
+**Event-length control** (per event; built at fit time by the `is_swr`-contrast
+content runner, not stored):
+- `log_n_nonlocal_bins` — `log(n_nonlocal_bins)`; `log_n_nonlocal_bins_z` is its
+  z-score over the fit cohort. SWR-coupled events run ~1.8× longer than non-SWR
+  ones and a longer trajectory visits more arms, so without this an
+  `swr_x_is_current_arm` coefficient partly reads "longer events leave the
+  current arm".
+- `log_n_nonlocal_bins_z_x_is_current_arm` / `log_n_nonlocal_bins_z_x_is_prev_arm`
+  (`_x_is_current_patch` for the patch hierarchy) — the length products that put
+  that channel in the design. Members of `BASEc`, so every rung built on the base
+  carries them; the `nt` twins (`BASEc_NT`, e.g. `CS1nt_current`) are the
+  uncontrolled sensitivity fits that omit them.
+- `log1p_time_since_stop_start_s_z_x_is_current_arm` — the within-stop time-course
+  product, also a `BASEc` member and also absent from the `nt` twins.
 
 **Self-history** (per-bin rate design; built at fit time, not stored):
 - `tc` — time (s) since stop onset for each bin; entered via a `bs(tc)` spline (the
