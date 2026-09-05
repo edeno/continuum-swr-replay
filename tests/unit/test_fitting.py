@@ -16,8 +16,15 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import fitting as fitting_mod
 from continuum_swr_replay.analysis.replay.fitting import (
+    event_clustered_covariance,
     fit_conditional_logit,
     fit_conditional_poisson,
+    fit_null_model_conditional,
+    fit_null_model_conditional_logit,
+)
+from continuum_swr_replay.analysis.replay.simulation import (
+    simulate_autocorrelated_counts,
+    simulate_with_event_covariates,
 )
 
 
@@ -263,3 +270,179 @@ def test_zero_variance_column_does_not_divide_by_zero():
     assert np.isfinite(diagnostics["cond_number"]) or np.isinf(
         diagnostics["cond_number"]
     )
+
+
+# ── Event-clustered covariance and the estimator result schema ──
+
+CONTENT_BETA = {"is_current_arm": 1.2, "is_prev_arm": 0.6}
+CONTENT_PREDICTORS = list(CONTENT_BETA)
+
+
+def test_clustered_se_equals_model_se_when_each_event_is_a_single_draw():
+    """With one timebin per event the two SEs estimate the same quantity.
+
+    ``L_e = 1`` leaves nothing for the cluster correction to do -- each event
+    contributes exactly one multinomial draw, which is what the model
+    information already assumes -- so the sandwich must reproduce the model SE
+    (agreement here is what licenses reading a *disagreement* on real,
+    many-bin events as within-event mixing rather than as a coding error).
+    """
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=500, L_e=1, seed=7)
+    result = fit_conditional_poisson(long_df, CONTENT_PREDICTORS, n_categories=9)
+
+    for term in CONTENT_PREDICTORS:
+        model_se = result[f"bse_{term}"]
+        cluster_se = result[f"bse_cluster_{term}"]
+        assert abs(cluster_se - model_se) / model_se < 0.05
+
+
+def test_clustered_covariance_matches_a_direct_per_event_computation():
+    """Pins the sandwich against the definition, computed event by event."""
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=40, L_e=6, seed=11)
+    X = long_df[CONTENT_PREDICTORS].to_numpy(dtype=float)
+    y = long_df["arm_count_hard"].to_numpy(dtype=float)
+    groups = long_df["event_id"].to_numpy()
+    params = np.array([1.2, 0.6])
+
+    bread = np.zeros((2, 2))
+    meat = np.zeros((2, 2))
+    for event in np.unique(groups):
+        rows = groups == event
+        x_e, y_e = X[rows], y[rows]
+        prob = np.exp(x_e @ params)
+        prob = prob / prob.sum()
+        total = y_e.sum()
+        xbar = prob @ x_e
+        score = (y_e - total * prob) @ x_e
+        bread += total * ((x_e.T * prob) @ x_e - np.outer(xbar, xbar))
+        meat += np.outer(score, score)
+    expected = np.linalg.inv(bread) @ meat @ np.linalg.inv(bread)
+
+    covariance = event_clustered_covariance(X, y, groups, params)
+    assert covariance == pytest.approx(expected, rel=1e-10)
+
+
+def _with_event_fraction(long_df):
+    """Convert ``arm_count_hard`` to the per-event allocation fraction."""
+    out = long_df.copy()
+    totals = out.groupby("event_id")["arm_count_hard"].transform("sum")
+    out["arm_fraction"] = out["arm_count_hard"] / totals
+    return out
+
+
+@pytest.mark.slow
+def test_clustered_se_tracks_the_sampling_sd_of_sticky_events():
+    """Sticky within-event bins: the clustered SE, not the count SE, is honest.
+
+    Each event's 20 timebins are a ρ=0.95 Markov chain over arms, so they carry
+    far less information than 20 independent draws. Fitting the counts treats
+    them as independent and reports an SE several times narrower than the
+    coefficient's actual sampling SD across replicates; the event-clustered SE
+    of the fraction fit recovers that sampling SD.
+    """
+    n_replicates = 200
+    coefficients = []
+    cluster_se = []
+    count_se = []
+    for replicate in range(n_replicates):
+        long_df = _with_event_fraction(
+            simulate_autocorrelated_counts(
+                CONTENT_BETA,
+                n_events=200,
+                L_e=20,
+                rho=0.95,
+                seed=1000 + replicate,
+            )
+        )
+        fraction_fit = fit_conditional_poisson(
+            long_df, CONTENT_PREDICTORS, response_col="arm_fraction", n_categories=9
+        )
+        count_fit = fit_conditional_poisson(
+            long_df, CONTENT_PREDICTORS, response_col="arm_count_hard", n_categories=9
+        )
+        coefficients.append([fraction_fit[f"coef_{t}"] for t in CONTENT_PREDICTORS])
+        cluster_se.append(
+            [fraction_fit[f"bse_cluster_{t}"] for t in CONTENT_PREDICTORS]
+        )
+        count_se.append([count_fit[f"bse_{t}"] for t in CONTENT_PREDICTORS])
+
+    sampling_sd = np.std(np.array(coefficients), axis=0, ddof=1)
+    typical_cluster_se = np.median(np.array(cluster_se), axis=0)
+    typical_count_se = np.median(np.array(count_se), axis=0)
+
+    assert np.all(np.abs(typical_cluster_se - sampling_sd) / sampling_sd < 0.20)
+    assert np.all(sampling_sd / typical_count_se >= 2.0)
+
+
+def test_fraction_response_null_is_one_draw_per_event():
+    """Every event is a single draw, so ℓ₀ = -n_events · log(n_categories)."""
+    long_df = _with_event_fraction(
+        simulate_with_event_covariates(CONTENT_BETA, n_events=120, L_e=8, seed=5)
+    )
+
+    for n_categories in (9, 3):
+        result = fit_conditional_poisson(
+            long_df,
+            CONTENT_PREDICTORS,
+            response_col="arm_fraction",
+            n_categories=n_categories,
+        )
+        assert result["n_events"] == 120
+        assert result["llf_null"] == pytest.approx(-120 * np.log(n_categories))
+
+        null = fit_null_model_conditional(
+            long_df, response_col="arm_fraction", n_arms=n_categories
+        )
+        assert null["llf"] == pytest.approx(-120 * np.log(n_categories))
+
+
+def test_estimator_names_the_response_scale_and_the_fitter():
+    """``estimator`` distinguishes the three content fitters; none of their
+    log-likelihoods carries the multinomial constant."""
+    long_df = _with_event_fraction(
+        simulate_with_event_covariates(CONTENT_BETA, n_events=150, L_e=8, seed=3)
+    )
+
+    count_fit = fit_conditional_poisson(
+        long_df, CONTENT_PREDICTORS, response_col="arm_count_hard"
+    )
+    fraction_fit = fit_conditional_poisson(
+        long_df, CONTENT_PREDICTORS, response_col="arm_fraction"
+    )
+    logit_fit = fit_conditional_logit(
+        long_df, CONTENT_PREDICTORS, response_col="arm_count_hard"
+    )
+
+    assert count_fit["estimator"] == "conditional_poisson_count"
+    assert fraction_fit["estimator"] == "conditional_poisson_fraction"
+    assert logit_fit["estimator"] == "conditional_logit_dominant"
+    for fit in (count_fit, fraction_fit, logit_fit):
+        assert fit["llf_includes_constants"] is False
+
+
+def test_null_models_carry_the_estimator_of_the_ladder_they_null():
+    """A null rung is compared against its ladder, so it must be labeled like it."""
+    long_df = _with_event_fraction(
+        simulate_with_event_covariates(CONTENT_BETA, n_events=60, L_e=4, seed=9)
+    )
+
+    assert (
+        fit_null_model_conditional(long_df)["estimator"] == "conditional_poisson_count"
+    )
+    assert (
+        fit_null_model_conditional(
+            long_df,
+            response_col="arm_fraction",
+            estimator="conditional_poisson_fraction",
+        )["estimator"]
+        == "conditional_poisson_fraction"
+    )
+    assert (
+        fit_null_model_conditional_logit(long_df)["estimator"]
+        == "conditional_logit_dominant"
+    )
+    # An empty predictor list routes through the null, which must still report
+    # the response scale the caller asked for.
+    empty_fit = fit_conditional_poisson(long_df, [], response_col="arm_fraction")
+    assert empty_fit["estimator"] == "conditional_poisson_fraction"
+    assert empty_fit["llf_includes_constants"] is False

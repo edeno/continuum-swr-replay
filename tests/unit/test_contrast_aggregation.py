@@ -315,3 +315,61 @@ def test_unrelated_separated_term_never_drops_a_session() -> None:
     assert out.iloc[0]["n_sessions"] == 8
     assert out.iloc[0]["n_dropped"] == 0
     assert out.iloc[0]["n_sessions_flagged_separated"] == 8
+
+
+# ── Which standard error the audited row reports ──
+
+
+def test_typical_session_se_prefers_the_event_clustered_se() -> None:
+    """With a fraction response the model SE describes a design that no longer
+    exists (one draw per event, none of the within-event mixing), so the
+    event-clustered SE is the one the audited row must report."""
+    fits = _session_fits(bse_cluster_rpe_postoutcome=[0.30] * 8)
+
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=SD)
+
+    row = out.iloc[0]
+    assert row["typical_session_se"] == pytest.approx(0.30)
+    assert row["std_typical_session_se"] == pytest.approx(0.60)  # sd = 2.0
+    assert row["se_source"] == "cluster"
+
+
+def test_typical_session_se_falls_back_to_the_model_se() -> None:
+    """Frames written before the clustered SE existed carry only ``bse_``."""
+    fits = _session_fits()
+    assert "bse_cluster_rpe_postoutcome" not in fits.columns
+
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=SD)
+
+    row = out.iloc[0]
+    assert row["typical_session_se"] == pytest.approx(0.10)
+    assert row["se_source"] == "model"
+
+
+def test_session_without_a_finite_clustered_se_uses_its_own_model_se() -> None:
+    """A single non-finite sandwich must not void the whole row, nor be filled
+    with a value from another session: that session reports its model SE and the
+    row is labeled by the source the majority of sessions used."""
+    cluster = [0.30] * 8
+    cluster[0] = float("nan")
+    fits = _session_fits(bse_cluster_rpe_postoutcome=cluster)
+
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=SD)
+
+    row = out.iloc[0]
+    # Seven clustered 0.30 and one model 0.10 -> median 0.30.
+    assert row["typical_session_se"] == pytest.approx(0.30)
+    assert row["se_source"] == "cluster"
+
+
+def test_se_source_is_model_when_most_sessions_have_no_clustered_se() -> None:
+    cluster = [float("nan")] * 8
+    cluster[0] = 0.30
+    fits = _session_fits(bse_cluster_rpe_postoutcome=cluster)
+
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=SD)
+
+    row = out.iloc[0]
+    # One clustered 0.30 and seven model 0.10 -> median 0.10.
+    assert row["typical_session_se"] == pytest.approx(0.10)
+    assert row["se_source"] == "model"

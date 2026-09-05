@@ -12,7 +12,8 @@ animals a frequentist p is barely meaningful, so the sign consistency IS the cla
 ``session_signrank_p`` is a DESCRIPTIVE across-session consistency statistic (sessions
 within an animal are not independent), with a BH-FDR across the rungs sharing a
 population (``session_signrank_fdr_q``). ``typical_session_se`` is the median
-per-session SE, not the aggregate's uncertainty. Continuous-predictor coefficients
+per-session SE, not the aggregate's uncertainty; it is the event-clustered SE
+wherever the fitters wrote one (``se_source``). Continuous-predictor coefficients
 also carry a standardized (per-1-SD) form (``std_*``); binary predictors are
 per-category; and the reward-history basis features are weighted reward fractions
 in [0, 1], so their coefficients are reported per unit of the fraction (factor 1.0,
@@ -43,8 +44,9 @@ _AGG_COLUMNS = (
     "level", "model", "population", "term", "n_sessions", "n_animals",
     "n_dropped", "n_sessions_flagged_nonconverged", "n_sessions_flagged_separated",
     "coef_animal_median", "n_animals_pos", "coef_session_median",
-    "typical_session_se", "std_unit", "std_factor", "std_coef_animal_median",
-    "std_coef_session_median", "std_typical_session_se", "pct_positive_session",
+    "typical_session_se", "se_source", "std_unit", "std_factor",
+    "std_coef_animal_median", "std_coef_session_median",
+    "std_typical_session_se", "pct_positive_session",
     "pct_sig_session", "session_signrank_p",
 )
 
@@ -134,6 +136,45 @@ def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
     )
 
 
+def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
+    """Median per-session SE for ``term``, and which SE that median is made of.
+
+    The event-clustered SE (``bse_cluster_<term>``) is preferred wherever the
+    fitters wrote a finite one. On a fraction response the model SE describes a
+    design in which each event contributed one draw and nothing within it
+    varied, so it is the clustered SE that reflects the events' own
+    variability. A session whose sandwich is not finite keeps its own model SE
+    rather than being dropped or filled from another session.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        The per-session fits already kept for this (model, population, term).
+    term : str
+        The aggregated term.
+
+    Returns
+    -------
+    (float, str)
+        Median SE (NaN when neither column is present), and ``"cluster"`` when
+        more than half of the sessions contributed a clustered SE, else
+        ``"model"``. In practice the mix is all-or-nothing: a frame either
+        predates the clustered column or carries it for every session.
+    """
+    model = fits.get(f"bse_{term}")
+    cluster = fits.get(f"bse_cluster_{term}")
+    if cluster is None:
+        return (np.nan, "model") if model is None else (float(model.median()), "model")
+    from_cluster = np.isfinite(cluster.to_numpy(dtype=float))
+    chosen = (
+        cluster.where(from_cluster)
+        if model is None
+        else cluster.where(from_cluster, model)
+    )
+    source = "cluster" if from_cluster.sum() > len(fits) / 2 else "model"
+    return float(chosen.median()), source
+
+
 def aggregate_contrast(
     res: pd.DataFrame, specs: list[tuple[str, str, str]], level: str, sd: dict | None = None
 ) -> pd.DataFrame:
@@ -163,7 +204,7 @@ def aggregate_contrast(
     rows = []
     for model, pop, term in specs:
         factor, unit = std_factor(term, sd)
-        ccol, scol, pcol = f"coef_{term}", f"bse_{term}", f"pval_{term}"
+        ccol, pcol = f"coef_{term}", f"pval_{term}"
         s_all = res[(res.model == model) & (res.population == pop)]
         if ccol not in s_all.columns:
             continue
@@ -209,6 +250,7 @@ def aggregate_contrast(
             )
             continue
         coef = s[ccol]
+        session_se, se_source = typical_session_se(s, term)
         per_animal = s.groupby("animal")[ccol].median()
         srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
@@ -237,14 +279,13 @@ def aggregate_contrast(
             "coef_animal_median": float(per_animal.median()),
             "n_animals_pos": int((per_animal > 0).sum()),
             "coef_session_median": float(coef.median()),
-            "typical_session_se": float(s[scol].median()) if scol in s else np.nan,
+            "typical_session_se": session_se,
+            "se_source": se_source,
             "std_unit": unit,
             "std_factor": factor,
             "std_coef_animal_median": float(per_animal.median()) * factor,
             "std_coef_session_median": float(coef.median()) * factor,
-            "std_typical_session_se": (
-                float(s[scol].median()) * factor if scol in s else np.nan
-            ),
+            "std_typical_session_se": session_se * factor,
             "pct_positive_session": float((coef > 0).mean()),
             "pct_sig_session": float((s[pcol] < 0.05).mean()) if pcol in s else np.nan,
             "session_signrank_p": srp,

@@ -51,6 +51,83 @@ logger = logging.getLogger(__name__)
 # failing at 100 iterations and 2.1s converging at 1000.
 CONDITIONAL_FIT_MAXITER = 1000
 
+# Response columns whose per-event values are an allocation fraction summing to
+# 1.0 rather than a timebin count. The distinction is not cosmetic: with a
+# fraction the event contributes a single draw, so the model information (and
+# every AIC/BIC built on it) is at the event grain, and the analytic null
+# collapses to -n_events * log(n_categories).
+FRACTION_RESPONSE_COLUMNS = frozenset({"arm_fraction", "patch_fraction"})
+
+CONDITIONAL_POISSON_COUNT = "conditional_poisson_count"
+CONDITIONAL_POISSON_FRACTION = "conditional_poisson_fraction"
+CONDITIONAL_LOGIT_DOMINANT = "conditional_logit_dominant"
+
+
+def poisson_estimator_name(response_col: str) -> str:
+    """Estimator label for a conditional-Poisson fit on ``response_col``.
+
+    Fraction responses are named separately from counts because they change
+    what one row of the results frame means -- a coefficient's SE, AIC and
+    pseudo-R2 are per event rather than per timebin -- and downstream summaries
+    must not pool the two scales. Any other response (soft counts, posterior
+    mass) is on the count scale.
+    """
+    return (
+        CONDITIONAL_POISSON_FRACTION
+        if response_col in FRACTION_RESPONSE_COLUMNS
+        else CONDITIONAL_POISSON_COUNT
+    )
+
+
+def event_clustered_covariance(
+    X: np.ndarray, y: np.ndarray, groups: np.ndarray, params: np.ndarray
+) -> np.ndarray:
+    """Sandwich covariance of a conditional-Poisson fit, clustered by event.
+
+    The conditional likelihood treats the ``L_e`` timebins of an event as
+    independent multinomial draws. They are not: a replay is a smooth
+    trajectory, so its bins are near-copies of each other and the model
+    information overstates how much an event carries. The sandwich
+    ``H^-1 (sum_e g_e g_e') H^-1`` replaces the assumed per-event information
+    with the observed between-event variability of the score, which is what the
+    coefficient's sampling variance actually reflects.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, n_params)
+        Design matrix, one row per (event, candidate category).
+    y : np.ndarray, shape (n_rows,)
+        Response (timebin counts or per-event allocation fractions).
+    groups : np.ndarray, shape (n_rows,)
+        Event id per row; rows need not be sorted.
+    params : np.ndarray, shape (n_params,)
+        Fitted coefficients.
+
+    Returns
+    -------
+    np.ndarray, shape (n_params, n_params)
+        Event-clustered covariance of ``params``.
+    """
+    order = np.argsort(groups, kind="stable")
+    X, y, groups = X[order], y[order], groups[order]
+    _, starts, counts = np.unique(groups, return_index=True, return_counts=True)
+    p = X.shape[1]
+    bread = np.zeros((p, p))
+    meat = np.zeros((p, p))
+    eta = X @ params
+    for s, c in zip(starts, counts, strict=True):
+        sl = slice(s, s + c)
+        w = np.exp(eta[sl] - eta[sl].max())
+        prob = w / w.sum()
+        total = y[sl].sum()
+        xbar = prob @ X[sl]
+        score = (y[sl] - total * prob) @ X[sl]
+        bread += total * ((X[sl].T * prob) @ X[sl] - np.outer(xbar, xbar))
+        meat += np.outer(score, score)
+    bread_inv = np.linalg.pinv(bread)
+    return bread_inv @ meat @ bread_inv
+
+
 def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
     """True iff the within-group-demeaned design is full column rank.
 
@@ -123,7 +200,11 @@ def fit_conditional_poisson(
     """
     if len(predictors) == 0:
         return fit_null_model_conditional(
-            long_df, event_col, response_col, n_arms=n_categories
+            long_df,
+            event_col,
+            response_col,
+            n_arms=n_categories,
+            estimator=poisson_estimator_name(response_col),
         )
 
     required = [response_col, event_col] + predictors
@@ -203,6 +284,11 @@ def fit_conditional_poisson(
     coefs = dict(zip(predictors, result.params, strict=True))
     bse = dict(zip(predictors, result.bse, strict=True))
     pvals = dict(zip(predictors, result.pvalues, strict=True))
+    # Event-clustered SEs alongside the model SEs: the model SE is the one the
+    # conditional likelihood implies, the clustered SE is the one the events'
+    # own variability supports. Aggregation prefers the clustered column.
+    cluster_cov = event_clustered_covariance(X, y, groups, result.params)
+    bse_cluster = dict(zip(predictors, np.sqrt(np.diag(cluster_cov)), strict=True))
 
     llf = result.llf
     n_params = len(predictors)
@@ -230,6 +316,11 @@ def fit_conditional_poisson(
         **{f"coef_{k}": v for k, v in coefs.items()},
         **{f"bse_{k}": v for k, v in bse.items()},
         **{f"pval_{k}": v for k, v in pvals.items()},
+        **{f"bse_cluster_{k}": float(v) for k, v in bse_cluster.items()},
+        "estimator": poisson_estimator_name(response_col),
+        # statsmodels' conditional likelihood omits the multinomial coefficient,
+        # so this llf is comparable only with other fits that also omit it.
+        "llf_includes_constants": False,
         "n_events": n_events,
         "n_rows": len(df),
         "n_params": n_params,
@@ -265,6 +356,7 @@ def fit_null_model_conditional(
     event_col: str = "event_id",
     response_col: str = "arm_count_hard",
     n_arms: int = 9,
+    estimator: str = CONDITIONAL_POISSON_COUNT,
 ) -> dict:
     """Analytical null model for conditional Poisson.
 
@@ -281,9 +373,13 @@ def fit_null_model_conditional(
     event_col : str
         Column with event UIDs.
     response_col : str
-        Column with arm counts.
+        Column with arm counts (or per-event allocation fractions, in which
+        case L_e = 1 and the null is -n_events * log(n_arms)).
     n_arms : int
         Number of candidate arms per event.
+    estimator : str
+        Estimator label of the ladder this null belongs to; passed by the
+        caller so the null rung is comparable with the rungs above it.
 
     Returns
     -------
@@ -304,6 +400,8 @@ def fit_null_model_conditional(
     llf = -float(event_totals.sum()) * np.log(n_arms)
 
     return {
+        "estimator": estimator,
+        "llf_includes_constants": False,
         "n_events": n_events,
         "n_rows": len(df),
         "n_params": 0,
@@ -321,6 +419,7 @@ def fit_null_model_conditional_logit(
     event_col: str = "event_id",
     response_col: str = "arm_count_hard",
     n_arms: int = 9,
+    estimator: str = CONDITIONAL_LOGIT_DOMINANT,
 ) -> dict:
     """Analytical null for the dominant-arm conditional logit.
 
@@ -343,6 +442,8 @@ def fit_null_model_conditional_logit(
         Event id and arm-count columns.
     n_arms : int
         Size of the candidate set per event.
+    estimator : str
+        Estimator label of the ladder this null belongs to.
 
     Returns
     -------
@@ -358,6 +459,8 @@ def fit_null_model_conditional_logit(
     n_events = int(df[event_col].nunique())
     llf = -n_events * float(np.log(n_arms))
     return {
+        "estimator": estimator,
+        "llf_includes_constants": False,
         "n_events": n_events,
         "n_rows": len(df),
         "n_params": 0,
@@ -506,6 +609,8 @@ def fit_conditional_logit(
         **{f"coef_{k}": v for k, v in coefs.items()},
         **{f"bse_{k}": v for k, v in bse.items()},
         **{f"pval_{k}": v for k, v in pvals.items()},
+        "estimator": CONDITIONAL_LOGIT_DOMINANT,
+        "llf_includes_constants": False,
         "n_events": n_events,
         "n_rows": len(df),
         "n_params": len(predictors),
