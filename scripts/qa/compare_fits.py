@@ -343,39 +343,97 @@ def reward_quantities(new_bin: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     return kernel, paired
 
 
-def rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
-    """Sessions fitted per (rung, outcome) in each fit; rungs absent show as 0."""
+def _suffixed_side(
+    df: pd.DataFrame, keys: Sequence[str], cols: Sequence[str], suffix: str
+) -> pd.DataFrame:
+    """``df`` restricted to ``cols``, with every non-key column suffixed.
+
+    The join half of every before/after table in this module: keep the join keys
+    unsuffixed so the two sides merge on them, and tag everything else with which
+    fit it came from. Columns absent from ``df`` are simply not carried, so a
+    frame that predates a column joins without a KeyError.
+    """
+    keys = list(keys)
+    if df.empty:
+        return pd.DataFrame(columns=keys)
+    have = [c for c in cols if c in df.columns]
+    return df[have].rename(columns={c: f"{c}{suffix}" for c in have if c not in keys})
+
+
+def session_counts_by(
+    old: pd.DataFrame, new: pd.DataFrame, keys: Sequence[str]
+) -> pd.DataFrame:
+    """Sessions fitted per ``keys`` group in each fit; a group absent shows as 0."""
+    keys = list(keys)
 
     def _counts(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
         if df.empty:
-            return pd.DataFrame(columns=["model", "outcome", f"n_sessions{suffix}"])
-        out = (
-            df.groupby(["model", "outcome"], sort=False)
+            return pd.DataFrame(columns=keys + [f"n_sessions{suffix}"])
+        return (
+            df.groupby(keys, sort=False)
             .size()
             .rename(f"n_sessions{suffix}")
+            .reset_index()
         )
-        return out.reset_index()
 
-    merged = _counts(old, "_before").merge(
-        _counts(new, "_after"), on=["model", "outcome"], how="outer"
+    merged = _counts(old, "_before").merge(_counts(new, "_after"), on=keys, how="outer")
+    count_columns = ["n_sessions_before", "n_sessions_after"]
+    # An empty side contributes an object-dtype column, so coerce before filling:
+    # a bare fillna on object dtype is a deprecated silent downcast.
+    merged[count_columns] = (
+        merged[count_columns]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0)
+        .astype(int)
     )
-    merged[["n_sessions_before", "n_sessions_after"]] = (
-        merged[["n_sessions_before", "n_sessions_after"]].fillna(0).astype(int)
-    )
+    return merged
+
+
+def rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """Sessions fitted per (rung, outcome) in each fit; rungs absent show as 0."""
+    merged = session_counts_by(old, new, ["model", "outcome"])
     merged["outcome"] = pd.Categorical(merged["outcome"], OUTCOME_ORDER, ordered=True)
     return merged.sort_values(["model", "outcome"]).reset_index(drop=True)
 
 
+# Column-name stems whose values are counts, not measurements. An outer join
+# floats them (a group missing on one side is NaN), and rendering a session count
+# as "218.0000" beside a coefficient invites reading it as a measurement.
+COUNT_COLUMN_STEMS = (
+    "n_sessions",
+    "n_animals",
+    "n_dropped",
+    "n_paired",
+    "n_fit",
+    "n_flagged",
+    "n_runaway",
+    "child_better_aic",
+    "parent_better_aic",
+    "child_better_bic",
+)
+
+
+def _is_count_column(name: object) -> bool:
+    """Whether a column name is a count (rendered without decimals)."""
+    return isinstance(name, str) and name.startswith(COUNT_COLUMN_STEMS)
+
+
 def _md(df: pd.DataFrame, floatfmt: str = "{:.2f}") -> str:
-    """Markdown table; NaN renders as an em dash."""
+    """Markdown table; NaN renders as an em dash, count columns as integers."""
     if df.empty:
         return "_(no rows)_\n"
     shown = df.copy()
     for col in shown.columns:
         if pd.api.types.is_float_dtype(shown[col]):
+            fmt = "{:.0f}" if _is_count_column(col) else floatfmt
             shown[col] = shown[col].map(
-                lambda v: "—" if pd.isna(v) else floatfmt.format(v)
+                lambda v, f=fmt: "—" if pd.isna(v) else f.format(v)
             )
+        else:
+            # An outer join puts NaN into label columns too (a spec present on
+            # only one side). str() would render it as a literal "nan", which
+            # reads as a value rather than as "this side has no row".
+            shown[col] = shown[col].map(lambda v: "—" if pd.isna(v) else v)
     header = "| " + " | ".join(shown.columns) + " |"
     rule = "| " + " | ".join("---" for _ in shown.columns) + " |"
     body = "\n".join(
@@ -1104,16 +1162,69 @@ def _n_animals_pos(fits: pd.DataFrame, term: str) -> tuple[int, int]:
     return int((per_animal > 0).sum()), int(per_animal.size)
 
 
+def _rung_frame(fits: pd.DataFrame, model: str) -> pd.DataFrame:
+    """One rung's fits, with the columns no session of that rung carries removed.
+
+    A bundle's frame is the union of every rung's design, so a rung is joined to
+    columns belonging to other rungs, all NaN for its own rows. Dropping them
+    keeps a per-rung term list to the terms that rung was actually fit with.
+    """
+    if fits.empty or "model" not in fits.columns:
+        return fits
+    return fits[fits["model"] == model].dropna(axis=1, how="all")
+
+
+def _paired_coefficients(
+    old: pd.DataFrame, new: pd.DataFrame, term: str
+) -> tuple[float, float, int]:
+    """Medians of ``coef_<term>`` over the sessions BOTH fits reached.
+
+    The per-side medians are taken over each side's own fitted sessions, which
+    differ (e.g. 197 vs 201 sessions on ``models_swr_T``), so a shift between
+    them can be a cohort change rather than an effect change. This restricts to
+    the intersection on (session, rung) -- the brief's join -- so the two
+    medians describe the same sessions. Returns NaNs and 0 when the rung has no
+    session in common, which is what a bundle whose rung sets are disjoint looks
+    like.
+    """
+    col = f"coef_{term}"
+    keys = [*SC]
+    if any(
+        col not in frame.columns or not set(keys) <= set(frame.columns)
+        for frame in (old, new)
+    ):
+        return np.nan, np.nan, 0
+    merged = old[keys + [col]].merge(
+        new[keys + [col]], on=keys, suffixes=("_before", "_after")
+    )
+    merged = merged.dropna(subset=[f"{col}_before", f"{col}_after"])
+    if merged.empty:
+        return np.nan, np.nan, 0
+    return (
+        float(merged[f"{col}_before"].median()),
+        float(merged[f"{col}_after"].median()),
+        len(merged),
+    )
+
+
 def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     """Per (model, term): median coefficient, typical SE and animal signs, both fits.
 
-    The SE columns are deliberately asymmetric and labelled as such. The old
-    count-response fits carry only the model SE (``bse_<term>``), computed as if
-    an event's ~32 autocorrelated timebins were independent draws. The new
-    fraction-response fits also carry the event-clustered sandwich SE
-    (``bse_cluster_<term>``), which is the one the aggregation reads. Comparing
-    the two says how much the old SE understated the events' own variability; it
-    is not a like-for-like SE change.
+    Two things are deliberately asymmetric and labelled as such.
+
+    The SE columns: the old count-response fits carry only the model SE
+    (``bse_<term>``), computed as if an event's ~32 autocorrelated timebins were
+    independent draws. The new fraction-response fits also carry the
+    event-clustered sandwich SE (``bse_cluster_<term>``), which is the one the
+    aggregation reads. Comparing the two says how much the old SE understated the
+    events' own variability; it is not a like-for-like SE change.
+
+    The medians: ``coef_median_before`` / ``_after`` are over each side's own
+    fitted sessions, which are not the same set, while
+    ``coef_median_paired_before`` / ``_after`` restrict to the ``n_paired``
+    sessions both fits reached. Read the paired pair when asking whether the
+    coefficient moved; the unpaired pair still reports a rung that only one side
+    fitted at all.
 
     Parameters
     ----------
@@ -1132,8 +1243,8 @@ def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
         | set(new.get("model", pd.Series(dtype=object)))
     )
     for model in models:
-        o = old[old.model == model] if len(old) else old
-        n = new[new.model == model] if len(new) else new
+        o = _rung_frame(old, model)
+        n = _rung_frame(new, model)
         for term in _content_terms(o, n):
             col = f"coef_{term}"
             o_coef = o[col] if col in o.columns else pd.Series(dtype=float)
@@ -1143,14 +1254,18 @@ def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
             o_se = o.get(f"bse_{term}")
             n_model_se = n.get(f"bse_{term}")
             n_cluster_se = n.get(f"bse_cluster_{term}")
+            paired_before, paired_after, n_paired = _paired_coefficients(o, n, term)
             rows.append(
                 {
                     "model": model,
                     "term": term,
                     "n_sessions_before": int(o_coef.notna().sum()),
                     "n_sessions_after": int(n_coef.notna().sum()),
+                    "n_paired": n_paired,
                     "coef_median_before": o_coef.median() if len(o_coef) else np.nan,
                     "coef_median_after": n_coef.median() if len(n_coef) else np.nan,
+                    "coef_median_paired_before": paired_before,
+                    "coef_median_paired_after": paired_after,
                     "bse_model_median_before": (
                         o_se.median() if o_se is not None else np.nan
                     ),
@@ -1197,30 +1312,11 @@ def content_scale_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
 
 def content_rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     """Sessions fitted per rung in each fit; a rung absent on one side shows as 0."""
-
-    def _counts(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
-        if df.empty:
-            return pd.DataFrame(columns=["model", f"n_sessions{suffix}"])
-        return (
-            df.groupby("model", sort=False)
-            .size()
-            .rename(f"n_sessions{suffix}")
-            .reset_index()
-        )
-
-    merged = _counts(old, "_before").merge(
-        _counts(new, "_after"), on="model", how="outer"
+    return (
+        session_counts_by(old, new, ["model"])
+        .sort_values("model")
+        .reset_index(drop=True)
     )
-    count_columns = ["n_sessions_before", "n_sessions_after"]
-    # An empty side contributes an object-dtype column, so coerce before
-    # filling: a bare fillna on object dtype is a deprecated silent downcast.
-    merged[count_columns] = (
-        merged[count_columns]
-        .apply(pd.to_numeric, errors="coerce")
-        .fillna(0)
-        .astype(int)
-    )
-    return merged.sort_values("model").reset_index(drop=True)
 
 
 def content_delta_aic_table(
@@ -1244,17 +1340,9 @@ def content_delta_aic_table(
         "n_animals_child_better",
     ]
 
-    def _side(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
-        if df.empty:
-            return pd.DataFrame(columns=keys)
-        have = [c for c in cols if c in df.columns]
-        return df[have].rename(
-            columns={c: f"{c}{suffix}" for c in have if c not in keys}
-        )
-
     return (
-        _side(old_cmp, "_before")
-        .merge(_side(new_cmp, "_after"), on=keys, how="outer")
+        _suffixed_side(old_cmp, keys, cols, "_before")
+        .merge(_suffixed_side(new_cmp, keys, cols, "_after"), on=keys, how="outer")
         .reset_index(drop=True)
     )
 
@@ -1275,8 +1363,8 @@ def content_separation_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFra
         | set(new.get("model", pd.Series(dtype=object)))
     )
     for model in models:
-        o = old[old.model == model] if len(old) else old
-        n = new[new.model == model] if len(new) else new
+        o = _rung_frame(old, model)
+        n = _rung_frame(new, model)
         for term in _content_terms(o, n):
             record: dict = {"model": model, "term": term}
             excluded_any = False
@@ -1325,19 +1413,20 @@ def contrast_audited_table(
         "coef_session_median",
         "typical_session_se",
         "se_source",
+        # The per-SD unit travels with the standardized coefficient. Ruling 5
+        # moved the arm belief terms' SD onto leaf-arm support (e.g.
+        # reward_belief_mean_candidate_arm_preoutcome 0.2493 -> 0.1190), so a
+        # std_coef before and a std_coef after are stated per DIFFERENT SD and
+        # must not be differenced without reading these two columns.
+        "std_unit",
+        "std_factor",
         "std_coef_animal_median",
         "session_signrank_fdr_q",
     ]
 
-    def _side(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
-        if df.empty:
-            return pd.DataFrame(columns=keys)
-        have = [c for c in cols if c in df.columns]
-        return df[have].rename(
-            columns={c: f"{c}{suffix}" for c in have if c not in keys}
-        )
-
-    merged = _side(old, "_before").merge(_side(new, "_after"), on=keys, how="outer")
+    merged = _suffixed_side(old, keys, cols, "_before").merge(
+        _suffixed_side(new, keys, cols, "_after"), on=keys, how="outer"
+    )
     if terms is not None:
         merged = merged[merged["term"].isin(terms)]
     return merged.sort_values(keys).reset_index(drop=True)
@@ -1359,10 +1448,10 @@ def contrast_design_delta_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.Data
         | set(new.get("model", pd.Series(dtype=object)))
     )
     for model in models:
-        o = old[old.model == model] if len(old) else old
-        n = new[new.model == model] if len(new) else new
-        o_terms = set(_content_terms(o.dropna(axis=1, how="all"))) if len(o) else set()
-        n_terms = set(_content_terms(n.dropna(axis=1, how="all"))) if len(n) else set()
+        o = _rung_frame(old, model)
+        n = _rung_frame(new, model)
+        o_terms = set(_content_terms(o)) if len(o) else set()
+        n_terms = set(_content_terms(n)) if len(n) else set()
         if not len(o):
             rows.append(
                 {"model": model, "only_before": "(rung not fit)", "only_after": ""}
@@ -1390,19 +1479,79 @@ def contrast_stratum_table(
 ) -> pd.DataFrame:
     """Key-term audited rows for each outcome stratum, side by side."""
     keys = ["level", "model", "population", "term"]
-    wanted = keys + ["n_sessions", "coef_animal_median", "n_animals_pos"]
+    # std_factor comes along so a reader can see that every stratum shares one
+    # per-SD unit (frozen over the pooled cohort) before comparing std_coef.
+    wanted = keys + [
+        "n_sessions",
+        "coef_animal_median",
+        "n_animals_pos",
+        "std_unit",
+        "std_factor",
+    ]
     merged: pd.DataFrame | None = None
     for name, df in strata.items():
         if df.empty:
             continue
-        have = [c for c in wanted if c in df.columns]
-        side = df.loc[df["term"].isin(terms), have].rename(
-            columns={c: f"{c}_{name}" for c in have if c not in keys}
-        )
+        side = _suffixed_side(df[df["term"].isin(terms)], keys, wanted, f"_{name}")
         merged = side if merged is None else merged.merge(side, on=keys, how="outer")
     if merged is None:
         return pd.DataFrame()
     return merged.sort_values(keys).reset_index(drop=True)
+
+
+def _disjoint_rungs_note(old: pd.DataFrame, new: pd.DataFrame) -> str:
+    """Prose when a bundle's two sides share no rung, naming what each side holds.
+
+    Derived, not asserted: the canonical ``models/`` bundle was overwritten by a
+    partial belief run before the partial-ladder guard existed, so its "before"
+    holds Mv/Mu/Mvu and its "after" the M0-M6 default ladder. Every per-rung row
+    in such a bundle reads ``0 before / N after`` and would otherwise look like a
+    cohort collapse.
+    """
+    if old.empty or new.empty:
+        return ""
+    old_rungs = set(old.get("model", pd.Series(dtype=object)))
+    new_rungs = set(new.get("model", pd.Series(dtype=object)))
+    if not old_rungs or not new_rungs or (old_rungs & new_rungs):
+        return ""
+    return (
+        "**No rung is present on both sides of this bundle**, so every row below "
+        f"reads `0 before` or `0 after` and nothing here is a before/after "
+        f"comparison. The pre-fix bundle holds {', '.join(sorted(old_rungs))}; "
+        f"the refit holds {', '.join(sorted(new_rungs))}. A partial run had "
+        "published into this canonical directory before the partial-ladder guard "
+        "existed, so there is no count-response fit of the refitted rungs to "
+        "compare against.\n"
+    )
+
+
+def _stratum_power_note(table: pd.DataFrame, strata: Sequence[str]) -> str:
+    """Prose naming how many sessions each stratum's printed rows rest on.
+
+    A stratified refit can succeed and still be far too thin to read: the
+    ``omitted`` stratum keeps a small minority of events, so most of its rungs
+    are fitted on a handful of sessions.
+    """
+    parts = []
+    for name in strata:
+        col = f"n_sessions_{name}"
+        if col not in table.columns:
+            continue
+        counts = pd.to_numeric(table[col], errors="coerce").dropna()
+        if counts.empty:
+            continue
+        parts.append(
+            f"`{name}` {int(counts.min())}-{int(counts.max())} "
+            f"(median {int(counts.median())})"
+        )
+    if not parts:
+        return ""
+    return (
+        "**Sessions behind each stratum's rows** (min-max across the rows below): "
+        + "; ".join(parts)
+        + ". A stratum whose rungs rest on a handful of sessions is reported for "
+        "completeness and is not population evidence.\n"
+    )
 
 
 def build_content_report(
@@ -1446,6 +1595,17 @@ def build_content_report(
         "after, so the before/after ΔAIC columns are **different scales** and "
         "must never be differenced or read as an effect change.\n"
     )
+    add(
+        "**The per-SD unit also changed for the arm belief terms.** Their SDs are "
+        "now taken over the leaf arms only -- the trunks are a structural zero for "
+        "every one of them, so nine-arm rows measured a spread the fitted rows "
+        "never see. `reward_belief_mean_candidate_arm_preoutcome` moved from "
+        "0.2493 (all rows) to 0.1190 (leaf arms), a factor of 2.1. A "
+        "`std_coef_*_before` and a `std_coef_*_after` are therefore stated per "
+        "DIFFERENT SD: the `std_unit` / `std_factor` columns below carry each "
+        "side's unit, and the std_coef columns **must not be differenced across "
+        "the change**. Compare the raw `coef_*` columns instead.\n"
+    )
     add("## Inputs\n")
     rows = []
     for name, path in inputs.items():
@@ -1471,6 +1631,9 @@ def build_content_report(
 
     for name, (old, new, old_cmp, new_cmp) in bundles.items():
         add(f"\n## Bundle `{name}`\n")
+        disjoint = _disjoint_rungs_note(old, new)
+        if disjoint:
+            add(disjoint)
         add("### Response and cohort\n")
         add(_md(content_scale_table(old, new)))
         add("\n### Sessions fitted per rung\n")
@@ -1536,7 +1699,11 @@ def build_content_report(
             "outcome; the per-SD units are frozen over the pooled cohort, so the "
             "columns are on one unit.\n"
         )
-        add(_md(contrast_stratum_table(strata, key_terms), floatfmt="{:.4f}"))
+        stratum_table = contrast_stratum_table(strata, key_terms)
+        power_note = _stratum_power_note(stratum_table, list(strata))
+        if power_note:
+            add(power_note)
+        add(_md(stratum_table, floatfmt="{:.4f}"))
     return "\n".join(lines)
 
 

@@ -16,6 +16,9 @@ import pandas as pd
 import pytest
 
 from scripts.qa.compare_fits import (
+    _disjoint_rungs_note,
+    _md,
+    _stratum_power_note,
     build_content_report,
     collect_content_inputs,
     content_delta_aic_table,
@@ -23,6 +26,7 @@ from scripts.qa.compare_fits import (
     content_scale_table,
     content_separation_table,
     content_term_table,
+    contrast_audited_table,
     contrast_design_delta_table,
     contrast_stratum_table,
 )
@@ -280,3 +284,181 @@ def test_a_rung_absent_before_is_marked_not_fit():
     delta = contrast_design_delta_table(old, new).set_index("model")
 
     assert delta.loc["CS5b_new", "only_before"] == "(rung not fit)"
+
+
+# --- Fix round: units, pairing, empty rows, integer rendering -------------------
+
+
+def _audited(std_factor: float, coef: float, **overrides) -> pd.DataFrame:
+    """One audited contrast row, at a stated per-SD unit."""
+    row = {
+        "level": "candidate_arm",
+        "model": "CS5_armvalue",
+        "population": "all",
+        "term": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+        "n_sessions": 212,
+        "n_animals": 5,
+        "n_dropped": 6,
+        "coef_animal_median": coef,
+        "n_animals_pos": 0,
+        "coef_session_median": coef,
+        "typical_session_se": 0.3,
+        "se_source": "model",
+        "std_unit": "per SD",
+        "std_factor": std_factor,
+        "std_coef_animal_median": coef * std_factor,
+        "session_signrank_fdr_q": 0.0,
+    }
+    row.update(overrides)
+    return pd.DataFrame([row])
+
+
+def test_the_per_sd_unit_of_each_side_is_printed_beside_its_std_coef():
+    """A std_coef stated per a redefined SD must carry the SD it is stated per.
+
+    Ruling 5 moved the arm belief SD onto leaf-arm support (0.2493 -> 0.1190), so
+    a before/after std_coef pair mixes a unit redefinition with an effect change
+    unless both factors are on the page.
+    """
+    before = _audited(std_factor=1 / 0.249346, coef=-0.996)
+    after = _audited(std_factor=1 / 0.118986, coef=0.2366, se_source="cluster")
+
+    table = contrast_audited_table(before, after)
+
+    assert "std_factor_before" in table.columns
+    assert "std_factor_after" in table.columns
+    assert "std_unit_before" in table.columns
+    assert "std_unit_after" in table.columns
+    assert table.loc[0, "std_factor_before"] != pytest.approx(
+        table.loc[0, "std_factor_after"]
+    )
+
+
+def test_the_report_warns_that_the_per_sd_unit_changed(tmp_path):
+    old_root, new_root = tmp_path / "backup", tmp_path / "live"
+    (old_root / "models").mkdir(parents=True)
+    (new_root / "models").mkdir(parents=True)
+    _old().to_pickle(old_root / "models" / "all_models.pkl")
+    _new().to_pickle(new_root / "models" / "all_models.pkl")
+
+    bundles, contrast, inputs, missing = collect_content_inputs(
+        old_root, new_root, ("models",)
+    )
+    report = build_content_report(bundles, contrast, inputs, "; ".join(missing))
+
+    assert "per-SD unit also changed" in report
+    assert "must not be differenced across" in report
+
+
+def test_strata_carry_their_per_sd_factor():
+    audited = _audited(std_factor=8.4, coef=0.24)
+    strata = {"all": audited, "rewarded": audited.assign(coef_animal_median=0.16)}
+
+    table = contrast_stratum_table(
+        strata, {"swr_x_reward_belief_mean_candidate_arm_preoutcome"}
+    )
+
+    assert table.loc[0, "std_factor_all"] == pytest.approx(8.4)
+    assert table.loc[0, "std_factor_rewarded"] == pytest.approx(8.4)
+
+
+def test_a_rung_is_not_given_the_terms_of_other_rungs_in_the_same_bundle():
+    """A bundle frame is the union of every rung's design; a rung owns its own."""
+    m1 = _fits({"a": [0.5, 0.6]}, response="arm_fraction", bse=0.05, bse_cluster=0.3)
+    m2 = m1.assign(model="M2")
+    m2["coef_is_prev_arm"] = 0.2
+    bundle = pd.concat([m1, m2], ignore_index=True)
+
+    table = content_term_table(bundle, bundle)
+
+    m1_terms = set(table.loc[table.model == "M1", "term"])
+    m2_terms = set(table.loc[table.model == "M2", "term"])
+    assert m1_terms == {TERM}  # not is_prev_arm, which only M2 was fit with
+    assert m2_terms == {TERM, "is_prev_arm"}
+    # And no all-zero placeholder row survives.
+    assert (table["n_sessions_before"] > 0).all()
+
+
+def test_paired_medians_use_only_the_sessions_both_fits_reached():
+    """An unpaired median can move because the cohort moved, not the effect."""
+    old = _fits({"a": [1.0, 1.0, 1.0]}, response=None, bse=0.05, bse_cluster=None)
+    # Same first two sessions with the same coefficient, plus a third session the
+    # old fit never reached carrying a wildly different value.
+    new = _fits(
+        {"a": [1.0, 1.0, 1.0, 9.0]},
+        response="arm_fraction",
+        bse=0.05,
+        bse_cluster=0.3,
+    )
+
+    row = content_term_table(old, new).set_index("term").loc[TERM]
+
+    assert row["n_sessions_before"] == 3
+    assert row["n_sessions_after"] == 4
+    assert row["n_paired"] == 3
+    assert row["coef_median_after"] == pytest.approx(1.0)  # unpaired median
+    assert row["coef_median_paired_before"] == pytest.approx(1.0)
+    assert row["coef_median_paired_after"] == pytest.approx(1.0)
+
+
+def test_paired_columns_are_empty_when_no_session_is_shared():
+    old = _old().assign(model="Mv")
+    new = _new().assign(model="M1")
+
+    table = content_term_table(old, new).set_index("model")
+
+    assert table.loc["Mv", "n_paired"] == 0
+    assert np.isnan(table.loc["Mv", "coef_median_paired_before"])
+
+
+def test_count_columns_render_without_decimals():
+    frame = pd.DataFrame([{"n_sessions_before": 218.0, "coef_median_before": 0.8732}])
+
+    rendered = _md(frame, floatfmt="{:.4f}")
+
+    assert "| 218 |" in rendered
+    assert "0.8732" in rendered
+    assert "218.0000" not in rendered
+
+
+def test_a_bundle_whose_rungs_do_not_overlap_says_so():
+    """`models/` held a partial belief run before the guard existed."""
+    old = pd.concat(
+        [_old().assign(model=name) for name in ("Mv", "Mu", "Mvu")], ignore_index=True
+    )
+    new = pd.concat(
+        [_new().assign(model=name) for name in ("M0a", "M1")], ignore_index=True
+    )
+
+    note = _disjoint_rungs_note(old, new)
+
+    assert "No rung is present on both sides" in note
+    assert "Mu, Mv, Mvu" in note
+    assert "M0a, M1" in note
+    # A bundle that does share rungs gets no note.
+    assert _disjoint_rungs_note(new, new) == ""
+
+
+def test_a_thin_stratum_reports_how_many_sessions_it_rests_on():
+    table = pd.DataFrame(
+        [
+            {"n_sessions_all": 218.0, "n_sessions_omitted": 11.0},
+            {"n_sessions_all": 216.0, "n_sessions_omitted": 13.0},
+        ]
+    )
+
+    note = _stratum_power_note(table, ["all", "omitted"])
+
+    assert "`all` 216-218" in note
+    assert "`omitted` 11-13" in note
+    assert "not population evidence" in note
+
+
+def test_a_missing_label_renders_as_an_em_dash_not_the_string_nan():
+    """An outer join leaves NaN in label columns; "nan" reads as a value."""
+    frame = pd.DataFrame([{"se_source_after": np.nan, "n_sessions_after": np.nan}])
+
+    rendered = _md(frame)
+
+    assert "nan" not in rendered
+    assert rendered.count("—") == 2
