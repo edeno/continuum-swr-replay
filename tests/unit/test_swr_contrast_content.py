@@ -292,7 +292,8 @@ def test_per_sd_scale_is_frozen_over_the_full_cohort(stratum):
         ev.copy(), pt.copy(), outcome_stratum=stratum
     )
 
-    assert scale["support"] == "fit_cohort_all_rows"
+    assert scale["arm_cohort_support"] == "leaf_arms"
+    assert scale["patch_cohort_support"] == "fit_cohort_all_rows"
     assert set(scale["arm_cohort"]) == {
         "reward_belief_mean_candidate_arm_preoutcome",
         "reward_fraction_candidate_arm_last10_visits",
@@ -321,6 +322,40 @@ def test_per_sd_scale_survives_the_smoke_subset():
 
     assert smoke_scale == full_scale
     assert set(smoke_ev["event_id"]) == {0, 1, 2, 3}
+
+
+def test_per_sd_scale_ignores_trunk_arms():
+    """The per-SD unit is the spread on the leaf arms the rescaled rungs are fit on.
+
+    Every raw per-arm covariate the aggregation rescales is a structural zero on the
+    three trunk arms, so trunk rows contribute a spread the fitted rows never see.
+    """
+    ev, pt = _outcome_split_cohorts()
+    leaf_sd = float(
+        np.nanstd(ev["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(float))
+    )
+    # Same events, but each also carries a trunk row with a wildly different value.
+    trunk = ev.copy()
+    trunk["candidate_arm"] = 6
+    trunk["reward_belief_mean_candidate_arm_preoutcome"] = 100.0
+    trunk["reward_fraction_candidate_arm_last10_visits"] = 100.0
+    with_trunks = pd.concat([ev, trunk], ignore_index=True)
+    all_rows_sd = float(
+        np.nanstd(
+            with_trunks["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(float)
+        )
+    )
+    assert all_rows_sd > 10 * leaf_sd
+
+    _, _, scale, _ = mod.prepare_cohorts(with_trunks, pt.copy(), outcome_stratum="all")
+
+    assert scale["arm_cohort_support"] == "leaf_arms"
+    assert scale["arm_cohort"][
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ] == pytest.approx(leaf_sd)
+    assert scale["arm_cohort"][
+        "reward_fraction_candidate_arm_last10_visits"
+    ] == pytest.approx(leaf_sd)
 
 
 def test_provenance_records_the_frozen_per_sd_scale():

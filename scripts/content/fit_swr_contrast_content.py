@@ -294,6 +294,28 @@ _ARM_SD_TERMS = (
 )
 _PATCH_SD_TERMS: tuple[str, ...] = ()
 
+# Row support for the per-arm SD unit. Every one of ``_ARM_SD_TERMS`` is a
+# leaf-derived belief/reward quantity that is a STRUCTURAL ZERO on the three trunk
+# arms, and the rungs that carry them are fitted on the leaves (see
+# ``LEAF_ONLY_CONTRAST_RUNGS``). Taking the SD over all nine candidates therefore
+# states the effect per SD of a spread the fitted rows never see -- measured on the
+# canonical cohort, the trunk zeros inflate the arm-value SD by 2.1x, which would
+# shrink every per-SD value effect by the same factor.
+_ARM_SD_SUPPORT_LABEL = "leaf_arms"
+_PATCH_SD_SUPPORT_LABEL = _FIT_SUPPORT_LABEL
+
+
+def _leaf_arm_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """The six leaf-arm rows of an arm cohort; the trunks carry structural zeros."""
+    if "candidate_arm" not in frame.columns:
+        raise KeyError(
+            "arm cohort has no 'candidate_arm' column; the per-SD unit cannot be "
+            "restricted to the leaf arms it is read on"
+        )
+    return frame[
+        pd.to_numeric(frame["candidate_arm"], errors="coerce") < LEAF_ONLY_N_CATEGORIES
+    ]
+
 
 def _sd_reference(frame: pd.DataFrame, cols) -> dict:
     """Pooled SD of each raw covariate present in ``frame`` (the per-SD unit)."""
@@ -330,12 +352,17 @@ def prepare_cohorts(
     Returns
     -------
     (ev, pt, scale, stratum_audit)
-        The selected cohorts, the frozen per-SD scales (with their support label),
-        and the outcome-stratum event counts.
+        The selected cohorts, the frozen per-SD scales (each with the row support it
+        was taken over -- ``leaf_arms`` for the arm cohort), and the outcome-stratum
+        event counts.
     """
     scale = {
-        "support": _FIT_SUPPORT_LABEL,
-        "arm_cohort": _sd_reference(ev, _ARM_SD_TERMS),
+        # Support is recorded per cohort because they differ: the arm SDs are taken
+        # over the leaf arms only (the trunks are structural zeros for every term the
+        # aggregation rescales), the patch SDs over all rows.
+        "arm_cohort_support": _ARM_SD_SUPPORT_LABEL,
+        "arm_cohort": _sd_reference(_leaf_arm_rows(ev), _ARM_SD_TERMS),
+        "patch_cohort_support": _PATCH_SD_SUPPORT_LABEL,
         "patch_cohort": _sd_reference(pt, _PATCH_SD_TERMS),
     }
     ev, stratum_audit = select_outcome_stratum(ev, outcome_stratum)
