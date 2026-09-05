@@ -490,12 +490,16 @@ formal SWR-vs-non-SWR difference.
 | `CS2_prev` | `swr_x_is_prev_arm` | pooled | that term |
 | `CS3_lastrew` | `is_last_rewarded_noncurrent_arm` + its `swr_x_` | pooled | `swr_x_is_last_rewarded_noncurrent_arm` |
 | `CS4_armreward` | `reward_fraction_candidate_arm_last10_visits` + its `swr_x_` | pooled | `swr_x_reward_fraction_candidate_arm_last10_visits` |
+| `CS4nt_armreward` | on `BASEc_NT`: `CS4` terms | pooled | `swr_x_reward_fraction_candidate_arm_last10_visits` |
 | `CS5_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` + its `swr_x_` | pooled | `swr_x_reward_belief_mean_candidate_arm_preoutcome` |
+| `CS5nt_armvalue` | on `BASEc_NT`: `CS5` terms | pooled | `swr_x_reward_belief_mean_candidate_arm_preoutcome` |
 | `CS5b_valuevsprevgoal` | `CS5` + `is_last_rewarded_noncurrent_arm` + its `swr_x_` | pooled | `swr_x_reward_belief_mean_candidate_arm_preoutcome` |
 | `CS6_armuncert` | `reward_belief_variance_candidate_arm_preoutcome_z` + its `swr_x_` | pooled | `swr_x_reward_belief_variance_candidate_arm_preoutcome_z` |
+| `CS6nt_armuncert` | on `BASEc_NT`: `CS6` terms | pooled | `swr_x_reward_belief_variance_candidate_arm_preoutcome_z` |
 
 **Leaf-only rungs.** `C4_armvalue`, `C13_armuncert`, `CS5_armvalue`,
-`CS5b_valuevsprevgoal` and `CS6_armuncert` condition on the six leaf arms
+`CS5b_valuevsprevgoal`, `CS6_armuncert` and the `CS5nt`/`CS6nt` twins condition
+on the six leaf arms
 (`LEAF_ONLY_CONTRAST_RUNGS`): their belief covariates are structural zeros on the
 trunks, `is_candidate_arm_6/7` become identically zero, and the fraction response
 is renormalised to unit mass over the leaves so an SWR event is not downweighted

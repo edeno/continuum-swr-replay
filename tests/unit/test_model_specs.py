@@ -205,13 +205,16 @@ _PATCH_CONTROLS = (
 )
 
 
+_NT_TWIN = re.compile(r"^CP?S\d+nt_")
+
+
 def _rungs_built_on(ladder: dict, base: list[str]) -> dict[str, list[str]]:
     """Ladder rungs whose predictors extend ``base`` (the spatial-baseline rungs
     C0/C1 do not, and the ``nt`` twins are the deliberately uncontrolled ones)."""
     return {
         name: preds
         for name, (preds, _scope) in ladder.items()
-        if set(base) <= set(preds) and not name.endswith("nt_current")
+        if set(base) <= set(preds) and not _NT_TWIN.match(name)
     }
 
 
@@ -243,6 +246,48 @@ def test_uncontrolled_twins_keep_the_base_without_the_controls() -> None:
         assert control not in arm_nt
     for control in _PATCH_CONTROLS:
         assert control not in patch_nt
+
+
+def test_every_nt_twin_mirrors_its_controlled_rung() -> None:
+    """Each ``nt`` twin swaps ``BASEc``/``BASEc_PATCH`` for the uncontrolled base
+    and is otherwise term-for-term its controlled rung: same added terms, same
+    scope, same key term, same leaf-only membership. That is what makes the pair
+    a length-adjusted (direct) vs total SWR-effect contrast rather than two
+    unrelated fits."""
+    ladders = (
+        (
+            ms.SWR_CONTRAST_CONTENT_ARM_LADDER,
+            ms.SWR_CONTRAST_CONTENT_ARM_KEY_TERM,
+            ms.BASEc,
+            ms.BASEc_NT,
+            _ARM_CONTROLS,
+        ),
+        (
+            ms.SWR_CONTRAST_CONTENT_PATCH_LADDER,
+            ms.SWR_CONTRAST_CONTENT_PATCH_KEY_TERM,
+            ms.BASEc_PATCH,
+            ms.BASEc_PATCH_NT,
+            _PATCH_CONTROLS,
+        ),
+    )
+    seen = 0
+    for ladder, key_term, base, base_nt, controls in ladders:
+        for name, (preds, scope) in ladder.items():
+            if not _NT_TWIN.match(name):
+                continue
+            seen += 1
+            twin_of = name.replace("nt_", "_", 1)
+            assert twin_of in ladder, f"{name} has no controlled rung {twin_of}"
+            base_preds, base_scope = ladder[twin_of]
+            assert preds == [*base_nt, *[p for p in base_preds if p not in base]]
+            assert scope == base_scope
+            assert key_term[name] == key_term[twin_of]
+            assert (name in ms.LEAF_ONLY_CONTRAST_RUNGS) == (
+                twin_of in ms.LEAF_ONLY_CONTRAST_RUNGS
+            )
+            for control in controls:
+                assert control not in preds
+    assert seen == 5
 
 
 def test_base_minus_the_controls_is_the_uncontrolled_base() -> None:

@@ -1212,8 +1212,15 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # CS1 inherits the within-stop-time and event-length current-arm interactions
     # from BASEc UNCONDITIONALLY, so ``swr_x_is_current_arm`` is the SWR-specific
     # current-arm effect BEYOND the general time course and BEYOND event length
-    # (SWR and non-SWR events differ in both). CS1nt is the uncontrolled
-    # sensitivity twin; both report the same canonical interaction term.
+    # (SWR and non-SWR events differ in both).
+    #
+    # ESTIMAND. ``n_nonlocal_bins`` is post-treatment with respect to ``is_swr``
+    # (SWR events run ~1.7x longer), so conditioning on it is a post-treatment
+    # adjustment and length may be a mediator (SWR -> longer replay -> leaves the
+    # current arm). Every ``swr_x_`` coefficient on a BASEc rung is therefore the
+    # LENGTH-ADJUSTED (DIRECT) SWR effect; the ``nt`` twin, fitted on BASEc_NT,
+    # holds the TOTAL SWR effect. Both are shipped and are reported side by side;
+    # neither supersedes the other.
     "CS1_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
     "CS1nt_current": ([*BASEc_NT, "swr_x_is_current_arm"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
@@ -1233,9 +1240,25 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
         ],
         "pooled",
     ),
+    "CS4nt_armreward": (
+        [
+            *BASEc_NT,
+            "reward_fraction_candidate_arm_last10_visits",
+            "swr_x_reward_fraction_candidate_arm_last10_visits",
+        ],
+        "pooled",
+    ),
     "CS5_armvalue": (
         [
             *BASEc,
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+        ],
+        "pooled",
+    ),
+    "CS5nt_armvalue": (
+        [
+            *BASEc_NT,
             "reward_belief_mean_candidate_arm_preoutcome",
             "swr_x_reward_belief_mean_candidate_arm_preoutcome",
         ],
@@ -1275,6 +1298,14 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
         ],
         "pooled",
     ),
+    "CS6nt_armuncert": (
+        [
+            *BASEc_NT,
+            "reward_belief_variance_candidate_arm_preoutcome_z",
+            "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+        ],
+        "pooled",
+    ),
 }
 SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "C1_current": "is_current_arm",
@@ -1294,10 +1325,13 @@ SWR_CONTRAST_CONTENT_ARM_KEY_TERM = {
     "CS2_prev": "swr_x_is_prev_arm",
     "CS3_lastrew": "swr_x_is_last_rewarded_noncurrent_arm",
     "CS4_armreward": "swr_x_reward_fraction_candidate_arm_last10_visits",
+    "CS4nt_armreward": "swr_x_reward_fraction_candidate_arm_last10_visits",
     "CS5_armvalue": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "CS5nt_armvalue": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
     "CS5b_valuevsprevgoal": "swr_x_reward_belief_mean_candidate_arm_preoutcome",
     "C13_armuncert": "reward_belief_variance_candidate_arm_preoutcome_z",
     "CS6_armuncert": "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+    "CS6nt_armuncert": "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
 }
 BASEc_PATCH_NT = [
     "is_current_patch",
@@ -1390,8 +1424,10 @@ LEAF_ONLY_CONTRAST_RUNGS = frozenset(
         "C4_armvalue",
         "C13_armuncert",
         "CS5_armvalue",
+        "CS5nt_armvalue",
         "CS5b_valuevsprevgoal",
         "CS6_armuncert",
+        "CS6nt_armuncert",
     }
 )
 LEAF_ONLY_N_CATEGORIES = 6
