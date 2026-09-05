@@ -5,12 +5,15 @@ per 1 SD of predictor" and comparable across predictors. For these Poisson /
 conditional-Poisson GLMs the standardized coefficient equals ``raw_coef * SD(x)``
 exactly, so the persisted SD reference also documents how to convert a raw fit.
 
-This is the **persisted-table** `_z` (means/SDs over a documented scientific
-support in the full materialized table),
-folded into the owning builders (event_arm side in ``prepare_data``, qvals side in
-``qvals_table``) so a clean rebuild carries them. It is deliberately NOT the fit-time
-`_z` the is_swr-contrast runners compute over their event/stop cohort — those are a
-different scope and must not be repointed here.
+One function, two supports. The **persisted-table** `_z` (means/SDs over a
+documented scientific support in the full materialized table) is folded into the
+owning builders (event_arm side in ``prepare_data``, qvals side in ``qvals_table``)
+so a clean rebuild carries them. The **fit-cohort** `_z` the is_swr-contrast runners
+compute over their event/stop cohort goes through the same entry point with
+``support_label="fit_cohort_all_rows"``. The two are different scopes with different
+moments: a fit-cohort reference must never be applied as if it were the table's, and
+a consumer states which support it requires (see
+:func:`assert_standardized_matches_reference`).
 
 The reference (``{col: {"mean": ..., "std": ..., "support": ...,
 "n_reference_rows": ...}}``) is persisted next to each table so both the transform

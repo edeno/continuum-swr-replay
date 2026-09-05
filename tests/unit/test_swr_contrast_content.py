@@ -16,6 +16,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.model_specs import (
+    SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (
+    SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
+)
 from continuum_swr_replay.analysis.replay.standardization import attach_standardized
 from scripts.content import fit_swr_contrast_content as mod
 
@@ -245,3 +251,164 @@ def test_artifact_suffix_records_smoke_response_and_stratum(
         max_per_animal=max_per_animal, response=response, outcome_stratum=stratum
     )
     assert mod._artifact_suffix(args) == expected
+
+
+# --- Cohort-wide per-SD scales -------------------------------------------------
+
+
+def _outcome_split_cohorts() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Arm/patch cohorts whose rewarded and omitted events have different spreads."""
+    rewarded_value = [0.50, 0.52, 0.48, 0.51]  # tight
+    omitted_value = [0.10, 0.90, 0.20, 0.80]  # wide
+    outcome = [1.0] * 4 + [0.0] * 4 + [np.nan]
+    value = rewarded_value + omitted_value + [0.5]
+    n_events, n_arms = 9, 2
+    ev = pd.DataFrame(
+        {
+            "animal": ["a"] * n_events * n_arms,
+            "session_date": [1] * n_events * n_arms,
+            "epoch": ["01_r1"] * n_events * n_arms,
+            "event_id": np.repeat(np.arange(n_events), n_arms),
+            "candidate_arm": np.tile([0, 1], n_events),
+            "is_swr": np.repeat([True, False] * 5, n_arms)[: n_events * n_arms],
+            "is_rewarded_outcome": np.repeat(outcome, n_arms),
+            "reward_belief_mean_candidate_arm_preoutcome": np.repeat(value, n_arms),
+            "reward_fraction_candidate_arm_last10_visits": np.repeat(value, n_arms),
+        }
+    )
+    pt = ev.loc[:, ["animal", "session_date", "epoch", "event_id"]].copy()
+    return ev, pt
+
+
+@pytest.mark.parametrize("stratum", ["all", "rewarded", "omitted"])
+def test_per_sd_scale_is_frozen_over_the_full_cohort(stratum):
+    """A stratified refit must report per-SD effects in the pooled cohort's unit."""
+    ev, pt = _outcome_split_cohorts()
+    full_sd = float(
+        np.nanstd(ev["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(float))
+    )
+
+    selected, _selected_pt, scale, _audit = mod.prepare_cohorts(
+        ev.copy(), pt.copy(), outcome_stratum=stratum
+    )
+
+    assert scale["support"] == "fit_cohort_all_rows"
+    assert set(scale["arm_cohort"]) == {
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "reward_fraction_candidate_arm_last10_visits",
+    }
+    assert scale["arm_cohort"]["reward_belief_mean_candidate_arm_preoutcome"] == full_sd
+    assert scale["patch_cohort"] == {}
+    # The stratum really does have a different spread -- so computing the scale
+    # after the filter (the bug this pins) would have changed the unit.
+    stratum_sd = float(
+        np.nanstd(
+            selected["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(float)
+        )
+    )
+    if stratum != "all":
+        assert stratum_sd != pytest.approx(full_sd)
+
+
+def test_per_sd_scale_survives_the_smoke_subset():
+    ev, pt = _outcome_split_cohorts()
+    _, _, full_scale, _ = mod.prepare_cohorts(
+        ev.copy(), pt.copy(), outcome_stratum="all"
+    )
+    smoke_ev, _, smoke_scale, _ = mod.prepare_cohorts(
+        ev.copy(), pt.copy(), outcome_stratum="rewarded", max_per_animal=1
+    )
+
+    assert smoke_scale == full_scale
+    assert set(smoke_ev["event_id"]) == {0, 1, 2, 3}
+
+
+def test_provenance_records_the_frozen_per_sd_scale():
+    import argparse
+
+    ev, pt = _outcome_split_cohorts()
+    _, _, scale, audit = mod.prepare_cohorts(ev, pt, outcome_stratum="rewarded")
+    prov = mod._provenance(
+        argparse.Namespace(
+            max_per_animal=None, response="fraction", outcome_stratum="rewarded"
+        ),
+        n_sessions=1,
+        outcome_stratum_audit=audit,
+        per_sd_scale=scale,
+    )
+
+    assert prov["per_sd_scale"] == scale
+    assert prov["outcome_stratum"] == "rewarded"
+    assert prov["outcome_stratum_audit"]["n_events_kept"] == 4
+
+
+# --- Ladder/design name agreement ---------------------------------------------
+
+# The interaction products the runner materializes. Spelled out here independently
+# of both the assemblers and the ladders, so a rename on either side fails: the
+# runner must build every one of these, and the ladders must reference only these
+# plus columns the canonical tables supply.
+_RUNNER_BUILT_ARM_PRODUCTS = (
+    "rpe_postoutcome_z_x_is_current_arm",
+    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+    "periswitch_index_trials_z_x_is_current_arm",
+    "is_periswitch_post_x_is_current_arm",
+    "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
+    "trials_since_block_change_z_x_is_current_arm",
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+    "log1p_time_since_stop_start_s_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_prev_arm",
+    "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+)
+_RUNNER_BUILT_PATCH_PRODUCTS = (
+    "periswitch_index_trials_z_x_is_current_patch",
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
+    "log1p_time_since_stop_start_s_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_prev_patch",
+    "swr_x_is_current_patch",
+)
+
+
+def _ladder_predictors(ladder: dict) -> set[str]:
+    return {p for preds, _scope in ladder.values() for p in preds}
+
+
+@pytest.mark.parametrize(
+    ("helper", "frame_name", "ladder", "built"),
+    [
+        (
+            "_attach_arm_design_columns",
+            "arm_frame",
+            ARM_LADDER,
+            _RUNNER_BUILT_ARM_PRODUCTS,
+        ),
+        (
+            "_attach_patch_design_columns",
+            "patch_frame",
+            PATCH_LADDER,
+            _RUNNER_BUILT_PATCH_PRODUCTS,
+        ),
+    ],
+)
+def test_every_ladder_predictor_reaches_the_assembled_design(
+    helper, frame_name, ladder, built, request
+):
+    """A product renamed on one side would empty a rung through a silent skip."""
+    frame = request.getfixturevalue(frame_name).copy()
+    predictors = _ladder_predictors(ladder)
+    # Seed only what a canonical table supplies; the runner must build the rest.
+    for column in sorted(predictors - set(built)):
+        if column not in frame.columns:
+            frame[column] = 0.0
+    assert not set(built) & set(frame.columns), "a product was seeded, not built"
+
+    designed, _reference = getattr(mod, helper)(frame)
+
+    assert set(built) <= set(designed.columns)
+    missing = predictors - set(designed.columns)
+    assert not missing, f"ladder predictors absent from the design: {sorted(missing)}"

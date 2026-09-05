@@ -281,6 +281,76 @@ def _artifact_suffix(args: argparse.Namespace) -> str:
     return smoke + response + stratum
 
 
+# Raw-scale per-arm covariates whose coefficients the aggregation restates per SD
+# (``aggregate_contrast``'s ``std_factor``). Their SDs are frozen over the FULL
+# assembled cohort, like the ``_z`` reference, so a stratified refit reports effects
+# in the same unit as the pooled one. The patch ladder's key terms are all binary or
+# already standardized, so it has no raw-scale term to rescale.
+_ARM_SD_TERMS = (
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_fraction_candidate_arm_last10_visits",
+    "task_reward_probability_candidate_arm",
+)
+_PATCH_SD_TERMS: tuple[str, ...] = ()
+
+
+def _sd_reference(frame: pd.DataFrame, cols) -> dict:
+    """Pooled SD of each raw covariate present in ``frame`` (the per-SD unit)."""
+    return {
+        c: float(np.nanstd(frame[c].to_numpy(dtype=float)))
+        for c in cols
+        if c in frame.columns
+    }
+
+
+def prepare_cohorts(
+    ev: pd.DataFrame,
+    pt: pd.DataFrame,
+    *,
+    outcome_stratum: str,
+    max_per_animal: int | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
+    """Freeze the cohort-wide per-SD scales, then apply the stratum and smoke subset.
+
+    Order is load-bearing: the SDs (like the ``_z`` reference the assemblers
+    return) are estimated on the FULL cohorts, so the ``rewarded`` and ``omitted``
+    refits state their per-SD effects in the same unit as the pooled fit instead of
+    each rescaling to its own stratum.
+
+    Parameters
+    ----------
+    ev, pt : pandas.DataFrame
+        The fully assembled arm and patch cohorts.
+    outcome_stratum : {"all", "rewarded", "omitted"}
+        Current-outcome stratum to fit.
+    max_per_animal : int, optional
+        Smoke subset: keep the first N sessions per animal.
+
+    Returns
+    -------
+    (ev, pt, scale, stratum_audit)
+        The selected cohorts, the frozen per-SD scales (with their support label),
+        and the outcome-stratum event counts.
+    """
+    scale = {
+        "support": _FIT_SUPPORT_LABEL,
+        "arm_cohort": _sd_reference(ev, _ARM_SD_TERMS),
+        "patch_cohort": _sd_reference(pt, _PATCH_SD_TERMS),
+    }
+    ev, stratum_audit = select_outcome_stratum(ev, outcome_stratum)
+    if outcome_stratum != "all":
+        # One stratum, one event set: the patch cohort follows the arm cohort's
+        # events rather than re-deriving the outcome on patch rows.
+        pt = pt[pt["event_id"].isin(set(ev["event_id"]))]
+    if max_per_animal is not None:
+        keep = (
+            ev[SC].drop_duplicates().groupby("animal", sort=False).head(max_per_animal)
+        )
+        ev = ev.merge(keep, on=SC)
+        pt = pt.merge(keep, on=SC)
+    return ev, pt, scale, stratum_audit
+
+
 def _assemble_arm() -> tuple[pd.DataFrame, dict]:
     """Load the arm cohort and attach its design columns and ``_z`` reference."""
     ev = read_table(FIT_INPUTS["event_arm_table"])
@@ -710,6 +780,7 @@ def _provenance(
     n_sessions: int,
     z_reference: dict | None = None,
     outcome_stratum_audit: dict | None = None,
+    per_sd_scale: dict | None = None,
 ) -> dict:
     """Reproducibility record saved alongside the audited results."""
     try:
@@ -730,6 +801,9 @@ def _provenance(
         # events had no known outcome and were therefore in neither stratum.
         "outcome_stratum": args.outcome_stratum,
         "outcome_stratum_audit": outcome_stratum_audit or {},
+        # Per-SD units the audited table's standardized effects are stated in.
+        # Frozen over the full cohort, so they do not move between strata.
+        "per_sd_scale": per_sd_scale or {},
         "inference": "per-session conditional Poisson; across-session Wilcoxon "
         "signed-rank across sessions is DESCRIPTIVE only (sessions within an animal "
         "are not independent); primary population evidence is per-animal sign "
@@ -820,11 +894,12 @@ def main() -> None:
         )
     logger.info("response = %s / %s (%s)", arm_response, patch_response, estimator)
     fit_z_reference = {"arm_cohort": arm_z_reference, "patch_cohort": patch_z_reference}
-    ev, stratum_audit = select_outcome_stratum(ev, args.outcome_stratum)
-    if args.outcome_stratum != "all":
-        # One stratum, one event set: the patch cohort follows the arm cohort's
-        # events rather than re-deriving the outcome on patch rows.
-        pt = pt[pt["event_id"].isin(set(ev["event_id"]))]
+    ev, pt, per_sd_scale, stratum_audit = prepare_cohorts(
+        ev,
+        pt,
+        outcome_stratum=args.outcome_stratum,
+        max_per_animal=args.max_per_animal,
+    )
     logger.info(
         "outcome stratum %s: %d of %d events kept; %d excluded for an unknown "
         "outcome (%d SWR / %d non-SWR)",
@@ -835,15 +910,6 @@ def main() -> None:
         stratum_audit["n_events_unknown_outcome_swr"],
         stratum_audit["n_events_unknown_outcome_non_swr"],
     )
-    if args.max_per_animal is not None:
-        keep = (
-            ev[SC]
-            .drop_duplicates()
-            .groupby("animal", sort=False)
-            .head(args.max_per_animal)
-        )
-        ev = ev.merge(keep, on=SC)
-        pt = pt.merge(keep, on=SC)
 
     logger.info(
         "ARM ladder: %d rows, %d events, %d sessions",
@@ -896,23 +962,27 @@ def main() -> None:
 
     # Audited aggregation: SE, per-session significance, per-animal sign, signed-rank
     # p, BH-FDR across the rung family, and standardized (per-SD) effect sizes — plus a
-    # provenance sidecar. SDs are the global (pooled) SD of the raw per-arm covariates.
-    sd_arm = {
-        c: float(np.nanstd(ev[c].to_numpy(dtype=float)))
-        for c in ("reward_belief_mean_candidate_arm_preoutcome", "reward_fraction_candidate_arm_last10_visits", "task_reward_probability_candidate_arm")
-        if c in ev.columns
-    }
+    # provenance sidecar. The per-SD units are the pooled SDs frozen over the full
+    # cohort by prepare_cohorts, so a stratified refit is on the pooled unit.
     agg = pd.concat(
         [
-            _aggregate(arm, ARM_LADDER, ARM_KEY_TERM, "candidate_arm", sd_arm),
-            _aggregate(patch, PATCH_LADDER, PATCH_KEY_TERM, "patch", {}),
+            _aggregate(
+                arm, ARM_LADDER, ARM_KEY_TERM, "candidate_arm",
+                per_sd_scale["arm_cohort"],
+            ),
+            _aggregate(
+                patch, PATCH_LADDER, PATCH_KEY_TERM, "patch",
+                per_sd_scale["patch_cohort"],
+            ),
         ],
         ignore_index=True,
     )
     audited_path = RC / "models" / f"swr_contrast_content_audited{sfx}.pkl"
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv)
-    prov = _provenance(args, ev.groupby(SC).ngroups, fit_z_reference, stratum_audit)
+    prov = _provenance(
+        args, ev.groupby(SC).ngroups, fit_z_reference, stratum_audit, per_sd_scale
+    )
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)
     )
