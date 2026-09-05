@@ -577,7 +577,12 @@ def _fit_session(
     # Split NaN-dropped events into the qvals gap (mechanism B) vs own-predictor
     # missingness (mechanism A), qvals taking priority so the buckets stay disjoint.
     qvals_preds = [c for c in predictors if c in QVALS_GAP_COLS]
-    other_cols = [c for c in (response_col, *predictors) if c not in QVALS_GAP_COLS]
+    # The response is not a predictor. An event whose response is undefined --
+    # every candidate NaN, which is what a leaf-only event with no leaf mass
+    # renormalizes to -- has no allocation to fit, and that is a response drop,
+    # not predictor missingness. Keeping it out of this split books it under
+    # n_drop_zero_response below, as the ladder's cohort audit does.
+    other_cols = [c for c in predictors if c not in QVALS_GAP_COLS]
     qvals_nan = (
         set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"]) if qvals_preds else set()
     )
@@ -591,8 +596,14 @@ def _fit_session(
     # Preserve the full candidate set within every retained event (row-wise NaN drops
     # would shrink an event's arm/patch set and desync it from the null's n_categories).
     surv = g[~g["event_id"].isin(dropped_events)]
-    totals = surv.groupby("event_id")[response_col].sum()
-    zero_events = set(totals[totals == 0].index)
+    # skipna=False: an event missing the response on any candidate has no
+    # defined allocation, and fitting the candidates it does have would shrink
+    # its candidate set out of step with the null's n_categories. Undefined and
+    # empty allocations are the same drop -- there is nothing to fit.
+    totals = surv.groupby("event_id")[response_col].agg(
+        lambda values: values.sum(skipna=False)
+    )
+    zero_events = set(totals[totals.isna() | totals.le(0)].index)
     n_zero = len(zero_events)
     surv = surv[~surv["event_id"].isin(zero_events)]
     n_surv = int(surv["event_id"].nunique())
@@ -792,12 +803,39 @@ def _aggregate(
     return aggregate_contrast(res, specs_from_ladder(ladder, key_term), level, sd)
 
 
+def _renormalized_rungs(*results: pd.DataFrame) -> list[str]:
+    """Rung names whose fitted rows were produced on a rescaled response.
+
+    Read off the rows that were actually fitted rather than off the leaf-only
+    rung set, so a run that skipped or never requested a rung cannot claim it.
+
+    Parameters
+    ----------
+    *results : pd.DataFrame
+        Per-session result frames carrying ``model`` and, where the fit rescaled
+        its response to the fitted candidate set, ``response_renormalized``.
+
+    Returns
+    -------
+    list of str
+        Sorted rung names, empty when no fitted row was rescaled.
+    """
+    names: set[str] = set()
+    for res in results:
+        if res.empty or "response_renormalized" not in res.columns:
+            continue
+        rescaled = res["response_renormalized"].fillna(False).astype(bool)
+        names |= set(res.loc[rescaled, "model"])
+    return sorted(names)
+
+
 def _provenance(
     args: argparse.Namespace,
     n_sessions: int,
     z_reference: dict | None = None,
     outcome_stratum_audit: dict | None = None,
     per_sd_scale: dict | None = None,
+    renormalized_rungs: list[str] | None = None,
 ) -> dict:
     """Reproducibility record saved alongside the audited results."""
     try:
@@ -826,12 +864,11 @@ def _provenance(
         "are not independent); primary population evidence is per-animal sign "
         "consistency (n_animals_pos / n_animals, n=5). BH-FDR across the rung family "
         "per population is applied to the descriptive session signed-rank p.",
-        # Leaf-only rungs condition on the six leaf arms, so on the fraction
-        # response their allocation is rescaled to unit mass over those six;
-        # every other rung is fit on the table's own nine-arm fractions.
-        "response_renormalized_rungs": (
-            sorted(LEAF_ONLY_CONTRAST_RUNGS) if args.response == "fraction" else []
-        ),
+        # Rungs whose fitted rows were produced on a response rescaled to the
+        # candidate set they conditioned on (the leaf-only rungs, on the
+        # fraction response). Read off the rows that were fitted, so a rung that
+        # produced none is not named here.
+        "response_renormalized_rungs": list(renormalized_rungs or []),
         "q_arm_source": (
             "beta-bernoulli per-arm value "
             "(reward_belief_mean_candidate_arm_preoutcome)"
@@ -1004,7 +1041,12 @@ def main() -> None:
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv)
     prov = _provenance(
-        args, ev.groupby(SC).ngroups, fit_z_reference, stratum_audit, per_sd_scale
+        args,
+        ev.groupby(SC).ngroups,
+        fit_z_reference,
+        stratum_audit,
+        per_sd_scale,
+        _renormalized_rungs(arm, patch),
     )
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)

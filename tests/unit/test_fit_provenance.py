@@ -86,6 +86,34 @@ def test_sidecar_records_the_sha256_of_every_input_file(fit_dir, inputs):
         assert record["inputs"][name]["covariate_schema_version"] == "v9"
 
 
+def test_sidecar_records_extra_facts_about_how_the_fit_was_produced(fit_dir, inputs):
+    """A runner can state a fit-shaping fact the standard fields cannot carry."""
+    sidecar = write_fit_provenance(
+        fit_dir / "all_models.pkl",
+        inputs,
+        "conditional_poisson_fraction",
+        ["fit.py", "--leaf-only"],
+        extra={"response_renormalized": True},
+    )
+
+    record = json.loads(sidecar.read_text())
+    assert record["response_renormalized"] is True
+    assert record["estimator"] == "conditional_poisson_fraction"
+
+
+def test_sidecar_refuses_extras_that_would_overwrite_its_own_fields(fit_dir, inputs):
+    """Silently replacing the estimator or the input hashes would falsify it."""
+    with pytest.raises(ValueError, match="estimator"):
+        write_fit_provenance(
+            fit_dir / "all_models.pkl",
+            inputs,
+            "poisson_glm",
+            ["fit.py"],
+            extra={"estimator": "something_else", "response_renormalized": True},
+        )
+    assert not fit_provenance_path(fit_dir / "all_models.pkl").exists()
+
+
 def test_sidecar_hashes_the_parquet_a_pkl_path_resolves_to(fit_dir, inputs):
     """``read_table`` reads the parquet sibling, so the parquet is what is hashed."""
     (fit_dir / "stop_table.pkl").write_bytes(b"a stale pickle nobody reads")

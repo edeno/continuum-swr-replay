@@ -526,24 +526,81 @@ def test_leaf_only_count_rungs_keep_their_timebin_counts(monkeypatch):
     assert np.array_equal(leaf["arm_count_hard"].to_numpy(), expected)
 
 
-def test_provenance_names_the_rungs_whose_response_was_rescaled():
+def test_provenance_names_only_the_rescaled_rungs_that_produced_rows():
+    """A rung nothing was fitted for cannot be claimed as rescaled."""
     import argparse
 
-    from continuum_swr_replay.analysis.replay.model_specs import (
-        LEAF_ONLY_CONTRAST_RUNGS,
+    fitted = pd.DataFrame(
+        {
+            "model": ["C4_armvalue", "C4_armvalue", "C1_nine_arm"],
+            "response_renormalized": [True, True, False],
+        }
+    )
+    empty = pd.DataFrame(columns=["model", "response_renormalized"])
+
+    assert mod._renormalized_rungs(fitted, empty) == ["C4_armvalue"]
+    assert mod._renormalized_rungs(empty) == []
+    # A count run rescales nothing, so nothing is named.
+    counts = fitted.assign(response_renormalized=False)
+    assert mod._renormalized_rungs(counts) == []
+
+    args = argparse.Namespace(
+        max_per_animal=None, response="fraction", outcome_stratum="all"
+    )
+    prov = mod._provenance(
+        args, n_sessions=1, renormalized_rungs=mod._renormalized_rungs(fitted)
+    )
+    assert prov["response_renormalized_rungs"] == ["C4_armvalue"]
+    assert mod._provenance(args, n_sessions=1)["response_renormalized_rungs"] == []
+
+
+def _leaf_session_with_a_trunk_only_event(n_events: int = 20) -> pd.DataFrame:
+    """One session; event ``e0`` spends its whole allocation on the trunks."""
+    rows = []
+    for index in range(n_events):
+        event = f"e{index}"
+        current = index % 6
+        counts = np.zeros(9)
+        if index == 0:
+            counts[6] = 8.0
+        else:
+            counts[current] = 6.0
+            counts[(current + 1) % 6] = 2.0
+        for arm in range(9):
+            rows.append(
+                {
+                    "animal": "chimi",
+                    "session_date": "20200212",
+                    "epoch": "02_r1",
+                    "event_id": event,
+                    "candidate_arm": arm,
+                    "arm_fraction": counts[arm] / counts.sum(),
+                    "is_current_arm": float(arm == current),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_event_left_without_leaf_mass_is_audited_as_a_response_drop():
+    """Its response is undefined, not its predictors; the mechanism must say so."""
+    session = _leaf_session_with_a_trunk_only_event()
+    leaves = mod.renormalize_fraction_over_candidates(
+        session[session["candidate_arm"] < 6], response_col="arm_fraction"
     )
 
-    def _args(response: str) -> argparse.Namespace:
-        return argparse.Namespace(
-            max_per_animal=None, response=response, outcome_stratum="all"
-        )
-
-    assert mod._provenance(_args("fraction"), n_sessions=1)[
-        "response_renormalized_rungs"
-    ] == sorted(LEAF_ONLY_CONTRAST_RUNGS)
-    assert (
-        mod._provenance(_args("hard_count"), n_sessions=1)[
-            "response_renormalized_rungs"
-        ]
-        == []
+    result, audit = mod._fit_session(
+        leaves, ["is_current_arm"], response_col="arm_fraction", n_categories=6
     )
+
+    assert audit["n_drop_zero_response"] == 1
+    assert audit["n_drop_own_predictor_missing"] == 0
+    assert audit["n_drop_qvals_gap"] == 0
+    assert audit["n_modeled"] == 19
+    assert result is not None
+    drops = (
+        audit["n_drop_qvals_gap"]
+        + audit["n_drop_own_predictor_missing"]
+        + audit["n_drop_zero_response"]
+        + audit["n_excluded_session"]
+    )
+    assert audit["n_in"] - drops == audit["n_modeled"]
