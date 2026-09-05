@@ -460,9 +460,13 @@ current arm" rather than "SWR content is less current-arm-locked"; `_TSC` remove
 the same channel for the within-stop time course, which also differs between the
 two streams. Both enter `BASEc` **unconditionally**, so every rung built on the
 base reports its SWR interaction *beyond* event length and *beyond* the general
-time course. The `nt` twins (`CS1nt_current`, on `BASEc_NT`) are the uncontrolled
-sensitivity fits and report the same canonical interaction term — read them as a
-sensitivity check, never as the headline.
+time course. Because `n_nonlocal_bins` is measured after `is_swr` and differs
+with it, that is a **post-treatment adjustment**: a `BASEc` rung's `swr_x_…` is
+the length-adjusted (DIRECT) SWR effect, and length may be a mediator
+(SWR → longer replay → the trajectory leaves the current arm). The `nt` twins on
+`BASEc_NT` (`CS1nt_current`, `CS4nt_armreward`, `CS5nt_armvalue`,
+`CS6nt_armuncert`, `CPS1nt_current`) report the same term as the TOTAL SWR
+effect. Both are shipped; report the pair and say which estimand a number is.
 
 **Split vs pooled.** A `split` rung is fit three times (`all` / SWR-only /
 non-SWR-only) and the dissociation is the comparison across those populations. A

@@ -622,8 +622,10 @@ content runner, not stored):
 - `log_n_nonlocal_bins_z_x_is_current_arm` / `log_n_nonlocal_bins_z_x_is_prev_arm`
   (`_x_is_current_patch` for the patch hierarchy) — the length products that put
   that channel in the design. Members of `BASEc`, so every rung built on the base
-  carries them; the `nt` twins (`BASEc_NT`, e.g. `CS1nt_current`) are the
-  uncontrolled sensitivity fits that omit them.
+  reports the SWR effect NET of event length (a post-treatment adjustment — length
+  may be a mediator); the `nt` twins (`BASEc_NT`: `CS1nt_current`,
+  `CS4nt_armreward`, `CS5nt_armvalue`, `CS6nt_armuncert`, `CPS1nt_current`) omit
+  them and report the total SWR effect.
 - `log1p_time_since_stop_start_s_z_x_is_current_arm` — the within-stop time-course
   product, also a `BASEc` member and also absent from the `nt` twins.
 
