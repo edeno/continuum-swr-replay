@@ -903,12 +903,14 @@ _DEFINITIONS.append(
 _DEFINITIONS.append(
     _definition(
         "time_since_last_well_arrival_s",
-        "Time elapsed since the arrival at the well occupied at the start of "
-        "the stop. Two incarnations share the name and the clock: on the "
-        "per-bin rate design it is the bin centre minus the arrival, zero at "
-        "the moment of arrival and non-negative for every bin of an at-well "
-        "stop (the bout can only begin once the animal has arrived); on the "
-        "event table it is the event's first timebin minus the same arrival.",
+        "Time elapsed since the most recent completed well arrival before the "
+        "bout: the well occupied at the start of an at-well stop, and for an "
+        "in-transit bout the well the animal has already left. Two "
+        "incarnations share the name and the clock: on the per-bin rate design "
+        "it is the bin centre minus that arrival, zero at the moment of "
+        "arrival and non-negative for every bin of an at-well stop (the bout "
+        "can only begin once the animal has arrived); on the event table it is "
+        "the event's first timebin minus the same arrival.",
         grain="event; stop × response bin",
         units="seconds",
         clock=QueryClock.GOAL_ARRIVAL,

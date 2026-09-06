@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from threadpoolctl import threadpool_limits
 
 from continuum_swr_replay.analysis.replay import (
@@ -102,6 +103,7 @@ def _toy_tables(
     return pd.DataFrame(stop_rows), pd.DataFrame(onset_rows)
 
 
+@pytest.mark.slow
 def test_tidy_schema():
     stop, onsets = _toy_tables()
     # onsets already carry is_swr (as attach_is_swr_to_onsets would set it).
