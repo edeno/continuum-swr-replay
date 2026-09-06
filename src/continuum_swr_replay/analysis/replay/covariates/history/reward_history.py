@@ -9,6 +9,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay._helpers import (
     build_well_to_arm_map,
     raised_cosine_history_basis,
+    # Re-exported: the projection is a pure array primitive shared with the
+    # per-bin design builder, which must not import this package.
+    reward_basis_from_lags,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_N_BASIS,
@@ -280,38 +283,6 @@ def lagged_trial_rewards(
         idx = counts - j
         valid = idx >= 0
         out[valid, j - 1] = is_reward[idx[valid]]
-    return out
-
-
-def reward_basis_from_lags(lags: np.ndarray, basis: np.ndarray) -> np.ndarray:
-    """Project a lag matrix onto raised-cosine bumps, normalized per bump.
-
-    Each output is the bump-weighted mean over the *available* (finite) lags,
-    ``sum_j B[k, j] * lags[:, j] / sum_j B[k, j]``, so a query with only part of
-    the history is still on the reward-fraction scale rather than being shrunk
-    toward zero by the missing lags.
-
-    Parameters
-    ----------
-    lags : np.ndarray, shape (n_query, n_lags)
-        Per-lag reward outcomes (0/1), ``NaN`` where the lag is not known.
-    basis : np.ndarray, shape (n_basis, n_lags)
-        Bump weights; ``basis[k, j]`` is the weight of lag ``j + 1`` in bump
-        ``k``.
-
-    Returns
-    -------
-    np.ndarray, shape (n_query, n_basis)
-        Normalized projections; ``NaN`` where no lag in the bump's support is
-        finite.
-    """
-    finite = np.isfinite(lags)
-    values = np.where(finite, lags, 0.0)  # (n_query, n_lags)
-    num = values @ basis.T  # (n_query, n_basis)
-    den = finite.astype(float) @ basis.T  # (n_query, n_basis)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        out = num / den
-    out[den <= 0] = np.nan
     return out
 
 

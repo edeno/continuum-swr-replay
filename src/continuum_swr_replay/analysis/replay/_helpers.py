@@ -24,11 +24,33 @@ from .model_specs import (
     ARM_FE_PREDICTORS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
 )
 from .spatial_mapping import well_to_arm_set
 
 logger = logging.getLogger(__name__)
 _SESSION_COLS = list(SESSION_COLUMNS)
+
+#: Per-lag known-outcome columns the reward-history basis is built over.
+_REWARD_LAG_COLUMNS = tuple(
+    f"known_reward_outcome_lag_{j}" for j in range(1, REWARD_HISTORY_N_LAGS + 1)
+)
+#: Stop columns needed to place a bin on the arrival / outcome-availability clocks.
+_ARRIVAL_CLOCK_STOP_COLUMNS = (
+    "stop_start",
+    "last_well_arrival_time_s",
+    "outcome_known_time_s",
+)
+#: Extra stop columns needed to re-derive the reward history at the outcome boundary.
+_OUTCOME_SHIFT_STOP_COLUMNS = (
+    "stop_start",
+    "outcome_known_time_s",
+    "occupancy_state",
+    "completed_trial_reward",
+    *_REWARD_LAG_COLUMNS,
+)
+
 
 def nearest_well_distance_cm(
     dot: pd.DataFrame,
@@ -784,6 +806,37 @@ def raised_cosine_history_basis(n_lags: int, n_basis: int) -> np.ndarray:
     return B
 
 
+def reward_basis_from_lags(lags: np.ndarray, basis: np.ndarray) -> np.ndarray:
+    """Project a lag matrix onto raised-cosine bumps, normalized per bump.
+
+    Each output is the bump-weighted mean over the *available* (finite) lags,
+    ``sum_j B[k, j] * lags[:, j] / sum_j B[k, j]``, so a query with only part of
+    the history is still on the reward-fraction scale rather than being shrunk
+    toward zero by the missing lags.
+
+    Parameters
+    ----------
+    lags : np.ndarray, shape (n_query, n_lags)
+        Per-lag reward outcomes (0/1), ``NaN`` where the lag is not known.
+    basis : np.ndarray, shape (n_basis, n_lags)
+        Bump weights; ``basis[k, j]`` is the weight of lag ``j + 1`` in bump
+        ``k``.
+
+    Returns
+    -------
+    np.ndarray, shape (n_query, n_basis)
+        Normalized projections; ``NaN`` where no lag in the bump's support is
+        finite.
+    """
+    finite = np.isfinite(lags)
+    values = np.where(finite, lags, 0.0)  # (n_query, n_lags)
+    num = values @ basis.T  # (n_query, n_basis)
+    den = finite.astype(float) @ basis.T  # (n_query, n_basis)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = num / den
+    out[den <= 0] = np.nan
+    return out
+
 def reward_kernel_weights(n_lags: int, n_basis: int) -> np.ndarray:
     """Per-lag weight each reward-history basis coefficient contributes.
 
@@ -892,7 +945,34 @@ def aggregate_to_timebins(
         ``reward_basis``), each name in
         ``stop_covariates``, ``count`` (population onsets in the bin),
         ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
-        ``hist_rcos_0..self_history_basis-1``.
+        ``hist_rcos_0..self_history_basis-1``. When ``stop_table`` carries
+        ``stop_start``, ``last_well_arrival_time_s`` and
+        ``outcome_known_time_s``, two further per-bin clocks are emitted:
+        ``time_since_last_well_arrival_s`` and ``time_since_outcome_known_s``
+        (bin centre minus the absolute clock; ``NaN`` where the clock is
+        ``NaN``, and negative for bins that precede the outcome boundary).
+
+    Notes on the outcome boundary
+    -----------------------------
+    A stop's reward history is evaluated at bout start, so a stop that is still
+    in progress when the current trip's reward or omission becomes observable
+    would carry a history missing that outcome for its later bins. When
+    ``reward_basis`` is set and ``stop_table`` additionally carries
+    ``occupancy_state``, ``completed_trial_reward`` and the
+    ``known_reward_outcome_lag_{1..10}`` columns, bins whose LEFT EDGE is at or
+    past ``outcome_known_time_s`` (for an ``at_well`` stop whose boundary falls
+    inside it) get the lag vector shifted by one --
+    ``[completed_trial_reward, lag_1, ..., lag_9]`` -- and the basis features and
+    ``reward_history_incomplete`` re-derived from it by the same functions the
+    stop level uses. Bins before the boundary keep the bout-start values. Bouts
+    that span the arrival (``occupancy_state == "mixed"``) change which trip is
+    the completed one partway through, so they are never shifted; the number of
+    such stops whose boundary falls inside them is reported in
+    ``out.attrs["n_stops_arrival_spanning"]``.
+
+    The absolute stop clocks are carried only to derive these per-bin columns
+    and are dropped before return unless explicitly requested through
+    ``stop_covariates``; an absolute session clock is never a model predictor.
 
     Raises
     ------
@@ -920,7 +1000,23 @@ def aggregate_to_timebins(
     reward_cols = (
         [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE] if reward_basis else []
     )
-    carry = reward_cols + list(stop_covariates)
+    # Optional per-bin clocks / outcome-boundary shift: both are gated on the
+    # stop frame actually carrying their inputs, so a stop table built before
+    # the arrival clocks existed produces exactly the design it produced before.
+    emit_clocks = all(c in stop_table.columns for c in _ARRIVAL_CLOCK_STOP_COLUMNS)
+    shift_at_outcome = reward_basis and all(
+        c in stop_table.columns for c in _OUTCOME_SHIFT_STOP_COLUMNS
+    )
+    internal_cols = list(
+        dict.fromkeys(
+            (_ARRIVAL_CLOCK_STOP_COLUMNS if emit_clocks else ())
+            + (_OUTCOME_SHIFT_STOP_COLUMNS if shift_at_outcome else ())
+        )
+    )
+    carry = list(dict.fromkeys([*reward_cols, *internal_cols, *stop_covariates]))
+    # Carried only to derive the per-bin columns; the absolute session clocks in
+    # particular must never reach a model as predictors (see covariate_timing).
+    drop_internal = [c for c in internal_cols if c not in stop_covariates]
 
     s = stop_table[stop_table["immobility_duration_s"] > 0]
     # ceil, not int: when tmax is not a multiple of bin_s, int() drops the final
@@ -939,6 +1035,18 @@ def aggregate_to_timebins(
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
+    if emit_clocks:
+        # Bin CENTRE on two absolute session clocks, as elapsed seconds. The
+        # arrival clock is >= 0 for an at-well stop (the animal arrived before
+        # the bout began); the outcome clock is NEGATIVE for bins that precede
+        # the reward/omission becoming observable.
+        bin_center_abs = out["stop_start"].to_numpy(dtype=float) + (binj + 0.5) * bin_s
+        out["time_since_last_well_arrival_s"] = bin_center_abs - out[
+            "last_well_arrival_time_s"
+        ].to_numpy(dtype=float)
+        out["time_since_outcome_known_s"] = bin_center_abs - out[
+            "outcome_known_time_s"
+        ].to_numpy(dtype=float)
     # bin width, clipped by both the stop's immobility end and tmax (the final
     # bin of a stop longer than tmax is exposed only up to tmax, not bin_s).
     out["exposure"] = np.minimum(
@@ -1038,8 +1146,52 @@ def aggregate_to_timebins(
                 out[f"cross_hist_rcos_{k}"] = xproj[:, k]
         out = out.drop(columns=["cross_count"])
 
-    out = out.drop(columns=["immobility_duration_s"]).reset_index(drop=True)
+    n_stops_arrival_spanning: int | None = None
+    if shift_at_outcome:
+        # The reward history a stop carries is evaluated at BOUT START, so bins
+        # after the current trip's reward/omission became observable would
+        # otherwise be modelled with a history that omits the outcome the animal
+        # already has. Shift the lag vector by one at the boundary and re-derive
+        # the basis features with the same functions the stop level uses, so the
+        # two levels stay one kernel rather than two.
+        stop_start = out["stop_start"].to_numpy(dtype=float)
+        boundary = out["outcome_known_time_s"].to_numpy(dtype=float)
+        occupancy = out["occupancy_state"].to_numpy()
+        left_edge_abs = stop_start + out["binj"].to_numpy(dtype=float) * bin_s
+        # NaN boundary -> False, so a stop with no known outcome is untouched.
+        # ``stop_start < boundary`` excludes stops already past their outcome at
+        # bout start (their bout-start history already contains it); the bins of
+        # a stop whose boundary sits beyond its last bin never satisfy ``post``.
+        inside = (stop_start < boundary) & (left_edge_abs >= boundary)
+        crosses = inside & (occupancy == "at_well")
+        # A bout that spans the arrival changes WHICH trip is the completed one
+        # partway through, so ``completed_trial_reward`` is not the outcome that
+        # becomes known at the boundary; those stops are left on their bout-start
+        # history and counted instead of silently mis-shifted.
+        n_stops_arrival_spanning = int(
+            pd.unique(out["stop_id"].to_numpy()[inside & (occupancy == "mixed")]).size
+        )
+
+        lags = out[list(_REWARD_LAG_COLUMNS)].to_numpy(dtype=float)
+        shifted = lags.copy()
+        shifted[crosses, 1:] = lags[crosses, :-1]
+        shifted[crosses, 0] = out["completed_trial_reward"].to_numpy(dtype=float)[
+            crosses
+        ]
+        raw = reward_basis_from_lags(
+            shifted,
+            raised_cosine_history_basis(REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS),
+        )
+        out[REWARD_HISTORY_INCOMPLETE] = np.isnan(raw).any(axis=1).astype(float)
+        for k, col in enumerate(REWARD_HISTORY_COLUMNS):
+            out[col] = np.nan_to_num(raw[:, k], nan=0.0)
+
+    out = out.drop(columns=["immobility_duration_s", *drop_internal]).reset_index(
+        drop=True
+    )
     out.attrs["n_onsets_in_dropped_bins"] = n_onsets_in_dropped_bins
+    if n_stops_arrival_spanning is not None:
+        out.attrs["n_stops_arrival_spanning"] = n_stops_arrival_spanning
     return out
 
 
