@@ -70,14 +70,16 @@ directly comparable.
 
 ### Bundle names and suffixes
 
-Content bundles are directories under `Processed-Data/replay_content/`; the base
-name is `models/` (arm) or `models_patch/` (patch), and suffixes append in this
-order:
+Content bundles are directories under `Processed-Data/replay_content/`. The
+**base name** is `models/` (arm) or `models_patch/` (patch); a ContFrag run
+(`--event-source {SWR,MUA}`) extends the base name itself with
+`_{source}_{area}` — `models_swr_HPC`, `models_patch_mua_HPC` — so SWR/HPC,
+SWR/mPFC and MUA/HPC never overwrite each other. The suffixes below then append
+to whichever base name that produced, in this order:
 
 | suffix | added when |
 |---|---|
-| `_swr_T` / `_swr_F` | `--swr-subset {T,F}` — the ladder refit on SWR-only / non-SWR-only events (`models_swr_T`, `models_patch_swr_F`, …) |
-| `_{source}_{area}` | a ContFrag run (`--event-source {SWR,MUA}`), e.g. `models_swr_HPC` |
+| `_swr_T` / `_swr_F` | `--swr-subset {T,F}` — the ladder refit on SWR-only / non-SWR-only events (`models_swr_T`, `models_patch_swr_F`, and on a ContFrag base `models_swr_HPC_swr_T`) |
 | `_event_grain` | `--grain event` |
 | `_hard_count` | `--response hard_count`, where that is not the estimator's own default response |
 | `_leaf` | `--leaf-only` — the six-leaf candidate set |
@@ -462,7 +464,7 @@ REWXTIME  := reward_history_rcos_0:BS_TC
 
 Response `count` = non-local onset count per 15 ms bin; `family = poisson(log)`,
 `offset = log(exposure)`; rows are (stop × bin) to `tmax = 4 s`. Fit per session,
-aggregate coefficients across sessions.
+aggregate coefficients across sessions (signed-rank).
 
 Notes on the covariate choices. (1) **Single-model provenance:** every task
 dimension comes from the beta-Bernoulli model; there is one behavioural model.

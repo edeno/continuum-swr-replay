@@ -39,9 +39,10 @@ descriptive**, else the run fails.
   `reward_fraction_candidate_arm_last10_visits` is `0.0` (not NaN), while
   `is_candidate_arm_never_visited` explicitly identifies novelty. The two enter
   together wherever recency/reward history is modeled.
-- The stay/leave model `is_stay ~ outcome * content` legitimately uses the
-  post-outcome `is_omitted_outcome`: its modeled unit (the stay/leave decision)
-  is post-outcome by construction, so the timing gate does not apply.
+- The stay/leave model `is_stay ~ outcome * content`
+  (`scripts/pfc/run_stage6_learning.py`) legitimately uses the post-outcome
+  `is_omitted_outcome`: its modeled unit (the stay/leave decision) is
+  post-outcome by construction, so the timing gate does not apply.
 
 ## Cohort-audit tables
 

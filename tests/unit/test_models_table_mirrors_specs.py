@@ -124,6 +124,39 @@ def _parse_rungs_blocks(text: str) -> dict[str, list[list[str]]]:
     return blocks
 
 
+def _section_text(text: str, heading: str) -> str:
+    """The lines of ``heading``'s own section, excluding nested code fences' headings.
+
+    A section runs from its heading to the next heading at the same or a
+    shallower level, so a per-rung table row is only credited to the family it
+    is written under -- a row under a neighbouring family cannot satisfy this
+    family's check.
+    """
+    lines = text.splitlines()
+    start: int | None = None
+    level = 0
+    in_fence = False
+    collected: list[str] = []
+    for index, line in enumerate(lines):
+        if _FENCE_ANY.match(line):
+            in_fence = not in_fence
+            if start is not None:
+                collected.append(line)
+            continue
+        match = None if in_fence else _HEADING.match(line)
+        if start is None:
+            if match is not None and match.group(2) == heading:
+                start = index
+                level = len(match.group(1))
+            continue
+        if match is not None and len(match.group(1)) <= level:
+            break
+        collected.append(line)
+    if start is None:
+        pytest.fail(f"{DOC_PATH.name}: no heading {heading!r}")
+    return "\n".join(collected)
+
+
 @pytest.fixture(scope="module")
 def blocks() -> dict[str, list[list[str]]]:
     return _parse_rungs_blocks(_read_doc())
@@ -177,10 +210,10 @@ def test_swr_and_mua_contfrag_ladders_are_the_same_rungs() -> None:
 
 @pytest.mark.parametrize("heading", TABLE_FAMILIES)
 def test_table_families_carry_a_row_per_rung(heading: str) -> None:
-    text = _read_doc()
+    section = _section_text(_read_doc(), heading)
     rows = {
         match.group(1)
-        for match in re.finditer(r"^\|\s*`([^`]+)`\s*\|", text, flags=re.MULTILINE)
+        for match in re.finditer(r"^\|\s*`([^`]+)`\s*\|", section, flags=re.MULTILINE)
     }
     missing = sorted(EXPECTED[heading] - rows)
     assert not missing, (
