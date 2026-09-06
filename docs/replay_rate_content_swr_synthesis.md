@@ -6,28 +6,75 @@ relate. Companion to the per-layer references: rate ladder
 [per_bin_rate_results.md](per_bin_rate_results.md) / [rate_models.md](rate_models.md);
 content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 
-> **Historical-results warning (2026-08-14):** The numerical results below
-> predate the event-location, two-clock reward-history, time-local recency, and
-> exact-cohort contracts. They are retained as an audit trail, not as current
-> paper estimates. Regenerate the canonical tables and models, then re-evaluate
-> every coefficient, model comparison, and conclusion before citing them.
+> **Refit status (2026-09-06).** Both quantitative layers were refit in the 2026-09
+> fix wave, and the numbers below have been restated from those refits wherever
+> the audits report them. The rate ladders were refit on **2026-09-06** with a
+> smooth past-only reward-history basis, boundary-recomputed reward features,
+> per-coefficient separation judging and shared-row rung scoring
+> ([audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md));
+> the content ladders were refit on **2026-09-05** onto the per-event allocation
+> fraction with event-clustered standard errors
+> ([audits/2026-09-05-content-refit-comparison.md](audits/2026-09-05-content-refit-comparison.md)).
+> Any quantity this document still carries that was **not** re-derived from those
+> refits is marked **PENDING** and must not be cited; where a claim rested on a
+> rung that no longer exists, the claim is marked retired in place rather than
+> deleted.
 
 ## Provenance & methods (read first)
 
-- **Data:** event tables (`event_table.parquet`, `event_arm_table.parquet`, `stop_table.parquet`)
-  regenerated 2026-06-24. Nominal value from the canonical
-  LorenFrankLab/SpatialBanditTask parsed CSVs (commit `96dfed1`), mapped to
-  `stop_id` (`scripts/_bandit_csv_contingency.py`; 96% agreement with the retired
-  StateScript parser). Content models re-fit 2026-06-28 on the current tables
-  (the prior fits were stale, from 2026-06-08).
+- **Data:** event tables (`event_table.parquet`, `event_arm_table.parquet`,
+  `stop_table.parquet`) on the canonical 218-session, 5-animal corpus. Rate
+  models refit 2026-09-06; content models refit 2026-09-05.
 - **Inference convention (all layers):** fit **per session**, then test the
-  per-session coefficients **across sessions** (Wilcoxon signed-rank; the session
-  is the exchangeable unit), with **per-animal sign consistency (n/5)**. This is
-  robust to within-session clustering; it is *not* an event-level test.
-- **Everything here is correlational.** Covariate↔replay associations, not
+  per-session coefficients **across sessions** (the session is the exchangeable
+  unit), with **per-animal sign consistency (n/5)**. Content aggregates are the
+  **animal-balanced median** (the median over animals of that animal's
+  per-session median), animals-positive-of-5, and a session sign-rank **BH-FDR
+  q**; an animal bootstrap (2000 draws, seed 0) supplies intervals where the
+  source reports one. This is robust to within-session clustering; it is *not*
+  an event-level test.
+- **Content response and standard errors.** The shipped content response is the
+  **per-event allocation fraction** — one event, one unit of mass — fit with
+  **event-clustered** standard errors. The retired per-timebin count response
+  treated a median ~32 autocorrelated bins per event as independent draws, so
+  its standard errors and its likelihood-scale quantities (AIC, ΔAIC) are not
+  interpretable at the event scale: a count-response number and a
+  fraction-response number must never be differenced. The per-SD unit for the
+  arm belief terms also changed with the leaf-only fitting, so standardized
+  coefficients are not comparable across the change either.
+- **Content estimand — direct vs total, and why both are shipped.** `BASEc`
+  rungs carry the event-length products (`log_n_nonlocal_bins_z ×
+  is_current_arm` / `× is_prev_arm`). Event length is measured **after**
+  `is_swr` and differs with it, so it is **post-treatment**: a `BASEc`
+  `swr_x_...` coefficient is the length-adjusted **direct** effect, and length
+  is plausibly a mediator (SWR to longer replay to a trajectory that leaves the
+  current arm). The `nt` twins on `BASEc_NT` omit those products and report the
+  **total** effect. Both are shipped, neither supersedes the other, and every
+  number below says which it is.
+- **Content estimator comparison.** One cohort, three likelihoods — retired
+  count, shipped fraction, Dirichlet-multinomial (DM) — are compared term for
+  term in
+  [design/content_estimator_comparison.md](design/content_estimator_comparison.md).
+  **Exactly one conclusion is estimator-dependent:** the *direct* SWR by
+  arm-value interaction (`CS5_armvalue`
+  `swr_x_reward_belief_mean_candidate_arm_preoutcome`), where count −0.398 (1/5
+  animals) and DM −0.316 (0/5) are negative while the shipped fraction estimator
+  is +0.237 (3/5), on the fully paired 216-session cohort. Every other key term
+  agrees in sign across all three, and the magnitudes shrink monotonically from
+  count to fraction to DM on the SWR interactions and the recency/novelty terms
+  (`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.840) while
+  `is_current_arm` moves the other way (+0.626 → +0.681 → +0.737). The DM also
+  carries a parameter the conditional estimators do not — `log_phi_is_swr`, the
+  within-event concentration contrast — which is the direct measurement of "SWR
+  broadens content" (Layer 3). The fraction's event-clustered SE runs ~15–50 %
+  above the DM's model SE (median ≈ 30 %), so the shipped estimator is if
+  anything the more conservative of the two honest options, and the fraction
+  stays the shipped response.
+- **Everything here is correlational.** Covariate-to-replay associations, not
   established causation. Two confounds are explicitly controlled where noted:
   **occupancy** (via the within-well outcome contrast) and **within-stop time /
-  dwell** (via a `time_since_stop_start_s` control); **collinearity** was audited (VIF).
+  dwell** (via a `time_since_stop_start_s` control); **collinearity** was
+  audited.
 - **One process, three layers.** A non-local event is a *point* (occurrence)
   carrying *marks*: its **SWR-coupling** (ripple power) and its **content**
   (represented arm). "Rate" = occurrence intensity; "coupling" and "content" =
@@ -36,86 +83,120 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 
 ## Layer 1 — Rate (occurrence)
 
-Per-bin conditional-intensity ladder (Family B; `MODEL_PER_BIN_RATE`). Baseline
-rates (M0): non-local 0.405 > detected-SWR 0.285 > NL-no-SWR 0.234 > NL-w/SWR
-0.181 events/s. Dominant structure (predictive, all populations): within-stop
-**time course** (rise→plateau over ~1.5–2 s), **reward-history suppression**
-(lags 2–10, ~0.85×), **self-history** clustering. Best model M7r (AIC 2105,
-CV +0.199).
+Per-bin conditional-intensity ladder (Family B, `MODEL_PER_BIN_RATE`; 15 ms
+bins, 218 sessions). Baseline rates (`M0_const`, events per second of
+immobility, median across sessions): non-local (all) **0.408** > detected SWR
+**0.282** > non-local no-SWR **0.234** > non-local w/ SWR **0.180**. The
+non-local split is roughly additive, so **SWR-coupled non-local events are the
+rarest type**. The dominant structure in every population is the within-stop
+**time course** (rise over the first ~1.5–2 s then plateau; median peak 2.4 s
+detected SWR / 2.8 s non-local / 2.2 s w/ SWR / 3.0 s no-SWR, read only on the
+supported interval [1, 3] s), **self-history** clustering, and a smooth
+**reward-history** kernel. The time spline is what calibrates the process
+(KS-in-band 0.50 → 0.85 at `M5_time`). `M5_time` is the best-generalizing rung
+(0.225 held-out bits/event over 217 of 218 sessions);
+`M7r_time_histcos_rew` is the rung to read coefficients off (median AIC 2220,
+KS-in-band 0.87), but its CV is scored on a selected 84 sessions and is **not** a
+like-for-like win over `M5_time`.
 
-Value/uncertainty covariates (canonical-contingency MU model), **with-SWR vs
-non-SWR**:
+**Reward history is one smooth three-feature basis, not per-lag dummies.** The
+five lag-dummy rungs (`M3_hist`, `M4_hist_rew`, `M6_time_hist`,
+`M7_time_hist_rew`, `M9_rew_x_time`) were retired on 2026-09-06 —
+`cv_bits_per_event` was NaN in **99.08 %** of the non-local fits — so every
+number this document previously carried from them is withdrawn. Read the reward
+effect off the **per-session reconstructed kernel**
+(`paper/figures/rate/reward_kernel_basis.png`), never off one basis
+coefficient: the three are strongly collinear.
 
-| covariate | NL with-SWR | NL non-SWR | note |
+| population | kernel lag 1 | kernel lags 3–10 | immediate coefficient RR (`M7r`) |
 | --- | --- | --- | --- |
-| reward lag-1 (M7) | **3.93×** | 1.11× | |
-| `task_reward_probability_chosen_arm` | **~1.0× (null, all p>0.47)** | ~1.0× (null) | no sign-consistency, ~zero rate information; *historical* de-inflation 6.6→3.1→2.0 (collinearity fix + canonical contingency) ended at null in the current MU |
-| `rpe_postoutcome` | **1.69×** (RR1.693, p 5e-4) | 1.10 (n.s.) | |
-| `patch_switch_fraction_last5_completed_trips` | **0.57×** (G3 stratified, p 5e-10) | 1.16 (n.s.) | exploration suppression — 0.55× (S5 contrast); near-null in the joint MU model (covariate competition) |
-| `task_reward_probability_patch_mean_gap_best_vs_second` | 0.52 (p 1e-3) | 0.77 (p 0.04) | **4/5 animals only** (j16 reverses), inference-only, **opposite sign in the power model** |
+| detected SWR | 1.22 | 0.91–1.03 | 3.48 (79 % of sessions, 5/5, p 6.1e-20) |
+| non-local (all) | 1.14 | 0.91–1.03 | 2.85 (72 %, 5/5, p 1.0e-14) |
+| non-local, w/ SWR | **1.44** | 0.89–1.07 | **8.65** (86 %, 5/5, p 2.9e-29) |
+| non-local, no SWR | **0.99** | 0.92–1.00 | **1.24** (56 %, 4/5, p 0.22) |
 
-**Inference ≠ prediction (important):** value/RPE are real *population-level*
-effects (consistent sign across animals) but **do not improve per-session
-prediction** — the **entire value/switch block fails held-out CV in every
-population and animal (0/5)** (ΔCV −0.075 non-SWR, −0.163 with-SWR, −0.043 SWR);
-per-session ΔAIC sits at the null. Only time + reward kernel +
-self-history forecast the rate. A fitted within-block Q-value (`q_chosen`) does
-**not** predict better than nominal value (falsified). So the value-gating is a
-modest, detectable-by-pooling effect, not a strong driver.
+**The dissociation lives in the immediate component, and it is paired within
+session:** the within-session comparison of `coef_reward_history_rcos_0` between
+the two non-local streams is positive in **79.2 % of 216 paired sessions, 5/5
+animals, signed-rank p = 7.8e-22**. After full control the non-SWR immediate
+component is indistinguishable from no immediate reward response (RR 1.24,
+p = 0.22, 4/5). The slower part of the kernel — a mild suppression from lag 3
+on, RR ≈ 0.89–0.97, back to ~1 by lag 10 — is **shared** by all four
+populations. Whether that slower part is an RPE / relative-reward signal or
+satiety / adaptation is **not** established here: the GLM uses past binary
+outcomes, not a prediction error.
 
-### Update 2026-07-02 — `is_swr`-contrast ladder (per-bin, LR-tested)
+**The reward block is a small AIC step marginally and a negative one
+conditionally** (negative ΔAIC = child better). `M1_rew − M0_const` is **−3.01**
+(detected SWR) / **−7.84** (non-local) / **−5.42** (w/ SWR) / **+0.14** (no
+SWR); `M7r_time_histcos_rew − M6r_time_histcos`, the same block given time
+**and** self-history, is **+1.64** / **+1.09** / **+2.17** / **+2.38** — every
+population moves the wrong way. Family A (per-stop Poisson with a
+`log(immobility)` offset, the literature-comparable layer) agrees in *direction*
+only: median per-session `R1 − R0` ΔAIC **−1.41** (detected SWR) / **−5.12**
+(non-local) / **−2.43** (w/ SWR) / **+0.30** (no SWR), 218 sessions each — the
+block helps everywhere except the non-SWR stream. **Retired with the outcome-flag
+rung:** the per-stop omission RR 0.36 and recent-reward RR 0.62 headline came
+from a rung built at the trial *start*, which could encode the not-yet-delivered
+outcome on approach stops; it is no longer fit and neither its magnitude nor its
+session share survives.
 
-Re-fit of the occurrence-rate dissociation with the **beta-bernoulli covariates**
-(`relative_value_switch_minus_stay_preoutcome`/`rpe_postoutcome`/
-`reward_belief_differential_entropy_leaf_mean_preoutcome`/
-`reward_belief_mean_update_l1_all_ports_postoutcome`;
-refit 2026-07-13, HMM retired) on the per-bin **`is_swr`-contrast (Design B)** ladder —
-stratified `G0–G8` (×{all, SWR, non-SWR}) + stacked-contrast `S0–S10`.
-Runner `scripts/rate/fit_swr_contrast_rate.py`; 218 sessions →
-`models_per_bin_rate/swr_contrast_rate.pkl`. Inference: per-session fit + **per-session
-likelihood-ratio tests** aggregated as *% sessions significant / binomial p* (the
-power-robust read; pooled χ² is over-powered by the per-bin n).
+**Events are strongly non-Poisson.** The controlled self-history kernel is
+refractory at short lags then bursty: peak RR **2.64** (detected SWR, 135 ms),
+**2.08** (non-local, 135 ms), **2.50** (w/ SWR, 150 ms, dead time ≤45 ms),
+**1.72** (no SWR, 120 ms). SWR-coupled non-local events are the most tightly
+bursty stream and non-SWR events the flattest.
 
-- **Reward-gating dissociation confirmed and strongest by far.**
-  `is_swr:known_reward_outcome_lag_1`
-  significant in **53% of sessions (binom p=7e-78)**; direction **91–100% positive in
-  all 5 animals**. The ~50% per-session significance is a **power gradient**
-  (43/53/60% by event-count tertile), **not animal clustering** — the effect is
-  near-universal in sign; low-event sessions just can't clear p<0.05 individually.
-- **Headline magnitude is model-dependent:** the
-  `is_swr:known_reward_outcome_lag_1` effect is 5.1×
-  when the reward-history kernel is shared (`S1_rew1`) but **3.1× when `is_swr` is
-  crossed with the full kernel** (`S2_base`, history-controlled) — both p<1e-23.
-  The 3.1× matches the prior SWR reward-RR (3.10). *(Reporting choice deferred.)*
-- **Dissociation hierarchy** (`is_swr:X`, % sessions sig / binom p):
-  reward **53% / 7e-78** ≫ periswitch **21% / 1.5e-8** > rpe / switchrate / value
-  (~10–12% / 5e-3–2e-2) > block (marginal) > **update / uncert (null)**.
-- **Stratified pattern (G-ladder):** every task dimension modulates rate far more
-  consistently in **non-SWR** than SWR events (periswitch 25% vs 9%, rpe 25% vs 8%,
-  value 15% vs 4%; SWR at chance) → **SWR events narrowly reward-gated, non-SWR events
-  broadly task-modulated** (value / RPE / context).
-- **Dwell-shape is NULL.** `G8 rewxtime`
-  (`known_reward_outcome_lag_1 : bs(tc)` — does reward reshape
-  the within-stop rate *profile*?) is not consistently significant (8% / p=0.088),
-  **numerically unstable** (205/218 fit, mean CV −9.6e+302) and **CV-harmful**
-  (M9−M7 −0.22, 5/5 neg). **Reward shifts the rate LEVEL, not the profile SHAPE** — the reward-gating headline
-  is not a dwell-profile artifact (the per-bin offset already removes the pure
-  duration confound; rewarded stops are ~3.6× longer, 1.86 s vs 0.51 s).
-- **RPE caveat:** coefficient signed-rank leans SWR-specific, but the per-session LR
-  is *more consistent in non-SWR* (25% vs 8% of sessions) — direction-consistent vs
-  per-session-needed diverge; do **not** call RPE cleanly "SWR-specific". Also,
-  SWR RPE is **reward-collinear** (`rpe_postoutcome = reward −
-  reward_belief_mean_chosen_arm_preoutcome`, kernel retained) —
-  largely reward-gating re-expressed, not independent RPE coding.
+**Reward shifts the rate LEVEL, not the within-stop profile SHAPE.**
+`M9r_rew_x_time` costs both AIC and held-out bits against its parent
+`M7r_time_histcos_rew` (2228 vs 2220; 0.186 vs 0.220 bits/event, on a smaller CV
+cohort still).
 
-*(The `is_swr`-contrast ladder has no auto-generated results doc — `per_bin_rate_results.md`
-covers the separate M0–M9 ladder. These findings live here.)*
+**Arrival clock.** Sister rungs (`M0a_const_arrival`, `M5a_time_arrival`,
+`M7ra_time_arrival_histcos_rew`) re-anchor the same spline on time since well
+arrival over [0, 8] s. They are fit on a strict subset of the rows and are
+therefore **never differenced** against the stop-clock rungs. On their supported
+interior the two clocks put the median peak at broadly the same delay
+(2.2–3.0 s on the stop clock vs 3.0–3.6 s after arrival, KS distance
+0.06–0.12), so the early-in-stop rise is not an artifact of the bout clock. They
+retain a **different** share of each population's event bins — **0.912**
+detected SWR, **0.902** w/ SWR, **0.850** non-local, **0.814** no SWR — so a
+between-population contrast on that ladder is partly a contrast between windows;
+and they are heavily flagged (37–66 % of fits carry a separated non-nuisance
+term), so read them pooled, on the fitted curve, never per session.
+
+### Behavioral-state covariates on rate — PENDING
+
+**The shipped per-bin ladder carries none.** Value, uncertainty, switch-rate and
+block covariates are fit in dedicated ladders — `MU_uncertainty`
+(`scripts/rate/fit_uncertainty_rate.py`) and the per-bin `is_swr`-contrast
+ladder (`scripts/rate/fit_swr_contrast_rate.py`) — on their own frozen cohorts
+and with the post-outcome gating they need.
+
+Every coefficient this document previously reported from those two ladders is
+**PENDING**: the nominal-value null, the RPE 1.69×, the exploration 0.57×/0.55×
+suppression, the patch-gap 0.52/0.77 pair, and the whole per-session
+likelihood-ratio table of the `is_swr`-contrast rate ladder (the 53 % / 5.1× /
+3.1× reward figures, the dissociation hierarchy, the stratified G-ladder
+pattern). They were fit against a reward block and a cohort that no longer
+exist. Those ladders were refit on 2026-09-06 alongside the main ladder and now
+carry the raised-cosine basis and per-coefficient separation judging, but the
+audit reports only fit counts and separation shares for them, not coefficients —
+see [per_bin_rate_results.md](per_bin_rate_results.md) §5 and
+[audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)
+("is_swr-contrast"). Note also that separation is heavy there: 64.7 % of the
+contrast-cohort fits carry a separated non-nuisance term, and
+`is_swr:reward_history_rcos_1` is flagged in 74.8 % of the fits that carry it —
+so any re-derived aggregate must state its excluded share.
 
 ## Layer 2 — SWR-coupling (ripple power as a continuous mark)
 
 `ripple_power_z` (event-mean consensus ripple power — the signal the Kay detector
 thresholds, so `is_swr` is its thresholded version). Per-event regression
-(`scripts/rate/fit_swr_power_model.py`):
+(`scripts/rate/fit_swr_power_model.py`). **Scope note:** this layer was **not**
+part of the 2026-09 refit wave — its numbers are unchanged and have not been
+re-audited against the current tables, so treat them as provisional beside the
+restated rate and content numbers.
 
 - **Distribution is ~unimodal** (Sarle bimodality 0.524; no gap at the detection
   threshold) → the SWR/non-SWR split looks like a **cut on a continuum**, not two
@@ -123,8 +204,10 @@ thresholds, so `is_swr` is its thresholded version). Per-event regression
   detector's actual criterion) is the definitive test and is **not yet run**.
 - Not duration-confounded (`corr(power, duration)` = 0.04).
 - **Reward (+0.141/SD, 5/5, p 5.5e-17)** and **RPE (5/5)** raise SWR power;
-  **exploration lowers it (5/5)**. Combined with Layer 1 (occurrence reward
-  effect only ~1.5×), reward acts on **coupling** more than on bare occurrence —
+  **exploration lowers it (5/5)**. Combined with Layer 1 (the reconstructed
+  occurrence kernel puts the immediate reward effect at RR 1.22 for detected
+  SWRs, 1.44 for SWR-coupled non-local events and 0.99 for non-SWR non-local
+  events), reward acts on **coupling** more than on bare occurrence —
   i.e. the binary "with-SWR rate" dissociation is largely reward pushing events'
   ripple power up across the threshold. *Caveat:* the power-model reward covariate
   is the **current-well** reward (corr 0.799 with current `reward_outcome`,
@@ -136,179 +219,216 @@ thresholds, so `is_swr` is its thresholded version). Per-event regression
 
 ## Layer 3 — Content (represented arm)
 
-Arm-hierarchy conditional Poisson (`MODEL_HIERARCHY`), re-fit on the 2026-06-24
-tables. Content predictors are *arm-relative* (a constant-across-arms covariate
-cancels in the per-event normalization), so scalar behavioral covariates enter
-only as **interactions with `is_current_arm`** (the arm the animal occupies).
+Conditional-Poisson arm ladder on the **per-event allocation fraction** with
+event-clustered SEs (refit 2026-09-05). Content predictors are *arm-relative* (a
+constant-across-arms covariate cancels in the per-event normalization), so
+scalar behavioral covariates enter only as **interactions with
+`is_current_arm`** (the arm the animal occupies). Every coefficient below is an
+animal-balanced median with animals-positive-of-5 and a session sign-rank FDR q,
+and every `swr_x_...` term states whether it is the length-adjusted **direct**
+effect (`BASEc`) or the **total** effect (`nt` twin on `BASEc_NT`).
 
-**Re-verified hierarchy (reproduces the documented findings, several near-exactly):**
+**The anchors:**
 
-| finding | non-SWR (M5) | with-SWR (M5) |
+| finding | rung / term | value |
 | --- | --- | --- |
-| current-arm bias (`is_current_arm`) | **+0.881** (RR2.41, 5/5, p 4e-28) | +0.509 (RR1.66, weaker → broadened) |
-| avoids last-rewarded-elsewhere | **−1.485** (5/5, p 2e-11) | strongly neg. (−11.73 = sparse-subset **separation artifact**, 89/169 separated; direction robust, magnitude not) |
-| raw recent arm reward fraction (`reward_fraction_candidate_arm_last10_visits`) | **+0.00 (p 0.31, null)** | **−0.065 (p 0.066, marginal)** — no consistent value main effect |
-| SWR broadening (arm-all M6) | — | `swr_x_current` −0.84, `swr_x_prev` −1.06 (5/5) |
+| current-arm bias, pooled | `C2_base` `is_current_arm` | **+0.681** (218 sessions, 5/5, q < 0.0001) |
+| current-arm bias, non-SWR | same, nonSWR population | **+0.685** (215 sessions, 5/5) |
+| current-arm bias, SWR | same, SWR population | **+0.720** (199 sessions, 5/5) |
+| SWR less current-locked (direct) | `CS1_current` `swr_x_is_current_arm` | **−0.3731** (218 sessions, 0/5, q < 0.0001) |
+| SWR less current-locked (total) | `CS1nt_current` | **−0.5985** (218 sessions, 0/5, q < 0.0001) |
+| SWR less prev-locked (direct) | `CS2_prev` `swr_x_is_prev_arm` | **−0.6436** (217 sessions, 1/5, q < 0.0001) |
+| arm reward fraction, non-SWR | `C3_armreward` `reward_fraction_candidate_arm_last10_visits` | **+0.0515** (215 sessions, 3/5, q 0.335) — null |
+| arm reward fraction, SWR | same, SWR population | **−0.2257** (196 sessions, 1/5, q 0.0078) |
+| SWR avoids recently-rewarded arms (direct) | `CS4_armreward` `swr_x_reward_fraction_candidate_arm_last10_visits` | **−1.1976** (218 sessions, 0/5, q < 0.0001) |
+| ... (total) | `CS4nt_armreward` | **−1.3346** (218 sessions, 0/5, q < 0.0001) |
+| current-patch bias | `CP0_base` `is_current_patch` | **+1.0767** (208 sessions, 5/5, q < 0.0001) |
+| SWR less patch-locked (direct / total) | `CPS1_current` / `CPS1nt_current` `swr_x_is_current_patch` | **−0.0709** (216 sessions, 2/5, q 0.608) / **−0.2615** (218 sessions, 0/5, q < 0.0001) |
 
-So **non-SWR content is value-neutral; with-SWR content is value-avoidant**
-(broadened off current/prev, avoids recently-rewarded — the last-rewarded-elsewhere
-row, still strongly negative; the raw arm reward-rate main effect is only marginal).
-Patch-level mirrors arm. *(These older pooled-M5 rows are corrected in place but are
-superseded by the C-split in the 2026-07-02 update below; the SWR×value result
-(content *avoids* high beta value, `swr_x_q_arm −2.45`) is in that block.)*
+So **non-SWR content is reward-value-neutral while with-SWR content avoids
+recently rewarded arms**, and SWR content is less locked to the current arm, the
+previous arm and the current patch — with the caveat that the patch-level
+current contrast survives only as a **total** effect. The current-arm bias is
+not an estimator artifact: count **+0.626**, fraction **+0.681**, DM **+0.737**,
+all 5/5, fraction bootstrap [+0.405, +1.496].
 
-**New — behavioral modulation of current-arm content** (`is_current_arm`
-interactions, **duration-controlled** with
-`log1p_time_since_stop_start_s_z_x_is_current_arm`;
-`scripts/exploratory/_content_reward_interactions.py`):
+**"SWR broadens content", measured directly rather than inferred from arm
+coefficients.** The Dirichlet-multinomial adds a within-event **concentration**
+parameter the conditional estimators do not have. `log_phi_is_swr` is **+1.799**
+on `C2_base` (animal bootstrap [+1.447, +2.205]), positive for **5/5 animals and
+100 % of sessions**, and positive on every rung of the pooled table. Large φ
+means the event's timebins sit closer to independent draws from its own arm
+distribution and its mass is spread over more arms, so an SWR event's φ is
+≈ e^1.80 ≈ **6×** a non-SWR event's. **Caveat — φ is assumed length-invariant.**
+The likelihood uses event length only as the multinomial index, and length is
+post-treatment with respect to `is_swr`: SWR events run **1.73×** longer (median
+45 vs 26 bins). The length-adjusted twin (`_dm_len`) puts the contrast at
+**+1.502** on `C2_base` (5/5, q 2.7e-37) — ≈ **4.5×** at the same length — with
+the length term itself at **+0.522 per SD**. About a sixth of the total runs
+through event length and the finding survives. Quote the total (+1.80) or the
+length-adjusted (+1.50) figure, but say which. This is a statement about
+**within-event timebin redundancy**, not about which arms are represented.
 
-| interaction | non-SWR | with-SWR | reading |
-| --- | --- | --- | --- |
-| within-stop time (`log1p_time_since_stop_start_s_z_x_is_current_arm`) | **+0.23** (5/5, p 3e-10) | **+0.40** (5/5) | content **deepens onto** current arm over the stop |
-| reward (`rew_x_current`) | **−0.76** (5/5, p 6e-5) | −0.13 (n.s.) | reward pushes non-SWR content **off** current |
-| current value (`value_x_current`) | **−0.53** (5/5, p 4e-3) | −0.25 (n.s.) | high-value current → off current |
-| exploration (`switch_x_current`) | **+0.53** (4/5, p 0.02) | **+1.21** (5/5, p 1e-4) | exploration **locks** content onto current |
+**The reward-memory (last-rewarded) family is refused as unidentified.** It has
+no usable rung in the per-session arm ladder (see
+[design/model_history.md](design/model_history.md)), and the previous avoidance
+coefficients — −1.485 at the arm grain, −1.62 SWR-split, −1.49 patch-grain — are
+**withdrawn with no replacement number**.
 
-Note: the reward effect **strengthened** under the duration control (−0.32→−0.76),
-because the within-stop drift runs *toward* current
-(`log1p_time_since_stop_start_s_z_x_is_current_arm` > 0) and was
-masking it — so it is not a dwell artifact. The reward/value content effects are
-**non-SWR-specific**; exploration and within-stop deepening hold for both types.
+**Behavioral modulation of the current-arm bias is PENDING.** The
+`is_current_arm` interaction block fit by an exploratory script (reward x
+current, scheduled-contingency x current, patch-switch-fraction x current,
+within-stop time x current: the −0.76 / −0.53 / +0.53 / +0.23 quartet) used the
+retired count response; those coefficients are withdrawn until refit. What
+survives on the fraction response is the `C`-rung interaction set below.
 
-### Update 2026-07-02 — content `is_swr`-contrast ladder (arm + patch, `is_swr` split)
+### Content `is_swr`-contrast ladder (arm + patch)
 
 Content analog of the rate `is_swr`-contrast ladder, with the beta-bernoulli
-covariates entered as `_x_is_current_arm` products (event scalars) or per-arm main
-effects. Runner `scripts/content/fit_swr_contrast_content.py`; 218 sessions →
-`models/swr_contrast_content_{arm,patch}.pkl`. Conditional Poisson over arms(9)/
-patches(3), per-session fit + across-session median / signed-rank / per-animal (n/5).
-**Value construct: beta-bernoulli
-`reward_belief_mean_candidate_arm_preoutcome` (the single behavioral model since the
-2026-07-13 HMM retirement).** The value–content result is that **content *avoids*
-high beta-value arms** — `swr_x_q_arm −2.45, 5/5, p=2e-36` (refit 2026-07-13). The
-earlier "construct-dependence" caveat is **moot**: there is one construct now (the
-retired HMM `q_arm_hmm` had shown the opposite `+1.06` sign, but it is gone). The
-beta value-avoidance reinforces the exploration reading — uncertainty↑ and value↓
-both point to under-explored arms. Audited per-fit SE/p and family FDR are in place;
-within-group-centered VIF and a common complete-case cohort remain deferred (see the
-runner provenance).
+covariates entered as `_x_is_current_arm` products (event scalars) or per-arm
+main effects. Runner `scripts/content/fit_swr_contrast_content.py`; refit
+2026-09-05 on the per-event fraction response with event-clustered SEs. The
+value construct is beta-bernoulli
+`reward_belief_mean_candidate_arm_preoutcome` — the single behavioral model
+since the 2026-07-13 HMM retirement, so the old "construct-dependence" caveat is
+moot.
 
-- **Anchors reproduce at full power:** `is_current_arm` +0.69 (5/5); SWR broadening
-  `swr_x_current` −0.81 (p=7e-35), `swr_x_prev` −0.93; SWR reward/value-avoidance
-  `swr_x_reward_rate_arm` −1.72 / `swr_x_q_arm` −2.45 / `swr_x_last_rewarded` −1.62
-  (all 0/5, p<1e-11). Net of autocorrelation controls (`C2_base`), the SWR current-
-  bias **vanishes** (−0.04 n.s.) while non-SWR persists (+0.67, p=3e-11).
-- **Beta state modulation of the current-bias** (refit 2026-07-13, beta covariates):
-  relative value ΔV
-  (`relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm` +0.16,
-  4/5, p=9e-15; SWR +0.16 5/5). **Read the
-  sign with care:** ΔV is *Switch − Stay*, and is ~ −(the current arm's stay value)
-  (r = −0.952 with the stay value, −0.890 with `q_chosen`). So a positive coefficient
-  means content sharpens onto the current arm when that arm's value is **low** — not
-  "value sharpens onto current", which is how this line previously read;
-  **RPE pushes off current** (`rpe_postoutcome_z_x_is_current_arm` −0.24,
-  5/5, p=2e-11;
-  non-SWR −0.20) — value and RPE oppose; value-update **sharpens onto current**
-  (`reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm`
-  +0.28, 5/5, p=3e-20; SWR +0.34). The scalar **belief-entropy
-  interaction is null**
-  (`reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm`
-  −0.00 n.s.) — the beta-entropy scalar
-  does not modulate current-arm focus (the per-arm uncertainty *main effect* is the
-  content-uncertainty result, C13 below; do not conflate).
-- **New — context/switch strongly modulate content:** **exploration locks content
-  onto current**
-  (`patch_switch_fraction_last5_completed_trips_z_x_is_current_arm` +0.23,
-  5/5, p=1e-17; SWR +0.34 — reproduces the prior +0.53); later-in-block moves
-  **off** current (`trials_since_block_change_z_x_is_current_arm` −0.19,
-  p=6e-12); near a switch → **broader/off-current**
-  (`periswitch_index_trials_z_x_is_current_arm` +0.33, 5/5).
-- **Patch:** current-patch bias +1.05 (5/5); SWR broadens off-patch
-  (`swr_x_is_current_patch`
-  −0.38, p=3e-18); avoids the abandoned patch (`swr_x_last_rewarded_patch` −1.49,
-  p=9e-5); exploration → current patch (+0.16). The switch-timing rungs (old-patch
-  decay `CP2`, new-patch growth `CP3`, `CPS3`) are **sparse/unstable** (n=43–62;
-  `CP2` magnitude unreliable) — the design-flagged rungs.
-- **Rate↔content asymmetry:** on *rate*, non-SWR events are the broadly task-modulated
-  ones; on *content*, several modulations (value, uncertainty, periswitch, switchrate)
-  are **SWR-equal-or-stronger** — SWR content is *broader* at baseline yet *more
-  retunable* by value/uncertainty/context.
+**State modulation of the current-arm bias** (all `_x_is_current_arm` products,
+animal-balanced median, animals-positive/5, session sign-rank FDR q):
 
-### Update 2026-07-08 — per-arm uncertainty (exploration); realized-gain test; CS6 caveat; prediction-model status
+| rung / term | pooled `all` | SWR | non-SWR |
+| --- | --- | --- | --- |
+| `C1_current` `is_current_arm` (no autocorrelation controls) | +0.8732 (218, 5/5) | +0.8999 (218, 5/5) | +0.8939 (218, 5/5) |
+| `C4_armvalue` `reward_belief_mean_candidate_arm_preoutcome` | +0.0835 (218, 3/5, q 0.295) — null | −0.2886 (189, 2/5, q 0.401) | +0.0472 (209, 3/5, q 0.355) |
+| `C6_rpe` `rpe_postoutcome_z` | −0.0816 (218, 0/5, q < 0.0001) | −0.0786 (197, 2/5, q 0.949) | −0.1639 (214, 0/5, q < 0.0001) |
+| `C7_value` `relative_value_switch_minus_stay_preoutcome_z` | +0.0777 (217, 4/5, q < 0.0001) | +0.1009 (193, 5/5) | +0.0995 (214, 4/5, q 0.0016) |
+| `C8_uncert` `reward_belief_differential_entropy_leaf_mean_preoutcome_z` | −0.0369 (218, 2/5, q 0.354) — null | +0.0273 (196, 3/5, q 0.133) | −0.0491 (214, 2/5, q 0.355) |
+| `C9_update` `reward_belief_mean_update_l1_all_ports_postoutcome_z` | +0.2282 (218, 5/5, q < 0.0001) | +0.1964 (196, 5/5) | +0.1967 (216, 5/5) |
+| `C10_periswitch` `periswitch_index_trials_z` | +0.2273 (197, 5/5, q 0.0001) | — | +0.0183 (174, 4/5, q 0.080) |
+| `C11_block` `trials_since_block_change_z` | −0.0613 (218, 0/5, q < 0.0001) | −0.0879 (195, 1/5) | −0.0603 (215, 0/5, q 0.011) |
+| `C12_switchrate` `patch_switch_fraction_last5_completed_trips_z` | +0.2658 (216, 5/5, q < 0.0001) | +0.2581 (195, 5/5) | +0.1964 (210, 5/5) |
+| `C13_armuncert` `reward_belief_variance_candidate_arm_preoutcome_z` (per-arm main effect) | +0.3764 (218, 5/5, q < 0.0001) | +0.3680 (188, 5/5) | +0.2810 (208, 5/5) |
 
-New per-arm content covariate
-**`reward_belief_variance_candidate_arm_preoutcome`** = the per-leaf beta belief
-variance (the variance counterpart of
-`reward_belief_mean_candidate_arm_preoutcome` from the
-SAME Beta posterior). Built into `event_arm_table` (leaf arm *j* → `betadist_var{j+1}`,
-trunk arms → 0.0, standardized `arm_uncertainty_z`); models `Mu`/`Mvu` (hierarchy)
-and `C13`/`CS6` (is_swr ladder). Commits `bfb0012` + `f3d1656`; generative-model
-assumptions in [behavior_models.md](behavior_models.md); memory
-`project_arm_uncertainty_content`.
+Readings. **Exploration locks content onto the current arm** (`C12`, 5/5 in both
+populations) and **near a patch switch content moves off it** (`C10`, pooled
+5/5, but the non-SWR split is a null at +0.02). **RPE pushes off current**
+(`C6`, 0/5 positive pooled and in non-SWR). **Relative value ΔV sharpens onto
+current** (`C7`) — but read the sign with care: ΔV is *Switch − Stay*, so a
+positive coefficient means content sharpens onto the current arm when that arm's
+value is **low**. **Value-update sharpens onto current** (`C9`, 5/5
+everywhere). The **scalar belief-entropy interaction is null** (`C8`) — the
+per-arm uncertainty *main effect* (`C13`) is the content-uncertainty result; do
+not conflate them. The **arm-value main effect is a null** (`C4`), so the value
+story lives entirely in the SWR interaction below.
 
-- **Content over-represents high-uncertainty arms** — `M5→Mu` ΔLR 371, p=1.7e-36;
-  `arm_uncertainty_z` **+0.83, 5/5, p=3e-32**. This is the exploration / gain axis
-  (Mattar-Daw) the value/reward/space ladder was missing.
-- **NOT a recency/reward confound.** VIF-decomposition: recency adds only **+1% R²**
-  beyond arm structure; the recency-*orthogonalized* effect **+0.62 (5/5, retains
-  74% of the raw +0.83)** survives.
-  The high raw **VIF 18 is a structural artifact** of the trunk=0 encoding against the
-  arm FE (arm FE alone explain **75%** of
-  `reward_belief_variance_candidate_arm_preoutcome`), not a scientific confound —
-  the effect is identified from within-leaf-arm variation.
-- **SWR separation — trust the split (`C13`), NOT the pooled (`CS6`).** Split: both
-  populations over-represent uncertain arms, **SWR +0.99 > non-SWR +0.60** (5/5 each) —
-  SWR weights uncertainty *more* (the SWR enhancement holds in **69% of sessions**;
-  chimi ≈ null). The pooled `CS6` interaction (`swr_x_arm_uncertainty_z`
-  **−0.41**, 0/5) is an **artifact** (its SWR *component* is still **+0.62**, positive —
-  not below baseline): the shared arm FE (75%-collinear with uncertainty)
-  differ by SWR population and the misfit leaks into the interaction. Neither
-  `swr_x_current` nor `swr_x_recency` rescues it; the **saturated `is_swr × ALL BASEc`
-  model recovers +0.39 = the split.** General lesson: **pooled `swr_x` contrasts are
-  unreliable for any covariate tied to arm identity** — report the split.
-- **Exploit-vs-explore: the `Mvu` arm-FE degeneracy (VIF 19) is a parameterization
-  artifact, not a real collinearity.** Within-arm (arm-demeaned, non-current-leaf),
-  beta value `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
-  `reward_belief_variance_candidate_arm_preoutcome` separate cleanly
-  (condition number ≈ 3.4, corr ≈ 0.16) — so the beta-only exploit/explore model **is
-  identifiable** in that frame (no HMM value needed; HMM is retired). The within-arm
-  horse-race shows content tracks **uncertainty (+0.06, 5/5)** while beta value is
-  ~null and distance flips negative — the explore axis, ~orthogonal to exploit. See
-  the Phase 5 uncertainty_content extension.
-- **Realized-gain (the PE face of Mattar-Daw) does NOT drive content.** The per-arm
-  realized-gain test used the retired HMM per-leaf update `|Δ hmm_q_port|` and found
-  `M5+gain` **−0.064, 5/5, p=2e-11** (content *avoids* recently-updated arms — the
-  update sits at the just-visited/rewarded arm, a reward/recency-avoidance signal, not
-  gain-seeking); with uncertainty co-fit, uncertainty stayed **+0.83** and gain → −0.03.
-  **The gain axis of content is epistemic UNCERTAINTY, not realized value-update.**
-  *(HMM-era number; the beta per-arm value-update re-run is a Phase-5 to-do — the beta
-  scalar `global_mu_update_abs × current` is +0.28, a different estimand.)*
+**Rate/content asymmetry (restated).** On *content*, several modulations
+(uncertainty, periswitch, switchrate, value-update) are SWR-equal-or-stronger —
+SWR content is *broader* at baseline yet *retunable* by state. The
+matching statement on *rate* rested on the `is_swr`-contrast rate ladder and is
+**PENDING** (see Layer 1).
 
-**Prediction models (Stage 5A — does content predict the next choice?).** The
-behavioral-relevance layer, and the weakest link. `replay_fraction` over a behavioral
-baseline (conditional logit): non-SWR **+0.34 (p=0.019)**, SWR **null** (claims #19d),
-but the model **drops `dist_to_arm`** (quasi-separation — the animal picks the closest
-arm 95–99%), so it is **not distance-controlled** — the +0.34 may be current/nearest-arm
-bias. Content does **not** predict stay/leave (#19e, null across strata). So: replay
-content has, at best, a modest *uncontrolled* choice correlation and no stay/leave signal.
-**The choice-prediction fits exist** (`event_source_comparison/*_comparison_fits.pkl`,
-`choice` / `choice_swr_split`) but are **in-sample only — no held-out CV**. Raw
-`replay_fraction`
-is *negative* (−0.94, 5/5 — current-arm bias: the animal leaves the arm it most replays),
-flipping to **+0.38 over the behavior baseline** (4/5 animals, but only 13% of sessions
-individually significant; in-sample llf gain +0.32, 100% positive but that is guaranteed by
-adding a parameter). The positive signal is carried by **non-SWR content**
-(`replay_fraction_non_swr` +0.335, 5/5) while **SWR content is null**
-(−0.14, n.s.); the split is
-**underpowered (n 214→183)**. So there is a weak, non-SWR-carried, sign-flips-on-control,
-**in-sample-only** choice correlation — not a cross-validated SWR prediction.
+### Per-arm uncertainty (the exploration axis)
 
-**Cross-validation for content models** — the content hierarchy had been fit with the
-hard-count response only, **no CV** (unlike the rate ladder). A `--cv` run over
-`M0a→M5,Mv,Mu,Mvu` (event-based per-session CV) is being added so the uncertainty rungs
-carry held-out `cv_bits` alongside the LR/AIC comparison.
+Per-arm content covariate **`reward_belief_variance_candidate_arm_preoutcome`**
+= the per-leaf Beta belief variance (the variance counterpart of
+`reward_belief_mean_candidate_arm_preoutcome`, from the SAME Beta posterior).
+Built into `event_arm_table` (leaf arm *j* to `betadist_var{j+1}`, trunk arms
+0.0, standardized `_z`); rungs `Mu` / `Mvu` in the arm hierarchy and
+`C13` / `CS6` in the `is_swr` ladder. Generative-model assumptions in
+[behavior_models.md](behavior_models.md).
 
-### Update 2026-07-08 (b) — spatial FORM of SWR vs non-SWR content: wells vs paths, and trajectory start/end
+- **Content over-represents high-uncertainty arms.** On the leaf-only bundle
+  `models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu`, `Mu`'s
+  `reward_belief_variance_candidate_arm_preoutcome_z` is **+0.3509** (session
+  median over 215 sessions, **5/5 animals positive**, median event-clustered SE
+  0.182). This is the exploration / gain axis (Mattar-Daw) the
+  value/reward/space ladder was missing.
+- **It earns its parameter where value does not.** Median per-session ΔAIC
+  against the nested parent (positive = child wins): `M4 → Mu` **+1.80** (103 of
+  215 sessions, 5/5 animals child-better), against `M4 → Mv` **−2.34** (0/5) and
+  `Mu → Mvu` **−1.61** (0/5).
+- **Both populations over-represent uncertain arms, SWR more so.** The split
+  `C13_armuncert` gives **SWR +0.3680** (188 sessions, 5/5) against **non-SWR
+  +0.2810** (208 sessions, 5/5), pooled `all` **+0.3764** (218 sessions, 5/5),
+  every q < 0.0001.
+- **The pooled `swr_x` interaction is null as a direct effect and positive as a
+  total effect, and the two estimators agree on each.** *Direct*
+  `CS6_armuncert` — fraction **+0.0037** (218 sessions, 3/5, q 0.392) and DM
+  **−0.027** (2/5, q 0.564). *Total* `CS6nt_armuncert` — fraction **+0.1807**
+  (218 sessions, **5/5**, q < 0.0001) and DM **+0.146** (4/5, q 7.5e-12). So the
+  extra SWR weighting on uncertainty appears in the **total** contrast and
+  vanishes once event length is held fixed. The earlier reading — that the
+  pooled `CS6` interaction was a nine-arm fixed-effect artifact — is superseded:
+  on the leaf-only fraction fit the direct interaction is simply a null.
+- **PENDING (not re-derived on the fraction response):** the
+  recency-orthogonalized uncertainty effect (+0.62), the recency VIF
+  decomposition, the within-arm value-by-uncertainty horse-race (uncertainty
+  +0.06 with value and recency near zero), the `Mvu` VIF diagnostics, and the
+  per-arm realized-gain test. All were count-response fits; their numbers are
+  withdrawn until refit. The *design* conclusions they supported — that the
+  within-arm frame identifies value and uncertainty separately, and that the
+  gain axis of content is epistemic uncertainty rather than realized
+  value-update — are retained as hypotheses, not as measurements.
+
+### SWR by arm value — the one estimator-dependent conclusion
+
+`CS5_armvalue`'s `swr_x_reward_belief_mean_candidate_arm_preoutcome` is the only
+term in the whole three-estimator comparison whose sign moves with the
+likelihood. Animal-balanced median, animals-positive/5, animal-bootstrap
+2.5–97.5, on the fully paired 216-session cohort:
+
+| estimand | count (retired) | fraction (shipped) | Dirichlet-multinomial |
+| --- | --- | --- | --- |
+| **direct** (`CS5_armvalue`, length-adjusted) | −0.398 (1/5) [−0.904, +0.199] | **+0.237 (3/5) [−1.322, +0.539]** | −0.316 (0/5) [−1.136, −0.057] |
+| **total** (`CS5nt_armvalue`) | — | **−0.6506** (1/5, q < 0.0001) | **−0.638** (0/5, q 7.9e-10) |
+
+The shipped audited fraction fit reads **+0.2366** (216 sessions, 3/5, q 0.117);
+the DM's direct q is 0.025. **The DIRECT effect's sign is estimator-dependent** —
+count and DM negative, the shipped fraction estimator positive; the three
+bootstrap intervals overlap heavily, only the DM's excludes zero and only the DM
+has 0/5 animals positive — **while the TOTAL (`nt`) effect is negative under
+both estimators that fit it.** Report it as a three-way comparison; do not write
+"the DM confirms value avoidance" without saying that the shipped estimator does
+not.
+
+The rung is also barely worth its parameters on either honest scale: median
+per-session ΔAIC against `C2_base_leaf` is **+2.524** (fraction) and **+2.252**
+(DM), against **−85.415** on the retired count scale — the count figure is the
+timebin-pseudoreplication artefact, not an effect.
+
+**Where the count-response avoidance went** (response x design factorial,
+session-median coefficient): count/`NT` **−0.980** (0/5 animals positive) →
+count/full **−0.398** (1/5) → fraction/full **−0.114** (3/5). The event-length
+adjustment and the response change each remove roughly half and act
+approximately additively (additive prediction +0.03 against the observed −0.11);
+`chimi` and `wilbur` are negative in every cell. Read the table as "the
+count-response avoidance does not survive either change", **not** as evidence of
+a positive effect.
+
+`CS5b_valuevsprevgoal`, the previous-goal control rung, is **refused as
+unidentified**: 132 sessions with **94 flagged separated** under the DM (−0.316,
+1/5, q 0.294); the fraction fit has 133 sessions (+0.1840, 3/5, q 0.396).
+
+### Prediction models — does content predict the next choice?
+
+The behavioral-relevance layer, and the weakest link. `replay_fraction` over a
+behavioral baseline (conditional logit): non-SWR **+0.34 (p 0.019)**, SWR
+**null** — but the model **drops `dist_to_arm`** (quasi-separation: the animal
+picks the closest arm 95–99 % of the time), so it is **not distance-controlled**
+and the +0.34 may be current/nearest-arm bias. Content does **not** predict
+stay/leave (null across strata). Raw `replay_fraction` is *negative* (−0.94,
+5/5 — the current-arm bias: the animal leaves the arm it most replays), flipping
+to **+0.38** over the behavior baseline (4/5 animals, but only 13 % of sessions
+individually significant). The fits are **in-sample only — no held-out CV** —
+and the SWR split is underpowered (n 214 → 183). So: a weak, non-SWR-carried,
+sign-flips-on-control, in-sample-only choice correlation, not a cross-validated
+prediction. These fits were **not** part of the 2026-09 refit wave and have not
+been re-derived on the fraction response.
+
+### Spatial FORM of SWR vs non-SWR content: wells vs paths, and trajectory start/end
+
+*(Content-occupancy and trajectory rollups. Neither is a content-ladder fit and
+neither was part of the 2026-09 refit wave.)*
 
 **Correction to the "non-SWR is current-focused" framing.** The arm-model
 `is_current_arm`
@@ -355,104 +475,126 @@ are **predominantly *behind* the animal** (max_behind ≫ max_ahead → retrospe
 **rarely ends at the next chosen arm** (7–12%) — consistent with not-choice-predictive. A
 formal SWR-split trajectory characterization has **not** been run/reported yet.
 
-### Update 2026-07-27 — distinction from Gillespie et al. 2021 (Neuron)
+### Distinction from Gillespie et al. 2021 (Neuron)
 
-Gillespie et al. 2021 (same lab, same clusterless decoder, predecessor spatial task)
-is the key replication risk for the content layer. Much of our **spatial** content
-ladder *recovers* their results (a pipeline validation, to be framed as replicate +
-extend, not as new): current-arm bias (their Fig 8), immediate-past suppression,
-the **future/choice null** (#19d ↔ their Fig 5), and reward-history dependence
-(their Fig 3/6).
+Gillespie et al. 2021 (same lab, same clusterless decoder, predecessor spatial
+task) is the key replication risk for the content layer. Much of our **spatial**
+content ladder *recovers* their results (a pipeline validation, to be framed as
+replicate + extend, not as new): current-arm bias (their Fig 8), immediate-past
+suppression, the **future/choice null** (their Fig 5), and reward-history
+dependence (their Fig 3/6).
 
-**Open — previous-goal sign disagrees.** Gillespie report previous-goal
-*enrichment* (their Fig 8); every estimate in this document goes the other way
-(`is_last_rewarded_noncurrent_arm` −1.485, 5/5, p 2e-11 at the arm grain; SWR-split
-`swr_x_last_rewarded` −1.62; patch-grain −1.49). This is a **divergence to
-explain, not a replication** — resolve before framing the spatial ladder as
-"replicate + extend".
+**The previous-goal comparison can no longer be made.** Gillespie report
+previous-goal *enrichment* (their Fig 8). Our reward-memory family is **refused
+as unidentified** — it has no usable rung in the per-session arm ladder (see
+[design/model_history.md](design/model_history.md)) — and the previous-goal
+control rung `CS5b_valuevsprevgoal` fits on only **132 sessions with 94 flagged
+separated** under the DM (−0.316, 1/5, q 0.294; the fraction fit has 133
+sessions, +0.1840, 3/5, q 0.396). The earlier avoidance coefficients (−1.485 at
+the arm grain, −1.62 SWR-split, −1.49 patch-grain) and the −0.79
+SWR-by-previous-goal interaction are **withdrawn**. Neither a divergence nor a
+replication can be claimed from this rung as it stands.
 
-Two headline claims are **not** reducible to Gillespie:
+**The graded-value discriminant is retired as stated.** It rested on
+`CS5b_valuevsprevgoal` leaving the SWR by arm-value interaction unmoved at
+−2.45 → −2.43. Both numbers came from the retired count response and the rung is
+unidentified, so the discriminant is withdrawn. What remains is the arm-value
+result itself: **estimator-dependent** in its direct form and negative in its
+total form (−0.6506 fraction / −0.638 DM; see the CS5 section above).
+Gillespie's binary-goal task structurally cannot yield a graded-value
+coefficient either way, so the *conceptual* novelty stands even though the
+discriminating fit does not.
 
-- **Graded-value avoidance is not the previous-goal effect (their Fig 8).** Refitting
-  `CS5` with the previous-goal analog added (`CS5b_valuevsprevgoal` =
-  `+ is_last_rewarded_noncurrent_arm + swr_x_is_last_rewarded_noncurrent_arm`),
-  `swr_x_reward_belief_mean_candidate_arm_preoutcome`
-  is **unmoved: −2.45 → −2.43, 5/5 animals, p=8e-28**; the added SWR-by-previous-goal
-  interaction (`swr_x_is_last_rewarded_elsewhere`) is itself significant at −0.79,
-  p=5e-8 — i.e. the two effects coexist, both as avoidance. Their binary-goal task
-  structurally cannot yield a graded-value coefficient; this is genuinely new.
-  *Provenance:* these values came from an exploratory refit that has since been
-  removed; `CS5b_valuevsprevgoal` is now a permanent rung of
-  `SWR_CONTRAST_CONTENT_ARM_LADDER`, so **re-derive them from a standard
-  `fit_swr_contrast_content.py` run** before citing.
-- **Uncertainty→content is not their visit-recency bias (their Fig 7).** In the
-  within-arm frame (arm identity demeaned out), recency's coefficient is ≈0 while
-  uncertainty's is +0.06 (5/5) — the tested `within_arm_horserace` estimand. The
-  global `corr(uncertainty, recency)=0.54` is a **between-arm**
-  artifact. Caveat: this is a *within-arm* estimand (cleaner but different from their
-  *between-arm* binned recency) — the claim is "uncertainty dominates recency in the
-  frame that isolates state from arm identity, which Fig 7 could not separate," not a
-  refutation of Fig 7.
+**Uncertainty-to-content vs their visit-recency bias (their Fig 7)** remains a
+distinction of *estimand* — theirs is between-arm binned recency, ours is
+within-arm — but the numeric within-arm horse-race backing it was a
+count-response fit and is **PENDING** re-derivation.
 
 The remaining structurally-novel axes (no Gillespie analog): the **SWR/non-SWR
 dissociation** and the **rate/intensity models** (they modeled content only).
 
 ## The intersection — what's new here
 
-**The covariate atlas** (duration-controlled where applicable; non-SWR | with-SWR):
+**The covariate atlas.** Rate entries come from the per-bin ladder's
+reconstructed reward kernel; content entries are per-event fraction coefficients
+with their estimand named.
 
-| driver | RATE / coupling | CONTENT (current-arm) |
+| driver | RATE / coupling | CONTENT (current arm) |
 | --- | --- | --- |
-| reward | non-SWR small (~1.11×) but reliable / **with-SWR ↑ rate & coupling** | **non-SWR ↓ current** / with-SWR n.s. |
-| current value | with-SWR ↑ rate (modest) | **non-SWR ↓ current** / with-SWR n.s. |
-| exploration | **both ↓ SWR-coupled rate** | **both ↑ current** (with-SWR stronger) |
-| within-stop time | rate rise→plateau | **both deepen onto current** |
+| immediate reward (kernel lag 1) | non-SWR **0.99×** (no immediate response after control) vs with-SWR **1.44×**; paired in 79.2 % of 216 sessions, 5/5 animals | the current-arm interaction is **PENDING** (count-response fit withdrawn) |
+| recent reward (kernel lags 3–10) | **shared**: RR ≈ 0.89–0.97 in all four populations | arm reward fraction non-SWR **+0.05 (null)** vs SWR **−0.23**; SWR contrast **−1.20** direct / **−1.33** total |
+| arm value | not in the shipped rate ladder (**pending**) | main effect null (+0.08); the direct SWR interaction is **estimator-dependent** (fraction +0.24 / count −0.40 / DM −0.32), the total is **−0.65 / −0.64** |
+| arm uncertainty | not in the shipped rate ladder (**pending**) | both populations over-represent uncertain arms, **SWR +0.37 > non-SWR +0.28**; pooled SWR interaction null direct, **+0.18** total |
+| exploration (patch-switch fraction) | **pending** | **locks content onto the current arm** in both: +0.27 pooled, +0.26 SWR, +0.20 non-SWR (5/5 each) |
+| within-stop time | rate rises over ~1.5–2 s then plateaus in every population | the current-arm interaction is **pending** |
 
-**The headline: a double dissociation by SWR status.**
+**The headline, restated: one half solid, one half estimand-dependent.**
 
-> Reward acts on with-SWR **occurrence** but on non-SWR **content**.
+> Reward gates with-SWR **occurrence**; the content half of the old double
+> dissociation is not currently quotable as a coefficient.
 
-- **with-SWR:** reward/value/RPE gate **how much** (rate 3.9×, coupling); content
-  is **broad and value-avoidant by default** and is **not** retuned by the
-  immediate reward (`rew_x_current` n.s.).
-- **non-SWR:** reward/value only weakly gate how much (rate ~1.11×, small but
-  reliable 5/5 — a ratio dissociation, not flat-vs-gated); content is
-  **current-locked but dynamically pushed off-current** by immediate reward/value
-  (`rew_x_current` −0.76).
-- **Shared:** exploration suppresses SWR-coupled rate yet **concentrates** content
-  on current in both; content **deepens onto current** through the stop in both.
+- **Occurrence (solid).** The immediate reward component dissociates — kernel
+  lag 1 RR **1.44** (SWR-coupled non-local) vs **0.99** (non-SWR), paired in
+  **79.2 % of 216 sessions, 5/5 animals, p 7.8e-22** — while the slower
+  recent-reward component is **shared** by all four populations. So non-SWR
+  events are a **less consummatory/reward-coupled mode** that obeys the same
+  slower recent-reward baseline.
+- **Content (restated).** SWR content is less current-locked (**−0.37** direct /
+  **−0.60** total) and less prev-locked (**−0.64**), avoids recently rewarded
+  arms (**−1.20** / **−1.33**), and is **broader within the event**
+  (`log_phi_is_swr` **+1.80** total, **+1.50** length-adjusted, 5/5 animals,
+  100 % of sessions). Whether it also avoids high-**value** arms is
+  estimator-dependent in the direct form and negative in the total form.
+- **Shared.** Exploration concentrates content on the current arm in both
+  populations; both over-represent uncertain arms.
+- **Withdrawn.** "Reward pushes non-SWR content off the current arm" and its
+  with-SWR null — both from the retired count response.
 
 ## Confirmed (robust: multi-control and/or 5/5 animals)
 
-1. Rate baseline ordering and the dominant time-course/reward-history/self-history
-   structure (all populations).
-2. **Exploration suppression of SWR-coupled rate** (0.57× (G3), p 5e-10 —
-   model-fragile magnitude; source-independent — does not depend on the
-   contingency parse).
-3. **Content current-arm bias** and **last-rewarded-elsewhere avoidance**
-   (non-SWR), reproduced on current tables (+0.881 / −1.485).
-4. **Non-SWR content is value-neutral; with-SWR content is value-avoidant.**
-4b. **Content over-represents high-*uncertainty* arms** (`Mu` +0.83, 5/5, p=3e-32),
-   robust to the recency confound (VIF-decomposition: recency +1% R²; recency-
-   orthogonalized +0.62 = 74% retained, 5/5). Present in both populations, **stronger in SWR** (split
-   `C13` +0.99 vs +0.60). The exploration/epistemic axis — *not* realized value-update
-   (per-arm gain is negative). See the 2026-07-08 update.
-5. **SWR broadening** of content off current/prev.
-6. **Reward/value push non-SWR content off the current arm** (duration-controlled,
-   5/5); **exploration locks content onto current** (both types).
-7. **The double dissociation** (reward → with-SWR rate, non-SWR content).
-8. **The reward-driven off-current content is spike-supported, not a decode/
-   consummation artifact.** Reality engine (`analyze_event_spike_evidence.py`,
-   5 sessions): post-reward off-current (nonSWR-remote) `dll_per_spike` = 0.63,
-   **99% > 0** vs baseline ≈ 0; rewarded ≈ omitted (0.63 vs 0.65), so reward does
-   not degrade spike support. The off-current (remote) fraction of non-SWR events
-   rises 0.45 → 0.50 with reward (the `rew_x_current` shift, replicated).
-9. **Off-current content's destination is the "novel" patch.** On patch-switch
-   events the off-current content prefers the **third (other) patch over the
-   previous patch** (non-SWR 0.24 vs 0.19; with-SWR 0.23 vs 0.16) — and the
-   previous patch is avoided largely because it is often the **last-rewarded**
-   one (30%/20% vs 1–2% for the third patch). So replay samples the
-   non-recent, non-rewarded option, not where it came from.
+1. **Rate baseline ordering and the dominant structure.** Non-local (all)
+   **0.408** > detected SWR **0.282** > non-local no-SWR **0.234** > non-local
+   w/ SWR **0.180** events/s. The within-stop time course is what calibrates the
+   process (KS-in-band 0.50 → 0.85 at `M5_time`), with self-history clustering
+   and a smooth reward kernel on top.
+2. **The immediate-reward dissociation.** Kernel lag 1 RR **1.44** (non-local
+   w/ SWR) vs **0.99** (non-local, no SWR); paired within session in **79.2 % of
+   216 sessions, 5/5 animals, p 7.8e-22**. The slower recent-reward component
+   (lags 3–10, RR ≈ 0.89–0.97) is **shared** across all four populations.
+3. **Events are strongly non-Poisson** — refractory then bursty, peak RR
+   **1.72–2.64** by population, SWR-coupled non-local events the most tightly
+   bursty and non-SWR the flattest.
+4. **Content current-arm bias.** `C2_base` `is_current_arm` **+0.681** (218
+   sessions, 5/5, q < 0.0001), present in both populations (non-SWR +0.685 /
+   SWR +0.720) and sign-consistent across all three estimators (count +0.626 /
+   fraction +0.681 / DM +0.737).
+5. **SWR content is less current- and prev-locked, and broader within the
+   event.** `swr_x_is_current_arm` **−0.3731** direct / **−0.5985** total;
+   `swr_x_is_prev_arm` **−0.6436**; `log_phi_is_swr` **+1.799** (5/5 animals,
+   100 % of sessions), **+1.502** length-adjusted.
+6. **Non-SWR content is reward-value-neutral; with-SWR content avoids recently
+   rewarded arms.** `C3_armreward` non-SWR **+0.0515** (q 0.335) vs SWR
+   **−0.2257** (q 0.0078); the pooled SWR interaction is **−1.1976** direct /
+   **−1.3346** total and negative under all three estimators.
+7. **Content over-represents high-uncertainty arms.** `Mu`
+   `reward_belief_variance_candidate_arm_preoutcome_z` **+0.3509** (215
+   sessions, 5/5); split `C13_armuncert` SWR **+0.3680** vs non-SWR **+0.2810**
+   (5/5 each). The rung earns its parameter (`M4 → Mu` ΔAIC **+1.80**, 5/5
+   animals child-better) where the value rung does not (`M4 → Mv` **−2.34**,
+   0/5).
+8. **Exploration concentrates content on the current arm** in both populations
+   (`C12_switchrate` **+0.2658** pooled, **+0.2581** SWR, **+0.1964** non-SWR,
+   5/5 each).
+9. **The reward-driven off-current content is spike-supported, not a decode /
+   consummation artifact.** Reality engine (5 sessions): post-reward off-current
+   `dll_per_spike` = 0.63, **99 % > 0** vs baseline ≈ 0; rewarded ≈ omitted
+   (0.63 vs 0.65). *(The content coefficient this was built to check — the
+   reward-by-current-arm interaction — is itself pending refit, so this stands
+   as a reality check on the phenomenon, not on a current number.)*
+10. **Off-current content's destination is the "novel" patch.** On patch-switch
+    events the off-current content prefers the third (other) patch over the
+    previous (non-SWR 0.24 vs 0.19; with-SWR 0.23 vs 0.16). Not a content-ladder
+    fit and not part of the 2026-09 refit wave.
 
 ## Hypotheses (suggestive; need a further test)
 
@@ -460,20 +602,20 @@ dissociation** and the **rate/intensity models** (they modeled content only).
   broadening of content. *Needs:* peri-onset **peak** distribution; the joint MPP.
 - **Reward shifts SWR-coupling continuously** (binary dissociation = thresholded
   shadow). *Needs:* the joint occurrence+mark model.
-- **Value-gating of with-SWR rate is modest and not predictive** — report as a
-  population inferential effect, not a forecaster.
+- **Value-gating of with-SWR rate.** The covariates that carried this are not in
+  the shipped rate ladder and their coefficients are **pending** re-derivation
+  (Layer 1); the hypothesis is retained without a number.
 
 ## Unknown / pending — including the models we DON'T have
 
-- **Clean exploit-vs-explore content model — identifiable within-arm, being built
-  (Phase 5).** The `Mvu` arm-FE degeneracy (VIF 19) was a parameterization artifact:
-  within-arm (arm-demeaned, non-current-leaf) beta value
-  `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
-  `reward_belief_variance_candidate_arm_preoutcome` separate cleanly
-  (cond ≈ 3.4, corr ≈ 0.16). No HMM value needed
-  (HMM retired). The within-arm horse-race already shows the answer — content tracks
-  **uncertainty** (+0.06, 5/5), value ~null — being folded into the
-  `uncertainty_content` feature.
+- **Clean exploit-vs-explore content model — the within-arm frame, not yet refit.**
+  The design conclusion stands: within-arm (arm-demeaned, non-current-leaf) beta
+  value `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
+  `reward_belief_variance_candidate_arm_preoutcome` are separately identifiable,
+  and no HMM value is needed (HMM retired). The **numbers** — the within-arm
+  horse-race coefficients and the `Mvu` conditioning diagnostics — were
+  count-response fits and are **PENDING** re-derivation on the per-event fraction
+  response before any of them can be quoted.
 - **Full marked point process** (joint intensity + coupling + content; shared
   latent; power↔history independence). **Not built.** The three layers are treated as
   separable factors but never jointly fit.
@@ -487,15 +629,23 @@ dissociation** and the **rate/intensity models** (they modeled content only).
 - **Content choice-mediation** (does rate × content predict the next choice). The
   prior choice correlation (#19d) is modest and **not distance-controlled** (`dist_to_arm`
   dropped for quasi-separation); stay/leave is null (#19e).
-- **Per-arm realized-gain: tested (HMM-era), negative.** `|Δ hmm value|` per arm
-  *avoids* content (−0.06, 5/5) — the gain axis of content is epistemic uncertainty,
-  not realized value-update (see the 2026-07-08 update). Not a driver to add; the beta
-  per-arm value-update re-run is a Phase-5 to-do.
-- **CS6-class pooled `swr_x` contrasts are unreliable** for arm-identity-tied covariates
-  (the `swr_x_arm_uncertainty` artifact) — a model to *distrust*, use the split.
-- **Other content responses** (soft-count, posterior-mass) and **CV /
-  model-comparison** for the content hierarchy — the base ladder used the hard-count
-  response only; a `--cv` run (M0a→M5,Mv,Mu,Mvu) is in progress (2026-07-08).
+- **Per-arm realized-gain: tested under the retired HMM covariate and the
+  retired count response, and negative.** Its coefficient is **withdrawn**; the
+  reading it supported — that the gain axis of content is epistemic uncertainty
+  rather than realized value-update — survives only as a hypothesis. The
+  beta per-arm value-update re-run has not been done.
+- **Pooled `swr_x` contrasts on arm-identity-tied covariates: read the split as
+  well.** The earlier fixed-effect-artifact diagnosis of the pooled uncertainty
+  interaction is superseded — on the leaf-only fraction fit the *direct*
+  interaction is simply a null (+0.0037, 3/5) while the *total* twin is positive
+  (+0.1807, 5/5). Report the split (`C13_armuncert`) alongside the pooled pair,
+  and never a pooled contrast without its estimand.
+- **Other content responses and held-out CV for the content hierarchy.** Three
+  responses have now been compared on one cohort — retired count, shipped
+  per-event fraction, and Dirichlet-multinomial
+  ([design/content_estimator_comparison.md](design/content_estimator_comparison.md)) —
+  but the arm hierarchy still has **no held-out cross-validation**; model
+  comparison there rests on ΔAIC on the quasi-likelihood scale.
 
 ## Caveats & confounds (and how addressed)
 
@@ -503,15 +653,24 @@ dissociation** and the **rate/intensity models** (they modeled content only).
   reward content effect uses the **within-well outcome contrast** (rewarded vs
   omitted at the same well, identifiable via the probabilistic schedule), which
   isolates the reward *outcome* from the well's location.
-- **Dwell / within-stop time** (reward → ~3.5× longer stops): controlled by
-  `log1p_time_since_stop_start_s_z_x_is_current_arm`; the reward content effect
-  *strengthened* under
-  it (drift is toward current), so it is not a dwell artifact. Control is linear
-  in `z(log1p t)` — a spline would be stricter.
-- **Collinearity:** `reward_rate_trial_k10` (= mean of the reward lags, VIF ∞)
-  removed; value covariate set curated to VIF ≤ 1.07.
-- **Separation:** with-SWR `is_last_rewarded_noncurrent_arm` magnitude is a sparse-
-  subset artifact (the per-session `ValueError`s) — direction only.
+- **Dwell / within-stop time** (rewarded stops are 3.6× longer on the mean, 1.858 s
+  vs 0.519 s): `BASEc` carries
+  `log1p_time_since_stop_start_s_z_x_is_current_arm`, and the response x design
+  factorial shows this term **changes nothing** on the CS5 coefficient — it is the
+  event-length products, not the within-stop clock, that move it. Control is
+  linear in `z(log1p t)`; a spline would be stricter.
+- **Event length is post-treatment, not a nuisance.** The `BASEc` length products
+  make a `swr_x_...` coefficient a **direct** effect; the `nt` twin gives the
+  **total**. Neither is "the" answer — see the estimand bullet in *Provenance*.
+- **Collinearity:** the trial-level reward-rate covariate (the mean of the reward
+  lags, VIF infinite) was removed; the reward-history block is now a smooth
+  three-feature basis whose coefficients are collinear **by construction**, which
+  is why the kernel is reconstructed rather than read term by term.
+- **Separation:** the whole last-rewarded family is **refused as unidentified**
+  in the per-session fits, and `CS5b_valuevsprevgoal` fits on 132 sessions with
+  94 flagged separated. Per-coefficient separation flags and a
+  `|coef| x SD >= 10` magnitude backstop now decide which session fits enter an
+  aggregate; a rung's excluded share must be stated with its coefficient.
 - **Circularity** (content from the same decoder that defines events): both the
   baseline current-arm claim *and* the new reward-driven off-current content
   clear the spike-evidence engine (post-reward off-current `dll_per_spike` 0.63,
@@ -526,16 +685,23 @@ dissociation** and the **rate/intensity models** (they modeled content only).
 
 ## Reproducibility (scripts & key commits)
 
-- Rate: `scripts/rate/fit_per_bin_rate_models.py`, `fit_uncertainty_rate.py` (canonical
-  contingency, curated covariates).
+- Rate: `scripts/rate/fit_per_bin_rate_models.py`,
+  `scripts/rate/fit_per_stop_rate_models.py`, `scripts/rate/fit_uncertainty_rate.py`,
+  `scripts/rate/fit_swr_contrast_rate.py`; summaries
+  `scripts/rate/summarize_per_bin_rate_models.py`, plots
+  `scripts/rate/plot_per_bin_rate_models.py`.
 - Coupling: `scripts/rate/fit_swr_power_model.py`.
-- Content: `scripts/content/fit_replay_content_models.py` (re-fit 6 configs);
-  `scripts/exploratory/_verify_content_models.py`; `scripts/exploratory/_content_reward_interactions.py`.
+- Content: `scripts/content/fit_replay_content_models.py`,
+  `scripts/content/fit_swr_contrast_content.py`,
+  `scripts/content/compare_content_estimators.py`;
+  audits by `scripts/qa/compare_fits.py`.
 - Contingency: `scripts/behavior/fetch_spatial_bandit_behavior.sh`,
   `scripts/_bandit_csv_contingency.py`.
 - Reality check on reward-modulated content: `scripts/qa/analyze_event_spike_evidence.py`
   (now emits per-event `start_time`) + `scripts/exploratory/_reality_reward_test.py`;
   content destination: `scripts/exploratory/_content_patch_destination.py`.
-- Commits: `6d63566` (collinearity fix), `b246e66` (canonical contingency),
-  `6d9983c` (SWR-power model), `0dc2dfa` (content re-verify), `45dc147`
-  (duration-controlled content interactions).
+- Audits behind the current numbers:
+  [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md),
+  [audits/2026-09-05-content-refit-comparison.md](audits/2026-09-05-content-refit-comparison.md),
+  [audits/2026-09-05-cs5-response-by-design-factorial.md](audits/2026-09-05-cs5-response-by-design-factorial.md),
+  [design/content_estimator_comparison.md](design/content_estimator_comparison.md).
