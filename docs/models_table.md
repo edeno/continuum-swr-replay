@@ -32,7 +32,7 @@ Per-family fit conventions:
 | Per-stop rate (A) | Poisson GLM | `n_selected_events` per stop | log | `log(immobility_duration_s)` | per session |
 | Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | `arm_fraction` (per-event allocation fraction) | log | — | per session × is_swr split {all, T, F}; SEs event-clustered |
 | Content patch | conditional Poisson over 3 patches/event | `patch_fraction` | log | — | per session × {all, T, F}; SEs event-clustered |
-| Content arm/patch, DM alternative | Dirichlet-multinomial over the same 9 arms / 3 patches per event, with `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` | `arm_count_hard` / `patch_count_hard` | log (softmax mean) | — | per session × population; SEs event-level by construction |
+| Content arm/patch, DM alternative | Dirichlet-multinomial over the same 9 arms / 3 patches per event, with `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` (`+ log_phi_log_n_nonlocal_bins_z · z(log L_e)` under `--concentration-length`) | `arm_count_hard` / `patch_count_hard` | log (softmax mean) | — | per session × population; SEs event-level by construction |
 | Choice | conditional logit over candidate arms/stop ≡ `clogit(…, strata(stop))` | `chosen` | logit | — | per event-source |
 | SWR power | OLS (`lm`) | `ripple_power_z` (event-level) | identity | — | per session; predictors z-scored |
 
@@ -75,8 +75,17 @@ suffix, appended *last* so an estimator's stratified artifacts sort together
 with fewer modelled events than `--min-events-session-phi` (default **40**) is
 refit with its animal's median concentration intercept pinned, and the column
 records which. `--n-jobs` sizes the process pool that fits the per-session DM
-models (ignored by the conditional Poisson). The estimator comparison behind
-this is [`design/content_estimator_comparison.md`](design/content_estimator_comparison.md).
+models (ignored by the conditional Poisson).
+**`--concentration-length` (`is_swr`-contrast runner only)** adds
+`log_n_nonlocal_bins_z` to the concentration design wherever `is_swr` is
+identified, writing a separate **`_dm_len`** bundle. The likelihood otherwise
+treats φ as **length-invariant** — `L_e` enters only as the multinomial index —
+and SWR events run ~1.7× longer, so the plain `_dm` `log_phi_is_swr` is the
+**total** concentration contrast and the `_dm_len` one is the length-adjusted
+twin, reported next to `log_phi_log_n_nonlocal_bins_z` (per SD). The flag is
+refused for the conditional Poisson, which has no concentration design. The
+estimator comparison behind all of this is
+[`design/content_estimator_comparison.md`](design/content_estimator_comparison.md).
 
 Every per-session fit carries `converged` / `separated` status flags, the
 `|`-joined `separated_terms` naming which coefficients are unidentified, one
@@ -553,8 +562,16 @@ folded into the β contrast — it is not any rung's key term but the same
 quantity on every rung (how tightly an SWR event's mass is concentrated), and
 the conditional-Poisson fits produce no such row. Rungs whose `n_sessions_modeled`
 is 0 in a stratum (the omission-only last-rewarded family under `rewarded`) and
-the DM's `dm_design` refusals are named in the cohort audit. Results:
-[`design/content_estimator_comparison.md`](design/content_estimator_comparison.md).
+the DM's `dm_design` refusals are named in the cohort audit.
+`--concentration-length` writes a fourth bundle,
+`swr_contrast_content_{arm,patch,audited}_dm_len.pkl` (`_dm_len` again before
+the stratum suffix), whose audited table carries **both** `log_phi_is_swr` —
+now the length-adjusted estimand — and `log_phi_log_n_nonlocal_bins_z` per rung
+× population. Each artifact's provenance sidecar records the
+`concentration_cols` it was fit with, so the two estimands are told apart from
+the record rather than the filename. Results:
+[`design/content_estimator_comparison.md`](design/content_estimator_comparison.md)
+(§7.1 for the total-vs-length-adjusted table).
 
 ## Phase-2 refit classification
 

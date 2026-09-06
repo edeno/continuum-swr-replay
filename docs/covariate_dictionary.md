@@ -671,6 +671,39 @@ result):
   non-SWR event. It is a statement about redundancy
   across an event's bins, not about which arms are represented. Absent from the
   within-SWR / within-non-SWR population splits, where the flag is constant.
+  **TOTAL vs LENGTH-ADJUSTED — say which you mean.** The fitter assumes φ is
+  **length-invariant**: an event's length `L_e` enters the likelihood only as
+  the multinomial index, and `log φ_e` carries no length term. Event length is
+  **post-treatment** with respect to `is_swr` — on the canonical 65,913-event
+  cohort an SWR event runs **1.73×** longer (median 45 vs 26 bins) — so the
+  shipped `_dm` coefficient is the **TOTAL** concentration contrast, length
+  included. The length-adjusted twin comes from
+  `fit_swr_contrast_content.py --concentration-length` (`_dm_len` artifacts),
+  which puts `log_n_nonlocal_bins_z` in the concentration design as well: on
+  `C2_base` it is **+1.502** (5/5 animals, q = 2.7e-37) against the total
+  **+1.799**, next to a length coefficient
+  `log_phi_log_n_nonlocal_bins_z` = **+0.522 per SD** (5/5, q = 2.7e-37).
+  About a sixth of the total runs through event length and the effect survives
+  the adjustment. Full per-rung table and the estimand the recommendation cites:
+  [`design/content_estimator_comparison.md`](design/content_estimator_comparison.md)
+  §7.1.
+- `log_phi_log_n_nonlocal_bins_z` — the additive shift of the log concentration
+  **per SD of `log n_nonlocal_bins`**, present only in `_dm_len` fits. Positive
+  (+0.43 … +0.53 across rungs, 5/5 animals on every one) means a longer event's
+  bins are *also* closer to independent draws, which is why omitting it inflates
+  `log_phi_is_swr`. It is reported per SD, not per category: it is the one
+  concentration term whose design column is continuous.
+- `sd_log_phi_<col>` — the SD of that concentration column over the fitted
+  events, persisted so the aggregation's identifiability backstop is read on the
+  effect scale (`|coef| × sd`) like every other term. `sd_log_phi_intercept` is
+  **NaN** by construction — a constant column has no spread — so the intercept
+  is judged by the separation flag alone.
+- `n_events_swr` / `n_events_nonswr` — modelled events on each side of the
+  `is_swr` modifier, on every DM row; **NaN** where the concentration design has
+  no `is_swr` column (the within-SWR splits). A modifier resting on one or two
+  SWR events is finite and unflagged, and no identifiability rule can see it —
+  these counts are the only way to find such a fit. On the `all` stratum the
+  minimum is 25 SWR events per fit.
 - `phi_source` — provenance of the concentration intercept used for that
   session's fit, one of `session` (the session estimated its own),
   `animal_pooled` (fewer modelled events than `--min-events-session-phi`,
