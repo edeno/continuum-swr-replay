@@ -234,7 +234,7 @@ Map decoded replay positions to spatial units (arms, patches).
 
 Pooled-global standardization of continuous covariates (`<col>_z`).
 
-`attach_standardized`, `assert_standardized_present`, `assert_standardized_matches_reference`, `save_reference`, `load_reference`
+`attach_standardized`, `assert_standardized_present`, `assert_standardized_matches_reference`, `z_reference_path`, `save_reference`, `load_reference`
 
 ### `src/continuum_swr_replay/analysis/replay/uncertainty.py`
 
