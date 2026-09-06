@@ -1,0 +1,40 @@
+# Phase 4 ledger (archived from .superpowers/sdd/phase-4-execution/progress.md on 2026-09-06)
+
+# SDD ledger — plan: .claude/docs/plans/regression-pipeline-fixes/phase-4-execution.md
+Branch regression-pipeline-fixes-phase-4 off master eb6f790 (phases 1, 2a, 2b, 3 merged); plan commit 3a25e0d. Spec: phase-4-docs-claims.md; sources of numbers listed at the top of phase-4-execution.md.
+
+Pre-flight scan:
+| pair | produces / consumes | finding |
+| T1→T4 | models_table.md rebuild + mirror test; T4's retired-name scan greps docs/ incl. models_table.md | consistent — T1 must not reintroduce retired names |
+| T2→T3 | rate docs numbers → synthesis/claims rows 19c (reward kernel) | consistent if both quote the 2026-09-06 rate audit (phase 3 supersedes phase 1) |
+| T3 internal | claims rows must name estimand × estimator for CS5/CS6; sources: 2026-09-05 content audit (nt twins), content_estimator_comparison.md (DM, _dm_len) | consistent; the 19g `Mu` value: the fraction-response Mu is in the leaf bundle, not the content audit — Ruling 1: quote it from `models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/Mu.pkl` via the uncertainty reader's summary, citing the artifact path, or mark "pending" if that reader's output is not committed |
+| T4 internal | delete `.claude/docs/reviews/08_regression_pipeline_code_map.md`, replace with generated `docs/regression_pipeline_map.md` + `scripts/qa/write_pipeline_map.py --check` | consistent; the deleted file is agent-process (allowed) |
+| T4 internal | `test_docs_have_no_retired_names.py` must fail before T3 and pass after | T4 runs after T3 — the "fails before" evidence is taken from the T4 report running it against `git show` of the pre-T3 doc, or from the hit count recorded at dispatch (~15) |
+| All | numbers only from the listed sources | Ruling 2: any number whose source is a pickle is quoted with the artifact path and the reading code path (script + flags) |
+Task 1: dispatching implementer (opus); BASE = HEAD after the doc requote
+Task 1: implementer DONE (d11a9ba 5e71081); suite 2110 passed; mirror test failed on the pre-fix doc (17 failed: no rungs blocks, CP/CPS ladder undocumented, is_after_omission present). Ruling 3: the refit-classification section moved to model_history.md (audit trail, allowlisted) rather than deleted. Review dispatched (opus).
+Task 1: review spec ✅ / quality Approved; minors carried as Task 2 pre-step: (1) bundle-suffix order in the Conventions table (source/area is part of the base name, before _swr_T/F), (2) per-rung table-row check not section-scoped, (6) restore "(signed-rank)" + the stay/leave runner name; out-of-scope: fit_replay_content_models.py --hierarchy help still says M0-M7 / P0-P4 (fix in Task 4 paths pass).
+Task 1: complete
+Task 2: dispatching implementer (opus); BASE = 5e71081
+Task 2: implementer DONE (4f38931 8cb815c); burst peak is 2.64 in the artifact (memory/brief said 2.65 — use 2.64); review dispatched (opus)
+Note for Task 3: the shipped Mu uncertainty coefficient IS in the content audit (docs/audits/2026-09-05-content-refit-comparison.md ~line 834, leaf bundle after: reward_belief_variance_candidate_arm_preoutcome_z +0.3509, 215 sessions, 5/5) — Ruling 1 fallback (pickle read) not needed; old +0.83 (arm_uncertainty, count response) is superseded.
+Task 2: review spec ✅ / quality needs fixes — 3 Important text corrections (M5_time AIC rank; 'three history rungs' vs M3r; MU section retired names + uncited collinearity figures) + 4 minors; fix round 1 dispatched (resume implementer). Burst peak = 2.64 (artifact), brief's 2.65 was the slip.
+Task 2: fix round 1 implemented (b8177be); re-review dispatched (sonnet)
+Task 2: re-review — 6/7 addressed; residual (scope note says three rows, should be four) fixed by the controller in 86447a0
+Task 2: complete
+Task 3: dispatching implementer (opus); BASE = 86447a0
+Task 3: implementer DONE (9547160 a63683c de8dc1d); retired-name grep zero; q printed as < 0.0001 where the audit prints 0.0000 (Ruling 4: correct — sharper values are not in a listed source); Mu +0.3509 labelled session median; MU/rate-contrast coefficient blocks marked pending (audits print no coefficients). Review dispatched (opus).
+Note for Task 4: retired-name hits outside the allowlist now 2 (were ~15 before Task 3) — listed above in the shell; the new test must fail on these two before Task 4's cleanup and pass after. CLAUDE.md:162 path is analysis/replay/spatial_mapping.py (verified); label_event_* still exists in tables_event.py:487 (alias present → keep the sentence, correct the wording).
+Task 3: review — 32 numbers traced OK; 1 Critical (19f title contradicts its cell) + 4 Important (19d scope note; 19f REVISED note; ΔAIC sign convention; split-vs-interaction reconciliation) + 4 minors; fix round 1 dispatched (resume implementer)
+Task 3: fix round 1 implemented (2c1119b); two extra stale rate_models.md pointers about 19c corrected (accepted: they became false with the rewrite); re-review dispatched (opus)
+Task 3: re-review — 9/9 addressed; three wording residuals fixed by the controller (19d count-response label; "paired within-event" → pooled single-fit; 19f double-dissociation clause)
+Task 3: complete
+Task 4: dispatching implementer (opus); BASE = b4c90d0
+Task 4: implementer DONE (138fd89 3fa7ab5 38aca20 a61def0 d9ec76e); suite 2112 passed; retired-name hits before: 3 (two dictionary migration notes + known_issues/current_arm_trunk_fallback.md:147). Ruling 5: the scan's allowlist = model_history.md + any dated docs/design/<YYYY-MM-DD>-*.md snapshot (point-in-time records; ~25 hits inside them) — accepted, documented in the test. Mutation check 89/124 (72 %) with the default test set, 95/124 (77 %) incl. test_value_block.py; 42 min. CLAUDE.md label_event_* sentence was wrong (columns dropped after a bit-for-bit check; alias only in the registry) — corrected. task_description: 37 % non-canonical CONTINGENCIES reproduces; 99.2 % canonical VALUES is a different question — both stated. Review dispatched (opus).
+Task 4: review spec ✅ / quality Approved; minors carried to the fix wave: (1) map generator takes the first docstring LINE not sentence (4 truncated entries); (2) scan covers reward_lag1 only — use \breward_lag\d+\b + reward_lag{j}; (3) map header says private helpers omitted but private MODULES are listed; (4) dead links to the deleted code map in two .claude/docs/plans/regression-integrity-fixes files (repoint) — the dated review stays; (5) builder_test_floor anchors on file:line (note).
+Task 4: complete
+Final whole-branch review: dispatched (fable), base master eb6f790, head d9ec76e
+Final review (fable): merge-ready NO pending one fix wave. Important: C1 leaf-only value MAIN effect (+0.264 5/5 [+0.031,+0.818] fraction; Mv leaf +0.2512 4/5) omitted — 19g/19b/synthesis overstate "not high-value arms"; C2 CS5 outcome strata missing in 19f (rewarded direct +0.1583 202 3/5; total −0.3514 206 0/5); C3 "Considered and dropped" still cites a switch-rate sign difference that C12 (+0.26 SWR / +0.20 non-SWR, 5/5 each) contradicts; X1 covariate_dictionary.md:245 names retired rungs M4/M7/M9. Minors: ΔAIC>2 wording; 19a REVISED attribution (+0.98 was a different rung); 19b 4/5 caveat; closing paragraph; dictionary:294 stale + "phase-2"; CLAUDE.md "enforced by" scope; map first-line truncation; scan reward_lag\d+; map header wording; two dead links under regression-integrity-fixes; acknowledge the help-text edit. Suite 2112 passed. All 12 spot-checked numbers traced.
+Fix wave: BASE d9ec76e; dispatched (fresh opus implementer)
+Fix wave: DONE (f2abd57 31dc8d4 2049792 daea62f 3e272fc 61b5768); doc tests 46 passed; scoped re-review dispatched (opus)
+Fix wave: re-review — F2–F11 fixed; F1(c)'s "nine-arm design" explanation was wrong (C4 is leaf-only too; the gap is pooled-with-swr_x vs split: C4 nonSWR +0.0472 3/5 vs CS5 pooled main +0.264 5/5) — corrected by the controller with the model-dependence stated in 19b/19g/synthesis; row 14 rephrased as an occupancy claim. Phase 4: COMPLETE — archived, merged to master.

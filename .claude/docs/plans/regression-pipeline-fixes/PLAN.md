@@ -1,6 +1,6 @@
 # Regression Pipeline Fixes Implementation Plan
 
-**Status:** Phases 1, 2a, 2b, 3 complete and merged to master (2026-09-06); phase 4 in progress. Follow-up parked: add `M6ra_time_arrival_histcos` so the arrival ladder has a reward-given-time+history step like the stop-clock ladder.
+**Status:** Phases 1, 2a, 2b, 3, 4 complete and merged to master (2026-09-06); phase 5a in progress. Follow-up parked: add `M6ra_time_arrival_histcos` so the arrival ladder has a reward-given-time+history step like the stop-clock ladder.
 
 Fixes the inference-changing defects found in the 2026-09-03 regression pipeline review
 (`.claude/docs/reviews/2026-09-03-regression-pipeline-review.md`), refits every ladder on the
