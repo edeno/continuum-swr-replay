@@ -449,6 +449,30 @@ centre, and `event_onset_table.t_since_stop_onset` is the event *start* minus
 `event_duration_s / 2` (median 31 ms, max 1.71 s). Negligible for
 time-by-current-arm interactions, but they are not one construct.
 
+### F.4 Per-bin reward history is recomputed at the outcome boundary
+
+A stop is an immobility **fragment**, not a well visit: 69,224 at-well stops fall
+in 35,043 visits (mean **1.96 fragments per visit**, 90th pct 3), only 50.9 % of
+at-well stops are the first fragment of their visit, and **69.9 % of at-well
+non-local events occur in a non-first fragment**. **80.1 %** of at-well stops
+already begin after their trial's outcome is knowable.
+
+The other **11.5 %** of all stops (17.9 % of at-well stops) *span* the boundary:
+`stop_start < outcome_known_time_s <= stop_end`. For those, holding the
+reward-history features at their bout-start values would let bins recorded after
+the animal learned the outcome carry a reward history that predates it. So from
+the first bin whose left edge is at or after `outcome_known_time_s`, the per-bin
+lag matrix is shifted (`lag_1 <- completed_trial_reward`, `lag_j <- lag_{j-1}`)
+and `reward_history_rcos_0..2` plus `reward_history_incomplete` are recomputed
+from the shifted row **by the same basis functions the stop level uses**. Bins
+before the boundary keep the bout-start values. Arrival-spanning stops
+(`occupancy_state == "mixed"`; 2.0 % of all stops both span the arrival and
+contain the boundary) are **not** shifted — the well they occupy changes inside
+the bout, so `completed_trial_reward` is not the outcome that becomes known at
+the boundary — and those with at least one bin past it are counted in
+`out.attrs["n_stops_arrival_spanning"]`. A stop whose boundary lies outside it is
+untouched.
+
 ## G. Base covariate reference
 
 Definitions for the base (non-interaction) covariates on the canonical tables.
@@ -576,6 +600,17 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   never used.
 - `time_since_last_reward_s` — time from the last reward available by event start to
   the event start.
+
+**Stop-grain clocks** (columns on `stop_table`, absolute seconds on the session
+clock; both are NaN for a bout with no completed trial, e.g. a pre-trial stop):
+- `last_well_arrival_time_s` — arrival at the well occupied at the bout start
+  (`_goal_arrival_time` of the completed trial). Clock GOAL_ARRIVAL, timing
+  PRE_OUTCOME: it is known the moment the animal reaches the well.
+- `outcome_known_time_s` — the moment the trial's outcome became observable: the
+  pump onset on a rewarded trial, poke-in + `OMISSION_KNOWN_LATENCY_SEC` on an
+  omission. Clock OUTCOME_AVAILABILITY, timing POST_OUTCOME. Finite at bout start
+  for 80.1 % of at-well stops; the remaining at-well stops begin inside the
+  arrival → outcome window, so their outcome is not yet knowable when they start.
 - `event_duration_s`, `event_start_s`, `event_end_s`, `event_midpoint_s` — the event's
   boundary/mid timestamps and inclusive decoded duration:
   `event_end_s - event_start_s + 1 / DEFAULT_SAMPLING_FREQUENCY_HZ`. Thus a
@@ -629,9 +664,26 @@ content runner, not stored):
 - `log1p_time_since_stop_start_s_z_x_is_current_arm` — the within-stop time-course
   product, also a `BASEc` member and also absent from the `nt` twins.
 
+**Per-bin clocks** (Family-B design; built by `aggregate_to_timebins` at fit
+time, not stored). All three are bin-centre quantities, so they are the per-bin
+analogues of the per-event columns above and must not be joined with them:
+- `tc` — time (s) since **stop onset** (the speed-threshold crossing that opened
+  the immobility bout), entered via a `bs(tc)` spline with fixed knots (1, 2, 3) s
+  over `[0, TMAX = 4]`. The default time-course backbone of Family B. A stop is an
+  immobility *fragment*, not a well visit (see §F.4), so `tc = 0` is the start of a
+  fragment and need not be an arrival or a reward.
+- `time_since_last_well_arrival_s` — bin centre minus the stop's
+  `last_well_arrival_time_s`; NaN where that clock is NaN. The arrival-anchored
+  alternative to `tc`, entered via a `bs(...)` spline with knots (1, 2, 4, 6) s
+  over `[0, TMAX_ARRIVAL = 8]` by the arrival rungs (`M0a_const_arrival`,
+  `M5a_time_arrival`, `M7ra_time_arrival_histcos_rew`). Same *name* as the
+  per-event column in the Timing / exposure block above and a different *grain*.
+- `time_since_outcome_known_s` — bin centre minus the stop's
+  `outcome_known_time_s`; NaN where that clock is NaN, and **negative before the
+  outcome is knowable**. Not a fitted predictor of the shipped ladder; it is the
+  boundary the per-bin reward features are recomputed at (§F.4).
+
 **Self-history** (per-bin rate design; built at fit time, not stored):
-- `tc` — time (s) since stop onset for each bin; entered via a `bs(tc)` spline (the
-  time-course backbone of Family B).
 - `onset_lag{j}` — count of the event's own onsets `j` bins back (past-only, resets
   per stop); `hist_rcos_k` projects those causal lags onto raised-cosine basis `k`.
 - `cross_hist_rcos_k` — the same raised-cosine history for the *other* event stream.

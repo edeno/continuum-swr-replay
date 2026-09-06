@@ -1,5 +1,18 @@
 # Per-bin replay-rate ladder: fitted effects (Family B)
 
+> **Header date: 2026-09-04 fit. Numbers below are stale as of the 2026-09-06
+> refit and are not to be quoted until this file is rewritten.** The 2026-09-06
+> refit changed the per-bin design (reward-history features recomputed at the
+> outcome boundary for the 11.5 % of stops that span it) and the ladder itself
+> (the `onset_lag` dummy rungs retired, the reward×time interaction re-parented
+> onto `M7r_time_histcos_rew`, and three arrival-anchored rungs added). Every
+> section below reads a rung that either no longer exists or was refit on the
+> new design. What changed, with the measured sizes, is in
+> [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md);
+> the methods in [rate_models.md](rate_models.md) are current. Regenerate this
+> file from the new artifact with
+> `uv run python scripts/rate/summarize_per_bin_rate_models.py`.
+
 Quantitative readout of the per-bin conditional-intensity ladder
 (`MODEL_PER_BIN_RATE`, see [rate_models.md](rate_models.md) for the methods),
 fit per session over **218 sessions** and persisted in
