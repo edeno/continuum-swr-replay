@@ -267,6 +267,9 @@ def attach_arm_uncertainty(
 QVALS_TIME_TOLERANCE_SEC: float = 1e-6
 """Maximum ``|qvals_context_time - stop_start|`` accepted as the same stop."""
 
+SESSION_SPAN_PAD_SEC: float = 600.0
+"""Slack on each end of a stop table's own span when claiming qvals rows."""
+
 
 def _qvals_rows_expected_in(
     stop_table: pd.DataFrame, contingency: pd.DataFrame
@@ -282,12 +285,18 @@ def _qvals_rows_expected_in(
     went stale is still recognised as belonging here. A corpus-wide stop table
     therefore claims every qvals row of every epoch it covers, and a
     one-session stop table claims only that session's rows.
+
+    The span is padded by ``SESSION_SPAN_PAD_SEC`` on each end because the
+    bouts that went missing can be the session's own first and last, which
+    would otherwise shrink the span past them and let them escape unnoticed;
+    the smallest gap between sessions in this corpus is 61,589 s, so ten
+    minutes of slack cannot reach a neighbouring session.
     """
     spans = stop_table.groupby("epoch", sort=False)["stop_start"].agg(["min", "max"])
     epoch = contingency["epoch"].to_numpy()
     time = contingency["qvals_context_time"].to_numpy(dtype=float)
-    low = spans["min"].reindex(epoch).to_numpy(dtype=float)
-    high = spans["max"].reindex(epoch).to_numpy(dtype=float)
+    low = spans["min"].reindex(epoch).to_numpy(dtype=float) - SESSION_SPAN_PAD_SEC
+    high = spans["max"].reindex(epoch).to_numpy(dtype=float) + SESSION_SPAN_PAD_SEC
     with np.errstate(invalid="ignore"):
         in_span = (time >= low) & (time <= high)
     joined = contingency["stop_id"].isin(set(stop_table["stop_id"])).to_numpy()
@@ -355,8 +364,8 @@ def assert_qvals_aligned(
         first = merged.loc[absent].iloc[0]
         raise ValueError(
             f"{int(absent.sum())} qvals row(s) name a stop that is not in the "
-            f"stop table; first stop_id={int(first['stop_id'])} at "
-            f"qvals_context_time={first['qvals_context_time']!r}. Regenerate "
+            f"stop table; first stop_id={first['stop_id']} at "
+            f"qvals_context_time={first['qvals_context_time']:.6f}. Regenerate "
             "qvals_table against the live stop table."
         )
     drift = (merged["qvals_context_time"] - merged["stop_start"]).abs()
@@ -366,8 +375,8 @@ def assert_qvals_aligned(
         raise ValueError(
             f"{int(offending.sum())} qvals row(s) are off the stop table's "
             f"clock by more than {tolerance:g} s; first stop_id="
-            f"{int(first['stop_id'])} has qvals_context_time="
-            f"{first['qvals_context_time']!r} but stop_start="
-            f"{first['stop_start']!r}. Regenerate qvals_table against the "
+            f"{first['stop_id']} has qvals_context_time="
+            f"{first['qvals_context_time']:.6f} but stop_start="
+            f"{first['stop_start']:.6f}. Regenerate qvals_table against the "
             "live stop table."
         )

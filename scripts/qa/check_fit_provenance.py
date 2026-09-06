@@ -83,11 +83,17 @@ def check_artifact(artifact: Path, sidecar: Path, root: Path) -> dict[str, objec
         "artifact": str(artifact),
         "status": "fresh",
         "stale_inputs": [],
+        "inherited_inputs": [],
         "unresolved_inputs": [],
         "inputs": {},
     }
     if not sidecar.exists():
         result["status"] = "missing_sidecar"
+        return result
+    # A sidecar outliving its artifact certifies nothing: the fit it describes
+    # is gone, so anything that reads it reads a file that is not there.
+    if not artifact.exists() and not parquet_path(artifact).exists():
+        result["status"] = "missing_artifact"
         return result
     recorded = json.loads(sidecar.read_text()).get("inputs", {})
     inputs: dict[str, Path] = {}
@@ -131,7 +137,7 @@ def propagate_stale(results: list[dict[str, object]]) -> None:
             )
             if upstream:
                 result["status"] = "stale"
-                result["stale_inputs"] = upstream
+                result["inherited_inputs"] = upstream
                 status[str(result["artifact"])] = "stale"
                 changed = True
 
@@ -148,11 +154,18 @@ def format_line(result: dict[str, object], root: Path) -> str:
         return f"fresh          {label}"
     if status == "missing_sidecar":
         return f"no sidecar     {label}"
+    if status == "missing_artifact":
+        return f"no artifact    {label}"
     if status == "missing_input":
         names = ", ".join(result["unresolved_inputs"])  # type: ignore[arg-type]
         return f"missing input  {label}  ({names})"
-    names = ", ".join(result["stale_inputs"])  # type: ignore[arg-type]
-    return f"STALE          {label}  (changed: {names})"
+    # "changed" is this artifact's own input bytes; "inherited" is an upstream
+    # fit that went stale, which this artifact's own hashes cannot see.
+    if result["stale_inputs"]:
+        names = ", ".join(result["stale_inputs"])  # type: ignore[arg-type]
+        return f"STALE          {label}  (changed: {names})"
+    names = ", ".join(result["inherited_inputs"])  # type: ignore[arg-type]
+    return f"STALE          {label}  (inherited: {names})"
 
 
 def main() -> int:

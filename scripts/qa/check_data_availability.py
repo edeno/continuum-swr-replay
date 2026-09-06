@@ -278,7 +278,8 @@ def main():
         for component in ["position", "spikes", "ripple", "theta", "dios"]:
             ok = result.get(f"{component}_ok", False)
             checks.append(f"{component}:{'OK' if ok else 'FAIL'}")
-        # Pokes clipped by the epoch boundary carry an artifactual arrival time.
+        # Pokes touching the first/last second of the epoch -- an upper
+        # bound on how many arrival times the interval cut could have made up.
         checks.append(f"edge_pokes:{int(result.get('n_edge_pokes', 0))}")
         print(" | ".join(checks))
 

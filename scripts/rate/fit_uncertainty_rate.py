@@ -603,9 +603,8 @@ def main() -> None:
             *RL_COVARIATES,
         ]
     ]
-    # The join key is a stop_id hash with no clock in it, so a renumbered
-    # decode would misjoin silently. Compare the two clocks on the full
-    # stop table, before the inner join hides the stops that went missing.
+    # Guard the stop_id join before the inner join hides its casualties
+    # (see assert_qvals_aligned).
     assert_qvals_aligned(stop, qvals)
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")

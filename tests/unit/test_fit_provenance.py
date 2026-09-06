@@ -615,7 +615,18 @@ def test_sweep_carries_staleness_forward_through_a_derived_fit(sweep_tree, capsy
     code, out = _run_sweep(["--root", str(sweep_tree)], capsys)
 
     assert code == 1
-    assert "STALE          models_toy/audited.pkl  (changed: stale)" in out
+    assert "STALE          models_toy/audited.pkl  (inherited: stale)" in out
+
+
+def test_sweep_reports_a_sidecar_whose_artifact_is_gone(sweep_tree, capsys):
+    """A sidecar outliving its fit certifies a file that is not there."""
+    (sweep_tree / "models_toy" / "fresh.pkl").unlink()
+
+    code, out = _run_sweep(["--root", str(sweep_tree)], capsys)
+
+    assert code == 1
+    assert "no artifact    models_toy/fresh.pkl" in out
+    assert "1 fresh" not in out
 
 
 def test_sweep_skips_backup_directories(sweep_tree, capsys):

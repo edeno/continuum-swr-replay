@@ -11,6 +11,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.covariates import assert_qvals_aligned
+from continuum_swr_replay.analysis.replay.covariates.history.value_block import (
+    SESSION_SPAN_PAD_SEC,
+)
 
 
 def _stop_table() -> pd.DataFrame:
@@ -70,8 +73,8 @@ def test_error_names_the_first_offending_stop_and_both_times():
         assert_qvals_aligned(stop, qvals)
     message = str(excinfo.value)
     assert "stop_id=12" in message
-    assert "141.25" in message
-    assert "140.0" in message
+    assert "qvals_context_time=141.250000" in message
+    assert "stop_start=140.000000" in message
 
 
 def test_session_scoped_stop_table_ignores_other_sessions():
@@ -102,3 +105,42 @@ def test_missing_columns_raise():
         assert_qvals_aligned(stop, _qvals(stop).drop(columns=["qvals_context_time"]))
     with pytest.raises(ValueError, match="missing columns"):
         assert_qvals_aligned(stop.drop(columns=["stop_start"]), _qvals(stop))
+
+
+def test_dropped_first_and_last_bout_of_a_session_still_raise():
+    """The span cannot shrink past the very stops that went missing.
+
+    A renumbering that drops a session's first and last bout also moves the
+    unpadded [min, max] of ``stop_start`` inside them, so those two qvals rows
+    would fall outside the session's own span and escape both checks.
+    """
+    stop = pd.DataFrame(
+        {
+            "stop_id": [21, 22, 23],
+            "epoch": ["02_r1"] * 3,
+            "stop_start": [100.0, 120.0, 140.0],
+        }
+    )
+    qvals = _qvals(stop)
+    with pytest.raises(ValueError, match="not in the stop table"):
+        assert_qvals_aligned(stop.iloc[[1]], qvals)
+
+
+def test_padding_does_not_reach_a_neighbouring_session():
+    """The pad is slack around one session, not a claim on the next one."""
+    stop = pd.DataFrame(
+        {
+            "stop_id": [31, 32],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_start": [100.0, 140.0],
+        }
+    )
+    later = pd.DataFrame(
+        {
+            "stop_id": [41],
+            "epoch": ["02_r1"],
+            "qvals_context_time": [140.0 + 2 * SESSION_SPAN_PAD_SEC],
+        }
+    )
+    qvals = pd.concat([_qvals(stop), later], ignore_index=True)
+    assert assert_qvals_aligned(stop, qvals) is None
