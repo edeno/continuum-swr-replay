@@ -246,6 +246,15 @@ effect (`BASEc`) or the **total** effect (`nt` twin on `BASEc_NT`).
 | current-patch bias | `CP0_base` `is_current_patch` | **+1.0767** (208 sessions, 5/5, q < 0.0001) |
 | SWR less patch-locked (direct / total) | `CPS1_current` / `CPS1nt_current` `swr_x_is_current_patch` | **−0.0709** (216 sessions, 2/5, q 0.608) / **−0.2615** (218 sessions, 0/5, q < 0.0001) |
 
+**The population-split rows and the `swr_x_...` rows are different estimands,
+not a contradiction.** A `SWR` or `nonSWR` row is a *separately baselined* fit on
+that population's own, unpaired, differently sized session set (199 vs 215 on
+`C2_base`), so it answers "is the bias present in this population". A
+`swr_x_...` row is the *paired within-event* SWR contrast against the shared
+non-SWR baseline, so it answers "does SWR change it". Both `C2_base` splits being
+strongly positive while `swr_x_is_current_arm` is negative is therefore
+consistent, not conflicting.
+
 So **non-SWR content is reward-value-neutral while with-SWR content avoids
 recently rewarded arms**, and SWR content is less locked to the current arm, the
 previous arm and the current patch — with the caveat that the patch-level
@@ -392,10 +401,12 @@ both estimators that fit it.** Report it as a three-way comparison; do not write
 "the DM confirms value avoidance" without saying that the shipped estimator does
 not.
 
-The rung is also barely worth its parameters on either honest scale: median
-per-session ΔAIC against `C2_base_leaf` is **+2.524** (fraction) and **+2.252**
-(DM), against **−85.415** on the retired count scale — the count figure is the
-timebin-pseudoreplication artefact, not an effect.
+The rung is also barely worth its parameters on either honest scale. Median
+per-session ΔAIC against `C2_base_leaf` — **content convention: positive = child
+better**, the opposite of the rate ΔAIC convention used in Layer 1 — is
+**+2.524** (fraction) and **+2.252** (DM), against **−85.415** on the retired
+count scale. The count figure is the timebin-pseudoreplication artefact, not an
+effect.
 
 **Where the count-response avoidance went** (response x design factorial,
 session-median coefficient): count/`NT` **−0.980** (0/5 animals positive) →
@@ -558,10 +569,15 @@ with their estimand named.
    w/ SWR **0.180** events/s. The within-stop time course is what calibrates the
    process (KS-in-band 0.50 → 0.85 at `M5_time`), with self-history clustering
    and a smooth reward kernel on top.
-2. **The immediate-reward dissociation.** Kernel lag 1 RR **1.44** (non-local
-   w/ SWR) vs **0.99** (non-local, no SWR); paired within session in **79.2 % of
-   216 sessions, 5/5 animals, p 7.8e-22**. The slower recent-reward component
-   (lags 3–10, RR ≈ 0.89–0.97) is **shared** across all four populations.
+2. **The immediate-reward dissociation, from two distinct measurements.** The
+   reconstructed kernel puts lag 1 at RR **1.44** (non-local w/ SWR) against
+   **0.99** (non-local, no SWR) — *how large* the effect is. Separately, the
+   **paired within-session** test of the immediate basis coefficient between the
+   two streams is positive in **79.2 % of 216 paired sessions, 5/5 animals,
+   signed-rank p = 7.8e-22** — *how consistently* they differ. Do not read the
+   percentage as a property of the kernel values or vice versa. The slower
+   recent-reward component (lags 3–10, RR ≈ 0.89–0.97) is **shared** across all
+   four populations.
 3. **Events are strongly non-Poisson** — refractory then bursty, peak RR
    **1.72–2.64** by population, SWR-coupled non-local events the most tightly
    bursty and non-SWR the flattest.
@@ -578,8 +594,8 @@ with their estimand named.
    **−0.2257** (q 0.0078); the pooled SWR interaction is **−1.1976** direct /
    **−1.3346** total and negative under all three estimators.
 7. **Content over-represents high-uncertainty arms.** `Mu`
-   `reward_belief_variance_candidate_arm_preoutcome_z` **+0.3509** (215
-   sessions, 5/5); split `C13_armuncert` SWR **+0.3680** vs non-SWR **+0.2810**
+   `reward_belief_variance_candidate_arm_preoutcome_z` **+0.3509** (**session
+   median** over 215 sessions, 5/5 animals positive); split `C13_armuncert` SWR **+0.3680** vs non-SWR **+0.2810**
    (5/5 each). The rung earns its parameter (`M4 → Mu` ΔAIC **+1.80**, 5/5
    animals child-better) where the value rung does not (`M4 → Mv` **−2.34**,
    0/5).

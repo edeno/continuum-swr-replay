@@ -79,10 +79,9 @@ one-population null tested against its split.
   clock nor the boundary-recomputed per-bin reward features — the two things
   that refit changed — and the four steps above reproduce the previous fit to
   the audits' printed precision. They are the current Family-A result, not a
-  number awaiting a refit.
-  `#19c` in [`../paper/claims_table.md`](../paper/claims_table.md) still quotes
-  per-stop values from a retired outcome-flag rung this ladder no longer
-  carries, so those numbers are not Family-A results any more.
+  number awaiting a refit. The retired outcome-flag rung's per-stop values are
+  no longer Family-A results and are recorded only as retracted in `#19c` of
+  [`../paper/claims_table.md`](../paper/claims_table.md).
 
 This is the simple layer: one rate per stop, dwell handled as an exposure
 offset. Its limitation is exactly that offset — see below.
@@ -214,8 +213,7 @@ offset. Its limitation is exactly that offset — see below.
   [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)
   for what changed. The smooth reward basis has no per-lag parameter, so the
   lag-1 boost is smaller than the retired per-lag specification reported; the
-  ordering and the dissociation are unchanged. `#19c` in the claims table still
-  carries the retired per-lag values and rung names. The audited SWR-contrast
+  ordering and the dissociation are unchanged. The audited SWR-contrast
   ladder publishes **32 aggregate rows** under the per-term separation rule —
   `G0`–`G7` across the three stratified populations plus `S1` and `S3`–`S9` on
   the contrast, split over the primary and post-outcome cohorts (6 primary + 2
@@ -438,9 +436,7 @@ Family A agrees in *direction* on a four-parameter block test; Family B is where
 the effect is measured. Read the agreement as directional only: Family A's step
 is an AIC comparison of a whole block, Family B's is a kernel value at one lag,
 and the conditional Family-B version of Family A's test (`M7r − M6r`, the block
-given time and self-history) is positive in all four populations. `#19c` in
-[`../paper/claims_table.md`](../paper/claims_table.md) still records the retired
-per-lag values and needs re-deriving before it is cited.
+given time and self-history) is positive in all four populations.
 
 ## Point-process model checking (Family B)
 
