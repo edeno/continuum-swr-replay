@@ -101,7 +101,7 @@ This is a compute and scientific reconciliation PR; it does not hide failed gate
   use formal interactions or mark the claim unavailable.
 - Append a resolution section to the 07 audit and create
   `.claude/docs/reviews/09_covariate_construction_review_resolution.md`, using the
-  [08 pipeline map](../../reviews/08_regression_pipeline_code_map.md) as its executable-code index.
+  [pipeline map](../../../../docs/regression_pipeline_map.md) as its executable-code index.
   Map every finding to code/manifest evidence, a remaining limitation, or an explicitly withdrawn
   claim. Include before/after numerical deltas without requiring the old conclusion to survive. Stage
   both review documents in the same release-output tree.

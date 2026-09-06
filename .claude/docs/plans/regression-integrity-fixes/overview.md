@@ -5,7 +5,7 @@
 Source audit:
 [07_comprehensive_regression_model_statistical_audit.md](../../reviews/07_comprehensive_regression_model_statistical_audit.md).
 Executable pipeline map:
-[08_regression_pipeline_code_map.md](../../reviews/08_regression_pipeline_code_map.md).
+[regression_pipeline_map.md](../../../../docs/regression_pipeline_map.md).
 
 ## Current codebase integration points
 
