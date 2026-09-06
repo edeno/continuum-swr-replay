@@ -418,8 +418,8 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
   fails the KS band on about half of sessions (`ks_within_band` 0.49,
   non-Poisson: refractory + bursty), and the reward / self-history blocks
   *without* time do **not** fix it (`M1_rew` 0.46, `M3r_histcos` 0.39). Adding
-  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to 0.86 and the full
-  model `M7r_time_histcos_rew` to 0.87. The dominant misfit of the constant model is
+  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to 0.85 and the full
+  model `M7r_time_histcos_rew` to 0.87 (2026-09-06 refit). The dominant misfit of the constant model is
   the strong post-stop rate transient, not the fine-timescale clustering.
 - **Dispersion stays far below 1 (underdispersed), not → 1.** At these sparse 15 ms
   bins the Poisson deviance is not a calibrated dispersion estimate, so the

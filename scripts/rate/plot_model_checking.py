@@ -35,6 +35,7 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     MODEL_PER_BIN_RATE,
+    N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     POPULATIONS,
     STOP_COVARIATES,
@@ -124,6 +125,7 @@ def _refit_session(
     design = aggregate_to_timebins(
         stops_g, pop, bin_s=BIN_S, tmax=TMAX,
         reward_basis=True, self_history_lags=N_HISTORY_LAGS,
+        self_history_basis=N_HISTORY_BASIS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
     )
     # Freeze the cohort before fitting (the fitter refuses an incomplete
