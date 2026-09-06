@@ -837,6 +837,7 @@ def reward_basis_from_lags(lags: np.ndarray, basis: np.ndarray) -> np.ndarray:
     out[den <= 0] = np.nan
     return out
 
+
 def reward_kernel_weights(n_lags: int, n_basis: int) -> np.ndarray:
     """Per-lag weight each reward-history basis coefficient contributes.
 
@@ -966,9 +967,10 @@ def aggregate_to_timebins(
     ``reward_history_incomplete`` re-derived from it by the same functions the
     stop level uses. Bins before the boundary keep the bout-start values. Bouts
     that span the arrival (``occupancy_state == "mixed"``) change which trip is
-    the completed one partway through, so they are never shifted; the number of
-    such stops whose boundary falls inside them is reported in
-    ``out.attrs["n_stops_arrival_spanning"]``.
+    the completed one partway through, so they are never shifted;
+    ``out.attrs["n_stops_arrival_spanning"]`` counts how many such stops have at
+    least one bin at or after the boundary (a boundary that falls inside a stop
+    but beyond its last retained bin leaves no bin to shift and is not counted).
 
     The absolute stop clocks are carried only to derive these per-bin columns
     and are dropped before return unless explicitly requested through

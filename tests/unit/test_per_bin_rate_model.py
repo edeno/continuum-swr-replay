@@ -33,6 +33,8 @@ def make_per_bin_rate_design(
     reward_effect: float = 1.0,
     time_profile=None,
     arrival_clocks: bool = False,
+    arrival_lead_max: float = 3.0,
+    arrival_time_profile=None,
     seed: int = 0,
 ) -> pd.DataFrame:
     """Simulate an ``aggregate_to_timebins``-shaped design with known truth.
@@ -46,14 +48,25 @@ def make_per_bin_rate_design(
     tenth stop is structurally incomplete (features zero-filled, indicator 1,
     baseline rate), mirroring the persisted stop-table contract.
 
-    With ``arrival_clocks``, each stop also carries the per-stop clock inputs
-    (``stop_start``, ``last_well_arrival_time_s``, ``outcome_known_time_s``,
-    ``occupancy_state``, ``completed_trial_reward``, the ten
-    ``known_reward_outcome_lag_j`` columns) and the two per-bin clocks
-    ``aggregate_to_timebins`` derives from them. Off by default, so the shipped
+    With ``arrival_clocks``, each stop also carries the absolute clocks
+    (``stop_start``, ``last_well_arrival_time_s``, ``outcome_known_time_s``) and
+    the two per-bin clocks ``aggregate_to_timebins`` derives from them. Each
+    stop's arrival is drawn uniformly ``[0, arrival_lead_max)`` seconds before
+    its bout starts, so the two clocks disagree by a per-stop offset, and
+    ``arrival_time_profile`` (a callable on the arrival clock, in seconds since
+    arrival) multiplies the rate the same way ``time_profile`` does on the stop
+    clock. The boundary-shifted reward history is not simulated here (it is
+    covered on real stop-table inputs in ``test_per_bin_rate_helpers``), so the
+    lag columns it reads are deliberately absent rather than inconsistent with
+    the planted ``reward_history_rcos_*``. Off by default, so the shipped
     ladder's designs are exactly what they were.
     """
     rng = np.random.default_rng(seed)
+    leads = (
+        rng.uniform(0.0, arrival_lead_max, n_stops)
+        if arrival_clocks
+        else np.zeros(n_stops)
+    )
     recs = []
     for s in range(n_stops):
         incomplete = float(s % 10 == 0)
@@ -63,7 +76,12 @@ def make_per_bin_rate_design(
         for b in range(n_bins):
             tc = (b + 0.5) * bin_s
             tp = time_profile(tc) if time_profile is not None else 1.0
-            mu = base_rate * tp * (reward_effect if reward else 1.0)
+            ap = (
+                arrival_time_profile(tc + leads[s])
+                if arrival_time_profile is not None
+                else 1.0
+            )
+            mu = base_rate * tp * ap * (reward_effect if reward else 1.0)
             recs.append(
                 ("sim", 1, "02_r1", s, b, tc, bin_s, reward, rcos1, rcos2,
                  incomplete, int(rng.poisson(mu)))
@@ -79,19 +97,16 @@ def make_per_bin_rate_design(
     if not arrival_clocks:
         return design
 
-    # Stops start 10 s apart; the animal arrived 1 s before each bout and the
-    # outcome became observable 0.2 s into it, so the arrival clock is positive
-    # throughout and the outcome clock changes sign inside every stop.
+    # Stops start 10 s apart; the animal arrived ``leads[stop]`` seconds before
+    # each bout and the outcome became observable 0.2 s into it, so the arrival
+    # clock is positive throughout and the outcome clock changes sign inside
+    # every stop.
     stop_start = 1000.0 + 10.0 * design["stop_id"].to_numpy(dtype=float)
     design["stop_start"] = stop_start
-    design["last_well_arrival_time_s"] = stop_start - 1.0
+    design["last_well_arrival_time_s"] = (
+        stop_start - leads[design["stop_id"].to_numpy()]
+    )
     design["outcome_known_time_s"] = stop_start + 0.2
-    design["occupancy_state"] = "at_well"
-    design["completed_trial_reward"] = design["stop_id"].to_numpy(dtype=float) % 2.0
-    for j in range(1, 11):
-        design[f"known_reward_outcome_lag_{j}"] = (
-            design["stop_id"].to_numpy(dtype=float) + j
-        ) % 2.0
     center_abs = stop_start + design["tc"].to_numpy(dtype=float)
     arrival = design["last_well_arrival_time_s"].to_numpy(dtype=float)
     outcome = design["outcome_known_time_s"].to_numpy(dtype=float)

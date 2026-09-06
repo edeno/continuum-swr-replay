@@ -903,17 +903,22 @@ _DEFINITIONS.append(
 _DEFINITIONS.append(
     _definition(
         "time_since_last_well_arrival_s",
-        "Response-bin time relative to the arrival at the well occupied at the "
-        "start of the stop. Zero at the moment of arrival and non-negative for "
-        "every bin of an at-well stop, since the bout can only begin once the "
-        "animal has arrived.",
-        grain="stop × response bin",
+        "Time elapsed since the arrival at the well occupied at the start of "
+        "the stop. Two incarnations share the name and the clock: on the "
+        "per-bin rate design it is the bin centre minus the arrival, zero at "
+        "the moment of arrival and non-negative for every bin of an at-well "
+        "stop (the bout can only begin once the animal has arrived); on the "
+        "event table it is the event's first timebin minus the same arrival.",
+        grain="event; stop × response bin",
         units="seconds",
         clock=QueryClock.GOAL_ARRIVAL,
         availability=Availability.PRE_OUTCOME,
-        support="per-bin rate design; stops with a completed arrival",
-        producer="replay._helpers.aggregate_to_timebins",
-        missingness="no completed arrival at the bout start",
+        support="event table; per-bin rate design; requires a completed arrival",
+        producer=(
+            "replay.tables_event.build_event_table (event grain); "
+            "replay._helpers.aggregate_to_timebins (per-bin grain)"
+        ),
+        missingness="no completed arrival before the event / at the bout start",
     )
 )
 
