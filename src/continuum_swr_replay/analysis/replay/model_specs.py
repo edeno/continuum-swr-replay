@@ -883,6 +883,22 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         parent="M0_const",
         self_history_basis=N_HISTORY_BASIS,
     ),
+    # Time + self-history without the reward block, so the reward block has a
+    # nested null that already holds time AND self-history: the "reward given
+    # time + self-history" step is M7r - M6r, not M7r - M5_time (which mixes
+    # the reward block in with the self-history block).
+    "M6r_time_histcos": PerBinRateModelSpec(
+        name="M6r_time_histcos",
+        time_spline=True,
+        reward_basis=0,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time + raised-cosine self-history",
+        parent="M5_time",
+        self_history_basis=N_HISTORY_BASIS,
+    ),
     "M7r_time_histcos_rew": PerBinRateModelSpec(
         name="M7r_time_histcos_rew",
         time_spline=True,
@@ -892,7 +908,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         switch=False,
         reward_time_interaction=False,
         description="+ time + raised-cosine self-history + reward history",
-        parent="M5_time",
+        parent="M6r_time_histcos",
         self_history_basis=N_HISTORY_BASIS,
     ),
     "M9r_rew_x_time": PerBinRateModelSpec(

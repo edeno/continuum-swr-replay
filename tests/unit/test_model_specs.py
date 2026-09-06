@@ -78,7 +78,7 @@ def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
     )
     reward_rungs = {
         "M1_rew": "M0_const",
-        "M7r_time_histcos_rew": "M5_time",
+        "M7r_time_histcos_rew": "M6r_time_histcos",
         "M9r_rew_x_time": "M7r_time_histcos_rew",
         "M7ra_time_arrival_histcos_rew": "M5a_time_arrival",
     }
@@ -92,6 +92,20 @@ def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
     for name, spec in ms.MODEL_PER_BIN_RATE.items():
         if name not in reward_rungs:
             assert spec.reward_basis == 0, name
+
+
+def test_the_reward_block_has_a_time_plus_self_history_null() -> None:
+    """``M7r - M6r`` is the reward block alone, not reward plus self-history."""
+    m6r = ms.MODEL_PER_BIN_RATE["M6r_time_histcos"]
+    m7r = ms.MODEL_PER_BIN_RATE["M7r_time_histcos_rew"]
+    assert m6r.parent == "M5_time"
+    assert m6r.reward_basis == 0
+    assert m7r.parent == "M6r_time_histcos"
+    # Identical apart from the reward block, so the step is nested and clean.
+    reward_terms = [*ms.REWARD_HISTORY_COLUMNS, ms.REWARD_HISTORY_INCOMPLETE]
+    m6r_terms = [t.strip() for t in m6r.formula().split("~", 1)[1].split("+")]
+    m7r_terms = [t.strip() for t in m7r.formula().split("~", 1)[1].split("+")]
+    assert [t for t in m7r_terms if t not in reward_terms] == m6r_terms
 
 
 def test_reward_time_interaction_uses_the_immediate_component() -> None:
