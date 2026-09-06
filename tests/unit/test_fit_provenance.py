@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -506,3 +507,129 @@ def test_fitters_record_every_table_they_read(fitter):
     constants = _module_constants(fitter)
 
     assert _read_table_paths(fitter, constants) == set(constants["FIT_INPUTS"].values())
+
+
+def test_data_flow_figure_gates_the_arm_model_it_draws():
+    """The pipeline figure plots fitted M3 coefficients, so it is gated too."""
+    figure = _load_script(FIGURES / "generate_supp_pipeline_data_flow.py")
+    fitter = _load_script(CONTENT / "fit_replay_content_models.py")
+    expected = fitter.content_fit_inputs(
+        fitter.PROCESSED_DATA_DIR / "replay_content", "event_arm_table"
+    )
+
+    assert figure.ALL_MODELS_INPUTS == expected
+    assert figure.M3_PATH == fitter.PROCESSED_DATA_DIR / (
+        "replay_content/models/M3.pkl"
+    )
+    assert figure.build_parser().parse_args([]).allow_stale is False
+    assert figure.build_parser().parse_args(["--allow-stale"]).allow_stale is True
+
+
+# ── The sweep script ──
+
+QA = REPO_ROOT / "scripts" / "qa"
+
+
+@pytest.fixture()
+def sweep_tree(tmp_path: Path) -> Path:
+    """A models tree holding one current fit and one whose input has moved."""
+    root = tmp_path / "replay_content"
+    models = root / "models_toy"
+    models.mkdir(parents=True)
+    frame = pd.DataFrame({"stop_id": [0, 1, 2], "count": [1, 0, 4]})
+    frame.attrs["covariate_schema_version"] = "v9"
+    write_table(frame, root / "stop_table.pkl")
+    inputs = {"stop_table": root / "stop_table.pkl"}
+
+    pd.DataFrame({"coef": [0.1]}).to_pickle(models / "stale.pkl")
+    write_fit_provenance(models / "stale.pkl", inputs, "poisson_glm", ["fit.py"])
+    # Regenerate the table between the two fits, as a rebuild would.
+    frame["count"] = [2, 0, 4]
+    write_table(frame, root / "stop_table.pkl")
+    pd.DataFrame({"coef": [0.2]}).to_pickle(models / "fresh.pkl")
+    write_fit_provenance(models / "fresh.pkl", inputs, "poisson_glm", ["fit.py"])
+    return root
+
+
+def _run_sweep(argv: list[str], capsys) -> tuple[int, str]:
+    module = _load_script(QA / "check_fit_provenance.py")
+    saved = sys.argv
+    sys.argv = ["check_fit_provenance.py", *argv]
+    try:
+        code = module.main()
+    finally:
+        sys.argv = saved
+    return code, capsys.readouterr().out
+
+
+def test_sweep_separates_the_current_fit_from_the_stale_one(sweep_tree, capsys):
+    code, out = _run_sweep(["--root", str(sweep_tree)], capsys)
+
+    assert code == 1
+    assert "fresh          models_toy/fresh.pkl" in out
+    assert "STALE          models_toy/stale.pkl  (changed: stop_table)" in out
+    assert "2 artifact(s): 1 fresh, 1 stale" in out
+
+
+def test_sweep_exits_zero_when_every_fit_is_current(sweep_tree, capsys):
+    (sweep_tree / "models_toy" / "stale.pkl").unlink()
+    fit_provenance_path(sweep_tree / "models_toy" / "stale.pkl").unlink()
+
+    code, out = _run_sweep(["--root", str(sweep_tree)], capsys)
+
+    assert code == 0
+    assert "1 artifact(s): 1 fresh" in out
+
+
+def test_sweep_reports_a_fit_with_no_sidecar(sweep_tree, capsys):
+    orphan = sweep_tree / "models_toy" / "orphan.pkl"
+    orphan.write_bytes(b"a fit nobody recorded")
+
+    code, out = _run_sweep([str(orphan)], capsys)
+
+    assert code == 1
+    assert "no sidecar" in out
+
+
+def test_sweep_json_output_carries_the_stale_input_names(sweep_tree, capsys):
+    code, out = _run_sweep(["--root", str(sweep_tree), "--json"], capsys)
+
+    assert code == 1
+    by_name = {Path(r["artifact"]).name: r for r in json.loads(out)}
+    assert by_name["fresh.pkl"]["status"] == "fresh"
+    assert by_name["stale.pkl"]["status"] == "stale"
+    assert by_name["stale.pkl"]["stale_inputs"] == ["stop_table"]
+
+
+def test_sweep_carries_staleness_forward_through_a_derived_fit(sweep_tree, capsys):
+    """An aggregate of a stale fit is stale, even though its own bytes match."""
+    models = sweep_tree / "models_toy"
+    pd.DataFrame({"coef": [0.3]}).to_pickle(models / "audited.pkl")
+    write_fit_provenance(
+        models / "audited.pkl",
+        {"stale": models / "stale.pkl"},
+        "aggregate",
+        ["fit.py", "--aggregate-only"],
+    )
+
+    code, out = _run_sweep(["--root", str(sweep_tree)], capsys)
+
+    assert code == 1
+    assert "STALE          models_toy/audited.pkl  (changed: stale)" in out
+
+
+def test_sweep_skips_backup_directories(sweep_tree, capsys):
+    """Frozen copies have moved on by design; reporting them buries the rest."""
+    backup = sweep_tree / "_pre_phase3_backup_20260906" / "models_toy"
+    backup.mkdir(parents=True)
+    (backup / "stale.pkl").write_bytes(b"frozen")
+    write_fit_provenance(
+        backup / "stale.pkl",
+        {"stop_table": sweep_tree / "stop_table.pkl"},
+        "poisson_glm",
+        ["fit.py"],
+    )
+
+    _, out = _run_sweep(["--root", str(sweep_tree)], capsys)
+
+    assert "_pre_phase3_backup" not in out

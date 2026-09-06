@@ -35,11 +35,20 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    require_fresh_inputs,
+)
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
+
+RC = PROCESSED_DATA_DIR / "replay_content"
+# The panel draws the fitted M3 arm model, so it is gated on the same table the
+# content ladder recorded when it fit M3.
+M3_PATH = RC / "models" / "M3.pkl"
+ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
 
 # Colour code for each arm (0..8). Patches share families:
 # arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
@@ -359,7 +368,7 @@ def make_figure(
     plt.close(fig)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--animal", default="chimi")
     parser.add_argument("--day", type=int, default=20200213)
@@ -368,18 +377,24 @@ def main() -> None:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="Draw the fitted model even if its input table has changed.",
+    )
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     dot, env = load_session(args.animal, args.day, args.epoch)
-    long_count = read_table(
-        PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.pkl"
-    )
-    events = read_table(PROCESSED_DATA_DIR / "replay_content" / "event_table.pkl")
+    long_count = read_table(RC / "event_arm_table.pkl")
+    events = read_table(RC / "event_table.pkl")
     require_covariate_schema(long_count, table="event_arm")
     require_covariate_schema(events, table="event")
-    m3_fits = pd.read_pickle(
-        Path("Processed-Data/replay_content/models/M3.pkl")
-    )
+    require_fresh_inputs(M3_PATH, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
+    m3_fits = pd.read_pickle(M3_PATH)
 
     sess_mask = (
         (long_count["animal"] == args.animal)
