@@ -150,6 +150,42 @@ carries an intercept) or `MODEL_CHOICE`; see their own sections in the catalog.
   Refractory/bursty shape and its ordering across
   populations are what the reconstruction preserves.
 
+## Covariate-harmonization refit classification (2026-08)
+
+Kept from the model catalog, which now describes only the models as they are
+fitted today. Under the covariate-harmonization pass each spec was classified as
+either CHANGED (covariates moved → coefficients move → true refit and report) or
+parity-only (covariate-unchanged → a refit should reproduce the design columns;
+checked by `_verify_harmonization_parity`).
+
+| family | CHANGED (report old→new) | parity-only |
+|---|---|---|
+| MU uncertainty | MU_uncertainty (**done**) | — |
+| SWR power | `ripple_power_z` model (canonical `rpe_postoutcome` and `reward_belief_mean_chosen_arm_preoutcome`) | — |
+| Content arm | M3, M4, M5, M6, Mv | M0, M0a, M1, M2 |
+| Content patch | P2, P3, Pv (patch reward rate replaces count) | P0–P1 |
+| ContFrag content | arm M3–M4 | arm M0–M2, patch P0–P2 |
+| Choice | C_behavior, C_full, C_full_swr_split | C_replay_only |
+| Per-bin rate (B) | — covariates unchanged; **verify** the table regen / TMAX fix did not move onset counts, else refit | all specs |
+| Per-stop rate (A) | — | R0, R1 |
+
+Changed drivers: candidate-arm reward fraction (5→10 visits), the candidate-arm
+task-probability/reward-belief block, post-outcome RPE, and the choice geometry
+control now named `candidate_arm_distance_rank`.
+
+Two standing qualifications on that table:
+
+- **Never a parity pass (2026-08-20).** The key-aligned gate reproduced every
+  declared unchanged column on shared rows but failed coverage, because a
+  transient rebuild error omitted three Replay sessions (218 → 215). No row
+  there should be treated as verified without regenerating those sessions.
+- **Superseded for the rate families (2026-09-04).** Both rate ladders were
+  respecified onto the reward-history raised-cosine basis and refit, so the rate
+  rows above describe the pre-basis ladder: `R1` is a different specification
+  from the one classified parity-only, and the per-bin reward rungs changed with
+  it. The old→new comparison is in
+  [`../audits/2026-09-04-rate-refit-comparison.md`](../audits/2026-09-04-rate-refit-comparison.md).
+
 ## Where the rest of the narrative lives
 
 The per-rung inline comments (the reasoning attached to individual `ModelSpec`

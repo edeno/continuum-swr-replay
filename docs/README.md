@@ -37,6 +37,10 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     replay-content model rung carries the predictors it does (reversed reasoning
     and retracted numbers included). The machine-readable catalog is
     `analysis/replay/model_specs.py`; this is the record of how it got that way.
+  - [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md) —
+    *design spec*: the covariate causal-hygiene rules every fit runner enforces
+    and the `<run>_cohort_audit.csv` schema (drop buckets + reconciliation
+    invariant).
   - [design/builder_test_floor.md](design/builder_test_floor.md) — *reference*: the
     measured value-level test coverage of the covariate builders and the target,
     kept honest by `scripts/qa/mutation_check.py`.
