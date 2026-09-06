@@ -327,3 +327,26 @@ def test_too_few_events_returns_none():
     """A session that cannot identify the parameters returns None rather than a fit."""
     df = _simulate(3.0, seed=9, n_events=6)
     assert fit_dirichlet_multinomial(df, PREDICTORS) is None
+
+
+def test_event_loglik_stays_finite_when_a_category_is_ruled_out():
+    """A coefficient large enough to underflow softmax must not make lgamma blow up.
+
+    ``exp(log_p)`` reaches exactly 0.0 for a candidate the mean structure has
+    ruled out, and ``lgamma(0)`` is ``+inf``: without a floor on the Dirichlet
+    concentration the event's log-likelihood is NaN and the optimizer loses the
+    objective it was following.
+    """
+    df = _simulate(3.0, seed=11, n_events=8, L_e=20)
+    packed_x = (
+        df[PREDICTORS].to_numpy(dtype=float).reshape(8, 9, len(PREDICTORS))
+    )
+    packed_y = df["arm_count_hard"].to_numpy(dtype=float).reshape(8, 9)
+    packed_z = df.groupby("event_id", sort=True)["is_swr"].first().to_numpy()[:, None]
+
+    theta = np.array([-800.0, 0.0, np.log(3.0), 0.0])
+    per_event = event_loglik(theta, packed_x, packed_y, packed_z)
+
+    assert per_event.shape == (8,)
+    assert np.isfinite(per_event).all()
+    assert (per_event < 0).all()

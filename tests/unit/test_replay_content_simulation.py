@@ -671,3 +671,51 @@ class TestDirichletMultinomialSimulator:
             simulate_dirichlet_multinomial_counts(
                 {"not_a_real_column": 1.0}, log_phi_intercept=0.0, n_events=10, seed=0
             )
+
+
+class TestSharedDesignSamplerIsSeedPinned:
+    """The two simulators draw one design from one RNG, in a fixed order.
+
+    Both public simulators call the same private column sampler as their first
+    RNG consumer, so a reordering of the draws inside it silently changes every
+    seeded fixture in the suite -- including the recovery tests, whose tolerances
+    are stated against these exact designs. These values pin the draw order.
+    """
+
+    GOLDEN = {
+        "is_current_arm": [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+        "is_prev_arm": [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+        "visit_recency_trials": [4.0, 7.0, 3.0, 1.0, 5.0, 2.0, 0.0, 0.0, 0.0],
+        "distance_to_candidate_arm_cm": [
+            72.901512, 92.742393, 96.792619, 1.470630, 86.364009,
+            98.119504, 95.721018, 14.876401, 97.262881,
+        ],
+        "is_swr": [0.0] * 9,
+        "time_since_stop_start_s": [1.208379] * 9,
+    }
+
+    def _first_event(self, df):
+        return df[df["event_id"] == 0].reset_index(drop=True)
+
+    def test_multinomial_simulator_draws_the_pinned_design(self):
+        df = self._first_event(
+            simulate_with_event_covariates(
+                {"is_current_arm": 0.5}, n_events=3, L_e=8, seed=0
+            )
+        )
+        for column, expected in self.GOLDEN.items():
+            np.testing.assert_allclose(
+                df[column].to_numpy(dtype=float), expected, atol=1e-6, err_msg=column
+            )
+        assert df["arm_count_hard"].tolist() == [0, 0, 1, 1, 3, 1, 0, 1, 1]
+
+    def test_overdispersed_simulator_shares_that_design(self):
+        df = self._first_event(
+            simulate_dirichlet_multinomial_counts(
+                {"is_current_arm": 0.5}, log_phi_intercept=1.0, n_events=3, L_e=8, seed=0
+            )
+        )
+        for column, expected in self.GOLDEN.items():
+            np.testing.assert_allclose(
+                df[column].to_numpy(dtype=float), expected, atol=1e-6, err_msg=column
+            )

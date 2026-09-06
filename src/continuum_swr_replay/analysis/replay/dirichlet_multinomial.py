@@ -102,7 +102,12 @@ def _event_loglik_jax(
     const = jax_gammaln(total + 1.0) - jax_gammaln(Y + 1.0).sum(axis=1)
     log_p = jax.nn.log_softmax(jnp.einsum("eak,k->ea", X, beta), axis=1)
     phi = jnp.exp(gamma[0] + Z @ gamma[1:])
-    alpha = phi[:, None] * jnp.exp(log_p)
+    # A candidate the mean structure has all but ruled out underflows
+    # ``exp(log_p)`` to exactly 0, and ``lgamma(0)`` is ``+inf``: the event's
+    # log-likelihood becomes NaN and the optimizer walks off the objective it
+    # was following. Clipping at the smallest positive double keeps the
+    # likelihood finite there and changes nothing anywhere else.
+    alpha = jnp.clip(phi[:, None] * jnp.exp(log_p), min=jnp.finfo(jnp.float64).tiny)
     return (
         const
         + jax_gammaln(phi)
@@ -255,7 +260,6 @@ def _pack_events(
     n_drop_zero_response = int(len(zero_events))
     if n_drop_zero_response:
         df = df[~df[event_col].isin(zero_events)].reset_index(drop=True)
-        totals = totals[totals != 0].reset_index(drop=True)
 
     if len(df) == 0:
         raise ValueError(
