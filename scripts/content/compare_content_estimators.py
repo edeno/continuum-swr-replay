@@ -638,8 +638,9 @@ def _estimator_rows(
                     "parent": rung.parent,
                     # ``sd_<term>`` and the fit's separated-term names travel
                     # with the coefficient so the identifiability rule can be
-                    # reproduced downstream from the table alone. Concentration
-                    # terms have no design column and so no ``sd_``.
+                    # reproduced downstream from the table alone. The fitter
+                    # emits ``sd_`` for the concentration modifiers too (from
+                    # their event-level design) and NaN for the intercept.
                     "sd": float(fit[f"sd_{name}"]) if f"sd_{name}" in fit else np.nan,
                     "separated_terms": separated_terms,
                     "separated_term": name in separated,

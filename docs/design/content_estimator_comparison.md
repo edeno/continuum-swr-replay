@@ -262,6 +262,12 @@ direct, uniform result of this comparison.
 
 ### 7.1 φ is assumed length-invariant, so the shipped number is the TOTAL contrast
 
+> The `_dm_len` artifacts are a separate fit of the whole rung, not a φ-only refit: their
+> β terms differ from the `_dm` fit by up to 0.09 (e.g. `CS4_armreward` `swr_x_reward_fraction…`
+> −0.840 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
+> `_dm_len` only for the two concentration terms. The table below lists 14 of the 32 pooled
+> rungs; the full set is in `swr_contrast_content_audited_dm_len.pkl`.
+
 The likelihood uses an event's length `L_e` **only as the multinomial index**:
 `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` carries no length
 term, so the fitter assumes one concentration for a 25-bin event and a 90-bin

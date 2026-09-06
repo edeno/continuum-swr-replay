@@ -259,7 +259,7 @@ def resolve_concentration_cols(
     The Dirichlet-multinomial likelihood uses an event's length ``L_e`` only as
     the multinomial index: ``log phi_e`` carries no length term, so the fitted
     concentration is assumed to be the same for a 25-bin event and a 90-bin one.
-    SWR events run about 1.8x longer than non-SWR events, so the shipped
+    SWR events run about 1.7x longer (median 45 vs 26 bins) than non-SWR events, so the shipped
     ``log_phi_is_swr`` is the TOTAL concentration contrast -- whatever an SWR
     event does to within-event redundancy, length included. Adding
     ``log_n_nonlocal_bins_z`` to the concentration design gives the
@@ -1258,7 +1258,7 @@ def main() -> None:
             "Dirichlet-multinomial only: add z(log n_nonlocal_bins) to the "
             "concentration design, giving the LENGTH-ADJUSTED twin of "
             f"coef_{LOG_PHI_IS_SWR}. The likelihood otherwise treats log phi as "
-            "length-invariant, and SWR events run ~1.8x longer, so the default "
+            "length-invariant, and SWR events run ~1.7x longer, so the default "
             "coefficient is the TOTAL concentration contrast with length "
             "included. Writes '_dm_len' artifacts of its own and also reports "
             f"coef_{LOG_PHI_EVENT_LENGTH} per SD of log event length."

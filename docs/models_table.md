@@ -489,7 +489,7 @@ BASEc    := BASEc_NT + _TSC + _LENC + _LENP
 ```
 
 **Why `BASEc` carries the two length products and `_TSC`.** SWR-coupled events
-run ~1.8× longer than non-SWR ones, and a longer trajectory visits more arms, so
+run ~1.7× longer than non-SWR ones (median 45 vs 26 bins), and a longer trajectory visits more arms, so
 an uncontrolled `swr_x_is_current_arm` partly reads "longer events leave the
 current arm" rather than "SWR content is less current-arm-locked"; `_TSC` removes
 the same channel for the within-stop time course, which also differs between the
