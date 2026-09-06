@@ -1,4 +1,4 @@
-"""Tests for :mod:`continuum_swr_replay.analysis.replay.tables`.
+"""Tests for the canonical replay-content table builders.
 
 Covers the table invariant list on a small synthetic session —
 schema, within-event sum invariants, range invariants, cross-table ID
@@ -17,18 +17,20 @@ import xarray as xr
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     EventDefinitionError,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
-    build_event_patch_table,
-    build_event_sequence_table,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table as _build_event_arm_table,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
+    build_event_patch_table,
+)
+from continuum_swr_replay.analysis.replay.tables_event import build_event_sequence_table
+from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_table as _build_event_table,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_stop import (
     build_stop_table as _build_stop_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH

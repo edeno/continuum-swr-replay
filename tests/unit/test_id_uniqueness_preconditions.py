@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.replay.choice_prediction import (
 from continuum_swr_replay.analysis.replay.switch_analysis import (
     stop_patch_replay,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_patch_table,
 )
 

@@ -289,7 +289,7 @@ def behavioral_location_from_port_experiences(
       derived from trip intervals, not from tracked position, and is **NaN
       during a trip**: the destination is never named before the animal reaches
       it, which is what keeps it usable as a predictor.
-    * ``physical_arm`` (built in ``tables.py``) -- *which track segment does the
+    * ``physical_arm`` (built in ``tables_event.py``) -- *which track segment does the
       tracked position fall on?* Always defined, trunks included.
 
     They are allowed to disagree, and do on 46 of 59,374 at-well events (0.077%,

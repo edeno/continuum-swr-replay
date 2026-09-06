@@ -28,6 +28,9 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZED_COLS
+from continuum_swr_replay.analysis.replay._tables_common import (
+    EVENT_ARM_STANDARDIZED_COLS,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -35,7 +38,6 @@ from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     load_reference,
 )
-from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
 

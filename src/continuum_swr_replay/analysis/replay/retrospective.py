@@ -73,15 +73,6 @@ __all__ = [
 ]
 
 
-# Patch → set of arm IDs that fall in that patch (leaf + trunk).
-# Built once from TRACK_SEGMENT_TO_PATCH so the topology has a single
-# source of truth.
-_PATCH_TO_ARM_SET: dict[int, frozenset[int]] = {
-    p: frozenset(arm for arm, patch in TRACK_SEGMENT_TO_PATCH.items() if patch == p)
-    for p in set(TRACK_SEGMENT_TO_PATCH.values())
-}
-
-
 # Patch (1/2/3) → trunk arm id. Each patch junction connects to the
 # center node via exactly one trunk arm, and the trunk-arm IDs are 5
 # offsets above the patch IDs by construction. This is the only place a

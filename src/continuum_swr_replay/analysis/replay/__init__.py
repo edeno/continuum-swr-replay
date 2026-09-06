@@ -107,13 +107,15 @@ from .switch_analysis import (
     build_switch_aligned_table,
     stop_patch_replay,
 )
-from .tables import (
+from .tables_arm_patch import (
     build_event_arm_table,
     build_event_patch_table,
+)
+from .tables_event import (
     build_event_sequence_table,
     build_event_table,
-    build_stop_table,
 )
+from .tables_stop import build_stop_table
 
 # Deferred rather than imported eagerly: the Dirichlet-multinomial fitter pulls
 # in JAX and switches it to float64 at import. Both effects are process-wide, so

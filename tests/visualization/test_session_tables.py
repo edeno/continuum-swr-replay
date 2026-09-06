@@ -1308,12 +1308,12 @@ class TestPublicPlotSessionTables:
         all plotted tables, and the resulting artists are checked against those
         tables' values and time intervals.
         """
-        from continuum_swr_replay.analysis.replay.tables import (
+        from continuum_swr_replay.analysis.replay.tables_arm_patch import (
             build_event_arm_table,
             build_event_patch_table,
-            build_event_table,
-            build_stop_table,
         )
+        from continuum_swr_replay.analysis.replay.tables_event import build_event_table
+        from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
         from tests.unit.test_replay_tables import (
             _bandit_graph as production_test_graph,
         )

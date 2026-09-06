@@ -36,7 +36,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay._tables_common import (
     _EVENT_SEQUENCE_TABLE_COLUMNS,
 )
 from continuum_swr_replay.table_io import read_table, write_table

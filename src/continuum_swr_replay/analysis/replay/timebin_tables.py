@@ -94,7 +94,7 @@ def build_event_onset_table(
 
     ``nonlocal_threshold`` must match the threshold used to create
     ``dot``'s Non-Local labels — it is validated, not re-applied. Family A
-    (``replay/tables.py``) threads the same parameter; keep the two in
+    (``replay/tables_event.py``) threads the same parameter; keep the two in
     step or the families will disagree on which sessions are admissible.
     """
     if "non_local_event" in dot:

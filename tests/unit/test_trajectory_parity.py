@@ -15,14 +15,12 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table as _build_contfrag_event_table,
 )
+from continuum_swr_replay.analysis.replay._tables_common import _EVENT_TABLE_COLUMNS
 from continuum_swr_replay.analysis.replay.model_specs import RECENCY_SPLINE_COLUMNS
-from continuum_swr_replay.analysis.replay.tables import (
-    _EVENT_TABLE_COLUMNS,
-)
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table as _build_event_arm_table,
 )
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_table as _build_event_table,
 )
 from continuum_swr_replay.analysis.replay.trajectory import (

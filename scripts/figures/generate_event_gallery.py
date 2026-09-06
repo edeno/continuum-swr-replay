@@ -94,10 +94,8 @@ from continuum_swr_replay.analysis.replay.covariates import (
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
-from continuum_swr_replay.analysis.replay.tables import (
-    build_event_arm_table,
-    build_event_table,
-)
+from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
+from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (

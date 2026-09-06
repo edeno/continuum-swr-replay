@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """Build the four canonical replay-content tables across all sessions.
 
-Thin driver over :mod:`continuum_swr_replay.analysis.replay.tables`. For
+Thin driver over the per-grain table builders in
+``continuum_swr_replay.analysis.replay.tables_event`` / ``tables_stop`` /
+``tables_arm_patch``. For
 each session it loads the pre-saved ``data_over_time.pkl``,
 ``environment.pkl``, and ``results.nc``, pulls ``trials`` +
 ``track_graph`` from Spyglass, and calls the four table builders.
@@ -68,6 +70,9 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.replay._tables_common import (
+    EVENT_ARM_STANDARDIZED_COLS,
+)
 from continuum_swr_replay.analysis.replay.covariates import (
     assert_qvals_aligned,
     load_contingency,
@@ -83,13 +88,16 @@ from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     save_reference,
 )
-from continuum_swr_replay.analysis.replay.tables import (
-    EVENT_ARM_STANDARDIZED_COLS,
-    add_nonlocal_swr_split,
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table,
     build_event_patch_table,
+)
+from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_sequence_table,
     build_event_table,
+)
+from continuum_swr_replay.analysis.replay.tables_stop import (
+    add_nonlocal_swr_split,
     build_stop_table,
 )
 from continuum_swr_replay.data_loaders.constants import NWB_FILES, WELL_ARMS
@@ -807,7 +815,7 @@ def _assemble_canonical_tables(
             all_event_sequence_tables, ignore_index=True
         )
     else:
-        from continuum_swr_replay.analysis.replay.tables import (
+        from continuum_swr_replay.analysis.replay._tables_common import (
             _EVENT_SEQUENCE_TABLE_COLUMNS,
         )
 

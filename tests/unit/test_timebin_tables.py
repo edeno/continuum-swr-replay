@@ -160,7 +160,7 @@ def test_invalid_nonlocal_probability_labels_fail_loud():
 def test_custom_nonlocal_threshold_accepts_labels_built_at_that_threshold():
     """Family B must validate at the threshold that created the labels.
 
-    Family A (``replay/tables.py``) already threads ``nonlocal_threshold``.
+    Family A (``replay/tables_event.py``) already threads ``nonlocal_threshold``.
     With it hard-coded here, a ``_50_data_over_time`` file raised on
     perfectly valid labels while Family A accepted them.
     """

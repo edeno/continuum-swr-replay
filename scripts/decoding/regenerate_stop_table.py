@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
     stamp_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
-from continuum_swr_replay.analysis.replay.tables import (  # noqa: E402
+from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402

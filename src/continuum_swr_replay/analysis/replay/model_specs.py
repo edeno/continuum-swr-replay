@@ -133,96 +133,22 @@ def default_content_model_names(
 
 # ── Primary arm-level hierarchy ──
 #
-# M0a (arm fixed effects) enters as a baseline below M1, and every
-# model from M1 on carries the 8 arm-FE dummies so the spatial /
-# reward predictors are estimated above each arm's static occupancy.
-#
-# CONVERGENCE / VIF NOTE: the pre-arm-FE hierarchy was tuned for
-# max VIF < 3 through M4 and converged 7/7 on the j16 pilot. Adding
-# arm fixed effects deliberately introduces competition between
-# ``is_current`` and the dummy of whichever arm the animal occupies
-# — VIF will rise (especially in camp-heavy sessions) and a session
-# where the animal never leaves one well can become rank-deficient
-# (is_current ≡ that arm's dummy) and fail to converge. The
-# ``n_events < 2 * n_predictors`` gate in ``fit_conditional_poisson``
-# also drops more small sessions now (M6 needs ≥26 events).
-#
-# There is no reward-memory rung. There was one -- M5 carried
-# ``is_last_rewarded_elsewhere`` and the SWR rungs sat above it at M6
-# and M7 -- and it was removed on 2026-08-18, with the SWR rungs
-# renumbered down into M5 and M6.
-#
-# The predictor is not identifiable per-session, and it does not measure
-# what its name says. It is an **omission-only** indicator: it cannot fire
-# on a rewarded stop, because if the animal was just rewarded here then
-# the last-rewarded arm is here and the residual is zero. It fires on 0.0%
-# of rewarded at-well events and 67.4% of omission ones, and every event
-# where it fires is an omission. So its support is capped by the ~10%
-# omission rate, and any coefficient answers "within omission stops, is
-# the previously-rewarded arm over- or under-represented" rather than
-# anything about reward memory in general.
-#
-# On top of that it is not estimable per-session. It fires on 6.1% of
-# events, and in 99 of 208 sessions no replay mass ever lands on the arm
-# it marks, which is perfect separation: the coefficient runs to -inf
-# and the standard error explodes (median -3.503, SE > 10 in 49% of
-# sessions). Which sessions separate tracks their omission count (median
-# 14 omission events, against 22 for the identified ones). Its SWR interaction was worse -- constant within every
-# event in 58 sessions -- and because the ladder freezes one
-# complete-case cohort over the union of all rungs, the refusals
-# propagated to every rung including M0, fitting 145 of 215 sessions
-# where 215 of 218 had fitted before.
-#
-# The raw ``is_last_rewarded`` cannot take its place: it correlates
-# 0.919 with ``is_current``, which is the near-collinearity the
-# "elsewhere" residual existed to remove. Reward memory therefore lives
-# only in the pooled contrast rungs C5_lastrew / CS3_lastrew, where
-# pooling across sessions supplies the within-event variation that a
-# per-session conditional fit does not have.
-#
-# SWR interactions enter at M5 / M6. M5 carries the *spatial* × SWR
-# interactions (``swr_x_is_current_arm``, ``swr_x_is_prev_arm``) — does the local/previous
-# bias differ for SWR-overlapping events? M6 adds the *value* × SWR
-# interactions (``swr_x_reward_fraction_candidate_arm_last10_visits`` and the
-# centered-recency spline interactions) — does the reward structure of replay
-# differ on SWR events? Splitting M5 from M6 lets the nested LR cleanly
-# separate "spatial is SWR-modulated" from "reward is SWR-modulated".
-#
-# An SWR split (fit M0–M4 separately on is_swr=True and is_swr=False
-# event subsets) is the unrestricted complement to these interaction
-# terms — same pattern documented for MUA below.
-#
-# MUA event-type effects are assessed via split analysis (fit M0–M4
-# separately on MUA-only and non-MUA events) rather than interaction
-# terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
-# VIF > 70).
+# M0a (arm fixed effects) is the baseline below M1, and every rung from M1 on
+# carries the 8 arm-FE dummies so the spatial / reward predictors are estimated
+# above each arm's static occupancy. M5 adds the spatial × SWR interactions, M6
+# the value × SWR ones. There is no reward-memory rung, and MUA event-type
+# effects are assessed by splitting the cohort rather than by interaction terms.
+# The last-rewarded family is REFUSED as unidentified — the pooled contrast
+# rungs (C5_lastrew, CS3_lastrew, CS5b_valuevsprevgoal) did not rescue it
+# either, and no coefficient from them is citable. Why (incl. the arm-FE
+# convergence trade-off, the retired M5 rung and the refusal):
+# ``docs/design/model_history.md``.
 
-# Natural-cubic-spline basis for visit recency, on the raw trial-count scale.
-#
-# Recency is deterministic on the two arms that already have their own
-# indicators: exactly 1 on the current arm and exactly 2 on the previous arm, on
-# 100.00% of location-resolved events. A basis evaluated there is a fixed
-# vector, hence exactly collinear with ``is_current`` + ``is_prev`` -- fitting it
-# unmasked is rank-deficient. The basis is therefore masked to the arms where
-# recency is not already determined (visited leaves that are neither current nor
-# previous, where recency is >= 3 by construction), and one basis column is
-# dropped as reference because a natural spline basis is a partition of unity
-# and would otherwise sum to the mask.
-#
-# Knots are fixed globally rather than fitted per session: a per-session basis
-# would give each session its own units and make coefficients incomparable
-# across the medians the ladders aggregate over. 12 and 40 trials sit near the
-# tertiles of the identified support (13 and 36), and are the best-conditioned
-# of the placements tried.
-#
-# Raw rather than log1p, by preference for knots that read directly in trials.
-# Measured trade-off: the two are indistinguishable on fit (median paired Δllf
-# 5.6 on a ~22,700 session log-likelihood, log1p ahead in 13 of 30 sessions),
-# but raw is less well conditioned -- within-event demeaned condition number
-# 4.12 against 2.74, and the third basis column has SD 0.032 against the first's
-# 0.386 because recency is right-skewed (median 21 on the support, max 198). If
-# per-session instability in these columns becomes a problem, the log1p scale is
-# the first thing to try: only these two constants change.
+# Natural-cubic-spline basis for visit recency, on the raw trial-count scale,
+# masked to the arms where recency is not already determined by
+# ``is_current_arm`` / ``is_prev_arm``, with one basis column dropped as
+# reference. Why masked, why fixed global knots, and the raw-vs-log1p
+# measurement: ``docs/design/model_history.md``.
 # Interior knot positions (in trial counts) and clamp bounds for the natural
 # cubic spline on visit recency. The two knots (12, 40 trials) place flexibility
 # across the bulk of the recency distribution; the bounds (3, 200) clamp
@@ -381,21 +307,10 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # ladder's rate definition and avoids reintroducing a visit-frequency
 # confound through an accumulated reward count.
 #
-# There is no patch reward-memory rung, for the reason the arm ladder
-# has none (see the M5 note above). ``is_last_rewarded_patch`` overlaps
-# ``is_current_patch`` at r = 0.945, and the "elsewhere" residual that
-# was meant to break that overlap fires on 2.9% of events and is
-# perfectly separated in 77 of 184 sessions. At patch level it also
-# carries no signal to recover: mean ``patch_count_hard`` is 14.76 on
-# the marked patch against 14.81 elsewhere, where ``is_current_patch``
-# shows 17.16 against 13.63.
-#
-# It cost more here than in the arm ladder. Carrying it in P2/P3 lost 31
-# sessions and its SWR interaction in P4 lost 120, leaving 95 of 215 --
-# the frozen-union cohort propagates each refusal to every rung. Removed
-# 2026-08-18, P3 and P4 renumbered down into P2 and P3.
-# ``MODEL_PATCH_SWITCH`` remains the dedicated test of the
-# previous-vs-current contrast.
+# There is no patch reward-memory rung, for the reason the arm ladder has none
+# (removed 2026-08-18, P3/P4 renumbered down into P2/P3). ``MODEL_PATCH_SWITCH``
+# remains the dedicated previous-vs-current contrast. Numbers:
+# ``docs/design/model_history.md``.
 
 # ── Event-source-restricted hierarchies (ContFrag pipeline) ──
 #
@@ -406,10 +321,7 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # effects and are unidentifiable. The hierarchy therefore mirrors
 # MODEL_HIERARCHY's M0–M4 and stops there.
 #
-# A cross-modality rung (mua_x_* inside SWR-events, swr_x_* inside
-# MUA-events) is potentially identifiable when the cross-modality
-# flag varies, but should only be added once the ContFrag event_arm
-# tables are built and the cross-modality variability is verified.
+# A cross-modality rung is deferred; see ``docs/design/model_history.md``.
 
 _M0_TO_M4 = {
     name: MODEL_HIERARCHY[name] for name in ("M0", "M0a", "M1", "M2", "M3", "M4")
@@ -484,13 +396,7 @@ MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P2)
 # ≈ -0.5, VIF < 2). On stay trials these are collinear (r = 0.95,
 # VIF > 20) and must not be combined.
 #
-# Results on 7 j16 sessions:
-# - is_current_patch is STRONGER after switches (median +1.66 larger
-#   coefficient, 7/7, p=0.016) — replay immediately represents the
-#   new patch
-# - is_prev_patch is reliably NEGATIVE (7/7, median −1.8) — the
-#   patch the animal just left is actively suppressed, below even
-#   the unrelated third patch
+# Pilot result on 7 j16 sessions: ``docs/design/model_history.md``.
 
 MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
     "PS0": ModelSpec(
@@ -566,26 +472,10 @@ N_REWARD_LAGS = REWARD_HISTORY_N_LAGS
 #
 # R1 carries the whole reward history in three numbers: the known-outcome lag
 # vector projected onto the log-spaced raised-cosine basis
-# (``REWARD_HISTORY_COLUMNS``), plus the structural-missingness indicator
-# ``REWARD_HISTORY_INCOMPLETE``. It is the stop-level analog of the content
-# hierarchy's reward-history axis (``reward_fraction_candidate_arm_last10_visits``
-# at M3): R1 vs R0 tests whether replay *occurrence* tracks reward history at
-# all, and is the confound check for whether an M3 content effect is partly a
-# rate effect. The basis replaces both the single newest-outcome indicator and
-# the overlapping window-10 fraction — one smooth kernel instead of two
-# encodings of the same history at two timescales. Candidate-arm visit recency
-# has no stop-level analog (every trial visits some arm), so the rate hierarchy
-# stops at R1.
-#
-# The hierarchy intentionally stops at R1. An ``is_swr_stop`` term
-# (1 if any timebin in the stop had an SWR) was dropped: ``n_selected_events``
-# counts non-local events, which overlap SWRs heavily by construction,
-# so ``is_swr_stop`` is largely tautological with the response and says
-# little about whether SWRs *drive* replay occurrence. The SWR-vs-non-SWR
-# question is answered at the event level (the ``swr_x_*`` content
-# interactions / SWR-split fits), not via the per-stop rate. A future
-# R-level term (+ ``trials_since_block_change``, ``block_number``) is
-# deferred until the contingency-block loader is wired.
+# (``REWARD_HISTORY_COLUMNS``) plus the structural-missingness indicator
+# ``REWARD_HISTORY_INCOMPLETE``. The ladder stops there. Why — the content
+# ladder's M3 analogy, the dropped ``is_swr_stop`` term, and the deferred
+# block-level rung: ``docs/design/model_history.md``.
 
 MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
@@ -843,15 +733,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         parent="M0_const",
     ),
     # The five ``onset_lag1..10`` dummy rungs (M3_hist, M4_hist_rew,
-    # M6_time_hist, M7_time_hist_rew, M9_rew_x_time) are RETIRED. The dummy
-    # history block separates on the refractory bins, which voids the whole
-    # rung's held-out metric: measured on the 2026-09-06 refit of 218 sessions,
-    # ``cv_bits_per_event`` was NaN in 99.08 % of non-local fits (99.08 /
-    # 99.54 / 99.54 / 100.00 % across the four populations), so the rungs could
+    # M6_time_hist, M7_time_hist_rew, M9_rew_x_time) are RETIRED — they could
     # not be cross-validated at all. The raised-cosine variants below span the
-    # same 150 ms window with four smooth parameters and ARE scored. The
-    # reward x time interaction survives as ``M9r_rew_x_time`` on the
-    # raised-cosine parent. See ``docs/design/model_history.md``.
+    # same window and ARE scored; the reward x time interaction survives as
+    # ``M9r_rew_x_time``. Numbers: ``docs/design/model_history.md``.
     "M5_time": PerBinRateModelSpec(
         name="M5_time",
         time_spline=True,
@@ -863,11 +748,8 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="+ time-since-stop (spline)",
         parent="M0_const",
     ),
-    # M8_full_switch (the per-bin switch main-effect extension) was retired:
-    # The completed-trip switch flag is often constant within a session's complete-case
-    # cohort, making the design rank-deficient. See the naming spec's
-    # "Immediate switch is not a nuisance adjustment" section. Nothing parents
-    # off it, so removal leaves the ladder intact.
+    # M8_full_switch (the per-bin switch main-effect extension) was retired;
+    # nothing parents off it. Why: ``docs/design/model_history.md``.
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
@@ -992,20 +874,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 # replay-only reference (``parent=None``).
 #
 # Two predictors are deliberately excluded from the behavioural block:
-# - ``is_same_patch``: a coarse binary of ``distance_to_candidate_arm_cm`` (same-patch
-#   arms are close); the two were near-collinear (VIF > 700).
-# - ``distance_to_candidate_arm_cm`` itself: the animal chose the closest arm in ~95-99%
-#   of stops (median 0.99 in sessions that previously failed to fit),
-#   producing quasi-separation that crashed ``ConditionalLogit.fit`` in
-#   ~25% of sessions. Dropping it restores identifiability across all
-#   sessions and de-saturates the baseline so ``C_full`` vs
-#   ``C_behavior`` has room to detect a replay effect. Trade-off: the
-#   replay coefficient is no longer cleanly controlled for distance,
-#   and ``replay_fraction`` is correlated with low candidate-arm distance (replay
-#   biases toward the current/closest arm), so a positive
-#   ``replay_fraction`` coefficient could partly launder distance. A
-#   switch-style restriction (fit only on stops where the animal did
-#   not pick the closest arm) is the principled alternative; defer.
+# ``is_same_patch`` (near-collinear with candidate-arm distance) and
+# ``distance_to_candidate_arm_cm`` itself (quasi-separation). The trade-off —
+# the replay coefficient is then not cleanly distance-controlled — and the
+# principled alternative are in ``docs/design/model_history.md``.
 # Callers should still drop any column absent from the choice dataset
 # before fitting.
 
@@ -1198,20 +1070,10 @@ POST_OUTCOME_COHORT = "post_outcome"
 # --- Content is_swr-contrast ladder (conditional Poisson over 9 arms / 3 patches) ---
 # name -> (predictors, scope)  scope: "split" (per is_swr split) | "pooled" (contrast)
 ARMFE = [f"is_candidate_arm_{a}" for a in range(8)]
-# ``candidate_arm_distance_rank`` is deliberately absent. It takes five tied
-# values over a fixed track topology, its rank-1 level is *identical* to
-# ``is_current_arm``
-# (agreement 1.000000 across 59,374 location-resolved events), and it ranks last
-# in unique likelihood of any covariate here. Carrying it collapsed the
-# current-arm coefficient from +0.705 (5/5 animals) to +0.102 (3/5) and doubled
-# its standard error, making every C*/CS* ``is_current_arm`` non-comparable with
-# ``M1``/``C1_current``. Its removal leaves the SWR interactions untouched
-# (the SWR × candidate-arm belief-mean coefficient changed -2.390 -> -2.407).
-# This also restores consistency with the
-# module docstring above, which excludes ``distance_to_candidate_arm_cm`` and
-# ``is_same_patch``
-# on the same grounds -- candidate-arm distance rank re-imported most of their
-# content.
+# ``candidate_arm_distance_rank`` is deliberately absent: its rank-1 level is
+# identical to ``is_current_arm``, so carrying it makes every C*/CS*
+# ``is_current_arm`` non-comparable with ``M1``/``C1_current``. Numbers:
+# ``docs/design/model_history.md``.
 BASEc_NT = [
     *ARMFE,
     "is_current_arm",
@@ -1220,12 +1082,10 @@ BASEc_NT = [
     "is_candidate_arm_never_visited",
 ]
 _TSC = "log1p_time_since_stop_start_s_z_x_is_current_arm"
-# Event-length control. SWR-coupled events run ~1.8x longer than non-SWR ones, and a
-# longer trajectory visits more arms, so an uncontrolled ``swr_x_is_current_arm``
-# partly reads "longer events leave the current arm". z(log n_nonlocal_bins) crossed
-# with the current and previous arm indicators removes that channel from every rung
-# built on the base; the ``nt`` twins below keep BASEc_NT as the uncontrolled
-# sensitivity fit.
+# Event-length control: z(log n_nonlocal_bins) crossed with the current and
+# previous arm indicators, on every rung built on ``BASEc``; the ``nt`` twins
+# keep ``BASEc_NT`` as the uncontrolled sensitivity fit. Why:
+# ``docs/design/model_history.md``.
 _LENC = "log_n_nonlocal_bins_z_x_is_current_arm"
 _LENP = "log_n_nonlocal_bins_z_x_is_prev_arm"
 BASEc = [*BASEc_NT, _TSC, _LENC, _LENP]
@@ -1278,18 +1138,10 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
         ],
         "split",
     ),
-    # CS1 inherits the within-stop-time and event-length current-arm interactions
-    # from BASEc UNCONDITIONALLY, so ``swr_x_is_current_arm`` is the SWR-specific
-    # current-arm effect BEYOND the general time course and BEYOND event length
-    # (SWR and non-SWR events differ in both).
-    #
-    # ESTIMAND. ``n_nonlocal_bins`` is post-treatment with respect to ``is_swr``
-    # (SWR events run ~1.7x longer), so conditioning on it is a post-treatment
-    # adjustment and length may be a mediator (SWR -> longer replay -> leaves the
-    # current arm). Every ``swr_x_`` coefficient on a BASEc rung is therefore the
-    # LENGTH-ADJUSTED (DIRECT) SWR effect; the ``nt`` twin, fitted on BASEc_NT,
-    # holds the TOTAL SWR effect. Both are shipped and are reported side by side;
-    # neither supersedes the other.
+    # Every ``swr_x_`` coefficient on a ``BASEc`` rung is the LENGTH-ADJUSTED
+    # (DIRECT) SWR effect; the ``nt`` twin on ``BASEc_NT`` holds the TOTAL SWR
+    # effect. Both are shipped and reported side by side; neither supersedes the
+    # other. Estimand argument: ``docs/design/model_history.md``.
     "CS1_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
     "CS1nt_current": ([*BASEc_NT, "swr_x_is_current_arm"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
@@ -1338,8 +1190,10 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # CS5b adds the previous-goal analog (is_last_rewarded_elsewhere + its SWR
     # interaction) on top of CS5, so the
     # ``swr_x_reward_belief_mean_candidate_arm_preoutcome`` term is read as the
-    # value effect net of previous-goal. Fitted values are reported in
-    # paper/claims_table.md (row 19f) — do not duplicate numbers here.
+    # value effect net of previous-goal. The rung is REFUSED as unidentified
+    # (most fitted sessions are flagged separated); it is kept so the refusal is
+    # reproducible, not because its coefficient is citable. Fitted values are
+    # reported in paper/claims_table.md (row 19f) — do not duplicate them here.
     "CS5b_valuevsprevgoal": (
         [
             *BASEc,
@@ -1413,14 +1267,8 @@ _TSC_PATCH = "log1p_time_since_stop_start_s_z_x_is_current_patch"
 _LENC_PATCH = "log_n_nonlocal_bins_z_x_is_current_patch"
 _LENP_PATCH = "log_n_nonlocal_bins_z_x_is_prev_patch"
 BASEc_PATCH = [*BASEc_PATCH_NT, _TSC_PATCH, _LENC_PATCH, _LENP_PATCH]
-# ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18. Both crossed
-# ``is_last_rewarded_noncurrent_patch`` with a peri-switch term, and
-# the indicator correlates -0.96/-0.97 with its own interaction, so the design
-# was rank-deficient in 83 and 87 of 215 sessions. What survived the |coef|<10
-# filter was selection on the estimate: CP2 reported +4.83 with a typical
-# session SE of 7,313, against +0.36 on the sessions that were actually
-# identified. A 3%-support indicator crossed with a time term is not estimable
-# per session in a 3-alternative model.
+# ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18; see
+# ``docs/design/model_history.md``.
 _LR_PATCH = "is_last_rewarded_noncurrent_patch"
 SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP0_base": (BASEc_PATCH, "split"),

@@ -15,7 +15,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.tables import build_event_patch_table
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
+    build_event_patch_table,
+)
 
 
 def _make_event_arm_table(cumulative_reward_values):

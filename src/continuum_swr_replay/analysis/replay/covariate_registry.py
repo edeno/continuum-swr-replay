@@ -385,7 +385,7 @@ REGISTRY: tuple[Entry, ...] = (
         "arm_never_visited_patch",
         "is_patch_never_visited",
         "event_patch",
-        notes="patch-grain column in event_patch_table (tables.py:1685); "
+        notes="patch-grain column in event_patch_table (tables_arm_patch.py); "
         "used by BASEc_PATCH (model_specs.py:1233)",
     ),
     _rename("is_same_patch", "is_same_patch_as_current", "event_arm"),

@@ -64,7 +64,7 @@ context. Existing pickles retain the old values until regeneration.
 event — but only when that segment touches a well. Trunk arms (6/7/8) connect two
 junctions and no well, so `arm_to_well` returns NaN and the builder falls back to
 the arm of `current_well`
-([`tables.py`](../../src/continuum_swr_replay/analysis/replay/tables.py), the
+([`tables_event.py`](../../src/continuum_swr_replay/analysis/replay/tables_event.py), the
 `_single_arm_from_well(_strict_first(g["current_well"]), ...)` branch).
 
 `current_well` is `to_well` of the latest trial **started** at or before the event

@@ -3,10 +3,9 @@ column-order constants for the per-grain table builders.
 
 The three prep helpers and ``EVENT_ARM_STANDARDIZED_COLS`` are genuinely
 cross-grain (used by more than one builder module). The per-grain column-order
-tuples (``_EVENT_TABLE_*`` etc.) each serve one grain, but live here so the
-``tables.py`` shim can re-export them for prepare_data's empty-session
-short-circuit and the parity/provenance tests without importing every grain
-module."""
+tuples (``_EVENT_TABLE_*`` etc.) each serve one grain, but live here so
+prepare_data's empty-session short-circuits and the parity/provenance tests can
+import them without importing every grain module."""
 
 from __future__ import annotations
 

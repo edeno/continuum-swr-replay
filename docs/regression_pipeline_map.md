@@ -112,12 +112,6 @@ Scientific table contracts beyond the generic covariate schema stamp.
 
 `validate_event_arm_table`, `validate_event_patch_table`
 
-### `src/continuum_swr_replay/analysis/replay/tables.py`
-
-Canonical replay-content table builders, split by grain.
-
-_No module-level public symbols._
-
 ### `src/continuum_swr_replay/analysis/replay/tables_arm_patch.py`
 
 Canonical arm- and patch-grain builders: one row per (event, arm) / (event, patch).
@@ -278,7 +272,7 @@ Shared fit-diagnostics helpers: convergence, separation, warning capture.
 
 Shared helpers for event-table builders.
 
-`nearest_well_distance_cm`, `immobility_bout_starts`, `immobility_bout_intervals`, `time_since_stop`, `single_arm_from_well`, `arm_to_patch`, `align_posterior_to_dot`, `safe_mode`, `safe_first`, `strict_first`, `strict_mean`, `strict_sum`, `hash_event_id`, `validate_event_ids`, `hash_stop_id`, `assign_bout`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`, `attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
+`nearest_well_distance_cm`, `immobility_bout_intervals`, `time_since_stop`, `single_arm_from_well`, `arm_to_patch`, `align_posterior_to_dot`, `safe_mode`, `safe_first`, `strict_first`, `strict_mean`, `strict_sum`, `hash_event_id`, `validate_event_ids`, `hash_stop_id`, `assign_bout`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`, `attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay/choice_prediction.py`
 

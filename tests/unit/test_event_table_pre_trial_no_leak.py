@@ -20,7 +20,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_table as _build_event_table,
 )
 from tests.unit._port_experience_fixtures import port_experiences_from_trials

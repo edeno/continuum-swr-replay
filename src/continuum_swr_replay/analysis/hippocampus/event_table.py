@@ -38,7 +38,7 @@ This is the same label source used by the Figure 2 bar / triggered-average /
 timing panels and by the replay-content tables, so a single population and
 overlap convention governs the whole figure.
 
-The replay-content tables in ``analysis/replay/tables.py`` build on top of
+The replay-content tables in ``analysis/replay/tables_*.py`` build on top of
 this table: ``build_event_table`` computes aggregates over this same complete,
 atomically validated label window and merges the classification columns here.
 """
@@ -69,7 +69,7 @@ from .event_immobility import (
 
 # NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
 # ``analysis/replay/_helpers``. Importing them at module load would close a
-# cycle — ``replay/__init__`` eagerly imports ``replay.tables``, which
+# cycle — ``replay/__init__`` eagerly imports the replay table builders, which
 # imports this module — so they are imported lazily inside
 # :func:`build_classified_nonlocal_event_table` instead. The natural
 # dependency direction (replay builds on hippocampus) stays at module

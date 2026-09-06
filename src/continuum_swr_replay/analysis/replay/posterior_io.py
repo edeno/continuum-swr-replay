@@ -9,7 +9,7 @@ from the acausal posterior by
 ``analysis.hippocampus.posterior_analysis.get_conditional_non_local_posterior``.
 
 This module wraps that derivation plus the netCDF load, so
-``tables.py`` does not need to know about ``xarray.open_dataset`` or the
+the table builders do not need to know about ``xarray.open_dataset`` or the
 detector-results internals.
 """
 

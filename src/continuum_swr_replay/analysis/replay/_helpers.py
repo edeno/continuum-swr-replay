@@ -1,6 +1,6 @@
 """Shared helpers for event-table builders.
 
-These utilities are used by both the NonLocal (``tables.py``) and
+These utilities are used by both the NonLocal (``tables_*.py``) and
 ContFrag (``contfrag/tables.py``) table builders. Trial clocks, behavioral
 context, and behavioral-history covariates live in :mod:`.covariates`.
 """
@@ -131,20 +131,6 @@ def nearest_well_distance_cm(
         displacement = positions[valid, None, :] - well_positions[None, :, :]
         output[valid] = np.linalg.norm(displacement, axis=2).min(axis=1)
     return output
-
-
-def immobility_bout_starts(
-    dot: pd.DataFrame,
-    speed_col: str = "head_speed",
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-) -> np.ndarray:
-    """Timestamps at which speed crossed from above to below the threshold."""
-    imm = (dot[speed_col] < speed_threshold).to_numpy()
-    imm_times = dot.index.to_numpy()
-    transitions = np.where(~imm[:-1] & imm[1:])[0] + 1
-    if len(imm) > 0 and imm[0]:
-        transitions = np.concatenate([[0], transitions])
-    return imm_times[transitions]
 
 
 def immobility_bout_intervals(

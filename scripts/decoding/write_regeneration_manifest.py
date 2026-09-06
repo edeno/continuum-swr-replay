@@ -16,6 +16,9 @@ import pyarrow.parquet as pq
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
+from continuum_swr_replay.analysis.replay._tables_common import (
+    EVENT_ARM_STANDARDIZED_COLS,
+)
 from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
     load_reference,
@@ -23,9 +26,6 @@ from continuum_swr_replay.analysis.replay.standardization import (
 from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
-)
-from continuum_swr_replay.analysis.replay.tables import (
-    EVENT_ARM_STANDARDIZED_COLS,
 )
 from continuum_swr_replay.analysis.replay.versions import MANIFEST_SCHEMA
 from continuum_swr_replay.session_keys import (

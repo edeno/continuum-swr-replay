@@ -3229,11 +3229,12 @@ def plot_session_tables(
         ``data['environment']``; decoder-dependent panels still require their
         normal fitted-detector inputs.
     event_table, event_arm_table, event_sequence_table, stop_table
-        Canonical tables produced by
-        :mod:`continuum_swr_replay.analysis.replay.tables`.
+        Canonical tables produced by the per-grain builders in
+        ``continuum_swr_replay.analysis.replay.tables_event`` /
+        ``tables_stop`` / ``tables_arm_patch``.
     event_patch_table : pd.DataFrame, optional
         Patch-collapsed table from
-        :func:`~continuum_swr_replay.analysis.replay.tables.build_event_patch_table`.
+        :func:`~continuum_swr_replay.analysis.replay.tables_arm_patch.build_event_patch_table`.
         Required only by the patch-grain panels in
         :data:`PATCH_COVARIATE_PANELS`; every other panel ignores it.
     trials : pd.DataFrame, optional

@@ -98,10 +98,6 @@ _ARM_ARM_INTERACTIONS: dict[str, tuple[str, str]] = {
     ),
 }
 
-_BASE_BINARY = ("is_current_arm", "is_prev_arm", "is_next_arm", "is_last_rewarded_arm")
-_CONTINUOUS_ARM = ("visit_recency_trials", "reward_count_candidate_arm_last10_known_trials", "distance_to_candidate_arm_cm")
-_EVENT_LEVEL = ("is_swr", "is_omitted_outcome", "time_since_stop_start_s")
-
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
     """Softmax over the last axis with the standard max-shift for stability."""

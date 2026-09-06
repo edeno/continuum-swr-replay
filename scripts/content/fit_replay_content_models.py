@@ -72,6 +72,9 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
+from continuum_swr_replay.analysis.replay._tables_common import (
+    EVENT_ARM_STANDARDIZED_COLS,
+)
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     drop_profile,
@@ -135,7 +138,6 @@ from continuum_swr_replay.analysis.replay.standardization import (
     assert_standardized_matches_reference,
     load_reference,
 )
-from continuum_swr_replay.analysis.replay.tables import EVENT_ARM_STANDARDIZED_COLS
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
