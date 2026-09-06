@@ -125,7 +125,7 @@ arm-value / arm-uncertainty axes).
   ripple-power bump at non-local onset. Reframed as continuum claim #24.
 - **"SWR and non-SWR events are recruited differently by behavior."** Not
   shown as a *gross* recruitment difference; the peri-switch "flat" non-SWR
-  profile is a null. Superseded by the per-effect 3b decomposition (#19a–#19e),
+  profile is a null. Superseded by the per-effect 3b decomposition (#19a–#19g),
   where non-SWR and SWR *do* differ on specific axes — immediate-reward gating
   of *occurrence* (#19c: kernel lag-1 RR **1.44** SWR-coupled vs **0.99**
   non-SWR, the paired basis coefficient positive in 79.2 % of 216 sessions) and
