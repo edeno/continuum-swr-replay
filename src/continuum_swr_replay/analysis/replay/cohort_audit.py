@@ -16,6 +16,8 @@ the row reconciliation — they annotate the retained cohort, they do not remove
 
 from __future__ import annotations
 
+from collections.abc import Container, Iterable
+
 import numpy as np
 import pandas as pd
 
@@ -257,6 +259,82 @@ def drop_profile(dropped: pd.DataFrame) -> str:
         if vcol in dropped:
             parts.append(f"{vcol}_median={dropped[vcol].median():.3f}")
     return "; ".join(parts) if parts else f"n_dropped={len(dropped)}"
+
+
+#: Characters ``drop_notes`` uses as its own separators, and which therefore may
+#: not appear inside one note's text.
+_NOTE_SEPARATORS = ";,"
+
+
+def escape_note_field(text: object) -> str:
+    """Make arbitrary text safe to embed in a ``drop_notes`` string.
+
+    ``drop_notes`` is a single free-text cell built by joining parts with ``"; "``
+    and ``", "``, and it is written to CSV. An estimator's refusal message is the
+    one part that is not authored here -- it quotes column names and shapes and
+    routinely contains commas -- so embedding it raw makes the note's own
+    structure unparseable and can split the cell in a naive CSV reader. The
+    separators are replaced by spaces (never dropped: removing them would run
+    two words together).
+
+    Parameters
+    ----------
+    text : object
+        The message to embed; coerced with ``str``.
+
+    Returns
+    -------
+    str
+        ``text`` with ``";"`` and ``","`` replaced by spaces and runs of
+        whitespace collapsed.
+    """
+    cleaned = str(text)
+    for separator in _NOTE_SEPARATORS:
+        cleaned = cleaned.replace(separator, " ")
+    return " ".join(cleaned.split())
+
+
+def estimator_skip_note(
+    named_skips: Iterable[tuple[str, str]], skip_classes: Container[str]
+) -> str:
+    """The ``drop_notes`` fragment describing sessions that produced no fit.
+
+    One policy for every runner: the skip **classes** are summarized (a session
+    that was simply too short is routine and needs no name), and only the classes
+    in ``skip_classes`` -- the estimator refusing a design it cannot fit -- name
+    the sessions they happened to, because those are rare and actionable.
+
+    Parameters
+    ----------
+    named_skips : iterable of (str, str)
+        ``(session_label, reason)`` for every session with no fit.
+    skip_classes : container of str
+        Reason classes whose sessions are named individually.
+
+    Returns
+    -------
+    str
+        ``""`` when nothing was skipped.
+    """
+    named_skips = list(named_skips)
+    if not named_skips:
+        return ""
+    classes = sorted({str(reason).split(":")[0] for _label, reason in named_skips})
+    named = [
+        (label, reason)
+        for label, reason in named_skips
+        if str(reason).split(":")[0] in skip_classes
+    ]
+    parts = ["no fit: " + ", ".join(classes)]
+    if named:
+        parts.append(
+            "estimator skipped "
+            + ", ".join(
+                f"{escape_note_field(label)} ({escape_note_field(reason)})"
+                for label, reason in named
+            )
+        )
+    return "; ".join(parts)
 
 
 def records_from_common_cohort_provenance(prov, model: str, population: str, *, grain="stop"):

@@ -10,6 +10,8 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     classify_drops,
     cohort_record,
     drop_profile,
+    escape_note_field,
+    estimator_skip_note,
     event_drop_buckets,
     records_from_common_cohort_provenance,
     term_diagnostics,
@@ -286,3 +288,44 @@ def test_term_diagnostics_counts_quasiseparation():
     b = td[td.term == "b"].iloc[0]
     assert b["n_sessions_quasiseparated"] == 0
     assert b["n_sessions_used"] == 6
+
+
+def test_an_embedded_message_cannot_impersonate_a_note_separator():
+    """A fitter's refusal text is quoted, not authored: it may carry ``,``/``;``."""
+    message = (
+        "dm_design:within-event design is rank deficient: at least one "
+        "predictor is constant within every event (or collinear) in "
+        "['is_current_arm', 'is_prev_arm']"
+    )
+    cleaned = escape_note_field(message)
+
+    assert ";" not in cleaned
+    assert "," not in cleaned
+    # Separators become spaces, never nothing: the words must not run together.
+    assert "is_current_arm'  'is_prev_arm'" not in cleaned
+    assert "is_current_arm' 'is_prev_arm'" in cleaned
+    assert "rank deficient" in cleaned
+
+
+def test_skip_note_summarizes_classes_and_names_only_the_refusals():
+    """One policy for every runner: classes summarized, refusals named."""
+    note = estimator_skip_note(
+        [
+            ("chimi/20200212/02_r1", "fit_none"),
+            ("j16/20210714/04_r2", "dm_design:rank deficient, in ['a', 'b']"),
+            ("senor/20201027/02_r1", "pinned_fit_none"),
+        ],
+        {"dm_design", "pinned_fit_none"},
+    )
+
+    assert note.startswith("no fit: dm_design, fit_none, pinned_fit_none")
+    assert "j16/20210714/04_r2" in note
+    assert "senor/20201027/02_r1" in note
+    # A routine short session is counted by class, not named.
+    assert "chimi/20200212/02_r1" not in note
+    # The refusal's own text carries none of the note's separators.
+    assert "rank deficient in ['a' 'b']" in note
+
+
+def test_skip_note_is_empty_when_nothing_was_skipped():
+    assert estimator_skip_note([], {"dm_design"}) == ""

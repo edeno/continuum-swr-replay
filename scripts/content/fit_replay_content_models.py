@@ -75,6 +75,7 @@ from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     drop_profile,
+    estimator_skip_note,
     event_drop_buckets,
     write_cohort_audit,
 )
@@ -99,6 +100,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
+    ESTIMATOR_SKIP_CLASSES,
     concentration_cols_for_cohort,
     fit_sessions_dirichlet_multinomial,
 )
@@ -1492,6 +1494,20 @@ def print_model_results(
             vals = mdf[metric].dropna()
             if len(vals) > 0:
                 print(f"  {metric}: median={vals.median():.2f}")
+    if "pseudo_r2" in mdf.columns:
+        vals = mdf["pseudo_r2"].dropna()
+        if len(vals) > 0:
+            # McFadden's ratio is not comparable across estimators: the DM's
+            # llf and llf_null both carry the multinomial constant that a
+            # conditional likelihood omits, and its null refits the
+            # concentration, so the ratio sits on a different scale.
+            note = (
+                f" ({scale_label(estimator)}; llf and llf_null both include the "
+                "multinomial constant, so NOT on a conditional fit's scale)"
+                if estimator == "dirichlet_multinomial"
+                else ""
+            )
+            print(f"  pseudo_r2: median={vals.median():.3f}{note}")
 
     if not predictors:
         print("  (null model — uniform allocation)")
@@ -1728,7 +1744,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Dirichlet-multinomial concentration intercept (default: "
             f"{DEFAULT_MIN_EVENTS_SESSION_PHI}). Shorter sessions are pinned to "
             "the median intercept of that animal's longer sessions, and record "
-            "which pooled value they used in phi_source."
+            "which pooled value they used in phi_source. This changes the "
+            "fitted COHORT, not just a nuisance parameter: a session just under "
+            "the threshold is refit with its intercept pinned, and if that "
+            "refit fails it is dropped (reason 'pinned_fit_none') even though "
+            "its free fit had converged."
         ),
     )
     parser.add_argument(
@@ -2461,21 +2481,17 @@ def _audit_compare_and_publish(
         # and does not belong in a drop bucket -- its events are already
         # counted under n_excluded_session. It IS a fitted-cohort fact, so it is
         # named here rather than only in the run log.
-        notes = drop_profile(dropped)
         skipped = estimator_skips.get(model_name, [])
-        if skipped:
-            notes = "; ".join(
-                filter(
-                    None,
-                    [
-                        notes,
-                        "estimator skipped "
-                        + ", ".join(
-                            f"{skip['session']} ({skip['reason']})" for skip in skipped
-                        ),
-                    ],
-                )
-            )
+        notes = drop_profile(dropped)
+        # The routine classes are summarized; only an estimator REFUSAL names
+        # the session it happened to. Same helper (and so the same policy) as
+        # the is_swr-contrast runner's cohort audit.
+        skip_note = estimator_skip_note(
+            [(skip["session"], skip["reason"]) for skip in skipped],
+            ESTIMATOR_SKIP_CLASSES,
+        )
+        if skip_note:
+            notes = "; ".join(filter(None, [notes, skip_note]))
         cohort_audits.append(
             cohort_record(
                 model_name,
