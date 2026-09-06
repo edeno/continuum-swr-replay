@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     default_content_model_names,
 )
 from continuum_swr_replay.analysis.replay.simulation import (
+    simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,
 )
 from continuum_swr_replay.data_loaders.constants import (
@@ -39,6 +40,10 @@ from scripts.content import fit_replay_content_models as mod
 
 def _args(**overrides) -> argparse.Namespace:
     defaults = {
+        "estimator": "conditional_poisson",
+        "n_jobs": 1,
+        "min_events_session_phi": 40,
+        "cv": False,
         "event_source": "non_local",
         "hierarchy": "arm",
         "brain_area": "HPC",
@@ -355,10 +360,11 @@ def test_fraction_runs_keep_the_unsuffixed_canonical_bundle() -> None:
     )
 
 
-def test_parser_defaults_to_the_fraction_response() -> None:
+def test_parser_leaves_the_response_to_the_estimator_by_default() -> None:
     parser = mod._build_arg_parser()
-    assert parser.parse_args([]).response == "fraction"
+    assert parser.parse_args([]).response is None
     assert parser.parse_args(["--response", "hard_count"]).response == "hard_count"
+    assert mod._resolve_run_config(_args(response=None)).response == "fraction"
 
 
 # ── Estimator and response recorded on every fitted row ──
@@ -768,10 +774,178 @@ def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None
         response_renormalized=renormalized,
     )
 
-    results = mod._fit_content_ladder(_args(leaf_only=True, cv=False), config, cohort)
+    results, _skips = mod._fit_content_ladder(
+        _args(leaf_only=True, cv=False), config, cohort
+    )
 
     fitted = results["X"]
     assert fitted["response_renormalized"].tolist() == [True]
     n_events = int(fitted["n_events"].iloc[0])
     # Unit mass per event against a six-category uniform null.
     assert fitted["llf_null"].iloc[0] == pytest.approx(-n_events * np.log(6))
+
+
+# ── Dirichlet-multinomial estimator ──
+
+
+def test_dm_bundle_is_suffixed_last_and_named_in_the_canonical_set() -> None:
+    """The overdispersed ladder never publishes over the conditional bundle."""
+    assert (
+        mod.canonical_output_subdir(
+            "non_local",
+            "HPC",
+            "arm",
+            "all",
+            "timebin",
+            "hard_count",
+            False,
+            "dirichlet_multinomial",
+        )
+        == "models_dm"
+    )
+    # ``_dm`` is appended after every other suffix, so stripping it names the
+    # conditional bundle this fit is the counterpart of.
+    assert (
+        mod.canonical_output_subdir(
+            "non_local",
+            "HPC",
+            "arm",
+            "T",
+            "timebin",
+            "hard_count",
+            True,
+            "dirichlet_multinomial",
+        )
+        == "models_swr_T_leaf_dm"
+    )
+    subdirs = mod.canonical_output_subdirs()
+    assert {"models", "models_hard_count", "models_dm", "models_leaf_dm"} <= subdirs
+    assert "models_patch_dm" in subdirs
+    # The count response is the estimator's own, so it is not named twice.
+    assert "models_hard_count_dm" not in subdirs
+
+
+def test_dm_run_resolves_the_count_response_and_its_own_directory() -> None:
+    config = mod._resolve_run_config(
+        _args(estimator="dirichlet_multinomial", response=None)
+    )
+    assert config.response == "hard_count"
+    assert config.output_dir == Path("/tmp/content-in/models_dm")
+
+
+def test_dm_refuses_the_fraction_response_naming_both_flags() -> None:
+    with pytest.raises(ValueError) as excinfo:
+        mod._resolve_run_config(
+            _args(estimator="dirichlet_multinomial", response="fraction")
+        )
+    message = str(excinfo.value)
+    assert "--response fraction" in message
+    assert "--estimator dirichlet_multinomial" in message
+
+
+def test_dm_parser_defaults() -> None:
+    parser = mod._build_arg_parser()
+    args = parser.parse_args([])
+    assert args.estimator == "conditional_poisson"
+    assert args.n_jobs == mod.DEFAULT_N_JOBS
+    assert args.min_events_session_phi == 40
+    assert (
+        parser.parse_args(["--estimator", "dirichlet_multinomial"]).estimator
+        == "dirichlet_multinomial"
+    )
+
+
+def test_dm_numbers_are_labelled_a_full_event_likelihood() -> None:
+    assert mod.scale_label("dirichlet_multinomial") == "event-scale (full likelihood)"
+
+
+def _dm_session(
+    n_events: int, *, seed: int, animal: str = "chimi", epoch: str = "02_r1"
+) -> pd.DataFrame:
+    df = simulate_dirichlet_multinomial_counts(
+        {"is_current_arm": 0.8},
+        log_phi_intercept=1.2,
+        n_events=n_events,
+        L_e=20,
+        seed=seed,
+    )
+    df["animal"] = animal
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    # Event ids are globally unique; the simulator numbers each session from 0.
+    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
+    # The simulator leaves its drawn allocations in attrs, which pandas compares
+    # element-wise (and so raises on) when concatenating two sessions.
+    df.attrs.clear()
+    return df
+
+
+def test_short_dm_session_borrows_its_animals_concentration() -> None:
+    """A 20-event session cannot pin down its own concentration; a 60-event one can."""
+    cohort = pd.concat(
+        [
+            _dm_session(60, seed=0, epoch="02_r1"),
+            _dm_session(20, seed=1, epoch="04_r2"),
+        ],
+        ignore_index=True,
+    )
+
+    result = mod.fit_model_per_session(
+        cohort,
+        "X",
+        ["is_current_arm"],
+        response_col="arm_count_hard",
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    assert result["estimator"].tolist() == ["dirichlet_multinomial"] * 2
+    assert result["response_col"].tolist() == ["arm_count_hard"] * 2
+    rows = result.set_index("epoch")
+    assert rows.loc["02_r1", "n_events"] == 60
+    assert rows.loc["04_r2", "n_events"] == 20
+    assert rows.loc["02_r1", "phi_source"] == "session"
+    assert rows.loc["04_r2", "phi_source"] == "animal_pooled"
+    assert rows.loc["04_r2", "coef_log_phi_intercept"] == pytest.approx(
+        rows.loc["02_r1", "coef_log_phi_intercept"]
+    )
+    # The concentration modifier is estimated because the cohort carries both
+    # kinds of event.
+    assert "coef_log_phi_is_swr" in result.columns
+    assert result["coef_log_phi_is_swr"].notna().all()
+    assert bool(result["llf_includes_constants"].all())
+
+
+def test_dm_concentration_modifier_is_dropped_within_an_swr_subset() -> None:
+    """Inside a subset ``is_swr`` is constant, so there is no contrast to fit."""
+    cohort = _dm_session(60, seed=0)
+    assert mod.dirichlet_multinomial_concentration_cols(cohort) == ("is_swr",)
+    subset = cohort[cohort["is_swr"] == 1.0]
+    assert mod.dirichlet_multinomial_concentration_cols(subset) == ()
+    assert (
+        mod.dirichlet_multinomial_concentration_cols(cohort.drop(columns="is_swr"))
+        == ()
+    )
+
+
+def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
+    """A predictor constant within every event raises; the ladder books it instead."""
+    good = _dm_session(60, seed=0, epoch="02_r1")
+    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
+    cohort = pd.concat([good, bad], ignore_index=True)
+
+    result = mod.fit_model_per_session(
+        cohort,
+        "X",
+        ["is_current_arm", "is_prev_arm"],
+        response_col="arm_count_hard",
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    assert result["epoch"].tolist() == ["02_r1"]
+    skips = result.attrs["estimator_skips"]
+    assert [skip["session"] for skip in skips] == ["chimi/20200212/04_r2"]
+    assert skips[0]["reason"].startswith("dm_design:")

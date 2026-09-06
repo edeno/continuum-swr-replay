@@ -233,24 +233,37 @@ def test_unknown_outcome_stratum_is_refused(outcome_frame):
 
 
 @pytest.mark.parametrize(
-    ("max_per_animal", "response", "stratum", "expected"),
+    ("max_per_animal", "estimator", "response", "stratum", "expected"),
     [
-        (None, "fraction", "all", ""),
-        (None, "fraction", "rewarded", "_rewarded"),
-        (None, "fraction", "omitted", "_omitted"),
-        (None, "hard_count", "rewarded", "_hard_count_rewarded"),
-        (1, "hard_count", "omitted", "_smoke_hard_count_omitted"),
+        (None, "conditional_poisson", "fraction", "all", ""),
+        (None, "conditional_poisson", "fraction", "rewarded", "_rewarded"),
+        (None, "conditional_poisson", "fraction", "omitted", "_omitted"),
+        (None, "conditional_poisson", "hard_count", "rewarded", "_hard_count_rewarded"),
+        (
+            1,
+            "conditional_poisson",
+            "hard_count",
+            "omitted",
+            "_smoke_hard_count_omitted",
+        ),
+        # The Dirichlet-multinomial has only one response, so naming it would say
+        # the same thing twice; ``_dm`` comes before the stratum.
+        (None, "dirichlet_multinomial", "hard_count", "all", "_dm"),
+        (None, "dirichlet_multinomial", "hard_count", "omitted", "_dm_omitted"),
+        (1, "dirichlet_multinomial", "hard_count", "rewarded", "_smoke_dm_rewarded"),
     ],
 )
-def test_artifact_suffix_records_smoke_response_and_stratum(
-    max_per_animal, response, stratum, expected
+def test_artifact_suffix_records_smoke_estimator_response_and_stratum(
+    max_per_animal, estimator, response, stratum, expected
 ):
     import argparse
 
     args = argparse.Namespace(
-        max_per_animal=max_per_animal, response=response, outcome_stratum=stratum
+        max_per_animal=max_per_animal,
+        estimator=estimator,
+        outcome_stratum=stratum,
     )
-    assert mod._artifact_suffix(args) == expected
+    assert mod._artifact_suffix(args, response) == expected
 
 
 # --- Cohort-wide per-SD scales -------------------------------------------------
@@ -639,3 +652,85 @@ def test_event_left_without_leaf_mass_is_audited_as_a_response_drop():
         + audit["n_excluded_session"]
     )
     assert audit["n_in"] - drops == audit["n_modeled"]
+
+
+# --- Dirichlet-multinomial estimator -------------------------------------------
+
+
+def _dm_contrast_cohort(n_events: int = 60, *, epoch: str, seed: int) -> pd.DataFrame:
+    """One session of nine-arm counts drawn at a known within-event concentration."""
+    from continuum_swr_replay.analysis.replay.simulation import (
+        simulate_dirichlet_multinomial_counts,
+    )
+
+    df = simulate_dirichlet_multinomial_counts(
+        {"is_current_arm": 0.8},
+        log_phi_intercept=1.2,
+        log_phi_is_swr=-0.8,
+        n_events=n_events,
+        L_e=20,
+        seed=seed,
+    )
+    df["animal"] = "chimi"
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
+    df["is_swr"] = df["is_swr"].astype(bool)
+    df.attrs.clear()
+    return df
+
+
+def test_dm_run_reports_a_concentration_contrast_on_every_rung():
+    """Every rung also answers "does an SWR event spread its mass more widely"."""
+    cohort = pd.concat(
+        [
+            _dm_contrast_cohort(epoch="02_r1", seed=0),
+            _dm_contrast_cohort(epoch="04_r2", seed=1),
+        ],
+        ignore_index=True,
+    )
+    ladder = {
+        "C0_base": (["is_current_arm"], "pooled"),
+        "C1_split": (["is_current_arm"], "split"),
+    }
+
+    res, audits = mod._run(
+        cohort,
+        ladder,
+        response_col="arm_count_hard",
+        n_categories=9,
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    assert set(res["model"]) == {"C0_base", "C1_split"}
+    assert res["estimator"].unique().tolist() == ["dirichlet_multinomial"]
+    assert bool(res["llf_includes_constants"].all())
+    assert res["phi_source"].unique().tolist() == ["session"]
+
+    pooled = res[res["population"] == "all"]
+    # The pooled rows carry the contrast; both kinds of event are present there.
+    assert pooled["coef_log_phi_is_swr"].notna().all()
+    assert pooled["bse_log_phi_is_swr"].notna().all()
+    # Generated at log_phi_is_swr = -0.8: SWR events are the more concentrated.
+    assert pooled["coef_log_phi_is_swr"].median() < 0.0
+
+    # Within an SWR split the flag is constant, so there is no contrast to fit.
+    split = res[res["population"] == "SWR"]
+    assert len(split) == 2
+    assert split["coef_log_phi_is_swr"].isna().all()
+
+    assert {record["model"] for record in audits} == {"C0_base", "C1_split"}
+
+
+def test_concentration_specs_cover_every_rung_and_population():
+    specs = mod._concentration_specs(
+        {"C0_base": ([], "pooled"), "C1_split": ([], "split")}
+    )
+    assert specs == [
+        ("C0_base", "all", "log_phi_is_swr"),
+        ("C1_split", "all", "log_phi_is_swr"),
+        ("C1_split", "SWR", "log_phi_is_swr"),
+        ("C1_split", "nonSWR", "log_phi_is_swr"),
+    ]

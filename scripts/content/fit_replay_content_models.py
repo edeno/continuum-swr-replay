@@ -36,9 +36,19 @@ Every pickle in a published bundle carries a ``.provenance.json`` sidecar naming
 the table it was fit on and that table's SHA-256 as of the read, which the
 figure and summary scripts check before reading the fit.
 
+``--estimator dirichlet_multinomial`` replaces the conditional Poisson with a
+softmax whose within-event concentration is estimated rather than assumed, so an
+event's ~32 autocorrelated timebins stop counting as independent draws and
+``coef_log_phi_is_swr`` says directly whether SWR events spread their mass over
+more arms. It is defined on the integer counts, so it forces ``--response
+hard_count``, and it publishes to its own ``_dm`` bundle: its likelihood keeps
+the multinomial coefficient the conditional one drops, so its AIC is on a
+different scale and must never be differenced against the conditional bundle's.
+
 Usage:
     uv run python scripts/content/fit_replay_content_models.py                # base ladder
     uv run python scripts/content/fit_replay_content_models.py --response hard_count
+    uv run python scripts/content/fit_replay_content_models.py --estimator dirichlet_multinomial
     uv run python scripts/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
     uv run python scripts/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
     uv run python scripts/content/fit_replay_content_models.py --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu
@@ -72,8 +82,11 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
 )
 from continuum_swr_replay.analysis.replay.content_response import (
+    ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
+    default_response_for_estimator,
     renormalize_fraction_over_candidates,
+    resolve_response_choice,
     resolve_response_column,
     validate_fraction_response,
 )
@@ -82,6 +95,10 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
+    DEFAULT_MIN_EVENTS_SESSION_PHI,
+    fit_sessions_dirichlet_multinomial,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
@@ -468,6 +485,9 @@ HIERARCHY_CHOICES = ("arm", "patch")
 SWR_SUBSET_CHOICES = ("all", "T", "F")
 GRAIN_CHOICES = ("timebin", "event")
 
+#: Worker processes the Dirichlet-multinomial per-session fits are spread over.
+DEFAULT_N_JOBS = 8
+
 
 def resolve_contfrag_paths(
     event_source: str,
@@ -512,6 +532,7 @@ def canonical_output_subdir(
     grain: str,
     response: str = "fraction",
     leaf_only: bool = False,
+    estimator: str = "conditional_poisson",
 ) -> str:
     """Directory name a FULL-ladder run of one configuration publishes into.
 
@@ -542,6 +563,15 @@ def canonical_output_subdir(
         candidates. A six-category conditional likelihood is on a different
         scale from a nine-category one, so a leaf-only ladder gets its own
         ``_leaf`` bundle.
+    estimator : str, optional
+        One of :data:`~continuum_swr_replay.analysis.replay.content_response.ESTIMATOR_CHOICES`.
+        The Dirichlet-multinomial appends ``_dm`` LAST, after every other
+        suffix, so a reader can strip it to find the conditional-Poisson bundle
+        the fit is the overdispersed counterpart of. Its likelihood carries the
+        multinomial coefficient the conditional one drops, so its AIC is not on
+        the conditional bundle's scale and must never replace it. The response
+        suffix is omitted where the response is the estimator's own default,
+        which is what the ``_hard_count`` suffix would otherwise say twice.
 
     Returns
     -------
@@ -566,10 +596,12 @@ def canonical_output_subdir(
         subdir = f"{subdir}_swr_{swr_subset}"
     if grain == "event":
         subdir = f"{subdir}_event_grain"
-    if response != "fraction":
+    if response != default_response_for_estimator(estimator):
         subdir = f"{subdir}_{response}"
     if leaf_only:
         subdir = f"{subdir}_leaf"
+    if estimator != "conditional_poisson":
+        subdir = f"{subdir}_dm"
     return subdir
 
 
@@ -583,14 +615,21 @@ def canonical_output_subdirs() -> frozenset[str]:
     """
     return frozenset(
         canonical_output_subdir(
-            source, area, hierarchy_kind, subset, grain, response, leaf_only
+            source, area, hierarchy_kind, subset, grain, response, leaf_only, estimator
         )
         for source in EVENT_SOURCE_CHOICES
         for area in BRAIN_AREA_CHOICES
         for hierarchy_kind in HIERARCHY_CHOICES
         for subset in SWR_SUBSET_CHOICES
         for grain in GRAIN_CHOICES
-        for response in RESPONSE_CHOICES
+        for estimator in ESTIMATOR_CHOICES
+        # Only the conditional Poisson has a choice of response; the
+        # Dirichlet-multinomial is defined on counts and nothing else.
+        for response in (
+            RESPONSE_CHOICES
+            if estimator == "conditional_poisson"
+            else (default_response_for_estimator(estimator),)
+        )
         # The patch hierarchy has no leaf-only variant to guard.
         for leaf_only in ((False,) if hierarchy_kind == "patch" else (False, True))
     )
@@ -921,6 +960,94 @@ def prepare_canonical_fit_request(
     return prepared, requested, predictors, response_col, "event_id"
 
 
+def dirichlet_multinomial_concentration_cols(
+    long_df: pd.DataFrame,
+) -> tuple[str, ...]:
+    """Event-level columns entering ``log phi`` for this cohort.
+
+    ``is_swr`` is the concentration modifier the estimator exists to measure --
+    whether an SWR event's allocation is more concentrated than a non-SWR
+    event's -- but only where the cohort actually carries both kinds. Inside an
+    ``--swr-subset`` the flag is constant, its coefficient is not identified,
+    and asking for it would return an infinite standard error instead of a
+    concentration that is simply not in question.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        The fitting cohort.
+
+    Returns
+    -------
+    tuple of str
+        ``("is_swr",)`` when the cohort carries both values, else ``()``.
+    """
+    if "is_swr" not in long_df.columns:
+        return ()
+    values = set(long_df["is_swr"].dropna().astype(bool).unique())
+    return ("is_swr",) if values == {False, True} else ()
+
+
+def _fit_dirichlet_multinomial_per_session(
+    long_df: pd.DataFrame,
+    model_name: str,
+    predictors: list[str],
+    *,
+    response_col: str,
+    event_col: str,
+    n_categories: int,
+    min_rows: int,
+    n_jobs: int,
+    min_events_session_phi: int,
+) -> pd.DataFrame:
+    """Fit the Dirichlet-multinomial rung for every session of ``long_df``.
+
+    The per-session fits run in a process pool with a pooled fallback for the
+    short sessions; see
+    :func:`~continuum_swr_replay.analysis.replay.dirichlet_multinomial.fit_sessions_dirichlet_multinomial`.
+    Sessions the fitter refuses -- a rank-deficient within-event design raises,
+    a session with too few events for its parameters returns nothing -- are
+    recorded on the returned frame's ``attrs["estimator_skips"]`` so the cohort
+    audit can name them, rather than crashing the ladder.
+    """
+    animal_position = SESSION_COLS.index("animal")
+    sessions = [
+        (tuple(keys), keys[animal_position], group)
+        for keys, group in long_df.groupby(SESSION_COLS)
+        if len(group) >= min_rows
+    ]
+    fits, skips = fit_sessions_dirichlet_multinomial(
+        sessions,
+        list(predictors),
+        min_events=min_events_session_phi,
+        n_jobs=n_jobs,
+        response_col=response_col,
+        event_col=event_col,
+        concentration_cols=dirichlet_multinomial_concentration_cols(long_df),
+        n_categories=n_categories,
+    )
+    results = []
+    for keys, result in fits:
+        result["model"] = model_name
+        result["response_col"] = response_col
+        for col, val in zip(SESSION_COLS, keys, strict=True):
+            result[col] = val
+        results.append(result)
+    for keys, reason in skips:
+        logging.warning(
+            "%s: no Dirichlet-multinomial fit for session %s (%s)",
+            model_name,
+            "/".join(map(str, keys)),
+            reason,
+        )
+    frame = pd.DataFrame(results)
+    frame.attrs["estimator_skips"] = [
+        {"session": "/".join(map(str, keys)), "reason": reason}
+        for keys, reason in skips
+    ]
+    return frame
+
+
 def fit_model_per_session(
     long_df: pd.DataFrame,
     model_name: str,
@@ -930,8 +1057,11 @@ def fit_model_per_session(
     event_col: str = "event_id",
     n_categories: int = 9,
     grain: str = "timebin",
+    estimator: str = "conditional_poisson",
+    n_jobs: int = 1,
+    min_events_session_phi: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
 ) -> pd.DataFrame:
-    """Fit conditional Poisson model across all sessions.
+    """Fit one content rung across all sessions.
 
     Parameters
     ----------
@@ -949,6 +1079,15 @@ def fit_model_per_session(
         (``arm_count_hard`` / ``patch_count_hard``).
     event_col : str
         Column name for the event grouping key.
+    estimator : str
+        ``"conditional_poisson"`` (the shipped softmax fit, whose grain is set
+        by ``grain``) or ``"dirichlet_multinomial"``, which adds an explicit
+        within-event concentration and is fit on the counts only.
+    n_jobs : int
+        Worker processes for the Dirichlet-multinomial per-session fits.
+    min_events_session_phi : int
+        Sessions with fewer modelled events than this have their concentration
+        intercept pinned to the animal-pooled value.
 
     Returns
     -------
@@ -967,6 +1106,20 @@ def fit_model_per_session(
     # sessions before fit_conditional_poisson could apply its own
     # n_events < 2 * len(predictors) gate.
     min_rows = n_categories * 2
+
+    if estimator == "dirichlet_multinomial":
+        return _fit_dirichlet_multinomial_per_session(
+            long_df,
+            model_name,
+            predictors,
+            response_col=response_col,
+            event_col=event_col,
+            n_categories=n_categories,
+            min_rows=min_rows,
+            n_jobs=n_jobs,
+            min_events_session_phi=min_events_session_phi,
+        )
+
     for keys, group in long_df.groupby(SESSION_COLS):
         if len(group) < min_rows:
             continue
@@ -1312,6 +1465,11 @@ _SCALE_LABELS = {
     "conditional_poisson_fraction": "event-scale (quasi)",
     "conditional_logit_dominant": "event-scale (quasi)",
     "conditional_poisson_count": "timebin-scale",
+    # The DM likelihood is a proper probability of the event's whole count
+    # vector -- multinomial coefficient included -- so its AIC and LRT are exact
+    # information criteria at the event grain rather than quasi ones. That same
+    # constant is why they must not be differenced against a conditional fit's.
+    "dirichlet_multinomial": "event-scale (full likelihood)",
 }
 _DEFAULT_SCALE_LABEL = "unlabelled scale"
 
@@ -1494,7 +1652,9 @@ def format_comparison_table(comparison: pd.DataFrame) -> list[str]:
         lines.append(line)
 
     if event_scale:
-        lines.append("  Child wins / LRT sig are event-scale quasi-likelihood counts.")
+        # Read off the label rather than hardcoded: the conditional fits' counts
+        # are quasi-likelihood ones, the Dirichlet-multinomial's are not.
+        lines.append(f"  Child wins / LRT sig are {label} counts.")
     else:
         lines.append(
             "  Per-session child_better_aic / lrt_significant are timebin-scale "
@@ -1561,12 +1721,55 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--estimator",
+        type=str,
+        default="conditional_poisson",
+        choices=list(ESTIMATOR_CHOICES),
+        help=(
+            "Per-session estimator. 'conditional_poisson' (default, shipped) "
+            "fits the softmax allocation at the grain --response selects. "
+            "'dirichlet_multinomial' fits the same softmax mean structure with "
+            "an explicit within-event concentration, so an event's "
+            "autocorrelated timebins are not counted as independent draws and "
+            "coef_log_phi_is_swr measures directly whether SWR events spread "
+            "their mass more widely. It is defined on the integer counts, so it "
+            "forces --response hard_count, and it publishes to a '_dm' "
+            "directory: its likelihood carries the multinomial coefficient the "
+            "conditional one drops, so its AIC is not on the conditional "
+            "bundle's scale."
+        ),
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=DEFAULT_N_JOBS,
+        help=(
+            "Worker processes for the Dirichlet-multinomial per-session fits "
+            f"(default: {DEFAULT_N_JOBS}). Ignored by the conditional Poisson."
+        ),
+    )
+    parser.add_argument(
+        "--min-events-session-phi",
+        type=int,
+        default=DEFAULT_MIN_EVENTS_SESSION_PHI,
+        help=(
+            "Modelled events a session needs to estimate its own "
+            "Dirichlet-multinomial concentration intercept (default: "
+            f"{DEFAULT_MIN_EVENTS_SESSION_PHI}). Shorter sessions are pinned to "
+            "the median intercept of that animal's longer sessions, and record "
+            "which pooled value they used in phi_source."
+        ),
+    )
+    parser.add_argument(
         "--response",
         type=str,
-        default="fraction",
+        default=None,
         choices=list(RESPONSE_CHOICES),
         help=(
-            "Per-event response. 'fraction' (default, shipped) fits "
+            "Per-event response. Defaults to the estimator's own: 'fraction' "
+            "for the conditional Poisson, 'hard_count' for the "
+            "Dirichlet-multinomial (which has no fraction form, so asking for "
+            "one is an error). 'fraction' (the shipped response) fits "
             "arm_fraction / patch_fraction, so every event contributes one "
             "observation of unit mass and the likelihood, AIC and SEs are at "
             "the event grain. 'hard_count' fits arm_count_hard / "
@@ -1649,6 +1852,9 @@ class _RunConfig(NamedTuple):
     output_dir: Path
     table_name: str
     model_names: Sequence[str]
+    # ``--response`` after the estimator default is applied, so no downstream
+    # step has to re-derive it (or forget to).
+    response: str = "fraction"
 
 
 class _ContentCohort(NamedTuple):
@@ -1671,6 +1877,25 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     # --hierarchy flag overrides the model dict and table name when
     # 'patch' is selected; the input directory follows the event source.
     source_config = _EVENT_SOURCE_CONFIG[args.event_source]
+    estimator = getattr(args, "estimator", "conditional_poisson")
+    # One resolution point for the response: ``--response`` defaults to the
+    # estimator's own, and a combination the estimator cannot fit is refused
+    # here rather than silently overridden.
+    response = resolve_response_choice(estimator, getattr(args, "response", None))
+    if estimator == "dirichlet_multinomial":
+        if args.grain != "timebin":
+            raise ValueError(
+                "--grain event collapses each event to the arm that won, which "
+                "discards the within-event distribution the "
+                "Dirichlet-multinomial concentration is estimated from. Drop "
+                "--grain event or use --estimator conditional_poisson."
+            )
+        if getattr(args, "cv", False):
+            raise ValueError(
+                "--cv runs the conditional-Poisson cross-validation, whose "
+                "held-out score is not on the Dirichlet-multinomial likelihood "
+                "scale. Drop --cv or use --estimator conditional_poisson."
+            )
     if args.leaf_only and args.hierarchy == "patch":
         raise ValueError(
             "--leaf-only restricts the nine candidate arms to the six leaves; "
@@ -1731,15 +1956,18 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         args.hierarchy,
         args.swr_subset,
         args.grain,
-        args.response,
+        response,
         args.leaf_only,
+        estimator,
     )
     if args.leaf_only:
         logging.info(
             "candidate set = %d leaf arms -> %s", LEAF_ONLY_N_CATEGORIES, output_dir
         )
-    if args.response != "fraction":
-        logging.info("response = %s -> %s", args.response, output_dir)
+    if response != "fraction":
+        logging.info("response = %s -> %s", response, output_dir)
+    if estimator != "conditional_poisson":
+        logging.info("estimator = %s -> %s", estimator, output_dir)
     if args.grain == "event":
         logging.info("grain = event (one observation per event) -> %s", output_dir)
 
@@ -1788,6 +2016,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         output_dir=output_dir,
         table_name=table_name,
         model_names=model_names,
+        response=response,
     )
 
 
@@ -1841,9 +2070,9 @@ def _load_and_filter_cohort(
         model_names=model_names,
         hierarchy_kind=args.hierarchy,
         table_label=canonical_path,
-        response=args.response,
+        response=config.response,
     )
-    logging.info("response = %s (%s)", response_col, args.response)
+    logging.info("response = %s (%s)", response_col, config.response)
     _validate_requested_standardization(
         long_df,
         union_predictors=union_predictors,
@@ -1913,7 +2142,7 @@ def _load_and_filter_cohort(
         long_df, response_renormalized = leaf_only_cohort(
             long_df,
             response_col=response_col,
-            response=args.response,
+            response=config.response,
             event_col=event_col,
         )
         logging.info(
@@ -1999,8 +2228,13 @@ def _load_and_filter_cohort(
 
 def _fit_content_ladder(
     args: argparse.Namespace, config: _RunConfig, cohort: _ContentCohort
-) -> dict[str, pd.DataFrame]:
-    """Fit every requested rung per session and validate the matched ladder."""
+) -> tuple[dict[str, pd.DataFrame], dict[str, list[dict]]]:
+    """Fit every requested rung per session and validate the matched ladder.
+
+    Returns the matched per-rung results and, per rung, the sessions the
+    estimator produced no fit for, each with its reason -- an auditable skip
+    rather than a crash of the whole ladder.
+    """
     hierarchy = config.hierarchy
     long_df = cohort.long_df
     valid_model_names = cohort.valid_model_names
@@ -2011,6 +2245,7 @@ def _fit_content_ladder(
     # created or modified until the whole ladder and its shared cohort pass
     # integrity checks, so a late empty/failed rung cannot leave mixed results.
     fit_results: dict[str, pd.DataFrame] = {}
+    estimator_skips: dict[str, list[dict]] = {}
     for model_name in valid_model_names:
         spec = hierarchy[model_name]
         predictors = rung_predictors(spec, args.leaf_only)
@@ -2035,7 +2270,15 @@ def _fit_content_ladder(
             event_col=event_col,
             n_categories=n_categories,
             grain=args.grain,
+            estimator=getattr(args, "estimator", "conditional_poisson"),
+            n_jobs=getattr(args, "n_jobs", DEFAULT_N_JOBS),
+            min_events_session_phi=getattr(
+                args, "min_events_session_phi", DEFAULT_MIN_EVENTS_SESSION_PHI
+            ),
         )
+        # Read off the frame the fitter returned, before matching reindexes it:
+        # attrs are not a contract pandas carries through every operation.
+        estimator_skips[model_name] = list(mdf.attrs.get("estimator_skips", []))
 
         elapsed = time.time() - t0
         logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
@@ -2064,7 +2307,7 @@ def _fit_content_ladder(
         shared_session_count,
     )
 
-    return model_results
+    return model_results, estimator_skips
 
 
 def _fit_conditional_logit_robustness(
@@ -2182,6 +2425,7 @@ def _audit_compare_and_publish(
     config: _RunConfig,
     cohort: _ContentCohort,
     model_results: dict[str, pd.DataFrame],
+    estimator_skips: dict[str, list[dict]] | None = None,
 ) -> None:
     """Build the cohort audit, run nested comparisons and optional conditional-
     logit robustness fits, then stage and publish the complete output bundle."""
@@ -2193,6 +2437,7 @@ def _audit_compare_and_publish(
     response_col = cohort.response_col
     event_col = cohort.event_col
     n_before = cohort.n_events_before_complete_case
+    estimator_skips = estimator_skips or {}
 
     # Build every audit record only after the model frames have been restricted
     # to the exact same successfully fitted session cohort.
@@ -2242,6 +2487,26 @@ def _audit_compare_and_publish(
         dropped = long_df_prefilter[
             long_df_prefilter[event_col].isin(buckets["dropped_event_ids"])
         ].drop_duplicates(event_col)
+        # A session the estimator itself refused (a rank-deficient within-event
+        # design, or too few events for its parameters) is not a dropped event
+        # and does not belong in a drop bucket -- its events are already
+        # counted under n_excluded_session. It IS a fitted-cohort fact, so it is
+        # named here rather than only in the run log.
+        notes = drop_profile(dropped)
+        skipped = estimator_skips.get(model_name, [])
+        if skipped:
+            notes = "; ".join(
+                filter(
+                    None,
+                    [
+                        notes,
+                        "estimator skipped "
+                        + ", ".join(
+                            f"{skip['session']} ({skip['reason']})" for skip in skipped
+                        ),
+                    ],
+                )
+            )
         cohort_audits.append(
             cohort_record(
                 model_name,
@@ -2253,7 +2518,7 @@ def _audit_compare_and_publish(
                 sessions_in=sessions_in,
                 sessions_modeled=len(mdf),
                 animals_modeled=int(mdf["animal"].nunique()) if len(mdf) else 0,
-                drop_notes=drop_profile(dropped),
+                drop_notes=notes,
                 n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
                 n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
                 n_drop_nonfinite=buckets["n_drop_nonfinite"],
@@ -2331,8 +2596,8 @@ def run_content_fit(args: argparse.Namespace) -> None:
     """Load the content tables, fit the ladder, compare, and publish the bundle."""
     config = _resolve_run_config(args)
     cohort = _load_and_filter_cohort(args, config)
-    model_results = _fit_content_ladder(args, config, cohort)
-    _audit_compare_and_publish(args, config, cohort, model_results)
+    model_results, estimator_skips = _fit_content_ladder(args, config, cohort)
+    _audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
 
 
 def main() -> None:
