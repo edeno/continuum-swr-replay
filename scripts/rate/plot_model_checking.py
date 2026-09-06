@@ -78,6 +78,16 @@ ARRIVAL_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "a
 # Gap in x units between the last stop rung and the first arrival rung.
 CLOCK_GAP = 1.0
 FULL = "M7r_time_histcos_rew"
+# The arrival rungs are fit on the arrival window, which is not a neutral
+# subset: it keeps a larger share of the SWR onsets than of the non-SWR ones,
+# so a BETWEEN-population arrival comparison is confounded by retention. The
+# shares are the corpus values from the cohort audit that the current fit was
+# generated with (``per_bin_rate_cohort_audit.csv``).
+ARRIVAL_RETENTION_NOTE = (
+    "arrival rungs are read on a different row set — the arrival window keeps "
+    "91 % of SWR vs 81 % of non-SWR non-local onsets, so between-population "
+    "arrival differences are partly retention"
+)
 
 
 def _ladder_positions() -> tuple[np.ndarray, np.ndarray, float]:
@@ -155,7 +165,11 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
         if col == "cv_bits_per_event":
             ax.axhline(0, color="0.5", ls=":")
     axes.flat[0].legend(frameon=False, fontsize=8)
-    fig.suptitle("Point-process GOF up the per-bin ladder", y=1.04)
+    fig.suptitle(
+        "Point-process GOF up the per-bin ladder\n" + ARRIVAL_RETENTION_NOTE,
+        y=1.06,
+        fontsize=10,
+    )
     fig.tight_layout()
     out = FIGS / "model_checking_ladder.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")

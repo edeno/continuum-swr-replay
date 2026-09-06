@@ -13,7 +13,7 @@ across-session significance and the cross-population comparisons:
 4. Self-history kernel lags 1-10 (M3r_histcos raw, M7r controlled): refractory
    window and burstiness peak, compared across types. Both are reconstructed
    from the four raised-cosine coefficients, not read per lag.
-5. Other covariates (M2r recent reward rate).
+5. Reward-history basis components 0-2 (M7r), one section per component.
 6. Ladder fit summary (AIC / CV bits/event / KS-in-band) per model x type.
 
 All "RR" are rate ratios = exp(coef); summaries are across-session medians with
