@@ -17,6 +17,7 @@ import argparse
 import ast
 import difflib
 import sys
+from itertools import takewhile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -167,11 +168,22 @@ def _public_symbols(path: Path) -> list[str]:
 
 
 def _summary(path: Path) -> str:
-    """First sentence-line of the module docstring, or an empty string."""
+    """Opening sentence of the module docstring, unwrapped, or an empty string.
+
+    Docstring summaries are hard-wrapped, so the first *physical* line is often
+    half a sentence. Join the lines of the opening paragraph (up to the first
+    blank line) and then cut at the first sentence end, so the map reads as
+    prose rather than as truncated fragments.
+    """
     doc = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8")))
     if not doc:
         return ""
-    return doc.strip().splitlines()[0].strip()
+    paragraph = " ".join(
+        line.strip()
+        for line in takewhile(lambda line: line.strip(), doc.strip().splitlines())
+    )
+    head, sentence_end, _ = paragraph.partition(". ")
+    return f"{head}." if sentence_end else paragraph
 
 
 def render() -> str:
@@ -187,7 +199,8 @@ def render() -> str:
         "`--check` fails when the tree and this file disagree.",
         "",
         "Names are the anchor, not line numbers: grep the symbol. Private",
-        "helpers (`_name`) and `__init__.py` re-export surfaces are omitted.",
+        "symbols (`_name`) are omitted, but private *modules* are listed;",
+        "`__init__.py` re-export surfaces are omitted.",
         "",
     ]
 

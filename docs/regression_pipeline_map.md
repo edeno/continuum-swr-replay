@@ -9,7 +9,8 @@ classes it defines (in definition order).
 `--check` fails when the tree and this file disagree.
 
 Names are the anchor, not line numbers: grep the symbol. Private
-helpers (`_name`) and `__init__.py` re-export surfaces are omitted.
+symbols (`_name`) are omitted, but private *modules* are listed;
+`__init__.py` re-export surfaces are omitted.
 
 ## Tables
 
@@ -17,7 +18,7 @@ Event, arm, patch, stop and time-bin tables built from the decoded session, plus
 
 ### `src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py`
 
-Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from
+Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from Alison Comrie's `rl_helpers.py` (LorenFrankLab/SpatialBanditTask analysis code, /home/alison/Src/alison_spyglass/rl_helpers.py).
 
 `set_nan_at_max2`, `add_ak_style_cols_to_RL_output`, `add_periswitch_cols`, `add_dvs_beta`, `add_switch_advantage_beta`, `add_stem_q_dvs_beta`, `make_full_beta_bernoulli_dv_df`
 
@@ -89,7 +90,7 @@ Event-triggered analysis utilities for extracting signal windows around events.
 
 ### `src/continuum_swr_replay/analysis/replay/_tables_common.py`
 
-Shared prep helpers, the arm standardization column list, and canonical
+Shared prep helpers, the arm standardization column list, and canonical column-order constants for the per-grain table builders.
 
 _No module-level public symbols._
 
@@ -195,7 +196,7 @@ _No module-level public symbols._
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/history/diagnostics.py`
 
-Diagnostic per-animal fitted-alpha leaky-Q learner. Produces no catalogued covariate; used only for offline model checking.
+Diagnostic per-animal fitted-alpha leaky-Q learner.
 
 `q_all_arm`
 
@@ -213,7 +214,7 @@ Canonical qvals value-block and arm-uncertainty joins.
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/history/value_uncertainty.py`
 
-Value and uncertainty covariates computed from the behavioral stream: the
+Value and uncertainty covariates computed from the behavioral stream: the canonical leaky-Q value history and the model-free behavioral-uncertainty covariates.
 
 `canonical_port_value_history`, `canonical_trial_switch_history`, `add_uncertainty_covariates`
 
@@ -435,7 +436,7 @@ Validate candidate covariate bundles and write a release manifest.
 
 ### `scripts/rate/fit_cross_history_rate.py`
 
-Bivariate per-bin conditional intensity: does one non-local stream's history
+Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
 
 `fit_cross_history`, `main`
 
