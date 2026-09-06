@@ -221,25 +221,25 @@ order, and per-arm matrices are indexed by position in it, so analysis and
 visualization must share a single definition — reordering it silently
 reinterprets every per-arm coefficient.
 """
-# Seconds after destination poke-in by which the absence of reward is
-# established on an omission trial.
-#
-# The rewarded boundary is a stimulus: in the refreshed 218-session behavioral
-# cache, 18,753 rewarded task visits had p99 pump latency 91 ms and maximum
-# latency 236 ms after destination arrival.
-# Omissions have no negative-feedback cue to timestamp, and the previous rule
-# used destination poke-out -- a median 880 ms later, and a *behavioural*
-# boundary rather than a stimulus one. Gating on when the animal chose to
-# leave is circular (dwell length plausibly covaries with replay) and it
-# excluded 99% of omission events from every outcome-gated fit, collapsing
-# the reward contrast those models exist to estimate.
-#
-# 0.30 s exceeds every reward latency observed in that corpus, so it cannot
-# declare an omission while a pump could still fire, and it retains 99.6% of
-# omission pokes with a median 0.58 s of usable dwell. Re-derive from the
-# reward-latency distribution if the hardware or task timing changes.
-#
-# It lives with the loading constants, not the analysis ones, because the
-# trial builders on the loading side define the outcome clock with it and must
-# not have to import from ``analysis`` to do so.
+
 OMISSION_KNOWN_LATENCY_SEC: float = 0.30
+"""Seconds after destination poke-in by which an omission is established.
+
+The rewarded boundary is a stimulus: in the refreshed 218-session behavioral
+cache, 18,753 rewarded task visits had p99 pump latency 91 ms and maximum
+latency 236 ms after destination arrival. Omissions have no negative-feedback
+cue to timestamp, and the previous rule used destination poke-out -- a median
+880 ms later, and a *behavioural* boundary rather than a stimulus one. Gating
+on when the animal chose to leave is circular (dwell length plausibly covaries
+with replay) and it excluded 99% of omission events from every outcome-gated
+fit, collapsing the reward contrast those models exist to estimate.
+
+0.30 s exceeds every reward latency observed in that corpus, so it cannot
+declare an omission while a pump could still fire, and it retains 99.6% of
+omission pokes with a median 0.58 s of usable dwell. Re-derive from the
+reward-latency distribution if the hardware or task timing changes.
+
+It lives with the loading constants, not the analysis ones, because the trial
+builders on the loading side define the outcome clock with it and must not have
+to import from ``analysis`` to do so.
+"""
