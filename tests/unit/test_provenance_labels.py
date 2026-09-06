@@ -14,7 +14,11 @@ from scripts.content import fit_swr_contrast_content as mod
 
 def test_q_arm_source_is_beta():
     args = argparse.Namespace(
-        max_per_animal=None, response="fraction", outcome_stratum="all"
+        max_per_animal=None,
+        response="fraction",
+        estimator="conditional_poisson",
+        min_events_session_phi=40,
+        outcome_stratum="all",
     )
     prov = mod._provenance(args, n_sessions=218)
 

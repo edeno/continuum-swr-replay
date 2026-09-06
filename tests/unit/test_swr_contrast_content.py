@@ -378,7 +378,11 @@ def test_provenance_records_the_frozen_per_sd_scale():
     _, _, scale, audit = mod.prepare_cohorts(ev, pt, outcome_stratum="rewarded")
     prov = mod._provenance(
         argparse.Namespace(
-            max_per_animal=None, response="fraction", outcome_stratum="rewarded"
+            max_per_animal=None,
+            response="fraction",
+            estimator="conditional_poisson",
+            min_events_session_phi=40,
+            outcome_stratum="rewarded",
         ),
         n_sessions=1,
         outcome_stratum_audit=audit,
@@ -593,7 +597,11 @@ def test_provenance_names_only_the_rescaled_rungs_that_produced_rows():
     assert mod._renormalized_rungs(counts) == []
 
     args = argparse.Namespace(
-        max_per_animal=None, response="fraction", outcome_stratum="all"
+        max_per_animal=None,
+        response="fraction",
+        estimator="conditional_poisson",
+        min_events_session_phi=40,
+        outcome_stratum="all",
     )
     prov = mod._provenance(
         args, n_sessions=1, renormalized_rungs=mod._renormalized_rungs(fitted)
@@ -734,3 +742,38 @@ def test_concentration_specs_cover_every_rung_and_population():
         ("C1_split", "SWR", "log_phi_is_swr"),
         ("C1_split", "nonSWR", "log_phi_is_swr"),
     ]
+
+
+def test_a_refused_dm_session_is_named_in_the_run_audit():
+    """A session the estimator refuses is named in the record, not just counted.
+
+    Its events land in ``n_excluded_session`` like any unfitted session, so the
+    audit's ``drop_notes`` is the only place a reader learns which session went
+    missing from the rung and why.
+    """
+    good = _dm_contrast_cohort(epoch="02_r1", seed=0)
+    bad = _dm_contrast_cohort(epoch="04_r2", seed=1).assign(is_prev_arm=0.0)
+    cohort = pd.concat([good, bad], ignore_index=True)
+
+    res, audits = mod._run(
+        cohort,
+        {"C0_base": (["is_current_arm", "is_prev_arm"], "pooled")},
+        response_col="arm_count_hard",
+        n_categories=9,
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    # The refused session contributes no row.
+    assert res["epoch"].tolist() == ["02_r1"]
+
+    assert len(audits) == 1
+    record = audits[0]
+    notes = record["drop_notes"]
+    assert "no fit: dm_design" in notes
+    assert "estimator skipped chimi/20200212/04_r2 (dm_design:" in notes
+    # Counted as a session-level exclusion, not as dropped events.
+    assert record["n_drop_own_predictor_missing"] == 0
+    assert record["n_excluded_session"] == 60
+    assert record["n_modeled"] == 60

@@ -78,6 +78,10 @@ _DM_NUISANCE_TERMS = frozenset(NUISANCE_TERMS | {LOG_PHI_INTERCEPT})
 
 _MAXITER = 1000
 
+# The forkserver's preload list is process-wide and only read when the server
+# first starts, so it is set once here rather than on every pool.
+_forkserver_preloaded = False
+
 
 # ── likelihood ──────────────────────────────────────────────────────────────
 
@@ -698,6 +702,40 @@ DEFAULT_MIN_EVENTS_SESSION_PHI = 40
 #: Key under which :func:`animal_pooled_log_phi` stores the all-animal median.
 POOLED_ALL_ANIMALS_KEY = "__all__"
 
+#: Worker processes a runner spreads its per-session fits over by default.
+DEFAULT_N_JOBS = 8
+
+
+def concentration_cols_for_cohort(frame: pd.DataFrame) -> tuple[str, ...]:
+    """Event-level columns entering ``log phi`` for one cohort of rows.
+
+    ``is_swr`` is the concentration modifier this estimator exists to measure --
+    whether an SWR event's mass is spread over more arms than a non-SWR
+    event's -- but only where the rows being fitted carry both kinds. Within an
+    SWR subset (or an SWR / nonSWR population split) the flag is constant, its
+    coefficient is not identified, and asking for it would return an infinite
+    standard error rather than a concentration difference that is simply not in
+    question there.
+
+    Both content runners resolve the concentration design through this one
+    function, so a subset fit cannot ask for a term the pooled fit's cohort
+    defines and its own does not.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        The rows about to be fitted.
+
+    Returns
+    -------
+    tuple of str
+        ``("is_swr",)`` when the cohort carries both values, else ``()``.
+    """
+    if "is_swr" not in frame.columns:
+        return ()
+    values = set(frame["is_swr"].dropna().astype(bool).unique())
+    return ("is_swr",) if values == {False, True} else ()
+
 
 def animal_pooled_log_phi(
     rows: pd.DataFrame, *, min_events: int = DEFAULT_MIN_EVENTS_SESSION_PHI
@@ -779,33 +817,6 @@ def resolve_pooled_log_phi(
     return None, "session"
 
 
-def fit_dirichlet_multinomial_with_fallback(
-    long_df: pd.DataFrame,
-    predictors: list[str],
-    *,
-    animal: object,
-    pooled_log_phi: dict[str, float],
-    **kwargs,
-) -> dict | None:
-    """Fit one session with its concentration intercept pinned to a pooled value.
-
-    The second pass of :func:`fit_sessions_dirichlet_multinomial`. Returns
-    ``None`` when no pooled value is available or the pinned fit itself does not
-    converge to a finite optimum; the returned row records ``phi_source`` and
-    the ``fixed_log_phi`` it was pinned to.
-    """
-    value, source = resolve_pooled_log_phi(animal, pooled_log_phi)
-    if value is None:
-        return None
-    result = fit_dirichlet_multinomial(
-        long_df, predictors, fixed_log_phi=value, **kwargs
-    )
-    if result is not None:
-        result["phi_source"] = source
-        result["fixed_log_phi"] = float(value)
-    return result
-
-
 def _fit_one_session(task: tuple) -> tuple:
     """Worker entry point: fit one session, converting a bad design to a skip.
 
@@ -833,13 +844,20 @@ def _run_session_fits(tasks: list[tuple], n_jobs: int) -> list[tuple]:
     never inherit a JAX runtime that the parent has already started, and each
     worker is then a cheap fork of a server that already carries this module.
     """
+    global _forkserver_preloaded
+
     if not tasks:
         return []
     context = multiprocessing.get_context("forkserver")
-    # Preloaded so each worker is a cheap fork of a server that already carries
-    # this module; without it every worker re-imports jax and statsmodels
-    # (~5 s) before it can start fitting.
-    context.set_forkserver_preload([__name__])
+    if not _forkserver_preloaded:
+        # Preloaded so each worker is a cheap fork of a server that already
+        # carries this module; without it every worker re-imports jax and
+        # statsmodels (~5 s) before it can start fitting. This replaces the
+        # default ``["__main__"]``: the worker needs this module and nothing
+        # from the runner script, and importing a runner as ``__main__`` in the
+        # server would re-execute its module body for no benefit.
+        context.set_forkserver_preload([__name__])
+        _forkserver_preloaded = True
     with ProcessPoolExecutor(
         max_workers=max(1, int(n_jobs)),
         mp_context=context,
@@ -887,8 +905,18 @@ def fit_sessions_dirichlet_multinomial(
     list of (key, dict)
         The fitted rows, in sorted key order.
     list of (key, str)
-        Sessions that produced no fit, in sorted key order, each with the reason
-        (``"fit_none"``, ``"dm_design:<message>"``, or ``"no_pooled_log_phi"``).
+        Sessions that produced no fit, in sorted key order, each with the
+        reason: ``"fit_none"`` (too few events for the free fit's parameters, or
+        a non-finite optimum), ``"dm_design:<message>"`` (a within-event design
+        the fitter refused), or ``"pinned_fit_none"`` (the pinned refit of a
+        short session failed where the free fit had succeeded).
+
+    Notes
+    -----
+    The fitted cohort therefore depends on ``min_events``: a session just under
+    the threshold is refit with its intercept pinned, and if that refit fails it
+    is dropped even though its free fit had converged. Changing
+    ``min_events`` can change which sessions a rung reports.
     """
     fit_kwargs = {
         "response_col": response_col,
@@ -958,28 +986,26 @@ def fit_sessions_dirichlet_multinomial(
             len(retry),
         )
     if retry and pooled:
+        pinned = {key: resolve_pooled_log_phi(animals[key], pooled) for key in retry}
         second = _run_session_fits(
             [
-                (
-                    key,
-                    frames[key],
-                    predictors,
-                    {
-                        **fit_kwargs,
-                        "fixed_log_phi": resolve_pooled_log_phi(animals[key], pooled)[
-                            0
-                        ],
-                    },
-                )
-                for key in retry
+                (key, frames[key], predictors, {**fit_kwargs, "fixed_log_phi": value})
+                for key, (value, _source) in pinned.items()
             ],
             n_jobs,
         )
         for key, result, reason in second:
-            value, source = resolve_pooled_log_phi(animals[key], pooled)
+            value, source = pinned[key]
             if result is None:
-                fitted.pop(key, None)
-                skipped[key] = reason
+                # Distinguished from a first-pass failure: this session HAD a
+                # free fit and lost it to the pinning, which is a consequence of
+                # the threshold rather than of the session's own data.
+                had_free_fit = fitted.pop(key, None) is not None
+                skipped[key] = (
+                    "pinned_fit_none"
+                    if had_free_fit and reason == "fit_none"
+                    else reason
+                )
                 continue
             result["phi_source"] = source
             result["fixed_log_phi"] = float(value)
@@ -1014,14 +1040,15 @@ def fit_sessions_dirichlet_multinomial(
 
 __all__ = [
     "DEFAULT_MIN_EVENTS_SESSION_PHI",
+    "DEFAULT_N_JOBS",
     "ESTIMATOR",
     "LOG_PHI_INTERCEPT",
     "POOLED_ALL_ANIMALS_KEY",
     "animal_pooled_log_phi",
+    "concentration_cols_for_cohort",
     "cross_validate_dirichlet_multinomial",
     "event_loglik",
     "fit_dirichlet_multinomial",
-    "fit_dirichlet_multinomial_with_fallback",
     "fit_sessions_dirichlet_multinomial",
     "multinomial_log_constant",
     "resolve_pooled_log_phi",

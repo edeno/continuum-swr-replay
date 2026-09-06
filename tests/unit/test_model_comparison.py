@@ -399,3 +399,38 @@ def test_a_rung_that_records_nothing_is_unknown_not_different():
     assert (
         summarize_comparison(comparison, "M0", "M1")["llf_includes_constants"] is None
     )
+
+
+def test_constants_alone_invalidate_a_pair_that_agrees_on_everything_else():
+    """The flag is guarded on its own, not as a proxy for the estimator name.
+
+    Two rungs can report the same estimator and the same response and still
+    differ here -- a fit whose likelihood was rebased to include the
+    multinomial coefficient against one that was not -- and the ΔAIC would
+    then be that constant.
+    """
+    parent = _fit_with_constants(
+        aic=100,
+        bic=110,
+        ll=-50,
+        includes_constants=False,
+        estimator="dirichlet_multinomial",
+    )
+    child = _fit_with_constants(
+        aic=90,
+        bic=105,
+        ll=-44,
+        includes_constants=True,
+        estimator="dirichlet_multinomial",
+    )
+
+    comparison = compare_nested_models(parent, child)
+
+    assert (
+        comparison["estimator_parent"].iloc[0] == comparison["estimator_child"].iloc[0]
+    )
+    assert np.isnan(comparison["delta_aic"].iloc[0])
+    assert np.isnan(comparison["lr_stat"].iloc[0])
+    # And the summary refuses the step outright: one value cannot be reported.
+    with pytest.raises(ValueError, match="llf_includes_constants"):
+        summarize_comparison(comparison, "M0", "M1")

@@ -103,6 +103,8 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
+    DEFAULT_N_JOBS,
+    concentration_cols_for_cohort,
     fit_sessions_dirichlet_multinomial,
 )
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
@@ -157,11 +159,13 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 SC = list(SESSION_COLUMNS)
 MIN_EVENTS = 18
 
-#: Worker processes the Dirichlet-multinomial per-session fits are spread over.
-DEFAULT_N_JOBS = 8
-
 #: Concentration contrast the Dirichlet-multinomial adds to every rung.
 LOG_PHI_IS_SWR = "log_phi_is_swr"
+
+# Skip classes that are the ESTIMATOR refusing a session rather than the cohort
+# rules excluding it. These are rare and actionable, so the audit names the
+# session; ``too_few`` / ``missing`` are routine and are summarized by class.
+_ESTIMATOR_SKIP_CLASSES = frozenset({"dm_design", "pinned_fit_none"})
 
 # The tables every fit in this family is built from. Their hashes go into the
 # provenance sidecar of each artifact written here, and the readers of those
@@ -300,7 +304,7 @@ def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
     the stratum suffix, so the stratified artifacts of one estimator sort
     together.
     """
-    estimator = getattr(args, "estimator", "conditional_poisson")
+    estimator = args.estimator
     smoke = "_smoke" if args.max_per_animal is not None else ""
     default_response = default_response_for_estimator(estimator)
     response_suffix = "" if response == default_response else f"_{response}"
@@ -747,22 +751,6 @@ def _dropped_event_rows(g: pd.DataFrame, event_ids: set) -> pd.DataFrame:
     return sub.drop_duplicates("event_id")[cols] if cols else g.iloc[0:0]
 
 
-def _concentration_cols(frame: pd.DataFrame) -> tuple[str, ...]:
-    """Event-level columns entering ``log phi`` for one population's rows.
-
-    ``is_swr`` is the concentration modifier the Dirichlet-multinomial exists to
-    measure -- whether an SWR event's mass is spread over more arms than a
-    non-SWR event's -- but only in the pooled population. Within the ``SWR`` or
-    ``nonSWR`` split the flag is constant, its coefficient is not identified,
-    and asking for it would return an infinite standard error rather than a
-    concentration difference that is simply not in question there.
-    """
-    if "is_swr" not in frame.columns:
-        return ()
-    values = set(frame["is_swr"].dropna().astype(bool).unique())
-    return ("is_swr",) if values == {False, True} else ()
-
-
 def _fit_population(
     pop_frame: pd.DataFrame,
     predictors: list[str],
@@ -812,7 +800,7 @@ def _fit_population(
         n_jobs=n_jobs,
         response_col=response_col,
         event_col="event_id",
-        concentration_cols=_concentration_cols(pop_frame),
+        concentration_cols=concentration_cols_for_cohort(pop_frame),
         n_categories=n_categories,
     )
     rows = dict(fits)
@@ -855,6 +843,7 @@ def _run(
             sessions_in = sessions_modeled = n_nonconv = n_sep = 0
             animals_modeled: set = set()
             skip_reasons: set = set()
+            estimator_skips: list[tuple[tuple, str]] = []
             dropped_frames = []
             # Belief rungs are fitted over the leaf arms only: the trunks carry a
             # structural zero for every leaf-derived belief covariate, so they add
@@ -897,7 +886,10 @@ def _run(
                     dropped_frames.append(a["dropped"])
                 if r is None:
                     if a["reason"]:
-                        skip_reasons.add(a["reason"].split(":")[0])
+                        reason_class = a["reason"].split(":")[0]
+                        skip_reasons.add(reason_class)
+                        if reason_class in _ESTIMATOR_SKIP_CLASSES:
+                            estimator_skips.append((keys, a["reason"]))
                     continue
                 sessions_modeled += 1
                 animals_modeled.add(keys[SC.index("animal")])
@@ -952,11 +944,26 @@ def _run(
             )
             notes = drop_profile(dropped)
             if skip_reasons:
-                # Sessions the estimator produced no fit for are already counted
-                # under n_excluded_session; naming why keeps a refused design
-                # distinguishable from a session that was merely too short.
+                # Sessions that produced no fit are already counted under
+                # n_excluded_session; naming why keeps a design the estimator
+                # refused distinguishable from a session that was merely too
+                # short. The routine classes are summarized; a refusal by the
+                # estimator itself names the session it happened to.
                 notes = "; ".join(
-                    filter(None, [notes, "no fit: " + ", ".join(sorted(skip_reasons))])
+                    filter(
+                        None,
+                        [
+                            notes,
+                            "no fit: " + ", ".join(sorted(skip_reasons)),
+                            "estimator skipped "
+                            + ", ".join(
+                                f"{'/'.join(map(str, key))} ({reason})"
+                                for key, reason in estimator_skips
+                            )
+                            if estimator_skips
+                            else "",
+                        ],
+                    )
                 )
             audits.append(cohort_record(
                 name, pop, "event",
@@ -1085,8 +1092,8 @@ def _provenance(
         "smoke_max_per_animal": args.max_per_animal,
         # Which per-session estimator produced the coefficients, and therefore
         # whether the table carries a concentration contrast at all.
-        "estimator": getattr(args, "estimator", "conditional_poisson"),
-        "min_events_session_phi": getattr(args, "min_events_session_phi", None),
+        "estimator": args.estimator,
+        "min_events_session_phi": args.min_events_session_phi,
         # Cohort selection: which current-outcome stratum was fit, and how many
         # events had no known outcome and were therefore in neither stratum.
         "outcome_stratum": args.outcome_stratum,

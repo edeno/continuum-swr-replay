@@ -41,6 +41,7 @@ from scripts.content import fit_replay_content_models as mod
 def _args(**overrides) -> argparse.Namespace:
     defaults = {
         "estimator": "conditional_poisson",
+        "logit": False,
         "n_jobs": 1,
         "min_events_session_phi": 40,
         "cv": False,
@@ -920,13 +921,10 @@ def test_short_dm_session_borrows_its_animals_concentration() -> None:
 def test_dm_concentration_modifier_is_dropped_within_an_swr_subset() -> None:
     """Inside a subset ``is_swr`` is constant, so there is no contrast to fit."""
     cohort = _dm_session(60, seed=0)
-    assert mod.dirichlet_multinomial_concentration_cols(cohort) == ("is_swr",)
+    assert mod.concentration_cols_for_cohort(cohort) == ("is_swr",)
     subset = cohort[cohort["is_swr"] == 1.0]
-    assert mod.dirichlet_multinomial_concentration_cols(subset) == ()
-    assert (
-        mod.dirichlet_multinomial_concentration_cols(cohort.drop(columns="is_swr"))
-        == ()
-    )
+    assert mod.concentration_cols_for_cohort(subset) == ()
+    assert mod.concentration_cols_for_cohort(cohort.drop(columns="is_swr")) == ()
 
 
 def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
@@ -949,3 +947,53 @@ def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
     skips = result.attrs["estimator_skips"]
     assert [skip["session"] for skip in skips] == ["chimi/20200212/04_r2"]
     assert skips[0]["reason"].startswith("dm_design:")
+
+
+def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -> None:
+    """The skip channel's consumer: the audit says which session, and why.
+
+    A session the estimator refuses is not a dropped event -- its events are
+    already counted under ``n_excluded_session`` -- so the only place a reader
+    can learn that a session is missing from the fitted cohort, and for what
+    reason, is the audit's ``drop_notes``.
+    """
+    good = _dm_session(60, seed=0, epoch="02_r1")
+    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
+    cohort_df = pd.concat([good, bad], ignore_index=True)
+    ladder = {"X": ModelSpec("X", ("is_current_arm", "is_prev_arm"), "two arms", None)}
+    args = _args(estimator="dirichlet_multinomial", response="hard_count", n_jobs=2)
+    args.logit = False
+    config = mod._RunConfig(
+        hierarchy=ladder,
+        input_dir=tmp_path,
+        output_dir=tmp_path / "models_dm",
+        table_name="event_arm_table",
+        model_names=["X"],
+        response="hard_count",
+    )
+    cohort = mod._ContentCohort(
+        long_df=cohort_df,
+        long_df_prefilter=cohort_df,
+        valid_model_names=["X"],
+        union_predictors=["is_current_arm", "is_prev_arm"],
+        response_col="arm_count_hard",
+        event_col="event_id",
+        n_events_before_complete_case=int(cohort_df["event_id"].nunique()),
+        fit_inputs={},
+        response_renormalized=False,
+    )
+
+    model_results, estimator_skips = mod._fit_content_ladder(args, config, cohort)
+    mod._audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
+
+    # The refused session contributes no row to the fit frame.
+    assert model_results["X"]["epoch"].tolist() == ["02_r1"]
+
+    audit = pd.read_csv(config.output_dir / "all_models_cohort_audit.csv")
+    assert len(audit) == 1
+    notes = str(audit["drop_notes"].iloc[0])
+    assert "estimator skipped chimi/20200212/04_r2" in notes
+    assert "dm_design:" in notes
+    # Its events are excluded at the session level, not booked as event drops.
+    assert int(audit["n_drop_own_predictor_missing"].iloc[0]) == 0
+    assert int(audit["n_excluded_session"].iloc[0]) == 60

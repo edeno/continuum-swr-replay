@@ -98,6 +98,8 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 )
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
+    DEFAULT_N_JOBS,
+    concentration_cols_for_cohort,
     fit_sessions_dirichlet_multinomial,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -484,9 +486,6 @@ BRAIN_AREA_CHOICES = ("HPC", "mPFC", "OFC")
 HIERARCHY_CHOICES = ("arm", "patch")
 SWR_SUBSET_CHOICES = ("all", "T", "F")
 GRAIN_CHOICES = ("timebin", "event")
-
-#: Worker processes the Dirichlet-multinomial per-session fits are spread over.
-DEFAULT_N_JOBS = 8
 
 
 def resolve_contfrag_paths(
@@ -960,34 +959,6 @@ def prepare_canonical_fit_request(
     return prepared, requested, predictors, response_col, "event_id"
 
 
-def dirichlet_multinomial_concentration_cols(
-    long_df: pd.DataFrame,
-) -> tuple[str, ...]:
-    """Event-level columns entering ``log phi`` for this cohort.
-
-    ``is_swr`` is the concentration modifier the estimator exists to measure --
-    whether an SWR event's allocation is more concentrated than a non-SWR
-    event's -- but only where the cohort actually carries both kinds. Inside an
-    ``--swr-subset`` the flag is constant, its coefficient is not identified,
-    and asking for it would return an infinite standard error instead of a
-    concentration that is simply not in question.
-
-    Parameters
-    ----------
-    long_df : pd.DataFrame
-        The fitting cohort.
-
-    Returns
-    -------
-    tuple of str
-        ``("is_swr",)`` when the cohort carries both values, else ``()``.
-    """
-    if "is_swr" not in long_df.columns:
-        return ()
-    values = set(long_df["is_swr"].dropna().astype(bool).unique())
-    return ("is_swr",) if values == {False, True} else ()
-
-
 def _fit_dirichlet_multinomial_per_session(
     long_df: pd.DataFrame,
     model_name: str,
@@ -1023,7 +994,7 @@ def _fit_dirichlet_multinomial_per_session(
         n_jobs=n_jobs,
         response_col=response_col,
         event_col=event_col,
-        concentration_cols=dirichlet_multinomial_concentration_cols(long_df),
+        concentration_cols=concentration_cols_for_cohort(long_df),
         n_categories=n_categories,
     )
     results = []
@@ -1877,11 +1848,11 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     # --hierarchy flag overrides the model dict and table name when
     # 'patch' is selected; the input directory follows the event source.
     source_config = _EVENT_SOURCE_CONFIG[args.event_source]
-    estimator = getattr(args, "estimator", "conditional_poisson")
+    estimator = args.estimator
     # One resolution point for the response: ``--response`` defaults to the
     # estimator's own, and a combination the estimator cannot fit is refused
     # here rather than silently overridden.
-    response = resolve_response_choice(estimator, getattr(args, "response", None))
+    response = resolve_response_choice(estimator, args.response)
     if estimator == "dirichlet_multinomial":
         if args.grain != "timebin":
             raise ValueError(
@@ -1890,7 +1861,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
                 "Dirichlet-multinomial concentration is estimated from. Drop "
                 "--grain event or use --estimator conditional_poisson."
             )
-        if getattr(args, "cv", False):
+        if args.cv:
             raise ValueError(
                 "--cv runs the conditional-Poisson cross-validation, whose "
                 "held-out score is not on the Dirichlet-multinomial likelihood "
@@ -2270,11 +2241,9 @@ def _fit_content_ladder(
             event_col=event_col,
             n_categories=n_categories,
             grain=args.grain,
-            estimator=getattr(args, "estimator", "conditional_poisson"),
-            n_jobs=getattr(args, "n_jobs", DEFAULT_N_JOBS),
-            min_events_session_phi=getattr(
-                args, "min_events_session_phi", DEFAULT_MIN_EVENTS_SESSION_PHI
-            ),
+            estimator=args.estimator,
+            n_jobs=args.n_jobs,
+            min_events_session_phi=args.min_events_session_phi,
         )
         # Read off the frame the fitter returned, before matching reindexes it:
         # attrs are not a contract pandas carries through every operation.

@@ -29,7 +29,13 @@ from scripts.content import fit_swr_contrast_content as mod
 
 
 def _args(**overrides) -> argparse.Namespace:
-    params = {"max_per_animal": None, "response": "fraction", "outcome_stratum": "all"}
+    params = {
+        "max_per_animal": None,
+        "response": "fraction",
+        "estimator": "conditional_poisson",
+        "min_events_session_phi": 40,
+        "outcome_stratum": "all",
+    }
     params.update(overrides)
     return argparse.Namespace(**params)
 
