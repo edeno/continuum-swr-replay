@@ -328,8 +328,15 @@ positive coefficient means content sharpens onto the current arm when that arm's
 value is **low**. **Value-update sharpens onto current** (`C9`, 5/5
 everywhere). The **scalar belief-entropy interaction is null** (`C8`) — the
 per-arm uncertainty *main effect* (`C13`) is the content-uncertainty result; do
-not conflate them. The **arm-value main effect is a null** (`C4`), so the value
-story lives entirely in the SWR interaction below.
+not conflate them. The **arm-value main effect is a null on this nine-arm
+design** (`C4`, pooled +0.0835 over 218 sessions, 3/5, q 0.295) — but it is
+**positive on the leaf design**: `CS5_armvalue`'s main term
+`reward_belief_mean_candidate_arm_preoutcome` reads **+0.264** (fraction, 217
+sessions, **5/5 animals positive**, bootstrap [+0.031, +0.818]; count +0.228,
+5/5; DM +0.168, 4/5) and the leaf bundle's `Mv` reads **+0.2512** (215 sessions,
+4/5). So the value story is a positive main effect on the leaf design *plus* the
+SWR interaction below — do not write that it lives entirely in the interaction,
+and do not write that content is not value-selective.
 
 **Rate/content asymmetry (restated).** On *content*, several modulations
 (uncertainty, periswitch, switchrate, value-update) are SWR-equal-or-stronger —
@@ -353,10 +360,17 @@ Built into `event_arm_table` (leaf arm *j* to `betadist_var{j+1}`, trunk arms
   median over 215 sessions, **5/5 animals positive**, median event-clustered SE
   0.182). This is the exploration / gain axis (Mattar-Daw) the
   value/reward/space ladder was missing.
-- **It earns its parameter where value does not.** Median per-session ΔAIC
-  against the nested parent (positive = child wins): `M4 → Mu` **+1.80** (103 of
-  215 sessions, 5/5 animals child-better), against `M4 → Mv` **−2.34** (0/5) and
-  `Mu → Mvu` **−1.61** (0/5).
+- **It earns its parameter where value does not — but value's main effect is
+  still positive.** Median per-session ΔAIC against the nested parent (positive
+  = child wins): `M4 → Mu` **+1.80** (ΔAIC > 2 in 103 of 215 sessions, 5/5
+  animals child-better), against `M4 → Mv` **−2.34** (ΔAIC > 2 in 20/215, 0/5
+  animals) and `Mu → Mvu` **−1.61** (ΔAIC > 2 in 11/215, 0/5). The session count
+  is the number of sessions clearing ΔAIC > 2, not a bare sign count. On the
+  same leaf design the value *coefficient* is positive — `Mv`
+  `reward_belief_mean_candidate_arm_preoutcome` **+0.2512** (215 sessions, 4/5)
+  and the `CS5_armvalue` main term **+0.264** (fraction, 217 sessions, 5/5,
+  bootstrap [+0.031, +0.818]) — so the contrast between the two axes is a model
+  comparison, not a difference in sign.
 - **Both populations over-represent uncertain arms, SWR more so.** The split
   `C13_armuncert` gives **SWR +0.3680** (188 sessions, 5/5) against **non-SWR
   +0.2810** (208 sessions, 5/5), pooled `all` **+0.3764** (218 sessions, 5/5),
@@ -393,7 +407,12 @@ likelihood. Animal-balanced median, animals-positive/5, animal-bootstrap
 | **total** (`CS5nt_armvalue`) | — | **−0.6506** (1/5, q < 0.0001) | **−0.638** (0/5, q 7.9e-10) |
 
 The shipped audited fraction fit reads **+0.2366** (216 sessions, 3/5, q 0.117);
-the DM's direct q is 0.025. **The DIRECT effect's sign is estimator-dependent** —
+the DM's direct q is 0.025. **By current outcome**, on the fraction response: the
+**rewarded** stratum gives direct `CS5_armvalue` **+0.1583** (202 sessions, 3/5
+animals positive) and total `CS5nt_armvalue` **−0.3514** (206 sessions, 0/5) —
+the same direct-positive / total-negative split as the pooled fit. The
+**omitted** stratum is **not fit for these two rungs**, so there is no
+omission-side value number. **The DIRECT effect's sign is estimator-dependent** —
 count and DM negative, the shipped fraction estimator positive; the three
 bootstrap intervals overlap heavily, only the DM's excludes zero and only the DM
 has 0/5 animals positive — **while the TOTAL (`nt`) effect is negative under
@@ -589,16 +608,26 @@ with their estimand named.
    event.** `swr_x_is_current_arm` **−0.3731** direct / **−0.5985** total;
    `swr_x_is_prev_arm` **−0.6436**; `log_phi_is_swr` **+1.799** (5/5 animals,
    100 % of sessions), **+1.502** length-adjusted.
-6. **Non-SWR content is reward-value-neutral; with-SWR content avoids recently
-   rewarded arms.** `C3_armreward` non-SWR **+0.0515** (q 0.335) vs SWR
-   **−0.2257** (q 0.0078); the pooled SWR interaction is **−1.1976** direct /
-   **−1.3346** total and negative under all three estimators.
+6. **Non-SWR content is neutral to *recently rewarded* arms; with-SWR content
+   avoids them.** Measured on `reward_fraction_candidate_arm_last10_visits` —
+   the realized reward fraction over the last ten visits to that arm — **not**
+   on the belief mean `reward_belief_mean_candidate_arm_preoutcome`, whose main
+   effect is positive (item 7). `C3_armreward` non-SWR **+0.0515** (215
+   sessions, 3/5, q 0.335) against SWR **−0.2257** (196 sessions, **4/5 animals
+   negative**, 1/5 positive, q 0.0078); the pooled SWR interaction is
+   **−1.1976** direct (218 sessions, **0/5** animals positive) / **−1.3346**
+   total and negative under all three estimators. The 0/5 belongs to the pooled
+   `CS4` interaction, not to the split `C3` SWR coefficient.
 7. **Content over-represents high-uncertainty arms.** `Mu`
    `reward_belief_variance_candidate_arm_preoutcome_z` **+0.3509** (**session
    median** over 215 sessions, 5/5 animals positive); split `C13_armuncert` SWR **+0.3680** vs non-SWR **+0.2810**
-   (5/5 each). The rung earns its parameter (`M4 → Mu` ΔAIC **+1.80**, 5/5
-   animals child-better) where the value rung does not (`M4 → Mv` **−2.34**,
-   0/5).
+   (5/5 each). The rung earns its parameter (`M4 → Mu` ΔAIC **+1.80**, ΔAIC > 2
+   in 103/215 sessions, 5/5 animals child-better) where the value rung does not
+   (`M4 → Mv` **−2.34**, ΔAIC > 2 in 20/215, 0/5 animals). **Value's main effect
+   is nonetheless positive on this same leaf design** — `CS5_armvalue`'s
+   `reward_belief_mean_candidate_arm_preoutcome` **+0.264** (217 sessions, 5/5,
+   bootstrap [+0.031, +0.818]), `Mv` **+0.2512** (215 sessions, 4/5) — so the
+   two axes are separated by model comparison, not by the sign of value.
 8. **Exploration concentrates content on the current arm** in both populations
    (`C12_switchrate` **+0.2658** pooled, **+0.2581** SWR, **+0.1964** non-SWR,
    5/5 each).
