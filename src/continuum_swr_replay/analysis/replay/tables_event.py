@@ -11,7 +11,6 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_keys,
@@ -245,8 +244,6 @@ def _aggregate_event_features(
         # downstream, so neither is persisted here.
         is_rewarded_outcome = _strict_first(g["is_rewarded_outcome"])
 
-        midpoint_idx = len(times) // 2
-        midpoint_time = float(times[midpoint_idx])
         context_time = float(times[0])
         last_port_entry = g["_goal_arrival_time"].iloc[0]
         time_since_last_port_entry = (
@@ -264,11 +261,6 @@ def _aggregate_event_features(
         event_records.append(
             {
                 "non_local_event": int(ev_id),
-                "event_start_s": float(times[0]),
-                "event_end_s": float(times[-1]),
-                "event_duration_s": float(
-                    times[-1] - times[0] + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
-                ),
                 "is_mua": (animal, day, epoch, int(ev_id)) in mua_overlap_keys,
                 "occupancy_state": location["occupancy_state"],
                 "at_well": location["at_well"],
@@ -287,7 +279,6 @@ def _aggregate_event_features(
                 "is_stay": _stay_indicator(next_arm, current_arm),
                 "n_undecoded_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
-                "event_midpoint_s": midpoint_time,
                 "time_since_last_well_arrival_s": time_since_last_port_entry,
                 "time_since_last_reward_s": float(
                     context_time - g["_last_reward_time"].iloc[0]
@@ -432,23 +423,29 @@ def _attach_trajectory_rollups(
     return per_event
 
 
-def _attach_identifiers_and_stops(
-    per_event: pd.DataFrame,
-    session_key: _SessionKey,
-    bout_starts: np.ndarray,
-    bout_ends: np.ndarray,
+def _attach_identifiers(
+    per_event: pd.DataFrame, session_key: _SessionKey
 ) -> pd.DataFrame:
-    """Insert session identifiers, the stable ``event_id`` hash, and map each
-    event to its immobility bout (``stop_idx`` / ``stop_id``)."""
+    """Insert the session identifiers and the stable ``event_id`` hash."""
     animal, day, epoch = session_key
     per_event.insert(0, "animal", animal)
     per_event.insert(1, "session_date", day)
     per_event.insert(2, "epoch", epoch)
     per_event["event_id"] = _hash_event_id(per_event)
+    return per_event
 
-    # stop_id: each event's event_start belongs to exactly one
-    # immobility bout (the in-event filter guarantees immobility, so
-    # ``_assign_bout`` should find a valid bout for every row).
+
+def _attach_stop_ids(
+    per_event: pd.DataFrame,
+    session_key: _SessionKey,
+    bout_starts: np.ndarray,
+    bout_ends: np.ndarray,
+) -> pd.DataFrame:
+    """Map each event to its immobility bout (``stop_idx`` / ``stop_id``)."""
+    animal, day, epoch = session_key
+    # Each event's start belongs to exactly one immobility bout (the in-event
+    # filter guarantees immobility, so ``_assign_bout`` should find a valid
+    # bout for every row).
     stop_idx = _assign_bout(
         per_event["event_start_s"].to_numpy(), bout_starts, bout_ends
     )
@@ -462,18 +459,21 @@ def _attach_identifiers_and_stops(
     return per_event
 
 
-def _merge_classified_and_verify_timing(
+def _merge_classified_event_facts(
     per_event: pd.DataFrame,
     dot: pd.DataFrame,
     speed_threshold: float,
     nonlocal_threshold: float,
 ) -> pd.DataFrame:
-    """Attach SWR classification + compatibility timing aliases, verify the
-    builder and label passes agree bit-for-bit, then drop the label copies.
+    """Attach the canonical event timing and the SWR classification.
 
-    Both passes use the same complete event label because the in-event filter
-    validates the speed/probability contract without clipping. Merge on
-    ``event_id``; every model-cohort event must have exactly one classified row.
+    Both come from the same second pass over the event labels
+    (:func:`build_classified_nonlocal_event_table`), which covers the identical
+    complete window the aggregate pass does -- ``_in_event_mask`` validates the
+    speed/probability contract without clipping. Timing is therefore *derived
+    once*, here, rather than recomputed by the aggregate pass and checked for
+    agreement afterwards. Merged on ``event_id``; every model-cohort event must
+    have exactly one classified row.
     """
     classified = build_classified_nonlocal_event_table(
         dot,
@@ -482,18 +482,18 @@ def _merge_classified_and_verify_timing(
     )
     classified = classified.rename(
         columns={
-            "event_start": "label_event_start",
-            "event_end": "label_event_end",
-            "event_duration": "label_event_duration",
-            "event_midpoint_time": "label_event_midpoint_time",
+            "event_start": "event_start_s",
+            "event_end": "event_end_s",
+            "event_duration": "event_duration_s",
+            "event_midpoint_time": "event_midpoint_s",
         }
     )
     classified_cols = [
         "event_id",
-        "label_event_start",
-        "label_event_end",
-        "label_event_duration",
-        "label_event_midpoint_time",
+        "event_start_s",
+        "event_end_s",
+        "event_duration_s",
+        "event_midpoint_s",
         "animal_max_speed_cm_s",
         "animal_mean_speed_cm_s",
         "animal_start_speed_cm_s",
@@ -520,8 +520,9 @@ def _merge_classified_and_verify_timing(
     # here can only mean an unmatched left key (a legacy event with no
     # classified row). Correct *matching* relies on both passes hashing
     # the same (animal, day, epoch, non_local_event) tuple via
-    # ``hash_event_id`` — this guard catches unmatched rows, not a
-    # hypothetical mismatch from changing the key in only one pass.
+    # ``hash_event_id`` -- this guard catches unmatched rows, not a
+    # hypothetical mismatch from changing the key in only one pass. An
+    # unmatched row would also leave the event with no timing at all.
     n_unclassified = int(per_event["is_swr"].isna().sum())
     if n_unclassified > 0:
         raise RuntimeError(
@@ -531,36 +532,6 @@ def _merge_classified_and_verify_timing(
             "passes hashed different (animal, day, epoch, non_local_event) "
             "tuples."
         )
-
-    # Cross-pass timing agreement: the per-event builder pass and the classified
-    # label pass cover the identical validated label window, so their event
-    # timings must agree bit-for-bit. Verify explicitly (this replaces the
-    # implicit alias equality the schema boundary used to enforce), then drop
-    # the label copies -- the canonical ``event_*_s`` columns carry the
-    # builder-pass values, which are identical to the label pass by this check.
-    for _built, _label in (
-        ("event_start_s", "label_event_start"),
-        ("event_end_s", "label_event_end"),
-        ("event_duration_s", "label_event_duration"),
-        ("event_midpoint_s", "label_event_midpoint_time"),
-    ):
-        if not np.array_equal(
-            per_event[_built].to_numpy(dtype=float),
-            per_event[_label].to_numpy(dtype=float),
-            equal_nan=True,
-        ):
-            raise RuntimeError(
-                f"event timing disagrees across builder/label passes: "
-                f"{_built} vs {_label}"
-            )
-    per_event = per_event.drop(
-        columns=[
-            "label_event_start",
-            "label_event_end",
-            "label_event_duration",
-            "label_event_midpoint_time",
-        ]
-    )
     return per_event
 
 
@@ -586,21 +557,21 @@ def build_event_table(
     The table is composed from two passes over the same complete, validated
     event-label window:
 
-    - **Event aggregates** (timing, arms, patches, context flags, content,
-      posterior summaries, ``stop_id``) use every bin in an accepted label.
-      ``_in_event_mask`` validates that all bins meet the saved speed and
-      probability contracts; it never clips individual bins.
-    - **SWR classification and compatibility timing aliases** come from
+    - **Event aggregates** (arms, patches, context flags, content, posterior
+      summaries) use every bin in an accepted label. ``_in_event_mask``
+      validates that all bins meet the saved speed and probability contracts;
+      it never clips individual bins.
+    - **Event timing and SWR classification** come from
       :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
-      and are merged on ``event_id``: ``is_swr`` (strict
-      positive-duration SWR overlap), ``overlap_class`` /
-      ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``,
-      speed summaries, and ``peak_nonlocal_prob``.
+      and are merged on ``event_id``: the canonical ``event_*_s`` window,
+      ``is_swr`` (strict positive-duration SWR overlap), ``overlap_class`` /
+      ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``, speed
+      summaries, and ``peak_nonlocal_prob``.
 
-    The per-event and classified passes yield identical timing for newly
-    generated data; they are verified equal across passes and collapsed to a
-    single canonical ``event_*_s`` window (the ``label_event_*`` copies are
-    dropped after the check).
+    Both passes cover the identical validated label window, so the timing is
+    derived once -- in the classified pass -- rather than computed twice and
+    checked for agreement. ``stop_idx`` / ``stop_id`` are then assigned from
+    that single ``event_start_s``.
 
     ``conditional_posterior`` is optional. When supplied (e.g., from
     :func:`posterior_io.load_conditional_posterior`), five additional columns
@@ -763,13 +734,13 @@ def build_event_table(
         nonlocal_threshold,
     )
 
-    per_event = _attach_identifiers_and_stops(
-        per_event, session_key, bout_starts, bout_ends
-    )
+    per_event = _attach_identifiers(per_event, session_key)
 
-    per_event = _merge_classified_and_verify_timing(
+    per_event = _merge_classified_event_facts(
         per_event, dot, speed_threshold, nonlocal_threshold
     )
+
+    per_event = _attach_stop_ids(per_event, session_key, bout_starts, bout_ends)
 
     return stamp_covariate_schema(per_event[column_order], table="event")
 
