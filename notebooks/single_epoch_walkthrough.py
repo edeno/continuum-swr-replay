@@ -138,13 +138,19 @@ from continuum_swr_replay.analysis.replay.standardization import (
 )
 
 # --- Canonical table assembly (same functions as prepare_data) ---
-from continuum_swr_replay.analysis.replay.tables import (
+from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
-    add_nonlocal_swr_split,
+)
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table,
     build_event_patch_table,
+)
+from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_sequence_table,
     build_event_table,
+)
+from continuum_swr_replay.analysis.replay.tables_stop import (
+    add_nonlocal_swr_split,
     build_stop_table,
 )
 from continuum_swr_replay.analysis.replay.uncertainty_content import (

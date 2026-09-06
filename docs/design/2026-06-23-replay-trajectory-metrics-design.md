@@ -19,7 +19,7 @@ The metrics apply to **both** event scenarios with **identical
 definitions** so the two are directly comparable:
 
 - **Non-Local** scenario — events from the non-local detector
-  (`build_event_table` in `analysis/replay/tables.py`)
+  (`build_event_table` in `analysis/replay/tables_event.py`)
 - **ContFrag** scenario — SWR/MUA-detected events
   (`build_contfrag_event_table` in `analysis/contfrag/tables.py`)
 

@@ -142,13 +142,14 @@ def default_content_model_names(
 # rungs (C5_lastrew, CS3_lastrew, CS5b_valuevsprevgoal) did not rescue it
 # either, and no coefficient from them is citable. Why (incl. the arm-FE
 # convergence trade-off, the retired M5 rung and the refusal):
-# ``docs/design/model_history.md``.
+# ``docs/design/model_history.md`` § "Primary arm-level hierarchy".
 
 # Natural-cubic-spline basis for visit recency, on the raw trial-count scale,
 # masked to the arms where recency is not already determined by
 # ``is_current_arm`` / ``is_prev_arm``, with one basis column dropped as
 # reference. Why masked, why fixed global knots, and the raw-vs-log1p
-# measurement: ``docs/design/model_history.md``.
+# measurement: ``docs/design/model_history.md`` § "Visit-recency spline".
+
 # Interior knot positions (in trial counts) and clamp bounds for the natural
 # cubic spline on visit recency. The two knots (12, 40 trials) place flexibility
 # across the bulk of the recency distribution; the bounds (3, 200) clamp
@@ -310,7 +311,8 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # There is no patch reward-memory rung, for the reason the arm ladder has none
 # (removed 2026-08-18, P3/P4 renumbered down into P2/P3). ``MODEL_PATCH_SWITCH``
 # remains the dedicated previous-vs-current contrast. Numbers:
-# ``docs/design/model_history.md``.
+# ``docs/design/model_history.md`` § "Patch ladder: the retired patch
+# reward-memory rung".
 
 # ── Event-source-restricted hierarchies (ContFrag pipeline) ──
 #
@@ -321,7 +323,8 @@ MODEL_HIERARCHY: dict[str, ModelSpec] = {
 # effects and are unidentifiable. The hierarchy therefore mirrors
 # MODEL_HIERARCHY's M0–M4 and stops there.
 #
-# A cross-modality rung is deferred; see ``docs/design/model_history.md``.
+# A cross-modality rung is deferred; see ``docs/design/model_history.md``
+# § "Event-source-restricted hierarchies".
 
 _M0_TO_M4 = {
     name: MODEL_HIERARCHY[name] for name in ("M0", "M0a", "M1", "M2", "M3", "M4")
@@ -396,7 +399,8 @@ MODEL_PATCH_MUA: dict[str, ModelSpec] = dict(_P0_TO_P2)
 # ≈ -0.5, VIF < 2). On stay trials these are collinear (r = 0.95,
 # VIF > 20) and must not be combined.
 #
-# Pilot result on 7 j16 sessions: ``docs/design/model_history.md``.
+# Pilot result on 7 j16 sessions: ``docs/design/model_history.md``
+# § "Post-switch patch model".
 
 MODEL_PATCH_SWITCH: dict[str, ModelSpec] = {
     "PS0": ModelSpec(
@@ -475,7 +479,7 @@ N_REWARD_LAGS = REWARD_HISTORY_N_LAGS
 # (``REWARD_HISTORY_COLUMNS``) plus the structural-missingness indicator
 # ``REWARD_HISTORY_INCOMPLETE``. The ladder stops there. Why — the content
 # ladder's M3 analogy, the dropped ``is_swr_stop`` term, and the deferred
-# block-level rung: ``docs/design/model_history.md``.
+# block-level rung: ``docs/design/model_history.md`` § "Per-stop rate ladder".
 
 MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
     "R0": ModelSpec(
@@ -736,7 +740,8 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     # M6_time_hist, M7_time_hist_rew, M9_rew_x_time) are RETIRED — they could
     # not be cross-validated at all. The raised-cosine variants below span the
     # same window and ARE scored; the reward x time interaction survives as
-    # ``M9r_rew_x_time``. Numbers: ``docs/design/model_history.md``.
+    # ``M9r_rew_x_time``. Numbers: ``docs/design/model_history.md``
+    # § "Retirements in the per-bin rate ladder (Family B)".
     "M5_time": PerBinRateModelSpec(
         name="M5_time",
         time_spline=True,
@@ -749,7 +754,8 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         parent="M0_const",
     ),
     # M8_full_switch (the per-bin switch main-effect extension) was retired;
-    # nothing parents off it. Why: ``docs/design/model_history.md``.
+    # nothing parents off it. Why: ``docs/design/model_history.md``
+    # § "Retirements in the per-bin rate ladder (Family B)".
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
@@ -877,7 +883,8 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
 # ``is_same_patch`` (near-collinear with candidate-arm distance) and
 # ``distance_to_candidate_arm_cm`` itself (quasi-separation). The trade-off —
 # the replay coefficient is then not cleanly distance-controlled — and the
-# principled alternative are in ``docs/design/model_history.md``.
+# principled alternative are in ``docs/design/model_history.md``
+# § "Choice models: the two excluded behavioural predictors".
 # Callers should still drop any column absent from the choice dataset
 # before fitting.
 
@@ -1073,7 +1080,8 @@ ARMFE = [f"is_candidate_arm_{a}" for a in range(8)]
 # ``candidate_arm_distance_rank`` is deliberately absent: its rank-1 level is
 # identical to ``is_current_arm``, so carrying it makes every C*/CS*
 # ``is_current_arm`` non-comparable with ``M1``/``C1_current``. Numbers:
-# ``docs/design/model_history.md``.
+# ``docs/design/model_history.md`` § "Content is_swr-contrast base: why
+# candidate_arm_distance_rank is absent".
 BASEc_NT = [
     *ARMFE,
     "is_current_arm",
@@ -1085,7 +1093,8 @@ _TSC = "log1p_time_since_stop_start_s_z_x_is_current_arm"
 # Event-length control: z(log n_nonlocal_bins) crossed with the current and
 # previous arm indicators, on every rung built on ``BASEc``; the ``nt`` twins
 # keep ``BASEc_NT`` as the uncontrolled sensitivity fit. Why:
-# ``docs/design/model_history.md``.
+# ``docs/design/model_history.md`` § "Content is_swr-contrast base: the
+# event-length control".
 _LENC = "log_n_nonlocal_bins_z_x_is_current_arm"
 _LENP = "log_n_nonlocal_bins_z_x_is_prev_arm"
 BASEc = [*BASEc_NT, _TSC, _LENC, _LENP]
@@ -1141,7 +1150,8 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # Every ``swr_x_`` coefficient on a ``BASEc`` rung is the LENGTH-ADJUSTED
     # (DIRECT) SWR effect; the ``nt`` twin on ``BASEc_NT`` holds the TOTAL SWR
     # effect. Both are shipped and reported side by side; neither supersedes the
-    # other. Estimand argument: ``docs/design/model_history.md``.
+    # other. Estimand argument: ``docs/design/model_history.md``
+    # § "Content is_swr-contrast: the direct/total estimand of every swr_x term".
     "CS1_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
     "CS1nt_current": ([*BASEc_NT, "swr_x_is_current_arm"], "pooled"),
     "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
@@ -1268,7 +1278,8 @@ _LENC_PATCH = "log_n_nonlocal_bins_z_x_is_current_patch"
 _LENP_PATCH = "log_n_nonlocal_bins_z_x_is_prev_patch"
 BASEc_PATCH = [*BASEc_PATCH_NT, _TSC_PATCH, _LENC_PATCH, _LENP_PATCH]
 # ``CP2_olddecay`` and ``CPS3_olddecay`` were retired 2026-08-18; see
-# ``docs/design/model_history.md``.
+# ``docs/design/model_history.md`` § "Content patch is_swr-contrast: the retired
+# CP2/CPS3 rungs".
 _LR_PATCH = "is_last_rewarded_noncurrent_patch"
 SWR_CONTRAST_CONTENT_PATCH_LADDER: dict[str, tuple[list[str], str]] = {
     "CP0_base": (BASEc_PATCH, "split"),

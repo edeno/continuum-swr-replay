@@ -102,6 +102,23 @@ carries an intercept) or `MODEL_CHOICE`; see their own sections in the catalog.
 - **MUA interactions are a separate analysis** (split, not interaction) to avoid
   the same collinearity.
 
+### Correction (2026-09-06): the whole last-rewarded family is refused
+
+Earlier wording — the reward-memory bullet in this section, and the moved
+`model_specs.py` comment below — said reward memory "lives only in the pooled
+contrast rungs C5_lastrew / CS3_lastrew, where pooling supplies the variation a
+per-session fit lacks". That is superseded: pooling across sessions did not
+supply the missing variation, and the **entire last-rewarded family is refused
+as unidentified**. `CS5b_valuevsprevgoal` — the previous-goal discriminant
+against Gillespie et al. 2021 — fits only **132 sessions** under the
+Dirichlet-multinomial with **94 flagged separated** (−0.316, 1/5 animals,
+q = 0.294) and **133 sessions** on the shipped fraction response (+0.1840, 3/5,
+q = 0.396). The rungs remain in the catalog so the refusal is reproducible, but
+no coefficient from `C5_lastrew`, `CS3_lastrew`, `CS5b_valuevsprevgoal`,
+`CP1_lastrew` or `CPS2_lastrew` is citable, and the previously quoted
+−2.45 / −2.43 / −1.03 value-avoidance figures and the −0.79 SWR-by-previous-goal
+interaction are withdrawn. Current wording: `paper/claims_table.md` row 19f.
+
 ## Retirements in the per-bin rate ladder (Family B)
 
 - **The five `onset_lag1..10` dummy rungs are retired (2026-09-06):**
@@ -188,6 +205,11 @@ Two standing qualifications on that table:
 
 ## Primary arm-level hierarchy: arm fixed effects, the retired reward-memory rung, SWR splits (moved 2026-09-06)
 
+Superseded by § "Design decisions (exploratory analysis on 7 j16 sessions)" above;
+kept as the verbatim `model_specs.py` comment as of its removal on 2026-09-06.
+(References such as "above", "below" and "the module docstring" inside the
+moved blocks in this file are to `model_specs.py`, not to this document.)
+
 Moved verbatim from `model_specs.py`:
 
 ```
@@ -258,20 +280,9 @@ terms, because mua_x_current ≈ mua_x_last_rewarded (r = 0.98,
 VIF > 70).
 ```
 
-### Correction (2026-09-06): the whole last-rewarded family is refused
-
-The paragraph above says reward memory "lives only in the pooled contrast rungs
-C5_lastrew / CS3_lastrew". That is superseded: pooling across sessions did not
-supply the missing variation, and the **entire last-rewarded family is refused
-as unidentified**. `CS5b_valuevsprevgoal` — the previous-goal discriminant
-against Gillespie et al. 2021 — fits only **132 sessions** under the
-Dirichlet-multinomial with **94 flagged separated** (−0.316, 1/5 animals,
-q = 0.294) and **133 sessions** on the shipped fraction response (+0.1840, 3/5,
-q = 0.396). The rungs remain in the catalog so the refusal is reproducible, but
-no coefficient from `C5_lastrew`, `CS3_lastrew`, `CS5b_valuevsprevgoal`,
-`CP1_lastrew` or `CPS2_lastrew` is citable, and the previously quoted
-−2.45 / −2.43 / −1.03 value-avoidance figures and the −0.79 SWR-by-previous-goal
-interaction are withdrawn. Current wording: `paper/claims_table.md` row 19f.
+The last-rewarded paragraphs in the block above are superseded — see
+§ "Correction (2026-09-06): the whole last-rewarded family is refused" in
+*Design decisions*.
 
 ## Visit-recency spline: masking, knot placement, raw-vs-log1p (moved 2026-09-06)
 
@@ -384,6 +395,9 @@ deferred until the contingency-block loader is wired.
 
 ## Per-bin rate ladder: the retired per-lag dummy rungs (moved 2026-09-06)
 
+Superseded by § "Retirements in the per-bin rate ladder (Family B)" above; kept as
+the verbatim `model_specs.py` comment as of its removal on 2026-09-06.
+
 Moved verbatim from `model_specs.py`:
 
 ```
@@ -396,10 +410,13 @@ rung's held-out metric: measured on the 2026-09-06 refit of 218 sessions,
 not be cross-validated at all. The raised-cosine variants below span the
 same 150 ms window with four smooth parameters and ARE scored. The
 reward x time interaction survives as ``M9r_rew_x_time`` on the
-raised-cosine parent. See ``docs/design/model_history.md``.
+raised-cosine parent. See § "Retirements in the per-bin rate ladder (Family B)".
 ```
 
 ## Per-bin rate ladder: the retired M8 switch rung (moved 2026-09-06)
+
+Companion to § "Retirements in the per-bin rate ladder (Family B)" above; kept as
+the verbatim `model_specs.py` comment as of its removal on 2026-09-06.
 
 Moved verbatim from `model_specs.py`:
 
@@ -431,6 +448,11 @@ module docstring above, which excludes ``distance_to_candidate_arm_cm`` and
 on the same grounds -- candidate-arm distance rank re-imported most of their
 content.
 ```
+
+The `-2.390 -> -2.407` figure is an **invariance check only** — it says the
+exclusion did not move the SWR × belief-mean term, not that the term is
+estimable. That −2.4 family is withdrawn; see § "Correction (2026-09-06): the
+whole last-rewarded family is refused".
 
 ## Content is_swr-contrast base: the event-length control (moved 2026-09-06)
 
