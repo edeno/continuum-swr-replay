@@ -1,4 +1,4 @@
-"""Visit-recency covariates: how recently (and whether ever) each arm was visited, at event time and as per-arm scalar views."""
+"""Visit-recency covariates: how recently (and whether ever) each arm was visited, at event time."""
 
 from __future__ import annotations
 

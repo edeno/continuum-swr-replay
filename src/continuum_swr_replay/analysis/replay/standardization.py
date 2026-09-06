@@ -323,18 +323,37 @@ def assert_standardized_matches_reference(
         )
 
 
-def z_reference_path(artifact_path):
-    """``<artifact-stem>.z_reference.json`` beside a fitted artifact."""
-    return artifact_path.with_name(f"{artifact_path.stem}.z_reference.json")
+def z_reference_path(artifact_path, *, by_session: bool = False):
+    """``<artifact-stem>.z_reference.json`` beside a fitted artifact.
+
+    ``by_session=True`` names the per-session variant
+    ``<artifact-stem>.z_reference_by_session.json``. A runner that standardizes
+    inside a per-session loop has one set of moments per session, so its payload
+    is ``dict[session_key, Reference]`` rather than a single :data:`Reference`.
+    The distinct filename keeps the two payload shapes from being loaded
+    interchangeably by a consumer expecting flat ``{column: moments}``.
+    """
+    stem = "z_reference_by_session" if by_session else "z_reference"
+    return artifact_path.with_name(f"{artifact_path.stem}.{stem}.json")
 
 
-def save_reference(reference: Reference, path) -> None:
-    """Write a standardization reference to JSON (sorted, stable)."""
+def save_reference(reference: Reference | dict[str, Reference], path) -> None:
+    """Write a standardization reference to JSON (sorted, stable).
+
+    Accepts either a flat :data:`Reference` (``{column: moments}``, the
+    pooled-cohort case) or the per-session ``{session_key: Reference}`` mapping a
+    per-session fit produces; :func:`z_reference_path` names the two differently.
+    """
     with open(path, "w") as f:
         json.dump(reference, f, indent=2, sort_keys=True)
 
 
-def load_reference(path) -> Reference:
-    """Read a standardization reference written by :func:`save_reference`."""
+def load_reference(path) -> Reference | dict[str, Reference]:
+    """Read a standardization reference written by :func:`save_reference`.
+
+    The payload shape follows the file: a flat :data:`Reference` from a
+    ``.z_reference.json``, a ``{session_key: Reference}`` mapping from a
+    ``.z_reference_by_session.json``.
+    """
     with open(path) as f:
         return json.load(f)

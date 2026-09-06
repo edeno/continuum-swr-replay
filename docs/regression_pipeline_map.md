@@ -214,7 +214,7 @@ Value and uncertainty covariates computed from the behavioral stream: the canoni
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/history/visit_recency.py`
 
-Visit-recency covariates: how recently (and whether ever) each arm was visited, at event time and as per-arm scalar views.
+Visit-recency covariates: how recently (and whether ever) each arm was visited, at event time.
 
 `center_visit_recency_within_event`, `spline_visit_recency_within_event`, `visit_recency_all_events`, `arm_never_visited_all_events`, `visit_recency_and_never_visited_all_events`
 

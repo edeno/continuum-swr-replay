@@ -408,6 +408,34 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     return records
 
 
+def _write_outputs(
+    out_dir: Path,
+    *,
+    coefs: pd.DataFrame,
+    z_reference: dict[str, Reference],
+    gate_audit: pd.DataFrame,
+    cohort_records: list[dict],
+    smoke: bool,
+) -> Path:
+    """Write the fitted coefficients, their z reference, and the two audits.
+
+    The per-session standardization moments go beside the model as
+    ``<stem>.z_reference_by_session.json``, so a standardized coefficient can be
+    converted back to raw units without refitting. Returns the model path.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sfx = "_smoke" if smoke else ""
+    out = out_dir / f"swr_power_model{sfx}.pkl"
+    coefs.to_pickle(out)
+    save_reference(z_reference, z_reference_path(out, by_session=True))
+    gate_audit.to_csv(
+        out_dir / f"swr_power_post_outcome_gate_audit{sfx}.csv",
+        index=False,
+    )
+    write_cohort_audit(cohort_records, out_dir / f"swr_power_cohort_audit{sfx}.csv")
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -428,7 +456,6 @@ def main() -> None:
     args = parser.parse_args()
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
-    sfx = "_smoke" if smoke else ""
 
     df = _assemble()
     if smoke:
@@ -457,18 +484,13 @@ def main() -> None:
 
     coefs = fit_power_model(df)
     gate_audit = pd.DataFrame(coefs.attrs["post_outcome_gate_audit"])
-    out_dir = args.output_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"swr_power_model{sfx}.pkl"
-    coefs.to_pickle(out)
-    save_reference(coefs.attrs["z_reference"], z_reference_path(out))
-    gate_audit.to_csv(
-        out_dir / f"swr_power_post_outcome_gate_audit{sfx}.csv",
-        index=False,
-    )
-    write_cohort_audit(
-        _cohort_records(df, coefs),
-        out_dir / f"swr_power_cohort_audit{sfx}.csv",
+    out = _write_outputs(
+        args.output_dir,
+        coefs=coefs,
+        z_reference=coefs.attrs["z_reference"],
+        gate_audit=gate_audit,
+        cohort_records=_cohort_records(df, coefs),
+        smoke=smoke,
     )
     if coefs.empty:
         raise RuntimeError(

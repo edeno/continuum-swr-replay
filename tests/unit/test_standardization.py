@@ -300,20 +300,52 @@ def test_ddof_selects_the_sample_sd():
 
 
 def test_runner_references_written(tmp_path):
-    """Both rate runners persist a fit-cohort reference beside their artifact."""
+    """Both rate runners write their z reference beside the model they fit.
+
+    Exercises each runner's real output-writing block, so deleting its
+    ``save_reference`` call fails here rather than passing silently.
+    """
     from scripts.rate import fit_swr_power_model, fit_uncertainty_rate
 
-    for runner, artifact in (
-        (fit_uncertainty_rate, "uncertainty_rate_smoke.pkl"),
-        (fit_swr_power_model, "swr_power_model_smoke.pkl"),
-    ):
-        assert runner.FIT_SUPPORT_LABEL == "fit_cohort_all_rows"
-        path = z_reference_path(tmp_path / artifact)
-        assert path.name == artifact.replace(".pkl", ".z_reference.json")
+    frame = pd.DataFrame({"a": [1.0, 2.0, 4.0, 8.0]})
+    _, flat_reference = attach_standardized(
+        frame.copy(), ["a"], support_label=fit_uncertainty_rate.FIT_SUPPORT_LABEL
+    )
+    empty_audit = pd.DataFrame({"animal": ["chimi"]})
 
-        df = pd.DataFrame({"a": [1.0, 2.0, 4.0, 8.0]})
-        _, reference = attach_standardized(
-            df, ["a"], support_label=runner.FIT_SUPPORT_LABEL
-        )
-        save_reference(reference, path)
-        assert load_reference(path)["a"]["support"] == "fit_cohort_all_rows"
+    uncertainty_out = fit_uncertainty_rate._write_outputs(
+        tmp_path / "uncertainty",
+        models=frame.copy(),
+        z_reference=flat_reference,
+        gate_audit=empty_audit,
+        cohort_records=[{"model": "MU_uncertainty", "n_in": 1}],
+        fit_inputs={},
+        argv=["fit_uncertainty_rate.py", "--max-per-animal", "1"],
+        smoke=True,
+    )
+    assert uncertainty_out.name == "uncertainty_rate_smoke.pkl"
+    sidecar = z_reference_path(uncertainty_out)
+    assert sidecar.name == "uncertainty_rate_smoke.z_reference.json"
+    for moments in load_reference(sidecar).values():
+        assert moments["support"] == "fit_cohort_all_rows"
+
+    # The power model standardizes inside a per-session loop, so its payload is
+    # one reference per session under the by-session filename.
+    _, session_reference = attach_standardized(
+        frame.copy(), ["a"], support_label=fit_swr_power_model.FIT_SUPPORT_LABEL
+    )
+    power_out = fit_swr_power_model._write_outputs(
+        tmp_path / "power",
+        coefs=frame.copy(),
+        z_reference={"chimi|20200212|02_r1": session_reference},
+        gate_audit=empty_audit,
+        cohort_records=[{"model": "swr_power", "n_in": 1}],
+        smoke=True,
+    )
+    assert power_out.name == "swr_power_model_smoke.pkl"
+    session_sidecar = z_reference_path(power_out, by_session=True)
+    assert session_sidecar.name == "swr_power_model_smoke.z_reference_by_session.json"
+    by_session = load_reference(session_sidecar)
+    assert set(by_session) == {"chimi|20200212|02_r1"}
+    for moments in by_session["chimi|20200212|02_r1"].values():
+        assert moments["support"] == "fit_cohort_all_rows"

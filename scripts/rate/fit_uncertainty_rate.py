@@ -48,6 +48,7 @@ import logging  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
@@ -91,6 +92,7 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.analysis.replay.standardization import (  # noqa: E402
+    Reference,
     attach_standardized,
     save_reference,
     z_reference_path,
@@ -554,6 +556,39 @@ def _cohort_records(
     return records
 
 
+def _write_outputs(
+    out_dir: Path,
+    *,
+    models: pd.DataFrame,
+    z_reference: Reference,
+    gate_audit: pd.DataFrame,
+    cohort_records: list[dict],
+    fit_inputs: dict,
+    argv: list[str],
+    smoke: bool,
+) -> Path:
+    """Write the fitted rows, their z reference, the provenance, and the audits.
+
+    The fit-cohort standardization moments go beside the model as
+    ``<stem>.z_reference.json``, so a per-SD coefficient can be converted back to
+    raw units without refitting. Returns the model path.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sfx = "_smoke" if smoke else ""
+    out = out_dir / f"uncertainty_rate{sfx}.pkl"
+    models.to_pickle(out)
+    save_reference(z_reference, z_reference_path(out))
+    write_fit_provenance(out, fit_inputs, "poisson_glm", argv)
+    gate_audit.to_csv(
+        out_dir / f"uncertainty_rate_post_outcome_gate_audit{sfx}.csv",
+        index=False,
+    )
+    write_cohort_audit(
+        cohort_records, out_dir / f"uncertainty_rate_cohort_audit{sfx}.csv"
+    )
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -671,19 +706,6 @@ def main() -> None:
     models = fit_uncertainty_rate(stop, onsets)
     gate_audit = pd.DataFrame(models.attrs["post_outcome_gate_audit"])
 
-    out_dir = RC / "models_per_bin_rate"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fname = "uncertainty_rate_smoke.pkl" if smoke else "uncertainty_rate.pkl"
-    csfx = "_smoke" if smoke else ""
-    out = out_dir / fname
-    models.to_pickle(out)
-    save_reference(z_reference, z_reference_path(out))
-    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
-    gate_audit.to_csv(
-        out_dir / f"uncertainty_rate_post_outcome_gate_audit{csfx}.csv",
-        index=False,
-    )
-
     # Cohort audit (stop grain). The inner qvals join is the mechanism-B qvals-gap;
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
     # first-session-per-animal drop, subset, and per-bin gates -> excluded.
@@ -695,8 +717,15 @@ def main() -> None:
         n_sessions_postjoin=n_sessions_postjoin,
         qvals_gap=audit_qvals,
     )
-    write_cohort_audit(
-        audit_records, out_dir / f"uncertainty_rate_cohort_audit{csfx}.csv"
+    out = _write_outputs(
+        RC / "models_per_bin_rate",
+        models=models,
+        z_reference=z_reference,
+        gate_audit=gate_audit,
+        cohort_records=audit_records,
+        fit_inputs=fit_inputs,
+        argv=sys.argv,
+        smoke=smoke,
     )
     if models.empty:
         raise RuntimeError(
