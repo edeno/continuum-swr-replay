@@ -20,7 +20,7 @@ from .._helpers import (
     eq_indicator,
     eq_indicator_or_nan,
 )
-from ..model_specs import RECENCY_SPLINE_COLUMNS
+from ..design_constants import RECENCY_SPLINE_COLUMNS
 from ..spatial import arm_dist_rank, dist_to_arm_from_well
 from ..spatial_mapping import arm_to_well
 from .history import (

@@ -250,7 +250,13 @@ Model-light estimands for reward-belief uncertainty and replay content.
 
 ## Specs
 
-The single source of truth for every model ladder.
+The single source of truth for every model ladder, and the design constants the ladders share with the covariate builders.
+
+### `src/continuum_swr_replay/analysis/replay/design_constants.py`
+
+Design constants shared by the covariate builders and the model ladders.
+
+_No module-level public symbols._
 
 ### `src/continuum_swr_replay/analysis/replay/model_specs.py`
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.replay.design_constants import (
     RECENCY_SPLINE_BOUNDS,
     RECENCY_SPLINE_KNOTS,
 )
@@ -106,8 +106,8 @@ def spline_visit_recency_within_event(
     """Event-centered natural-spline basis of recency, on its identified support.
 
     The basis is built on the raw trial-count scale (see the knot constants in
-    ``model_specs``), so a coefficient reads per unit of the basis at knots that
-    are themselves trial counts.
+    ``design_constants``), so a coefficient reads per unit of the basis at knots
+    that are themselves trial counts.
 
     All inputs are flat per-(event, arm) row arrays of equal length. Returns
     ``(n_rows, len(RECENCY_SPLINE_COLUMNS))``, zero outside the masked support so

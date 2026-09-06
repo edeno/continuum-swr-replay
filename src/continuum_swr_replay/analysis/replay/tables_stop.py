@@ -48,7 +48,7 @@ from .covariates import (
     reward_history_basis_features,
     summarize_behavioral_location,
 )
-from .model_specs import (
+from .design_constants import (
     N_REWARD_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,

@@ -7,7 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.replay.design_constants import (
     N_REWARD_LAGS,
 )
 from continuum_swr_replay.data_loaders.constants import (

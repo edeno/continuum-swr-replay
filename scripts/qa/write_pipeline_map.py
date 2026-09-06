@@ -71,8 +71,12 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     (
         "Specs",
-        "The single source of truth for every model ladder.",
-        ("*/analysis/replay/model_specs.py",),
+        "The single source of truth for every model ladder, and the design "
+        "constants the ladders share with the covariate builders.",
+        (
+            "*/analysis/replay/model_specs.py",
+            "*/analysis/replay/design_constants.py",
+        ),
     ),
     (
         "Fitters",

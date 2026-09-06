@@ -20,7 +20,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
-from .model_specs import (
+from .design_constants import (
     ARM_FE_PREDICTORS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,

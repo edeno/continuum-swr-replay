@@ -11,7 +11,7 @@ from continuum_swr_replay.analysis.replay._helpers import (
     # per-bin design builder, which must not import this package.
     reward_basis_from_lags,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.replay.design_constants import (
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
 )

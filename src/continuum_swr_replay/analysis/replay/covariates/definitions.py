@@ -22,7 +22,7 @@ from enum import StrEnum
 
 import pandas as pd
 
-from ..model_specs import (
+from ..design_constants import (
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
