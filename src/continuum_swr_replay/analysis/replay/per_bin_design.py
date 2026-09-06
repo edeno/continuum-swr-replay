@@ -41,7 +41,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-_SESSION_COLS = list(SESSION_COLUMNS)
 
 _REWARD_LAG_COLUMNS = tuple(
     f"known_reward_outcome_lag_{j}" for j in range(1, REWARD_HISTORY_N_LAGS + 1)
@@ -98,14 +97,14 @@ def attach_is_swr_to_onsets(
         excluded session keys and row counts.
     """
     session_presence = {
-        "onset": [column in onset_df for column in _SESSION_COLS],
-        "event": [column in event_table for column in _SESSION_COLS],
+        "onset": [column in onset_df for column in SESSION_COLUMNS],
+        "event": [column in event_table for column in SESSION_COLUMNS],
     }
     for name, presence in session_presence.items():
         if any(presence) and not all(presence):
             missing = [
                 column
-                for column, present in zip(_SESSION_COLS, presence, strict=True)
+                for column, present in zip(SESSION_COLUMNS, presence, strict=True)
                 if not present
             ]
             raise KeyError(
@@ -115,20 +114,20 @@ def attach_is_swr_to_onsets(
     if all(session_presence["onset"]) != all(session_presence["event"]):
         raise KeyError(
             "onset and event tables must either both carry natural session keys "
-            f"{tuple(_SESSION_COLS)} or both be single-session fixtures"
+            f"{tuple(SESSION_COLUMNS)} or both be single-session fixtures"
         )
 
     if has_session_keys:
         if (
-            onset_df[_SESSION_COLS].isna().any().any()
-            or event_table[_SESSION_COLS].isna().any().any()
+            onset_df[list(SESSION_COLUMNS)].isna().any().any()
+            or event_table[list(SESSION_COLUMNS)].isna().any().any()
         ):
             raise ValueError("onset/event natural session keys must not be missing")
         onset_sessions = pd.MultiIndex.from_frame(
-            onset_df[_SESSION_COLS].drop_duplicates()
+            onset_df[list(SESSION_COLUMNS)].drop_duplicates()
         )
         event_sessions = pd.MultiIndex.from_frame(
-            event_table[_SESSION_COLS].drop_duplicates()
+            event_table[list(SESSION_COLUMNS)].drop_duplicates()
         )
         shared_sessions = onset_sessions.intersection(event_sessions, sort=False)
         onset_only = onset_sessions.difference(event_sessions, sort=False)
@@ -138,11 +137,11 @@ def attach_is_swr_to_onsets(
                 "onset and event tables share no natural session keys; they are "
                 "from incompatible cohorts or builds"
             )
-        onset_keys = pd.MultiIndex.from_frame(onset_df[_SESSION_COLS])
-        event_keys = pd.MultiIndex.from_frame(event_table[_SESSION_COLS])
+        onset_keys = pd.MultiIndex.from_frame(onset_df[list(SESSION_COLUMNS)])
+        event_keys = pd.MultiIndex.from_frame(event_table[list(SESSION_COLUMNS)])
         out = onset_df.loc[onset_keys.isin(shared_sessions)].copy()
         event_shared = event_table.loc[event_keys.isin(shared_sessions)].copy()
-        merge_keys = [*_SESSION_COLS, "stop_id"]
+        merge_keys = [*SESSION_COLUMNS, "stop_id"]
     else:
         # Small direct unit fixtures historically omit natural keys. Treat both
         # complete frames as one implicit session and retain strict whole-frame
@@ -201,8 +200,8 @@ def attach_is_swr_to_onsets(
     ev = event_shared[[*merge_keys, "event_start_s", "is_swr"]].copy()
     nl = out[out["event_type"] == "non_local"].copy()
     if has_session_keys:
-        onset_counts = nl.groupby(_SESSION_COLS, sort=False).size()
-        event_counts = ev.groupby(_SESSION_COLS, sort=False).size()
+        onset_counts = nl.groupby(list(SESSION_COLUMNS), sort=False).size()
+        event_counts = ev.groupby(list(SESSION_COLUMNS), sort=False).size()
         counts = pd.concat(
             [onset_counts.rename("onsets"), event_counts.rename("events")], axis=1
         ).fillna(0)
@@ -415,8 +414,8 @@ def _arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:
     np.ndarray
         The spanning stops' ``stop_id`` values (possibly empty).
     """
-    ordered = stops.sort_values([*_SESSION_COLS, "stop_start"], kind="stable")
-    next_arrival = ordered.groupby(_SESSION_COLS, sort=False, observed=True)[
+    ordered = stops.sort_values([*SESSION_COLUMNS, "stop_start"], kind="stable")
+    next_arrival = ordered.groupby(list(SESSION_COLUMNS), sort=False, observed=True)[
         "last_well_arrival_time_s"
     ].shift(-1)
     spans = (next_arrival > ordered["stop_start"]) & (
@@ -576,7 +575,7 @@ def aggregate_to_timebins(
         if len(s)
         else np.empty(0, dtype=int)
     )
-    cols = [*_SESSION_COLS, "stop_id", "immobility_duration_s", *carry]
+    cols = [*SESSION_COLUMNS, "stop_id", "immobility_duration_s", *carry]
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s

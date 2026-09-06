@@ -72,7 +72,6 @@ from continuum_swr_replay.table_io import read_table
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 # The table this family is fit on; recorded in the artifact's provenance sidecar.
@@ -137,7 +136,7 @@ def fit_per_stop_rate_hierarchy(
 
     rows = []
     acc: dict = {}  # (model, outcome) -> counts
-    for keys, group in stop_table.groupby(SESSION_COLS, sort=False):
+    for keys, group in stop_table.groupby(list(SESSION_COLUMNS), sort=False):
         # ONE cohort for the whole ladder and every outcome of this session.
         cohort, _selection = freeze_common_cohort(
             group,
@@ -182,7 +181,7 @@ def fit_per_stop_rate_hierarchy(
                 row = {
                     "outcome": outcome,
                     "model": name,
-                    **dict(zip(SESSION_COLS, keys, strict=True)),
+                    **dict(zip(SESSION_COLUMNS, keys, strict=True)),
                     **res,
                 }
                 if run_cv:
@@ -225,9 +224,12 @@ def fit_per_stop_rate_hierarchy(
 def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     """Keep only the first ``n`` sessions per animal (smoke mode)."""
     keep = (
-        stop_table[SESSION_COLS].drop_duplicates().groupby("animal", sort=False).head(n)
+        stop_table[list(SESSION_COLUMNS)]
+        .drop_duplicates()
+        .groupby("animal", sort=False)
+        .head(n)
     )
-    return stop_table.merge(keep, on=SESSION_COLS)
+    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
 
 
 def main() -> None:
@@ -271,7 +273,7 @@ def main() -> None:
         list(MODEL_PER_STOP_RATE),
         not args.no_cv,
         list(RESPONSE_COLS),
-        stop.groupby(SESSION_COLS).ngroups,
+        stop.groupby(list(SESSION_COLUMNS)).ngroups,
     )
     rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=not args.no_cv)
 
@@ -285,7 +287,7 @@ def main() -> None:
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",
         len(rate),
-        rate.groupby(SESSION_COLS).ngroups,
+        rate.groupby(list(SESSION_COLUMNS)).ngroups,
         sorted(rate["outcome"].unique()),
         out,
     )

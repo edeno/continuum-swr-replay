@@ -58,7 +58,6 @@ UNCERTAINTY_RATE_INPUTS = _fit.FIT_INPUTS
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 COVARIATES = _fit.CURATED_COVARIATES
 
 
@@ -71,9 +70,9 @@ def _paired_wilcoxon(
     ``(nan, n)`` if fewer than 6 pairs or all differences are zero.
     """
     col = f"coef_{covariate}"
-    a = models[models["outcome"] == pop_a][[*SESSION_COLS, col]]
-    b = models[models["outcome"] == pop_b][[*SESSION_COLS, col]]
-    merged = a.merge(b, on=SESSION_COLS, suffixes=("_a", "_b")).dropna()
+    a = models[models["outcome"] == pop_a][[*SESSION_COLUMNS, col]]
+    b = models[models["outcome"] == pop_b][[*SESSION_COLUMNS, col]]
+    merged = a.merge(b, on=list(SESSION_COLUMNS), suffixes=("_a", "_b")).dropna()
     if len(merged) < 6 or np.allclose(merged[f"{col}_a"], merged[f"{col}_b"]):
         return np.nan, len(merged)
     stat, p = wilcoxon(merged[f"{col}_a"], merged[f"{col}_b"])

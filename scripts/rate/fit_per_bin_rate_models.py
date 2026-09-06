@@ -114,7 +114,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 # The tables every fit in this family is built from. The provenance sidecar
@@ -230,7 +229,7 @@ def _fit_one_session(
             row = {
                 "outcome": outcome,
                 "model": name,
-                **dict(zip(SESSION_COLS, keys, strict=True)),
+                **dict(zip(SESSION_COLUMNS, keys, strict=True)),
                 # Which clock this rung's rows are on. Rungs on different clocks
                 # are fit to different rows, so this travels with every fit and
                 # invalidates a cross-clock comparison downstream.
@@ -292,10 +291,10 @@ def fit_per_bin_rate_models(
     common cohort, and what the window then retained, per outcome) are attached
     as ``result.attrs["arrival_clock_cohort"]``.
     """
-    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     items = [
         (keys, stops_g, onset_groups[keys])
-        for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False)
+        for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False)
         if keys in onset_groups
     ]
 
@@ -370,12 +369,12 @@ def fit_per_bin_rate_models(
 
 def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     keep = (
-        stop_table[SESSION_COLS]
+        stop_table[list(SESSION_COLUMNS)]
         .drop_duplicates()
         .groupby("animal", sort=False)
         .head(n)
     )
-    return stop_table.merge(keep, on=SESSION_COLS)
+    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
 
 
 def _stop_level_design_columns(spec, stop: pd.DataFrame) -> list[str]:
@@ -421,7 +420,7 @@ def _cohort_records(
     is where the missingness lives.
     """
     total = int(len(stop))
-    n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
+    n_sessions_in = stop.groupby(list(SESSION_COLUMNS), sort=False).ngroups
     frozen_drops = cohort_stop_drops or {}
     union_cols = [
         c
@@ -441,7 +440,9 @@ def _cohort_records(
                 if len(models) else models
             )
             fit_keys = (
-                {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+                {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
+                if len(sub)
+                else set()
             )
             n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
             n_frozen_out = int(frozen_drops.get(outcome, 0))
@@ -525,7 +526,7 @@ def main() -> None:
         not args.no_cv,
         not args.no_gof,
         list(POPULATIONS),
-        stop.groupby(SESSION_COLS).ngroups,
+        stop.groupby(list(SESSION_COLUMNS)).ngroups,
         BIN_S,
         args.workers,
     )
@@ -551,7 +552,7 @@ def main() -> None:
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s, models=%s) to %s in %.1fs",
         len(models),
-        models.groupby(SESSION_COLS).ngroups if len(models) else 0,
+        models.groupby(list(SESSION_COLUMNS)).ngroups if len(models) else 0,
         sorted(models["outcome"].unique()) if len(models) else [],
         sorted(models["model"].unique()) if len(models) else [],
         out,

@@ -19,7 +19,6 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .summaries import PROBABILITY_ROW_SUM_ATOL
 
-_SESSION_COLUMNS = SESSION_COLUMNS
 _PATCHES = (1, 2, 3)
 _LEAF_SUPPORT_COLUMNS = (
     "visit_recency_trials",
@@ -110,7 +109,7 @@ def _require_event_set_matches(
             f"missing={missing}, unexpected={unexpected}"
         )
 
-    session_columns = [c for c in _SESSION_COLUMNS if c in derived and c in event_table]
+    session_columns = [c for c in SESSION_COLUMNS if c in derived and c in event_table]
     if not session_columns or derived.empty:
         return
     reference = event_table[["event_id", *session_columns]]
@@ -271,7 +270,7 @@ def validate_event_arm_table(
     _require_stable_event_context(
         frame,
         (
-            *_SESSION_COLUMNS,
+            *SESSION_COLUMNS,
             "stop_id",
             "occupancy_state",
             "at_well",
@@ -306,7 +305,7 @@ def validate_event_patch_table(
         expected=_PATCHES,
         label="event_patch patch set",
     )
-    _require_stable_event_context(frame, _SESSION_COLUMNS)
+    _require_stable_event_context(frame, SESSION_COLUMNS)
     if event_table is not None:
         _require_event_set_matches(frame, event_table, table_name="event_patch")
     if "patch_count_hard" in frame:

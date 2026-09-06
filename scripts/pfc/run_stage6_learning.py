@@ -41,7 +41,6 @@ from continuum_swr_replay.analysis.replay.learning import (
     stop_replay_summary,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(
@@ -58,7 +57,6 @@ GEE_PATH = INPUT_DIR / "stage6_is_stay_pooled_gee.pkl"
 ARM_ROLES = ("current", "prev", "last_rewarded", "best")
 PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
 ROLES = ARM_ROLES + PATCH_ROLES
-SESSION_COLS = list(SESSION_COLUMNS)
 
 
 def _content_col_for(role: str, stratum: str) -> str:

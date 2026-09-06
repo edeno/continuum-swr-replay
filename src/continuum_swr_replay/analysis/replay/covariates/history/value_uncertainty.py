@@ -17,8 +17,6 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._common import _prepare_port_experiences
 
-_SESSION_COLS = list(SESSION_COLUMNS)
-
 # Canonical paper-analysis settings. Patch-switch history uses every movement
 # trip; local value history uses every spatial port experience but updates only
 # on observed outcomes. Neither can be reconstructed correctly from a stop
@@ -385,7 +383,7 @@ def add_uncertainty_covariates(
         )
 
     required = (
-        *_SESSION_COLS,
+        *SESSION_COLUMNS,
         "stop_idx",
         "completed_trial_id",
         "completed_trial_arm",
@@ -437,7 +435,7 @@ def add_uncertainty_covariates(
     omission = pd.Series(np.nan, index=out.index, dtype=float)
     wsls = pd.Series(np.nan, index=out.index, dtype=float)
 
-    for _, idx in out.groupby(_SESSION_COLS, sort=False).groups.items():
+    for _, idx in out.groupby(list(SESSION_COLUMNS), sort=False).groups.items():
         g = out.loc[idx].sort_values("stop_idx")
         pos = g.index
         _completed_visit_context(g)

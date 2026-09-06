@@ -66,7 +66,6 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 # Value columns merged from qvals_table at exact stop-start alignment. Preserve
@@ -120,7 +119,7 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
         )
         aic_base = _aic(d, ())
         aic_full = _aic(d, CANDIDATES)
-        base = dict(zip(SESSION_COLS, keys, strict=True))
+        base = dict(zip(SESSION_COLUMNS, keys, strict=True))
         for c in CANDIDATES:
             drop = tuple(x for x in CANDIDATES if x != c)
             rows.append({
@@ -146,10 +145,10 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
     )
     first = (
-        stop[SESSION_COLS].drop_duplicates().sort_values(SESSION_COLS)
+        stop[list(SESSION_COLUMNS)].drop_duplicates().sort_values(list(SESSION_COLUMNS))
         .groupby("animal", as_index=False).first()
     )
-    merged = stop.merge(first, on=SESSION_COLS, how="left", indicator=True)
+    merged = stop.merge(first, on=list(SESSION_COLUMNS), how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
     onset_table = read_table(RC / "event_onset_table.pkl")
     event_table = read_table(RC / "event_table.pkl")
@@ -169,14 +168,16 @@ def main() -> None:
     stop, onsets = _load()
     if args.max_per_animal is not None:
         keep = (
-            stop[SESSION_COLS].drop_duplicates().groupby("animal", as_index=False)
+            stop[list(SESSION_COLUMNS)]
+            .drop_duplicates()
+            .groupby("animal", as_index=False)
             .head(args.max_per_animal)
         )
-        stop = stop.merge(keep, on=SESSION_COLS)
-    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+        stop = stop.merge(keep, on=list(SESSION_COLUMNS))
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     tasks = [
         (keys, g, onset_groups[keys])
-        for keys, g in stop.groupby(SESSION_COLS, sort=False)
+        for keys, g in stop.groupby(list(SESSION_COLUMNS), sort=False)
         if keys in onset_groups
     ]
     logger.info("Ranking %d covariates over %d sessions (workers=%d)...",

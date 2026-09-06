@@ -58,8 +58,6 @@ logging.basicConfig(
 INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
-SESSION_COLS = list(SESSION_COLUMNS)
-
 
 def _family_unit_counts(
     result: dict[str, float | int | bool | str],
@@ -164,7 +162,7 @@ def main() -> None:
         len(event_table),
         len(event_arm_table),
         len(event_sequence_table),
-        event_table.groupby(SESSION_COLS).ngroups,
+        event_table.groupby(list(SESSION_COLUMNS)).ngroups,
     )
     n_before_location = len(event_table)
     event_table, event_arm_table, event_sequence_table = at_well_event_cohort(
@@ -181,8 +179,8 @@ def main() -> None:
         event_table = event_table[keep].copy()
         event_arm_table = event_arm_table[event_arm_table["is_swr"].astype(bool)].copy()
         event_sequence_table = event_sequence_table.merge(
-            event_table[[*SESSION_COLS, "event_id"]],
-            on=[*SESSION_COLS, "event_id"],
+            event_table[[*SESSION_COLUMNS, "event_id"]],
+            on=[*SESSION_COLUMNS, "event_id"],
             how="inner",
         )
         logging.info("Filtered to SWR events: %d", len(event_table))
@@ -193,8 +191,8 @@ def main() -> None:
             ~event_arm_table["is_swr"].astype(bool)
         ].copy()
         event_sequence_table = event_sequence_table.merge(
-            event_table[[*SESSION_COLS, "event_id"]],
-            on=[*SESSION_COLS, "event_id"],
+            event_table[[*SESSION_COLUMNS, "event_id"]],
+            on=[*SESSION_COLUMNS, "event_id"],
             how="inner",
         )
         logging.info("Filtered to non-SWR events: %d", len(event_table))
@@ -202,7 +200,7 @@ def main() -> None:
     rng = np.random.default_rng(args.seed)
     rows = []
     n_no_movable = 0
-    sessions = sorted(event_table.groupby(SESSION_COLS).groups.keys())
+    sessions = sorted(event_table.groupby(list(SESSION_COLUMNS)).groups.keys())
     for i, sess_key in enumerate(sessions):
         animal, session_date, epoch = sess_key
         ev_s = event_table[

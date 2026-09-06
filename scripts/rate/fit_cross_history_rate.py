@@ -61,7 +61,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 RC = PROCESSED_DATA_DIR / "replay_content"
-SESSION_COLS = list(SESSION_COLUMNS)
 
 # Both directions: (response population, cross/predictor population).
 DIRECTIONS = {
@@ -137,16 +136,16 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
 
 
 def fit_cross_history(stop_table: pd.DataFrame, onsets: pd.DataFrame) -> pd.DataFrame:
-    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     rows = []
-    for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
+    for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False):
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
         for direction, (resp_pop, cross_pop) in DIRECTIONS.items():
             r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop)
             if r is not None:
-                rows.append({**dict(zip(SESSION_COLS, keys, strict=True)),
+                rows.append({**dict(zip(SESSION_COLUMNS, keys, strict=True)),
                              "direction": direction, **r})
     return pd.DataFrame(rows)
 
@@ -195,11 +194,13 @@ def main() -> None:
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (
-            stop[SESSION_COLS].drop_duplicates()
+            stop[list(SESSION_COLUMNS)].drop_duplicates()
             .groupby("animal").head(args.max_per_animal)
         )
-        stop = stop.merge(keep, on=SESSION_COLS)
-        logger.info("smoke: %d sessions", len(stop[SESSION_COLS].drop_duplicates()))
+        stop = stop.merge(keep, on=list(SESSION_COLUMNS))
+        logger.info(
+            "smoke: %d sessions", len(stop[list(SESSION_COLUMNS)].drop_duplicates())
+        )
 
     models = fit_cross_history(stop, onsets)
     _summary(models)

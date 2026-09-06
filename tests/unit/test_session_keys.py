@@ -86,6 +86,36 @@ def test_no_module_level_session_constant_defined_elsewhere():
     )
 
 
+_LOCAL_SESSION_ALIAS = re.compile(
+    r"^_?SESSION_COL(S|UMNS)(_DAY)?\s*(:\s*[^=]+?)?\s*=\s*\S"
+)
+
+
+def test_no_local_session_key_definitions():
+    """No module may bind its own name for the session key.
+
+    ``test_no_module_level_session_constant_defined_elsewhere`` catches a
+    *retyped* tuple; this catches the softer copy -- a module-level
+    ``SESSION_COLS = list(SESSION_COLUMNS)`` alias. Fifteen modules carried one,
+    which meant fifteen names for one concept and fifteen places a reader had to
+    check that the alias really was the canonical key. Import
+    ``SESSION_COLUMNS`` / ``SESSION_COLUMNS_DAY`` and use it under its own name.
+    """
+    repo = Path(__file__).resolve().parents[2]
+    offenders = []
+    for directory in ("src", "scripts"):
+        for path in (repo / directory).rglob("*.py"):
+            if path.name == "session_keys.py":
+                continue
+            for number, line in enumerate(path.read_text().splitlines(), start=1):
+                if _LOCAL_SESSION_ALIAS.match(line):
+                    offenders.append(f"{path.relative_to(repo)}:{number}")
+    assert not offenders, (
+        "local session-key alias defined outside session_keys.py: "
+        + ", ".join(offenders)
+    )
+
+
 def test_session_key_matches_columns_day():
     """The event builder's ``_SessionKey`` fields mirror ``SESSION_COLUMNS_DAY``.
 

@@ -37,7 +37,6 @@ from .covariate_timing import assert_predictor_timing
 LOGGER = logging.getLogger(__name__)
 
 LEAF_ARMS: tuple[int, ...] = tuple(range(6))
-SESSION_COLUMNS: tuple[str, ...] = SESSION_COLUMNS
 UNCERTAINTY_COLUMNS: tuple[str, ...] = tuple(
     f"reward_belief_variance_port_{arm}" for arm in LEAF_ARMS
 )

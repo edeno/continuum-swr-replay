@@ -111,7 +111,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
 # The tables `main` reads; recorded in the artifact's provenance sidecar.
@@ -199,25 +198,27 @@ MU_UNCERTAINTY = PerBinRateModelSpec(
 def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:
     """Drop each animal's first (exposure) session by (session_date, epoch) order."""
     first = (
-        stop_table[SESSION_COLS]
+        stop_table[list(SESSION_COLUMNS)]
         .drop_duplicates()
-        .sort_values(SESSION_COLS)
+        .sort_values(list(SESSION_COLUMNS))
         .groupby("animal", sort=False)
         .head(1)
     )
-    merged = stop_table.merge(first, on=SESSION_COLS, how="left", indicator=True)
+    merged = stop_table.merge(
+        first, on=list(SESSION_COLUMNS), how="left", indicator=True
+    )
     return stop_table[merged["_merge"].to_numpy() == "left_only"]
 
 
 def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
     keep = (
-        stop_table[SESSION_COLS]
+        stop_table[list(SESSION_COLUMNS)]
         .drop_duplicates()
-        .sort_values(SESSION_COLS)
+        .sort_values(list(SESSION_COLUMNS))
         .groupby("animal", sort=False)
         .head(n)
     )
-    return stop_table.merge(keep, on=SESSION_COLS)
+    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
 
 
 def _retained_time_course_support(
@@ -400,7 +401,7 @@ def fit_uncertainty_rate(
     reward lags; ``onsets`` must already carry ``is_swr``.
     """
     assert_predictor_timing(FITTED_COVARIATES, retrospective=True)
-    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     stop_covariates = (
         *STOP_COVARIATES,
         *FITTED_COVARIATES,
@@ -413,7 +414,7 @@ def fit_uncertainty_rate(
     gate_audit_rows: list[dict] = []
     attempted = dict.fromkeys(POPULATIONS_TO_FIT, 0)
     n_unfit = dict.fromkeys(POPULATIONS_TO_FIT, 0)
-    for keys, stops_g in stop_table.groupby(SESSION_COLS, sort=False):
+    for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False):
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
@@ -432,7 +433,7 @@ def fit_uncertainty_rate(
             design, gate_audit = _gate_bins_after_outcome(design)
             gate_audit_rows.append(
                 {
-                    **dict(zip(SESSION_COLS, keys, strict=True)),
+                    **dict(zip(SESSION_COLUMNS, keys, strict=True)),
                     "outcome": outcome,
                     "post_outcome_gate": True,
                     "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
@@ -475,7 +476,7 @@ def fit_uncertainty_rate(
                     "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
                     "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
                     **gate_audit,
-                    **dict(zip(SESSION_COLS, keys, strict=True)),
+                    **dict(zip(SESSION_COLUMNS, keys, strict=True)),
                     **{k: v for k, v in fit.items() if k != "predicted"},
                 }
             )
@@ -527,7 +528,9 @@ def _cohort_records(
         )
         n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
         fit_keys = (
-            {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+            {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
+            if len(sub)
+            else set()
         )
         records.append(
             cohort_record(
@@ -657,7 +660,7 @@ def main() -> None:
     # Session count BEFORE the first-session-per-animal drop, so the audit's
     # sessions_in matches n_in's stop population (n_in includes the first-session
     # stops as excluded, not removed).
-    n_sessions_postjoin = stop.groupby(SESSION_COLS).ngroups
+    n_sessions_postjoin = stop.groupby(list(SESSION_COLUMNS)).ngroups
     frac = len(stop) / n_before
     if frac < 0.5:
         raise ValueError(
@@ -695,7 +698,7 @@ def main() -> None:
         # The fitted design carries the standardized values under the raw name.
         stop[c] = stop.pop(f"{c}_z")
 
-    n_sessions = stop.groupby(SESSION_COLS).ngroups
+    n_sessions = stop.groupby(list(SESSION_COLUMNS)).ngroups
     logger.info(
         "Fitting %s over %d sessions x %s populations (BIN_S=%.3f, "
         "switch_window=%d)...",
@@ -738,7 +741,7 @@ def main() -> None:
     logger.info(
         "Saved %d rows (%d sessions, populations=%s) to %s in %.1fs",
         len(models),
-        models.groupby(SESSION_COLS).ngroups if len(models) else 0,
+        models.groupby(list(SESSION_COLUMNS)).ngroups if len(models) else 0,
         sorted(models["outcome"].unique()) if len(models) else [],
         out,
         time.perf_counter() - t0,

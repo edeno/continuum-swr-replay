@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 # already documents that trunk arms cannot be stop endpoints. The
 # learning-stage helpers use the same set under
 # ``StopSummaryConfig.well_arms`` for "best arm" lookups.
-_SESSION_COLS = SESSION_COLUMNS
 
 
 def _require_session_unique_ids(
@@ -67,10 +66,12 @@ def _require_session_unique_ids(
     No-op when the session columns aren't present (e.g. tests that
     pass minimal frames without animal/day/epoch).
     """
-    missing = [c for c in _SESSION_COLS if c not in df.columns]
+    missing = [c for c in SESSION_COLUMNS if c not in df.columns]
     if missing or id_col not in df.columns:
         return
-    per_id_session_count = df.groupby(id_col)[list(_SESSION_COLS)].nunique().max(axis=1)
+    per_id_session_count = (
+        df.groupby(id_col)[list(SESSION_COLUMNS)].nunique().max(axis=1)
+    )
     bad = per_id_session_count[per_id_session_count > 1]
     if len(bad):
         sample = bad.index[: min(3, len(bad))].tolist()

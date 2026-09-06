@@ -135,7 +135,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SESSION_COLS = list(SESSION_COLUMNS)
 
 # Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
 # dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
@@ -401,7 +400,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         )
         cohort_drops[pop] = freeze["n_stops_before"] - freeze["n_stops_after"]
         designs[pop] = frozen
-    base = dict(zip(SESSION_COLS, keys, strict=True))
+    base = dict(zip(SESSION_COLUMNS, keys, strict=True))
     # A. stratified, primary cohort
     for pop in STRATA:
         for name, (formula, need) in G_SPECS.items():
@@ -588,8 +587,13 @@ def _home_cohort(model: str) -> str:
 
 
 def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
-    keep = stop[SESSION_COLS].drop_duplicates().groupby("animal", sort=False).head(n)
-    return stop.merge(keep, on=SESSION_COLS)
+    keep = (
+        stop[list(SESSION_COLUMNS)]
+        .drop_duplicates()
+        .groupby("animal", sort=False)
+        .head(n)
+    )
+    return stop.merge(keep, on=list(SESSION_COLUMNS))
 
 
 def _cohort_records(
@@ -624,7 +628,7 @@ def _cohort_records(
     than colliding on ``(model, population)``.
     """
     total = int(len(stop))  # post-join stops
-    n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
+    n_sessions_in = stop.groupby(list(SESSION_COLUMNS), sort=False).ngroups
     if len(models) and "cohort" not in models.columns:
         raise ValueError(
             "the fitted rows must carry a 'cohort' column; the ladder null is "
@@ -682,7 +686,11 @@ def _cohort_records(
             ]
             if len(models) else models
         )
-        fit_keys = {tuple(r) for r in sub[SESSION_COLS].to_numpy()} if len(sub) else set()
+        fit_keys = (
+            {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
+            if len(sub)
+            else set()
+        )
         n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
         stop_level = [c for c in need_by_model.get(name, ()) if c in stop.columns]
         own_missing = stop_own_missing(stop, stop_level)
@@ -924,10 +932,10 @@ def main() -> None:
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 
-    onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     items = [
         (k, s, onset_groups[k])
-        for k, s in stop.groupby(SESSION_COLS, sort=False)
+        for k, s in stop.groupby(list(SESSION_COLUMNS), sort=False)
         if k in onset_groups
     ]
     logger.info(
@@ -1009,7 +1017,7 @@ def main() -> None:
     logger.info(
         "Saved %d rows (%d sessions, populations=%s, models=%s) to %s in %.1fs",
         len(models),
-        models.groupby(SESSION_COLS).ngroups if len(models) else 0,
+        models.groupby(list(SESSION_COLUMNS)).ngroups if len(models) else 0,
         sorted(models["population"].unique()) if len(models) else [],
         sorted(models["model"].unique()) if len(models) else [],
         out,

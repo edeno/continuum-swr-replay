@@ -187,7 +187,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-SESSION_COLS = list(SESSION_COLUMNS)
 
 # A canonical content table carries more than whichever columns one requested
 # model happens to use. These fields distinguish the current location-aware,
@@ -195,7 +194,7 @@ SESSION_COLS = list(SESSION_COLUMNS)
 # M0-M3 and silently produce a truncated ladder.
 _CANONICAL_SCHEMA_COLUMNS = {
     "arm": (
-        *SESSION_COLS,
+        *SESSION_COLUMNS,
         "event_id",
         "candidate_arm",
         "arm_count_hard",
@@ -208,7 +207,7 @@ _CANONICAL_SCHEMA_COLUMNS = {
         "is_candidate_arm_never_visited",
     ),
     "patch": (
-        *SESSION_COLS,
+        *SESSION_COLUMNS,
         "event_id",
         "patch",
         "patch_count_hard",
@@ -304,14 +303,14 @@ def _validate_canonical_table_contract(
     """
     if long_df.empty:
         raise ValueError(f"Canonical content table {table_label} is empty")
-    if long_df[[*SESSION_COLS, "event_id"]].isna().any(axis=None):
+    if long_df[[*SESSION_COLUMNS, "event_id"]].isna().any(axis=None):
         raise ValueError(
             f"Canonical content table {table_label} has missing session/event keys"
         )
 
     candidate_col, expected_candidates = _CANDIDATE_COLUMNS[hierarchy_kind]
     n_candidates = len(expected_candidates)
-    unit_cols = [*SESSION_COLS, "event_id"]
+    unit_cols = [*SESSION_COLUMNS, "event_id"]
     if (
         long_df.duplicated([*unit_cols, candidate_col]).any()
         or not long_df[candidate_col].isin(expected_candidates).all()
@@ -335,7 +334,7 @@ def _validate_canonical_table_contract(
     # here also prevents later event-only cohort/audit groupbys from fusing two
     # sessions if a stale table reused a session-local event counter.
     event_session_counts = long_df.groupby("event_id", sort=False, observed=True)[
-        SESSION_COLS
+        list(SESSION_COLUMNS)
     ].nunique(dropna=False)
     if event_session_counts.gt(1).any(axis=None):
         raise ValueError(
@@ -343,7 +342,7 @@ def _validate_canonical_table_contract(
         )
 
     context_cols = [
-        *SESSION_COLS,
+        *SESSION_COLUMNS,
         "occupancy_state",
         "at_well",
         "occupancy_well_id",
@@ -985,10 +984,10 @@ def _fit_dirichlet_multinomial_per_session(
     recorded on the returned frame's ``attrs["estimator_skips"]`` so the cohort
     audit can name them, rather than crashing the ladder.
     """
-    animal_position = SESSION_COLS.index("animal")
+    animal_position = SESSION_COLUMNS.index("animal")
     sessions = [
         (tuple(keys), keys[animal_position], group)
-        for keys, group in long_df.groupby(SESSION_COLS)
+        for keys, group in long_df.groupby(list(SESSION_COLUMNS))
         if len(group) >= min_rows
     ]
     fits, skips = fit_sessions_dirichlet_multinomial(
@@ -1005,7 +1004,7 @@ def _fit_dirichlet_multinomial_per_session(
     for keys, result in fits:
         result["model"] = model_name
         result["response_col"] = response_col
-        for col, val in zip(SESSION_COLS, keys, strict=True):
+        for col, val in zip(SESSION_COLUMNS, keys, strict=True):
             result[col] = val
         results.append(result)
     for keys, reason in skips:
@@ -1095,7 +1094,7 @@ def fit_model_per_session(
             min_events_session_phi=min_events_session_phi,
         )
 
-    for keys, group in long_df.groupby(SESSION_COLS):
+    for keys, group in long_df.groupby(list(SESSION_COLUMNS)):
         if len(group) < min_rows:
             continue
 
@@ -1157,7 +1156,7 @@ def fit_model_per_session(
 
         r["model"] = model_name
         r["response_col"] = response_col
-        for col, val in zip(SESSION_COLS, keys, strict=True):
+        for col, val in zip(SESSION_COLUMNS, keys, strict=True):
             r[col] = val
 
         results.append(r)
@@ -1192,7 +1191,7 @@ def _validate_and_match_fit_results(
     expected_event_counts = {
         tuple(keys): int(group[event_col].nunique())
         for keys, group in cohort.groupby(
-            SESSION_COLS, sort=False, observed=True, dropna=False
+            list(SESSION_COLUMNS), sort=False, observed=True, dropna=False
         )
     }
     session_sets: dict[str, set[tuple]] = {}
@@ -1202,19 +1201,19 @@ def _validate_and_match_fit_results(
         # ``estimator`` and ``response_col`` are integrity columns: without them
         # a published bundle does not say at which grain its llf/AIC/SEs are
         # stated, and a fraction bundle is indistinguishable from a count one.
-        required = [*SESSION_COLS, "model", "n_events", "estimator", "response_col"]
+        required = [*SESSION_COLUMNS, "model", "n_events", "estimator", "response_col"]
         missing_columns = [column for column in required if column not in result]
         if missing_columns:
             raise RuntimeError(
                 f"Fit result for {model_name} is missing integrity column(s) "
                 f"{missing_columns}; no output will be published"
             )
-        if result[SESSION_COLS].isna().any(axis=None):
+        if result[list(SESSION_COLUMNS)].isna().any(axis=None):
             raise RuntimeError(
                 f"Fit result for {model_name} has missing session keys; "
                 "no output will be published"
             )
-        if result.duplicated(SESSION_COLS).any():
+        if result.duplicated(list(SESSION_COLUMNS)).any():
             raise RuntimeError(
                 f"Fit result for {model_name} has duplicate session rows; "
                 "no output will be published"
@@ -1275,7 +1274,7 @@ def _validate_and_match_fit_results(
 
         sessions: set[tuple] = set()
         for row in result.itertuples(index=False):
-            session = tuple(getattr(row, column) for column in SESSION_COLS)
+            session = tuple(getattr(row, column) for column in SESSION_COLUMNS)
             if session not in expected_event_counts:
                 raise RuntimeError(
                     f"Fit result for {model_name} contains session {session} outside "
@@ -1311,15 +1310,15 @@ def _validate_and_match_fit_results(
     matched: dict[str, pd.DataFrame] = {}
     for model_name in requested:
         result = fit_results[model_name]
-        session_index = pd.MultiIndex.from_frame(result[SESSION_COLS])
+        session_index = pd.MultiIndex.from_frame(result[list(SESSION_COLUMNS)])
         keep = session_index.isin(shared_sessions)
         matched_result = (
             result.loc[keep]
-            .sort_values(SESSION_COLS, kind="stable")
+            .sort_values(list(SESSION_COLUMNS), kind="stable")
             .reset_index(drop=True)
         )
         matched_sessions = set(
-            matched_result[SESSION_COLS].itertuples(index=False, name=None)
+            matched_result[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
         )
         if matched_sessions != shared_sessions:
             raise RuntimeError(
@@ -2079,7 +2078,7 @@ def _load_and_filter_cohort(
     logging.info(
         "Loaded %d rows, %d sessions",
         len(long_df),
-        long_df.groupby(SESSION_COLS).ngroups,
+        long_df.groupby(list(SESSION_COLUMNS)).ngroups,
     )
 
     # Apply the SWR subset filter (--swr-subset T/F). is_swr is
@@ -2206,7 +2205,7 @@ def _load_and_filter_cohort(
     logging.info(
         "Fitting on %d rows, %d sessions, %d events",
         len(long_df),
-        long_df.groupby(SESSION_COLS).ngroups,
+        long_df.groupby(list(SESSION_COLUMNS)).ngroups,
         long_df[event_col].nunique(),
     )
 
@@ -2326,11 +2325,11 @@ def _fit_conditional_logit_robustness(
     # Conditional-logit robustness results are also collected before the output
     # bundle is staged. Restrict them to the primary ladder's shared sessions.
     shared_sessions = set(
-        next(iter(model_results.values()))[SESSION_COLS].itertuples(
+        next(iter(model_results.values()))[list(SESSION_COLUMNS)].itertuples(
             index=False, name=None
         )
     )
-    long_session_index = pd.MultiIndex.from_frame(long_df[SESSION_COLS])
+    long_session_index = pd.MultiIndex.from_frame(long_df[list(SESSION_COLUMNS)])
     matched_long_df = long_df.loc[long_session_index.isin(shared_sessions)]
     logit_outputs: dict[str, pd.DataFrame] = {}
     if args.logit:
@@ -2345,7 +2344,7 @@ def _fit_conditional_logit_robustness(
             predictors = rung_predictors(spec, args.leaf_only)
 
             model_logit_results = []
-            for keys, group in matched_long_df.groupby(SESSION_COLS):
+            for keys, group in matched_long_df.groupby(list(SESSION_COLUMNS)):
                 # Forward the resolved response column. Patch fits use
                 # ``patch_count_hard``; without this, the logit call
                 # silently fell back to ``arm_count_hard`` (the
@@ -2367,7 +2366,7 @@ def _fit_conditional_logit_robustness(
                 r["model"] = model_name
                 r["response_col"] = response_col
                 r["response_renormalized"] = cohort.response_renormalized
-                for col, val in zip(SESSION_COLS, keys, strict=True):
+                for col, val in zip(SESSION_COLUMNS, keys, strict=True):
                     r[col] = val
                 model_logit_results.append(r)
 
@@ -2382,7 +2381,7 @@ def _fit_conditional_logit_robustness(
             )
             for model_name, logit_df in logit_outputs.items():
                 logit_sessions = set(
-                    logit_df[SESSION_COLS].itertuples(index=False, name=None)
+                    logit_df[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
                 )
                 if logit_sessions != shared_sessions:
                     raise RuntimeError(
@@ -2438,7 +2437,7 @@ def _audit_compare_and_publish(
     # to the exact same successfully fitted session cohort.
     cohort_audits: list[dict] = []
     population = getattr(args, "swr_subset", None) or "all"
-    sessions_in = long_df_prefilter.groupby(SESSION_COLS).ngroups
+    sessions_in = long_df_prefilter.groupby(list(SESSION_COLUMNS)).ngroups
     # Events whose response is undefined or sums to nothing: on the fraction
     # response these are the all-junction events, which carry NaN on every
     # candidate. The cohort freeze removes them; the audit must also SAY so,

@@ -75,7 +75,6 @@ from .event_immobility import (
 # dependency direction (replay builds on hippocampus) stays at module
 # scope; only this upward reference is deferred to call time.
 
-_SESSION_COLS = list(SESSION_COLUMNS_DAY)
 
 _REQUIRED_DOT_COLUMNS = (
     "animal",
@@ -266,14 +265,14 @@ def build_classified_nonlocal_event_table(
         ["SWR_event"],
         speed_threshold=speed_threshold,
     )
-    overlap_sessions = overlap_dot.groupby(_SESSION_COLS, sort=False)
+    overlap_sessions = overlap_dot.groupby(list(SESSION_COLUMNS_DAY), sort=False)
 
     if (dot["non_local_event"] > 0).sum() == 0:
         return pd.DataFrame(columns=column_order)
 
     session_frames: list[pd.DataFrame] = []
 
-    for session_key, session_dot in dot.groupby(_SESSION_COLS, sort=False):
+    for session_key, session_dot in dot.groupby(list(SESSION_COLUMNS_DAY), sort=False):
         animal, day, epoch = session_key
         event_rows = session_dot.loc[session_dot["non_local_event"] > 0]
         if len(event_rows) == 0:
