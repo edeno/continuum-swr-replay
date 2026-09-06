@@ -250,7 +250,7 @@ effect (`BASEc`) or the **total** effect (`nt` twin on `BASEc_NT`).
 not a contradiction.** A `SWR` or `nonSWR` row is a *separately baselined* fit on
 that population's own, unpaired, differently sized session set (199 vs 215 on
 `C2_base`), so it answers "is the bias present in this population". A
-`swr_x_...` row is the *paired within-event* SWR contrast against the shared
+`swr_x_...` row is the *pooled single-fit* SWR contrast against the shared
 non-SWR baseline, so it answers "does SWR change it". Both `C2_base` splits being
 strongly positive while `swr_x_is_current_arm` is negative is therefore
 consistent, not conflicting.
