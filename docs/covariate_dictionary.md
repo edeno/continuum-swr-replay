@@ -10,7 +10,9 @@ against; the harmonization refactor brings the code to this spec.
 regeneration before paper results are updated.** The covariate
 definitions live in the `analysis/replay/covariates/` package: `clocks.py`
 owns arrival/outcome timing, `context.py` owns time-local trial and location
-labels, `history.py` owns reward, visit, switch, and local leaky-Q history,
+labels, the `history/` subpackage owns reward, visit, switch, and local
+leaky-Q history (`reward_history.py`, `visit_recency.py`, `value_block.py`,
+`value_uncertainty.py`, `diagnostics.py`, over a shared `_common.py`),
 and `candidate_arm.py` is the single shared Replay/ContFrag implementation of
 the nine-arm predictor block. `definitions.py` provides the machine-readable
 scientific catalog (units, grain, clock, support, missingness, and producer),
@@ -90,7 +92,7 @@ the formerly deferred `nominal_reward_prob` field was removed. The model's nativ
 adapted to `reward_belief_mean_port_{0..5}`, and the chosen value is exposed as
 `reward_belief_mean_chosen_arm_preoutcome`. **`leaky_q_value_diff` is NOT this** — it is a different local
 construct (one pre-update best-minus-second margin per arrived movement destination, α=0.3,
-computed from the complete starting-port-plus-destinations experience stream in `covariates/history.py`, persisted on stop rows,
+computed from the complete starting-port-plus-destinations experience stream in `covariates/history/`, persisted on stop rows,
 and then broadcast to events by `stop_id`), kept as a reported MU-only comparison. `task_reward_probability_patch_mean_gap_best_vs_second`
 (nominal) remains a scalar
 rate/coupling covariate. **`rpe_postoutcome` is the model RPE everywhere**

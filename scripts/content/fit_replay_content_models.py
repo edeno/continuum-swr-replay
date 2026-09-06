@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Fit the replay content model hierarchy (M0-M7) on pre-computed data.
+"""Fit the replay content model hierarchy (M0-M6) on pre-computed data.
 
 Primary model: Conditional Poisson regression (multinomial-count softmax).
 Robustness check: Conditional Logit on dominant arm.
@@ -1660,7 +1660,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--models",
         type=str,
         default=None,
-        help="Comma-separated model names (default: all M0-M7)",
+        help=(
+            "Comma-separated model names (default: the arm ladder "
+            "M0,M0a,M1-M6 or the patch ladder P0-P3; the value/uncertainty "
+            "rungs Mv,Mu,Mvu,Pv are opt-in and must be named here)"
+        ),
     )
     parser.add_argument(
         "--cv",
@@ -1702,9 +1706,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default="arm",
         choices=list(HIERARCHY_CHOICES),
         help=(
-            "Resolution: 'arm' (9 candidate arms, M0-M7) or 'patch' (3 patches, "
-            "P0-P4). Patch fits use event_patch_table.pkl and "
-            "patch_count_hard."
+            "Resolution: 'arm' (9 candidate arms, M0,M0a,M1-M6 plus opt-in "
+            "Mv/Mu/Mvu) or 'patch' (3 patches, P0-P3 plus opt-in Pv). Patch "
+            "fits use event_patch_table.parquet and patch_count_hard."
         ),
     )
     parser.add_argument(

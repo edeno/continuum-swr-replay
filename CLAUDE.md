@@ -89,7 +89,8 @@ docs/                      # Published reference — see docs/README.md for the 
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
 > `src/continuum_swr_replay/analysis/replay/model_specs.py`** (the single source of truth;
-> `docs/models_table.md` mirrors it). Where fitted outputs / figures land is in
+> `docs/models_table.md` mirrors it, enforced by
+> `tests/unit/test_models_table_mirrors_specs.py`). Where fitted outputs / figures land is in
 > [docs/README.md](docs/README.md) ("Where results live" / "Figure outputs").
 
 ## Key Architecture Concepts
@@ -159,8 +160,9 @@ bins at track-graph junctions with `edge_id = -1` (interpolation artifacts
 from `edge_spacing > 0`, not real spatial positions). Any MAP-to-arm or
 posterior-to-arm computation MUST exclude these bins before argmax or
 normalization — otherwise the MAP can silently land on a junction bin and
-return NaN. See `map_estimate_to_arm` in `replay_content/spatial_mapping.py`
-for the canonical nearest-neighbor-over-real-bins pattern.
+return NaN. See `map_estimate_to_arm` in
+`analysis/replay/spatial_mapping.py` for the canonical
+nearest-neighbor-over-real-bins pattern.
 
 ### Data Integration with Spyglass
 
@@ -212,10 +214,16 @@ the stop-level and bin-level tables — see
 The previously recorded Δ82/Δ250 magnitudes predate the unified speed
 gating and **must be re-derived** before being cited.
 
-The replay-content `build_event_table` in `analysis/replay/tables.py`
-builds on top of this: `event_*` and `label_event_*` now denote the *same*
-complete label window (`label_event_*` is retained as a compatibility
-alias), and the classified columns are merged in on `event_id`.
+The replay-content `build_event_table` in
+`analysis/replay/tables_event.py` (re-exported from `tables.py`) builds on
+top of this. The classified columns are merged in on `event_id`; the
+classified pass's timing columns arrive renamed `label_event_start` /
+`_end` / `_duration` / `_midpoint_time`, are checked bit-for-bit against
+the builder pass's canonical `event_start_s` / `event_end_s` /
+`event_duration_s` / `event_midpoint_s`, and are then dropped — the shipped
+table carries only the `event_*_s` names. `label_event_*` survives solely
+in `covariate_registry.py`, as a legacy-spelling alias resolving to those
+same canonical columns.
 
 Changing the eligible cohort renumbers non-local labels, so `event_id`
 hashes shift. `event_table`, `event_arm_table`, `event_sequence_table`,

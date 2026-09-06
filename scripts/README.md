@@ -49,6 +49,20 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung
   session counts, per-term separation shares — and writes the markdown comparison
   under `docs/audits/`.
+- `check_fit_provenance.py` — sweeps the whole `models*/` tree and reports which
+  fitted artifacts are stale for the tables they read, from the SHA-256 sidecars
+  each runner writes.
+- `audit_event_patch_fraction.py`, `audit_stop_table_reward_history.py` — keyed-parity
+  audits of a candidate event-patch / stop table against its pre-change reference:
+  every pre-existing column must be unchanged and only the declared new columns may
+  appear.
+- `freeze_regression_baseline.py`, `compare_to_golden_baseline.py` — freeze the
+  canonical tables and model outputs as a read-only golden baseline (with a sha256
+  manifest), and diff a regenerated root against it.
+- `mutation_check.py` — AST mutation check on the covariate builders; the measured
+  floor is recorded in `docs/design/builder_test_floor.md`.
+- `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into
+  one table.
 
 ## `pfc/` — cross-area / staged analyses
 - `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.

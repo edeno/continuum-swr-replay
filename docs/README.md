@@ -92,13 +92,13 @@ Three tiers:
    |---|---|---|
    | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | `all_models.pkl` (Family-B ladder); also holds `qvals_table.parquet`, `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `swr_power_model.pkl` |
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
-   | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | content M0–M7 / P0–P4, all events; also holds `swr_contrast_content_{arm,patch}.pkl` |
+   | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — over all events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models`; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
-   | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial (count response + fitted within-event concentration); the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted}.pkl` sit in `models/` beside their conditional twins |
+   | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial (count response + fitted within-event concentration); the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models/` beside their conditional twins |
    | `content_estimator_comparison/` | `scripts/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
 
-   (These dir names are terse — a descriptive rename + un-mix was scoped as reorg phase 5 but
-   deferred; see `.claude/docs/plans/repo-reorg/phase-5-data-dirs.md`.)
+   (These dir names are terse — a descriptive rename and un-mix of the content directories
+   has been considered and deferred; the names above are the ones the runners write.)
 
    Each **primary** fit runner (content base/contrast, rate contrast, Family A/B) also
    writes a **`<run>_cohort_audit.csv`** (one row per model × population; retained-N and
