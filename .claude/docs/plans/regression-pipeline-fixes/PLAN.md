@@ -1,6 +1,6 @@
 # Regression Pipeline Fixes Implementation Plan
 
-**Status:** Phases 1 and 2a complete and merged to master (2026-09-05); phase 2b in progress.
+**Status:** Phases 1, 2a, 2b complete and merged to master (2026-09-06); phase 3 in progress.
 
 Fixes the inference-changing defects found in the 2026-09-03 regression pipeline review
 (`.claude/docs/reviews/2026-09-03-regression-pipeline-review.md`), refits every ladder on the
