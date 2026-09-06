@@ -141,31 +141,31 @@ def _two_clock_fits(
     return pd.concat([stop, arrival], ignore_index=True)
 
 
-# The supported interior each summary is read on: one first-knot spacing is
-# dropped at each end, so the stop clock is read on [1, 3] s and the arrival
-# clock on [1, 7] s. The fixtures below plant their bumps inside those.
-STOP_SUPPORT = _support_window(SPLINE_KNOTS, TMAX)
-ARRIVAL_SUPPORT = _support_window(ARRIVAL_SPLINE_KNOTS, TMAX_ARRIVAL)
+# The supported interior each summary is read on: between the outermost
+# interior knots, so the stop clock is read on [1, 3] s (knots 1/2/3) and the
+# arrival clock on [1, 6] s (knots 1/2/4/6). The fixtures plant bumps inside.
+STOP_SUPPORT = _support_window(SPLINE_KNOTS)
+ARRIVAL_SUPPORT = _support_window(ARRIVAL_SPLINE_KNOTS)
 
 
 def test_the_summary_is_read_on_the_supported_interior_only():
     assert STOP_SUPPORT == (1.0, 3.0)
-    assert ARRIVAL_SUPPORT == (1.0, 7.0)
+    assert ARRIVAL_SUPPORT == (1.0, 6.0)
 
 
 def test_shape_table_recovers_each_clocks_planted_peak():
-    """A bump planted at 1.5 s on tc and 2.5 s after arrival is read back."""
+    """A bump planted at 1.5 s on tc and 2.25 s after arrival is read back."""
     fits = _two_clock_fits(
-        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.25, arrival_width=1.5
     )
     table = arrival_clock_shape_table(fits).set_index("outcome")
     row = table.loc["non_local"]
     assert row["n_sessions_stop"] == 2
     assert row["n_sessions_arrival"] == 2
     assert row["support_s_stop"] == "1.0-3.0"
-    assert row["support_s_arrival"] == "1.0-7.0"
+    assert row["support_s_arrival"] == "1.0-6.0"
     assert row["peak_s_stop"] == pytest.approx(1.5, abs=0.1)
-    assert row["peak_s_arrival"] == pytest.approx(2.5, abs=0.1)
+    assert row["peak_s_arrival"] == pytest.approx(2.25, abs=0.1)
     assert row["peak_frac_support_stop"] == pytest.approx(0.25, abs=0.05)
     assert row["peak_frac_support_arrival"] == pytest.approx(0.25, abs=0.05)
 
@@ -173,7 +173,7 @@ def test_shape_table_recovers_each_clocks_planted_peak():
 def test_matched_relative_shape_gives_a_near_zero_ks_distance():
     """Same bump at the same fraction of each supported interval."""
     fits = _two_clock_fits(
-        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.25, arrival_width=1.5
     )
     ks = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
     assert ks["ks_distance"] < 0.05

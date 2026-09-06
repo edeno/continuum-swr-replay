@@ -10,11 +10,12 @@ of the reward-free time model, and the size of the fitted cohort:
 * Family B (per-bin conditional intensity) reward step, twice: the reward rung
   against its reward-free parent, as a per-session AIC difference
   (``AIC(reward rung) - AIC(parent)``; negative = the reward block helps).
-  Old ``M2_rewhist`` / new ``M1_rew`` share the parent ``M0_const``. The old
-  full step is ``M7_time_hist_rew`` over ``M6_time_hist``; those rungs were
-  retired, so the new full step is ``M7r_time_histcos_rew`` over ``M5_time``
-  — the same three blocks with a raised-cosine self-history in place of the
-  ``onset_lag`` dummies, not a term-for-term counterpart.
+  Old ``M2_rewhist`` / new ``M1_rew`` share the parent ``M0_const``: that is
+  the reward block's MARGINAL step. The conditional step is the reward block
+  given time and self-history — old ``M7_time_hist_rew`` over ``M6_time_hist``,
+  new ``M7r_time_histcos_rew`` over ``M6r_time_histcos`` — the same three
+  blocks with a raised-cosine self-history in place of the ``onset_lag``
+  dummies, not a term-for-term counterpart.
 * Family B time-only rung ``M5_time``: median KS statistic and the share of
   sessions inside the KS band — a reward-free rung, so a shift here means the
   cohort or the binning moved, not the reward respecification.
@@ -40,6 +41,8 @@ import argparse
 import datetime as dt
 import hashlib
 import re
+import shlex
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -108,7 +111,7 @@ OLD_PER_BIN_STEPS = {
 }
 NEW_PER_BIN_STEPS = {
     "base": ("M1_rew", "M0_const"),
-    "full": ("M7r_time_histcos_rew", "M5_time"),
+    "full": ("M7r_time_histcos_rew", "M6r_time_histcos"),
 }
 # Family A: the new single reward rung, and the two old rungs it replaced.
 OLD_PER_STOP_STEPS = {"R2 vs R0": ("R2", "R0"), "Rlag vs R0": ("Rlag", "R0")}
@@ -391,7 +394,7 @@ def _spline_coef_columns(fits: pd.DataFrame, clock: str) -> list[str]:
     return sorted(cols, key=lambda c: int(c.rsplit("[", 1)[1][:-1]))
 
 
-def _support_window(knots: Sequence[float], tmax: float) -> tuple[float, float]:
+def _support_window(knots: Sequence[float]) -> tuple[float, float]:
     """The part of a spline's window the summary is allowed to read.
 
     A cubic B-spline is only pinned by data between its knots; outside the
@@ -404,13 +407,14 @@ def _support_window(knots: Sequence[float], tmax: float) -> tuple[float, float]:
 
     The exposure per grid cell is the honest support measure, but it lives in
     the per-bin design, which this script does not read — it reads fitted
-    coefficients only. So the margin is a fixed proxy: **one first-knot spacing
-    is excluded at each end** (1 s for both ladders, the distance from the
-    lower bound to the first interior knot). It is a rule of thumb, not a
-    measurement, and the audit says so beside the table.
+    coefficients only. So the window is a structural proxy: the curve is read
+    **between the outermost interior knots** — ``[1, 3]`` s on the stop clock
+    (knots 1/2/3 over ``[0, 4]``) and ``[1, 6]`` s on the arrival clock (knots
+    1/2/4/6 over ``[0, 8]``). Each end drops one boundary-knot span, the region
+    where the basis is carried by a single extrapolating B-spline. It is a rule
+    of thumb, not a measurement, and the audit says so beside the table.
     """
-    margin = float(knots[0])
-    return margin, float(tmax) - margin
+    return float(knots[0]), float(knots[-1])
 
 
 def _fitted_time_courses(
@@ -442,7 +446,7 @@ def _fitted_time_courses(
     curves : ndarray, shape (n_sessions, TIME_COURSE_GRID_POINTS)
         One finite fitted curve per retained session.
     """
-    grid = np.linspace(*_support_window(knots, tmax), TIME_COURSE_GRID_POINTS)
+    grid = np.linspace(*_support_window(knots), TIME_COURSE_GRID_POINTS)
     columns = _spline_coef_columns(fits, clock)
     sub = fits[(fits.model == model) & (fits.outcome == outcome)]
     if not columns or sub.empty or "coef_Intercept" not in sub:
@@ -1365,6 +1369,16 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     return "\n".join(lines)
 
 
+def _invocation() -> str:
+    """This run's command line, relative to the repo root and shell-quoted."""
+    script = Path(sys.argv[0])
+    try:
+        script = script.resolve().relative_to(REPO)
+    except ValueError:
+        pass
+    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
+
+
 def build_report(
     old_bin: pd.DataFrame,
     new_bin: pd.DataFrame,
@@ -1374,6 +1388,7 @@ def build_report(
     per_stop_note: str,
     termlevel: dict[str, pd.DataFrame] | None = None,
     cv_audit_bin: pd.DataFrame | None = None,
+    command: str | None = None,
 ) -> str:
     """Assemble the markdown audit.
 
@@ -1394,6 +1409,9 @@ def build_report(
         A per-bin fit whose per-rung, per-population cross-validation validity
         is tabulated. Use it to report rungs that are absent from ``new_bin``
         because that measurement retired them; defaults to ``new_bin``.
+    command : str, optional
+        The invocation that produced the report, printed in the header so the
+        audit records which artifacts it was pointed at and can be reproduced.
     """
     lines: list[str] = []
     add = lines.append
@@ -1412,6 +1430,8 @@ def build_report(
         "are never differenced against a stop-clock rung; they are reported by "
         "held-out bits per event and by the shape of the fitted time course.\n"
     )
+    if command:
+        add(f"Command: `{command}`\n")
     add("## Inputs\n")
     rows = []
     for name, path in inputs.items():
@@ -1458,12 +1478,13 @@ def build_report(
     for label, title in [
         (
             "base",
-            "Reward rung vs constant baseline (old `M2_rewhist` − `M0_const`; new `M1_rew` − `M0_const`)",
+            "Reward block, marginal (old `M2_rewhist` − `M0_const`; new "
+            "`M1_rew` − `M0_const`)",
         ),
         (
             "full",
-            "Full model vs its reward-free parent (old `M7_time_hist_rew` − "
-            "`M6_time_hist`; new `M7r_time_histcos_rew` − `M5_time`)",
+            "Reward block given time + self-history (old `M7_time_hist_rew` − "
+            "`M6_time_hist`; new `M7r_time_histcos_rew` − `M6r_time_histcos`)",
         ),
     ]:
         old_d, old_unpaired = delta_aic(old_bin, *OLD_PER_BIN_STEPS[label])
@@ -2566,6 +2587,7 @@ def main() -> None:
         args.per_stop_note,
         termlevel,
         cv_audit_bin,
+        _invocation(),
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
