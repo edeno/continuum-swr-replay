@@ -39,6 +39,7 @@ from continuum_swr_replay.analysis.replay._helpers import (
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
+    MODEL_PER_BIN_RATE,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
@@ -217,16 +218,10 @@ def section_ladder():
     print("\n" + "=" * 78)
     print("6. LADDER FIT (median AIC, CV bits/event, KS-in-band frac), outcome=non_local")
     print("=" * 78)
-    # Stop-clock rungs only: the arrival rungs are fit on a subset of the frozen
-    # cohort's rows, so their AIC is not on this ladder's scale.
-    ladder = [
-        "M0_const",
-        "M1_rew",
-        "M3r_histcos",
-        "M5_time",
-        "M7r_time_histcos_rew",
-        "M9r_rew_x_time",
-    ]
+    # Stop-clock rungs only, taken from the executable spec so a new rung cannot
+    # be silently missing here: the arrival rungs are fit on a subset of the
+    # frozen cohort's rows, so their AIC is not on this ladder's scale.
+    ladder = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "stop"]
     g = df[df.outcome == "non_local"]
     print(f"  {'model':22s} {'AIC':>8} {'cv_bits':>9} {'ks_band':>8} {'n':>4}")
     for m in ladder:

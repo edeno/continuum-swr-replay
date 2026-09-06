@@ -39,6 +39,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MODEL_PER_BIN_RATE,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
@@ -67,17 +68,11 @@ STYLE = {  # outcome -> (label, color)
     "non_local_swr": ("NL w/ SWR", "C3"),
     "non_local_no_swr": ("NL no-SWR", "C0"),
 }
-# The stop-clock ladder, in ladder order. The arrival-clock rungs are fit on a
-# subset of the frozen cohort's rows, so their AIC and held-out likelihood are
-# not on this ladder's scale and they are deliberately absent from panel E.
-LADDER = [
-    "M0_const",
-    "M1_rew",
-    "M3r_histcos",
-    "M5_time",
-    "M7r_time_histcos_rew",
-    "M9r_rew_x_time",
-]
+# The stop-clock ladder, in ladder order, taken from the executable spec so a
+# new rung cannot be silently missing from panel E. The arrival-clock rungs are
+# fit on a subset of the frozen cohort's rows, so their AIC and held-out
+# likelihood are not on this ladder's scale and they are deliberately excluded.
+LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "stop"]
 POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]

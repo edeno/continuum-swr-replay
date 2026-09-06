@@ -67,14 +67,38 @@ ALL_MODELS_INPUTS = {
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
 SC = list(SESSION_COLUMNS)
-LADDER = list(MODEL_PER_BIN_RATE)  # M0_const .. M9r_rew_x_time, in ladder order
+# The two clocks are two ladders, not one. An arrival rung is fit to the
+# arrival window — a strict subset of the frozen cohort's rows — so its AIC,
+# deviance, dispersion and held-out likelihood are on a different row set from
+# every stop-clock rung's. Drawn on one continuous axis they read as further
+# steps of the same ladder, which is exactly the comparison that is invalid, so
+# they are plotted after a marked gap with the two groups labelled.
+STOP_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "stop"]
+ARRIVAL_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "arrival"]
+# Gap in x units between the last stop rung and the first arrival rung.
+CLOCK_GAP = 1.0
 FULL = "M7r_time_histcos_rew"
 
 
+def _ladder_positions() -> tuple[np.ndarray, np.ndarray, float]:
+    """x positions for the stop rungs, the arrival rungs, and the gap between."""
+    stop_x = np.arange(len(STOP_LADDER), dtype=float)
+    boundary = len(STOP_LADDER) - 1 + CLOCK_GAP / 2
+    arrival_x = (
+        len(STOP_LADDER) - 1 + CLOCK_GAP + np.arange(len(ARRIVAL_LADDER), dtype=float)
+    )
+    return stop_x, arrival_x, boundary
+
+
 def plot_gof_ladder(df: pd.DataFrame) -> None:
-    """GOF metrics up the ladder, one line per population."""
+    """GOF metrics up the ladder, one line per population.
+
+    The stop-clock and arrival-clock rungs are drawn as two SEPARATE line
+    segments either side of a labelled gap: they are fit to different rows, so a
+    line joining them would assert a ladder step that does not exist.
+    """
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
-    x = np.arange(len(LADDER))
+    stop_x, arrival_x, boundary = _ladder_positions()
     metrics = [
         ("ks_within_band", "fraction KS within band", "mean"),
         ("ks_statistic", "median KS statistic", "median"),
@@ -82,22 +106,56 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
         ("cv_bits_per_event", "median CV bits/event vs M0", "median"),
     ]
     for ax, (col, label, agg) in zip(axes.flat, metrics, strict=True):
-        for oc in ["swr", "non_local", "non_local_swr", "non_local_no_swr"]:
+        for i, oc in enumerate(
+            ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
+        ):
             d = df[df.outcome == oc]
-            vals = [
-                getattr(d[d.model == m][col], agg)() if (d.model == m).any() else np.nan
-                for m in LADDER
-            ]
-            ax.plot(x, vals, marker="o", label=oc)
-        ax.set_xticks(x)
-        ax.set_xticklabels(LADDER, rotation=60, ha="right", fontsize=7)
+            for rungs, xs in ((STOP_LADDER, stop_x), (ARRIVAL_LADDER, arrival_x)):
+                vals = [
+                    getattr(d[d.model == m][col], agg)()
+                    if (d.model == m).any()
+                    else np.nan
+                    for m in rungs
+                ]
+                ax.plot(
+                    xs,
+                    vals,
+                    marker="o",
+                    color=f"C{i}",
+                    label=oc if rungs is STOP_LADDER else None,
+                )
+        ax.axvline(boundary, color="0.4", ls="--", lw=1.0)
+        ax.set_xticks([*stop_x, *arrival_x])
+        ax.set_xticklabels(
+            [*STOP_LADDER, *ARRIVAL_LADDER], rotation=60, ha="right", fontsize=7
+        )
         ax.set_ylabel(label)
+        # Above the axes frame (x in data units, y in axes units) so the labels
+        # cannot land on top of a line: the dispersion panel is nearly flat and
+        # its data reach the top of the axes.
+        for xpos, text in (
+            (stop_x[0], "stop clock"),
+            (
+                arrival_x[0],
+                "arrival clock (different rows — not a further ladder step)",
+            ),
+        ):
+            ax.text(
+                xpos,
+                1.01,
+                text,
+                transform=ax.get_xaxis_transform(),
+                fontsize=7,
+                va="bottom",
+                color="0.4",
+                clip_on=False,
+            )
         if col == "dispersion":
             ax.axhline(1, color="0.5", ls=":")
         if col == "cv_bits_per_event":
             ax.axhline(0, color="0.5", ls=":")
     axes.flat[0].legend(frameon=False, fontsize=8)
-    fig.suptitle("Point-process GOF up the per-bin ladder", y=1.0)
+    fig.suptitle("Point-process GOF up the per-bin ladder", y=1.04)
     fig.tight_layout()
     out = FIGS / "model_checking_ladder.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -177,13 +235,25 @@ def plot_example_quartet(design: pd.DataFrame, fit: dict, title: str, fname: str
 
 def _print_ladder_table(df: pd.DataFrame) -> None:
     print("\n=== GOF up the ladder (outcome=non_local) ===")
-    print(f"{'model':18s} {'ks_band':>8s} {'ks_med':>8s} {'disp_med':>9s} {'bits_med':>9s}")
     g = df[df.outcome == "non_local"]
-    for m in LADDER:
-        s = g[g.model == m]
-        if len(s):
-            print(f"{m:18s} {s.ks_within_band.mean():8.2f} {s.ks_statistic.median():8.3f} "
-                  f"{s.dispersion.median():9.3f} {s.cv_bits_per_event.median():9.3f}")
+    for header, rungs in (
+        ("stop clock", STOP_LADDER),
+        (
+            "arrival clock (fit on the arrival window — not comparable with "
+            "the rows above)",
+            ARRIVAL_LADDER,
+        ),
+    ):
+        print(f"-- {header}")
+        print(f"{'model':30s} {'ks_band':>8s} {'ks_med':>8s} "
+              f"{'disp_med':>9s} {'bits_med':>9s}")
+        for m in rungs:
+            s = g[g.model == m]
+            if len(s):
+                print(f"{m:30s} {s.ks_within_band.mean():8.2f} "
+                      f"{s.ks_statistic.median():8.3f} "
+                      f"{s.dispersion.median():9.3f} "
+                      f"{s.cv_bits_per_event.median():9.3f}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -217,7 +287,10 @@ def main() -> None:
     print(f"\nKS calibration improves up the ladder: M0_const={ks0:.2f} -> {FULL}={ksf:.2f}")
 
     # Honest reporting of where the textbook narrative does NOT hold:
-    bits = {m: g[g.model == m].cv_bits_per_event.median() for m in LADDER}
+    bits = {
+        m: g[g.model == m].cv_bits_per_event.median()
+        for m in (*STOP_LADDER, *ARRIVAL_LADDER)
+    }
     print("CV bits/event: time block helps (M5_time={:.3f}); the raised-cosine "
           "self-history block costs held-out likelihood (M3r_histcos={:.3f}) -- "
           "in-sample KS improves but cv_bits drops. Dispersion stays ~{:.2f} "
