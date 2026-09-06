@@ -167,6 +167,66 @@ def fit_status(
     bse = np.asarray(result.bse, dtype=float)
     names = _resolve_term_names(result, term_names, params.size)
 
+    terms = separated_terms(
+        params,
+        bse,
+        predictor_sd=predictor_sd,
+        term_names=names,
+        nuisance_terms=nuisance_terms,
+    )
+    return {
+        "converged": converged,
+        "separated": len(terms) > 0,
+        "separated_terms": terms,
+    }
+
+
+def separated_terms(
+    params,
+    bse,
+    *,
+    predictor_sd=None,
+    term_names: Sequence[str],
+    nuisance_terms: Collection[str] = (),
+) -> tuple[str, ...]:
+    """Names of the terms that are not identified, by the effect-scale rule.
+
+    Shared by every fitter so the threshold lives in one place: a statsmodels
+    result goes through :func:`fit_status`, while a fitter that optimizes its own
+    likelihood (and so has no statsmodels result object) calls this directly with
+    its parameter and standard-error vectors.
+
+    Parameters
+    ----------
+    params : array-like, shape (n_terms,)
+        Fitted coefficients.
+    bse : array-like, shape (n_terms,)
+        Standard errors, in the same order.
+    predictor_sd : array-like, optional
+        Per-coefficient standard deviation of the corresponding design column.
+        When given, separation is judged on the scale-free effect scale
+        (``bse * sd >= SEPARATION_EFFECT_SE``); without it, and for any column
+        whose SD is 0 or non-finite, the absolute rule ``|coef| >=
+        SEPARATION_COEF_ABS`` applies.
+    term_names : sequence of str
+        Coefficient names, in ``params`` order.
+    nuisance_terms : collection of str, optional
+        Terms excluded from the judgment entirely.
+
+    Returns
+    -------
+    tuple of str
+        The non-nuisance terms that are not identified, in coefficient order.
+    """
+    params = np.asarray(params, dtype=float)
+    bse = np.asarray(bse, dtype=float)
+    names = [str(t) for t in term_names]
+    if len(names) != params.size:
+        raise ValueError(
+            f"term_names has {len(names)} entries; expected {params.size} to match "
+            "the fitted coefficients"
+        )
+
     # Every clause is per term: a fit is only as unidentified as its worst
     # *scientific* term, and naming that term is what lets the aggregation drop the
     # session for it alone instead of for every coefficient the fit carries.
@@ -188,16 +248,11 @@ def fit_status(
             np.abs(params) >= SEPARATION_COEF_ABS,
         )
     excluded = frozenset(nuisance_terms)
-    separated_terms = tuple(
+    return tuple(
         name
         for name, name_flag in zip(names, degenerate | unpinned, strict=True)
         if name_flag and name not in excluded
     )
-    return {
-        "converged": converged,
-        "separated": len(separated_terms) > 0,
-        "separated_terms": separated_terms,
-    }
 
 
 @contextlib.contextmanager

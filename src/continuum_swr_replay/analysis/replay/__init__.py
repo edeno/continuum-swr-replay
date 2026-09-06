@@ -111,6 +111,29 @@ from .tables import (
     build_stop_table,
 )
 
+# Deferred rather than imported eagerly: the Dirichlet-multinomial fitter pulls
+# in JAX and switches it to float64 at import. Both effects are process-wide, so
+# they are paid by callers that actually use the estimator rather than by every
+# consumer of this package (a GPU decoding run in the same process would
+# otherwise inherit float64).
+_LAZY_EXPORTS = {
+    "cross_validate_dirichlet_multinomial": ".dirichlet_multinomial",
+    "event_loglik": ".dirichlet_multinomial",
+    "fit_dirichlet_multinomial": ".dirichlet_multinomial",
+    "multinomial_log_constant": ".dirichlet_multinomial",
+}
+
+
+def __getattr__(name: str):
+    """Import the deferred estimator exports on first attribute access."""
+    module_name = _LAZY_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    return getattr(import_module(module_name, __name__), name)
+
+
 __all__ = [
     "ARM_FE_PREDICTORS",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
@@ -166,14 +189,17 @@ __all__ = [
     "compute_retrospective_metrics",
     "contains_path_to_next",
     "cross_validate_conditional_poisson",
+    "cross_validate_dirichlet_multinomial",
     "cross_validate_per_bin_rate_model",
     "dist_to_arm_from_well",
     "default_content_model_names",
     "ends_at_next",
     "ends_at_next_patch",
+    "event_loglik",
     "fit_choice_model",
     "fit_conditional_logit",
     "fit_conditional_poisson",
+    "fit_dirichlet_multinomial",
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
     "fit_null_model_conditional",
@@ -183,6 +209,7 @@ __all__ = [
     "freeze_per_bin_cohort",
     "next_arm_circular_shift",
     "nearest_well_distance_cm",
+    "multinomial_log_constant",
     "per_bin_rate_gof",
     "raised_cosine_history_basis",
     "single_arm_from_well",
