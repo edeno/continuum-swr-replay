@@ -460,6 +460,12 @@ def _cohort_records(
                     "immobility<=0 / NaN own stop-level predictor -> own; "
                     "NaN only in another rung's column (frozen cohort) -> common; "
                     "min_bins/min_events/reward-contrast gates + bin-level -> excluded"
+                    + (
+                        "; a stop whose every bin is past the arrival window is "
+                        "excluded too"
+                        if spec.time_clock == "arrival"
+                        else ""
+                    )
                 ),
                 n_drop_own_predictor_missing=n_own,
                 n_drop_common_cohort_other=n_common,
