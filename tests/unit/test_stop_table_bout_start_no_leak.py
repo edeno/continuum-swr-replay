@@ -106,3 +106,13 @@ class TestBoutStartContextNoLeak:
         assert pd.isna(row["occupancy_well_arm"]), (
             f"occupancy_well_arm leaked: {row['occupancy_well_arm']}"
         )
+        # The bout-start clocks are the same leak surface: the trip completes
+        # at t=1.5, inside the bout, so a NaN-skipping first would report its
+        # arrival/outcome times as if the animal had already been sitting at
+        # that well when the stop began.
+        assert pd.isna(row["last_well_arrival_time_s"]), (
+            f"last_well_arrival_time_s leaked: {row['last_well_arrival_time_s']}"
+        )
+        assert pd.isna(row["outcome_known_time_s"]), (
+            f"outcome_known_time_s leaked: {row['outcome_known_time_s']}"
+        )

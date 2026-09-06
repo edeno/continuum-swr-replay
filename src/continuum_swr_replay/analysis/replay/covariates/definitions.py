@@ -101,6 +101,9 @@ def _definition(
 _EVENT_ARM = "event × candidate_arm"
 _STOP = "immobility stop"
 _TRIAL_STOP = "behavioral-model trial broadcast at stop start"
+# Absolute clock readings, not durations: only differences between them are
+# interpretable, so they must never be standardized or entered as a predictor.
+_ABSOLUTE_SECONDS = "seconds on the absolute session clock (differences only)"
 
 # These quantities use a pre-outcome model state, but selecting one port needs
 # the realized destination at goal arrival.  The enforcement registry currently
@@ -322,7 +325,7 @@ _DEFINITIONS = [
         "last_well_arrival_time_s",
         "Absolute session time at which the animal arrived at the well occupied at the start of the stop.",
         grain=_STOP,
-        units="seconds",
+        units=_ABSOLUTE_SECONDS,
         clock=QueryClock.GOAL_ARRIVAL,
         availability=Availability.PRE_OUTCOME,
         support="stops after at least one completed arrival",
@@ -333,12 +336,12 @@ _DEFINITIONS = [
         "outcome_known_time_s",
         "Absolute session time at which the outcome of that arrival became physically observable: pump onset when rewarded, the canonical latency/poke-out boundary when omitted.",
         grain=_STOP,
-        units="seconds",
+        units=_ABSOLUTE_SECONDS,
         clock=QueryClock.OUTCOME_AVAILABILITY,
         availability=Availability.POST_OUTCOME,
-        support="stops after at least one completed arrival with an observable outcome",
+        support="stops after at least one completed arrival",
         producer="covariates.context.add_trial_context -> replay.tables_stop.build_stop_table",
-        missingness="no completed arrival at the bout start, or its outcome is never observable",
+        missingness="no completed arrival at the bout start",
     ),
     _definition(
         "omission_streak",

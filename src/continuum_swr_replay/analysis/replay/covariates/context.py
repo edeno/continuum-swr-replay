@@ -621,8 +621,10 @@ def add_trial_context(
     # latency/poke-out boundary when omitted). This is the *boundary* itself,
     # not an outcome-gated value, so it is carried from arrival onward -- a
     # timebin before the boundary has to know where the boundary lies. NaN
-    # before the first completed arrival and whenever that trip's outcome is
-    # never observable.
+    # before the first completed arrival. The ``outcome_observed`` conjunct is
+    # defensive only: ``_prepare_port_experiences`` refuses an unobserved
+    # experience outright, so the canonical derivation cannot currently reach
+    # it.
     dot["_outcome_known_time"] = np.where(
         has_completed & outcome_observed[completed_clipped],
         outcome_times[completed_clipped],
