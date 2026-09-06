@@ -240,7 +240,7 @@ table (`stop_table.parquet`, 107,400 stops):
 
 (A well visit is one `last_well_arrival_time_s` within a session, so the 414 of
 69,224 at-well stops with no arrival clock (0.6 %) belong to no visit and are
-outside the first two rows; events are
+outside the first three rows, each of which is visit-scoped; events are
 `event_onset_table` onsets joined to their stop. The corresponding shares for the
 other two onset streams are 66.8 % (SWR) and 72.4 % (MUA).)
 
@@ -259,7 +259,10 @@ direct test of that alternative.
 re-anchor the same spline block on `time_since_last_well_arrival_s` (bin centre
 minus the arrival of the well occupied at bout start) instead of `tc`. Window
 `[0, TMAX_ARRIVAL = 8]` s with interior knots (1, 2, 4, 6) s, chosen from the
-at-well event distribution (median 3.7 s after arrival, IQR 2.7–5.1 s).
+at-well event distribution (median 3.7 s after arrival, IQR 2.7–5.1 s — at-well
+`event_onset_table` onsets timed against their stop's
+`last_well_arrival_time_s`; measured on the 2026-09-06 review pass, not printed
+in the audit).
 
 Cohort. The arrival column is part of the union `freeze_per_bin_cohort` freezes
 over, so a bin with a NaN arrival clock (a stop with no completed trial) leaves
@@ -288,8 +291,8 @@ read on [1, 3] s (knots 1/2/3) and the arrival clock on [1, 6] s (knots
 knot sits over almost no exposure and can run away there. On the 2026-09-06 refit the two clocks put
 the across-session median peak at broadly the same delay in **every**
 population: 2.2–3.0 s on `tc` against 3.0–3.6 s after arrival, with KS
-distances of 0.06 (non-local, all / non-local no-SWR / detected SWR) to 0.12
-(non-local with SWR) between the normalized curves. Detected SWR is no
+distances between the normalized curves of 0.06 (non-local, all), 0.07 (detected
+SWR and non-local no-SWR) and 0.12 (non-local with SWR). Detected SWR is no
 exception — its supported arrival-clock maximum is at 3.6 s, like the others.
 
 That last point is a correction worth stating plainly, because the naive
@@ -301,7 +304,10 @@ window their median curve's argmax lands at 0.04 s, and 44 % of those fits
 ≈ 2.2e3, with an upper quartile many orders larger). It is a
 boundary artefact, not an arrival-locked rate: only **0.018 %** of the
 arrival-window exposure lies in [0, 0.1] s and 1.0 % in [0, 0.25] s, against
-17.5 % in [2.5, 3.5] s, and the median SWR curve normalized to its own
+17.5 % in [2.5, 3.5] s (exposure summed per arrival-clock cell over the per-bin
+design `aggregate_to_timebins` builds from the canonical stop and onset tables;
+measured on the 2026-09-06 review pass, not printed in the audit), and the
+median SWR curve normalized to its own
 full-window maximum reads 0.93 at 0 s, 0.84 at 0.1 s, 0.12 at 1 s, 0.47 at
 2 s, 0.69 at 3 s and **0.70 at its supported maximum, 3.55 s** — a broad,
 well-supported hump near 3.5 s with an unsupported spike at the very edge that
@@ -323,7 +329,9 @@ the window then kept **6,618,107 of 7,315,746 bins (90.5 %)**.
 **The arrival clock is not always the clock of the well the animal is at.**
 3.5 % of the arrival-window bins (2.6 % of the window's event onsets — 3.7 % of
 non-local, 1.5 % of SWR) come from `in_transit` bouts, whose
-`last_well_arrival_time_s` is the arrival at the well the animal **left**. The
+`last_well_arrival_time_s` is the arrival at the well the animal **left** (the
+same per-bin design split by the stop's `occupancy_state`; measured on the
+2026-09-06 review pass, not printed in the audit). The
 arrival rungs do not condition on occupancy, so those bins enter the time
 course on a clock that measures time since departure, not time at a well.
 
@@ -380,18 +388,29 @@ uncertainty beyond the time/reward/history controls. It is the M7r base
 - **model value (per-unit):** `rpe_postoutcome` = `reward − reward_belief_mean_chosen_arm_preoutcome` from the fitted
   RL model (`qvals_table.parquet`), represented canonically as
   `rpe_postoutcome`.
-- **RL decision variables (z-scored → per-SD rate ratios):** `switch_advantage`
-  (ΔV = switch − stay value), `reward_entropy` (HMM outcome uncertainty), and the
-  absolute value-update magnitudes (`global`, `unchosen_patches`). See
+- **RL decision variables (z-scored → per-SD rate ratios):**
+  `relative_value_switch_minus_stay_preoutcome` (ΔV = switch − stay value),
+  `reward_belief_differential_entropy_leaf_mean_preoutcome` (the mean per-leaf
+  Beta differential entropy — the belief-uncertainty covariate), and the two
+  absolute value-update magnitudes
+  `reward_belief_mean_update_l1_all_ports_postoutcome` and
+  `reward_belief_mean_update_l1_alternative_patches_postoutcome`. Every one comes
+  from the beta-Bernoulli behavioural model; the block carries no HMM covariate
+  (the HMM was retired 2026-07-13). See
   [behavior_model_covariates.md](behavior_model_covariates.md).
 
-Collinearity is controlled: `q_chosen` is dropped (r≈0.90 with ΔV, VIF 6.4);
-`leaky_q_value_diff` and nominal-RPE stand-ins are dropped;
-`rpe_postoutcome` is the behavioral-model RPE;
-`task_reward_probability_patch_mean_gap_best_vs_second` is kept (r≈−0.04 with ΔV —
-independent nominal information). Final panel VIF ≤ 1.86, max |r| = 0.64. Fit
-over the three populations `swr` / `non_local_swr` / `non_local_no_swr` (the
-pooled `non_local` null is not fit here).
+Collinearity is controlled, and the exclusions are recorded in the runner
+(`scripts/rate/fit_uncertainty_rate.py`): the model's chosen-port value is not
+fit, being r ≈ 0.90 with ΔV; the nominal-RPE stand-in is not fit either
+(r ≈ 0.71 with `rpe_postoutcome`, the behavioural-model RPE the block fits
+instead); `task_reward_probability_patch_mean_gap_best_vs_second` is kept
+because it is r ≈ −0.04 with ΔV and so carries independent nominal information.
+*(The panel's variance-inflation summary — VIF 6.4 on the dropped value
+covariate, final panel VIF ≤ 1.86, max |r| = 0.64 — predates the 2026-09 refits
+and was not re-derived from them. Read it as a design note recording why this
+panel was chosen, not as a current measurement.)* Fit over the three populations
+`swr` / `non_local_swr` / `non_local_no_swr` (the pooled `non_local` null is not
+fit here).
 
 ## The result holds across both families
 
@@ -506,11 +525,16 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
   high-rate-bin KS bias can be ruled out.
 - **The time block is the only rung with both a large CV gain and a near-full CV
   cohort.** `M5_time` scores **0.225** held-out bits/event on **217 of 218**
-  non-local sessions, and has the ladder's second-lowest median AIC (2223,
-  against 2220 for `M7r_time_histcos_rew`). The three raised-cosine history
-  rungs score 0.186–0.229 bits/event but only on **64–84** sessions each, so a
-  nominally higher median there (`M6r_time_histcos`, 0.229 over 82 sessions) is
-  a selected-minority number and not a like-for-like win over `M5_time`. The
+  non-local sessions. Its median AIC (2223) is the ladder's third-lowest, behind
+  `M7r_time_histcos_rew` (2220) and `M6r_time_histcos` (2221) — the AIC ordering
+  and the held-out ordering are not the same ordering. The three rungs that carry
+  time **and** the raised-cosine self-history block (`M6r_time_histcos`,
+  `M7r_time_histcos_rew`, `M9r_rew_x_time`) score 0.186–0.229 bits/event but only
+  on **64–84** sessions each, so a nominally higher median there
+  (`M6r_time_histcos`, 0.229 over 82 sessions) is a selected-minority number and
+  not a like-for-like win over `M5_time`. The fourth rung carrying that block,
+  `M3r_histcos`, has no time spline and scores **0.052** over 79 sessions — far
+  below `M5_time` on a comparably selected cohort. The
   `onset_lag` dummy rungs were scored on essentially no sessions at all — that
   is the measurement that retired them (99.08 % NaN `cv_bits_per_event` on the
   non-local population over 218 sessions) — and no longer exist. Use `M5_time`

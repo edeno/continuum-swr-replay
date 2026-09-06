@@ -89,8 +89,9 @@ as "at or beyond 3 s", not as a located maximum
 "Time-course shape").
 
 **Duration caveat (important):** stop durations are very unequal and
-*endogenous* — rewarded stops are ~3.5× longer on the mean (2.3× on the median:
-0.518 s vs 0.228 s, `stop_table.parquet`) — so at large `tc` only the long
+*endogenous* — rewarded stops are **3.6× longer on the mean** (1.858 s vs
+0.519 s; 2.3× on the median, 0.518 s vs 0.228 s, `stop_table.parquet`) — so at
+large `tc` only the long
 (≈rewarded) stops survive: 20 % of stops are still immobile at 2 s and 12 % at
 4 s. The exposure offset makes `λ(tc)` a proper rate, but the curve at large
 `tc` reflects a **selected subpopulation**, not the same stops over time. The
@@ -251,10 +252,16 @@ read from `all_models.pkl`; the other three columns are the summarizer's.)
   constant model without it: 0.46 and 0.39).
 - **`M5_time` is the best-generalizing model**, and the only rung with both a
   large held-out gain and an essentially complete CV cohort (0.225 bits/event
-  over 217 of 218 sessions). The three raised-cosine history rungs score
-  0.19–0.23 bits/event but only on 64–84 sessions each, so their CV is **not**
-  a like-for-like comparison against `M5_time`'s — a rung is not "better on
-  held-out data" because a selected fifth of sessions scored well. Use
+  over 217 of 218 sessions). The three rungs carrying time **and** the
+  raised-cosine self-history block — `M6r_time_histcos` (0.229/82),
+  `M7r_time_histcos_rew` (0.220/84), `M9r_rew_x_time` (0.186/64) — score
+  0.186–0.229 bits/event on 64–84 sessions each, so their CV is **not** a
+  like-for-like comparison against `M5_time`'s: a rung is not "better on
+  held-out data" because a selected fifth of sessions scored well.
+  `M3r_histcos`, which carries that block without the time spline, scores only
+  **0.052** over 79 sessions — a comparably selected cohort, and far below
+  `M5_time`. Note also that the AIC ordering differs from the held-out one:
+  `M7r` (2220) and `M6r` (2221) sit below `M5_time` (2223) on median AIC. Use
   `M5_time` as the parsimonious predictive model and `M7r_time_histcos_rew`
   for the full additive coefficient read.
 - **The reward block is a small step marginally and a negative one
