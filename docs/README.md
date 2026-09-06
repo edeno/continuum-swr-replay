@@ -17,6 +17,7 @@ it stops drifting; add new docs to the matching home.
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
 | review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures |
+| code map (generated) | `docs/regression_pipeline_map.md` | every pipeline module and the public symbols it defines, by stage |
 | model spec (code) | `src/continuum_swr_replay/analysis/replay/model_specs.py` | single source of truth for all model ladders |
 
 Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.claude/`.**
@@ -32,6 +33,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md) — *results*: integrative rate × content × SWR synthesis (living note).
 - [task_description.md](task_description.md) — *reference*: behavioral task / recording setup.
 - [cached_trials_for_testing.md](cached_trials_for_testing.md) — *reference*: test-fixture trial cache.
+- [regression_pipeline_map.md](regression_pipeline_map.md) — *code map*: every module
+  from decoded session to fitted regression, grouped by stage, with the public symbols
+  each defines. Generated — regenerate with `scripts/qa/write_pipeline_map.py`.
 - [design/](design/) — *design specs*: per-analysis design documents.
   - [design/model_history.md](design/model_history.md) — *design journal*: why each
     replay-content model rung carries the predictors it does (reversed reasoning
