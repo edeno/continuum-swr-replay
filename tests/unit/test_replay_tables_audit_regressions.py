@@ -298,16 +298,18 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
 
 @pytest.mark.slow
 def test_rate_ladder_rungs_share_a_cohort():
-    """Rungs compared by AIC must be fit on the same rows.
+    """Rungs compared by AIC must be fit on the same rows, clock by clock.
 
     ``freeze_per_bin_cohort`` selects one (stop x bin) cohort per (session,
     population) over the union of every rung's design columns, and the fitters
-    now raise rather than drop rows per rung, so every rung of the ladder must
-    report the same ``n_bins``. AIC scales with n: a rung fit to fewer bins
-    would gain mechanically.
+    raise rather than drop rows per rung, so every stop-clock rung must report
+    the same ``n_bins``. The arrival-clock rungs then apply their own window
+    after the freeze, so they share a cohort with each other but not with the
+    stop-clock rungs; ``compare_nested_models`` refuses to compare across the
+    two clocks on ``time_clock`` metadata. AIC scales with n: a rung fit to
+    fewer bins than its comparison partner would gain mechanically.
 
-    Reads the materialized fits, so it holds only once they have been refit
-    with the frozen cohort (hence ``slow``; unit runs use ``-m "not slow"``).
+    Reads the materialized fits (hence ``slow``; unit runs use ``-m "not slow"``).
     """
     fits = Path("Processed-Data/replay_content/models_per_bin_rate/all_models.pkl")
     if not fits.exists():
@@ -315,8 +317,22 @@ def test_rate_ladder_rungs_share_a_cohort():
 
     df = pd.read_pickle(fits)
     df = df[df["outcome"] == "non_local"] if "outcome" in df.columns else df
-    n_by_model = df.groupby("model")["n_bins"].sum()
-    assert n_by_model.nunique() == 1, (
-        "per-bin rate rungs are fit on different numbers of bins, so their "
-        f"AIC/BIC/deviance are not comparable:\n{n_by_model.sort_values()}"
+    session_keys = [c for c in ("animal", "session_date", "epoch") if c in df.columns]
+    if "time_clock" not in df.columns:
+        df = df.assign(time_clock="stop")
+    # Within one (session, clock) every rung that fit must report the same
+    # cohort. A rung whose fit failed in a session (no row) is a coverage gap,
+    # not a cohort difference, so the check is per session rather than summed.
+    per_session = df.groupby([*session_keys, "time_clock"])["n_bins"].nunique()
+    offenders = per_session[per_session > 1]
+    assert offenders.empty, (
+        "per-bin rate rungs are fit on different numbers of bins within a "
+        f"session, so their AIC/BIC/deviance are not comparable:\n{offenders}"
     )
+    # And no rung may be missing from more than a few sessions, or the ladder's
+    # pooled comparisons silently change cohort.
+    coverage = df.groupby(["time_clock", "model"]).size()
+    for time_clock, rows in coverage.groupby(level=0):
+        assert rows.max() - rows.min() <= 10, (
+            f"rungs on the {time_clock} clock cover different session counts:\n{rows}"
+        )
