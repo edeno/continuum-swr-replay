@@ -81,6 +81,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
+    assert_qvals_aligned,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
@@ -602,6 +603,10 @@ def main() -> None:
             *RL_COVARIATES,
         ]
     ]
+    # The join key is a stop_id hash with no clock in it, so a renumbered
+    # decode would misjoin silently. Compare the two clocks on the full
+    # stop table, before the inner join hides the stops that went missing.
+    assert_qvals_aligned(stop, qvals)
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this

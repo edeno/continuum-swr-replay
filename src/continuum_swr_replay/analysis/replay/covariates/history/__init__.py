@@ -48,6 +48,7 @@ from .reward_history import (
     rolling_reward_count_per_arm,
 )
 from .value_block import (
+    assert_qvals_aligned,
     attach_arm_uncertainty,
     attach_contingency_value_block,
     load_contingency,
@@ -83,6 +84,7 @@ __all__ = [
     "add_uncertainty_covariates",
     "arm_never_visited_all_events",
     "arm_never_visited_per_arm",
+    "assert_qvals_aligned",
     "attach_arm_uncertainty",
     "attach_contingency_value_block",
     "canonical_port_value_history",

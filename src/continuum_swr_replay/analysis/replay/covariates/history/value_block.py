@@ -262,3 +262,112 @@ def attach_arm_uncertainty(
     if present.any() and ((var_mat[present] < 0.0) | (var_mat[present] > 0.25)).any():
         raise ValueError("matched Beta posterior variances must lie in [0, 0.25]")
     return _pick_leaf_port_value(arm, present, var_mat)
+
+
+QVALS_TIME_TOLERANCE_SEC: float = 1e-6
+"""Maximum ``|qvals_context_time - stop_start|`` accepted as the same stop."""
+
+
+def _qvals_rows_expected_in(
+    stop_table: pd.DataFrame, contingency: pd.DataFrame
+) -> np.ndarray:
+    """Mask the qvals rows the given stop table is expected to account for.
+
+    ``qvals_table`` has no animal/date columns, so a single-session stop table
+    cannot be matched against the corpus-wide artifact by key alone. A qvals
+    row is claimed by a stop table when either its ``stop_id`` names one of the
+    table's stops -- those are joined, so their clock is always checked -- or
+    its epoch appears in the table and its ``qvals_context_time`` falls inside
+    that epoch's span of ``stop_start``, which is how a row whose ``stop_id``
+    went stale is still recognised as belonging here. A corpus-wide stop table
+    therefore claims every qvals row of every epoch it covers, and a
+    one-session stop table claims only that session's rows.
+    """
+    spans = stop_table.groupby("epoch", sort=False)["stop_start"].agg(["min", "max"])
+    epoch = contingency["epoch"].to_numpy()
+    time = contingency["qvals_context_time"].to_numpy(dtype=float)
+    low = spans["min"].reindex(epoch).to_numpy(dtype=float)
+    high = spans["max"].reindex(epoch).to_numpy(dtype=float)
+    with np.errstate(invalid="ignore"):
+        in_span = (time >= low) & (time <= high)
+    joined = contingency["stop_id"].isin(set(stop_table["stop_id"])).to_numpy()
+    return in_span | joined
+
+
+def assert_qvals_aligned(
+    stop_table: pd.DataFrame,
+    contingency: pd.DataFrame | None,
+    *,
+    tolerance: float = QVALS_TIME_TOLERANCE_SEC,
+) -> None:
+    """Fail if the qvals value block is not on the live stop table's clock.
+
+    ``qvals_table`` is keyed by ``stop_id``, a hash of
+    ``(animal, day, epoch, stop_idx)``. Renumbering the immobility bouts --
+    a re-decode, a changed speed threshold, a changed cohort -- reassigns
+    those hashes, and the join then silently attaches one stop's value block
+    to a different stop, or drops it. The stop id carries no timestamp, so the
+    only way to notice is to compare the two clocks: ``qvals_context_time`` is
+    the bout start the value artifact was built against and must equal the
+    live ``stop_start`` for the same ``stop_id``.
+
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        Live stop table (one session or the whole corpus) with ``stop_id``,
+        ``stop_start``, and ``epoch``.
+    contingency : pd.DataFrame or None
+        ``qvals_table`` rows, or ``None`` when the artifact is absent (nothing
+        is joined, so there is nothing to check).
+    tolerance : float, optional
+        Maximum accepted absolute difference between the two clocks, seconds.
+
+    Raises
+    ------
+    ValueError
+        If a qvals row the stop table is expected to account for has no
+        matching ``stop_id``, or if a matched row's ``qvals_context_time``
+        differs from ``stop_start`` by more than ``tolerance``.
+    """
+    if contingency is None or contingency.empty or stop_table.empty:
+        return
+    missing_cols = {"stop_id", "qvals_context_time", "epoch"} - set(contingency.columns)
+    if missing_cols:
+        raise ValueError(f"qvals table is missing columns {sorted(missing_cols)}")
+    missing_cols = {"stop_id", "stop_start", "epoch"} - set(stop_table.columns)
+    if missing_cols:
+        raise ValueError(f"stop table is missing columns {sorted(missing_cols)}")
+
+    expected = contingency.loc[
+        _qvals_rows_expected_in(stop_table, contingency),
+        ["stop_id", "qvals_context_time"],
+    ]
+    if expected.empty:
+        return
+    merged = expected.merge(
+        stop_table[["stop_id", "stop_start"]],
+        on="stop_id",
+        how="left",
+        validate="one_to_one",
+    )
+    absent = merged["stop_start"].isna()
+    if absent.any():
+        first = merged.loc[absent].iloc[0]
+        raise ValueError(
+            f"{int(absent.sum())} qvals row(s) name a stop that is not in the "
+            f"stop table; first stop_id={int(first['stop_id'])} at "
+            f"qvals_context_time={first['qvals_context_time']!r}. Regenerate "
+            "qvals_table against the live stop table."
+        )
+    drift = (merged["qvals_context_time"] - merged["stop_start"]).abs()
+    offending = drift > tolerance
+    if offending.any():
+        first = merged.loc[offending].iloc[0]
+        raise ValueError(
+            f"{int(offending.sum())} qvals row(s) are off the stop table's "
+            f"clock by more than {tolerance:g} s; first stop_id="
+            f"{int(first['stop_id'])} has qvals_context_time="
+            f"{first['qvals_context_time']!r} but stop_start="
+            f"{first['stop_start']!r}. Regenerate qvals_table against the "
+            "live stop table."
+        )

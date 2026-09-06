@@ -68,7 +68,10 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.replay.covariates import load_contingency
+from continuum_swr_replay.analysis.replay.covariates import (
+    assert_qvals_aligned,
+    load_contingency,
+)
 from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
@@ -422,6 +425,10 @@ def _process_session(
     # the downstream rate model, which models n_selected_events per stop
     # over a denominator that *must* include zero-event stops.
     stop_table = build_stop_table(dot, trials, port_experiences, track_graph)
+    # The value block is joined on stop_id, a hash that carries no clock.
+    # Check the session's stops against the qvals rows claiming them before
+    # anything downstream joins on that hash.
+    assert_qvals_aligned(stop_table, contingency)
 
     event_table = build_event_table(
         dot,

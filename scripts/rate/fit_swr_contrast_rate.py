@@ -101,6 +101,9 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
+    assert_qvals_aligned,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
@@ -537,6 +540,10 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
             f"qvals_table missing {missing}; regenerate it "
             "(python -m continuum_swr_replay.analysis.behavior.qvals_table --write)"
         )
+    # The join key is a stop_id hash with no clock in it, so a renumbered
+    # decode would misjoin silently. Compare the two clocks on the full
+    # stop table, before the inner join hides the stops that went missing.
+    assert_qvals_aligned(stop, q)
     n0 = len(stop)
     stop = stop.merge(q[qcols], on="stop_id", how="inner", validate="many_to_one")
     # fail loudly if a task covariate the specs need never made it onto the stop
