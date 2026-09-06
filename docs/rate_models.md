@@ -154,15 +154,16 @@ offset. Its limitation is exactly that offset — see below.
   audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7r_time_histcos_rew`, the reconstructed reward kernel at
-  lag 1 dissociates — `non_local_swr ≈ 1.38` > `swr ≈ 1.18` >
-  `non_local_no_swr ≈ 0.91` (these agreed to two decimals with the retired
-  `onset_lag` full model, so the headline kernel did not depend on which
-  self-history parameterization carried it) — while the
+  lag 1 dissociates — `non_local_swr ≈ 1.43` > `swr ≈ 1.21` >
+  `non_local_no_swr ≈ 0.98` (2026-09-06 refit; the retired `onset_lag` full
+  model agreed with the raised-cosine one to two decimals before the
+  outcome-boundary recomputation moved both, so the headline kernel does not
+  depend on which self-history parameterization carries it) — while the
   slower **recent-reward suppression** from lag 3 on (RR ≈ 0.90–0.97 per lag) is
   **shared** across populations and returns to ~1 by lag 10. Separately, the
   single immediate basis coefficient is higher for `non_local_swr` than for
-  `non_local_no_swr` **within session in 80 % of 217 paired sessions, 5/5
-  animals, signed-rank p = 2.5e-23**. Those two are different measurements:
+  `non_local_no_swr` **within session in 79 % of 216 paired sessions, 5/5
+  animals, signed-rank p = 4.5e-22** (2026-09-06 refit). Those two are different measurements:
   the first is the size of the kernel at a lag, the second is the consistency of
   a between-population difference — quote them as separate clauses, never
   spliced. Both are properties of the *fitted kernel*, which is reconstructed
@@ -180,9 +181,12 @@ offset. Its limitation is exactly that offset — see below.
   non-local events — and **bursty** (RR > 1) at ~105–135 ms, peaking at 2.77×
   (detected SWR) down to 1.82× (non-SWR non-local); events are non-Poisson
   ([per_bin_rate_results.md](per_bin_rate_results.md) §4). Those self-history
-  numbers were read per lag off the retired `onset_lag` dummies; the smooth
+  numbers were read per lag off the retired `onset_lag` dummies. The smooth
   reconstruction that replaces them cannot represent a single-lag notch, so the
-  refractory depth and the burst peak are re-derived, not carried over.
+  shape is re-derived rather than carried over: on the 2026-09-06 refit the
+  refractory window is ≤60 ms (≤45 ms for non-local with SWR) and the burst
+  peak is 2.65× (detected SWR), 2.50× (non-local with SWR), 2.08× (non-local,
+  all) and 1.72× (non-local without SWR) at 120–150 ms.
 
   (Numbers from the 2026-09-04 refit onto the three-bump raised-cosine reward
   basis — see [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full
