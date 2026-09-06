@@ -338,6 +338,42 @@ def _pack_events(
     )
 
 
+def _swr_event_counts(
+    Z: np.ndarray, concentration_cols: tuple[str, ...]
+) -> dict[str, float]:
+    """Modelled events on each side of the ``is_swr`` concentration modifier.
+
+    The ``log_phi_is_swr`` contrast is only as trustworthy as the smaller of the
+    two event groups behind it, and neither ``n_events`` nor the effect-scale
+    identifiability rule can see that split: a session with two SWR events can
+    return a perfectly finite modifier that no downstream filter would question.
+    Recording both counts on the row lets a reader (or an audit) find those
+    sessions.
+
+    Parameters
+    ----------
+    Z : np.ndarray, shape (n_events, n_concentration)
+        Packed event-level concentration design.
+    concentration_cols : tuple of str
+        Column names, in ``Z`` order.
+
+    Returns
+    -------
+    dict
+        ``n_events_swr`` / ``n_events_nonswr``, both NaN when the concentration
+        design carries no ``is_swr`` column (a within-SWR cohort, where the flag
+        is constant and the modifier is not estimated at all).
+    """
+    if "is_swr" not in concentration_cols:
+        return {"n_events_swr": np.nan, "n_events_nonswr": np.nan}
+    column = Z[:, concentration_cols.index("is_swr")]
+    n_swr = int(np.count_nonzero(column))
+    return {
+        "n_events_swr": float(n_swr),
+        "n_events_nonswr": float(len(column) - n_swr),
+    }
+
+
 # ── optimization ────────────────────────────────────────────────────────────
 
 
@@ -495,9 +531,16 @@ def fit_dirichlet_multinomial(
     dict | None
         The content-estimator result schema: ``coef_<term>``, ``bse_<term>``,
         ``pval_<term>`` for every beta and concentration term, ``sd_<term>`` for
-        every beta term, fit statistics (``llf``, ``llf_null``, ``aic``, ``bic``,
-        ``pseudo_r2``), and diagnostics (``converged``, ``separated``,
-        ``separated_terms``, ``n_convergence_warnings``). ``None`` when the
+        every beta term and ``sd_log_phi_<col>`` for every concentration
+        modifier (NaN for the intercept, whose design column is constant), the
+        events on each side of the ``is_swr`` modifier (``n_events_swr`` /
+        ``n_events_nonswr``, NaN when it is absent), fit statistics (``llf``,
+        ``llf_null``, ``aic``, ``bic``, ``pseudo_r2``), and diagnostics
+        (``converged``, ``separated``, ``separated_terms``,
+        ``n_convergence_warnings``). ``pseudo_r2`` is formed from two FULL
+        log-likelihoods -- the multinomial constant is in both -- so it is NOT
+        on the scale of a conditional fit's, and its null refits the
+        concentration. ``None`` when the
         session carries too few events to identify the parameters, or when the
         optimizer returns a non-finite objective.
 
@@ -569,6 +612,14 @@ def fit_dirichlet_multinomial(
 
     llf_null = _null_loglik(packed, fixed_log_phi=fixed_log_phi)
     n_params = n_free
+    # McFadden's ratio of two FULL log-likelihoods: both ``llf`` and ``llf_null``
+    # carry the multinomial coefficient, which a statsmodels conditional fit's
+    # likelihood omits. The constant is a large negative number that enters both
+    # numerator and denominator, so this ratio is compressed towards zero
+    # relative to a conditional fit's -- the two are not on one scale and must
+    # not be tabulated against each other. Its null also differs: the DM null
+    # refits the concentration, so the baseline is uniform-allocation-at-the-
+    # fitted-redundancy rather than uniform-allocation-at-independent-bins.
     pseudo_r2 = (
         1.0 - llf / llf_null if np.isfinite(llf_null) and llf_null != 0 else np.nan
     )
@@ -578,6 +629,19 @@ def fit_dirichlet_multinomial(
         **{f"bse_{k}": float(v) for k, v in zip(names, se, strict=True)},
         **{f"pval_{k}": float(v) for k, v in zip(names, pvals, strict=True)},
         **{f"sd_{k}": float(v) for k, v in zip(predictors, predictor_sd, strict=True)},
+        # Effect-scale SD for the concentration terms as well, so the shipped
+        # aggregation judges ``log_phi_<col>`` on ``|coef| * sd`` -- the log-phi
+        # swing the modifier actually produces -- instead of falling back to the
+        # raw ``|coef| >= 10`` rule, which is not a scale any concentration term
+        # is on. The intercept's design column is a constant with no spread to
+        # measure, so its SD is NaN and it stays flag-only.
+        f"sd_{LOG_PHI_INTERCEPT}": float("nan"),
+        **{
+            f"sd_log_phi_{c}": float(v)
+            for c, v in zip(concentration_cols, packed.Z.std(axis=0), strict=True)
+        },
+        # Events on each side of the is_swr modifier (NaN where it is absent).
+        **_swr_event_counts(packed.Z, concentration_cols),
         "estimator": ESTIMATOR,
         # The multinomial coefficient is in ``llf``; a statsmodels conditional
         # fit's is not (see ``multinomial_log_constant``).
@@ -704,6 +768,14 @@ POOLED_ALL_ANIMALS_KEY = "__all__"
 
 #: Worker processes a runner spreads its per-session fits over by default.
 DEFAULT_N_JOBS = 8
+
+#: Skip classes that are the ESTIMATOR refusing a session rather than the cohort
+#: rules excluding it. A refusal is rare and actionable, so a runner's cohort
+#: audit names the session it happened to; ``fit_none`` (too few events for the
+#: free fit's parameters) is routine and is summarized by class alone. The
+#: classes are the part of a skip reason before the first ``":"``, so
+#: ``dm_design:<message>`` matches ``"dm_design"``.
+ESTIMATOR_SKIP_CLASSES = frozenset({"dm_design", "pinned_fit_none"})
 
 
 def concentration_cols_for_cohort(frame: pd.DataFrame) -> tuple[str, ...]:
@@ -1042,6 +1114,7 @@ __all__ = [
     "DEFAULT_MIN_EVENTS_SESSION_PHI",
     "DEFAULT_N_JOBS",
     "ESTIMATOR",
+    "ESTIMATOR_SKIP_CLASSES",
     "LOG_PHI_INTERCEPT",
     "POOLED_ALL_ANIMALS_KEY",
     "animal_pooled_log_phi",

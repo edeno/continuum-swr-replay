@@ -326,6 +326,64 @@ def test_result_matches_estimator_schema():
     )
 
 
+def test_concentration_terms_carry_the_scale_the_identifiability_rule_reads():
+    """``sd_log_phi_<col>`` puts the modifiers on the effect scale; intercept NaN.
+
+    The shipped aggregation drops a runaway coefficient on ``|coef| * sd``. With
+    no ``sd_`` the concentration terms fell back to the raw ``|coef| >= 10``
+    rule, which is not a scale a log concentration is on.
+    """
+    df = _simulate(3.0, seed=21, n_events=120)
+    fit = fit_dirichlet_multinomial(df, PREDICTORS)
+
+    assert np.isnan(fit["sd_log_phi_intercept"])
+    assert fit["sd_log_phi_is_swr"] == pytest.approx(
+        df.drop_duplicates("event_id")["is_swr"].to_numpy(dtype=float).std()
+    )
+    assert fit["sd_log_phi_is_swr"] > 0
+
+
+def test_a_second_concentration_column_gets_its_own_coefficient_and_scale():
+    """The concentration design is not hard-wired to ``is_swr`` alone."""
+    df = _simulate(3.0, seed=22, n_events=150)
+    rng = np.random.default_rng(22)
+    length = pd.Series(
+        rng.normal(size=df["event_id"].nunique()),
+        index=sorted(df["event_id"].unique()),
+    )
+    df = df.assign(log_length_z=df["event_id"].map(length))
+
+    fit = fit_dirichlet_multinomial(
+        df, PREDICTORS, concentration_cols=("is_swr", "log_length_z")
+    )
+
+    for prefix in ("coef_", "bse_", "pval_"):
+        assert f"{prefix}log_phi_log_length_z" in fit
+    assert fit["sd_log_phi_log_length_z"] == pytest.approx(length.std(ddof=0))
+    # One extra free parameter relative to the single-modifier design.
+    assert fit["n_params"] == len(PREDICTORS) + 3
+
+
+def test_the_events_behind_the_is_swr_modifier_are_counted_on_the_row():
+    """A modifier resting on 2 SWR events must be findable from the row alone."""
+    df = _simulate(3.0, seed=23, n_events=120)
+    fit = fit_dirichlet_multinomial(df, PREDICTORS)
+
+    events = df.drop_duplicates("event_id")
+    assert fit["n_events_swr"] == float(events["is_swr"].astype(bool).sum())
+    assert fit["n_events_nonswr"] == float((~events["is_swr"].astype(bool)).sum())
+    assert fit["n_events_swr"] + fit["n_events_nonswr"] == fit["n_events"]
+
+
+def test_the_swr_event_counts_are_nan_when_the_flag_is_not_in_the_design():
+    """Within an SWR-only cohort there is no split to report."""
+    df = _simulate(3.0, seed=24, n_events=120)
+    fit = fit_dirichlet_multinomial(df, PREDICTORS, concentration_cols=())
+
+    assert np.isnan(fit["n_events_swr"])
+    assert np.isnan(fit["n_events_nonswr"])
+
+
 def test_too_few_events_returns_none():
     """A session that cannot identify the parameters returns None rather than a fit."""
     df = _simulate(3.0, seed=9, n_events=6)
