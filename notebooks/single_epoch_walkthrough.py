@@ -1318,7 +1318,7 @@ TRIAL_SCALARS = (
 )
 
 # Every belief value below is produced by the SAME builders that populate the
-# fitted event-arm design matrix (tables.py:1312-1320), keyed on stop_id --
+# fitted event-arm design matrix (tables_arm_patch.build_event_arm_table), keyed on stop_id --
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]
@@ -1499,7 +1499,7 @@ TRIAL_SCALARS = (
 )
 
 # Every belief value below is produced by the SAME builders that populate the
-# fitted event-arm design matrix (tables.py:1312-1320), keyed on stop_id --
+# fitted event-arm design matrix (tables_arm_patch.build_event_arm_table), keyed on stop_id --
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]

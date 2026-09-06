@@ -420,3 +420,5 @@ the uncertainty runner's `uncertainty_rate_*_smoke.*`, which it writes into
 `models_per_bin_rate/` by design and which are untracked. No canonical table or fit artifact
 was modified: every sha256 in § 1 matches the frozen baseline, and the canonical
 `swr_power_model.pkl` sha256 was re-checked after every fit run.
+
+> Postscript: the assertion in `test_rate_ladder_rungs_share_a_cohort` was rewritten after this audit's range (commit 8d3c923) to compare `n_bins` per (session, time clock) and to bound rung coverage; it passes at the branch head. The arrival-clock rungs `M5a`/`M7ra` fit 213 of 218 sessions (five fits returned None); per-session cohorts are equal in 436/436 (session, clock) groups.

@@ -253,6 +253,10 @@ direct test of that alternative.
 
 ### The arrival-clock variant of the time course
 
+> Coverage: `M0a_const_arrival` fits all 218 sessions, but `M5a_time_arrival` and
+> `M7ra_time_arrival_histcos_rew` return no fit in five sessions each (213 of 218), so the
+> arrival sub-ladder's pooled comparisons are over 213 paired sessions.
+
 `M0a_const_arrival`, `M5a_time_arrival` and `M7ra_time_arrival_histcos_rew`
 re-anchor the same spline block on `time_since_last_well_arrival_s` (bin centre
 minus the arrival of the well occupied at bout start) instead of `tc`. Window
