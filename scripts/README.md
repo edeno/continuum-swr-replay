@@ -22,6 +22,9 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
+- `compare_content_estimators.py` — conditional Poisson (counts), conditional Poisson
+  (fractions, clustered SE) and Dirichlet-multinomial fit on one shared event set,
+  with equalized AIC, an animal bootstrap, and `paper/figures/content_estimators/`.
 - `analyze_content_occupancy.py`, `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
 - `analyze_uncertainty_content.py` — trial×well reward-belief uncertainty profiles,
   absolute content rates, response sensitivities, and cohort audit tables.
