@@ -258,15 +258,36 @@ constraint travels with the artifact. The two ladders are read **side by side**,
 never differenced; the scale-free comparison the audit publishes is the peak
 position of each fitted time course and the KS distance between the two curves
 normalized on their own windows
-(`scripts/qa/compare_fits.py --new-per-bin ...`). On the 2026-09-06 refit the
-two clocks put the across-session median peak at broadly the same *absolute*
-delay — 2.3–2.8 s on `tc` and 2.9 s after arrival for the non-local
-populations — with KS distances of 0.07 (non-local no-SWR) to 0.31 (non-local
-with SWR) between the normalized curves. Detected SWR is the exception: its
-arrival-clock curve is monotonically decreasing from the arrival (peak at
-0 s), where its stop-clock curve peaks at 2.4 s. Read that as a difference
-between two descriptions of the same rate, not as one clock beating the
-other — neither ladder is fit to the other's rows.
+(`scripts/qa/compare_fits.py --new-per-bin ...`). Both are read on each rung's
+**supported interior** — one first-knot spacing (1 s) is dropped at each end,
+so `tc` is read on [1, 3] s and the arrival clock on [1, 7] s — because a
+cubic B-spline extrapolating past its outermost interior knot sits over almost
+no exposure and can run away there. On the 2026-09-06 refit the two clocks put
+the across-session median peak at broadly the same delay in **every**
+population: 2.2–3.0 s on `tc` against 3.0–3.6 s after arrival, with KS
+distances of 0.06 (non-local no-SWR) to 0.22 (non-local with SWR) between the
+normalized curves. Detected SWR is no exception — its supported arrival-clock
+maximum is at 3.6 s, like the others.
+
+That last point is a correction worth stating plainly, because the naive
+summary gets it backwards. Read over the **full** window the detected-SWR
+arrival curve's argmax lands on 0 s, and 45 % of individual SWR sessions peak
+on the boundary grid point with per-session dynamic ranges around 5e8. It is a
+boundary artefact, not an arrival-locked rate: only **0.018 %** of the
+arrival-window exposure lies in [0, 0.1] s and 1.0 % in [0, 0.25] s, against
+17.5 % in [2.5, 3.5] s, and the median SWR curve normalized to its own maximum
+reads 1.00 at 0 s but 0.51 at 0.1 s, 0.074 at 1 s, 0.56 at 2 s and **0.90 at
+3 s** — a broad, well-supported maximum near 3 s with an unsupported rise at
+the very edge that the argmax picks up. **A 0.00 s peak must never be read as
+arrival-locked.** The same caution applies to the non-local-no-SWR stop-clock
+peak, which sits exactly on the right edge of its supported interval (3.0 s).
+
+Read the whole comparison as two descriptions of the same rate, not as one
+clock beating the other — neither ladder is fit to the other's rows. The
+arrival rungs are also heavily flagged: 37 % (detected SWR) to 66 %
+(non-local with SWR) of their fits carry a separated non-nuisance term and are
+excluded from the shape summary, so the curves above rest on 68–132 sessions,
+not 218.
 
 Measured on the 2026-09-06 refit of 218 sessions: requiring the arrival clock
 cost the common cohort **84,502 of 7,400,248 bins (1.14 %) and 1,322 stops**;
@@ -290,10 +311,11 @@ its CV.
 
 ### Per-bin reward history is recomputed at the outcome boundary
 
-The stop-level reward history is evaluated at **bout start**. Because 11.5 % of
-stops span the moment their trial's outcome becomes knowable
-(`stop_start < outcome_known_time_s <= stop_end`; 17.9 % of at-well stops), the
-per-bin design shifts the lag vector at that boundary for at-well stops —
+The stop-level reward history is evaluated at **bout start**. The predicate
+`stop_start < outcome_known_time_s <= stop_end` holds for 13.5 % of all stops;
+the shift applies to the **at-well** ones, which are **11.5 % of all stops**
+(17.9 % of at-well stops). For those the per-bin design shifts the lag vector
+at that boundary —
 `lag_1 <- completed_trial_reward`, `lag_j <- lag_{j-1}` for bins whose left edge
 is at or past it — and re-derives `reward_history_rcos_0..2` and
 `reward_history_incomplete` from the shifted row with the **same** basis

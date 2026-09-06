@@ -457,8 +457,11 @@ at-well stops are the first fragment of their visit, and **69.9 % of at-well
 non-local events occur in a non-first fragment**. **80.1 %** of at-well stops
 already begin after their trial's outcome is knowable.
 
-The other **11.5 %** of all stops (17.9 % of at-well stops) *span* the boundary:
-`stop_start < outcome_known_time_s <= stop_end`. For those, holding the
+The predicate `stop_start < outcome_known_time_s <= stop_end` — the stop *spans*
+the boundary — holds for **13.5 %** of all stops. The shift applies to the
+**at-well** ones, **11.5 % of all stops** (17.9 % of at-well stops); the
+remainder are in-transit or arrival-spanning bouts, handled below. For those,
+holding the
 reward-history features at their bout-start values would let bins recorded after
 the animal learned the outcome carry a reward history that predates it. So from
 the first bin whose left edge is at or after `outcome_known_time_s`, the per-bin
