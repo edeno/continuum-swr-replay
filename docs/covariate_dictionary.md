@@ -82,10 +82,11 @@ never-visited leaf arms are `0.0` plus
 | `reward_belief_mean_candidate_arm_preoutcome` | Beta-model reward-probability belief mean for each candidate arm | candidate arm | behavior model (`beta_stable_withleaf`) | content value main effect and primary Stage-5A choice-value control |
 | `leaky_q_value_diff` | pre-update leaky-Q best-minus-second **margin** at the most recently arrived physical movement destination (α=0.3); every earlier observed port outcome updates the state | scalar | `canonical_port_value_history` | **retained comparison** (MU only) |
 
-Migration note: the old event-arm names `p_reward_arm` and `q_arm` became
+Migration note: the two event-arm value columns were renamed 2026-08-21 to
 `task_reward_probability_candidate_arm` and
-`reward_belief_mean_candidate_arm_preoutcome`; the formerly deferred
-`nominal_reward_prob` field was removed. The model's native per-port values are
+`reward_belief_mean_candidate_arm_preoutcome` (old spellings and the full rename
+table: [design/2026-08-21-covariate-naming-scheme.md](design/2026-08-21-covariate-naming-scheme.md));
+the formerly deferred `nominal_reward_prob` field was removed. The model's native per-port values are
 adapted to `reward_belief_mean_port_{0..5}`, and the chosen value is exposed as
 `reward_belief_mean_chosen_arm_preoutcome`. **`leaky_q_value_diff` is NOT this** — it is a different local
 construct (one pre-update best-minus-second margin per arrived movement destination, α=0.3,
@@ -107,9 +108,11 @@ after the migration every consumer (`fit_uncertainty_rate`, `fit_swr_power`, and
 | `omission_streak` | leading consecutive omissions in `known_reward_outcome_lag_1, known_reward_outcome_lag_2, …`, stopping at the first reward; a NaN truncates the count and unresolved lag 1 yields NaN | up to 10 known outcomes | count | model-free uncertainty block; excluded from the MU rate fit — it is another summary of the same lag vector the `reward_history_rcos_*` basis already carries |
 | `wsls_deviation` | 0 on win-stay or lose-shift, 1 on win-shift or lose-stay. Reads `completed_trial_reward` (the trip's *realized* outcome, ungated) paired with `is_stay`. `NaN` where no trip has completed, the outcome was not observed, or the outbound choice is unresolved | 1 completed trial | binary | **descriptive only** — embeds the eventual choice, so future-referencing however the outcome is clocked |
 
-(D4 (2026-06-29) kept both; **superseded 2026-08-21**: `recent_switch_rate` (now
-`patch_switch_fraction_last5_completed_trips`) remains the canonical graded covariate, but
-`is_after_switch` is retired as a fitted predictor — see the row above.)
+(D4 (2026-06-29) kept both; **superseded 2026-08-21**:
+`patch_switch_fraction_last5_completed_trips` (renamed 2026-08-21; see the
+[naming scheme](design/2026-08-21-covariate-naming-scheme.md)) remains the
+canonical graded covariate, but `is_after_switch` is retired as a fitted
+predictor — see the row above.)
 
 ### 4. Spatial / role — already consistent, no change
 
