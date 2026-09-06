@@ -210,6 +210,7 @@ M0_const              count ~ 1
 M1_rew                count ~ REWBASIS
 M5_time               count ~ BS_TC
 M3r_histcos           count ~ HISTCOS
+M6r_time_histcos      count ~ BS_TC + HISTCOS
 M7r_time_histcos_rew  count ~ BS_TC + REWBASIS + HISTCOS
 M9r_rew_x_time        count ~ BS_TC + REWBASIS + HISTCOS + reward_history_rcos_0:BS_TC
 
@@ -218,6 +219,10 @@ M9r_rew_x_time        count ~ BS_TC + REWBASIS + HISTCOS + reward_history_rcos_0
 # history block separated on the refractory bins and voided the held-out
 # metric (cv_bits_per_event NaN in 99.08 % of non-local fits over 218
 # sessions, 2026-09-06). HISTCOS spans the same window and is scored.
+
+# M6r_time_histcos is M7r without the reward block, so the reward step given
+# time AND self-history is the nested pair M7r - M6r; M1_rew - M0_const is the
+# same block's marginal step.
 
 # Arrival-anchored sub-ladder (time_clock = "arrival"). Fit on the arrival
 # window, a strict subset of the frozen cohort's rows, so these rungs are

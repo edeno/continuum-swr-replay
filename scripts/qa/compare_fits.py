@@ -61,6 +61,7 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     ARRIVAL_CLOCK_COLUMN,
     ARRIVAL_SPLINE_KNOTS,
+    BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -72,6 +73,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.table_io import read_table, table_exists
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 REPO = Path(__file__).resolve().parents[2]
@@ -694,6 +696,70 @@ def arrival_cohort_table(fits: pd.DataFrame) -> pd.DataFrame:
                 ),
                 "retained_share_arrival_events": counts["n_event_bins_arrival_window"]
                 / counts["n_event_bins_frozen"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def outcome_boundary_shift_cohort(stop_path: Path) -> pd.DataFrame:
+    """Which stops the outcome-boundary shift applies to, on the canonical table.
+
+    Two predicates, counted on the stop table the fits were built from:
+    a stop **crosses** its outcome boundary when
+    ``stop_start < outcome_known_time_s <= stop_end``, and a stop **spans an
+    arrival** when the next stop of the same session (ordered by ``stop_start``)
+    arrived inside ``(stop_start, stop_end]``. The shift applies to the crossing
+    stops except the arrival-spanning ones, whose completed trip changes partway
+    through the bout — and only where the design still has a bin to shift, i.e.
+    a retained ``BIN_S`` bin whose left edge is at or past the boundary within
+    the ``TMAX`` truncation (``n_shifted``).
+
+    Parameters
+    ----------
+    stop_path : Path
+        Canonical stop table.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per ``occupancy_state`` plus an ``all`` row, with the stop
+        counts and the crossing share.
+    """
+    stops = read_table(stop_path)
+    crosses = (
+        (stops["stop_start"] < stops["outcome_known_time_s"])
+        & (stops["outcome_known_time_s"] <= stops["stop_end"])
+    ).fillna(False)
+    ordered = stops.sort_values(SC + ["stop_start"], kind="stable")
+    next_arrival = ordered.groupby(SC, sort=False, observed=True)[
+        "last_well_arrival_time_s"
+    ].shift(-1)
+    spans = (
+        (next_arrival > ordered["stop_start"]) & (next_arrival <= ordered["stop_end"])
+    ).fillna(False)
+    spans = spans.reindex(stops.index)
+    # A crossing stop only moves if a retained bin starts at or past the
+    # boundary: the first such bin is ceil(delta / BIN_S), and it survives the
+    # exposure filter only inside min(immobility, TMAX).
+    delta = (stops["outcome_known_time_s"] - stops["stop_start"]).to_numpy(float)
+    exposed = np.minimum(stops["immobility_duration_s"].to_numpy(float), float(TMAX))
+    with np.errstate(invalid="ignore"):
+        has_bin = (exposed - np.ceil(delta / BIN_S) * BIN_S) > 1e-4
+    has_bin = pd.Series(np.nan_to_num(has_bin, nan=False).astype(bool), stops.index)
+    shifts = crosses & ~spans & has_bin
+    rows = []
+    groups = list(stops.groupby("occupancy_state", observed=True).groups.items())
+    for state, index in [*groups, ("all", stops.index)]:
+        c, s = crosses.loc[index], spans.loc[index]
+        rows.append(
+            {
+                "occupancy_state": str(state),
+                "n_stops": int(len(index)),
+                "n_crossing_boundary": int(c.sum()),
+                "pct_crossing": 100.0 * float(c.mean()),
+                "n_spanning_arrival": int(s.sum()),
+                "n_crossing_and_spanning": int((c & s).sum()),
+                "n_shifted": int(shifts.loc[index].sum()),
             }
         )
     return pd.DataFrame(rows)
@@ -1536,6 +1602,18 @@ def build_report(
     )
     add(_md(reward_boundary_shift_table(old_bin, new_bin), floatfmt="{:.3f}"))
 
+    stop_path = RC / "stop_table.pkl"
+    if table_exists(stop_path):
+        add(
+            "\nWhich stops the shift applies to, on the canonical stop table. A "
+            "stop **crosses** the boundary when `stop_start < "
+            "outcome_known_time_s <= stop_end`; it **spans an arrival** when the "
+            "next stop of the session arrived inside `(stop_start, stop_end]`, "
+            "which is the only exclusion (the completed trip changes partway "
+            "through the bout). `occupancy_state` is not part of the rule:\n"
+        )
+        add(_md(outcome_boundary_shift_cohort(stop_path), floatfmt="{:.2f}"))
+
     add(
         f"\n## Family B — arrival clock vs stop clock "
         f"(`{ARRIVAL_TIME_RUNG}` vs `{STOP_TIME_RUNG}`)\n"
@@ -1555,16 +1633,21 @@ def build_report(
         "where both are finite.\n"
     )
     add(_md(arrival_clock_cv_table(new_bin), floatfmt="{:.4f}"))
+    stop_lo, stop_hi = _support_window(SPLINE_KNOTS)
+    arr_lo, arr_hi = _support_window(ARRIVAL_SPLINE_KNOTS)
     add(
         "\n**(b) Time-course shape.** Both quantities are read on each rung's "
-        "**supported interior** only — one first-knot spacing (1 s) is dropped "
-        "at each end of the window, so the stop clock is read on "
-        f"[1, {TMAX - 1.0:g}] s and the arrival clock on "
-        f"[1, {TMAX_ARRIVAL - 1.0:g}] s. Outside the outermost interior knot a "
+        "**supported interior** only — **between the outermost interior "
+        "knots**, so the stop clock is read on "
+        f"[{stop_lo:g}, {stop_hi:g}] s (knots "
+        f"{'/'.join(f'{k:g}' for k in SPLINE_KNOTS)}) and the arrival clock on "
+        f"[{arr_lo:g}, {arr_hi:g}] s (knots "
+        f"{'/'.join(f'{k:g}' for k in ARRIVAL_SPLINE_KNOTS)}). "
+        "Outside the outermost interior knot a "
         "cubic B-spline is extrapolating over very little exposure and can run "
         "away: read over the full window, the argmax lands on a boundary grid "
         "point and the normalizing integral is dominated by mass that almost no "
-        "bin contributes to. **This margin is a rule of thumb, not a measured "
+        "bin contributes to. **This window is a rule of thumb, not a measured "
         "support** — the exposure per grid cell lives in the per-bin design, "
         "which this script does not read — so a peak sitting near either edge of "
         "the interval should still be checked against the exposure before it is "

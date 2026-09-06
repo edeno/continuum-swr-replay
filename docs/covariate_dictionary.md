@@ -451,30 +451,37 @@ time-by-current-arm interactions, but they are not one construct.
 
 ### F.4 Per-bin reward history is recomputed at the outcome boundary
 
-A stop is an immobility **fragment**, not a well visit: 69,224 at-well stops fall
-in 35,043 visits (mean **1.96 fragments per visit**, 90th pct 3), only 50.9 % of
+A stop is an immobility **fragment**, not a well visit: 68,810 of the 69,224
+at-well stops carry an arrival clock and fall in 35,043 visits (mean **1.96
+fragments per visit**, median 1, 90th pct 3), only 50.9 % of
 at-well stops are the first fragment of their visit, and **69.9 % of at-well
 non-local events occur in a non-first fragment**. **80.1 %** of at-well stops
 already begin after their trial's outcome is knowable.
 
 The predicate `stop_start < outcome_known_time_s <= stop_end` — the stop *spans*
-the boundary — holds for **13.5 %** of all stops. The shift applies to the
-**at-well** ones, **11.5 % of all stops** (17.9 % of at-well stops); the
-remainder are in-transit or arrival-spanning bouts, handled below. For those,
-holding the
+the boundary — holds for **13.5 %** of all stops (14,494 of 107,400: 12,393
+at-well and 2,101 `mixed`; no in-transit bout ever spans it). The shift applies
+to the **13.4 %** (14,343 stops) that also keep at least one bin at or past the
+boundary. For those, holding the
 reward-history features at their bout-start values would let bins recorded after
 the animal learned the outcome carry a reward history that predates it. So from
 the first bin whose left edge is at or after `outcome_known_time_s`, the per-bin
 lag matrix is shifted (`lag_1 <- completed_trial_reward`, `lag_j <- lag_{j-1}`)
 and `reward_history_rcos_0..2` plus `reward_history_incomplete` are recomputed
 from the shifted row **by the same basis functions the stop level uses**. Bins
-before the boundary keep the bout-start values. Arrival-spanning stops
-(`occupancy_state == "mixed"`; 2.0 % of all stops both span the arrival and
-contain the boundary) are **not** shifted — the well they occupy changes inside
-the bout, so `completed_trial_reward` is not the outcome that becomes known at
-the boundary — and those with at least one bin past it are counted in
-`out.attrs["n_stops_arrival_spanning"]`. A stop whose boundary lies outside it is
-untouched.
+before the boundary keep the bout-start values.
+
+The one exclusion is a bout that genuinely **spans a well arrival**: the next
+stop of the same session (ordered by `stop_start`) arrived inside
+`(stop_start, stop_end]`, so the well the animal occupies changes partway
+through and `completed_trial_reward` is not the outcome that becomes known at
+the boundary. Those stops are not shifted, and the ones with at least one bin
+past the boundary are counted in `out.attrs["n_stops_arrival_spanning"]`.
+`occupancy_state == "mixed"` is **not** that test and was a bad proxy for it: on
+the canonical stop table 173 stops (0.16 %) contain a later arrival and **none**
+of them also contains an outcome boundary, while the 2,099 `mixed` stops that do
+contain a boundary begin a median 0.22 s *after* their own arrival and last
+~0.7 s. A stop whose boundary lies outside it is untouched.
 
 ## G. Base covariate reference
 

@@ -125,6 +125,12 @@ carries an intercept) or `MODEL_CHOICE`; see their own sections in the catalog.
   additive rung and is what the summarizer, the figures and the refit audit
   read.
 
+  The retirement also removed `M7r`'s natural null: with `M6_time_hist` gone it
+  parented straight onto `M5_time`, so "the reward step" was the reward block
+  and the self-history block together. **`M6r_time_histcos`** (2026-09-06)
+  restores the missing rung — `M5_time` + the raised-cosine self-history block —
+  so the reward-given-time-and-self-history step `M7r − M6r` exists again.
+
   The reward × time interaction survives, re-parented onto the raised-cosine
   full model as **`M9r_rew_x_time`** (`M7r` + `reward_history_rcos_0:bs(tc)`).
   Its specification is otherwise unchanged.
@@ -135,9 +141,13 @@ carries an intercept) or `MODEL_CHOICE`; see their own sections in the catalog.
   (`_helpers.reconstruct_self_history_kernels`), which projects through the
   **un-normalized** raised-cosine basis — `hist_rcos_k` is a plain projection of
   the lag counts, unlike the reward block's bump-weighted fractions. The
-  reported kernel is therefore smooth: it cannot represent a lag-specific spike,
-  so a sharp single-lag refractory notch will read shallower than the dummy
-  specification reported. Refractory/bursty shape and its ordering across
+  reported kernel is therefore smooth: it cannot represent a lag-specific spike.
+  Measured against the retired dummies on the same sessions, that costs less
+  than it sounds: **both** parameterizations read RR ≈ 0 at lags 1–2 in all
+  four populations, and the smooth kernel is shallower only from lag 3 on,
+  in 4/4 populations (non-local 0.31 vs 0.22, non-local with SWR 0.15 vs 0.00,
+  non-local without SWR 0.02 vs 0.00, detected SWR 0.01 vs 0.00).
+  Refractory/bursty shape and its ordering across
   populations are what the reconstruction preserves.
 
 ## Where the rest of the narrative lives

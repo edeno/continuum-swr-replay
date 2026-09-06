@@ -3,8 +3,9 @@
 > **Header date: 2026-09-04 fit. Numbers below are stale as of the 2026-09-06
 > refit and are not to be quoted until this file is rewritten.** The 2026-09-06
 > refit changed the per-bin design (reward-history features recomputed at the
-> outcome boundary for the 11.5 % of stops that span it) and the ladder itself
-> (the `onset_lag` dummy rungs retired, the reward×time interaction re-parented
+> outcome boundary for the 13.4 % of stops that cross it) and the ladder itself
+> (the `onset_lag` dummy rungs retired, `M6r_time_histcos` added as the reward
+> block's nested null, the reward×time interaction re-parented
 > onto `M7r_time_histcos_rew`, and three arrival-anchored rungs added). Every
 > section below reads a rung that either no longer exists or was refit on the
 > new design. What changed, with the measured sizes, is in
@@ -16,7 +17,8 @@
 Quantitative readout of the per-bin conditional-intensity ladder
 (`MODEL_PER_BIN_RATE`, see [rate_models.md](rate_models.md) for the methods),
 fit per session over **218 sessions** and persisted in
-`models_per_bin_rate/all_models.pkl` (10 models, `BIN_S = 0.015`, `TMAX = 4 s`).
+`models_per_bin_rate/all_models.pkl` (10 models on the current artifact,
+`BIN_S = 0.015`, `TMAX = 4 s`).
 Numbers below are the **reward-basis** run (2026-09-04): the reward block is the
 three-bump raised-cosine basis over the last ten known outcomes
 (`reward_history_rcos_0..2` plus the `reward_history_incomplete` nuisance
