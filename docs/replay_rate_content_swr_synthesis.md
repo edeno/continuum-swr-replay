@@ -337,7 +337,7 @@ classes with the `swr_x_` interaction, so the main term is the non-SWR reference
 `reward_belief_mean_candidate_arm_preoutcome` reads **+0.264** (fraction, 217
 sessions, **5/5 animals positive**, bootstrap [+0.031, +0.818]; count +0.228,
 5/5; DM +0.168, 4/5) and the leaf bundle's `Mv` reads **+0.2512** (215 sessions,
-4/5). So the value story is a positive main effect on the leaf design *plus* the
+4/5). So the value story is a positive main effect in the pooled fit *plus* the
 SWR interaction below — do not write that it lives entirely in the interaction,
 and do not write that content is not value-selective.
 
