@@ -22,6 +22,7 @@ Notes
 
 import numpy as np
 
+from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     SAMPLING_FREQUENCY,
@@ -31,24 +32,9 @@ from continuum_swr_replay.parameters import (
 DEFAULT_NON_LOCAL_THRESHOLD = 0.8
 """Default probability threshold for classifying non-local events (0-1)."""
 
-# Seconds after destination poke-in by which the absence of reward is
-# established on an omission trial.
-#
-# The rewarded boundary is a stimulus: in the refreshed 218-session behavioral
-# cache, 18,753 rewarded task visits had p99 pump latency 91 ms and maximum
-# latency 236 ms after destination arrival.
-# Omissions have no negative-feedback cue to timestamp, and the previous rule
-# used destination poke-out -- a median 880 ms later, and a *behavioural*
-# boundary rather than a stimulus one. Gating on when the animal chose to
-# leave is circular (dwell length plausibly covaries with replay) and it
-# excluded 99% of omission events from every outcome-gated fit, collapsing
-# the reward contrast those models exist to estimate.
-#
-# 0.30 s exceeds every reward latency observed in that corpus, so it cannot
-# declare an omission while a pump could still fire, and it retains 99.6% of
-# omission pokes with a median 0.58 s of usable dwell. Re-derive from the
-# reward-latency distribution if the hardware or task timing changes.
-OMISSION_KNOWN_LATENCY_SEC: float = 0.30
+# The omission latency itself is a loading-side task constant (see
+# ``data_loaders.constants``); the semantics string that reports it is an
+# analysis-side provenance field, so it stays here.
 OUTCOME_TIME_SEMANTICS: str = (
     "earliest reward onset for rewarded trials; min(destination arrival + "
     f"{OMISSION_KNOWN_LATENCY_SEC:.2f} s, destination final poke-out) for omissions"

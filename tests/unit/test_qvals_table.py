@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
     canonicalize_behavior_model_columns,
     peri_switch_index,
 )
-from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
+from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 
 
 def _valid_qvals_output() -> pd.DataFrame:

@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.analysis.replay.covariates import (
     behavioral_location_from_port_experiences,
     visit_recency_all_events,
 )
+from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.data_loaders.trials import (
     align_port_experiences_to_task_records,
     make_port_experiences_df,

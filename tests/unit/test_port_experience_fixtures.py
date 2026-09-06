@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
+from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 _OMISSION_ARRIVAL = 1.0

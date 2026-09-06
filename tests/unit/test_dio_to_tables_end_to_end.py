@@ -22,9 +22,9 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
+from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.data_loaders.trials import (
     make_port_experiences_df,
     make_trials_df_from_well_visits,
