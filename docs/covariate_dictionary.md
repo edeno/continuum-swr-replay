@@ -651,10 +651,15 @@ result):
   means the event's mass clumps onto a few arms and its bins are near-copies of
   one another.** It is the DM analogue of `Intercept`: a **structural nuisance
   term**, excluded from the separation judgment (`_DM_NUISANCE_TERMS`) and
-  **never aggregated or reported** as a scientific effect. It is `NaN` by
-  construction wherever it was pinned (see `phi_source`), and it is genuinely
-  unidentified when a session's events are near-independent, so read it only
-  when it is not in `separated_terms`.
+  **never aggregated or reported** as a scientific effect. Because it is a
+  nuisance term it can **never appear in `separated_terms`** — that flag says
+  nothing about it either way. Where the session's concentration was pinned
+  rather than estimated, the coefficient **is** the pinned value (not NaN) and
+  it is `bse_log_phi_intercept` that is `NaN`, with the parameter excluded from
+  `n_params`. It is also genuinely unidentified when a session's events are
+  near-independent (large φ). Judge it from `phi_source` and its SE — a
+  non-`session` `phi_source` means it was imposed, and a large or non-finite SE
+  means the data did not pin it — never from `separated_terms`.
 - `log_phi_is_swr` — the additive shift of that log concentration on SWR
   events, on the same per-category scale. **This one is a scientific term**: it
   stays in the separation judgment and is aggregated in its own BH-FDR family
