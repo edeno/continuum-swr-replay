@@ -328,9 +328,12 @@ positive coefficient means content sharpens onto the current arm when that arm's
 value is **low**. **Value-update sharpens onto current** (`C9`, 5/5
 everywhere). The **scalar belief-entropy interaction is null** (`C8`) — the
 per-arm uncertainty *main effect* (`C13`) is the content-uncertainty result; do
-not conflate them. The **arm-value main effect is a null on this nine-arm
-design** (`C4`, pooled +0.0835 over 218 sessions, 3/5, q 0.295) — but it is
-**positive on the leaf design**: `CS5_armvalue`'s main term
+not conflate them. The **arm-value main effect depends on how the fit is specified**, not on the arm
+support (`C4_armvalue` and `CS5_armvalue` are both leaf-only): in the *split* `C4`
+fits it is a null (all +0.0835, 218 sessions, 3/5, q 0.295; non-SWR +0.0472, 209, 3/5;
+SWR −0.2886, 189, 2/5), whereas in the *pooled* `CS5` fit — one model over both event
+classes with the `swr_x_` interaction, so the main term is the non-SWR reference level — it is
+**positive**: `CS5_armvalue`'s main term
 `reward_belief_mean_candidate_arm_preoutcome` reads **+0.264** (fraction, 217
 sessions, **5/5 animals positive**, bootstrap [+0.031, +0.818]; count +0.228,
 5/5; DM +0.168, 4/5) and the leaf bundle's `Mv` reads **+0.2512** (215 sessions,
