@@ -55,6 +55,11 @@ _TABLE_RELPATHS = {
 # copy a stale bundle into a fresh baseline. The leaf-only belief chain's
 # directory is derived, not spelled out, because it is keyed by the rungs it
 # fits.
+# The Dirichlet-multinomial bundles are deliberately absent as well: ``models_dm``
+# and the ``*_dm`` / ``*_dm_len`` artifacts inside ``models`` are a non-primary
+# estimator kept for the content-estimator comparison, not part of the shipped
+# result the baseline exists to protect. Freezing them would make every DM
+# experiment a baseline diff. Add them here if the DM is ever promoted.
 _MODEL_DIRS = (
     "models",
     "models_swr_T",

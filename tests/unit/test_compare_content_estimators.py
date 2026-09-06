@@ -15,6 +15,8 @@ comparison is supposed to surface.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -213,8 +215,11 @@ def test_overdispersion_widens_the_dirichlet_multinomial_standard_errors(one_run
         (one_rung.summary["model"] == BASE_RUNG.name)
         & (one_rung.summary["term"] == "is_current_arm")
     ].iloc[0]
-    assert row["median_se_ratio_dm_over_count"] > 1.0
-    assert row["median_se_ratio_fraction_over_count"] > 1.0
+    # The column names spell out WHICH standard error each side is: the fraction
+    # ratio is a sandwich over a model SE, the DM's is model over model, and the
+    # two are not the same comparison.
+    assert row["median_se_ratio_dm_model_over_count_model"] > 1.0
+    assert row["median_se_ratio_fraction_cluster_over_count_model"] > 1.0
     # The mean structure is shared, so the point estimates agree even where the
     # uncertainty does not.
     assert row["median_coef_dm"] == pytest.approx(row["median_coef_count"], abs=0.25)
@@ -415,9 +420,15 @@ def test_the_persisted_rows_carry_the_scale_the_rule_is_read_on(one_rung):
     predictors = coefficients[coefficients["term"].isin(BASE_RUNG.predictors)]
     assert predictors["sd"].notna().all()
     assert (predictors["sd"] > 0).all()
-    # Concentration terms have no design column, hence no scale.
-    concentration = coefficients[coefficients["term"].str.startswith("log_phi_")]
-    assert concentration["sd"].isna().all()
+    # The concentration MODIFIER carries the SD of its own event-level design
+    # column, so the effect-scale rule applies to it like any other term; the
+    # intercept's column is a constant with no spread and stays flag-only.
+    intercept = coefficients[coefficients["term"] == mod.LOG_PHI_INTERCEPT]
+    assert not intercept.empty
+    assert intercept["sd"].isna().all()
+    modifier = coefficients[coefficients["term"] == mod.LOG_PHI_IS_SWR]
+    assert not modifier.empty
+    assert (modifier["sd"] > 0).all()
     assert "separated_terms" in coefficients.columns
 
 
@@ -429,3 +440,77 @@ def test_the_concentration_figure_refuses_a_rung_it_has_no_fits_for(one_rung, tm
             tmp_path / "log_phi_by_session.png",
             rung="not_a_fitted_rung",
         )
+
+
+def test_the_fraction_fits_non_finite_sandwich_is_refused(one_rung):
+    """A NaN clustered SE is the same failure as a missing one, not a datum.
+
+    Reported as-is it becomes a NaN SE and a NaN SE ratio, which drops that
+    session from the medians silently -- selection on the estimator's own
+    numerical trouble.
+    """
+    fit = {
+        "coef_is_current_arm": 0.8,
+        "bse_is_current_arm": 0.1,
+        "bse_cluster_is_current_arm": np.nan,
+        "llf": -100.0,
+        "llf_includes_constants": False,
+        "n_params": 2,
+    }
+    with pytest.raises(ValueError, match="bse_cluster_is_current_arm"):
+        mod._estimator_rows(
+            ("alpha", "20200101", "02_r1"),
+            BASE_RUNG,
+            {CONDITIONAL_POISSON_FRACTION: fit},
+            info={"n_events_in": 10},
+            log_constant=0.0,
+            n_events=10,
+        )
+
+
+def test_the_concentration_figure_is_optional_but_the_provenance_is_not(
+    one_rung, cohort, tmp_path, monkeypatch
+):
+    """A rung selection without the log-phi rung must still finish the run.
+
+    The figure is pinned to one rung; raising there aborted AFTER the tables
+    were written and BEFORE the provenance sidecar, leaving artifacts no reader
+    could date or trace back to their inputs.
+    """
+    monkeypatch.setattr(mod, "_assemble_arm", lambda: (cohort.copy(), {}))
+    monkeypatch.setattr(mod, "_assemble_patch", lambda ev: (cohort.copy(), {}))
+    monkeypatch.setattr(
+        mod,
+        "prepare_cohorts",
+        lambda ev, pt, **kwargs: (ev, pt, {}, {"stratum": "all"}),
+    )
+    monkeypatch.setattr(mod, "record_inputs", lambda inputs: {})
+    monkeypatch.setattr(mod, "run_comparison", lambda *args, **kwargs: one_rung)
+    figures_dir = tmp_path / "figures"
+
+    # M3 pulls in its parent M2; neither is the concentration figure's rung.
+    mod.main(
+        [
+            "--rungs",
+            "M3",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--figures-dir",
+            str(figures_dir),
+            "--n-bootstrap",
+            "10",
+        ]
+    )
+
+    assert not (figures_dir / "log_phi_by_session.png").exists()
+    provenance = tmp_path / "out" / f"{mod.COEFFICIENTS_BASENAME}.provenance.json"
+    assert provenance.exists()
+    assert json.loads(provenance.read_text())["rungs"] == ["M2", "M3"]
+
+
+@pytest.mark.parametrize(
+    ("names", "expected"),
+    [(["C2_base"], mod.DEFAULT_LOG_PHI_RUNG), (["M3"], None)],
+)
+def test_the_figure_rung_is_reported_only_when_it_was_selected(names, expected):
+    assert mod.log_phi_figure_rung(mod.resolve_rungs(names)) == expected

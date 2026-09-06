@@ -11,9 +11,12 @@ three estimators were fit on one shared per-(session, rung) event set, so a
 departure from the identity is a difference of likelihood, not of cohort.
 Unidentified fits are excluded, by the same rule the shipped aggregation uses:
 the fitter flagged that term as separated, or the effect-scale magnitude
-|coefficient| × SD(predictor) reaches 10. The drop is applied to the whole
-(session, rung, term) triple, so the three estimators are always compared over
-the same sessions.
+|coefficient| × SD(predictor) reaches 10. That effect-scale backstop applies to
+the concentration modifier `log_phi_is_swr` as well, on the SD of the event-level
+`is_swr` flag; `log_phi_intercept` is the one term it cannot apply to, because
+its design column is a constant with no SD, so there the separation flag is the
+whole criterion. The drop is applied to the whole (session, rung, term) triple,
+so the three estimators are always compared over the same sessions.
 
 `log_phi_by_session.png` — the Dirichlet-multinomial concentration for the
 `C2_base` rung. **Top,** the log concentration intercept, i.e. how tightly a

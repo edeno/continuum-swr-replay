@@ -158,6 +158,23 @@ ESTIMATORS = tuple(ESTIMATOR_LABELS)
 QUASI_SCALE = "event-scale (quasi)"
 LIKELIHOOD_SCALE = "count-scale"
 
+#: Which standard error each estimator's rows carry. The fraction fit reports the
+#: event-clustered sandwich and the other two report the fitted model SE, so an SE
+#: RATIO between them is not one kind of uncertainty over the same kind -- the
+#: column name has to say so, or "the fraction model is more conservative than the
+#: DM" gets read off a comparison of a sandwich against a likelihood.
+SE_TYPE_LABELS = {
+    "count": "count_model",
+    "fraction": "fraction_cluster",
+    "dm": "dm_model",
+}
+
+
+def se_ratio_column(label: str) -> str:
+    """Name of the SE-ratio column for estimator ``label``, SE types spelled out."""
+    return f"se_ratio_{SE_TYPE_LABELS[label]}_over_{SE_TYPE_LABELS['count']}"
+
+
 N_BOOTSTRAP = 2000
 BOOTSTRAP_SEED = 0
 BOOTSTRAP_PERCENTILES = (2.5, 50.0, 97.5)
@@ -258,6 +275,23 @@ COMPARISON_RUNGS: tuple[RungSpec, ...] = (
 
 #: Rung whose Dirichlet-multinomial concentration the log-phi figure shows.
 DEFAULT_LOG_PHI_RUNG = "C2_base"
+
+
+def log_phi_figure_rung(rungs: Sequence[RungSpec]) -> str | None:
+    """The rung the concentration figure is drawn for, or ``None`` if unselected.
+
+    ``--rungs`` can legitimately select a set that excludes
+    :data:`DEFAULT_LOG_PHI_RUNG`. That is a partial run, not a failure: the
+    figure is pinned to one rung because its caption names that rung, and
+    silently substituting another would publish a figure whose caption describes
+    a different model. Returning ``None`` lets the caller skip the panel and
+    still finish writing its tables and provenance.
+    """
+    return (
+        DEFAULT_LOG_PHI_RUNG
+        if DEFAULT_LOG_PHI_RUNG in {rung.name for rung in rungs}
+        else None
+    )
 
 
 def resolve_rungs(names: Sequence[str] | None) -> tuple[RungSpec, ...]:
@@ -568,14 +602,18 @@ def _estimator_rows(
         for name in [k[len("coef_") :] for k in fit if k.startswith("coef_")]:
             clustered = fit.get(f"bse_cluster_{name}")
             use_cluster = estimator == CONDITIONAL_POISSON_FRACTION
-            if use_cluster and clustered is None:
+            if use_cluster and (clustered is None or not np.isfinite(float(clustered))):
                 # The shipped estimator IS its clustered SE; silently reporting
                 # the model SE instead would put a number a third the size in a
                 # column the comparison reads as the fraction fit's uncertainty.
-                raise KeyError(
+                # A non-finite sandwich is the same failure as a missing one --
+                # it would become a NaN SE and a NaN SE ratio, quietly dropping
+                # that session from the medians the comparison is built on.
+                raise ValueError(
                     f"{rung.name} {key}: the conditional-Poisson fraction fit "
-                    f"returned no bse_cluster_{name}; the event-clustered "
-                    "standard error is what this estimator reports"
+                    f"returned bse_cluster_{name}={clustered!r}; the "
+                    "event-clustered standard error is what this estimator "
+                    "reports and it must be finite"
                 )
             rows.append(
                 {
@@ -661,11 +699,14 @@ def unidentified_rows(coefficients: pd.DataFrame) -> pd.Series:
     it drops identified sessions whose predictor has a small SD and keeps
     unidentified ones whose predictor has a large one.
 
-    The Dirichlet-multinomial's concentration terms have no design column and so
-    no ``sd_``. ``log_phi_intercept`` is an unbounded log concentration -- a
-    session whose events really are near-deterministic has a legitimately large
-    one -- so no magnitude rule is applied to them at all; the fitter's
-    separation flag is the whole criterion there.
+    The Dirichlet-multinomial's concentration MODIFIERS do carry a design column
+    (the event-level ``is_swr`` flag, and the event length under the
+    length-adjusted design), so the fitter persists their SD and the same
+    effect-scale rule applies to them. ``log_phi_intercept`` does not: its design
+    column is a constant, its SD is NaN by construction, and it is an unbounded
+    log concentration anyway -- a session whose events really are
+    near-deterministic has a legitimately large one -- so no magnitude rule is
+    applied to it and the fitter's separation flag is the whole criterion there.
     """
     if coefficients.empty:
         return pd.Series(dtype=bool, index=coefficients.index)
@@ -735,7 +776,7 @@ def _wide_by_estimator(coefficients: pd.DataFrame) -> pd.DataFrame:
     for estimator in (CONDITIONAL_POISSON_FRACTION, DIRICHLET_MULTINOMIAL):
         label = ESTIMATOR_LABELS[estimator]
         with np.errstate(invalid="ignore", divide="ignore"):
-            wide[f"se_ratio_{label}_over_count"] = np.where(
+            wide[se_ratio_column(label)] = np.where(
                 wide["se_count"].to_numpy(dtype=float) > 0,
                 wide[f"se_{label}"].to_numpy(dtype=float)
                 / wide["se_count"].to_numpy(dtype=float),
@@ -786,8 +827,8 @@ def summarize(coefficients: pd.DataFrame) -> pd.DataFrame:
                 group, f"delta_aic_vs_parent_{label}"
             )
             if estimator != CONDITIONAL_POISSON_COUNT:
-                record[f"median_se_ratio_{label}_over_count"] = _animal_balanced_median(
-                    group, f"se_ratio_{label}_over_count"
+                record[f"median_{se_ratio_column(label)}"] = _animal_balanced_median(
+                    group, se_ratio_column(label)
                 )
         animal_log_phi = per_rung_log_phi.get(model, pd.Series(dtype=float))
         record["dm_log_phi_is_swr_animal_median"] = (
@@ -1127,9 +1168,12 @@ three estimators were fit on one shared per-(session, rung) event set, so a
 departure from the identity is a difference of likelihood, not of cohort.
 Unidentified fits are excluded, by the same rule the shipped aggregation uses:
 the fitter flagged that term as separated, or the effect-scale magnitude
-|coefficient| × SD(predictor) reaches 10. The drop is applied to the whole
-(session, rung, term) triple, so the three estimators are always compared over
-the same sessions.
+|coefficient| × SD(predictor) reaches 10. That effect-scale backstop applies to
+the concentration modifier `log_phi_is_swr` as well, on the SD of the event-level
+`is_swr` flag; `log_phi_intercept` is the one term it cannot apply to, because
+its design column is a constant with no SD, so there the separation flag is the
+whole criterion. The drop is applied to the whole (session, rung, term) triple,
+so the three estimators are always compared over the same sessions.
 
 `log_phi_by_session.png` — the Dirichlet-multinomial concentration for the
 `C2_base` rung. **Top,** the log concentration intercept, i.e. how tightly a
@@ -1231,9 +1275,23 @@ def main(argv: Sequence[str] | None = None) -> None:
     plot_coefficient_agreement(
         result.coefficients, rungs, figures_dir / "coef_agreement.png"
     )
-    plot_log_phi_by_session(
-        result.coefficients, result.bootstrap, figures_dir / "log_phi_by_session.png"
-    )
+    # The concentration figure is pinned to one rung, and --rungs can select a
+    # set that does not include it. That is a legitimate partial run, not a
+    # failure: raising here would abort AFTER the tables were written and BEFORE
+    # the provenance sidecar, leaving artifacts no reader could date or trace.
+    if log_phi_figure_rung(rungs) is not None:
+        plot_log_phi_by_session(
+            result.coefficients,
+            result.bootstrap,
+            figures_dir / "log_phi_by_session.png",
+        )
+    else:
+        logger.info(
+            "skipping the concentration figure: it is drawn for %s, which is "
+            "not among the selected rungs (%s)",
+            DEFAULT_LOG_PHI_RUNG,
+            ", ".join(rung.name for rung in rungs),
+        )
     write_caption(figures_dir / "content_estimators_caption.md")
 
     write_fit_provenance(
