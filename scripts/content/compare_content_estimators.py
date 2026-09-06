@@ -65,6 +65,9 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E402
+    SEPARATION_COEF_ABS,
+)
 from continuum_swr_replay.analysis.replay.content_response import (  # noqa: E402
     renormalize_fraction_over_candidates,
 )
@@ -159,15 +162,15 @@ N_BOOTSTRAP = 2000
 BOOTSTRAP_SEED = 0
 BOOTSTRAP_PERCENTILES = (2.5, 50.0, 97.5)
 
-#: A coefficient this large on a bounded design column is a quasi-separated fit,
-#: not an effect. Such terms are kept in the per-session table (flagged) and
-#: excluded from the medians, the bootstrap, and the figures.
-IDENTIFIABILITY_LIMIT = 10.0
-
 LOG_PHI_IS_SWR = "log_phi_is_swr"
 
-#: Key term of each ``MODEL_HIERARCHY`` rung: the predictor it adds to its
-#: parent. The contrast rungs take theirs from the runner's own key-term map.
+#: Key term the agreement figure plots for each ``MODEL_HIERARCHY`` rung: the
+#: LAST predictor the rung adds to its parent. ``M2`` and ``M3`` add exactly one
+#: (``is_prev_arm``, the arm reward fraction); ``M4`` adds four -- the three
+#: recency-spline columns and ``is_candidate_arm_never_visited`` -- and the
+#: novelty indicator is the interpretable one of those. Every added term is
+#: still in the parquet and the summary; this map only chooses figure panels.
+#: The contrast rungs take theirs from the runner's own key-term map.
 _HIERARCHY_KEY_TERMS = {
     "M2": "is_prev_arm",
     "M3": "reward_fraction_candidate_arm_last10_visits",
@@ -560,12 +563,20 @@ def _estimator_rows(
             0.0 if fit["llf_includes_constants"] else log_constant
         )
         aic_equalized = 2.0 * fit["n_params"] - 2.0 * equalized
-        separated = set(str(fit.get("separated_terms") or "").split("|")) - {""}
+        separated_terms = str(fit.get("separated_terms") or "")
+        separated = set(separated_terms.split("|")) - {""}
         for name in [k[len("coef_") :] for k in fit if k.startswith("coef_")]:
             clustered = fit.get(f"bse_cluster_{name}")
-            use_cluster = (
-                estimator == CONDITIONAL_POISSON_FRACTION and clustered is not None
-            )
+            use_cluster = estimator == CONDITIONAL_POISSON_FRACTION
+            if use_cluster and clustered is None:
+                # The shipped estimator IS its clustered SE; silently reporting
+                # the model SE instead would put a number a third the size in a
+                # column the comparison reads as the fraction fit's uncertainty.
+                raise KeyError(
+                    f"{rung.name} {key}: the conditional-Poisson fraction fit "
+                    f"returned no bse_cluster_{name}; the event-clustered "
+                    "standard error is what this estimator reports"
+                )
             rows.append(
                 {
                     **dict(zip(SC, key, strict=True)),
@@ -587,6 +598,12 @@ def _estimator_rows(
                     else LIKELIHOOD_SCALE,
                     "leaf_only": bool(rung.leaf_only),
                     "parent": rung.parent,
+                    # ``sd_<term>`` and the fit's separated-term names travel
+                    # with the coefficient so the identifiability rule can be
+                    # reproduced downstream from the table alone. Concentration
+                    # terms have no design column and so no ``sd_``.
+                    "sd": float(fit[f"sd_{name}"]) if f"sd_{name}" in fit else np.nan,
+                    "separated_terms": separated_terms,
                     "separated_term": name in separated,
                     "converged": bool(fit.get("converged")),
                 }
@@ -633,14 +650,64 @@ def _attach_delta_aic(coefficients: pd.DataFrame) -> pd.DataFrame:
 # ── aggregation ─────────────────────────────────────────────────────────────
 
 
+def unidentified_rows(coefficients: pd.DataFrame) -> pd.Series:
+    """Per-row mask: is this term unidentified in this fit?
+
+    The same rule the shipped aggregation applies
+    (``contrast_aggregation.aggregate_contrast``): the fitter's own per-term
+    separation flag, plus a magnitude backstop read on the EFFECT scale --
+    ``|coef| * sd_<term>``, the log-rate swing the predictor actually produces
+    over one SD of itself. Judging ``|coef|`` alone is selection on the estimate:
+    it drops identified sessions whose predictor has a small SD and keeps
+    unidentified ones whose predictor has a large one.
+
+    The Dirichlet-multinomial's concentration terms have no design column and so
+    no ``sd_``. ``log_phi_intercept`` is an unbounded log concentration -- a
+    session whose events really are near-deterministic has a legitimately large
+    one -- so no magnitude rule is applied to them at all; the fitter's
+    separation flag is the whole criterion there.
+    """
+    if coefficients.empty:
+        return pd.Series(dtype=bool, index=coefficients.index)
+    coef = coefficients["coef"].abs()
+    sd = pd.to_numeric(coefficients["sd"], errors="coerce")
+    # A missing SD makes the product NaN, which compares False -- so a term with
+    # no design scale is never dropped for magnitude, only for its own flag.
+    runaway = coef * sd >= SEPARATION_COEF_ABS
+    return coefficients["separated_term"].astype(bool) | runaway
+
+
 def _identified(coefficients: pd.DataFrame) -> pd.DataFrame:
-    """Rows a median may be taken over: not separated, and on the effect scale."""
+    """Rows a median may be taken over, dropped as PAIRED (session, rung, term).
+
+    The identifiability rule fires per (session, rung, term, estimator), but a
+    summary row compares estimators to each other: if one estimator's row is
+    dropped and another's kept, the two medians would be over different
+    sessions and the comparison would no longer be paired. The whole triple
+    goes.
+    """
     if coefficients.empty:
         return coefficients
-    return coefficients[
-        ~coefficients["separated_term"]
-        & coefficients["coef"].abs().lt(IDENTIFIABILITY_LIMIT)
-    ]
+    bad = unidentified_rows(coefficients)
+    if not bad.any():
+        return coefficients
+    dropped = coefficients.loc[bad, [*SC, "model", "term"]].drop_duplicates()
+    keep = (
+        coefficients.merge(
+            dropped.assign(_drop=True), on=[*SC, "model", "term"], how="left"
+        )["_drop"]
+        .isna()
+        .to_numpy()
+    )
+    return coefficients[keep]
+
+
+def n_unpaired_triples(coefficients: pd.DataFrame) -> int:
+    """(session, rung, term) triples the identifiability rule removed."""
+    if coefficients.empty:
+        return 0
+    bad = unidentified_rows(coefficients)
+    return int(coefficients.loc[bad, [*SC, "model", "term"]].drop_duplicates().shape[0])
 
 
 def _per_animal_medians(frame: pd.DataFrame, column: str) -> pd.Series:
@@ -968,7 +1035,15 @@ def plot_log_phi_by_session(
     *,
     rung: str = DEFAULT_LOG_PHI_RUNG,
 ) -> Path:
-    """Concentration intercept and its is_swr modifier, session by session."""
+    """Concentration intercept and its is_swr modifier, session by session.
+
+    Raises
+    ------
+    ValueError
+        If ``rung`` has no Dirichlet-multinomial rows. The caption names the
+        rung the panels show, so quietly substituting another one would publish
+        a figure whose caption describes a different model.
+    """
     identified = _identified(coefficients)
     dm = identified[
         (identified["estimator"] == DIRICHLET_MULTINOMIAL)
@@ -980,12 +1055,11 @@ def plot_log_phi_by_session(
                 identified["estimator"] == DIRICHLET_MULTINOMIAL, "model"
             ].unique()
         )
-        if available:
-            rung = available[0]
-            dm = identified[
-                (identified["estimator"] == DIRICHLET_MULTINOMIAL)
-                & (identified["model"] == rung)
-            ]
+        raise ValueError(
+            f"no identified Dirichlet-multinomial fits for rung {rung!r}; the "
+            f"concentration figure cannot be drawn (rungs with DM fits: "
+            f"{available})"
+        )
 
     terms = [
         (LOG_PHI_INTERCEPT, "log φ intercept (non-SWR)"),
@@ -1051,8 +1125,11 @@ Dirichlet-multinomial on the same counts with an `is_swr` concentration
 modifier. The dashed line is the identity. Colour identifies the animal. All
 three estimators were fit on one shared per-(session, rung) event set, so a
 departure from the identity is a difference of likelihood, not of cohort.
-Quasi-separated fits (a term flagged separated, or |coefficient| ≥ 10) are
-excluded.
+Unidentified fits are excluded, by the same rule the shipped aggregation uses:
+the fitter flagged that term as separated, or the effect-scale magnitude
+|coefficient| × SD(predictor) reaches 10. The drop is applied to the whole
+(session, rung, term) triple, so the three estimators are always compared over
+the same sessions.
 
 `log_phi_by_session.png` — the Dirichlet-multinomial concentration for the
 `C2_base` rung. **Top,** the log concentration intercept, i.e. how tightly a
@@ -1186,6 +1263,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "conditional-Poisson llf values; the fraction estimator's AIC is "
                 f"{QUASI_SCALE}"
             ),
+            # (session, rung, term) triples the identifiability rule removed
+            # from the medians, the bootstrap and the figures. The drop is
+            # paired: if one estimator's row is unidentified, all three go.
+            "n_unidentified_triples_dropped": n_unpaired_triples(result.coefficients),
             # (session, rung, estimator) fits whose parent landed on a
             # different number of events, so their AIC was not differenced.
             "n_fits_delta_aic_row_mismatch": (

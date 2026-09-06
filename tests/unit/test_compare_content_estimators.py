@@ -257,7 +257,6 @@ def test_the_comparison_table_round_trips_through_parquet(one_rung, tmp_path):
     assert not restored.duplicated([*SC, "model", "term", "estimator"]).any()
 
 
-@pytest.mark.slow
 def test_the_summary_has_one_row_per_rung_and_term(two_rungs):
     summary = two_rungs.summary
     assert not summary.duplicated(["model", "term"]).any()
@@ -267,7 +266,6 @@ def test_the_summary_has_one_row_per_rung_and_term(two_rungs):
     assert set(map(tuple, summary[["model", "term"]].values)) == expected
 
 
-@pytest.mark.slow
 def test_delta_aic_is_formed_only_against_a_parent_fit_on_the_same_events(two_rungs):
     coefficients = two_rungs.coefficients
     parentless = coefficients[coefficients["model"] == BASE_RUNG.name]
@@ -291,7 +289,6 @@ def test_delta_aic_is_formed_only_against_a_parent_fit_on_the_same_events(two_ru
     ).all()
 
 
-@pytest.mark.slow
 def test_both_rungs_are_compared_on_the_same_sessions(two_rungs):
     per_rung = two_rungs.coefficients.groupby("model")[SC].apply(
         lambda frame: frozenset(map(tuple, frame.drop_duplicates().values))
@@ -341,3 +338,94 @@ def test_every_comparison_rung_names_a_parent_on_its_own_candidate_set():
             continue
         assert catalog[rung.parent].leaf_only == rung.leaf_only
         assert set(catalog[rung.parent].predictors) <= set(rung.predictors)
+
+
+def _row(term, coef, sd, separated_terms="", estimator=CONDITIONAL_POISSON_COUNT):
+    """One synthetic coefficient row, enough for the identifiability rule."""
+    return {
+        "animal": "alpha",
+        "session_date": "20200101",
+        "epoch": "02_r1",
+        "model": "B_spatial",
+        "term": term,
+        "estimator": estimator,
+        "coef": coef,
+        "sd": sd,
+        "separated_terms": separated_terms,
+        "separated_term": term in set(separated_terms.split("|")) - {""},
+    }
+
+
+def test_a_steep_coefficient_on_a_small_sd_predictor_stays_identified():
+    """|coef| = 12 at SD 0.05 is an effect of 0.6, not a runaway fit."""
+    rows = pd.DataFrame([_row("is_current_arm", 12.0, 0.05)])
+    assert not mod.unidentified_rows(rows).iloc[0]
+
+
+def test_the_same_coefficient_on_a_unit_sd_predictor_is_dropped():
+    rows = pd.DataFrame([_row("is_current_arm", 12.0, 1.0)])
+    assert mod.unidentified_rows(rows).iloc[0]
+
+
+def test_a_flagged_term_is_dropped_however_small_its_effect():
+    rows = pd.DataFrame(
+        [_row("is_current_arm", 0.3, 0.5, separated_terms="is_current_arm")]
+    )
+    assert mod.unidentified_rows(rows).iloc[0]
+
+
+def test_a_large_concentration_intercept_is_kept_because_it_has_no_design_scale():
+    """``log_phi_intercept`` is unbounded; only the fitter's flag may drop it."""
+    rows = pd.DataFrame(
+        [
+            _row("log_phi_intercept", 25.0, np.nan, estimator=DIRICHLET_MULTINOMIAL),
+            _row(
+                "log_phi_is_swr",
+                25.0,
+                np.nan,
+                separated_terms="log_phi_is_swr",
+                estimator=DIRICHLET_MULTINOMIAL,
+            ),
+        ]
+    )
+    assert list(mod.unidentified_rows(rows)) == [False, True]
+
+
+def test_an_unidentified_row_drops_the_whole_estimator_triple():
+    """Otherwise one summary row would average different sessions per estimator."""
+    rows = pd.DataFrame(
+        [
+            _row("is_current_arm", 12.0, 1.0, estimator=CONDITIONAL_POISSON_COUNT),
+            _row("is_current_arm", 0.7, 1.0, estimator=CONDITIONAL_POISSON_FRACTION),
+            _row("is_current_arm", 0.8, 1.0, estimator=DIRICHLET_MULTINOMIAL),
+            _row("is_prev_arm", -0.4, 1.0, estimator=CONDITIONAL_POISSON_COUNT),
+            _row("is_prev_arm", -0.4, 1.0, estimator=CONDITIONAL_POISSON_FRACTION),
+            _row("is_prev_arm", -0.4, 1.0, estimator=DIRICHLET_MULTINOMIAL),
+        ]
+    )
+    kept = mod._identified(rows)
+    assert set(kept["term"]) == {"is_prev_arm"}
+    assert len(kept) == 3
+    assert mod.n_unpaired_triples(rows) == 1
+
+
+def test_the_persisted_rows_carry_the_scale_the_rule_is_read_on(one_rung):
+    """``sd`` and ``separated_terms`` travel with the coefficients."""
+    coefficients = one_rung.coefficients
+    predictors = coefficients[coefficients["term"].isin(BASE_RUNG.predictors)]
+    assert predictors["sd"].notna().all()
+    assert (predictors["sd"] > 0).all()
+    # Concentration terms have no design column, hence no scale.
+    concentration = coefficients[coefficients["term"].str.startswith("log_phi_")]
+    assert concentration["sd"].isna().all()
+    assert "separated_terms" in coefficients.columns
+
+
+def test_the_concentration_figure_refuses_a_rung_it_has_no_fits_for(one_rung, tmp_path):
+    with pytest.raises(ValueError, match="no identified Dirichlet-multinomial fits"):
+        mod.plot_log_phi_by_session(
+            one_rung.coefficients,
+            one_rung.bootstrap,
+            tmp_path / "log_phi_by_session.png",
+            rung="not_a_fitted_rung",
+        )

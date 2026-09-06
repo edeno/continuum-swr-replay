@@ -9,8 +9,11 @@ Dirichlet-multinomial on the same counts with an `is_swr` concentration
 modifier. The dashed line is the identity. Colour identifies the animal. All
 three estimators were fit on one shared per-(session, rung) event set, so a
 departure from the identity is a difference of likelihood, not of cohort.
-Quasi-separated fits (a term flagged separated, or |coefficient| ≥ 10) are
-excluded.
+Unidentified fits are excluded, by the same rule the shipped aggregation uses:
+the fitter flagged that term as separated, or the effect-scale magnitude
+|coefficient| × SD(predictor) reaches 10. The drop is applied to the whole
+(session, rung, term) triple, so the three estimators are always compared over
+the same sessions.
 
 `log_phi_by_session.png` — the Dirichlet-multinomial concentration for the
 `C2_base` rung. **Top,** the log concentration intercept, i.e. how tightly a
