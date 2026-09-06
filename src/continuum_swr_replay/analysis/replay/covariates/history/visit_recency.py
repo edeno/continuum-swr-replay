@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay._helpers import build_well_to_arm_map
 from continuum_swr_replay.analysis.replay.model_specs import (
     RECENCY_SPLINE_BOUNDS,
     RECENCY_SPLINE_KNOTS,
@@ -279,28 +277,3 @@ def visit_recency_and_never_visited_all_events(
         never_visited[was_visited, j] = 0.0
 
     return recency, never_visited
-
-
-# ── Scalar compatibility views over the vectorized history functions ──
-
-
-def visit_recency_per_arm(
-    event_time: float,
-    port_experiences: pd.DataFrame,
-    track_graph: nx.Graph,
-) -> dict[int, float]:
-    """Port experiences since each arm was last visited."""
-    w2a = build_well_to_arm_map(track_graph)
-    row = visit_recency_all_events(np.array([event_time]), port_experiences, w2a)
-    return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}
-
-
-def arm_never_visited_per_arm(
-    event_time: float,
-    port_experiences: pd.DataFrame,
-    track_graph: nx.Graph,
-) -> dict[int, float]:
-    """Indicate which reachable arms were unvisited before one event."""
-    w2a = build_well_to_arm_map(track_graph)
-    row = arm_never_visited_all_events(np.array([event_time]), port_experiences, w2a)
-    return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}

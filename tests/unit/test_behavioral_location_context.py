@@ -17,7 +17,6 @@ from continuum_swr_replay.analysis.replay.covariates import (
     add_trial_context as _add_trial_context,
 )
 from continuum_swr_replay.analysis.replay.covariates import (
-    behavioral_location_at_times,
     behavioral_location_from_port_experiences,
     summarize_behavioral_location,
 )
@@ -96,17 +95,6 @@ def test_behavioral_location_uses_arrival_and_departure_boundaries():
         True,
         False,
     ]
-
-
-def test_legacy_location_name_warns_and_delegates_to_explicit_api():
-    experiences = port_experiences_from_trials(_trials(), prepend_initial=True)
-    times = np.array([0.5, 3.0])
-
-    with pytest.deprecated_call(match="port experiences"):
-        legacy = behavioral_location_at_times(times, experiences)
-    explicit = behavioral_location_from_port_experiences(times, experiences)
-
-    pd.testing.assert_frame_equal(legacy, explicit)
 
 
 def test_trial_context_is_past_only_while_next_well_is_explicitly_future():

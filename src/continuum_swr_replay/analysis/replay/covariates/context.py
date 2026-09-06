@@ -10,19 +10,17 @@ nor outcomes.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 
-from .clocks import _trial_arrival_times, _trial_outcome_times
+from .clocks import trial_arrival_times, trial_outcome_times
 from .history import (
-    _prepare_port_experiences,
     canonical_port_value_history,
     canonical_trial_switch_history,
 )
+from .history._common import _prepare_port_experiences
 
 # ── Trial-derived context ──
 
@@ -52,7 +50,7 @@ def _prepare_trials_for_context(
     A trip reaches its destination at ``goal_arrival_time``, with the
     established per-row ``end_time`` fallback. Sorting by that clock is
     essential for location and visit history. Reward history uses the separate
-    outcome clock returned by :func:`_trial_outcome_times`.
+    outcome clock returned by :func:`trial_outcome_times`.
     """
     if trials.empty:
         return trials.copy(), np.array([], dtype=float)
@@ -70,7 +68,7 @@ def _prepare_trials_for_context(
     )
     starts = prepared[departure_column].to_numpy(dtype=float)
     ends = prepared["end_time"].to_numpy(dtype=float)
-    cutoffs = _trial_arrival_times(prepared)
+    cutoffs = trial_arrival_times(prepared)
     to_wells = prepared["to_well"].to_numpy(dtype=float)
 
     if not np.isfinite(starts).all():
@@ -124,7 +122,7 @@ def _validate_trial_experience_alignment(
         "is_reward",
         "is_patch_change",
     )
-    raw_arrivals = _trial_arrival_times(trials)
+    raw_arrivals = trial_arrival_times(trials)
     order = np.argsort(raw_arrivals, kind="stable")
     trial_ids = pd.to_numeric(pd.Index(trials.index), errors="coerce").to_numpy(
         dtype=float
@@ -228,7 +226,7 @@ def _validate_trial_experience_alignment(
         or np.isfinite(destination_rewards[~destination_observed]).any()
     ):
         raise ValueError("port-experience rewards do not align with trial outcomes")
-    expected_outcomes = _trial_outcome_times(prepared)
+    expected_outcomes = trial_outcome_times(prepared)
     expected_reward_on = (
         prepared["reward_on_time"].to_numpy(dtype=float)
         if "reward_on_time" in prepared
@@ -359,20 +357,6 @@ def behavioral_location_from_port_experiences(
         },
         index=index,
     )
-
-
-def behavioral_location_at_times(
-    times: np.ndarray,
-    port_experiences: pd.DataFrame,
-) -> pd.DataFrame:
-    """Deprecated compatibility name for the explicit experience-based API."""
-    warnings.warn(
-        "behavioral_location_at_times now consumes port experiences; use "
-        "behavioral_location_from_port_experiences",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return behavioral_location_from_port_experiences(times, port_experiences)
 
 
 def summarize_behavioral_location(
@@ -596,7 +580,7 @@ def add_trial_context(
     # Advance this history at the physical outcome clock: exact pump onset for
     # newly generated rewarded trials, the canonical latency/departure boundary
     # for omissions, or the explicit
-    # conservative end-time fallback documented by _trial_outcome_times.
+    # conservative end-time fallback documented by trial_outcome_times.
     experience_reward = experiences["outcome_observed"].to_numpy(
         dtype=bool
     ) & experiences["is_reward"].fillna(False).to_numpy(dtype=bool)

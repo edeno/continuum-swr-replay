@@ -211,7 +211,7 @@ class TestNoPastTrialsContract:
                     # (max observed 0.2361 s) and under
                     # OMISSION_KNOWN_LATENCY_SEC, so
                     # the fixture exercises the arrival-vs-pump gap without
-                    # tripping the latency guard in _trial_outcome_times.
+                    # tripping the latency guard in trial_outcome_times.
                     "reward_on_time": 2.2,
                     "outcome_known_time": 2.2,
                     "from_well": 0,

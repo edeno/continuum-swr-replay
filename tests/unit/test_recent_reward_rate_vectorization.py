@@ -13,9 +13,13 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.covariates.history import (
-    _observed_port_outcomes,
-    _prepare_port_experiences,
     recent_reward_rate_all_events,
+)
+from continuum_swr_replay.analysis.replay.covariates.history._common import (
+    _prepare_port_experiences,
+)
+from continuum_swr_replay.analysis.replay.covariates.history.reward_history import (
+    _observed_port_outcomes,
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from tests.unit._port_experience_fixtures import port_experiences_from_trials

@@ -16,6 +16,10 @@ from continuum_swr_replay.analysis.replay import _helpers, covariates
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
+from continuum_swr_replay.analysis.replay.covariates.history import (
+    diagnostics,
+    value_uncertainty,
+)
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 # Scientific definitions must have one owning module.  ``_helpers`` is for
@@ -27,23 +31,17 @@ HISTORY_NAMES = [
     "recent_reward_rate_all_events",
     "recent_trial_reward_rate",
     "lagged_trial_rewards",
-    "_leaky_q_value_diff",
-    "_omission_streak",
     "add_uncertainty_covariates",
-    "visit_recency_per_arm",
-    "rolling_reward_count_per_arm",
-    "recent_reward_rate_per_arm",
 ]
 
 CONTEXT_NAMES = [
     "add_trial_context",
-    "behavioral_location_at_times",
     "behavioral_location_from_port_experiences",
     "summarize_behavioral_location",
     "trial_context_at_times",
 ]
 
-CLOCK_NAMES = ["trial_cutoff_times", "trial_outcome_times"]
+CLOCK_NAMES = ["trial_arrival_times", "trial_outcome_times"]
 
 # Names exposed from ``analysis.replay`` before the ownership cleanup remain
 # available there and now resolve through the covariates package.
@@ -80,10 +78,10 @@ def test_public_names_resolve_via_package():
         assert name in replay_pkg.__all__
 
 
-def test_q_learner_lives_in_covariates():
-    """The promoted fitted-alpha leaky-Q learner is importable from covariates."""
-    assert callable(covariates._q_chosen)
-    assert callable(covariates._fit_alpha)
+def test_q_learner_lives_in_its_diagnostics_module():
+    """The fitted-alpha leaky-Q learner is owned by ``history.diagnostics``."""
+    assert callable(diagnostics._q_chosen)
+    assert callable(diagnostics._fit_alpha)
 
 
 def test_unobserved_initial_occupancy_is_rejected_as_noncanonical():
@@ -148,7 +146,7 @@ def test_q_all_arm_chosen_column_matches_q_chosen():
     grp = np.repeat([0, 1, 2, 3], n // 4)  # 4 sessions, reset at each
     alpha = 0.2
     full = covariates.q_all_arm(arm, reward, grp, alpha)
-    chosen = covariates._q_chosen(arm, reward, grp, alpha)
+    chosen = diagnostics._q_chosen(arm, reward, grp, alpha)
     assert full.shape == (n, 6)
     np.testing.assert_allclose(full[np.arange(n), arm], chosen)
 
@@ -836,13 +834,13 @@ def test_omission_streak_is_undefined_without_a_resolved_outcome():
     category, systematically the earliest stops of each session.
     """
     no_history = np.full((1, 10), np.nan)
-    assert np.isnan(covariates._omission_streak(no_history)[0])
+    assert np.isnan(value_uncertainty._omission_streak(no_history)[0])
     # A genuine "last trial rewarded" is the value it must not be confused with.
     rewarded = np.array([[1.0] + [0.0] * 9])
-    assert covariates._omission_streak(rewarded)[0] == 0.0
+    assert value_uncertainty._omission_streak(rewarded)[0] == 0.0
     # An unresolved tail still truncates the count rather than voiding it.
     partial = np.array([[0.0, np.nan] + [np.nan] * 8])
-    assert covariates._omission_streak(partial)[0] == 1.0
+    assert value_uncertainty._omission_streak(partial)[0] == 1.0
 
 
 def test_reward_rate_arm_window_is_ten_visits_not_five():

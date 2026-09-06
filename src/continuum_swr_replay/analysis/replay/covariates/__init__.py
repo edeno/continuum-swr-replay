@@ -28,21 +28,11 @@ from .candidate_arm import (
     broadcast_candidate_arms,
 )
 from .clocks import (
-    _trial_arrival_times as _trial_arrival_times,
-)
-from .clocks import (
-    _trial_outcome_times as _trial_outcome_times,
-)
-from .clocks import (
-    trial_cutoff_times,
+    trial_arrival_times,
     trial_outcome_times,
 )
 from .context import (
-    _prepare_trials_for_context as _prepare_trials_for_context,
-)
-from .context import (
     add_trial_context,
-    behavioral_location_at_times,
     behavioral_location_from_port_experiences,
     summarize_behavioral_location,
     trial_context_at_times,
@@ -62,7 +52,6 @@ from .history import (
     UNCERTAINTY_COVARIATES,
     add_uncertainty_covariates,
     arm_never_visited_all_events,
-    arm_never_visited_per_arm,
     assert_qvals_aligned,
     attach_arm_uncertainty,
     attach_contingency_value_block,
@@ -73,28 +62,13 @@ from .history import (
     load_contingency,
     q_all_arm,
     recent_reward_rate_all_events,
-    recent_reward_rate_per_arm,
     recent_trial_reward_rate,
     reward_basis_from_lags,
     reward_history_basis_features,
     rolling_reward_count_all_events,
-    rolling_reward_count_per_arm,
     spline_visit_recency_within_event,
     visit_recency_all_events,
     visit_recency_and_never_visited_all_events,
-    visit_recency_per_arm,
-)
-from .history import (
-    _fit_alpha as _fit_alpha,
-)
-from .history import (
-    _leaky_q_value_diff as _leaky_q_value_diff,
-)
-from .history import (
-    _omission_streak as _omission_streak,
-)
-from .history import (
-    _q_chosen as _q_chosen,
 )
 
 __all__ = [
@@ -109,12 +83,10 @@ __all__ = [
     "add_trial_context",
     "add_uncertainty_covariates",
     "arm_never_visited_all_events",
-    "arm_never_visited_per_arm",
     "assert_qvals_aligned",
     "attach_arm_uncertainty",
     "attach_candidate_arm_covariates",
     "attach_contingency_value_block",
-    "behavioral_location_at_times",
     "behavioral_location_from_port_experiences",
     "broadcast_candidate_arms",
     "candidate_arm",
@@ -131,18 +103,15 @@ __all__ = [
     "load_contingency",
     "q_all_arm",
     "recent_reward_rate_all_events",
-    "recent_reward_rate_per_arm",
     "recent_trial_reward_rate",
     "reward_basis_from_lags",
     "reward_history_basis_features",
     "rolling_reward_count_all_events",
-    "rolling_reward_count_per_arm",
     "spline_visit_recency_within_event",
     "summarize_behavioral_location",
+    "trial_arrival_times",
     "trial_context_at_times",
-    "trial_cutoff_times",
     "trial_outcome_times",
     "visit_recency_all_events",
     "visit_recency_and_never_visited_all_events",
-    "visit_recency_per_arm",
 ]

@@ -61,7 +61,7 @@ def port_experiences_from_trials(
         )
     elif "reward_on_time" in frame:
         # An omission becomes known at the pump-latency boundary after arrival,
-        # not at departure. This is the clock ``_trial_outcome_times`` derives
+        # not at departure. This is the clock ``trial_outcome_times`` derives
         # from the same reward-on column, so the adapted experiences have to
         # match it or every builder test would run a later omission clock than
         # the pipeline it stands in for.
@@ -76,7 +76,7 @@ def port_experiences_from_trials(
         )
     else:
         # With no reward-on column there is no pump onset to anchor either
-        # outcome, and ``_trial_outcome_times`` falls back to ``end_time`` for
+        # outcome, and ``trial_outcome_times`` falls back to ``end_time`` for
         # both; mirror that fallback rather than inventing a boundary.
         outcome = end
     reward_on = np.where(reward.astype(bool), outcome, np.nan)

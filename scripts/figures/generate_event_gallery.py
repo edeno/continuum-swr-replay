@@ -88,7 +88,7 @@ from continuum_swr_replay.analysis.replay._helpers import (
     immobility_bout_intervals,
 )
 from continuum_swr_replay.analysis.replay.covariates import (
-    trial_cutoff_times,
+    trial_arrival_times,
     trial_outcome_times,
 )
 from continuum_swr_replay.analysis.replay.posterior_io import (
@@ -727,7 +727,7 @@ def _completed_trials_at(trials: pd.DataFrame, event_start: float) -> pd.DataFra
     if trials is None or not len(trials):
         return pd.DataFrame() if trials is None else trials.copy()
     completed = trials.copy()
-    completed["_completion_time"] = trial_cutoff_times(completed)
+    completed["_completion_time"] = trial_arrival_times(completed)
     return (
         completed[completed["_completion_time"] <= event_start]
         .sort_values("_completion_time", kind="stable")

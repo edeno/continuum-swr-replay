@@ -1,8 +1,9 @@
-"""Benchmark: vectorized vs scalar per-arm helpers.
+"""Benchmark: throughput of the vectorized per-arm history helpers.
 
-Run with:
-    python tests/benchmarks/bench_per_arm_helpers.py
+Run with (as a module, so the shared test fixtures import):
+    python -m tests.benchmarks.bench_per_arm_helpers
 """
+
 from __future__ import annotations
 
 import time
@@ -35,65 +36,45 @@ def _make_trials(n_trials: int, rng: np.random.Generator) -> pd.DataFrame:
     })
 
 
-def _run_scalar(func, event_times, trials, track_graph):
-    """Run the scalar (per-event) version, collect results as 2D array."""
-    from continuum_swr_replay.data_loaders.constants import ALL_ARMS
-
-    n_arms = len(ALL_ARMS)
-    out = np.full((len(event_times), n_arms), np.nan)
-    for i, t in enumerate(event_times):
-        result = func(float(t), trials, track_graph)
-        for j, arm in enumerate(ALL_ARMS):
-            out[i, j] = result[arm]
-    return out
-
-
 def main():
     from continuum_swr_replay.analysis.replay._helpers import (
         build_well_to_arm_map,
     )
     from continuum_swr_replay.analysis.replay.covariates import (
         recent_reward_rate_all_events,
-        recent_reward_rate_per_arm,
         rolling_reward_count_all_events,
-        rolling_reward_count_per_arm,
         visit_recency_all_events,
-        visit_recency_per_arm,
     )
+    from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+    from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
     rng = np.random.default_rng(42)
     graph = _bandit_graph()
     trials = _make_trials(80, rng)
+    experiences = port_experiences_from_trials(trials, prepend_initial=True)
     event_times = np.sort(rng.uniform(0, 100, 500))
     w2a = build_well_to_arm_map(graph)
 
     funcs = [
-        ("visit_recency_trials", visit_recency_per_arm, visit_recency_all_events),
-        ("reward_count_candidate_arm_last10_known_trials", rolling_reward_count_per_arm, rolling_reward_count_all_events),
-        ("reward_fraction_candidate_arm_last10_visits", recent_reward_rate_per_arm, recent_reward_rate_all_events),
+        ("visit_recency_trials", visit_recency_all_events),
+        (
+            "reward_count_candidate_arm_last10_known_trials",
+            rolling_reward_count_all_events,
+        ),
+        ("reward_fraction_candidate_arm_last10_visits", recent_reward_rate_all_events),
     ]
 
-    for name, scalar_fn, batch_fn in funcs:
-        # --- Scalar (old) ---
+    for name, batch_fn in funcs:
         t0 = time.perf_counter()
-        old = _run_scalar(scalar_fn, event_times, trials, graph)
-        t_old = time.perf_counter() - t0
+        values = batch_fn(event_times, experiences, w2a)
+        elapsed = time.perf_counter() - t0
 
-        # --- Batch (new) ---
-        t0 = time.perf_counter()
-        new = batch_fn(event_times, trials, w2a)
-        t_new = time.perf_counter() - t0
-
-        # Verify identical output
-        np.testing.assert_array_equal(
-            old, new,
-            err_msg=f"{name}: vectorized output differs from scalar",
+        assert values.shape == (len(event_times), len(ALL_ARMS)), name
+        per_event_us = 1e6 * elapsed / len(event_times)
+        print(
+            f"{name:30s}  batch={elapsed:.4f}s"
+            f"  ({per_event_us:.1f} us/event over {len(event_times)} events)"
         )
-
-        speedup = t_old / t_new if t_new > 0 else float("inf")
-        print(f"{name:30s}  scalar={t_old:.4f}s  batch={t_new:.4f}s  speedup={speedup:.1f}x")
-
-    print("\nAll outputs match exactly.")
 
 
 if __name__ == "__main__":

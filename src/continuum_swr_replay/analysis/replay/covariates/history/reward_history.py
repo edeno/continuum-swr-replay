@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.replay._helpers import (
-    build_well_to_arm_map,
     raised_cosine_history_basis,
     # Re-exported: the projection is a pure array primitive shared with the
     # per-bin design builder, which must not import this package.
@@ -329,31 +327,3 @@ def reward_history_basis_features(
     raw = reward_basis_from_lags(lags, raised_cosine_history_basis(n_lags, n_basis))
     incomplete = np.isnan(raw).any(axis=1).astype(float)
     return np.nan_to_num(raw, nan=0.0), incomplete
-
-
-def rolling_reward_count_per_arm(
-    event_time: float,
-    port_experiences: pd.DataFrame,
-    track_graph: nx.Graph,
-    window: int = 10,
-) -> dict[int, float]:
-    """Rewards at each arm over the last ``window`` known port outcomes."""
-    w2a = build_well_to_arm_map(track_graph)
-    row = rolling_reward_count_all_events(
-        np.array([event_time]), port_experiences, w2a, window=window
-    )
-    return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}
-
-
-def recent_reward_rate_per_arm(
-    event_time: float,
-    port_experiences: pd.DataFrame,
-    track_graph: nx.Graph,
-    k: int = 10,
-) -> dict[int, float]:
-    """Fraction of the last ``k`` visits to each arm that were rewarded."""
-    w2a = build_well_to_arm_map(track_graph)
-    row = recent_reward_rate_all_events(
-        np.array([event_time]), port_experiences, w2a, k=k
-    )
-    return {arm: float(row[0, j]) for j, arm in enumerate(ALL_ARMS)}

@@ -82,8 +82,8 @@ from matplotlib.ticker import FixedFormatter, FixedLocator, MaxNLocator
 
 from continuum_swr_replay.analysis.replay import (
     single_arm_from_well,
+    trial_arrival_times,
     trial_context_at_times,
-    trial_cutoff_times,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     N_REWARD_LAGS,
@@ -502,7 +502,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
 
     # Validate using the same helper as the canonical table builders.
     trial_context_at_times(np.array([lo]), ordered, ctx.port_experiences)
-    completion_times = trial_cutoff_times(ordered)
+    completion_times = trial_arrival_times(ordered)
     if not np.isfinite(completion_times).all():
         raise ValueError("canonical trial cutoff times must be finite")
 

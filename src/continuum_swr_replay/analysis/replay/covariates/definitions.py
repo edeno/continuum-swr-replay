@@ -354,7 +354,7 @@ _DEFINITIONS = [
         clock=QueryClock.STOP_START,
         availability=Availability.PRE_OUTCOME,
         support="all stops with known lag 1",
-        producer="covariates.history._omission_streak",
+        producer="covariates.history.value_uncertainty._omission_streak",
         window="known_reward_outcome_lag_1 through lag_10",
         missingness="lag 1 is unavailable",
     ),

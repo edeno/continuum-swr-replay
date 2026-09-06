@@ -25,11 +25,10 @@ from .covariates import (
     UNCERTAINTY_COVARIATES,
     add_trial_context,
     add_uncertainty_covariates,
-    behavioral_location_at_times,
     behavioral_location_from_port_experiences,
     summarize_behavioral_location,
+    trial_arrival_times,
     trial_context_at_times,
-    trial_cutoff_times,
     trial_outcome_times,
 )
 from .fitting import (
@@ -180,7 +179,6 @@ __all__ = [
     "at_well_event_cohort",
     "freeze_retrospective_cohort",
     "attach_is_swr_to_onsets",
-    "behavioral_location_at_times",
     "behavioral_location_from_port_experiences",
     "build_choice_dataset",
     "build_control_aligned_table",
@@ -229,7 +227,7 @@ __all__ = [
     "stop_patch_replay",
     "stop_replay_summary",
     "summarize_behavioral_location",
+    "trial_arrival_times",
     "trial_context_at_times",
-    "trial_cutoff_times",
     "trial_outcome_times",
 ]

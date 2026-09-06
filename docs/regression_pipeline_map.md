@@ -168,13 +168,13 @@ Shared derivation of candidate-arm predictors.
 
 Canonical arrival and outcome-availability clocks for behavioral history.
 
-`trial_cutoff_times`, `trial_outcome_times`
+`trial_arrival_times`, `trial_outcome_times`
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/context.py`
 
 Time-local behavioral location and completed-trial context.
 
-`behavioral_location_from_port_experiences`, `behavioral_location_at_times`, `summarize_behavioral_location`, `add_trial_context`, `trial_context_at_times`
+`behavioral_location_from_port_experiences`, `summarize_behavioral_location`, `add_trial_context`, `trial_context_at_times`
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/definitions.py`
 
@@ -198,7 +198,7 @@ Diagnostic per-animal fitted-alpha leaky-Q learner.
 
 Reward-history covariates: rolling reward counts and recent reward rates over an arm's last visits, plus stop-level reward histories.
 
-`rolling_reward_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`, `rolling_reward_count_per_arm`, `recent_reward_rate_per_arm`
+`rolling_reward_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/history/value_block.py`
 
@@ -216,7 +216,7 @@ Value and uncertainty covariates computed from the behavioral stream: the canoni
 
 Visit-recency covariates: how recently (and whether ever) each arm was visited, at event time and as per-arm scalar views.
 
-`center_visit_recency_within_event`, `spline_visit_recency_within_event`, `visit_recency_all_events`, `arm_never_visited_all_events`, `visit_recency_and_never_visited_all_events`, `visit_recency_per_arm`, `arm_never_visited_per_arm`
+`center_visit_recency_within_event`, `spline_visit_recency_within_event`, `visit_recency_all_events`, `arm_never_visited_all_events`, `visit_recency_and_never_visited_all_events`
 
 ### `src/continuum_swr_replay/analysis/replay/spatial.py`
 

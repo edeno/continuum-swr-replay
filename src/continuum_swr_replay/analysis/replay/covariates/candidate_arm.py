@@ -24,7 +24,6 @@ from ..model_specs import RECENCY_SPLINE_COLUMNS
 from ..spatial import arm_dist_rank, dist_to_arm_from_well
 from ..spatial_mapping import arm_to_well
 from .history import (
-    _prepare_port_experiences,
     attach_arm_uncertainty,
     attach_contingency_value_block,
     center_visit_recency_within_event,
@@ -33,6 +32,7 @@ from .history import (
     spline_visit_recency_within_event,
     visit_recency_and_never_visited_all_events,
 )
+from .history._common import _prepare_port_experiences
 
 
 def broadcast_candidate_arms(event_table: pd.DataFrame) -> pd.DataFrame:

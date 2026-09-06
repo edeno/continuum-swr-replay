@@ -10,7 +10,7 @@ from continuum_swr_replay.data_loaders.trial_clocks import (
 )
 
 
-def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
+def trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
     """Per-trial destination-arrival timestamps for visit/location history.
 
     Uses ``goal_arrival_time`` (the moment the animal *arrives at* the
@@ -18,7 +18,7 @@ def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
     falling back to ``end_time`` per row when ``goal_arrival_time`` is NaN,
     and per frame when the column is absent. This clock controls destination,
     visit-recency, and switch history only. Reward-bearing history must use
-    :func:`_trial_outcome_times` instead.
+    :func:`trial_outcome_times` instead.
     """
     if "goal_arrival_time" in trials.columns:
         cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
@@ -33,7 +33,7 @@ def _trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
     return trials["end_time"].to_numpy(dtype=float)
 
 
-def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
+def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     """Per-trial timestamp at which reward versus omission is observable.
 
     Newly generated trial tables carry ``outcome_known_time``: first pump onset
@@ -53,7 +53,7 @@ def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
         raise KeyError("trial outcome timing requires end_time")
 
     end = trials["end_time"].to_numpy(dtype=float)
-    arrival = _trial_arrival_times(trials)
+    arrival = trial_arrival_times(trials)
     if "destination_first_poke_out_time" in trials:
         first_poke_out = trials["destination_first_poke_out_time"].to_numpy(dtype=float)
         if (
@@ -136,17 +136,3 @@ def _trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
             f"destination arrival and end_time; invalid row(s): {bad}"
         )
     return outcome
-
-
-def trial_cutoff_times(trials: pd.DataFrame) -> np.ndarray:
-    """Return the canonical destination-arrival cutoff for each trial.
-
-    This public compatibility wrapper is for visit/location history. Reward
-    history uses :func:`trial_outcome_times`.
-    """
-    return _trial_arrival_times(trials)
-
-
-def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
-    """Return the canonical reward/omission availability time per trial."""
-    return _trial_outcome_times(trials)

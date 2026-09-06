@@ -27,17 +27,12 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table as _build_contfrag_event_table,
 )
+from continuum_swr_replay.analysis.replay._helpers import build_well_to_arm_map
 from continuum_swr_replay.analysis.replay.covariates import (
-    arm_never_visited_per_arm as _arm_never_visited_per_arm,
-)
-from continuum_swr_replay.analysis.replay.covariates import (
-    recent_reward_rate_per_arm as _recent_reward_rate_per_arm,
-)
-from continuum_swr_replay.analysis.replay.covariates import (
-    rolling_reward_count_per_arm as _rolling_reward_count_per_arm,
-)
-from continuum_swr_replay.analysis.replay.covariates import (
-    visit_recency_per_arm as _visit_recency_per_arm,
+    arm_never_visited_all_events,
+    recent_reward_rate_all_events,
+    rolling_reward_count_all_events,
+    visit_recency_all_events,
 )
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
@@ -64,20 +59,13 @@ def build_contfrag_event_arm_table(event_table, dot, env, trials, graph, **kwarg
     )
 
 
-def visit_recency_per_arm(time, trials, graph):
-    return _visit_recency_per_arm(time, _experiences(trials), graph)
-
-
-def arm_never_visited_per_arm(time, trials, graph):
-    return _arm_never_visited_per_arm(time, _experiences(trials), graph)
-
-
-def rolling_reward_count_per_arm(time, trials, graph):
-    return _rolling_reward_count_per_arm(time, _experiences(trials), graph)
-
-
-def recent_reward_rate_per_arm(time, trials, graph, k=10):
-    return _recent_reward_rate_per_arm(time, _experiences(trials), graph, k=k)
+def arm_history(function, times, trials, graph):
+    """``(n_times, 9)`` history over the nine arms from a vectorized helper."""
+    return function(
+        np.asarray(times, dtype=float),
+        _experiences(trials),
+        build_well_to_arm_map(graph),
+    )
 
 
 class _EnvStub:
@@ -430,26 +418,24 @@ class TestContfragArmFractionDenominator:
             np.tile(np.arange(9), (len(events), 1)),
         )
 
-        scalar_functions = {
-            "visit_recency_trials": visit_recency_per_arm,
-            "is_candidate_arm_never_visited": arm_never_visited_per_arm,
-            "reward_count_candidate_arm_last10_known_trials": rolling_reward_count_per_arm,
-            "reward_fraction_candidate_arm_last10_visits": lambda t, trials, graph: (
-                recent_reward_rate_per_arm(t, trials, graph, k=10)
+        history_functions = {
+            "visit_recency_trials": visit_recency_all_events,
+            "is_candidate_arm_never_visited": arm_never_visited_all_events,
+            "reward_count_candidate_arm_last10_known_trials": (
+                rolling_reward_count_all_events
             ),
+            "reward_fraction_candidate_arm_last10_visits": recent_reward_rate_all_events,
         }
-        for column, function in scalar_functions.items():
-            expected = np.asarray(
-                [
-                    [function(t, trials, graph)[arm] for arm in range(9)]
-                    for t in events["event_start_s"].to_numpy(dtype=float)
-                ]
-            )
+        event_start_times = events["event_start_s"].to_numpy(dtype=float)
+        for column, function in history_functions.items():
+            expected = arm_history(function, event_start_times, trials, graph)
             actual = event_arms[column].to_numpy(dtype=float).reshape(len(events), 9)
             np.testing.assert_allclose(actual, expected, rtol=0.0, atol=0.0)
 
-        start_reward = rolling_reward_count_per_arm(0.25, trials, graph)[2]
-        midpoint_reward = rolling_reward_count_per_arm(0.26, trials, graph)[2]
+        reward_counts = arm_history(
+            rolling_reward_count_all_events, [0.25, 0.26], trials, graph
+        )
+        start_reward, midpoint_reward = reward_counts[0, 2], reward_counts[1, 2]
         assert start_reward == 0.0
         assert midpoint_reward == 1.0
         assert (
