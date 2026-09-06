@@ -18,13 +18,37 @@ from .model_specs import MODEL_HIERARCHY
 
 # Fit-scale metadata carried from the per-session frames onto the comparison and
 # its summary: which estimator produced the numbers, which response column it was
-# fit on, and whether its log-likelihood carries the response's normalizing
-# constants. All three must agree between parent and child for a comparison to
-# mean anything, so ``summarize_comparison`` refuses a step where they do not.
-METADATA_COLUMNS = ("estimator", "response_col", "llf_includes_constants")
+# fit on, whether its log-likelihood carries the response's normalizing
+# constants, and which time clock a per-bin rung's rows are on. All four must
+# agree between parent and child for a comparison to mean anything, so
+# ``summarize_comparison`` refuses a step where they do not.
+METADATA_COLUMNS = (
+    "estimator",
+    "response_col",
+    "llf_includes_constants",
+    "time_clock",
+)
 
-#: Metadata column whose disagreement invalidates a per-session comparison.
-LIKELIHOOD_CONSTANTS_COLUMN = "llf_includes_constants"
+#: Metadata columns whose disagreement invalidates a per-session comparison, and
+#: why. ``llf_includes_constants``: the Dirichlet-multinomial likelihood carries
+#: the response's normalizing constants and a statsmodels conditional likelihood
+#: does not. ``time_clock``: a per-bin rung anchored on the arrival clock is fit
+#: on the arrival window, a strict subset of the frozen cohort's rows, so a
+#: cross-clock delta measures the window rather than the rungs. The row-count
+#: guard below would catch that too, but the clock says WHY.
+INVALIDATING_METADATA_COLUMNS = {
+    "llf_includes_constants": (
+        "compares a likelihood that includes the response's normalizing "
+        "constants against one that does not — equalize the constants (see "
+        "dirichlet_multinomial.multinomial_log_constant) before differencing "
+        "information criteria across estimators"
+    ),
+    "time_clock": (
+        "compares rungs anchored on different time clocks, which are fit to "
+        "different rows (an arrival-clock rung is fit on the arrival window) — "
+        "compare an arrival rung with its own clock's null instead"
+    ),
+}
 
 
 def compare_nested_models(
@@ -55,10 +79,13 @@ def compare_nested_models(
         any session whose parent and child report different ``n_events``,
         ``n_bins``, or ``n_stops`` — rungs fit to different rows are not
         comparable — and likewise for any session whose two rungs disagree on
-        ``llf_includes_constants``: the Dirichlet-multinomial likelihood carries
-        the multinomial coefficient and a statsmodels conditional likelihood
-        does not, so differencing them measures that constant rather than the
-        rungs.
+        one of :data:`INVALIDATING_METADATA_COLUMNS`: on
+        ``llf_includes_constants`` because the Dirichlet-multinomial likelihood
+        carries the multinomial coefficient and a statsmodels conditional
+        likelihood does not, so differencing them measures that constant rather
+        than the rungs, and on ``time_clock`` because a per-bin rung anchored on
+        the arrival clock is fit on the arrival window rather than the whole
+        frozen cohort.
     """
     if session_cols is None:
         session_cols = ["animal", "session_date", "epoch"]
@@ -136,30 +163,27 @@ def compare_nested_models(
         for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
             merged.loc[different_n, col] = np.nan
 
-    # Invalidate the same metrics when the two rungs' log-likelihoods do not
-    # carry the same constants. Both sides must actually say so: a legacy frame
-    # that records nothing is unknown, not different.
-    parent_constants = f"{LIKELIHOOD_CONSTANTS_COLUMN}_parent"
-    child_constants = f"{LIKELIHOOD_CONSTANTS_COLUMN}_child"
-    if parent_constants in merged.columns and child_constants in merged.columns:
-        stated = merged[parent_constants].notna() & merged[child_constants].notna()
-        different_constants = stated & (
-            merged[parent_constants] != merged[child_constants]
-        )
-        if different_constants.any():
+    # Invalidate the same metrics when the two rungs disagree on a metadata
+    # column that makes their information criteria incommensurable. Both sides
+    # must actually say so: a legacy frame that records nothing is unknown, not
+    # different.
+    for column, reason in INVALIDATING_METADATA_COLUMNS.items():
+        parent_col, child_col = f"{column}_parent", f"{column}_child"
+        if parent_col not in merged.columns or child_col not in merged.columns:
+            continue
+        stated = merged[parent_col].notna() & merged[child_col].notna()
+        mismatched = stated & (merged[parent_col] != merged[child_col])
+        if mismatched.any():
             import logging
 
             logging.warning(
-                "%d/%d sessions compare a likelihood that includes the response's "
-                "normalizing constants against one that does not — invalidating "
-                "those comparisons. Equalize the constants (see "
-                "dirichlet_multinomial.multinomial_log_constant) before "
-                "differencing information criteria across estimators.",
-                int(different_constants.sum()),
+                "%d/%d sessions %s — invalidating those comparisons.",
+                int(mismatched.sum()),
                 len(merged),
+                reason,
             )
         for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
-            merged.loc[different_constants, col] = np.nan
+            merged.loc[mismatched, col] = np.nan
 
     return merged
 

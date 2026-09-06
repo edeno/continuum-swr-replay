@@ -434,3 +434,44 @@ def test_constants_alone_invalidate_a_pair_that_agrees_on_everything_else():
     # And the summary refuses the step outright: one value cannot be reported.
     with pytest.raises(ValueError, match="llf_includes_constants"):
         summarize_comparison(comparison, "M0", "M1")
+
+
+def _per_bin_fit(*, aic, bic, ll, n_bins, time_clock):
+    """One per-bin rung's per-session row, tagged with the clock it was fit on."""
+    frame = _make_fit_results(ll=ll, aic=aic, bic=bic, n_params=7)
+    frame = frame.drop(columns=["n_events"])
+    frame["n_bins"] = n_bins
+    frame["time_clock"] = time_clock
+    return frame
+
+
+def test_cross_clock_comparison_is_invalidated_and_says_which_clocks(caplog):
+    """An arrival rung is fit on the arrival window, so it is not the stop ladder's child.
+
+    The row-count guard would also catch this (the window is a strict subset of
+    the frozen cohort), but the clock is what makes the reason legible, so it
+    travels with the comparison and invalidates it on its own.
+    """
+    parent = _per_bin_fit(aic=100, bic=110, ll=-50, n_bins=1000, time_clock="stop")
+    child = _per_bin_fit(aic=90, bic=105, ll=-44, n_bins=900, time_clock="arrival")
+
+    with caplog.at_level("WARNING"):
+        row = compare_nested_models(parent, child).iloc[0]
+
+    assert np.isnan(row["delta_aic"])
+    assert np.isnan(row["delta_bic"])
+    assert np.isnan(row["lr_stat"])
+    assert np.isnan(row["lr_pvalue"])
+    assert row["time_clock_parent"] == "stop"
+    assert row["time_clock_child"] == "arrival"
+    assert "different time clocks" in caplog.text
+
+
+def test_same_clock_comparison_is_untouched():
+    parent = _per_bin_fit(aic=100, bic=110, ll=-50, n_bins=900, time_clock="arrival")
+    child = _per_bin_fit(aic=90, bic=105, ll=-44, n_bins=900, time_clock="arrival")
+
+    row = compare_nested_models(parent, child).iloc[0]
+
+    assert row["delta_aic"] == 10
+    assert np.isfinite(row["lr_stat"])

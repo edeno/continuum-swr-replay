@@ -66,6 +66,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
+    ARRIVAL_CLOCK_COLUMN,
     BIN_S,
     MODEL_PER_BIN_RATE,
     N_HISTORY_BASIS,
@@ -74,6 +75,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     STOP_COVARIATES,
     TMAX,
     aggregate_to_timebins,
+    apply_arrival_window,
     attach_is_swr_to_onsets,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
@@ -89,6 +91,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
     require_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
+    DERIVED_COVARIATE_SOURCES,
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
@@ -130,25 +133,33 @@ def _fit_one_session(
     onsets_g: pd.DataFrame,
     run_cv: bool,
     run_gof: bool,
-) -> tuple[tuple, list[dict], dict, dict, dict, float]:
+) -> tuple[tuple, list[dict], dict, dict, dict, dict, float]:
     """Fit all (outcome, model) cells for one session on ONE frozen cohort.
 
-    Returns ``(keys, rows, none_counts, cv_none_counts, cohort_drops, elapsed)``.
-    ``none_counts`` maps ``(model, outcome) -> count`` of cells whose GLM fit
-    returned ``None`` (too little data / unidentified / numerical failure);
-    ``cv_none_counts`` maps the same key to cells that fit but whose
-    cross-validation returned ``None`` (a fold failed or the design was not
-    CV-able), which would otherwise drop the ``cv_*`` columns silently.
-    ``cohort_drops`` maps ``outcome -> stops removed by the cohort freeze``,
-    which the shipped ladder requires to be zero (asserted below) and which the
-    cohort audit reports as ``n_drop_common_cohort_other``.
-    Top-level (picklable) so it can run in a worker process.
+    Returns ``(keys, rows, none_counts, cv_none_counts, cohort_drops,
+    arrival_counts, elapsed)``. ``none_counts`` maps ``(model, outcome) ->
+    count`` of cells whose GLM fit returned ``None`` (too little data /
+    unidentified / numerical failure); ``cv_none_counts`` maps the same key to
+    cells that fit but whose cross-validation returned ``None`` (a fold failed
+    or the design was not CV-able), which would otherwise drop the ``cv_*``
+    columns silently. ``cohort_drops`` maps ``outcome -> stops removed by the
+    cohort freeze``, which the cohort audit reports as
+    ``n_drop_common_cohort_other``; apart from the stops with no arrival clock
+    the shipped ladder requires it to be zero (asserted below).
+    ``arrival_counts`` maps ``outcome -> Counter`` of the arrival-clock cohort
+    tallies (what the arrival column cost the common cohort, and what its
+    window then retained). Top-level (picklable) so it can run in a worker
+    process.
     """
     t0 = time.perf_counter()
     rows: list[dict] = []
     none_counts: dict = {}
     cv_none_counts: dict = {}
     cohort_drops: dict = {}
+    arrival_counts: dict = {}
+    has_arrival_rungs = any(
+        spec.time_clock == "arrival" for spec in MODEL_PER_BIN_RATE.values()
+    )
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -164,25 +175,55 @@ def _fit_one_session(
         frozen, freeze = freeze_per_bin_cohort(design, MODEL_PER_BIN_RATE.values())
         n_dropped = freeze["n_stops_before"] - freeze["n_stops_after"]
         cohort_drops[outcome] = n_dropped
-        if n_dropped:
+        # The arrival clock is the ONE column of the union that is legitimately
+        # missing on the canonical stop table: a stop that began before the
+        # session's first well arrival has none. Because the freeze is common to
+        # the ladder those bins leave every rung, so the cost is reported rather
+        # than absorbed -- but it is not the upstream-table change the assertion
+        # below is looking for, and is subtracted from it.
+        n_dropped_arrival = int(freeze.get("n_stops_dropped_arrival_clock", 0))
+        if n_dropped - n_dropped_arrival:
             offenders = {
                 col: int(design[col].isna().sum())
                 for col in freeze["required_columns"]
-                if design[col].isna().any()
+                if col != ARRIVAL_CLOCK_COLUMN and design[col].isna().any()
             }
             raise ValueError(
                 f"{'_'.join(map(str, keys))}/{outcome}: freezing the shipped "
-                f"per-bin ladder removed {n_dropped} of "
-                f"{freeze['n_stops_before']} stops. Every column the ladder "
-                "needs is complete on the canonical stop table by construction "
-                "(the reward-history basis is zero-filled and flagged by "
-                "reward_history_incomplete, the history lags are zero-filled), "
-                f"so a drop means an upstream table changed. Missing values "
-                f"per column: {offenders}"
+                f"per-bin ladder removed {n_dropped - n_dropped_arrival} of "
+                f"{freeze['n_stops_before']} stops for reasons other than the "
+                "arrival clock. Every other column the ladder needs is complete "
+                "on the canonical stop table by construction (the reward-history "
+                "basis is zero-filled and flagged by reward_history_incomplete, "
+                "the history lags are zero-filled), so such a drop means an "
+                f"upstream table changed. Missing values per column: {offenders}"
             )
         design = frozen
+        # The arrival rungs are fit on the window their spline's boundary knots
+        # span, taken from the frozen cohort so they still share the ladder's
+        # bins; a stop-clock rung is never fit on it.
+        arrival_design, window = (None, {})
+        if has_arrival_rungs:
+            arrival_design, window = apply_arrival_window(design)
+        arrival_counts[outcome] = Counter(
+            {
+                "n_bins_frozen": int(freeze["n_bins_after"]),
+                "n_stops_frozen": int(freeze["n_stops_after"]),
+                "n_event_bins_frozen": int(freeze["n_event_bins_after"]),
+                "n_bins_dropped_arrival_clock": int(
+                    freeze.get("n_bins_dropped_arrival_clock", 0)
+                ),
+                "n_stops_dropped_arrival_clock": n_dropped_arrival,
+                "n_bins_arrival_window": int(window.get("n_bins_arrival_window", 0)),
+                "n_stops_arrival_window": int(window.get("n_stops_arrival_window", 0)),
+                "n_event_bins_arrival_window": int(
+                    window.get("n_event_bins_arrival_window", 0)
+                ),
+            }
+        )
         for name, spec in MODEL_PER_BIN_RATE.items():
-            fit = fit_per_bin_rate_model(design, spec)
+            fit_design = arrival_design if spec.time_clock == "arrival" else design
+            fit = fit_per_bin_rate_model(fit_design, spec)
             if fit is None:
                 none_counts[(name, outcome)] = none_counts.get((name, outcome), 0) + 1
                 continue
@@ -190,18 +231,24 @@ def _fit_one_session(
                 "outcome": outcome,
                 "model": name,
                 **dict(zip(SESSION_COLS, keys, strict=True)),
+                # Which clock this rung's rows are on. Rungs on different clocks
+                # are fit to different rows, so this travels with every fit and
+                # invalidates a cross-clock comparison downstream.
+                "time_clock": spec.time_clock,
                 # 'predicted' is a per-bin Series (GOF input), not tidy data.
                 **{k: v for k, v in fit.items() if k != "predicted"},
             }
+            if spec.time_clock == "arrival":
+                row.update(window)
             if run_gof:
-                gof = per_bin_rate_gof(design, fit)
+                gof = per_bin_rate_gof(fit_design, fit)
                 # n_events / dispersion duplicate the fit dict (same rows);
                 # keep the fit's to avoid a silent, fragile overwrite.
                 gof.pop("n_events", None)
                 gof.pop("dispersion", None)
                 row.update(gof)
             if run_cv:
-                cv = cross_validate_per_bin_rate_model(design, spec)
+                cv = cross_validate_per_bin_rate_model(fit_design, spec)
                 if cv is not None:
                     row.update(cv)
                 else:
@@ -210,7 +257,12 @@ def _fit_one_session(
                     )
             rows.append(row)
     return (
-        keys, rows, none_counts, cv_none_counts, cohort_drops,
+        keys,
+        rows,
+        none_counts,
+        cv_none_counts,
+        cohort_drops,
+        arrival_counts,
         time.perf_counter() - t0,
     )
 
@@ -229,11 +281,16 @@ def fit_per_bin_rate_models(
     :func:`attach_is_swr_to_onsets` once before calling). ``workers > 1``
     fans the per-session work out over processes (sessions are independent).
 
-    Every rung of one (session, outcome) cell is fit to the same frozen cohort,
-    so all rungs of a cell report the same ``n_bins`` / ``n_stops``. The number
-    of stops that freeze removed per outcome is attached as
-    ``result.attrs["cohort_stop_drops"]`` for the cohort audit; the shipped
-    ladder requires it to be zero.
+    Every rung of one (session, outcome) cell is fit to the frozen cohort, so
+    all its stop-clock rungs report the same ``n_bins`` / ``n_stops``; the
+    arrival-clock rungs are fit on the arrival window carved out of that same
+    cohort, so they share an ``n_bins`` / ``n_stops`` with each other. The
+    number of stops that freeze removed per outcome is attached as
+    ``result.attrs["cohort_stop_drops"]`` for the cohort audit; apart from the
+    stops with no arrival clock the shipped ladder requires it to be zero. The
+    arrival-clock cohort tallies (what requiring the arrival clock cost the
+    common cohort, and what the window then retained, per outcome) are attached
+    as ``result.attrs["arrival_clock_cohort"]``.
     """
     onset_groups = dict(tuple(onsets.groupby(SESSION_COLS, sort=False)))
     items = [
@@ -246,12 +303,15 @@ def fit_per_bin_rate_models(
     none_counts: Counter = Counter()
     cv_none_counts: Counter = Counter()
     cohort_stop_drops: Counter = Counter()
+    arrival_cohort: dict[str, Counter] = {outcome: Counter() for outcome in POPULATIONS}
 
-    def _collect(keys, r, nc, cvnc, drops, elapsed):
+    def _collect(keys, r, nc, cvnc, drops, arrival, elapsed):
         rows.extend(r)
         none_counts.update(nc)
         cv_none_counts.update(cvnc)
         cohort_stop_drops.update(drops)
+        for outcome, counts in arrival.items():
+            arrival_cohort[outcome].update(counts)
         logger.info("  %s: %d fits in %.1fs", "_".join(map(str, keys)), len(r), elapsed)
 
     if workers > 1:
@@ -276,9 +336,34 @@ def fit_per_bin_rate_models(
             "CV-None (fit ok, CV dropped) counts per (model, outcome): %s",
             {f"{m}/{o}": c for (m, o), c in sorted(cv_none_counts.items())},
         )
+    for outcome, counts in arrival_cohort.items():
+        if not counts["n_bins_frozen"]:
+            continue
+        kept = counts["n_bins_frozen"] + counts["n_bins_dropped_arrival_clock"]
+        logger.info(
+            "  %s: the arrival clock cost the common cohort %d/%d bins (%.2f%%) "
+            "and %d stops; its window then kept %d/%d bins (%.1f%%) and "
+            "%d/%d event bins (%.1f%%)",
+            outcome,
+            counts["n_bins_dropped_arrival_clock"],
+            kept,
+            100.0 * counts["n_bins_dropped_arrival_clock"] / kept,
+            counts["n_stops_dropped_arrival_clock"],
+            counts["n_bins_arrival_window"],
+            counts["n_bins_frozen"],
+            100.0 * counts["n_bins_arrival_window"] / counts["n_bins_frozen"],
+            counts["n_event_bins_arrival_window"],
+            counts["n_event_bins_frozen"],
+            100.0
+            * counts["n_event_bins_arrival_window"]
+            / max(counts["n_event_bins_frozen"], 1),
+        )
     result = pd.DataFrame(rows)
     result.attrs["cohort_stop_drops"] = {
         outcome: int(cohort_stop_drops.get(outcome, 0)) for outcome in POPULATIONS
+    }
+    result.attrs["arrival_clock_cohort"] = {
+        outcome: dict(counts) for outcome, counts in arrival_cohort.items()
     }
     return result
 
@@ -291,6 +376,23 @@ def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
         .head(n)
     )
     return stop_table.merge(keep, on=SESSION_COLS)
+
+
+def _stop_level_design_columns(spec, stop: pd.DataFrame) -> list[str]:
+    """A spec's design columns as they exist on the stop table.
+
+    A per-bin design column that the design *derives* from a stop column (the
+    arrival clock, built as bin centre minus ``last_well_arrival_time_s``) is
+    resolved to that source, so a stop whose clock is missing is attributed to
+    the rung that needs it instead of vanishing from the audit.
+    """
+    cols = [
+        source
+        for column in _design_columns(spec)
+        for source in DERIVED_COVARIATE_SOURCES.get(column, [column])
+        if source in stop.columns
+    ]
+    return list(dict.fromkeys(cols))
 
 
 def _cohort_records(
@@ -313,7 +415,10 @@ def _cohort_records(
 
     ``cohort_stop_drops`` is the runner's per-outcome count of stops the freeze
     actually removed (``result.attrs["cohort_stop_drops"]``); it must not exceed
-    what the stop-level attribution accounts for.
+    what the stop-level attribution accounts for. A per-bin design column the
+    design derives from a stop column (the arrival clock from
+    ``last_well_arrival_time_s``) is attributed through its source, since that
+    is where the missingness lives.
     """
     total = int(len(stop))
     n_sessions_in = stop.groupby(SESSION_COLS, sort=False).ngroups
@@ -321,13 +426,12 @@ def _cohort_records(
     union_cols = [
         c
         for spec in MODEL_PER_BIN_RATE.values()
-        for c in _design_columns(spec)
-        if c in stop.columns
+        for c in _stop_level_design_columns(spec, stop)
     ]
     union_missing = stop_own_missing(stop, list(dict.fromkeys(union_cols)))
     recs = []
     for name, spec in MODEL_PER_BIN_RATE.items():
-        stop_level = [c for c in _design_columns(spec) if c in stop.columns]
+        stop_level = _stop_level_design_columns(spec, stop)
         own_missing = stop_own_missing(stop, stop_level)
         n_own = int(own_missing.sum())
         n_common = int((union_missing & ~own_missing).sum())
