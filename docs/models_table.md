@@ -32,6 +32,7 @@ Per-family fit conventions:
 | Per-stop rate (A) | Poisson GLM | `n_selected_events` per stop | log | `log(immobility_duration_s)` | per session |
 | Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | `arm_fraction` (per-event allocation fraction) | log | — | per session × is_swr split {all, T, F}; SEs event-clustered |
 | Content patch | conditional Poisson over 3 patches/event | `patch_fraction` | log | — | per session × {all, T, F}; SEs event-clustered |
+| Content arm/patch, DM alternative | Dirichlet-multinomial over the same 9 arms / 3 patches per event, with `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` | `arm_count_hard` / `patch_count_hard` | log (softmax mean) | — | per session × population; SEs event-level by construction |
 | Choice | conditional logit over candidate arms/stop ≡ `clogit(…, strata(stop))` | `chosen` | logit | — | per event-source |
 | SWR power | OLS (`lm`) | `ripple_power_z` (event-level) | identity | — | per session; predictors z-scored |
 
@@ -54,6 +55,28 @@ is retained behind `--response hard_count`, publishing to its own
 before/after audit — it weights an event by its number of decoded timebins and
 treats those autocorrelated bins as independent draws, so its AIC scale is not
 comparable with a fraction bundle's.
+
+**Dirichlet-multinomial alternative (`--estimator dirichlet_multinomial`).** A
+second, non-primary content estimator that keeps the timebin **count** response
+(it has no fraction form, so the flag forces `--response hard_count`) and adds
+an explicit within-event concentration, `log φ_e = log_phi_intercept +
+log_phi_is_swr · is_swr_e`. Overdispersion is then a fitted parameter rather
+than a sandwich correction, so the standard errors are event-level by
+construction and `coef_log_phi_is_swr` is a direct test of whether SWR events
+spread their mass over more arms. It is fit on the **full** likelihood
+including the multinomial coefficient (`llf_includes_constants = True`),
+whereas the conditional fits drop it (`False`): **a DM AIC is not comparable to
+a conditional fit's until `multinomial_log_constant` — computed from the same
+count matrix — is added to the conditional side.** Artifacts get a **`_dm`**
+suffix, appended *last* so an estimator's stratified artifacts sort together
+(`…_dm`, `…_dm_rewarded`, `…_dm_omitted`); the base content ladder resolves to
+`models_dm/` rather than a response-named directory. Every DM row carries
+`phi_source` ∈ {`session`, `animal_pooled`, `pooled_all_animals`}: a session
+with fewer modelled events than `--min-events-session-phi` (default **40**) is
+refit with its animal's median concentration intercept pinned, and the column
+records which. `--n-jobs` sizes the process pool that fits the per-session DM
+models (ignored by the conditional Poisson). The estimator comparison behind
+this is [`design/content_estimator_comparison.md`](design/content_estimator_comparison.md).
 
 Every per-session fit carries `converged` / `separated` status flags, the
 `|`-joined `separated_terms` naming which coefficients are unidentified, one
@@ -239,7 +262,10 @@ Mvu  arm_fraction ~ [M4 terms] + task_reward_probability_candidate_arm
                  + reward_belief_variance_candidate_arm_preoutcome_z
 ```
 
-`M0`–`M6` are the default ladder (`models/`). The belief rungs `Mv` / `Mu` /
+`M0`–`M6` are the default ladder (`models/`); under `--estimator
+dirichlet_multinomial` the same eight default rungs publish to **`models_dm/`**
+(`Mv`/`Mu`/`Mvu` are excluded from a default run either way — they need
+`--leaf-only`). The belief rungs `Mv` / `Mu` /
 `Mvu` depend on the qvals covariates, which are NaN on the unmapped-stop tail, so
 they are **not** in the default run — including them there would shrink the
 shared complete-case cohort for the whole base ladder. Request them with their
@@ -515,6 +541,20 @@ rewarded` and `omitted` (an event whose current outcome is not yet known is in
 neither), writing `_rewarded` / `_omitted` artifacts. The per-SD units and the
 fit-time `_z` reference are frozen over the pooled cohort first, so a stratified
 refit states its effects in the same unit as the pooled one.
+
+**Dirichlet-multinomial bundles.** `--estimator dirichlet_multinomial` refits
+this ladder on the counts with a fitted within-event concentration, writing
+`swr_contrast_content_{arm,patch,audited}_dm.pkl` and the stratified
+`…_dm_rewarded` / `…_dm_omitted` twins (plus their `_cohort_audit_dm*.csv`,
+`_term_diagnostics_dm*.csv`, `_provenance_dm*.json`). The `_dm` suffix precedes
+the stratum suffix. **Under the DM the audited table gains a `log_phi_is_swr`
+row per rung × population**, aggregated as its own BH-FDR family rather than
+folded into the β contrast — it is not any rung's key term but the same
+quantity on every rung (how tightly an SWR event's mass is concentrated), and
+the conditional-Poisson fits produce no such row. Rungs whose `n_sessions_modeled`
+is 0 in a stratum (the omission-only last-rewarded family under `rewarded`) and
+the DM's `dm_design` refusals are named in the cohort audit. Results:
+[`design/content_estimator_comparison.md`](design/content_estimator_comparison.md).
 
 ## Phase-2 refit classification
 

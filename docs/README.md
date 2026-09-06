@@ -46,6 +46,11 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [design/2026-08-21-covariate-naming-scheme.md](design/2026-08-21-covariate-naming-scheme.md)
     — proposed predictor-column names across the four canonical tables,
     code-verified; also flags the duplicate and dead columns the pass found.
+  - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
+    — the retired count multinomial vs the shipped per-event fractions vs a
+    Dirichlet-multinomial, on one 218-session cohort: what each assumes,
+    simulation recovery, which conclusions are estimator-dependent, and the
+    `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
@@ -85,6 +90,8 @@ Three tiers:
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | content M0–M7 / P0–P4, all events; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
+   | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial (count response + fitted within-event concentration); the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted}.pkl` sit in `models/` beside their conditional twins |
+   | `content_estimator_comparison/` | `scripts/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
 
    (These dir names are terse — a descriptive rename + un-mix was scoped as reorg phase 5 but
    deferred; see `.claude/docs/plans/repo-reorg/phase-5-data-dirs.md`.)

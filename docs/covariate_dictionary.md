@@ -635,3 +635,44 @@ content runner, not stored):
 - `onset_lag{j}` — count of the event's own onsets `j` bins back (past-only, resets
   per stop); `hist_rcos_k` projects those causal lags onto raised-cosine basis `k`.
 - `cross_hist_rcos_k` — the same raised-cosine history for the *other* event stream.
+
+**Dirichlet-multinomial estimator parameters** (content fits under
+`--estimator dirichlet_multinomial`; **model parameters, not table columns** —
+nothing on the canonical tables holds them, and they exist only in a fitted DM
+result):
+- `log_phi_intercept` — the log within-event Dirichlet concentration of a
+  **non-SWR** event: `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e`,
+  with `c_e ~ DirichletMultinomial(L_e, φ_e · p_e)`. It lives on the
+  **per-category** scale that φ parameterizes (φ multiplies the softmax
+  probability vector to give the Dirichlet parameters), so it is a redundancy
+  scale, not an effect on any arm. **Larger φ is *less* overdispersion**: the
+  event's probability vector sits close to the model mean and its timebins are
+  near-independent draws (φ → ∞ is exactly the count multinomial). **Smaller φ
+  means the event's mass clumps onto a few arms and its bins are near-copies of
+  one another.** It is the DM analogue of `Intercept`: a **structural nuisance
+  term**, excluded from the separation judgment (`_DM_NUISANCE_TERMS`) and
+  **never aggregated or reported** as a scientific effect. It is `NaN` by
+  construction wherever it was pinned (see `phi_source`), and it is genuinely
+  unidentified when a session's events are near-independent, so read it only
+  when it is not in `separated_terms`.
+- `log_phi_is_swr` — the additive shift of that log concentration on SWR
+  events, on the same per-category scale. **This one is a scientific term**: it
+  stays in the separation judgment and is aggregated in its own BH-FDR family
+  (one row per rung × population in the audited DM table), separately from the
+  β contrast, because it is the same quantity on every rung rather than any
+  rung's key term. Positive means an SWR event's mass is spread over *more*
+  arms and its bins are closer to independent draws — less within-event timebin
+  redundancy — and `+1.8` means an SWR event's φ is ≈ e^1.8 ≈ 6× that of a
+  non-SWR event. It is a statement about redundancy
+  across an event's bins, not about which arms are represented. Absent from the
+  within-SWR / within-non-SWR population splits, where the flag is constant.
+- `phi_source` — provenance of the concentration intercept used for that
+  session's fit, one of `session` (the session estimated its own),
+  `animal_pooled` (fewer modelled events than `--min-events-session-phi`,
+  default 40, so the median intercept of that animal's longer sessions was
+  pinned), or `pooled_all_animals` (the animal had no qualifying session
+  either, so the all-animal median was pinned). A pinned fit's
+  `bse_log_phi_intercept` is `NaN` and the parameter is excluded from
+  `n_params`. Report the share of pinned rows alongside any concentration
+  result — it is negligible in the comparison and the base ladder and large in
+  the thin `omitted` stratum.
