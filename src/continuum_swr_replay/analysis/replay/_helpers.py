@@ -44,6 +44,45 @@ def arm_to_patch(arm: float) -> float:
     return float(TRACK_SEGMENT_TO_PATCH.get(int(arm), np.nan))
 
 
+# ── Stay / switch ──
+
+
+def stay_indicator_from_patches(next_patch, current_patch):
+    """1.0 when the next trip stays in the current patch, 0.0 when it switches.
+
+    ``NaN`` propagates: an unknown patch on either side is not evidence of a
+    stay *or* a switch, and encoding it as 0 would tell a model the animal
+    switched. Accepts scalars or equal-length arrays and returns the matching
+    shape.
+
+    Parameters
+    ----------
+    next_patch, current_patch : float or np.ndarray
+        Patch IDs, already mapped from arms by :func:`arm_to_patch`.
+
+    Returns
+    -------
+    float or np.ndarray
+        1.0 / 0.0 / ``NaN``, elementwise.
+    """
+    nxt = np.asarray(next_patch, dtype=float)
+    cur = np.asarray(current_patch, dtype=float)
+    out = np.where(np.isnan(nxt) | np.isnan(cur), np.nan, (nxt == cur).astype(float))
+    return float(out) if out.ndim == 0 else out
+
+
+def stay_indicator(next_arm: float, current_arm: float) -> float:
+    """``is_stay`` for one row, from the two arms rather than their patches.
+
+    The arm-level entry point to :func:`stay_indicator_from_patches`; the
+    stay/switch distinction is a *patch* comparison, so both arms are mapped
+    through :func:`arm_to_patch` first. Two arms of the same patch are a stay.
+    """
+    return stay_indicator_from_patches(
+        arm_to_patch(next_arm), arm_to_patch(current_arm)
+    )
+
+
 # ── Posterior alignment ──
 
 

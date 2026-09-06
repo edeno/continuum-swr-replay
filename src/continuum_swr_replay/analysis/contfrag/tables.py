@@ -39,6 +39,8 @@ from ..replay._helpers import (
     assert_single_session_alignment,
     safe_mode,
     single_arm_from_well,
+    stay_indicator,
+    stay_indicator_from_patches,
     strict_first,
 )
 from ..replay.bouts import (
@@ -421,11 +423,7 @@ def build_contfrag_event_table(
             "next_patch": arm_to_patch(next_arm),
             "did_last_completed_trip_switch_patch": is_after_switch,
             "is_rewarded_outcome": is_rewarded_outcome,
-            "is_stay": float(arm_to_patch(next_arm) == arm_to_patch(current_arm))
-            if not (
-                np.isnan(arm_to_patch(next_arm)) or np.isnan(arm_to_patch(current_arm))
-            )
-            else np.nan,
+            "is_stay": stay_indicator(next_arm, current_arm),
             "n_timebins": len(g),
             # Counts bins with no real-arm ``decoded_arm``; since
             # ``map_estimate_to_arm`` never returns a junction, that means
@@ -911,10 +909,7 @@ def build_contfrag_stop_table(
     per_bout["current_patch"] = cur_patch
     per_bout["prev_patch"] = [arm_to_patch(a) for a in prev_arm_vals]
     per_bout["next_patch"] = nxt_patch
-    both_valid = ~np.isnan(cur_patch.astype(float)) & ~np.isnan(nxt_patch.astype(float))
-    per_bout["is_stay"] = np.where(
-        both_valid, (cur_patch == nxt_patch).astype(float), np.nan
-    )
+    per_bout["is_stay"] = stay_indicator_from_patches(nxt_patch, cur_patch)
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)

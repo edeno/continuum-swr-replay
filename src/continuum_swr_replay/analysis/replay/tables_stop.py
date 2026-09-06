@@ -21,6 +21,9 @@ from ._helpers import (
     single_arm_from_well as _single_arm_from_well,
 )
 from ._helpers import (
+    stay_indicator_from_patches as _stay_indicator_from_patches,
+)
+from ._helpers import (
     strict_first as _strict_first,
 )
 from ._tables_common import (
@@ -323,10 +326,7 @@ def build_stop_table(
     per_bout["prev_patch"] = [_arm_to_patch(a) for a in prev_arm_vals]
     per_bout["next_patch"] = nxt_patch
     # is_stay: will the next trip be within the same patch? Post-hoc.
-    both_valid = ~np.isnan(cur_patch.astype(float)) & ~np.isnan(nxt_patch.astype(float))
-    per_bout["is_stay"] = np.where(
-        both_valid, (cur_patch == nxt_patch).astype(float), np.nan
-    )
+    per_bout["is_stay"] = _stay_indicator_from_patches(nxt_patch, cur_patch)
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)

@@ -23,6 +23,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from ._helpers import stay_indicator_from_patches
+
 # ── 1. Within-event circular time shuffle ──
 
 
@@ -319,8 +321,8 @@ def next_arm_circular_shift(
         and "current_patch" in out.columns
         and "next_patch" in out.columns
     ):
-        cp = out["current_patch"].to_numpy(dtype=float)
-        np_arr = out["next_patch"].to_numpy(dtype=float)
-        both_finite = ~np.isnan(cp) & ~np.isnan(np_arr)
-        out["is_stay"] = np.where(both_finite, (cp == np_arr).astype(float), np.nan)
+        out["is_stay"] = stay_indicator_from_patches(
+            out["next_patch"].to_numpy(dtype=float),
+            out["current_patch"].to_numpy(dtype=float),
+        )
     return out

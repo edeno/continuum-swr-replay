@@ -37,6 +37,9 @@ from ._helpers import (
     single_arm_from_well as _single_arm_from_well,
 )
 from ._helpers import (
+    stay_indicator as _stay_indicator,
+)
+from ._helpers import (
     strict_first as _strict_first,
 )
 from ._tables_common import (
@@ -281,12 +284,7 @@ def _aggregate_event_features(
                 "completed_trial_id": completed_trial_id,
                 "did_last_completed_trip_switch_patch": is_after_switch,
                 "is_rewarded_outcome": is_rewarded_outcome,
-                "is_stay": float(_arm_to_patch(next_arm) == _arm_to_patch(current_arm))
-                if not (
-                    np.isnan(_arm_to_patch(next_arm))
-                    or np.isnan(_arm_to_patch(current_arm))
-                )
-                else np.nan,
+                "is_stay": _stay_indicator(next_arm, current_arm),
                 "n_undecoded_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),
                 "event_midpoint_s": midpoint_time,
