@@ -42,6 +42,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from patsy import dmatrix
 from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
@@ -52,11 +53,16 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
+    ARRIVAL_CLOCK_COLUMN,
+    ARRIVAL_SPLINE_KNOTS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+    SPLINE_KNOTS,
     SWR_CONTRAST_CONTENT_ARM_KEY_TERM,
     SWR_CONTRAST_CONTENT_PATCH_KEY_TERM,
+    TMAX,
+    TMAX_ARRIVAL,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -342,6 +348,274 @@ def reward_quantities(new_bin: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
         ]
     )
     return kernel, paired
+
+
+# ── Arrival-clock sub-ladder and the outcome-boundary reward shift ────────────
+#
+# ``M5a_time_arrival`` re-anchors the same time-course spline block on the
+# arrival clock and is fit on the arrival window, a strict subset of the frozen
+# cohort's rows. Its likelihood-scale numbers therefore live on a different row
+# set from ``M5_time``'s and are never differenced. Two things ARE readable side
+# by side: the held-out ``cv_bits_per_event``, which is a per-event rate rather
+# than a total, and the SHAPE of the two fitted time courses, each evaluated on
+# its own window and compared on a common grid of RELATIVE time (fraction of the
+# window). Neither is a nested test; both are descriptive.
+STOP_TIME_RUNG = "M5_time"
+ARRIVAL_TIME_RUNG = "M5a_time_arrival"
+# The rung whose reward block moves when the per-bin reward-history features are
+# recomputed at the outcome boundary instead of held at their bout-start values.
+BOUNDARY_REWARD_RUNG = "M7r_time_histcos_rew"
+TIME_COURSE_GRID_POINTS = 401
+
+
+def _spline_coef_columns(fits: pd.DataFrame, clock: str) -> list[str]:
+    """Fitted spline coefficients of the time-course block, in basis order.
+
+    The block's patsy term carries its own knots and bounds in the column name,
+    so the arrival and stop clocks are told apart by the variable inside
+    ``bs(...)``. Interaction columns (``reward:bs(...)``) carry a colon and are
+    excluded: they are a different block.
+    """
+    prefix = f"coef_bs({clock},"
+    cols = [
+        c
+        for c in fits.columns
+        if isinstance(c, str)
+        and c.startswith(prefix)
+        and c.endswith("]")
+        and ":" not in c
+    ]
+    return sorted(cols, key=lambda c: int(c.rsplit("[", 1)[1][:-1]))
+
+
+def _fitted_time_courses(
+    fits: pd.DataFrame,
+    model: str,
+    outcome: str,
+    clock: str,
+    knots: Sequence[float],
+    tmax: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-session fitted rate over the clock's window, at the ladder's knots.
+
+    The knots are fixed (not data-driven), so the basis is a deterministic
+    function of the clock and the curve is reconstructable from the saved
+    coefficients: ``rate(t) = exp(intercept + B(t) @ spline_coef)``, with every
+    other block at its reference value.
+
+    Returns
+    -------
+    grid : ndarray, shape (TIME_COURSE_GRID_POINTS,)
+        Clock values in seconds spanning ``[0, tmax]``.
+    curves : ndarray, shape (n_sessions, TIME_COURSE_GRID_POINTS)
+        One fitted curve per session with a complete finite coefficient set.
+    """
+    grid = np.linspace(0.0, tmax, TIME_COURSE_GRID_POINTS)
+    columns = _spline_coef_columns(fits, clock)
+    sub = fits[(fits.model == model) & (fits.outcome == outcome)]
+    if not columns or sub.empty or "coef_Intercept" not in sub:
+        return grid, np.empty((0, grid.size))
+    beta = sub[columns].to_numpy(dtype=float)
+    intercept = sub["coef_Intercept"].to_numpy(dtype=float)
+    ok = np.isfinite(beta).all(axis=1) & np.isfinite(intercept)
+    if not ok.any():
+        return grid, np.empty((0, grid.size))
+    basis = np.asarray(
+        dmatrix(
+            f"bs(x, knots={tuple(knots)}, lower_bound=0.0, upper_bound={tmax}) - 1",
+            {"x": grid},
+            return_type="dataframe",
+        )
+    )
+    if basis.shape[1] != beta.shape[1]:
+        raise ValueError(
+            f"{model}: the saved fit carries {beta.shape[1]} spline coefficients "
+            f"but the basis rebuilt from knots={tuple(knots)} over [0, {tmax}] "
+            f"has {basis.shape[1]} columns. The fit was made with different "
+            "knots than the ones this comparison reconstructs."
+        )
+    return grid, np.exp(intercept[ok, None] + beta[ok] @ basis.T)
+
+
+def _density_cdf(grid: np.ndarray, curve: np.ndarray) -> np.ndarray:
+    """``curve`` read as a density over its own window, as a CDF on that window.
+
+    Normalizing removes the baseline rate, which differs between the two clocks
+    because they are fit to different row sets. What survives is the shape.
+    """
+    increments = np.diff(grid) * 0.5 * (curve[1:] + curve[:-1])
+    cdf = np.concatenate([[0.0], np.cumsum(increments)])
+    total = cdf[-1]
+    if not np.isfinite(total) or total <= 0:
+        return np.full(cdf.shape, np.nan)
+    return cdf / total
+
+
+def arrival_clock_cv_table(fits: pd.DataFrame) -> pd.DataFrame:
+    """Held-out bits per event for the stop-clock and arrival-clock time rungs.
+
+    ``cv_bits_per_event`` is normalized per held-out event, so the two rungs'
+    values are on one scale even though they are fit to different numbers of
+    bins. The paired column is a within-session difference over the sessions
+    where both are finite; it is descriptive, not a nested-model test.
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        sides = {}
+        for label, rung in (("stop", STOP_TIME_RUNG), ("arrival", ARRIVAL_TIME_RUNG)):
+            side = fits[(fits.model == rung) & (fits.outcome == outcome)]
+            sides[label] = side[SC + ["cv_bits_per_event"]] if len(side) else side
+        if all(len(side) == 0 for side in sides.values()):
+            continue
+        row = {"outcome": outcome}
+        for label, side in sides.items():
+            finite = (
+                np.isfinite(side["cv_bits_per_event"])
+                if len(side)
+                else pd.Series(dtype=bool)
+            )
+            row[f"n_fits_{label}"] = int(len(side))
+            row[f"pct_cv_finite_{label}"] = (
+                100 * float(finite.mean()) if len(side) else np.nan
+            )
+            row[f"median_cv_bits_{label}"] = (
+                side.loc[finite, "cv_bits_per_event"].median() if len(side) else np.nan
+            )
+        merged = (
+            sides["stop"].merge(sides["arrival"], on=SC, suffixes=("_stop", "_arrival"))
+            if len(sides["stop"]) and len(sides["arrival"])
+            else pd.DataFrame()
+        )
+        if len(merged):
+            difference = (
+                (merged["cv_bits_per_event_arrival"] - merged["cv_bits_per_event_stop"])
+                .replace([np.inf, -np.inf], np.nan)
+                .dropna()
+            )
+        else:
+            difference = pd.Series(dtype=float)
+        row["n_paired_cv_finite"] = int(len(difference))
+        row["median_delta_bits_arrival_minus_stop"] = (
+            difference.median() if len(difference) else np.nan
+        )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def arrival_clock_shape_table(fits: pd.DataFrame) -> pd.DataFrame:
+    """Shape of the two fitted time courses: peak position and KS distance.
+
+    Each rung's across-session median curve is normalized to a density over its
+    OWN window and turned into a CDF; the two CDFs are then read on a common
+    grid of relative time (fraction of the window) and their maximum absolute
+    difference is the KS distance. The peak is reported both in seconds on the
+    rung's own clock and as a fraction of its window, because the windows differ
+    (``[0, TMAX]`` vs ``[0, TMAX_ARRIVAL]``).
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        stop_grid, stop_curves = _fitted_time_courses(
+            fits, STOP_TIME_RUNG, outcome, "tc", SPLINE_KNOTS, TMAX
+        )
+        arr_grid, arr_curves = _fitted_time_courses(
+            fits,
+            ARRIVAL_TIME_RUNG,
+            outcome,
+            ARRIVAL_CLOCK_COLUMN,
+            ARRIVAL_SPLINE_KNOTS,
+            TMAX_ARRIVAL,
+        )
+        if not len(stop_curves) and not len(arr_curves):
+            continue
+        row: dict[str, object] = {"outcome": outcome}
+        cdfs = {}
+        for label, grid, curves, tmax in (
+            ("stop", stop_grid, stop_curves, TMAX),
+            ("arrival", arr_grid, arr_curves, TMAX_ARRIVAL),
+        ):
+            row[f"n_sessions_{label}"] = int(len(curves))
+            if not len(curves):
+                row[f"peak_s_{label}"] = np.nan
+                row[f"peak_frac_window_{label}"] = np.nan
+                cdfs[label] = None
+                continue
+            median_curve = np.median(curves, axis=0)
+            peak = float(grid[int(np.argmax(median_curve))])
+            row[f"peak_s_{label}"] = peak
+            row[f"peak_frac_window_{label}"] = peak / tmax
+            cdfs[label] = _density_cdf(grid, median_curve)
+        if cdfs["stop"] is None or cdfs["arrival"] is None:
+            row["ks_distance"] = np.nan
+        else:
+            row["ks_distance"] = float(
+                np.nanmax(np.abs(cdfs["stop"] - cdfs["arrival"]))
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def reward_boundary_shift_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """The reward-history coefficients before and after the boundary shift.
+
+    Before, every bin of a stop carried the reward features as of the bout
+    start; after, a stop that spans the moment its trial's outcome becomes known
+    carries the recomputed features from that bin on. Same rung, same basis,
+    same lag matrix — only the per-bin values move — so the three coefficients
+    are compared term for term, paired within session.
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        for term in REWARD_HISTORY_COLUMNS:
+            column = f"coef_{term}"
+            sides = []
+            for fits in (old, new):
+                side = fits[
+                    (fits.model == BOUNDARY_REWARD_RUNG) & (fits.outcome == outcome)
+                ]
+                sides.append(
+                    side[SC + [column]]
+                    if len(side) and column in side
+                    else pd.DataFrame()
+                )
+            before, after = sides
+            if not len(before) and not len(after):
+                continue
+            merged = (
+                before.merge(after, on=SC, suffixes=("_before", "_after"))
+                if len(before) and len(after)
+                else pd.DataFrame()
+            )
+            row: dict[str, object] = {
+                "outcome": outcome,
+                "term": term,
+                "n_sessions_before": int(before[column].notna().sum())
+                if len(before)
+                else 0,
+                "median_before": before[column].median() if len(before) else np.nan,
+                "n_sessions_after": int(after[column].notna().sum())
+                if len(after)
+                else 0,
+                "median_after": after[column].median() if len(after) else np.nan,
+            }
+            difference = (
+                (merged[f"{column}_after"] - merged[f"{column}_before"]).dropna()
+                if len(merged)
+                else pd.Series(dtype=float)
+            )
+            row["n_paired"] = int(len(difference))
+            row["median_delta"] = difference.median() if len(difference) else np.nan
+            row["pct_sessions_moved"] = (
+                100 * float((difference.abs() > 1e-9).mean())
+                if len(difference)
+                else np.nan
+            )
+            row["signrank_p"] = (
+                f"{wilcoxon(difference).pvalue:.1e}"
+                if len(difference) >= 2 and float(difference.abs().max()) > 0
+                else "—"
+            )
+            rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _suffixed_side(
@@ -1071,6 +1345,52 @@ def build_report(
 
     add("\n## Family B — frozen cohort size (`n_bins`, `M0_const`)\n")
     add(_md(n_bins_table(old_bin, new_bin), floatfmt="{:.1f}"))
+
+    add(
+        "\n## Family B — reward history at the outcome boundary "
+        f"(`{BOUNDARY_REWARD_RUNG}`)\n"
+    )
+    add(
+        "Before, every bin of a stop carried the reward-history features as of "
+        "the **bout start**; after, a stop that spans the moment its trial's "
+        "outcome becomes known carries features **recomputed at that boundary** "
+        "from the shifted lag matrix. Same rung, same basis, same lag matrix — "
+        "only the per-bin values move — so the three coefficients are compared "
+        "term for term, paired within session. `pct_sessions_moved` is the share "
+        "of paired sessions whose coefficient changed at all: a session with no "
+        "boundary-spanning stop is expected to be unchanged.\n"
+    )
+    add(_md(reward_boundary_shift_table(old_bin, new_bin), floatfmt="{:.3f}"))
+
+    add(
+        f"\n## Family B — arrival clock vs stop clock "
+        f"(`{ARRIVAL_TIME_RUNG}` vs `{STOP_TIME_RUNG}`)\n"
+    )
+    add(
+        f"`{ARRIVAL_TIME_RUNG}` is fit on the arrival window "
+        f"`[0, {TMAX_ARRIVAL}]` s, a strict subset of the frozen cohort's rows, "
+        f"so its AIC / deviance / log-likelihood are on a different row set from "
+        f"`{STOP_TIME_RUNG}`'s and are **never differenced**. The two quantities "
+        "below are read side by side, not as a nested test.\n"
+    )
+    add(
+        "\n**(a) Held-out bits per event.** Normalized per held-out event, so "
+        "the two rungs are on one scale despite the different bin counts. "
+        "`pct_cv_finite` is the share of fits whose cross-validation survived; "
+        "the paired column is the within-session difference over the sessions "
+        "where both are finite.\n"
+    )
+    add(_md(arrival_clock_cv_table(new_bin), floatfmt="{:.4f}"))
+    add(
+        "\n**(b) Time-course shape.** Each rung's across-session median fitted "
+        "curve is normalized to a density over its own window and turned into a "
+        "CDF; the two CDFs are read on a common grid of relative time (fraction "
+        "of the window) and `ks_distance` is their maximum absolute difference. "
+        "The peak is given both in seconds on the rung's own clock and as a "
+        f"fraction of its window, because the windows differ ({TMAX} s vs "
+        f"{TMAX_ARRIVAL} s).\n"
+    )
+    add(_md(arrival_clock_shape_table(new_bin), floatfmt="{:.3f}"))
 
     add("\n## Family A — per-stop reward step\n")
     add(
