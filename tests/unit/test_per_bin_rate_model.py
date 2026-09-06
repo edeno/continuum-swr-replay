@@ -32,6 +32,7 @@ def make_per_bin_rate_design(
     base_rate: float = 0.05,
     reward_effect: float = 1.0,
     time_profile=None,
+    arrival_clocks: bool = False,
     seed: int = 0,
 ) -> pd.DataFrame:
     """Simulate an ``aggregate_to_timebins``-shaped design with known truth.
@@ -44,6 +45,13 @@ def make_per_bin_rate_design(
     ``time_profile``. The slower components carry independent noise and every
     tenth stop is structurally incomplete (features zero-filled, indicator 1,
     baseline rate), mirroring the persisted stop-table contract.
+
+    With ``arrival_clocks``, each stop also carries the per-stop clock inputs
+    (``stop_start``, ``last_well_arrival_time_s``, ``outcome_known_time_s``,
+    ``occupancy_state``, ``completed_trial_reward``, the ten
+    ``known_reward_outcome_lag_j`` columns) and the two per-bin clocks
+    ``aggregate_to_timebins`` derives from them. Off by default, so the shipped
+    ladder's designs are exactly what they were.
     """
     rng = np.random.default_rng(seed)
     recs = []
@@ -60,7 +68,7 @@ def make_per_bin_rate_design(
                 ("sim", 1, "02_r1", s, b, tc, bin_s, reward, rcos1, rcos2,
                  incomplete, int(rng.poisson(mu)))
             )
-    return pd.DataFrame(
+    design = pd.DataFrame(
         recs,
         columns=[
             "animal", "session_date", "epoch", "stop_id", "binj", "tc",
@@ -68,6 +76,28 @@ def make_per_bin_rate_design(
             "reward_history_rcos_2", "reward_history_incomplete", "count",
         ],
     )
+    if not arrival_clocks:
+        return design
+
+    # Stops start 10 s apart; the animal arrived 1 s before each bout and the
+    # outcome became observable 0.2 s into it, so the arrival clock is positive
+    # throughout and the outcome clock changes sign inside every stop.
+    stop_start = 1000.0 + 10.0 * design["stop_id"].to_numpy(dtype=float)
+    design["stop_start"] = stop_start
+    design["last_well_arrival_time_s"] = stop_start - 1.0
+    design["outcome_known_time_s"] = stop_start + 0.2
+    design["occupancy_state"] = "at_well"
+    design["completed_trial_reward"] = design["stop_id"].to_numpy(dtype=float) % 2.0
+    for j in range(1, 11):
+        design[f"known_reward_outcome_lag_{j}"] = (
+            design["stop_id"].to_numpy(dtype=float) + j
+        ) % 2.0
+    center_abs = stop_start + design["tc"].to_numpy(dtype=float)
+    arrival = design["last_well_arrival_time_s"].to_numpy(dtype=float)
+    outcome = design["outcome_known_time_s"].to_numpy(dtype=float)
+    design["time_since_last_well_arrival_s"] = center_abs - arrival
+    design["time_since_outcome_known_s"] = center_abs - outcome
+    return design
 
 
 def test_formula_strings():

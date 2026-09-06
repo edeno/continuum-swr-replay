@@ -6,6 +6,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import model_specs as ms
 from continuum_swr_replay.analysis.replay.covariate_timing import (
+    ABSOLUTE_SESSION_CLOCKS,
     KNOWN_ATOMS,
     assert_predictor_timing,
     timing_of,
@@ -198,3 +199,30 @@ def test_event_length_products_resolve_to_pre_outcome_atoms(predictor, expected_
     assert timing_of(predictor) == expected_atoms
     assert set(expected_atoms) <= KNOWN_ATOMS
     assert_predictor_timing([predictor])
+
+
+def test_rejects_a_raw_absolute_session_clock():
+    """An epoch clock reading is never a predictor, under any gate.
+
+    Its scale is the arbitrary session origin, so as a regressor it fits
+    recording drift rather than any elapsed-time effect. The derived elapsed
+    times built from it are fine, and keep their source's availability.
+    """
+    for clock in ABSOLUTE_SESSION_CLOCKS:
+        with pytest.raises(ValueError, match="absolute session clock"):
+            assert_predictor_timing([clock], retrospective=True, descriptive=True)
+        with pytest.raises(ValueError, match="absolute session clock"):
+            assert_predictor_timing([f"is_swr:{clock}"], descriptive=True)
+
+    assert ABSOLUTE_SESSION_CLOCKS == frozenset(
+        {"last_well_arrival_time_s", "outcome_known_time_s"}
+    )
+
+    # The per-bin durations derived from those clocks are usable, gated only by
+    # the availability of the clock each one is measured from.
+    assert timing_of("time_since_last_well_arrival_s") == ["last_well_arrival_time_s"]
+    assert timing_of("time_since_outcome_known_s") == ["outcome_known_time_s"]
+    assert_predictor_timing(["time_since_last_well_arrival_s"])
+    with pytest.raises(ValueError, match="post-outcome"):
+        assert_predictor_timing(["time_since_outcome_known_s"])
+    assert_predictor_timing(["time_since_outcome_known_s"], retrospective=True)

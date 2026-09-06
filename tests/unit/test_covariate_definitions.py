@@ -58,6 +58,7 @@ def test_timing_class_membership_is_pinned() -> None:
             "reward_belief_mean_update_l1_alternative_patches_postoutcome",
             "rpe_postoutcome",
             "task_reward_probability_chosen_arm",
+            "time_since_outcome_known_s",
         }
     )
     assert FUTURE_REFERENCING == frozenset(

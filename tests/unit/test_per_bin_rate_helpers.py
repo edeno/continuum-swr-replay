@@ -11,6 +11,8 @@ Covers the two shared primitives behind the per-bin rate models:
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -22,6 +24,9 @@ from continuum_swr_replay.analysis.replay import (
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.covariates.history.reward_history import (
+    reward_basis_from_lags,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
@@ -238,14 +243,23 @@ def test_raised_cosine_basis_shape_and_nonneg():
 
 def test_aggregate_history_basis_is_projection():
     """hist_rcos_k equals the onset_lag counts projected onto the basis."""
-    stops = pd.DataFrame({
-        "animal": ["x"], "session_date": [1], "epoch": ["02_r1"], "stop_id": [1],
-        "immobility_duration_s": [0.5],
-    })
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.5],
+        }
+    )
     onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.05, 0.20]})
     df = aggregate_to_timebins(
-        stops, onsets, bin_s=0.05, tmax=0.5,
-        self_history_lags=4, self_history_basis=3,
+        stops,
+        onsets,
+        bin_s=0.05,
+        tmax=0.5,
+        self_history_lags=4,
+        self_history_basis=3,
     )
     assert {"hist_rcos_0", "hist_rcos_1", "hist_rcos_2"} <= set(df.columns)
     B = raised_cosine_history_basis(4, 3)
@@ -257,15 +271,18 @@ def test_aggregate_history_basis_is_projection():
 
 
 def test_history_basis_requires_lags():
-    stops = pd.DataFrame({
-        "animal": ["x"], "session_date": [1], "epoch": ["02_r1"], "stop_id": [1],
-        "immobility_duration_s": [0.5],
-    })
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.5],
+        }
+    )
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
     with pytest.raises(ValueError, match="self_history_lags"):
-        aggregate_to_timebins(
-            stops, onsets, bin_s=0.05, tmax=0.5, self_history_basis=3
-        )
+        aggregate_to_timebins(stops, onsets, bin_s=0.05, tmax=0.5, self_history_basis=3)
 
 
 def test_reward_groupby_drops_nan_reward():
@@ -288,9 +305,7 @@ def test_reward_groupby_drops_nan_reward():
             "reward_history_incomplete": [0.0, 0.0],
         }
     )
-    onsets = pd.DataFrame(
-        {"stop_id": [1, 2], "t_since_stop_onset": [0.05, 0.05]}
-    )
+    onsets = pd.DataFrame({"stop_id": [1, 2], "t_since_stop_onset": [0.05, 0.05]})
     df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
     assert {1, 2} <= set(df.stop_id)  # both stops produce bins
     cells = df.groupby(["reward_history_rcos_0", "binj"], as_index=False)["count"].sum()
@@ -326,12 +341,7 @@ def session_slice():
 
     # Pick the session with the most non-local onsets for a meaningful slice.
     sc = ["animal", "session_date", "epoch"]
-    key = (
-        onset[onset.event_type == "non_local"]
-        .groupby(sc)
-        .size()
-        .idxmax()
-    )
+    key = onset[onset.event_type == "non_local"].groupby(sc).size().idxmax()
     sel = pd.Series(True, index=onset.index)
     for col, val in zip(sc, key, strict=True):
         sel &= onset[col] == val
@@ -366,9 +376,7 @@ def test_attach_is_swr_requires_exact_nonlocal_partition():
             "onset_time": [1.0, 2.0],
         }
     )
-    events = pd.DataFrame(
-        {"stop_id": [1], "event_start_s": [1.0], "is_swr": [True]}
-    )
+    events = pd.DataFrame({"stop_id": [1], "event_start_s": [1.0], "is_swr": [True]})
 
     with pytest.raises(ValueError, match="exact.*partition|unmatched"):
         attach_is_swr_to_onsets(onsets, events)
@@ -453,18 +461,30 @@ def test_aggregate_cross_history_lags():
     """
     stops = pd.DataFrame(
         {
-            "animal": ["x"], "session_date": [1], "epoch": ["02_r1"],
-            "stop_id": [1], "immobility_duration_s": [1.0],
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [1.0],
         }
     )
     # response (non-SWR) onsets in bins 3, 4
     resp = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.35, 0.45]})
     # cross (with-SWR) onsets in bins 2, 5
     cross = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.25, 0.55]})
-    df = aggregate_to_timebins(
-        stops, resp, bin_s=0.1, tmax=1.0,
-        self_history_lags=2, cross_onset_times=cross, cross_history_lags=2,
-    ).sort_values("binj").set_index("binj")
+    df = (
+        aggregate_to_timebins(
+            stops,
+            resp,
+            bin_s=0.1,
+            tmax=1.0,
+            self_history_lags=2,
+            cross_onset_times=cross,
+            cross_history_lags=2,
+        )
+        .sort_values("binj")
+        .set_index("binj")
+    )
     # response counts unaffected by the cross stream
     assert df.loc[3, "count"] == 1 and df.loc[4, "count"] == 1
     # cross_lag1 fires one bin after each cross onset (bins 2->3, 5->6)
@@ -482,9 +502,286 @@ def test_aggregate_cross_history_lags():
 def test_aggregate_cross_history_requires_stream():
     """cross_history_lags without cross_onset_times is a loud error."""
     stops = pd.DataFrame(
-        {"animal": ["x"], "session_date": [1], "epoch": ["02_r1"],
-         "stop_id": [1], "immobility_duration_s": [0.5]}
+        {
+            "animal": ["x"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "stop_id": [1],
+            "immobility_duration_s": [0.5],
+        }
     )
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.05]})
     with pytest.raises(ValueError, match="cross_onset_times"):
         aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, cross_history_lags=2)
+
+
+# ── Arrival / outcome-availability clocks and the boundary-shifted history ──
+
+
+LAG_COLUMNS = [f"known_reward_outcome_lag_{j}" for j in range(1, 11)]
+
+
+def _bout_start_features(lags: list[float]) -> tuple[np.ndarray, float]:
+    """Stop-level reward-history features for one lag vector.
+
+    Calls the same primitives the stop table uses, so a test expectation can
+    never drift from the production kernel.
+    """
+    raw = reward_basis_from_lags(
+        np.asarray([lags], dtype=float), raised_cosine_history_basis(10, 3)
+    )
+    return np.nan_to_num(raw[0], nan=0.0), float(np.isnan(raw[0]).any())
+
+
+#: Fully known history for the stop that crosses its outcome boundary.
+FULL_LAGS = [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0]
+#: One known outcome only -- the slowest bump is undefined at bout start.
+ONE_LAG = [1.0] + [np.nan] * 9
+
+
+@pytest.fixture
+def arrival_clock_stops() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Five stops covering every branch of the outcome-boundary rule.
+
+    With ``bin_s=0.1``, ``tmax=0.5`` (left edges are ``stop_start + binj * 0.1``):
+
+    * stop 1 -- ``at_well``, boundary 0.15 s into a 0.35 s bout: bins 0-1 keep the
+      bout-start history, bins 2-3 are shifted.
+    * stop 2 -- ``at_well`` with a single known outcome, boundary 0.05 s in: the
+      shift supplies a second outcome, so ``reward_history_incomplete`` flips 1 -> 0.
+    * stop 3 -- ``mixed`` (the bout spans the arrival): never shifted, counted.
+    * stop 4 -- the outcome was already known at bout start: never shifted.
+    * stop 5 -- no completed arrival: both clocks NaN, never shifted.
+    """
+    starts = [100.0, 200.0, 300.0, 400.0, 500.0]
+    arrivals = [99.5, 199.4, np.nan, 399.0, np.nan]
+    outcomes = [100.15, 200.05, 300.15, 399.5, np.nan]
+    lags = [FULL_LAGS, ONE_LAG, FULL_LAGS, FULL_LAGS, ONE_LAG]
+    stops = pd.DataFrame(
+        {
+            "animal": ["x"] * 5,
+            "session_date": [1] * 5,
+            "epoch": ["02_r1"] * 5,
+            "stop_id": [1, 2, 3, 4, 5],
+            "stop_start": starts,
+            "immobility_duration_s": [0.35, 0.35, 0.35, 0.35, 0.35],
+            "occupancy_state": ["at_well", "at_well", "mixed", "at_well", "in_transit"],
+            "completed_trial_reward": [1.0, 0.0, 1.0, 1.0, np.nan],
+            "last_well_arrival_time_s": arrivals,
+            "outcome_known_time_s": outcomes,
+        }
+    )
+    for j, col in enumerate(LAG_COLUMNS):
+        stops[col] = [row[j] for row in lags]
+    features = [_bout_start_features(row) for row in lags]
+    for k in range(3):
+        stops[f"reward_history_rcos_{k}"] = [f[0][k] for f in features]
+    stops["reward_history_incomplete"] = [f[1] for f in features]
+    onsets = pd.DataFrame(
+        {"stop_id": [1, 2], "t_since_stop_onset": [0.05, 0.25]}, dtype=float
+    )
+    onsets["stop_id"] = onsets["stop_id"].astype(int)
+    return stops, onsets
+
+
+def _aggregate_with_clocks(stops, onsets):
+    return aggregate_to_timebins(
+        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True
+    ).sort_values(["stop_id", "binj"])
+
+
+def test_time_since_arrival_and_outcome(arrival_clock_stops):
+    """Both per-bin clocks are the bin centre minus the absolute stop clock."""
+    stops, onsets = arrival_clock_stops
+    df = _aggregate_with_clocks(stops, onsets)
+
+    clocks = stops.set_index("stop_id")
+    center_abs = (
+        df["stop_id"].map(clocks["stop_start"]).to_numpy() + (df["binj"] + 0.5) * 0.1
+    )
+    assert df["time_since_last_well_arrival_s"].to_numpy() == pytest.approx(
+        center_abs - df["stop_id"].map(clocks["last_well_arrival_time_s"]).to_numpy(),
+        nan_ok=True,
+    )
+    assert df["time_since_outcome_known_s"].to_numpy() == pytest.approx(
+        center_abs - df["stop_id"].map(clocks["outcome_known_time_s"]).to_numpy(),
+        nan_ok=True,
+    )
+
+    # A NaN clock yields a NaN elapsed time -- never a silent zero.
+    stop5 = df[df.stop_id == 5]
+    assert stop5["time_since_last_well_arrival_s"].isna().all()
+    assert stop5["time_since_outcome_known_s"].isna().all()
+
+    # The arrival clock is non-negative for an at-well bout (the animal arrived
+    # before the bout began); the outcome clock is negative before the boundary.
+    stop1 = df[df.stop_id == 1]
+    assert (stop1["time_since_last_well_arrival_s"] >= 0).all()
+    assert stop1["time_since_outcome_known_s"].tolist() == pytest.approx(
+        [-0.1, 0.0, 0.1, 0.2]
+    )
+
+    # The absolute clocks themselves are not carried into the design.
+    assert "last_well_arrival_time_s" not in df.columns
+    assert "outcome_known_time_s" not in df.columns
+    assert "stop_start" not in df.columns
+    assert not [c for c in LAG_COLUMNS if c in df.columns]
+
+
+def test_reward_features_shift_at_outcome_boundary(arrival_clock_stops):
+    """Bins at/after the boundary carry the history including the new outcome."""
+    stops, onsets = arrival_clock_stops
+    df = _aggregate_with_clocks(stops, onsets)
+    stop1 = df[df.stop_id == 1]
+
+    before, before_incomplete = _bout_start_features(FULL_LAGS)
+    after, after_incomplete = _bout_start_features([1.0, *FULL_LAGS[:-1]])
+    assert before != pytest.approx(after)
+
+    # Left edges 100.0 / 100.1 precede the 100.15 boundary; 100.2 / 100.3 do not.
+    pre = stop1[stop1.binj < 2]
+    post = stop1[stop1.binj >= 2]
+    for k in range(3):
+        col = f"reward_history_rcos_{k}"
+        assert pre[col].tolist() == pytest.approx([before[k]] * len(pre))
+        assert post[col].tolist() == pytest.approx([after[k]] * len(post))
+    assert pre["reward_history_incomplete"].tolist() == [before_incomplete] * len(pre)
+    assert post["reward_history_incomplete"].tolist() == [after_incomplete] * len(post)
+
+
+def test_reward_history_incomplete_flips_at_the_second_known_outcome(
+    arrival_clock_stops,
+):
+    """A stop that learns its second outcome mid-bout stops being zero-filled."""
+    stops, onsets = arrival_clock_stops
+    df = _aggregate_with_clocks(stops, onsets)
+    stop2 = df[df.stop_id == 2]
+
+    # Boundary 200.05: only bin 0 (left edge 200.0) precedes it.
+    assert stop2.loc[stop2.binj == 0, "reward_history_incomplete"].tolist() == [1.0]
+    assert stop2.loc[stop2.binj > 0, "reward_history_incomplete"].tolist() == [0.0] * 3
+    # The slowest component was zero-filled at bout start and is defined after.
+    assert stop2.loc[stop2.binj == 0, "reward_history_rcos_2"].tolist() == [0.0]
+    assert (stop2.loc[stop2.binj > 0, "reward_history_rcos_2"] > 0).all()
+
+
+def test_arrival_spanning_and_out_of_stop_boundaries_are_not_shifted(
+    arrival_clock_stops,
+):
+    """Only an at-well stop whose boundary falls inside it is shifted."""
+    stops, onsets = arrival_clock_stops
+    df = _aggregate_with_clocks(stops, onsets)
+
+    full, full_incomplete = _bout_start_features(FULL_LAGS)
+    one, one_incomplete = _bout_start_features(ONE_LAG)
+    # stop 3 spans the arrival; stop 4 already knew its outcome at bout start;
+    # stop 5 has no completed arrival at all. None of them moves off bout start.
+    for stop_id, (expected, expected_incomplete) in {
+        3: (full, full_incomplete),
+        4: (full, full_incomplete),
+        5: (one, one_incomplete),
+    }.items():
+        rows = df[df.stop_id == stop_id]
+        for k in range(3):
+            assert rows[f"reward_history_rcos_{k}"].tolist() == pytest.approx(
+                [expected[k]] * len(rows)
+            )
+        assert rows["reward_history_incomplete"].tolist() == [
+            expected_incomplete
+        ] * len(rows)
+
+    # Counted once per stop, not once per bin, and only for the arrival-spanning
+    # bout whose boundary actually falls inside it.
+    assert df.attrs["n_stops_arrival_spanning"] == 1
+
+
+def test_arrival_columns_absent_leaves_the_design_unchanged(two_stop_design):
+    """A stop frame without the clocks produces exactly the pre-existing design."""
+    stops, onsets = two_stop_design
+    df = aggregate_to_timebins(
+        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True, self_history_lags=1
+    )
+    assert "time_since_last_well_arrival_s" not in df.columns
+    assert "time_since_outcome_known_s" not in df.columns
+    assert "n_stops_arrival_spanning" not in df.attrs
+
+    # Frozen reference: value hash of the full design plus pinned cells, so a
+    # change to any carried column or row order fails here rather than silently
+    # moving every fitted per-bin coefficient.
+    frozen = aggregate_to_timebins(
+        FROZEN_STOPS,
+        FROZEN_ONSETS,
+        bin_s=0.1,
+        tmax=0.5,
+        reward_basis=True,
+        self_history_lags=2,
+        self_history_basis=2,
+        cross_onset_times=FROZEN_CROSS_ONSETS,
+        cross_history_lags=2,
+        cross_history_basis=2,
+        stop_covariates=("is_swr_stop",),
+    )
+    assert list(frozen.columns) == FROZEN_COLUMNS
+    assert frozen.shape == (13, 21)
+    digest = hashlib.sha256(
+        frozen.sort_values(["stop_id", "binj"]).round(12).to_csv(index=False).encode()
+    ).hexdigest()
+    assert digest == FROZEN_DIGEST
+    last = frozen[frozen.stop_id == 3].sort_values("binj").iloc[-1]
+    assert last.binj == 4
+    assert last.exposure == pytest.approx(0.02)
+    assert last.tc == pytest.approx(0.45)
+    assert last.onset_lag1 == pytest.approx(1.0)
+    assert last.cross_hist_rcos_1 == pytest.approx(1.0)
+
+
+# ── Frozen (stop x bin) design: the shape and values before the per-bin clocks ──
+#
+# Three stops exercising tmax truncation, a partial final bin, self- and
+# cross-history lags with their raised-cosine projections, and an extra per-stop
+# covariate. The digest is over the sorted, 12-decimal CSV of the whole frame.
+
+FROZEN_STOPS = pd.DataFrame(
+    {
+        "animal": ["x", "x", "x"],
+        "session_date": [1, 1, 1],
+        "epoch": ["02_r1", "02_r1", "02_r1"],
+        "stop_id": [1, 2, 3],
+        "immobility_duration_s": [0.25, 0.85, 0.42],
+        "reward_history_rcos_0": [1.0, 0.0, 0.5],
+        "reward_history_rcos_1": [0.8, 0.2, 0.25],
+        "reward_history_rcos_2": [0.6, 0.4, 0.125],
+        "reward_history_incomplete": [0.0, 0.0, 1.0],
+        "is_swr_stop": [True, False, True],
+    }
+)
+FROZEN_ONSETS = pd.DataFrame(
+    {"stop_id": [1, 1, 2, 3, 3], "t_since_stop_onset": [0.05, 0.15, 0.25, 0.02, 0.31]}
+)
+FROZEN_CROSS_ONSETS = pd.DataFrame(
+    {"stop_id": [1, 2, 3], "t_since_stop_onset": [0.12, 0.05, 0.22]}
+)
+FROZEN_COLUMNS = [
+    "animal",
+    "session_date",
+    "epoch",
+    "stop_id",
+    "reward_history_rcos_0",
+    "reward_history_rcos_1",
+    "reward_history_rcos_2",
+    "reward_history_incomplete",
+    "is_swr_stop",
+    "binj",
+    "tc",
+    "exposure",
+    "count",
+    "onset_lag1",
+    "onset_lag2",
+    "hist_rcos_0",
+    "hist_rcos_1",
+    "cross_lag1",
+    "cross_lag2",
+    "cross_hist_rcos_0",
+    "cross_hist_rcos_1",
+]
+FROZEN_DIGEST = "7a2311d8acfde43383573a07f6da8a08c7220eb6797a38a3bb962c3dc014fc3c"
