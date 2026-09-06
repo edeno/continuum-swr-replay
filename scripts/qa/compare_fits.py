@@ -1549,7 +1549,13 @@ def contrast_stratum_table(
         merged = side if merged is None else merged.merge(side, on=keys, how="outer")
     if merged is None:
         return pd.DataFrame()
-    return merged.sort_values(keys).reset_index(drop=True)
+    # Same twin-adjacent order as the audited table above.
+    return (
+        merged.assign(_rung_order=merged["model"].map(rung_sort_key))
+        .sort_values(["level", "_rung_order", "population", "term"])
+        .drop(columns="_rung_order")
+        .reset_index(drop=True)
+    )
 
 
 def _disjoint_rungs_note(old: pd.DataFrame, new: pd.DataFrame, note: str = "") -> str:
