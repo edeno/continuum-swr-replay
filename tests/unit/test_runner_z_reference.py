@@ -110,7 +110,7 @@ def test_patch_cohort_is_its_own_standardization_scope():
 def test_reference_round_trips_through_the_sidecar(tmp_path):
     """Reloading the persisted sidecar reproduces the fit's ``_z`` exactly."""
     designed, reference = mod._attach_patch_design_columns(_patch_frame())
-    path = mod._z_reference_path(tmp_path / "swr_contrast_content_patch.pkl")
+    path = mod.z_reference_path(tmp_path / "swr_contrast_content_patch.pkl")
     save_reference(reference, path)
 
     assert path.name == "swr_contrast_content_patch.z_reference.json"

@@ -57,6 +57,12 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay.standardization import (
+    Reference,
+    attach_standardized,
+    save_reference,
+    z_reference_path,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
@@ -75,6 +81,7 @@ PREDICTORS = [
 ]
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
 POST_OUTCOME_GATE_RULE = "event_start_s >= outcome_known_time"
+FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
 
 
 def _subset_max_per_animal(events: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -282,14 +289,25 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
         for row in gate_audit.to_dict(orient="records")
     }
     rows = []
+    z_reference: dict[str, Reference] = {}
     for keys, g in gated.groupby(SC, sort=False):
         # ``_balanced_post_outcome_selection`` already applied this exact
         # listwise-finite column set before checking outcome balance.
         g = g[list(POWER_FIT_COLUMNS)]
         if len(g) < 30:
             continue
-        X = g[PREDICTORS].to_numpy(dtype=float)
-        X = (X - X.mean(0)) / np.where(X.std(0) > 0, X.std(0), 1.0)
+        # Per-session standardization, so a coefficient reads per 1 SD of that
+        # session's own covariate spread. ``zero_std="center"`` keeps a
+        # within-session constant predictor as an all-zero (unidentified,
+        # coefficient 0) column rather than NaN-ing the whole session's fit.
+        standardized, session_reference = attach_standardized(
+            g[list(PREDICTORS)].copy(),
+            PREDICTORS,
+            support_label=FIT_SUPPORT_LABEL,
+            zero_std="center",
+        )
+        z_reference["|".join(str(key) for key in keys)] = session_reference
+        X = standardized[[f"{c}_z" for c in PREDICTORS]].to_numpy(dtype=float)
         y = g[POWER_COL].to_numpy(dtype=float)
         beta, *_ = np.linalg.lstsq(np.c_[np.ones(len(g)), X], y, rcond=None)
         gate_metadata = gate_by_session[keys]
@@ -303,6 +321,7 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
         )
     result = pd.DataFrame(rows)
     result.attrs["post_outcome_gate_audit"] = gate_audit.to_dict(orient="records")
+    result.attrs["z_reference"] = z_reference
     return result
 
 
@@ -442,6 +461,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"swr_power_model{sfx}.pkl"
     coefs.to_pickle(out)
+    save_reference(coefs.attrs["z_reference"], z_reference_path(out))
     gate_audit.to_csv(
         out_dir / f"swr_power_post_outcome_gate_audit{sfx}.csv",
         index=False,

@@ -90,6 +90,11 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
+from continuum_swr_replay.analysis.replay.standardization import (  # noqa: E402
+    attach_standardized,
+    save_reference,
+    z_reference_path,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
@@ -157,6 +162,9 @@ RL_COVARIATES = (
     "reward_belief_mean_update_l1_all_ports_postoutcome",  # |value update| summed over all ports
     "reward_belief_mean_update_l1_alternative_patches_postoutcome",  # |update| over alternative patches
 )
+
+# Fit-cohort standardization support: the moments are the fitted rows' own.
+FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
 
 # What the model actually fits + reports (nominal + model value + RL DVs).
 FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATES)
@@ -637,12 +645,18 @@ def main() -> None:
                 c,
                 100 * frac_valid,
             )
-        sd = stop[c].std()
-        if pd.isna(sd) or sd == 0:
+    # ddof=1: these coefficients are reported per *sample* SD of the fitted rows.
+    stop, z_reference = attach_standardized(
+        stop, RL_COVARIATES, support_label=FIT_SUPPORT_LABEL, ddof=1
+    )
+    for c in RL_COVARIATES:
+        sd = z_reference[c]["std"]
+        if not np.isfinite(sd) or sd == 0:
             raise ValueError(
                 f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score"
             )
-        stop[c] = (stop[c] - stop[c].mean()) / sd
+        # The fitted design carries the standardized values under the raw name.
+        stop[c] = stop.pop(f"{c}_z")
 
     n_sessions = stop.groupby(SESSION_COLS).ngroups
     logger.info(
@@ -663,6 +677,7 @@ def main() -> None:
     csfx = "_smoke" if smoke else ""
     out = out_dir / fname
     models.to_pickle(out)
+    save_reference(z_reference, z_reference_path(out))
     write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
     gate_audit.to_csv(
         out_dir / f"uncertainty_rate_post_outcome_gate_audit{csfx}.csv",

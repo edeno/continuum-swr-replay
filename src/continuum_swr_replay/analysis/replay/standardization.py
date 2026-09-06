@@ -39,6 +39,8 @@ def attach_standardized(
     *,
     support_mask: Sequence[bool] | np.ndarray | pd.Series | None = None,
     support_label: str = "all_rows",
+    ddof: int = 0,
+    zero_std: str = "nan",
 ) -> tuple[pd.DataFrame, Reference]:
     """Append ``<col>_z`` pooled-global standardized columns to ``df`` in place.
 
@@ -61,14 +63,26 @@ def attach_standardized(
         slopes and therefore must not define the reported one-SD unit.
     support_label : str
         Persisted human-readable name for ``support_mask``.
+    ddof : int
+        Delta degrees of freedom for the SD. ``0`` (population SD) is the
+        persisted-table convention. The per-bin uncertainty-rate runner reports
+        its RL covariates per *sample* SD (``ddof=1``) and passes ``1`` so the
+        reported per-SD rate ratios keep their published scale.
+    zero_std : {"nan", "center"}
+        What a zero-SD column becomes. ``"nan"`` (default) yields an all-``NaN``
+        ``_z``: the coefficient is not identified. ``"center"`` yields
+        ``x - mean`` (an all-zero column), the design-matrix convention for a
+        pooled per-session fit, where NaN-ing one constant predictor would
+        otherwise discard that session's other coefficients too. Either way the
+        recorded reference carries the true ``std`` of ``0``.
 
     Returns
     -------
     (df, used_reference)
         ``used_reference`` maps every standardized column to the mean/SD actually used.
-        A column with ``std == 0`` (or non-finite) yields an all-``NaN`` ``_z`` — the
-        coefficient is not identified, matching the original one-off's behavior.
     """
+    if zero_std not in ("nan", "center"):
+        raise ValueError(f"zero_std must be 'nan' or 'center'; got {zero_std!r}")
     if support_mask is None:
         support = np.ones(len(df), dtype=bool)
     else:
@@ -157,10 +171,13 @@ def attach_standardized(
                     f"standardization support for {c!r} contains no finite values"
                 )
             mu = float(np.nanmean(reference_values))
-            sd = float(np.nanstd(reference_values))
+            sd = float(np.nanstd(reference_values, ddof=ddof))
             label = support_label
             n_reference_rows = int(finite_reference.sum())
-        df[c + "_z"] = (x - mu) / sd if sd > 0 else np.nan
+        if sd > 0:
+            df[c + "_z"] = (x - mu) / sd
+        else:
+            df[c + "_z"] = (x - mu) if zero_std == "center" else np.nan
         used[c] = {
             "mean": mu,
             "std": sd,
@@ -304,6 +321,11 @@ def assert_standardized_matches_reference(
             "materialized standardized values do not match the frozen "
             f"{support_label!r} reference: {mismatched}"
         )
+
+
+def z_reference_path(artifact_path):
+    """``<artifact-stem>.z_reference.json`` beside a fitted artifact."""
+    return artifact_path.with_name(f"{artifact_path.stem}.z_reference.json")
 
 
 def save_reference(reference: Reference, path) -> None:

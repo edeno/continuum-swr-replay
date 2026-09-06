@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     load_reference,
     save_reference,
+    z_reference_path,
 )
 
 
@@ -264,3 +265,55 @@ def test_materialized_z_guard_rejects_missing_raw_or_z_column():
             reference,
             support_label="leaf_arms",
         )
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_zero_variance_can_be_centered_instead():
+    """``zero_std="center"`` leaves a constant column as zeros, not NaN.
+
+    A per-session design matrix pools one fit over several predictors: NaN-ing a
+    within-session constant predictor would discard that session's other
+    coefficients too, so its column is centered to all-zero (unidentified,
+    coefficient 0) instead.
+    """
+    df = pd.DataFrame({"c": [4.0, 4.0, 4.0], "v": [0.0, 1.0, 2.0]})
+    out, ref = attach_standardized(df.copy(), ["c", "v"], zero_std="center")
+    np.testing.assert_array_equal(out["c_z"].to_numpy(), np.zeros(3))
+    assert ref["c"]["std"] == 0.0
+    np.testing.assert_allclose(
+        out["v_z"].to_numpy(), (df["v"] - 1.0) / np.nanstd(df["v"])
+    )
+    with pytest.raises(ValueError, match="zero_std"):
+        attach_standardized(df.copy(), ["c"], zero_std="drop")
+
+
+def test_ddof_selects_the_sample_sd():
+    """``ddof=1`` reports per sample SD; the default stays the population SD."""
+    rng = np.random.default_rng(3)
+    values = rng.normal(size=40)
+    df = pd.DataFrame({"a": values})
+    _, population = attach_standardized(df.copy(), ["a"])
+    _, sample = attach_standardized(df.copy(), ["a"], ddof=1)
+    assert population["a"]["std"] == float(np.nanstd(values))
+    assert sample["a"]["std"] == float(np.nanstd(values, ddof=1))
+    assert sample["a"]["std"] > population["a"]["std"]
+
+
+def test_runner_references_written(tmp_path):
+    """Both rate runners persist a fit-cohort reference beside their artifact."""
+    from scripts.rate import fit_swr_power_model, fit_uncertainty_rate
+
+    for runner, artifact in (
+        (fit_uncertainty_rate, "uncertainty_rate_smoke.pkl"),
+        (fit_swr_power_model, "swr_power_model_smoke.pkl"),
+    ):
+        assert runner.FIT_SUPPORT_LABEL == "fit_cohort_all_rows"
+        path = z_reference_path(tmp_path / artifact)
+        assert path.name == artifact.replace(".pkl", ".z_reference.json")
+
+        df = pd.DataFrame({"a": [1.0, 2.0, 4.0, 8.0]})
+        _, reference = attach_standardized(
+            df, ["a"], support_label=runner.FIT_SUPPORT_LABEL
+        )
+        save_reference(reference, path)
+        assert load_reference(path)["a"]["support"] == "fit_cohort_all_rows"

@@ -143,6 +143,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
     attach_standardized,
     load_reference,
     save_reference,
+    z_reference_path,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -345,11 +346,6 @@ def select_outcome_stratum(ev: pd.DataFrame, stratum: str) -> tuple[pd.DataFrame
         "n_events_unknown_outcome_non_swr": int((unknown & ~is_swr).sum()),
     }
     return kept, audit
-
-
-def _z_reference_path(artifact_path):
-    """``<artifact-stem>.z_reference.json`` beside a fitted artifact."""
-    return artifact_path.with_name(f"{artifact_path.stem}.z_reference.json")
 
 
 def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
@@ -1387,7 +1383,7 @@ def main() -> None:
     arm_path = RC / "models" / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
     write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
-    save_reference(arm_z_reference, _z_reference_path(arm_path))
+    save_reference(arm_z_reference, z_reference_path(arm_path))
 
     logger.info(
         "PATCH ladder: %d rows, %d events, %d sessions",
@@ -1401,7 +1397,7 @@ def main() -> None:
     patch_path = RC / "models" / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
     write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
-    save_reference(patch_z_reference, _z_reference_path(patch_path))
+    save_reference(patch_z_reference, z_reference_path(patch_path))
 
     # Cohort-audit table (one row per model x population; reconciles n_in - Σdrops =
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
