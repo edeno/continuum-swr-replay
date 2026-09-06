@@ -30,10 +30,16 @@ detector's actual criterion) is the better summary and is left as a follow-up.
 
 Output: ``models_per_bin_rate/swr_power_model.pkl`` (per-session coefficients).
 
-Usage: python scripts/rate/fit_swr_power_model.py
+Usage::
+
+    uv run python scripts/rate/fit_swr_power_model.py                    # full
+    uv run python scripts/rate/fit_swr_power_model.py --max-per-animal 1 # smoke
 """
 
 from __future__ import annotations
+
+import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -69,6 +75,18 @@ PREDICTORS = [
 ]
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
 POST_OUTCOME_GATE_RULE = "event_start_s >= outcome_known_time"
+
+
+def _subset_max_per_animal(events: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Keep the first ``n`` sessions per animal (session order, not event order)."""
+    keep = (
+        events[SC]
+        .drop_duplicates()
+        .sort_values(SC)
+        .groupby("animal", sort=False)
+        .head(n)
+    )
+    return events.merge(keep, on=SC)
 
 
 def _bimodality_coef(x: np.ndarray) -> float:
@@ -372,7 +390,30 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--max-per-animal",
+        type=int,
+        default=None,
+        help=(
+            "Smoke mode: keep only the first N sessions per animal and write "
+            "`_smoke`-suffixed artifacts, never the canonical ones."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RC / "models_per_bin_rate",
+        help="Directory for the fitted model, its z reference, and the audits.",
+    )
+    args = parser.parse_args()
+    # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
+    smoke = args.max_per_animal is not None
+    sfx = "_smoke" if smoke else ""
+
     df = _assemble()
+    if smoke:
+        df = _subset_max_per_animal(df, args.max_per_animal)
     m = df[POWER_COL].to_numpy()
     print(f"=== SWR power distribution ({POWER_COL}, n={len(df)} non-local events) ===")
     print(
@@ -397,15 +438,17 @@ def main() -> None:
 
     coefs = fit_power_model(df)
     gate_audit = pd.DataFrame(coefs.attrs["post_outcome_gate_audit"])
-    out = RC / "models_per_bin_rate" / "swr_power_model.pkl"
+    out_dir = args.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"swr_power_model{sfx}.pkl"
     coefs.to_pickle(out)
     gate_audit.to_csv(
-        RC / "models_per_bin_rate" / "swr_power_post_outcome_gate_audit.csv",
+        out_dir / f"swr_power_post_outcome_gate_audit{sfx}.csv",
         index=False,
     )
     write_cohort_audit(
         _cohort_records(df, coefs),
-        RC / "models_per_bin_rate" / "swr_power_cohort_audit.csv",
+        out_dir / f"swr_power_cohort_audit{sfx}.csv",
     )
     if coefs.empty:
         raise RuntimeError(
