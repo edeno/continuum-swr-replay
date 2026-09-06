@@ -46,9 +46,15 @@ _ARRIVAL_CLOCK_STOP_COLUMNS = (
 _OUTCOME_SHIFT_STOP_COLUMNS = (
     "stop_start",
     "outcome_known_time_s",
-    "occupancy_state",
     "completed_trial_reward",
     *_REWARD_LAG_COLUMNS,
+)
+#: Stop columns read only at STOP level, to find the bouts that span an arrival.
+#: They are never carried per bin (the per-bin design has its own clocks).
+_ARRIVAL_SPAN_STOP_COLUMNS = (
+    "stop_start",
+    "stop_end",
+    "last_well_arrival_time_s",
 )
 
 
@@ -917,6 +923,38 @@ def reconstruct_self_history_kernels(
     return coefs @ raised_cosine_history_basis(n_lags, n_basis)
 
 
+def _arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:
+    """``stop_id`` of the bouts that contain a later well arrival.
+
+    A stop spans an arrival iff the NEXT stop of the same session -- ordering
+    by ``stop_start`` within ``animal, session_date, epoch`` -- reports a
+    ``last_well_arrival_time_s`` strictly inside ``(stop_start, stop_end]`` of
+    this bout. Well arrivals are monotone within a session, so only the next
+    stop's arrival can fall inside this one and the test is exact. A stop with
+    no successor, or whose successor has no arrival clock, does not span.
+
+    Parameters
+    ----------
+    stops : pd.DataFrame
+        Per-stop frame (unique ``stop_id``) carrying ``animal``,
+        ``session_date``, ``epoch``, ``stop_start``, ``stop_end`` and
+        ``last_well_arrival_time_s``.
+
+    Returns
+    -------
+    np.ndarray
+        The spanning stops' ``stop_id`` values (possibly empty).
+    """
+    ordered = stops.sort_values([*_SESSION_COLS, "stop_start"], kind="stable")
+    next_arrival = ordered.groupby(_SESSION_COLS, sort=False, observed=True)[
+        "last_well_arrival_time_s"
+    ].shift(-1)
+    spans = (next_arrival > ordered["stop_start"]) & (
+        next_arrival <= ordered["stop_end"]
+    )
+    return ordered.loc[spans.fillna(False).to_numpy(), "stop_id"].to_numpy()
+
+
 def aggregate_to_timebins(
     stop_table: pd.DataFrame,
     onset_times: pd.DataFrame,
@@ -991,15 +1029,17 @@ def aggregate_to_timebins(
     in progress when the current trip's reward or omission becomes observable
     would carry a history missing that outcome for its later bins. When
     ``reward_basis`` is set and ``stop_table`` additionally carries
-    ``occupancy_state``, ``completed_trial_reward`` and the
-    ``known_reward_outcome_lag_{1..10}`` columns, bins whose LEFT EDGE is at or
-    past ``outcome_known_time_s`` (for an ``at_well`` stop whose boundary falls
-    inside it) get the lag vector shifted by one --
+    ``stop_end``, ``last_well_arrival_time_s``, ``completed_trial_reward`` and
+    the ``known_reward_outcome_lag_{1..10}`` columns, bins whose LEFT EDGE is at
+    or past ``outcome_known_time_s`` (for a stop whose boundary falls inside it)
+    get the lag vector shifted by one --
     ``[completed_trial_reward, lag_1, ..., lag_9]`` -- and the basis features and
     ``reward_history_incomplete`` re-derived from it by the same functions the
-    stop level uses. Bins before the boundary keep the bout-start values. Bouts
-    that span the arrival (``occupancy_state == "mixed"``) change which trip is
-    the completed one partway through, so they are never shifted;
+    stop level uses. Bins before the boundary keep the bout-start values. The
+    one exception is a bout that spans a well arrival -- the next stop of the
+    session arrived inside ``(stop_start, stop_end]`` (see
+    :func:`_arrival_spanning_stop_ids`) -- which changes which trip is the
+    completed one partway through, so it is never shifted;
     ``out.attrs["n_stops_arrival_spanning"]`` counts how many such stops have at
     least one bin at or after the boundary (a boundary that falls inside a stop
     but beyond its last retained bin leaves no bin to shift and is not counted).
@@ -1039,7 +1079,8 @@ def aggregate_to_timebins(
     # the arrival clocks existed produces exactly the design it produced before.
     emit_clocks = all(c in stop_table.columns for c in _ARRIVAL_CLOCK_STOP_COLUMNS)
     shift_at_outcome = reward_basis and all(
-        c in stop_table.columns for c in _OUTCOME_SHIFT_STOP_COLUMNS
+        c in stop_table.columns
+        for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
     )
     internal_cols = list(
         dict.fromkeys(
@@ -1190,20 +1231,24 @@ def aggregate_to_timebins(
         # two levels stay one kernel rather than two.
         stop_start = out["stop_start"].to_numpy(dtype=float)
         boundary = out["outcome_known_time_s"].to_numpy(dtype=float)
-        occupancy = out["occupancy_state"].to_numpy()
         left_edge_abs = stop_start + out["binj"].to_numpy(dtype=float) * bin_s
         # NaN boundary -> False, so a stop with no known outcome is untouched.
         # ``stop_start < boundary`` excludes stops already past their outcome at
         # bout start (their bout-start history already contains it); the bins of
         # a stop whose boundary sits beyond its last bin never satisfy ``post``.
         inside = (stop_start < boundary) & (left_edge_abs >= boundary)
-        crosses = inside & (occupancy == "at_well")
-        # A bout that spans the arrival changes WHICH trip is the completed one
-        # partway through, so ``completed_trial_reward`` is not the outcome that
-        # becomes known at the boundary; those stops are left on their bout-start
-        # history and counted instead of silently mis-shifted.
+        # A bout that spans a well arrival changes WHICH trip is the completed
+        # one partway through, so ``completed_trial_reward`` is not the outcome
+        # that becomes known at the boundary; those stops are left on their
+        # bout-start history and counted instead of silently mis-shifted. A bout
+        # spans an arrival iff the NEXT stop of the same session (ordered by
+        # ``stop_start``) arrived at its well inside ``(stop_start, stop_end]``;
+        # arrivals are monotone in the session, so the next stop's is the only
+        # one that can fall there and the test is exact.
+        spans_arrival = out["stop_id"].isin(_arrival_spanning_stop_ids(s)).to_numpy()
+        crosses = inside & ~spans_arrival
         n_stops_arrival_spanning = int(
-            pd.unique(out["stop_id"].to_numpy()[inside & (occupancy == "mixed")]).size
+            pd.unique(out["stop_id"].to_numpy()[inside & spans_arrival]).size
         )
 
         lags = out[list(_REWARD_LAG_COLUMNS)].to_numpy(dtype=float)

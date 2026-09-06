@@ -541,7 +541,7 @@ ONE_LAG = [1.0] + [np.nan] * 9
 
 @pytest.fixture
 def arrival_clock_stops() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Five stops covering every branch of the outcome-boundary rule.
+    """Seven stops covering every branch of the outcome-boundary rule.
 
     With ``bin_s=0.1``, ``tmax=0.5`` (left edges are ``stop_start + binj * 0.1``):
 
@@ -549,24 +549,38 @@ def arrival_clock_stops() -> tuple[pd.DataFrame, pd.DataFrame]:
       bout-start history, bins 2-3 are shifted.
     * stop 2 -- ``at_well`` with a single known outcome, boundary 0.05 s in: the
       shift supplies a second outcome, so ``reward_history_incomplete`` flips 1 -> 0.
-    * stop 3 -- ``mixed`` (the bout spans the arrival): never shifted, counted.
+    * stop 3 -- ``mixed`` but the next stop's arrival is nowhere near it, so the
+      bout spans no arrival: shifted like any other crossing bout.
     * stop 4 -- the outcome was already known at bout start: never shifted.
     * stop 5 -- no completed arrival: both clocks NaN, never shifted.
+    * stop 6 -- genuinely arrival-spanning: stop 7's arrival (600.2) falls inside
+      ``(600.0, 600.35]``. Never shifted, and counted.
+    * stop 7 -- the successor whose arrival stop 6 contains; already past its own
+      outcome at bout start, so it is never shifted itself.
     """
-    starts = [100.0, 200.0, 300.0, 400.0, 500.0]
-    arrivals = [99.5, 199.4, np.nan, 399.0, np.nan]
-    outcomes = [100.15, 200.05, 300.15, 399.5, np.nan]
-    lags = [FULL_LAGS, ONE_LAG, FULL_LAGS, FULL_LAGS, ONE_LAG]
+    starts = [100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0]
+    arrivals = [99.5, 199.4, np.nan, 399.0, np.nan, 599.5, 600.2]
+    outcomes = [100.15, 200.05, 300.15, 399.5, np.nan, 600.15, 699.5]
+    lags = [FULL_LAGS, ONE_LAG, FULL_LAGS, FULL_LAGS, ONE_LAG, FULL_LAGS, FULL_LAGS]
     stops = pd.DataFrame(
         {
-            "animal": ["x"] * 5,
-            "session_date": [1] * 5,
-            "epoch": ["02_r1"] * 5,
-            "stop_id": [1, 2, 3, 4, 5],
+            "animal": ["x"] * 7,
+            "session_date": [1] * 7,
+            "epoch": ["02_r1"] * 7,
+            "stop_id": [1, 2, 3, 4, 5, 6, 7],
             "stop_start": starts,
-            "immobility_duration_s": [0.35, 0.35, 0.35, 0.35, 0.35],
-            "occupancy_state": ["at_well", "at_well", "mixed", "at_well", "in_transit"],
-            "completed_trial_reward": [1.0, 0.0, 1.0, 1.0, np.nan],
+            "stop_end": [s + 0.35 for s in starts],
+            "immobility_duration_s": [0.35] * 7,
+            "occupancy_state": [
+                "at_well",
+                "at_well",
+                "mixed",
+                "at_well",
+                "in_transit",
+                "mixed",
+                "at_well",
+            ],
+            "completed_trial_reward": [1.0, 0.0, 1.0, 1.0, np.nan, 1.0, 1.0],
             "last_well_arrival_time_s": arrivals,
             "outcome_known_time_s": outcomes,
         }
@@ -668,18 +682,20 @@ def test_reward_history_incomplete_flips_at_the_second_known_outcome(
 def test_arrival_spanning_and_out_of_stop_boundaries_are_not_shifted(
     arrival_clock_stops,
 ):
-    """Only an at-well stop whose boundary falls inside it is shifted."""
+    """A stop is shifted unless it contains a later arrival or has no boundary."""
     stops, onsets = arrival_clock_stops
     df = _aggregate_with_clocks(stops, onsets)
 
     full, full_incomplete = _bout_start_features(FULL_LAGS)
     one, one_incomplete = _bout_start_features(ONE_LAG)
-    # stop 3 spans the arrival; stop 4 already knew its outcome at bout start;
-    # stop 5 has no completed arrival at all. None of them moves off bout start.
+    # stop 6 contains stop 7's arrival; stop 4 and stop 7 already knew their
+    # outcome at bout start; stop 5 has no completed arrival at all. None of
+    # them moves off bout start.
     for stop_id, (expected, expected_incomplete) in {
-        3: (full, full_incomplete),
         4: (full, full_incomplete),
         5: (one, one_incomplete),
+        6: (full, full_incomplete),
+        7: (full, full_incomplete),
     }.items():
         rows = df[df.stop_id == stop_id]
         for k in range(3):
@@ -689,6 +705,19 @@ def test_arrival_spanning_and_out_of_stop_boundaries_are_not_shifted(
         assert rows["reward_history_incomplete"].tolist() == [
             expected_incomplete
         ] * len(rows)
+
+    # stop 3 is ``mixed`` but contains no arrival, so it IS shifted at its
+    # boundary (left edges 300.0 / 300.1 precede 300.15; 300.2 / 300.3 do not).
+    after, after_incomplete = _bout_start_features([1.0, *FULL_LAGS[:-1]])
+    stop3 = df[df.stop_id == 3]
+    for k in range(3):
+        col = f"reward_history_rcos_{k}"
+        assert stop3.loc[stop3.binj < 2, col].tolist() == pytest.approx([full[k]] * 2)
+        assert stop3.loc[stop3.binj >= 2, col].tolist() == pytest.approx([after[k]] * 2)
+    assert (
+        stop3["reward_history_incomplete"].tolist()
+        == [full_incomplete] * 2 + [after_incomplete] * 2
+    )
 
     # Counted once per stop, not once per bin, and only for the arrival-spanning
     # bout whose boundary actually falls inside it.
