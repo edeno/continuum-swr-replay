@@ -59,7 +59,7 @@ Named by **scope + window** so the same word never hides a different definition.
 |---|---|---|---|---|---|
 | `known_reward_outcome_lag_{1..10}` | outcome of the j-th most recent port experience whose outcome was observable by the query time; experience 0 enters only when its outcome was physically observed | 10 known outcomes, per-lag | all-port | binary | **stop metadata, not a ladder predictor** — the rate ladders see this history only through the `reward_history_rcos_*` basis below, never as per-lag dummies (the one direct consumer left is the SWR-power OLS, which z-scores lag 1) |
 | `reward_fraction_last10_known_trials` | rewarded fraction of the last 10 outcome-known port experiences; experience 0 enters only when its outcome was physically observed | 10 known outcomes | all-port | fraction | **stop metadata, not a ladder predictor** (it is the kernel's unweighted mean → VIF ∞ against the basis) |
-| `reward_history_rcos_{0,1,2}` | the known-outcome lag vector projected onto three log-spaced raised-cosine bumps: `Σ_j B[k,j]·lag_j / Σ_j B[k,j]`, summed over the lags whose outcome is known at the query time, so each feature is a bump-weighted reward *fraction*. Bump 0 weights lags 1–7 (1.00, 0.79, 0.54, …) — the **immediate** component; bump 1 spans all ten lags and peaks at lag 3; bump 2 spans lags 2–10 and peaks at lag 10. A bump with no known lag in its support is `0.0` and flagged by `reward_history_incomplete`. Producer: `covariates.history.reward_history_basis_features`, evaluated at bout start. | 10 known outcomes, log-spaced smoothing | all-port | weighted reward fraction in [0, 1] | **the reward-history block of every rate ladder** — Family A `R1`, Family B `M1_rew`/`M4`/`M7`/`M9`/`M7r`, `BASE` of the `is_swr`-contrast G/S ladder, and `MU_uncertainty`. Coefficients are **per unit of the fraction** (a 0→1 contrast), not per SD; read the per-lag effect off the kernel reconstruction, not off one coefficient. |
+| `reward_history_rcos_{0,1,2}` | the known-outcome lag vector projected onto three log-spaced raised-cosine bumps: `Σ_j B[k,j]·lag_j / Σ_j B[k,j]`, summed over the lags whose outcome is known at the query time, so each feature is a bump-weighted reward *fraction*. Bump 0 weights lags 1–7 (1.00, 0.79, 0.54, …) — the **immediate** component; bump 1 spans all ten lags and peaks at lag 3; bump 2 spans lags 2–10 and peaks at lag 10. A bump with no known lag in its support is `0.0` and flagged by `reward_history_incomplete`. Producer: `covariates.history.reward_history_basis_features`, evaluated at bout start. | 10 known outcomes, log-spaced smoothing | all-port | weighted reward fraction in [0, 1] | **the reward-history block of every rate ladder** — Family A `R1`, Family B `M1_rew`/`M7r_time_histcos_rew`/`M9r_rew_x_time`/`M7ra_time_arrival_histcos_rew`, `BASE` of the `is_swr`-contrast G/S ladder, and `MU_uncertainty`. Coefficients are **per unit of the fraction** (a 0→1 contrast), not per SD; read the per-lag effect off the kernel reconstruction, not off one coefficient. |
 | `reward_history_incomplete` | 1 when fewer than two outcomes are known at the query time — the slowest bump then has no finite lag in its support and all three features are zero-filled — else 0. Flagged stops form an unbroken prefix of each epoch (1.296 % of stops, 1.576 % of events). | epoch prefix | all-port | binary indicator | **structural-missingness nuisance main effect**: fit in every rung that carries the basis, always outside any `is_swr` expansion, never aggregated or reported, and excluded from the separation judgment (`NUISANCE_TERMS`). |
 | `reward_fraction_candidate_arm_last10_visits` | rewarded fraction of the last 10 **visits to that candidate arm**; an unvisited leaf is encoded `0.0`, while `is_candidate_arm_never_visited` separates novelty from an observed zero. Trunk arms are structurally `0.0`; rows before any known port outcome are NaN. | 10 arm-visits | candidate arm | fraction | content and choice main effect; rate/coupling via current-arm interaction |
 
@@ -242,7 +242,7 @@ explicit current-arm interaction when a within-stop content effect is tested.
 |---|---|---|---|---|---|
 | `known_reward_outcome_lag_{j}` | — (stop metadata) | — (stop metadata) | raw lag 1, z-scored (SWR-power OLS) | current-arm interaction if tested | — |
 | `reward_fraction_last10_known_trials` | — | — | — | — | — |
-| `reward_history_rcos_{0,1,2}` + `reward_history_incomplete` | **main** (`M1`/`M4`/`M7`/`M9`/`M7r`, `BASE`) | **main** (`R1`) | — | — | — |
+| `reward_history_rcos_{0,1,2}` + `reward_history_incomplete` | **main** (`M1_rew`/`M7r_time_histcos_rew`/`M9r_rew_x_time`/`M7ra_time_arrival_histcos_rew`, `BASE`) | **main** (`R1`) | — | — | — |
 | `reward_fraction_candidate_arm_last10_visits` | current-arm interaction | — | current-arm interaction | **main** | **main** |
 | current-arm task probability / `task_reward_probability_candidate_arm` | main | — | main | candidate-arm main | nominal-value sensitivity |
 | chosen-arm / candidate-arm reward-belief mean | main | — | main | candidate-arm main | candidate-arm main |
@@ -290,8 +290,9 @@ explicit current-arm interaction when a within-stop content effect is tested.
   value, ΔV / Stay / Switch, value updates, Beta variance, beta belief entropy) live
   in a separate per-stop table; see
   [`behavior_model_covariates.md`](behavior_model_covariates.md).
-- Every regression model that consumes these covariates, in R formula notation (per
-  family, with the phase-2 changed/parity classification): [`models_table.md`](models_table.md).
+- Every regression model that consumes these covariates, in R formula notation, per
+  family: [`models_table.md`](models_table.md). The record of which rungs changed or
+  held parity across refits lives in [`design/model_history.md`](design/model_history.md).
 
 ## F. Temporal causality (pre- vs post-outcome) — leakage audit
 

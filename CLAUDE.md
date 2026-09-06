@@ -89,8 +89,9 @@ docs/                      # Published reference — see docs/README.md for the 
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
 > `src/continuum_swr_replay/analysis/replay/model_specs.py`** (the single source of truth;
-> `docs/models_table.md` mirrors it, enforced by
-> `tests/unit/test_models_table_mirrors_specs.py`). Where fitted outputs / figures land is in
+> `docs/models_table.md` mirrors it, its rung sets enforced by
+> `tests/unit/test_models_table_mirrors_specs.py` — the formulas themselves are not
+> pinned by that test). Where fitted outputs / figures land is in
 > [docs/README.md](docs/README.md) ("Where results live" / "Figure outputs").
 
 ## Key Architecture Concepts
