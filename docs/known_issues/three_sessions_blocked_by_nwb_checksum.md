@@ -45,5 +45,5 @@ must not depend on that.
 
 ## Related
 
-- `attach_is_swr_to_onsets` session-scoping + warning (analysis/replay/_helpers.py).
+- `attach_is_swr_to_onsets` session-scoping + warning (analysis/replay/per_bin_design.py).
 - `model_specs.py` already annotates "215 of 218 had fitted before".

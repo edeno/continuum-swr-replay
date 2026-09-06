@@ -32,10 +32,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.replay._helpers import (
-    reconstruct_reward_kernels,
-    reconstruct_self_history_kernels,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -45,6 +41,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
 from continuum_swr_replay.session_keys import SESSION_COLUMNS

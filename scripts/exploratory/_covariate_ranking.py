@@ -52,9 +52,11 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
 )
-from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
+    POPULATIONS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402

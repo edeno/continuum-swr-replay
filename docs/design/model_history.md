@@ -155,7 +155,7 @@ interaction are withdrawn. Current wording: `paper/claims_table.md` row 19f.
   Consequence for the per-lag self-history kernel: it is no longer read off ten
   `coef_onset_lag{j}` values but **reconstructed** from the four
   `coef_hist_rcos_k` per session
-  (`_helpers.reconstruct_self_history_kernels`), which projects through the
+  (`per_bin_design.reconstruct_self_history_kernels`), which projects through the
   **un-normalized** raised-cosine basis — `hist_rcos_k` is a plain projection of
   the lag counts, unlike the reward block's bump-weighted fractions. The
   reported kernel is therefore smooth: it cannot represent a lag-specific spike.

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay._helpers import (
+from continuum_swr_replay.analysis.replay.bouts import (
     nearest_well_distance_cm,
 )
 from continuum_swr_replay.analysis.replay.covariates import (

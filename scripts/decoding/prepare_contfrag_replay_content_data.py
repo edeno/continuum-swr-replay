@@ -100,7 +100,7 @@ def find_sessions(
     though ``run_decoding_contfrag.py`` writes per-area files; the
     saved tables would also collide on event_id / stop_id because
     the canonical hashes do not include brain_area
-    (see ``analysis.replay._helpers.hash_event_id`` /
+    (see ``analysis.replay.event_ids.hash_event_id`` /
     ``hash_stop_id``).
     """
     dot_files = sorted(PROCESSED_DATA_DIR.glob("*_contfrag_data_over_time.pkl"))

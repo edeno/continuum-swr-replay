@@ -6,11 +6,7 @@ the replay content analysis pipeline.
 """
 
 from ._helpers import (
-    POPULATIONS,
     add_arm_fixed_effects,
-    aggregate_to_timebins,
-    attach_is_swr_to_onsets,
-    raised_cosine_history_basis,
     single_arm_from_well,
 )
 from .choice_prediction import (
@@ -48,6 +44,12 @@ from .model_specs import (
     TMAX,
     TMAX_ARRIVAL,
     PerBinRateModelSpec,
+)
+from .per_bin_design import (
+    POPULATIONS,
+    aggregate_to_timebins,
+    attach_is_swr_to_onsets,
+    raised_cosine_history_basis,
 )
 from .per_bin_rate_model import (
     apply_arrival_window,

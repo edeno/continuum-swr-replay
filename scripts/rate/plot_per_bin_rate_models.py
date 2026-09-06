@@ -37,10 +37,6 @@ from scipy.stats import wilcoxon
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
-    reconstruct_reward_kernels,
-    reconstruct_self_history_kernels,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
@@ -51,6 +47,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
+    reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS

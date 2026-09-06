@@ -15,18 +15,6 @@ from ._helpers import (
     arm_to_patch as _arm_to_patch,
 )
 from ._helpers import (
-    assign_bout as _assign_bout,
-)
-from ._helpers import (
-    hash_stop_id as _hash_stop_id,
-)
-from ._helpers import (
-    immobility_bout_intervals as _immobility_bout_intervals,
-)
-from ._helpers import (
-    nearest_well_distance_cm as _nearest_well_distance_cm,
-)
-from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
@@ -40,6 +28,15 @@ from ._tables_common import (
     _filter_external_event_labels,
     _in_event_mask,
 )
+from .bouts import (
+    assign_bout as _assign_bout,
+)
+from .bouts import (
+    immobility_bout_intervals as _immobility_bout_intervals,
+)
+from .bouts import (
+    nearest_well_distance_cm as _nearest_well_distance_cm,
+)
 from .covariate_registry import stamp_covariate_schema
 from .covariates import (
     add_trial_context,
@@ -52,6 +49,9 @@ from .design_constants import (
     N_REWARD_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
+)
+from .event_ids import (
+    hash_stop_id as _hash_stop_id,
 )
 
 

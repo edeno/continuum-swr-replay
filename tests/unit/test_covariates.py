@@ -12,7 +12,12 @@ import pandas as pd
 import pytest
 
 import continuum_swr_replay.analysis.replay as replay_pkg
-from continuum_swr_replay.analysis.replay import _helpers, covariates
+from continuum_swr_replay.analysis.replay import (
+    _helpers,
+    covariates,
+    event_ids,
+    per_bin_design,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -126,12 +131,19 @@ def test_covariates_imports_standalone_without_cycle():
     assert result.returncode == 0, result.stderr
 
 
-def test_helpers_source_does_not_import_covariates_package():
-    """Static guard against recreating the former two-way import dependency."""
-    helper_path = Path(_helpers.__file__)
-    source = helper_path.read_text()
+@pytest.mark.parametrize("module", [_helpers, per_bin_design])
+def test_shared_primitive_module_does_not_import_covariates_package(module):
+    """Static guard against recreating the former two-way import dependency.
+
+    ``covariates.history.reward_history`` imports the raised-cosine basis and
+    its projection from ``per_bin_design``, so ``per_bin_design`` importing
+    back would be a cycle; ``_helpers`` carries the same constraint from when
+    it owned those primitives.
+    """
+    source = Path(module.__file__).read_text()
     assert "from .covariates" not in source
     assert "import .covariates" not in source
+    assert "replay.covariates" not in source
 
 
 # ── q_all_arm (per-arm leaky-Q rollout) ──
@@ -340,13 +352,13 @@ def test_value_block_plain_key_populates_suffixed_key_misses():
     animal, day, epoch = "x", 1, "02_r1"
     stop_idx = np.array([0, 0])
     arm = np.array([0, 6])  # one leaf, one trunk
-    plain = _helpers.hash_stop_id(
+    plain = event_ids.hash_stop_id(
         np.array([animal, animal]),
         np.array([day, day]),
         np.array([epoch, epoch]),
         stop_idx,
     )
-    suffixed = _helpers.hash_stop_id(
+    suffixed = event_ids.hash_stop_id(
         np.array([animal, animal]),
         np.array([day, day]),
         np.array([epoch, epoch]),
@@ -914,7 +926,7 @@ def test_reward_rate_arm_counts_only_resolved_visits():
 
 def _reward_basis() -> np.ndarray:
     """The (3, 10) log-spaced raised-cosine kernel the features project onto."""
-    return _helpers.raised_cosine_history_basis(10, 3)
+    return per_bin_design.raised_cosine_history_basis(10, 3)
 
 
 def test_reward_history_features_are_bump_weighted_means_of_the_lag_vector():

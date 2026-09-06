@@ -76,7 +76,7 @@ _hash_contfrag_event_id = _load_function(
     extra_top_level_names=("_EVENT_SOURCE_TO_COL", "_resolve_event_col"),
 )
 hash_stop_id = _load_function(
-    "analysis/replay/_helpers.py", "hash_stop_id"
+    "analysis/replay/event_ids.py", "hash_stop_id"
 )
 
 

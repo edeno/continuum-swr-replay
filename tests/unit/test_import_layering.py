@@ -23,8 +23,6 @@ import ast
 from collections.abc import Callable
 from pathlib import Path
 
-import pytest
-
 SRC = Path(__file__).resolve().parents[2] / "src" / "continuum_swr_replay"
 assert SRC.is_dir(), f"package root not found at {SRC}; the scan would be vacuous"
 
@@ -134,10 +132,6 @@ def test_data_loaders_do_not_import_analysis() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="moves land with the `_helpers` split",
-)
 def test_hippocampus_imports_only_shared_replay_leaves() -> None:
     """Rule 3: the hippocampus package shares only ``bouts`` and ``event_ids``."""
     target = "continuum_swr_replay.analysis.replay"

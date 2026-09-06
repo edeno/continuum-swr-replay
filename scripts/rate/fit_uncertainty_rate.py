@@ -68,7 +68,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
-from continuum_swr_replay.analysis.replay._helpers import POPULATIONS  # noqa: E402
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
     stop_own_missing,
@@ -87,6 +86,9 @@ from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
+    POPULATIONS,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,

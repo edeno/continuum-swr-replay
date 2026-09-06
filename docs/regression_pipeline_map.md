@@ -94,11 +94,23 @@ Shared prep helpers, the arm standardization column list, and canonical column-o
 
 _No module-level public symbols._
 
+### `src/continuum_swr_replay/analysis/replay/bouts.py`
+
+Immobility bouts: where a stop begins and ends, and what falls inside one.
+
+`nearest_well_distance_cm`, `immobility_bout_intervals`, `time_since_stop`, `assign_bout`
+
 ### `src/continuum_swr_replay/analysis/replay/cohort_selection.py`
 
 Shared whole-unit complete-case cohort selection.
 
 `freeze_common_cohort`
+
+### `src/continuum_swr_replay/analysis/replay/event_ids.py`
+
+Stable row identities: the ``event_id`` and ``stop_id`` hashes.
+
+`hash_event_id`, `validate_event_ids`, `hash_stop_id`
 
 ### `src/continuum_swr_replay/analysis/replay/prepare_data.py`
 
@@ -276,9 +288,9 @@ Shared fit-diagnostics helpers: convergence, separation, warning capture.
 
 ### `src/continuum_swr_replay/analysis/replay/_helpers.py`
 
-Shared helpers for event-table builders.
+Small shared primitives for the event-table builders.
 
-`nearest_well_distance_cm`, `immobility_bout_intervals`, `time_since_stop`, `single_arm_from_well`, `arm_to_patch`, `align_posterior_to_dot`, `safe_mode`, `safe_first`, `strict_first`, `strict_mean`, `strict_sum`, `hash_event_id`, `validate_event_ids`, `hash_stop_id`, `assign_bout`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`, `attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
+`single_arm_from_well`, `arm_to_patch`, `align_posterior_to_dot`, `safe_mode`, `safe_first`, `strict_first`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
 
 ### `src/continuum_swr_replay/analysis/replay/choice_prediction.py`
 
@@ -297,6 +309,12 @@ Dirichlet-multinomial fitter for replay content over candidate categories.
 Per-session model fitting for the replay content model hierarchy.
 
 `poisson_estimator_name`, `event_clustered_covariance`, `within_group_full_rank`, `fit_conditional_poisson`, `fit_null_model_conditional`, `fit_null_model_conditional_logit`, `fit_conditional_logit`
+
+### `src/continuum_swr_replay/analysis/replay/per_bin_design.py`
+
+The (stop x bin) point-process design and the bases it is built on.
+
+`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py`
 

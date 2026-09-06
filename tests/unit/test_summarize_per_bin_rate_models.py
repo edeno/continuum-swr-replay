@@ -14,15 +14,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay._helpers import (
-    raised_cosine_history_basis,
-)
 from continuum_swr_replay.analysis.replay.model_specs import (
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    raised_cosine_history_basis,
 )
 
 _SPEC = importlib.util.spec_from_file_location(

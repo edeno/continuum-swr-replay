@@ -32,8 +32,9 @@ from ..hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
-from ._helpers import assign_bout, hash_stop_id, immobility_bout_intervals
+from .bouts import assign_bout, immobility_bout_intervals
 from .covariate_registry import stamp_covariate_schema
+from .event_ids import hash_stop_id
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
 

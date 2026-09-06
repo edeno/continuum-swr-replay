@@ -28,10 +28,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
 )
-from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
-    reconstruct_reward_kernels,
-    reconstruct_self_history_kernels,
-)
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -47,6 +43,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     REWARD_HISTORY_N_LAGS,
     SPLINE_KNOTS,
     TMAX,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
+    reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.table_io import read_table

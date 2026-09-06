@@ -223,7 +223,7 @@ offset. Its limitation is exactly that offset — see below.
 ### Stops are immobility fragments, not well visits
 
 A "stop" is an immobility bout: the interval between two crossings of the
-`head_speed < 4 cm/s` threshold (`_helpers.py`). A single well visit is routinely
+`head_speed < 4 cm/s` threshold (`bouts.py`). A single well visit is routinely
 cut into several such bouts by small movements at the port, so **the modelled
 unit is a fragment of a visit, not the visit**. Measured on the canonical stop
 table (`stop_table.parquet`, 107,400 stops):

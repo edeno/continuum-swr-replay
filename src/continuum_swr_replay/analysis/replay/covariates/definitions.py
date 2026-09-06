@@ -541,7 +541,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="all response bins/events",
-            producer="replay._helpers.aggregate_to_timebins or the replay table builders",
+            producer="replay.per_bin_design.aggregate_to_timebins or the replay table builders",
             missingness="response time or stop start unavailable",
         ),
         _definition(
@@ -846,7 +846,7 @@ for lag in range(1, N_HISTORY_LAGS + 1):
                 clock=QueryClock.EVENT_RESPONSE,
                 availability=Availability.PRE_OUTCOME,
                 support="per-bin rate design",
-                producer="replay._helpers.aggregate_to_timebins",
+                producer="replay.per_bin_design.aggregate_to_timebins",
                 missingness="lag precedes stop start",
             )
         )
@@ -865,7 +865,7 @@ for basis in range(N_HISTORY_BASIS):
                 clock=QueryClock.EVENT_RESPONSE,
                 availability=Availability.PRE_OUTCOME,
                 support="per-bin rate design",
-                producer="replay._helpers.aggregate_to_timebins",
+                producer="replay.per_bin_design.aggregate_to_timebins",
                 window="past 150 ms",
                 missingness="none; pre-stop history is structural zero",
             )
@@ -895,7 +895,7 @@ _DEFINITIONS.append(
         clock=QueryClock.EVENT_RESPONSE,
         availability=Availability.PRE_OUTCOME,
         support="per-bin rate design",
-        producer="replay._helpers.aggregate_to_timebins",
+        producer="replay.per_bin_design.aggregate_to_timebins",
         missingness="none for constructed bins",
     )
 )
@@ -918,7 +918,7 @@ _DEFINITIONS.append(
         support="event table; per-bin rate design; requires a completed arrival",
         producer=(
             "replay.tables_event.build_event_table (event grain); "
-            "replay._helpers.aggregate_to_timebins (per-bin grain)"
+            "replay.per_bin_design.aggregate_to_timebins (per-bin grain)"
         ),
         missingness="no completed arrival before the event / at the bout start",
     )
@@ -935,7 +935,7 @@ _DEFINITIONS.append(
         clock=QueryClock.OUTCOME_AVAILABILITY,
         availability=Availability.POST_OUTCOME,
         support="per-bin rate design; stops with a completed arrival",
-        producer="replay._helpers.aggregate_to_timebins",
+        producer="replay.per_bin_design.aggregate_to_timebins",
         missingness="no completed arrival at the bout start",
     )
 )

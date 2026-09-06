@@ -492,7 +492,7 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 #                  + sum(beta * covariates)
 #
 # fit on the canonical (stop x bin) design from
-# :func:`_helpers.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
+# :func:`per_bin_design.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
 # row per stop, ``log(immobility_duration_s)`` dwell offset), every model here is one
 # row per (stop, ``BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
 # offset, so the within-stop time course is modelled explicitly by a spline
@@ -527,7 +527,7 @@ class PerBinRateModelSpec:
 
     Parallel to :class:`ModelSpec` (kept separate so the simpler arm/patch/
     per-stop families are unaffected). The toggle fields drive both
-    :func:`_helpers.aggregate_to_timebins` (which columns to build) and
+    :func:`per_bin_design.aggregate_to_timebins` (which columns to build) and
     :meth:`formula` (the patsy formula), so the spec is the single source of
     truth for each model.
 

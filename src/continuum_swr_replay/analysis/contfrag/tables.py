@@ -37,13 +37,14 @@ from ..replay._helpers import (
     arm_to_patch,
     assert_event_label_alignment,
     assert_single_session_alignment,
-    assign_bout,
-    hash_stop_id,
-    immobility_bout_intervals,
-    nearest_well_distance_cm,
     safe_mode,
     single_arm_from_well,
     strict_first,
+)
+from ..replay.bouts import (
+    assign_bout,
+    immobility_bout_intervals,
+    nearest_well_distance_cm,
     time_since_stop,
 )
 from ..replay.covariate_registry import stamp_covariate_schema
@@ -56,6 +57,7 @@ from ..replay.covariates.candidate_arm import (
     attach_candidate_arm_covariates,
     broadcast_candidate_arms,
 )
+from ..replay.event_ids import hash_stop_id
 from ..replay.spatial_mapping import map_estimate_to_arm
 from ..replay.summaries import (
     arm_count_hard,

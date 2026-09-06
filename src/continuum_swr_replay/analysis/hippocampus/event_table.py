@@ -68,7 +68,7 @@ from .event_immobility import (
 )
 
 # NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
-# ``analysis/replay/_helpers``. Importing them at module load would close a
+# ``analysis/replay/event_ids``. Importing them at module load would close a
 # cycle — ``replay/__init__`` eagerly imports the replay table builders, which
 # imports this module — so they are imported lazily inside
 # :func:`build_classified_nonlocal_event_table` instead. The natural
@@ -228,7 +228,7 @@ def build_classified_nonlocal_event_table(
     ``event_duration`` are in seconds; the four ``*_speed`` columns are in
     cm/s.
     """
-    from continuum_swr_replay.analysis.replay._helpers import (
+    from continuum_swr_replay.analysis.replay.event_ids import (
         hash_event_id,
         validate_event_ids,
     )

@@ -46,6 +46,8 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "*/analysis/replay/tables*.py",
             "*/analysis/replay/_tables_common.py",
+            "*/analysis/replay/bouts.py",
+            "*/analysis/replay/event_ids.py",
             "*/analysis/replay/timebin_tables.py",
             "*/analysis/replay/table_contracts.py",
             "*/analysis/replay/cohort_selection.py",
@@ -85,6 +87,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/analysis/replay/fitting.py",
             "*/analysis/replay/_fit_diagnostics.py",
             "*/analysis/replay/_helpers.py",
+            "*/analysis/replay/per_bin_design.py",
             "*/analysis/replay/per_bin_rate_model.py",
             "*/analysis/replay/per_stop_rate_model.py",
             "*/analysis/replay/dirichlet_multinomial.py",

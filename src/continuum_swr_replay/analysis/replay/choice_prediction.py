@@ -79,7 +79,7 @@ def _require_session_unique_ids(
             f"sessions, but {len(bad)} value(s) appear in multiple "
             f"(animal, day, epoch) tuples (e.g. {sample}). Use the "
             "canonical hashed IDs from "
-            "``analysis.replay._helpers.hash_event_id`` / "
+            "``analysis.replay.event_ids.hash_event_id`` / "
             "``hash_stop_id`` (or the ContFrag equivalents) before "
             "calling this helper."
         )

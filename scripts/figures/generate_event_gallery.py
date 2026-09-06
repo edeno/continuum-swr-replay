@@ -84,7 +84,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.replay._helpers import (
+from continuum_swr_replay.analysis.replay.bouts import (
     immobility_bout_intervals,
 )
 from continuum_swr_replay.analysis.replay.covariates import (

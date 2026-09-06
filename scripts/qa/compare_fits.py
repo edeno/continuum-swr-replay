@@ -54,7 +54,6 @@ from scipy.stats import wilcoxon
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
     SEPARATION_COEF_ABS,
 )
-from continuum_swr_replay.analysis.replay._helpers import reconstruct_reward_kernels
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
 )
@@ -70,6 +69,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_KEY_TERM,
     TMAX,
     TMAX_ARRIVAL,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    reconstruct_reward_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS

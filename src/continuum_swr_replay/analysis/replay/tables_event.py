@@ -31,21 +31,6 @@ from ._helpers import (
     arm_to_patch as _arm_to_patch,
 )
 from ._helpers import (
-    assign_bout as _assign_bout,
-)
-from ._helpers import (
-    hash_event_id as _hash_event_id,
-)
-from ._helpers import (
-    hash_stop_id as _hash_stop_id,
-)
-from ._helpers import (
-    immobility_bout_intervals as _immobility_bout_intervals,
-)
-from ._helpers import (
-    nearest_well_distance_cm as _nearest_well_distance_cm,
-)
-from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
@@ -54,9 +39,6 @@ from ._helpers import (
 from ._helpers import (
     strict_first as _strict_first,
 )
-from ._helpers import (
-    time_since_stop as _time_since_stop,
-)
 from ._tables_common import (
     _EVENT_SEQUENCE_TABLE_BUILD_COLUMNS,
     _EVENT_TABLE_BUILD_COLUMNS,
@@ -64,10 +46,28 @@ from ._tables_common import (
     _in_event_mask,
     _prepare_dot,
 )
+from .bouts import (
+    assign_bout as _assign_bout,
+)
+from .bouts import (
+    immobility_bout_intervals as _immobility_bout_intervals,
+)
+from .bouts import (
+    nearest_well_distance_cm as _nearest_well_distance_cm,
+)
+from .bouts import (
+    time_since_stop as _time_since_stop,
+)
 from .covariate_registry import stamp_covariate_schema
 from .covariates import (
     add_trial_context,
     summarize_behavioral_location,
+)
+from .event_ids import (
+    hash_event_id as _hash_event_id,
+)
+from .event_ids import (
+    hash_stop_id as _hash_stop_id,
 )
 from .summaries import (
     arm_map_from_posterior,

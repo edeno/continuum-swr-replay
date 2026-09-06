@@ -5,15 +5,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay._helpers import (
-    raised_cosine_history_basis,
-    # Re-exported: the projection is a pure array primitive shared with the
-    # per-bin design builder, which must not import this package.
-    reward_basis_from_lags,
-)
 from continuum_swr_replay.analysis.replay.design_constants import (
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    raised_cosine_history_basis,
+    # Re-exported: the projection is a pure array primitive owned by the
+    # per-bin design builder, which must not import this package.
+    reward_basis_from_lags,
 )
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,

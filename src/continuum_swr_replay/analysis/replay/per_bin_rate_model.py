@@ -1,7 +1,7 @@
 """Per-bin conditional-intensity Poisson model for replay event onsets (Family B).
 
 A point-process GLM conditional-intensity ladder (Truccolo-Eden-Brown 2005) on
-the canonical (stop x bin) design from :func:`_helpers.aggregate_to_timebins`.
+the canonical (stop x bin) design from :func:`per_bin_design.aggregate_to_timebins`.
 Each row is one ``BIN_S``-wide time bin within an immobility stop; the response
 is the per-bin onset ``count`` and the offset is ``log(exposure)`` (seconds of
 immobility in the bin), so ``exp(intercept)`` is the per-bin onset rate.
@@ -123,7 +123,7 @@ def freeze_per_bin_cohort(
     Parameters
     ----------
     design : pd.DataFrame
-        One (session, population) :func:`_helpers.aggregate_to_timebins` output,
+        One (session, population) :func:`per_bin_design.aggregate_to_timebins` output,
         shape ``(n_bins, n_columns)``. Must carry ``stop_id``, ``count``,
         ``exposure`` and every required design column.
     specs : iterable of PerBinRateModelSpec
@@ -318,7 +318,7 @@ def fit_per_bin_rate_model(
     Parameters
     ----------
     design : pd.DataFrame
-        One session's :func:`_helpers.aggregate_to_timebins` output, already
+        One session's :func:`per_bin_design.aggregate_to_timebins` output, already
         frozen by :func:`freeze_per_bin_cohort`, shape ``(n_bins, n_columns)``.
         Must carry ``count``, ``exposure``, ``stop_id``, ``binj`` plus the
         columns the spec's formula references, all complete.
