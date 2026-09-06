@@ -78,6 +78,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     QVALS_GAP_COLS,
     cohort_record,
     drop_profile,
+    estimator_skip_note,
     term_diagnostics,
     write_cohort_audit,
 )
@@ -104,6 +105,7 @@ from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_cova
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
+    ESTIMATOR_SKIP_CLASSES,
     concentration_cols_for_cohort,
     fit_sessions_dirichlet_multinomial,
 )
@@ -162,10 +164,15 @@ MIN_EVENTS = 18
 #: Concentration contrast the Dirichlet-multinomial adds to every rung.
 LOG_PHI_IS_SWR = "log_phi_is_swr"
 
+#: Event-length term of the length-adjusted concentration design
+#: (``--concentration-length``). Reported per SD of ``log n_nonlocal_bins``.
+LOG_PHI_EVENT_LENGTH = "log_phi_log_n_nonlocal_bins_z"
+
 # Skip classes that are the ESTIMATOR refusing a session rather than the cohort
 # rules excluding it. These are rare and actionable, so the audit names the
 # session; ``too_few`` / ``missing`` are routine and are summarized by class.
-_ESTIMATOR_SKIP_CLASSES = frozenset({"dm_design", "pinned_fit_none"})
+# Shared with the content runner so the two report skips the same way.
+_ESTIMATOR_SKIP_CLASSES = ESTIMATOR_SKIP_CLASSES
 
 # The tables every fit in this family is built from. Their hashes go into the
 # provenance sidecar of each artifact written here, and the readers of those
@@ -244,6 +251,56 @@ def _attach_log_event_length(frame: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
+def resolve_concentration_cols(
+    frame: pd.DataFrame, *, with_event_length: bool
+) -> tuple[str, ...]:
+    """Event-level columns entering ``log phi`` for one population's rows.
+
+    The Dirichlet-multinomial likelihood uses an event's length ``L_e`` only as
+    the multinomial index: ``log phi_e`` carries no length term, so the fitted
+    concentration is assumed to be the same for a 25-bin event and a 90-bin one.
+    SWR events run about 1.8x longer than non-SWR events, so the shipped
+    ``log_phi_is_swr`` is the TOTAL concentration contrast -- whatever an SWR
+    event does to within-event redundancy, length included. Adding
+    ``log_n_nonlocal_bins_z`` to the concentration design gives the
+    length-adjusted twin, exactly parallel to the total/direct distinction the
+    ``nt`` rungs already draw on the mean structure.
+
+    The length term is added only where the cohort identifies ``is_swr`` at all:
+    inside an SWR (or non-SWR) split there is no concentration contrast to
+    decompose, and the fits there must keep the same design as before.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        The rows about to be fitted.
+    with_event_length : bool
+        Whether to append the z-scored log event length.
+
+    Returns
+    -------
+    tuple of str
+
+    Raises
+    ------
+    ValueError
+        When the length term is requested and the cohort does not carry it. A
+        silently dropped term would publish a ``_dm_len`` artifact identical to
+        the unadjusted one under a name that claims otherwise.
+    """
+    base = concentration_cols_for_cohort(frame)
+    if not with_event_length or base != ("is_swr",):
+        return base
+    column = f"{_LOG_EVENT_LENGTH}_z"
+    if column not in frame.columns:
+        raise ValueError(
+            f"--concentration-length needs {column!r} on the cohort; the "
+            "assembled arm and patch frames standardize it in "
+            "_attach_log_event_length / _standardize"
+        )
+    return (*base, column)
+
+
 def select_outcome_stratum(ev: pd.DataFrame, stratum: str) -> tuple[pd.DataFrame, dict]:
     """Restrict a cohort to one current-outcome stratum.
 
@@ -302,13 +359,17 @@ def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
     a Dirichlet-multinomial artifact says ``_dm`` rather than repeating in
     ``_hard_count`` the one response that estimator has. ``_dm`` comes before
     the stratum suffix, so the stratified artifacts of one estimator sort
-    together.
+    together, and the length-adjusted concentration twin is ``_dm_len`` -- a
+    different estimand of ``log_phi_is_swr``, so it must never overwrite the
+    total one.
     """
     estimator = args.estimator
     smoke = "_smoke" if args.max_per_animal is not None else ""
     default_response = default_response_for_estimator(estimator)
     response_suffix = "" if response == default_response else f"_{response}"
     dm = "_dm" if estimator == "dirichlet_multinomial" else ""
+    if dm and args.concentration_length:
+        dm += "_len"
     stratum = "" if args.outcome_stratum == "all" else f"_{args.outcome_stratum}"
     return smoke + response_suffix + dm + stratum
 
@@ -760,6 +821,7 @@ def _fit_population(
     n_categories: int,
     n_jobs: int,
     min_events_session_phi: int,
+    concentration_length: bool = False,
 ) -> list[tuple[tuple, dict | None, dict]]:
     """Fit every session of one (rung, population), in groupby order.
 
@@ -800,7 +862,9 @@ def _fit_population(
         n_jobs=n_jobs,
         response_col=response_col,
         event_col="event_id",
-        concentration_cols=concentration_cols_for_cohort(pop_frame),
+        concentration_cols=resolve_concentration_cols(
+            pop_frame, with_event_length=concentration_length
+        ),
         n_categories=n_categories,
     )
     rows = dict(fits)
@@ -824,6 +888,7 @@ def _run(
     estimator: str = "conditional_poisson",
     n_jobs: int = 1,
     min_events_session_phi: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
+    concentration_length: bool = False,
 ) -> tuple[pd.DataFrame, list[dict]]:
     """Fit the ladder per session and build one cohort-audit record per (model, pop).
 
@@ -842,8 +907,7 @@ def _run(
             ), 0)
             sessions_in = sessions_modeled = n_nonconv = n_sep = 0
             animals_modeled: set = set()
-            skip_reasons: set = set()
-            estimator_skips: list[tuple[tuple, str]] = []
+            session_skips: list[tuple[str, str]] = []
             dropped_frames = []
             # Belief rungs are fitted over the leaf arms only: the trunks carry a
             # structural zero for every leaf-derived belief covariate, so they add
@@ -878,6 +942,7 @@ def _run(
                 n_categories=fit_categories,
                 n_jobs=n_jobs,
                 min_events_session_phi=min_events_session_phi,
+                concentration_length=concentration_length,
             ):
                 sessions_in += 1
                 for k in acc:
@@ -886,10 +951,7 @@ def _run(
                     dropped_frames.append(a["dropped"])
                 if r is None:
                     if a["reason"]:
-                        reason_class = a["reason"].split(":")[0]
-                        skip_reasons.add(reason_class)
-                        if reason_class in _ESTIMATOR_SKIP_CLASSES:
-                            estimator_skips.append((keys, a["reason"]))
+                        session_skips.append(("/".join(map(str, keys)), a["reason"]))
                     continue
                 sessions_modeled += 1
                 animals_modeled.add(keys[SC.index("animal")])
@@ -915,6 +977,14 @@ def _run(
                         # coefficient ran away is not dropped for every term.
                         "separated_terms": r.get("separated_terms"),
                         "n_events": r["n_events"],
+                        # Events on each side of the is_swr concentration
+                        # modifier. A modifier resting on one or two SWR events
+                        # is finite, unflagged, and invisible to every
+                        # identifiability rule; only these counts expose it.
+                        # NaN under the conditional Poisson and in the within-SWR
+                        # splits, where there is no such modifier.
+                        "n_events_swr": r.get("n_events_swr", np.nan),
+                        "n_events_nonswr": r.get("n_events_nonswr", np.nan),
                         "n_params": r["n_params"],
                         # Which allocation the row was fit on, and therefore at
                         # which grain its llf/AIC/SEs are stated.
@@ -943,28 +1013,15 @@ def _run(
                 else pd.DataFrame()
             )
             notes = drop_profile(dropped)
-            if skip_reasons:
-                # Sessions that produced no fit are already counted under
-                # n_excluded_session; naming why keeps a design the estimator
-                # refused distinguishable from a session that was merely too
-                # short. The routine classes are summarized; a refusal by the
-                # estimator itself names the session it happened to.
-                notes = "; ".join(
-                    filter(
-                        None,
-                        [
-                            notes,
-                            "no fit: " + ", ".join(sorted(skip_reasons)),
-                            "estimator skipped "
-                            + ", ".join(
-                                f"{'/'.join(map(str, key))} ({reason})"
-                                for key, reason in estimator_skips
-                            )
-                            if estimator_skips
-                            else "",
-                        ],
-                    )
-                )
+            # Sessions that produced no fit are already counted under
+            # n_excluded_session; naming why keeps a design the estimator
+            # refused distinguishable from a session that was merely too short.
+            # The routine classes are summarized; a refusal by the estimator
+            # itself names the session it happened to. Same helper (and so the
+            # same policy) as the content runner's cohort audit.
+            skip_note = estimator_skip_note(session_skips, _ESTIMATOR_SKIP_CLASSES)
+            if skip_note:
+                notes = "; ".join(filter(None, [notes, skip_note]))
             audits.append(cohort_record(
                 name, pop, "event",
                 n_in=acc["n_in"], n_modeled=acc["n_modeled"],
@@ -1021,23 +1078,33 @@ def _aggregate(
     return aggregate_contrast(res, specs_from_ladder(ladder, key_term), level, sd)
 
 
+#: Concentration terms aggregated on every rung. ``log_phi_log_n_nonlocal_bins_z``
+#: is only fitted under ``--concentration-length``; on a run without it the
+#: coefficient column is simply absent and ``aggregate_contrast`` emits no row.
+_CONCENTRATION_TERMS = (LOG_PHI_IS_SWR, LOG_PHI_EVENT_LENGTH)
+
+
 def _concentration_specs(ladder: dict) -> list[tuple[str, str, str]]:
     """Aggregation specs for the concentration contrast, one per rung x population.
 
     ``log_phi_is_swr`` is not any rung's key term -- it is the same quantity on
     every rung, the difference in how tightly an SWR event's mass is
     concentrated -- so it is aggregated as its own family rather than folded
-    into the beta contrast's BH-FDR. Specs are emitted for every rung and
-    population; the ones whose fits carry no such coefficient (the conditional
-    Poisson everywhere, and the within-SWR splits, where the flag is constant)
+    into the beta contrast's BH-FDR. The same holds for the event-length term of
+    the length-adjusted design, which is what the ``is_swr`` contrast is being
+    adjusted for and must be readable next to it. Specs are emitted for every
+    rung, population and concentration term; the ones whose fits carry no such
+    coefficient (the conditional Poisson everywhere, the within-SWR splits where
+    the flag is constant, and the length term on a run that did not fit it)
     produce no row.
     """
     return [
-        (name, pop, LOG_PHI_IS_SWR)
+        (name, pop, term)
         for name in ladder
         for pop in (
             ["all"] if ladder[name][1] == "pooled" else ["all", "SWR", "nonSWR"]
         )
+        for term in _CONCENTRATION_TERMS
     ]
 
 
@@ -1074,6 +1141,7 @@ def _provenance(
     outcome_stratum_audit: dict | None = None,
     per_sd_scale: dict | None = None,
     renormalized_rungs: list[str] | None = None,
+    concentration_cols: list[str] | None = None,
 ) -> dict:
     """Reproducibility record saved alongside the audited results."""
     try:
@@ -1094,6 +1162,13 @@ def _provenance(
         # whether the table carries a concentration contrast at all.
         "estimator": args.estimator,
         "min_events_session_phi": args.min_events_session_phi,
+        # Event-level columns entering log phi on the pooled populations. With
+        # the length term the is_swr coefficient is the LENGTH-ADJUSTED
+        # concentration contrast; without it, the total one.
+        "concentration_cols": list(concentration_cols or []),
+        "concentration_length_adjusted": (
+            f"{_LOG_EVENT_LENGTH}_z" in (concentration_cols or [])
+        ),
         # Cohort selection: which current-outcome stratum was fit, and how many
         # events had no known outcome and were therefore in neither stratum.
         "outcome_stratum": args.outcome_stratum,
@@ -1169,7 +1244,24 @@ def main() -> None:
             "Modelled events a session needs to estimate its own "
             "Dirichlet-multinomial concentration intercept (default: "
             f"{DEFAULT_MIN_EVENTS_SESSION_PHI}); shorter sessions are pinned to "
-            "the median intercept of that animal's longer sessions."
+            "the median intercept of that animal's longer sessions. This "
+            "changes the fitted COHORT, not just a nuisance parameter: a "
+            "session just under the threshold is refit with its intercept "
+            "pinned, and if that refit fails it is dropped (reason "
+            "'pinned_fit_none') even though its free fit had converged."
+        ),
+    )
+    ap.add_argument(
+        "--concentration-length",
+        action="store_true",
+        help=(
+            "Dirichlet-multinomial only: add z(log n_nonlocal_bins) to the "
+            "concentration design, giving the LENGTH-ADJUSTED twin of "
+            f"coef_{LOG_PHI_IS_SWR}. The likelihood otherwise treats log phi as "
+            "length-invariant, and SWR events run ~1.8x longer, so the default "
+            "coefficient is the TOTAL concentration contrast with length "
+            "included. Writes '_dm_len' artifacts of its own and also reports "
+            f"coef_{LOG_PHI_EVENT_LENGTH} per SD of log event length."
         ),
     )
     ap.add_argument(
@@ -1201,6 +1293,14 @@ def main() -> None:
         ),
     )
     args = ap.parse_args()
+    if args.concentration_length and args.estimator != "dirichlet_multinomial":
+        # The conditional Poisson has no concentration parameter at all, so
+        # there is nothing for a length term to enter; accepting the flag would
+        # write an artifact whose name promises an adjustment it never made.
+        ap.error(
+            "--concentration-length is a Dirichlet-multinomial option; the "
+            f"{args.estimator!r} estimator has no concentration design"
+        )
     # One resolution point for the response: the estimator's own default, and a
     # refusal where the two cannot be combined.
     response = resolve_response_choice(args.estimator, args.response)
@@ -1215,7 +1315,19 @@ def main() -> None:
         "estimator": args.estimator,
         "n_jobs": args.n_jobs,
         "min_events_session_phi": args.min_events_session_phi,
+        "concentration_length": args.concentration_length,
     }
+    # The concentration design as requested. Within an SWR / non-SWR split the
+    # flag is constant and ``resolve_concentration_cols`` drops the whole design;
+    # this records what the pooled populations were asked for.
+    concentration_cols = (
+        []
+        if args.estimator != "dirichlet_multinomial"
+        else ["is_swr", f"{_LOG_EVENT_LENGTH}_z"]
+        if args.concentration_length
+        else ["is_swr"]
+    )
+    fit_extra = {"concentration_cols": concentration_cols}
 
     # Causal-hygiene gate: every rung's predictors must be pre-outcome, OR the
     # rung must be an explicitly-declared descriptive rung (RPE/value association or
@@ -1274,7 +1386,7 @@ def main() -> None:
     )
     arm_path = RC / "models" / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
-    write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv)
+    write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(arm_z_reference, _z_reference_path(arm_path))
 
     logger.info(
@@ -1288,7 +1400,7 @@ def main() -> None:
     )
     patch_path = RC / "models" / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
-    write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv)
+    write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(patch_z_reference, _z_reference_path(patch_path))
 
     # Cohort-audit table (one row per model x population; reconciles n_in - Σdrops =
@@ -1348,7 +1460,7 @@ def main() -> None:
     )
     audited_path = RC / "models" / f"swr_contrast_content_audited{sfx}.pkl"
     agg.to_pickle(audited_path)
-    write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv)
+    write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     prov = _provenance(
         args,
         ev.groupby(SC).ngroups,
@@ -1356,6 +1468,7 @@ def main() -> None:
         stratum_audit,
         per_sd_scale,
         _renormalized_rungs(arm, patch),
+        concentration_cols,
     )
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)

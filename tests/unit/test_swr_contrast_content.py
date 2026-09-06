@@ -16,6 +16,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    aggregate_contrast,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
@@ -233,28 +236,54 @@ def test_unknown_outcome_stratum_is_refused(outcome_frame):
 
 
 @pytest.mark.parametrize(
-    ("max_per_animal", "estimator", "response", "stratum", "expected"),
+    ("max_per_animal", "estimator", "response", "stratum", "length", "expected"),
     [
-        (None, "conditional_poisson", "fraction", "all", ""),
-        (None, "conditional_poisson", "fraction", "rewarded", "_rewarded"),
-        (None, "conditional_poisson", "fraction", "omitted", "_omitted"),
-        (None, "conditional_poisson", "hard_count", "rewarded", "_hard_count_rewarded"),
+        (None, "conditional_poisson", "fraction", "all", False, ""),
+        (None, "conditional_poisson", "fraction", "rewarded", False, "_rewarded"),
+        (None, "conditional_poisson", "fraction", "omitted", False, "_omitted"),
+        (
+            None,
+            "conditional_poisson",
+            "hard_count",
+            "rewarded",
+            False,
+            "_hard_count_rewarded",
+        ),
         (
             1,
             "conditional_poisson",
             "hard_count",
             "omitted",
+            False,
             "_smoke_hard_count_omitted",
         ),
         # The Dirichlet-multinomial has only one response, so naming it would say
         # the same thing twice; ``_dm`` comes before the stratum.
-        (None, "dirichlet_multinomial", "hard_count", "all", "_dm"),
-        (None, "dirichlet_multinomial", "hard_count", "omitted", "_dm_omitted"),
-        (1, "dirichlet_multinomial", "hard_count", "rewarded", "_smoke_dm_rewarded"),
+        (None, "dirichlet_multinomial", "hard_count", "all", False, "_dm"),
+        (None, "dirichlet_multinomial", "hard_count", "omitted", False, "_dm_omitted"),
+        (
+            1,
+            "dirichlet_multinomial",
+            "hard_count",
+            "rewarded",
+            False,
+            "_smoke_dm_rewarded",
+        ),
+        # The length-adjusted concentration is a different estimand of
+        # log_phi_is_swr, so it gets its own artifact name.
+        (None, "dirichlet_multinomial", "hard_count", "all", True, "_dm_len"),
+        (
+            None,
+            "dirichlet_multinomial",
+            "hard_count",
+            "omitted",
+            True,
+            "_dm_len_omitted",
+        ),
     ],
 )
 def test_artifact_suffix_records_smoke_estimator_response_and_stratum(
-    max_per_animal, estimator, response, stratum, expected
+    max_per_animal, estimator, response, stratum, length, expected
 ):
     import argparse
 
@@ -262,6 +291,7 @@ def test_artifact_suffix_records_smoke_estimator_response_and_stratum(
         max_per_animal=max_per_animal,
         estimator=estimator,
         outcome_stratum=stratum,
+        concentration_length=length,
     )
     assert mod._artifact_suffix(args, response) == expected
 
@@ -717,6 +747,16 @@ def test_dm_run_reports_a_concentration_contrast_on_every_rung():
     assert bool(res["llf_includes_constants"].all())
     assert res["phi_source"].unique().tolist() == ["session"]
 
+    # The events behind the modifier travel with it: a contrast resting on one
+    # or two SWR events is finite and unflagged, and nothing else would show it.
+    pooled_counts = res[res["population"] == "all"]
+    assert (pooled_counts["n_events_swr"] > 0).all()
+    assert (
+        pooled_counts["n_events_swr"] + pooled_counts["n_events_nonswr"]
+        == pooled_counts["n_events"]
+    ).all()
+    assert res.loc[res["population"] == "SWR", "n_events_swr"].isna().all()
+
     pooled = res[res["population"] == "all"]
     # The pooled rows carry the contrast; both kinds of event are present there.
     assert pooled["coef_log_phi_is_swr"].notna().all()
@@ -732,15 +772,124 @@ def test_dm_run_reports_a_concentration_contrast_on_every_rung():
     assert {record["model"] for record in audits} == {"C0_base", "C1_split"}
 
 
+def _with_event_length(cohort: pd.DataFrame, *, seed: int) -> pd.DataFrame:
+    """Attach a z-scored log event length that is constant within each event."""
+    rng = np.random.default_rng(seed)
+    events = sorted(cohort["event_id"].unique())
+    # SWR events run longer, which is the whole reason the adjustment exists.
+    is_swr = (
+        cohort.drop_duplicates("event_id").set_index("event_id")["is_swr"].astype(bool)
+    )
+    values = pd.Series(
+        rng.normal(size=len(events)) + 0.6 * is_swr.loc[events].to_numpy(),
+        index=events,
+    )
+    values = (values - values.mean()) / values.std(ddof=0)
+    return cohort.assign(log_n_nonlocal_bins_z=cohort["event_id"].map(values))
+
+
+class TestLengthAdjustedConcentration:
+    """``--concentration-length`` fits the length-adjusted twin of log_phi_is_swr."""
+
+    def test_the_length_term_joins_the_design_only_where_is_swr_is_identified(self):
+        cohort = _with_event_length(_dm_contrast_cohort(epoch="02_r1", seed=0), seed=0)
+
+        assert mod.resolve_concentration_cols(cohort, with_event_length=False) == (
+            "is_swr",
+        )
+        assert mod.resolve_concentration_cols(cohort, with_event_length=True) == (
+            "is_swr",
+            "log_n_nonlocal_bins_z",
+        )
+        # Inside an SWR split there is no concentration contrast to decompose.
+        swr_only = cohort[cohort["is_swr"]]
+        assert mod.resolve_concentration_cols(swr_only, with_event_length=True) == ()
+
+    def test_a_cohort_without_the_length_column_is_refused(self):
+        """A silently dropped term would publish ``_dm_len`` fits that are not."""
+        cohort = _dm_contrast_cohort(epoch="02_r1", seed=0)
+        with pytest.raises(ValueError, match="log_n_nonlocal_bins_z"):
+            mod.resolve_concentration_cols(cohort, with_event_length=True)
+
+    def test_the_run_reports_both_concentration_terms(self):
+        cohort = pd.concat(
+            [
+                _with_event_length(_dm_contrast_cohort(epoch="02_r1", seed=0), seed=0),
+                _with_event_length(_dm_contrast_cohort(epoch="04_r2", seed=1), seed=1),
+            ],
+            ignore_index=True,
+        )
+        ladder = {"C0_base": (["is_current_arm"], "pooled")}
+        kwargs = {
+            "response_col": "arm_count_hard",
+            "n_categories": 9,
+            "estimator": "dirichlet_multinomial",
+            "n_jobs": 2,
+            "min_events_session_phi": 40,
+        }
+
+        total, _ = mod._run(cohort, ladder, concentration_length=False, **kwargs)
+        adjusted, _ = mod._run(cohort, ladder, concentration_length=True, **kwargs)
+
+        assert "coef_log_phi_log_n_nonlocal_bins_z" not in total.columns
+        assert adjusted["coef_log_phi_log_n_nonlocal_bins_z"].notna().all()
+        assert adjusted["bse_log_phi_log_n_nonlocal_bins_z"].notna().all()
+        # The effect-scale unit travels with the coefficient (the column is
+        # already z-scored, so its SD is ~1).
+        assert (adjusted["sd_log_phi_log_n_nonlocal_bins_z"] > 0).all()
+        # One more free parameter than the unadjusted twin.
+        assert (
+            adjusted["n_params"].to_numpy() == total["n_params"].to_numpy() + 1
+        ).all()
+
+    def test_the_aggregation_reports_the_length_term_next_to_the_contrast(self):
+        cohort = pd.concat(
+            [
+                _with_event_length(
+                    _dm_contrast_cohort(epoch=f"{index:02d}_r1", seed=index), seed=index
+                )
+                for index in range(6)
+            ],
+            ignore_index=True,
+        )
+        ladder = {"C0_base": (["is_current_arm"], "pooled")}
+        res, _ = mod._run(
+            cohort,
+            ladder,
+            response_col="arm_count_hard",
+            n_categories=9,
+            estimator="dirichlet_multinomial",
+            n_jobs=2,
+            min_events_session_phi=40,
+            concentration_length=True,
+        )
+        agg = aggregate_contrast(res, mod._concentration_specs(ladder), "candidate_arm")
+
+        assert set(agg["term"]) == {
+            "log_phi_is_swr",
+            "log_phi_log_n_nonlocal_bins_z",
+        }
+        # A z-scored column is reported per SD, not per category.
+        length = agg[agg["term"] == "log_phi_log_n_nonlocal_bins_z"].iloc[0]
+        assert length["std_unit"] == "per_SD"
+
+
 def test_concentration_specs_cover_every_rung_and_population():
     specs = mod._concentration_specs(
         {"C0_base": ([], "pooled"), "C1_split": ([], "split")}
     )
+    # Both concentration terms on every (rung, population): the length term is
+    # only fitted under --concentration-length, and on a run without it the
+    # coefficient column is absent so aggregate_contrast emits no row for it.
     assert specs == [
         ("C0_base", "all", "log_phi_is_swr"),
+        ("C0_base", "all", "log_phi_log_n_nonlocal_bins_z"),
         ("C1_split", "all", "log_phi_is_swr"),
+        ("C1_split", "all", "log_phi_log_n_nonlocal_bins_z"),
         ("C1_split", "SWR", "log_phi_is_swr"),
+        ("C1_split", "SWR", "log_phi_log_n_nonlocal_bins_z"),
         ("C1_split", "nonSWR", "log_phi_is_swr"),
+        ("C1_split", "nonSWR", "log_phi_log_n_nonlocal_bins_z"),
     ]
 
 
