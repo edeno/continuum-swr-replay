@@ -9,6 +9,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.data_loaders.trial_clocks import (
+    outcome_known_times_from_task_visits,
+)
+
 PORT_EXPERIENCE_COLUMNS = [
     "experience_id",
     "movement_trial_number",
@@ -56,11 +60,24 @@ def port_experiences_from_trials(
             dtype=float
         )
     elif "reward_on_time" in frame:
-        reward_on = pd.to_numeric(frame["reward_on_time"], errors="coerce").to_numpy(
-            dtype=float
+        # An omission becomes known at the pump-latency boundary after arrival,
+        # not at departure. This is the clock ``_trial_outcome_times`` derives
+        # from the same reward-on column, so the adapted experiences have to
+        # match it or every builder test would run a later omission clock than
+        # the pipeline it stands in for.
+        given_reward_on = pd.to_numeric(
+            frame["reward_on_time"], errors="coerce"
+        ).to_numpy(dtype=float)
+        outcome = outcome_known_times_from_task_visits(
+            rewarded=reward,
+            first_poke_in_time=arrival,
+            final_poke_out_time=end,
+            reward_on_time=np.where(reward.astype(bool), given_reward_on, np.nan),
         )
-        outcome = np.where(reward.astype(bool), reward_on, end)
     else:
+        # With no reward-on column there is no pump onset to anchor either
+        # outcome, and ``_trial_outcome_times`` falls back to ``end_time`` for
+        # both; mirror that fallback rather than inventing a boundary.
         outcome = end
     reward_on = np.where(reward.astype(bool), outcome, np.nan)
     ports = (
