@@ -1000,9 +1000,11 @@ def main() -> None:
         cur = obs["occupancy_well_arm"].reindex(t["stop_id"]).to_numpy(dtype=float)
         rout = obs["is_rewarded_outcome"].reindex(t["stop_id"]).to_numpy(dtype=float)
         arm_ok = np.mean(t["chosen_arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
-        # ``is_rewarded_outcome`` is frozen at the bout start, which precedes the
-        # trip's own outcome, so it is missing on essentially every at-well
-        # stop. Score agreement only where the reference exists and report the
+        # ``is_rewarded_outcome`` is frozen at the bout start, which is inside
+        # the arrival -> outcome window for about a fifth of at-well stops
+        # (observable at 80.06 % of at-well bout starts; docs/audits/
+        # 2026-09-06-stop-table-clock-columns-regen.md), so it is missing
+        # there. Score agreement only where the reference exists and report the
         # comparable share, rather than counting "not yet known" as "wrong".
         rew_known = at_well & np.isfinite(rout)
         rew_ok = (

@@ -118,6 +118,30 @@ def check_theta(nwb_file_name: str, epoch_name: str) -> dict:
         return {"theta_ok": False, "theta_error": _short_error(e)}
 
 
+EPOCH_EDGE_WINDOW_SEC = 1.0
+"""How close to an epoch boundary a poke has to be to count as edge-clipped."""
+
+
+def _n_edge_pokes(beam_breaks: pd.DataFrame, valid_times: tuple[float, float]) -> int:
+    """Count beam-break bouts touching the first or last second of the epoch.
+
+    A poke already in progress when the epoch starts (or still in progress
+    when it ends) is clipped by the interval, so its poke-in is the epoch
+    boundary rather than a real arrival. Those visits get an arrival time that
+    is an artifact of where the recording was cut, which propagates into every
+    arrival-anchored clock. This is a report, not a gate: it says how many
+    visits per epoch are exposed.
+    """
+    if beam_breaks.empty:
+        return 0
+    start, end = float(valid_times[0]), float(valid_times[1])
+    poke_in = beam_breaks["start_time"].to_numpy(dtype=float)
+    poke_out = beam_breaks["end_time"].to_numpy(dtype=float)
+    at_start = poke_in <= start + EPOCH_EDGE_WINDOW_SEC
+    at_end = poke_out >= end - EPOCH_EDGE_WINDOW_SEC
+    return int((at_start | at_end).sum())
+
+
 def check_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> dict:
     """Check if DIO events can be loaded."""
     try:
@@ -129,6 +153,7 @@ def check_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> dict:
             "dios_error": "",
             "n_beam_breaks": n_beam_breaks,
             "n_pump_events": n_pump_events,
+            "n_edge_pokes": _n_edge_pokes(dio_data["beam_breaks"], valid_times),
         }
     except Exception as e:
         return {
@@ -136,6 +161,7 @@ def check_dios(nwb_file_name: str, valid_times: tuple[float, float]) -> dict:
             "dios_error": _short_error(e),
             "n_beam_breaks": 0,
             "n_pump_events": 0,
+            "n_edge_pokes": 0,
         }
 
 
@@ -184,6 +210,7 @@ def check_session(nwb_file_name: str, epoch_name: str, animal: str, date: int) -
             "dios_error": "Skipped: position failed",
             "n_beam_breaks": 0,
             "n_pump_events": 0,
+            "n_edge_pokes": 0,
         }
     result.update(dio_result)
 
@@ -251,6 +278,8 @@ def main():
         for component in ["position", "spikes", "ripple", "theta", "dios"]:
             ok = result.get(f"{component}_ok", False)
             checks.append(f"{component}:{'OK' if ok else 'FAIL'}")
+        # Pokes clipped by the epoch boundary carry an artifactual arrival time.
+        checks.append(f"edge_pokes:{int(result.get('n_edge_pokes', 0))}")
         print(" | ".join(checks))
 
     # Build results DataFrame

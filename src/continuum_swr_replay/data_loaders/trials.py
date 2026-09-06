@@ -495,10 +495,17 @@ def _collapse_physical_pokes_to_port_experiences(
     # Pump onsets that fell in a beam-release gap between a visit's bouts are
     # unmatched at the per-bout stage but still lie inside Comrie's whole-visit
     # reward window [first_poke_in, final_poke_out]. Recover the same-well ones
-    # so a collapsed visit is credited exactly as her parser does -- a real,
-    # common case (e.g. wilbur, where the pump often fires on a return poke
-    # after a >1 s release). Genuine transit orphans (different well, or outside
-    # every visit) stay unmatched, which her parser also drops.
+    # so a collapsed visit is credited exactly as her parser does -- a real
+    # case (e.g. wilbur, where a brief beam release can put the pump on a
+    # return poke). Genuine transit orphans (different well, or outside every
+    # visit) stay unmatched, which her parser also drops.
+    #
+    # This recovery does NOT license a long reward latency. The binding rule is
+    # OMISSION_KNOWN_LATENCY_SEC = 0.30 s, and
+    # ``outcome_known_times_from_task_visits`` raises if any recovered pump
+    # lands later than that after its visit's first poke-in. Measured over the
+    # 218-session corpus, latency from arrival is p99 91 ms with a maximum of
+    # 236 ms, so the guard has headroom over every observed pump.
     unmatched = list(physical_pokes.attrs.get("unmatched_pump_events", ()))
     unmatched_well = [PUMP_EVENT_TO_WELL.get(str(name)) for name, _ in unmatched]
     recovered_pumps: set[int] = set()

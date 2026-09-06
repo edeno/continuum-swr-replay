@@ -339,9 +339,10 @@ def add_uncertainty_covariates(
     - ``wsls_deviation``: 1.0 (deviated from win-stay/lose-shift) unless the stop
       is ``(rewarded & is_stay)`` or ``(omitted & ~is_stay)``, in which case
       0.0. Uses ``completed_trial_reward``, the trip's *realized* outcome, not
-      the bout-start-gated ``is_rewarded_outcome`` -- an at-well bout starts at
-      arrival, before the outcome exists, so the gated form was NaN at every
-      at-well stop. ``NaN`` where no physical trip has completed or the outbound
+      the bout-start-gated ``is_rewarded_outcome`` -- an at-well bout that
+      starts inside the arrival -> outcome window has no outcome yet, which is
+      the case for about a fifth of them, so the gated form drops those stops.
+      ``NaN`` where no physical trip has completed or the outbound
       choice is unresolved -- such rows are dropped at fit time rather than
       counted as a deviation. Descriptive only: it embeds the eventual choice.
     - ``leaky_q_value_diff``: canonical best-minus-second-best leaky-Q margin
@@ -444,10 +445,12 @@ def add_uncertainty_covariates(
         omission.loc[pos] = _omission_streak(g[expected_lag_cols].to_numpy(dtype=float))
 
         # Read the trip's *realized* outcome, not the bout-start-gated flags.
-        # A bout at a well begins at arrival, which precedes the physical
-        # outcome boundary, so ``is_rewarded_outcome`` is missing at essentially
-        # every at-well stop and gating here would leave the
-        # covariate NaN wherever it means anything. Win-stay/lose-shift is by
+        # A bout at a well begins at arrival, and the outcome is already
+        # observable at 80.06 % of at-well bout starts (docs/audits/
+        # 2026-09-06-stop-table-clock-columns-regen.md); the remaining fifth
+        # start inside the arrival -> outcome window, where
+        # ``is_rewarded_outcome`` is legitimately missing. Gating here would
+        # drop those. Win-stay/lose-shift is by
         # definition about the outcome the animal just experienced, paired with
         # the choice it then makes -- and that choice, ``is_stay``, is future
         # information regardless, so this construct is descriptive-only however

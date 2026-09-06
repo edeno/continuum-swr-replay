@@ -10,8 +10,11 @@ is_swr (matched within stop by time-rank).
 
 rate(t) = onsets(t) / (exposure_bins(t) * bin_s)   [events / s of immobility]
 
-NB: does NOT use is_reward_stop (that builder flag is broken — pumps fire at
-the poke, just before the bout, so ~none fall strictly inside a bout).
+NB: does NOT use is_reward_stop (a pump fires within ~0.1 s of the poke, so
+almost none fall strictly inside a later bout). The canonical clock for
+"how long since the outcome was available" is the stop table's
+``time_since_outcome_known_s`` / ``outcome_known_time_s``; use those rather
+than re-deriving a pump offset here.
 """
 
 from __future__ import annotations
