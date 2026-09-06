@@ -17,11 +17,13 @@ from continuum_swr_replay.analysis.replay import (
     REWARD_HISTORY_N_BASIS,
     PerBinRateModelSpec,
     aggregate_to_timebins,
+    apply_arrival_window,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
+from continuum_swr_replay.analysis.replay.per_bin_rate_model import _design_columns
 
 
 def make_per_bin_rate_design(
@@ -546,3 +548,164 @@ def test_cv_fold_separated_only_on_the_indicator_keeps_the_metric():
     assert cv["cv_n_separated_folds"] == 0
     assert np.isfinite(cv["cv_ll_per_bin_mean"])
     assert np.isfinite(cv["cv_bits_per_event"])
+
+
+def _arrival_bump(t):
+    """True rate multiplier: a 0.5 s-wide 5x peak 2 s after the well arrival."""
+    return 1.0 + 4.0 * np.exp(-0.5 * ((t - 2.0) / 0.5) ** 2)
+
+
+def _arrival_ladder_design(seed: int = 0) -> pd.DataFrame:
+    """A design whose rate follows the ARRIVAL clock, not the stop clock.
+
+    Stops run the full ``TMAX`` window (266 bins x 15 ms) and each animal
+    arrived a uniform 0-6 s before its bout began, so the planted peak sits at
+    a different ``tc`` in every stop and the arrival clock reaches past
+    ``TMAX_ARRIVAL`` in the long-lead stops.
+    """
+    return make_per_bin_rate_design(
+        n_stops=250,
+        n_bins=266,
+        base_rate=0.02,
+        arrival_clocks=True,
+        arrival_lead_max=6.0,
+        arrival_time_profile=_arrival_bump,
+        seed=seed,
+    )
+
+
+def test_arrival_clock_spec_formula_and_columns():
+    """The arrival rungs spline the arrival clock and request only that clock."""
+    arrival = MODEL_PER_BIN_RATE["M5a_time_arrival"]
+    spline = (
+        "bs(time_since_last_well_arrival_s, knots=(1.0, 2.0, 4.0, 6.0), "
+        "lower_bound=0.0, upper_bound=8.0)"
+    )
+    assert arrival.formula() == f"count ~ {spline}"
+    assert arrival.time_clock == "arrival"
+    # The arrival sub-ladder has its own constant-rate null, because it is fit
+    # on a strict subset of the frozen cohort's rows.
+    assert arrival.parent == "M0a_const_arrival"
+    assert MODEL_PER_BIN_RATE["M0a_const_arrival"].time_clock == "arrival"
+    assert MODEL_PER_BIN_RATE["M0a_const_arrival"].parent is None
+    assert MODEL_PER_BIN_RATE["M0a_const_arrival"].formula() == "count ~ 1"
+    assert MODEL_PER_BIN_RATE["M7ra_time_arrival_histcos_rew"].parent == (
+        "M5a_time_arrival"
+    )
+    assert spline in MODEL_PER_BIN_RATE["M7ra_time_arrival_histcos_rew"].formula()
+
+    for name in (
+        "M0a_const_arrival",
+        "M5a_time_arrival",
+        "M7ra_time_arrival_histcos_rew",
+    ):
+        cols = _design_columns(MODEL_PER_BIN_RATE[name])
+        assert "time_since_last_well_arrival_s" in cols, name
+        assert "tc" not in cols, name
+    for name in ("M0_const", "M5_time", "M7r_time_histcos_rew", "M9_rew_x_time"):
+        cols = _design_columns(MODEL_PER_BIN_RATE[name])
+        assert "time_since_last_well_arrival_s" not in cols, name
+    assert "tc" in _design_columns(MODEL_PER_BIN_RATE["M5_time"])
+
+
+def test_arrival_clock_recovers_a_peak_the_stop_clock_smears():
+    """A rate locked to the arrival is recovered on that clock and only there.
+
+    Both rungs are fit to the SAME windowed rows and differ only in which clock
+    the spline is anchored to. Asserted numerically: the arrival rung's fitted
+    time course peaks within 0.5 s of the planted 2 s (searched over the
+    interior 0.5-7.5 s, away from the boundary knots where the basis has almost
+    no support); the stop-clock rung's fitted log rate varies less than 0.75x as
+    much across the same rows (it can only fit the lead-averaged smear); and the
+    arrival rung wins by more than 100 AIC (the two rungs differ by one spline
+    column, so the df penalty is 2).
+    """
+    design = _arrival_ladder_design()
+    specs = [
+        MODEL_PER_BIN_RATE[n]
+        for n in ("M0a_const_arrival", "M5a_time_arrival", "M5_time")
+    ]
+    frozen, _ = freeze_per_bin_cohort(design, specs)
+    windowed, window = apply_arrival_window(frozen)
+
+    fits = {
+        name: fit_per_bin_rate_model(windowed, MODEL_PER_BIN_RATE[name])
+        for name in ("M5a_time_arrival", "M5_time")
+    }
+    assert all(fit is not None for fit in fits.values())
+    exposure = windowed["exposure"].to_numpy()
+    rates = {
+        name: fit["predicted"].to_numpy() / exposure for name, fit in fits.items()
+    }
+
+    clock = windowed["time_since_last_well_arrival_s"].to_numpy()
+    interior = (clock >= 0.5) & (clock <= 7.5)
+    course = (
+        pd.Series(rates["M5a_time_arrival"][interior])
+        .groupby(np.round(clock[interior], 1))
+        .mean()
+    )
+    assert abs(float(course.idxmax()) - 2.0) <= 0.5
+
+    sd_arrival = float(np.log(rates["M5a_time_arrival"]).std())
+    sd_stop = float(np.log(rates["M5_time"]).std())
+    assert sd_stop < 0.75 * sd_arrival
+    assert fits["M5_time"]["aic"] - fits["M5a_time_arrival"]["aic"] > 100
+
+    # Every rung on one clock is fit to the same rows as every other rung on it.
+    m0a = fit_per_bin_rate_model(windowed, MODEL_PER_BIN_RATE["M0a_const_arrival"])
+    assert m0a["n_bins"] == fits["M5a_time_arrival"]["n_bins"]
+    m0 = fit_per_bin_rate_model(frozen, MODEL_PER_BIN_RATE["M0_const"])
+    m5 = fit_per_bin_rate_model(frozen, MODEL_PER_BIN_RATE["M5_time"])
+    assert m0["n_bins"] == m5["n_bins"] == len(frozen)
+    assert m0a["n_bins"] == window["n_bins_arrival_window"] < len(frozen)
+
+
+def test_arrival_window_keeps_the_planted_share_of_events():
+    """The window's retained event share matches the planted rate mass in it."""
+    design = _arrival_ladder_design()
+    frozen, _ = freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M5a_time_arrival"]])
+    _, window = apply_arrival_window(frozen)
+
+    clock = frozen["time_since_last_well_arrival_s"].to_numpy()
+    planted = _arrival_bump(clock)
+    inside = (clock >= 0.0) & (clock <= 8.0)
+    planted_share = float(planted[inside].sum() / planted.sum())
+
+    assert window["retained_share_arrival_events"] == pytest.approx(
+        planted_share, abs=0.03
+    )
+    # Late bins are the ones the window drops, and the planted mass is early, so
+    # the window keeps a larger share of the events than of the bins.
+    assert (
+        window["retained_share_arrival_events"] > window["retained_share_arrival_bins"]
+    )
+    assert window["n_bins_arrival_window"] == int(inside.sum())
+
+
+def test_freeze_reports_what_the_arrival_clock_alone_removed():
+    """Stops with no arrival leave EVERY rung, and the freeze says how many."""
+    design = _arrival_ladder_design()
+    no_arrival = design["stop_id"].isin([0, 1, 2])
+    design.loc[no_arrival, "time_since_last_well_arrival_s"] = np.nan
+    specs = [MODEL_PER_BIN_RATE[n] for n in ("M0_const", "M5a_time_arrival")]
+
+    frozen, report = freeze_per_bin_cohort(design, specs)
+
+    assert report["n_stops_dropped_arrival_clock"] == 3
+    assert report["n_bins_dropped_arrival_clock"] == int(no_arrival.sum())
+    assert report["n_stops_after"] == design["stop_id"].nunique() - 3
+    # ... including the stop-clock rungs: the cohort is common to the ladder.
+    assert frozen["stop_id"].isin([0, 1, 2]).sum() == 0
+
+    # A ladder without an arrival rung neither needs the column nor reports it.
+    _, stop_only = freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M5_time"]])
+    assert "n_stops_dropped_arrival_clock" not in stop_only
+    assert stop_only["n_stops_after"] == design["stop_id"].nunique()
+
+
+def test_arrival_window_refuses_an_unfrozen_arrival_clock():
+    design = _arrival_ladder_design()
+    design.loc[0, "time_since_last_well_arrival_s"] = np.nan
+    with pytest.raises(ValueError, match="freeze the"):
+        apply_arrival_window(design)

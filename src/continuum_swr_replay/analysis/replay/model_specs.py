@@ -34,6 +34,8 @@ from dataclasses import dataclass
 
 __all__ = [
     "ARM_FE_PREDICTORS",
+    "ARRIVAL_CLOCK_COLUMN",
+    "ARRIVAL_SPLINE_KNOTS",
     "BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "MODEL_CHOICE",
@@ -73,6 +75,7 @@ __all__ = [
     "SWR_CONTRAST_RATE_S_SPECS",
     "SWR_CONTRAST_RATE_STOP_COVARS",
     "TMAX",
+    "TMAX_ARRIVAL",
     "default_content_model_names",
 ]
 
@@ -648,6 +651,22 @@ TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
 # with 3 interior knots -> 6 spline columns.
 SPLINE_KNOTS = (1.0, 2.0, 3.0)
 _SPLINE = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX})"
+# Arrival-anchored counterpart of the within-stop clock. ``tc`` starts at the
+# bout (the moment the animal became immobile); a stop can begin well after the
+# animal reached the well, so a rate that is locked to the ARRIVAL is smeared
+# across ``tc`` by the arrival-to-bout offset. The arrival rungs re-anchor the
+# same spline block on ``time_since_last_well_arrival_s`` (bin centre minus the
+# arrival of the well occupied at bout start) to ask which clock the rate
+# follows. Window and knots come from the at-well event distribution: median
+# 3.7 s after arrival, IQR 2.7-5.1 s, 87.6 % of events within 8 s, balanced
+# across the SWR classes.
+TMAX_ARRIVAL = 8.0
+ARRIVAL_SPLINE_KNOTS = (1.0, 2.0, 4.0, 6.0)
+ARRIVAL_CLOCK_COLUMN = "time_since_last_well_arrival_s"
+_ARRIVAL_SPLINE = (
+    f"bs({ARRIVAL_CLOCK_COLUMN}, knots={ARRIVAL_SPLINE_KNOTS}, "
+    f"lower_bound=0.0, upper_bound={TMAX_ARRIVAL})"
+)
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
 N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
 # Per-stop covariates the shipped ladder needs beyond the reward-history basis
@@ -735,8 +754,23 @@ class PerBinRateModelSpec:
     # carried into the per-bin design via ``aggregate_to_timebins``'
     # ``stop_covariates``.
     extra_covariates: tuple[str, ...] = ()
+    # Which clock the time-course spline is anchored to. ``"stop"`` uses ``tc``
+    # (time since the bout began) over ``[0, TMAX]``; ``"arrival"`` uses
+    # ``ARRIVAL_CLOCK_COLUMN`` over ``[0, TMAX_ARRIVAL]``, and the runner
+    # additionally restricts an arrival rung to that window AFTER the ladder's
+    # common-cohort freeze. Rungs on different clocks are fit to different rows
+    # and are therefore never compared numerically with each other (the clock
+    # travels with every fitted row as ``time_clock``, and
+    # ``model_comparison.compare_nested_models`` invalidates a cross-clock
+    # pair); an arrival rung's parent must itself be an arrival rung.
+    time_clock: str = "stop"
 
     def __post_init__(self) -> None:
+        if self.time_clock not in ("stop", "arrival"):
+            raise ValueError(
+                "PerBinRateModelSpec.time_clock must be 'stop' or 'arrival'; "
+                f"got {self.time_clock!r}."
+            )
         if self.reward_basis not in (0, REWARD_HISTORY_N_BASIS):
             raise ValueError(
                 "PerBinRateModelSpec.reward_basis must be 0 or "
@@ -754,9 +788,10 @@ class PerBinRateModelSpec:
 
     def formula(self) -> str:
         """patsy formula (response ``count``; the offset is applied at fit time)."""
+        spline = _ARRIVAL_SPLINE if self.time_clock == "arrival" else _SPLINE
         terms: list[str] = []
         if self.time_spline:
-            terms.append(_SPLINE)
+            terms.append(spline)
         if self.reward_basis:
             terms += [
                 *REWARD_HISTORY_COLUMNS[: self.reward_basis],
@@ -775,7 +810,7 @@ class PerBinRateModelSpec:
         # ``switch`` is retired (see the field docstring); the completed-trip
         # switch flag is never added to a per-bin model.
         if self.reward_time_interaction:
-            terms.append(f"{REWARD_HISTORY_COLUMNS[0]}:{_SPLINE}")
+            terms.append(f"{REWARD_HISTORY_COLUMNS[0]}:{spline}")
         terms += list(self.extra_covariates)
         return "count ~ " + (" + ".join(terms) if terms else "1")
 
@@ -904,6 +939,57 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="+ time + raised-cosine self-history + reward history",
         parent="M5_time",
         self_history_basis=N_HISTORY_BASIS,
+    ),
+    # Arrival-anchored sub-ladder. These rungs re-anchor the time-course block
+    # on ``ARRIVAL_CLOCK_COLUMN`` and are fit on the arrival window
+    # ``[0, TMAX_ARRIVAL]``, a strict subset of the frozen cohort's rows. Their
+    # own null therefore cannot be ``M0_const`` (fit on the whole frozen
+    # cohort): AIC / deviance / held-out likelihood all scale with the number of
+    # rows, so differencing across the two row sets would measure the window,
+    # not the clock. ``M0a_const_arrival`` is that null -- the same homogeneous
+    # Poisson formula as ``M0_const``, refit on the arrival window -- persisted
+    # as a real rung so every rung reports an ``n_bins`` equal to every other
+    # rung's WITHIN its clock, and so the sub-ladder's comparisons are the
+    # ordinary parent/child ones. The stop-clock and arrival-clock ladders are
+    # reported side by side and never differenced against each other.
+    "M0a_const_arrival": PerBinRateModelSpec(
+        name="M0a_const_arrival",
+        time_spline=False,
+        reward_basis=0,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="homogeneous Poisson baseline on the arrival window",
+        parent=None,
+        time_clock="arrival",
+    ),
+    "M5a_time_arrival": PerBinRateModelSpec(
+        name="M5a_time_arrival",
+        time_spline=True,
+        reward_basis=0,
+        reward_rate=False,
+        self_history_lags=0,
+        switch=False,
+        reward_time_interaction=False,
+        description="+ time-since-arrival (spline)",
+        parent="M0a_const_arrival",
+        time_clock="arrival",
+    ),
+    "M7ra_time_arrival_histcos_rew": PerBinRateModelSpec(
+        name="M7ra_time_arrival_histcos_rew",
+        time_spline=True,
+        reward_basis=_NB,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description=(
+            "+ time-since-arrival + raised-cosine self-history + reward history"
+        ),
+        parent="M5a_time_arrival",
+        self_history_basis=N_HISTORY_BASIS,
+        time_clock="arrival",
     ),
 }
 

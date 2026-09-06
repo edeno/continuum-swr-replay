@@ -49,6 +49,8 @@ from .model_checking import (
 )
 from .model_specs import (
     ARM_FE_PREDICTORS,
+    ARRIVAL_CLOCK_COLUMN,
+    ARRIVAL_SPLINE_KNOTS,
     BELIEF_DEPENDENT_CONTENT_MODELS,
     BIN_S,
     MODEL_CHOICE,
@@ -69,11 +71,13 @@ from .model_specs import (
     SPLINE_KNOTS,
     STOP_COVARIATES,
     TMAX,
+    TMAX_ARRIVAL,
     ModelSpec,
     PerBinRateModelSpec,
     default_content_model_names,
 )
 from .per_bin_rate_model import (
+    apply_arrival_window,
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
@@ -155,9 +159,12 @@ __all__ = [
     "REWARD_HISTORY_INCOMPLETE",
     "REWARD_HISTORY_N_BASIS",
     "REWARD_HISTORY_N_LAGS",
+    "ARRIVAL_CLOCK_COLUMN",
+    "ARRIVAL_SPLINE_KNOTS",
     "SPLINE_KNOTS",
     "STOP_COVARIATES",
     "TMAX",
+    "TMAX_ARRIVAL",
     "UNCERTAINTY_COVARIATES",
     "ModelSpec",
     "PerBinRateModelSpec",
@@ -206,6 +213,7 @@ __all__ = [
     "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
     "freeze_common_cohort",
+    "apply_arrival_window",
     "freeze_per_bin_cohort",
     "next_arm_circular_shift",
     "nearest_well_distance_cm",

@@ -82,6 +82,7 @@ def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
         "M7_time_hist_rew": "M6_time_hist",
         "M7r_time_histcos_rew": "M5_time",
         "M9_rew_x_time": "M7_time_hist_rew",
+        "M7ra_time_arrival_histcos_rew": "M5a_time_arrival",
     }
     for name, parent in reward_rungs.items():
         spec = ms.MODEL_PER_BIN_RATE[name]
@@ -116,9 +117,18 @@ def test_every_per_bin_formula_term_resolves_through_design_columns() -> None:
             if factor == ms._SPLINE:
                 assert "tc" in cols, name
                 continue
+            if factor == ms._ARRIVAL_SPLINE:
+                assert ms.ARRIVAL_CLOCK_COLUMN in cols, name
+                continue
             assert factor in cols, f"{name}: {factor}"
-        # and nothing is requested that the formula never mentions
-        for col in cols - {"count", "tc"}:
+        # and nothing is requested that the formula never mentions. An arrival
+        # rung requests its clock whether or not it splines it: the runner
+        # windows the rung on that column, so a bin without one is outside the
+        # rung's support and has to leave the ladder's common cohort.
+        clock_cols = {"tc"}
+        if spec.time_clock == "arrival":
+            clock_cols.add(ms.ARRIVAL_CLOCK_COLUMN)
+        for col in cols - {"count"} - clock_cols:
             assert col in rhs, f"{name}: unused design column {col}"
 
 

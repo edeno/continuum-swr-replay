@@ -50,8 +50,10 @@ from ._fit_diagnostics import (
     fit_status,
 )
 from .model_specs import (
+    ARRIVAL_CLOCK_COLUMN,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
+    TMAX_ARRIVAL,
     PerBinRateModelSpec,
 )
 
@@ -75,8 +77,13 @@ _EXPECTED_FIT_ERRORS = (
 def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     """Columns the spec's formula references (besides the offset's ``exposure``)."""
     cols = ["count"]
+    if spec.time_clock == "arrival":
+        # An arrival rung lives on the arrival clock whether or not it splines
+        # it: the runner windows it on that column, so a bin without one is not
+        # in the rung's support and must leave the ladder's common cohort.
+        cols.append(ARRIVAL_CLOCK_COLUMN)
     if spec.time_spline or spec.reward_time_interaction:
-        cols.append("tc")
+        cols.append("tc" if spec.time_clock == "stop" else ARRIVAL_CLOCK_COLUMN)
     if spec.reward_basis:
         cols += [*REWARD_HISTORY_COLUMNS[: spec.reward_basis], REWARD_HISTORY_INCOMPLETE]
     if spec.reward_time_interaction and not spec.reward_basis:
@@ -135,8 +142,15 @@ def freeze_per_bin_cohort(
     report : dict
         ``n_bins_before`` / ``n_bins_after``, ``n_stops_before`` /
         ``n_stops_after``, ``n_event_bins_before`` / ``n_event_bins_after``
-        (bins with ``count > 0``), and the ``required_columns`` tuple the
-        selection used.
+        (bins with ``count > 0``), the ``required_columns`` tuple the selection
+        used, and — when an arrival-clock rung put ``ARRIVAL_CLOCK_COLUMN`` in
+        that union — ``n_bins_dropped_arrival_clock`` /
+        ``n_stops_dropped_arrival_clock``: the bins and stops that every other
+        required column would have kept and that only the arrival clock removed
+        (a stop that began before the session's first well arrival has no
+        arrival clock). Because the freeze is common to the ladder, those bins
+        leave EVERY rung, including the stop-clock ones, so the cost of adding
+        the arrival rungs is reported rather than absorbed.
 
     Raises
     ------
@@ -168,7 +182,95 @@ def freeze_per_bin_cohort(
         "n_event_bins_after": int((frozen["count"] > 0).sum()),
         "required_columns": tuple(required),
     }
+    if ARRIVAL_CLOCK_COLUMN in required:
+        others = [c for c in required if c != ARRIVAL_CLOCK_COLUMN]
+        keep_others = design[others].notna().all(axis=1) & (design["exposure"] > 0)
+        report["n_bins_dropped_arrival_clock"] = int((keep_others & ~keep).sum())
+        report["n_stops_dropped_arrival_clock"] = int(
+            design.loc[keep_others, "stop_id"].nunique() - report["n_stops_after"]
+        )
     return frozen, report
+
+
+def apply_arrival_window(
+    design: pd.DataFrame, *, tmax_arrival: float = TMAX_ARRIVAL
+) -> tuple[pd.DataFrame, dict]:
+    """Restrict a frozen cohort to ``0 <= arrival clock <= tmax_arrival``.
+
+    Applied AFTER :func:`freeze_per_bin_cohort` and only to the rungs whose
+    ``time_clock`` is ``"arrival"``. The order matters both ways: freezing
+    first keeps the ladder on one cohort (the arrival column's own missingness
+    removes bins from every rung, and is reported by the freeze), while
+    windowing second keeps the arrival rungs inside the range their spline's
+    boundary knots span, where the fitted curve is interpolation rather than
+    extrapolation.
+
+    The windowed rows are a strict subset of the frozen ones, so an arrival
+    rung's information criteria are comparable with another arrival rung's and
+    NOT with a stop-clock rung's — which is why the arrival sub-ladder carries
+    its own constant-rate null.
+
+    Parameters
+    ----------
+    design : pd.DataFrame
+        A frozen per-bin cohort, shape ``(n_bins, n_columns)``, carrying
+        ``stop_id``, ``count`` and ``ARRIVAL_CLOCK_COLUMN``.
+    tmax_arrival : float
+        Right edge of the window in seconds (the spline's upper boundary knot).
+
+    Returns
+    -------
+    windowed : pd.DataFrame
+        The retained rows with a fresh integer index. ``design`` is never
+        mutated.
+    report : dict
+        ``n_bins_arrival_window`` / ``n_stops_arrival_window`` /
+        ``n_event_bins_arrival_window`` and the shares of the frozen cohort
+        retained: ``retained_share_arrival_bins`` and
+        ``retained_share_arrival_events`` (event bins, i.e. ``count > 0`` — the
+        population-specific share, since the population enters through
+        ``count``).
+
+    Raises
+    ------
+    KeyError
+        If the arrival clock column is absent.
+    ValueError
+        If it carries a missing value — the cohort was not frozen over a union
+        that included it, so the arrival rungs would not share the ladder's
+        cohort.
+    """
+    if ARRIVAL_CLOCK_COLUMN not in design.columns:
+        raise KeyError(
+            f"apply_arrival_window needs {ARRIVAL_CLOCK_COLUMN}; the per-bin "
+            "design was built without the stop's arrival clock."
+        )
+    clock = design[ARRIVAL_CLOCK_COLUMN].to_numpy(dtype=float)
+    if np.isnan(clock).any():
+        raise ValueError(
+            f"apply_arrival_window: {ARRIVAL_CLOCK_COLUMN} has "
+            f"{int(np.isnan(clock).sum())} missing value(s); freeze the "
+            "ladder's common cohort over a union that includes it before "
+            "windowing (the arrival rungs must share the ladder's cohort)."
+        )
+    keep = (clock >= 0.0) & (clock <= tmax_arrival)
+    windowed = design.loc[keep].reset_index(drop=True)
+    windowed.attrs["per_bin_cohort_frozen"] = True
+    n_bins = int(len(design))
+    n_event_bins = int((design["count"] > 0).sum())
+    n_event_bins_kept = int((windowed["count"] > 0).sum())
+    report = {
+        "n_bins_arrival_window": int(len(windowed)),
+        "n_stops_arrival_window": int(windowed["stop_id"].nunique()),
+        "n_event_bins_arrival_window": n_event_bins_kept,
+        "retained_share_arrival_bins": (
+            float(len(windowed)) / n_bins if n_bins else np.nan
+        ),
+        "retained_share_arrival_events": (
+            n_event_bins_kept / n_event_bins if n_event_bins else np.nan
+        ),
+    }
+    return windowed, report
 
 
 def require_frozen_per_bin_design(
