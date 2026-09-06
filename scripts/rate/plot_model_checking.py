@@ -66,8 +66,8 @@ ALL_MODELS_INPUTS = {
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
 SC = list(SESSION_COLUMNS)
-LADDER = list(MODEL_PER_BIN_RATE)  # M0_const .. M9_rew_x_time, in ladder order
-FULL = "M7_time_hist_rew"
+LADDER = list(MODEL_PER_BIN_RATE)  # M0_const .. M9r_rew_x_time, in ladder order
+FULL = "M7r_time_histcos_rew"
 
 
 def plot_gof_ladder(df: pd.DataFrame) -> None:
@@ -216,11 +216,13 @@ def main() -> None:
 
     # Honest reporting of where the textbook narrative does NOT hold:
     bits = {m: g[g.model == m].cv_bits_per_event.median() for m in LADDER}
-    print("CV bits/event: time block helps (M5_time={:.3f}); the self-history "
-          "block OVERFITS held-out (M3_hist={:.3f}) -- in-sample KS improves but "
-          "cv_bits drops. Dispersion stays ~{:.2f} (underdispersed at sparse 15 ms "
-          "bins), so the dispersion->1 expectation does not apply here."
-          .format(bits["M5_time"], bits["M3_hist"], g[g.model == FULL].dispersion.median()))
+    print("CV bits/event: time block helps (M5_time={:.3f}); the raised-cosine "
+          "self-history block costs held-out likelihood (M3r_histcos={:.3f}) -- "
+          "in-sample KS improves but cv_bits drops. Dispersion stays ~{:.2f} "
+          "(underdispersed at sparse 15 ms bins), so the dispersion->1 "
+          "expectation does not apply here."
+          .format(bits["M5_time"], bits["M3r_histcos"],
+                  g[g.model == FULL].dispersion.median()))
 
     # --- per-event-type model-checking face of the dissociation ---
     print(f"\n=== fit quality by population (model={FULL}) ===")

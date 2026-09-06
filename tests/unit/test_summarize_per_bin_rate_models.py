@@ -18,6 +18,8 @@ from continuum_swr_replay.analysis.replay._helpers import (
     raised_cosine_history_basis,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -114,5 +116,60 @@ def test_sessions_missing_the_block_do_not_contribute():
     np.testing.assert_allclose(
         spbrm.reward_kernel_rate_ratios(pd.concat([sessions, unfit])),
         spbrm.reward_kernel_rate_ratios(sessions),
+        rtol=1e-12,
+    )
+
+
+def _history_sessions() -> pd.DataFrame:
+    """Two sessions' raised-cosine self-history coefficients."""
+    return pd.DataFrame(
+        {
+            "animal": ["a", "b"],
+            "coef_hist_rcos_0": [-2.0, -1.2],
+            "coef_hist_rcos_1": [0.4, 0.1],
+            "coef_hist_rcos_2": [0.9, 0.6],
+            "coef_hist_rcos_3": [0.2, -0.1],
+        }
+    )
+
+
+def test_self_history_kernel_uses_the_unnormalized_basis():
+    """``hist_rcos_k`` is a plain projection, so its kernel is ``coef @ B``.
+
+    The reward block divides each bump by its span because its features are
+    bump-weighted fractions; dividing here would shrink every self-history lag
+    by the same wrong factor, so the two reconstructions must differ.
+    """
+    sessions = _history_sessions()
+    basis = raised_cosine_history_basis(N_HISTORY_LAGS, N_HISTORY_BASIS)
+    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+    expected = np.median(
+        np.exp(sessions[columns].to_numpy(dtype=float) @ basis), axis=0
+    )
+
+    kernel = spbrm.self_history_rate_ratios(sessions)
+
+    np.testing.assert_allclose(kernel, expected, rtol=1e-12)
+    normalized = np.median(
+        np.exp(
+            sessions[columns].to_numpy(dtype=float)
+            @ (basis / basis.sum(axis=1, keepdims=True))
+        ),
+        axis=0,
+    )
+    assert not np.allclose(kernel, normalized)
+
+
+def test_self_history_sessions_missing_the_block_do_not_contribute():
+    """A session that did not fit the history block is dropped, not zero-filled."""
+    sessions = _history_sessions()
+    with_gap = pd.concat(
+        [sessions, sessions.iloc[[0]].assign(coef_hist_rcos_1=np.nan)],
+        ignore_index=True,
+    )
+
+    np.testing.assert_allclose(
+        spbrm.self_history_rate_ratios(with_gap),
+        spbrm.self_history_rate_ratios(sessions),
         rtol=1e-12,
     )

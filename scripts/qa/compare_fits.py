@@ -10,8 +10,11 @@ of the reward-free time model, and the size of the fitted cohort:
 * Family B (per-bin conditional intensity) reward step, twice: the reward rung
   against its reward-free parent, as a per-session AIC difference
   (``AIC(reward rung) - AIC(parent)``; negative = the reward block helps).
-  Old ``M2_rewhist`` / new ``M1_rew`` share the parent ``M0_const``; old and
-  new ``M7_time_hist_rew`` share the parent ``M6_time_hist``.
+  Old ``M2_rewhist`` / new ``M1_rew`` share the parent ``M0_const``. The old
+  full step is ``M7_time_hist_rew`` over ``M6_time_hist``; those rungs were
+  retired, so the new full step is ``M7r_time_histcos_rew`` over ``M5_time``
+  — the same three blocks with a raised-cosine self-history in place of the
+  ``onset_lag`` dummies, not a term-for-term counterpart.
 * Family B time-only rung ``M5_time``: median KS statistic and the share of
   sessions inside the KS band — a reward-free rung, so a shift here means the
   cohort or the binning moved, not the reward respecification.
@@ -105,7 +108,7 @@ OLD_PER_BIN_STEPS = {
 }
 NEW_PER_BIN_STEPS = {
     "base": ("M1_rew", "M0_const"),
-    "full": ("M7_time_hist_rew", "M6_time_hist"),
+    "full": ("M7r_time_histcos_rew", "M5_time"),
 }
 # Family A: the new single reward rung, and the two old rungs it replaced.
 OLD_PER_STOP_STEPS = {"R2 vs R0": ("R2", "R0"), "Rlag vs R0": ("Rlag", "R0")}
@@ -115,7 +118,7 @@ OUTCOME_ORDER = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 # Current-outcome strata the SWR-content contrast runner publishes.
 CONTRAST_OUTCOME_STRATA = ("all", "rewarded", "omitted")
 # The rung both reward quantities below are read from.
-FULL_MODEL = "M7_time_hist_rew"
+FULL_MODEL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
@@ -1310,7 +1313,8 @@ def build_report(
         ),
         (
             "full",
-            "Full model vs time+history (old and new `M7_time_hist_rew` − `M6_time_hist`)",
+            "Full model vs its reward-free parent (old `M7_time_hist_rew` − "
+            "`M6_time_hist`; new `M7r_time_histcos_rew` − `M5_time`)",
         ),
     ]:
         old_d, old_unpaired = delta_aic(old_bin, *OLD_PER_BIN_STEPS[label])

@@ -102,6 +102,44 @@ carries an intercept) or `MODEL_CHOICE`; see their own sections in the catalog.
 - **MUA interactions are a separate analysis** (split, not interaction) to avoid
   the same collinearity.
 
+## Retirements in the per-bin rate ladder (Family B)
+
+- **The five `onset_lag1..10` dummy rungs are retired (2026-09-06):**
+  `M3_hist`, `M4_hist_rew`, `M6_time_hist`, `M7_time_hist_rew` and
+  `M9_rew_x_time`. Ten collinear lag dummies over a 150 ms window separate on
+  the refractory bins — the first lags have essentially no events, the
+  coefficients run to −inf — and a fit carrying a separated non-nuisance term
+  has its whole cross-validation voided. Measured on the 2026-09-06 refit of
+  218 sessions, `cv_bits_per_event` was **NaN in 99.08 % of the non-local fits**
+  of each of the five (99.08 % non-local, 99.54 % non-local-no-SWR, 99.54 %
+  non-local-with-SWR, 100.00 % detected SWR; 99.54 % pooled over the four
+  populations). A rung that can never be scored out of sample cannot take part
+  in the ladder's held-out comparison, which is one of the two things the
+  ladder is read on.
+
+  The raised-cosine variants `M3r_histcos` and `M7r_time_histcos_rew` span the
+  same 150 ms window with four smooth, non-separating parameters and **are**
+  scored (61.9 % / 63.8 % NaN on the non-local population — high, but not
+  categorical). They were built for exactly this reason and now carry the
+  self-history block alone. `M7r_time_histcos_rew` becomes the ladder's full
+  additive rung and is what the summarizer, the figures and the refit audit
+  read.
+
+  The reward × time interaction survives, re-parented onto the raised-cosine
+  full model as **`M9r_rew_x_time`** (`M7r` + `reward_history_rcos_0:bs(tc)`).
+  Its specification is otherwise unchanged.
+
+  Consequence for the per-lag self-history kernel: it is no longer read off ten
+  `coef_onset_lag{j}` values but **reconstructed** from the four
+  `coef_hist_rcos_k` per session
+  (`_helpers.reconstruct_self_history_kernels`), which projects through the
+  **un-normalized** raised-cosine basis — `hist_rcos_k` is a plain projection of
+  the lag counts, unlike the reward block's bump-weighted fractions. The
+  reported kernel is therefore smooth: it cannot represent a lag-specific spike,
+  so a sharp single-lag refractory notch will read shallower than the dummy
+  specification reported. Refractory/bursty shape and its ordering across
+  populations are what the reconstruction preserves.
+
 ## Where the rest of the narrative lives
 
 The per-rung inline comments (the reasoning attached to individual `ModelSpec`

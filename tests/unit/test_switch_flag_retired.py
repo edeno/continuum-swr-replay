@@ -74,7 +74,9 @@ def test_registry_and_model_specs_agree_switch_is_not_a_predictor() -> None:
 
 
 def test_ladder_parent_chain_survives_m8_removal() -> None:
-    """M9 parents off M7, so removing M8 leaves the ladder connected."""
-    assert ms.MODEL_PER_BIN_RATE["M9_rew_x_time"].parent == "M7_time_hist_rew"
+    """The interaction rung parents off the full additive rung, not off M8."""
+    assert (
+        ms.MODEL_PER_BIN_RATE["M9r_rew_x_time"].parent == "M7r_time_histcos_rew"
+    )
     parents = {s.parent for s in ms.MODEL_PER_BIN_RATE.values()} - {None}
     assert "M8_full_switch" not in parents

@@ -78,10 +78,8 @@ def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
     )
     reward_rungs = {
         "M1_rew": "M0_const",
-        "M4_hist_rew": "M3_hist",
-        "M7_time_hist_rew": "M6_time_hist",
         "M7r_time_histcos_rew": "M5_time",
-        "M9_rew_x_time": "M7_time_hist_rew",
+        "M9r_rew_x_time": "M7r_time_histcos_rew",
         "M7ra_time_arrival_histcos_rew": "M5a_time_arrival",
     }
     for name, parent in reward_rungs.items():
@@ -97,7 +95,7 @@ def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
 
 
 def test_reward_time_interaction_uses_the_immediate_component() -> None:
-    formula = ms.MODEL_PER_BIN_RATE["M9_rew_x_time"].formula()
+    formula = ms.MODEL_PER_BIN_RATE["M9r_rew_x_time"].formula()
     assert f"{ms.REWARD_HISTORY_COLUMNS[0]}:{ms._SPLINE}" in formula
 
 

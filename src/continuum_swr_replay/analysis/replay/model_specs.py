@@ -842,28 +842,16 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="+ reward history (raised-cosine basis over the last 10 known outcomes)",
         parent="M0_const",
     ),
-    "M3_hist": PerBinRateModelSpec(
-        name="M3_hist",
-        time_spline=False,
-        reward_basis=0,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ self-history (autoregressive)",
-        parent="M0_const",
-    ),
-    "M4_hist_rew": PerBinRateModelSpec(
-        name="M4_hist_rew",
-        time_spline=False,
-        reward_basis=_NB,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ self-history + reward history",
-        parent="M3_hist",
-    ),
+    # The five ``onset_lag1..10`` dummy rungs (M3_hist, M4_hist_rew,
+    # M6_time_hist, M7_time_hist_rew, M9_rew_x_time) are RETIRED. The dummy
+    # history block separates on the refractory bins, which voids the whole
+    # rung's held-out metric: measured on the 2026-09-06 refit of 218 sessions,
+    # ``cv_bits_per_event`` was NaN in 99.08 % of non-local fits (99.08 /
+    # 99.54 / 99.54 / 100.00 % across the four populations), so the rungs could
+    # not be cross-validated at all. The raised-cosine variants below span the
+    # same 150 ms window with four smooth parameters and ARE scored. The
+    # reward x time interaction survives as ``M9r_rew_x_time`` on the
+    # raised-cosine parent. See ``docs/design/model_history.md``.
     "M5_time": PerBinRateModelSpec(
         name="M5_time",
         time_spline=True,
@@ -875,44 +863,11 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="+ time-since-stop (spline)",
         parent="M0_const",
     ),
-    "M6_time_hist": PerBinRateModelSpec(
-        name="M6_time_hist",
-        time_spline=True,
-        reward_basis=0,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ time + self-history",
-        parent="M5_time",
-    ),
-    "M7_time_hist_rew": PerBinRateModelSpec(
-        name="M7_time_hist_rew",
-        time_spline=True,
-        reward_basis=_NB,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=False,
-        description="+ time + self-history + reward history",
-        parent="M6_time_hist",
-    ),
     # M8_full_switch (the per-bin switch main-effect extension) was retired:
     # The completed-trip switch flag is often constant within a session's complete-case
     # cohort, making the design rank-deficient. See the naming spec's
     # "Immediate switch is not a nuisance adjustment" section. Nothing parents
-    # off it (M9 parents off M7), so removal leaves the ladder intact.
-    "M9_rew_x_time": PerBinRateModelSpec(
-        name="M9_rew_x_time",
-        time_spline=True,
-        reward_basis=_NB,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=True,
-        description="M7 + reward x time interaction",
-        parent="M7_time_hist_rew",
-    ),
+    # off it, so removal leaves the ladder intact.
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
@@ -938,6 +893,18 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         reward_time_interaction=False,
         description="+ time + raised-cosine self-history + reward history",
         parent="M5_time",
+        self_history_basis=N_HISTORY_BASIS,
+    ),
+    "M9r_rew_x_time": PerBinRateModelSpec(
+        name="M9r_rew_x_time",
+        time_spline=True,
+        reward_basis=_NB,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=True,
+        description="M7r + reward x time interaction",
+        parent="M7r_time_histcos_rew",
         self_history_basis=N_HISTORY_BASIS,
     ),
     # Arrival-anchored sub-ladder. These rungs re-anchor the time-course block

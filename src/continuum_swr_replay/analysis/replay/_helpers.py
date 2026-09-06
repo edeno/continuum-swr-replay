@@ -885,6 +885,38 @@ def reconstruct_reward_kernels(
     return coefs @ reward_kernel_weights(n_lags, n_basis)
 
 
+def reconstruct_self_history_kernels(
+    coefs: np.ndarray, n_lags: int, n_basis: int
+) -> np.ndarray:
+    """Per-session self-history kernels over lags ``1..n_lags``, log-rate scale.
+
+    The reward and self-history blocks share the raised-cosine bumps but not the
+    projection. Reward features are bump-weighted *fractions* over the available
+    lags, so their kernel is read off the ROW-NORMALIZED basis
+    (:func:`reward_kernel_weights`); ``hist_rcos_k`` is the plain projection of
+    the ``onset_lag{j}`` counts onto the raw bumps, so an onset ``j`` bins back
+    contributes ``sum_k coef_k * B[k, j]`` with ``B`` un-normalized. Using the
+    reward weights here would divide every lag by the bump's span.
+
+    Parameters
+    ----------
+    coefs : np.ndarray, shape (n_sessions, n_basis)
+        Fitted ``coef_hist_rcos_k`` values, one row per session. Rows with any
+        NaN are dropped, so a session that did not fit the block contributes
+        nothing.
+    n_lags, n_basis : int
+        Shape of the basis the coefficients were fit against.
+
+    Returns
+    -------
+    np.ndarray, shape (n_fitted_sessions, n_lags)
+        Log-rate contribution of an onset at each lag, per session.
+    """
+    coefs = np.atleast_2d(np.asarray(coefs, dtype=float))
+    coefs = coefs[~np.isnan(coefs).any(axis=1)]
+    return coefs @ raised_cosine_history_basis(n_lags, n_basis)
+
+
 def aggregate_to_timebins(
     stop_table: pd.DataFrame,
     onset_times: pd.DataFrame,

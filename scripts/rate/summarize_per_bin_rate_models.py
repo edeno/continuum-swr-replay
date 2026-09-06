@@ -9,9 +9,10 @@ across-session significance and the cross-population comparisons:
 1. Baseline rate (M0_const): events / s of immobility, and which type is higher.
 2. Reward lag-1 (M1 raw, M7 controlled): does each type respond, and how the
    effect compares across types.
-3. Reward kernel lags 1-10 (M7): boost-then-suppression shape, per type.
-4. Self-history kernel lags 1-10 (M3_hist raw, M7 controlled): refractory window
-   and burstiness peak, compared across types.
+3. Reward kernel lags 1-10 (M7r): boost-then-suppression shape, per type.
+4. Self-history kernel lags 1-10 (M3r_histcos raw, M7r controlled): refractory
+   window and burstiness peak, compared across types. Both are reconstructed
+   from the four raised-cosine coefficients, not read per lag.
 5. Other covariates (M2r recent reward rate).
 6. Ladder fit summary (AIC / CV bits/event / KS-in-band) per model x type.
 
@@ -31,10 +32,15 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.replay._helpers import reconstruct_reward_kernels
+from continuum_swr_replay.analysis.replay._helpers import (
+    reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -57,6 +63,7 @@ SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 LABEL = {"swr": "detected SWR", "non_local": "non-local (all)",
          "non_local_swr": "NL w/ SWR", "non_local_no_swr": "NL no-SWR"}
+FULL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
@@ -121,16 +128,31 @@ def section_coef(title, model, coef, note=""):
             print(f"  {LABEL[oc]:16s} {rr:6.2f} {fp:6.0%} {n5:5d}/{na} {p:9.1e} {n:5d}")
 
 
-def section_kernel(title, model, prefix, n):
+def self_history_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+    """Across-session median of the per-session reconstructed self-history kernel.
+
+    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
+    the raw raised-cosine bumps, so an onset ``j`` bins back contributes
+    ``sum_k coef_k * B[k, j]`` to the log rate — the un-normalized basis, unlike
+    the reward block's bump-weighted fractions.
+    """
+    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+    kernels = reconstruct_self_history_kernels(
+        sessions[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
+    )
+    return np.median(np.exp(kernels), axis=0)
+
+
+def section_kernel(title, model):
     print("\n" + "=" * 78)
-    print(f"{title}   ({model}: {prefix}1..{n}, RR per lag)")
+    print(f"{title}   ({model}: reconstructed RR per lag 1..{N_HISTORY_LAGS})")
     print("=" * 78)
-    lags = range(1, n + 1)
     for oc in OUT:
         s = df[(df.model == model) & (df.outcome == oc)]
-        rr = [np.exp(s[f"coef_{prefix}{j}"].median()) for j in lags]
-        print(f"  {LABEL[oc]:16s} " + " ".join(f"{v:5.2f}" for v in rr))
-    return
+        print(
+            f"  {LABEL[oc]:16s} "
+            + " ".join(f"{v:5.2f}" for v in self_history_rate_ratios(s))
+        )
 
 
 def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
@@ -179,12 +201,12 @@ def section_reward_kernel(title, model):
 
 def section_selfhistory(model):
     print("\n" + "=" * 78)
-    print(f"   self-history kernel detail   ({model}: onset_lag, 15 ms lags)")
+    print(f"   self-history kernel detail   ({model}: reconstructed, 15 ms lags)")
     print("=" * 78)
     print(f"  {'population':16s} {'refractory(<1 lags)':>20} {'burst peak RR':>14} {'@lag(ms)':>9}")
     for oc in OUT:
         s = df[(df.model == model) & (df.outcome == oc)]
-        rr = np.array([np.exp(s[f"coef_onset_lag{j}"].median()) for j in range(1, 11)])
+        rr = self_history_rate_ratios(s)
         refr = [j for j in range(1, 11) if rr[j - 1] < 1.0]
         refr_lags = f"{len(refr)} (≤{max(refr)*15 if refr else 0}ms)"
         pk = int(np.nanargmax(rr)) + 1
@@ -195,10 +217,16 @@ def section_ladder():
     print("\n" + "=" * 78)
     print("6. LADDER FIT (median AIC, CV bits/event, KS-in-band frac), outcome=non_local")
     print("=" * 78)
-    ladder = ["M0_const", "M1_rew", "M3_hist",
-              "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
-              "M7_time_hist_rew", "M7r_time_histcos_rew",
-              "M9_rew_x_time"]
+    # Stop-clock rungs only: the arrival rungs are fit on a subset of the frozen
+    # cohort's rows, so their AIC is not on this ladder's scale.
+    ladder = [
+        "M0_const",
+        "M1_rew",
+        "M3r_histcos",
+        "M5_time",
+        "M7r_time_histcos_rew",
+        "M9r_rew_x_time",
+    ]
     g = df[df.outcome == "non_local"]
     print(f"  {'model':22s} {'AIC':>8} {'cv_bits':>9} {'ks_band':>8} {'n':>4}")
     for m in ladder:
@@ -234,25 +262,29 @@ def main():
 
     section_coef("2. IMMEDIATE REWARD COMPONENT (raw, uncontrolled)", "M1_rew",
                  IMMEDIATE_COEF)
-    section_coef("2. IMMEDIATE REWARD COMPONENT (controlled: time+history)",
-                 "M7_time_hist_rew", IMMEDIATE_COEF)
-    print(f"\n  paired NL-w/SWR vs NL-no-SWR (M7 {IMMEDIATE_COEF}):  "
-          + str(_paired(df, "M7_time_hist_rew", IMMEDIATE_COEF,
-                        "non_local_swr", "non_local_no_swr")))
-
-    section_reward_kernel(
-        "3. REWARD KERNEL (M7, controlled) — reconstructed from the basis",
-        "M7_time_hist_rew",
+    section_coef(
+        "2. IMMEDIATE REWARD COMPONENT (controlled: time+history)",
+        FULL,
+        IMMEDIATE_COEF,
+    )
+    print(
+        f"\n  paired NL-w/SWR vs NL-no-SWR (M7r {IMMEDIATE_COEF}):  "
+        + str(_paired(df, FULL, IMMEDIATE_COEF, "non_local_swr", "non_local_no_swr"))
     )
 
-    section_kernel("4. SELF-HISTORY KERNEL (M3_hist, raw)", "M3_hist", "onset_lag", 10)
-    section_kernel("4. SELF-HISTORY KERNEL (M7, controlled)", "M7_time_hist_rew",
-                   "onset_lag", 10)
-    section_selfhistory("M7_time_hist_rew")
+    section_reward_kernel(
+        "3. REWARD KERNEL (M7r, controlled) — reconstructed from the basis",
+        FULL,
+    )
+
+    section_kernel("4. SELF-HISTORY KERNEL (M3r_histcos, raw)", "M3r_histcos")
+    section_kernel("4. SELF-HISTORY KERNEL (M7r, controlled)", FULL)
+    section_selfhistory(FULL)
 
     for k, column in enumerate(REWARD_HISTORY_COLUMNS):
         section_coef(
-            f"5. REWARD-HISTORY BASIS COMPONENT {k}", "M7_time_hist_rew",
+            f"5. REWARD-HISTORY BASIS COMPONENT {k}",
+            FULL,
             f"coef_{column}",
         )
     section_ladder()

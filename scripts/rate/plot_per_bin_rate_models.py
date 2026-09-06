@@ -7,9 +7,9 @@ Reads the persisted per-session coefficients in
 re-fitting happens here. Within-animal / across-session summaries (medians,
 IQR, paired Wilcoxon) are computed at read time.
 
-Both figures read the full model ``M7_time_hist_rew`` (time spline +
-self-history + reward kernel), so every effect is shown controlled for the
-within-stop time course and the same-event clustering:
+Both figures read the full model ``M7r_time_histcos_rew`` (time spline +
+raised-cosine self-history + reward kernel), so every effect is shown
+controlled for the within-stop time course and the same-event clustering:
 
 * ``reward_kernel_basis.png`` -- the reward rate-ratio kernel over lags 1-10
   reconstructed from the three raised-cosine basis coefficients per
@@ -17,7 +17,8 @@ within-stop time course and the same-event clustering:
   through them), and the immediate-component dissociation between
   SWR-coupled and non-SWR non-local events.
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
-  (onset_lag1..10): refractory (<1) at short lags, bursty (>1) at ~100 ms.
+  over lags 1..10, reconstructed from the four raised-cosine basis
+  coefficients: refractory (<1) at short lags, bursty (>1) at ~100 ms.
 
 Usage:
     uv run python scripts/rate/plot_per_bin_rate_models.py
@@ -38,12 +39,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
     reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     BIN_S,
+    N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
@@ -65,7 +68,7 @@ ALL_MODELS_INPUTS = {
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
 SC = list(SESSION_COLUMNS)
-MODEL = "M7_time_hist_rew"
+MODEL = "M7r_time_histcos_rew"
 
 # outcome key -> (display label, colour)
 POP_STYLE = {
@@ -76,22 +79,26 @@ POP_STYLE = {
 }
 
 
-def _kernel(
-    df: pd.DataFrame, prefix: str, n: int
+def _self_history_kernel(
+    df: pd.DataFrame,
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """Per-lag median + IQR rate ratios (exp coef) across sessions, by outcome."""
+    """Per-lag median + IQR self-history rate ratios across sessions, by outcome.
+
+    Each session's kernel is reconstructed from that session's own four
+    raised-cosine coefficients and the quantiles are taken per lag. Summarizing
+    the coefficients first and reconstructing once would describe a session that
+    does not exist: the basis coefficients are collinear, so their marginal
+    medians are not any fitted kernel.
+    """
     out = {}
+    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
     for oc in POP_STYLE:
-        d = df[df.outcome == oc]
-        med = np.array(
-            [np.exp(d[f"coef_{prefix}{j}"].median()) for j in range(1, n + 1)]
+        fitted = df.loc[df.outcome == oc, columns].to_numpy(dtype=float)
+        kernels = np.exp(
+            reconstruct_self_history_kernels(fitted, N_HISTORY_LAGS, N_HISTORY_BASIS)
         )
-        lo = np.array(
-            [np.exp(d[f"coef_{prefix}{j}"].quantile(0.25)) for j in range(1, n + 1)]
-        )
-        hi = np.array(
-            [np.exp(d[f"coef_{prefix}{j}"].quantile(0.75)) for j in range(1, n + 1)]
-        )
+        med = np.median(kernels, axis=0)
+        lo, hi = np.percentile(kernels, [25, 75], axis=0)
         out[oc] = (med, lo, hi)
     return out
 
@@ -241,7 +248,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
 
 
 def plot_selfhistory(m7: pd.DataFrame) -> None:
-    ker = _kernel(m7, "onset_lag", N_HISTORY_LAGS)
+    ker = _self_history_kernel(m7)
     fig, ax = plt.subplots(figsize=(8, 5))
     lagms = np.arange(1, N_HISTORY_LAGS + 1) * BIN_S * 1000
     for oc in ["swr", "non_local", "non_local_swr", "non_local_no_swr"]:

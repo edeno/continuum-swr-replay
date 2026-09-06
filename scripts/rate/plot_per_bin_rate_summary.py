@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay._helpers import (  # noqa: E402
     reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -38,6 +39,8 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -64,13 +67,21 @@ STYLE = {  # outcome -> (label, color)
     "non_local_swr": ("NL w/ SWR", "C3"),
     "non_local_no_swr": ("NL no-SWR", "C0"),
 }
-LADDER = ["M0_const", "M1_rew", "M3_hist",
-          "M3r_histcos", "M4_hist_rew", "M5_time", "M6_time_hist",
-          "M7_time_hist_rew", "M7r_time_histcos_rew",
-          "M9_rew_x_time"]
+# The stop-clock ladder, in ladder order. The arrival-clock rungs are fit on a
+# subset of the frozen cohort's rows, so their AIC and held-out likelihood are
+# not on this ladder's scale and they are deliberately absent from panel E.
+LADDER = [
+    "M0_const",
+    "M1_rew",
+    "M3r_histcos",
+    "M5_time",
+    "M7r_time_histcos_rew",
+    "M9r_rew_x_time",
+]
 POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
+FULL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
 
@@ -155,7 +166,7 @@ def _panel_fitted_timecourse(ax, df, stop):
         and f"{REWARD_HISTORY_COLUMNS[0]}:" not in c
     )
     for oc in POPS4:
-        s = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
+        s = df[(df.model == FULL) & (df.outcome == oc)]
         beta = s[scols].to_numpy(float)
         b0 = s["coef_Intercept"].to_numpy(float)
         ok = ~np.isnan(beta).any(axis=1) & ~np.isnan(b0)
@@ -166,7 +177,7 @@ def _panel_fitted_timecourse(ax, df, stop):
                 label=STYLE[oc][0], lw=1.8)
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("fitted rate (events / s)")
-    ax.set_title("A1. Fitted time course (M7 spline, reward/history at ref)")
+    ax.set_title("A1. Fitted time course (M7r spline, reward/history at ref)")
     ax.set_xlim(0, 4)
     ax.legend(frameon=False, fontsize=7, loc="lower right")
     _shade_low_support(ax, stop)
@@ -184,7 +195,7 @@ def _panel_baseline(ax, df):
 
 
 def _panel_reward1(ax, df):
-    data = [np.exp(_coef(df, "M7_time_hist_rew", oc, IMMEDIATE_COEF)) for oc in POPS3]
+    data = [np.exp(_coef(df, FULL, oc, IMMEDIATE_COEF)) for oc in POPS3]
     bp = ax.boxplot(data, labels=SHORT, showfliers=False, patch_artist=True)
     for patch, oc in zip(bp["boxes"], POPS3, strict=True):
         patch.set_facecolor(STYLE[oc][1])
@@ -192,7 +203,7 @@ def _panel_reward1(ax, df):
     ax.axhline(1, color="0.5", ls=":")
     ax.set_ylim(0, 6)
     ax.set_ylabel("immediate reward RR (per session)")
-    ax.set_title("B. Immediate reward-history component (M7, controlled)")
+    ax.set_title("B. Immediate reward-history component (M7r, controlled)")
 
 
 def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
@@ -234,7 +245,7 @@ def _panel_reward_kernel(ax, df):
     """
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for oc in POPS4:
-        sessions = df[(df.model == "M7_time_hist_rew") & (df.outcome == oc)]
+        sessions = df[(df.model == FULL) & (df.outcome == oc)]
         ax.plot(lags, reward_kernel_rate_ratios(sessions), marker="o",
                 color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
     ax.axhline(1, color="0.5", ls=":")
@@ -242,20 +253,39 @@ def _panel_reward_kernel(ax, df):
     ax.set_ylim(0, 4.3)
     ax.set_xlabel("reward lag (trials back)")
     ax.set_ylabel("rate ratio")
-    ax.set_title("C. Reward kernel (M7, reconstructed from the basis)")
+    ax.set_title("C. Reward kernel (M7r, reconstructed from the basis)")
     ax.legend(frameon=False, fontsize=7)
 
 
 def _panel_selfhistory(ax, df):
-    lags = np.arange(1, 11)
+    """Self-history kernel reconstructed from the raised-cosine coefficients.
+
+    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
+    the raw bumps, so an onset ``j`` bins back contributes
+    ``sum_k coef_k * B[k, j]`` to the log rate.
+    """
+    lags = np.arange(1, N_HISTORY_LAGS + 1)
+    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
     for oc in POPS4:
-        rr = [np.exp(_coef(df, "M7_time_hist_rew", oc, f"coef_onset_lag{j}").median())
-              for j in lags]
-        ax.plot(lags * 15, rr, marker="o", color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
+        fitted = df.loc[(df.model == FULL) & (df.outcome == oc), columns]
+        kernels = np.exp(
+            reconstruct_self_history_kernels(
+                fitted.to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
+            )
+        )
+        ax.plot(
+            lags * 15,
+            np.median(kernels, axis=0),
+            marker="o",
+            color=STYLE[oc][1],
+            label=STYLE[oc][0],
+            lw=1.8,
+            ms=4,
+        )
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xlabel("self-history lag (ms)")
     ax.set_ylabel("rate ratio")
-    ax.set_title("D. Self-history (M7): refractory then bursty ~100 ms")
+    ax.set_title("D. Self-history (M7r): refractory then bursty ~100 ms")
     ax.legend(frameon=False, fontsize=7)
 
 
@@ -279,7 +309,7 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [("M7_time_hist_rew", SLOW_COEF)]
+    blocks = [(FULL, SLOW_COEF)]
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
             rr = np.exp(_coef(df, model, oc, coef).median())
@@ -289,7 +319,7 @@ def _panel_covar(ax, df):
     ax.set_xticks(range(3))
     ax.set_xticklabels(SHORT)
     ax.set_ylabel("rate ratio")
-    ax.set_title("F. Slow reward-history component by type (M7)")
+    ax.set_title("F. Slow reward-history component by type (M7r)")
 
 
 def build_parser() -> argparse.ArgumentParser:

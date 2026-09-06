@@ -11,7 +11,7 @@ The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
 (session, outcome) the design is built ONCE — carrying the reward-history
 basis and the self-history lags — then frozen to one cohort with
 ``freeze_per_bin_cohort`` over the union of every rung's design columns, and
-every ``MODEL_PER_BIN_RATE`` model (M0_const..M9_rew_x_time) is fit against
+every ``MODEL_PER_BIN_RATE`` model (M0_const..M9r_rew_x_time) is fit against
 that frozen design (each ``formula()`` selects its own columns). The freeze is
 what makes the nested AIC / CV / GOF comparison valid: AIC scales with the
 number of rows, so a rung fit to fewer bins would win mechanically. The

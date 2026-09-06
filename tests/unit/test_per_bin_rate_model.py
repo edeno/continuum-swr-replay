@@ -131,23 +131,20 @@ def test_formula_strings():
         assert f"reward_history_rcos_{k}" in rewhist
     assert "reward_history_incomplete" in rewhist
 
-    full = m["M7_time_hist_rew"].formula()
+    full = m["M7r_time_histcos_rew"].formula()
     assert spline in full
     for k in range(3):
         assert f"reward_history_rcos_{k}" in full
-    for j in range(1, 11):
-        assert f"onset_lag{j}" in full
 
-    assert f"reward_history_rcos_0:{spline}" in m["M9_rew_x_time"].formula()
+    assert f"reward_history_rcos_0:{spline}" in m["M9r_rew_x_time"].formula()
 
-    # Raised-cosine self-history variants use hist_rcos_*, not onset_lag dummies.
+    # Every self-history rung now carries the raised-cosine basis; the
+    # ``onset_lag`` dummy rungs are retired and no formula names one.
     m3r = m["M3r_histcos"].formula()
     assert "hist_rcos_0" in m3r and "onset_lag1" not in m3r
-    m7r = m["M7r_time_histcos_rew"].formula()
-    assert "hist_rcos_0" in m7r and "onset_lag1" not in m7r
-    assert spline in m7r and "reward_history_rcos_0" in m7r
-    # The dummy models still use onset_lag (kernel-shape readout preserved).
-    assert "onset_lag1" in m["M7_time_hist_rew"].formula()
+    assert "hist_rcos_0" in full and "onset_lag1" not in full
+    for name, spec in m.items():
+        assert "onset_lag" not in spec.formula(), name
 
 
 def test_extra_covariates_formula():
@@ -492,8 +489,8 @@ def test_freeze_per_bin_cohort_requires_its_columns():
     from continuum_swr_replay.analysis.replay import freeze_per_bin_cohort
 
     design = make_per_bin_rate_design(n_stops=20, n_bins=5, seed=0)
-    with pytest.raises(KeyError, match="onset_lag1"):
-        freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M3_hist"]])
+    with pytest.raises(KeyError, match="hist_rcos_0"):
+        freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M3r_histcos"]])
 
 
 def _design_with_separated_indicator(seed: int = 11) -> pd.DataFrame:
@@ -602,7 +599,7 @@ def test_arrival_clock_spec_formula_and_columns():
         cols = _design_columns(MODEL_PER_BIN_RATE[name])
         assert "time_since_last_well_arrival_s" in cols, name
         assert "tc" not in cols, name
-    for name in ("M0_const", "M5_time", "M7r_time_histcos_rew", "M9_rew_x_time"):
+    for name in ("M0_const", "M5_time", "M7r_time_histcos_rew", "M9r_rew_x_time"):
         cols = _design_columns(MODEL_PER_BIN_RATE[name])
         assert "time_since_last_well_arrival_s" not in cols, name
     assert "tc" in _design_columns(MODEL_PER_BIN_RATE["M5_time"])

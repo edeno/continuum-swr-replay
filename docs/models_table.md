@@ -12,13 +12,16 @@ Expanded once; used throughout:
 
 ```
 BS_TC   := bs(tc, knots=c(1,2,3), Boundary.knots=c(0,4))         # within-stop time-course spline
+BS_ARR  := bs(time_since_last_well_arrival_s, knots=c(1,2,4,6),  # arrival-anchored time course,
+              Boundary.knots=c(0,8))                             # fit on the [0,8] s window only
 REWBASIS:= reward_history_rcos_0 + reward_history_rcos_1 + reward_history_rcos_2
            + reward_history_incomplete
                                                                 # raised-cosine reward-history
                                                                 # kernel over the last 10 known
                                                                 # outcomes + its structural-
                                                                 # missingness nuisance indicator
-SELFLAG := onset_lag1 + ... + onset_lag10                         # raw self-history (autoregressive)
+SELFLAG := onset_lag1 + ... + onset_lag10                         # raw self-history; RETIRED from
+                                                                # the per-bin ladder (see below)
 HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosine self-history
 ARMFE   := is_candidate_arm_0 + ... + is_candidate_arm_7          # arm 8 is reference
 ```
@@ -205,14 +208,23 @@ documented, not silently dropped.
 ```r
 M0_const              count ~ 1
 M1_rew                count ~ REWBASIS
-M3_hist               count ~ SELFLAG
-M4_hist_rew           count ~ REWBASIS + SELFLAG
 M5_time               count ~ BS_TC
-M6_time_hist          count ~ BS_TC + SELFLAG
-M7_time_hist_rew      count ~ BS_TC + REWBASIS + SELFLAG
-M9_rew_x_time         count ~ BS_TC + REWBASIS + SELFLAG + reward_history_rcos_0:BS_TC
 M3r_histcos           count ~ HISTCOS
 M7r_time_histcos_rew  count ~ BS_TC + REWBASIS + HISTCOS
+M9r_rew_x_time        count ~ BS_TC + REWBASIS + HISTCOS + reward_history_rcos_0:BS_TC
+
+# The five SELFLAG (onset_lag1..10) rungs -- M3_hist, M4_hist_rew,
+# M6_time_hist, M7_time_hist_rew, M9_rew_x_time -- are RETIRED: the dummy
+# history block separated on the refractory bins and voided the held-out
+# metric (cv_bits_per_event NaN in 99.08 % of non-local fits over 218
+# sessions, 2026-09-06). HISTCOS spans the same window and is scored.
+
+# Arrival-anchored sub-ladder (time_clock = "arrival"). Fit on the arrival
+# window, a strict subset of the frozen cohort's rows, so these rungs are
+# compared ONLY with each other -- M0a is the window's own null.
+M0a_const_arrival              count ~ 1
+M5a_time_arrival               count ~ BS_ARR
+M7ra_time_arrival_histcos_rew  count ~ BS_ARR + REWBASIS + HISTCOS
 ```
 
 ## MU uncertainty — per-bin Poisson (M7r base + RL/value block)
