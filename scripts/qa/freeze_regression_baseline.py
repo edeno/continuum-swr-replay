@@ -56,10 +56,16 @@ _TABLE_RELPATHS = {
 # directory is derived, not spelled out, because it is keyed by the rungs it
 # fits.
 _MODEL_DIRS = (
-    "models", "models_swr_T", "models_swr_F", "models_patch",
-    "models_patch_swr_T", "models_patch_swr_F",
+    "models",
+    "models_swr_T",
+    "models_swr_F",
+    "models_patch",
+    "models_patch_swr_T",
+    "models_patch_swr_F",
     belief_chain_output_subdir(),
-    "models_per_stop_rate", "models_per_bin_rate", "uncertainty_content",
+    "models_per_stop_rate",
+    "models_per_bin_rate",
+    "uncertainty_content",
     "event_source_comparison",
 )
 

@@ -70,9 +70,7 @@ SWR_CONTRAST_RATE_INPUTS = {
 # here: the same covariates measured over all nine candidates have a 2.1x larger
 # SD (the trunks are structural zeros), which would shrink every per-SD arm
 # effect in this figure by that factor relative to the audited table.
-SWR_CONTRAST_CONTENT_PROVENANCE = (
-    RC / "models" / "swr_contrast_content_provenance.json"
-)
+SWR_CONTRAST_CONTENT_PROVENANCE = RC / "models" / "swr_contrast_content_provenance.json"
 
 SWR_CONTRAST_CONTENT_ARM = RC / "models" / "swr_contrast_content_arm.pkl"
 SWR_CONTRAST_CONTENT_PATCH = RC / "models" / "swr_contrast_content_patch.pkl"
@@ -138,11 +136,17 @@ def _global_sd(covariates):
 # question, so their pooled SD is computed here from the source tables. The
 # per-arm covariates come from the fit's own frozen units instead.
 SD = {
-    **_global_sd([
-        "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
-        "reward_belief_mean_update_l1_all_ports_postoutcome",
-        "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
-    ]),
+    **_global_sd(
+        [
+            "relative_value_switch_minus_stay_preoutcome",
+            "rpe_postoutcome",
+            "reward_belief_differential_entropy_leaf_mean_preoutcome",
+            "reward_belief_mean_update_l1_all_ports_postoutcome",
+            "periswitch_index_trials",
+            "trials_since_block_change",
+            "patch_switch_fraction_last5_completed_trips",
+        ]
+    ),
     **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
 }
 ANIM = ["chimi", "j16", "peanut", "senor", "wilbur"]
