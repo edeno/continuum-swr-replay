@@ -469,7 +469,7 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
 [per_bin_rate_results.md](per_bin_rate_results.md) §6):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`
-  fails the KS band on about half of sessions (`ks_within_band` 0.51,
+  fails the KS band on about half of sessions (`ks_within_band` 0.50,
   non-Poisson: refractory + bursty), and the reward / self-history blocks
   *without* time do **not** fix it (`M1_rew` 0.46, `M3r_histcos` 0.39). Adding
   the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to 0.85, `M6r` (+
