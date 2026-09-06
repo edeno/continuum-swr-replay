@@ -240,7 +240,7 @@ table (`stop_table.parquet`, 107,400 stops):
 
 (A well visit is one `last_well_arrival_time_s` within a session, so the 414 of
 69,224 at-well stops with no arrival clock (0.6 %) belong to no visit and are
-outside the first three rows, each of which is visit-scoped; events are
+outside the first four rows, each of which is visit-scoped; events are
 `event_onset_table` onsets joined to their stop. The corresponding shares for the
 other two onset streams are 66.8 % (SWR) and 72.4 % (MUA).)
 
