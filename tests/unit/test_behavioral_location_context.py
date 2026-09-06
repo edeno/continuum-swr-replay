@@ -194,6 +194,7 @@ def test_appending_future_trials_cannot_change_past_context_or_location():
         "patch_switch_fraction_last5_completed_trips",
         "leaky_q_value_diff",
         "_goal_arrival_time",
+        "_outcome_known_time",
         "_last_reward_time",
         "occupancy_state",
         "occupancy_well_id",
@@ -327,6 +328,8 @@ def test_empty_trials_have_explicit_unknown_location_and_context():
     assert out["completed_trial_id"].isna().all()
     assert out["patch_switch_fraction_last5_completed_trips"].isna().all()
     assert out["leaky_q_value_diff"].isna().all()
+    assert out["_goal_arrival_time"].isna().all()
+    assert out["_outcome_known_time"].isna().all()
     assert str(out["completed_trial_id"].dtype) == "Int64"
 
 
@@ -506,3 +509,41 @@ def test_nearest_well_distance_is_nan_when_geometry_is_unavailable():
     graph.add_edge(0, 1)
 
     assert np.isnan(nearest_well_distance_cm(dot, graph)).all()
+
+
+def test_outcome_known_time_names_the_boundary_from_arrival_onward():
+    """``_outcome_known_time`` is a clock, not an outcome-gated value.
+
+    It is unknown until a trip has completed, and from that arrival onward it
+    carries the trip's own outcome-known time -- including at bins that
+    precede the boundary, where the gated ``is_rewarded_outcome`` is still
+    missing. Expected values come from the fixture's own trial clocks so the
+    contract cannot be restated as literal seconds.
+    """
+    trials = _trials()
+    ordered = trials.sort_values("goal_arrival_time").reset_index(drop=True)
+    arrival = ordered["goal_arrival_time"].to_numpy(dtype=float)
+    outcome = ordered["outcome_known_time"].to_numpy(dtype=float)
+    before_first_arrival = float(ordered["start_time"].iloc[0])
+    between = 0.5 * (outcome[0] + arrival[1])
+
+    times = np.array(
+        [before_first_arrival, arrival[0], outcome[0], between, arrival[1], outcome[1]]
+    )
+    out = add_trial_context(pd.DataFrame(index=times), trials)
+
+    # No trip has completed yet: the boundary is genuinely unknown.
+    assert pd.isna(out.loc[before_first_arrival, "_outcome_known_time"])
+
+    # Arrival is inclusive, and the boundary is known before it is reached
+    # even though the outcome itself is not yet observable there.
+    assert out.loc[arrival[0], "_outcome_known_time"] == pytest.approx(outcome[0])
+    assert pd.isna(out.loc[arrival[0], "is_rewarded_outcome"])
+    for time in (outcome[0], between):
+        assert out.loc[time, "_outcome_known_time"] == pytest.approx(outcome[0])
+    assert out.loc[outcome[0], "is_rewarded_outcome"] == 1.0
+
+    # The next completed trip replaces the boundary with its own.
+    for time in (arrival[1], outcome[1]):
+        assert out.loc[time, "_outcome_known_time"] == pytest.approx(outcome[1])
+    assert out.loc[arrival[1], "_goal_arrival_time"] == pytest.approx(arrival[1])

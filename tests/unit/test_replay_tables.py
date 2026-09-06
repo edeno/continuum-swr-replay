@@ -300,6 +300,41 @@ def test_event_and_stop_tables_label_location_without_filtering_events():
         pd.testing.assert_series_equal(states, expected, check_names=False)
 
 
+def test_stop_table_persists_arrival_and_outcome_clocks():
+    """Both bout-start clocks are the trip the animal actually stopped under.
+
+    Expected values are read from the session's own trial clocks rather than
+    written as literal seconds, so the contract survives a change to how the
+    fixture derives an omission's outcome-known time.
+    """
+    dot, _env, trials, graph = _location_contract_session()
+    stops = build_stop_table(dot, trials, graph).sort_values("stop_start")
+    first_trip = trials.sort_values("goal_arrival_time").iloc[0]
+
+    # Pre-trial stop: no arrival has completed, so neither clock borrows the
+    # trip that only completes later.
+    assert pd.isna(stops["last_well_arrival_time_s"].iloc[0])
+    assert pd.isna(stops["outcome_known_time_s"].iloc[0])
+
+    # At-well stop after the first arrival: both clocks are that trip's.
+    assert stops["last_well_arrival_time_s"].iloc[1] == pytest.approx(
+        first_trip["goal_arrival_time"]
+    )
+    assert stops["outcome_known_time_s"].iloc[1] == pytest.approx(
+        first_trip["outcome_known_time"]
+    )
+
+    # The last bout straddles the second arrival, so its rows disagree about
+    # both clocks. Bout-start anchoring keeps the earlier trip's values instead
+    # of importing an arrival that had not happened when the stop began.
+    assert stops["last_well_arrival_time_s"].iloc[2] == pytest.approx(
+        first_trip["goal_arrival_time"]
+    )
+    assert stops["outcome_known_time_s"].iloc[2] == pytest.approx(
+        first_trip["outcome_known_time"]
+    )
+
+
 @pytest.fixture
 def tiny_session():
     dot = _tiny_dot_with_two_events()

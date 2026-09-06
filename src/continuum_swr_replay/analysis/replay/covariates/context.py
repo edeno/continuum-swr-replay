@@ -511,6 +511,7 @@ def add_trial_context(
             "completed_trial_reward",
             "did_last_completed_trip_switch_patch",
             "_goal_arrival_time",
+            "_outcome_known_time",
             "_last_reward_time",
             "patch_switch_fraction_last5_completed_trips",
             "leaky_q_value_diff",
@@ -614,6 +615,18 @@ def add_trial_context(
 
     dot["_goal_arrival_time"] = np.where(
         has_completed, arrival_times[completed_clipped], np.nan
+    )
+    # Companion clock to the arrival time: when the identified trip's outcome
+    # became physically observable (pump onset when rewarded, the canonical
+    # latency/poke-out boundary when omitted). This is the *boundary* itself,
+    # not an outcome-gated value, so it is carried from arrival onward -- a
+    # timebin before the boundary has to know where the boundary lies. NaN
+    # before the first completed arrival and whenever that trip's outcome is
+    # never observable.
+    dot["_outcome_known_time"] = np.where(
+        has_completed & outcome_observed[completed_clipped],
+        outcome_times[completed_clipped],
+        np.nan,
     )
 
     if len(reward_timestamps) > 0:

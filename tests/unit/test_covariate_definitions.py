@@ -52,6 +52,7 @@ def test_timing_class_membership_is_pinned() -> None:
             "completed_trial_reward",
             "is_omitted_outcome",
             "is_rewarded_outcome",
+            "outcome_known_time_s",
             "reward_belief_mean_chosen_arm_preoutcome",
             "reward_belief_mean_update_l1_all_ports_postoutcome",
             "reward_belief_mean_update_l1_alternative_patches_postoutcome",

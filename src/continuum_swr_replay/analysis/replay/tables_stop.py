@@ -161,6 +161,26 @@ def build_stop_table(
         per_bout[column] = reward_history[:, j]
     per_bout[REWARD_HISTORY_INCOMPLETE] = reward_history_incomplete
 
+    # Absolute bout-start clocks: when the animal arrived at the well it is
+    # sitting at, and when that trip's outcome became observable. Both come
+    # from the bout's first row via ``_strict_first``, so a bout that spans an
+    # arrival keeps the clock it started under rather than inheriting the
+    # later trip's, and a bout with no completed trip yet stays NaN. The
+    # outcome clock is a boundary, not an outcome-gated value: it is finite
+    # from arrival onward, including bins that precede the boundary.
+    per_bout["last_well_arrival_time_s"] = (
+        grouped["_goal_arrival_time"]
+        .apply(_strict_first)
+        .reindex(np.arange(n_bouts))
+        .to_numpy(dtype=float)
+    )
+    per_bout["outcome_known_time_s"] = (
+        grouped["_outcome_known_time"]
+        .apply(_strict_first)
+        .reindex(np.arange(n_bouts))
+        .to_numpy(dtype=float)
+    )
+
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
         .apply(lambda s: (s > 0).any())

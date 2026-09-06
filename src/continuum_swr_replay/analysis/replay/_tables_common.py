@@ -244,6 +244,8 @@ _STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     *[f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)],
     *REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
+    "last_well_arrival_time_s",
+    "outcome_known_time_s",
 )
 
 _STOP_TABLE_COLUMNS: tuple[str, ...] = tuple(
