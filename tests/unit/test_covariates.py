@@ -1036,3 +1036,14 @@ def test_reward_basis_from_lags_is_nan_only_where_a_bump_has_no_support():
     assert np.isnan(out[0, 2])
     assert np.isnan(out[1, 0])
     np.testing.assert_allclose(out[1, 1:], 1.0)
+
+
+def test_package_all_is_a_working_star_import_surface():
+    """Every ``__all__`` name resolves, including the deferred DM estimators."""
+    namespace: dict[str, object] = {}
+    exec(  # noqa: S102 -- the star-import surface is only testable by executing one
+        "from continuum_swr_replay.analysis.replay import *", namespace
+    )
+    exported = set(replay_pkg.__all__)
+    assert exported - set(namespace) == set()
+    assert set(replay_pkg._LAZY_EXPORTS) <= exported

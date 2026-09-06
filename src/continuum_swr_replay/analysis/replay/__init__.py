@@ -10,15 +10,12 @@ from ._helpers import (
     add_arm_fixed_effects,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
-    nearest_well_distance_cm,
     raised_cosine_history_basis,
     single_arm_from_well,
 )
 from .choice_prediction import (
     build_choice_dataset,
-    build_residualized_choice_dataset,
     fit_choice_model,
-    predict_arm_fractions,
 )
 from .cohort_selection import freeze_common_cohort
 from .covariates import (
@@ -31,29 +28,11 @@ from .covariates import (
     trial_context_at_times,
     trial_outcome_times,
 )
-from .fitting import (
-    fit_conditional_logit,
-    fit_conditional_poisson,
-    fit_null_model_conditional,
-)
-from .learning import (
-    StopSummaryConfig,
-    fit_is_stay_logistic_per_session,
-    fit_is_stay_pooled_gee,
-    stop_replay_summary,
-)
-from .model_checking import (
-    compute_pearson_residuals,
-    cross_validate_conditional_poisson,
-)
+from .fitting import fit_conditional_poisson
 from .model_specs import (
-    ARM_FE_PREDICTORS,
     ARRIVAL_CLOCK_COLUMN,
-    ARRIVAL_SPLINE_KNOTS,
-    BELIEF_DEPENDENT_CONTENT_MODELS,
     BIN_S,
     MODEL_CHOICE,
-    MODEL_HIERARCHY,
     MODEL_PATCH,
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
@@ -64,16 +43,11 @@ from .model_specs import (
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
     REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
     REWARD_HISTORY_N_BASIS,
-    REWARD_HISTORY_N_LAGS,
-    SPLINE_KNOTS,
     STOP_COVARIATES,
     TMAX,
     TMAX_ARRIVAL,
-    ModelSpec,
     PerBinRateModelSpec,
-    default_content_model_names,
 )
 from .per_bin_rate_model import (
     apply_arrival_window,
@@ -82,38 +56,13 @@ from .per_bin_rate_model import (
     freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
-from .per_stop_rate_model import PER_STOP_RATE_OUTCOMES, fit_per_stop_rate_model
+from .per_stop_rate_model import fit_per_stop_rate_model
 from .retrospective import (
-    arm_path_well_to_well,
     at_well_event_cohort,
-    chosen_arm_fraction,
-    chosen_patch_fraction,
-    compute_retrospective_metrics,
-    contains_path_to_next,
-    ends_at_next,
-    ends_at_next_patch,
-    freeze_retrospective_cohort,
     retrospective_alignment_with_shuffle,
 )
-from .shuffles import (
-    circular_time_shuffle,
-    next_arm_circular_shift,
-    stop_label_shuffle,
-)
-from .spatial import arm_dist_rank, dist_to_arm_from_well
-from .switch_analysis import (
-    build_control_aligned_table,
-    build_switch_aligned_table,
-    stop_patch_replay,
-)
-from .tables_arm_patch import (
-    build_event_arm_table,
-    build_event_patch_table,
-)
-from .tables_event import (
-    build_event_sequence_table,
-    build_event_table,
-)
+from .switch_analysis import build_switch_aligned_table
+from .tables_arm_patch import build_event_patch_table
 from .tables_stop import build_stop_table
 
 # Deferred rather than imported eagerly: the Dirichlet-multinomial fitter pulls
@@ -140,11 +89,8 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    "ARM_FE_PREDICTORS",
-    "BELIEF_DEPENDENT_CONTENT_MODELS",
     "BIN_S",
     "MODEL_CHOICE",
-    "MODEL_HIERARCHY",
     "MODEL_PATCH",
     "MODEL_PATCH_MUA",
     "MODEL_PATCH_SWR",
@@ -154,78 +100,42 @@ __all__ = [
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
-    "PER_STOP_RATE_OUTCOMES",
     "POPULATIONS",
     "REWARD_HISTORY_COLUMNS",
-    "REWARD_HISTORY_INCOMPLETE",
     "REWARD_HISTORY_N_BASIS",
-    "REWARD_HISTORY_N_LAGS",
     "ARRIVAL_CLOCK_COLUMN",
-    "ARRIVAL_SPLINE_KNOTS",
-    "SPLINE_KNOTS",
     "STOP_COVARIATES",
     "TMAX",
     "TMAX_ARRIVAL",
     "UNCERTAINTY_COVARIATES",
-    "ModelSpec",
     "PerBinRateModelSpec",
-    "StopSummaryConfig",
     "add_arm_fixed_effects",
     "add_trial_context",
     "add_uncertainty_covariates",
     "aggregate_to_timebins",
-    "arm_dist_rank",
-    "arm_path_well_to_well",
     "at_well_event_cohort",
-    "freeze_retrospective_cohort",
     "attach_is_swr_to_onsets",
     "behavioral_location_from_port_experiences",
     "build_choice_dataset",
-    "build_control_aligned_table",
-    "build_event_arm_table",
     "build_event_patch_table",
-    "build_event_sequence_table",
-    "build_event_table",
-    "build_residualized_choice_dataset",
     "build_stop_table",
     "build_switch_aligned_table",
-    "chosen_arm_fraction",
-    "chosen_patch_fraction",
-    "circular_time_shuffle",
-    "compute_pearson_residuals",
-    "compute_retrospective_metrics",
-    "contains_path_to_next",
-    "cross_validate_conditional_poisson",
     "cross_validate_dirichlet_multinomial",
     "cross_validate_per_bin_rate_model",
-    "dist_to_arm_from_well",
-    "default_content_model_names",
-    "ends_at_next",
-    "ends_at_next_patch",
     "event_loglik",
     "fit_choice_model",
-    "fit_conditional_logit",
     "fit_conditional_poisson",
     "fit_dirichlet_multinomial",
-    "fit_is_stay_logistic_per_session",
-    "fit_is_stay_pooled_gee",
-    "fit_null_model_conditional",
     "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
     "freeze_common_cohort",
     "apply_arrival_window",
     "freeze_per_bin_cohort",
-    "next_arm_circular_shift",
-    "nearest_well_distance_cm",
     "multinomial_log_constant",
     "per_bin_rate_gof",
     "raised_cosine_history_basis",
     "single_arm_from_well",
-    "predict_arm_fractions",
     "retrospective_alignment_with_shuffle",
-    "stop_label_shuffle",
-    "stop_patch_replay",
-    "stop_replay_summary",
     "summarize_behavioral_location",
     "trial_arrival_times",
     "trial_context_at_times",
