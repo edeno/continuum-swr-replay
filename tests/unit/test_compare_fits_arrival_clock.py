@@ -34,6 +34,8 @@ from scripts.qa.compare_fits import (
     STOP_TIME_RUNG,
     arrival_clock_cv_table,
     arrival_clock_shape_table,
+    arrival_cohort_table,
+    cv_nan_share_table,
     reward_boundary_shift_table,
 )
 
@@ -243,3 +245,54 @@ def test_reward_boundary_table_reports_a_side_that_lacks_the_rung():
     assert immediate["n_sessions_after"] == 2
     assert immediate["n_paired"] == 0
     assert np.isnan(immediate["median_delta"])
+
+
+def test_cv_nan_share_is_reported_pooled_and_per_population():
+    """A rung scored on one population and not another is not averaged away."""
+    rows = []
+    for outcome, bits in (("non_local", [0.1, 0.2]), ("swr", [np.nan, np.nan])):
+        for (animal, date, epoch), value in zip(SESSIONS, bits, strict=True):
+            rows.append(
+                {
+                    "animal": animal,
+                    "session_date": date,
+                    "epoch": epoch,
+                    "model": "M3_hist",
+                    "outcome": outcome,
+                    "cv_bits_per_event": value,
+                }
+            )
+    row = cv_nan_share_table(pd.DataFrame(rows)).set_index("model").loc["M3_hist"]
+    assert row["n_fits"] == 4
+    assert row["pct_cv_nan_pooled"] == pytest.approx(50.0)
+    assert row["pct_cv_nan_non_local"] == pytest.approx(0.0)
+    assert row["pct_cv_nan_swr"] == pytest.approx(100.0)
+    assert np.isnan(row["pct_cv_nan_non_local_swr"])
+
+
+def test_arrival_cohort_table_reads_the_runner_tallies():
+    """The retained shares are computed from the counts, not re-derived."""
+    fits = pd.DataFrame({"model": ["M0_const"], "outcome": ["non_local"]})
+    fits.attrs["arrival_clock_cohort"] = {
+        "non_local": {
+            "n_bins_frozen": 900,
+            "n_bins_dropped_arrival_clock": 100,
+            "n_stops_dropped_arrival_clock": 7,
+            "n_bins_arrival_window": 450,
+            "n_event_bins_frozen": 200,
+            "n_event_bins_arrival_window": 150,
+        },
+        "swr": {"n_bins_frozen": 0},
+    }
+    table = arrival_cohort_table(fits)
+    assert list(table["outcome"]) == ["non_local"]
+    row = table.iloc[0]
+    assert row["pct_bins_dropped_arrival_clock"] == pytest.approx(10.0)
+    assert row["n_stops_dropped_arrival_clock"] == 7
+    assert row["retained_share_arrival_bins"] == pytest.approx(0.5)
+    assert row["retained_share_arrival_events"] == pytest.approx(0.75)
+
+
+def test_arrival_cohort_table_is_empty_without_the_runner_tallies():
+    """A fit with no such attribute yields no section rather than a wrong one."""
+    assert arrival_cohort_table(pd.DataFrame({"model": ["M0_const"]})).empty

@@ -557,6 +557,93 @@ def arrival_clock_shape_table(fits: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def cv_nan_share_table(fits: pd.DataFrame) -> pd.DataFrame:
+    """Share of session-fits whose ``cv_bits_per_event`` is not finite, per rung.
+
+    A fit whose cross-validation is NaN carries no held-out evidence at all, and
+    a rung that is NaN on nearly every session cannot take part in the ladder's
+    held-out comparison. The share is reported per population as well as pooled,
+    because the four populations differ in how sparse their events are and a
+    rung can be scoreable on one and not another.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Tidy per-session per-bin fits carrying ``model``, ``outcome`` and
+        ``cv_bits_per_event``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per rung: the pooled fit count and NaN share, then the NaN share
+        within each population.
+    """
+    rows = []
+    for model in sorted(fits["model"].unique()):
+        rung = fits[fits.model == model]
+        row: dict[str, object] = {
+            "model": model,
+            "n_fits": int(len(rung)),
+            "pct_cv_nan_pooled": 100
+            * float((~np.isfinite(rung["cv_bits_per_event"])).mean()),
+        }
+        for outcome in OUTCOME_ORDER:
+            side = rung.loc[rung.outcome == outcome, "cv_bits_per_event"]
+            row[f"pct_cv_nan_{outcome}"] = (
+                100 * float((~np.isfinite(side)).mean()) if len(side) else np.nan
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def arrival_cohort_table(fits: pd.DataFrame) -> pd.DataFrame:
+    """What requiring the arrival clock cost, and what its window then kept.
+
+    Read from ``fits.attrs["arrival_clock_cohort"]``, which the runner attaches
+    per population: the bins and stops the arrival column removed from the
+    COMMON cohort (they leave every rung, not only the arrival ones), then the
+    share of that frozen cohort the ``[0, TMAX_ARRIVAL]`` window retained. The
+    event-bin share is the one that matters for reading the arrival ladder: the
+    populations do not retain the same fraction of their events, so an
+    arrival-ladder contrast between two populations is partly a contrast between
+    two windows.
+    """
+    cohort = fits.attrs.get("arrival_clock_cohort")
+    if not cohort:
+        return pd.DataFrame()
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        counts = cohort.get(outcome)
+        if not counts or not counts.get("n_bins_frozen"):
+            continue
+        before_freeze = counts["n_bins_frozen"] + counts["n_bins_dropped_arrival_clock"]
+        rows.append(
+            {
+                "outcome": outcome,
+                "n_bins_dropped_arrival_clock": int(
+                    counts["n_bins_dropped_arrival_clock"]
+                ),
+                "pct_bins_dropped_arrival_clock": 100
+                * counts["n_bins_dropped_arrival_clock"]
+                / before_freeze,
+                "n_stops_dropped_arrival_clock": int(
+                    counts["n_stops_dropped_arrival_clock"]
+                ),
+                "n_bins_frozen": int(counts["n_bins_frozen"]),
+                "n_bins_arrival_window": int(counts["n_bins_arrival_window"]),
+                "retained_share_arrival_bins": counts["n_bins_arrival_window"]
+                / counts["n_bins_frozen"],
+                "n_event_bins_frozen": int(counts["n_event_bins_frozen"]),
+                "n_event_bins_arrival_window": int(
+                    counts["n_event_bins_arrival_window"]
+                ),
+                "retained_share_arrival_events": counts["n_event_bins_arrival_window"]
+                / counts["n_event_bins_frozen"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def reward_boundary_shift_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     """The reward-history coefficients before and after the boundary shift.
 
@@ -1235,6 +1322,7 @@ def build_report(
     inputs: dict[str, Path],
     per_stop_note: str,
     termlevel: dict[str, pd.DataFrame] | None = None,
+    cv_audit_bin: pd.DataFrame | None = None,
 ) -> str:
     """Assemble the markdown audit.
 
@@ -1251,17 +1339,27 @@ def build_report(
         ``old_contrast`` / ``new_contrast`` / ``old_audited`` / ``new_audited``
         for the term-level separation section. Omitted when those artifacts are
         not available.
+    cv_audit_bin : pd.DataFrame, optional
+        A per-bin fit whose per-rung, per-population cross-validation validity
+        is tabulated. Use it to report rungs that are absent from ``new_bin``
+        because that measurement retired them; defaults to ``new_bin``.
     """
     lines: list[str] = []
     add = lines.append
-    add("# Rate refit comparison: pre-fix fits vs the reward-basis refit\n")
+    add("# Rate refit comparison\n")
     add(
-        "Generated by `scripts/qa/compare_fits.py`. The reward block changed from "
-        "per-lag reward indicators to a three-bump raised-cosine basis, so lag "
-        "coefficients are **not** compared term for term. Comparable quantities "
-        "are the joint reward step (ΔAIC of a reward rung against its reward-free "
+        "Generated by `scripts/qa/compare_fits.py`, comparing a backed-up rate "
+        "fit against the current one. Rungs whose **specification** differs "
+        "between the two sides are not compared term for term; what is compared "
+        "is the joint reward step (ΔAIC of a reward rung against its reward-free "
         "parent, negative = reward block helps), the reward-free `M5_time` "
-        "goodness-of-fit, the frozen-cohort size, and the per-rung session counts.\n"
+        "goodness-of-fit, the frozen-cohort size, and the per-rung session "
+        "counts. Where the two sides share a rung and a basis and only the "
+        "per-bin feature VALUES moved — the outcome-boundary recomputation — the "
+        "coefficients are paired within session and compared directly. The "
+        "arrival-clock rungs are fit on a subset of the frozen cohort's rows and "
+        "are never differenced against a stop-clock rung; they are reported by "
+        "held-out bits per event and by the shape of the fitted time course.\n"
     )
     add("## Inputs\n")
     rows = []
@@ -1395,6 +1493,36 @@ def build_report(
         f"{TMAX_ARRIVAL} s).\n"
     )
     add(_md(arrival_clock_shape_table(new_bin), floatfmt="{:.3f}"))
+
+    cohort = arrival_cohort_table(new_bin)
+    add("\n### What the arrival clock cost the cohort, and what its window kept\n")
+    add(
+        "The arrival column is part of the union the per-bin cohort freeze runs "
+        "over, so a bin with no arrival clock (a stop with no completed trial) "
+        "leaves the frozen cohort for **every** rung, not only the arrival ones "
+        "— that is `*_dropped_arrival_clock`. The arrival rungs then apply the "
+        f"`[0, {TMAX_ARRIVAL}]` s window to what is left. "
+        "`retained_share_arrival_events` is **not equal across populations**: "
+        "the arrival ladder reads a different fraction of each population's "
+        "events, so a between-population contrast on that ladder is partly a "
+        "contrast between windows.\n"
+    )
+    add(_md(cohort, floatfmt="{:.3f}"))
+
+    add("\n## Held-out cross-validation validity per rung and population\n")
+    add(
+        "Share of session-fits whose `cv_bits_per_event` is NOT finite. A fit "
+        "carrying a separated non-nuisance term has its whole cross-validation "
+        "voided, so a rung that is NaN on nearly every session carries no "
+        "held-out evidence at all and cannot take part in the ladder's held-out "
+        "comparison.\n"
+    )
+    add(
+        _md(
+            cv_nan_share_table(new_bin if cv_audit_bin is None else cv_audit_bin),
+            floatfmt="{:.2f}",
+        )
+    )
 
     add("\n## Family A — per-stop reward step\n")
     add(
@@ -2251,6 +2379,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OLD_TERMLEVEL_PER_STOP,
         help="Family A fit under the fit-level separation flag (same spec).",
     )
+    parser.add_argument(
+        "--per-bin-cv-audit",
+        type=Path,
+        default=None,
+        help=(
+            "Per-bin fit whose per-rung, per-population cross-validation "
+            "validity is tabulated. Point it at the fit that still carried a "
+            "rung the CV measurement then retired; defaults to --new-per-bin."
+        ),
+    )
     parser.add_argument("--old-contrast", type=Path, default=DEFAULT_OLD_CONTRAST)
     parser.add_argument("--new-contrast", type=Path, default=DEFAULT_NEW_CONTRAST)
     parser.add_argument("--old-audited", type=Path, default=DEFAULT_OLD_AUDITED)
@@ -2351,6 +2489,12 @@ def main() -> None:
                 "is_swr-contrast audited (after)": args.new_audited,
             }
         )
+    cv_audit_bin = None
+    if args.per_bin_cv_audit is not None:
+        if not args.per_bin_cv_audit.exists():
+            raise SystemExit(f"missing fit artifact: {args.per_bin_cv_audit}")
+        cv_audit_bin = pd.read_pickle(args.per_bin_cv_audit)
+        inputs["per-bin (cross-validation audit)"] = args.per_bin_cv_audit
     report = build_report(
         pd.read_pickle(args.old_per_bin),
         pd.read_pickle(args.new_per_bin),
@@ -2359,6 +2503,7 @@ def main() -> None:
         inputs,
         args.per_stop_note,
         termlevel,
+        cv_audit_bin,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
