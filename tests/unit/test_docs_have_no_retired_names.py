@@ -37,13 +37,23 @@ RETIRED_NAMES: dict[str, str] = {
     "q_arm": "reward_belief_mean_candidate_arm_preoutcome",
     "arm_uncertainty": "reward_belief_variance_candidate_arm_preoutcome",
     "recent_switch_rate": "patch_switch_fraction_last5_completed_trips",
-    "reward_lag1": "known_reward_outcome_lag_1",
+    "reward_lag{j}": "known_reward_outcome_lag_{j}",
 }
 
-# Word boundaries keep ``arm_uncertainty_z``, ``reward_lag10`` and the
-# ``swr_x_`` compounds from matching the bare stems (the compounds are listed
-# separately above so they are still caught).
-_PATTERNS = {name: re.compile(rf"\b{re.escape(name)}\b") for name in RETIRED_NAMES}
+# Most retired names are literals. ``reward_lag{j}`` is a whole family --
+# ``reward_lag1`` through ``reward_lag10`` were all renamed -- so it gets an
+# explicit pattern rather than a literal match on lag 1 alone.
+_EXPLICIT_PATTERNS: dict[str, re.Pattern[str]] = {
+    "reward_lag{j}": re.compile(r"\breward_lag\d+\b"),
+}
+
+# Word boundaries keep ``arm_uncertainty_z`` and the ``swr_x_`` compounds from
+# matching the bare stems (the compounds are listed separately above so they are
+# still caught).
+_PATTERNS = {
+    name: _EXPLICIT_PATTERNS.get(name, re.compile(rf"\b{re.escape(name)}\b"))
+    for name in RETIRED_NAMES
+}
 
 _ALLOWLIST = {Path("docs/design/model_history.md")}
 _DATED_DESIGN_SNAPSHOT = re.compile(r"^\d{4}-\d{2}-\d{2}-.*\.md$")
