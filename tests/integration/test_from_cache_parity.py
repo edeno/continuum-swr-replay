@@ -39,7 +39,8 @@ def test_process_session_cache_parity(tmp_path, monkeypatch):
             pdm.OUTPUT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
         )
     except ValueError as exc:
-        if "legacy or mismatched covariate schema" not in str(exc):
+        stale = ("legacy or mismatched covariate schema", "covariate schema version")
+        if not any(reason in str(exc) for reason in stale):
             raise
         pytest.skip(f"materialized qvals requires canonical regeneration: {exc}")
 

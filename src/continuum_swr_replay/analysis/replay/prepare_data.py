@@ -124,6 +124,7 @@ OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
 from continuum_swr_replay.analysis.replay.versions import (  # noqa: E402
     BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
+    assert_versions_compatible,
 )
 
 PORT_EXPERIENCE_CACHE_COLUMNS = (
@@ -217,6 +218,22 @@ def behavioral_context_cache_path(
     )
 
 
+def _behavioral_cache_version_error(cache_version: object) -> str | None:
+    """Why a cache entry's stamp is unusable, or ``None`` when it is current.
+
+    A mismatch is a cache *miss*, not an error: the entry is ignored and the
+    session re-fetched. The comparison itself goes through the centralized
+    version check so the cache and the covariate contract cannot drift apart.
+    """
+    if cache_version is None:
+        return "entry carries no behavioral-context version stamp"
+    try:
+        assert_versions_compatible(behavioral_context_cache_version=str(cache_version))
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
 def load_behavioral_context(
     session: dict, *, from_cache: bool, cache_key: str | None = None
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None, object | None, bool]:
@@ -254,6 +271,7 @@ def load_behavioral_context(
             if column not in cached["trials"].columns
         ]
         cache_version = cached.get("cache_schema_version")
+        cache_version_error = _behavioral_cache_version_error(cache_version)
         experiences = cached.get("port_experiences")
         stale_experiences = (
             list(PORT_EXPERIENCE_CACHE_COLUMNS)
@@ -270,13 +288,12 @@ def load_behavioral_context(
                 validate_port_experience_pump_audit(experiences)
             except (KeyError, ValueError) as exc:
                 pump_audit_error = str(exc)
-        if cache_version != BEHAVIORAL_CONTEXT_CACHE_VERSION:
+        if cache_version_error is not None:
             logging.warning(
-                "session cache entry %s has behavioral-context version %r, "
-                "expected %r; ignoring it and re-fetching from Spyglass",
+                "session cache entry %s is off the current behavioral-context "
+                "contract (%s); ignoring it and re-fetching from Spyglass",
                 cache_path.name,
-                cache_version,
-                BEHAVIORAL_CONTEXT_CACHE_VERSION,
+                cache_version_error,
             )
         elif stale_trials:
             logging.warning(

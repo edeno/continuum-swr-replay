@@ -533,8 +533,13 @@ def test_schema_stamp_declares_and_requires_its_exact_scope() -> None:
 
     prior_definition = stamped.copy()
     prior_definition.attrs["covariate_schema_version"] = "covariate_names_v1"
-    with pytest.raises(ValueError, match="legacy or mismatched"):
+    with pytest.raises(ValueError, match="covariate schema version"):
         reg.require_covariate_schema(prior_definition, table="qvals")
+
+    unstamped = stamped.copy()
+    del unstamped.attrs["covariate_schema_version"]
+    with pytest.raises(ValueError, match="legacy or mismatched"):
+        reg.require_covariate_schema(unstamped, table="qvals")
 
     mislabeled = stamped.copy()
     mislabeled.attrs["covariate_schema_scope"] = "names_only"

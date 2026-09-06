@@ -73,6 +73,7 @@ _DIGIT_IDIOM_STEMS = ("last", "k", "l", "p", "log")  # last10, k10, l1, p90, log
 # many importers of covariate_registry.COVARIATE_SCHEMA_VERSION are unaffected.
 from continuum_swr_replay.analysis.replay.versions import (  # noqa: E402
     COVARIATE_SCHEMA_VERSION,
+    assert_versions_compatible,
 )
 
 COVARIATE_SCHEMA_SCOPE = "canonical_names_and_unique_row_keys_v1"
@@ -1508,16 +1509,15 @@ def require_covariate_schema(df, *, table: str) -> None:  # type: ignore[no-unty
     version = df.attrs.get("covariate_schema_version")
     labeled_table = df.attrs.get("covariate_schema_table")
     scope = df.attrs.get("covariate_schema_scope")
-    if (
-        version != COVARIATE_SCHEMA_VERSION
-        or labeled_table != table
-        or scope != COVARIATE_SCHEMA_SCOPE
-    ):
+    # An unstamped frame carries no version to compare, so it cannot reach the
+    # centralized check; it is legacy by construction.
+    if version is None or labeled_table != table or scope != COVARIATE_SCHEMA_SCOPE:
         raise ValueError(
             f"{table} uses a legacy or mismatched covariate schema "
             f"(version={version!r}, table={labeled_table!r}, scope={scope!r}); regenerate "
             "canonical tables before fitting or plotting"
         )
+    assert_versions_compatible(covariate_schema_version=version)
     assert_canonical_vocabulary(df, table=table)
     assert_unique_scientific_rows(df, table=table)
 

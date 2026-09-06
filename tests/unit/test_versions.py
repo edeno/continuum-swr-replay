@@ -42,3 +42,34 @@ def test_mismatched_covariate_version_raises():
 def test_mismatched_cache_version_raises():
     with pytest.raises(ValueError, match="behavioral cache version"):
         versions.assert_versions_compatible(behavioral_context_cache_version="stale")
+
+
+def test_require_schema_rejects_old_version():
+    """An old stamp raises through ``require_covariate_schema``."""
+    pd = pytest.importorskip("pandas")
+    from continuum_swr_replay.analysis.replay import covariate_registry as reg
+
+    frame = reg.stamp_covariate_schema(
+        pd.DataFrame({"stop_id": [1], "task_reward_probability_chosen_arm": [0.5]}),
+        table="qvals",
+    )
+    frame.attrs["covariate_schema_version"] = "covariate_contract_v4_dio_poke_trials"
+
+    with pytest.raises(ValueError, match="covariate schema version"):
+        reg.require_covariate_schema(frame, table="qvals")
+
+
+def test_stale_behavioral_cache_stamp_is_reported_not_raised():
+    """A cache-version mismatch is a miss (a reason string), never an exception."""
+    from continuum_swr_replay.analysis.replay import prepare_data
+
+    assert prepare_data._behavioral_cache_version_error(None) is not None
+    assert "comrie_photogate_trials_v3" in str(
+        prepare_data._behavioral_cache_version_error("comrie_photogate_trials_v3")
+    )
+    assert (
+        prepare_data._behavioral_cache_version_error(
+            versions.BEHAVIORAL_CONTEXT_CACHE_VERSION
+        )
+        is None
+    )
