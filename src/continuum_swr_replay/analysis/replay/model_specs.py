@@ -755,7 +755,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     ),
     # M8_full_switch (the per-bin switch main-effect extension) was retired;
     # nothing parents off it. Why: ``docs/design/model_history.md``
-    # § "Retirements in the per-bin rate ladder (Family B)".
+    # § "Per-bin rate ladder: the retired M8 switch rung (moved 2026-09-06)".
     # Raised-cosine self-history variants: smooth basis over the same window so
     # the history block cannot separate on the refractory bins (lifts held-out
     # cv_bits_per_event from negative to positive vs the onset_lag dummies).
