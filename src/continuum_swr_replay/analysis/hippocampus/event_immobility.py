@@ -13,13 +13,11 @@ Caveats worth knowing before citing a filtered count:
   mask: the animal was moving, the speed sample was non-finite, or the
   interval covers no sample at all (a position-tracking gap, or an interval
   past the position tail). All three yield ``False``.
-- Filtering is silent. Nothing here logs how many events were removed, so a
-  caller that reports ``n_SWR`` / ``n_MUA`` is reporting the eligible count
-  with no record of the drop.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 import numpy as np
@@ -31,6 +29,8 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.data_loaders.utils import get_labels
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_EVENT_GROUP_COLS = SESSION_COLUMNS_DAY
 
@@ -212,6 +212,10 @@ def filter_event_intervals_by_speed(
     Samples in the closed interval ``[start_time, end_time]`` are evaluated,
     matching :func:`continuum_swr_replay.data_loaders.utils.get_labels`.
     The input row order, index, and all columns are preserved.
+
+    How many intervals this removed is logged at INFO, so a caller reporting
+    ``n_SWR`` / ``n_MUA`` leaves a record of the drop rather than only the
+    surviving count.
     """
     threshold = _validate_speed_threshold(speed_threshold)
     missing = [
@@ -255,6 +259,14 @@ def filter_event_intervals_by_speed(
         dtype=bool,
         count=len(event_times),
     )
+    n_removed = int((~keep).sum())
+    if n_removed:
+        logger.info(
+            "whole-event speed rule (< %g cm/s) removed %d of %d intervals",
+            threshold,
+            n_removed,
+            len(keep),
+        )
     return event_times.loc[keep].copy()
 
 

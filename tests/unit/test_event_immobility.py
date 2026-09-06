@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -274,3 +276,19 @@ def test_invalid_speed_threshold_raises(threshold):
 
     with pytest.raises(ValueError, match="speed_threshold must be finite and positive"):
         whole_event_immobility_mask(data, "SWR_event", speed_threshold=threshold)
+
+
+def test_speed_filter_logs_how_many_intervals_it_removed(caplog):
+    """The drop is recorded, so an eligible count is never reported alone."""
+    time = np.array([0.0, 1.0, 2.0, 3.0])
+    speed = np.array([0.0, 30.0, 0.0, 0.0])
+    events = pd.DataFrame({"start_time": [0.0, 2.0], "end_time": [1.0, 3.0]})
+
+    with caplog.at_level(
+        logging.INFO,
+        logger="continuum_swr_replay.analysis.hippocampus.event_immobility",
+    ):
+        kept = filter_event_intervals_by_speed(events, speed=speed, time=time)
+
+    assert len(kept) == 1
+    assert "removed 1 of 2 intervals" in caplog.text
