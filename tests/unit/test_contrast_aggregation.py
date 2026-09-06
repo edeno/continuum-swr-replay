@@ -24,7 +24,9 @@ import pytest
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     load_per_sd_scale,
+    session_se,
     std_factor,
+    typical_session_se,
 )
 from continuum_swr_replay.analysis.replay.model_specs import REWARD_HISTORY_COLUMNS
 
@@ -497,3 +499,53 @@ def test_the_contrast_figure_takes_its_arm_units_from_the_fit() -> None:
     assert recomputed, "the rate ladder's own SDs are still computed in the figure"
     assert not recomputed & set(_ARM_UNITS)
     assert "load_per_sd_scale" in called
+
+
+# --- Dirichlet-multinomial concentration terms ---------------------------------
+
+
+def test_concentration_terms_are_per_category() -> None:
+    """``log_phi_is_swr`` is a coefficient on a 0/1 flag, not on an SD of one."""
+    assert std_factor("log_phi_is_swr", SD) == (1.0, "per_category")
+    assert std_factor("log_phi_intercept", SD) == (1.0, "per_category")
+    # Even if a caller hands in an SD for the flag, the per-category rule wins.
+    assert std_factor("log_phi_is_swr", {"log_phi_is_swr": 0.5}) == (
+        1.0,
+        "per_category",
+    )
+
+
+def _dm_rows(n_sessions: int = 6) -> pd.DataFrame:
+    """Per-session Dirichlet-multinomial fits: model SEs, no clustered column."""
+    return pd.DataFrame(
+        {
+            "model": ["C0"] * n_sessions,
+            "population": ["all"] * n_sessions,
+            "animal": [f"a{index % 3}" for index in range(n_sessions)],
+            "coef_log_phi_is_swr": [-0.8 - 0.01 * index for index in range(n_sessions)],
+            "bse_log_phi_is_swr": [0.2] * n_sessions,
+            "pval_log_phi_is_swr": [0.01] * n_sessions,
+            "separated_terms": [""] * n_sessions,
+            "converged": [True] * n_sessions,
+            "separated": [False] * n_sessions,
+        }
+    )
+
+
+def test_dm_rows_report_the_model_se_they_actually_carry() -> None:
+    """The DM SE is already event-level, so there is no sandwich to prefer."""
+    rows = _dm_rows()
+    se, source = session_se(rows, "log_phi_is_swr")
+
+    assert source == "model"
+    assert se.tolist() == [0.2] * 6
+    assert typical_session_se(rows, "log_phi_is_swr") == (0.2, "model")
+
+    aggregated = aggregate_contrast(rows, [("C0", "all", "log_phi_is_swr")], "arm")
+    assert len(aggregated) == 1
+    row = aggregated.iloc[0]
+    assert row["se_source"] == "model"
+    assert row["typical_session_se"] == pytest.approx(0.2)
+    assert row["std_unit"] == "per_category"
+    assert row["std_factor"] == 1.0
+    assert row["std_coef_session_median"] == pytest.approx(row["coef_session_median"])

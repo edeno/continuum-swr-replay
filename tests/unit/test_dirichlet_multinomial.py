@@ -16,10 +16,13 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
+    animal_pooled_log_phi,
     cross_validate_dirichlet_multinomial,
     event_loglik,
     fit_dirichlet_multinomial,
+    fit_sessions_dirichlet_multinomial,
     multinomial_log_constant,
+    resolve_pooled_log_phi,
 )
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.simulation import (
@@ -338,9 +341,7 @@ def test_event_loglik_stays_finite_when_a_category_is_ruled_out():
     objective it was following.
     """
     df = _simulate(3.0, seed=11, n_events=8, L_e=20)
-    packed_x = (
-        df[PREDICTORS].to_numpy(dtype=float).reshape(8, 9, len(PREDICTORS))
-    )
+    packed_x = df[PREDICTORS].to_numpy(dtype=float).reshape(8, 9, len(PREDICTORS))
     packed_y = df["arm_count_hard"].to_numpy(dtype=float).reshape(8, 9)
     packed_z = df.groupby("event_id", sort=True)["is_swr"].first().to_numpy()[:, None]
 
@@ -350,3 +351,130 @@ def test_event_loglik_stays_finite_when_a_category_is_ruled_out():
     assert per_event.shape == (8,)
     assert np.isfinite(per_event).all()
     assert (per_event < 0).all()
+
+
+# ── per-session driving: pooled concentration and the process pool ──────────
+
+
+def _session(n_events, *, seed, animal="chimi"):
+    """One session's rows, drawn at a concentration of 3."""
+    return _simulate(3.0, seed=seed, n_events=n_events, L_e=20)
+
+
+class TestPooledConcentrationIntercept:
+    """A session too short to estimate its own concentration borrows one."""
+
+    def test_short_session_is_pinned_to_its_animals_median(self):
+        sessions = [
+            (("chimi", "d1"), "chimi", _session(60, seed=0)),
+            (("chimi", "d2"), "chimi", _session(20, seed=1)),
+        ]
+        fits, skips = fit_sessions_dirichlet_multinomial(
+            sessions, PREDICTORS, min_events=40, n_jobs=1
+        )
+
+        assert skips == []
+        rows = dict(fits)
+        long_row = rows[("chimi", "d1")]
+        short_row = rows[("chimi", "d2")]
+        assert long_row["phi_source"] == "session"
+        assert short_row["phi_source"] == "animal_pooled"
+        # Pinned to exactly the long session's estimate: with one qualifying
+        # session the animal's median IS that session's intercept.
+        assert short_row["coef_log_phi_intercept"] == pytest.approx(
+            long_row["coef_log_phi_intercept"]
+        )
+        assert short_row["fixed_log_phi"] == pytest.approx(
+            long_row["coef_log_phi_intercept"]
+        )
+        # A pinned parameter is not estimated, so it has no sampling variance
+        # and costs the fit one degree of freedom.
+        assert np.isnan(short_row["bse_log_phi_intercept"])
+        assert short_row["n_params"] == long_row["n_params"] - 1
+
+    def test_the_pool_size_does_not_change_the_answer(self):
+        sessions = [
+            (("chimi", "d1"), "chimi", _session(60, seed=0)),
+            (("chimi", "d2"), "chimi", _session(20, seed=1)),
+        ]
+        serial, _ = fit_sessions_dirichlet_multinomial(
+            sessions, PREDICTORS, min_events=40, n_jobs=1
+        )
+        # Reversed on the way in: the returned order is the sorted session key,
+        # not the order the pool happened to finish in.
+        parallel, _ = fit_sessions_dirichlet_multinomial(
+            sessions[::-1], PREDICTORS, min_events=40, n_jobs=2
+        )
+
+        assert [key for key, _row in serial] == [("chimi", "d1"), ("chimi", "d2")]
+        assert [key for key, _row in parallel] == [key for key, _row in serial]
+        for (_key, one), (_other_key, two) in zip(serial, parallel, strict=True):
+            assert set(one) == set(two)
+            for name, value in one.items():
+                other = two[name]
+                if isinstance(value, float) and np.isnan(value):
+                    assert np.isnan(other), name
+                else:
+                    assert other == value, name
+
+
+class TestAnimalPooledLogPhi:
+    """Which sessions set the pooled intercept, and what a short one falls back to."""
+
+    def _rows(self, *triples):
+        return pd.DataFrame(
+            [
+                {"animal": a, "n_events": n, "coef_log_phi_intercept": v}
+                for a, n, v in triples
+            ]
+        )
+
+    def test_only_sessions_over_the_threshold_contribute(self):
+        pooled = animal_pooled_log_phi(
+            self._rows(
+                ("chimi", 60, 1.0),
+                ("chimi", 80, 3.0),
+                ("chimi", 10, 99.0),
+                ("j16", 50, 2.0),
+            ),
+            min_events=40,
+        )
+        assert pooled["chimi"] == pytest.approx(2.0)
+        assert pooled["j16"] == pytest.approx(2.0)
+        assert pooled["__all__"] == pytest.approx(2.0)
+
+    def test_an_animal_with_no_long_session_falls_back_to_every_animal(self):
+        pooled = animal_pooled_log_phi(
+            self._rows(("chimi", 60, 1.0), ("j16", 5, 99.0)), min_events=40
+        )
+        assert "j16" not in pooled
+        assert resolve_pooled_log_phi("j16", pooled) == (1.0, "pooled_all_animals")
+        assert resolve_pooled_log_phi("chimi", pooled) == (1.0, "animal_pooled")
+
+    def test_nothing_qualifies_leaves_every_session_on_its_own(self):
+        pooled = animal_pooled_log_phi(self._rows(("chimi", 5, 1.0)), min_events=40)
+        assert pooled == {}
+        assert resolve_pooled_log_phi("chimi", pooled) == (None, "session")
+
+    def test_missing_column_is_refused(self):
+        with pytest.raises(ValueError, match="coef_log_phi_intercept"):
+            animal_pooled_log_phi(pd.DataFrame({"animal": ["chimi"], "n_events": [60]}))
+
+
+def test_rank_deficient_session_is_a_skip_not_an_exception():
+    """A within-event constant predictor raises; the driver books it and goes on."""
+    good = _session(60, seed=0)
+    bad = _session(60, seed=2).assign(is_prev_arm=0.0)
+    fits, skips = fit_sessions_dirichlet_multinomial(
+        [(("chimi", "d1"), "chimi", good), (("chimi", "d2"), "chimi", bad)],
+        PREDICTORS,
+        min_events=40,
+        n_jobs=2,
+    )
+
+    assert [key for key, _row in fits] == [("chimi", "d1")]
+    assert len(skips) == 1
+    key, reason = skips[0]
+    assert key == ("chimi", "d2")
+    assert reason.startswith("dm_design:")
+    assert "rank deficient" in reason

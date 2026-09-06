@@ -38,6 +38,9 @@ the process pays a one-off compile (~1 s); repeated fits at the same shape do no
 from __future__ import annotations
 
 import logging
+import multiprocessing
+from collections.abc import Hashable, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
 import jax
@@ -686,11 +689,340 @@ def cross_validate_dirichlet_multinomial(
     }
 
 
+# ── per-session driving, with a pooled concentration for small sessions ─────
+
+
+#: Default minimum modelled events for a session to estimate its own ``log phi``.
+DEFAULT_MIN_EVENTS_SESSION_PHI = 40
+
+#: Key under which :func:`animal_pooled_log_phi` stores the all-animal median.
+POOLED_ALL_ANIMALS_KEY = "__all__"
+
+
+def animal_pooled_log_phi(
+    rows: pd.DataFrame, *, min_events: int = DEFAULT_MIN_EVENTS_SESSION_PHI
+) -> dict[str, float]:
+    """Median ``coef_log_phi_intercept`` per animal, over its larger sessions.
+
+    The concentration intercept is the one parameter a short session cannot
+    pin down: with a handful of events the likelihood is nearly flat in it, and
+    the optimizer walks it to whatever value makes the few observed allocations
+    look certain -- which then propagates into that session's coefficient
+    standard errors. Sessions with at least ``min_events`` modelled events do
+    estimate it, and their median within an animal is what a short session of
+    the same animal is pinned to.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        First-pass fits, one row per session, carrying ``animal``,
+        ``n_events`` and ``coef_log_phi_intercept``.
+    min_events : int, optional
+        Minimum modelled events for a session to contribute.
+
+    Returns
+    -------
+    dict of str to float
+        Animal -> median intercept, plus :data:`POOLED_ALL_ANIMALS_KEY` ->
+        median over every qualifying session of every animal. Empty when no
+        session qualifies.
+
+    Raises
+    ------
+    ValueError
+        If a required column is absent: a pooled value read off an incomplete
+        frame would silently pin every short session to a number derived from
+        the wrong sessions.
+    """
+    required = ["animal", "n_events", "coef_log_phi_intercept"]
+    missing = [column for column in required if column not in rows.columns]
+    if missing:
+        raise ValueError(
+            f"animal_pooled_log_phi needs column(s) {missing} on the first-pass "
+            "fits to pool a concentration intercept"
+        )
+    if rows.empty:
+        return {}
+    qualifying = rows.loc[
+        (pd.to_numeric(rows["n_events"], errors="coerce") >= min_events)
+        & np.isfinite(pd.to_numeric(rows["coef_log_phi_intercept"], errors="coerce"))
+    ]
+    if qualifying.empty:
+        return {}
+    pooled = {
+        str(animal): float(value)
+        for animal, value in qualifying.groupby("animal")["coef_log_phi_intercept"]
+        .median()
+        .items()
+    }
+    pooled[POOLED_ALL_ANIMALS_KEY] = float(
+        qualifying["coef_log_phi_intercept"].median()
+    )
+    return pooled
+
+
+def resolve_pooled_log_phi(
+    animal: object, pooled_log_phi: dict[str, float]
+) -> tuple[float | None, str]:
+    """The concentration intercept a short session of ``animal`` is pinned to.
+
+    Returns ``(value, phi_source)``: the animal's own pooled median where it has
+    one (``"animal_pooled"``), else the all-animal median
+    (``"pooled_all_animals"``), else ``(None, "session")`` when nothing
+    qualified and the session must stand on its own fit.
+    """
+    key = str(animal)
+    if key in pooled_log_phi:
+        return float(pooled_log_phi[key]), "animal_pooled"
+    if POOLED_ALL_ANIMALS_KEY in pooled_log_phi:
+        return float(pooled_log_phi[POOLED_ALL_ANIMALS_KEY]), "pooled_all_animals"
+    return None, "session"
+
+
+def fit_dirichlet_multinomial_with_fallback(
+    long_df: pd.DataFrame,
+    predictors: list[str],
+    *,
+    animal: object,
+    pooled_log_phi: dict[str, float],
+    **kwargs,
+) -> dict | None:
+    """Fit one session with its concentration intercept pinned to a pooled value.
+
+    The second pass of :func:`fit_sessions_dirichlet_multinomial`. Returns
+    ``None`` when no pooled value is available or the pinned fit itself does not
+    converge to a finite optimum; the returned row records ``phi_source`` and
+    the ``fixed_log_phi`` it was pinned to.
+    """
+    value, source = resolve_pooled_log_phi(animal, pooled_log_phi)
+    if value is None:
+        return None
+    result = fit_dirichlet_multinomial(
+        long_df, predictors, fixed_log_phi=value, **kwargs
+    )
+    if result is not None:
+        result["phi_source"] = source
+        result["fixed_log_phi"] = float(value)
+    return result
+
+
+def _fit_one_session(task: tuple) -> tuple:
+    """Worker entry point: fit one session, converting a bad design to a skip.
+
+    Top-level (not a closure) because the process pool pickles it by reference.
+    """
+    key, frame, predictors, kwargs = task
+    try:
+        result = fit_dirichlet_multinomial(frame, list(predictors), **kwargs)
+    except ValueError as exc:
+        return key, None, f"dm_design:{exc}"
+    if result is None:
+        return key, None, "fit_none"
+    return key, result, ""
+
+
+def _run_session_fits(tasks: list[tuple], n_jobs: int) -> list[tuple]:
+    """Map :func:`_fit_one_session` over ``tasks``, in input order.
+
+    Each fit is run in a fresh subprocess. The JAX objective is jitted per
+    ``(n_events, n_categories, n_predictors)`` shape and every session is a new
+    shape, so a long in-process loop accumulates one compiled executable per
+    session and grows without bound (measured at +729 MB over 30 shapes);
+    ``max_tasks_per_child=1`` returns that memory after every fit. The
+    forkserver context is deliberate: its server is fork+exec'd, so the workers
+    never inherit a JAX runtime that the parent has already started, and each
+    worker is then a cheap fork of a server that already carries this module.
+    """
+    if not tasks:
+        return []
+    context = multiprocessing.get_context("forkserver")
+    # Preloaded so each worker is a cheap fork of a server that already carries
+    # this module; without it every worker re-imports jax and statsmodels
+    # (~5 s) before it can start fitting.
+    context.set_forkserver_preload([__name__])
+    with ProcessPoolExecutor(
+        max_workers=max(1, int(n_jobs)),
+        mp_context=context,
+        max_tasks_per_child=1,
+    ) as pool:
+        return list(pool.map(_fit_one_session, tasks))
+
+
+def fit_sessions_dirichlet_multinomial(
+    sessions: Sequence[tuple[Hashable, object, pd.DataFrame]],
+    predictors: list[str],
+    *,
+    min_events: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
+    n_jobs: int = 1,
+    response_col: str = "arm_count_hard",
+    event_col: str = "event_id",
+    concentration_cols: tuple[str, ...] = ("is_swr",),
+    n_categories: int = 9,
+) -> tuple[list[tuple[Hashable, dict]], list[tuple[Hashable, str]]]:
+    """Fit every session, pinning the short ones to a pooled concentration.
+
+    Two passes. The first fits every session with a free concentration
+    intercept; :func:`animal_pooled_log_phi` then summarizes the sessions that
+    were long enough to estimate it, and the second pass refits the short ones
+    (and retries the ones the free fit had too few events for) with that value
+    pinned. Every returned row carries ``phi_source`` in ``{"session",
+    "animal_pooled", "pooled_all_animals"}``.
+
+    Parameters
+    ----------
+    sessions : sequence of (key, animal, frame)
+        One entry per session: a sortable session key, the animal the pooled
+        fallback is taken from, and that session's long-format rows.
+    predictors : list of str
+        Category-varying predictors for this rung.
+    min_events : int, optional
+        Sessions with fewer modelled events than this are pinned.
+    n_jobs : int, optional
+        Worker processes for the per-session fits.
+    response_col, event_col, concentration_cols, n_categories
+        As in :func:`fit_dirichlet_multinomial`.
+
+    Returns
+    -------
+    list of (key, dict)
+        The fitted rows, in sorted key order.
+    list of (key, str)
+        Sessions that produced no fit, in sorted key order, each with the reason
+        (``"fit_none"``, ``"dm_design:<message>"``, or ``"no_pooled_log_phi"``).
+    """
+    fit_kwargs = {
+        "response_col": response_col,
+        "event_col": event_col,
+        "concentration_cols": tuple(concentration_cols),
+        "n_categories": n_categories,
+    }
+    keep = list(
+        dict.fromkeys([event_col, response_col, *predictors, *concentration_cols])
+    )
+    ordered = sorted(sessions, key=lambda item: item[0])
+    animals = {key: animal for key, animal, _frame in ordered}
+    frames = {
+        key: frame[[column for column in keep if column in frame.columns]]
+        for key, _animal, frame in ordered
+    }
+
+    first = _run_session_fits(
+        [
+            (key, frames[key], predictors, fit_kwargs)
+            for key, _animal, _frame in ordered
+        ],
+        n_jobs,
+    )
+
+    fitted: dict[Hashable, dict] = {}
+    skipped: dict[Hashable, str] = {}
+    for key, result, reason in first:
+        if result is None:
+            skipped[key] = reason
+        else:
+            result["phi_source"] = "session"
+            result["fixed_log_phi"] = np.nan
+            fitted[key] = result
+
+    pooled = animal_pooled_log_phi(
+        pd.DataFrame(
+            [
+                {
+                    "animal": animals[key],
+                    "n_events": result["n_events"],
+                    "coef_log_phi_intercept": result.get(
+                        f"coef_{LOG_PHI_INTERCEPT}", np.nan
+                    ),
+                }
+                for key, result in fitted.items()
+            ],
+            columns=["animal", "n_events", "coef_log_phi_intercept"],
+        ),
+        min_events=min_events,
+    )
+
+    # Short sessions, and the ones the free fit had too few events for: pinning
+    # the intercept removes a free parameter, so a session the free fit refused
+    # can still be fitted here.
+    retry = [
+        key
+        for key, _animal, _frame in ordered
+        if (key in fitted and int(fitted[key]["n_events"]) < min_events)
+        or skipped.get(key) == "fit_none"
+    ]
+    if retry and not pooled:
+        logger.warning(
+            "no session reached %d events, so %d short session(s) keep their own "
+            "concentration intercept",
+            min_events,
+            len(retry),
+        )
+    if retry and pooled:
+        second = _run_session_fits(
+            [
+                (
+                    key,
+                    frames[key],
+                    predictors,
+                    {
+                        **fit_kwargs,
+                        "fixed_log_phi": resolve_pooled_log_phi(animals[key], pooled)[
+                            0
+                        ],
+                    },
+                )
+                for key in retry
+            ],
+            n_jobs,
+        )
+        for key, result, reason in second:
+            value, source = resolve_pooled_log_phi(animals[key], pooled)
+            if result is None:
+                fitted.pop(key, None)
+                skipped[key] = reason
+                continue
+            result["phi_source"] = source
+            result["fixed_log_phi"] = float(value)
+            fitted[key] = result
+            skipped.pop(key, None)
+
+    for key in fitted:
+        fitted[key]["min_events_session_phi"] = int(min_events)
+    n_pinned = sum(1 for row in fitted.values() if row["phi_source"] != "session")
+    if n_pinned:
+        by_animal = pd.Series(
+            [
+                str(animals[key])
+                for key, row in fitted.items()
+                if row["phi_source"] != "session"
+            ]
+        ).value_counts()
+        logger.info(
+            "pinned the concentration intercept for %d of %d session fits "
+            "(fewer than %d events): %s",
+            n_pinned,
+            len(fitted),
+            min_events,
+            by_animal.to_dict(),
+        )
+    order = [key for key, _animal, _frame in ordered]
+    return (
+        [(key, fitted[key]) for key in order if key in fitted],
+        [(key, skipped[key]) for key in order if key in skipped],
+    )
+
+
 __all__ = [
+    "DEFAULT_MIN_EVENTS_SESSION_PHI",
     "ESTIMATOR",
     "LOG_PHI_INTERCEPT",
+    "POOLED_ALL_ANIMALS_KEY",
+    "animal_pooled_log_phi",
     "cross_validate_dirichlet_multinomial",
     "event_loglik",
     "fit_dirichlet_multinomial",
+    "fit_dirichlet_multinomial_with_fallback",
+    "fit_sessions_dirichlet_multinomial",
     "multinomial_log_constant",
+    "resolve_pooled_log_phi",
 ]

@@ -86,6 +86,13 @@ BINARY_TERMS = frozenset(
         "is_last_rewarded_noncurrent_patch",
         "swr_x_is_current_patch",
         "swr_x_is_last_rewarded_noncurrent_patch",
+        # Dirichlet-multinomial concentration terms. ``log_phi_is_swr`` is the
+        # coefficient on a 0/1 event flag, so its natural unit is the category
+        # (how much less concentrated an SWR event's allocation is), not an SD
+        # of the flag; ``log_phi_intercept`` is a constant column with no SD to
+        # rescale by at all.
+        "log_phi_intercept",
+        "log_phi_is_swr",
     }
 )
 

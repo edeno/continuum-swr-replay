@@ -318,3 +318,84 @@ class TestEstimatorTravelsWithTheComparison:
 
         assert result["estimator"] is None
         assert result["response_col"] is None
+
+
+# ── likelihood constants ──
+
+
+def _fit_with_constants(*, aic, bic, ll, includes_constants, estimator):
+    frame = _make_fit_results(ll=ll, aic=aic, bic=bic, n_params=2)
+    frame["llf_includes_constants"] = includes_constants
+    frame["estimator"] = estimator
+    frame["response_col"] = "arm_count_hard"
+    return frame
+
+
+def test_mismatched_likelihood_constants_invalidate_the_comparison():
+    """A full likelihood minus a conditional one measures the constant, not the rung.
+
+    The Dirichlet-multinomial keeps the multinomial coefficient the statsmodels
+    conditional likelihood drops, so differencing their AICs would report that
+    coefficient as a model improvement.
+    """
+    parent = _fit_with_constants(
+        aic=100,
+        bic=110,
+        ll=-50,
+        includes_constants=False,
+        estimator="conditional_poisson_count",
+    )
+    child = _fit_with_constants(
+        aic=90,
+        bic=105,
+        ll=-44,
+        includes_constants=True,
+        estimator="dirichlet_multinomial",
+    )
+
+    row = compare_nested_models(parent, child).iloc[0]
+
+    assert np.isnan(row["delta_aic"])
+    assert np.isnan(row["delta_bic"])
+    assert np.isnan(row["lr_stat"])
+    assert np.isnan(row["lr_pvalue"])
+    assert bool(row["llf_includes_constants_parent"]) is False
+    assert bool(row["llf_includes_constants_child"]) is True
+
+
+def test_agreeing_likelihood_constants_leave_the_comparison_alone():
+    parent = _fit_with_constants(
+        aic=100,
+        bic=110,
+        ll=-50,
+        includes_constants=True,
+        estimator="dirichlet_multinomial",
+    )
+    child = _fit_with_constants(
+        aic=90,
+        bic=105,
+        ll=-44,
+        includes_constants=True,
+        estimator="dirichlet_multinomial",
+    )
+
+    comparison = compare_nested_models(parent, child)
+
+    assert comparison["delta_aic"].iloc[0] == 10.0
+    assert comparison["lr_stat"].iloc[0] == 12.0
+    summary = summarize_comparison(comparison, "M0", "M1")
+    assert bool(summary["llf_includes_constants"]) is True
+    assert summary["estimator"] == "dirichlet_multinomial"
+
+
+def test_a_rung_that_records_nothing_is_unknown_not_different():
+    """Legacy artifacts predate the flag; absence must not NaN their comparisons."""
+    parent = _make_fit_results(ll=-50, aic=100, bic=110, n_params=2)
+    child = _make_fit_results(ll=-44, aic=90, bic=105, n_params=4)
+
+    comparison = compare_nested_models(parent, child)
+
+    assert comparison["delta_aic"].iloc[0] == 10.0
+    assert (
+        summarize_comparison(comparison, "M0", "M1")["llf_includes_constants"] is None
+    )

@@ -17,10 +17,14 @@ from scipy.stats import chi2, wilcoxon
 from .model_specs import MODEL_HIERARCHY
 
 # Fit-scale metadata carried from the per-session frames onto the comparison and
-# its summary: which estimator produced the numbers and which response column it
-# was fit on. Both must agree between parent and child for a comparison to mean
-# anything, so ``summarize_comparison`` refuses a step where they do not.
-METADATA_COLUMNS = ("estimator", "response_col")
+# its summary: which estimator produced the numbers, which response column it was
+# fit on, and whether its log-likelihood carries the response's normalizing
+# constants. All three must agree between parent and child for a comparison to
+# mean anything, so ``summarize_comparison`` refuses a step where they do not.
+METADATA_COLUMNS = ("estimator", "response_col", "llf_includes_constants")
+
+#: Metadata column whose disagreement invalidates a per-session comparison.
+LIKELIHOOD_CONSTANTS_COLUMN = "llf_includes_constants"
 
 
 def compare_nested_models(
@@ -50,7 +54,11 @@ def compare_nested_models(
         ``delta_aic`` / ``delta_bic`` / ``lr_stat`` / ``lr_pvalue`` are NaN for
         any session whose parent and child report different ``n_events``,
         ``n_bins``, or ``n_stops`` — rungs fit to different rows are not
-        comparable.
+        comparable — and likewise for any session whose two rungs disagree on
+        ``llf_includes_constants``: the Dirichlet-multinomial likelihood carries
+        the multinomial coefficient and a statsmodels conditional likelihood
+        does not, so differencing them measures that constant rather than the
+        rungs.
     """
     if session_cols is None:
         session_cols = ["animal", "session_date", "epoch"]
@@ -127,6 +135,31 @@ def compare_nested_models(
             )
         for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
             merged.loc[different_n, col] = np.nan
+
+    # Invalidate the same metrics when the two rungs' log-likelihoods do not
+    # carry the same constants. Both sides must actually say so: a legacy frame
+    # that records nothing is unknown, not different.
+    parent_constants = f"{LIKELIHOOD_CONSTANTS_COLUMN}_parent"
+    child_constants = f"{LIKELIHOOD_CONSTANTS_COLUMN}_child"
+    if parent_constants in merged.columns and child_constants in merged.columns:
+        stated = merged[parent_constants].notna() & merged[child_constants].notna()
+        different_constants = stated & (
+            merged[parent_constants] != merged[child_constants]
+        )
+        if different_constants.any():
+            import logging
+
+            logging.warning(
+                "%d/%d sessions compare a likelihood that includes the response's "
+                "normalizing constants against one that does not — invalidating "
+                "those comparisons. Equalize the constants (see "
+                "dirichlet_multinomial.multinomial_log_constant) before "
+                "differencing information criteria across estimators.",
+                int(different_constants.sum()),
+                len(merged),
+            )
+        for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
+            merged.loc[different_constants, col] = np.nan
 
     return merged
 

@@ -28,8 +28,11 @@ import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 
 __all__ = [
+    "ESTIMATOR_CHOICES",
     "RESPONSE_CHOICES",
     "FRACTION_SUM_TOLERANCE",
+    "default_response_for_estimator",
+    "resolve_response_choice",
     "renormalize_fraction_over_candidates",
     "resolve_response_column",
     "validate_fraction_response",
@@ -37,6 +40,18 @@ __all__ = [
 
 #: CLI values both content runners accept for ``--response``.
 RESPONSE_CHOICES = ("fraction", "hard_count")
+
+#: CLI values both content runners accept for ``--estimator``.
+ESTIMATOR_CHOICES = ("conditional_poisson", "dirichlet_multinomial")
+
+# Each estimator's natural response. The conditional Poisson ships on the
+# per-event fraction; the Dirichlet-multinomial likelihood is defined on integer
+# counts and has no fraction form at all, so it is not a default that can be
+# overridden -- asking for both is a contradiction the CLI refuses.
+_DEFAULT_RESPONSE = {
+    "conditional_poisson": "fraction",
+    "dirichlet_multinomial": "hard_count",
+}
 
 #: How far an event's candidate fractions may sum from 1.0. The builder divides
 #: exact integer counts by one event-level integer total, so the only admissible
@@ -80,6 +95,81 @@ def resolve_response_column(hierarchy_kind: str, response: str) -> str:
             f"--response {response!r}; hierarchy must be 'arm' or 'patch' and "
             f"response one of {list(RESPONSE_CHOICES)}"
         ) from None
+
+
+def default_response_for_estimator(estimator: str) -> str:
+    """The ``--response`` value an estimator uses when none is given.
+
+    Parameters
+    ----------
+    estimator : str
+        One of :data:`ESTIMATOR_CHOICES`.
+
+    Returns
+    -------
+    str
+        ``"fraction"`` for the conditional Poisson, ``"hard_count"`` for the
+        Dirichlet-multinomial.
+
+    Raises
+    ------
+    ValueError
+        If ``estimator`` is not a known choice.
+    """
+    try:
+        return _DEFAULT_RESPONSE[estimator]
+    except KeyError:
+        raise ValueError(
+            f"unknown estimator {estimator!r}; expected one of "
+            f"{list(ESTIMATOR_CHOICES)}"
+        ) from None
+
+
+def resolve_response_choice(estimator: str, response: str | None) -> str:
+    """Resolve the ``--response`` value for a run, given its ``--estimator``.
+
+    ``None`` means the caller did not ask for a response and takes the
+    estimator's own. An explicit response that the estimator cannot fit is a
+    refusal, not a silent override: the Dirichlet-multinomial log-likelihood is
+    a sum of ``lgamma`` terms in integer counts, so a fraction response has no
+    meaning under it and a run that quietly rounded or reweighted one would
+    publish numbers nobody asked for.
+
+    Parameters
+    ----------
+    estimator : str
+        One of :data:`ESTIMATOR_CHOICES`.
+    response : str or None
+        One of :data:`RESPONSE_CHOICES`, or ``None`` for the estimator default.
+
+    Returns
+    -------
+    str
+        The resolved ``--response`` value, ready for
+        :func:`resolve_response_column`.
+
+    Raises
+    ------
+    ValueError
+        If the estimator or response is unknown, or if the two are
+        incompatible.
+    """
+    default = default_response_for_estimator(estimator)
+    if response is None:
+        return default
+    if response not in RESPONSE_CHOICES:
+        raise ValueError(
+            f"unknown response {response!r}; expected one of {list(RESPONSE_CHOICES)}"
+        )
+    if estimator == "dirichlet_multinomial" and response != default:
+        raise ValueError(
+            "--response fraction cannot be combined with --estimator "
+            "dirichlet_multinomial: the Dirichlet-multinomial likelihood is "
+            "defined on integer timebin counts, so it has no fraction form. "
+            "Drop --response (it defaults to hard_count under this estimator) "
+            "or pass --response hard_count."
+        )
+    return response
 
 
 def validate_fraction_response(
