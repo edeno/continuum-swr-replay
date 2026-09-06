@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.replay.simulation import (
     make_synthetic_env,
     simulate_autocorrelated_counts,
     simulate_counts,
+    simulate_dirichlet_multinomial_counts,
     simulate_full_pipeline,
     simulate_hard_vs_soft_counts,
     simulate_posterior_bumps,
@@ -576,3 +577,97 @@ class TestUnbiasedAcrossSeeds:
         assert abs(mean - 0.6) < 3 * sem, (
             f"mean={mean:.3f} truth=0.6 sem={sem:.3f}"
         )
+
+
+class TestDirichletMultinomialSimulator:
+    """The overdispersed simulator: same softmax mean, correlated within-event bins."""
+
+    def test_long_format_and_totals(self):
+        df = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0},
+            log_phi_intercept=np.log(3.0),
+            n_events=40,
+            L_e=32,
+            seed=0,
+        )
+        assert {"event_id", "candidate_arm", "arm_count_hard", "arm_fraction"} <= set(
+            df.columns
+        )
+        assert len(df) == 40 * 9
+        totals = df.groupby("event_id")["arm_count_hard"].sum()
+        assert (totals == 32).all()
+        fractions = df.groupby("event_id")["arm_fraction"].sum()
+        np.testing.assert_allclose(fractions.to_numpy(), 1.0)
+        # Every canonical predictor the multinomial simulator builds is present.
+        assert {"is_swr", "is_prev_arm", "swr_x_is_current_arm"} <= set(df.columns)
+
+    def test_p_true_is_returned_and_is_a_distribution(self):
+        df = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0},
+            log_phi_intercept=np.log(3.0),
+            n_events=25,
+            L_e=20,
+            seed=1,
+        )
+        p_true = df.attrs["p_true"]
+        assert p_true.shape == (25, 9)
+        np.testing.assert_allclose(p_true.sum(axis=1), 1.0)
+        assert (p_true >= 0).all()
+
+    def test_seed_is_reproducible(self):
+        kwargs = {"log_phi_intercept": np.log(3.0), "n_events": 20, "L_e": 16}
+        a = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0}, seed=5, **kwargs
+        )
+        b = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0}, seed=5, **kwargs
+        )
+        c = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0}, seed=6, **kwargs
+        )
+        np.testing.assert_array_equal(a["arm_count_hard"], b["arm_count_hard"])
+        assert not np.array_equal(a["arm_count_hard"], c["arm_count_hard"])
+
+    def test_small_phi_overdisperses_relative_to_multinomial(self):
+        """Small phi spreads per-event counts far beyond the multinomial variance.
+
+        Large phi is the multinomial limit, so its count variance must land near
+        the analytic ``L·p(1-p)`` while small phi lands well above it.
+        """
+        beta = {"is_current_arm": 1.0}
+        L_e = 32
+        variances = {}
+        for phi in (1.5, 1e4):
+            df = simulate_dirichlet_multinomial_counts(
+                beta, log_phi_intercept=np.log(phi), n_events=2000, L_e=L_e, seed=3
+            )
+            current = df.loc[df["is_current_arm"] == 1.0, "arm_count_hard"].to_numpy()
+            variances[phi] = float(np.var(current, ddof=1))
+            if phi == 1e4:
+                p = float(np.mean(current)) / L_e
+                multinomial_var = L_e * p * (1 - p)
+
+        assert variances[1e4] == pytest.approx(multinomial_var, rel=0.15)
+        assert variances[1.5] > 3.0 * variances[1e4], variances
+
+    def test_is_swr_shifts_concentration(self):
+        """A negative ``log_phi_is_swr`` makes SWR events the more concentrated ones."""
+        df = simulate_dirichlet_multinomial_counts(
+            {"is_current_arm": 1.0},
+            log_phi_intercept=np.log(20.0),
+            log_phi_is_swr=-3.0,
+            n_events=800,
+            L_e=32,
+            seed=4,
+        )
+        peak = df.groupby("event_id")["arm_fraction"].max()
+        is_swr = df.groupby("event_id")["is_swr"].first()
+        swr_peak = peak[is_swr == 1.0].mean()
+        non_swr_peak = peak[is_swr == 0.0].mean()
+        assert swr_peak > non_swr_peak + 0.05, (swr_peak, non_swr_peak)
+
+    def test_unknown_predictor_rejected(self):
+        with pytest.raises(ValueError, match="does not know how to build"):
+            simulate_dirichlet_multinomial_counts(
+                {"not_a_real_column": 1.0}, log_phi_intercept=0.0, n_events=10, seed=0
+            )

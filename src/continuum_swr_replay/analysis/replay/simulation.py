@@ -336,6 +336,54 @@ def simulate_with_event_covariates(
     """
     rng = np.random.default_rng(seed)
     predictor_list = list(beta_true)
+    all_columns = _sample_event_covariate_columns(n_events, rng)
+
+    missing = [p for p in predictor_list if p not in all_columns]
+    if missing:
+        raise ValueError(
+            f"simulate_with_event_covariates does not know how to build: {missing}"
+        )
+    n_arms = len(ALL_ARMS)
+
+    beta_vec = np.array([beta_true[p] for p in predictor_list], dtype=float)
+    design = np.stack([all_columns[p] for p in predictor_list], axis=-1)
+    logits = design @ beta_vec
+    probs = _softmax(logits)
+
+    if np.isscalar(L_e):
+        L_e_arr = np.full(n_events, int(L_e))
+    else:
+        L_e_arr = np.asarray(L_e, dtype=int)
+        if L_e_arr.shape != (n_events,):
+            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+
+    counts = np.empty((n_events, n_arms), dtype=int)
+    for e in range(n_events):
+        counts[e] = rng.multinomial(L_e_arr[e], probs[e])
+
+    # Long-format with EVERY canonical column populated, so callers can
+    # fit any nested submodel of the truth.
+    event_ids = np.repeat(np.arange(n_events), n_arms)
+    arm_ids = np.tile(ALL_ARMS, n_events)
+    data: dict[str, np.ndarray] = {
+        "event_id": event_ids,
+        "arm_id": arm_ids,
+        "arm_count_hard": counts.reshape(-1),
+    }
+    for name, arr in all_columns.items():
+        data[name] = arr.reshape(-1)
+    return pd.DataFrame(data)
+
+
+def _sample_event_covariate_columns(
+    n_events: int, rng: np.random.Generator
+) -> dict[str, np.ndarray]:
+    """Sample every canonical arm/event/interaction column, shape (n_events, n_arms).
+
+    The design sampler shared by :func:`simulate_with_event_covariates` and
+    :func:`simulate_dirichlet_multinomial_counts`, so both draw from the same
+    predictor vocabulary and the same distributions.
+    """
     n_arms = len(ALL_ARMS)
     leaf = np.asarray(WELL_ARMS, dtype=int)
     visit_recency, arm_never_visited = _sample_visit_history(n_events, rng)
@@ -394,22 +442,81 @@ def simulate_with_event_covariates(
     for name, (left, right) in _ARM_ARM_INTERACTIONS.items():
         interaction_cols[name] = arm_features[left] * arm_features[right]
 
-    all_columns: dict[str, np.ndarray] = {
+    return {
         **arm_features,
         **event_broadcast,
         **interaction_cols,
     }
 
+
+def simulate_dirichlet_multinomial_counts(
+    beta_true: dict[str, float],
+    *,
+    log_phi_intercept: float,
+    log_phi_is_swr: float = 0.0,
+    n_events: int = 300,
+    L_e: int | Sequence[int] = 32,
+    seed: int | None = None,
+) -> pd.DataFrame:
+    """Draw ``p_e ~ Dirichlet(phi_e · softmax(X_e β))``, then ``c_e ~ Multinomial(L_e, p_e)``.
+
+    The overdispersed counterpart of :func:`simulate_with_event_covariates`: the
+    mean allocation over arms is the same softmax, but each event draws its *own*
+    allocation from a Dirichlet centred on it, so the within-event timebins are
+    correlated. ``phi_e = exp(log_phi_intercept + log_phi_is_swr · is_swr_e)``
+    controls how tightly: large ``phi`` reproduces the multinomial simulator,
+    small ``phi`` makes each event's bins near-copies of one another.
+
+    Parameters
+    ----------
+    beta_true : dict[str, float]
+        Map from predictor name to true coefficient; any column the shared design
+        sampler builds is available.
+    log_phi_intercept : float
+        Log concentration of a non-SWR event.
+    log_phi_is_swr : float, optional
+        Additive shift of ``log phi`` on SWR events (negative = SWR events more
+        concentrated / more redundant).
+    n_events : int, optional
+        Number of synthetic events.
+    L_e : int or sequence of int, optional
+        Timebin count per event. Scalar broadcasts.
+    seed : int, optional
+        RNG seed.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long-format frame with one row per (event, candidate arm): ``event_id``,
+        ``candidate_arm``, ``arm_count_hard``, ``arm_fraction`` (counts / L_e) and
+        every canonical predictor column. ``df.attrs["p_true"]`` holds the drawn
+        per-event allocation, shape (n_events, n_arms).
+
+    Notes
+    -----
+    ``attrs["p_true"]`` is an array, and pandas compares ``attrs`` element-wise
+    when it propagates them through a concatenation (``groupby(...).agg`` with a
+    per-column dict, for one), which raises on an array. Take the array off the
+    frame (or use single-column aggregations) if you hit that.
+    """
+    rng = np.random.default_rng(seed)
+    predictor_list = list(beta_true)
+    all_columns = _sample_event_covariate_columns(n_events, rng)
+
     missing = [p for p in predictor_list if p not in all_columns]
     if missing:
         raise ValueError(
-            f"simulate_with_event_covariates does not know how to build: {missing}"
+            f"simulate_dirichlet_multinomial_counts does not know how to build: {missing}"
         )
+    n_arms = len(ALL_ARMS)
 
     beta_vec = np.array([beta_true[p] for p in predictor_list], dtype=float)
     design = np.stack([all_columns[p] for p in predictor_list], axis=-1)
-    logits = design @ beta_vec
-    probs = _softmax(logits)
+    mean_probs = _softmax(design @ beta_vec)
+
+    is_swr = all_columns["is_swr"][:, 0]
+    phi = np.exp(log_phi_intercept + log_phi_is_swr * is_swr)
+    alpha = phi[:, None] * mean_probs
 
     if np.isscalar(L_e):
         L_e_arr = np.full(n_events, int(L_e))
@@ -418,22 +525,23 @@ def simulate_with_event_covariates(
         if L_e_arr.shape != (n_events,):
             raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
 
+    p_true = np.empty((n_events, n_arms))
     counts = np.empty((n_events, n_arms), dtype=int)
     for e in range(n_events):
-        counts[e] = rng.multinomial(L_e_arr[e], probs[e])
+        p_true[e] = rng.dirichlet(alpha[e])
+        counts[e] = rng.multinomial(L_e_arr[e], p_true[e])
 
-    # Long-format with EVERY canonical column populated, so callers can
-    # fit any nested submodel of the truth.
-    event_ids = np.repeat(np.arange(n_events), n_arms)
-    arm_ids = np.tile(ALL_ARMS, n_events)
     data: dict[str, np.ndarray] = {
-        "event_id": event_ids,
-        "arm_id": arm_ids,
+        "event_id": np.repeat(np.arange(n_events), n_arms),
+        "candidate_arm": np.tile(ALL_ARMS, n_events),
         "arm_count_hard": counts.reshape(-1),
+        "arm_fraction": (counts / L_e_arr[:, None]).reshape(-1),
     }
     for name, arr in all_columns.items():
         data[name] = arr.reshape(-1)
-    return pd.DataFrame(data)
+    out = pd.DataFrame(data)
+    out.attrs["p_true"] = p_true
+    return out
 
 
 # ── Tier B: trajectory-level simulation with within-event autocorrelation ──
