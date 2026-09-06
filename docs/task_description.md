@@ -45,18 +45,44 @@ them. It combines spatial memory with probabilistic decision-making.
   (0.5, 0.8)" means the *highest-average* patch, not the only 0.8-bearing one.
   (Verified from the rig-side per-session Python control files that set `leafProbs`,
   `/stelmo/alison/<animal>/<animal>_py_done/*.py`: across 352 contingencies, `(0.2,0.8)`
-  patches occur 188× and `(0.8,0.8)` occurs 0×.)
+  patches occur 188× and `(0.8,0.8)` occurs 0×. The shipped `qvals_table` agrees:
+  no `(0.8,0.8)` patch on any of its 105 359 stops.)
 - **Dataset caveat (matters for value/contingency covariates).** The recorded and
-  ingested epochs are **not** all canonical-protocol sessions. **~37% of contingencies
-  (chimi+peanut ground-truth; ~35% of stops in `qvals_table`) do not follow the
-  canonical rule** — they are **shaping** (all-ports p=1.0 then all-0.5, the first run
-  session), **early-training** sessions (configs with no 0.8 anywhere, e.g.
-  [0.5,0.5,0.5,0.2,0.5,0.2]), and **special sessions** using probabilities outside
-  {0.2,0.5,0.8} (e.g. {0.1,0.3,0.4,0.6,0.9}). So candidate-arm reward-belief
-  mean, task reward probability, and `task_reward_probability_patch_mean_gap_best_vs_second`
-  are computed over a mix of canonical and non-canonical contingencies unless sessions
-  are explicitly filtered (they are **not** currently — only technical exclusions apply;
-  see `data_loaders/constants.py`).
+  ingested epochs are **not** all canonical-protocol sessions. Two different
+  questions have two different answers, and they are often confused:
+
+  - *Do the contingencies follow the canonical rule?* **No, for 35.6 % of stops**
+    (37.4 % of the 473 distinct epoch-label × contingency combinations in that
+    table; the table carries no animal/day key, so that is the coarsest honest
+    block unit). Every one of those failures is
+    the same failure: no patch is (0.5, 0.8), so the "best patch = (0.5, 0.8)"
+    clause does not hold. By stop share the top patch is (0.2, 0.8) for 19.4 %,
+    (0.5, 0.5) for 8.4 %, (0.2, 0.5) for 7.1 %, and the all-p=1.0 shaping
+    configuration for 0.8 %; 2.5 % of stops have two patches tied for the highest
+    mean. The always-enforced (0.8, 0.8) prohibition holds on **100 %** of stops.
+  - *Do the contingencies use the canonical values?* **Yes, for 99.2 % of stops** —
+    all six port probabilities drawn from {0.2, 0.5, 0.8}. The residual 0.8 %
+    (838 stops) is the single all-p=1.0 shaping configuration.
+
+  So the non-canonical mass is overwhelmingly **structural** — early-training
+  configurations built from canonical values but without the best-patch structure —
+  not exotic probabilities. Both figures were measured on the shipped
+  `Processed-Data/replay_content/models_per_bin_rate/qvals_table.parquet`
+  (105 359 stops; `task_reward_probability_port_{0..5}`).
+
+  The rig-side control files (`/stelmo/alison/<animal>/<animal>_py_done/*.py`) gave the
+  original ~37 % figure (chimi + peanut ground truth) and agree, but they are a
+  **broader parse**: they cover every session the rig ran, including ones never
+  ingested. Special sessions using
+  probabilities outside {0.2, 0.5, 0.8} (e.g. {0.1, 0.3, 0.4, 0.6, 0.9}) appear
+  there and **not** in the ingested cohort — which is why the raw-file view and the
+  table view disagree about value diversity while agreeing about the rule.
+
+  Either way, candidate-arm reward-belief mean, task reward probability, and
+  `task_reward_probability_patch_mean_gap_best_vs_second` are computed over a mix of
+  canonical and non-canonical contingencies unless sessions are explicitly filtered
+  (they are **not** currently — only technical exclusions apply; see
+  `data_loaders/constants.py`).
 - **Consecutive pokes at the same port are never rewarded** — animals
   must alternate between ports to receive reward.
 - p(R) assignments are uncued; animals can only infer them through
