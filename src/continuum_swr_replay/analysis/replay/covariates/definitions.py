@@ -541,7 +541,10 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="all response bins/events",
-            producer="replay.per_bin_design.aggregate_to_timebins or the replay table builders",
+            producer=(
+                "replay.per_bin_design.aggregate_to_timebins or the replay "
+                "table builders"
+            ),
             missingness="response time or stop start unavailable",
         ),
         _definition(

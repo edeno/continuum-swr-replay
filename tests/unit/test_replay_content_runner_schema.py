@@ -609,12 +609,12 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
 
     def _fit_with_one_late_session_failure(long_df, model_name, predictors, **kwargs):
         rows = []
-        for keys, group in long_df.groupby(runner.SESSION_COLS):
+        for keys, group in long_df.groupby(list(runner.SESSION_COLUMNS)):
             if model_name == "M1" and keys[0] == "a":
                 continue
             rows.append(
                 {
-                    **dict(zip(runner.SESSION_COLS, keys, strict=True)),
+                    **dict(zip(runner.SESSION_COLUMNS, keys, strict=True)),
                     "model": model_name,
                     "n_events": group["event_id"].nunique(),
                     "estimator": "conditional_poisson_fraction",
