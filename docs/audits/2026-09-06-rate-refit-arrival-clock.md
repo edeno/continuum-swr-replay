@@ -190,14 +190,14 @@ Before, every bin of a stop carried the reward-history features as of the **bout
 | non_local_no_swr | 218 | 95.4128 | 0.1040 | 211 | 7.5829 | 0.1931 | 16 | 0.1632 |
 
 
-**(b) Time-course shape.** Each rung's across-session median fitted curve is normalized to a density over its own window and turned into a CDF; the two CDFs are read on a common grid of relative time (fraction of the window) and `ks_distance` is their maximum absolute difference. The peak is given both in seconds on the rung's own clock and as a fraction of its window, because the windows differ (4.0 s vs 8.0 s).
+**(b) Time-course shape.** Both quantities are read on each rung's **supported interior** only — one first-knot spacing (1 s) is dropped at each end of the window, so the stop clock is read on [1, 3] s and the arrival clock on [1, 7] s. Outside the outermost interior knot a cubic B-spline is extrapolating over very little exposure and can run away: read over the full window, the argmax lands on a boundary grid point and the normalizing integral is dominated by mass that almost no bin contributes to. **This margin is a rule of thumb, not a measured support** — the exposure per grid cell lives in the per-bin design, which this script does not read — so a peak sitting near either edge of the interval should still be checked against the exposure before it is quoted. Within the interval, each rung's across-session median fitted curve is normalized to a density and turned into a CDF; the two CDFs are read on a common grid of relative position and `ks_distance` is their maximum absolute difference. Session-fits flagged `separated` are excluded (`pct_separated` reports how many), as are curves that overflow to infinity.
 
-| outcome | n_sessions_stop | peak_s_stop | peak_frac_window_stop | n_sessions_arrival | peak_s_arrival | peak_frac_window_arrival | ks_distance |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| swr | 218 | 2.390 | 0.598 | 211 | 0.000 | 0.000 | 0.224 |
-| non_local | 218 | 2.790 | 0.698 | 213 | 2.880 | 0.360 | 0.114 |
-| non_local_swr | 217 | 2.310 | 0.578 | 198 | 2.940 | 0.367 | 0.307 |
-| non_local_no_swr | 218 | 4.000 | 1.000 | 211 | 3.860 | 0.482 | 0.068 |
+| outcome | n_sessions_stop | pct_separated_stop | support_s_stop | peak_s_stop | peak_frac_support_stop | n_sessions_arrival | pct_separated_arrival | support_s_arrival | peak_s_arrival | peak_frac_support_arrival | ks_distance |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| swr | 212 | 2.752 | 1.0-3.0 | 2.385 | 0.692 | 132 | 37.441 | 1.0-7.0 | 3.550 | 0.425 | 0.121 |
+| non_local | 217 | 0.459 | 1.0-3.0 | 2.790 | 0.895 | 88 | 58.685 | 1.0-7.0 | 3.025 | 0.337 | 0.073 |
+| non_local_swr | 179 | 17.512 | 1.0-3.0 | 2.230 | 0.615 | 68 | 65.657 | 1.0-7.0 | 2.950 | 0.325 | 0.221 |
+| non_local_no_swr | 217 | 0.459 | 1.0-3.0 | 3.000 | 1.000 | 86 | 59.242 | 1.0-7.0 | 3.640 | 0.440 | 0.056 |
 
 
 ### What the arrival clock cost the cohort, and what its window kept

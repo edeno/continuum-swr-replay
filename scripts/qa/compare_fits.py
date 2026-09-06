@@ -391,6 +391,28 @@ def _spline_coef_columns(fits: pd.DataFrame, clock: str) -> list[str]:
     return sorted(cols, key=lambda c: int(c.rsplit("[", 1)[1][:-1]))
 
 
+def _support_window(knots: Sequence[float], tmax: float) -> tuple[float, float]:
+    """The part of a spline's window the summary is allowed to read.
+
+    A cubic B-spline is only pinned by data between its knots; outside the
+    outermost interior knot the fitted curve is an extrapolation held up by very
+    little exposure, and it can run away there. Two independent quantities are
+    read off these curves — where the rate peaks, and how the two clocks'
+    normalized shapes differ — and both are destroyed by an unsupported edge
+    excursion: the argmax lands on the boundary grid point and the normalizing
+    integral is dominated by mass that almost no bin contributes to.
+
+    The exposure per grid cell is the honest support measure, but it lives in
+    the per-bin design, which this script does not read — it reads fitted
+    coefficients only. So the margin is a fixed proxy: **one first-knot spacing
+    is excluded at each end** (1 s for both ladders, the distance from the
+    lower bound to the first interior knot). It is a rule of thumb, not a
+    measurement, and the audit says so beside the table.
+    """
+    margin = float(knots[0])
+    return margin, float(tmax) - margin
+
+
 def _fitted_time_courses(
     fits: pd.DataFrame,
     model: str,
@@ -399,21 +421,28 @@ def _fitted_time_courses(
     knots: Sequence[float],
     tmax: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Per-session fitted rate over the clock's window, at the ladder's knots.
+    """Per-session fitted rate over the clock's SUPPORTED interior.
 
     The knots are fixed (not data-driven), so the basis is a deterministic
     function of the clock and the curve is reconstructable from the saved
     coefficients: ``rate(t) = exp(intercept + B(t) @ spline_coef)``, with every
-    other block at its reference value.
+    other block at its reference value. The basis is built over the rung's real
+    bounds and then evaluated only on :func:`_support_window`, so a coefficient
+    is never re-fit — the curve is simply not read where it is unsupported.
+
+    A session is dropped when its fit is flagged ``separated`` (an unidentified
+    non-nuisance term makes its coefficients meaningless, not merely uncertain)
+    or when its reconstructed curve is not everywhere finite (``exp`` of a
+    runaway coefficient overflows).
 
     Returns
     -------
     grid : ndarray, shape (TIME_COURSE_GRID_POINTS,)
-        Clock values in seconds spanning ``[0, tmax]``.
+        Clock values in seconds spanning the supported interior.
     curves : ndarray, shape (n_sessions, TIME_COURSE_GRID_POINTS)
-        One fitted curve per session with a complete finite coefficient set.
+        One finite fitted curve per retained session.
     """
-    grid = np.linspace(0.0, tmax, TIME_COURSE_GRID_POINTS)
+    grid = np.linspace(*_support_window(knots, tmax), TIME_COURSE_GRID_POINTS)
     columns = _spline_coef_columns(fits, clock)
     sub = fits[(fits.model == model) & (fits.outcome == outcome)]
     if not columns or sub.empty or "coef_Intercept" not in sub:
@@ -421,6 +450,8 @@ def _fitted_time_courses(
     beta = sub[columns].to_numpy(dtype=float)
     intercept = sub["coef_Intercept"].to_numpy(dtype=float)
     ok = np.isfinite(beta).all(axis=1) & np.isfinite(intercept)
+    if "separated" in sub:
+        ok &= ~(sub["separated"] == True).to_numpy()  # noqa: E712
     if not ok.any():
         return grid, np.empty((0, grid.size))
     basis = np.asarray(
@@ -437,7 +468,9 @@ def _fitted_time_courses(
             f"has {basis.shape[1]} columns. The fit was made with different "
             "knots than the ones this comparison reconstructs."
         )
-    return grid, np.exp(intercept[ok, None] + beta[ok] @ basis.T)
+    with np.errstate(over="ignore"):
+        curves = np.exp(intercept[ok, None] + beta[ok] @ basis.T)
+    return grid, curves[np.isfinite(curves).all(axis=1)]
 
 
 def _density_cdf(grid: np.ndarray, curve: np.ndarray) -> np.ndarray:
@@ -505,15 +538,31 @@ def arrival_clock_cv_table(fits: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _separated_share(fits: pd.DataFrame, model: str, outcome: str) -> float:
+    """Share of a rung's session-fits flagged ``separated`` for one population."""
+    sub = fits[(fits.model == model) & (fits.outcome == outcome)]
+    if not len(sub) or "separated" not in sub:
+        return np.nan
+    return 100 * float((sub["separated"] == True).mean())  # noqa: E712
+
+
 def arrival_clock_shape_table(fits: pd.DataFrame) -> pd.DataFrame:
     """Shape of the two fitted time courses: peak position and KS distance.
 
-    Each rung's across-session median curve is normalized to a density over its
-    OWN window and turned into a CDF; the two CDFs are then read on a common
-    grid of relative time (fraction of the window) and their maximum absolute
-    difference is the KS distance. The peak is reported both in seconds on the
-    rung's own clock and as a fraction of its window, because the windows differ
-    (``[0, TMAX]`` vs ``[0, TMAX_ARRIVAL]``).
+    Both quantities are read on each rung's SUPPORTED interior only
+    (:func:`_support_window`): the peak is the argmax of the across-session
+    median curve there, and the KS distance compares the two curves after each
+    is normalized to a density over its own supported interior and read on a
+    common grid of relative position within it. Reading either quantity over the
+    full window lets an unsupported edge excursion decide it — the argmax lands
+    on the boundary grid point and the normalizing integral is dominated by mass
+    almost no bin contributes to.
+
+    The peak is reported both in seconds on the rung's own clock and as a
+    fraction of the supported interval, because the two intervals differ in
+    length. ``pct_separated`` is the share of that rung's session-fits excluded
+    for carrying an unidentified non-nuisance term, reported so a shrinking
+    ``n_sessions`` is attributable.
     """
     rows = []
     for outcome in OUTCOME_ORDER:
@@ -532,20 +581,22 @@ def arrival_clock_shape_table(fits: pd.DataFrame) -> pd.DataFrame:
             continue
         row: dict[str, object] = {"outcome": outcome}
         cdfs = {}
-        for label, grid, curves, tmax in (
-            ("stop", stop_grid, stop_curves, TMAX),
-            ("arrival", arr_grid, arr_curves, TMAX_ARRIVAL),
+        for label, rung, grid, curves in (
+            ("stop", STOP_TIME_RUNG, stop_grid, stop_curves),
+            ("arrival", ARRIVAL_TIME_RUNG, arr_grid, arr_curves),
         ):
             row[f"n_sessions_{label}"] = int(len(curves))
+            row[f"pct_separated_{label}"] = _separated_share(fits, rung, outcome)
+            row[f"support_s_{label}"] = f"{grid[0]:.1f}-{grid[-1]:.1f}"
             if not len(curves):
                 row[f"peak_s_{label}"] = np.nan
-                row[f"peak_frac_window_{label}"] = np.nan
+                row[f"peak_frac_support_{label}"] = np.nan
                 cdfs[label] = None
                 continue
             median_curve = np.median(curves, axis=0)
             peak = float(grid[int(np.argmax(median_curve))])
             row[f"peak_s_{label}"] = peak
-            row[f"peak_frac_window_{label}"] = peak / tmax
+            row[f"peak_frac_support_{label}"] = (peak - grid[0]) / (grid[-1] - grid[0])
             cdfs[label] = _density_cdf(grid, median_curve)
         if cdfs["stop"] is None or cdfs["arrival"] is None:
             row["ks_distance"] = np.nan
@@ -1484,13 +1535,24 @@ def build_report(
     )
     add(_md(arrival_clock_cv_table(new_bin), floatfmt="{:.4f}"))
     add(
-        "\n**(b) Time-course shape.** Each rung's across-session median fitted "
-        "curve is normalized to a density over its own window and turned into a "
-        "CDF; the two CDFs are read on a common grid of relative time (fraction "
-        "of the window) and `ks_distance` is their maximum absolute difference. "
-        "The peak is given both in seconds on the rung's own clock and as a "
-        f"fraction of its window, because the windows differ ({TMAX} s vs "
-        f"{TMAX_ARRIVAL} s).\n"
+        "\n**(b) Time-course shape.** Both quantities are read on each rung's "
+        "**supported interior** only — one first-knot spacing (1 s) is dropped "
+        "at each end of the window, so the stop clock is read on "
+        f"[1, {TMAX - 1.0:g}] s and the arrival clock on "
+        f"[1, {TMAX_ARRIVAL - 1.0:g}] s. Outside the outermost interior knot a "
+        "cubic B-spline is extrapolating over very little exposure and can run "
+        "away: read over the full window, the argmax lands on a boundary grid "
+        "point and the normalizing integral is dominated by mass that almost no "
+        "bin contributes to. **This margin is a rule of thumb, not a measured "
+        "support** — the exposure per grid cell lives in the per-bin design, "
+        "which this script does not read — so a peak sitting near either edge of "
+        "the interval should still be checked against the exposure before it is "
+        "quoted. Within the interval, each rung's across-session median fitted "
+        "curve is normalized to a density and turned into a CDF; the two CDFs "
+        "are read on a common grid of relative position and `ks_distance` is "
+        "their maximum absolute difference. Session-fits flagged `separated` "
+        "are excluded (`pct_separated` reports how many), as are curves that "
+        "overflow to infinity.\n"
     )
     add(_md(arrival_clock_shape_table(new_bin), floatfmt="{:.3f}"))
 

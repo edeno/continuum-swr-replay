@@ -32,6 +32,7 @@ from scripts.qa.compare_fits import (
     ARRIVAL_TIME_RUNG,
     BOUNDARY_REWARD_RUNG,
     STOP_TIME_RUNG,
+    _support_window,
     arrival_clock_cv_table,
     arrival_clock_shape_table,
     arrival_cohort_table,
@@ -52,20 +53,29 @@ def _basis(clock: str, knots: tuple[float, ...], tmax: float, x: np.ndarray):
     return np.asarray(design), list(design.columns)
 
 
-def _encode_bump(
-    clock: str, knots: tuple[float, ...], tmax: float, peak: float, width: float
-):
-    """Spline coefficients whose fitted curve is a Gaussian bump at ``peak``.
+def _encode_log_rate(clock: str, knots: tuple[float, ...], tmax: float, log_rate):
+    """Spline coefficients whose fitted curve best matches ``log_rate(t)``.
 
     Returns the intercept, the coefficients in basis order, and the basis column
     names, so a fixture can write exactly the columns a real fit would carry.
     """
     grid = np.linspace(0.0, tmax, 2001)
-    target = np.log(0.5 + 4.0 * np.exp(-0.5 * ((grid - peak) / width) ** 2))
     basis, names = _basis(clock, knots, tmax, grid)
     augmented = np.column_stack([np.ones_like(grid), basis])
-    solution, *_ = np.linalg.lstsq(augmented, target, rcond=None)
+    solution, *_ = np.linalg.lstsq(augmented, log_rate(grid), rcond=None)
     return float(solution[0]), solution[1:], names
+
+
+def _encode_bump(
+    clock: str, knots: tuple[float, ...], tmax: float, peak: float, width: float
+):
+    """Spline coefficients whose fitted curve is a Gaussian bump at ``peak``."""
+    return _encode_log_rate(
+        clock,
+        knots,
+        tmax,
+        lambda t: np.log(0.5 + 4.0 * np.exp(-0.5 * ((t - peak) / width) ** 2)),
+    )
 
 
 def _time_rung_rows(
@@ -76,10 +86,12 @@ def _time_rung_rows(
     peak: float,
     width: float,
     cv_bits: list[float],
+    separated: list[bool] | None = None,
 ) -> pd.DataFrame:
     intercept, coefficients, names = _encode_bump(clock, knots, tmax, peak, width)
+    flags = separated if separated is not None else [False] * len(SESSIONS)
     rows = []
-    for (animal, date, epoch), bits in zip(SESSIONS, cv_bits, strict=True):
+    for (animal, date, epoch), bits, flag in zip(SESSIONS, cv_bits, flags, strict=True):
         row = {
             "animal": animal,
             "session_date": date,
@@ -88,6 +100,7 @@ def _time_rung_rows(
             "outcome": "non_local",
             "coef_Intercept": intercept,
             "cv_bits_per_event": bits,
+            "separated": flag,
         }
         row.update(
             {
@@ -128,25 +141,39 @@ def _two_clock_fits(
     return pd.concat([stop, arrival], ignore_index=True)
 
 
+# The supported interior each summary is read on: one first-knot spacing is
+# dropped at each end, so the stop clock is read on [1, 3] s and the arrival
+# clock on [1, 7] s. The fixtures below plant their bumps inside those.
+STOP_SUPPORT = _support_window(SPLINE_KNOTS, TMAX)
+ARRIVAL_SUPPORT = _support_window(ARRIVAL_SPLINE_KNOTS, TMAX_ARRIVAL)
+
+
+def test_the_summary_is_read_on_the_supported_interior_only():
+    assert STOP_SUPPORT == (1.0, 3.0)
+    assert ARRIVAL_SUPPORT == (1.0, 7.0)
+
+
 def test_shape_table_recovers_each_clocks_planted_peak():
-    """A bump planted at 1.0 s on tc and 2.0 s after arrival is read back."""
+    """A bump planted at 1.5 s on tc and 2.5 s after arrival is read back."""
     fits = _two_clock_fits(
-        stop_peak=1.0, stop_width=0.5, arrival_peak=2.0, arrival_width=1.0
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
     )
     table = arrival_clock_shape_table(fits).set_index("outcome")
     row = table.loc["non_local"]
     assert row["n_sessions_stop"] == 2
     assert row["n_sessions_arrival"] == 2
-    assert row["peak_s_stop"] == pytest.approx(1.0, abs=0.1)
-    assert row["peak_s_arrival"] == pytest.approx(2.0, abs=0.1)
-    assert row["peak_frac_window_stop"] == pytest.approx(0.25, abs=0.03)
-    assert row["peak_frac_window_arrival"] == pytest.approx(0.25, abs=0.03)
+    assert row["support_s_stop"] == "1.0-3.0"
+    assert row["support_s_arrival"] == "1.0-7.0"
+    assert row["peak_s_stop"] == pytest.approx(1.5, abs=0.1)
+    assert row["peak_s_arrival"] == pytest.approx(2.5, abs=0.1)
+    assert row["peak_frac_support_stop"] == pytest.approx(0.25, abs=0.05)
+    assert row["peak_frac_support_arrival"] == pytest.approx(0.25, abs=0.05)
 
 
 def test_matched_relative_shape_gives_a_near_zero_ks_distance():
-    """Same bump at the same fraction of each window: the shapes agree."""
+    """Same bump at the same fraction of each supported interval."""
     fits = _two_clock_fits(
-        stop_peak=1.0, stop_width=0.5, arrival_peak=2.0, arrival_width=1.0
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
     )
     ks = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
     assert ks["ks_distance"] < 0.05
@@ -155,11 +182,83 @@ def test_matched_relative_shape_gives_a_near_zero_ks_distance():
 def test_ks_distance_separates_clocks_that_disagree():
     """An early stop-clock bump against a late arrival bump is far apart."""
     fits = _two_clock_fits(
-        stop_peak=0.5, stop_width=0.4, arrival_peak=6.0, arrival_width=0.8
+        stop_peak=1.4, stop_width=0.5, arrival_peak=5.8, arrival_width=0.9
     )
     row = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
-    assert row["peak_s_arrival"] == pytest.approx(6.0, abs=0.15)
+    assert row["peak_s_arrival"] == pytest.approx(5.8, abs=0.15)
     assert row["ks_distance"] > 0.5
+
+
+def test_an_unsupported_edge_spike_does_not_become_the_reported_peak():
+    """A narrow runaway at t=0 sits outside the support; the real bump wins.
+
+    This is the failure the margin exists for: at the window edge the spline is
+    extrapolating over almost no exposure, and a curve that rises there would
+    otherwise be reported as a peak at 0 s — read as "locked to the arrival"
+    when the supported maximum is seconds later.
+    """
+    intercept, coefficients, names = _encode_log_rate(
+        ARRIVAL_CLOCK_COLUMN,
+        ARRIVAL_SPLINE_KNOTS,
+        TMAX_ARRIVAL,
+        lambda t: np.log(
+            0.2 + 4.0 * np.exp(-0.5 * ((t - 3.0) / 1.0) ** 2) + 60.0 * np.exp(-t / 0.05)
+        ),
+    )
+    rows = []
+    for animal, date, epoch in SESSIONS:
+        row = {
+            "animal": animal,
+            "session_date": date,
+            "epoch": epoch,
+            "model": ARRIVAL_TIME_RUNG,
+            "outcome": "non_local",
+            "coef_Intercept": intercept,
+            "cv_bits_per_event": 0.2,
+            "separated": False,
+        }
+        row.update(
+            {
+                f"coef_{name}": value
+                for name, value in zip(names, coefficients, strict=True)
+            }
+        )
+        rows.append(row)
+    fits = pd.DataFrame(rows)
+    grid = np.linspace(0.0, TMAX_ARRIVAL, 401)
+    basis, _ = _basis(ARRIVAL_CLOCK_COLUMN, ARRIVAL_SPLINE_KNOTS, TMAX_ARRIVAL, grid)
+    full_window = np.exp(intercept + basis @ coefficients)
+    assert grid[int(np.argmax(full_window))] == pytest.approx(0.0, abs=0.05)
+
+    row = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
+
+    assert row["peak_s_arrival"] == pytest.approx(3.0, abs=0.4)
+
+
+def test_separated_fits_are_excluded_and_their_share_reported():
+    """A flagged fit's coefficients are unidentified, not merely uncertain."""
+    fits = _two_clock_fits(
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
+    )
+    flagged = (fits.model == ARRIVAL_TIME_RUNG) & (fits.animal == "j16")
+    fits.loc[flagged, "separated"] = True
+    row = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
+    assert row["n_sessions_arrival"] == 1
+    assert row["pct_separated_arrival"] == pytest.approx(50.0)
+    assert row["n_sessions_stop"] == 2
+    assert row["pct_separated_stop"] == pytest.approx(0.0)
+
+
+def test_a_curve_that_overflows_to_infinity_is_dropped():
+    """``exp`` of a runaway intercept is inf and must not enter the median."""
+    fits = _two_clock_fits(
+        stop_peak=1.5, stop_width=0.6, arrival_peak=2.5, arrival_width=1.8
+    )
+    runaway = (fits.model == STOP_TIME_RUNG) & (fits.animal == "j16")
+    fits.loc[runaway, "coef_Intercept"] = 1e5
+    row = arrival_clock_shape_table(fits).set_index("outcome").loc["non_local"]
+    assert row["n_sessions_stop"] == 1
+    assert row["peak_s_stop"] == pytest.approx(1.5, abs=0.1)
 
 
 def test_shape_table_raises_when_the_saved_basis_is_a_different_size():
