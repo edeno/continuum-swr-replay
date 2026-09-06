@@ -601,20 +601,25 @@ def _estimator_rows(
         separated = set(separated_terms.split("|")) - {""}
         for name in [k[len("coef_") :] for k in fit if k.startswith("coef_")]:
             clustered = fit.get(f"bse_cluster_{name}")
-            use_cluster = estimator == CONDITIONAL_POISSON_FRACTION
-            if use_cluster and (clustered is None or not np.isfinite(float(clustered))):
-                # The shipped estimator IS its clustered SE; silently reporting
-                # the model SE instead would put a number a third the size in a
-                # column the comparison reads as the fraction fit's uncertainty.
-                # A non-finite sandwich is the same failure as a missing one --
-                # it would become a NaN SE and a NaN SE ratio, quietly dropping
-                # that session from the medians the comparison is built on.
+            is_fraction = estimator == CONDITIONAL_POISSON_FRACTION
+            if is_fraction and clustered is None:
                 raise ValueError(
                     f"{rung.name} {key}: the conditional-Poisson fraction fit "
-                    f"returned bse_cluster_{name}={clustered!r}; the "
-                    "event-clustered standard error is what this estimator "
-                    "reports and it must be finite"
+                    f"carries no bse_cluster_{name}; the event-clustered "
+                    "standard error is what this estimator reports"
                 )
+            # A non-finite sandwich (a predictor that is constant or nearly so
+            # within one session) falls back to that session's model SE with
+            # ``se_source == "model"``, exactly as the shipped aggregation's
+            # ``session_se`` does, so the row stays in the medians on the same
+            # footing the audited tables give it. Rows that fell back are
+            # counted in the provenance sidecar.
+            use_cluster = is_fraction and np.isfinite(float(clustered))
+            se_source = (
+                "event_clustered"
+                if use_cluster
+                else ("model_fallback" if is_fraction else "model")
+            )
             rows.append(
                 {
                     **dict(zip(SC, key, strict=True)),
@@ -623,7 +628,7 @@ def _estimator_rows(
                     "estimator": estimator,
                     "coef": float(fit[f"coef_{name}"]),
                     "se": float(clustered if use_cluster else fit[f"bse_{name}"]),
-                    "se_source": "event_clustered" if use_cluster else "model",
+                    "se_source": se_source,
                     "n_events": int(n_events),
                     "n_events_in": int(info["n_events_in"]),
                     "n_events_shared_dropped": int(info["n_events_in"] - n_events),
@@ -1326,6 +1331,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             # from the medians, the bootstrap and the figures. The drop is
             # paired: if one estimator's row is unidentified, all three go.
             "n_unidentified_triples_dropped": n_unpaired_triples(result.coefficients),
+            "n_fraction_rows_model_se_fallback": int(
+                (result.coefficients["se_source"] == "model_fallback").sum()
+            ),
             # (session, rung, estimator) fits whose parent landed on a
             # different number of events, so their AIC was not differenced.
             "n_fits_delta_aic_row_mismatch": (

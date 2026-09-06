@@ -442,17 +442,38 @@ def test_the_concentration_figure_refuses_a_rung_it_has_no_fits_for(one_rung, tm
         )
 
 
-def test_the_fraction_fits_non_finite_sandwich_is_refused(one_rung):
-    """A NaN clustered SE is the same failure as a missing one, not a datum.
+def test_the_fraction_fits_non_finite_sandwich_falls_back_to_the_model_se(one_rung):
+    """A NaN clustered SE keeps the row on its model SE, labelled as such.
 
-    Reported as-is it becomes a NaN SE and a NaN SE ratio, which drops that
-    session from the medians silently -- selection on the estimator's own
-    numerical trouble.
+    This is the shipped aggregation's own rule (``session_se``): a predictor
+    that is constant within one session has no sandwich, and dropping the
+    session would be selection on the estimator's numerical trouble.
     """
     fit = {
         "coef_is_current_arm": 0.8,
         "bse_is_current_arm": 0.1,
         "bse_cluster_is_current_arm": np.nan,
+        "llf": -100.0,
+        "llf_includes_constants": False,
+        "n_params": 2,
+    }
+    rows = mod._estimator_rows(
+        ("alpha", "20200101", "02_r1"),
+        BASE_RUNG,
+        {CONDITIONAL_POISSON_FRACTION: fit},
+        info={"n_events_in": 10},
+        log_constant=0.0,
+        n_events=10,
+    )
+    (row,) = rows
+    assert row["se"] == 0.1
+    assert row["se_source"] == "model_fallback"
+
+
+def test_the_fraction_fit_without_a_sandwich_column_is_refused(one_rung):
+    fit = {
+        "coef_is_current_arm": 0.8,
+        "bse_is_current_arm": 0.1,
         "llf": -100.0,
         "llf_includes_constants": False,
         "n_params": 2,

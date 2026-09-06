@@ -169,7 +169,9 @@ per-rung key terms:
 
 **Type caveat — these two ranges are not the same comparison.** The fraction
 ratio puts an event-**clustered sandwich** SE over the count model's **model**
-SE (`se_source` is `event_clustered` for the fraction rows and `model` for the
+SE (`se_source` is `event_clustered` for the fraction rows — or `model_fallback` for the
+few (session, term) rows whose sandwich is not finite, which keep their model SE exactly as
+the shipped aggregation's per-session rule does; the count is in the provenance sidecar — and `model` for the
 other two); the DM ratio is model SE over model SE. Do not read the gap between
 4.6× and 5.9× as "the fraction model is more conservative than the DM" — one
 number is robust, the other is parametric.
