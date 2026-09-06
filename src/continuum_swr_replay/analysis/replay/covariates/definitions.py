@@ -103,7 +103,10 @@ _STOP = "immobility stop"
 _TRIAL_STOP = "behavioral-model trial broadcast at stop start"
 # Absolute clock readings, not durations: only differences between them are
 # interpretable, so they must never be standardized or entered as a predictor.
-_ABSOLUTE_SECONDS = "seconds on the absolute session clock (differences only)"
+# The units string is load-bearing -- ``covariate_timing`` derives its
+# absolute-clock deny set from it, so tagging a column with it is what keeps the
+# raw clock out of every model.
+ABSOLUTE_SECONDS_UNITS = "seconds on the absolute session clock (differences only)"
 
 # These quantities use a pre-outcome model state, but selecting one port needs
 # the realized destination at goal arrival.  The enforcement registry currently
@@ -325,7 +328,7 @@ _DEFINITIONS = [
         "last_well_arrival_time_s",
         "Absolute session time at which the animal arrived at the well occupied at the start of the stop.",
         grain=_STOP,
-        units=_ABSOLUTE_SECONDS,
+        units=ABSOLUTE_SECONDS_UNITS,
         clock=QueryClock.GOAL_ARRIVAL,
         availability=Availability.PRE_OUTCOME,
         support="stops after at least one completed arrival",
@@ -336,7 +339,7 @@ _DEFINITIONS = [
         "outcome_known_time_s",
         "Absolute session time at which the outcome of that arrival became physically observable: pump onset when rewarded, the canonical latency/poke-out boundary when omitted.",
         grain=_STOP,
-        units=_ABSOLUTE_SECONDS,
+        units=ABSOLUTE_SECONDS_UNITS,
         clock=QueryClock.OUTCOME_AVAILABILITY,
         availability=Availability.POST_OUTCOME,
         support="stops after at least one completed arrival",
@@ -894,6 +897,39 @@ _DEFINITIONS.append(
         support="per-bin rate design",
         producer="replay._helpers.aggregate_to_timebins",
         missingness="none for constructed bins",
+    )
+)
+
+_DEFINITIONS.append(
+    _definition(
+        "time_since_last_well_arrival_s",
+        "Response-bin time relative to the arrival at the well occupied at the "
+        "start of the stop. Zero at the moment of arrival and non-negative for "
+        "every bin of an at-well stop, since the bout can only begin once the "
+        "animal has arrived.",
+        grain="stop × response bin",
+        units="seconds",
+        clock=QueryClock.GOAL_ARRIVAL,
+        availability=Availability.PRE_OUTCOME,
+        support="per-bin rate design; stops with a completed arrival",
+        producer="replay._helpers.aggregate_to_timebins",
+        missingness="no completed arrival at the bout start",
+    )
+)
+
+_DEFINITIONS.append(
+    _definition(
+        "time_since_outcome_known_s",
+        "Response-bin time relative to the moment the current trip's reward or "
+        "omission became physically observable. NEGATIVE for bins that precede "
+        "that boundary, zero at it, positive after it.",
+        grain="stop × response bin",
+        units="seconds",
+        clock=QueryClock.OUTCOME_AVAILABILITY,
+        availability=Availability.POST_OUTCOME,
+        support="per-bin rate design; stops with a completed arrival",
+        producer="replay._helpers.aggregate_to_timebins",
+        missingness="no completed arrival at the bout start",
     )
 )
 

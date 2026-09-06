@@ -29,6 +29,7 @@ the completeness test asserts every ladder predictor resolves into
 from __future__ import annotations
 
 from .covariates.definitions import (
+    ABSOLUTE_SECONDS_UNITS,
     COVARIATE_DEFINITIONS,
     POST_CHOICE_COVARIATES,
     Availability,
@@ -61,6 +62,20 @@ PRE_OUTCOME_SAFE = frozenset(
 # Gating factors, not outcome-bearing -- dropped when resolving a patsy interaction.
 SAFE_MODIFIERS = frozenset({"is_swr", "is_mua", "Intercept", "1"})
 
+# Raw readings of the absolute session clock (e.g. ``last_well_arrival_time_s``,
+# ``outcome_known_time_s``). Only DIFFERENCES between them are interpretable, so
+# an epoch clock is never itself a predictor -- as a regressor it would fit
+# session drift and the arbitrary epoch origin rather than any elapsed-time
+# effect. Derived durations (``time_since_last_well_arrival_s``,
+# ``time_since_outcome_known_s``) are fine and are gated only by their source
+# atom's availability. Derived from the catalog's units string so a new clock
+# column inherits the ban by being tagged, not by being listed here.
+ABSOLUTE_SESSION_CLOCKS = frozenset(
+    name
+    for name, definition in COVARIATE_DEFINITIONS.items()
+    if definition.units == ABSOLUTE_SECONDS_UNITS
+)
+
 DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
     # Stop-local summaries. Omission streak is a deterministic reduction of the
     # causal reward-lag vector. WSLS uses the eventual outbound choice and is
@@ -70,6 +85,12 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     ],
     # Reads completed_trial_reward since 1290257, not reward_outcome.
     "wsls_deviation": ["completed_trial_reward", "is_stay"],
+    # Per-bin clocks built by ``aggregate_to_timebins`` as bin centre minus an
+    # absolute stop clock; each inherits its source clock's availability, so the
+    # outcome-relative one stays behind the post-outcome gate even though its
+    # negative values sit before the boundary.
+    "time_since_last_well_arrival_s": ["last_well_arrival_time_s"],
+    "time_since_outcome_known_s": ["outcome_known_time_s"],
     # Patch aggregates of already-classified arm covariates. Registered
     # explicitly so the patch ladder resolves, rather than relying on a
     # name-split heuristic that would treat "<x>_patch" as its own atom.
@@ -225,8 +246,19 @@ def assert_predictor_timing(
     current outcome is known — the fit must be gated to post-current-outcome bins).
     FUTURE_REFERENCING covariates are **never** gate-fixable and require
     ``descriptive=True`` (or a strictly past-only replacement).
+
+    A raw :data:`ABSOLUTE_SESSION_CLOCKS` reading is refused outright under every
+    flag: no gate makes an epoch origin a meaningful regressor.
     """
     for p in predictors:
+        raw_clocks = ABSOLUTE_SESSION_CLOCKS.intersection(p.split(":"))
+        if raw_clocks:
+            raise ValueError(
+                f"{p} enters an absolute session clock ({sorted(raw_clocks)}) as a "
+                "predictor; only differences between clocks are interpretable. Use "
+                "the derived elapsed-time column (e.g. "
+                "time_since_last_well_arrival_s) instead."
+            )
         atoms = set(timing_of(p))
         unknown = atoms - KNOWN_ATOMS
         if unknown:
