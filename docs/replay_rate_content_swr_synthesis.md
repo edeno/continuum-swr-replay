@@ -184,10 +184,11 @@ carry the raised-cosine basis and per-coefficient separation judging, but the
 audit reports only fit counts and separation shares for them, not coefficients —
 see [per_bin_rate_results.md](per_bin_rate_results.md) §5 and
 [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)
-("is_swr-contrast"). Note also that separation is heavy there: 64.7 % of the
-contrast-cohort fits carry a separated non-nuisance term, and
-`is_swr:reward_history_rcos_1` is flagged in 74.8 % of the fits that carry it —
-so any re-derived aggregate must state its excluded share.
+("is_swr-contrast"). Note also that separation is heavy there: **64.7 %** of the
+contrast cohort's post-outcome fits and **68.4 %** of its primary fits carry a
+separated non-nuisance term, and `is_swr:reward_history_rcos_1` is flagged in
+**74.8 %** of the fits that carry it — so any re-derived aggregate must state
+its excluded share.
 
 ## Layer 2 — SWR-coupling (ripple power as a continuous mark)
 
