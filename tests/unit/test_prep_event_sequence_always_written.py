@@ -42,7 +42,8 @@ from continuum_swr_replay.analysis.replay._tables_common import (
 from continuum_swr_replay.table_io import read_table, write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# The replay-content prep driver moved from scripts/ into the package (ee1eb51).
+# The build lives in the package; its command line is
+# scripts/decoding/prepare_replay_content_data.py.
 PREPARE_DATA = REPO_ROOT / "src/continuum_swr_replay/analysis/replay/prepare_data.py"
 
 

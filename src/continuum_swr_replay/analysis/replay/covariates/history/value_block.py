@@ -173,7 +173,7 @@ def attach_contingency_value_block(
             f"{sorted(missing)}; qvals_table is the sole source and must carry "
             "task_reward_probability_port_{0..5} / "
             "reward_belief_mean_port_{0..5} (regenerate with "
-            "`python -m continuum_swr_replay.analysis.behavior.qvals_table --write`)"
+            "`uv run python scripts/behavior/build_qvals_table.py --write`)"
         )
     merged = _merge_contingency_on_stop(
         stop_id,

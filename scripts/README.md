@@ -7,6 +7,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `decoding/` — produce the decoded data + event/stop tables
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
+- `prepare_replay_content_data.py` — build the canonical replay-content tables
+  (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.
 - `build_timebin_tables.py` — build the per-(stop×bin) design tables.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
@@ -31,6 +33,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 
 ## `behavior/`
 - `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
+- `build_qvals_table.py` — build the per-stop behavioral-model covariate table
+  (`qvals_table`) from the shared DataJoint RL-model and trial-timing schemas.
 
 ## `figures/` — publication figures
 - `generate_figure01.py … generate_figure04.py`, `generate_all_figures.py` (orchestrator).

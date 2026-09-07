@@ -19,6 +19,7 @@ import pytest
 
 import continuum_swr_replay.data_loaders as dl
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
+from scripts.decoding import prepare_replay_content_data as prepare_cli
 
 
 @pytest.fixture
@@ -365,10 +366,10 @@ def test_canonical_build_aborts_instead_of_publishing_a_partial_session_set(
         raise ValueError("physical-poke chain mismatch")
 
     monkeypatch.setattr(pdm, "_process_session", fail_session)
-    monkeypatch.setattr(sys, "argv", ["prepare_data.py"])
+    monkeypatch.setattr(sys, "argv", ["prepare_replay_content_data.py"])
 
     with pytest.raises(RuntimeError, match="No scientific tables were written"):
-        pdm.main()
+        prepare_cli.main()
     assert not (tmp_path / "candidate").exists()
 
 

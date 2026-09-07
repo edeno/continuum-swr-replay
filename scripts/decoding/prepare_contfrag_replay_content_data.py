@@ -399,7 +399,7 @@ def main():
             # Behavioral context / track graph unavailable. This is a failure,
             # not a benign skip: count it toward the fail-closed gate below so a
             # dropped session cannot leave a complete-looking table set (mirrors
-            # the Replay driver in analysis/replay/prepare_data.py:main).
+            # the Replay driver, analysis/replay/prepare_data.run_prepare_data).
             reason = "behavioral context or track graph unavailable"
             logging.warning("skip %s %s: %s", nwb, epoch, reason)
             skipped.append((nwb, epoch, reason))

@@ -26,7 +26,7 @@ Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from Alison Co
 
 Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `main`
+`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `run_build_qvals_table`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
@@ -116,7 +116,7 @@ Stable row identities: the ``event_id`` and ``stop_id`` hashes.
 
 Build the four canonical replay-content tables across all sessions.
 
-`find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`, `main`
+`find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`
 
 ### `src/continuum_swr_replay/analysis/replay/table_contracts.py`
 
@@ -344,6 +344,12 @@ Synthetic-data generators for validating the conditional Poisson model.
 
 Command-line entry points that fit or plot a ladder.
 
+### `scripts/behavior/build_qvals_table.py`
+
+Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
+
+`main`
+
 ### `scripts/content/analyze_content_occupancy.py`
 
 Content occupancy of non-local events — where the decoded activity represents.
@@ -421,6 +427,12 @@ Convert the materialized canonical tables from pickle to parquet.
 Build canonical replay-content tables from ContFrag decoding results.
 
 `contfrag_table_basenames`, `find_sessions`, `main`
+
+### `scripts/decoding/prepare_replay_content_data.py`
+
+Build the four canonical replay-content tables across all sessions.
+
+`main`
 
 ### `scripts/decoding/refresh_contfrag_behavioral_covariates.py`
 

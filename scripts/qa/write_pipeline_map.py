@@ -28,6 +28,7 @@ ROOTS: tuple[str, ...] = (
     "src/continuum_swr_replay/analysis/replay",
     "src/continuum_swr_replay/analysis/hippocampus",
     "src/continuum_swr_replay/analysis/behavior",
+    "scripts/behavior",
     "scripts/decoding",
     "scripts/content",
     "scripts/rate",
@@ -100,6 +101,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Runners",
         "Command-line entry points that fit or plot a ladder.",
         (
+            "scripts/behavior/*.py",
             "scripts/decoding/*.py",
             "scripts/content/*.py",
             "scripts/rate/*.py",

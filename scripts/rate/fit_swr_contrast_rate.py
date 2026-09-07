@@ -537,7 +537,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
     if missing:
         raise ValueError(
             f"qvals_table missing {missing}; regenerate it "
-            "(python -m continuum_swr_replay.analysis.behavior.qvals_table --write)"
+            "(uv run python scripts/behavior/build_qvals_table.py --write)"
         )
     # Guard the stop_id join before the inner join hides its casualties
     # (see assert_qvals_aligned).

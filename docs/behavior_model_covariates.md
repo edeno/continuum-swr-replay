@@ -5,7 +5,7 @@ decision variables, uncertainty, value updates, entropy), one row per stop,
 keyed by `stop_id` (joins to `stop_table.parquet`).
 
 - **Generator:** [`analysis/behavior/qvals_table.py`](../src/continuum_swr_replay/analysis/behavior/qvals_table.py)
-  — run `python -m continuum_swr_replay.analysis.behavior.qvals_table --write`.
+  — run `uv run python scripts/behavior/build_qvals_table.py --write`.
 - **Output:** `Processed-Data/replay_content/models_per_bin_rate/qvals_table.parquet`
   (gitignored data artifact; regenerate from the script).
 - **Decision-variable functions:** vendored verbatim from Alison Comrie's

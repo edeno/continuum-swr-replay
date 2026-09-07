@@ -10,7 +10,7 @@
 
 ## Why this exists
 
-`scripts/prepare_replay_content_data.py` and any analysis that wants
+`scripts/decoding/prepare_replay_content_data.py` and any analysis that wants
 real trial context need per-session `trials` and `track_graph`.
 Normally both come from:
 
