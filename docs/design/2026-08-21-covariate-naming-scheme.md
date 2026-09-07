@@ -41,10 +41,11 @@ they must be regenerated before analyses or figures are rerun.
   fitting or plotting when that stamp, the naming vocabulary, or registered
   row identity is absent or mismatched. Table-specific scientific validators
   separately own candidate support, dtypes, ranges, and estimand eligibility.
-- `rename_map`, `plan_rename`, `apply_rename`, and numerical-path
-  canonicalization require an explicit `table=` argument. The qvals realized
-  destination is `chosen_arm`; only an `event_arm` choice-set row becomes
-  `candidate_arm`.
+- `plan_rename`, `apply_rename`, and numerical-path canonicalization require
+  an explicit `table=` argument. The qvals realized destination is
+  `chosen_arm`; only an `event_arm` choice-set row becomes `candidate_arm`.
+  Only the qvals grain still has executable ledger rows; the rest of the
+  ledger is the appendix at the end of this document.
 - External behavioral-model code retains its native vocabulary. One qvals
   ingestion adapter validates numerical duplicates and translates them into
   repository-owned names.
@@ -52,7 +53,8 @@ they must be regenerated before analyses or figures are rerun.
   `scripts/exploratory/_verify_harmonization_parity.py` normalizes only the
   frozen legacy side, then requires exact row/session keys, column order,
   dtypes, missing masks, and values. Missing pairs and zero executed
-  comparisons fail.
+  comparisons fail. That normalization now translates the qvals grain only;
+  a baseline at any other grain must already carry canonical names.
 - Offline real-session smoke evidence on 2026-08-22 used the cached
   `chimi20200213_02_r1_HPC` decoder/trial inputs. Relative to the frozen
   immediate pre-rename artifacts, regenerated output preserved exactly 1,714
@@ -563,3 +565,313 @@ each reading the producing code and recomputing from the materialized tables,
 then reviewed. Before implementation, migration step 4 makes those checks
 reproducible by binding them to exact source artifacts. Structural/ID columns
 are named for reference but are out of rename scope.*
+
+---
+
+## Appendix: the rename ledger
+
+The complete old -> new decision table, one row per decision, 237 rows over
+10 row grains. This is the authoritative record of the migration and the
+source the runtime deny-list was extracted from.
+
+`covariate_registry.py` keeps the `qvals` rows executable -- the external
+behavioral model still emits its native vocabulary on every build, so that
+grain's translation runs in production -- and freezes every legacy spelling
+below into `LEGACY_COLUMN_NAMES`, the deny-list
+`assert_canonical_vocabulary` enforces. The rest of the table is read by
+people, not by code: the repository-owned builders emit canonical names
+directly.
+
+Actions: **rename** (1:1, value unchanged), **alias** (byte-identical columns
+collapsed to one), **canonicalize** (same quantity by separate numerical paths,
+collapsed under a declared tolerance), **retire** (disendorsed, carried forward
+under no name), **drop** (dead model output), **derive** (exact complement of a
+stored primitive -- recompute in the design matrix, do not store), **audit**
+(selection invariant relocated to the destination shown, not deleted).
+
+### `choice` (7 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `replay_frac` | rename | `replay_fraction` | predictor |  |
+| `replay_frac_current_patch` | rename | `replay_fraction_current_patch` | diagnostic |  |
+| `replay_frac_non_swr` | rename | `replay_fraction_non_swr` | predictor |  |
+| `replay_frac_noncurrent` | rename | `replay_fraction_noncurrent` | diagnostic |  |
+| `replay_frac_residual` | rename | `replay_fraction_residual` | predictor |  |
+| `replay_frac_residual_noncurrent` | rename | `replay_fraction_residual_noncurrent` | diagnostic |  |
+| `replay_frac_swr` | rename | `replay_fraction_swr` | predictor |  |
+
+### `event` (46 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `current_arm`, `location_arm` | alias | `occupancy_well_arm` |  | byte-identical incl. NaN; task state, NaN off-well, never trunk |
+| `label_event_duration`, `event_duration` | alias | `event_duration_s` |  |  |
+| `label_event_end`, `event_end` | alias | `event_end_s` |  |  |
+| `label_event_midpoint_time`, `event_midpoint_time` | alias | `event_midpoint_s` |  |  |
+| `label_event_start`, `event_start` | alias | `event_start_s` |  |  |
+| `posterior_mass_total`, `nonlocal_weight_sum` | alias | `nonlocal_probability_sum` |  | byte-identical Sigma w_t |
+| `reward_outcome`, `is_after_reward` | alias | `is_rewarded_outcome` | outcome | byte-identical; one nullable 0/1 primitive |
+| `time_since_port_entry`, `time_since_last_port_entry` | alias | `time_since_last_well_arrival_s` |  | same variable assigned twice; elapsed since goal arrival |
+| `endpoints_speed_below_thresh` | audit | -> artifact/cohort metadata |  | legacy endpoint speed certificate |
+| `nonlocal_fraction` | audit | -> event_table / event-keyed audit |  | all 1.0 here; eligibility fraction defining each event |
+| `nospike_fraction` | audit | -> event_table / event-keyed audit |  | all 0.0 here; eligibility fraction defining each event |
+| `whole_event_speed_eligible` | audit | -> artifact/cohort metadata |  | certifies the immobility/speed filter the cohort passed |
+| `is_after_omission` | derive | `is_rewarded_outcome`, `is_omitted_outcome = 1 - reward` |  | derive with the primitive's missingness; do not persist |
+| `is_after_stay` | derive | `did_last_completed_trip_switch_patch`, `did_last_completed_trip_stay_in_patch = 1 - switch` |  | verified exact complement; do not persist |
+| `ab_slope` | rename | `ab_slope_cm_s` | diagnostic | slope of ahead/behind vs time; a replay speed |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+| `end_position` | rename | `replay_end_position_cm` | diagnostic |  |
+| `end_speed` | rename | `animal_end_speed_cm_s` | diagnostic |  |
+| `is_after_switch` | rename | `did_last_completed_trip_switch_patch` | provenance | completed-action flag; retired as a fitted predictor |
+| `location_state` | rename | `occupancy_state` |  |  |
+| `location_well` | rename | `occupancy_well_id` |  |  |
+| `max_abs_ahead_behind` | rename | `max_abs_ahead_behind_cm` | diagnostic |  |
+| `max_ahead` | rename | `max_ahead_cm` | diagnostic |  |
+| `max_behind` | rename | `max_behind_cm` | diagnostic |  |
+| `max_speed` | rename | `animal_max_speed_cm_s` | diagnostic | animal head speed, not replay speed |
+| `mean_abs_ahead_behind` | rename | `mean_abs_ahead_behind_cm` | diagnostic |  |
+| `mean_speed` | rename | `animal_mean_speed_cm_s` | diagnostic |  |
+| `n_junction_bins` | rename | `n_undecoded_bins` | diagnostic | counts undecoded bins, not junctions; retain at event grain (sum(arm_count_hard) = n_nonlocal_bins - n_undecoded_bins) |
+| `net_displacement` | rename | `net_displacement_cm` | diagnostic |  |
+| `path_continuity` | rename | `path_continuity_fraction` | diagnostic |  |
+| `path_length` | rename | `path_length_cm` | diagnostic |  |
+| `physical_arm` | rename | `modal_observed_track_segment_id` |  | modal observed track segment, trunks included, never NaN |
+| `posterior_hpd_width_50` | rename | `posterior_hpd_arm_count_mean_coverage_50pct` | diagnostic | prob-weighted mean of per-bin HPD arm count; fractional |
+| `posterior_hpd_width_80` | rename | `posterior_hpd_arm_count_mean_coverage_80pct` | diagnostic | prob-weighted mean of per-bin HPD arm count; fractional |
+| `posterior_hpd_width_95` | rename | `posterior_hpd_arm_count_mean_coverage_95pct` | diagnostic | prob-weighted mean of per-bin HPD arm count; fractional |
+| `replay_speed_continuous_median` | rename | `replay_speed_continuous_median_cm_s` | diagnostic |  |
+| `replay_speed_median` | rename | `replay_speed_median_cm_s` | diagnostic |  |
+| `replay_speed_p90` | rename | `replay_speed_p90_cm_s` | diagnostic |  |
+| `spatial_extent` | rename | `spatial_extent_cm` | diagnostic |  |
+| `start_position` | rename | `replay_start_position_cm` | diagnostic | replay MAP position; animal has its own |
+| `start_speed` | rename | `animal_start_speed_cm_s` | diagnostic |  |
+| `step_distance_max` | rename | `step_distance_max_cm` | diagnostic |  |
+| `step_distance_median` | rename | `step_distance_median_cm` | diagnostic |  |
+| `step_distance_p90` | rename | `step_distance_p90_cm` | diagnostic |  |
+| `time_since_reward` | rename | `time_since_last_reward_s` |  |  |
+| `time_since_stop` | rename | `time_since_stop_start_s` |  |  |
+
+### `event_arm` (61 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `current_arm`, `location_arm` | alias | `occupancy_well_arm` |  | byte-identical incl. NaN; task state, NaN off-well, never trunk |
+| `reward_outcome`, `is_after_reward` | alias | `is_rewarded_outcome` | outcome | byte-identical; one nullable 0/1 primitive |
+| `time_since_port_entry`, `time_since_last_port_entry` | alias | `time_since_last_well_arrival_s` |  | same variable assigned twice; elapsed since goal arrival |
+| `is_after_omission` | derive | `is_rewarded_outcome`, `is_omitted_outcome = 1 - reward` |  | derive with the primitive's missingness; do not persist |
+| `is_after_stay` | derive | `did_last_completed_trip_switch_patch`, `did_last_completed_trip_stay_in_patch = 1 - switch` |  | verified exact complement; do not persist |
+| `arm` | rename | `candidate_arm` | predictor | the row's arm in the choice set |
+| `arm_dist_rank` | rename | `candidate_arm_distance_rank` |  |  |
+| `arm_never_visited` | rename | `is_candidate_arm_never_visited` |  |  |
+| `arm_uncertainty` | rename | `reward_belief_variance_candidate_arm_preoutcome` | predictor |  |
+| `continuous_x_current` | rename | `continuous_replay_score_mean_x_is_current_arm` | interaction |  |
+| `continuous_x_next` | rename | `continuous_replay_score_mean_x_is_next_arm` | interaction |  |
+| `continuous_x_prev` | rename | `continuous_replay_score_mean_x_is_prev_arm` | interaction |  |
+| `cumulative_reward` | rename | `reward_count_candidate_arm_last10_known_trials` | predictor | rolling 10-known-trial count in [0,5], not cumulative |
+| `current_x_last_rewarded` | rename | `is_current_arm_x_is_last_rewarded_arm` | interaction |  |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+| `dist_to_arm` | rename | `distance_to_candidate_arm_cm` |  |  |
+| `event_duration` | rename | `event_duration_s` |  |  |
+| `event_end` | rename | `event_end_s` |  |  |
+| `event_start` | rename | `event_start_s` |  |  |
+| `is_after_switch` | rename | `did_last_completed_trip_switch_patch` | provenance | completed-action flag; retired as a fitted predictor |
+| `is_current` | rename | `is_current_arm` | predictor |  |
+| `is_last_rewarded` | rename | `is_last_rewarded_arm` |  |  |
+| `is_last_rewarded_elsewhere` | rename | `is_last_rewarded_noncurrent_arm` |  | omission-only support is structural; keep out of the primary hierarchy |
+| `is_next` | rename | `is_next_arm` | outcome |  |
+| `is_prev` | rename | `is_prev_arm` | predictor |  |
+| `is_same_patch` | rename | `is_same_patch_as_current` |  |  |
+| `location_state` | rename | `occupancy_state` |  |  |
+| `location_well` | rename | `occupancy_well_id` |  |  |
+| `mua_x_current` | rename | `mua_x_is_current_arm` | interaction |  |
+| `mua_x_last_rewarded` | rename | `mua_x_is_last_rewarded_arm` | interaction |  |
+| `mua_x_next` | rename | `mua_x_is_next_arm` | interaction |  |
+| `mua_x_prev` | rename | `mua_x_is_prev_arm` | interaction |  |
+| `omission_x_last_rewarded` | rename | `is_omitted_outcome_x_is_last_rewarded_arm` | interaction |  |
+| `p_reward_arm` | rename | `task_reward_probability_candidate_arm` |  | programmed contingency, not a belief |
+| `physical_arm` | rename | `modal_observed_track_segment_id` |  | modal observed track segment, trunks included, never NaN |
+| `q_arm` | rename | `reward_belief_mean_candidate_arm_preoutcome` | predictor | Beta belief mean; reward_belief_ separates it from the spatial decoder posterior |
+| `reward_rate_arm_k10` | rename | `reward_fraction_candidate_arm_last10_visits` | predictor | last 10 visits to that arm; a fraction |
+| `swr_x_arm_never_visited` | rename | `swr_x_is_candidate_arm_never_visited` | interaction |  |
+| `swr_x_arm_uncertainty` | rename | `swr_x_reward_belief_variance_candidate_arm_preoutcome` | interaction |  |
+| `swr_x_current` | rename | `swr_x_is_current_arm` | interaction |  |
+| `swr_x_is_last_rewarded_elsewhere` | rename | `swr_x_is_last_rewarded_noncurrent_arm` | interaction |  |
+| `swr_x_last_rewarded` | rename | `swr_x_is_last_rewarded_arm` | interaction |  |
+| `swr_x_next` | rename | `swr_x_is_next_arm` | interaction |  |
+| `swr_x_prev` | rename | `swr_x_is_prev_arm` | interaction |  |
+| `swr_x_reward_rate_arm_k10` | rename | `swr_x_reward_fraction_candidate_arm_last10_visits` | interaction |  |
+| `swr_x_visit_recency_demeaned` | rename | `swr_x_visit_recency_trials_event_leaf_centered` | interaction |  |
+| `swr_x_visit_recency_spline1_demeaned` | rename | `swr_x_visit_recency_trials_event_leaf_centered_spline_1` | interaction |  |
+| `swr_x_visit_recency_spline2_demeaned` | rename | `swr_x_visit_recency_trials_event_leaf_centered_spline_2` | interaction |  |
+| `swr_x_visit_recency_spline3_demeaned` | rename | `swr_x_visit_recency_trials_event_leaf_centered_spline_3` | interaction |  |
+| `time_since_reward` | rename | `time_since_last_reward_s` |  |  |
+| `time_since_stop` | rename | `time_since_stop_start_s` |  |  |
+| `time_x_current` | rename | `time_since_stop_start_s_x_is_current_arm` | interaction |  |
+| `time_x_next` | rename | `time_since_stop_start_s_x_is_next_arm` | interaction |  |
+| `time_x_prev` | rename | `time_since_stop_start_s_x_is_prev_arm` | interaction |  |
+| `visit_recency` | rename | `visit_recency_trials` |  |  |
+| `visit_recency_demeaned` | rename | `visit_recency_trials_event_leaf_centered` |  | centered across visited leaf candidates within each event |
+| `visit_recency_spline1_demeaned` | rename | `visit_recency_trials_event_leaf_centered_spline_1` |  |  |
+| `visit_recency_spline2_demeaned` | rename | `visit_recency_trials_event_leaf_centered_spline_2` |  |  |
+| `visit_recency_spline3_demeaned` | rename | `visit_recency_trials_event_leaf_centered_spline_3` |  |  |
+| `switch_x_current` | retire | -- | interaction | interaction on the retired immediate-switch predictor; use the graded patch_switch_fraction_last5_completed_trips instead |
+| `switch_x_prev` | retire | -- | interaction | sibling of switch_x_current; same retired-predictor interaction |
+
+### `event_onset` (1 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+
+### `event_patch` (16 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `current_arm`, `location_arm` | alias | `occupancy_well_arm` |  | byte-identical incl. NaN; task state, NaN off-well, never trunk |
+| `arm_never_visited_patch` | rename | `is_patch_never_visited` |  | patch-grain column in event_patch_table (tables_arm_patch.py); used by BASEc_PATCH (model_specs.py:1233) |
+| `cumulative_reward_patch` | rename | `reward_count_candidate_arm_last10_known_trials_patch` | predictor |  |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+| `is_last_rewarded_patch_elsewhere` | rename | `is_last_rewarded_noncurrent_patch` |  |  |
+| `location_state` | rename | `occupancy_state` |  |  |
+| `location_well` | rename | `occupancy_well_id` |  |  |
+| `p_reward_arm_patch` | rename | `task_reward_probability_candidate_arm_patch` | predictor |  |
+| `physical_arm` | rename | `modal_observed_track_segment_id` |  | modal observed track segment, trunks included, never NaN |
+| `q_arm_patch` | rename | `reward_belief_mean_candidate_arm_preoutcome_patch` | predictor |  |
+| `reward_rate_arm_k10_patch` | rename | `reward_fraction_candidate_arm_last10_visits_patch` | predictor |  |
+| `swr_x_current_patch` | rename | `swr_x_is_current_patch` | interaction |  |
+| `swr_x_last_rewarded_patch_elsewhere` | rename | `swr_x_is_last_rewarded_noncurrent_patch` | interaction |  |
+| `swr_x_prev_patch` | rename | `swr_x_is_prev_patch` | interaction |  |
+| `visit_recency_patch` | rename | `visit_recency_trials_patch` | predictor |  |
+| `switch_x_current_patch` | retire | -- | interaction | interaction with retired immediate-switch predictor |
+
+### `event_sequence` (1 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+
+### `fit_time` (21 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `arm_fe_0` | rename | `is_candidate_arm_0` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_1` | rename | `is_candidate_arm_1` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_2` | rename | `is_candidate_arm_2` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_3` | rename | `is_candidate_arm_3` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_4` | rename | `is_candidate_arm_4` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_5` | rename | `is_candidate_arm_5` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_6` | rename | `is_candidate_arm_6` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `arm_fe_7` | rename | `is_candidate_arm_7` | predictor | arm_fe_k = 1 iff arm==k; reference_arm=8 |
+| `block_x_current` | rename | `trials_since_block_change_z_x_is_current_arm` | interaction |  |
+| `currentpatch_x_switchrate` | rename | `patch_switch_fraction_last5_completed_trips_z_x_is_current_patch` | interaction |  |
+| `currentpatch_x_tsc` | rename | `log1p_time_since_stop_start_s_z_x_is_current_patch` | interaction |  |
+| `currentpatch_x_tss` | rename | `periswitch_index_trials_z_x_is_current_patch` | interaction |  |
+| `entropy_x_current` | rename | `reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm` | interaction |  |
+| `postsw_x_current` | rename | `is_periswitch_post_x_is_current_arm` | interaction |  |
+| `relval_x_current` | rename | `relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm` | interaction |  |
+| `rpe_x_current` | rename | `rpe_postoutcome_z_x_is_current_arm` | interaction |  |
+| `switchrate_x_current` | rename | `patch_switch_fraction_last5_completed_trips_z_x_is_current_arm` | interaction |  |
+| `tsc_x_current` | rename | `log1p_time_since_stop_start_s_z_x_is_current_arm` | interaction |  |
+| `tss_x_current` | rename | `periswitch_index_trials_z_x_is_current_arm` | interaction |  |
+| `tsspostsw_x_current` | rename | `periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm` | interaction |  |
+| `update_x_current` | rename | `reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm` | interaction |  |
+
+### `qvals` (53 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `Q1`, `q_port0`, `betadist_mu1` | canonicalize | `reward_belief_mean_port_0` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `Q2`, `q_port1`, `betadist_mu2` | canonicalize | `reward_belief_mean_port_1` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `Q3`, `q_port2`, `betadist_mu3` | canonicalize | `reward_belief_mean_port_2` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `Q4`, `q_port3`, `betadist_mu4` | canonicalize | `reward_belief_mean_port_3` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `Q5`, `q_port4`, `betadist_mu5` | canonicalize | `reward_belief_mean_port_4` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `Q6`, `q_port5`, `betadist_mu6` | canonicalize | `reward_belief_mean_port_5` |  | old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12 |
+| `prev_global_variance`, `global_leaf_var_sum_preoutcome_sess` | canonicalize | `reward_belief_variance_leaf_sum_preoutcome` |  | allclose, corr 1.0; declared tolerance atol=1e-15 rtol=1e-12 |
+| `depletion_leaf_1` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_leaf_2` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_leaf_3` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_leaf_4` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_leaf_5` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_leaf_6` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_mean_stem_1` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_mean_stem_2` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `depletion_mean_stem_3` | drop | -- |  | constant 1.0; withleaf fit has no depletion |
+| `Qstem1` | rename | `decision_value_patch_1` |  | 1-based task patches; not a probability |
+| `Qstem2` | rename | `decision_value_patch_2` |  | 1-based task patches; not a probability |
+| `Qstem3` | rename | `decision_value_patch_3` |  | 1-based task patches; not a probability |
+| `arm` | rename | `chosen_arm` |  | realized trial destination; not a choice-set candidate row |
+| `best_other_patch_mean_mu_preoutcome_sess` | rename | `switch_value_preoutcome` |  | manuscript term; max over two alternative patches |
+| `beta_reward_entropy` | rename | `reward_belief_differential_entropy_leaf_mean_preoutcome` |  | Beta differential entropy; can be negative, not Shannon |
+| `betadist_var1` | rename | `reward_belief_variance_port_0` |  |  |
+| `betadist_var2` | rename | `reward_belief_variance_port_1` |  |  |
+| `betadist_var3` | rename | `reward_belief_variance_port_2` |  |  |
+| `betadist_var4` | rename | `reward_belief_variance_port_3` |  |  |
+| `betadist_var5` | rename | `reward_belief_variance_port_4` |  |  |
+| `betadist_var6` | rename | `reward_belief_variance_port_5` |  |  |
+| `chosen_leaf_mu_update_abs_postoutcome_sess` | rename | `reward_belief_mean_update_chosen_arm_postoutcome_abs` | diagnostic | absolute scalar update at the chosen arm |
+| `chosen_leaf_var_preoutcome_sess` | rename | `reward_belief_variance_chosen_arm_preoutcome` | diagnostic | pre-outcome Beta variance at the realized chosen arm |
+| `chosen_patch_mu_update_abs_postoutcome_sess` | rename | `reward_belief_mean_update_l1_chosen_patch_postoutcome` | diagnostic | L1 update over the two ports in the chosen patch |
+| `global_mu_update_abs_postoutcome_sess` | rename | `reward_belief_mean_update_l1_all_ports_postoutcome` |  | L1 aggregate over six ports |
+| `global_mu_update_signed_postoutcome_sess` | rename | `reward_belief_mean_update_sum_all_ports_postoutcome` | diagnostic | signed sum of reward-belief mean updates over six ports |
+| `is_post_switch` | rename | `is_periswitch_post` |  | peri-switch alignment flag; hinge partner |
+| `is_rewarding` | rename | `pump_on_at_bout_mid` | diagnostic | mid-bout pump flag (4.8%), not a trial outcome |
+| `leaf_choice_p` | rename | `leaf_choice_logp` |  | a log probability (<=0) |
+| `p_reward_best` | rename | `task_reward_probability_best_arm` | diagnostic | maximum scheduled reward probability over six arms |
+| `p_reward_current` | rename | `task_reward_probability_chosen_arm` | predictor | scheduled reward probability selected by the realized destination arm |
+| `p_reward_port0` | rename | `task_reward_probability_port_0` |  |  |
+| `p_reward_port1` | rename | `task_reward_probability_port_1` |  |  |
+| `p_reward_port2` | rename | `task_reward_probability_port_2` |  |  |
+| `p_reward_port3` | rename | `task_reward_probability_port_3` |  |  |
+| `p_reward_port4` | rename | `task_reward_probability_port_4` |  |  |
+| `p_reward_port5` | rename | `task_reward_probability_port_5` |  |  |
+| `q_chosen` | rename | `reward_belief_mean_chosen_arm_preoutcome` |  |  |
+| `rpe` | rename | `rpe_postoutcome` | predictor |  |
+| `rpe_abs` | rename | `rpe_postoutcome_abs` |  |  |
+| `stay_sibling_mu_preoutcome_sess` | rename | `stay_value_preoutcome` | predictor | manuscript term; sibling-leaf belief mean |
+| `switch_advantage_mu_preoutcome_sess` | rename | `relative_value_switch_minus_stay_preoutcome` | predictor | manuscript relative value; sign convention |
+| `switch_advantage_preoutcome_sess_Qstem` | rename | `relative_decision_value_switch_minus_stay_preoutcome` |  | Qstem-scale contrast, distinct from the reward-belief one |
+| `trials_since_switch` | rename | `periswitch_index_trials` |  | signed, two-sided; drops the false 'since' |
+| `unchosen_patches_mu_update_abs_postoutcome_sess` | rename | `reward_belief_mean_update_l1_alternative_patches_postoutcome` | predictor | L1 update over the four ports in alternative patches |
+| `value_diff_patch` | rename | `task_reward_probability_patch_mean_gap_best_vs_second` | predictor | best minus second-best mean scheduled reward probability over patches |
+
+### `stop` (27 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `current_arm`, `location_arm` | alias | `occupancy_well_arm` |  | byte-identical incl. NaN; task state, NaN off-well, never trunk |
+| `n_events`, `n_non_local` | alias | `n_selected_events` | outcome | event-source count per stop; exact duplicates in Replay inputs |
+| `reward_outcome`, `is_after_reward` | alias | `is_rewarded_outcome` | outcome | byte-identical; one nullable 0/1 primitive |
+| `is_after_omission` | derive | `is_rewarded_outcome`, `is_omitted_outcome = 1 - reward` |  | derive with the primitive's missingness; do not persist |
+| `is_after_stay` | derive | `did_last_completed_trip_switch_patch`, `did_last_completed_trip_stay_in_patch = 1 - switch` |  | verified exact complement; do not persist |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+| `immobility_time` | rename | `immobility_duration_s` |  | stop_end - stop_start; a duration |
+| `is_after_switch` | rename | `did_last_completed_trip_switch_patch` | provenance | completed-action flag; retired as a fitted predictor |
+| `location_state` | rename | `occupancy_state` |  |  |
+| `location_well` | rename | `occupancy_well_id` |  |  |
+| `n_MUA` | rename | `n_mua_events` | outcome |  |
+| `n_SWR` | rename | `n_swr_events` | outcome |  |
+| `n_non_local_SWR` | rename | `n_nonlocal_swr_events` | outcome |  |
+| `n_non_local_no_SWR` | rename | `n_nonlocal_non_swr_events` | outcome |  |
+| `physical_arm` | rename | `modal_observed_track_segment_id` |  | modal observed track segment, trunks included, never NaN |
+| `recent_switch_rate` | rename | `patch_switch_fraction_last5_completed_trips` | predictor | fraction over a fixed 5-completed-trip window, in [0,1] |
+| `reward_lag1` | rename | `known_reward_outcome_lag_1` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag10` | rename | `known_reward_outcome_lag_10` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag2` | rename | `known_reward_outcome_lag_2` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag3` | rename | `known_reward_outcome_lag_3` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag4` | rename | `known_reward_outcome_lag_4` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag5` | rename | `known_reward_outcome_lag_5` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag6` | rename | `known_reward_outcome_lag_6` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag7` | rename | `known_reward_outcome_lag_7` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag8` | rename | `known_reward_outcome_lag_8` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_lag9` | rename | `known_reward_outcome_lag_9` |  | j-th most recently KNOWN outcome, not a fixed lag |
+| `reward_rate_trial_k10` | rename | `reward_fraction_last10_known_trials` |  | arm-agnostic; last 10 outcome-known trials |
+
+### `stop_timebin` (4 decisions)
+
+| legacy spelling(s) | action | canonical / target | role | notes |
+| --- | --- | --- | --- | --- |
+| `day` | rename | `session_date` | provenance | YYYYMMDD date, not a day index |
+| `n_MUA` | rename | `n_mua_events` | outcome |  |
+| `n_SWR` | rename | `n_swr_events` | outcome |  |
+| `n_non_local` | rename | `n_nonlocal_events` | outcome |  |

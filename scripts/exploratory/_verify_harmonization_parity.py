@@ -10,6 +10,11 @@ and session keys, columns, dtypes, missingness, and values.
 No scientific change is allowlisted here.  Alias collapse and qvals numerical-
 path consolidation are themselves validated by ``finalize_covariate_schema``.
 Any remaining difference is a rename-migration failure.
+
+``finalize_covariate_schema`` translates the ``qvals`` grain only -- the rest of
+the rename ledger is the appendix of
+``docs/design/2026-08-21-covariate-naming-scheme.md``, not executable code -- so
+a baseline at any other grain must already carry canonical names.
 """
 
 from __future__ import annotations

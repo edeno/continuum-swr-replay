@@ -1,32 +1,31 @@
-"""Covariate naming contract — the single source of truth for column names.
+"""Covariate naming contract -- the runtime half of the 2026-08-21 rename.
 
-Generated from the specification in
-``docs/design/2026-08-21-covariate-naming-scheme.md``. Each :class:`Entry`
-records the *canonical* column name together with the legacy spelling(s) it
-replaced and the relationship between them (a plain rename, an alias/numerical
-collapse, a derived complement, a retired predictor, or a dead output). The
-rename map is **generated** from this registry (:func:`rename_map`), never
-hand-authored, so there is one explicit decision per column.
+The full rename ledger (every legacy spelling, its canonical replacement, and
+the decision that connects them) is the appendix of
+``docs/design/2026-08-21-covariate-naming-scheme.md``. It is a historical
+record: the repository-owned builders emit canonical names directly and nothing
+in the pipeline routes data through the legacy translation, so the ledger is
+read by people, not by code. Two roles keep *this* module live and permanent:
 
-The repository-owned table builders now emit canonical names directly and
-validate their output with :func:`stamp_covariate_schema`; nothing in the
-pipeline routes data through the legacy translation. Two roles keep this module
-live and permanent:
-
-- **Validation.** :func:`assert_canonical_vocabulary` uses the recorded legacy
-  spellings as a deny-list, while :func:`assert_unique_scientific_rows` checks
-  the registered row identity. The persisted stamp certifies exactly those two
-  layers—not table-specific candidate support, dtypes, ranges, or fit eligibility.
+- **Validation.** :func:`assert_canonical_vocabulary` rejects the ledger's
+  legacy spellings (frozen here as :data:`LEGACY_COLUMN_NAMES`), while
+  :func:`assert_unique_scientific_rows` checks the registered row identity. The
+  persisted stamp certifies exactly those two layers -- not table-specific
+  candidate support, dtypes, ranges, or fit eligibility.
 - **Vendored ingestion.** The behavioral-model adapter in
   ``analysis.behavior.qvals_table`` translates the external model's native
   vocabulary (``Q``/``betadist_mu``/``Qstem`` ...) into the canonical
-  reward-belief schema, reusing :func:`canonicalize_numerical_paths` /
-  :func:`apply_rename` here as the one ingestion boundary.
+  reward-belief schema. That translation still runs on every build, so the
+  ``qvals`` rows of the ledger -- and only those -- stay here as executable
+  :class:`Entry` records feeding :func:`canonicalize_numerical_paths` /
+  :func:`apply_rename` / :func:`rename_dynamic_columns` / :func:`plan_rename`,
+  the one ingestion boundary.
 
 Nothing in this module reads or writes a persisted table; it is a pure naming
-contract. :func:`finalize_covariate_schema` (the full legacy->canonical
-transform) is retained only for the migration-parity checking tools and is not
-part of the production pipeline.
+contract. :func:`finalize_covariate_schema` (the full transform) is retained
+only for the migration-parity checking tools and is not part of the production
+pipeline; with the non-``qvals`` rows now in the design doc it renames nothing
+outside ``qvals`` and reduces to the stamp there.
 """
 
 from __future__ import annotations
@@ -35,10 +34,6 @@ import keyword
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
 
 # ---------------------------------------------------------------------------
 # Migration actions
@@ -156,61 +151,13 @@ def _rename(current: str, canonical: str, table: str, **kw: str) -> Entry:
     return Entry((current,), "rename", table, canonical=canonical, **kw)
 
 
-def _alias(current: tuple[str, ...], canonical: str, table: str, **kw: str) -> Entry:
-    return Entry(current, "alias", table, canonical=canonical, **kw)
-
-
 # ---------------------------------------------------------------------------
-# The registry
+# The vendored-ingestion rows
 # ---------------------------------------------------------------------------
+# The ``qvals`` slice of the ledger, kept executable because the external
+# behavioral model still emits its native vocabulary on every build. Every
+# other grain's rows live in the design doc named in the module docstring.
 REGISTRY: tuple[Entry, ...] = (
-    # -- Cleanup 1: exact aliases -> collapse to one canonical --------------
-    *[
-        _alias(
-            ("current_arm", "location_arm"),
-            "occupancy_well_arm",
-            table,
-            notes="byte-identical incl. NaN; task state, NaN off-well, never trunk",
-        )
-        for table in ("stop", "event", "event_arm", "event_patch")
-    ],
-    *[
-        _alias(
-            ("reward_outcome", "is_after_reward"),
-            "is_rewarded_outcome",
-            table,
-            role="outcome",
-            notes="byte-identical; one nullable 0/1 primitive",
-        )
-        for table in ("stop", "event", "event_arm")
-    ],
-    _alias(("label_event_start", "event_start"), "event_start_s", "event"),
-    _alias(("label_event_end", "event_end"), "event_end_s", "event"),
-    _alias(("label_event_duration", "event_duration"), "event_duration_s", "event"),
-    _alias(
-        ("label_event_midpoint_time", "event_midpoint_time"),
-        "event_midpoint_s",
-        "event",
-    ),
-    _alias(
-        ("posterior_mass_total", "nonlocal_weight_sum"),
-        "nonlocal_probability_sum",
-        "event",
-        notes="byte-identical Sigma w_t",
-    ),
-    *[
-        _alias(
-            ("time_since_port_entry", "time_since_last_port_entry"),
-            "time_since_last_well_arrival_s",
-            table,
-            notes="same variable assigned twice; elapsed since goal arrival",
-        )
-        for table in ("event", "event_arm")
-    ],
-    _rename("event_start", "event_start_s", "event_arm"),
-    _rename("event_end", "event_end_s", "event_arm"),
-    _rename("event_duration", "event_duration_s", "event_arm"),
-    # -- Cleanup 2: numerical-path duplicates -> canonicalize (tolerance) ---
     Entry(
         ("prev_global_variance", "global_leaf_var_sum_preoutcome_sess"),
         "canonicalize",
@@ -218,8 +165,6 @@ REGISTRY: tuple[Entry, ...] = (
         canonical="reward_belief_variance_leaf_sum_preoutcome",
         notes="allclose, corr 1.0; declared tolerance atol=1e-15 rtol=1e-12",
     ),
-    # (q_port / betadist_mu numerical-path family is in the value section.)
-    # -- Cleanup 3: dead model outputs -> drop ------------------------------
     *[
         Entry(
             (f"depletion_leaf_{i}",),
@@ -238,78 +183,6 @@ REGISTRY: tuple[Entry, ...] = (
         )
         for i in range(1, 4)
     ],
-    # -- Cleanup 4: selection invariants / diagnostics -> audit -------------
-    Entry(
-        ("whole_event_speed_eligible",),
-        "audit",
-        "event",
-        destination="artifact/cohort metadata",
-        notes="certifies the immobility/speed filter the cohort passed",
-    ),
-    Entry(
-        ("endpoints_speed_below_thresh",),
-        "audit",
-        "event",
-        destination="artifact/cohort metadata",
-        notes="legacy endpoint speed certificate",
-    ),
-    Entry(
-        ("nonlocal_fraction",),
-        "audit",
-        "event",
-        destination="event_table / event-keyed audit",
-        notes="all 1.0 here; eligibility fraction defining each event",
-    ),
-    Entry(
-        ("nospike_fraction",),
-        "audit",
-        "event",
-        destination="event_table / event-keyed audit",
-        notes="all 0.0 here; eligibility fraction defining each event",
-    ),
-    Entry(
-        ("n_junction_bins",),
-        "rename",
-        "event",
-        canonical="n_undecoded_bins",
-        role="diagnostic",
-        notes="counts undecoded bins, not junctions; retain at event grain "
-        "(sum(arm_count_hard) = n_nonlocal_bins - n_undecoded_bins)",
-    ),
-    # -- Cleanup 5 / Switch family: complements + switch renames ------------
-    *[
-        Entry(
-            ("is_after_switch",),
-            "rename",
-            table,
-            canonical="did_last_completed_trip_switch_patch",
-            role="provenance",
-            notes="completed-action flag; retired as a fitted predictor",
-        )
-        for table in ("stop", "event", "event_arm")
-    ],
-    *[
-        Entry(
-            ("is_after_stay",),
-            "derive",
-            table,
-            primitive="did_last_completed_trip_switch_patch",
-            derive_expr="did_last_completed_trip_stay_in_patch = 1 - switch",
-            notes="verified exact complement; do not persist",
-        )
-        for table in ("stop", "event", "event_arm")
-    ],
-    *[
-        Entry(
-            ("is_after_omission",),
-            "derive",
-            table,
-            primitive="is_rewarded_outcome",
-            derive_expr="is_omitted_outcome = 1 - reward",
-            notes="derive with the primitive's missingness; do not persist",
-        )
-        for table in ("stop", "event", "event_arm")
-    ],
     _rename(
         "is_post_switch",
         "is_periswitch_post",
@@ -322,101 +195,6 @@ REGISTRY: tuple[Entry, ...] = (
         "qvals",
         notes="signed, two-sided; drops the false 'since'",
     ),
-    _rename(
-        "recent_switch_rate",
-        "patch_switch_fraction_last5_completed_trips",
-        "stop",
-        role="predictor",
-        notes="fraction over a fixed 5-completed-trip window, in [0,1]",
-    ),
-    Entry(
-        ("switch_x_current",),
-        "retire",
-        "event_arm",
-        role="interaction",
-        notes="interaction on the retired immediate-switch predictor; use the "
-        "graded patch_switch_fraction_last5_completed_trips instead",
-    ),
-    Entry(
-        ("switch_x_prev",),
-        "retire",
-        "event_arm",
-        role="interaction",
-        notes="sibling of switch_x_current; same retired-predictor interaction",
-    ),
-    # -- Arm occupancy ------------------------------------------------------
-    # (location_arm / current_arm collapse is in Cleanup 1 above.)
-    *[
-        _rename(
-            "physical_arm",
-            "modal_observed_track_segment_id",
-            table,
-            notes="modal observed track segment, trunks included, never NaN",
-        )
-        for table in ("stop", "event", "event_arm", "event_patch")
-    ],
-    _rename(
-        "arm",
-        "candidate_arm",
-        "event_arm",
-        role="predictor",
-        notes="the row's arm in the choice set",
-    ),
-    *[
-        _rename("location_well", "occupancy_well_id", table)
-        for table in ("stop", "event", "event_arm", "event_patch")
-    ],
-    *[
-        _rename("location_state", "occupancy_state", table)
-        for table in ("stop", "event", "event_arm", "event_patch")
-    ],
-    # -- Relational arm indicators ------------------------------------------
-    _rename("is_current", "is_current_arm", "event_arm", role="predictor"),
-    _rename("is_prev", "is_prev_arm", "event_arm", role="predictor"),
-    _rename("is_next", "is_next_arm", "event_arm", role="outcome"),
-    _rename("is_last_rewarded", "is_last_rewarded_arm", "event_arm"),
-    _rename(
-        "is_last_rewarded_elsewhere",
-        "is_last_rewarded_noncurrent_arm",
-        "event_arm",
-        notes="omission-only support is structural; keep out of the primary hierarchy",
-    ),
-    _rename("arm_never_visited", "is_candidate_arm_never_visited", "event_arm"),
-    _rename(
-        "arm_never_visited_patch",
-        "is_patch_never_visited",
-        "event_patch",
-        notes="patch-grain column in event_patch_table (tables_arm_patch.py); "
-        "used by BASEc_PATCH (model_specs.py:1233)",
-    ),
-    _rename("is_same_patch", "is_same_patch_as_current", "event_arm"),
-    _rename("dist_to_arm", "distance_to_candidate_arm_cm", "event_arm"),
-    _rename("arm_dist_rank", "candidate_arm_distance_rank", "event_arm"),
-    _rename("visit_recency", "visit_recency_trials", "event_arm"),
-    # -- Behavioral-model value and belief ----------------------------------
-    _rename(
-        "q_arm",
-        "reward_belief_mean_candidate_arm_preoutcome",
-        "event_arm",
-        role="predictor",
-        notes="Beta belief mean; reward_belief_ separates it from the "
-        "spatial decoder posterior",
-    ),
-    _rename(
-        "p_reward_arm",
-        "task_reward_probability_candidate_arm",
-        "event_arm",
-        notes="programmed contingency, not a belief",
-    ),
-    _rename(
-        "arm_uncertainty",
-        "reward_belief_variance_candidate_arm_preoutcome",
-        "event_arm",
-        role="predictor",
-    ),
-    # Q{i+1}, q_port{i}, and betadist_mu{i+1} are the SAME belief mean by
-    # separate paths. q_port is assigned directly from Q; betadist_mu is the
-    # model-native posterior mean and is tolerance-equal on real artifacts.
     *[
         Entry(
             (f"Q{i + 1}", f"q_port{i}", f"betadist_mu{i + 1}"),
@@ -557,528 +335,120 @@ REGISTRY: tuple[Entry, ...] = (
         role="diagnostic",
         notes="pre-outcome Beta variance at the realized chosen arm",
     ),
-    # -- Reward history and time --------------------------------------------
-    _rename(
-        "cumulative_reward",
-        "reward_count_candidate_arm_last10_known_trials",
-        "event_arm",
-        role="predictor",
-        notes="rolling 10-known-trial count in [0,5], not cumulative",
-    ),
-    _rename(
-        "reward_rate_arm_k10",
-        "reward_fraction_candidate_arm_last10_visits",
-        "event_arm",
-        role="predictor",
-        notes="last 10 visits to that arm; a fraction",
-    ),
-    _rename(
-        "reward_rate_trial_k10",
-        "reward_fraction_last10_known_trials",
-        "stop",
-        notes="arm-agnostic; last 10 outcome-known trials",
-    ),
-    *[
-        _rename(
-            f"reward_lag{j}",
-            f"known_reward_outcome_lag_{j}",
-            "stop",
-            notes="j-th most recently KNOWN outcome, not a fixed lag",
-        )
-        for j in range(1, 11)
-    ],
-    _alias(
-        ("n_events", "n_non_local"),
-        "n_selected_events",
-        "stop",
-        role="outcome",
-        notes="event-source count per stop; exact duplicates in Replay inputs",
-    ),
-    _rename("n_SWR", "n_swr_events", "stop", role="outcome"),
-    _rename("n_MUA", "n_mua_events", "stop", role="outcome"),
-    _rename("n_non_local_SWR", "n_nonlocal_swr_events", "stop", role="outcome"),
-    _rename("n_non_local_no_SWR", "n_nonlocal_non_swr_events", "stop", role="outcome"),
-    _rename("n_SWR", "n_swr_events", "stop_timebin", role="outcome"),
-    _rename("n_MUA", "n_mua_events", "stop_timebin", role="outcome"),
-    _rename("n_non_local", "n_nonlocal_events", "stop_timebin", role="outcome"),
-    *[
-        _rename("time_since_stop", "time_since_stop_start_s", table)
-        for table in ("event", "event_arm")
-    ],
-    *[
-        _rename("time_since_reward", "time_since_last_reward_s", table)
-        for table in ("event", "event_arm")
-    ],
-    # (time_since_port_entry alias pair is in Cleanup 1 above.)
-    _rename(
-        "immobility_time",
-        "immobility_duration_s",
-        "stop",
-        notes="stop_end - stop_start; a duration",
-    ),
-    # -- Event-table geometry: the explicitly-named exceptions --------------
-    *[
-        _rename(
-            f"posterior_hpd_width_{c}",
-            f"posterior_hpd_arm_count_mean_coverage_{c}pct",
-            "event",
-            role="diagnostic",
-            notes="prob-weighted mean of per-bin HPD arm count; fractional",
-        )
-        for c in (50, 80, 95)
-    ],
-    *[
-        Entry(
-            ("day",),
-            "rename",
-            table,
-            canonical="session_date",
-            role="provenance",
-            notes="YYYYMMDD date, not a day index",
-        )
-        for table in (
-            "stop",
-            "event",
-            "event_arm",
-            "event_patch",
-            "event_sequence",
-            "event_onset",
-            "stop_timebin",
-        )
-    ],
-    # -- Transforms and interactions ----------------------------------------
-    _rename(
-        "visit_recency_demeaned",
-        "visit_recency_trials_event_leaf_centered",
-        "event_arm",
-        notes="centered across visited leaf candidates within each event",
-    ),
-    _rename(
-        "swr_x_visit_recency_demeaned",
-        "swr_x_visit_recency_trials_event_leaf_centered",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "visit_recency_spline1_demeaned",
-        "visit_recency_trials_event_leaf_centered_spline_1",
-        "event_arm",
-    ),
-    _rename(
-        "visit_recency_spline2_demeaned",
-        "visit_recency_trials_event_leaf_centered_spline_2",
-        "event_arm",
-    ),
-    _rename(
-        "visit_recency_spline3_demeaned",
-        "visit_recency_trials_event_leaf_centered_spline_3",
-        "event_arm",
-    ),
-    _rename(
-        "swr_x_visit_recency_spline1_demeaned",
-        "swr_x_visit_recency_trials_event_leaf_centered_spline_1",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_visit_recency_spline2_demeaned",
-        "swr_x_visit_recency_trials_event_leaf_centered_spline_2",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_visit_recency_spline3_demeaned",
-        "swr_x_visit_recency_trials_event_leaf_centered_spline_3",
-        "event_arm",
-        role="interaction",
-    ),
-    # Interaction names inherit the canonical spelling of every base term.
-    # Keeping only the ``*_x_*`` product grammar stable prevents a renamed
-    # main effect from acquiring a second, legacy identity in model output.
-    _rename(
-        "current_x_last_rewarded",
-        "is_current_arm_x_is_last_rewarded_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "time_x_current",
-        "time_since_stop_start_s_x_is_current_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "time_x_prev",
-        "time_since_stop_start_s_x_is_prev_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "time_x_next",
-        "time_since_stop_start_s_x_is_next_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename("swr_x_current", "swr_x_is_current_arm", "event_arm", role="interaction"),
-    _rename("swr_x_prev", "swr_x_is_prev_arm", "event_arm", role="interaction"),
-    _rename("swr_x_next", "swr_x_is_next_arm", "event_arm", role="interaction"),
-    _rename(
-        "swr_x_last_rewarded",
-        "swr_x_is_last_rewarded_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_reward_rate_arm_k10",
-        "swr_x_reward_fraction_candidate_arm_last10_visits",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_arm_never_visited",
-        "swr_x_is_candidate_arm_never_visited",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_is_last_rewarded_elsewhere",
-        "swr_x_is_last_rewarded_noncurrent_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_arm_uncertainty",
-        "swr_x_reward_belief_variance_candidate_arm_preoutcome",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename("mua_x_current", "mua_x_is_current_arm", "event_arm", role="interaction"),
-    _rename("mua_x_prev", "mua_x_is_prev_arm", "event_arm", role="interaction"),
-    _rename("mua_x_next", "mua_x_is_next_arm", "event_arm", role="interaction"),
-    _rename(
-        "mua_x_last_rewarded",
-        "mua_x_is_last_rewarded_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "continuous_x_current",
-        "continuous_replay_score_mean_x_is_current_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "continuous_x_prev",
-        "continuous_replay_score_mean_x_is_prev_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "continuous_x_next",
-        "continuous_replay_score_mean_x_is_next_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    _rename(
-        "omission_x_last_rewarded",
-        "is_omitted_outcome_x_is_last_rewarded_arm",
-        "event_arm",
-        role="interaction",
-    ),
-    # Patch-grain aggregates preserve the arm-level scientific definition and
-    # append ``_patch`` to state that the two leaf-arm values were aggregated.
-    _rename(
-        "cumulative_reward_patch",
-        "reward_count_candidate_arm_last10_known_trials_patch",
-        "event_patch",
-        role="predictor",
-    ),
-    _rename(
-        "reward_rate_arm_k10_patch",
-        "reward_fraction_candidate_arm_last10_visits_patch",
-        "event_patch",
-        role="predictor",
-    ),
-    _rename(
-        "p_reward_arm_patch",
-        "task_reward_probability_candidate_arm_patch",
-        "event_patch",
-        role="predictor",
-    ),
-    _rename(
-        "q_arm_patch",
-        "reward_belief_mean_candidate_arm_preoutcome_patch",
-        "event_patch",
-        role="predictor",
-    ),
-    _rename(
-        "visit_recency_patch",
-        "visit_recency_trials_patch",
-        "event_patch",
-        role="predictor",
-    ),
-    _rename(
-        "is_last_rewarded_patch_elsewhere",
-        "is_last_rewarded_noncurrent_patch",
-        "event_patch",
-    ),
-    Entry(
-        ("switch_x_current_patch",),
-        "retire",
-        "event_patch",
-        role="interaction",
-        notes="interaction with retired immediate-switch predictor",
-    ),
-    _rename(
-        "swr_x_current_patch",
-        "swr_x_is_current_patch",
-        "event_patch",
-        role="interaction",
-    ),
-    _rename(
-        "swr_x_prev_patch", "swr_x_is_prev_patch", "event_patch", role="interaction"
-    ),
-    _rename(
-        "swr_x_last_rewarded_patch_elsewhere",
-        "swr_x_is_last_rewarded_noncurrent_patch",
-        "event_patch",
-        role="interaction",
-    ),
-    # Choice-grain fractions are built after the persisted event-arm schema.
-    # Register them so model/result scans treat the old abbreviation as legacy.
-    _rename("replay_frac", "replay_fraction", "choice", role="predictor"),
-    _rename(
-        "replay_frac_residual", "replay_fraction_residual", "choice", role="predictor"
-    ),
-    _rename("replay_frac_swr", "replay_fraction_swr", "choice", role="predictor"),
-    _rename(
-        "replay_frac_non_swr", "replay_fraction_non_swr", "choice", role="predictor"
-    ),
-    _rename(
-        "replay_frac_current_patch",
-        "replay_fraction_current_patch",
-        "choice",
-        role="diagnostic",
-    ),
-    _rename(
-        "replay_frac_noncurrent",
-        "replay_fraction_noncurrent",
-        "choice",
-        role="diagnostic",
-    ),
-    _rename(
-        "replay_frac_residual_noncurrent",
-        "replay_fraction_residual_noncurrent",
-        "choice",
-        role="diagnostic",
-    ),
-    # Fit-time products spell out every canonical factor. These are generated
-    # directly (not persisted source-table columns), but the registry keeps the
-    # legacy abbreviations visible to repository-wide guards.
-    _rename(
-        "rpe_x_current",
-        "rpe_postoutcome_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "relval_x_current",
-        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "entropy_x_current",
-        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "update_x_current",
-        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "tss_x_current",
-        "periswitch_index_trials_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "postsw_x_current",
-        "is_periswitch_post_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "tsspostsw_x_current",
-        "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "block_x_current",
-        "trials_since_block_change_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "switchrate_x_current",
-        "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "tsc_x_current",
-        "log1p_time_since_stop_start_s_z_x_is_current_arm",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "currentpatch_x_tss",
-        "periswitch_index_trials_z_x_is_current_patch",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "currentpatch_x_tsc",
-        "log1p_time_since_stop_start_s_z_x_is_current_patch",
-        "fit_time",
-        role="interaction",
-    ),
-    _rename(
-        "currentpatch_x_switchrate",
-        "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
-        "fit_time",
-        role="interaction",
-    ),
-    # Fit-time arm fixed effects: arm 8 is the dropped reference (see spec).
-    *[
-        _rename(
-            f"arm_fe_{k}",
-            f"is_candidate_arm_{k}",
-            "fit_time",
-            role="predictor",
-            notes="arm_fe_k = 1 iff arm==k; reference_arm=8",
-        )
-        for k in range(8)
-    ],
-    # -- Event-table geometry: units (append _cm / _cm_s / _fraction) -------
-    # Replay MAP geometry (trajectory.py), unambiguously replay: append _cm.
-    _rename("net_displacement", "net_displacement_cm", "event", role="diagnostic"),
-    _rename("path_length", "path_length_cm", "event", role="diagnostic"),
-    _rename("spatial_extent", "spatial_extent_cm", "event", role="diagnostic"),
-    _rename(
-        "step_distance_median", "step_distance_median_cm", "event", role="diagnostic"
-    ),
-    _rename("step_distance_p90", "step_distance_p90_cm", "event", role="diagnostic"),
-    _rename("step_distance_max", "step_distance_max_cm", "event", role="diagnostic"),
-    _rename("max_ahead", "max_ahead_cm", "event", role="diagnostic"),
-    _rename("max_behind", "max_behind_cm", "event", role="diagnostic"),
-    _rename(
-        "max_abs_ahead_behind", "max_abs_ahead_behind_cm", "event", role="diagnostic"
-    ),
-    _rename(
-        "mean_abs_ahead_behind", "mean_abs_ahead_behind_cm", "event", role="diagnostic"
-    ),
-    # Position collides with the animal's position -> subject prefix + unit.
-    _rename(
-        "start_position",
-        "replay_start_position_cm",
-        "event",
-        role="diagnostic",
-        notes="replay MAP position; animal has its own",
-    ),
-    _rename("end_position", "replay_end_position_cm", "event", role="diagnostic"),
-    # Animal head speed (event_table.py): prefix animal_, append _cm_s.
-    _rename(
-        "max_speed",
-        "animal_max_speed_cm_s",
-        "event",
-        role="diagnostic",
-        notes="animal head speed, not replay speed",
-    ),
-    _rename("mean_speed", "animal_mean_speed_cm_s", "event", role="diagnostic"),
-    _rename("start_speed", "animal_start_speed_cm_s", "event", role="diagnostic"),
-    _rename("end_speed", "animal_end_speed_cm_s", "event", role="diagnostic"),
-    # Replay MAP speed (already replay_-prefixed): append _cm_s.
-    _rename(
-        "replay_speed_median", "replay_speed_median_cm_s", "event", role="diagnostic"
-    ),
-    _rename("replay_speed_p90", "replay_speed_p90_cm_s", "event", role="diagnostic"),
-    _rename(
-        "replay_speed_continuous_median",
-        "replay_speed_continuous_median_cm_s",
-        "event",
-        role="diagnostic",
-    ),
-    _rename(
-        "ab_slope",
-        "ab_slope_cm_s",
-        "event",
-        role="diagnostic",
-        notes="slope of ahead/behind vs time; a replay speed",
-    ),
-    # Fraction: keep the full word 'fraction'; only path_continuity lacks it.
-    _rename("path_continuity", "path_continuity_fraction", "event", role="diagnostic"),
 )
 
+# ---------------------------------------------------------------------------
+# The frozen deny-list
+# ---------------------------------------------------------------------------
+# Every legacy spelling the 2026-08-21 ledger retired, across all table grains,
+# excluding the ``audit`` relocations (those columns are allowed to stay put).
+# Extracted once from the ledger at the commit that moved it into
+# ``docs/design/2026-08-21-covariate-naming-scheme.md``:
+#
+#     {n for e in REGISTRY if e.action != "audit" for n in e.current}
+#
+# The ledger's grains are collapsed into one set on purpose: no canonical name
+# of any table is a legacy name of another (the ledger's own
+# no-collision invariant, checked table-by-table, holds globally), so a single
+# set rejects exactly the same columns a per-grain deny-list would.
+LEGACY_COLUMN_NAMES: frozenset[str] = frozenset(
+    """
+    Q1 Q2 Q3 Q4 Q5 Q6 Qstem1 Qstem2 Qstem3 ab_slope arm arm_dist_rank arm_fe_0
+    arm_fe_1 arm_fe_2 arm_fe_3 arm_fe_4 arm_fe_5 arm_fe_6 arm_fe_7
+    arm_never_visited arm_never_visited_patch arm_uncertainty
+    best_other_patch_mean_mu_preoutcome_sess beta_reward_entropy betadist_mu1
+    betadist_mu2 betadist_mu3 betadist_mu4 betadist_mu5 betadist_mu6 betadist_var1
+    betadist_var2 betadist_var3 betadist_var4 betadist_var5 betadist_var6
+    block_x_current chosen_leaf_mu_update_abs_postoutcome_sess
+    chosen_leaf_var_preoutcome_sess chosen_patch_mu_update_abs_postoutcome_sess
+    continuous_x_current continuous_x_next continuous_x_prev cumulative_reward
+    cumulative_reward_patch current_arm current_x_last_rewarded
+    currentpatch_x_switchrate currentpatch_x_tsc currentpatch_x_tss day
+    depletion_leaf_1 depletion_leaf_2 depletion_leaf_3 depletion_leaf_4
+    depletion_leaf_5 depletion_leaf_6 depletion_mean_stem_1 depletion_mean_stem_2
+    depletion_mean_stem_3 dist_to_arm end_position end_speed entropy_x_current
+    event_duration event_end event_midpoint_time event_start
+    global_leaf_var_sum_preoutcome_sess global_mu_update_abs_postoutcome_sess
+    global_mu_update_signed_postoutcome_sess immobility_time is_after_omission
+    is_after_reward is_after_stay is_after_switch is_current is_last_rewarded
+    is_last_rewarded_elsewhere is_last_rewarded_patch_elsewhere is_next
+    is_post_switch is_prev is_rewarding is_same_patch label_event_duration
+    label_event_end label_event_midpoint_time label_event_start leaf_choice_p
+    location_arm location_state location_well max_abs_ahead_behind max_ahead
+    max_behind max_speed mean_abs_ahead_behind mean_speed mua_x_current
+    mua_x_last_rewarded mua_x_next mua_x_prev n_MUA n_SWR n_events n_junction_bins
+    n_non_local n_non_local_SWR n_non_local_no_SWR net_displacement
+    nonlocal_weight_sum omission_x_last_rewarded p_reward_arm p_reward_arm_patch
+    p_reward_best p_reward_current p_reward_port0 p_reward_port1 p_reward_port2
+    p_reward_port3 p_reward_port4 p_reward_port5 path_continuity path_length
+    physical_arm posterior_hpd_width_50 posterior_hpd_width_80
+    posterior_hpd_width_95 posterior_mass_total postsw_x_current
+    prev_global_variance q_arm q_arm_patch q_chosen q_port0 q_port1 q_port2 q_port3
+    q_port4 q_port5 recent_switch_rate relval_x_current replay_frac
+    replay_frac_current_patch replay_frac_non_swr replay_frac_noncurrent
+    replay_frac_residual replay_frac_residual_noncurrent replay_frac_swr
+    replay_speed_continuous_median replay_speed_median replay_speed_p90 reward_lag1
+    reward_lag10 reward_lag2 reward_lag3 reward_lag4 reward_lag5 reward_lag6
+    reward_lag7 reward_lag8 reward_lag9 reward_outcome reward_rate_arm_k10
+    reward_rate_arm_k10_patch reward_rate_trial_k10 rpe rpe_abs rpe_x_current
+    spatial_extent start_position start_speed stay_sibling_mu_preoutcome_sess
+    step_distance_max step_distance_median step_distance_p90
+    switch_advantage_mu_preoutcome_sess switch_advantage_preoutcome_sess_Qstem
+    switch_x_current switch_x_current_patch switch_x_prev switchrate_x_current
+    swr_x_arm_never_visited swr_x_arm_uncertainty swr_x_current swr_x_current_patch
+    swr_x_is_last_rewarded_elsewhere swr_x_last_rewarded
+    swr_x_last_rewarded_patch_elsewhere swr_x_next swr_x_prev swr_x_prev_patch
+    swr_x_reward_rate_arm_k10 swr_x_visit_recency_demeaned
+    swr_x_visit_recency_spline1_demeaned swr_x_visit_recency_spline2_demeaned
+    swr_x_visit_recency_spline3_demeaned time_since_last_port_entry
+    time_since_port_entry time_since_reward time_since_stop time_x_current
+    time_x_next time_x_prev trials_since_switch tsc_x_current tss_x_current
+    tsspostsw_x_current unchosen_patches_mu_update_abs_postoutcome_sess
+    update_x_current value_diff_patch visit_recency visit_recency_demeaned
+    visit_recency_patch visit_recency_spline1_demeaned
+    visit_recency_spline2_demeaned visit_recency_spline3_demeaned
+    """.split()
+)
+
+# The subset of the deny-list that was never given a canonical replacement
+# (retired predictors, dead model outputs, derived complements). A decorated
+# spelling of one of these -- ``coef_switch_x_current`` -- has no canonical form
+# to rewrite it to, so the decorated-name check below skips them.
+_LEGACY_WITHOUT_CANONICAL: frozenset[str] = frozenset(
+    """
+    depletion_leaf_1 depletion_leaf_2 depletion_leaf_3 depletion_leaf_4
+    depletion_leaf_5 depletion_leaf_6 depletion_mean_stem_1 depletion_mean_stem_2
+    depletion_mean_stem_3 is_after_omission is_after_stay switch_x_current
+    switch_x_current_patch switch_x_prev
+    """.split()
+)
+_LEGACY_RENAMED: frozenset[str] = LEGACY_COLUMN_NAMES - _LEGACY_WITHOUT_CANONICAL
 
 # ---------------------------------------------------------------------------
 # Derived views
 # ---------------------------------------------------------------------------
+
+
 def _entries_for(table: str) -> tuple[Entry, ...]:
-    """Return registry entries for one persisted table/grain.
+    """Return ledger entries for one persisted table/grain.
 
     Column spellings are not globally meaningful: for example ``arm`` is the
     choice-set row in ``event_arm`` but the realized destination in ``qvals``.
     Requiring a table makes it impossible to apply one grain's semantic rename
-    to another merely because the legacy spelling happens to match.
+    to another merely because the legacy spelling happens to match. Only
+    ``qvals`` still has rows; the other registered grains resolve to an empty
+    tuple, which is what "the builders already emit canonical names" means.
     """
-    known = frozenset(e.table for e in REGISTRY)
-    if table not in known:
+    if table not in _ROW_KEYS:
         raise RegistryError(
-            f"unknown covariate-registry table {table!r}; expected {sorted(known)}"
+            f"unknown covariate-registry table {table!r}; expected {sorted(_ROW_KEYS)}"
         )
     return tuple(e for e in REGISTRY if e.table == table)
-
-
-def rename_map(*, table: str) -> dict[str, str]:
-    """Map current columns to canonical names for exactly one table/grain."""
-    out: dict[str, str] = {}
-    for e in _entries_for(table):
-        if e.action in _RENAMING:
-            assert e.canonical is not None
-            for name in e.current:
-                out[name] = e.canonical
-    return out
-
-
-def retired_columns(*, table: str | None = None) -> frozenset[str]:
-    entries = REGISTRY if table is None else _entries_for(table)
-    return frozenset(n for e in entries if e.action == "retire" for n in e.current)
-
-
-def dropped_columns(*, table: str | None = None) -> frozenset[str]:
-    entries = REGISTRY if table is None else _entries_for(table)
-    return frozenset(n for e in entries if e.action == "drop" for n in e.current)
 
 
 def derived_columns(*, table: str | None = None) -> tuple[Entry, ...]:
     entries = REGISTRY if table is None else _entries_for(table)
     return tuple(e for e in entries if e.action == "derive")
-
-
-def audit_columns(*, table: str | None = None) -> tuple[Entry, ...]:
-    entries = REGISTRY if table is None else _entries_for(table)
-    return tuple(e for e in entries if e.action == "audit")
-
-
-def all_current_columns(*, table: str | None = None) -> frozenset[str]:
-    """Every legacy column named anywhere in the registry."""
-    entries = REGISTRY if table is None else _entries_for(table)
-    return frozenset(n for e in entries for n in e.current)
 
 
 def canonical_names(*, table: str | None = None) -> frozenset[str]:
@@ -1090,7 +460,9 @@ def canonical_names(*, table: str | None = None) -> frozenset[str]:
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 _IDENT = re.compile(r"^[a-z][a-z0-9_]*$")
+
 _LETTER_DIGIT = re.compile(r"([a-z]+)\d")
 
 
@@ -1239,26 +611,15 @@ def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
     return RenamePlan(rename, tuple(drop), tuple(audit_present))
 
 
-def export_json() -> str:
-    """Serialize the registry as JSON for non-Python migration tooling."""
-    import json
-
-    return json.dumps(
-        [
-            {k: v for k, v in vars(e).items() if v not in ((), "", None)}
-            for e in REGISTRY
-        ],
-        indent=2,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Frame transforms (in-memory; no disk I/O)
 # ---------------------------------------------------------------------------
-# These apply the registry to a pandas frame. They are separated by migration
+# These apply the ledger to a pandas frame. They are separated by migration
 # step so each carries the correct comparison policy: the mechanical rename is
 # bit-for-bit invariant, the numerical-path canonicalization uses a declared
 # tolerance, and schema pruning is a distinct step.
+
+
 def apply_rename(df, *, table: str):  # type: ignore[no-untyped-def]
     """Apply the mechanical rename to a frame: 1:1 renames and byte-identical
     alias collapses only.
@@ -1424,6 +785,23 @@ def rename_dynamic_columns(df, *, table: str):  # type: ignore[no-untyped-def]
     return df.rename(columns=rename)
 
 
+def _undecorate(name: str) -> frozenset[str]:
+    """Every stem a deterministic result decoration could have been built from.
+
+    Fitted artifacts prefix predictors with ``coef_`` / ``bse_`` and
+    standardized tables suffix them with ``_z``; a legacy predictor therefore
+    survives into a result table under a decorated spelling. Stripping the
+    decorations back off is what lets one deny-list cover both.
+    """
+    stems = {name}
+    for prefix in ("coef_", "bse_"):
+        if name.startswith(prefix):
+            stems |= _undecorate(name[len(prefix) :])
+    if name.endswith("_z"):
+        stems |= _undecorate(name[:-2])
+    return frozenset(stems)
+
+
 def assert_canonical_vocabulary(df, *, table: str) -> None:  # type: ignore[no-untyped-def]
     """Validate column vocabulary, not scientific values or candidate support.
 
@@ -1434,25 +812,20 @@ def assert_canonical_vocabulary(df, *, table: str) -> None:  # type: ignore[no-u
     contracts remain the responsibility of their producer and fitter.
     """
     validate()
+    _entries_for(table)
     columns = list(df.columns)
     if len(columns) != len(set(columns)):
         duplicates = sorted({c for c in columns if columns.count(c) > 1})
         raise RegistryError(f"{table} has duplicate columns {duplicates}")
 
-    forbidden: set[str] = set()
-    for entry in _entries_for(table):
-        if entry.action != "audit":
-            forbidden.update(entry.current)
-    surviving = sorted(forbidden & set(columns))
+    surviving = sorted(LEGACY_COLUMN_NAMES & set(columns))
     if surviving:
         raise RegistryError(
             f"{table} retains legacy/retired covariate columns {surviving}"
         )
 
     dynamic_survivors = sorted(
-        column
-        for column in columns
-        if canonical_output_name(column, table=table) != column
+        column for column in columns if _undecorate(column) & _LEGACY_RENAMED
     )
     if dynamic_survivors:
         raise RegistryError(

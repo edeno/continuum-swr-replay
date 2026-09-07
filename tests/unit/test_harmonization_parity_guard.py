@@ -11,14 +11,19 @@ from scripts.exploratory import _verify_harmonization_parity as parity
 
 
 def _stop_frame(stop_indices: list[int], n_events: list[int]) -> pd.DataFrame:
+    """A canonical stop frame.
+
+    ``finalize_covariate_schema`` translates the ``qvals`` grain only, so a
+    stop-grain fixture has to be spelled canonically to reach the stamp.
+    """
     return pd.DataFrame(
         {
             "animal": "rat",
-            "day": 1,
+            "session_date": 1,
             "epoch": "01_r1",
             "stop_idx": stop_indices,
             "stop_id": [f"stop-{index}" for index in stop_indices],
-            "n_events": n_events,
+            "n_selected_events": n_events,
         }
     )
 

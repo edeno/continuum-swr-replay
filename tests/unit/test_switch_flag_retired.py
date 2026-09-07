@@ -10,9 +10,15 @@ patch analysis, which uses the flag to define a cohort, not as a coefficient.
 
 from __future__ import annotations
 
-from continuum_swr_replay.analysis.replay import covariate_registry as reg
+from pathlib import Path
+
 from continuum_swr_replay.analysis.replay import model_specs as ms
 from continuum_swr_replay.analysis.replay import per_bin_rate_model as pbrm
+
+NAMING_SCHEME = (
+    Path(__file__).resolve().parents[2]
+    / "docs/design/2026-08-21-covariate-naming-scheme.md"
+)
 
 
 def test_per_stop_rate_ladders_drop_the_switch_flag() -> None:
@@ -52,17 +58,20 @@ def test_dedicated_post_switch_patch_model_is_preserved() -> None:
     assert ms.MODEL_PATCH_SWITCH, "the post-switch patch model was removed"
 
 
-def test_registry_and_model_specs_agree_switch_is_not_a_predictor() -> None:
-    """The naming registry marks is_after_switch as provenance, not a
+def test_naming_ledger_and_model_specs_agree_switch_is_not_a_predictor() -> None:
+    """The rename ledger marks is_after_switch as provenance, not a
     predictor; model_specs must not carry it in any fitted ladder. This pins
-    the two files against drift -- if a future edit re-adds the flag to a
-    ladder while leaving the registry note stale, one of these fails."""
-    entry = next(
-        e
-        for e in reg.REGISTRY
-        if e.canonical == "did_last_completed_trip_switch_patch"
-    )
-    assert entry.role == "provenance", "registry still calls the flag a predictor"
+    the two records against drift -- if a future edit re-adds the flag to a
+    ladder while leaving the ledger note stale, one of these fails."""
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in NAMING_SCHEME.read_text().splitlines()
+        if "| rename |" in line
+        and "`did_last_completed_trip_switch_patch`" in line
+    ]
+    assert rows, "the rename ledger no longer records the switch flag"
+    for _legacy, _action, _canonical, role, _notes in rows:
+        assert role == "provenance", "the ledger still calls the flag a predictor"
     fitted = (
         *ms.MODEL_PER_STOP_RATE.values(),
         *ms.MODEL_HIERARCHY.values(),
