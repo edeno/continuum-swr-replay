@@ -311,7 +311,7 @@ def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
     )
     save_reference(reference, tmp_path / "standardization_reference.json")
 
-    runner._validate_requested_standardization(
+    runner.validate_requested_standardization(
         frame,
         union_predictors=("reward_belief_variance_candidate_arm_preoutcome_z",),
         input_dir=tmp_path,

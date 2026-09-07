@@ -5,18 +5,33 @@ certify that an event has the complete task choice set, that response counts
 are conserved, or that a partially missing leaf family has not been silently
 averaged.  Those are scientific properties of the table, and are validated
 here at the producer/reducer boundary.
+
+The same reasoning covers the consumer boundary: what a fitting run must
+establish about the table it reads and the fits it produced --
+:func:`validate_requested_standardization`,
+:func:`validate_canonical_table_contract` and
+:func:`validate_and_match_fit_results` -- is a contract, not a fitting step,
+so it lives here rather than inside a runner.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
+from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS, TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
+from ._tables_common import EVENT_ARM_STANDARDIZED_COLS
+from .content_response import validate_fraction_response
+from .standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
 from .summaries import PROBABILITY_ROW_SUM_ATOL
 
 _PATCHES = (1, 2, 3)
@@ -29,6 +44,31 @@ _LEAF_SUPPORT_COLUMNS = (
     "reward_belief_mean_candidate_arm_preoutcome",
     "reward_belief_variance_candidate_arm_preoutcome",
 )
+
+# Consumer-side contract constants: the location states a canonical content
+# table may carry, its per-hierarchy candidate set, and the cross-validation
+# columns a fitted ladder must report.
+_LOCATION_STATES = frozenset({"at_well", "in_transit", "mixed", "unknown"})
+_CANDIDATE_COLUMNS = {
+    "arm": ("candidate_arm", ALL_ARMS),
+    "patch": ("patch", tuple(sorted(set(TRACK_SEGMENT_TO_PATCH.values())))),
+}
+
+CV_RESULT_COLUMNS = (
+    "cv_ll_per_event_mean",
+    "cv_ll_per_event_std",
+    "cv_ll_per_timebin_mean",
+    "cv_ll_per_timebin_std",
+    "cv_n_folds",
+    "cv_n_nonconverged_folds",
+    "cv_n_separated_folds",
+)
+_CV_COUNT_COLUMNS = (
+    "cv_n_folds",
+    "cv_n_nonconverged_folds",
+    "cv_n_separated_folds",
+)
+
 
 
 def _require_columns(
@@ -330,3 +370,404 @@ def validate_event_patch_table(
         n_candidates=len(_PATCHES),
         table_name="event_patch",
     )
+
+
+def validate_requested_standardization(
+    long_df: pd.DataFrame,
+    *,
+    union_predictors: Sequence[str],
+    input_dir: Path,
+    table_label: object,
+) -> None:
+    """Fail before fitting if requested persisted ``_z`` units are stale.
+
+    The canonical event-arm builder estimates these moments on the six leaf arms.
+    Older materialized tables used all nine arms, which inflated uncertainty
+    coefficients while preserving plausible column names.  Only inspect sources
+    whose standardized columns are actually requested by this invocation.
+    """
+    sources = tuple(
+        source
+        for source in EVENT_ARM_STANDARDIZED_COLS
+        if f"{source}_z" in union_predictors
+    )
+    if not sources:
+        return
+
+    reference_path = input_dir / "standardization_reference.json"
+    if not reference_path.exists():
+        raise FileNotFoundError(
+            f"Requested standardized predictor(s) {[f'{c}_z' for c in sources]} "
+            f"from {table_label}, but {reference_path} is missing. Regenerate the "
+            "canonical event-arm table and its leaf-support reference."
+        )
+    try:
+        assert_standardized_matches_reference(
+            long_df,
+            sources,
+            load_reference(reference_path),
+            support_label="leaf_arms",
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Canonical standardization for {table_label} is stale or invalid: "
+            f"{exc}. Regenerate the event-arm table and "
+            "standardization_reference.json before fitting."
+        ) from exc
+
+
+def validate_canonical_table_contract(
+    long_df: pd.DataFrame,
+    *,
+    hierarchy_kind: str,
+    table_label: object,
+    response_col: str | None = None,
+) -> None:
+    """Validate location and novelty semantics that identify current tables.
+
+    ``response_col`` is the column this run will actually fit. The hard counts
+    are validated unconditionally because they are part of the canonical schema;
+    a fraction response is additionally held to its own contract (defined for
+    every candidate of an event or for none of it, and summing to 1.0).
+    """
+    if long_df.empty:
+        raise ValueError(f"Canonical content table {table_label} is empty")
+    if long_df[[*SESSION_COLUMNS, "event_id"]].isna().any(axis=None):
+        raise ValueError(
+            f"Canonical content table {table_label} has missing session/event keys"
+        )
+
+    candidate_col, expected_candidates = _CANDIDATE_COLUMNS[hierarchy_kind]
+    n_candidates = len(expected_candidates)
+    unit_cols = [*SESSION_COLUMNS, "event_id"]
+    if (
+        long_df.duplicated([*unit_cols, candidate_col]).any()
+        or not long_df[candidate_col].isin(expected_candidates).all()
+    ):
+        raise ValueError(
+            f"Canonical {hierarchy_kind} content table {table_label} must have "
+            f"exactly the expected {candidate_col} candidates "
+            f"{list(expected_candidates)} once per session/event"
+        )
+
+    by_event = long_df.groupby(unit_cols, sort=False, observed=True)
+    event_sizes = by_event.size()
+    if not event_sizes.eq(n_candidates).all():
+        raise ValueError(
+            f"Canonical {hierarchy_kind} content table {table_label} must have "
+            f"exactly the expected {candidate_col} candidates "
+            f"{list(expected_candidates)} once per session/event"
+        )
+
+    # ``event_id`` is canonicalized as globally unique. Enforcing the mapping
+    # here also prevents later event-only cohort/audit groupbys from fusing two
+    # sessions if a stale table reused a session-local event counter.
+    event_session_counts = long_df.groupby("event_id", sort=False, observed=True)[
+        list(SESSION_COLUMNS)
+    ].nunique(dropna=False)
+    if event_session_counts.gt(1).any(axis=None):
+        raise ValueError(
+            f"Canonical content table {table_label} reuses event_id across sessions"
+        )
+
+    context_cols = [
+        *SESSION_COLUMNS,
+        "occupancy_state",
+        "at_well",
+        "occupancy_well_id",
+        "occupancy_well_arm",
+    ]
+    if (by_event[context_cols].nunique(dropna=False) != 1).any(axis=None):
+        raise ValueError(
+            f"Canonical content table {table_label} has event context that "
+            "changes across candidate rows"
+        )
+
+    state = long_df["occupancy_state"]
+    invalid_states = sorted(set(state.dropna().unique()) - _LOCATION_STATES)
+    if state.isna().any() or invalid_states:
+        raise ValueError(
+            f"Canonical content table {table_label} has invalid location_state "
+            f"values {invalid_states}; expected {sorted(_LOCATION_STATES)}"
+        )
+    at_well = state.eq("at_well")
+    # ``at_well`` is a nullable boolean and is NA exactly for the ``unknown``
+    # state (events before the first completed trip): the window's location was
+    # never observed, so "is the animal at a well" has no answer. Transit and
+    # mixed windows are explicitly False. Requiring non-null here would reject a
+    # canonical table for carrying a state this validator itself accepts.
+    unknown = state.eq("unknown")
+    observed_at_well = long_df["at_well"].notna()
+    if not observed_at_well.eq(~unknown).all() or not (
+        long_df["at_well"].fillna(False).eq(at_well).all()
+    ):
+        raise ValueError(
+            f"Canonical content table {table_label} has at_well values "
+            "inconsistent with location_state"
+        )
+
+    # A current candidate is scientifically defined only for whole-window
+    # at-well events. Numeric zeros off-well would retain those events in the
+    # common cohort and silently change the estimand.
+    current_col = "is_current_arm" if hierarchy_kind == "arm" else "is_current_patch"
+    current = long_df[current_col]
+    if not current.dropna().isin([0.0, 1.0]).all():
+        raise ValueError(
+            f"Canonical content table {table_label} has non-binary {current_col}"
+        )
+    if current.loc[~at_well].notna().any() or current.loc[at_well].isna().any():
+        raise ValueError(
+            f"Canonical content table {table_label} must encode {current_col} "
+            "as one-hot at wells and NaN off-well"
+        )
+    current_sums = (
+        long_df.loc[at_well]
+        .groupby(unit_cols, sort=False, observed=True)[current_col]
+        .sum()
+    )
+    if not current_sums.eq(1.0).all():
+        raise ValueError(
+            f"Canonical content table {table_label} must encode exactly one "
+            f"{current_col} candidate for every at-well event"
+        )
+
+    for location_col in ("occupancy_well_id", "occupancy_well_arm"):
+        if (
+            long_df.loc[at_well, location_col].isna().any()
+            or long_df.loc[~at_well, location_col].notna().any()
+        ):
+            raise ValueError(
+                f"Canonical content table {table_label} must define "
+                f"{location_col} only for at-well events"
+            )
+    current_reference = (
+        long_df["occupancy_well_arm"]
+        if hierarchy_kind == "arm"
+        else long_df["occupancy_well_arm"].map(TRACK_SEGMENT_TO_PATCH)
+    )
+    expected_current = long_df[candidate_col].eq(current_reference).astype(float)
+    if not current.loc[at_well].eq(expected_current.loc[at_well]).all():
+        relation = (
+            "occupancy_well_arm"
+            if hierarchy_kind == "arm"
+            else "the mapped occupancy_well_arm patch"
+        )
+        raise ValueError(
+            f"Canonical content table {table_label}: {current_col} must match "
+            f"{relation} exactly"
+        )
+
+    count_col = "arm_count_hard" if hierarchy_kind == "arm" else "patch_count_hard"
+    response = long_df[count_col]
+    numeric_response = pd.to_numeric(response, errors="coerce").to_numpy(dtype=float)
+    invalid_response = (
+        not pd.api.types.is_numeric_dtype(response.dtype)
+        or pd.api.types.is_bool_dtype(response.dtype)
+        or not np.isfinite(numeric_response).all()
+        or (numeric_response < 0).any()
+        or not np.equal(numeric_response, np.floor(numeric_response)).all()
+    )
+    if invalid_response:
+        raise ValueError(
+            f"Canonical content table {table_label} requires {count_col} to "
+            "contain finite nonnegative integer counts"
+        )
+    if response_col is not None and response_col != count_col:
+        validate_fraction_response(
+            long_df,
+            response_col,
+            event_col="event_id",
+            table_label=table_label,
+        )
+
+    novelty_col = (
+        "is_candidate_arm_never_visited"
+        if hierarchy_kind == "arm"
+        else "is_patch_never_visited"
+    )
+    recency_col = (
+        "visit_recency_trials_event_leaf_centered"
+        if hierarchy_kind == "arm"
+        else "visit_recency_trials_patch"
+    )
+    novelty = long_df[novelty_col]
+    if not novelty.dropna().isin([0.0, 1.0]).all():
+        raise ValueError(
+            f"Canonical content table {table_label} has non-binary {novelty_col}"
+        )
+    novelty_counts = by_event[novelty_col].count()
+    recency_counts = by_event[recency_col].count()
+    valid_counts = {0, n_candidates}
+    if (
+        not novelty_counts.isin(valid_counts).all()
+        or not recency_counts.isin(valid_counts).all()
+        or not novelty_counts.eq(recency_counts).all()
+    ):
+        raise ValueError(
+            f"Canonical content table {table_label} must carry {novelty_col} "
+            f"and {recency_col} together for all candidates in an event, or "
+            "leave both unknown before history exists"
+        )
+
+
+def validate_and_match_fit_results(
+    fit_results: Mapping[str, pd.DataFrame],
+    *,
+    requested_model_names: Sequence[str],
+    cohort: pd.DataFrame,
+    event_col: str,
+    require_cv: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """Require a complete ladder on one exact shared session/event cohort."""
+    requested = tuple(requested_model_names)
+    missing_results = [
+        model_name
+        for model_name in requested
+        if model_name not in fit_results or fit_results[model_name].empty
+    ]
+    if missing_results:
+        raise RuntimeError(
+            f"Requested content model(s) {missing_results} produced no session fits; "
+            "the complete ladder will not be published"
+        )
+
+    expected_event_counts = {
+        tuple(keys): int(group[event_col].nunique())
+        for keys, group in cohort.groupby(
+            list(SESSION_COLUMNS), sort=False, observed=True, dropna=False
+        )
+    }
+    session_sets: dict[str, set[tuple]] = {}
+
+    for model_name in requested:
+        result = fit_results[model_name]
+        # ``estimator`` and ``response_col`` are integrity columns: without them
+        # a published bundle does not say at which grain its llf/AIC/SEs are
+        # stated, and a fraction bundle is indistinguishable from a count one.
+        required = [*SESSION_COLUMNS, "model", "n_events", "estimator", "response_col"]
+        missing_columns = [column for column in required if column not in result]
+        if missing_columns:
+            raise RuntimeError(
+                f"Fit result for {model_name} is missing integrity column(s) "
+                f"{missing_columns}; no output will be published"
+            )
+        if result[list(SESSION_COLUMNS)].isna().any(axis=None):
+            raise RuntimeError(
+                f"Fit result for {model_name} has missing session keys; "
+                "no output will be published"
+            )
+        if result.duplicated(list(SESSION_COLUMNS)).any():
+            raise RuntimeError(
+                f"Fit result for {model_name} has duplicate session rows; "
+                "no output will be published"
+            )
+        if require_cv:
+            missing_cv = [
+                column for column in CV_RESULT_COLUMNS if column not in result
+            ]
+            if missing_cv:
+                raise RuntimeError(
+                    f"Requested CV result for {model_name} is missing column(s) "
+                    f"{missing_cv}; no output will be published"
+                )
+            # Sessions whose CV did not run carry NaN in every CV column. Those
+            # are tolerated -- a failed fold must not cost a session its primary
+            # coefficient -- but a rung where NO session scored means CV is
+            # broken rather than marginal, and that still refuses to publish.
+            scored = result["cv_n_folds"].notna()
+            if not scored.any():
+                raise RuntimeError(
+                    f"Requested CV produced no scored session for {model_name}; "
+                    "no output will be published"
+                )
+            if not scored.all():
+                logging.warning(
+                    "%s: CV scored %d of %d sessions (%.0f%%); coefficients keep "
+                    "the full cohort, held-out comparisons use the scored subset",
+                    model_name,
+                    int(scored.sum()),
+                    len(result),
+                    100 * scored.mean(),
+                )
+            cv_counts = result.loc[scored, list(_CV_COUNT_COLUMNS)].apply(
+                pd.to_numeric, errors="coerce"
+            )
+            invalid_cv_counts = (
+                ~np.isfinite(cv_counts.to_numpy(dtype=float)).all(axis=1)
+                | cv_counts["cv_n_folds"].lt(2)
+                | cv_counts.ne(np.floor(cv_counts)).any(axis=1)
+                | cv_counts["cv_n_nonconverged_folds"].lt(0)
+                | cv_counts["cv_n_separated_folds"].lt(0)
+                | cv_counts["cv_n_nonconverged_folds"].gt(cv_counts["cv_n_folds"])
+                | cv_counts["cv_n_separated_folds"].gt(cv_counts["cv_n_folds"])
+            )
+            if invalid_cv_counts.any():
+                raise RuntimeError(
+                    f"Requested CV result for {model_name} has invalid or missing "
+                    "fold metadata; no output will be published"
+                )
+        if (
+            set(result["model"].dropna().unique()) != {model_name}
+            or result["model"].isna().any()
+        ):
+            raise RuntimeError(
+                f"Fit result labeled as {model_name} contains inconsistent model "
+                "labels; no output will be published"
+            )
+
+        sessions: set[tuple] = set()
+        for row in result.itertuples(index=False):
+            session = tuple(getattr(row, column) for column in SESSION_COLUMNS)
+            if session not in expected_event_counts:
+                raise RuntimeError(
+                    f"Fit result for {model_name} contains session {session} outside "
+                    "the frozen cohort; no output will be published"
+                )
+            n_events = row.n_events
+            try:
+                numeric_n_events = float(n_events)
+            except (TypeError, ValueError):
+                numeric_n_events = np.nan
+            if (
+                not np.isfinite(numeric_n_events)
+                or not numeric_n_events.is_integer()
+                or int(numeric_n_events) != expected_event_counts[session]
+            ):
+                raise RuntimeError(
+                    f"Fit result for {model_name}/{session} reports n_events="
+                    f"{n_events!r}, expected {expected_event_counts[session]} from "
+                    "the frozen cohort; no output will be published"
+                )
+            sessions.add(session)
+        session_sets[model_name] = sessions
+
+    shared_sessions = set.intersection(
+        *(session_sets[model_name] for model_name in requested)
+    )
+    if not shared_sessions:
+        raise RuntimeError(
+            "Requested content models have no common successfully fitted session; "
+            "the complete ladder will not be published"
+        )
+
+    matched: dict[str, pd.DataFrame] = {}
+    for model_name in requested:
+        result = fit_results[model_name]
+        session_index = pd.MultiIndex.from_frame(result[list(SESSION_COLUMNS)])
+        keep = session_index.isin(shared_sessions)
+        matched_result = (
+            result.loc[keep]
+            .sort_values(list(SESSION_COLUMNS), kind="stable")
+            .reset_index(drop=True)
+        )
+        matched_sessions = set(
+            matched_result[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
+        )
+        if matched_sessions != shared_sessions:
+            raise RuntimeError(
+                f"Internal shared-session alignment failed for {model_name}; "
+                "no output will be published"
+            )
+        matched[model_name] = matched_result
+
+    return matched
