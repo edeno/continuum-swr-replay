@@ -940,8 +940,8 @@ def test_runner_smoke():
     qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
     if not table_exists(qvals_path):
         pytest.skip(
-            "qvals_table not present "
-            "(run continuum_swr_replay.analysis.behavior.qvals_table --write first)"
+            "qvals_table not present (run "
+            "`uv run python scripts/behavior/build_qvals_table.py --write` first)"
         )
 
     stop = read_table(rc / "stop_table.pkl")

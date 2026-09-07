@@ -246,8 +246,8 @@ def attach_arm_uncertainty(
     if missing:
         raise ValueError(
             "contingency is missing per-leaf beta-variance columns "
-            f"{sorted(missing)}; regenerate qvals_table with `python -m "
-            "continuum_swr_replay.analysis.behavior.qvals_table --write` "
+            f"{sorted(missing)}; regenerate qvals_table with "
+            "`uv run python scripts/behavior/build_qvals_table.py --write` "
             "(carries reward_belief_variance_port_{0..5})."
         )
     merged = _merge_contingency_on_stop(
