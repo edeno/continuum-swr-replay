@@ -272,8 +272,12 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     frame = _canonical_arm_table()
-    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0)
-    frame, legacy = attach_standardized(frame, ["reward_belief_variance_candidate_arm_preoutcome"])
+    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(
+        frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0
+    )
+    frame, legacy = attach_standardized(
+        frame, ["reward_belief_variance_candidate_arm_preoutcome"]
+    )
     frame.to_pickle(input_dir / "event_arm_table.pkl")
     # Simulate the shipped pre-fix sidecar: right mean/SD keys, no scientific
     # support metadata, and moments computed over all nine candidates.
@@ -281,8 +285,12 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
         json.dumps(
             {
                 "reward_belief_variance_candidate_arm_preoutcome": {
-                    "mean": legacy["reward_belief_variance_candidate_arm_preoutcome"]["mean"],
-                    "std": legacy["reward_belief_variance_candidate_arm_preoutcome"]["std"],
+                    "mean": legacy["reward_belief_variance_candidate_arm_preoutcome"][
+                        "mean"
+                    ],
+                    "std": legacy["reward_belief_variance_candidate_arm_preoutcome"][
+                        "std"
+                    ],
                 }
             }
         )
@@ -302,7 +310,9 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
 
 def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
     frame = _canonical_arm_table()
-    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0)
+    frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(
+        frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0
+    )
     frame, reference = attach_standardized(
         frame,
         ["reward_belief_variance_candidate_arm_preoutcome"],
@@ -472,7 +482,9 @@ def test_each_session_event_requires_the_exact_candidate_set():
     frame = _canonical_arm_table()
     frame.loc[frame.index[0], "candidate_arm"] = 1
 
-    with pytest.raises(ValueError, match="exactly the expected candidate_arm candidates"):
+    with pytest.raises(
+        ValueError, match="exactly the expected candidate_arm candidates"
+    ):
         runner.prepare_canonical_fit_request(
             frame,
             hierarchy=runner.MODEL_HIERARCHY,

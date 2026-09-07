@@ -314,6 +314,12 @@ pre-split module against the four post-split modules reports `missing: []`, `ext
 | `_validate_and_match_fit_results` | `scripts/content/fit_replay_content_models.py` | **0** |
 | `_CV_RESULT_COLUMNS` | `scripts/content/fit_replay_content_models.py` | **0** |
 
+Two grain *names* went with the trimmed rows: `_entries_for` (and through it
+`assert_canonical_vocabulary`) now validates `table=` against the eight `_ROW_KEYS` grains
+rather than the ten that used to carry registry entries, so `table="choice"` and
+`table="fit_time"` raise `RegistryError` instead of resolving to an empty entry set — both
+have **0** callers at HEAD.
+
 `_merge_classified_and_verify_timing` computed the event timing twice — once in the
 aggregator as `event_*_s`, once from the classified table as `label_event_*` — and then
 asserted the two agreed. Before deleting it, the comparison was reproduced outside the
@@ -346,10 +352,16 @@ three vectorized sites keep their vectorized path), and `stay_indicator` maps ar
 `arm_to_patch` first.
 
 The registry's per-grain vocabulary check became one global deny-list. Two measurements
-justify it: no canonical name of any grain is a legacy name of any other
+bound the change: no canonical name of any grain is a legacy name of any other
 (`⋃canonical ∩ ⋃legacy = ∅` over all 10 grains), and for each of the eight materialized
 tables the global set flags exactly the columns the per-grain set did (386 distinct columns,
-zero difference). At HEAD the registry holds 53 entries and 219 frozen legacy names.
+zero difference). So on the columns that actually exist — canonical vocabularies and
+materialized tables alike — the two checks are indistinguishable. They are *not* identical
+in general: cross-grain the global set is deliberately stricter, because a legacy spelling
+retired from one grain (or a `coef_`/`bse_`/`_z` decoration of one) is now rejected in every
+grain, including grains that never carried it. That direction only ever rejects more, and
+nothing in the pipeline relies on re-introducing another grain's retired spelling. At HEAD
+the registry holds 53 entries and 219 frozen legacy names.
 
 ---
 

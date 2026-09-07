@@ -47,18 +47,14 @@ def test_verify_table_rejects_row_loss_even_when_new_is_exact_subset(tmp_path):
         _stop_frame([1, 2], [5, 6]),
     )
 
-    assert not parity.verify_table(
-        "replay stop", backup_path, new_path, table="stop"
-    )
+    assert not parity.verify_table("replay stop", backup_path, new_path, table="stop")
 
 
 def test_verify_table_accepts_identical_keyed_cohort(tmp_path):
     frame = _stop_frame([0, 1, 2], [4, 5, 6])
     backup_path, new_path = _write_pair(tmp_path, frame, frame.copy())
 
-    assert parity.verify_table(
-        "replay stop", backup_path, new_path, table="stop"
-    )
+    assert parity.verify_table("replay stop", backup_path, new_path, table="stop")
 
 
 def test_verify_table_detects_changed_core_value_on_shared_key(tmp_path):
@@ -68,9 +64,7 @@ def test_verify_table_detects_changed_core_value_on_shared_key(tmp_path):
         _stop_frame([0, 1], [4, 99]),
     )
 
-    assert not parity.verify_table(
-        "replay stop", backup_path, new_path, table="stop"
-    )
+    assert not parity.verify_table("replay stop", backup_path, new_path, table="stop")
 
 
 def test_main_fails_when_no_table_pair_was_checked(tmp_path, monkeypatch):

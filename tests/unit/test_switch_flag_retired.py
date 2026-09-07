@@ -23,7 +23,10 @@ NAMING_SCHEME = (
 
 def test_per_stop_rate_ladders_drop_the_switch_flag() -> None:
     for name in ("R0", "R1"):
-        assert "did_last_completed_trip_switch_patch" not in ms.MODEL_PER_STOP_RATE[name].predictors
+        assert (
+            "did_last_completed_trip_switch_patch"
+            not in ms.MODEL_PER_STOP_RATE[name].predictors
+        )
 
 
 def test_stop_covariates_drop_the_switch_flag() -> None:
@@ -38,7 +41,9 @@ def test_no_per_bin_model_emits_the_switch_flag() -> None:
     """Neither the patsy formula nor the design-column builder may add it."""
     for name, spec in ms.MODEL_PER_BIN_RATE.items():
         assert "did_last_completed_trip_switch_patch" not in spec.formula(), name
-        assert "did_last_completed_trip_switch_patch" not in pbrm._design_columns(spec), name
+        assert "did_last_completed_trip_switch_patch" not in pbrm._design_columns(
+            spec
+        ), name
         assert spec.switch is False, name
 
 
@@ -66,8 +71,7 @@ def test_naming_ledger_and_model_specs_agree_switch_is_not_a_predictor() -> None
     rows = [
         [cell.strip() for cell in line.strip().strip("|").split("|")]
         for line in NAMING_SCHEME.read_text().splitlines()
-        if "| rename |" in line
-        and "`did_last_completed_trip_switch_patch`" in line
+        if "| rename |" in line and "`did_last_completed_trip_switch_patch`" in line
     ]
     assert rows, "the rename ledger no longer records the switch flag"
     for _legacy, _action, _canonical, role, _notes in rows:
@@ -77,15 +81,15 @@ def test_naming_ledger_and_model_specs_agree_switch_is_not_a_predictor() -> None
         *ms.MODEL_HIERARCHY.values(),
     )
     for spec in fitted:
-        assert "did_last_completed_trip_switch_patch" not in getattr(spec, "predictors", ()), spec.name
+        assert "did_last_completed_trip_switch_patch" not in getattr(
+            spec, "predictors", ()
+        ), spec.name
     for spec in ms.MODEL_PER_BIN_RATE.values():
         assert "did_last_completed_trip_switch_patch" not in spec.formula(), spec.name
 
 
 def test_ladder_parent_chain_survives_m8_removal() -> None:
     """The interaction rung parents off the full additive rung, not off M8."""
-    assert (
-        ms.MODEL_PER_BIN_RATE["M9r_rew_x_time"].parent == "M7r_time_histcos_rew"
-    )
+    assert ms.MODEL_PER_BIN_RATE["M9r_rew_x_time"].parent == "M7r_time_histcos_rew"
     parents = {s.parent for s in ms.MODEL_PER_BIN_RATE.values()} - {None}
     assert "M8_full_switch" not in parents

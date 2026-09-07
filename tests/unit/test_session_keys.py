@@ -55,7 +55,7 @@ def test_missing_columns_raise():
 
 
 _MODULE_LEVEL_SESSION_CONST = re.compile(
-    r'^[A-Za-z_][A-Za-z0-9_]*(\s*:\s*[^=]+?)?\s*=\s*[\[\(]\s*'
+    r"^[A-Za-z_][A-Za-z0-9_]*(\s*:\s*[^=]+?)?\s*=\s*[\[\(]\s*"
     r'"animal"\s*,\s*"(session_date|day)"\s*,\s*"epoch"\s*[\]\)]\s*$'
 )
 

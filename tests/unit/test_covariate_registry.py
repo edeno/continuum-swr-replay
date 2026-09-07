@@ -5,14 +5,14 @@ The full old->new ledger now lives in the appendix of
 ``covariate_registry`` is the runtime half: the frozen deny-list, the row-key
 contract and the stamp built on them, plus the ``qvals`` ledger rows that the
 vendored behavioral-model ingestion still translates on every build. These
-tests cover that half, and pin the frozen deny-list back to the ledger it was
-extracted from.
+tests cover that half, and pin the frozen deny-list back to the published
+ledger it was extracted from.
 """
 
 from __future__ import annotations
 
 import keyword
-import subprocess
+import re
 from pathlib import Path
 
 import pytest
@@ -21,9 +21,11 @@ from continuum_swr_replay.analysis.replay import covariate_registry as reg
 
 REPO = Path(__file__).resolve().parents[2]
 NAMING_SCHEME = REPO / "docs/design/2026-08-21-covariate-naming-scheme.md"
-# The commit whose covariate_registry.py still carried the whole ledger; the
-# deny-list below was extracted from it and must still agree with it.
-PRE_TRIM_COMMIT = "d2e5d44"
+APPENDIX_HEADING = "## Appendix: the rename ledger"
+# Actions whose third column names a canonical replacement; ``derive``,
+# ``retire``, ``drop`` and ``audit`` rows carry no canonical by construction
+# (``validate`` rejects one).
+CANONICAL_ACTIONS = frozenset({"rename", "alias", "canonicalize"})
 
 
 def _qvals_rename_map() -> dict[str, str]:
@@ -73,58 +75,56 @@ def test_deny_list_leaves_a_canonical_decorated_column_alone() -> None:
     reg.assert_canonical_vocabulary(frame, table="qvals")
 
 
-def test_deny_list_matches_the_ledger_it_was_extracted_from() -> None:
-    """``LEGACY_COLUMN_NAMES`` is the pre-trim ledger's non-audit legacy names.
+def _appendix_ledger_rows() -> list[tuple[str, str, str, str, str]]:
+    """Parse the published ledger's tables into five-column rows.
 
-    The extraction ran once; this recomputes it from the module as it stood at
-    the commit that still held the whole ledger, so the frozen set cannot
-    silently drift away from the record it summarizes.
+    Reads only the tables under ``## Appendix: the rename ledger`` in the
+    naming-scheme design doc: header and separator lines are skipped, and a row
+    is ``| legacy spelling(s) | action | canonical / target | role | notes |``.
     """
-    import importlib.util
-    import sys
-    import tempfile
+    appendix = NAMING_SCHEME.read_text().split(APPENDIX_HEADING, 1)
+    assert len(appendix) == 2, f"{NAMING_SCHEME} has no {APPENDIX_HEADING!r}"
 
-    blob = f"{PRE_TRIM_COMMIT}:src/continuum_swr_replay/analysis/replay/covariate_registry.py"
-    try:
-        source = subprocess.run(
-            ["git", "show", blob],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError):  # pragma: no cover - shallow clone
-        pytest.skip(f"{blob} is not available in this checkout")
-
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "pre_trim_covariate_registry.py"
-        path.write_text(source)
-        spec = importlib.util.spec_from_file_location(path.stem, path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        # dataclasses resolves __module__ through sys.modules while decorating.
-        sys.modules[path.stem] = module
-        try:
-            spec.loader.exec_module(module)
-            ledger = module.REGISTRY
-        finally:
-            del sys.modules[path.stem]
-
-    assert reg.LEGACY_COLUMN_NAMES == {
-        name for e in ledger if e.action != "audit" for name in e.current
-    }
-    assert reg._LEGACY_RENAMED == {
-        name for e in ledger if e.canonical is not None for name in e.current
-    }
+    rows: list[tuple[str, str, str, str, str]] = []
+    for line in appendix[1].splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        assert len(cells) == 5, f"ledger row is not 5 columns: {line}"
+        if cells[0] in {"legacy spelling(s)", "---"}:
+            continue
+        rows.append((cells[0], cells[1], cells[2], cells[3], cells[4]))
+    return rows
 
 
-def test_deny_list_is_documented_in_the_naming_scheme_appendix() -> None:
-    """Every frozen legacy spelling appears in the published ledger."""
-    appendix = NAMING_SCHEME.read_text()
-    undocumented = sorted(
-        name for name in reg.LEGACY_COLUMN_NAMES if f"`{name}`" not in appendix
-    )
-    assert not undocumented, f"deny-list names absent from the ledger: {undocumented}"
+def test_deny_list_matches_the_published_ledger() -> None:
+    """``LEGACY_COLUMN_NAMES``/``_LEGACY_RENAMED`` are the appendix's own sets.
+
+    The frozen sets were extracted from the ledger when it moved out of the
+    module; this recomputes them from the published table so neither side can
+    drift. Removing a name from the appendix fails this test.
+    """
+    rows = _appendix_ledger_rows()
+    assert rows, "the appendix ledger parsed to zero rows"
+
+    non_audit: set[str] = set()
+    with_canonical: set[str] = set()
+    for legacy, action, target, _role, _notes in rows:
+        # A cell may collapse several legacy spellings: "`a`, `b`".
+        names = re.findall(r"`([^`]+)`", legacy)
+        assert names, f"ledger row names no legacy column: {legacy!r}"
+        if action != "audit":
+            non_audit |= set(names)
+        if action in CANONICAL_ACTIONS:
+            assert re.fullmatch(r"`[a-z][a-z0-9_]*`", target), (
+                f"{action} row {names} has no single canonical target: {target!r}"
+            )
+            with_canonical |= set(names)
+
+    assert non_audit == set(reg.LEGACY_COLUMN_NAMES)
+    assert with_canonical == set(reg._LEGACY_RENAMED)
+    assert len(reg.LEGACY_COLUMN_NAMES) == 219
 
 
 def test_fitted_model_specs_do_not_reference_legacy_names() -> None:

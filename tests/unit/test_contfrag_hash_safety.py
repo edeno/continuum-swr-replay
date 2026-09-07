@@ -46,8 +46,7 @@ def _load_function(
     for extra in extra_top_level_names:
         for node in tree.body:
             if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id == extra
-                for t in node.targets
+                isinstance(t, ast.Name) and t.id == extra for t in node.targets
             ):
                 wrapper = ast.Module(body=[node], type_ignores=[])
                 ast.fix_missing_locations(wrapper)
@@ -75,9 +74,7 @@ _hash_contfrag_event_id = _load_function(
     "_hash_contfrag_event_id",
     extra_top_level_names=("_EVENT_SOURCE_TO_COL", "_resolve_event_col"),
 )
-hash_stop_id = _load_function(
-    "analysis/replay/event_ids.py", "hash_stop_id"
-)
+hash_stop_id = _load_function("analysis/replay/event_ids.py", "hash_stop_id")
 
 
 def _two_row_event_frame(event_col: str) -> pd.DataFrame:
@@ -156,8 +153,6 @@ class TestStopIdHashSafety:
                 "stop_idx": idx,
             }
         )
-        legacy = (
-            pd.util.hash_pandas_object(keys, index=False) % (2**63)
-        ).to_numpy()
+        legacy = (pd.util.hash_pandas_object(keys, index=False) % (2**63)).to_numpy()
         new_unsuffixed = hash_stop_id("chimi", 20200212, "02_r1", idx)
         np.testing.assert_array_equal(legacy, new_unsuffixed)

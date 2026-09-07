@@ -347,10 +347,14 @@ REGISTRY: tuple[Entry, ...] = (
 #
 #     {n for e in REGISTRY if e.action != "audit" for n in e.current}
 #
-# The ledger's grains are collapsed into one set on purpose: no canonical name
-# of any table is a legacy name of another (the ledger's own
-# no-collision invariant, checked table-by-table, holds globally), so a single
-# set rejects exactly the same columns a per-grain deny-list would.
+# The ledger's grains are collapsed into one set on purpose. No canonical name
+# of any table is a legacy name of another (the ledger's own no-collision
+# invariant, checked table-by-table, holds globally), so over the canonical
+# vocabularies and over the eight materialized tables the global set flags
+# exactly the columns a per-grain deny-list flagged. Cross-grain it is
+# deliberately stricter: a legacy spelling retired from one grain -- including
+# a ``coef_``/``bse_``/``_z`` decoration of one -- is now rejected wherever it
+# turns up, even in a grain that never used it.
 LEGACY_COLUMN_NAMES: frozenset[str] = frozenset(
     """
     Q1 Q2 Q3 Q4 Q5 Q6 Qstem1 Qstem2 Qstem3 ab_slope arm arm_dist_rank arm_fe_0
