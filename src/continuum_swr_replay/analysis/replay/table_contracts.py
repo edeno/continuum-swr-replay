@@ -70,7 +70,6 @@ _CV_COUNT_COLUMNS = (
 )
 
 
-
 def _require_columns(
     frame: pd.DataFrame, columns: Iterable[str], *, table_name: str
 ) -> None:

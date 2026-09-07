@@ -35,7 +35,7 @@ from .trajectory import (
 
 # Continuous per-arm covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``.
 # The build fills NaN placeholders per session; the real global z is computed once in
-# ``prepare_data.main`` after the all-session concat (see analysis.replay.standardization).
+# ``prepare_data.run_prepare_data`` after the all-session concat (see analysis.replay.standardization).
 EVENT_ARM_STANDARDIZED_COLS = (
     "reward_belief_mean_candidate_arm_preoutcome",
     "reward_fraction_candidate_arm_last10_visits",

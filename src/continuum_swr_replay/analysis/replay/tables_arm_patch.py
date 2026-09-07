@@ -206,7 +206,7 @@ def build_event_arm_table(
     )
 
     # Standardized (<col>_z) placeholders: the real pooled-GLOBAL z is computed
-    # post-concat in prepare_data.main (a per-session build cannot know the global
+    # post-concat in prepare_data.run_prepare_data (a per-session build cannot know the global
     # mean/SD). Fill NaN here so the canonical column order carries the names.
     for c in EVENT_ARM_STANDARDIZED_COLS:
         long[f"{c}_z"] = np.nan

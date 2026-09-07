@@ -987,7 +987,7 @@ class TestEventArmTableInvariants:
     def test_standardized_z_are_per_session_nan_placeholders(self, tiny_session):
         """Phase-6 build contract: the per-session build carries the ``<col>_z``
         columns (so the canonical order is stable) but leaves them all-NaN — the real
-        pooled-GLOBAL z is filled post-concat in ``prepare_data.main``. This proves the
+        pooled-GLOBAL z is filled post-concat in ``prepare_data.run_prepare_data``. This proves the
         per-session build adds only NaN placeholders (raw columns are built normally),
         i.e. the standardization did not leak a wrong per-session z into the table."""
         dot, env, trials, graph = tiny_session

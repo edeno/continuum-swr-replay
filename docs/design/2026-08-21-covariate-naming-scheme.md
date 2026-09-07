@@ -576,7 +576,7 @@ source the runtime deny-list was extracted from.
 
 `covariate_registry.py` keeps the `qvals` rows executable -- the external
 behavioral model still emits its native vocabulary on every build, so that
-grain's translation runs in production -- and freezes every legacy spelling
+grain's translation runs in production -- and freezes every non-`audit` legacy spelling
 below into `LEGACY_COLUMN_NAMES`, the deny-list
 `assert_canonical_vocabulary` enforces. The rest of the table is read by
 people, not by code: the repository-owned builders emit canonical names
