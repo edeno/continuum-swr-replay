@@ -47,7 +47,9 @@ def arm_to_patch(arm: float) -> float:
 # ── Stay / switch ──
 
 
-def stay_indicator_from_patches(next_patch, current_patch):
+def stay_indicator_from_patches(
+    next_patch: float | np.ndarray, current_patch: float | np.ndarray
+) -> float | np.ndarray:
     """1.0 when the next trip stays in the current patch, 0.0 when it switches.
 
     ``NaN`` propagates: an unknown patch on either side is not evidence of a
