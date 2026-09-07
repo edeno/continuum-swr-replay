@@ -338,7 +338,7 @@ vector).
 |---|---:|---|---|
 | module-level session-key aliases | **16** (6 in `src/`, 10 in `scripts/`) | 0; every site uses `session_keys.SESSION_COLUMNS` / `SESSION_COLUMNS_DAY` directly | `tests/unit/test_session_keys.py::test_no_local_session_key_definitions`; `grep -rnE "^_?SESSION_COL(S\|UMNS)(_DAY)?\s*(:[^=]*)?=" src/ scripts/` (excluding `session_keys.py`) → no hits |
 | copies of the `is_stay` rule | **5** (3 vectorized, 2 scalar, across `tables_stop.py`, `tables_event.py`, `shuffles.py`, `contfrag/tables.py` ×2) | one definition pair in `_helpers.py`, called from all five | `tests/unit/test_stay_indicator.py` (12 tests) |
-| covariate-registry `Entry` rows | **237** across 10 grains | **53** (`qvals` only); the other 184 published as an appendix table in `docs/design/2026-08-21-covariate-naming-scheme.md` (565 → 877 lines) | `test_deny_list_matches_the_ledger_it_was_extracted_from` (recomputes both frozen sets from the pre-trim module) and `test_deny_list_is_documented_in_the_naming_scheme_appendix` (git-free) |
+| covariate-registry `Entry` rows | **237** across 10 grains | **53** (`qvals` only); the other 184 published as an appendix table in `docs/design/2026-08-21-covariate-naming-scheme.md` (565 → 877 lines) | `test_deny_list_matches_the_published_ledger` (git-free) |
 
 All 16 session-key aliases were derived from the canonical `session_keys` constants — none
 retyped the tuple and none disagreed, so the collapse is a naming change, not a semantic one.
