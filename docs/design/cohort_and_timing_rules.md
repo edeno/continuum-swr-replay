@@ -17,50 +17,83 @@ The rungs themselves, in R notation, are in
 ## Shared stop cohort
 
 **The rule.** Every rate and content runner selects its population through one
-function, `analysis.replay.cohort_selection.select_stop_cohort` (and its
-event-grain sibling `select_event_cohort`), on the canonical `occupancy_state`
-column of the stop / event table:
+function, `analysis.replay.cohort_selection.select_stop_cohort` (stop grain) or
+its sibling `select_event_cohort` (event grain), on the canonical
+`occupancy_state` column:
 
-| cohort | rule | artifacts |
-| --- | --- | --- |
-| `at_well` (canonical, default) | `occupancy_state == "at_well"` | the unsuffixed names |
-| `in_transit` | `occupancy_state == "in_transit"` | `_intransit` |
-| `all_stops` | no occupancy restriction | `_allstops` |
+| cohort | stop-grain predicate | event-grain predicate | artifacts |
+| --- | --- | --- | --- |
+| `at_well` (canonical, default) | `occupancy_state in {"at_well", "mixed"}` — *well-anchored* | `occupancy_state == "at_well"` | the unsuffixed names |
+| `in_transit` | `occupancy_state == "in_transit"` | `occupancy_state == "in_transit"` | `_intransit` |
+| `all_stops` | no occupancy restriction | no occupancy restriction | `_allstops` |
 
-The four rate runners (`fit_per_bin_rate_models.py`,
+**The two grains need different predicates to mean the same thing.**
+`occupancy_state` is not the same statement about a stop as about an event. A
+stop is labelled `mixed` whenever its sampled states differ; an event is
+`at_well` only when its whole window is at one well. 14,845 of the 107,400
+canonical stops are `mixed`, and they hold **18,274 of the 59,699 content
+events (30.6%)** — so a naive stop-grain `occupancy_state == "at_well"` filter
+would make the rate and content cohorts **cross** rather than nest.
+
+Measured, those `mixed` stops are at-well bouts. Of the 14,743 (99.3%) that
+have a last-well arrival at all, **every one** begins *after* it — median
+0.73 s after, p10 0.22 s (the other 102 begin before the session's first
+arrival, so they have no clock, not a late one). Their nearest-well distance
+over the bout has median 0 cm at both ends and mean 0.28 cm, and is exactly 0
+throughout for 81.6% of them, against a 5.2 cm median for `in_transit` stops.
+And **96.8%** of their events (18,274 of 18,883) are themselves event-grain
+`at_well`. Their first settling samples simply read as in-transit. The
+stop-grain predicate is therefore *well-anchored* — a bout that begins after
+arriving at a well and sits at it.
+
+**The counts** (canonical tables, schema `v5_dio_poke_trials`):
+
+- stop table: **107,400** stops → **84,069 well-anchored** (69,224 `at_well` +
+  14,845 `mixed`), 22,850 `in_transit`, 481 `unknown`.
+- arm event table: **65,913** events → **59,699 at-well** (90.6%).
+
+**Nesting, and its residual.** Every event in the content cohort lies in a stop
+in the rate cohort. The converse does not hold exactly: 609 events sit in
+well-anchored stops without being event-grain `at_well` (446 `in_transit`, 144
+`mixed`, 19 `unknown`) — **1.0%** of the 60,308 events those stops hold. So
+`content ⊂ rate` holds up to that residual, which is in the rate cohort and not
+the content one by design.
+
+**How it is applied.** The four rate runners (`fit_per_bin_rate_models.py`,
 `fit_per_stop_rate_models.py`, `fit_swr_contrast_rate.py`,
 `fit_uncertainty_rate.py`) expose it as `--stop-cohort`, applied to the stop
 table **before** the `--max-per-animal` smoke subset and **before** the
 common-cohort freeze, logged with its counts, written onto every fitted row as
 `stop_cohort`, and recorded in the provenance sidecar's `extra`. The two
 content runners (`fit_replay_content_models.py`,
-`fit_swr_contrast_content.py`) apply `at_well` unconditionally — the content
-ladders are only defined there, since every location-derived predictor
-(`is_current_arm` and everything built from it) is undefined off a well.
+`fit_swr_contrast_content.py`) apply the event-grain `at_well` rule
+unconditionally — the content ladders are only defined there, since every
+location-derived predictor (`is_current_arm` and everything built from it) is
+undefined off a well.
+
 `model_comparison.METADATA_COLUMNS` carries `stop_cohort`, so an at-well rung
 compared against an all-stops rung is NaN'd with a reason rather than
-differenced.
+differenced. That guard is soft on legacy artifacts: fits written before the
+flag existed carry no `stop_cohort` at all, and `compare_nested_models`
+deliberately treats a missing value as *unknown*, not *different*, so the
+`n_stops` / `n_bins` row-count guard is the backstop for those until the
+refits land.
 
-**The counts** (canonical tables, schema `v5_dio_poke_trials`): the stop table
-holds **107,400** immobility stops — 69,224 at-well, 22,850 in-transit, 14,845
-mixed and 481 unknown — so the at-well cohort keeps 64.5% of stops. The arm
-event table holds **65,913** non-local events, of which **59,699** (90.6%) are
-at-well.
+**Why at-well is the shared cohort.** The rate ladders used to fit every
+immobility stop while the content ladders fit only at-well events, so "non-SWR
+replay is not reward-gated" (a rate claim) and every content claim about
+non-SWR replay were statements about different populations. And the difference
+is not neutral: in-transit stops hold **7.0%** of the corpus's immobility time
+(9,093 s of 129,997 s) but **11.9%** of the non-SWR non-local onsets (4,690 of
+39,510) and only **3.3%** of the SWR-coupled ones (859 of 26,403). Per second
+of immobility that is **1.79x** the well-anchored non-SWR onset rate (0.516 vs
+0.288 Hz) and **0.45x** the well-anchored SWR-coupled rate (0.094 vs 0.212 Hz).
+Pooling those stops into the rate family and not the content family therefore
+moves exactly the SWR-vs-non-SWR contrast the two families are compared on.
 
-**Why.** The rate ladders used to fit every immobility stop while the content
-ladders fit only at-well events, so "non-SWR replay is not reward-gated" (a
-rate claim) and every content claim about non-SWR replay were statements about
-different populations. And the difference is not neutral: in-transit stops hold
-7.0% of the corpus's immobility time (9,093 s of 129,997 s) but **11.9%** of the
-non-SWR non-local onsets (4,690 of 39,510) and only **3.3%** of the SWR-coupled
-ones (859 of 26,403). Per second of immobility that is 1.73x the at-well non-SWR
-onset rate (0.516 vs 0.298 Hz) and 0.44x the at-well SWR-coupled rate (0.094 vs
-0.216 Hz). Pooling those stops into the rate family and not the content family
-therefore moves exactly the SWR-vs-non-SWR contrast the two families are
-compared on. At-well stops are therefore the shared canonical cohort for both. The all-stops fits remain available as a
-sensitivity bundle under `_allstops`, and in-transit stops may be fit as their
-own bundle under `_intransit`, but an in-transit population is never pooled
-with an at-well one.
+The all-stops fits remain available as a sensitivity bundle under `_allstops`,
+and in-transit stops may be fit as their own bundle under `_intransit`, but an
+in-transit population is never pooled with a well-anchored one.
 
 The restriction is not balanced across the SWR contrast (3.3% of SWR events are
 off-well against 13.0% of non-SWR events) — expected, since SWR events

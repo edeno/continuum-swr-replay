@@ -142,6 +142,15 @@ def at_well_event_cohort(
     that column are rejected: their occupancy field may contain the retired
     destination-well fallback for in-transit events. The same event keys are
     applied to arm and sequence rows, preventing metric-specific denominators.
+
+    This is the event-grain at-well rule, equivalent to
+    ``cohort_selection.select_event_cohort(frame, cohort="at_well")`` -- it
+    selects the same events, by the ``at_well`` flag rather than the
+    ``occupancy_state`` label, and additionally carries the filter across the
+    three retrospective tables. The shared rule and the stop-grain half of it
+    live in ``analysis/replay/cohort_selection.py``; this one is deliberately
+    left on its own path for now because it also owns the three-table key
+    alignment.
     """
     if event_table.empty:
         return (

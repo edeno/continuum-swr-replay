@@ -1691,22 +1691,26 @@ def _load_and_filter_cohort(
     # events are off-well against 13.0% of non-SWR) -- expected, since SWR
     # events concentrate at wells -- so the cohort belongs in Methods.
     #
-    # The rule itself lives in `select_event_cohort`, which is the same rule the
-    # rate runners apply to their stop table, so "at-well" means one thing across
-    # both families rather than two filters that happen to agree today.
-    if "occupancy_state" in long_df.columns:
-        long_df, cohort_report = select_event_cohort(
-            long_df, cohort="at_well", event_col=event_col
-        )
-        logging.info(
-            "cohort = at-well events (%s): %d -> %d events (%.1f%% retained)",
-            cohort_report["rule"],
-            cohort_report["n_events_before"],
-            cohort_report["n_events_after"],
-            100
-            * cohort_report["n_events_after"]
-            / max(cohort_report["n_events_before"], 1),
-        )
+    # The rule itself lives in `select_event_cohort`, the event-grain half of the
+    # rule the rate runners apply to their stop table, so "at-well" means one
+    # thing across both families rather than two filters that happen to agree
+    # today. It is called unconditionally: a table without `occupancy_state`
+    # cannot state a cohort, and raising there is the point -- the schema gate in
+    # `prepare_canonical_fit_request` already refuses such a table, and a
+    # `column in frame` guard here would silently fit the whole corpus if it ever
+    # stopped doing so.
+    long_df, cohort_report = select_event_cohort(
+        long_df, cohort="at_well", event_col=event_col
+    )
+    logging.info(
+        "cohort = at-well events (%s): %d -> %d events (%.1f%% retained)",
+        cohort_report["rule"],
+        cohort_report["n_events_before"],
+        cohort_report["n_events_after"],
+        100
+        * cohort_report["n_events_after"]
+        / max(cohort_report["n_events_before"], 1),
+    )
 
     # Candidate set: the six leaf arms, when asked for. Applied before the
     # complete-case freeze so the cohort is the set of events the leaf-only

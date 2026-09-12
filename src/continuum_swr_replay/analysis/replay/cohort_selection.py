@@ -192,19 +192,48 @@ def freeze_common_cohort(
 
 
 #: The stop/event populations a rate or content ladder may be fit on, and the
-#: rule each one states. ``at_well`` is the canonical shared cohort: both the
-#: rate and the content families are read on stops the animal spent at a well,
-#: so a rate claim and a content claim describe the same population. The other
-#: two exist as separately-published sensitivity bundles -- an in-transit
-#: population is never pooled with an at-well one.
+#: rule each one states, keyed by ``(cohort, grain)``. ``at_well`` is the
+#: canonical shared cohort: both the rate and the content families are read on
+#: the animal's time at a well, so a rate claim and a content claim describe the
+#: same population. The other two exist as separately-published sensitivity
+#: bundles -- an in-transit population is never pooled with an at-well one.
+#:
+#: The two grains need DIFFERENT predicates to mean the same thing, because
+#: ``occupancy_state`` is not the same statement about a stop as it is about an
+#: event. A stop is labelled ``mixed`` whenever its sampled states differ, and
+#: 14,845 of the 107,400 canonical stops are -- but they are at-well bouts:
+#: every one that has a last-well arrival begins after it (median 0.73 s), their
+#: median nearest-well distance is 0 cm at both ends, and 96.8% of their events
+#: are themselves event-grain ``at_well``. Their first settling samples read
+#: as in-transit. Excluding them from the stop cohort would drop 18,274 of the
+#: 59,699 content events' stops (30.6%) and make the two cohorts CROSS rather
+#: than nest, so the stop predicate is "well-anchored": ``at_well`` or
+#: ``mixed``. An event carries no such settling ambiguity -- an event window
+#: that is not wholly at one well has no defined current arm -- so the event
+#: predicate stays the strict one.
 STOP_COHORT_RULES = {
-    "at_well": "occupancy_state == 'at_well'",
-    "in_transit": "occupancy_state == 'in_transit'",
-    "all_stops": "no occupancy restriction (every immobility stop)",
+    ("at_well", "stop"): (
+        "occupancy_state in {'at_well', 'mixed'} (well-anchored: a bout that "
+        "begins after arriving at a well and sits at it)"
+    ),
+    ("at_well", "event"): "occupancy_state == 'at_well'",
+    ("in_transit", "stop"): "occupancy_state == 'in_transit'",
+    ("in_transit", "event"): "occupancy_state == 'in_transit'",
+    ("all_stops", "stop"): "no occupancy restriction (every immobility stop)",
+    ("all_stops", "event"): "no occupancy restriction (every event)",
+}
+
+#: Occupancy states each ``(cohort, grain)`` predicate keeps. ``all_stops``
+#: keeps everything and so states no set.
+_COHORT_STATES = {
+    ("at_well", "stop"): frozenset({"at_well", "mixed"}),
+    ("at_well", "event"): frozenset({"at_well"}),
+    ("in_transit", "stop"): frozenset({"in_transit"}),
+    ("in_transit", "event"): frozenset({"in_transit"}),
 }
 
 #: CLI-facing tuple of the accepted cohort names, in the order runners list them.
-STOP_COHORTS = tuple(STOP_COHORT_RULES)
+STOP_COHORTS = ("at_well", "in_transit", "all_stops")
 
 #: Artifact-name suffix each cohort publishes under. The canonical at-well
 #: bundle keeps the unsuffixed names every reader already hard-codes, so a
@@ -245,7 +274,7 @@ def stop_cohort_suffix(cohort: str, *, smoke: bool = False) -> str:
         suffix = STOP_COHORT_ARTIFACT_SUFFIX[cohort]
     except KeyError:
         raise ValueError(
-            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORT_RULES)}"
+            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORTS)}"
         ) from None
     return suffix + ("_smoke" if smoke else "")
 
@@ -274,11 +303,11 @@ def _occupancy_event_counts(frame: pd.DataFrame, event_col: str) -> dict[str, in
     return {str(state): int(count) for state, count in counts.items()}
 
 
-def _cohort_mask(frame: pd.DataFrame, cohort: str) -> pd.Series:
-    """Row mask selecting ``cohort``; raises if the rule cannot be evaluated."""
-    if cohort not in STOP_COHORT_RULES:
+def _cohort_mask(frame: pd.DataFrame, cohort: str, grain: str) -> pd.Series:
+    """Row mask selecting ``cohort`` at ``grain``; raises if it cannot be evaluated."""
+    if cohort not in STOP_COHORTS:
         raise ValueError(
-            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORT_RULES)}"
+            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORTS)}"
         )
     if _OCCUPANCY_COLUMN not in frame.columns:
         raise KeyError(
@@ -288,7 +317,8 @@ def _cohort_mask(frame: pd.DataFrame, cohort: str) -> pd.Series:
         )
     if cohort == "all_stops":
         return pd.Series(True, index=frame.index)
-    return frame[_OCCUPANCY_COLUMN].eq(cohort)
+    # A KeyError here means an unrecognized grain, not a data problem.
+    return frame[_OCCUPANCY_COLUMN].isin(_COHORT_STATES[(cohort, grain)])
 
 
 def select_stop_cohort(
@@ -307,7 +337,12 @@ def select_stop_cohort(
     stop_table : pandas.DataFrame
         One row per immobility stop, carrying ``occupancy_state``.
     cohort : {"at_well", "all_stops", "in_transit"}
-        Population to keep.  ``at_well`` is canonical.
+        Population to keep.  ``at_well`` is canonical and, at the stop grain,
+        means *well-anchored*: ``occupancy_state`` of ``at_well`` **or**
+        ``mixed``.  A ``mixed`` stop is an at-well bout whose first settling
+        samples read as in-transit (see :data:`STOP_COHORT_RULES`); excluding
+        those stops would leave 30.6% of the content cohort's events with no
+        stop in the rate cohort.
 
     Returns
     -------
@@ -327,11 +362,11 @@ def select_stop_cohort(
     ValueError
         If ``cohort`` is not one of the three accepted names.
     """
-    keep = _cohort_mask(stop_table, cohort)
+    keep = _cohort_mask(stop_table, cohort, "stop")
     selected = stop_table.loc[keep].reset_index(drop=True)
     report = {
         "cohort": cohort,
-        "rule": STOP_COHORT_RULES[cohort],
+        "rule": STOP_COHORT_RULES[(cohort, "stop")],
         "n_stops_before": int(len(stop_table)),
         "n_stops_after": int(len(selected)),
         "n_stops_dropped": int(len(stop_table) - len(selected)),
@@ -349,11 +384,17 @@ def select_event_cohort(
     """Apply :data:`STOP_COHORT_RULES` at the event grain.
 
     The content ladders are fit on a long (event x candidate) frame rather than
-    on the stop table, but the population they mean is the same one: each event
-    carries the ``occupancy_state`` of the stop it occurred in, so the same rule
-    reads the same column.  Keeping both grains in one module is what makes the
-    two families' cohorts comparable -- :func:`select_stop_cohort` and this
-    function select the same stops.
+    on the stop table, but the population they mean is the same one.  The
+    predicate is NOT identical, because ``occupancy_state`` says a different
+    thing about an event than about a stop: an event is ``at_well`` only when
+    its whole window is at one well (off that, it has no defined current arm),
+    while a stop is ``mixed`` as soon as any sampled state differs.  So the
+    event grain keeps strictly ``at_well`` and the stop grain keeps the
+    well-anchored stops those events live in.  Keeping both grains in one module
+    is what makes the two families' cohorts nest: every event this function
+    keeps lies in a stop :func:`select_stop_cohort` keeps, up to a 1.0% residual
+    of off-well events inside well-anchored stops (609 of 60,308), which are in
+    the rate cohort and not the content one.
 
     Parameters
     ----------
@@ -382,13 +423,13 @@ def select_event_cohort(
     ValueError
         If ``cohort`` is not one of the three accepted names.
     """
-    keep = _cohort_mask(long_df, cohort)
+    keep = _cohort_mask(long_df, cohort, "event")
     if event_col not in long_df.columns:
         raise KeyError(f"event cohort selection needs the {event_col!r} column")
     selected = long_df.loc[keep].reset_index(drop=True)
     report = {
         "cohort": cohort,
-        "rule": STOP_COHORT_RULES[cohort],
+        "rule": STOP_COHORT_RULES[(cohort, "event")],
         "n_rows_before": int(len(long_df)),
         "n_rows_after": int(len(selected)),
         "n_events_before": int(long_df[event_col].nunique()),

@@ -229,7 +229,9 @@ def _occupancy_stops() -> pd.DataFrame:
 @pytest.mark.parametrize(
     ("cohort", "expected"),
     [
-        ("at_well", ["s0", "s1"]),
+        # at_well is WELL-ANCHORED at the stop grain: a 'mixed' stop (s3) is an
+        # at-well bout whose first settling samples read as in-transit.
+        ("at_well", ["s0", "s1", "s3"]),
         ("in_transit", ["s2"]),
         ("all_stops", ["s0", "s1", "s2", "s3", "s4", "s5"]),
     ],
@@ -251,10 +253,10 @@ def test_select_stop_cohort_report_states_the_rule_and_the_counts():
     _, report = select_stop_cohort(stops, cohort="at_well")
 
     assert report["cohort"] == "at_well"
-    assert report["rule"] == STOP_COHORT_RULES["at_well"]
+    assert report["rule"] == STOP_COHORT_RULES[("at_well", "stop")]
     assert report["n_stops_before"] == 6
-    assert report["n_stops_after"] == 2
-    assert report["n_stops_dropped"] == 4
+    assert report["n_stops_after"] == 3
+    assert report["n_stops_dropped"] == 3
     assert report["counts_before"] == {
         "at_well": 2,
         "in_transit": 1,
@@ -262,7 +264,7 @@ def test_select_stop_cohort_report_states_the_rule_and_the_counts():
         "unknown": 1,
         "missing": 1,
     }
-    assert report["counts_after"] == {"at_well": 2}
+    assert report["counts_after"] == {"at_well": 2, "mixed": 1}
 
 
 def test_select_stop_cohort_all_stops_keeps_the_missing_state():

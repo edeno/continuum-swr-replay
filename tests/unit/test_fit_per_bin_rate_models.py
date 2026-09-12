@@ -340,8 +340,9 @@ def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
 
     fprm.main()
 
-    # Only the at-well stops reached the fitter.
-    assert seen["stop_ids"] == ["s0", "s1", "s5"]
+    # Only the well-anchored stops reached the fitter -- the 'mixed' stop s4 is
+    # one of them (an at-well bout whose first samples read as in-transit).
+    assert seen["stop_ids"] == ["s0", "s1", "s4", "s5"]
     out = tmp_path / "models_per_bin_rate" / "all_models.pkl"
     assert out.exists()
     assert seen["audit"].name == "per_bin_rate_cohort_audit.csv"
