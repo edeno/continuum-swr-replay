@@ -125,10 +125,12 @@ itself, so the sister rungs `M0a_const_arrival` / `M5a_time_arrival` /
 arrival over `[0, 8]` s. They are fit on a strict subset of this ladder's rows
 and are therefore **never differenced against it** — read the two side by side.
 On their supported interior, [1, 6] s, the two clocks put the median peak at
-broadly the same delay in every population (2.2–3.0 s on `tc` against
-3.0–3.6 s after arrival, KS distance 0.06–0.12 between the normalized curves) —
-measured on the **all-stops** fit and not re-derived on this cohort, where the
-`tc` peaks read 2.31–2.82 s. The arrival
+broadly the same delay in every population: on this cohort 2.31–2.82 s on `tc`
+against 2.80–3.80 s after arrival, KS distance 0.06–0.11 between the normalized
+curves (on all stops, 2.2–3.0 s against 3.0–3.6 s, KS 0.06–0.12 — the statement
+does not turn on the cohort; both columns are in
+[audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)).
+The arrival
 rungs are heavily flagged (42.9–63.6 % of `M5a_time_arrival` fits carry a
 separated non-nuisance term) and are rarely cross-validated, so they are read
 pooled, on their fitted curve, never per session; see
