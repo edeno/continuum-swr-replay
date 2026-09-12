@@ -314,6 +314,9 @@ def test_select_event_cohort_selects_whole_events_and_counts_them():
     assert report["n_events_dropped"] == 1
     assert report["n_rows_before"] == 6
     assert report["n_rows_after"] == 4
+    # The tallies count events, not the candidate rows each event spans.
+    assert report["counts_before"] == {"at_well": 2, "in_transit": 1}
+    assert report["counts_after"] == {"at_well": 2}
 
 
 def test_select_event_cohort_raises_without_the_event_column():

@@ -262,6 +262,18 @@ def _occupancy_counts(states: pd.Series) -> dict[str, int]:
     }
 
 
+def _occupancy_event_counts(frame: pd.DataFrame, event_col: str) -> dict[str, int]:
+    """Occupancy-state tallies at the event grain, not the candidate-row grain.
+
+    A long content frame carries one row per event x candidate, so row counts
+    would overstate the cohort by the candidate-set size; the event counts are
+    what the ladder is read on.
+    """
+    states = frame[_OCCUPANCY_COLUMN].fillna("missing")
+    counts = frame.groupby(states, observed=True)[event_col].nunique()
+    return {str(state): int(count) for state, count in counts.items()}
+
+
 def _cohort_mask(frame: pd.DataFrame, cohort: str) -> pd.Series:
     """Row mask selecting ``cohort``; raises if the rule cannot be evaluated."""
     if cohort not in STOP_COHORT_RULES:
@@ -360,7 +372,8 @@ def select_event_cohort(
     report : dict
         As :func:`select_stop_cohort`, at the event grain
         (``n_events_before``/``n_events_after``/``n_events_dropped`` alongside
-        the row counts).
+        the row counts; ``counts_before``/``counts_after`` tally distinct
+        events, not candidate rows).
 
     Raises
     ------
@@ -380,9 +393,9 @@ def select_event_cohort(
         "n_rows_after": int(len(selected)),
         "n_events_before": int(long_df[event_col].nunique()),
         "n_events_after": int(selected[event_col].nunique()),
-        "counts_before": _occupancy_counts(long_df[_OCCUPANCY_COLUMN]),
+        "counts_before": _occupancy_event_counts(long_df, event_col),
         "counts_after": (
-            _occupancy_counts(selected[_OCCUPANCY_COLUMN]) if len(selected) else {}
+            _occupancy_event_counts(selected, event_col) if len(selected) else {}
         ),
     }
     report["n_events_dropped"] = report["n_events_before"] - report["n_events_after"]

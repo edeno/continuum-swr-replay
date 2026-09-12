@@ -473,7 +473,8 @@ def prepare_cohorts(
 def _cohort_log(label: str, report: dict) -> None:
     """Log one cohort selection at the grain the runner reports it on."""
     logger.info(
-        "%s cohort = %s (%s): %d -> %d events (%.1f%% retained); dropped %s",
+        "%s cohort = %s (%s): %d -> %d events (%.1f%% retained); dropped events "
+        "by state %s",
         label,
         report["cohort"],
         report["rule"],
