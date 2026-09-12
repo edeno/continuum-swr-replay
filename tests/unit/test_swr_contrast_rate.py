@@ -16,6 +16,8 @@ Two guards:
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -339,3 +341,105 @@ def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, tmp_path):
         mod._aggregate_only(smoke=False, cohort="at_well")
 
     assert "swr_contrast_rate.pkl" in str(canonical.value)
+
+
+# ── The audited bundle names its own stop population ──
+
+
+def _aggregation_inputs(monkeypatch, tmp_path, stops):
+    """Point the aggregation at ``tmp_path`` and at a synthetic covariate source.
+
+    ``_write_aggregation`` re-reads the qvals and stop tables only to recover the
+    per-SD factors for its ``std_*`` columns, which is not what these tests are
+    about; the synthetic stop frame carries the same covariate columns, so the
+    aggregation runs end to end without the canonical tables.
+    """
+    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(mod, "RC", tmp_path)
+    monkeypatch.setattr(mod, "read_table", lambda _path: stops)
+    monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)
+    return out_dir
+
+
+def test_audited_bundle_carries_the_cohort_its_fits_were_made_on(
+    two_session_fits, monkeypatch, tmp_path
+):
+    """A sensitivity bundle must not be readable as the canonical one."""
+    fits, stops, _drops, _gated = two_session_fits
+    out_dir = _aggregation_inputs(monkeypatch, tmp_path, stops)
+    # The aggregation refuses to publish a term fit in fewer than five
+    # sessions, so the two synthetic sessions are replicated across three
+    # animals. The coefficients repeat; what is under test is the label the
+    # aggregate carries, not its value.
+    labelled = pd.concat(
+        [
+            fits.assign(
+                stop_cohort="all_stops",
+                animal=animal,
+                session_date=fits["session_date"] + 10 * replica,
+            )
+            for replica, animal in enumerate("abc")
+        ],
+        ignore_index=True,
+    )
+
+    n_rows = mod._write_aggregation(
+        labelled, out_dir, "_allstops", {}, ["fit_swr_contrast_rate.py"]
+    )
+
+    assert n_rows > 0
+    audited = pd.read_pickle(out_dir / "swr_contrast_rate_audited_allstops.pkl")
+    assert set(audited["stop_cohort"]) == {"all_stops"}
+    sidecar = json.loads(
+        (out_dir / "swr_contrast_rate_audited_allstops.provenance.json").read_text()
+    )
+    assert sidecar["stop_cohort"] == "all_stops"
+
+
+def test_aggregation_refuses_fits_that_mix_stop_cohorts(
+    two_session_fits, monkeypatch, tmp_path
+):
+    """Two populations concatenated into one bundle is not one audited ladder."""
+    fits, stops, _drops, _gated = two_session_fits
+    out_dir = _aggregation_inputs(monkeypatch, tmp_path, stops)
+    mixed = fits.assign(
+        stop_cohort=np.where(np.arange(len(fits)) % 2, "at_well", "all_stops")
+    )
+
+    with pytest.raises(ValueError, match="one stop cohort"):
+        mod._write_aggregation(mixed, out_dir, "", {}, ["fit_swr_contrast_rate.py"])
+
+
+def test_aggregate_only_records_the_bundle_it_read_by_name(monkeypatch, tmp_path):
+    """The sidecar names the sensitivity pickle, not the canonical one.
+
+    The freshness sweep resolves a recorded input name to a file beside the
+    sidecar, so a bare ``swr_contrast_rate`` would point an ``_allstops``
+    aggregate at the canonical at-well fit and report it as permanently stale.
+    """
+    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "population": ["contrast"],
+            "model": ["S1_rew"],
+            "cohort": [mod.PRIMARY_COHORT],
+            "animal": ["a"],
+            "separated": [False],
+            "separated_terms": [""],
+            "stop_cohort": ["all_stops"],
+        }
+    ).to_pickle(out_dir / "swr_contrast_rate_allstops.pkl")
+    monkeypatch.setattr(mod, "RC", tmp_path)
+    recorded: dict[str, object] = {}
+    monkeypatch.setattr(
+        mod,
+        "_write_aggregation",
+        lambda models, out, suffix, inputs, cli: recorded.update(inputs) or 0,
+    )
+
+    mod._aggregate_only(smoke=False, cohort="all_stops")
+
+    assert list(recorded) == ["swr_contrast_rate_allstops"]

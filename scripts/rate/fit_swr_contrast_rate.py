@@ -777,10 +777,15 @@ def _write_aggregation(
     on; the null refit on the post-outcome cohort exists for the AIC comparison
     only and is never aggregated as a second copy of the ladder null.
 
+    The audited rows and their sidecar carry the ``stop_cohort`` the per-session
+    fits were made on, so a sensitivity bundle can never be read as the
+    canonical one.
+
     Parameters
     ----------
     models : pd.DataFrame
-        Per-session fits, one row per (population, model, session, cohort).
+        Per-session fits, one row per (population, model, session, cohort),
+        carrying the ``stop_cohort`` label the run was fit under.
     out_dir : Path
         ``models_per_bin_rate``.
     suffix : str
@@ -794,9 +799,24 @@ def _write_aggregation(
     -------
     int
         Number of audited rows written (0 when ``models`` is empty).
+
+    Raises
+    ------
+    ValueError
+        If the per-session fits do not all name exactly one ``stop_cohort``.
     """
     if not len(models):
         return 0
+
+    # The audited table is the artifact a reader quotes, so it has to say which
+    # stop population it is about; the label comes from the fits it aggregates
+    # rather than from the CLI, so `--aggregate-only` cannot relabel a bundle.
+    stop_cohorts = sorted(models["stop_cohort"].dropna().unique())
+    if len(stop_cohorts) != 1:
+        raise ValueError(
+            "per-session fits must all name one stop cohort; "
+            f"found {stop_cohorts or ['none']}"
+        )
 
     td_specs = [(g, p, t) for g, t in _G_KEY.items() for p in STRATA]
     td_specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
@@ -836,9 +856,16 @@ def _write_aggregation(
         ignore_index=True,
     )
     agg["population"] = agg["population"].map(lambda p: _POP_LABEL.get(p, p))
+    agg["stop_cohort"] = stop_cohorts[0]
     audited = out_dir / f"swr_contrast_rate_audited{suffix}.pkl"
     agg.to_pickle(audited)
-    write_fit_provenance(audited, fit_inputs, "poisson_glm", cli)
+    write_fit_provenance(
+        audited,
+        fit_inputs,
+        "poisson_glm",
+        cli,
+        extra={"stop_cohort": stop_cohorts[0]},
+    )
     # Persist the exact per-SD factors this run used for the std_* columns so the
     # standardized coefficients are reproducible. These SDs are computed over the
     # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the
@@ -903,7 +930,11 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         models,
         out_dir,
         suffix,
-        record_inputs({"swr_contrast_rate": fits_path}),
+        # Named by the file, not by the runner: the freshness sweep resolves an
+        # input name to a file beside the sidecar, so recording a sensitivity
+        # bundle under the bare name would point it at the canonical fit and
+        # report the aggregate as permanently stale.
+        record_inputs({fits_path.stem: fits_path}),
         sys.argv,
     )
     logger.info(
