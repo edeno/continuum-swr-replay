@@ -30,9 +30,17 @@ of the reward-free time model, and the size of the fitted cohort:
   comparison has its own "before" — the immediately preceding refit of the SAME
   specification, fit under the fit-level flag.
 
+There is also a **cohort-contrast** mode (``--cohort-contrast``), which does
+not compare a refit to its predecessor at all: it places the SAME ladder fit on
+the three stop populations (well-anchored ``at_well``, ``all_stops``,
+``in_transit``) side by side, so a number that moves between them is moving
+because the population moved. Every likelihood-scale step it prints is taken
+WITHIN one cohort.
+
 Usage:
     uv run python scripts/qa/compare_fits.py
     uv run python scripts/qa/compare_fits.py --out docs/audits/my-comparison.md
+    uv run python scripts/qa/compare_fits.py --cohort-contrast
 """
 
 from __future__ import annotations
@@ -897,6 +905,9 @@ def rung_session_counts(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
 COUNT_COLUMN_STEMS = (
     "n_sessions",
     "n_animals",
+    "n_stops",
+    "n_bins",
+    "n_event",
     "n_dropped",
     "n_paired",
     "n_fit",
@@ -2529,6 +2540,439 @@ def run_content_mode(args: argparse.Namespace) -> None:
     print(f"wrote {args.out}")
 
 
+# ── Cohort-contrast mode ──────────────────────────────────────────────────────
+#
+# The rate ladders can be fit on three stop populations, and only one of them is
+# the population the content family describes. `at_well` (well-anchored stops)
+# is that canonical cohort; `all_stops` and `in_transit` are separately
+# published sensitivity bundles. Reading one bundle's numbers against another's
+# is the whole point of this mode: every quantity below is the SAME estimator on
+# the SAME rung, so a difference between the columns is a difference between the
+# populations and nothing else. The three bundles are never pooled, and no
+# ΔAIC / likelihood quantity is ever differenced ACROSS cohorts -- those live on
+# different row sets. What is compared across cohorts is a per-session
+# coefficient summary, a within-cohort nested step, a scale-free curve feature,
+# and the cohort's own size.
+COHORT_ORDER = ("at_well", "all_stops", "in_transit")
+COHORT_RULE_NOTE = {
+    "at_well": "well-anchored stops (`occupancy_state` at_well or mixed) — canonical",
+    "all_stops": "every immobility stop — sensitivity bundle",
+    "in_transit": "in-transit stops only — sensitivity bundle",
+}
+DEFAULT_COHORT_PER_BIN = {
+    "at_well": RC / "models_per_bin_rate" / "all_models.pkl",
+    "all_stops": RC / "models_per_bin_rate" / "all_models_allstops.pkl",
+    "in_transit": RC / "models_per_bin_rate" / "all_models_intransit.pkl",
+}
+DEFAULT_COHORT_CONTRAST = {
+    "at_well": RC / "models_per_bin_rate" / "swr_contrast_rate.pkl",
+    "all_stops": RC / "models_per_bin_rate" / "swr_contrast_rate_allstops.pkl",
+}
+# The nested per-bin reward steps, child first. Both are read WITHIN a cohort.
+COHORT_AIC_STEPS = (
+    ("M7r_time_histcos_rew", "M6r_time_histcos"),
+    ("M1_rew", "M0_const"),
+)
+# The is_swr-contrast bundle fits each rung on its own primary/post-outcome
+# cohort; only the primary one spans the whole ladder, so the rung table reads it.
+CONTRAST_PRIMARY_COHORT = "primary"
+
+
+def _animal_balanced(frame: pd.DataFrame, column: str) -> tuple[float, int, int]:
+    """Median of the per-animal medians of ``column``, and the animal sign count.
+
+    The animal is the replication unit: a median within each animal first, so an
+    animal contributing many sessions does not outvote the others. Mirrors the
+    audited aggregation the ladders are read on.
+
+    Returns
+    -------
+    median : float
+        Median across animals of each animal's median, NaN when nothing is fit.
+    n_positive, n_animals : int
+        Animals whose own median is positive, and animals contributing.
+    """
+    if column not in frame.columns or "animal" not in frame.columns:
+        return np.nan, 0, 0
+    per_animal = frame.dropna(subset=[column]).groupby("animal")[column].median()
+    if per_animal.empty:
+        return np.nan, 0, 0
+    return (
+        float(per_animal.median()),
+        int((per_animal > 0).sum()),
+        int(per_animal.size),
+    )
+
+
+def _by_cohort(fits: dict[str, pd.DataFrame]) -> list[tuple[str, pd.DataFrame]]:
+    """The supplied cohorts in the canonical order, skipping the absent ones."""
+    return [(c, fits[c]) for c in COHORT_ORDER if c in fits and len(fits[c])]
+
+
+def cohort_size_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Each cohort's fitted size per population, from the common null rung.
+
+    Every rung of a population shares one frozen cohort, so ``M0_const`` carries
+    it. ``n_event_onsets`` is the response total -- the events the intensity
+    model is fit to -- not the number of non-local events in the corpus.
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        for cohort, frame in _by_cohort(fits):
+            sub = frame[(frame.model == "M0_const") & (frame.outcome == outcome)]
+            if sub.empty:
+                continue
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "stop_cohort": cohort,
+                    "n_sessions": len(sub),
+                    "n_stops": float(sub["n_stops"].sum()),
+                    "n_bins": float(sub["n_bins"].sum()),
+                    "n_event_onsets": float(sub["n_events"].sum()),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Immediate reward-component rate ratio per population and cohort.
+
+    ``exp`` of the animal-balanced median of ``coef_reward_history_rcos_0`` on
+    the full rung: the rate ratio the first raised-cosine reward component
+    carries, holding the time course, the self-history and the reward rate. The
+    exponential is applied to the median coefficient rather than the median of
+    the exponentials -- the same monotone summary the ladder is reported with.
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        for cohort, frame in _by_cohort(fits):
+            sub = frame[(frame.model == FULL_MODEL) & (frame.outcome == outcome)]
+            if sub.empty:
+                continue
+            median, n_positive, n_animals = _animal_balanced(sub, IMMEDIATE_COEF)
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "stop_cohort": cohort,
+                    "n_sessions": (
+                        int(sub[IMMEDIATE_COEF].notna().sum())
+                        if IMMEDIATE_COEF in sub
+                        else 0
+                    ),
+                    "rr_immediate": float(np.exp(median)),
+                    "animals_positive": f"{n_positive}/{n_animals}",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def cohort_paired_swr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """The SWR-coupled vs non-SWR immediate-coefficient test, once per cohort.
+
+    Reuses :func:`reward_quantities`, the same within-session paired comparison
+    the refit audit reports, so the three cohorts are read with one estimator.
+    """
+    rows = []
+    for cohort, frame in _by_cohort(fits):
+        _, paired = reward_quantities(frame)
+        if paired.empty:
+            continue
+        rows.append({"stop_cohort": cohort, **paired.iloc[0].to_dict()})
+    return pd.DataFrame(rows)
+
+
+def cohort_delta_aic_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Each nested reward step, WITHIN each cohort (negative = child better).
+
+    The difference is always taken between two rungs of one cohort, which share
+    rows; the table simply places the three within-cohort steps side by side.
+    """
+    rows = []
+    for rung, parent in COHORT_AIC_STEPS:
+        for outcome in OUTCOME_ORDER:
+            for cohort, frame in _by_cohort(fits):
+                paired, _ = delta_aic(frame, rung, parent)
+                sub = paired[paired.outcome == outcome] if len(paired) else paired
+                if not len(sub):
+                    continue
+                rows.append(
+                    {
+                        "step": f"{rung} − {parent}",
+                        "outcome": outcome,
+                        "stop_cohort": cohort,
+                        "n_sessions": len(sub),
+                        "median_delta_aic": float(sub["delta_aic"].median()),
+                        "pct_sessions_child_better": 100
+                        * float((sub["delta_aic"] < 0).mean()),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def cohort_burst_peak_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Where the smooth within-stop time course peaks, per population and cohort.
+
+    The peak of the across-session median curve of the reward-free time rung,
+    read only on the spline's supported interior (:func:`_support_window`). It
+    is a scale-free feature of one cohort's own fit, so it is comparable across
+    cohorts even though their likelihoods are not.
+    """
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        for cohort, frame in _by_cohort(fits):
+            grid, curves = _fitted_time_courses(
+                frame, STOP_TIME_RUNG, outcome, "tc", SPLINE_KNOTS, TMAX
+            )
+            if not len(curves):
+                continue
+            median_curve = np.median(curves, axis=0)
+            peak = float(grid[int(np.argmax(median_curve))])
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "stop_cohort": cohort,
+                    "n_sessions": int(len(curves)),
+                    "support_s": f"{grid[0]:.1f}–{grid[-1]:.1f}",
+                    "burst_peak_s": peak,
+                    "peak_frac_support": (peak - grid[0]) / (grid[-1] - grid[0]),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def cohort_arrival_retention_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """``retained_share_arrival_events`` per population and cohort.
+
+    The arrival-clock window keeps a different share of each population's event
+    bins, and moving the stop cohort moves that share again -- an arrival-ladder
+    contrast between two cohorts is partly a contrast between two windows.
+    """
+    rows = []
+    per_cohort = {
+        cohort: arrival_cohort_table(frame) for cohort, frame in _by_cohort(fits)
+    }
+    for outcome in OUTCOME_ORDER:
+        for cohort, table in per_cohort.items():
+            if table.empty:
+                continue
+            sub = table[table.outcome == outcome]
+            if sub.empty:
+                continue
+            row = sub.iloc[0]
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "stop_cohort": cohort,
+                    "n_event_bins_frozen": float(row["n_event_bins_frozen"]),
+                    "n_event_bins_arrival_window": float(
+                        row["n_event_bins_arrival_window"]
+                    ),
+                    "retained_share_arrival_events": float(
+                        row["retained_share_arrival_events"]
+                    ),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def cohort_contrast_rung_table(contrast: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Per rung and population, what each cohort's is_swr-contrast bundle holds.
+
+    Restricted to the bundle's PRIMARY fitting cohort (the post-outcome refits
+    exist for one AIC comparison and are not a second copy of the ladder), and
+    reporting the fitted size plus the immediate reward component where the rung
+    carries it, so a coefficient shift can be read beside the cohort shift.
+    """
+    rows = []
+    frames = [(c, f) for c, f in _by_cohort(contrast)]
+    models = sorted(
+        {m for _, frame in frames for m in frame["model"].unique()}, key=rung_sort_key
+    )
+    populations = sorted(
+        {p for _, frame in frames for p in frame["population"].unique()}
+    )
+    for model in models:
+        for population in populations:
+            for cohort, frame in frames:
+                sub = frame[
+                    (frame.model == model)
+                    & (frame.population == population)
+                    & (frame.cohort == CONTRAST_PRIMARY_COHORT)
+                ]
+                if sub.empty:
+                    continue
+                median, n_positive, n_animals = _animal_balanced(sub, IMMEDIATE_COEF)
+                rows.append(
+                    {
+                        "model": model,
+                        "population": population,
+                        "stop_cohort": cohort,
+                        "n_sessions": len(sub),
+                        "n_stops": float(sub["n_stops"].sum()),
+                        "n_bins": float(sub["n_bins"].sum()),
+                        "rr_immediate": float(np.exp(median)),
+                        "animals_positive": (
+                            f"{n_positive}/{n_animals}" if n_animals else "—"
+                        ),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def _cohort_label_note(fits: dict[str, pd.DataFrame]) -> str:
+    """What each artifact says its own cohort is, so a mislabelled input shows."""
+    parts = []
+    for cohort, frame in _by_cohort(fits):
+        if "stop_cohort" not in frame.columns:
+            parts.append(f"`{cohort}`: no `stop_cohort` column (pre-flag fit)")
+            continue
+        recorded = sorted(map(str, frame["stop_cohort"].dropna().unique()))
+        parts.append(f"`{cohort}`: rows say {recorded}")
+    return "; ".join(parts)
+
+
+def build_cohort_report(
+    fits: dict[str, pd.DataFrame],
+    contrast: dict[str, pd.DataFrame],
+    inputs: dict[str, Path],
+    command: str | None = None,
+) -> str:
+    """Assemble the at-well / all-stops / in-transit comparison."""
+    lines = [
+        "# Rate ladders across the three stop cohorts",
+        "",
+        f"Generated {dt.date.today().isoformat()} by `scripts/qa/compare_fits.py "
+        "--cohort-contrast`.",
+        "",
+    ]
+    if command:
+        lines += [f"Command: `{command}`", ""]
+    lines += [
+        "The same ladder, the same estimator, three stop populations. "
+        "`at_well` is the canonical cohort the content family is also fit on; "
+        "the other two are sensitivity bundles and are never pooled with it. "
+        "No likelihood-scale quantity is differenced across cohorts — the "
+        "ΔAIC steps below are each taken WITHIN one cohort, between two rungs "
+        "that share rows.",
+        "",
+        "## Cohorts",
+        "",
+        _md(
+            pd.DataFrame(
+                [
+                    {
+                        "stop_cohort": c,
+                        "fit_supplied": "yes" if c in fits and len(fits[c]) else "no",
+                        "rule": COHORT_RULE_NOTE[c],
+                    }
+                    for c in COHORT_ORDER
+                ]
+            )
+        ),
+        "",
+        f"What each artifact records about itself: {_cohort_label_note(fits)}.",
+        "",
+        "## Inputs",
+        "",
+        _md(
+            pd.DataFrame(
+                [
+                    {"role": role, "path": str(path), "sha256": _sha256(path)[:12]}
+                    for role, path in inputs.items()
+                ]
+            )
+        ),
+        "",
+        "## Cohort size (per-bin ladder)",
+        "",
+        _md(cohort_size_table(fits)),
+        "",
+        "## Immediate reward component, `M7r_time_histcos_rew`",
+        "",
+        "`rr_immediate` is `exp` of the animal-balanced median "
+        f"`{IMMEDIATE_COEF}`; `animals_positive` counts animals whose own median "
+        "is positive.",
+        "",
+        _md(cohort_reward_rr_table(fits), floatfmt="{:.3f}"),
+        "",
+        "## SWR-coupled vs non-SWR, paired within session",
+        "",
+        _md(cohort_paired_swr_table(fits), floatfmt="{:.3f}"),
+        "",
+        "## Nested reward steps, within cohort (negative = child better)",
+        "",
+        _md(cohort_delta_aic_table(fits)),
+        "",
+        "## Burst peak of the smooth time course (`M5_time`)",
+        "",
+        _md(cohort_burst_peak_table(fits), floatfmt="{:.3f}"),
+        "",
+        "## Arrival-window retention",
+        "",
+        _md(cohort_arrival_retention_table(fits), floatfmt="{:.3f}"),
+        "",
+    ]
+    if contrast:
+        lines += [
+            "## is_swr-contrast rate bundle, per rung and population",
+            "",
+            "Primary fitting cohort only; the post-outcome refits exist for one "
+            "AIC comparison and are not a second copy of the ladder.",
+            "",
+            _md(cohort_contrast_rung_table(contrast), floatfmt="{:.3f}"),
+            "",
+        ]
+    return "\n".join(lines)
+
+
+def collect_cohort_inputs(
+    per_bin: dict[str, Path], contrast: dict[str, Path]
+) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame], dict[str, Path]]:
+    """Read whichever cohort bundles exist, and record what was read.
+
+    A missing sensitivity bundle is skipped rather than fatal -- the mode is
+    still meaningful with two cohorts -- but the canonical at-well per-bin fit
+    is required, since it is what the other columns are read against.
+    """
+    fits: dict[str, pd.DataFrame] = {}
+    contrast_fits: dict[str, pd.DataFrame] = {}
+    inputs: dict[str, Path] = {}
+    for cohort in COHORT_ORDER:
+        path = per_bin.get(cohort)
+        if path is not None and path.exists():
+            fits[cohort] = pd.read_pickle(path)
+            inputs[f"per-bin ({cohort})"] = path
+        path = contrast.get(cohort)
+        if path is not None and path.exists():
+            contrast_fits[cohort] = pd.read_pickle(path)
+            inputs[f"is_swr-contrast rate ({cohort})"] = path
+    if "at_well" not in fits:
+        raise SystemExit(
+            f"the canonical at-well per-bin fit is required: {per_bin.get('at_well')}"
+        )
+    return fits, contrast_fits, inputs
+
+
+def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
+    """Build and write the cohort comparison."""
+    fits, contrast, inputs = collect_cohort_inputs(
+        {
+            "at_well": args.at_well_per_bin,
+            "all_stops": args.all_stops_per_bin,
+            "in_transit": args.in_transit_per_bin,
+        },
+        {
+            "at_well": args.at_well_contrast,
+            "all_stops": args.all_stops_contrast,
+        },
+    )
+    report = build_cohort_report(fits, contrast, inputs, _invocation())
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(report)
+    print(f"wrote {args.out}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--old-per-bin", type=Path, default=DEFAULT_OLD_PER_BIN)
@@ -2598,12 +3042,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated content bundle directory names to compare.",
     )
     parser.add_argument(
+        "--cohort-contrast",
+        action="store_true",
+        help=(
+            "Compare the rate ladders fit on the three stop cohorts (at-well, "
+            "all-stops, in-transit) instead of comparing a refit to its "
+            "predecessor."
+        ),
+    )
+    parser.add_argument(
+        "--at-well-per-bin",
+        type=Path,
+        default=DEFAULT_COHORT_PER_BIN["at_well"],
+        help="Canonical at-well per-bin fit (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--all-stops-per-bin",
+        type=Path,
+        default=DEFAULT_COHORT_PER_BIN["all_stops"],
+        help="All-stops per-bin sensitivity fit (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--in-transit-per-bin",
+        type=Path,
+        default=DEFAULT_COHORT_PER_BIN["in_transit"],
+        help="In-transit per-bin sensitivity fit (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--at-well-contrast",
+        type=Path,
+        default=DEFAULT_COHORT_CONTRAST["at_well"],
+        help="Canonical at-well is_swr-contrast rate bundle (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--all-stops-contrast",
+        type=Path,
+        default=DEFAULT_COHORT_CONTRAST["all_stops"],
+        help="All-stops is_swr-contrast rate bundle (--cohort-contrast).",
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=None,
         help=(
             "Report path. Defaults to docs/audits/<today>-rate-refit-comparison.md, "
-            "or <today>-content-refit-comparison.md under --content."
+            "<today>-content-refit-comparison.md under --content, or "
+            "<today>-rate-cohort-atwell.md under --cohort-contrast."
         ),
     )
     return parser
@@ -2611,14 +3095,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    if args.content and args.cohort_contrast:
+        raise SystemExit("--content and --cohort-contrast are separate modes")
     if args.out is None:
-        kind = "content" if args.content else "rate"
-        args.out = (
-            REPO
-            / "docs"
-            / "audits"
-            / f"{dt.date.today().isoformat()}-{kind}-refit-comparison.md"
-        )
+        today = dt.date.today().isoformat()
+        if args.cohort_contrast:
+            args.out = REPO / "docs" / "audits" / f"{today}-rate-cohort-atwell.md"
+        else:
+            kind = "content" if args.content else "rate"
+            args.out = REPO / "docs" / "audits" / f"{today}-{kind}-refit-comparison.md"
+    if args.cohort_contrast:
+        run_cohort_contrast_mode(args)
+        return
     if args.content:
         run_content_mode(args)
         return
