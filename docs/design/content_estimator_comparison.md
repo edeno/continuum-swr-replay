@@ -290,7 +290,7 @@ direct, uniform result of this comparison.
 
 > The `_dm_len` artifacts are a separate fit of the whole rung, not a φ-only refit: their
 > β terms differ from the `_dm` fit by up to 0.09 (e.g. `CS4_armreward` `swr_x_reward_fraction…`
-> −0.840 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
+> −0.841 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
 > `_dm_len` only for the two concentration terms. The table below lists 14 of the 32 pooled
 > rungs; the full set is in `swr_contrast_content_audited_dm_len.pkl`.
 

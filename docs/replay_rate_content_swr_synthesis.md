@@ -82,7 +82,7 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
   is +0.237 (3/5), on the fully paired 216-session cohort. Every other key term
   agrees in sign across all three, and the magnitudes shrink monotonically from
   count to fraction to DM on the SWR interactions and the recency/novelty terms
-  (`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.841) while
+  (`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.840) while
   `is_current_arm` moves the other way (+0.626 → +0.681 → +0.737). Those three
   columns are one fitting run, made before the 2026-09-12 cohort refit, so the
   fraction column there is the pre-refit value of a coefficient that now reads
