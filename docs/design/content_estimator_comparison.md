@@ -42,6 +42,28 @@ the animal-bootstrap band.
 > (`paper/claims_table.md`) has not been revised against them and does not cite
 > them. Nothing here supersedes a shipped claim until that revision happens.
 
+> **Cohort note (2026-09-12).** This comparison was fit on 2026-09-05, before
+> the `is_swr`-contrast content runner was given the explicit well-anchored
+> (at-well) event cohort it now shares with the rate family. All three columns
+> come from that one run, so the table remains an honest like-for-like
+> comparison of likelihoods — but its **fraction** column is the pre-refit value
+> of a coefficient that has since moved. Measured against the refit
+> ([audits/2026-09-12-content-cohort-comparison.md](../audits/2026-09-12-content-cohort-comparison.md)):
+> `C2_base` `is_current_arm` **+0.681 → +0.708**, `CS5_armvalue`
+> `swr_x_reward_belief_mean_candidate_arm_preoutcome` **+0.237 → +0.236**, and
+> `CS1_current` (−0.373), `CS4_armreward` (−1.198) and `CS4nt_armreward`
+> (−1.335) are unchanged at the precision printed here. Per-SD units are now
+> defined on the at-well fit cohort (2026-09-12); pre-refit values differ at the
+> third decimal (the arm-belief SD moves 0.1190 → 0.1193). **This table's count
+> and DM columns come from the same 2026-09-05 harness run and were not refit
+> either**, so do not replace a single fraction cell below with a refit value:
+> that would make the row a comparison across two cohorts. Quote the refit
+> fraction value from the audited contrast bundle instead. (The separately
+> shipped DM contrast bundles, `swr_contrast_content_audited_dm{,_len}.pkl`,
+> *were* refit on the well-anchored cohort; their key terms — `log_phi_is_swr`
+> +1.799 / +1.502, `CS4` −0.841, `CS5` −0.316, `CS5nt` −0.638, `CS6` −0.027,
+> `CS6nt` +0.146 — are unchanged at the precision quoted anywhere.)
+
 ## 1. What each estimator assumes
 
 | estimator | response | observation unit | what it assumes |
@@ -229,11 +251,13 @@ long events does, while `is_current_arm` moves the other way (+0.626 → +0.681 
 +0.737 on `C2_base`), which implies the long events the count model
 over-weights are the ones less locked to the current arm.
 
-The comparison harness's **fraction** column reproduces the shipped runner's
-canonical audited table exactly (CS5 +0.2366, CS4 −1.1976, CS1 −0.3731 all
-match `swr_contrast_content_audited.pkl` to every printed digit), so the
-comparison measures an estimator difference and not a cohort or code
-difference.
+The comparison harness's **fraction** column reproduced the shipped runner's
+audited table exactly as both stood on 2026-09-05 (CS5 +0.2366, CS4 −1.1976,
+CS1 −0.3731 all matched `swr_contrast_content_audited.pkl` to every printed
+digit), so the comparison measures an estimator difference and not a cohort or
+code difference. The audited bundle has since been refit on the well-anchored
+cohort and now reads +0.2363 / −1.1975 / −0.3730; this harness has not, which is
+the cohort note at the top of this file and not a second estimator.
 
 ## 7. The one uniform finding: an SWR event's timebins are far less redundant
 
