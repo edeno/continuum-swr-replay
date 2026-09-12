@@ -5,9 +5,11 @@ The generated provenance paragraph below reports only what the sidecars record, 
 these two are written here by hand and are **not** reproduced by re-running the
 command.
 
-1. The uncommitted edits behind the four `-dirty` rows recorded against
-   `aee8b258` were to this audit script, and to nothing the fit runners import.
-   The fifth `-dirty` row — the at-well audited aggregate, recorded against
+1. The four `-dirty` rows recorded against `aee8b258` were fit from a tree whose
+   uncommitted edits were the runner changes this branch later committed
+   (`1b32ba6`…`97dd4ac`); the person running the fits recorded at the time that
+   the committed code was identical to what ran. The sidecars cannot confirm
+   that, and it has not been re-verified since. The fifth `-dirty` row — the at-well audited aggregate, recorded against
    `c5e1cfb` — carries one further uncommitted edit, to
    `scripts/rate/fit_swr_contrast_rate.py`'s aggregation step, which scoped that
    bundle's per-SD reference to the well-anchored cohort. It rescales the
