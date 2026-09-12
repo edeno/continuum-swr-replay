@@ -599,3 +599,14 @@ def test_report_defines_both_reward_quantities_and_carries_the_caveats(
     assert "[0.325, 0.066, 0]" in report
     assert "absence of evidence" in report
     assert "peak_frac_support" in report
+
+
+def test_short_git_hash_keeps_the_dirty_marker():
+    from scripts.qa.compare_fits import _short_git_hash
+
+    assert (
+        _short_git_hash("aee8b258ccc3067a89d4ffffffffffffffffffff-dirty")
+        == "aee8b258ccc3-dirty"
+    )
+    assert _short_git_hash("aee8b258ccc3067a89d4ffffffffffffffffffff") == "aee8b258ccc3"
+    assert _short_git_hash("") == ""

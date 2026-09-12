@@ -44,13 +44,13 @@ What each artifact records about itself: `at_well`: rows say ['at_well']; `all_s
 
 | artifact | role | git_hash | stop_cohort | written_at |
 | --- | --- | --- | --- | --- |
-| all_models.pkl | per-bin (at_well) | aee8b258ccc3067a89d4 | at_well | 2026-09-12T18:02:17 |
-| swr_contrast_rate.pkl | is_swr-contrast rate (at_well) | aee8b258ccc3067a89d4 | at_well | 2026-09-12T17:40:55 |
-| all_models_allstops.pkl | per-bin (all_stops) | 9e6808fc3e3af4854222 | all_stops | 2026-09-12T18:39:32 |
-| swr_contrast_rate_allstops.pkl | is_swr-contrast rate (all_stops) | aee8b258ccc3067a89d4 | all_stops | 2026-09-12T18:09:31 |
-| all_models_intransit.pkl | per-bin (in_transit) | aee8b258ccc3067a89d4 | in_transit | 2026-09-12T17:48:24 |
-| swr_contrast_rate_audited.pkl | is_swr-contrast audited (at_well) | aee8b258ccc3067a89d4 | at_well | 2026-09-12T18:21:19 |
-| swr_contrast_rate_audited_allstops.pkl | is_swr-contrast audited (all_stops) | aee8b258ccc3067a89d4 | all_stops | 2026-09-12T18:20:11 |
+| all_models.pkl | per-bin (at_well) | aee8b258ccc3-dirty | at_well | 2026-09-12T18:02:17 |
+| swr_contrast_rate.pkl | is_swr-contrast rate (at_well) | aee8b258ccc3 | at_well | 2026-09-12T17:40:55 |
+| all_models_allstops.pkl | per-bin (all_stops) | 9e6808fc3e3a | all_stops | 2026-09-12T18:39:32 |
+| swr_contrast_rate_allstops.pkl | is_swr-contrast rate (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:09:31 |
+| all_models_intransit.pkl | per-bin (in_transit) | aee8b258ccc3-dirty | in_transit | 2026-09-12T17:48:24 |
+| swr_contrast_rate_audited.pkl | is_swr-contrast audited (at_well) | aee8b258ccc3-dirty | at_well | 2026-09-12T18:21:19 |
+| swr_contrast_rate_audited_allstops.pkl | is_swr-contrast audited (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:20:11 |
 
 
 The hash is taken when the artifact is WRITTEN, not when its run started, so a long fit that spanned a commit records the later one — which is why the rows above do not all agree even though they describe one sitting. A `-dirty` suffix means the tree carried uncommitted edits at that moment; here those edits were to this audit script and to nothing the fit runners import. The audited is_swr-contrast bundles are the one place where the recorded hash PREDATES the code that wrote them: they were re-derived with `--aggregate-only` after the commit that gave the audited table its `stop_cohort` label and fixed the input name its freshness check resolves, and the hash records the tree that re-derivation ran from. The per-session fits beneath them, which carry every number this audit reads, are unaffected.
@@ -73,7 +73,7 @@ The hash is taken when the artifact is WRITTEN, not when its run started, so a l
 | non_local_no_swr | in_transit | 32 | 8756 | 227001 | 2988 |
 
 
-The `in_transit` rows above are a whole-corpus total over the few sessions that reach the ladder, not over 218. **The in-transit column is thin.** Only **50 of 218** sessions clear the per-bin minimum-sample gates on any population (swr 18, non_local 48, non_local_swr 10, non_local_no_swr 32), against 218 on the canonical cohort. An in-transit cell that shows no effect is an absence of evidence, not evidence of absence, and its paired tests have no power.
+The `in_transit` rows above are a whole-corpus total over the few sessions that reach the ladder, not over the whole corpus. **The in-transit column is thin.** Only **50 of 218** sessions clear the per-bin minimum-sample gates on any population (swr 18, non_local 48, non_local_swr 10, non_local_no_swr 32), against 218 on the canonical cohort. An in-transit cell that shows no effect is an absence of evidence, not evidence of absence, and its paired tests have no power.
 
 ## Reward rate ratios, `M7r_time_histcos_rew`
 

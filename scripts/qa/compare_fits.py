@@ -2998,6 +2998,17 @@ def _cohort_headline(fits: dict[str, pd.DataFrame]) -> str:
     return "\n\n".join(parts) if parts else "_(nothing fitted)_"
 
 
+def _short_git_hash(recorded: str) -> str:
+    """Abbreviate a recorded git hash without dropping its ``-dirty`` marker.
+
+    Sidecars record the full 40-character sha plus ``-dirty`` when the tree
+    had uncommitted changes at write time; that suffix is the whole point of
+    printing the hash in a provenance table, so only the hex part is cut.
+    """
+    hexpart, sep, suffix = recorded.partition("-")
+    return hexpart[:12] + (sep + suffix if sep else "")
+
+
 def cohort_provenance_table(paths: dict[str, Path]) -> pd.DataFrame:
     """What each artifact's sidecar records about the code that produced it.
 
@@ -3015,7 +3026,7 @@ def cohort_provenance_table(paths: dict[str, Path]) -> pd.DataFrame:
             {
                 "artifact": path.name,
                 "role": role,
-                "git_hash": str(record.get("git_hash", ""))[:20],
+                "git_hash": _short_git_hash(str(record.get("git_hash", ""))),
                 "stop_cohort": str(record.get("stop_cohort", "—")),
                 "written_at": str(record.get("written_at", ""))[:19],
             }
@@ -3170,7 +3181,8 @@ def build_cohort_report(
         _md(cohort_size_table(fits)),
         "",
         "The `in_transit` rows above are a whole-corpus total over the few "
-        "sessions that reach the ladder, not over 218. " + in_transit_power_note(fits),
+        "sessions that reach the ladder, not over the whole corpus. "
+        + in_transit_power_note(fits),
         "",
         "## Reward rate ratios, `M7r_time_histcos_rew`",
         "",
