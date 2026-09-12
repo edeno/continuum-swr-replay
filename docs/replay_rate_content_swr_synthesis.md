@@ -166,12 +166,17 @@ SWR); `M7r_time_histcos_rew − M6r_time_histcos`, the same block given time
 **and** self-history, is **+1.58** / **+1.19** / **+2.41** / **+2.28** — every
 population moves the wrong way. Family A (per-stop Poisson with a
 `log(immobility)` offset, the literature-comparable layer) agrees in *direction*
-only: median per-session `R1 − R0` ΔAIC **−1.41** (detected SWR) / **−5.12**
-(non-local) / **−2.43** (w/ SWR) / **+0.30** (no SWR), 218 sessions each — the
-block helps everywhere except the non-SWR stream. **Those Family-A values are
-the all-stops fit**: the per-stop ladder was refit on the well-anchored cohort
-but no audit of that refit has been published, so cite it as the sensitivity
-until one is. **Retired with the outcome-flag
+only. On the **well-anchored** cohort its median per-session `R1 − R0` ΔAIC is
+**−1.30** (detected SWR) / **−5.97** (non-local) / **−2.10** (w/ SWR) /
+**−0.07** (no SWR) animal-balanced, and **−2.43** / **−5.37** / **−1.79** /
+**−0.44** session-pooled, over 217 sessions each — the block earns its
+parameters in every population, but the non-SWR cell is marginal (52.1 % of
+sessions child-better, 3/5 animals, against 76.0 % and 5/5 on the pooled
+non-local stream). It is a **difference of degree**, not the block helping
+everywhere except the non-SWR stream: on the all-stops sensitivity that cell
+sits the other side of zero (**+0.30**; the sensitivity quartet is
+**−1.41** / **−5.12** / **−2.43** / **+0.30** session-pooled over 218 sessions).
+**Retired with the outcome-flag
 rung:** the per-stop omission RR 0.36 and recent-reward RR 0.62 headline came
 from a rung built at the trial *start*, which could encode the not-yet-delivered
 outcome on approach stops; it is no longer fit and neither its magnitude nor its
@@ -193,16 +198,16 @@ cohort still).
 arrival over [0, 8] s. They are fit on a strict subset of the rows and are
 therefore **never differenced** against the stop-clock rungs. On their supported
 interior the two clocks put the median peak at broadly the same delay
-(2.2–3.0 s on the stop clock vs 3.0–3.6 s after arrival, KS distance
-0.06–0.12), so the early-in-stop rise is not an artifact of the bout clock. They
+(2.3–2.8 s on the stop clock vs 2.8–3.8 s after arrival, KS distance
+0.06–0.11 on the well-anchored cohort; 2.2–3.0 s vs 3.0–3.6 s, KS 0.06–0.12 on
+all stops), so the early-in-stop rise is not an artifact of the bout clock. They
 retain a **different** share of each population's event bins — **0.943**
 detected SWR, **0.929** w/ SWR, **0.906** non-local, **0.889** no SWR (on all
 stops: 0.912 / 0.902 / 0.850 / 0.814) — so a
 between-population contrast on that ladder is partly a contrast between windows;
 and they are heavily flagged (42.9–63.6 % of `M5a_time_arrival` fits carry a
 separated non-nuisance term), so read them pooled, on the fitted curve, never
-per session. The peak positions and KS distances quoted just above are
-all-stops values and have not been re-derived on this cohort.
+per session.
 
 ### Behavioral-state covariates on rate — PENDING
 

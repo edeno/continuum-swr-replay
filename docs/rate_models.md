@@ -87,19 +87,24 @@ one-population null tested against its split.
   Poisson-events-per-second estimator) and the **detected-SWR positive
   control**. The reward history enters as one four-parameter block, so the
   citable quantity is the block's step, the median per-session `R1 − R0` ΔAIC.
-  On the **all-stops** population that step is **−5.12** (non-local), **−2.43**
-  (non-local w/ SWR), **−1.41** (detected SWR) and **+0.30** (non-local, no
-  SWR) over 218 sessions each — negative everywhere except the non-SWR stream,
-  and small
-  ([audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md),
-  "Family A — per-stop reward step").
+  On the **well-anchored** cohort — the population the content family is also
+  fit on — that step is **−5.97** (non-local), **−2.10** (non-local w/ SWR),
+  **−1.30** (detected SWR) and **−0.07** (non-local, no SWR) animal-balanced,
+  and **−5.37** / **−1.79** / **−2.43** / **−0.44** session-pooled, over 217
+  sessions each
+  ([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  "Family A — per-stop reward step"). The block earns its parameters in **every**
+  population here, but by very different margins: **76.0 %** of sessions are
+  child-better on the pooled non-local stream (5/5 animals) against **52.1 %**
+  on the non-SWR one (3/5 animals, a step within half an AIC unit of zero). Read
+  the non-SWR cell as *marginal*, not as the block failing there.
 
-  *Provenance.* The per-stop ladder was refit on the well-anchored cohort on
-  2026-09-12 (`--stop-cohort at_well`, recorded in its provenance sidecar), but
-  **no audit of that fit has been published**, so the four steps above are still
-  the all-stops values. Cite them as the all-stops sensitivity and re-derive the
-  well-anchored step before quoting Family A as the cohort-matched layer; the
-  confound-free statement is Family B's either way. The retired outcome-flag
+  *Sensitivity.* On the **all-stops** population the same step reads **−5.12**
+  (non-local), **−2.43** (non-local w/ SWR), **−1.41** (detected SWR) and
+  **+0.30** (non-local, no SWR) session-pooled over 218 sessions — so the cohort
+  is what carries the non-SWR cell across zero, and the well-anchored quartet is
+  the cohort-matched one to cite. The confound-free statement is Family B's
+  either way. The retired outcome-flag
   rung's per-stop values are no longer Family-A results and are recorded only as
   retracted in `#19c` of
   [`../paper/claims_table.md`](../paper/claims_table.md).
@@ -350,22 +355,25 @@ normalized on their own windows
 **supported interior** — **between the outermost interior knots**, so `tc` is
 read on [1, 3] s (knots 1/2/3) and the arrival clock on [1, 6] s (knots
 1/2/4/6) — because a cubic B-spline extrapolating past its outermost interior
-knot sits over almost no exposure and can run away there. On the **all-stops**
-fit of 2026-09-06 the two clocks put
+knot sits over almost no exposure and can run away there. On the **well-anchored**
+cohort the two clocks put
 the across-session median peak at broadly the same delay in **every**
-population: 2.2–3.0 s on `tc` against 3.0–3.6 s after arrival, with KS
-distances between the normalized curves of 0.06 (non-local, all), 0.07 (detected
-SWR and non-local no-SWR) and 0.12 (non-local with SWR). Detected SWR is no
-exception — its supported arrival-clock maximum is at 3.6 s, like the others.
-The `tc` half of that comparison has been re-derived on the well-anchored cohort
-(2.3–2.8 s, [per_bin_rate_results.md](per_bin_rate_results.md) §1b); the
-arrival-clock peaks and the KS distances have **not**, so the paragraph's
-cross-clock statement stands on the all-stops population until they are.
+population: 2.3–2.8 s on `tc` against 2.8–3.8 s after arrival, with KS
+distances between the normalized curves of 0.06 (non-local, all), 0.06
+(non-local no-SWR), 0.07 (detected SWR) and 0.11 (non-local with SWR). Detected
+SWR is no exception — its supported arrival-clock maximum is at 3.2 s, in the
+same band as the others. The all-stops sensitivity reads 2.2–3.0 s against
+3.0–3.6 s with KS distances 0.06–0.12, so the cross-clock statement does not
+turn on the cohort
+([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+"Arrival clock vs stop clock, by cohort").
 
 That last point is a correction worth stating plainly, because the naive
 summary gets it backwards. All the numbers in this paragraph are read from the
-**132 detected-SWR `M5a_time_arrival` fits that are not flagged separated** —
-the same set the shape table above uses. Read over the **full** [0, 8] s
+**132 detected-SWR `M5a_time_arrival` fits that are not flagged separated** on
+the **all-stops** fit, where this diagnostic was run; the well-anchored fit has
+121 such fits and puts the same supported maximum at 3.15 s. Read over the
+**full** [0, 8] s
 window their median curve's argmax lands at 0.04 s, and 44 % of those fits
 (58/132) peak exactly on the 0 s grid point (median per-session dynamic range
 ≈ 2.2e3, with an upper quartile many orders larger). It is a
@@ -379,8 +387,9 @@ full-window maximum reads 0.93 at 0 s, 0.84 at 0.1 s, 0.12 at 1 s, 0.47 at
 2 s, 0.69 at 3 s and **0.70 at its supported maximum, 3.55 s** — a broad,
 well-supported hump near 3.5 s with an unsupported spike at the very edge that
 the argmax picks up. **A 0.00 s peak must never be read as
-arrival-locked.** The same caution applies to the non-local-no-SWR stop-clock
-peak, which sits exactly on the right edge of its supported interval (3.0 s).
+arrival-locked.** The same caution applied to the non-local-no-SWR stop-clock
+peak, which on the all-stops fit sat exactly on the right edge of its supported
+interval (3.0 s); on the well-anchored fit it moves inside, to 2.68 s.
 
 Read the whole comparison as two descriptions of the same rate, not as one
 clock beating the other — neither ladder is fit to the other's rows. The
@@ -495,13 +504,15 @@ Both estimators now carry the *same* past-only reward-history block, and in both
 the reward dependence is carried by the SWR-coupled stream and is absent from the
 non-SWR one:
 
-- **Family A (per-stop):** on the all-stops fit of 2026-09-06 the reward block
-  still improves the fit on every population except the non-SWR one — median
-  `R1 − R0` ΔAIC
-  **−5.12** (non-local), **−2.43** (non-local w/ SWR), **−1.41** (detected SWR),
-  **+0.30** (non-local, no SWR), over 218 sessions each. The well-anchored refit
-  of this ladder has not been audited, so this bullet is the all-stops
-  sensitivity. The earlier per-stop
+- **Family A (per-stop):** on the well-anchored cohort the reward block improves
+  the fit on every population, most on the SWR-coupled side and barely at all on
+  the non-SWR one — median `R1 − R0` ΔAIC (animal-balanced / session-pooled)
+  **−5.97 / −5.37** (non-local), **−2.10 / −1.79** (non-local w/ SWR),
+  **−1.30 / −2.43** (detected SWR), **−0.07 / −0.44** (non-local, no SWR), over
+  217 sessions each, with 76.0 % of sessions child-better on the pooled
+  non-local stream against 52.1 % on the non-SWR one. On the all-stops
+  sensitivity the non-SWR cell sits on the other side of zero (**+0.30**), which
+  is a cohort difference, not an effect difference. The earlier per-stop
   headline — a large suppression of the rate after an omitted reward, in most
   sessions — came from an outcome-flag rung that is no longer fit: it was built
   from the trial *start*, so it could encode the not-yet-delivered outcome on
