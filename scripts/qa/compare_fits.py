@@ -2832,6 +2832,51 @@ def _cohort_label_note(fits: dict[str, pd.DataFrame]) -> str:
     return "; ".join(parts)
 
 
+def _cohort_headline(fits: dict[str, pd.DataFrame]) -> str:
+    """The two numbers the cohort choice actually moves, read off the tables.
+
+    Written from the tables below rather than typed, so the prose cannot drift
+    from the artifacts. It names the non-SWR non-local reward ratio and the
+    paired SWR-vs-non-SWR test, which are the quantities the population choice
+    was suspected of deciding.
+    """
+    rr = cohort_reward_rr_table(fits)
+    paired = cohort_paired_swr_table(fits)
+    parts = []
+    non_swr = rr[rr.outcome == "non_local_no_swr"]
+    if len(non_swr):
+        stated = "; ".join(
+            f"`{row.stop_cohort}` {row.rr_immediate:.2f}x ({row.animals_positive} "
+            f"animals, {int(row.n_sessions)} sessions)"
+            for row in non_swr.itertuples()
+        )
+        parts.append(
+            "Immediate reward component on the non-SWR non-local population "
+            f"({FULL_MODEL}): {stated}."
+        )
+    if len(paired):
+        stated = "; ".join(
+            f"`{row.stop_cohort}` {row.pct_sessions_positive:.1f}% of "
+            f"{int(row.n_paired_sessions)} sessions, {row.animals_positive} "
+            f"animals, p={row.signrank_p}"
+            for row in paired.itertuples()
+        )
+        parts.append(
+            "SWR-coupled minus non-SWR immediate coefficient, paired within "
+            f"session: {stated}."
+        )
+    sizes = cohort_size_table(fits)
+    sizes = sizes[sizes.outcome == "non_local"]
+    if len(sizes):
+        stated = "; ".join(
+            f"`{row.stop_cohort}` {int(row.n_stops):,} stops over "
+            f"{int(row.n_sessions)} sessions"
+            for row in sizes.itertuples()
+        )
+        parts.append(f"Modelled non-local cohort: {stated}.")
+    return "\n\n".join(parts) if parts else "_(nothing fitted)_"
+
+
 def build_cohort_report(
     fits: dict[str, pd.DataFrame],
     contrast: dict[str, pd.DataFrame],
@@ -2855,6 +2900,10 @@ def build_cohort_report(
         "No likelihood-scale quantity is differenced across cohorts — the "
         "ΔAIC steps below are each taken WITHIN one cohort, between two rungs "
         "that share rows.",
+        "",
+        "## What moved",
+        "",
+        _cohort_headline(fits),
         "",
         "## Cohorts",
         "",
