@@ -13,7 +13,13 @@ from .choice_prediction import (
     build_choice_dataset,
     fit_choice_model,
 )
-from .cohort_selection import freeze_common_cohort
+from .cohort_selection import (
+    STOP_COHORT_RULES,
+    STOP_COHORTS,
+    freeze_common_cohort,
+    select_event_cohort,
+    select_stop_cohort,
+)
 from .covariates import (
     UNCERTAINTY_COVARIATES,
     add_trial_context,
@@ -106,6 +112,8 @@ __all__ = [
     "REWARD_HISTORY_COLUMNS",
     "REWARD_HISTORY_N_BASIS",
     "ARRIVAL_CLOCK_COLUMN",
+    "STOP_COHORTS",
+    "STOP_COHORT_RULES",
     "STOP_COVARIATES",
     "TMAX",
     "TMAX_ARRIVAL",
@@ -138,6 +146,8 @@ __all__ = [
     "raised_cosine_history_basis",
     "single_arm_from_well",
     "retrospective_alignment_with_shuffle",
+    "select_event_cohort",
+    "select_stop_cohort",
     "summarize_behavioral_location",
     "trial_arrival_times",
     "trial_context_at_times",

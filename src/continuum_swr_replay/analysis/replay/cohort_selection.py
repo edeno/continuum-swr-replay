@@ -5,6 +5,12 @@ events or stops.  :func:`freeze_common_cohort` applies that selection once at
 the unit grain: if any row for a unit fails a required check, every row for the
 unit is removed.  The helper deliberately owns selection only; callers remain
 responsible for model-specific provenance, minimum-sample gates, and fitting.
+
+:func:`select_stop_cohort` (and its event-grain sibling
+:func:`select_event_cohort`) owns the other half of the question: not which
+units are complete, but which population the ladder is about at all.  Both the
+rate and the content families route their occupancy restriction through it, so
+one rule -- stated once, here -- decides the stops both families describe.
 """
 
 from __future__ import annotations
@@ -183,3 +189,157 @@ def freeze_common_cohort(
         "included_ids": included_ids,
     }
     return cohort, report
+
+
+#: The stop/event populations a rate or content ladder may be fit on, and the
+#: rule each one states. ``at_well`` is the canonical shared cohort: both the
+#: rate and the content families are read on stops the animal spent at a well,
+#: so a rate claim and a content claim describe the same population. The other
+#: two exist as separately-published sensitivity bundles -- an in-transit
+#: population is never pooled with an at-well one.
+STOP_COHORT_RULES = {
+    "at_well": "occupancy_state == 'at_well'",
+    "in_transit": "occupancy_state == 'in_transit'",
+    "all_stops": "no occupancy restriction (every immobility stop)",
+}
+
+#: CLI-facing tuple of the accepted cohort names, in the order runners list them.
+STOP_COHORTS = tuple(STOP_COHORT_RULES)
+
+_OCCUPANCY_COLUMN = "occupancy_state"
+
+
+def _occupancy_counts(states: pd.Series) -> dict[str, int]:
+    """Occupancy-state tallies, with missing states named rather than dropped."""
+    counts = states.value_counts(dropna=False)
+    return {
+        ("missing" if pd.isna(state) else str(state)): int(count)
+        for state, count in counts.items()
+    }
+
+
+def _cohort_mask(frame: pd.DataFrame, cohort: str) -> pd.Series:
+    """Row mask selecting ``cohort``; raises if the rule cannot be evaluated."""
+    if cohort not in STOP_COHORT_RULES:
+        raise ValueError(
+            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORT_RULES)}"
+        )
+    if _OCCUPANCY_COLUMN not in frame.columns:
+        raise KeyError(
+            f"cohort selection needs the {_OCCUPANCY_COLUMN!r} column; the frame "
+            f"carries {list(frame.columns)[:12]}... . Regenerate the canonical "
+            "stop/event tables, which carry it by construction."
+        )
+    if cohort == "all_stops":
+        return pd.Series(True, index=frame.index)
+    return frame[_OCCUPANCY_COLUMN].eq(cohort)
+
+
+def select_stop_cohort(
+    stop_table: pd.DataFrame, *, cohort: str = "at_well"
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Restrict a stop table to one occupancy cohort.
+
+    The rate and content families are only describing the same population when
+    they are fit on the same stops.  This is the single place that rule lives:
+    every runner in both families routes its stop/event selection through it so
+    the cohort is a stated, auditable choice rather than a filter re-derived per
+    script.
+
+    Parameters
+    ----------
+    stop_table : pandas.DataFrame
+        One row per immobility stop, carrying ``occupancy_state``.
+    cohort : {"at_well", "all_stops", "in_transit"}
+        Population to keep.  ``at_well`` is canonical.
+
+    Returns
+    -------
+    selected : pandas.DataFrame
+        A copy holding the selected rows with a fresh integer index.
+        ``stop_table`` is never mutated.
+    report : dict
+        ``cohort``, the ``rule`` string, ``n_stops_before``/``n_stops_after``,
+        ``n_stops_dropped``, and the ``occupancy_state`` tallies before and
+        after (``counts_before`` / ``counts_after``), for the runner log and the
+        provenance sidecar.
+
+    Raises
+    ------
+    KeyError
+        If ``occupancy_state`` is absent.
+    ValueError
+        If ``cohort`` is not one of the three accepted names.
+    """
+    keep = _cohort_mask(stop_table, cohort)
+    selected = stop_table.loc[keep].reset_index(drop=True)
+    report = {
+        "cohort": cohort,
+        "rule": STOP_COHORT_RULES[cohort],
+        "n_stops_before": int(len(stop_table)),
+        "n_stops_after": int(len(selected)),
+        "n_stops_dropped": int(len(stop_table) - len(selected)),
+        "counts_before": _occupancy_counts(stop_table[_OCCUPANCY_COLUMN]),
+        "counts_after": (
+            _occupancy_counts(selected[_OCCUPANCY_COLUMN]) if len(selected) else {}
+        ),
+    }
+    return selected, report
+
+
+def select_event_cohort(
+    long_df: pd.DataFrame, *, cohort: str = "at_well", event_col: str = "event_id"
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Apply :data:`STOP_COHORT_RULES` at the event grain.
+
+    The content ladders are fit on a long (event x candidate) frame rather than
+    on the stop table, but the population they mean is the same one: each event
+    carries the ``occupancy_state`` of the stop it occurred in, so the same rule
+    reads the same column.  Keeping both grains in one module is what makes the
+    two families' cohorts comparable -- :func:`select_stop_cohort` and this
+    function select the same stops.
+
+    Parameters
+    ----------
+    long_df : pandas.DataFrame
+        One row per event x candidate (arm or patch), carrying
+        ``occupancy_state`` and ``event_col``.
+    cohort : {"at_well", "all_stops", "in_transit"}
+        Population to keep.  ``at_well`` is canonical.
+    event_col : str
+        Event identifier, counted in the report.
+
+    Returns
+    -------
+    selected : pandas.DataFrame
+        A copy holding the selected rows with a fresh integer index.
+    report : dict
+        As :func:`select_stop_cohort`, at the event grain
+        (``n_events_before``/``n_events_after``/``n_events_dropped`` alongside
+        the row counts).
+
+    Raises
+    ------
+    KeyError
+        If ``occupancy_state`` or ``event_col`` is absent.
+    ValueError
+        If ``cohort`` is not one of the three accepted names.
+    """
+    keep = _cohort_mask(long_df, cohort)
+    if event_col not in long_df.columns:
+        raise KeyError(f"event cohort selection needs the {event_col!r} column")
+    selected = long_df.loc[keep].reset_index(drop=True)
+    report = {
+        "cohort": cohort,
+        "rule": STOP_COHORT_RULES[cohort],
+        "n_rows_before": int(len(long_df)),
+        "n_rows_after": int(len(selected)),
+        "n_events_before": int(long_df[event_col].nunique()),
+        "n_events_after": int(selected[event_col].nunique()),
+        "counts_before": _occupancy_counts(long_df[_OCCUPANCY_COLUMN]),
+        "counts_after": (
+            _occupancy_counts(selected[_OCCUPANCY_COLUMN]) if len(selected) else {}
+        ),
+    }
+    report["n_events_dropped"] = report["n_events_before"] - report["n_events_after"]
+    return selected, report

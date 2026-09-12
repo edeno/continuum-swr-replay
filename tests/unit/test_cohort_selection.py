@@ -7,7 +7,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_selection import (
+    STOP_COHORT_RULES,
     freeze_common_cohort,
+    select_event_cohort,
+    select_stop_cohort,
 )
 
 
@@ -203,3 +206,118 @@ def test_freeze_common_cohort_drops_whole_unit_for_nonfinite_numeric_value(bad):
     assert tuple(cohort["event_id"].unique()) == (2,)
     assert report["nonfinite_unit_ids"] == (1,)
     assert report["n_nonfinite_units"] == 1
+
+
+def _occupancy_stops() -> pd.DataFrame:
+    """Six stops spanning every occupancy state the canonical table carries."""
+    return pd.DataFrame(
+        {
+            "stop_id": ["s0", "s1", "s2", "s3", "s4", "s5"],
+            "occupancy_state": [
+                "at_well",
+                "at_well",
+                "in_transit",
+                "mixed",
+                "unknown",
+                None,
+            ],
+            "immobility_time": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("cohort", "expected"),
+    [
+        ("at_well", ["s0", "s1"]),
+        ("in_transit", ["s2"]),
+        ("all_stops", ["s0", "s1", "s2", "s3", "s4", "s5"]),
+    ],
+)
+def test_select_stop_cohort_keeps_exactly_the_named_population(cohort, expected):
+    stops = _occupancy_stops()
+
+    selected, _ = select_stop_cohort(stops, cohort=cohort)
+
+    assert list(selected["stop_id"]) == expected
+    # The input is never mutated and the selection is re-indexed from zero.
+    assert len(stops) == 6
+    assert list(selected.index) == list(range(len(expected)))
+
+
+def test_select_stop_cohort_report_states_the_rule_and_the_counts():
+    stops = _occupancy_stops()
+
+    _, report = select_stop_cohort(stops, cohort="at_well")
+
+    assert report["cohort"] == "at_well"
+    assert report["rule"] == STOP_COHORT_RULES["at_well"]
+    assert report["n_stops_before"] == 6
+    assert report["n_stops_after"] == 2
+    assert report["n_stops_dropped"] == 4
+    assert report["counts_before"] == {
+        "at_well": 2,
+        "in_transit": 1,
+        "mixed": 1,
+        "unknown": 1,
+        "missing": 1,
+    }
+    assert report["counts_after"] == {"at_well": 2}
+
+
+def test_select_stop_cohort_all_stops_keeps_the_missing_state():
+    """``all_stops`` states no restriction, so a NaN state is not a silent drop."""
+    stops = _occupancy_stops()
+
+    selected, report = select_stop_cohort(stops, cohort="all_stops")
+
+    assert len(selected) == 6
+    assert report["counts_after"]["missing"] == 1
+
+
+def test_select_stop_cohort_raises_without_occupancy_state():
+    stops = _occupancy_stops().drop(columns=["occupancy_state"])
+
+    with pytest.raises(KeyError, match="occupancy_state"):
+        select_stop_cohort(stops, cohort="at_well")
+
+
+def test_select_stop_cohort_rejects_an_unknown_cohort():
+    with pytest.raises(ValueError, match="unknown cohort"):
+        select_stop_cohort(_occupancy_stops(), cohort="at_the_well")
+
+
+def test_select_event_cohort_selects_whole_events_and_counts_them():
+    long_df = pd.DataFrame(
+        {
+            "event_id": ["e0", "e0", "e1", "e1", "e2", "e2"],
+            "candidate_arm": [0, 1, 0, 1, 0, 1],
+            "occupancy_state": [
+                "at_well",
+                "at_well",
+                "in_transit",
+                "in_transit",
+                "at_well",
+                "at_well",
+            ],
+        }
+    )
+
+    selected, report = select_event_cohort(long_df, cohort="at_well")
+
+    assert set(selected["event_id"]) == {"e0", "e2"}
+    # Every candidate row of a retained event survives (the candidate set is
+    # never shrunk by the cohort rule).
+    assert len(selected) == 4
+    assert report["n_events_before"] == 3
+    assert report["n_events_after"] == 2
+    assert report["n_events_dropped"] == 1
+    assert report["n_rows_before"] == 6
+    assert report["n_rows_after"] == 4
+
+
+def test_select_event_cohort_raises_without_the_event_column():
+    long_df = pd.DataFrame({"occupancy_state": ["at_well"], "x": [1.0]})
+
+    with pytest.raises(KeyError, match="event_id"):
+        select_event_cohort(long_df, cohort="at_well")
