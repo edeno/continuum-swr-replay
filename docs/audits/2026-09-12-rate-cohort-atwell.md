@@ -35,8 +35,10 @@ What each artifact records about itself: `at_well`: rows say ['at_well']; `all_s
 | --- | --- | --- |
 | per-bin (at_well) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/all_models.pkl | 0dc2ce9f00fb |
 | is_swr-contrast rate (at_well) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl | a3b5f647e5fb |
+| per-stop (at_well) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_stop_rate/all_models.pkl | fa627b5f405d |
 | per-bin (all_stops) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl | 141ba3f20c10 |
 | is_swr-contrast rate (all_stops) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_allstops.pkl | 396ed95852a4 |
+| per-stop (all_stops) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_pre_atwell_backup_20260912/models_per_stop_rate/all_models.pkl | 584165205caa |
 | per-bin (in_transit) | /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl | 816c1ed11e03 |
 
 
@@ -46,8 +48,10 @@ What each artifact records about itself: `at_well`: rows say ['at_well']; `all_s
 | --- | --- | --- | --- | --- |
 | all_models.pkl | per-bin (at_well) | aee8b258ccc3-dirty | at_well | 2026-09-12T18:02:17 |
 | swr_contrast_rate.pkl | is_swr-contrast rate (at_well) | aee8b258ccc3 | at_well | 2026-09-12T17:40:55 |
+| all_models.pkl | per-stop (at_well) | aee8b258ccc3 | at_well | 2026-09-12T17:23:17 |
 | all_models_allstops.pkl | per-bin (all_stops) | 9e6808fc3e3a | all_stops | 2026-09-12T18:39:32 |
 | swr_contrast_rate_allstops.pkl | is_swr-contrast rate (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:09:31 |
+| all_models.pkl | per-stop (all_stops) | eecf54a56d36 | — | 2026-09-06T16:04:08 |
 | all_models_intransit.pkl | per-bin (in_transit) | aee8b258ccc3-dirty | in_transit | 2026-09-12T17:48:24 |
 | swr_contrast_rate_audited.pkl | is_swr-contrast audited (at_well) | aee8b258ccc3-dirty | at_well | 2026-09-12T18:21:19 |
 | swr_contrast_rate_audited_allstops.pkl | is_swr-contrast audited (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:20:11 |
@@ -170,6 +174,44 @@ Two different quantities, never to be quoted as one. **`rr_immediate`** is `exp`
 | non_local_no_swr | at_well | 26603 | 23655 | 0.889 |
 | non_local_no_swr | all_stops | 30913 | 25150 | 0.814 |
 | non_local_no_swr | in_transit | 4310 | 1495 | 0.347 |
+
+
+## Arrival clock vs stop clock, by cohort
+
+The two clocks are never differenced on the likelihood scale — they are fit on different rows. What is compared is the SHAPE of each fitted time course, read on its supported interior (between the outermost interior knots): where the across-session median curve peaks, and the KS distance between the two curves after each is normalized to a density over its own interior. Both are scale-free, so the cohorts can be read side by side. `pct_separated_arrival` is large on every cohort — the arrival rung is the one most often unidentified — so the arrival column rests on a selected minority of sessions and its peak is a weaker statement than the stop-clock one.
+
+| outcome | stop_cohort | n_sessions_stop | pct_separated_stop | support_s_stop | peak_s_stop | peak_frac_support_stop | n_sessions_arrival | pct_separated_arrival | support_s_arrival | peak_s_arrival | peak_frac_support_arrival | ks_distance |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| swr | at_well | 209 | 4.128 | 1.0-3.0 | 2.630 | 0.815 | 121 | 42.925 | 1.0-6.0 | 3.150 | 0.430 | 0.070 |
+| swr | all_stops | 212 | 2.752 | 1.0-3.0 | 2.385 | 0.692 | 132 | 37.441 | 1.0-6.0 | 3.550 | 0.510 | 0.069 |
+| swr | in_transit | 14 | 22.222 | 1.0-3.0 | 2.965 | 0.982 | 0 | — | 1.0-6.0 | — | — | — |
+| non_local | at_well | 217 | 0.459 | 1.0-3.0 | 2.815 | 0.907 | 80 | 62.441 | 1.0-6.0 | 2.987 | 0.397 | 0.056 |
+| non_local | all_stops | 217 | 0.459 | 1.0-3.0 | 2.790 | 0.895 | 88 | 58.685 | 1.0-6.0 | 3.025 | 0.405 | 0.062 |
+| non_local | in_transit | 41 | 14.583 | 1.0-3.0 | 1.465 | 0.233 | 7 | 58.824 | 1.0-6.0 | 4.875 | 0.775 | 0.294 |
+| non_local_swr | at_well | 168 | 22.936 | 1.0-3.0 | 2.305 | 0.652 | 75 | 63.592 | 1.0-6.0 | 2.800 | 0.360 | 0.105 |
+| non_local_swr | all_stops | 179 | 17.512 | 1.0-3.0 | 2.230 | 0.615 | 68 | 65.657 | 1.0-6.0 | 2.950 | 0.390 | 0.121 |
+| non_local_swr | in_transit | 9 | 10.000 | 1.0-3.0 | 2.865 | 0.933 | 0 | — | 1.0-6.0 | — | — | — |
+| non_local_no_swr | at_well | 211 | 3.211 | 1.0-3.0 | 2.680 | 0.840 | 80 | 62.264 | 1.0-6.0 | 3.800 | 0.560 | 0.059 |
+| non_local_no_swr | all_stops | 217 | 0.459 | 1.0-3.0 | 3.000 | 1.000 | 86 | 59.242 | 1.0-6.0 | 3.638 | 0.528 | 0.069 |
+| non_local_no_swr | in_transit | 29 | 9.375 | 1.0-3.0 | 1.700 | 0.350 | 6 | 53.846 | 1.0-6.0 | 5.288 | 0.858 | 0.433 |
+
+
+## Family A — per-stop reward step (`R1 − R0`), within cohort
+
+The per-stop Poisson ladder (with its `log(immobility)` offset) makes one reward statement: a four-parameter reward-history block against the offset-only null. **Negative = the block earns its parameters.** The difference is taken WITHIN a cohort, between two rungs scored on the same `n_stops` in the same session; a session whose two rungs disagree on `n_stops`, or that reaches only one of them, is counted in `n_dropped` instead. `median_delta_aic_animal` is the median of the per-animal medians (the population statement) and `median_delta_aic_session` the session-pooled median (what a per-session listing shows); `animals_child_better` counts animals whose own median is negative.
+
+Read from: `at_well` from `/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_stop_rate/all_models.pkl`; `all_stops` from `/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_pre_atwell_backup_20260912/models_per_stop_rate/all_models.pkl` — the pre-refit backup, which is where the all-stops fit of this ladder now lives: Family A publishes no bundle under an `_allstops` name, and the well-anchored refit overwrote the canonical one in place.
+
+| outcome | stop_cohort | n_sessions | n_dropped | median_delta_aic_animal | median_delta_aic_session | pct_sessions_child_better | animals_child_better |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| swr | at_well | 217 | 1 | -1.30 | -2.43 | 60.83 | 4/5 |
+| swr | all_stops | 218 | 0 | -1.12 | -1.41 | 61.01 | 3/5 |
+| non_local | at_well | 217 | 1 | -5.97 | -5.37 | 76.04 | 5/5 |
+| non_local | all_stops | 218 | 0 | -6.32 | -5.12 | 72.48 | 5/5 |
+| non_local_swr | at_well | 217 | 1 | -2.10 | -1.79 | 61.29 | 5/5 |
+| non_local_swr | all_stops | 218 | 0 | -1.24 | -2.43 | 66.06 | 5/5 |
+| non_local_no_swr | at_well | 217 | 1 | -0.07 | -0.44 | 52.07 | 3/5 |
+| non_local_no_swr | all_stops | 218 | 0 | 0.11 | 0.30 | 48.17 | 2/5 |
 
 
 ## is_swr-contrast rate bundle, per rung and population

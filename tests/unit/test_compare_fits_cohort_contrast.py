@@ -29,6 +29,7 @@ from scripts.qa.compare_fits import (
     COHORT_ORDER,
     FULL_MODEL,
     IMMEDIATE_COEF,
+    PER_STOP_ALL_STOPS_FALLBACK,
     REWARD_X_TIME_RUNGS,
     STOP_TIME_RUNG,
     SWR_IMMEDIATE_COEF,
@@ -36,15 +37,18 @@ from scripts.qa.compare_fits import (
     _flag_support_edge,
     build_cohort_report,
     build_parser,
+    cohort_arrival_shape_table,
     cohort_burst_peak_table,
     cohort_contrast_rung_table,
     cohort_delta_aic_table,
     cohort_paired_swr_table,
+    cohort_per_stop_delta_aic_table,
     cohort_provenance_table,
     cohort_reward_rr_table,
     cohort_size_table,
     collect_cohort_inputs,
     in_transit_power_note,
+    per_stop_source_note,
     rate_rung_sort_key,
     reward_kernel_lag1,
     run_cohort_contrast_mode,
@@ -482,16 +486,18 @@ def test_missing_sensitivity_bundles_are_skipped_but_at_well_is_required(
 ):
     at_well = tmp_path / "all_models.pkl"
     cohort_fits["at_well"].to_pickle(at_well)
-    fits, contrast, inputs = collect_cohort_inputs(
+    fits, contrast, per_stop, inputs = collect_cohort_inputs(
         {
             "at_well": at_well,
             "all_stops": tmp_path / "absent_allstops.pkl",
             "in_transit": tmp_path / "absent_intransit.pkl",
         },
         {"at_well": tmp_path / "absent_contrast.pkl"},
+        {"at_well": tmp_path / "absent_per_stop.pkl"},
     )
     assert set(fits) == {"at_well"}
     assert contrast == {}
+    assert per_stop == {}
     assert set(inputs) == {"per-bin (at_well)"}
 
     with pytest.raises(SystemExit, match="canonical at-well per-bin fit is required"):
@@ -610,3 +616,178 @@ def test_short_git_hash_keeps_the_dirty_marker():
     )
     assert _short_git_hash("aee8b258ccc3067a89d4ffffffffffffffffffff") == "aee8b258ccc3"
     assert _short_git_hash("") == ""
+
+
+def _per_stop_fits(
+    deltas: dict[tuple[str, str], dict[tuple[str, str], float]],
+    *,
+    n_stops: int = 100,
+    n_stops_child: dict[tuple[str, str], int] | None = None,
+) -> pd.DataFrame:
+    """One cohort's Family A ladder: the null `R0` and the reward rung `R1`.
+
+    ``deltas`` plants ``AIC(R1) - AIC(R0)`` per (outcome, session); a session
+    missing from an outcome's map is simply not fit there. ``n_stops_child``
+    plants a DIFFERENT ``n_stops`` on `R1` for a session, which is what a
+    cohort disagreement between two rungs looks like.
+    """
+    n_stops_child = n_stops_child or {}
+    rows = []
+    for outcome, per_session in deltas.items():
+        for (animal, date), delta in per_session.items():
+            for rung, aic in (("R0", 100.0), ("R1", 100.0 + delta)):
+                rows.append(
+                    {
+                        "animal": animal,
+                        "session_date": date,
+                        "epoch": "02_r1",
+                        "outcome": outcome,
+                        "model": rung,
+                        "aic": aic,
+                        "n_stops": (
+                            n_stops_child.get((animal, date), n_stops)
+                            if rung == "R1"
+                            else n_stops
+                        ),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+#: chimi is negative in both sessions and j16 positive in both, so the
+#: animal-balanced median (-2.5) and the session-pooled median (-2.0) differ and
+#: a test can tell which one a column reports.
+PER_STOP_DELTAS = {
+    "non_local": {
+        ("chimi", "20200212"): -10.0,
+        ("chimi", "20200213"): -6.0,
+        ("j16", "20210706"): 2.0,
+        ("j16", "20210707"): 4.0,
+    }
+}
+
+
+def test_family_a_step_reports_both_medians_and_the_animal_sign_count():
+    table = cohort_per_stop_delta_aic_table(
+        {"at_well": _per_stop_fits(PER_STOP_DELTAS)}
+    )
+    row = _row(table, outcome="non_local", stop_cohort="at_well")
+    assert row.n_sessions == 4 and row.n_dropped == 0
+    # median of the per-animal medians (-8, +3), not of the four sessions
+    assert row.median_delta_aic_animal == pytest.approx(-2.5)
+    assert row.median_delta_aic_session == pytest.approx(-2.0)
+    assert row.pct_sessions_child_better == pytest.approx(50.0)
+    assert row.animals_child_better == "1/2"
+
+
+def test_family_a_step_drops_a_session_whose_rungs_saw_different_stops():
+    """An `n_stops` disagreement makes the AIC gap a cohort comparison."""
+    deltas = {
+        "non_local": dict(PER_STOP_DELTAS["non_local"]) | {("j16", "20210707"): -500.0}
+    }
+    table = cohort_per_stop_delta_aic_table(
+        {"at_well": _per_stop_fits(deltas, n_stops_child={("j16", "20210707"): 90})}
+    )
+    row = _row(table, outcome="non_local", stop_cohort="at_well")
+    assert row.n_sessions == 3 and row.n_dropped == 1
+    # The excluded session would have dragged both medians far negative.
+    assert row.median_delta_aic_session == pytest.approx(-6.0)
+    assert row.median_delta_aic_animal == pytest.approx(-3.0)
+    assert row.animals_child_better == "1/2"
+
+
+def test_family_a_step_places_the_cohorts_side_by_side():
+    all_stops = {
+        "non_local": {
+            key: value + 12.0 for key, value in PER_STOP_DELTAS["non_local"].items()
+        }
+    }
+    table = cohort_per_stop_delta_aic_table(
+        {
+            "at_well": _per_stop_fits(PER_STOP_DELTAS),
+            "all_stops": _per_stop_fits(all_stops),
+        }
+    )
+    assert list(table.stop_cohort) == ["at_well", "all_stops"]
+    assert _row(
+        table, stop_cohort="all_stops"
+    ).median_delta_aic_animal == pytest.approx(9.5)
+    assert _row(table, stop_cohort="all_stops").animals_child_better == "0/2"
+
+
+def test_family_a_section_is_written_only_when_a_per_stop_ladder_is_supplied(
+    cohort_fits, tmp_path
+):
+    artifact = tmp_path / "all_models.pkl"
+    cohort_fits["at_well"].to_pickle(artifact)
+    inputs = {"per-bin (at_well)": artifact}
+
+    without = build_cohort_report(cohort_fits, {}, inputs, command="uv run x")
+    assert "Family A" not in without
+
+    with_step = build_cohort_report(
+        cohort_fits,
+        {},
+        inputs | {"per-stop (at_well)": artifact},
+        command="uv run x",
+        per_stop={"at_well": _per_stop_fits(PER_STOP_DELTAS)},
+    )
+    assert "## Family A — per-stop reward step (`R1 − R0`), within cohort" in with_step
+    assert "Negative = the block earns its parameters" in with_step
+    assert "median_delta_aic_animal" in with_step
+    assert str(artifact) in with_step
+
+
+def test_per_stop_source_note_marks_the_stand_in_all_stops_ladder(tmp_path):
+    note = per_stop_source_note(
+        {
+            "per-stop (at_well)": tmp_path / "all_models.pkl",
+            "per-stop (all_stops)": PER_STOP_ALL_STOPS_FALLBACK,
+        }
+    )
+    assert "`at_well` from" in note and "`all_stops` from" in note
+    assert "pre-refit backup" in note
+    assert per_stop_source_note({}) == ""
+
+
+def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
+    cohort_fits, tmp_path
+):
+    at_well_bin = tmp_path / "all_models.pkl"
+    cohort_fits["at_well"].to_pickle(at_well_bin)
+    at_well_stop = tmp_path / "per_stop.pkl"
+    _per_stop_fits(PER_STOP_DELTAS).to_pickle(at_well_stop)
+
+    _, _, per_stop, inputs = collect_cohort_inputs(
+        {"at_well": at_well_bin},
+        {},
+        {"at_well": at_well_stop, "all_stops": tmp_path / "absent_allstops.pkl"},
+    )
+
+    assert inputs["per-stop (at_well)"] == at_well_stop
+    if PER_STOP_ALL_STOPS_FALLBACK.exists():
+        assert inputs["per-stop (all_stops)"] == PER_STOP_ALL_STOPS_FALLBACK
+        assert set(per_stop) == {"at_well", "all_stops"}
+    else:  # the backup is data, not code, so a bare checkout has only at-well
+        assert set(per_stop) == {"at_well"}
+
+
+def test_arrival_shape_table_labels_every_cohort_it_stacks(cohort_fits):
+    """The shape comparison is per cohort, and says which cohort each row is."""
+    table = cohort_arrival_shape_table(cohort_fits)
+    assert set(table.stop_cohort) == set(cohort_fits)
+    assert {"peak_s_stop", "peak_s_arrival", "ks_distance"} <= set(table.columns)
+    # These fixtures carry no arrival rung, so the arrival half is empty and the
+    # KS distance between the two clocks is undefined rather than invented.
+    assert table["peak_s_arrival"].isna().all()
+    assert table["ks_distance"].isna().all()
+    # The stop-clock peak is still the planted one, per cohort.
+    at_well = _row(table, outcome="non_local", stop_cohort="at_well")
+    assert at_well.peak_s_stop == pytest.approx(1.5, abs=0.1)
+    assert _row(
+        table, outcome="non_local", stop_cohort="all_stops"
+    ).peak_s_stop == pytest.approx(2.5, abs=0.1)
+
+
+def test_arrival_shape_table_is_empty_without_fits():
+    assert cohort_arrival_shape_table({}).empty

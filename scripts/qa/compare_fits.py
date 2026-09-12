@@ -35,7 +35,8 @@ not compare a refit to its predecessor at all: it places the SAME ladder fit on
 the three stop populations (well-anchored ``at_well``, ``all_stops``,
 ``in_transit``) side by side, so a number that moves between them is moving
 because the population moved. Every likelihood-scale step it prints is taken
-WITHIN one cohort.
+WITHIN one cohort -- including Family A's per-stop reward step (``R1`` against
+``R0``), which is the quantity the literature-comparable layer is cited for.
 
 Usage:
     uv run python scripts/qa/compare_fits.py
@@ -2659,6 +2660,20 @@ DEFAULT_COHORT_CONTRAST = {
     "at_well": RC / "models_per_bin_rate" / "swr_contrast_rate.pkl",
     "all_stops": RC / "models_per_bin_rate" / "swr_contrast_rate_allstops.pkl",
 }
+# Family A (per-stop Poisson) is published as one ladder per cohort. Only the
+# canonical at-well fit is written under its own name; the all-stops ladder was
+# never re-published after the well-anchored refit overwrote it, so the pre-refit
+# backup IS the all-stops fit and the section says where it came from.
+DEFAULT_COHORT_PER_STOP = {
+    "at_well": RC / "models_per_stop_rate" / "all_models.pkl",
+    "all_stops": RC / "models_per_stop_rate" / "all_models_allstops.pkl",
+}
+PER_STOP_ALL_STOPS_FALLBACK = (
+    RC / "_pre_atwell_backup_20260912" / "models_per_stop_rate" / "all_models.pkl"
+)
+#: The Family A reward step, child first: the four-parameter reward-history
+#: block against the offset-only null it is nested in.
+PER_STOP_STEP = ("R1", "R0")
 # The nested per-bin reward steps, child first. Both are read WITHIN a cohort.
 COHORT_AIC_STEPS = (
     ("M7r_time_histcos_rew", "M6r_time_histcos"),
@@ -2886,6 +2901,132 @@ def cohort_delta_aic_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
                     }
                 )
     return pd.DataFrame(rows)
+
+
+def cohort_per_stop_delta_aic_table(
+    per_stop: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """Family A's reward step (``R1 - R0``) per population, WITHIN each cohort.
+
+    The per-stop Poisson ladder makes one reward statement — a four-parameter
+    block against the offset-only null — so this step is its citable quantity.
+    A session contributes a difference only when both rungs were fit there, both
+    carry a finite AIC, and both were scored on the SAME ``n_stops``: the ladder
+    freezes one cohort per session, so an ``n_stops`` disagreement means the two
+    rungs saw different rows and their AIC gap would be a cohort comparison
+    rather than a model comparison. Sessions that fail any of those are counted
+    in ``n_dropped`` rather than dropped without trace.
+
+    Both medians are reported because they answer different questions: the
+    animal-balanced one (median of each animal's median) is the population
+    statement, and the session-pooled one is what a per-session listing shows.
+
+    Parameters
+    ----------
+    per_stop : dict of str to pandas.DataFrame
+        One cohort's per-stop fits per key, carrying ``outcome``, ``model``,
+        the session keys, ``animal``, ``aic`` and ``n_stops``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per (outcome, cohort); empty when nothing pairs. Negative
+        ΔAIC = the reward block earns its parameters.
+    """
+    child, parent = PER_STOP_STEP
+    rows = []
+    for outcome in OUTCOME_ORDER:
+        for cohort in COHORT_ORDER:
+            frame = per_stop.get(cohort)
+            if frame is None or not len(frame):
+                continue
+            sub = frame[frame.outcome == outcome]
+            a = sub.loc[sub.model == child, SC + ["aic", "n_stops"]]
+            b = sub.loc[sub.model == parent, SC + ["aic", "n_stops"]]
+            if a.empty or b.empty:
+                continue
+            merged = a.merge(b, on=SC, suffixes=("_child", "_parent"))
+            paired = merged[merged.n_stops_child == merged.n_stops_parent].copy()
+            paired["delta_aic"] = paired["aic_child"] - paired["aic_parent"]
+            paired = paired[np.isfinite(paired["delta_aic"])]
+            n_either = len(pd.concat([a[SC], b[SC]]).drop_duplicates())
+            if paired.empty:
+                continue
+            per_animal = paired.groupby("animal")["delta_aic"].median()
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "stop_cohort": cohort,
+                    "n_sessions": len(paired),
+                    "n_dropped": n_either - len(paired),
+                    "median_delta_aic_animal": float(per_animal.median()),
+                    "median_delta_aic_session": float(paired["delta_aic"].median()),
+                    "pct_sessions_child_better": 100
+                    * float((paired["delta_aic"] < 0).mean()),
+                    "animals_child_better": (
+                        f"{int((per_animal < 0).sum())}/{per_animal.size}"
+                    ),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def cohort_arrival_shape_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """The stop-clock / arrival-clock shape comparison, once per cohort.
+
+    Reuses :func:`arrival_clock_shape_table`, so the peaks and the KS distance
+    between the two normalized curves are computed exactly as the refit audit
+    computes them; only the population changes between rows. Both quantities are
+    scale-free features of one cohort's own fits, so they are comparable across
+    cohorts even though the likelihoods behind them are not.
+    """
+    frames = []
+    for cohort, frame in _by_cohort(fits):
+        table = arrival_clock_shape_table(frame)
+        if table.empty:
+            continue
+        frames.append(table.assign(stop_cohort=cohort))
+    if not frames:
+        return pd.DataFrame()
+    stacked = pd.concat(frames, ignore_index=True)
+    ordered = ["outcome", "stop_cohort"] + [
+        c for c in stacked.columns if c not in ("outcome", "stop_cohort")
+    ]
+    return (
+        stacked[ordered]
+        .sort_values(
+            ["outcome", "stop_cohort"],
+            key=lambda column: column.map(
+                {name: i for i, name in enumerate(OUTCOME_ORDER + list(COHORT_ORDER))}
+            ),
+        )
+        .reset_index(drop=True)
+    )
+
+
+def per_stop_source_note(inputs: dict[str, Path]) -> str:
+    """Say which artifact each Family A column was read from.
+
+    The all-stops column can come from either the published sensitivity bundle
+    or the pre-refit backup that holds the same fit, and a reader cannot check
+    a ΔAIC against an artifact they cannot name.
+    """
+    parts = []
+    for cohort in COHORT_ORDER:
+        path = inputs.get(f"per-stop ({cohort})")
+        if path is None:
+            continue
+        stood_in = path == PER_STOP_ALL_STOPS_FALLBACK
+        origin = (
+            " — the pre-refit backup, which is where the all-stops fit of this "
+            "ladder now lives: Family A publishes no bundle under an "
+            "`_allstops` name, and the well-anchored refit overwrote the "
+            "canonical one in place"
+            if stood_in
+            else ""
+        )
+        parts.append(f"`{cohort}` from `{path}`{origin}")
+    return ("Read from: " + "; ".join(parts) + ".") if parts else ""
 
 
 def cohort_burst_peak_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -3190,14 +3331,19 @@ def build_cohort_report(
     inputs: dict[str, Path],
     command: str | None = None,
     provenance_extra: dict[str, Path] | None = None,
+    per_stop: dict[str, pd.DataFrame] | None = None,
 ) -> str:
     """Assemble the at-well / all-stops / in-transit comparison.
 
     ``provenance_extra`` names artifacts the audit does not read but whose
     sidecars belong in its provenance table -- the audited is_swr-contrast
-    aggregates, which are what a reader quotes from.
+    aggregates, which are what a reader quotes from. ``per_stop`` holds the
+    Family A (per-stop Poisson) ladders, whose reward step is the quantity the
+    literature-comparable layer is cited for; it is omitted when no per-stop
+    ladder was supplied.
     """
     provenance_extra = provenance_extra or {}
+    per_stop = per_stop or {}
     lines = [
         "# Rate ladders across the three stop cohorts",
         "",
@@ -3309,7 +3455,45 @@ def build_cohort_report(
         "",
         _md(cohort_arrival_retention_table(fits), floatfmt="{:.3f}"),
         "",
+        "## Arrival clock vs stop clock, by cohort",
+        "",
+        "The two clocks are never differenced on the likelihood scale — they are "
+        "fit on different rows. What is compared is the SHAPE of each fitted "
+        "time course, read on its supported interior (between the outermost "
+        "interior knots): where the across-session median curve peaks, and the "
+        "KS distance between the two curves after each is normalized to a "
+        "density over its own interior. Both are scale-free, so the cohorts can "
+        "be read side by side. `pct_separated_arrival` is large on every cohort "
+        "— the arrival rung is the one most often unidentified — so the arrival "
+        "column rests on a selected minority of sessions and its peak is a "
+        "weaker statement than the stop-clock one.",
+        "",
+        _md(cohort_arrival_shape_table(fits), floatfmt="{:.3f}"),
+        "",
     ]
+    per_stop_table = cohort_per_stop_delta_aic_table(per_stop)
+    if not per_stop_table.empty:
+        child, parent = PER_STOP_STEP
+        lines += [
+            f"## Family A — per-stop reward step (`{child} − {parent}`), within cohort",
+            "",
+            "The per-stop Poisson ladder (with its `log(immobility)` offset) "
+            "makes one reward statement: a four-parameter reward-history block "
+            "against the offset-only null. **Negative = the block earns its "
+            "parameters.** The difference is taken WITHIN a cohort, between two "
+            "rungs scored on the same `n_stops` in the same session; a session "
+            "whose two rungs disagree on `n_stops`, or that reaches only one of "
+            "them, is counted in `n_dropped` instead. "
+            "`median_delta_aic_animal` is the median of the per-animal medians "
+            "(the population statement) and `median_delta_aic_session` the "
+            "session-pooled median (what a per-session listing shows); "
+            "`animals_child_better` counts animals whose own median is negative.",
+            "",
+            per_stop_source_note(inputs),
+            "",
+            _md(per_stop_table, floatfmt="{:.2f}"),
+            "",
+        ]
     if contrast:
         lines += [
             "## is_swr-contrast rate bundle, per rung and population",
@@ -3344,16 +3528,29 @@ def build_cohort_report(
 
 
 def collect_cohort_inputs(
-    per_bin: dict[str, Path], contrast: dict[str, Path]
-) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame], dict[str, Path]]:
+    per_bin: dict[str, Path],
+    contrast: dict[str, Path],
+    per_stop: dict[str, Path] | None = None,
+) -> tuple[
+    dict[str, pd.DataFrame],
+    dict[str, pd.DataFrame],
+    dict[str, pd.DataFrame],
+    dict[str, Path],
+]:
     """Read whichever cohort bundles exist, and record what was read.
 
     A missing sensitivity bundle is skipped rather than fatal -- the mode is
     still meaningful with two cohorts -- but the canonical at-well per-bin fit
-    is required, since it is what the other columns are read against.
+    is required, since it is what the other columns are read against. A named
+    per-stop (Family A) ladder that is absent falls back to
+    :data:`PER_STOP_ALL_STOPS_FALLBACK` only for the all-stops cohort, which is
+    the one the refit overwrote in place; the fallback is recorded as the input
+    so the report can say where the column came from.
     """
+    per_stop = per_stop or {}
     fits: dict[str, pd.DataFrame] = {}
     contrast_fits: dict[str, pd.DataFrame] = {}
+    per_stop_fits: dict[str, pd.DataFrame] = {}
     inputs: dict[str, Path] = {}
     for cohort in COHORT_ORDER:
         path = per_bin.get(cohort)
@@ -3364,16 +3561,22 @@ def collect_cohort_inputs(
         if path is not None and path.exists():
             contrast_fits[cohort] = pd.read_pickle(path)
             inputs[f"is_swr-contrast rate ({cohort})"] = path
+        path = per_stop.get(cohort)
+        if path is not None and not path.exists() and cohort == "all_stops":
+            path = PER_STOP_ALL_STOPS_FALLBACK
+        if path is not None and path.exists():
+            per_stop_fits[cohort] = pd.read_pickle(path)
+            inputs[f"per-stop ({cohort})"] = path
     if "at_well" not in fits:
         raise SystemExit(
             f"the canonical at-well per-bin fit is required: {per_bin.get('at_well')}"
         )
-    return fits, contrast_fits, inputs
+    return fits, contrast_fits, per_stop_fits, inputs
 
 
 def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
     """Build and write the cohort comparison."""
-    fits, contrast, inputs = collect_cohort_inputs(
+    fits, contrast, per_stop, inputs = collect_cohort_inputs(
         {
             "at_well": args.at_well_per_bin,
             "all_stops": args.all_stops_per_bin,
@@ -3382,6 +3585,10 @@ def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
         {
             "at_well": args.at_well_contrast,
             "all_stops": args.all_stops_contrast,
+        },
+        {
+            "at_well": args.at_well_per_stop,
+            "all_stops": args.all_stops_per_stop,
         },
     )
     audited = {
@@ -3392,7 +3599,9 @@ def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
         )
         if _audited_sibling(path).exists()
     }
-    report = build_cohort_report(fits, contrast, inputs, _invocation(), audited)
+    report = build_cohort_report(
+        fits, contrast, inputs, _invocation(), audited, per_stop
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
     print(f"wrote {args.out}")
@@ -3514,6 +3723,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_COHORT_CONTRAST["all_stops"],
         help="All-stops is_swr-contrast rate bundle (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--at-well-per-stop",
+        type=Path,
+        default=DEFAULT_COHORT_PER_STOP["at_well"],
+        help="Canonical at-well Family A per-stop ladder (--cohort-contrast).",
+    )
+    parser.add_argument(
+        "--all-stops-per-stop",
+        type=Path,
+        default=DEFAULT_COHORT_PER_STOP["all_stops"],
+        help=(
+            "All-stops Family A per-stop ladder (--cohort-contrast); falls back "
+            "to the pre-refit backup, which holds that fit."
+        ),
     )
     parser.add_argument(
         "--out",
