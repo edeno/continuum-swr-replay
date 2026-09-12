@@ -6,12 +6,19 @@ rate designs" (preserved), and `docs/design/cohort_and_timing_rules.md` (gains t
 
 **The defect.** Content models fit only events whose stop is `occupancy_state == "at_well"`
 (59,699 of 65,913 events, `scripts/content/fit_replay_content_models.py` ~1692). Rate models fit
-every immobility stop (106,058 stops: 69,224 at-well, 22,850 in-transit, 14,845 mixed, 481
-unknown). In-transit stops carry a disproportionate share of non-SWR non-local onsets, so the
+every immobility stop (107,400 stops: 69,224 at-well, 14,845 mixed, 22,850 in-transit, 481
+unknown at the stop grain). In-transit stops carry a disproportionate share of non-SWR non-local onsets, so the
 rate claim "non-SWR replay is not reward-gated" and every content claim about non-SWR replay
 describe different populations.
 
-**The decision (binding).** At-well stops are the shared canonical cohort for BOTH families. The
+**The decision (binding, amended 2026-09-12 after Task 1's review).** Well-anchored stops are the
+shared canonical cohort for BOTH families. At the stop grain that is `occupancy_state ∈ {at_well,
+mixed}` (84,069 stops): a `mixed` bout is one whose first settling samples read as in-transit —
+every mixed stop begins after the last well arrival (median 0.73 s), sits at 0 cm from the well,
+and 97 % of its events are at-well at the event grain. At the event grain the rule stays
+`occupancy_state == at_well` (59,699 events); content ⊂ rate up to a documented 1 % residual.
+A stop-grain `at_well`-only rule would have dropped 30.6 % of the content cohort's events and made
+the two cohorts cross rather than nest. The
 all-stops rate fits become a supplementary sensitivity bundle; in-transit stops may be fit
 separately as their own bundle but are never pooled with at-well stops.
 
