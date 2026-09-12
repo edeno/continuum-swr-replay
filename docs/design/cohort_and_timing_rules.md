@@ -53,7 +53,7 @@ arriving at a well and sits at it.
 - arm event table: **65,913** events → **59,699 at-well** (90.6%).
 
 What reaches the shipped rate fits from those 84,069: Family A models **84,064**
-stops on `R0` (5 dropped for a non-positive immobility offset), Family B
+stops on `R0` (5 dropped for a missing own predictor), Family B
 **83,549** over **6,777,953** bins (the same 5, plus 515 with no arrival clock,
 which the arrival rungs put into the frozen union). Counts from
 `models_per_stop_rate/all_models_cohort_audit.csv` and

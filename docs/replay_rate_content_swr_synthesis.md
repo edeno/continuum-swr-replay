@@ -82,7 +82,7 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
   is +0.237 (3/5), on the fully paired 216-session cohort. Every other key term
   agrees in sign across all three, and the magnitudes shrink monotonically from
   count to fraction to DM on the SWR interactions and the recency/novelty terms
-  (`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.840) while
+  (`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.841) while
   `is_current_arm` moves the other way (+0.626 → +0.681 → +0.737). Those three
   columns are one fitting run, made before the 2026-09-12 cohort refit, so the
   fraction column there is the pre-refit value of a coefficient that now reads
@@ -449,9 +449,9 @@ likelihood. Animal-balanced median, animals-positive/5, animal-bootstrap
 | **direct** (`CS5_armvalue`, length-adjusted) | −0.398 (1/5) [−0.904, +0.199] | **+0.237 (3/5) [−1.322, +0.539]** | −0.316 (0/5) [−1.136, −0.057] |
 | **total** (`CS5nt_armvalue`) | — | **−0.6506** (1/5, q < 0.0001) | **−0.638** (0/5, q 7.9e-10) |
 
-The shipped audited fraction fit reads **+0.2366** (216 sessions, 3/5, q 0.117);
+The shipped audited fraction fit reads **+0.2363** (216 sessions, 3/5, q 0.117);
 the DM's direct q is 0.025. **By current outcome**, on the fraction response: the
-**rewarded** stratum gives direct `CS5_armvalue` **+0.1583** (202 sessions, 3/5
+**rewarded** stratum gives direct `CS5_armvalue` **+0.1303** (205 sessions, 3/5
 animals positive) and total `CS5nt_armvalue` **−0.3514** (206 sessions, 0/5) —
 the same direct-positive / total-negative split as the pooled fit. The
 **omitted** stratum is **not fit for these two rungs**, so there is no
@@ -480,8 +480,8 @@ count-response avoidance does not survive either change", **not** as evidence of
 a positive effect.
 
 `CS5b_valuevsprevgoal`, the previous-goal control rung, is **refused as
-unidentified**: 132 sessions with **94 flagged separated** under the DM (−0.316,
-1/5, q 0.294); the fraction fit has 133 sessions (+0.1840, 3/5, q 0.396).
+unidentified**: 133 sessions with **95 flagged separated** under the DM (−0.315,
+2/5, q 0.297); the fraction fit has 134 sessions (+0.1855, 3/5, q 0.378).
 
 ### Prediction models — does content predict the next choice?
 
@@ -562,9 +562,9 @@ dependence (their Fig 3/6).
 previous-goal *enrichment* (their Fig 8). Our reward-memory family is **refused
 as unidentified** — it has no usable rung in the per-session arm ladder (see
 [design/model_history.md](design/model_history.md)) — and the previous-goal
-control rung `CS5b_valuevsprevgoal` fits on only **132 sessions with 94 flagged
-separated** under the DM (−0.316, 1/5, q 0.294; the fraction fit has 133
-sessions, +0.1840, 3/5, q 0.396). The earlier avoidance coefficients (−1.485 at
+control rung `CS5b_valuevsprevgoal` fits on only **133 sessions with 95 flagged
+separated** under the DM (−0.315, 2/5, q 0.297; the fraction fit has 134
+sessions, +0.1855, 3/5, q 0.378). The earlier avoidance coefficients (−1.485 at
 the arm grain, −1.62 SWR-split, −1.49 patch-grain) and the −0.79
 SWR-by-previous-goal interaction are **withdrawn**. Neither a divergence nor a
 replication can be claimed from this rung as it stands.
@@ -757,8 +757,8 @@ with their estimand named.
   three-feature basis whose coefficients are collinear **by construction**, which
   is why the kernel is reconstructed rather than read term by term.
 - **Separation:** the whole last-rewarded family is **refused as unidentified**
-  in the per-session fits, and `CS5b_valuevsprevgoal` fits on 132 sessions with
-  94 flagged separated. Per-coefficient separation flags and a
+  in the per-session fits, and `CS5b_valuevsprevgoal` fits on 133 sessions with
+  95 flagged separated. Per-coefficient separation flags and a
   `|coef| x SD >= 10` magnitude backstop now decide which session fits enter an
   aggregate; a rung's excluded share must be stated with its coefficient.
 - **Circularity** (content from the same decoder that defines events): both the

@@ -122,7 +122,7 @@ by all three estimators on that (rung, term).
 | `CS1_current` | `swr_x_is_current_arm` | 217 | −0.461 (0/5) [−0.916, −0.121] | −0.373 (0/5) [−0.614, −0.095] | −0.297 (0/5) [−0.605, −0.174] |
 | `M3` | `reward_fraction_candidate_arm_last10_visits` | 218 | −0.077 (0/5) [−0.330, −0.006] | −0.034 (2/5) [−0.199, +0.052] | −0.046 (1/5) [−0.193, +0.089] |
 | `CS4_armreward` | `reward_fraction_candidate_arm_last10_visits` | 218 | +0.513 (5/5) [+0.399, +0.732] | +0.311 (5/5) [+0.177, +0.386] | +0.359 (5/5) [+0.283, +0.500] |
-| `CS4_armreward` | `swr_x_reward_fraction_candidate_arm_last10_visits` | 218 | −1.449 (0/5) [−1.609, −1.041] | −1.198 (0/5) [−1.523, −0.894] | −0.840 (0/5) [−1.002, −0.682] |
+| `CS4_armreward` | `swr_x_reward_fraction_candidate_arm_last10_visits` | 218 | −1.449 (0/5) [−1.609, −1.041] | −1.198 (0/5) [−1.523, −0.894] | −0.841 (0/5) [−1.002, −0.682] |
 | `CS5_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` | 217 | +0.228 (5/5) [+0.014, +1.209] | +0.264 (5/5) [+0.031, +0.818] | +0.168 (4/5) [−0.149, +0.850] |
 | **`CS5_armvalue`** | **`swr_x_reward_belief_mean_candidate_arm_preoutcome`** | 216 | **−0.398 (1/5) [−0.904, +0.199]** | **+0.237 (3/5) [−1.322, +0.539]** | **−0.316 (0/5) [−1.136, −0.057]** |
 | `M2` | `is_prev_arm` | 218 | −1.140 (0/5) [−1.205, −0.449] | −0.657 (0/5) [−0.943, −0.277] | −0.273 (0/5) [−0.593, −0.018] |
@@ -245,7 +245,7 @@ whose animals-positive count moves is `M3`'s
 disagreement: the coefficient is −0.034 to −0.077 under all three, a term
 sitting on zero, so which animals fall on which side of it is noise. Magnitudes are not uniformly ordered: the SWR interactions and
 the recency/novelty terms shrink monotonically from count → fraction → DM
-(`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.840; `M2` −1.140 →
+(`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.841; `M2` −1.140 →
 −0.657 → −0.273; `M4` +0.283 → +0.167 → +0.119), which is what down-weighting
 long events does, while `is_current_arm` moves the other way (+0.626 → +0.681 →
 +0.737 on `C2_base`), which implies the long events the count model
@@ -290,7 +290,7 @@ direct, uniform result of this comparison.
 
 > The `_dm_len` artifacts are a separate fit of the whole rung, not a φ-only refit: their
 > β terms differ from the `_dm` fit by up to 0.09 (e.g. `CS4_armreward` `swr_x_reward_fraction…`
-> −0.840 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
+> −0.841 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
 > `_dm_len` only for the two concentration terms. The table below lists 14 of the 32 pooled
 > rungs; the full set is in `swr_contrast_content_audited_dm_len.pkl`.
 
@@ -381,7 +381,7 @@ distinction is specified in
 [`../models_table.md`](../models_table.md) (section C of the `is_swr`-contrast
 ladder).
 For reference, the other audited DM contrast key terms on the `all` stratum:
-`CS5b_valuevsprevgoal` −0.316 (1/5, q = 0.294, only 132 sessions with 94
+`CS5b_valuevsprevgoal` −0.315 (2/5, q = 0.297, only 133 sessions with 95
 flagged separated), `CS6_armuncert` −0.027 (2/5, q = 0.564), `CS6nt_armuncert`
 +0.146 (4/5, q = 7.5e-12).
 

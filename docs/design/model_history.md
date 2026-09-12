@@ -110,10 +110,10 @@ contrast rungs C5_lastrew / CS3_lastrew, where pooling supplies the variation a
 per-session fit lacks". That is superseded: pooling across sessions did not
 supply the missing variation, and the **entire last-rewarded family is refused
 as unidentified**. `CS5b_valuevsprevgoal` — the previous-goal discriminant
-against Gillespie et al. 2021 — fits only **132 sessions** under the
-Dirichlet-multinomial with **94 flagged separated** (−0.316, 1/5 animals,
-q = 0.294) and **133 sessions** on the shipped fraction response (+0.1840, 3/5,
-q = 0.396). The rungs remain in the catalog so the refusal is reproducible, but
+against Gillespie et al. 2021 — fits only **133 sessions** under the
+Dirichlet-multinomial with **95 flagged separated** (−0.315, 2/5 animals,
+q = 0.297) and **134 sessions** on the shipped fraction response (+0.1855, 3/5,
+q = 0.378). The rungs remain in the catalog so the refusal is reproducible, but
 no coefficient from `C5_lastrew`, `CS3_lastrew`, `CS5b_valuevsprevgoal`,
 `CP1_lastrew` or `CPS2_lastrew` is citable, and the previously quoted
 −2.45 / −2.43 / −1.03 value-avoidance figures and the −0.79 SWR-by-previous-goal

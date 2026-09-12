@@ -311,9 +311,11 @@ direct test of that alternative.
 > Coverage: `M0a_const_arrival` fits all 218 sessions in every population, but
 > `M5a_time_arrival` is fit on 212 / 213 / 206 / 212 of them and
 > `M7ra_time_arrival_histcos_rew` on 206 / 216 / 200 / 210 (detected SWR /
-> non-local, all / non-local w/ SWR / non-local, no SWR; fitted rows of
-> `models_per_bin_rate/all_models.pkl`), so the arrival sub-ladder's pooled
-> comparisons are over the smaller of each pair, per population.
+> non-local, all / non-local w/ SWR / non-local, no SWR; fits with a finite AIC
+> in `models_per_bin_rate/all_models.pkl` — that pickle holds 201 non-local
+> w/ SWR rows for this rung, one of them without a finite AIC), so the arrival
+> sub-ladder's pooled comparisons are over the smaller of each pair, per
+> population.
 
 `M0a_const_arrival`, `M5a_time_arrival` and `M7ra_time_arrival_histcos_rew`
 re-anchor the same spline block on `time_since_last_well_arrival_s` (bin centre
