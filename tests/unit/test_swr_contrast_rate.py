@@ -610,3 +610,84 @@ def test_std_columns_use_the_bundles_own_cohort_sds(
     else:
         assert reported["relative_difference"] < -0.9
         assert reported["covariate"] in expected
+
+
+# ── `_load` restricts the fitted stops to one cohort ──
+
+
+def _load_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A stop/qvals pair spanning the three occupancy states, joinable on stop_id."""
+    n = 6
+    stops = pd.DataFrame(
+        {
+            "animal": ["a"] * n,
+            "session_date": [1] * n,
+            "epoch": ["02_r1"] * n,
+            "stop_id": [f"s{i}" for i in range(n)],
+            "stop_start": [100.0 * i for i in range(n)],
+            "occupancy_state": [
+                "at_well",
+                "at_well",
+                "in_transit",
+                "in_transit",
+                "mixed",
+                "at_well",
+            ],
+            # only the stop-table-sourced covariate lives here; the rest arrive
+            # on the qvals join, exactly as they do on the canonical tables
+            "patch_switch_fraction_last5_completed_trips": [0.0] * n,
+        }
+    )
+    qvals = pd.DataFrame(
+        {
+            "stop_id": [f"s{i}" for i in range(n)],
+            # every stop starts after its outcome is known, so the post-outcome
+            # gate is not what decides which stops come back
+            "outcome_known_time": [100.0 * i - 1.0 for i in range(n)],
+            "periswitch_index_trials": [0.0] * n,
+            "is_periswitch_post": [0.0] * n,
+            "trials_since_block_change": [0.0] * n,
+            "relative_value_switch_minus_stay_preoutcome": [0.0] * n,
+            "rpe_postoutcome": [0.0] * n,
+            "reward_belief_differential_entropy_leaf_mean_preoutcome": [0.0] * n,
+            "reward_belief_mean_update_l1_all_ports_postoutcome": [0.0] * n,
+        }
+    )
+    return stops, qvals
+
+
+@pytest.fixture()
+def stubbed_load(monkeypatch):
+    """Route ``_load`` at synthetic tables, leaving its cohort step untouched."""
+    stops, qvals = _load_tables()
+    monkeypatch.setattr(
+        mod, "read_table", lambda path: qvals if "qvals" in str(path) else stops
+    )
+    monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)
+    monkeypatch.setattr(mod, "assert_qvals_aligned", lambda *a, **k: None)
+    monkeypatch.setattr(
+        mod, "attach_is_swr_to_onsets", lambda onsets, events: pd.DataFrame()
+    )
+    return stops
+
+
+def test_load_defaults_to_the_well_anchored_stops(stubbed_load):
+    stop, _onsets, n_qvals_dropped = mod._load("at_well")
+
+    # The 'mixed' stop s4 is well-anchored -- an at-well bout whose first
+    # settling samples read as in-transit -- so it is kept.
+    assert list(stop["stop_id"]) == ["s0", "s1", "s4", "s5"]
+    assert n_qvals_dropped == 0
+
+
+def test_load_all_stops_keeps_every_occupancy_state(stubbed_load):
+    stop, _onsets, _dropped = mod._load("all_stops")
+
+    assert list(stop["stop_id"]) == [f"s{i}" for i in range(6)]
+
+
+def test_load_in_transit_keeps_only_the_transit_stops(stubbed_load):
+    stop, _onsets, _dropped = mod._load("in_transit")
+
+    assert list(stop["stop_id"]) == ["s2", "s3"]
