@@ -104,7 +104,7 @@ Immobility bouts: where a stop begins and ends, and what falls inside one.
 
 Shared whole-unit complete-case cohort selection.
 
-`freeze_common_cohort`
+`freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`
 
 ### `src/continuum_swr_replay/analysis/replay/event_ids.py`
 

@@ -12,13 +12,22 @@ could not have moved a fitted number.
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_selection import (
+    STOP_COHORTS,
     select_event_cohort,
     select_stop_cohort,
+    stop_cohort_suffix,
 )
 from scripts.content import fit_replay_content_models as content_mod
 from scripts.content import fit_swr_contrast_content as contrast_mod
+from scripts.rate import fit_per_bin_rate_models as per_bin_mod
+from scripts.rate import fit_per_stop_rate_models as per_stop_mod
+from scripts.rate import fit_swr_contrast_rate as contrast_rate_mod
+from scripts.rate import fit_uncertainty_rate as uncertainty_mod
+
+RATE_RUNNERS = (per_bin_mod, per_stop_mod, contrast_rate_mod, uncertainty_mod)
 
 
 def _synthetic_session() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -114,3 +123,48 @@ def test_content_runners_route_through_the_shared_rule():
     """Both content runners hold the shared function, not a private copy."""
     assert content_mod.select_event_cohort is select_event_cohort
     assert contrast_mod.select_event_cohort is select_event_cohort
+
+
+@pytest.mark.parametrize("module", RATE_RUNNERS, ids=lambda m: m.__name__)
+def test_rate_runners_route_through_the_shared_rule(module):
+    """Every rate runner holds the shared selection and suffix, not a copy."""
+    assert module.select_stop_cohort is select_stop_cohort
+    assert module.stop_cohort_suffix is stop_cohort_suffix
+
+
+@pytest.mark.parametrize("module", RATE_RUNNERS, ids=lambda m: m.__name__)
+def test_rate_runners_offer_every_cohort_on_the_command_line(
+    module, monkeypatch, capsys
+):
+    monkeypatch.setattr(module.sys, "argv", [module.__name__, "--help"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.main()
+
+    assert excinfo.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--stop-cohort" in help_text
+    for cohort in STOP_COHORTS:
+        assert cohort in help_text
+
+
+@pytest.mark.parametrize("module", RATE_RUNNERS, ids=lambda m: m.__name__)
+def test_rate_runners_refuse_an_unknown_cohort(module, monkeypatch, capsys):
+    monkeypatch.setattr(
+        module.sys, "argv", [module.__name__, "--stop-cohort", "at_the_well"]
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.main()
+
+    assert excinfo.value.code == 2
+    assert "at_the_well" in capsys.readouterr().err
+
+
+def test_cohort_suffixes_keep_the_canonical_names_unsuffixed():
+    """The at-well bundle keeps the names every reader hard-codes."""
+    assert stop_cohort_suffix("at_well") == ""
+    assert stop_cohort_suffix("at_well", smoke=True) == "_smoke"
+    assert stop_cohort_suffix("all_stops") == "_allstops"
+    assert stop_cohort_suffix("all_stops", smoke=True) == "_allstops_smoke"
+    assert stop_cohort_suffix("in_transit") == "_intransit"

@@ -9,6 +9,7 @@ and ``outcome`` / ``model`` values drawn from the canonical key sets.
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import numpy as np
@@ -271,3 +272,134 @@ def test_cohort_audit_attributes_the_missing_arrival_clock():
             assert record["n_drop_own_predictor_missing"] == 4, name
         else:
             assert record["n_drop_common_cohort_other"] == 4, name
+
+
+def _cohort_stop_table() -> pd.DataFrame:
+    """Six stops of one session spanning the occupancy states."""
+    return pd.DataFrame(
+        {
+            "animal": ["a"] * 6,
+            "session_date": [1] * 6,
+            "epoch": ["02_r1"] * 6,
+            "stop_id": [f"s{i}" for i in range(6)],
+            "occupancy_state": [
+                "at_well",
+                "at_well",
+                "in_transit",
+                "in_transit",
+                "mixed",
+                "at_well",
+            ],
+        }
+    )
+
+
+@pytest.fixture()
+def stubbed_run(monkeypatch, tmp_path):
+    """Run ``main`` without fitting: record what the fitter was handed."""
+    seen: dict = {}
+
+    stop = _cohort_stop_table()
+
+    def _read_table(path):
+        return stop if "stop_table" in str(path) else pd.DataFrame()
+
+    def _fit(stop_table, onsets, **kwargs):
+        seen["stop_ids"] = list(stop_table["stop_id"])
+        out = pd.DataFrame(
+            {
+                "animal": ["a"],
+                "session_date": [1],
+                "epoch": ["02_r1"],
+                "outcome": ["non_local"],
+                "model": ["M0_const"],
+                "n_stops": [3],
+            }
+        )
+        out.attrs["cohort_stop_drops"] = {}
+        return out
+
+    monkeypatch.setattr(fprm, "RC", tmp_path)
+    monkeypatch.setattr(fprm, "read_table", _read_table)
+    monkeypatch.setattr(fprm, "require_covariate_schema", lambda *a, **k: None)
+    monkeypatch.setattr(fprm, "record_inputs", lambda inputs: {})
+    monkeypatch.setattr(fprm, "attach_is_swr_to_onsets", lambda o, e: pd.DataFrame())
+    monkeypatch.setattr(fprm, "fit_per_bin_rate_models", _fit)
+    monkeypatch.setattr(fprm, "_cohort_records", lambda *a, **k: [])
+    monkeypatch.setattr(
+        fprm, "write_cohort_audit", lambda records, path: seen.setdefault("audit", path)
+    )
+    return seen, tmp_path
+
+
+def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
+    monkeypatch, stubbed_run
+):
+    seen, tmp_path = stubbed_run
+    monkeypatch.setattr(fprm.sys, "argv", ["fit_per_bin_rate_models.py"])
+
+    fprm.main()
+
+    # Only the at-well stops reached the fitter.
+    assert seen["stop_ids"] == ["s0", "s1", "s5"]
+    out = tmp_path / "models_per_bin_rate" / "all_models.pkl"
+    assert out.exists()
+    assert seen["audit"].name == "per_bin_rate_cohort_audit.csv"
+    models = pd.read_pickle(out)
+    assert list(models["stop_cohort"]) == ["at_well"]
+    provenance = json.loads((out.parent / "all_models.provenance.json").read_text())
+    assert provenance["stop_cohort"] == "at_well"
+
+
+def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run):
+    seen, tmp_path = stubbed_run
+    monkeypatch.setattr(
+        fprm.sys,
+        "argv",
+        [
+            "fit_per_bin_rate_models.py",
+            "--stop-cohort",
+            "all_stops",
+            "--max-per-animal",
+            "1",
+        ],
+    )
+
+    fprm.main()
+
+    # No occupancy restriction: every stop is fit.
+    assert seen["stop_ids"] == [f"s{i}" for i in range(6)]
+    out = tmp_path / "models_per_bin_rate" / "all_models_allstops_smoke.pkl"
+    assert out.exists()
+    # The canonical name is never written by a sensitivity run.
+    assert not (tmp_path / "models_per_bin_rate" / "all_models.pkl").exists()
+    assert seen["audit"].name == "per_bin_rate_cohort_audit_allstops_smoke.csv"
+    assert list(pd.read_pickle(out)["stop_cohort"]) == ["all_stops"]
+
+
+def test_in_transit_cohort_publishes_its_own_bundle(monkeypatch, stubbed_run):
+    seen, tmp_path = stubbed_run
+    monkeypatch.setattr(
+        fprm.sys,
+        "argv",
+        ["fit_per_bin_rate_models.py", "--stop-cohort", "in_transit"],
+    )
+
+    fprm.main()
+
+    assert seen["stop_ids"] == ["s2", "s3"]
+    assert (tmp_path / "models_per_bin_rate" / "all_models_intransit.pkl").exists()
+
+
+def test_unknown_cohort_is_refused_by_the_parser(monkeypatch, capsys):
+    monkeypatch.setattr(
+        fprm.sys,
+        "argv",
+        ["fit_per_bin_rate_models.py", "--stop-cohort", "at_the_well"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        fprm.main()
+
+    assert excinfo.value.code == 2
+    assert "at_the_well" in capsys.readouterr().err

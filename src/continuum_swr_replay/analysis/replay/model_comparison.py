@@ -19,14 +19,16 @@ from .model_specs import MODEL_HIERARCHY
 # Fit-scale metadata carried from the per-session frames onto the comparison and
 # its summary: which estimator produced the numbers, which response column it was
 # fit on, whether its log-likelihood carries the response's normalizing
-# constants, and which time clock a per-bin rung's rows are on. All four must
-# agree between parent and child for a comparison to mean anything, so
-# ``summarize_comparison`` refuses a step where they do not.
+# constants, which time clock a per-bin rung's rows are on, and which stop
+# population it was fit over. All five must agree between parent and child for a
+# comparison to mean anything, so ``summarize_comparison`` refuses a step where
+# they do not.
 METADATA_COLUMNS = (
     "estimator",
     "response_col",
     "llf_includes_constants",
     "time_clock",
+    "stop_cohort",
 )
 
 #: Metadata columns whose disagreement invalidates a per-session comparison, and
@@ -47,6 +49,12 @@ INVALIDATING_METADATA_COLUMNS = {
         "compares rungs anchored on different time clocks, which are fit to "
         "different rows (an arrival-clock rung is fit on the arrival window) — "
         "compare an arrival rung with its own clock's null instead"
+    ),
+    "stop_cohort": (
+        "compares rungs fit on different stop populations (at-well stops "
+        "against all stops or in-transit stops), which are different sets of "
+        "rows and different science — compare a rung with a null fit on its "
+        "own cohort instead"
     ),
 }
 
@@ -83,9 +91,10 @@ def compare_nested_models(
         ``llf_includes_constants`` because the Dirichlet-multinomial likelihood
         carries the multinomial coefficient and a statsmodels conditional
         likelihood does not, so differencing them measures that constant rather
-        than the rungs, and on ``time_clock`` because a per-bin rung anchored on
+        than the rungs, on ``time_clock`` because a per-bin rung anchored on
         the arrival clock is fit on the arrival window rather than the whole
-        frozen cohort.
+        frozen cohort, and on ``stop_cohort`` because an at-well fit and an
+        all-stops fit are about different populations.
     """
     if session_cols is None:
         session_cols = ["animal", "session_date", "epoch"]

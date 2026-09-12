@@ -73,6 +73,11 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     stop_own_missing,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E402
+    STOP_COHORTS,
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -571,19 +576,24 @@ def _write_outputs(
     fit_inputs: dict,
     argv: list[str],
     smoke: bool,
+    stop_cohort: str,
 ) -> Path:
     """Write the fitted rows, their z reference, the provenance, and the audits.
 
     The fit-cohort standardization moments go beside the model as
     ``<stem>.z_reference.json``, so a per-SD coefficient can be converted back to
-    raw units without refitting. Returns the model path.
+    raw units without refitting. ``stop_cohort`` picks the artifact suffix (the
+    canonical at-well bundle keeps the unsuffixed names) and is recorded in the
+    provenance sidecar. Returns the model path.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    sfx = "_smoke" if smoke else ""
+    sfx = stop_cohort_suffix(stop_cohort, smoke=smoke)
     out = out_dir / f"uncertainty_rate{sfx}.pkl"
     models.to_pickle(out)
     save_reference(z_reference, z_reference_path(out))
-    write_fit_provenance(out, fit_inputs, "poisson_glm", argv)
+    write_fit_provenance(
+        out, fit_inputs, "poisson_glm", argv, extra={"stop_cohort": stop_cohort}
+    )
     gate_audit.to_csv(
         out_dir / f"uncertainty_rate_post_outcome_gate_audit{sfx}.csv",
         index=False,
@@ -601,6 +611,17 @@ def main() -> None:
         type=int,
         default=None,
         help="Smoke mode: keep only the first N (post-exposure) sessions per animal.",
+    )
+    parser.add_argument(
+        "--stop-cohort",
+        choices=STOP_COHORTS,
+        default="at_well",
+        help=(
+            "Stop population to fit. 'at_well' (default) is the canonical cohort "
+            "shared with the content family and publishes the unsuffixed "
+            "artifacts; 'all_stops' and 'in_transit' are sensitivity bundles "
+            "published under _allstops / _intransit."
+        ),
     )
     parser.add_argument(
         "--switch-window",
@@ -652,8 +673,22 @@ def main() -> None:
         ]
     ]
     # Guard the stop_id join before the inner join hides its casualties
-    # (see assert_qvals_aligned).
+    # (see assert_qvals_aligned). It must see the WHOLE stop table: it claims
+    # every qvals row falling inside the epoch's span, so checking it against a
+    # cohort-restricted table would read the cohort's own stops as missing.
     assert_qvals_aligned(stop, qvals)
+    # Cohort next, so the qvals gap below is measured within the population
+    # actually fit rather than across one this run never touches.
+    stop, cohort_report = select_stop_cohort(stop, cohort=args.stop_cohort)
+    logger.info(
+        "stop cohort = %s (%s): %d -> %d stops (%.1f%% retained); by state %s",
+        cohort_report["cohort"],
+        cohort_report["rule"],
+        cohort_report["n_stops_before"],
+        cohort_report["n_stops_after"],
+        100 * cohort_report["n_stops_after"] / max(cohort_report["n_stops_before"], 1),
+        cohort_report["counts_before"],
+    )
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
@@ -722,6 +757,10 @@ def main() -> None:
         n_sessions_postjoin=n_sessions_postjoin,
         qvals_gap=audit_qvals,
     )
+    # Which population every row was fit on, carried on the row itself: a
+    # coefficient read out of a concatenated table would otherwise not say, and
+    # the model comparison invalidates a cross-cohort step on this column.
+    models["stop_cohort"] = args.stop_cohort
     out = _write_outputs(
         RC / "models_per_bin_rate",
         models=models,
@@ -731,6 +770,7 @@ def main() -> None:
         fit_inputs=fit_inputs,
         argv=sys.argv,
         smoke=smoke,
+        stop_cohort=args.stop_cohort,
     )
     if models.empty:
         raise RuntimeError(

@@ -48,6 +48,7 @@ def test_help_exits_zero_without_fitting(monkeypatch, capsys, no_fitting):
     help_text = capsys.readouterr().out
     assert "--max-per-animal" in help_text
     assert "--no-cv" in help_text
+    assert "--stop-cohort" in help_text
 
 
 def test_unknown_flag_exits_two_without_fitting(monkeypatch, capsys, no_fitting):
@@ -61,3 +62,19 @@ def test_unknown_flag_exits_two_without_fitting(monkeypatch, capsys, no_fitting)
     assert excinfo.value.code == 2
     assert no_fitting == []
     assert "--not-a-flag" in capsys.readouterr().err
+
+
+def test_unknown_stop_cohort_exits_two_without_fitting(monkeypatch, capsys, no_fitting):
+    """A cohort name the rule does not define must not reach the fitter."""
+    monkeypatch.setattr(
+        fpsr.sys,
+        "argv",
+        ["fit_per_stop_rate_models.py", "--stop-cohort", "at_the_well"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        fpsr.main()
+
+    assert excinfo.value.code == 2
+    assert no_fitting == []
+    assert "at_the_well" in capsys.readouterr().err

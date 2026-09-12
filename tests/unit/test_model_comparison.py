@@ -475,3 +475,43 @@ def test_same_clock_comparison_is_untouched():
 
     assert row["delta_aic"] == 10
     assert np.isfinite(row["lr_stat"])
+
+
+def _cohort_fit(*, aic, bic, ll, n_stops, stop_cohort):
+    """One rate rung's per-session row, tagged with the stop population it was fit on."""
+    frame = _make_fit_results(ll=ll, aic=aic, bic=bic, n_params=7)
+    frame = frame.drop(columns=["n_events"])
+    frame["n_stops"] = n_stops
+    frame["stop_cohort"] = stop_cohort
+    return frame
+
+
+def test_cross_cohort_comparison_is_invalidated_and_says_why(caplog):
+    """An at-well fit and an all-stops fit are about different populations.
+
+    Their row counts usually differ too, but a comparison built from equal-sized
+    subsets would slip past that guard; the cohort says WHY the step is refused.
+    """
+    parent = _cohort_fit(aic=100, bic=110, ll=-50, n_stops=900, stop_cohort="at_well")
+    child = _cohort_fit(aic=90, bic=105, ll=-44, n_stops=900, stop_cohort="all_stops")
+
+    with caplog.at_level("WARNING"):
+        row = compare_nested_models(parent, child).iloc[0]
+
+    assert np.isnan(row["delta_aic"])
+    assert np.isnan(row["delta_bic"])
+    assert np.isnan(row["lr_stat"])
+    assert np.isnan(row["lr_pvalue"])
+    assert row["stop_cohort_parent"] == "at_well"
+    assert row["stop_cohort_child"] == "all_stops"
+    assert "different stop populations" in caplog.text
+
+
+def test_same_cohort_comparison_is_untouched():
+    parent = _cohort_fit(aic=100, bic=110, ll=-50, n_stops=900, stop_cohort="at_well")
+    child = _cohort_fit(aic=90, bic=105, ll=-44, n_stops=900, stop_cohort="at_well")
+
+    row = compare_nested_models(parent, child).iloc[0]
+
+    assert row["delta_aic"] == 10
+    assert np.isfinite(row["lr_stat"])

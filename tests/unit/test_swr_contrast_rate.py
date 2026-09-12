@@ -311,7 +311,7 @@ def test_aggregate_only_refuses_fits_without_per_term_flags(tmp_path, monkeypatc
     monkeypatch.setattr(mod, "RC", tmp_path)
 
     with pytest.raises(SystemExit, match="separated_terms"):
-        mod._aggregate_only(smoke=False)
+        mod._aggregate_only(smoke=False, cohort="at_well")
 
 
 def test_aggregate_only_requires_the_per_session_fits(tmp_path, monkeypatch):
@@ -319,4 +319,23 @@ def test_aggregate_only_requires_the_per_session_fits(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "RC", tmp_path)
 
     with pytest.raises(SystemExit, match="no per-session fits"):
-        mod._aggregate_only(smoke=False)
+        mod._aggregate_only(smoke=False, cohort="at_well")
+
+
+def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, tmp_path):
+    """``--aggregate-only`` must look for the cohort's artifact, not the canonical one.
+
+    Re-aggregating an ``_allstops`` run against the unsuffixed pickle would
+    silently rewrite the canonical audited table from a sensitivity fit.
+    """
+    monkeypatch.setattr(mod, "RC", tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        mod._aggregate_only(smoke=False, cohort="all_stops")
+
+    assert "swr_contrast_rate_allstops.pkl" in str(excinfo.value)
+
+    with pytest.raises(SystemExit) as canonical:
+        mod._aggregate_only(smoke=False, cohort="at_well")
+
+    assert "swr_contrast_rate.pkl" in str(canonical.value)

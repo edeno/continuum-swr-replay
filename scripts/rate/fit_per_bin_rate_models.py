@@ -87,6 +87,11 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     stop_own_missing,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E402
+    STOP_COHORTS,
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -497,6 +502,17 @@ def main() -> None:
         default=1,
         help="Process workers for the per-session fan-out (default serial).",
     )
+    parser.add_argument(
+        "--stop-cohort",
+        choices=STOP_COHORTS,
+        default="at_well",
+        help=(
+            "Stop population to fit. 'at_well' (default) is the canonical cohort "
+            "shared with the content family and publishes the unsuffixed "
+            "artifacts; 'all_stops' and 'in_transit' are sensitivity bundles "
+            "published under _allstops / _intransit."
+        ),
+    )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
     parser.add_argument("--no-gof", action="store_true", help="Skip goodness-of-fit.")
     args = parser.parse_args()
@@ -516,6 +532,20 @@ def main() -> None:
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(FIT_INPUTS)
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
+    # The cohort is applied to the whole stop table BEFORE the smoke subset (so a
+    # smoke session is a cohort session) and before the per-session common-cohort
+    # freeze (so the freeze reports what the fitted population is missing, not
+    # what some other population is).
+    stop, cohort_report = select_stop_cohort(stop, cohort=args.stop_cohort)
+    logger.info(
+        "stop cohort = %s (%s): %d -> %d stops (%.1f%% retained); by state %s",
+        cohort_report["cohort"],
+        cohort_report["rule"],
+        cohort_report["n_stops_before"],
+        cohort_report["n_stops_after"],
+        100 * cohort_report["n_stops_after"] / max(cohort_report["n_stops_before"], 1),
+        cohort_report["counts_before"],
+    )
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
 
@@ -536,15 +566,25 @@ def main() -> None:
         workers=args.workers,
     )
 
+    # Which population every row was fit on, carried on the row itself: a
+    # coefficient read out of a concatenated table would otherwise not say, and
+    # the model comparison invalidates a cross-cohort step on this column.
+    models["stop_cohort"] = args.stop_cohort
+
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
-    fname = "all_models_smoke.pkl" if smoke else "all_models.pkl"
-    out = out_dir / fname
+    csfx = stop_cohort_suffix(args.stop_cohort, smoke=smoke)
+    out = out_dir / f"all_models{csfx}.pkl"
     models.to_pickle(out)
-    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
-    csfx = "_smoke" if smoke else ""
+    write_fit_provenance(
+        out,
+        fit_inputs,
+        "poisson_glm",
+        sys.argv,
+        extra={"stop_cohort": args.stop_cohort},
+    )
     write_cohort_audit(
         _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),
         out_dir / f"per_bin_rate_cohort_audit{csfx}.csv",

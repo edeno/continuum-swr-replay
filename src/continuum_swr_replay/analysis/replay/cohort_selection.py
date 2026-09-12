@@ -206,6 +206,50 @@ STOP_COHORT_RULES = {
 #: CLI-facing tuple of the accepted cohort names, in the order runners list them.
 STOP_COHORTS = tuple(STOP_COHORT_RULES)
 
+#: Artifact-name suffix each cohort publishes under. The canonical at-well
+#: bundle keeps the unsuffixed names every reader already hard-codes, so a
+#: sensitivity bundle can never be mistaken for the canonical one.
+STOP_COHORT_ARTIFACT_SUFFIX = {
+    "at_well": "",
+    "in_transit": "_intransit",
+    "all_stops": "_allstops",
+}
+
+
+def stop_cohort_suffix(cohort: str, *, smoke: bool = False) -> str:
+    """Artifact-name suffix for ``cohort`` (empty for the canonical at-well one).
+
+    The cohort comes first and the smoke marker last, so the canonical bundle
+    keeps the names every reader already hard-codes and a sensitivity smoke
+    reads as ``all_models_allstops_smoke.pkl``.
+
+    Parameters
+    ----------
+    cohort : {"at_well", "all_stops", "in_transit"}
+        Cohort the run was fit on.
+    smoke : bool
+        Whether this is a ``--max-per-animal`` smoke run.
+
+    Returns
+    -------
+    str
+        ``""``, ``"_allstops"``, ``"_intransit"``, each optionally followed by
+        ``"_smoke"``.
+
+    Raises
+    ------
+    ValueError
+        If ``cohort`` is not one of the three accepted names.
+    """
+    try:
+        suffix = STOP_COHORT_ARTIFACT_SUFFIX[cohort]
+    except KeyError:
+        raise ValueError(
+            f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORT_RULES)}"
+        ) from None
+    return suffix + ("_smoke" if smoke else "")
+
+
 _OCCUPANCY_COLUMN = "occupancy_state"
 
 

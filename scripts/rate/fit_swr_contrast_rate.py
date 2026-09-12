@@ -92,6 +92,11 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     term_diagnostics,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E402
+    STOP_COHORTS,
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
@@ -512,7 +517,7 @@ def _mask_post_outcome_covariates(
     return gated, n_masked_by_state
 
 
-def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
+def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     stop = read_table(RC / "stop_table.pkl")
     q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
     onset_table = read_table(RC / "event_onset_table.pkl")
@@ -540,8 +545,22 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame, int]:
             "(uv run python scripts/behavior/build_qvals_table.py --write)"
         )
     # Guard the stop_id join before the inner join hides its casualties
-    # (see assert_qvals_aligned).
+    # (see assert_qvals_aligned). It must see the WHOLE stop table: it claims
+    # every qvals row falling inside the epoch's span, so checking it against a
+    # cohort-restricted table would read the cohort's own stops as missing.
     assert_qvals_aligned(stop, q)
+    # Cohort next, so the qvals gap below is measured within the population
+    # actually fit rather than across one this run never touches.
+    stop, cohort_report = select_stop_cohort(stop, cohort=cohort)
+    logger.info(
+        "stop cohort = %s (%s): %d -> %d stops (%.1f%% retained); by state %s",
+        cohort_report["cohort"],
+        cohort_report["rule"],
+        cohort_report["n_stops_before"],
+        cohort_report["n_stops_after"],
+        100 * cohort_report["n_stops_after"] / max(cohort_report["n_stops_before"], 1),
+        cohort_report["counts_before"],
+    )
     n0 = len(stop)
     stop = stop.merge(q[qcols], on="stop_id", how="inner", validate="many_to_one")
     # fail loudly if a task covariate the specs need never made it onto the stop
@@ -845,7 +864,7 @@ def _write_aggregation(
     return len(agg)
 
 
-def _aggregate_only(smoke: bool) -> None:
+def _aggregate_only(smoke: bool, cohort: str) -> None:
     """Re-derive the audited artifacts from the persisted per-session fits.
 
     Reads ``swr_contrast_rate<suffix>.pkl`` and rewrites the audited table, the
@@ -857,6 +876,8 @@ def _aggregate_only(smoke: bool) -> None:
     ----------
     smoke : bool
         Read/write the ``_smoke`` artifacts.
+    cohort : {"at_well", "all_stops", "in_transit"}
+        Which cohort's bundle to re-aggregate; picks the artifact suffix.
 
     Raises
     ------
@@ -865,7 +886,7 @@ def _aggregate_only(smoke: bool) -> None:
         flag (no ``separated_terms`` column) -- aggregating it would silently
         apply the per-term drop rule to fits that carry no per-term information.
     """
-    suffix = "_smoke" if smoke else ""
+    suffix = stop_cohort_suffix(cohort, smoke=smoke)
     out_dir = RC / "models_per_bin_rate"
     fits_path = out_dir / f"swr_contrast_rate{suffix}.pkl"
     if not fits_path.exists():
@@ -902,6 +923,17 @@ def main() -> None:
         "--workers", type=int, default=1, help="per-session process fan-out"
     )
     ap.add_argument(
+        "--stop-cohort",
+        choices=STOP_COHORTS,
+        default="at_well",
+        help=(
+            "Stop population to fit. 'at_well' (default) is the canonical cohort "
+            "shared with the content family and publishes the unsuffixed "
+            "artifacts; 'all_stops' and 'in_transit' are sensitivity bundles "
+            "published under _allstops / _intransit."
+        ),
+    )
+    ap.add_argument(
         "--aggregate-only",
         action="store_true",
         help=(
@@ -913,7 +945,7 @@ def main() -> None:
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
     if args.aggregate_only:
-        _aggregate_only(smoke)
+        _aggregate_only(smoke, args.stop_cohort)
         return
 
     # Causal-hygiene gate: each rung's covariates must be pre-outcome, or the
@@ -925,7 +957,7 @@ def main() -> None:
         for name, (_formula, need) in specs.items():
             assert_predictor_timing(need, descriptive=(name in descr))
 
-    stop, onsets, n_qvals_dropped = _load()
+    stop, onsets, n_qvals_dropped = _load(args.stop_cohort)
     # Hash the inputs now, not at write time: the fan-out runs long enough that a
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(FIT_INPUTS)
@@ -995,18 +1027,28 @@ def main() -> None:
                 grp["n_stops"].median(),
                 grp["n_bins"].median(),
             )
+    # Which population every row was fit on, carried on the row itself: a
+    # coefficient read out of a concatenated table would otherwise not say, and
+    # the model comparison invalidates a cross-cohort step on this column.
+    models["stop_cohort"] = args.stop_cohort
+
     out_dir = RC / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / (
-        "swr_contrast_rate_smoke.pkl" if smoke else "swr_contrast_rate.pkl"
-    )
+    csfx = stop_cohort_suffix(args.stop_cohort, smoke=smoke)
+    out = out_dir / f"swr_contrast_rate{csfx}.pkl"
     models.to_pickle(out)
-    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
+    write_fit_provenance(
+        out,
+        fit_inputs,
+        "poisson_glm",
+        sys.argv,
+        extra={"stop_cohort": args.stop_cohort},
+    )
 
     # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +
     # term-level quasi-separation diagnostics, mirroring the content contrast runner.
-    csfx = "_smoke" if smoke else ""
-    # The qvals-join drop is measured on the full stop table in _load(); in smoke mode
+    # The qvals-join drop is measured on the cohort's stop table in _load(); in smoke
+    # mode
     # the per-animal subset happens after, so attributing the full-data drop against a
     # tiny subset n_in would be meaningless. Report 0 there (smoke is not a reported run).
     audit_qvals_drop = 0 if smoke else n_qvals_dropped

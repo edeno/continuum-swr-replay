@@ -43,7 +43,10 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     write_cohort_audit,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import (
+    STOP_COHORTS,
     freeze_common_cohort,
+    select_stop_cohort,
+    stop_cohort_suffix,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
@@ -240,6 +243,17 @@ def main() -> None:
         default=None,
         help="Smoke mode: keep only the first N sessions per animal.",
     )
+    parser.add_argument(
+        "--stop-cohort",
+        choices=STOP_COHORTS,
+        default="at_well",
+        help=(
+            "Stop population to fit. 'at_well' (default) is the canonical cohort "
+            "shared with the content family and publishes the unsuffixed "
+            "artifacts; 'all_stops' and 'in_transit' are sensitivity bundles "
+            "published under _allstops / _intransit."
+        ),
+    )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
     args = parser.parse_args()
 
@@ -266,6 +280,19 @@ def main() -> None:
             f"stop_table missing reward-history basis columns {missing_basis}; "
             "regenerate it first (scripts/decoding/regenerate_stop_table.py)."
         )
+    # The cohort is applied to the whole stop table BEFORE the smoke subset and
+    # before the ladder's common-cohort freeze, so the freeze reports what the
+    # fitted population is missing rather than what some other population is.
+    stop, cohort_report = select_stop_cohort(stop, cohort=args.stop_cohort)
+    logger.info(
+        "stop cohort = %s (%s): %d -> %d stops (%.1f%% retained); by state %s",
+        cohort_report["cohort"],
+        cohort_report["rule"],
+        cohort_report["n_stops_before"],
+        cohort_report["n_stops_after"],
+        100 * cohort_report["n_stops_after"] / max(cohort_report["n_stops_before"], 1),
+        cohort_report["counts_before"],
+    )
     if args.max_per_animal is not None:
         stop = _subset_max_per_animal(stop, args.max_per_animal)
     logger.info(
@@ -277,12 +304,23 @@ def main() -> None:
     )
     rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=not args.no_cv)
 
+    # Which population every row was fit on, carried on the row itself: a
+    # coefficient read out of a concatenated table would otherwise not say, and
+    # the model comparison invalidates a cross-cohort step on this column.
+    rate["stop_cohort"] = args.stop_cohort
+
     out_dir = RC / "models_per_stop_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    sfx = "_smoke" if args.max_per_animal is not None else ""
+    sfx = stop_cohort_suffix(args.stop_cohort, smoke=args.max_per_animal is not None)
     out = out_dir / f"all_models{sfx}.pkl"
     rate.to_pickle(out)
-    write_fit_provenance(out, fit_inputs, "poisson_glm", sys.argv)
+    write_fit_provenance(
+        out,
+        fit_inputs,
+        "poisson_glm",
+        sys.argv,
+        extra={"stop_cohort": args.stop_cohort},
+    )
     write_cohort_audit(cohort_audits, out_dir / f"all_models{sfx}_cohort_audit.csv")
     logger.info(
         "Saved %d rows (%d sessions, outcomes=%s) to %s",

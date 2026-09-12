@@ -322,6 +322,7 @@ def test_runner_references_written(tmp_path):
         fit_inputs={},
         argv=["fit_uncertainty_rate.py", "--max-per-animal", "1"],
         smoke=True,
+        stop_cohort="at_well",
     )
     assert uncertainty_out.name == "uncertainty_rate_smoke.pkl"
     sidecar = z_reference_path(uncertainty_out)

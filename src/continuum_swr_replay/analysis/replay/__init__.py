@@ -14,11 +14,13 @@ from .choice_prediction import (
     fit_choice_model,
 )
 from .cohort_selection import (
+    STOP_COHORT_ARTIFACT_SUFFIX,
     STOP_COHORT_RULES,
     STOP_COHORTS,
     freeze_common_cohort,
     select_event_cohort,
     select_stop_cohort,
+    stop_cohort_suffix,
 )
 from .covariates import (
     UNCERTAINTY_COVARIATES,
@@ -113,6 +115,7 @@ __all__ = [
     "REWARD_HISTORY_N_BASIS",
     "ARRIVAL_CLOCK_COLUMN",
     "STOP_COHORTS",
+    "STOP_COHORT_ARTIFACT_SUFFIX",
     "STOP_COHORT_RULES",
     "STOP_COVARIATES",
     "TMAX",
@@ -148,6 +151,7 @@ __all__ = [
     "retrospective_alignment_with_shuffle",
     "select_event_cohort",
     "select_stop_cohort",
+    "stop_cohort_suffix",
     "summarize_behavioral_location",
     "trial_arrival_times",
     "trial_context_at_times",
