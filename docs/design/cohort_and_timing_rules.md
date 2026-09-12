@@ -50,11 +50,14 @@ at-well.
 **Why.** The rate ladders used to fit every immobility stop while the content
 ladders fit only at-well events, so "non-SWR replay is not reward-gated" (a
 rate claim) and every content claim about non-SWR replay were statements about
-different populations. In-transit stops carry a disproportionate share of
-non-SWR non-local onsets, so pooling them into the rate family and not the
-content family is not a neutral difference in scope: it moves exactly the
-contrast the two families are compared on. At-well stops are therefore the
-shared canonical cohort for both. The all-stops fits remain available as a
+different populations. And the difference is not neutral: in-transit stops hold
+7.0% of the corpus's immobility time (9,093 s of 129,997 s) but **11.9%** of the
+non-SWR non-local onsets (4,690 of 39,510) and only **3.3%** of the SWR-coupled
+ones (859 of 26,403). Per second of immobility that is 1.73x the at-well non-SWR
+onset rate (0.516 vs 0.298 Hz) and 0.44x the at-well SWR-coupled rate (0.094 vs
+0.216 Hz). Pooling those stops into the rate family and not the content family
+therefore moves exactly the SWR-vs-non-SWR contrast the two families are
+compared on. At-well stops are therefore the shared canonical cohort for both. The all-stops fits remain available as a
 sensitivity bundle under `_allstops`, and in-transit stops may be fit as their
 own bundle under `_intransit`, but an in-transit population is never pooled
 with an at-well one.
