@@ -443,3 +443,170 @@ def test_aggregate_only_records_the_bundle_it_read_by_name(monkeypatch, tmp_path
     mod._aggregate_only(smoke=False, cohort="all_stops")
 
     assert list(recorded) == ["swr_contrast_rate_allstops"]
+
+
+# ── The per-SD reference is scoped to the bundle's own stop cohort ──
+
+
+def _sd_source_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A stop/qvals pair whose SDs change when the at-well cohort is applied.
+
+    Four well-anchored stops (``at_well``/``mixed``) carry a narrow spread and
+    four ``in_transit`` stops a wide one, on one stop-table covariate and one
+    qvals covariate, so an SD taken over the full tables cannot be mistaken for
+    an SD taken over the well-anchored cohort.
+    """
+    stops = pd.DataFrame(
+        {
+            "stop_id": list(range(8)),
+            "occupancy_state": [
+                "at_well",
+                "mixed",
+                "at_well",
+                "mixed",
+                "in_transit",
+                "in_transit",
+                "in_transit",
+                "in_transit",
+            ],
+            "patch_switch_fraction_last5_completed_trips": [
+                1.0,
+                1.0,
+                2.0,
+                2.0,
+                10.0,
+                20.0,
+                30.0,
+                40.0,
+            ],
+        }
+    )
+    qvals = pd.DataFrame(
+        {
+            "stop_id": list(range(8)),
+            "periswitch_index_trials": [
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+                100.0,
+                200.0,
+                300.0,
+                400.0,
+            ],
+        }
+    )
+    return stops, qvals
+
+
+def _sd_probe_fits(stop_cohort: str) -> pd.DataFrame:
+    """Six sessions over three animals fitting the two probe rungs."""
+    rows = []
+    for i in range(6):
+        for model, term in (
+            ("G3_switchrate", "patch_switch_fraction_last5_completed_trips"),
+            ("G1_periswitch", "periswitch_index_trials"),
+        ):
+            rows.append(
+                {
+                    "animal": "abc"[i % 3],
+                    "session_date": i,
+                    "epoch": "02_r1",
+                    "population": "non_local",
+                    "model": model,
+                    "cohort": mod.PRIMARY_COHORT,
+                    "stop_cohort": stop_cohort,
+                    "converged": True,
+                    "separated": False,
+                    "separated_terms": "",
+                    f"coef_{term}": 0.2 + 0.01 * i,
+                    f"bse_{term}": 0.05,
+                    f"pval_{term}": 0.01,
+                    f"sd_{term}": 1.0,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+@pytest.mark.parametrize(
+    ("stop_cohort", "suffix"), [("at_well", ""), ("all_stops", "_allstops")]
+)
+def test_std_columns_use_the_bundles_own_cohort_sds(
+    monkeypatch, tmp_path, stop_cohort, suffix
+):
+    """``std_*`` rescales by the SD of the population the fits were made on.
+
+    Standardizing an at-well coefficient by an all-stops SD would report a
+    per-SD effect for stops the rung was never fit on.  ``all_stops`` keeps
+    every stop, so the same code path leaves that bundle's SDs at the
+    full-table values.
+    """
+    stops, qvals = _sd_source_tables()
+    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir.mkdir(parents=True)
+    monkeypatch.setattr(mod, "RC", tmp_path)
+    monkeypatch.setattr(
+        mod,
+        "read_table",
+        lambda path: qvals if "qvals" in str(path) else stops,
+    )
+    monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)
+
+    n_rows = mod._write_aggregation(
+        _sd_probe_fits(stop_cohort),
+        out_dir,
+        suffix,
+        {},
+        ["fit_swr_contrast_rate.py"],
+    )
+    assert n_rows > 0
+
+    well_anchored = stops["occupancy_state"] != "in_transit"
+    expected = {
+        "at_well": {
+            "patch_switch_fraction_last5_completed_trips": float(
+                np.nanstd(
+                    stops.loc[
+                        well_anchored, "patch_switch_fraction_last5_completed_trips"
+                    ]
+                )
+            ),
+            "periswitch_index_trials": float(
+                np.nanstd(
+                    qvals.loc[well_anchored.to_numpy(), "periswitch_index_trials"]
+                )
+            ),
+        },
+        "all_stops": {
+            "patch_switch_fraction_last5_completed_trips": float(
+                np.nanstd(stops["patch_switch_fraction_last5_completed_trips"])
+            ),
+            "periswitch_index_trials": float(
+                np.nanstd(qvals["periswitch_index_trials"])
+            ),
+        },
+    }[stop_cohort]
+
+    meta = json.loads((out_dir / f"swr_contrast_rate_meta{suffix}.json").read_text())
+    assert stop_cohort in meta["sd_scope"]
+    for covariate, sd in expected.items():
+        assert meta["fit_time_sd_reference"][covariate] == pytest.approx(sd)
+
+    audited = pd.read_pickle(out_dir / f"swr_contrast_rate_audited{suffix}.pkl")
+    factors = audited.set_index("term")["std_factor"]
+    for covariate, sd in expected.items():
+        assert factors[covariate] == pytest.approx(sd)
+        assert audited.set_index("term").loc[covariate, "std_coef_animal_median"] == (
+            pytest.approx(
+                audited.set_index("term").loc[covariate, "coef_animal_median"] * sd
+            )
+        )
+
+    reported = meta["max_relative_sd_difference_vs_full_tables"]
+    if stop_cohort == "all_stops":
+        # The restriction is a no-op, so this bundle's SDs are the full ones.
+        assert reported["relative_difference"] == pytest.approx(0.0)
+    else:
+        assert reported["relative_difference"] < -0.9
+        assert reported["covariate"] in expected

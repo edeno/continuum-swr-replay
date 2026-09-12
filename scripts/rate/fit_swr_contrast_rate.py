@@ -755,6 +755,65 @@ def _cohort_records(
     return records
 
 
+def _covariate_sds(qv: pd.DataFrame, st: pd.DataFrame) -> dict[str, float]:
+    """Per-covariate SD over one (qvals, stop) pair.
+
+    Each name in :data:`_RATE_CONT_COVARS` is taken from whichever table carries
+    it, qvals first; a name absent from both is omitted rather than recorded as
+    ``nan``, exactly as ``aggregate_contrast`` expects.
+
+    Parameters
+    ----------
+    qv, st : pandas.DataFrame
+        qvals and stop tables, already restricted to the scope the SDs describe.
+
+    Returns
+    -------
+    dict of str to float
+        ``covariate -> nanstd``.
+    """
+    sd: dict[str, float] = {}
+    for c in _RATE_CONT_COVARS:
+        src = qv if c in qv.columns else st if c in st.columns else None
+        if src is not None:
+            sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
+    return sd
+
+
+def _max_relative_sd_difference(
+    sd: dict[str, float], sd_full: dict[str, float]
+) -> tuple[str | None, float]:
+    """Largest signed relative difference between two per-SD references.
+
+    Reported as ``(sd - sd_full) / sd_full`` so the sign says whether the cohort
+    is narrower (negative) or wider than the full tables; the covariate returned
+    is the one with the largest magnitude.
+
+    Parameters
+    ----------
+    sd : dict of str to float
+        SDs actually used for the ``std_*`` columns (the fitted cohort).
+    sd_full : dict of str to float
+        SDs over the full tables, for comparison only.
+
+    Returns
+    -------
+    covariate : str or None
+        Name of the largest-magnitude difference, ``None`` if none is comparable.
+    relative_difference : float
+        Its signed relative difference; ``0.0`` when nothing is comparable.
+    """
+    diffs = {
+        c: (v - sd_full[c]) / sd_full[c]
+        for c, v in sd.items()
+        if c in sd_full and np.isfinite(sd_full[c]) and sd_full[c] > 0
+    }
+    if not diffs:
+        return None, 0.0
+    worst = max(diffs, key=lambda c: abs(diffs[c]))
+    return worst, float(diffs[worst])
+
+
 def _write_aggregation(
     models: pd.DataFrame,
     out_dir: Path,
@@ -779,7 +838,9 @@ def _write_aggregation(
 
     The audited rows and their sidecar carry the ``stop_cohort`` the per-session
     fits were made on, so a sensitivity bundle can never be read as the
-    canonical one.
+    canonical one.  That same label scopes the per-SD reference behind the
+    ``std_*`` columns: the SDs are taken over the stop cohort the fits name, not
+    over the full tables.
 
     Parameters
     ----------
@@ -831,16 +892,31 @@ def _write_aggregation(
         ignore_index=True,
     ).to_csv(out_dir / f"swr_contrast_rate_term_diagnostics{suffix}.csv", index=False)
 
-    qv = read_table(FIT_INPUTS["qvals_table"])
-    st = read_table(FIT_INPUTS["stop_table"])
-    require_covariate_schema(qv, table="qvals")
-    require_covariate_schema(st, table="stop")
-    st = add_uncertainty_covariates(st)
-    sd = {}
-    for c in _RATE_CONT_COVARS:
-        src = qv if c in qv.columns else st if c in st.columns else None
-        if src is not None:
-            sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
+    qv_full = read_table(FIT_INPUTS["qvals_table"])
+    st_full = read_table(FIT_INPUTS["stop_table"])
+    require_covariate_schema(qv_full, table="qvals")
+    require_covariate_schema(st_full, table="stop")
+    st_full = add_uncertainty_covariates(st_full)
+    # A std_* column rescales a coefficient fit on ONE stop cohort, so its SD has
+    # to come from that same cohort: dividing an at-well coefficient by an
+    # all-stops SD reports a per-SD effect for a population the rung was never fit
+    # on. The label comes from the fits, so a sensitivity bundle standardizes on
+    # its own population. `all_stops` keeps every stop, so the restriction is a
+    # no-op there and that bundle's SDs are unchanged.
+    st, _ = select_stop_cohort(st_full, cohort=stop_cohorts[0])
+    qv = qv_full[qv_full["stop_id"].isin(set(st["stop_id"]))]
+    sd = _covariate_sds(qv, st)
+    sd_full = _covariate_sds(qv_full, st_full)
+    max_sd_covar, max_sd_rel = _max_relative_sd_difference(sd, sd_full)
+    logger.info(
+        "per-SD reference on the %s cohort (%d of %d stops); largest relative "
+        "difference vs the full tables: %s %+.2f%%",
+        stop_cohorts[0],
+        len(st),
+        len(st_full),
+        max_sd_covar,
+        100 * max_sd_rel,
+    )
     specs = [(g, p, t) for g, t in _G_KEY.items() for p in _POP_LABEL]
     specs += [(s, "contrast", t) for s, t in _S_KEY.items()]
     agg = pd.concat(
@@ -867,17 +943,23 @@ def _write_aggregation(
         extra={"stop_cohort": stop_cohorts[0]},
     )
     # Persist the exact per-SD factors this run used for the std_* columns so the
-    # standardized coefficients are reproducible. These SDs are computed over the
-    # FULL qvals/stop tables (re-read above), not the per-model fitted cohort -- the
-    # two differ negligibly on full data (~0.2% for recent_switch_rate). This is the
-    # runner's own reference; it is NOT the builder's pooled-global table _z.
+    # standardized coefficients are reproducible. They are computed over the stop
+    # cohort the fits name, not over the full tables; the recorded
+    # max_relative_sd_difference_vs_full_tables says how far the two scopes are
+    # apart on this run. This is the runner's own reference; it is NOT the
+    # builder's pooled-global table _z.
     (out_dir / f"swr_contrast_rate_meta{suffix}.json").write_text(
         json.dumps(
             {
                 "fit_time_sd_reference": {k: float(v) for k, v in sd.items()},
                 "sd_scope": (
-                    "full qvals_table + stop_table (std_factor = raw_coef * SD)"
+                    f"{stop_cohorts[0]} stop cohort of the qvals_table + "
+                    "stop_table (std_factor = raw_coef * SD)"
                 ),
+                "max_relative_sd_difference_vs_full_tables": {
+                    "covariate": max_sd_covar,
+                    "relative_difference": max_sd_rel,
+                },
                 "note": (
                     "the exact SD factors aggregate_contrast used for the std_* "
                     "columns; NOT the builder's pooled-global table _z"
