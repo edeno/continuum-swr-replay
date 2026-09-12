@@ -1,5 +1,24 @@
 # Rate ladders across the three stop cohorts
 
+**Two facts about this sitting that the sidecars cannot state (noted 2026-09-12).**
+The generated provenance paragraph below reports only what the sidecars record, so
+these two are written here by hand and are **not** reproduced by re-running the
+command.
+
+1. The uncommitted edits behind the four `-dirty` rows recorded against
+   `aee8b258` were to this audit script, and to nothing the fit runners import.
+   The fifth `-dirty` row — the at-well audited aggregate, recorded against
+   `c5e1cfb` — carries one further uncommitted edit, to
+   `scripts/rate/fit_swr_contrast_rate.py`'s aggregation step, which scoped that
+   bundle's per-SD reference to the well-anchored cohort. It rescales the
+   `std_*` columns of the audited table and changes no fitted coefficient.
+2. The audited is_swr-contrast rows are aggregates re-derived with
+   `--aggregate-only` from the per-session fits listed beside them, so their
+   recorded hash is the tree the re-derivation ran from, not the tree the fits
+   ran from — which is why the at-well audited row names a commit newer than the
+   fit it summarizes. The per-session fits beneath them, which carry every
+   number this audit reads, are unaffected.
+
 Generated 2026-09-12 by `scripts/qa/compare_fits.py --cohort-contrast`.
 
 Command: `uv run python scripts/qa/compare_fits.py --cohort-contrast`
@@ -53,11 +72,13 @@ What each artifact records about itself: `at_well`: rows say ['at_well']; `all_s
 | swr_contrast_rate_allstops.pkl | is_swr-contrast rate (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:09:31 |
 | all_models.pkl | per-stop (all_stops) | eecf54a56d36 | — | 2026-09-06T16:04:08 |
 | all_models_intransit.pkl | per-bin (in_transit) | aee8b258ccc3-dirty | in_transit | 2026-09-12T17:48:24 |
-| swr_contrast_rate_audited.pkl | is_swr-contrast audited (at_well) | aee8b258ccc3-dirty | at_well | 2026-09-12T18:21:19 |
+| swr_contrast_rate_audited.pkl | is_swr-contrast audited (at_well) | c5e1cfb41aac-dirty | at_well | 2026-09-12T23:15:21 |
 | swr_contrast_rate_audited_allstops.pkl | is_swr-contrast audited (all_stops) | aee8b258ccc3-dirty | all_stops | 2026-09-12T18:20:11 |
 
 
-The hash is taken when the artifact is WRITTEN, not when its run started, so a long fit that spanned a commit records the later one — which is why the rows above do not all agree even though they describe one sitting. A `-dirty` suffix means the tree carried uncommitted edits at that moment; here those edits were to this audit script and to nothing the fit runners import. The audited is_swr-contrast bundles are the one place where the recorded hash PREDATES the code that wrote them: they were re-derived with `--aggregate-only` after the commit that gave the audited table its `stop_cohort` label and fixed the input name its freshness check resolves, and the hash records the tree that re-derivation ran from. The per-session fits beneath them, which carry every number this audit reads, are unaffected.
+The hash is taken when the artifact is WRITTEN, not when its run started, so a long fit that spanned a commit records the later one — which is why the rows above need not agree. 5 of 9 rows record a `-dirty` tree (`per-bin (at_well)`, `is_swr-contrast rate (all_stops)`, `per-bin (in_transit)`, `is_swr-contrast audited (at_well)`, `is_swr-contrast audited (all_stops)`): those artifacts were written with uncommitted edits present, which the sidecar does not describe. The rows name 4 distinct commits, oldest first: `eecf54a56d36` (2026-09-06, 1 row); `aee8b258ccc3` (2026-09-12, 6 rows); `9e6808fc3e3a` (2026-09-12, 1 row); `c5e1cfb41aac` (2026-09-12, 1 row). Everything named before `c5e1cfb41aac` was written from code that predates it.
+
+Row order inside these artifacts is worker-nondeterministic — the per-session fits are collected as the workers finish — so a byte comparison between two of them is made only after sorting on (`outcome`/`population`, `model`, `cohort`, `animal`, `session_date`, `epoch`).
 
 ## Cohort size (per-bin ladder)
 
@@ -77,7 +98,7 @@ The hash is taken when the artifact is WRITTEN, not when its run started, so a l
 | non_local_no_swr | in_transit | 32 | 8756 | 227001 | 2988 |
 
 
-The `in_transit` rows above are a whole-corpus total over the few sessions that reach the ladder, not over the whole corpus. **The in-transit column is thin.** Only **50 of 218** sessions clear the per-bin minimum-sample gates on any population (swr 18, non_local 48, non_local_swr 10, non_local_no_swr 32), against 218 on the canonical cohort. An in-transit cell that shows no effect is an absence of evidence, not evidence of absence, and its paired tests have no power.
+The `in_transit` rows above are a whole-corpus total over the few sessions that reach the ladder, not over the whole corpus — see the thinness note under Cohorts.
 
 ## Reward rate ratios, `M7r_time_histcos_rew`
 

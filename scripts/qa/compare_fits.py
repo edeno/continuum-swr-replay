@@ -52,6 +52,7 @@ import hashlib
 import json
 import re
 import shlex
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -3265,6 +3266,103 @@ def cohort_provenance_table(paths: dict[str, Path]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _commit_time(commit: str) -> str | None:
+    """Committer date (ISO-8601) of a recorded hash, or ``None`` if unavailable.
+
+    A sidecar can name a commit this working tree does not carry (a different
+    clone, a rewritten branch), so the lookup is allowed to fail: the caller
+    then states only which hashes differ, not which of them is older.
+    """
+    if not re.fullmatch(r"[0-9a-f]{7,40}", commit):
+        return None
+    try:
+        done = subprocess.run(
+            ["git", "show", "-s", "--format=%cI", commit],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return done.stdout.strip() or None
+
+
+def cohort_provenance_note(table: pd.DataFrame) -> str:
+    """Prose for the provenance table, read off the sidecars rather than recalled.
+
+    States only what the rows show: which artifacts recorded an uncommitted
+    (``-dirty``) tree, how many distinct commits the set names, and -- when this
+    tree still carries those commits -- which of them are older, i.e. which
+    artifacts were written from code that predates the newest one named. What
+    the uncommitted edits WERE, and why a particular artifact names an older
+    commit, are not in the sidecars and are not asserted here.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        Output of :func:`cohort_provenance_table`.
+
+    Returns
+    -------
+    str
+        One paragraph, empty if the table is empty.
+    """
+    if not len(table):
+        return ""
+    parts = [
+        "The hash is taken when the artifact is WRITTEN, not when its run "
+        "started, so a long fit that spanned a commit records the later one — "
+        "which is why the rows above need not agree."
+    ]
+    dirty = [
+        str(row.role)
+        for row in table.itertuples()
+        if str(row.git_hash).endswith("-dirty")
+    ]
+    if dirty:
+        parts.append(
+            f"{len(dirty)} of {len(table)} rows record a `-dirty` tree ("
+            + ", ".join(f"`{role}`" for role in dirty)
+            + "): those artifacts were written with uncommitted edits present, "
+            "which the sidecar does not describe."
+        )
+    else:
+        parts.append(
+            f"No row records a `-dirty` tree: all {len(table)} were written from "
+            "a committed tree."
+        )
+    commits: dict[str, list[str]] = {}
+    for row in table.itertuples():
+        commits.setdefault(str(row.git_hash).removesuffix("-dirty"), []).append(
+            str(row.role)
+        )
+    if len(commits) == 1:
+        parts.append(f"Every row names the same commit `{next(iter(commits))}`.")
+        return " ".join(parts)
+    dated = {commit: _commit_time(commit) for commit in commits}
+    if all(dated.values()):
+        order = sorted(commits, key=lambda commit: dated[commit])
+        listed = "; ".join(
+            f"`{commit}` ({dated[commit][:10]}, {len(commits[commit])} row"
+            f"{'' if len(commits[commit]) == 1 else 's'})"
+            for commit in order
+        )
+        parts.append(
+            f"The rows name {len(commits)} distinct commits, oldest first: "
+            f"{listed}. Everything named before `{order[-1]}` was written from "
+            "code that predates it."
+        )
+    else:
+        parts.append(
+            f"The rows name {len(commits)} distinct commits ("
+            + ", ".join(f"`{commit}`" for commit in commits)
+            + "); this tree does not carry all of them, so their order is not "
+            "stated."
+        )
+    return " ".join(parts)
+
+
 def _audited_sibling(path: Path) -> Path:
     """The audited aggregate published beside a per-session contrast bundle."""
     return path.with_name(
@@ -3344,6 +3442,7 @@ def build_cohort_report(
     """
     provenance_extra = provenance_extra or {}
     per_stop = per_stop or {}
+    provenance = cohort_provenance_table({**inputs, **provenance_extra})
     lines = [
         "# Rate ladders across the three stop cohorts",
         "",
@@ -3397,28 +3496,23 @@ def build_cohort_report(
         "",
         "### Provenance of the artifacts read",
         "",
-        _md(cohort_provenance_table({**inputs, **provenance_extra})),
+        _md(provenance),
         "",
-        "The hash is taken when the artifact is WRITTEN, not when its run started, "
-        "so a long fit that spanned a commit records the later one — which is why "
-        "the rows above do not all agree even though they describe one sitting. A "
-        "`-dirty` suffix means the tree carried uncommitted edits at that moment; "
-        "here those edits were to this audit script and to nothing the fit runners "
-        "import. The audited is_swr-contrast bundles are the one place where the "
-        "recorded hash PREDATES the code that wrote them: they were re-derived with "
-        "`--aggregate-only` after the commit that gave the audited table its "
-        "`stop_cohort` label and fixed the input name its freshness check resolves, "
-        "and the hash records the tree that re-derivation ran from. The per-session "
-        "fits beneath them, which carry every number this audit reads, are "
-        "unaffected.",
+        cohort_provenance_note(provenance),
+        "",
+        "Row order inside these artifacts is worker-nondeterministic — the "
+        "per-session fits are collected as the workers finish — so a byte "
+        "comparison between two of them is made only after sorting on "
+        "(`outcome`/`population`, `model`, `cohort`, `animal`, `session_date`, "
+        "`epoch`).",
         "",
         "## Cohort size (per-bin ladder)",
         "",
         _md(cohort_size_table(fits)),
         "",
         "The `in_transit` rows above are a whole-corpus total over the few "
-        "sessions that reach the ladder, not over the whole corpus. "
-        + in_transit_power_note(fits),
+        "sessions that reach the ladder, not over the whole corpus — see the "
+        "thinness note under Cohorts.",
         "",
         "## Reward rate ratios, `M7r_time_histcos_rew`",
         "",

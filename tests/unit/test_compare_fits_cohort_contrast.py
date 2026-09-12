@@ -43,6 +43,7 @@ from scripts.qa.compare_fits import (
     cohort_delta_aic_table,
     cohort_paired_swr_table,
     cohort_per_stop_delta_aic_table,
+    cohort_provenance_note,
     cohort_provenance_table,
     cohort_reward_rr_table,
     cohort_size_table,
@@ -791,3 +792,78 @@ def test_arrival_shape_table_labels_every_cohort_it_stacks(cohort_fits):
 
 def test_arrival_shape_table_is_empty_without_fits():
     assert cohort_arrival_shape_table({}).empty
+
+
+def test_provenance_note_states_only_what_the_sidecars_show():
+    """The paragraph is derived, not recalled: no sitting-specific prose."""
+    table = pd.DataFrame(
+        [
+            {
+                "artifact": "all_models.pkl",
+                "role": "per-bin (at_well)",
+                "git_hash": "aaaaaaaaaaaa-dirty",
+                "stop_cohort": "at_well",
+                "written_at": "2026-09-12T10:00:00",
+            },
+            {
+                "artifact": "all_models_allstops.pkl",
+                "role": "per-bin (all_stops)",
+                "git_hash": "bbbbbbbbbbbb",
+                "stop_cohort": "all_stops",
+                "written_at": "2026-09-12T11:00:00",
+            },
+        ]
+    )
+
+    note = cohort_provenance_note(table)
+
+    assert "1 of 2 rows record a `-dirty` tree" in note
+    assert "`per-bin (at_well)`" in note
+    # Neither commit exists in this tree, so the note must not claim an order.
+    assert "2 distinct commits" in note
+    assert "oldest first" not in note
+    # None of the retired hand-written claims survive.
+    for recalled in ("this audit script", "aggregate-only", "the one place"):
+        assert recalled not in note
+
+
+def test_provenance_note_says_so_when_every_row_agrees():
+    table = pd.DataFrame(
+        [
+            {
+                "artifact": f"{name}.pkl",
+                "role": name,
+                "git_hash": "cccccccccccc",
+                "stop_cohort": "at_well",
+                "written_at": "2026-09-12T10:00:00",
+            }
+            for name in ("a", "b")
+        ]
+    )
+
+    note = cohort_provenance_note(table)
+
+    assert "No row records a `-dirty` tree" in note
+    assert "Every row names the same commit `cccccccccccc`" in note
+
+
+def test_the_in_transit_thinness_note_is_rendered_once(cohort_fits, tmp_path):
+    """One caveat, one place: a duplicated paragraph reads as two findings."""
+    artifact = tmp_path / "all_models.pkl"
+    cohort_fits["at_well"].to_pickle(artifact)
+    report = build_cohort_report(
+        cohort_fits, {}, {"per-bin (at_well)": artifact}, command="uv run x"
+    )
+
+    assert report.count("**The in-transit column is thin.**") == 1
+
+
+def test_report_states_the_sort_used_for_byte_comparisons(cohort_fits, tmp_path):
+    artifact = tmp_path / "all_models.pkl"
+    cohort_fits["at_well"].to_pickle(artifact)
+    report = build_cohort_report(
+        cohort_fits, {}, {"per-bin (at_well)": artifact}, command="uv run x"
+    )
+
+    assert "worker-nondeterministic" in report
+    assert "`session_date`" in report
