@@ -42,8 +42,10 @@ separately as their own bundle but are never pooled with at-well stops.
 
 Files: `src/continuum_swr_replay/analysis/replay/cohort_selection.py` (`freeze_common_cohort` ~33) —
 add `select_stop_cohort(stop_table, *, cohort: str) -> tuple[pd.DataFrame, dict]` with
-`cohort ∈ {"at_well", "all_stops", "in_transit"}`: `at_well` keeps `occupancy_state == "at_well"`;
-`in_transit` keeps `occupancy_state == "in_transit"`; `all_stops` keeps everything; returns the
+`cohort ∈ {"at_well", "all_stops", "in_transit"}` keyed by grain: at the stop grain `at_well` keeps
+`occupancy_state ∈ {"at_well", "mixed"}` (well-anchored; see the amended decision above) and at the
+event grain `occupancy_state == "at_well"`; `in_transit` keeps `occupancy_state == "in_transit"` at
+both grains; `all_stops` keeps everything; returns the
 frame and a report (`n_stops_before/after`, counts by `occupancy_state`, the rule string). Raise
 if `occupancy_state` is absent. `scripts/content/fit_replay_content_models.py` ~1692 and
 `scripts/content/fit_swr_contrast_content.py` (find its at-well filter in `_assemble_arm`) call it
