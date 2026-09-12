@@ -19,6 +19,22 @@ Both are fit on four outcome populations (tagged `outcome`): detected SWRs
 (`non_local_swr`, `non_local_no_swr`). The pooled `non_local` is the
 one-population null tested against its split.
 
+> **Cohort (2026-09-12, binding).** Both families are fit on the **well-anchored
+> stop cohort** — `occupancy_state ∈ {at_well, mixed}`, **84,069** of the
+> 107,400 canonical stops — which is the same population the content family is
+> fit on at the event grain. The rule lives in one function and is selected with
+> `--stop-cohort` on every rate runner
+> ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)).
+> The all-stops fits are kept as a **sensitivity bundle** (`_allstops`) and
+> in-transit stops as their own (`_intransit`); an in-transit population is never
+> pooled with a well-anchored one. Every number below is from the well-anchored
+> fit unless it is explicitly labelled all-stops. A number still dated
+> **2026-09-06** was measured on the all-stops population, which was then the
+> canonical one, and has **not** been re-derived on this cohort; it is labelled
+> where it appears and must be cited as the all-stops sensitivity, not as the
+> current result. The cohort comparison is
+> [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md).
+
 ## Family A — per-stop rate (the literature-comparable layer)
 
 - **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` reward-history
@@ -49,15 +65,18 @@ one-population null tested against its split.
 > It is carried as a plain main effect wherever the basis is fit — never inside
 > an `is_swr` expansion, never aggregated, never reported — and it is excluded
 > from the separation judgment (`NUISANCE_TERMS`, below).
-- **Cohort:** one frozen cohort per session for the whole ladder.
+- **Cohort:** the well-anchored stops (`--stop-cohort at_well`, the default),
+  then one frozen cohort per session for the whole ladder.
   `freeze_common_cohort` intersects the complete rows over the union of every
   `MODEL_PER_STOP_RATE` predictor with a positive `immobility_duration_s`
   offset, and `fit_per_stop_rate_model` then **raises** on any residual NaN
   instead of subsetting. `R0` and `R1` are therefore scored on identical stops,
   which is what makes their ΔAIC a model comparison rather than a cohort
-  comparison. In the shipped ladder that cohort is simply every stop with
-  positive immobility: `n_drop_common_cohort_other` is 0 in
-  `models_per_stop_rate/all_models_cohort_audit.csv`.
+  comparison. On the shipped fit that cohort costs nothing beyond the occupancy
+  rule — **84,069** well-anchored stops in, 5 dropped for a missing own
+  predictor, `n_drop_common_cohort_other` 0, **84,064** modelled on `R0` and
+  83,724 on `R1` (one session gated out)
+  (`models_per_stop_rate/all_models_cohort_audit.csv`).
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**
@@ -67,20 +86,22 @@ one-population null tested against its split.
 - **Cite it for:** the Ambrose 2016 / Sosa 2020 reward-rate comparison (same
   Poisson-events-per-second estimator) and the **detected-SWR positive
   control**. The reward history enters as one four-parameter block, so the
-  citable quantity is the block's step: median per-session `R1 − R0` ΔAIC over
-  218 sessions per population is **−5.12** (non-local), **−2.43** (non-local
-  w/ SWR), **−1.41** (detected SWR) and **+0.30** (non-local, no SWR) —
-  negative everywhere except the non-SWR stream, and small
+  citable quantity is the block's step, the median per-session `R1 − R0` ΔAIC.
+  On the **all-stops** population that step is **−5.12** (non-local), **−2.43**
+  (non-local w/ SWR), **−1.41** (detected SWR) and **+0.30** (non-local, no
+  SWR) over 218 sessions each — negative everywhere except the non-SWR stream,
+  and small
   ([audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md),
   "Family A — per-stop reward step").
 
-  *Provenance.* The per-stop ladder was refit on 2026-09-06 alongside Family B,
-  so its artifact is fresh, but its specification carries neither the arrival
-  clock nor the boundary-recomputed per-bin reward features — the two things
-  that refit changed — and the four steps above reproduce the previous fit to
-  the audits' printed precision. They are the current Family-A result, not a
-  number awaiting a refit. The retired outcome-flag rung's per-stop values are
-  no longer Family-A results and are recorded only as retracted in `#19c` of
+  *Provenance.* The per-stop ladder was refit on the well-anchored cohort on
+  2026-09-12 (`--stop-cohort at_well`, recorded in its provenance sidecar), but
+  **no audit of that fit has been published**, so the four steps above are still
+  the all-stops values. Cite them as the all-stops sensitivity and re-derive the
+  well-anchored step before quoting Family A as the cohort-matched layer; the
+  confound-free statement is Family B's either way. The retired outcome-flag
+  rung's per-stop values are no longer Family-A results and are recorded only as
+  retracted in `#19c` of
   [`../paper/claims_table.md`](../paper/claims_table.md).
 
 This is the simple layer: one rate per stop, dwell handled as an exposure
@@ -132,29 +153,35 @@ offset. Its limitation is exactly that offset — see below.
   cross-validation at all. The raised-cosine rungs span the same window with
   four smooth parameters and are scored. Rationale and the consequence for the
   per-lag self-history readout: [design/model_history.md](design/model_history.md).
-- **Cohort:** `freeze_per_bin_cohort` freezes one cohort per (session,
+- **Cohort:** the well-anchored stops (`--stop-cohort at_well`, the default),
+  then `freeze_per_bin_cohort` freezes one cohort per (session,
   population) over the union of every rung's design columns, keeping only bins
   complete for that union and with `exposure > 0`; `fit_per_bin_rate_model` and
   its cross-validation then **raise** on a NaN or a non-positive exposure rather
   than subsetting. Every rung of a session therefore reports the same `n_bins`
   and `n_stops`, and `compare_nested_models` NaNs any comparison whose two rungs
-  disagree on `n_events` / `n_bins` / `n_stops`. For the shipped ladder the
-  union costs nothing — the cohort is every stop with positive immobility
-  (`n_drop_common_cohort_other` is 0 in
-  `models_per_bin_rate/per_bin_rate_cohort_audit.csv`). The freeze bites where
-  rungs need different covariates — the `is_swr`-contrast ladder, whose audit is
-  the only rate audit with a non-zero `n_drop_common_cohort_other`. There and in
+  disagree on `n_events` / `n_bins` / `n_stops`. On the shipped fit the union
+  costs 515 of the 84,069 well-anchored stops (plus 5 with a missing own
+  predictor), leaving **83,549 stops and 6,777,953 bins** in every rung of every
+  population (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`;
+  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  "Cohort size"). Those 515 are the well-anchored stops carrying no
+  arrival clock — there are 516, one of which is already among the 5 — which the
+  arrival rungs put into the union. The freeze bites harder where
+  rungs need different covariates — the `is_swr`-contrast ladder, whose audit
+  reports the largest `n_drop_common_cohort_other`. There and in
   `MU_uncertainty` the value covariates' missing tail is charged to
   `n_drop_qvals_gap`, not to the union.
 
   The corpus is **218 sessions**, and a session may still carry no fit for a
-  population that has too few events in it. On the 2026-09-06 refit the full
-  additive rung `M7r_time_histcos_rew` is fit on **218 / 218 / 216 / 218**
+  population that has too few events in it. On the well-anchored fit the full
+  additive rung `M7r_time_histcos_rew` is fit on **218 / 217 / 216 / 218**
   sessions (detected SWR / non-local, all / non-local w/ SWR / non-local, no
-  SWR), and `M5_time` on 218 / 218 / 217 / 218; per-rung counts are in
-  [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md),
-  "Sessions fitted per rung". Quote the per-rung, per-population `n`, not a flat
-  218.
+  SWR) and `M5_time` on 218 in every population (fitted rows of
+  `models_per_bin_rate/all_models.pkl`; the reward-quantity `n` per population is
+  in
+  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)).
+  Quote the per-rung, per-population `n`, not a flat 218.
 - **Runner / output:** `scripts/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →
   `Processed-Data/replay_content/models_per_bin_rate/all_models.pkl`. Plot with
@@ -177,13 +204,13 @@ offset. Its limitation is exactly that offset — see below.
   audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7r_time_histcos_rew`, the reconstructed reward kernel at
-  lag 1 dissociates — `non_local_swr ≈ 1.44` > `swr ≈ 1.22` >
-  `non_local_no_swr ≈ 0.99` (2026-09-06 refit) — while the
+  lag 1 dissociates — `non_local_swr ≈ 1.41` > `swr ≈ 1.23` > `non_local ≈ 1.21`
+  > `non_local_no_swr ≈ 1.09` — while the
   slower **recent-reward suppression** from lag 3 on (RR ≈ 0.89–0.97 per lag) is
   **shared** across populations and returns to ~1 by lag 10. Separately, the
   single immediate basis coefficient is higher for `non_local_swr` than for
-  `non_local_no_swr` **within session in 79.2 % of 216 paired sessions, 5/5
-  animals, signed-rank p = 7.8e-22** (2026-09-06 refit). Those two are different measurements:
+  `non_local_no_swr` **within session in 69.4 % of 216 paired sessions, 5/5
+  animals, signed-rank p = 1.1e-11**. Those two are different measurements:
   the first is the size of the kernel at a lag, the second is the consistency of
   a between-population difference — quote them as separate clauses, never
   spliced. Both are properties of the *fitted kernel*, which is reconstructed
@@ -201,17 +228,32 @@ offset. Its limitation is exactly that offset — see below.
   population. It is reconstructed from the four `hist_rcos_k` coefficients,
   which is smooth and cannot represent a single-lag notch, so the tabulated
   refractory window is a resolution-limited bound rather than a measured dead
-  time: on the 2026-09-06 refit it is ≤60 ms everywhere except non-local with
-  SWR (≤45 ms), and the burst peak is 2.64× (detected SWR), 2.50× (non-local
-  with SWR), 2.08× (non-local, all) and 1.72× (non-local without SWR)
+  time: it is ≤60 ms everywhere except non-local with
+  SWR (≤45 ms), and the burst peak is 2.59× (detected SWR), 2.43× (non-local
+  with SWR), 2.02× (non-local, all) and 1.57× (non-local without SWR)
   ([per_bin_rate_results.md](per_bin_rate_results.md) §4). SWR-coupled non-local
   events are the tightly bursty stream; non-SWR non-local events are the
   flattest.
 
-  (Everything in this bullet is the 2026-09-06 refit over 218 sessions — see
+  **Two reward functionals, never interchangeable.** `rr_lag1` is the
+  reconstructed kernel evaluated **at lag 1** — the blend of the three bumps that
+  the docs and the claims table have always quoted, and the number in the
+  ordering above. `rr_immediate` is `exp` of the **single** bump-0 coefficient,
+  i.e. the full 0 → 1 contrast on the immediate component; it is much larger
+  because it is a different quantity, not a restatement. On the well-anchored
+  cohort the animal-balanced `rr_immediate` reads **4.91** (detected SWR),
+  **2.96** (non-local, all), **6.86** (non-local w/ SWR) and **2.28**
+  (non-local, no SWR), 5/5 animals each
+  ([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  "Reward rate ratios"). Quote one or the other, say which, and say whether it is
+  the animal-balanced or the session-pooled summary — `rr_lag1` is published
+  both ways (session-pooled **1.228 / 1.214 / 1.408 / 1.086**, animal-balanced
+  **1.300 / 1.200 / 1.405 / 1.089**, in the same row order).
+
+  (Everything in this bullet is the well-anchored fit over 218 sessions — see
   [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full kernel and
-  [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)
-  for what changed. The smooth reward basis has no per-lag parameter, so the
+  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)
+  for what the cohort moved. The smooth reward basis has no per-lag parameter, so the
   lag-1 boost is smaller than the retired per-lag specification reported; the
   ordering and the dissociation are unchanged. The audited SWR-contrast
   ladder publishes **32 aggregate rows** under the per-term separation rule —
@@ -225,8 +267,21 @@ offset. Its limitation is exactly that offset — see below.
 A "stop" is an immobility bout: the interval between two crossings of the
 `head_speed < 4 cm/s` threshold (`bouts.py`). A single well visit is routinely
 cut into several such bouts by small movements at the port, so **the modelled
-unit is a fragment of a visit, not the visit**. Measured on the canonical stop
-table (`stop_table.parquet`, 107,400 stops):
+unit is a fragment of a visit, not the visit**.
+
+**Which fragments are modelled.** Both families fit the **well-anchored**
+fragments: `occupancy_state` `at_well` **or** `mixed`, 84,069 of the 107,400
+canonical stops. A `mixed` bout is one whose first settling samples still read as
+in-transit — it begins after the last well arrival (median 0.73 s), sits at 0 cm
+from the well, and 96.8 % of its events are at-well at the event grain — so
+including it is what makes the rate cohort *contain* the content cohort instead
+of crossing it; the stop-grain `at_well`-only rule would have dropped 30.6 % of
+the content events. The 22,850 in-transit bouts are a separate bundle and are
+never pooled in ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)).
+The table below is stop-grain `at_well` only, so it describes the larger part of
+that cohort rather than all of it.
+
+Measured on the canonical stop table (`stop_table.parquet`, 107,400 stops):
 
 | quantity | value |
 | --- | --- |
@@ -253,9 +308,12 @@ direct test of that alternative.
 
 ### The arrival-clock variant of the time course
 
-> Coverage: `M0a_const_arrival` fits all 218 sessions, but `M5a_time_arrival` and
-> `M7ra_time_arrival_histcos_rew` return no fit in five sessions each (213 of 218), so the
-> arrival sub-ladder's pooled comparisons are over 213 paired sessions.
+> Coverage: `M0a_const_arrival` fits all 218 sessions in every population, but
+> `M5a_time_arrival` is fit on 212 / 213 / 206 / 212 of them and
+> `M7ra_time_arrival_histcos_rew` on 206 / 216 / 200 / 210 (detected SWR /
+> non-local, all / non-local w/ SWR / non-local, no SWR; fitted rows of
+> `models_per_bin_rate/all_models.pkl`), so the arrival sub-ladder's pooled
+> comparisons are over the smaller of each pair, per population.
 
 `M0a_const_arrival`, `M5a_time_arrival` and `M7ra_time_arrival_histcos_rew`
 re-anchor the same spline block on `time_since_last_well_arrival_s` (bin centre
@@ -290,12 +348,17 @@ normalized on their own windows
 **supported interior** — **between the outermost interior knots**, so `tc` is
 read on [1, 3] s (knots 1/2/3) and the arrival clock on [1, 6] s (knots
 1/2/4/6) — because a cubic B-spline extrapolating past its outermost interior
-knot sits over almost no exposure and can run away there. On the 2026-09-06 refit the two clocks put
+knot sits over almost no exposure and can run away there. On the **all-stops**
+fit of 2026-09-06 the two clocks put
 the across-session median peak at broadly the same delay in **every**
 population: 2.2–3.0 s on `tc` against 3.0–3.6 s after arrival, with KS
 distances between the normalized curves of 0.06 (non-local, all), 0.07 (detected
 SWR and non-local no-SWR) and 0.12 (non-local with SWR). Detected SWR is no
 exception — its supported arrival-clock maximum is at 3.6 s, like the others.
+The `tc` half of that comparison has been re-derived on the well-anchored cohort
+(2.3–2.8 s, [per_bin_rate_results.md](per_bin_rate_results.md) §1b); the
+arrival-clock peaks and the KS distances have **not**, so the paragraph's
+cross-clock statement stands on the all-stops population until they are.
 
 That last point is a correction worth stating plainly, because the naive
 summary gets it backwards. All the numbers in this paragraph are read from the
@@ -319,41 +382,51 @@ peak, which sits exactly on the right edge of its supported interval (3.0 s).
 
 Read the whole comparison as two descriptions of the same rate, not as one
 clock beating the other — neither ladder is fit to the other's rows. The
-arrival rungs are also heavily flagged: 37 % (detected SWR) to 66 %
-(non-local with SWR) of their fits carry a separated non-nuisance term and are
-excluded from the shape summary, so the curves above rest on 68–132 sessions,
-not 218.
+arrival rungs are also heavily flagged: on the well-anchored fit 42.9 %
+(detected SWR) to 63.6 % (non-local with SWR) of `M5a_time_arrival` fits carry a
+separated non-nuisance term and are excluded from the shape summary, so a shape
+summary rests on a minority of the corpus, not on 218 sessions. (The session
+counts behind the shape numbers quoted above — 68–132 — are the all-stops
+fit's.)
 
-Measured on the 2026-09-06 refit of 218 sessions: requiring the arrival clock
-cost the common cohort **84,502 of 7,400,248 bins (1.14 %) and 1,322 stops**;
-the window then kept **6,618,107 of 7,315,746 bins (90.5 %)**.
+On the all-stops fit of 2026-09-06, requiring the arrival clock cost the common
+cohort **84,502 of 7,400,248 bins (1.14 %) and 1,322 stops**; the window then
+kept **6,618,107 of 7,315,746 bins (90.5 %)**. On the well-anchored cohort the
+clock costs **515 of 84,069 stops** (above) and the window keeps a larger share
+of every population's events (retention table above).
 
-**The arrival clock is not always the clock of the well the animal is at.**
-3.5 % of the arrival-window bins (2.6 % of the window's event onsets — 3.7 % of
-non-local, 1.5 % of SWR) come from `in_transit` bouts, whose
+**The arrival clock used to be the clock of a well the animal had left.** On the
+all-stops fit, 3.5 % of the arrival-window bins (2.6 % of the window's event
+onsets — 3.7 % of non-local, 1.5 % of SWR) came from `in_transit` bouts, whose
 `last_well_arrival_time_s` is the arrival at the well the animal **left** (the
 same per-bin design split by the stop's `occupancy_state`; measured on the
-2026-09-06 review pass, not printed in the audit). The
-arrival rungs do not condition on occupancy, so those bins enter the time
-course on a clock that measures time since departure, not time at a well.
+2026-09-06 review pass, not printed in the audit). The arrival rungs still do
+not condition on occupancy, but the well-anchored cohort holds no in-transit
+bout, so on the canonical fit that population is gone and the clock measures
+time at a well. The caveat survives only for the `_allstops` sensitivity
+bundle.
 
 **Retention is not balanced across populations.** The window keeps a different
-fraction of each population's *events* — 91.2 % (detected SWR), 90.2 %
-(non-local with SWR), 85.0 % (non-local, all) and **81.4 %** (non-local without
-SWR) — so an arrival-ladder contrast between populations is partly a contrast
-between windows. Both the cohort audit and the runner log report it per
+fraction of each population's *events* — on the well-anchored cohort 94.3 %
+(detected SWR), 92.9 % (non-local with SWR), 90.6 % (non-local, all) and
+**88.9 %** (non-local without SWR) — so an arrival-ladder contrast between
+populations is partly a contrast between windows. The imbalance is smaller than
+it was on all stops (91.2 / 90.2 / 85.0 / **81.4 %**), because the bouts the
+window discards most are the in-transit ones the cohort no longer holds (their
+retention is 0.17–0.35). Both the cohort audit and the runner log report it per
 population (`result.attrs["arrival_clock_cohort"]`;
-[audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)).
+[audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+"Arrival-window retention").
 
-**The arrival rungs are themselves rarely cross-validated.** On the same refit
-`cv_bits_per_event` was NaN in 92.0 % (`M5a_time_arrival`) and 93.8 %
-(`M7ra_time_arrival_histcos_rew`) of non-local fits — 100 % on the
-`non_local_swr` population — so their held-out numbers describe a small,
+**The arrival rungs are themselves rarely cross-validated.** On the
+well-anchored fit `cv_bits_per_event` is NaN in 91.5 % (`M5a_time_arrival`) and
+93.5 % (`M7ra_time_arrival_histcos_rew`) of non-local fits — 99.5 % and 100 % on
+the `non_local_swr` population — so their held-out numbers describe a small,
 self-selected subset of sessions and must not be quoted as corpus quantities.
 Read the arrival ladder on its fitted time course, not on its CV — and read it
 **pooled**: `M5a_time_arrival` is flagged separated on its spline columns in
-37 % (detected SWR) to 66 % (non-local with SWR) of sessions, so a per-session
-arrival coefficient is usually not identified. The ladder-level AIC and the
+42.9 % (detected SWR) to 63.6 % (non-local with SWR) of sessions, so a
+per-session arrival coefficient is usually not identified. The ladder-level AIC and the
 across-session median curve are the readable quantities; individual
 coefficients are not.
 
@@ -420,21 +493,30 @@ Both estimators now carry the *same* past-only reward-history block, and in both
 the reward dependence is carried by the SWR-coupled stream and is absent from the
 non-SWR one:
 
-- **Family A (per-stop):** on the 2026-09-06 fit the reward block still improves
-  the fit on every population except the non-SWR one — median `R1 − R0` ΔAIC
+- **Family A (per-stop):** on the all-stops fit of 2026-09-06 the reward block
+  still improves the fit on every population except the non-SWR one — median
+  `R1 − R0` ΔAIC
   **−5.12** (non-local), **−2.43** (non-local w/ SWR), **−1.41** (detected SWR),
-  **+0.30** (non-local, no SWR), over 218 sessions each. The earlier per-stop
+  **+0.30** (non-local, no SWR), over 218 sessions each. The well-anchored refit
+  of this ladder has not been audited, so this bullet is the all-stops
+  sensitivity. The earlier per-stop
   headline — a large suppression of the rate after an omitted reward, in most
   sessions — came from an outcome-flag rung that is no longer fit: it was built
   from the trial *start*, so it could encode the not-yet-delivered outcome on
   approach stops, and the causal spec now uses the past-only basis instead (see
   the causal-hygiene note above). Neither its magnitude nor its session share
   survives into this ladder.
-- **Family B (per-bin):** the reconstructed kernel's lag-1 dissociation (**1.44**
-  SWR-coupled vs **0.99** non-SWR) and the paired within-session comparison
-  (**79.2 % of 216 sessions, 5/5 animals, signed-rank p = 7.8e-22**),
+- **Family B (per-bin):** on the well-anchored cohort, the reconstructed
+  kernel's lag-1 dissociation (**1.41** SWR-coupled vs **1.09** non-SWR) and the
+  paired within-session comparison
+  (**69.4 % of 216 sessions, 5/5 animals, signed-rank p = 1.1e-11**),
   controlling for dwell, the within-stop time course, reward history, and event
-  clustering.
+  clustering. Both are weaker than the all-stops values they replace (1.44 vs
+  0.99; 79.2 %, p = 7.8e-22): the non-SWR stream's immediate component is the
+  part the in-transit stops were holding down, and it rises once they leave. The
+  dissociation survives — SWR-coupled is still the reward-gated stream — but it
+  is a difference of degree, not the presence-vs-absence contrast the all-stops
+  numbers read as.
 
 Family A agrees in *direction* on a four-parameter block test; Family B is where
 the effect is measured. Read the agreement as directional only: Family A's step
@@ -485,7 +567,8 @@ scale: `|coef| × sd >= 10` using the fit's own persisted `sd_<term>`, so a stee
 per-unit slope on a narrow covariate is kept and only legacy artifacts carrying
 no `sd_<term>` fall back to the raw `|coef| >= 10`.
 
-The fit-level `separated` share of the S rungs stays high — 172–186 of the
+The fit-level `separated` share of the S rungs stays high — on the all-stops
+contrast fit, 172–186 of the
 211–216 fits of every rung that carries an `is_swr` expansion (`S2`–`S10`) —
 because one term dominates it: `is_swr:reward_history_rcos_1` alone is flagged in
 151–181 fits per rung. The middle bump of the three-bump reward basis is nearly
@@ -498,7 +581,8 @@ Read the fit-level share as "some coefficient in this fit is unidentified", neve
 as a verdict on the term being aggregated.
 
 Judging separation per term is what restored the cross-validation metrics of
-Family A: the reward rung `R1` goes from **19.6 %** to **83.5 %** of session-fits
+Family A: on the all-stops fit where it was measured, the reward rung `R1` goes
+from **19.6 %** to **83.5 %** of session-fits
 carrying a finite `cv_ll_per_stop_mean`. Quote that, not the pooled `all` row of
 the audit table (59.8 % → 91.7 %), which averages `R1` with `R0` — a rung that is
 always scored, so pooling flatters the change.
@@ -508,12 +592,12 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
 [per_bin_rate_results.md](per_bin_rate_results.md) §6):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`
-  fails the KS band on about half of sessions (`ks_within_band` 0.50,
+  fails the KS band on more than half of sessions (`ks_within_band` 0.44,
   non-Poisson: refractory + bursty), and the reward / self-history blocks
-  *without* time do **not** fix it (`M1_rew` 0.46, `M3r_histcos` 0.39). Adding
-  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to 0.85, `M6r` (+
-  self-history) holds it at 0.83 and the full model `M7r_time_histcos_rew`
-  reaches 0.87 (2026-09-06 refit). The dominant misfit of the constant model is
+  *without* time do **not** fix it (`M1_rew` 0.38, `M3r_histcos` 0.33). Adding
+  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to 0.91, `M6r` (+
+  self-history) holds it at 0.91 and the full model `M7r_time_histcos_rew`
+  reaches 0.93. The dominant misfit of the constant model is
   the strong post-stop rate transient, not the fine-timescale clustering.
 - **Dispersion stays far below 1 (underdispersed), not → 1.** At these sparse 15 ms
   bins the Poisson deviance is not a calibrated dispersion estimate, so the
@@ -524,16 +608,15 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
   well-behaved on average; `mean_predicted` / `max_predicted` are reported so the
   high-rate-bin KS bias can be ruled out.
 - **The time block is the only rung with both a large CV gain and a near-full CV
-  cohort.** `M5_time` scores **0.225** held-out bits/event on **217 of 218**
-  non-local sessions. Its median AIC (2223) is the ladder's third-lowest, behind
-  `M7r_time_histcos_rew` (2220) and `M6r_time_histcos` (2221) — the AIC ordering
+  cohort.** `M5_time` scores **0.266** held-out bits/event on **208 of 218**
+  non-local sessions. Its median AIC (2083) is the ladder's third-lowest, behind
+  `M7r_time_histcos_rew` (2077) and `M6r_time_histcos` (2078) — the AIC ordering
   and the held-out ordering are not the same ordering. The three rungs that carry
   time **and** the raised-cosine self-history block (`M6r_time_histcos`,
-  `M7r_time_histcos_rew`, `M9r_rew_x_time`) score 0.186–0.229 bits/event but only
-  on **64–84** sessions each, so a nominally higher median there
-  (`M6r_time_histcos`, 0.229 over 82 sessions) is a selected-minority number and
+  `M7r_time_histcos_rew`, `M9r_rew_x_time`) score 0.200–0.262 bits/event but only
+  on **43–74** sessions each, so a median there is a selected-minority number and
   not a like-for-like win over `M5_time`. The fourth rung carrying that block,
-  `M3r_histcos`, has no time spline and scores **0.052** over 79 sessions — far
+  `M3r_histcos`, has no time spline and scores **0.044** over 75 sessions — far
   below `M5_time` on a comparably selected cohort. The
   `onset_lag` dummy rungs were scored on essentially no sessions at all — that
   is the measurement that retired them (99.08 % NaN `cv_bits_per_event` on the
@@ -545,12 +628,13 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
 - **The reward block is a small AIC step once the rungs share rows, and a
   negative one once time and self-history are already in.** Read the block
   twice. *Marginally* (`M1_rew − M0_const`) the median per-session ΔAIC is
-  **−7.84** (non-local), **−5.42** (non-local w/ SWR), **−3.01** (detected SWR)
-  and **+0.14** (non-local, no SWR): the block pays for itself against a
-  constant rate in three of the four populations. *Conditionally* — the reward
+  **−8.18** (non-local), **−3.96** (non-local w/ SWR), **−3.23** (detected SWR)
+  and **−0.75** (non-local, no SWR): the block now pays for itself against a
+  constant rate in all four populations, the non-SWR one marginally (58.3 % of
+  its sessions). *Conditionally* — the reward
   block given time **and** self-history, `M7r_time_histcos_rew − M6r_time_histcos`
-  — every population moves the wrong way: **+1.09** (non-local), **+1.64**
-  (detected SWR), **+2.17** (non-local w/ SWR), **+2.38** (non-local, no SWR).
+  — every population moves the wrong way: **+1.58** (detected SWR), **+1.19**
+  (non-local), **+2.41** (non-local w/ SWR), **+2.28** (non-local, no SWR).
   The four-parameter smooth block does not pay for itself once the time
   course and self-history are in the model, even though its immediate component
   is a large and consistent effect. The much larger reward step the retired
