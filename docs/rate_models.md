@@ -27,7 +27,11 @@ one-population null tested against its split.
 > ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)).
 > The all-stops fits are kept as a **sensitivity bundle** (`_allstops`) and
 > in-transit stops as their own (`_intransit`); an in-transit population is never
-> pooled with a well-anchored one. Every number below is from the well-anchored
+> pooled with a well-anchored one. **The in-transit bundle is thin** — only 50 of
+> 218 sessions clear the per-bin sample gates on any population, and only 10 on
+> the SWR-coupled non-local stream — so an in-transit cell showing no effect is
+> an absence of evidence, not evidence of absence, and its paired tests have no
+> power. Every number below is from the well-anchored
 > fit unless it is explicitly labelled all-stops. A number still dated
 > **2026-09-06** was measured on the all-stops population, which was then the
 > canonical one, and has **not** been re-derived on this cohort; it is labelled

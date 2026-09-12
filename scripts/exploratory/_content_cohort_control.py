@@ -12,11 +12,15 @@ What it established on 2026-09-12, on the ``omitted`` stratum: the bypassed run
 reproduces the pre-cohort archive EXACTLY (700/700 arm rows, 259/259 patch,
 ``assert_frame_equal(check_exact=True)`` once the four diagnostic columns added
 since are dropped), so the archive is a valid baseline. Against the shipped
-at-well bundle the fitted event set is identical on every shared session-rung
-(``n_events`` max |diff| 0) -- the rule removes no event any rung other than
-``C0_armfe`` was fitting -- but every coefficient moves, because the runner's
-fit-time standardization reference is computed over the assembled cohort, so
-restricting the cohort changes the unit of every ``_z`` covariate.
+at-well bundle the fitted event set is unchanged on matched session-rungs:
+10,923 (session, rung, population) cells appear on both sides, and only
+``C0_armfe`` cells differ in ``n_events``, so the rule removes no event any
+other rung was fitting. That is a statement about the matched cells only -- 45
+session-rungs exist only after the refit and 27 only before, where a rung
+reached a per-session fit on one side and not the other. Every coefficient
+moves regardless, because the runner's fit-time standardization reference is
+computed over the assembled cohort, so restricting the cohort changes the unit
+of every ``_z`` covariate.
 
 The output root must look like ``replay_content`` to the runner, which reads its
 input tables and ``standardization_reference.json`` from the same root it writes
