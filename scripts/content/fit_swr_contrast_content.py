@@ -82,6 +82,9 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     term_diagnostics,
     write_cohort_audit,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import (
+    select_event_cohort,
+)
 from continuum_swr_replay.analysis.replay.content_response import (
     ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
@@ -467,10 +470,37 @@ def prepare_cohorts(
     return ev, pt, scale, stratum_audit
 
 
+def _cohort_log(label: str, report: dict) -> None:
+    """Log one cohort selection at the grain the runner reports it on."""
+    logger.info(
+        "%s cohort = %s (%s): %d -> %d events (%.1f%% retained); dropped %s",
+        label,
+        report["cohort"],
+        report["rule"],
+        report["n_events_before"],
+        report["n_events_after"],
+        100 * report["n_events_after"] / max(report["n_events_before"], 1),
+        {
+            state: count
+            for state, count in report["counts_before"].items()
+            if state not in report["counts_after"]
+        },
+    )
+
+
 def _assemble_arm() -> tuple[pd.DataFrame, dict]:
     """Load the arm cohort and attach its design columns and ``_z`` reference."""
     ev = read_table(FIT_INPUTS["event_arm_table"])
     require_covariate_schema(ev, table="event_arm")
+    # Cohort: at-well events, stated here rather than left to fall out of the
+    # complete-case filter. Every rung carrying `is_current_arm` already lost the
+    # off-well events that way (it is NaN off a well), so for those this is a
+    # no-op; the arm-fixed-effects rung carries no location predictor and so was
+    # being fit on a LARGER population than the rungs it is the null for. Stating
+    # the cohort once puts the whole ladder -- and the rate family, which applies
+    # the same rule to its stop table -- on one population.
+    ev, arm_cohort = select_event_cohort(ev, cohort="at_well")
+    _cohort_log("ARM", arm_cohort)
     reference_path = RC / "standardization_reference.json"
     if not reference_path.exists():
         raise FileNotFoundError(
@@ -594,6 +624,8 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Load the patch cohort and attach its design columns and ``_z`` reference."""
     pt = read_table(FIT_INPUTS["event_patch_table"])
     require_covariate_schema(pt, table="event_patch")
+    pt, patch_cohort = select_event_cohort(pt, cohort="at_well")
+    _cohort_log("PATCH", patch_cohort)
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
     e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
     pt = pt.merge(e2s, on="event_id", how="left")

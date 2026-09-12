@@ -82,6 +82,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     freeze_common_cohort,
+    select_event_cohort,
 )
 from continuum_swr_replay.analysis.replay.content_response import (
     ESTIMATOR_CHOICES,
@@ -1689,15 +1690,22 @@ def _load_and_filter_cohort(
     # The restriction is not balanced across the SWR contrast (3.3% of SWR
     # events are off-well against 13.0% of non-SWR) -- expected, since SWR
     # events concentrate at wells -- so the cohort belongs in Methods.
+    #
+    # The rule itself lives in `select_event_cohort`, which is the same rule the
+    # rate runners apply to their stop table, so "at-well" means one thing across
+    # both families rather than two filters that happen to agree today.
     if "occupancy_state" in long_df.columns:
-        at_well = long_df["occupancy_state"].eq("at_well")
-        n_before_events = long_df[event_col].nunique()
-        long_df = long_df.loc[at_well].reset_index(drop=True)
+        long_df, cohort_report = select_event_cohort(
+            long_df, cohort="at_well", event_col=event_col
+        )
         logging.info(
-            "cohort = at-well events: %d -> %d events (%.1f%% retained)",
-            n_before_events,
-            long_df[event_col].nunique(),
-            100 * long_df[event_col].nunique() / max(n_before_events, 1),
+            "cohort = at-well events (%s): %d -> %d events (%.1f%% retained)",
+            cohort_report["rule"],
+            cohort_report["n_events_before"],
+            cohort_report["n_events_after"],
+            100
+            * cohort_report["n_events_after"]
+            / max(cohort_report["n_events_before"], 1),
         )
 
     # Candidate set: the six leaf arms, when asked for. Applied before the
