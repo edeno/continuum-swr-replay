@@ -1,16 +1,67 @@
 # Cohort and covariate-timing rules
 
-Two cross-cutting rules that every fit runner enforces, moved out of the model
-catalog so that file stays a catalog:
+Three cross-cutting rules that every fit runner enforces, moved out of the
+model catalog so that file stays a catalog:
 
-1. **Covariate causal hygiene** — which covariates may be a forward predictor,
+1. **Shared stop cohort** — which stops (and therefore which events) the rate
+   and content families are both about.
+2. **Covariate causal hygiene** — which covariates may be a forward predictor,
    and which rungs are retained only under an explicitly *descriptive* claim.
-2. **Cohort-audit tables** — the `<run>_cohort_audit.csv` schema, its
+3. **Cohort-audit tables** — the `<run>_cohort_audit.csv` schema, its
    mutually-exclusive drop buckets, and its reconciliation invariant.
 
 The rungs themselves, in R notation, are in
 [`../models_table.md`](../models_table.md); the covariate definitions are in
 [`../covariate_dictionary.md`](../covariate_dictionary.md).
+
+## Shared stop cohort
+
+**The rule.** Every rate and content runner selects its population through one
+function, `analysis.replay.cohort_selection.select_stop_cohort` (and its
+event-grain sibling `select_event_cohort`), on the canonical `occupancy_state`
+column of the stop / event table:
+
+| cohort | rule | artifacts |
+| --- | --- | --- |
+| `at_well` (canonical, default) | `occupancy_state == "at_well"` | the unsuffixed names |
+| `in_transit` | `occupancy_state == "in_transit"` | `_intransit` |
+| `all_stops` | no occupancy restriction | `_allstops` |
+
+The four rate runners (`fit_per_bin_rate_models.py`,
+`fit_per_stop_rate_models.py`, `fit_swr_contrast_rate.py`,
+`fit_uncertainty_rate.py`) expose it as `--stop-cohort`, applied to the stop
+table **before** the `--max-per-animal` smoke subset and **before** the
+common-cohort freeze, logged with its counts, written onto every fitted row as
+`stop_cohort`, and recorded in the provenance sidecar's `extra`. The two
+content runners (`fit_replay_content_models.py`,
+`fit_swr_contrast_content.py`) apply `at_well` unconditionally — the content
+ladders are only defined there, since every location-derived predictor
+(`is_current_arm` and everything built from it) is undefined off a well.
+`model_comparison.METADATA_COLUMNS` carries `stop_cohort`, so an at-well rung
+compared against an all-stops rung is NaN'd with a reason rather than
+differenced.
+
+**The counts** (canonical tables, schema `v5_dio_poke_trials`): the stop table
+holds **107,400** immobility stops — 69,224 at-well, 22,850 in-transit, 14,845
+mixed and 481 unknown — so the at-well cohort keeps 64.5% of stops. The arm
+event table holds **65,913** non-local events, of which **59,699** (90.6%) are
+at-well.
+
+**Why.** The rate ladders used to fit every immobility stop while the content
+ladders fit only at-well events, so "non-SWR replay is not reward-gated" (a
+rate claim) and every content claim about non-SWR replay were statements about
+different populations. In-transit stops carry a disproportionate share of
+non-SWR non-local onsets, so pooling them into the rate family and not the
+content family is not a neutral difference in scope: it moves exactly the
+contrast the two families are compared on. At-well stops are therefore the
+shared canonical cohort for both. The all-stops fits remain available as a
+sensitivity bundle under `_allstops`, and in-transit stops may be fit as their
+own bundle under `_intransit`, but an in-transit population is never pooled
+with an at-well one.
+
+The restriction is not balanced across the SWR contrast (3.3% of SWR events are
+off-well against 13.0% of non-SWR events) — expected, since SWR events
+concentrate at wells — so the cohort belongs in Methods.
 
 ## Covariate causal hygiene
 
