@@ -48,6 +48,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import json
 import re
 import shlex
 import sys
@@ -2576,6 +2577,32 @@ COHORT_AIC_STEPS = (
 # The is_swr-contrast bundle fits each rung on its own primary/post-outcome
 # cohort; only the primary one spans the whole ladder, so the rung table reads it.
 CONTRAST_PRIMARY_COHORT = "primary"
+#: Rungs the primary cohort does NOT carry: they need a post-outcome covariate
+#: (`rpe_postoutcome`, `reward_belief_mean_update_l1_all_ports_postoutcome`),
+#: which is undefined on a stop that starts before its trial's outcome is known,
+#: so they are fit on the gated cohort alongside a refit of their ladder's null.
+CONTRAST_POST_OUTCOME_RUNGS = ("G5_rpe", "G7_update", "S7_rpe", "S9_update")
+#: Rungs whose reward block is interacted with the within-stop time spline. The
+#: main effect `coef_reward_history_rcos_0` is then the reward slope at the point
+#: where EVERY spline column is zero, which for a B-spline over [0, TMAX] is off
+#: the fitted window -- a boundary extrapolation, not the reward contrast. It is
+#: blanked rather than printed (it produced a 39.8x cell in an earlier draft).
+REWARD_X_TIME_RUNGS = ("G8_rewxtime", "S10_rewxtime")
+#: The is_swr interaction on the immediate reward component. On an S rung the
+#: main effect is the NON-SWR reference-level slope and this is the multiplier
+#: that turns it into the SWR one, so the ladder reads as a contrast.
+SWR_IMMEDIATE_COEF = f"coef_is_swr:{REWARD_HISTORY_COLUMNS[0]}"
+#: Ladder letter + rung number, so ``S10_rewxtime`` sorts after ``S9_update``
+#: instead of between ``S0_rate`` and ``S1_rew``.
+_RATE_RUNG_NUMBER = re.compile(r"^([A-Za-z]+)(\d+)(.*)$")
+
+
+def rate_rung_sort_key(model: str) -> tuple[str, int, str]:
+    """Order a rate rung by its ladder letter and its NUMBER, not as text."""
+    match = _RATE_RUNG_NUMBER.match(model)
+    if match is None:
+        return (model, 0, "")
+    return (match.group(1), int(match.group(2)), match.group(3))
 
 
 def _animal_balanced(frame: pd.DataFrame, column: str) -> tuple[float, int, int]:
@@ -2635,14 +2662,58 @@ def cohort_size_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Immediate reward-component rate ratio per population and cohort.
+def reward_kernel_lag1(frame: pd.DataFrame) -> pd.Series:
+    """Per-session reconstructed reward kernel at lag 1, indexed by animal.
 
-    ``exp`` of the animal-balanced median of ``coef_reward_history_rcos_0`` on
-    the full rung: the rate ratio the first raised-cosine reward component
-    carries, holding the time course, the self-history and the reward rate. The
-    exponential is applied to the median coefficient rather than the median of
-    the exponentials -- the same monotone summary the ladder is reported with.
+    This is the PUBLISHED functional. Each session's three basis coefficients
+    are mapped through the ROW-NORMALIZED reward basis and read at lag 1, whose
+    blend over the three bumps is ``[0.325, 0.066, 0]`` -- so it is a weighted
+    mixture of the whole block, not one coefficient. ``docs/rate_models.md``
+    and the 19c claim row quote this number; they do not quote
+    ``coef_reward_history_rcos_0``.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        One rung's per-session fits, carrying ``animal`` and the three
+        ``coef_reward_history_rcos_*`` columns.
+
+    Returns
+    -------
+    pandas.Series
+        Log-rate kernel value at lag 1 per fitted session, indexed by animal.
+        Empty when the block was not fit.
+    """
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    if not set(columns) <= set(frame.columns) or "animal" not in frame.columns:
+        return pd.Series(dtype=float)
+    fitted = frame.dropna(subset=columns)
+    if fitted.empty:
+        return pd.Series(dtype=float)
+    kernels = reconstruct_reward_kernels(
+        fitted[columns].to_numpy(dtype=float),
+        REWARD_HISTORY_N_LAGS,
+        REWARD_HISTORY_N_BASIS,
+    )
+    return pd.Series(kernels[:, 0], index=fitted["animal"].to_numpy())
+
+
+def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Two DIFFERENT reward rate ratios per population and cohort.
+
+    They are not interchangeable and must never be quoted as one number:
+
+    * ``rr_immediate`` -- ``exp`` of the animal-balanced median
+      ``coef_reward_history_rcos_0``, the full 0 -> 1 contrast on the first
+      raised-cosine bump. The cohort audit reads it because it is one
+      coefficient with one definition in all three cohorts.
+    * ``rr_lag1_*`` -- ``exp`` of the reconstructed kernel at lag 1
+      (:func:`reward_kernel_lag1`), the published functional, given both
+      session-pooled and animal-balanced because the rate docs report the first
+      and the audited aggregates the second.
+
+    Medians commute with ``exp``, so exponentiating the median kernel is the
+    same number as the median of the exponentiated kernels.
     """
     rows = []
     for outcome in OUTCOME_ORDER:
@@ -2651,6 +2722,10 @@ def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
             if sub.empty:
                 continue
             median, n_positive, n_animals = _animal_balanced(sub, IMMEDIATE_COEF)
+            lag1 = reward_kernel_lag1(sub)
+            per_animal = (
+                lag1.groupby(level=0).median() if len(lag1) else pd.Series(dtype=float)
+            )
             rows.append(
                 {
                     "outcome": outcome,
@@ -2661,7 +2736,20 @@ def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
                         else 0
                     ),
                     "rr_immediate": float(np.exp(median)),
-                    "animals_positive": f"{n_positive}/{n_animals}",
+                    "animals_pos_immediate": f"{n_positive}/{n_animals}",
+                    "rr_lag1_session": (
+                        float(np.exp(lag1.median())) if len(lag1) else np.nan
+                    ),
+                    "rr_lag1_animal": (
+                        float(np.exp(per_animal.median()))
+                        if len(per_animal)
+                        else np.nan
+                    ),
+                    "animals_pos_lag1": (
+                        f"{int((per_animal > 0).sum())}/{per_animal.size}"
+                        if len(per_animal)
+                        else "—"
+                    ),
                 }
             )
     return pd.DataFrame(rows)
@@ -2779,20 +2867,33 @@ def cohort_arrival_retention_table(fits: dict[str, pd.DataFrame]) -> pd.DataFram
 def cohort_contrast_rung_table(contrast: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Per rung and population, what each cohort's is_swr-contrast bundle holds.
 
-    Restricted to the bundle's PRIMARY fitting cohort (the post-outcome refits
-    exist for one AIC comparison and are not a second copy of the ladder), and
-    reporting the fitted size plus the immediate reward component where the rung
-    carries it, so a coefficient shift can be read beside the cohort shift.
+    Restricted to the bundle's PRIMARY fitting cohort, so the four rungs that
+    need a post-outcome covariate (:data:`CONTRAST_POST_OUTCOME_RUNGS`) are
+    absent: they are fit on the gated cohort with their own null and are not a
+    second copy of the ladder.
+
+    ``rr_immediate`` is the estimand the rung actually defines, which is not the
+    same statement on every rung:
+
+    * on a ``G`` rung it is that population's immediate reward slope;
+    * on an ``S`` rung the ladder carries ``is_swr`` as a gating modifier, so the
+      main effect is the **non-SWR reference-level** slope and
+      ``rr_swr_x_immediate`` is the multiplier that turns it into the SWR one;
+    * on a reward-x-time rung (:data:`REWARD_X_TIME_RUNGS`) it is neither -- the
+      main effect there is the slope where every spline column is zero, off the
+      fitted window -- so it is left blank rather than printed.
     """
     rows = []
-    frames = [(c, f) for c, f in _by_cohort(contrast)]
+    frames = list(_by_cohort(contrast))
     models = sorted(
-        {m for _, frame in frames for m in frame["model"].unique()}, key=rung_sort_key
+        {m for _, frame in frames for m in frame["model"].unique()},
+        key=rate_rung_sort_key,
     )
     populations = sorted(
         {p for _, frame in frames for p in frame["population"].unique()}
     )
     for model in models:
+        boundary = model in REWARD_X_TIME_RUNGS
         for population in populations:
             for cohort, frame in frames:
                 sub = frame[
@@ -2803,6 +2904,7 @@ def cohort_contrast_rung_table(contrast: dict[str, pd.DataFrame]) -> pd.DataFram
                 if sub.empty:
                     continue
                 median, n_positive, n_animals = _animal_balanced(sub, IMMEDIATE_COEF)
+                swr_median, _, swr_animals = _animal_balanced(sub, SWR_IMMEDIATE_COEF)
                 rows.append(
                     {
                         "model": model,
@@ -2811,9 +2913,16 @@ def cohort_contrast_rung_table(contrast: dict[str, pd.DataFrame]) -> pd.DataFram
                         "n_sessions": len(sub),
                         "n_stops": float(sub["n_stops"].sum()),
                         "n_bins": float(sub["n_bins"].sum()),
-                        "rr_immediate": float(np.exp(median)),
+                        "rr_immediate": (np.nan if boundary else float(np.exp(median))),
                         "animals_positive": (
-                            f"{n_positive}/{n_animals}" if n_animals else "—"
+                            "—"
+                            if boundary or not n_animals
+                            else f"{n_positive}/{n_animals}"
+                        ),
+                        "rr_swr_x_immediate": (
+                            np.nan
+                            if boundary or not swr_animals
+                            else float(np.exp(swr_median))
                         ),
                     }
                 )
@@ -2846,13 +2955,25 @@ def _cohort_headline(fits: dict[str, pd.DataFrame]) -> str:
     non_swr = rr[rr.outcome == "non_local_no_swr"]
     if len(non_swr):
         stated = "; ".join(
-            f"`{row.stop_cohort}` {row.rr_immediate:.2f}x ({row.animals_positive} "
-            f"animals, {int(row.n_sessions)} sessions)"
+            f"`{row.stop_cohort}` {row.rr_immediate:.2f}x "
+            f"({row.animals_pos_immediate} animals, {int(row.n_sessions)} sessions)"
             for row in non_swr.itertuples()
         )
         parts.append(
-            "Immediate reward component on the non-SWR non-local population "
+            "Immediate reward component (`rr_immediate`, the 0 -> 1 contrast on "
+            "bump 0) on the non-SWR non-local population "
             f"({FULL_MODEL}): {stated}."
+        )
+        stated = "; ".join(
+            f"`{row.stop_cohort}` {row.rr_lag1_session:.3f}x session-pooled / "
+            f"{row.rr_lag1_animal:.3f}x animal-balanced "
+            f"({row.animals_pos_lag1} animals)"
+            for row in non_swr.itertuples()
+        )
+        parts.append(
+            "The published functional on the same population and rung "
+            "(`rr_lag1`, the reconstructed kernel at lag 1 — a different "
+            f"quantity, not a restatement): {stated}."
         )
     if len(paired):
         stated = "; ".join(
@@ -2877,13 +2998,105 @@ def _cohort_headline(fits: dict[str, pd.DataFrame]) -> str:
     return "\n\n".join(parts) if parts else "_(nothing fitted)_"
 
 
+def cohort_provenance_table(paths: dict[str, Path]) -> pd.DataFrame:
+    """What each artifact's sidecar records about the code that produced it.
+
+    Read rather than asserted, because the two facts a reader needs here are
+    both easy to get wrong from memory: whether the tree was clean when the fit
+    ran, and which artifacts were re-derived after a later commit.
+    """
+    rows = []
+    for role, path in paths.items():
+        sidecar = Path(str(path).replace(".pkl", ".provenance.json"))
+        if not sidecar.exists():
+            continue
+        record = json.loads(sidecar.read_text())
+        rows.append(
+            {
+                "artifact": path.name,
+                "role": role,
+                "git_hash": str(record.get("git_hash", ""))[:20],
+                "stop_cohort": str(record.get("stop_cohort", "—")),
+                "written_at": str(record.get("written_at", ""))[:19],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _audited_sibling(path: Path) -> Path:
+    """The audited aggregate published beside a per-session contrast bundle."""
+    return path.with_name(
+        path.name.replace("swr_contrast_rate", "swr_contrast_rate_audited", 1)
+    )
+
+
+def in_transit_power_note(fits: dict[str, pd.DataFrame]) -> str:
+    """How many sessions the in-transit bundle actually reaches, per population.
+
+    Derived rather than asserted, because it is the caveat the in-transit column
+    cannot be read without: an in-transit stop is short and sparse, so most
+    sessions never clear the per-bin minimum-sample gates and the population
+    that is rarest there -- SWR-coupled non-local events -- clears them least
+    often. A cell that shows no effect in that column is an absence of evidence.
+    """
+    frame = fits.get("in_transit")
+    if frame is None or not len(frame):
+        return ""
+    reference = fits.get("at_well")
+    corpus = (
+        (reference if reference is not None and len(reference) else frame)
+        .groupby(SC)
+        .ngroups
+    )
+    fitted = frame.groupby(SC).ngroups
+    nulls = frame[frame.model == "M0_const"]
+    per_population = ", ".join(
+        f"{outcome} {int((nulls.outcome == outcome).sum())}"
+        for outcome in OUTCOME_ORDER
+        if (nulls.outcome == outcome).any()
+    )
+    return (
+        f"**The in-transit column is thin.** Only **{fitted} of {corpus}** sessions "
+        "clear the per-bin minimum-sample gates on any population "
+        f"({per_population}), against {corpus} on the canonical cohort. An "
+        "in-transit cell that shows no effect is an absence of evidence, not "
+        "evidence of absence, and its paired tests have no power."
+    )
+
+
+def _flag_support_edge(table: pd.DataFrame) -> pd.DataFrame:
+    """Star a burst peak that sits on the edge of the spline's supported interior.
+
+    An argmax at ``peak_frac_support`` 0 or 1 is the curve still rising (or
+    falling) where the summary stops looking, so the peak is a bound on where
+    the burst is, not a location. Starring is done at render time so the table
+    itself keeps a numeric column.
+    """
+    if table.empty or "burst_peak_s" not in table.columns:
+        return table
+    shown = table.copy()
+    edge = shown["peak_frac_support"].isin((0.0, 1.0))
+    shown["burst_peak_s"] = [
+        f"{value:.3f}*" if flag else f"{value:.3f}"
+        for value, flag in zip(shown["burst_peak_s"], edge, strict=True)
+    ]
+    return shown
+
+
 def build_cohort_report(
     fits: dict[str, pd.DataFrame],
     contrast: dict[str, pd.DataFrame],
     inputs: dict[str, Path],
     command: str | None = None,
+    provenance_extra: dict[str, Path] | None = None,
 ) -> str:
-    """Assemble the at-well / all-stops / in-transit comparison."""
+    """Assemble the at-well / all-stops / in-transit comparison.
+
+    ``provenance_extra`` names artifacts the audit does not read but whose
+    sidecars belong in its provenance table -- the audited is_swr-contrast
+    aggregates, which are what a reader quotes from.
+    """
+    provenance_extra = provenance_extra or {}
     lines = [
         "# Rate ladders across the three stop cohorts",
         "",
@@ -2922,6 +3135,8 @@ def build_cohort_report(
         "",
         f"What each artifact records about itself: {_cohort_label_note(fits)}.",
         "",
+        in_transit_power_note(fits),
+        "",
         "## Inputs",
         "",
         _md(
@@ -2933,15 +3148,41 @@ def build_cohort_report(
             )
         ),
         "",
+        "### Provenance of the artifacts read",
+        "",
+        _md(cohort_provenance_table({**inputs, **provenance_extra})),
+        "",
+        "The hash is taken when the artifact is WRITTEN, not when its run started, "
+        "so a long fit that spanned a commit records the later one — which is why "
+        "the rows above do not all agree even though they describe one sitting. A "
+        "`-dirty` suffix means the tree carried uncommitted edits at that moment; "
+        "here those edits were to this audit script and to nothing the fit runners "
+        "import. The audited is_swr-contrast bundles are the one place where the "
+        "recorded hash PREDATES the code that wrote them: they were re-derived with "
+        "`--aggregate-only` after the commit that gave the audited table its "
+        "`stop_cohort` label and fixed the input name its freshness check resolves, "
+        "and the hash records the tree that re-derivation ran from. The per-session "
+        "fits beneath them, which carry every number this audit reads, are "
+        "unaffected.",
+        "",
         "## Cohort size (per-bin ladder)",
         "",
         _md(cohort_size_table(fits)),
         "",
-        "## Immediate reward component, `M7r_time_histcos_rew`",
+        "The `in_transit` rows above are a whole-corpus total over the few "
+        "sessions that reach the ladder, not over 218. " + in_transit_power_note(fits),
         "",
-        "`rr_immediate` is `exp` of the animal-balanced median "
-        f"`{IMMEDIATE_COEF}`; `animals_positive` counts animals whose own median "
-        "is positive.",
+        "## Reward rate ratios, `M7r_time_histcos_rew`",
+        "",
+        "Two different quantities, never to be quoted as one. "
+        f"**`rr_immediate`** is `exp` of the animal-balanced median `{IMMEDIATE_COEF}` "
+        "— the full 0 → 1 contrast on the first raised-cosine bump, i.e. one "
+        "coefficient. **`rr_lag1_*`** is `exp` of the reconstructed reward kernel at "
+        "lag 1, the blend `[0.325, 0.066, 0]` over the three bumps, which is the "
+        "published functional `docs/rate_models.md` and claims row 19c quote; it is "
+        "given session-pooled (`rr_lag1_session`, how the rate docs report it) and "
+        "animal-balanced (`rr_lag1_animal`, how the audited aggregates report it). "
+        "`animals_pos_*` counts animals whose own median is positive for each.",
         "",
         _md(cohort_reward_rr_table(fits), floatfmt="{:.3f}"),
         "",
@@ -2955,7 +3196,12 @@ def build_cohort_report(
         "",
         "## Burst peak of the smooth time course (`M5_time`)",
         "",
-        _md(cohort_burst_peak_table(fits), floatfmt="{:.3f}"),
+        _md(_flag_support_edge(cohort_burst_peak_table(fits)), floatfmt="{:.3f}"),
+        "",
+        "`*` marks a peak sitting on the edge of the spline's supported interior "
+        "(`peak_frac_support` 0 or 1): the median curve is still rising or falling "
+        "where the summary stops reading it, so the value bounds the burst rather "
+        "than locating it.",
         "",
         "## Arrival-window retention",
         "",
@@ -2966,8 +3212,28 @@ def build_cohort_report(
         lines += [
             "## is_swr-contrast rate bundle, per rung and population",
             "",
-            "Primary fitting cohort only; the post-outcome refits exist for one "
-            "AIC comparison and are not a second copy of the ladder.",
+            "Primary fitting cohort only, so `"
+            + "`, `".join(CONTRAST_POST_OUTCOME_RUNGS)
+            + "` are absent: they need a post-outcome covariate and are fit on the "
+            "gated cohort with their own null, which exists for one AIC comparison "
+            "and is not a second copy of the ladder.",
+            "",
+            "`rr_immediate` is not the same statement on every rung. On a `G` rung "
+            "it is that population's immediate reward slope, fit on that "
+            "population's own rows. On an `S` rung that splits the reward block by "
+            "`is_swr` it is the **non-SWR reference-level** slope, and "
+            f"`rr_swr_x_immediate` (`exp` of the animal-balanced "
+            f"`{SWR_IMMEDIATE_COEF}`) is the multiplier that turns it into the SWR "
+            "one — so those two cells are a contrast, not two estimates of one "
+            "thing. `rr_swr_x_immediate` is blank wherever the rung carries no such "
+            "interaction: on every `G` rung, and on the ladder null `S0_rate`, "
+            "where `is_swr` enters only as an intercept shift and the reward slope "
+            "is shared by both populations. On `"
+            + "`, `".join(REWARD_X_TIME_RUNGS)
+            + "` it is blank: the reward block is interacted with the time spline "
+            "there, so the main effect is the slope at the point where every spline "
+            "column is zero — off the fitted window, a boundary extrapolation rather "
+            "than a reward contrast.",
             "",
             _md(cohort_contrast_rung_table(contrast), floatfmt="{:.3f}"),
             "",
@@ -3016,7 +3282,15 @@ def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
             "all_stops": args.all_stops_contrast,
         },
     )
-    report = build_cohort_report(fits, contrast, inputs, _invocation())
+    audited = {
+        f"is_swr-contrast audited ({cohort})": _audited_sibling(path)
+        for cohort, path in (
+            ("at_well", args.at_well_contrast),
+            ("all_stops", args.all_stops_contrast),
+        )
+        if _audited_sibling(path).exists()
+    }
+    report = build_cohort_report(fits, contrast, inputs, _invocation(), audited)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
     print(f"wrote {args.out}")
