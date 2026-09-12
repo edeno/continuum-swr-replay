@@ -52,6 +52,15 @@ arriving at a well and sits at it.
   14,845 `mixed`), 22,850 `in_transit`, 481 `unknown`.
 - arm event table: **65,913** events → **59,699 at-well** (90.6%).
 
+What reaches the shipped rate fits from those 84,069: Family A models **84,064**
+stops on `R0` (5 dropped for a non-positive immobility offset), Family B
+**83,549** over **6,777,953** bins (the same 5, plus 515 with no arrival clock,
+which the arrival rungs put into the frozen union). Counts from
+`models_per_stop_rate/all_models_cohort_audit.csv` and
+`models_per_bin_rate/per_bin_rate_cohort_audit.csv`; the three cohorts are placed
+side by side in
+[`../audits/2026-09-12-rate-cohort-atwell.md`](../audits/2026-09-12-rate-cohort-atwell.md).
+
 **Nesting, and its residual.** Every event in the content cohort lies in a stop
 in the rate cohort. The converse does not hold exactly: 609 events sit in
 well-anchored stops without being event-grain `at_well` (446 `in_transit`, 144

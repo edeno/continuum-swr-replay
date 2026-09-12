@@ -97,6 +97,21 @@ and `swr_contrast_rate_*`, each with its `_cohort_audit*.csv`,
 precedes the outcome-stratum suffix. The two rate families write to
 `models_per_bin_rate/` and `models_per_stop_rate/`.
 
+**Stop-cohort suffixes (rate artifacts).** Every rate runner takes
+`--stop-cohort {at_well,all_stops,in_transit}`, and the cohort it was given
+names the artifact: the canonical **`at_well`** (well-anchored stops,
+`occupancy_state ∈ {at_well, mixed}`) keeps the unsuffixed name, `all_stops`
+appends **`_allstops`** and `in_transit` appends **`_intransit`** — so
+`models_per_bin_rate/all_models.pkl`, `all_models_allstops.pkl` and
+`all_models_intransit.pkl` are the same ladder on three populations. The cohort
+is written onto every fitted row as a `stop_cohort` column, recorded in the
+provenance sidecar, and carried in `model_comparison.METADATA_COLUMNS`, so
+`compare_nested_models` NaNs a comparison across two cohorts instead of
+differencing it. The two content runners take no such flag: the content ladders
+are defined only at a well, so they always apply the event-grain rule. The rules
+themselves are in
+[design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md).
+
 ### Estimators
 
 | family | estimator | status | response | link | offset | grouping / replication |

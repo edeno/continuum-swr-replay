@@ -423,6 +423,10 @@ two are not the same instant.
 
 ### F.2 Scope condition: the at-well cohort is not SWR-neutral
 
+(Event grain throughout this section. Since 2026-09-12 the rate families fit the
+matching stop-grain cohort, so this scope condition now applies to both
+families rather than to the content family alone.)
+
 `is_current_arm` is undefined off-well, so every rung containing it fits the
 at-well cohort (see
 [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md)).
@@ -458,11 +462,15 @@ time-by-current-arm interactions, but they are not one construct.
 ### F.4 Per-bin reward history is recomputed at the outcome boundary
 
 A stop is an immobility **fragment**, not a well visit: 68,810 of the 69,224
-at-well stops carry an arrival clock and fall in 35,043 visits (mean **1.96
+stops whose `at_well` column is True carry an arrival clock and fall in 35,043
+visits (mean **1.96
 fragments per visit**, median 1, 90th pct 3), only 50.9 % of
-at-well stops are the first fragment of their visit, and **69.9 % of at-well
-non-local events occur in a non-first fragment**. **80.1 %** of at-well stops
-already begin after their trial's outcome is knowable.
+those stops are the first fragment of their visit, and **69.9 % of at-well
+non-local events occur in a non-first fragment**. **80.1 %** of them
+already begin after their trial's outcome is knowable. (The rate families fit
+the wider **well-anchored** cohort, 84,069 stops — those 69,224 plus the 14,845
+`mixed` bouts — so these fragment statistics describe the larger part of the fit
+cohort, not all of it.)
 
 The predicate `stop_start < outcome_known_time_s <= stop_end` — the stop *spans*
 the boundary — holds for **13.5 %** of all stops (14,494 of 107,400: 12,393
@@ -503,7 +511,13 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
 - `occupancy_state` / `at_well` / `occupancy_well_id` — whole-window behavioral
   location. An event is `at_well` only if every bin is at the same well;
   `in_transit`, `mixed`, and `unknown` events remain in the canonical tables so
-  analyses can filter them explicitly. `modal_observed_track_segment_id` is
+  analyses can filter them explicitly. **The boolean `at_well` column and the
+  fit cohort named `at_well` are not the same set at the stop grain.** The
+  column is False on a `mixed` stop; the cohort called `at_well` — the shared
+  rate/content population — is *well-anchored*, `occupancy_state ∈ {at_well,
+  mixed}`, and includes those bouts (84,069 of 107,400 stops, against 69,224
+  with the column True). At the event grain the cohort is the column
+  ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)). `modal_observed_track_segment_id` is
   the modal observed track segment, including trunks.
   `occupancy_well_arm` is NaN off-well; there is no
   trunk-to-destination fallback.
