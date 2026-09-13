@@ -154,6 +154,12 @@ def at_well_event_cohort(
     (``table_contracts`` refuses one where they disagree), so reading the
     membership from ``occupancy_state`` selects the same events while leaving
     one rule to change.
+
+    All three returned frames carry a fresh ``RangeIndex``: the shared selector
+    resets the event frame's index, and the arm/sequence frames come out of a
+    merge. Row ORDER is preserved; only the labels change. Nothing downstream
+    joins on those labels -- the metrics key on ``event_id`` -- but a caller
+    holding an index from before the call cannot reuse it after.
     """
     if event_table.empty:
         return (
@@ -162,7 +168,9 @@ def at_well_event_cohort(
             event_sequence_table.iloc[0:0].copy(),
         )
     missing = [
-        column for column in ("at_well", "occupancy_well_arm") if column not in event_table
+        column
+        for column in ("at_well", "occupancy_state", "occupancy_well_arm")
+        if column not in event_table
     ]
     if missing:
         raise KeyError(

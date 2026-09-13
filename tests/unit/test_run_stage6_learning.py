@@ -186,6 +186,18 @@ class TestProvenance:
         assert record["stop_table_sha256"] == record["inputs"]["stop_table"]["sha256"]
         assert record["n_stops"] == N_AT_WELL + N_MIXED
 
+    def test_the_cached_summary_carries_its_own_sidecar(self, stage6, monkeypatch):
+        """The summary is reused across strata, so it states its own population."""
+        _run(monkeypatch)
+
+        record = json.loads(
+            fit_provenance_path(stage6 / "stop_replay_summary.pkl").read_text()
+        )
+        assert record["estimator"] == "per_stop_summary"
+        assert record["stop_cohort"] == "at_well"
+        assert record["stop_cohort_report"]["n_stops_after"] == N_AT_WELL + N_MIXED
+        assert record["stop_table_sha256"] == record["inputs"]["stop_table"]["sha256"]
+
     def test_cached_summary_from_another_cohort_is_refused(self, stage6, monkeypatch):
         """The canonical name is unsuffixed, so the cache must be checked.
 
@@ -201,3 +213,49 @@ class TestProvenance:
         monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="not 'at_well'"):
             runner.main()
+
+    def test_cached_summary_that_states_no_cohort_is_refused(self, stage6, monkeypatch):
+        """A pre-cohort artifact names no population, so it cannot be this one.
+
+        It sits at exactly the canonical unsuffixed path and looks current in
+        every other respect, which is the whole reason the attribute is checked
+        rather than the file name.
+        """
+        _run(monkeypatch)
+        summary = pd.read_pickle(stage6 / "stop_replay_summary.pkl")
+        del summary.attrs["stop_cohort"]
+        summary.to_pickle(stage6 / "stop_replay_summary.pkl")
+
+        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        with pytest.raises(ValueError, match="cohort None, not 'at_well'"):
+            runner.main()
+
+    def test_cached_summary_cut_from_moved_tables_is_refused(self, stage6, monkeypatch):
+        """The cohort names a population; the hashes name the bytes.
+
+        A regenerated stop table changes which stops the summary holds without
+        changing its name or its cohort, so the cache is only usable while the
+        tables it read are the tables on disk.
+        """
+        _run(monkeypatch)
+        stop_table = pd.read_pickle(stage6 / "stop_table.pkl")
+        regenerated = stop_table.copy()
+        regenerated.attrs = dict(stop_table.attrs)
+        regenerated["immobility_duration_s"] = 6.0
+        regenerated.to_pickle(stage6 / "stop_table.pkl")
+
+        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        with pytest.raises(ValueError, match="different generation of stop_table"):
+            runner.main()
+
+    def test_cached_summary_is_reused_when_the_tables_have_not_moved(
+        self, stage6, monkeypatch
+    ):
+        """The staleness check must not reject a cache that is simply current."""
+        _run(monkeypatch)
+        stamp = (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns
+
+        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        runner.main()
+
+        assert (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns == stamp

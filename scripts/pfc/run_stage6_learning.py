@@ -16,6 +16,13 @@ on, so a Stage 6 statement and a content statement are about the same stops;
 ``_allstops`` names, so a sensitivity bundle cannot be mistaken for the
 canonical one.
 
+At this grain the choice makes no difference to any fitted number. ``is_stay``
+is derived from the stop's ``occupancy_well_arm`` (``tables_stop.py``), which is
+finite only for strictly ``at_well`` stops, so the response is missing for every
+``mixed``, ``in_transit`` and ``unknown`` stop and the effective population is
+the 67,606 strictly-at-well stops that carry an ``is_stay`` either way. The
+cohort is applied regardless, so the population is stated rather than implied.
+
 Outputs (next to the input tables):
 
 - ``stop_replay_summary.pkl`` — one row per stop.
@@ -35,6 +42,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -104,6 +112,31 @@ def fit_path(kind: str, stratum: str, stop_cohort: str) -> Path:
     stratum_part = "" if stratum == "all" else f"_{stratum}"
     suffix = stop_cohort_suffix(stop_cohort)
     return INPUT_DIR / f"stage6_is_stay_{kind}{stratum_part}{suffix}.pkl"
+
+
+def write_summary_provenance(
+    cache_path: Path,
+    fit_inputs: dict[str, Any],
+    stop_cohort: str,
+    cohort_report: dict[str, Any],
+) -> Path:
+    """Write the per-stop summary's own provenance sidecar.
+
+    The summary is an artifact in its own right -- it is cached, reused across
+    strata, and read months later -- so it states the population it holds and
+    the tables it was cut from without the reader having to open the pickle.
+    """
+    return write_fit_provenance(
+        cache_path,
+        fit_inputs,
+        "per_stop_summary",
+        sys.argv,
+        extra={
+            "stop_cohort": stop_cohort,
+            "stop_cohort_report": cohort_report,
+            "stop_table_sha256": fit_inputs.get("stop_table", {}).get("sha256"),
+        },
+    )
 
 
 def _content_col_for(role: str, stratum: str) -> str:
@@ -270,6 +303,9 @@ def main() -> None:
         summary.attrs["stop_cohort_report"] = cohort_report
         summary.attrs["inputs"] = fit_inputs
         summary.to_pickle(cache_path)
+        write_summary_provenance(
+            cache_path, fit_inputs, args.stop_cohort, cohort_report
+        )
         logging.info("  saved %d rows → %s", len(summary), cache_path)
     else:
         logging.info("Loading cached stop_replay_summary from %s", cache_path)
@@ -293,6 +329,22 @@ def main() -> None:
             )
         cohort_report = summary.attrs.get("stop_cohort_report", {})
         fit_inputs = summary.attrs.get("inputs", {})
+        # The cohort names a population; the hashes name the bytes it was cut
+        # from. A regenerated stop or event table changes which stops and events
+        # the summary holds without changing its name, so the cache is only
+        # usable while the tables it read are the tables on disk.
+        current_inputs = record_inputs(FIT_INPUTS)
+        moved = sorted(
+            name
+            for name, record in current_inputs.items()
+            if fit_inputs.get(name, {}).get("sha256") != record["sha256"]
+        )
+        if moved:
+            raise ValueError(
+                f"{cache_path.name} was built from a different generation of "
+                f"{', '.join(moved)} than the table(s) on disk now; rerun with "
+                "--rebuild-summary before fitting Stage 6"
+            )
 
     logging.info(
         "Stops with replay events: %d / %d",
