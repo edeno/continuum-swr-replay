@@ -179,7 +179,7 @@ def at_well_event_cohort(
         )
     at_well, _ = select_event_cohort(event_table, cohort="at_well")
     current = pd.to_numeric(at_well["occupancy_well_arm"], errors="coerce")
-    events = at_well.loc[np.isfinite(current)].copy()
+    events = at_well.loc[np.isfinite(current)].reset_index(drop=True)
     key_cols = [*_session_keys(event_table), "event_id"]
     keys = events[key_cols].drop_duplicates()
 
