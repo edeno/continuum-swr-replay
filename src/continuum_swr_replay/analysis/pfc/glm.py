@@ -1197,17 +1197,19 @@ def build_session_event_sets(
         get_overlap_times,
     )
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        validate_results_position_time_alignment,
+        align_results_to_position,
     )
     from continuum_swr_replay.analysis.hippocampus.event_immobility import (
         build_speed_eligible_event_cohort,
     )
 
-    position_time = data["position_info"].index
-    speed = data["position_info"].head_speed.to_numpy()
-    validate_results_position_time_alignment(
-        np.asarray(results.time.values), position_time
+    # Idempotent when the caller already aligned the pair (run_session does):
+    # the shared run is then the whole of both axes and this is the identity.
+    results, position_info, _ = align_results_to_position(
+        results, data["position_info"]
     )
+    position_time = position_info.index
+    speed = position_info.head_speed.to_numpy()
     non_local_prob = results.acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
@@ -1372,6 +1374,9 @@ def run_session(
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
     from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        align_results_to_position,
+    )
     from continuum_swr_replay.data_loaders import load_data
 
     logger = logging.getLogger(
@@ -1386,7 +1391,26 @@ def run_session(
     logger.info("Loading session data...")
     data = load_data(nwb_file_name, epoch_name)
 
-    position_time = data["position_info"].index
+    # Decodes saved before get_position_info was trimmed carry a few more time
+    # bins than load_data now returns. Intersect the two axes once, here, so
+    # every downstream consumer (fit mask, event sets, design matrices, spike
+    # binning) sees the same shared run.
+    results, position_info, alignment_counts = align_results_to_position(
+        results, data["position_info"]
+    )
+    data = {**data, "position_info": position_info}
+    if alignment_counts["dropped_at"] != "none":
+        logger.warning(
+            "Trimmed decode/position axes to their shared timestamps: dropped "
+            "%d results bins (%.3fs) and %d position rows (%.3fs) at the %s",
+            alignment_counts["n_results_bins_dropped"],
+            alignment_counts["dropped_seconds_results"],
+            alignment_counts["n_position_rows_dropped"],
+            alignment_counts["dropped_seconds_position"],
+            alignment_counts["dropped_at"],
+        )
+
+    position_time = position_info.index
     time = position_time.to_numpy(dtype=float)
 
     # Fit with wider lag window (±250ms) so spline boundary artifacts
@@ -1420,7 +1444,7 @@ def run_session(
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
-    cohort_info = {**bin_counts, **event_counts}
+    cohort_info = {**bin_counts, **event_counts, "alignment": alignment_counts}
     logger.info(
         "Events in cohort: %d/%d non-local (%d with SWR, %d without SWR), %d/%d SWRs",
         event_counts["n_nonlocal_after"],

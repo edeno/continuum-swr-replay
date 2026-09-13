@@ -1001,3 +1001,75 @@ class TestProcessNeuronFitMask:
             stats["immobility_avg_firing_rate"]
             != stats["immobility_avg_firing_rate_all_immobile"]
         )
+
+
+class TestAlignmentIsIdentityOnMatchedAxes:
+    """A session whose decode and position axes already match must be
+    untouched by the shared-timestamp alignment on the PFC load path: same
+    events, same design matrices, same fitted coefficients, bit for bit."""
+
+    EVENT_WINDOWS = [(2.0, 2.2), (6.2, 6.4), (8.0, 8.2)]
+    RIPPLE_WINDOWS = [(2.0, 2.15), (6.2, 6.35), (8.0, 8.15)]
+
+    @staticmethod
+    def _fit(data, results, position_info, sampling_frequency, spike_count):
+        from continuum_swr_replay.analysis.pfc.glm import (
+            build_session_event_sets,
+            build_session_fit_mask,
+        )
+
+        _, fit_mask, _ = build_session_fit_mask(position_info, stop_cohort="all_stops")
+        event_times, counts = build_session_event_sets(
+            data, results, stop_cohort="all_stops", fit_mask=fit_mask
+        )
+        design_matrices, _, _ = _make_design_matrices(
+            event_times,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-25, 26, 1),
+        )
+        glm_results, _ = _fit_immobility_models(fit_mask, design_matrices, spike_count)
+        return event_times, design_matrices, glm_results, counts
+
+    def test_fitted_numbers_are_unchanged_by_the_alignment_step(
+        self, position_info, sampling_frequency, spike_count, monkeypatch
+    ):
+        import continuum_swr_replay.analysis.hippocampus.data_aggregation as agg
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        with_alignment = self._fit(
+            data, results, position_info, sampling_frequency, spike_count
+        )
+
+        # Bypass the alignment step entirely and refit: on matched axes the two
+        # paths must agree exactly, not approximately.
+        monkeypatch.setattr(
+            agg,
+            "align_results_to_position",
+            lambda results, position_info, **kwargs: (results, position_info, {}),
+        )
+        without_alignment = self._fit(
+            data, results, position_info, sampling_frequency, spike_count
+        )
+
+        events_a, matrices_a, glms_a, counts_a = with_alignment
+        events_b, matrices_b, glms_b, counts_b = without_alignment
+
+        assert counts_a == counts_b
+        assert events_a.keys() == events_b.keys()
+        for key in events_a:
+            pd.testing.assert_frame_equal(
+                events_a[key].reset_index(drop=True),
+                events_b[key].reset_index(drop=True),
+                check_exact=True,
+            )
+        assert matrices_a.keys() == matrices_b.keys()
+        for key in matrices_a:
+            assert np.array_equal(matrices_a[key], matrices_b[key])
+        assert glms_a.keys() == glms_b.keys()
+        for key in glms_a:
+            assert np.array_equal(glms_a[key].params, glms_b[key].params)
+            assert glms_a[key].llf == glms_b[key].llf

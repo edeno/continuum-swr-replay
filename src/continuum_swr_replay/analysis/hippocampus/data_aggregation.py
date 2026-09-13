@@ -104,6 +104,7 @@ Examples
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -215,6 +216,177 @@ def validate_results_position_time_alignment(
             "origin; refusing to attach decoder outputs to position "
             "rows that don't share their timebase."
         )
+
+
+def align_results_to_position(
+    results: xr.Dataset,
+    position_info: pd.DataFrame,
+    *,
+    max_dropped_seconds: float = 1.0,
+    atol: float = 1e-6,
+) -> tuple[xr.Dataset, pd.DataFrame, dict[str, Any]]:
+    """Restrict a decode and a position frame to the timestamps they share.
+
+    Decodes saved before ``get_position_info`` was trimmed (April 2026) carry a
+    few more time bins than ``load_data`` now returns for the same epoch, so
+    :func:`validate_results_position_time_alignment` — which refuses any length
+    difference — rejects the pair at load. That strictness is right for the
+    aggregations that attach decoder columns to position rows; what it cannot do
+    is tell a head/tail trim of a handful of samples apart from two axes on
+    different timebases.
+
+    This helper resolves only the first case. It intersects the two axes on
+    exact timestamps (equal within ``atol``), and keeps the result **only** if
+    the shared timestamps form one contiguous run on both axes — i.e. the
+    mismatch is a trim at the head and/or tail, not an interleaving — and if the
+    dropped span on each side is at most ``max_dropped_seconds``. Both objects
+    are then restricted to that run and handed to the strict validator, so
+    drift inside the shared run still raises. Anything else raises rather than
+    silently re-aligning data that does not share a timebase.
+
+    Parameters
+    ----------
+    results : xarray.Dataset
+        Decoding results with a sorted ``time`` coordinate (seconds).
+    position_info : pandas.DataFrame
+        Time-indexed position frame (seconds).
+    max_dropped_seconds : float
+        Largest span either axis may lose to the intersection.
+    atol : float
+        Absolute tolerance (seconds) for calling two timestamps the same.
+
+    Returns
+    -------
+    results : xarray.Dataset
+        ``results`` restricted to the shared run.
+    position_info : pandas.DataFrame
+        ``position_info`` restricted to the shared run.
+    counts : dict
+        ``n_results_bins_dropped``, ``n_position_rows_dropped``,
+        ``dropped_seconds_results``, ``dropped_seconds_position`` and
+        ``dropped_at`` (``"head"`` / ``"tail"`` / ``"both"`` / ``"none"``).
+
+    Raises
+    ------
+    ValueError
+        If either axis is not strictly increasing, if the shared timestamps are
+        empty or not contiguous on both axes, if more than
+        ``max_dropped_seconds`` would be dropped from either side, or if the
+        restricted pair still fails the strict alignment check.
+    """
+    results_time = np.asarray(results.time.values, dtype=float)
+    position_time = position_info.index.to_numpy(dtype=float)
+
+    for name, axis in (
+        ("results.time", results_time),
+        ("position_info", position_time),
+    ):
+        if axis.size == 0 or not np.all(np.diff(axis) > 0):
+            raise ValueError(
+                f"{name} is not strictly increasing; alignment by shared "
+                "timestamps needs both axes sorted."
+            )
+
+    # Nearest-neighbor match on the sorted axes (no float-key merge): for each
+    # results bin, the closest position row is at searchsorted or one before it.
+    insert = np.searchsorted(position_time, results_time)
+    left = np.clip(insert - 1, 0, position_time.size - 1)
+    right = np.clip(insert, 0, position_time.size - 1)
+    nearest = np.where(
+        np.abs(position_time[left] - results_time)
+        <= np.abs(position_time[right] - results_time),
+        left,
+        right,
+    )
+    is_shared_results = np.isclose(
+        position_time[nearest], results_time, rtol=0.0, atol=atol
+    )
+    shared_results_ind = np.flatnonzero(is_shared_results)
+    shared_position_ind = nearest[is_shared_results]
+
+    def _first_divergent_time() -> float:
+        unmatched = [
+            axis[~mask][0]
+            for axis, mask in (
+                (results_time, is_shared_results),
+                (
+                    position_time,
+                    np.isin(np.arange(position_time.size), shared_position_ind),
+                ),
+            )
+            if (~mask).any()
+        ]
+        return float(min(unmatched)) if unmatched else float("nan")
+
+    def _raise(reason: str) -> None:
+        raise ValueError(
+            f"{reason}: results.time ({results_time.size}) and position_info "
+            f"({position_time.size}); first divergent timestamp "
+            f"{_first_divergent_time():.6f}s. Refusing to align axes whose "
+            "mismatch is not a head/tail trim."
+        )
+
+    if shared_results_ind.size == 0:
+        _raise("results and position_info share no timestamps")
+    is_contiguous_run = (
+        np.all(np.diff(shared_results_ind) == 1)
+        and np.all(np.diff(shared_position_ind) == 1)
+        and shared_position_ind.size == np.unique(shared_position_ind).size
+    )
+    if not is_contiguous_run:
+        _raise("shared timestamps are interleaved, not a head/tail trim")
+
+    results_slice = slice(int(shared_results_ind[0]), int(shared_results_ind[-1]) + 1)
+    position_slice = slice(
+        int(shared_position_ind[0]), int(shared_position_ind[-1]) + 1
+    )
+
+    dropped: dict[str, float] = {}
+    dropped_at_ends: set[str] = set()
+    for side, axis, sl in (
+        ("results", results_time, results_slice),
+        ("position", position_time, position_slice),
+    ):
+        head_seconds = float(axis[sl.start] - axis[0])
+        tail_seconds = float(axis[-1] - axis[sl.stop - 1])
+        dropped[side] = head_seconds + tail_seconds
+        if sl.start > 0:
+            dropped_at_ends.add("head")
+        if sl.stop < axis.size:
+            dropped_at_ends.add("tail")
+        if dropped[side] > max_dropped_seconds:
+            raise ValueError(
+                f"aligning results.time ({results_time.size}) to position_info "
+                f"({position_time.size}) would drop {dropped[side]:.3f}s from "
+                f"the {side} axis, over the {max_dropped_seconds}s budget; "
+                "refusing to trim this much."
+            )
+
+    aligned_results = results.isel(time=results_slice)
+    aligned_position = position_info.iloc[position_slice]
+    validate_results_position_time_alignment(
+        np.asarray(aligned_results.time.values), aligned_position.index
+    )
+
+    if not dropped_at_ends:
+        dropped_at = "none"
+    elif dropped_at_ends == {"head", "tail"}:
+        dropped_at = "both"
+    else:
+        dropped_at = dropped_at_ends.pop()
+
+    counts = {
+        "n_results_bins_dropped": int(
+            results_time.size - (results_slice.stop - results_slice.start)
+        ),
+        "n_position_rows_dropped": int(
+            position_time.size - (position_slice.stop - position_slice.start)
+        ),
+        "dropped_seconds_results": dropped["results"],
+        "dropped_seconds_position": dropped["position"],
+        "dropped_at": dropped_at,
+    }
+    return aligned_results, aligned_position, counts
 
 
 def validate_dot_event_contract(

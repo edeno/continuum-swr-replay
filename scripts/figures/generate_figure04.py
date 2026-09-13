@@ -46,6 +46,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    align_results_to_position,
+)
 from continuum_swr_replay.analysis.pfc import (
     build_session_event_sets,
     build_session_fit_mask,
@@ -332,7 +335,22 @@ def generate_figure(
     )
     data = load_data(nwb_file_name, epoch_name)
 
-    position_time = data["position_info"].index
+    # Decodes saved before get_position_info was trimmed carry a few more time
+    # bins than load_data now returns; refit the example neuron on the run the
+    # two axes share, exactly as the runner does.
+    results_hpc, position_info, alignment_counts = align_results_to_position(
+        results_hpc, data["position_info"]
+    )
+    data = {**data, "position_info": position_info}
+    if alignment_counts["dropped_at"] != "none":
+        print(
+            "Trimmed decode/position axes to their shared timestamps: dropped "
+            f"{alignment_counts['n_results_bins_dropped']} results bins and "
+            f"{alignment_counts['n_position_rows_dropped']} position rows at "
+            f"the {alignment_counts['dropped_at']}"
+        )
+
+    position_time = position_info.index
 
     # The example neuron is refit here, so it must be cut exactly as the
     # population bundle was: the same event sets and the same fit mask the
