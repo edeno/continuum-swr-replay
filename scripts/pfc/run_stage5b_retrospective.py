@@ -319,11 +319,14 @@ def main() -> None:
             "cohort_rule": STOP_COHORT_RULES[(args.stop_cohort, "event")],
             "n_events_before_cohort": n_before_location,
             "n_events_after_cohort": n_after_location,
-            "n_events_analysed": int(len(event_table)),
+            # Events left after the cohort AND the subset filter, over every
+            # session in the table -- not restricted to the sessions a partial
+            # run analysed, which `n_sessions_analysed` names.
+            "n_events_in_subset": int(len(event_table)),
             "subset": label,
             "n_shuffles": args.n_shuffles,
             "seed": args.seed,
-            "n_sessions": len(sessions),
+            "n_sessions_analysed": len(sessions),
             "is_partial_run": args.max_sessions is not None,
         },
     )
