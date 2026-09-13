@@ -8,9 +8,11 @@ import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     STOP_COHORT_RULES,
+    events_in_stops,
     freeze_common_cohort,
     select_event_cohort,
     select_stop_cohort,
+    stop_interval_mask,
 )
 
 
@@ -326,3 +328,99 @@ def test_select_event_cohort_raises_without_the_event_column():
 
     with pytest.raises(KeyError, match="event_id"):
         select_event_cohort(long_df, cohort="at_well")
+
+
+# ---------------------------------------------------------------------------
+# stop_interval_mask / events_in_stops
+# ---------------------------------------------------------------------------
+
+
+def _two_stops() -> pd.DataFrame:
+    """Two disjoint stops, deliberately given out of chronological order."""
+    return pd.DataFrame(
+        {
+            "stop_id": ["s1", "s0"],
+            "stop_start": [30.0, 10.0],
+            "stop_end": [31.0, 12.0],
+        }
+    )
+
+
+def test_stop_interval_mask_marks_the_samples_inside_a_stop():
+    times = np.array([9.0, 10.5, 12.5, 30.5, 40.0])
+
+    mask = stop_interval_mask(times, _two_stops())
+
+    np.testing.assert_array_equal(mask, [False, True, False, True, False])
+
+
+def test_stop_interval_mask_includes_both_edges():
+    times = np.array([9.999, 10.0, 11.0, 12.0, 12.001])
+
+    mask = stop_interval_mask(times, _two_stops())
+
+    np.testing.assert_array_equal(mask, [False, True, True, True, False])
+
+
+def test_stop_interval_mask_with_no_stops_marks_nothing():
+    stops = pd.DataFrame({"stop_start": [], "stop_end": []})
+
+    mask = stop_interval_mask(np.array([1.0, 2.0, 3.0]), stops)
+
+    assert mask.dtype == bool
+    np.testing.assert_array_equal(mask, [False, False, False])
+
+
+def test_stop_interval_mask_rejects_overlapping_stops():
+    stops = pd.DataFrame({"stop_start": [10.0, 11.0], "stop_end": [12.0, 13.0]})
+
+    with pytest.raises(ValueError, match="overlap"):
+        stop_interval_mask(np.array([10.5]), stops)
+
+
+def test_stop_interval_mask_rejects_an_inverted_stop():
+    stops = pd.DataFrame({"stop_start": [10.0], "stop_end": [9.0]})
+
+    with pytest.raises(ValueError, match="stop_end >= stop_start"):
+        stop_interval_mask(np.array([10.5]), stops)
+
+
+def test_stop_interval_mask_raises_without_the_bound_columns():
+    stops = pd.DataFrame({"start_time": [10.0], "end_time": [12.0]})
+
+    with pytest.raises(KeyError, match="stop_start"):
+        stop_interval_mask(np.array([10.5]), stops)
+
+
+def test_stop_interval_mask_agrees_with_the_naive_any_interval_test():
+    rng = np.random.default_rng(0)
+    starts = np.cumsum(rng.uniform(0.5, 2.0, size=40))
+    stops = pd.DataFrame(
+        {"stop_start": starts, "stop_end": starts + rng.uniform(0.05, 0.4, size=40)}
+    )
+    times = rng.uniform(0.0, starts[-1] + 1.0, size=500)
+
+    mask = stop_interval_mask(times, stops)
+
+    naive = np.array(
+        [
+            bool(
+                (
+                    (stops["stop_start"].to_numpy() <= t)
+                    & (t <= stops["stop_end"].to_numpy())
+                ).any()
+            )
+            for t in times
+        ]
+    )
+    np.testing.assert_array_equal(mask, naive)
+
+
+def test_events_in_stops_keys_on_the_onset_only():
+    # The second event begins inside the first stop and ends after it; the
+    # third begins outside every stop.
+    event_starts = np.array([11.0, 11.9, 20.0])
+
+    keep = events_in_stops(event_starts, _two_stops())
+
+    np.testing.assert_array_equal(keep, [True, True, False])

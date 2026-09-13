@@ -441,3 +441,113 @@ def select_event_cohort(
     }
     report["n_events_dropped"] = report["n_events_before"] - report["n_events_after"]
     return selected, report
+
+
+#: Column names a stop table carries for the absolute-time bounds of one
+#: immobility bout. Both are inclusive edges in seconds on the same clock as
+#: ``position_info.index``.
+_STOP_BOUND_COLUMNS = ("stop_start", "stop_end")
+
+
+def _stop_bounds(stops: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Start/end arrays of ``stops``, sorted by start and checked for overlap.
+
+    Overlap is a correctness precondition, not a style preference: the
+    ``searchsorted`` membership test below only inspects the latest stop that
+    begins at or before a time, so an earlier, longer stop containing that time
+    would be missed silently.
+
+    Raises
+    ------
+    KeyError
+        If either bound column is absent.
+    ValueError
+        If a bound is missing/non-finite, a stop ends before it starts, or two
+        stops overlap.
+    """
+    missing = [column for column in _STOP_BOUND_COLUMNS if column not in stops.columns]
+    if missing:
+        raise KeyError(
+            f"stop interval selection needs column(s) {missing}; the frame "
+            f"carries {list(stops.columns)[:12]}..."
+        )
+    order = np.argsort(stops["stop_start"].to_numpy(dtype=float), kind="stable")
+    starts = stops["stop_start"].to_numpy(dtype=float)[order]
+    ends = stops["stop_end"].to_numpy(dtype=float)[order]
+    if not (np.isfinite(starts).all() and np.isfinite(ends).all()):
+        raise ValueError("stop bounds must all be finite")
+    if (ends < starts).any():
+        raise ValueError("every stop must satisfy stop_end >= stop_start")
+    if starts.size > 1 and (starts[1:] < ends[:-1]).any():
+        overlapping = int((starts[1:] < ends[:-1]).sum())
+        raise ValueError(
+            f"{overlapping} stop interval(s) overlap their predecessor; the "
+            "interval mask assumes disjoint stops. Restrict to one session "
+            "before calling."
+        )
+    return starts, ends
+
+
+def stop_interval_mask(times: np.ndarray, stops: pd.DataFrame) -> np.ndarray:
+    """Mark the times that fall inside one of ``stops``.
+
+    The stop table states the cohort as intervals; a time-bin analysis needs it
+    as a per-sample mask. This is that translation, done once so every
+    consumer -- the PFC unit GLMs today, any later per-bin PFC model -- restricts
+    to the same bins.
+
+    Parameters
+    ----------
+    times : numpy.ndarray, shape (n_time,)
+        Sample times in seconds, on the same clock as the stop bounds.
+    stops : pandas.DataFrame
+        Stops to test against, carrying ``stop_start`` and ``stop_end``. Must be
+        disjoint, which the canonical stop table is within a session. An empty
+        frame marks nothing.
+
+    Returns
+    -------
+    numpy.ndarray of bool, shape (n_time,)
+        True where ``stop_start <= t <= stop_end`` for some stop. Both edges are
+        inclusive, matching the closed intervals the stop table records.
+
+    Raises
+    ------
+    KeyError
+        If ``stop_start`` or ``stop_end`` is absent.
+    ValueError
+        If the stops are non-finite, inverted, or overlapping.
+    """
+    times = np.asarray(times, dtype=float)
+    starts, ends = _stop_bounds(stops)
+    if starts.size == 0:
+        return np.zeros(times.shape, dtype=bool)
+    # The latest stop beginning at or before each time is the only one that can
+    # contain it, because the stops are disjoint.
+    index = np.searchsorted(starts, times, side="right") - 1
+    has_candidate = index >= 0
+    candidate = np.where(has_candidate, index, 0)
+    return has_candidate & (times <= ends[candidate])
+
+
+def events_in_stops(event_starts: np.ndarray, stops: pd.DataFrame) -> np.ndarray:
+    """Mark the events whose onset falls inside one of ``stops``.
+
+    An event is assigned to a stop by its onset alone, so an event that begins
+    inside a kept stop stays whole even if its tail runs past the stop's end.
+    That keeps the event count here equal to the count any onset-keyed table
+    reports for the same cohort.
+
+    Parameters
+    ----------
+    event_starts : numpy.ndarray, shape (n_events,)
+        Event onset times in seconds, on the stop table's clock.
+    stops : pandas.DataFrame
+        Stops to test against; see :func:`stop_interval_mask`.
+
+    Returns
+    -------
+    numpy.ndarray of bool, shape (n_events,)
+        True where the onset lies inside a kept stop.
+    """
+    return stop_interval_mask(np.asarray(event_starts, dtype=float), stops)
