@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay.cohort_selection import select_event_cohort
 from continuum_swr_replay.analysis.replay.retrospective import (
     arm_path_well_to_well,
     at_well_event_cohort,
@@ -109,6 +110,18 @@ def _make_event_table(events: list[dict]) -> pd.DataFrame:
             df[col] = default
     if "event_midpoint_s" in df.columns and df["event_midpoint_s"].isna().all():
         df["event_midpoint_s"] = np.arange(len(df), dtype=float)
+    if "occupancy_state" not in df.columns:
+        # Canonical tables carry both labels and ``table_contracts`` refuses a
+        # table where they disagree, so derive one from the other rather than
+        # letting a fixture state a combination production can never produce.
+        is_at_well = (
+            df["at_well"].eq(True).astype("boolean").fillna(False).to_numpy(dtype=bool)
+        )
+        df["occupancy_state"] = np.where(
+            df["at_well"].isna().to_numpy(),
+            "unknown",
+            np.where(is_at_well, "at_well", "in_transit"),
+        )
     if "stop_id" not in df.columns:
         df["stop_id"] = df["event_id"]
     if "completed_trial_id" not in df.columns:
@@ -575,6 +588,68 @@ class TestComputeRetrospectiveMetrics:
 
 
 class TestRetrospectiveAlignmentWithShuffle:
+    def test_cohort_matches_the_shared_event_grain_selector(self):
+        """The retrospective cohort is the shared rule plus an endpoint check.
+
+        A ``mixed`` or ``unknown`` event is not at one well for its whole
+        window, so neither the shared selector nor this one may keep it.  The
+        two must therefore name the same events; any drift would silently give
+        Stage 5B a different population from the content ladders.
+        """
+        ev = _make_event_table(
+            [
+                {
+                    "event_id": 1,
+                    "occupancy_well_arm": 0,
+                    "next_arm": 1,
+                    "next_patch": 1,
+                    "at_well": True,
+                    "occupancy_state": "at_well",
+                },
+                {
+                    "event_id": 2,
+                    "occupancy_well_arm": 3,
+                    "next_arm": 0,
+                    "next_patch": 1,
+                    "at_well": False,
+                    "occupancy_state": "mixed",
+                },
+                {
+                    "event_id": 3,
+                    "occupancy_well_arm": np.nan,
+                    "next_arm": 2,
+                    "next_patch": 2,
+                    "at_well": pd.NA,
+                    "occupancy_state": "unknown",
+                },
+                {
+                    "event_id": 4,
+                    "occupancy_well_arm": 2,
+                    "next_arm": 4,
+                    "next_patch": 3,
+                    "at_well": True,
+                    "occupancy_state": "at_well",
+                },
+            ]
+        )
+        ea = _make_event_arm_table(
+            {
+                1: [1.0] + [0.0] * 8,
+                2: [0.0, 1.0] + [0.0] * 7,
+                3: [0.0, 0.0, 1.0] + [0.0] * 6,
+                4: [0.0, 0.0, 0.0, 1.0] + [0.0] * 5,
+            }
+        )
+        es = _make_event_sequence_table({1: [0, 1], 2: [3], 3: [2], 4: [2, 4]})
+
+        ev_at, ea_at, es_at = at_well_event_cohort(ev, ea, es)
+        shared, report = select_event_cohort(ev, cohort="at_well")
+
+        assert set(ev_at["event_id"]) == set(shared["event_id"]) == {1, 4}
+        assert report["n_events_after"] == 2
+        assert set(ea_at["event_id"]) == {1, 4}
+        assert set(es_at["event_id"]) == {1, 4}
+
     def test_rejects_legacy_location_schema(self):
         ev = _make_event_table([{"event_id": 1, "occupancy_well_arm": 0, "next_arm": 1}]).drop(
             columns="at_well"

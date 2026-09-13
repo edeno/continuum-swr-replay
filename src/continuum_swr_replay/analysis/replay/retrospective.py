@@ -54,6 +54,7 @@ from continuum_swr_replay.data_loaders.constants import (
 )
 
 from ._helpers import strict_sum
+from .cohort_selection import select_event_cohort
 from .shuffles import next_arm_circular_shift
 
 __all__ = [
@@ -138,19 +139,21 @@ def at_well_event_cohort(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Filter all three event tables to one explicit at-well event cohort.
 
+    Membership is the shared event-grain rule and nothing else:
+    :func:`~continuum_swr_replay.analysis.replay.cohort_selection.select_event_cohort`
+    with ``cohort="at_well"``, the same call the content ladders make. What this
+    function adds on top is retrospective-specific: the finite
+    ``occupancy_well_arm`` conjunct (an endpoint the path metrics can name) and
+    the three-table key alignment that keeps arm and sequence rows from
+    acquiring metric-specific denominators.
+
     Canonical tables use the nullable ``at_well`` label. Legacy inputs without
     that column are rejected: their occupancy field may contain the retired
-    destination-well fallback for in-transit events. The same event keys are
-    applied to arm and sequence rows, preventing metric-specific denominators.
-
-    This is the event-grain at-well rule, equivalent to
-    ``cohort_selection.select_event_cohort(frame, cohort="at_well")`` -- it
-    selects the same events, by the ``at_well`` flag rather than the
-    ``occupancy_state`` label, and additionally carries the filter across the
-    three retrospective tables. The shared rule and the stop-grain half of it
-    live in ``analysis/replay/cohort_selection.py``; this one is deliberately
-    left on its own path for now because it also owns the three-table key
-    alignment.
+    destination-well fallback for in-transit events. ``at_well`` and
+    ``occupancy_state == "at_well"`` are equal by contract on a canonical table
+    (``table_contracts`` refuses one where they disagree), so reading the
+    membership from ``occupancy_state`` selects the same events while leaving
+    one rule to change.
     """
     if event_table.empty:
         return (
@@ -166,10 +169,9 @@ def at_well_event_cohort(
             "at-well retrospective cohort requires canonical location column(s) "
             f"{missing}; regenerate event tables"
         )
-    current = pd.to_numeric(event_table["occupancy_well_arm"], errors="coerce")
-    keep = pd.Series(np.isfinite(current), index=event_table.index)
-    keep &= event_table["at_well"].eq(True).fillna(False)  # noqa: E712
-    events = event_table.loc[keep].copy()
+    at_well, _ = select_event_cohort(event_table, cohort="at_well")
+    current = pd.to_numeric(at_well["occupancy_well_arm"], errors="coerce")
+    events = at_well.loc[np.isfinite(current)].copy()
     key_cols = [*_session_keys(event_table), "event_id"]
     keys = events[key_cols].drop_duplicates()
 
