@@ -7,6 +7,7 @@ theta phase modulation during running.
 
 import logging
 import warnings
+from collections.abc import Mapping
 from typing import Any
 
 import dask
@@ -1015,7 +1016,7 @@ def build_session_fit_mask(
 
 
 def build_session_event_sets(
-    data: dict[str, Any],
+    data: Mapping[str, Any],
     results: Any,
     *,
     cohort_stops: pd.DataFrame | None = None,
@@ -1034,7 +1035,7 @@ def build_session_event_sets(
 
     Parameters
     ----------
-    data : dict
+    data : Mapping
         Session data from ``data_loaders.load_data``: ``position_info`` and
         ``ripple_times``.
     results : xarray.Dataset

@@ -527,7 +527,7 @@ def stop_interval_mask(times: np.ndarray, stops: pd.DataFrame) -> np.ndarray:
     index = np.searchsorted(starts, times, side="right") - 1
     has_candidate = index >= 0
     candidate = np.where(has_candidate, index, 0)
-    return has_candidate & (times <= ends[candidate])
+    return np.asarray(has_candidate & (times <= ends[candidate]), dtype=bool)
 
 
 def events_in_stops(event_starts: np.ndarray, stops: pd.DataFrame) -> np.ndarray:
