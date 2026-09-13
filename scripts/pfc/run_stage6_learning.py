@@ -9,6 +9,13 @@ and runs:
    ``{current, prev, last_rewarded, best}``, fit
    ``is_stay ~ is_omitted_outcome * frac_on_<role>`` per session.
 
+Both steps are read on one population. ``--stop-cohort at_well`` (the default)
+keeps the well-anchored stops the hippocampal rate and content ladders are fit
+on, so a Stage 6 statement and a content statement are about the same stops;
+``all_stops`` applies no occupancy restriction and publishes its artifacts under
+``_allstops`` names, so a sensitivity bundle cannot be mistaken for the
+canonical one.
+
 Outputs (next to the input tables):
 
 - ``stop_replay_summary.pkl`` — one row per stop.
@@ -19,21 +26,32 @@ Usage::
     uv run python scripts/pfc/run_stage6_learning.py
     uv run python scripts/pfc/run_stage6_learning.py --content-stratum swr
     uv run python scripts/pfc/run_stage6_learning.py --content-stratum non_swr
+    uv run python scripts/pfc/run_stage6_learning.py --stop-cohort all_stops
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.replay.cohort_selection import (
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     COVARIATE_SCHEMA_VERSION,
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.learning import (
     fit_is_stay_logistic_per_session,
@@ -50,13 +68,42 @@ logging.basicConfig(
 )
 
 INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
-SUMMARY_PATH = INPUT_DIR / "stop_replay_summary.pkl"
-LOGIT_PATH = INPUT_DIR / "stage6_is_stay_logistic.pkl"
-GEE_PATH = INPUT_DIR / "stage6_is_stay_pooled_gee.pkl"
+
+#: The canonical tables the per-stop summary is built from, hashed into every
+#: provenance sidecar this script writes.
+FIT_INPUTS = {
+    "stop_table": INPUT_DIR / "stop_table.pkl",
+    "event_table": INPUT_DIR / "event_table.pkl",
+    "event_arm_table": INPUT_DIR / "event_arm_table.pkl",
+}
+
+#: Populations Stage 6 may be read on. ``at_well`` is the canonical shared
+#: cohort and publishes the unsuffixed artifact names; ``all_stops`` applies no
+#: occupancy restriction and publishes ``_allstops`` names. ``in_transit`` is
+#: not offered: every role this stage conditions on (current/prev/last-rewarded
+#: arm) is defined from a well the animal has arrived at.
+STOP_COHORTS = ("at_well", "all_stops")
 
 ARM_ROLES = ("current", "prev", "last_rewarded", "best")
 PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
 ROLES = ARM_ROLES + PATCH_ROLES
+
+
+def summary_path(stop_cohort: str) -> Path:
+    """Cached per-stop summary for one population."""
+    return INPUT_DIR / f"stop_replay_summary{stop_cohort_suffix(stop_cohort)}.pkl"
+
+
+def fit_path(kind: str, stratum: str, stop_cohort: str) -> Path:
+    """Output path for one (fit kind, content stratum, population).
+
+    The canonical at-well bundle keeps the unsuffixed names every reader already
+    hard-codes; the cohort suffix comes last, so a stratified sensitivity bundle
+    reads as ``stage6_is_stay_logistic_swr_allstops.pkl``.
+    """
+    stratum_part = "" if stratum == "all" else f"_{stratum}"
+    suffix = stop_cohort_suffix(stop_cohort)
+    return INPUT_DIR / f"stage6_is_stay_{kind}{stratum_part}{suffix}.pkl"
 
 
 def _content_col_for(role: str, stratum: str) -> str:
@@ -85,13 +132,28 @@ def main() -> None:
         action="store_true",
         help="Rebuild stop_replay_summary even if it exists on disk.",
     )
+    parser.add_argument(
+        "--stop-cohort",
+        type=str,
+        default="at_well",
+        choices=list(STOP_COHORTS),
+        help=(
+            "Population to read (default: at_well). 'at_well' keeps only the "
+            "well-anchored stops the hippocampal rate and content ladders are "
+            "fit on, and publishes the canonical artifact names; 'all_stops' "
+            "applies no occupancy restriction and publishes '_allstops' names."
+        ),
+    )
     args = parser.parse_args()
 
-    if not SUMMARY_PATH.exists() or args.rebuild_summary:
+    cache_path = summary_path(args.stop_cohort)
+    if not cache_path.exists() or args.rebuild_summary:
         logging.info("Building stop_replay_summary from canonical tables...")
-        st = read_table(INPUT_DIR / "stop_table.pkl")
-        ev = read_table(INPUT_DIR / "event_table.pkl")
-        ea = read_table(INPUT_DIR / "event_arm_table.pkl")
+        st = read_table(FIT_INPUTS["stop_table"])
+        ev = read_table(FIT_INPUTS["event_table"])
+        ea = read_table(FIT_INPUTS["event_arm_table"])
+        # Hash the tables while this run is reading them, not at write time.
+        fit_inputs = record_inputs(FIT_INPUTS)
         require_covariate_schema(st, table="stop")
         require_covariate_schema(ev, table="event")
         require_covariate_schema(ea, table="event_arm")
@@ -101,13 +163,27 @@ def main() -> None:
             len(ev),
             len(ea),
         )
+        # Restrict the population BEFORE summarising: a stop that is not in the
+        # cohort must not reach a fit, and an event inside it must not reach a
+        # stop that is.
+        st, cohort_report = select_stop_cohort(st, cohort=args.stop_cohort)
+        logging.info(
+            "  cohort=%s (%s): kept %d/%d stops",
+            cohort_report["cohort"],
+            cohort_report["rule"],
+            cohort_report["n_stops_after"],
+            cohort_report["n_stops_before"],
+        )
         summary = stop_replay_summary(st, ev, ea)
         summary.attrs["input_covariate_schema_version"] = COVARIATE_SCHEMA_VERSION
-        summary.to_pickle(SUMMARY_PATH)
-        logging.info("  saved %d rows → %s", len(summary), SUMMARY_PATH)
+        summary.attrs["stop_cohort"] = args.stop_cohort
+        summary.attrs["stop_cohort_report"] = cohort_report
+        summary.attrs["inputs"] = fit_inputs
+        summary.to_pickle(cache_path)
+        logging.info("  saved %d rows → %s", len(summary), cache_path)
     else:
-        logging.info("Loading cached stop_replay_summary from %s", SUMMARY_PATH)
-        summary = pd.read_pickle(SUMMARY_PATH)
+        logging.info("Loading cached stop_replay_summary from %s", cache_path)
+        summary = pd.read_pickle(cache_path)
         if (
             summary.attrs.get("input_covariate_schema_version")
             != COVARIATE_SCHEMA_VERSION
@@ -116,6 +192,17 @@ def main() -> None:
                 "stop_replay_summary uses a legacy covariate schema; rerun with "
                 "--rebuild-summary before fitting Stage 6"
             )
+        # A summary cut before the cohort existed carries the canonical name and
+        # every stop in the epoch. It states no population, so it cannot be
+        # accepted as this one.
+        cached_cohort = summary.attrs.get("stop_cohort")
+        if cached_cohort != args.stop_cohort:
+            raise ValueError(
+                f"{cache_path.name} was built on stop cohort {cached_cohort!r}, "
+                f"not {args.stop_cohort!r}; rerun with --rebuild-summary"
+            )
+        cohort_report = summary.attrs.get("stop_cohort_report", {})
+        fit_inputs = summary.attrs.get("inputs", {})
 
     logging.info(
         "Stops with replay events: %d / %d",
@@ -148,6 +235,7 @@ def main() -> None:
         coefs["role"] = role
         coefs["content_stratum"] = args.content_stratum
         coefs["content_col"] = col
+        coefs["stop_cohort"] = args.stop_cohort
         all_results.append(coefs)
 
         # Pooled GEE on the same data.
@@ -157,27 +245,41 @@ def main() -> None:
             outcome_col="is_omitted_outcome",
             target_col="is_stay",
         )
-        gee_result.update({"role": role, "content_stratum": args.content_stratum})
+        gee_result.update(
+            {
+                "role": role,
+                "content_stratum": args.content_stratum,
+                "stop_cohort": args.stop_cohort,
+            }
+        )
         gee_rows.append(gee_result)
+
+    provenance_extra = {
+        "stop_cohort": args.stop_cohort,
+        "stop_cohort_report": cohort_report,
+        "stop_table_sha256": fit_inputs.get("stop_table", {}).get("sha256"),
+        "content_stratum": args.content_stratum,
+        "min_stops": args.min_stops,
+        "n_stops": int(len(summary)),
+        "summary_artifact": cache_path.name,
+    }
 
     out = pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
     if not out.empty:
-        out_path = (
-            LOGIT_PATH
-            if args.content_stratum == "all"
-            else INPUT_DIR / f"stage6_is_stay_logistic_{args.content_stratum}.pkl"
-        )
+        out_path = fit_path("logistic", args.content_stratum, args.stop_cohort)
         out.to_pickle(out_path)
+        write_fit_provenance(
+            out_path, fit_inputs, "logistic_glm", sys.argv, extra=provenance_extra
+        )
         logging.info("Saved %d rows → %s", len(out), out_path)
 
     gee_df = pd.DataFrame(gee_rows)
     if not gee_df.empty:
-        gee_path = (
-            GEE_PATH
-            if args.content_stratum == "all"
-            else INPUT_DIR / f"stage6_is_stay_pooled_gee_{args.content_stratum}.pkl"
-        )
+        gee_path = fit_path("pooled_gee", args.content_stratum, args.stop_cohort)
         gee_df.to_pickle(gee_path)
+        write_fit_provenance(
+            gee_path, fit_inputs, "binomial_gee", sys.argv, extra=provenance_extra
+        )
         logging.info("Saved pooled-GEE %d rows → %s", len(gee_df), gee_path)
 
     # ── Cross-session summary, FDR-corrected across roles.
@@ -185,8 +287,10 @@ def main() -> None:
         return
     converged = out[out["status"] == "ok"].copy()
     logging.info(
-        "===== Cross-session summary (stratum=%s, converged sessions only) =====",
+        "===== Cross-session summary (stratum=%s, cohort=%s, converged "
+        "sessions only) =====",
         args.content_stratum,
+        args.stop_cohort,
     )
     pvals = []
     role_results = []
