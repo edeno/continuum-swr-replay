@@ -670,6 +670,12 @@ Concatenate and flag every ``*_cohort_audit.csv`` under the outputs dir.
 
 `load_all`, `flag`, `main`
 
+### `scripts/qa/summarize_stage6_fdr.py`
+
+Print Stage 6's per-role cross-session FDR table for a saved bundle.
+
+`main`
+
 ### `scripts/qa/write_pipeline_map.py`
 
 Generate the symbol-anchored regression pipeline code map.

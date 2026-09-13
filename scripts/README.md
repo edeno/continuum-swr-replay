@@ -67,9 +67,16 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   floor is recorded in `docs/design/builder_test_floor.md`.
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into
   one table.
+- `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
+  any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
+  before/after comparison across populations reads one implementation.
 
 ## `pfc/` — cross-area / staged analyses
 - `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.
+  All three take `--stop-cohort`: the well-anchored stop cohort the hippocampal rate
+  and content ladders are read on is the default (`at_well`, canonical artifact
+  names), `all_stops` publishes an unrestricted sensitivity bundle under `_allstops`
+  names, and Stage 5B accepts only `at_well` because its metrics need a current arm.
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the

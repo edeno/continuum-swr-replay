@@ -112,6 +112,96 @@ def _content_col_for(role: str, stratum: str) -> str:
     return f"frac_on_{role}_{stratum}"
 
 
+def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:
+    """Wilcoxon on each role's per-session interaction, FDR-corrected across roles.
+
+    This is the statistic Stage 6 is read on, so it lives in one function: the
+    run logs it, and an audit re-derives it from a saved bundle -- including a
+    bundle fit on another population -- with the same code rather than a second
+    implementation that can drift.
+
+    Parameters
+    ----------
+    coefs : pandas.DataFrame
+        Per-session fits as ``fit_is_stay_logistic_per_session`` returns them,
+        concatenated over roles: ``role``, ``status`` and ``beta_inter``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per role in :data:`ROLES`, in that order:
+        ``role``, ``n_sessions`` (converged sessions with a finite
+        ``beta_inter``), ``median_beta_inter``, ``n_pos``, ``n_neg``, ``p``,
+        ``p_fdr``, and ``status`` (``"ok"`` or ``"too_few_sessions"``). A role
+        with fewer than five sessions is not testable and is excluded from the
+        correction as well as from the test.
+    """
+    converged = coefs[coefs["status"] == "ok"]
+    rows = []
+    for role in ROLES:
+        sub = converged[converged["role"] == role].dropna(subset=["beta_inter"])
+        if len(sub) < 5:
+            rows.append(
+                {
+                    "role": role,
+                    "n_sessions": len(sub),
+                    "median_beta_inter": np.nan,
+                    "n_pos": int((sub["beta_inter"] > 0).sum()),
+                    "n_neg": int((sub["beta_inter"] < 0).sum()),
+                    "p": np.nan,
+                    "status": "too_few_sessions",
+                }
+            )
+            continue
+        try:
+            _, p = wilcoxon(sub["beta_inter"])
+        except ValueError:
+            # SciPy refuses an all-zero sample; that is a failed test, not a
+            # p-value, and must not become one below.
+            p = float("nan")
+        rows.append(
+            {
+                "role": role,
+                "n_sessions": len(sub),
+                "median_beta_inter": float(sub["beta_inter"].median()),
+                "n_pos": int((sub["beta_inter"] > 0).sum()),
+                "n_neg": int((sub["beta_inter"] < 0).sum()),
+                "p": p,
+                "status": "ok",
+            }
+        )
+    summary = pd.DataFrame(rows)
+    summary["p_fdr"] = np.nan
+    # ``multipletests`` returns an all-NaN vector if ANY input is NaN, so a
+    # single role that failed its test would otherwise erase every other role's
+    # FDR. Correct the finite p-values and pass NaN through for the rest.
+    testable = (summary["status"] == "ok") & np.isfinite(summary["p"])
+    if testable.any():
+        _, p_fdr, _, _ = multipletests(
+            summary.loc[testable, "p"].to_numpy(dtype=float), method="fdr_bh"
+        )
+        summary.loc[testable, "p_fdr"] = p_fdr
+    return summary
+
+
+def log_cross_session_role_summary(summary: pd.DataFrame) -> None:
+    """Log one line per role of :func:`cross_session_role_summary`."""
+    for row in summary.itertuples():
+        if row.status != "ok":
+            logging.info("  %s: too few sessions (%d)", row.role, row.n_sessions)
+            continue
+        logging.info(
+            "  role=%-25s n=%d  med β_inter=%+.3f  pos=%d  neg=%d  p=%.2e  p_FDR=%.2e",
+            row.role,
+            row.n_sessions,
+            row.median_beta_inter,
+            row.n_pos,
+            row.n_neg,
+            row.p,
+            row.p_fdr,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -285,57 +375,13 @@ def main() -> None:
     # ── Cross-session summary, FDR-corrected across roles.
     if out.empty:
         return
-    converged = out[out["status"] == "ok"].copy()
     logging.info(
         "===== Cross-session summary (stratum=%s, cohort=%s, converged "
         "sessions only) =====",
         args.content_stratum,
         args.stop_cohort,
     )
-    pvals = []
-    role_results = []
-    for role in ROLES:
-        sub = converged[converged["role"] == role].dropna(subset=["beta_inter"])
-        if len(sub) < 5:
-            logging.info("  %s: too few sessions (%d)", role, len(sub))
-            continue
-        med = float(sub["beta_inter"].median())
-        n_pos = int((sub["beta_inter"] > 0).sum())
-        n_neg = int((sub["beta_inter"] < 0).sum())
-        try:
-            stat, p = wilcoxon(sub["beta_inter"].dropna())
-        except ValueError:
-            p = float("nan")
-        role_results.append((role, len(sub), med, n_pos, n_neg, p))
-        pvals.append(p)
-
-    if pvals:
-        # ``multipletests`` with NaN inputs returns all-NaN adjusted
-        # p-values (verified on this branch's SciPy/statsmodels).
-        # That contaminates every role's FDR when a single role
-        # hits the wilcoxon ValueError path (e.g. all-zero β_inter
-        # samples on current SciPy that don't always raise).
-        # Correct only the finite p-values and pass NaN through for
-        # the failed roles.
-        pvals_arr = np.asarray(pvals, dtype=float)
-        ok = np.isfinite(pvals_arr)
-        p_fdr = np.full_like(pvals_arr, np.nan)
-        if ok.any():
-            _, p_fdr_ok, _, _ = multipletests(pvals_arr[ok], method="fdr_bh")
-            p_fdr[ok] = p_fdr_ok
-        for (role, n, med, n_pos, n_neg, p), p_corr in zip(
-            role_results, p_fdr, strict=True
-        ):
-            logging.info(
-                "  role=%-25s n=%d  med β_inter=%+.3f  pos=%d  neg=%d  p=%.2e  p_FDR=%.2e",
-                role,
-                n,
-                med,
-                n_pos,
-                n_neg,
-                p,
-                p_corr,
-            )
+    log_cross_session_role_summary(cross_session_role_summary(out))
 
     # ── Pooled GEE summary (population-averaged estimates with cluster-
     # robust SE on session). One row per role; FDR across roles.
