@@ -991,8 +991,8 @@ def build_session_fit_mask(
         Required unless ``stop_cohort`` is ``"all_stops"``.
     stop_cohort : str
         Cohort name, recorded in the returned counts. ``"all_stops"`` means *no
-        stop restriction at all* -- every immobile bin in the epoch is fit, which
-        is what this pipeline did before the cohort existed.
+        stop restriction at all* -- every immobile bin in the epoch is fit,
+        reproducing the pre-cohort mask exactly.
     immobility_threshold : float
         Speed threshold for immobility (cm/s).
 
@@ -1330,7 +1330,12 @@ def run_session(
         and events inside the well-anchored stops the hippocampal rate and
         content ladders are read on; ``"all_stops"`` applies no stop restriction
         at all, fitting every immobile bin and every speed-eligible event in the
-        epoch, as this pipeline did before the shared cohort existed.
+        epoch. Under ``"all_stops"`` the fit mask, the event sets and every
+        fitted number reproduce the pre-cohort pipeline bit-for-bit; what
+        differs is the shape of the output -- the stats table gains the
+        provenance columns ``stop_cohort`` and
+        ``immobility_avg_firing_rate_all_immobile``, and this function returns a
+        6-tuple rather than a 5-tuple.
     cohort_stops : pd.DataFrame, optional
         The session's kept stops from
         :func:`~continuum_swr_replay.analysis.pfc.cohort.load_session_stop_cohort`.
