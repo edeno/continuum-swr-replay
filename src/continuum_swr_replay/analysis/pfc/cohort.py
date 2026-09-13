@@ -73,9 +73,7 @@ def load_session_stop_cohort(
         problem, not an empty cohort, and fitting the whole epoch instead would
         silently reintroduce the population this restriction exists to remove.
     """
-    path = (
-        DEFAULT_STOP_TABLE_PATH if stop_table_path is None else Path(stop_table_path)
-    )
+    path = DEFAULT_STOP_TABLE_PATH if stop_table_path is None else Path(stop_table_path)
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     stop_table = read_table(path)

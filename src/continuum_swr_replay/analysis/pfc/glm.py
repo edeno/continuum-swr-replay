@@ -642,7 +642,16 @@ def process_neuron(
     neuron_stats : dict[str, Any]
         Per-neuron statistics including:
 
-        - ``run_avg_firing_rate``, ``immobility_avg_firing_rate``: Hz
+        - ``run_avg_firing_rate``: Hz over every moving bin.
+        - ``immobility_avg_firing_rate``: Hz over the bins the models were fit
+          on -- with a stop cohort, the cohort's immobile bins, not every
+          immobile bin. This is the rate the downstream ``min_firing_rate``
+          inclusion gate screens on, so it describes the sample the estimates
+          come from; its value therefore depends on the cohort the bundle was
+          fit on (named in the bundle's provenance sidecar).
+        - ``immobility_avg_firing_rate_all_immobile``: Hz over every immobile
+          bin, cohort or not. Equal to ``immobility_avg_firing_rate`` exactly
+          when no stop restriction was applied.
         - ``theta_mod``, ``theta_preferred_phase``: theta modulation during running
         - ``{model} vs. {baseline}: lr, pval``: likelihood ratio tests
         - ``{model} vs. {baseline}: frac_null_dev, frac_explained_dev``:
@@ -700,9 +709,15 @@ def process_neuron(
         # Get immobility SWR/non-local statistics. This is the mean rate over
         # the bins the models are actually fit on, so the downstream
         # minimum-firing-rate inclusion gate screens the sample the estimates
-        # come from rather than a wider one.
+        # come from rather than a wider one. The column name is the same across
+        # cohorts, so the unrestricted rate is carried alongside it: the pair
+        # makes a bundle's cohort readable from the table itself (the two are
+        # equal exactly when no stop restriction was applied).
         neuron_stats["immobility_avg_firing_rate"] = (
             neuron_spike_count[fit_mask].mean() * sampling_frequency
+        )
+        neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
+            neuron_spike_count[is_immobile].mean() * sampling_frequency
         )
 
         results, _ = _fit_immobility_models(
@@ -933,6 +948,9 @@ def process_neuron(
         neuron_stats["immobility_avg_firing_rate"] = (
             neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
+        neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
+            neuron_spike_count[is_immobile].mean() * sampling_frequency
+        )
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
         swr_modulation = nan_modulation
         no_swr_modulation = nan_modulation
@@ -1015,6 +1033,103 @@ def build_session_fit_mask(
     return is_immobile, fit_mask, counts
 
 
+#: Half-width of the peri-event spline basis, in seconds. The fit window is
+#: +/-125 samples at 500 Hz; a dropped event within this of a fitted bin is an
+#: event whose basis would have covered bins the model does fit.
+DEFAULT_BASIS_HALF_WINDOW_S = 0.25
+
+
+def count_events_covering_fit_bins(
+    onsets: NDArray,
+    times: NDArray,
+    fit_mask: NDArray,
+    *,
+    basis_half_window_s: float = DEFAULT_BASIS_HALF_WINDOW_S,
+) -> int:
+    """How many of ``onsets`` have a fitted bin within the basis half-window.
+
+    The cohort restriction drops events by onset, but the regressor basis spans
+    +/-250 ms around each event, so an event dropped just before a stop's
+    leading edge would have covered bins that *are* fit. Those bins are then fit
+    with that event's contribution set to zero. This counts the events for which
+    that is true, so a run can state the size of the effect rather than assume
+    it away.
+
+    Parameters
+    ----------
+    onsets : numpy.ndarray, shape (n_events,)
+        Onset times of the dropped events, in seconds.
+    times : numpy.ndarray, shape (n_time,)
+        Sample times, ascending, on the same clock.
+    fit_mask : numpy.ndarray of bool, shape (n_time,)
+        The bins the models are fit on.
+    basis_half_window_s : float
+        Half-width of the peri-event basis, in seconds.
+
+    Returns
+    -------
+    int
+        Number of onsets with at least one fitted bin in
+        ``[onset - basis_half_window_s, onset + basis_half_window_s]``.
+    """
+    onsets = np.asarray(onsets, dtype=float)
+    if onsets.size == 0:
+        return 0
+    # Prefix sums make the per-event window test a pair of searchsorted lookups
+    # rather than a scan over the time axis.
+    fitted_before = np.concatenate(
+        [[0], np.cumsum(np.asarray(fit_mask, dtype=bool), dtype=np.int64)]
+    )
+    first = np.searchsorted(times, onsets - basis_half_window_s, side="left")
+    last = np.searchsorted(times, onsets + basis_half_window_s, side="right")
+    return int((fitted_before[last] - fitted_before[first] > 0).sum())
+
+
+def _basis_coverage_counts(
+    dropped_non_local_onsets: NDArray,
+    dropped_ripple_onsets: NDArray,
+    *,
+    kept_non_local: int,
+    kept_ripple: int,
+    time: NDArray,
+    fit_mask: pd.Series | None,
+    basis_half_window_s: float,
+) -> dict[str, Any]:
+    """The leading-edge coverage diagnostic, as four report fields.
+
+    Named per event class and expressed both as a count and as a fraction of the
+    events that were kept, because the count alone is not interpretable without
+    the cohort's size.
+    """
+    if fit_mask is None:
+        return {
+            "n_nonlocal_dropped_overlapping_fit": None,
+            "n_ripple_dropped_overlapping_fit": None,
+            "n_nonlocal_dropped_overlapping_fit_frac_of_kept": None,
+            "n_ripple_dropped_overlapping_fit_frac_of_kept": None,
+        }
+    mask = np.asarray(fit_mask, dtype=bool)
+    n_non_local = count_events_covering_fit_bins(
+        dropped_non_local_onsets,
+        time,
+        mask,
+        basis_half_window_s=basis_half_window_s,
+    )
+    n_ripple = count_events_covering_fit_bins(
+        dropped_ripple_onsets, time, mask, basis_half_window_s=basis_half_window_s
+    )
+    return {
+        "n_nonlocal_dropped_overlapping_fit": n_non_local,
+        "n_ripple_dropped_overlapping_fit": n_ripple,
+        "n_nonlocal_dropped_overlapping_fit_frac_of_kept": (
+            n_non_local / kept_non_local if kept_non_local else None
+        ),
+        "n_ripple_dropped_overlapping_fit_frac_of_kept": (
+            n_ripple / kept_ripple if kept_ripple else None
+        ),
+    }
+
+
 def build_session_event_sets(
     data: Mapping[str, Any],
     results: Any,
@@ -1023,6 +1138,8 @@ def build_session_event_sets(
     stop_cohort: str = "at_well",
     immobility_threshold: float = 4.0,
     non_local_threshold: float = 0.8,
+    fit_mask: pd.Series | None = None,
+    basis_half_window_s: float = DEFAULT_BASIS_HALF_WINDOW_S,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
     """Build the four event sets the PFC design matrices are keyed on.
 
@@ -1049,6 +1166,12 @@ def build_session_event_sets(
         Speed threshold for whole-event immobility (cm/s).
     non_local_threshold : float
         Probability threshold for a confident non-local event.
+    fit_mask : pandas.Series of bool, optional
+        The bins the models will be fit on. Used only to measure how many
+        dropped events would have had basis coverage over fitted bins; when
+        omitted those counts are ``None``.
+    basis_half_window_s : float
+        Half-width of the peri-event basis used for that measurement.
 
     Returns
     -------
@@ -1057,8 +1180,11 @@ def build_session_event_sets(
     counts : dict
         ``stop_cohort`` and the event counts before and after the restriction
         (``n_nonlocal_before``/``n_nonlocal_after``,
-        ``n_ripple_before``/``n_ripple_after``), plus the split
-        (``n_nonlocal_swr``, ``n_nonlocal_no_swr``).
+        ``n_ripple_before``/``n_ripple_after``), the split
+        (``n_nonlocal_swr``, ``n_nonlocal_no_swr``), and the leading-edge
+        coverage diagnostic ``n_nonlocal_dropped_overlapping_fit`` /
+        ``n_ripple_dropped_overlapping_fit`` with their fractions of the kept
+        counts (``*_frac_of_kept``).
 
     Raises
     ------
@@ -1115,6 +1241,8 @@ def build_session_event_sets(
         "n_nonlocal_before": int(len(non_local_times)),
         "n_ripple_before": int(len(ripple_times)),
     }
+    dropped_non_local_onsets = np.empty(0, dtype=float)
+    dropped_ripple_onsets = np.empty(0, dtype=float)
     if stop_cohort != "all_stops":
         if cohort_stops is None:
             raise ValueError(
@@ -1122,16 +1250,33 @@ def build_session_event_sets(
                 "load_session_stop_cohort returned, or use 'all_stops' for no "
                 "stop restriction"
             )
-        non_local_times = non_local_times.loc[
-            events_in_stops(
-                non_local_times.start_time.to_numpy(dtype=float), cohort_stops
-            )
+        keep_non_local = events_in_stops(
+            non_local_times.start_time.to_numpy(dtype=float), cohort_stops
+        )
+        keep_ripple = events_in_stops(
+            ripple_times.start_time.to_numpy(dtype=float), cohort_stops
+        )
+        dropped_non_local_onsets = non_local_times.start_time.to_numpy(dtype=float)[
+            ~keep_non_local
         ]
-        ripple_times = ripple_times.loc[
-            events_in_stops(ripple_times.start_time.to_numpy(dtype=float), cohort_stops)
+        dropped_ripple_onsets = ripple_times.start_time.to_numpy(dtype=float)[
+            ~keep_ripple
         ]
+        non_local_times = non_local_times.loc[keep_non_local]
+        ripple_times = ripple_times.loc[keep_ripple]
     counts["n_nonlocal_after"] = int(len(non_local_times))
     counts["n_ripple_after"] = int(len(ripple_times))
+    counts.update(
+        _basis_coverage_counts(
+            dropped_non_local_onsets,
+            dropped_ripple_onsets,
+            kept_non_local=counts["n_nonlocal_after"],
+            kept_ripple=counts["n_ripple_after"],
+            time=position_time.to_numpy(dtype=float),
+            fit_mask=fit_mask,
+            basis_half_window_s=basis_half_window_s,
+        )
+    )
 
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
         non_local_times, ripple_times
@@ -1236,8 +1381,30 @@ def run_session(
     logger.info("Loading session data...")
     data = load_data(nwb_file_name, epoch_name)
 
-    logger.info("Identifying non-local events (stop cohort: %s)...", stop_cohort)
     position_time = data["position_info"].index
+    time = position_time.to_numpy(dtype=float)
+
+    # Fit with wider lag window (±250ms) so spline boundary artifacts
+    # fall outside the reported window (±200ms). The returned modulation
+    # arrays are trimmed to the reporting window after fitting.
+    fit_lags = np.arange(-125, 126, 1)
+    report_lags = np.arange(-100, 101, 1)
+
+    is_immobile, fit_mask, bin_counts = build_session_fit_mask(
+        data["position_info"],
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=immobility_threshold,
+    )
+    logger.info(
+        "Fit bins: %d immobile, %d in cohort (%.3f of %d time bins)",
+        bin_counts["n_bins_immobile"],
+        bin_counts["n_bins_fit"],
+        bin_counts["n_bins_fit"] / bin_counts["n_bins_total"],
+        bin_counts["n_bins_total"],
+    )
+
+    logger.info("Identifying non-local events (stop cohort: %s)...", stop_cohort)
     event_times, event_counts = build_session_event_sets(
         data,
         results,
@@ -1245,7 +1412,10 @@ def run_session(
         stop_cohort=stop_cohort,
         immobility_threshold=immobility_threshold,
         non_local_threshold=non_local_threshold,
+        fit_mask=fit_mask,
+        basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
+    cohort_info = {**bin_counts, **event_counts}
     logger.info(
         "Events in cohort: %d/%d non-local (%d with SWR, %d without SWR), %d/%d SWRs",
         event_counts["n_nonlocal_after"],
@@ -1255,28 +1425,12 @@ def run_session(
         event_counts["n_ripple_after"],
         event_counts["n_ripple_before"],
     )
-
-    time = position_time.to_numpy(dtype=float)
-    is_immobile, fit_mask, bin_counts = build_session_fit_mask(
-        data["position_info"],
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
-        immobility_threshold=immobility_threshold,
-    )
-    cohort_info = {**bin_counts, **event_counts}
     logger.info(
-        "Fit bins: %d immobile, %d in cohort (%.3f of %d time bins)",
-        bin_counts["n_bins_immobile"],
-        bin_counts["n_bins_fit"],
-        bin_counts["n_bins_fit"] / bin_counts["n_bins_total"],
-        bin_counts["n_bins_total"],
+        "Dropped events whose basis would have covered fitted bins: "
+        "%s non-local, %s SWR",
+        event_counts["n_nonlocal_dropped_overlapping_fit"],
+        event_counts["n_ripple_dropped_overlapping_fit"],
     )
-
-    # Fit with wider lag window (±250ms) so spline boundary artifacts
-    # fall outside the reported window (±200ms). The returned modulation
-    # arrays are trimmed to the reporting window after fitting.
-    fit_lags = np.arange(-125, 126, 1)
-    report_lags = np.arange(-100, 101, 1)
 
     logger.info("Building design matrices...")
     immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(

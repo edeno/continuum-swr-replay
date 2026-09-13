@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
 from continuum_swr_replay.analysis.pfc.glm import (
     test_theta_modulation as run_theta_modulation_test,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_cohort
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -615,20 +616,32 @@ class TestProcessNeuron:
 
 
 @pytest.fixture
-def cohort_stops():
-    """Two disjoint stops: one well-anchored (kept), one in transit (dropped).
+def session_stops():
+    """One session's two disjoint stops: one well-anchored, one in transit.
 
-    Both sit in immobile stretches of the ``position_info`` fixture, so what the
-    cohort drops is the stop rule and not the speed rule.
+    Both sit in immobile stretches of the ``position_info`` fixture (which runs
+    only between 4 s and 5 s), so what the cohort drops is the stop rule and not
+    the speed rule.
     """
     return pd.DataFrame(
         {
-            "stop_id": ["s0"],
-            "stop_start": [1.5],
-            "stop_end": [3.0],
-            "occupancy_state": ["at_well"],
+            "stop_id": ["s0", "s1"],
+            "stop_start": [1.5, 6.0],
+            "stop_end": [3.0, 7.0],
+            "occupancy_state": ["at_well", "in_transit"],
         }
     )
+
+
+@pytest.fixture
+def cohort_stops(session_stops):
+    """The kept stops, cut from ``session_stops`` by the shared cohort rule."""
+    selected, _ = select_stop_cohort(session_stops, cohort="at_well")
+    assert list(selected["stop_id"]) == ["s0"], (
+        "the in-transit stop must be dropped by the cohort rule, or the tests "
+        "below are not testing the restriction they claim to"
+    )
+    return selected
 
 
 class TestBuildSessionFitMask:
@@ -654,6 +667,11 @@ class TestBuildSessionFitMask:
         assert counts["n_bins_immobile"] == int(is_immobile.sum())
         assert counts["n_bins_total"] == len(position_info)
         assert counts["stop_cohort"] == "at_well"
+        # The dropped in-transit stop (6-7 s) is immobile throughout, so its
+        # bins are excluded by the stop rule alone.
+        in_dropped_stop = (position_info.index >= 6.0) & (position_info.index <= 7.0)
+        assert is_immobile.to_numpy()[in_dropped_stop].all()
+        assert not fit_mask.to_numpy()[in_dropped_stop].any()
 
     def test_all_stops_reproduces_the_immobility_mask_bit_for_bit(
         self, position_info, is_immobile
@@ -715,10 +733,11 @@ def _synthetic_session(position_info, event_windows, ripple_windows):
 
 
 class TestBuildSessionEventSets:
-    # Two replay events and two ripples, one of each inside the cohort stop
-    # (1.5-3.0 s) and one of each outside it, all in immobile stretches.
-    EVENT_WINDOWS = [(2.0, 2.2), (8.0, 8.2)]
-    RIPPLE_WINDOWS = [(2.0, 2.15), (8.0, 8.15)]
+    # Three replay events and three ripples, all in immobile stretches: one of
+    # each inside the kept stop (1.5-3.0 s), one of each inside the dropped
+    # in-transit stop (6.0-7.0 s), and one of each outside every stop.
+    EVENT_WINDOWS = [(2.0, 2.2), (6.2, 6.4), (8.0, 8.2)]
+    RIPPLE_WINDOWS = [(2.0, 2.15), (6.2, 6.35), (8.0, 8.15)]
 
     def test_only_events_starting_inside_a_cohort_stop_survive(
         self, position_info, cohort_stops
@@ -733,9 +752,9 @@ class TestBuildSessionEventSets:
             data, results, cohort_stops=cohort_stops, stop_cohort="at_well"
         )
 
-        assert counts["n_nonlocal_before"] == 2
+        assert counts["n_nonlocal_before"] == 3
         assert counts["n_nonlocal_after"] == 1
-        assert counts["n_ripple_before"] == 2
+        assert counts["n_ripple_before"] == 3
         assert counts["n_ripple_after"] == 1
         np.testing.assert_allclose(
             event_times["non_local"].start_time.to_numpy(), [2.0], atol=0.01
@@ -748,22 +767,27 @@ class TestBuildSessionEventSets:
         assert len(event_times["non_local_SWR"]) == 1
         assert len(event_times["non_local_no_SWR"]) == 0
 
-    def test_all_stops_keeps_every_speed_eligible_event(
-        self, position_info, cohort_stops
-    ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+    def test_all_stops_keeps_every_speed_eligible_event(self, position_info):
+        from continuum_swr_replay.analysis.pfc.glm import (
+            build_session_event_sets,
+            build_session_fit_mask,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
         )
+        _, fit_mask, _ = build_session_fit_mask(position_info, stop_cohort="all_stops")
 
         event_times, counts = build_session_event_sets(
-            data, results, stop_cohort="all_stops"
+            data, results, stop_cohort="all_stops", fit_mask=fit_mask
         )
 
-        assert counts["n_nonlocal_after"] == counts["n_nonlocal_before"] == 2
-        assert counts["n_ripple_after"] == counts["n_ripple_before"] == 2
-        assert len(event_times["non_local_SWR"]) == 2
+        assert counts["n_nonlocal_after"] == counts["n_nonlocal_before"] == 3
+        assert counts["n_ripple_after"] == counts["n_ripple_before"] == 3
+        assert len(event_times["non_local_SWR"]) == 3
+        # Nothing is dropped, so nothing can have been dropped over fitted bins.
+        assert counts["n_nonlocal_dropped_overlapping_fit"] == 0
+        assert counts["n_ripple_dropped_overlapping_fit"] == 0
 
     def test_a_cohort_without_stops_is_refused(self, position_info):
         from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
@@ -775,42 +799,170 @@ class TestBuildSessionEventSets:
         with pytest.raises(ValueError, match="cohort_stops"):
             build_session_event_sets(data, results, stop_cohort="at_well")
 
+    def test_a_dropped_event_at_a_stops_leading_edge_is_counted(
+        self, position_info, cohort_stops, is_immobile
+    ):
+        # An event beginning 0.1 s before the kept stop starts is dropped by the
+        # onset rule, but its +/-0.25 s basis would have covered fitted bins
+        # inside the stop. That is the gap the diagnostic exists to size.
+        from continuum_swr_replay.analysis.pfc.glm import (
+            build_session_event_sets,
+            build_session_fit_mask,
+        )
+
+        data, results = _synthetic_session(
+            position_info, [(1.4, 1.45), (8.0, 8.2)], [(1.4, 1.45)]
+        )
+        _, fit_mask, _ = build_session_fit_mask(
+            position_info, cohort_stops=cohort_stops, stop_cohort="at_well"
+        )
+
+        _, counts = build_session_event_sets(
+            data,
+            results,
+            cohort_stops=cohort_stops,
+            stop_cohort="at_well",
+            fit_mask=fit_mask,
+            basis_half_window_s=0.25,
+        )
+
+        # Both replay events are dropped; only the leading-edge one is within
+        # a basis half-window of a fitted bin (the 8.0 s one is not).
+        assert counts["n_nonlocal_after"] == 0
+        assert counts["n_nonlocal_dropped_overlapping_fit"] == 1
+        assert counts["n_ripple_dropped_overlapping_fit"] == 1
+        # With nothing kept, a fraction of the kept count is undefined, not zero.
+        assert counts["n_nonlocal_dropped_overlapping_fit_frac_of_kept"] is None
+
+    def test_the_diagnostic_is_none_when_no_fit_mask_is_given(
+        self, position_info, cohort_stops
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        _, counts = build_session_event_sets(
+            data, results, cohort_stops=cohort_stops, stop_cohort="at_well"
+        )
+
+        assert counts["n_nonlocal_dropped_overlapping_fit"] is None
+        assert counts["n_ripple_dropped_overlapping_fit"] is None
+
+
+class TestCountEventsCoveringFitBins:
+    def test_only_onsets_within_the_window_of_a_fitted_bin_count(self):
+        from continuum_swr_replay.analysis.pfc.glm import (
+            count_events_covering_fit_bins,
+        )
+
+        times = np.arange(0.0, 10.0, 0.002)
+        fit_mask = (times >= 5.0) & (times < 6.0)
+
+        # 4.80 is 0.20 s before the first fitted bin (inside the window);
+        # 4.70 is 0.30 s before it (outside); 6.10 is 0.10 s after the last.
+        counted = count_events_covering_fit_bins(
+            np.array([4.70, 4.80, 5.5, 6.10, 9.0]),
+            times,
+            fit_mask,
+            basis_half_window_s=0.25,
+        )
+
+        assert counted == 3
+
+    def test_no_onsets_counts_zero(self):
+        from continuum_swr_replay.analysis.pfc.glm import (
+            count_events_covering_fit_bins,
+        )
+
+        times = np.arange(0.0, 1.0, 0.002)
+
+        assert (
+            count_events_covering_fit_bins(
+                np.array([]), times, np.ones_like(times, dtype=bool)
+            )
+            == 0
+        )
+
+    def test_an_empty_fit_mask_counts_zero(self):
+        from continuum_swr_replay.analysis.pfc.glm import (
+            count_events_covering_fit_bins,
+        )
+
+        times = np.arange(0.0, 1.0, 0.002)
+
+        assert (
+            count_events_covering_fit_bins(
+                np.array([0.5]), times, np.zeros_like(times, dtype=bool)
+            )
+            == 0
+        )
+
 
 class TestProcessNeuronFitMask:
     def test_default_fit_mask_reproduces_the_immobility_fit_bit_for_bit(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
 
         default_stats, *default_mods = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
         explicit_stats, *explicit_mods = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
             fit_mask=is_immobile,
         )
 
         assert default_stats == explicit_stats
-        for default_mod, explicit_mod in zip(
-            default_mods, explicit_mods, strict=True
-        ):
+        for default_mod, explicit_mod in zip(default_mods, explicit_mods, strict=True):
             np.testing.assert_array_equal(default_mod, explicit_mod)
+        # With no stop restriction the fitted sample IS every immobile bin, so
+        # the redefined column and its unrestricted companion must agree exactly.
+        assert (
+            default_stats["immobility_avg_firing_rate"]
+            == default_stats["immobility_avg_firing_rate_all_immobile"]
+        )
 
     def test_a_narrower_fit_mask_changes_the_fitted_sample(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
 
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
@@ -821,8 +973,13 @@ class TestProcessNeuronFitMask:
         fit_mask = is_immobile & inside
 
         stats, *_ = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
             fit_mask=fit_mask,
         )
 
@@ -834,3 +991,13 @@ class TestProcessNeuronFitMask:
         # Running statistics still use every moving bin, cohort or not.
         expected_run = spike_count[~is_immobile].mean() * sampling_frequency
         assert stats["run_avg_firing_rate"] == pytest.approx(expected_run)
+        # The companion column keeps the unrestricted immobility rate, so a
+        # bundle's cohort is readable from the table: the two now differ.
+        expected_all = spike_count[is_immobile].mean() * sampling_frequency
+        assert stats["immobility_avg_firing_rate_all_immobile"] == pytest.approx(
+            expected_all
+        )
+        assert (
+            stats["immobility_avg_firing_rate"]
+            != stats["immobility_avg_firing_rate_all_immobile"]
+        )

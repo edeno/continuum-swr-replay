@@ -59,7 +59,9 @@ def test_only_the_sensitivity_bundle_is_suffixed(tmp_path):
     assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
 
 
-def _write_bundle_files(directory, epoch_identifier, stop_cohort, sidecar_cohort):
+def _write_bundle_files(
+    directory, epoch_identifier, stop_cohort, sidecar_cohort, sidecar_hash="abc123"
+):
     """Touch one bundle's five files, optionally with a provenance sidecar."""
     artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
     base = artifact.with_suffix("")
@@ -73,7 +75,9 @@ def _write_bundle_files(directory, epoch_identifier, stop_cohort, sidecar_cohort
         base.with_suffix(suffix).touch()
     if sidecar_cohort is not None:
         artifact.with_suffix(".provenance.json").write_text(
-            json.dumps({"stop_cohort": sidecar_cohort})
+            json.dumps(
+                {"stop_cohort": sidecar_cohort, "stop_table_sha256": sidecar_hash}
+            )
         )
 
 
@@ -81,9 +85,27 @@ def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
 
-    assert runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
-    assert not runner.results_exist(tmp_path, epoch_identifier, False, "all_stops")
-    assert not runner.results_exist(tmp_path, epoch_identifier, True, "at_well")
+    assert runner.results_exist(tmp_path, epoch_identifier, False, "at_well", "abc123")
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "all_stops", None
+    )
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, True, "at_well", "abc123"
+    )
+
+
+def test_a_bundle_cut_from_another_stop_table_is_refit(tmp_path):
+    # Regenerating the stop table changes which bins and events the cohort
+    # holds, so a bundle cut from the previous generation is not this run's
+    # bundle even though it names the same cohort.
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "at_well", "at_well", sidecar_hash="stale999"
+    )
+
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123"
+    )
 
 
 def test_a_bundle_that_does_not_state_its_population_is_refit(tmp_path):
@@ -93,14 +115,27 @@ def test_a_bundle_that_does_not_state_its_population_is_refit(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", sidecar_cohort=None)
 
-    assert not runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123"
+    )
 
 
 def test_a_bundle_naming_another_population_is_refit(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "all_stops")
 
-    assert not runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123"
+    )
+
+
+def test_an_allstops_bundle_matches_when_no_stop_table_was_read(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "all_stops", "all_stops", sidecar_hash=None
+    )
+
+    assert runner.results_exist(tmp_path, epoch_identifier, False, "all_stops", None)
 
 
 @pytest.fixture
@@ -140,6 +175,8 @@ def fake_session(monkeypatch):
                 "n_nonlocal_after": 8,
                 "n_ripple_before": 30,
                 "n_ripple_after": 11,
+                "n_nonlocal_dropped_overlapping_fit": 3,
+                "n_ripple_dropped_overlapping_fit": 5,
             },
         )
 
@@ -171,6 +208,9 @@ def test_the_sidecar_states_the_population_the_fit_was_read_on(
     assert record["stop_table_sha256"] == "deadbeef"
     assert record["cohort_counts"]["n_bins_fit"] == 400
     assert record["cohort_counts"]["n_nonlocal_after"] == 8
+    # The leading-edge coverage diagnostic travels with the bundle.
+    assert record["cohort_counts"]["n_nonlocal_dropped_overlapping_fit"] == 3
+    assert record["cohort_counts"]["n_ripple_dropped_overlapping_fit"] == 5
     assert record["stop_cohort_report"]["n_stops_after"] == 1
     assert fake_session["cohort"] == "at_well"
 

@@ -38,7 +38,13 @@ def load_population_data(
     data_dir : Path
         Directory containing *_mPFC_modulation.pkl and .npy files.
     min_firing_rate : float
-        Minimum immobility firing rate (Hz) to include a neuron.
+        Minimum immobility firing rate (Hz) to include a neuron. The screened
+        column, ``immobility_avg_firing_rate``, is the mean rate over the bins
+        the bundle was fit on -- with a stop cohort, that cohort's immobile
+        bins, not every immobile bin -- so the gate screens the sample the
+        estimates come from. Which cohort that was is named in the bundle's
+        provenance sidecar; ``immobility_avg_firing_rate_all_immobile`` carries
+        the unrestricted rate alongside it.
     artifact_suffix : str
         Suffix naming the stop cohort the bundle was fit on ("" for the
         canonical at-well bundle, "_allstops" for the sensitivity one). Only

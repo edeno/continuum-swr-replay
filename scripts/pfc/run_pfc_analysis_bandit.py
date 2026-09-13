@@ -106,17 +106,28 @@ def results_exist(
     epoch_identifier: str,
     overwrite: bool,
     stop_cohort: str = "at_well",
+    stop_table_sha256: str | None = None,
 ) -> bool:
-    """Check if all modulation result files already exist for this session.
+    """Check if this session's bundle already exists *for this population*.
 
     Distinct from ``_decoding_common.results_exist`` because the PFC
     pipeline writes a different set of files (modulation .npy arrays
     plus a single .pkl) than the decoder pipeline (results .nc, detector
-    .pkl, environment .pkl). The check is per cohort: an at-well bundle
-    never satisfies an ``all_stops`` request, and a bundle that does not
-    *state* its population in a provenance sidecar is not accepted as one --
-    the canonical name is unsuffixed, so a bundle fit before the cohort
-    existed would otherwise be kept silently by a skip.
+    .pkl, environment .pkl). Three things must match, not just the file names:
+    an at-well bundle never satisfies an ``all_stops`` request; a bundle that
+    does not *state* its population in a provenance sidecar is not accepted as
+    one (the canonical name is unsuffixed, so a bundle fit before the cohort
+    existed would otherwise be kept silently by a skip); and the stop table the
+    bundle was cut from must be the one on disk now, because regenerating the
+    stop table changes which bins and events the cohort contains.
+
+    Parameters
+    ----------
+    stop_table_sha256 : str or None
+        Hash of the stop table this run would use, as
+        ``load_session_stop_cohort`` reports it. ``None`` for ``all_stops``,
+        which reads no stop table -- and which therefore only matches a sidecar
+        that also recorded no stop table.
     """
     if overwrite:
         return False
@@ -134,7 +145,11 @@ def results_exist(
     sidecar = fit_provenance_path(artifact)
     if not sidecar.exists():
         return False
-    return json.loads(sidecar.read_text()).get("stop_cohort") == stop_cohort
+    record = json.loads(sidecar.read_text())
+    return (
+        record.get("stop_cohort") == stop_cohort
+        and record.get("stop_table_sha256") == stop_table_sha256
+    )
 
 
 def run_analysis(
@@ -185,7 +200,31 @@ def run_analysis(
         path_logfile=Path(log_directory) / f"{epoch_identifier}.log",
     )
 
-    if results_exist(output_dir, epoch_identifier, overwrite, stop_cohort):
+    # The cohort is resolved before the skip check, not after: the check needs
+    # the stop table's hash to tell a bundle cut from the current table from one
+    # cut from a previous generation of it. Reading and hashing the table is
+    # seconds against a multi-hour fit.
+    if stop_cohort == "all_stops":
+        cohort_stops, cohort_report = None, {"cohort": stop_cohort}
+    else:
+        try:
+            cohort_stops, cohort_report = load_session_stop_cohort(
+                nwb_file_name, epoch_name, cohort=stop_cohort
+            )
+        except Exception as e:
+            # One session missing from the stop table must not abort the batch;
+            # the log is the per-session failure record, as it is for a failed
+            # fit below.
+            logger.exception(f"No stop cohort for {epoch_identifier}: {e}")
+            return
+
+    if results_exist(
+        output_dir,
+        epoch_identifier,
+        overwrite,
+        stop_cohort,
+        cohort_report.get("stop_table_sha256"),
+    ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return
 
@@ -198,12 +237,7 @@ def run_analysis(
 
     try:
         logger.info(f"Processing {epoch_identifier}...")
-        if stop_cohort == "all_stops":
-            cohort_stops, cohort_report = None, {"cohort": stop_cohort}
-        else:
-            cohort_stops, cohort_report = load_session_stop_cohort(
-                nwb_file_name, epoch_name, cohort=stop_cohort
-            )
+        if cohort_stops is not None:
             logger.info(
                 "Stop cohort %s: %d/%d stops (%s)",
                 stop_cohort,

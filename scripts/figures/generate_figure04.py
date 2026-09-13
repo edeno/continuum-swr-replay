@@ -346,22 +346,9 @@ def generate_figure(
             f"Stop cohort {stop_cohort}: "
             f"{cohort_report['n_stops_after']}/{cohort_report['n_stops_before']} stops"
         )
-    event_times, event_counts = build_session_event_sets(
-        data,
-        results_hpc,
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
-        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-    )
-    print(
-        f"Events in cohort: {event_counts['n_nonlocal_after']}"
-        f"/{event_counts['n_nonlocal_before']} non-local, "
-        f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs"
-    )
-
     # Design matrices
     time = position_time.to_numpy(dtype=float)
+    lags = np.arange(-100, 101, 1)
     _, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],
         cohort_stops=cohort_stops,
@@ -373,10 +360,26 @@ def generate_figure(
         "immobile bins in cohort"
     )
 
+    event_times, event_counts = build_session_event_sets(
+        data,
+        results_hpc,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        fit_mask=fit_mask,
+        basis_half_window_s=float(np.abs(lags).max()) / DEFAULT_SAMPLING_FREQUENCY_HZ,
+    )
+    print(
+        f"Events in cohort: {event_counts['n_nonlocal_after']}"
+        f"/{event_counts['n_nonlocal_before']} non-local, "
+        f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs"
+    )
+
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
         event_times, data["position_info"],
         sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
-        lags=np.arange(-100, 101, 1),
+        lags=lags,
     )
 
     neuron_spike_times = data["spike_times"]["mPFC"][neuron_ind]
