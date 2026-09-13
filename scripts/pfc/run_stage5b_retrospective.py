@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
 
 import numpy as np
@@ -42,8 +43,13 @@ from continuum_swr_replay.analysis.replay import (
     at_well_event_cohort,
     retrospective_alignment_with_shuffle,
 )
+from continuum_swr_replay.analysis.replay.cohort_selection import STOP_COHORT_RULES
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -57,6 +63,20 @@ logging.basicConfig(
 
 INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
+
+#: The tables this analysis is cut from, hashed into the provenance sidecar.
+FIT_INPUTS = {
+    "event_table": INPUT_DIR / "event_table.pkl",
+    "event_arm_table": INPUT_DIR / "event_arm_table.pkl",
+    "event_sequence_table": INPUT_DIR / "event_sequence_table.pkl",
+}
+
+#: The only population these metrics are defined on. A retrospective metric
+#: asks what the animal did after a stop at a well, and needs the event's
+#: current arm as an endpoint, so an in-transit event has nothing to compare.
+#: The flag exists to make the cohort readable from the command line and the
+#: sidecar, not to offer a choice.
+STOP_COHORTS = ("at_well",)
 
 
 def _family_unit_counts(
@@ -135,6 +155,24 @@ def main() -> None:
         default=str(OUTPUT_PATH),
         help="Output pickle path. Defaults next to the input tables.",
     )
+    parser.add_argument(
+        "--stop-cohort",
+        type=str,
+        default="at_well",
+        choices=list(STOP_COHORTS),
+        help=(
+            "Population analysed (default, and only value: at_well). The "
+            "event-grain half of the cohort the hippocampal rate and content "
+            "ladders are read on; an in-transit event has no current arm to "
+            "measure alignment from."
+        ),
+    )
+    parser.add_argument(
+        "--max-sessions",
+        type=int,
+        default=None,
+        help="Analyse only the first N sessions (smoke runs; writes a partial table).",
+    )
     args = parser.parse_args()
 
     if args.swr_only and args.non_swr_only:
@@ -151,9 +189,12 @@ def main() -> None:
         output_path = str(INPUT_DIR / f"stage5b_retrospective_{label}.pkl")
 
     logging.info("Loading canonical tables from %s", INPUT_DIR)
-    event_table = read_table(INPUT_DIR / "event_table.pkl")
-    event_arm_table = read_table(INPUT_DIR / "event_arm_table.pkl")
-    event_sequence_table = read_table(INPUT_DIR / "event_sequence_table.pkl")
+    event_table = read_table(FIT_INPUTS["event_table"])
+    event_arm_table = read_table(FIT_INPUTS["event_arm_table"])
+    event_sequence_table = read_table(FIT_INPUTS["event_sequence_table"])
+    # Hash the tables while this run is reading them: a regeneration hours
+    # later must not be certified as this analysis's input.
+    fit_inputs = record_inputs(FIT_INPUTS)
     require_covariate_schema(event_table, table="event")
     require_covariate_schema(event_arm_table, table="event_arm")
     require_covariate_schema(event_sequence_table, table="event_sequence")
@@ -168,9 +209,12 @@ def main() -> None:
     event_table, event_arm_table, event_sequence_table = at_well_event_cohort(
         event_table, event_arm_table, event_sequence_table
     )
+    n_after_location = len(event_table)
     logging.info(
-        "Explicit at-well cohort: retained %d/%d events",
-        len(event_table),
+        "Cohort %s (%s): retained %d/%d events",
+        args.stop_cohort,
+        STOP_COHORT_RULES[(args.stop_cohort, "event")],
+        n_after_location,
         n_before_location,
     )
 
@@ -201,6 +245,9 @@ def main() -> None:
     rows = []
     n_no_movable = 0
     sessions = sorted(event_table.groupby(list(SESSION_COLUMNS)).groups.keys())
+    if args.max_sessions is not None:
+        sessions = sessions[: args.max_sessions]
+        logging.info("Smoke run: first %d session(s) only", len(sessions))
     for i, sess_key in enumerate(sessions):
         animal, session_date, epoch = sess_key
         ev_s = event_table[
@@ -250,6 +297,7 @@ def main() -> None:
                 "session_date": session_date,
                 "epoch": epoch,
                 "subset": label,
+                "stop_cohort": args.stop_cohort,
                 "retrospective_status": retrospective_status,
                 "elapsed_s": time.time() - t0,
             }
@@ -260,7 +308,27 @@ def main() -> None:
 
     out = pd.DataFrame(rows)
     out.to_pickle(output_path)
+    sidecar = write_fit_provenance(
+        output_path,
+        fit_inputs,
+        "retrospective_label_shuffle",
+        sys.argv,
+        extra={
+            "stop_cohort": args.stop_cohort,
+            "cohort_grain": "event",
+            "cohort_rule": STOP_COHORT_RULES[(args.stop_cohort, "event")],
+            "n_events_before_cohort": n_before_location,
+            "n_events_after_cohort": n_after_location,
+            "n_events_analysed": int(len(event_table)),
+            "subset": label,
+            "n_shuffles": args.n_shuffles,
+            "seed": args.seed,
+            "n_sessions": len(sessions),
+            "is_partial_run": args.max_sessions is not None,
+        },
+    )
     logging.info("Saved %d sessions → %s", len(out), output_path)
+    logging.info("Wrote provenance to %s", sidecar)
     logging.info(
         "Persisted %d/%d sessions with at least one non-movable metric family",
         n_no_movable,
