@@ -71,6 +71,15 @@ already undefined and the model's own complete-case rule already removed it.
 2,573 of the dropped stops did carry replay events and 2,506 a defined
 `frac_on_prev`, but not one of those had a response to fit.
 
+**The `mixed` stops the cohort keeps contribute nothing either.** The
+well-anchored predicate keeps 14,845 `mixed` stops, and `occupancy_well_arm` is
+finite for **0** of them; `is_stay` is derived from that arm
+(`tables_stop.py` ~319-329, via `current_patch`/`next_patch`), so `is_stay` is
+missing for all 14,845. Stage 6's effective population is therefore the
+**67,606** strictly-`at_well` stops that carry an `is_stay` — 67,606 of 69,224
+`at_well`, 0 of everything else — and the well-anchored-versus-strict choice
+that matters so much at the rate grain is inert here.
+
 So the cohort change at Stage 6 is a change in what the bundle *states*, not in
 what it estimates. That is the useful outcome: the population is now explicit,
 named on every artifact, and cannot drift from the rate/content population by
@@ -123,9 +132,12 @@ v3 → v4 behavior-cache reclassification that landed after that fit:
 - the new `all_stops` per-stop summary matches the backed-up
   `stop_replay_summary.pkl` on all 48 columns and all 107,400 rows **except**
   `is_rewarded_outcome` and `is_omitted_outcome`;
-- those differ on exactly 1,361 stops, and every one is `0.0` (omission) in the
-  backup and NaN now — the reclassification recorded in the project memory as
-  "v3→v4 reclassifies 1361 stops/12 events omission→NaN".
+- both differ on exactly the same 1,361 stops, and the two columns move in
+  opposite directions because one is `1 −` the other: `is_rewarded_outcome` is
+  `0.0` in the backup and NaN now, `is_omitted_outcome` is `1.0` in the backup
+  and NaN now. That is the reclassification recorded in the project memory as
+  "v3→v4 reclassifies 1361 stops/12 events omission→NaN" — 1,361 stops that
+  used to be scored as omissions now have no known outcome at all.
 
 Since `is_omitted_outcome` is the model's other predictor, those 1,361 stops
 leave the fits, which is what moves `n_stops` and `status`. Every replay-content
@@ -204,7 +216,11 @@ the shuffle seeding behaving as documented.
 
 Written by this sitting (`Processed-Data/replay_content/`), each with a
 `*.provenance.json` sidecar recording the cohort, the cohort report and the
-SHA-256 of every table read:
+SHA-256 of every table read. The two `stop_replay_summary*` sidecars were
+written after the fact from the pickles' own `attrs` (the runner gained the
+writer later the same day); their input hashes are the ones the run recorded
+while reading, and they say so — `backfilled_from_artifact_attrs` with the
+producing commit named in `produced_by_git_hash`:
 
 | artifact | population |
 | --- | --- |
