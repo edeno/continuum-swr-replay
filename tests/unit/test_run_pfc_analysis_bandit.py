@@ -1,0 +1,176 @@
+"""Command-line and artifact-naming behaviour of the PFC GLM runner.
+
+The runner writes into the shared ``Processed-Data`` tree under names every
+downstream reader hard-codes, so the population a run was fit on must be visible
+in the artifact name and in its provenance sidecar -- never inferred.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+_SPEC = importlib.util.spec_from_file_location(
+    "run_pfc_analysis_bandit",
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "pfc"
+    / "run_pfc_analysis_bandit.py",
+)
+runner = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(runner)
+
+
+def test_stop_cohort_defaults_to_the_canonical_at_well_population(monkeypatch):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+
+    args = runner.get_command_line_arguments()
+
+    assert args.stop_cohort == "at_well"
+    assert args.output_dir == runner.PROCESSED_DATA_DIR
+    assert args.max_sessions is None
+
+
+def test_an_unoffered_cohort_is_rejected(monkeypatch):
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        ["run_pfc_analysis_bandit.py", "--stop-cohort", "in_transit"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        runner.get_command_line_arguments()
+
+    assert excinfo.value.code == 2
+
+
+def test_only_the_sensitivity_bundle_is_suffixed(tmp_path):
+    canonical = runner.modulation_path(tmp_path, "wilbur20210329_02_r1_mPFC", "at_well")
+    sensitivity = runner.modulation_path(
+        tmp_path, "wilbur20210329_02_r1_mPFC", "all_stops"
+    )
+
+    assert canonical.name == "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
+
+
+def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    base = runner.modulation_path(tmp_path, epoch_identifier, "at_well").with_suffix("")
+    for suffix in (
+        ".pkl",
+        ".SWR_modulation.npy",
+        ".no_SWR_modulation.npy",
+        ".non_local_SWR_modulation.npy",
+        ".non_local_no_SWR_modulation.npy",
+    ):
+        base.with_suffix(suffix).touch()
+
+    assert runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
+    assert not runner.results_exist(tmp_path, epoch_identifier, False, "all_stops")
+    assert not runner.results_exist(tmp_path, epoch_identifier, True, "at_well")
+
+
+@pytest.fixture
+def fake_session(monkeypatch):
+    """Replace the per-session fit and the cohort load with recorded stubs."""
+    calls: dict[str, object] = {}
+
+    def _fake_cohort(nwb_file_name, epoch_name, *, cohort="at_well", **kwargs):
+        calls["cohort"] = cohort
+        stops = pd.DataFrame(
+            {"stop_start": [10.0], "stop_end": [11.0], "occupancy_state": ["at_well"]}
+        )
+        report = {
+            "cohort": cohort,
+            "rule": "test rule",
+            "n_stops_before": 3,
+            "n_stops_after": 1,
+            "stop_table_sha256": "deadbeef",
+        }
+        return stops, report
+
+    def _fake_run_session(nwb_file_name, epoch_name, **kwargs):
+        calls["run_session"] = kwargs
+        neuron_stats = pd.DataFrame({"immobility_avg_firing_rate": [3.0, 4.0]})
+        modulation = np.zeros((201, 2))
+        return (
+            neuron_stats,
+            modulation,
+            modulation,
+            modulation,
+            modulation,
+            {
+                "stop_cohort": kwargs["stop_cohort"],
+                "n_bins_immobile": 1000,
+                "n_bins_fit": 400,
+                "n_nonlocal_before": 20,
+                "n_nonlocal_after": 8,
+                "n_ripple_before": 30,
+                "n_ripple_after": 11,
+            },
+        )
+
+    monkeypatch.setattr(runner, "load_session_stop_cohort", _fake_cohort)
+    monkeypatch.setattr(runner, "run_session", _fake_run_session)
+    return calls
+
+
+def test_the_sidecar_states_the_population_the_fit_was_read_on(
+    tmp_path, fake_session, monkeypatch
+):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    assert artifact.exists(), "the fit wrote no artifact (run_analysis swallowed it)"
+    sidecar = artifact.with_suffix(".provenance.json")
+    record = json.loads(sidecar.read_text())
+    assert record["stop_cohort"] == "at_well"
+    assert record["stop_table_sha256"] == "deadbeef"
+    assert record["cohort_counts"]["n_bins_fit"] == 400
+    assert record["cohort_counts"]["n_nonlocal_after"] == 8
+    assert record["stop_cohort_report"]["n_stops_after"] == 1
+    assert fake_session["cohort"] == "at_well"
+
+
+def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
+    tmp_path, fake_session, monkeypatch
+):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="all_stops",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
+    assert artifact.exists()
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["stop_cohort"] == "all_stops"
+    # No stop table is read at all, so none is hashed as an input.
+    assert record["inputs"] == {}
+    assert record["stop_table_sha256"] is None
+    # The fit is handed no stops -- "all_stops" is the absence of the
+    # restriction, not a cohort that happens to keep everything.
+    assert "cohort" not in fake_session
+    assert fake_session["run_session"]["cohort_stops"] is None
