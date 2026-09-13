@@ -29,6 +29,7 @@ def _extract_animal(nwb_file_name: str) -> str:
 def load_population_data(
     data_dir: Path,
     min_firing_rate: float = 1.0,
+    artifact_suffix: str = "",
 ) -> tuple[pd.DataFrame, dict[str, np.ndarray], np.ndarray]:
     """Load and filter PFC population data.
 
@@ -38,6 +39,11 @@ def load_population_data(
         Directory containing *_mPFC_modulation.pkl and .npy files.
     min_firing_rate : float
         Minimum immobility firing rate (Hz) to include a neuron.
+    artifact_suffix : str
+        Suffix naming the stop cohort the bundle was fit on ("" for the
+        canonical at-well bundle, "_allstops" for the sensitivity one). Only
+        bundles carrying this suffix are read, so two cohorts can never be
+        pooled into one population.
 
     Returns
     -------
@@ -52,9 +58,10 @@ def load_population_data(
     """
     lag_time = np.arange(-100, 101) / 500.0
 
-    pkls = sorted(data_dir.glob("*_mPFC_modulation.pkl"))
+    stem = f"_mPFC_modulation{artifact_suffix}"
+    pkls = sorted(data_dir.glob(f"*{stem}.pkl"))
     if not pkls:
-        raise FileNotFoundError(f"No *_mPFC_modulation.pkl files in {data_dir}")
+        raise FileNotFoundError(f"No *{stem}.pkl files in {data_dir}")
 
     dfs = []
     swr_list, no_swr_list, nl_swr_list, nl_no_swr_list = [], [], [], []
@@ -62,7 +69,7 @@ def load_population_data(
     n_lag_times = len(lag_time)
 
     for p in pkls:
-        base = str(p).replace("_modulation.pkl", "_modulation")
+        base = str(p).removesuffix(".pkl")
         sess_swr = np.load(f"{base}.SWR_modulation.npy")
         sess_no_swr = np.load(f"{base}.no_SWR_modulation.npy")
         sess_nl_swr = np.load(f"{base}.non_local_SWR_modulation.npy")

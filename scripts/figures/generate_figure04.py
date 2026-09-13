@@ -45,22 +45,16 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.hippocampus import (
-    get_confident_times,
-    get_overlap_times,
-    load_results,
-)
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_results_position_time_alignment,
-)
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    build_speed_eligible_event_cohort,
-)
+from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.pfc import (
+    build_session_event_sets,
+    build_session_fit_mask,
     fit_immobility_models,
     make_design_matrices,
 )
+from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -308,6 +302,7 @@ def generate_figure(
     epoch_name="02_r1",
     neuron_ind=27,
     data_dir=PROCESSED_DATA_DIR,
+    stop_cohort="at_well",
 ):
     """Generate composite Figure 4.
 
@@ -321,6 +316,10 @@ def generate_figure(
         mPFC neuron index.
     data_dir : Path
         Directory containing processed data.
+    stop_cohort : {"at_well", "all_stops"}
+        Population the panels describe. The example neuron is refit here, so it
+        must be cut the same way the population bundle in ``data_dir`` was; the
+        suffixed ``_allstops`` bundle is read for ``all_stops``.
 
     Returns
     -------
@@ -334,51 +333,44 @@ def generate_figure(
     data = load_data(nwb_file_name, epoch_name)
 
     position_time = data["position_info"].index
-    speed = data["position_info"].head_speed.to_numpy()
-    validate_results_position_time_alignment(
-        results_hpc.time.values, position_time
-    )
-    non_local_prob = (
-        results_hpc.acausal_state_probabilities.sel(states="Non-Local Continuous")
-        + results_hpc.acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    ).assign_coords(time=position_time.to_numpy(dtype=float))
 
-    detected_non_local_times = get_confident_times(
-        non_local_prob,
-        speed,
-        position_time.to_numpy(dtype=float),
-        DEFAULT_NON_LOCAL_THRESHOLD,
+    # The example neuron is refit here, so it must be cut exactly as the
+    # population bundle was: the same event sets and the same fit mask the
+    # runner builds, from the same two functions.
+    cohort_stops = None
+    if stop_cohort != "all_stops":
+        cohort_stops, cohort_report = load_session_stop_cohort(
+            nwb_file_name, epoch_name, cohort=stop_cohort
+        )
+        print(
+            f"Stop cohort {stop_cohort}: "
+            f"{cohort_report['n_stops_after']}/{cohort_report['n_stops_before']} stops"
+        )
+    event_times, event_counts = build_session_event_sets(
+        data,
+        results_hpc,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
     )
-    non_local_times, _ = build_speed_eligible_event_cohort(
-        detected_non_local_times,
-        speed=speed,
-        time=position_time,
-        event_col="non_local_event",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    print(
+        f"Events in cohort: {event_counts['n_nonlocal_after']}"
+        f"/{event_counts['n_nonlocal_before']} non-local, "
+        f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs"
     )
-    ripple_times, _ = build_speed_eligible_event_cohort(
-        data["ripple_times"],
-        speed=speed,
-        time=position_time,
-        event_col="SWR_event",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
-    non_local_SWR_times, non_local_no_SWR_times = get_overlap_times(
-        non_local_times, ripple_times
-    )
-
-    event_times = {
-        "non_local_no_SWR": non_local_no_SWR_times,
-        "non_local_SWR": non_local_SWR_times,
-        "non_local": non_local_times,
-        "SWR": ripple_times,
-    }
 
     # Design matrices
     time = position_time.to_numpy(dtype=float)
-    is_immobile = (
-        data["position_info"].head_speed
-        < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    _, fit_mask, bin_counts = build_session_fit_mask(
+        data["position_info"],
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    print(
+        f"Fit bins: {bin_counts['n_bins_fit']}/{bin_counts['n_bins_immobile']} "
+        "immobile bins in cohort"
     )
 
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
@@ -392,13 +384,15 @@ def generate_figure(
 
     print("Fitting GLM models...")
     glm_results, _ = fit_immobility_models(
-        is_immobile, immobility_design_matrices, neuron_spike_count
+        fit_mask, immobility_design_matrices, neuron_spike_count
     )
 
     # --- Load population data ---
     print("Loading population data...")
     pop_df, modulations, pop_lag_time = load_population_data(
-        data_dir, min_firing_rate=1.0
+        data_dir,
+        min_firing_rate=1.0,
+        artifact_suffix=stop_cohort_suffix(stop_cohort),
     )
 
     # --- Create figure ---
@@ -502,6 +496,17 @@ def main():
     parser.add_argument("--epoch-name", type=str, default="02_r1")
     parser.add_argument("--neuron-ind", type=int, default=27)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument(
+        "--stop-cohort",
+        type=str,
+        default="at_well",
+        choices=["at_well", "all_stops"],
+        help=(
+            "Population the figure describes (default: at_well, the canonical "
+            "bundle). 'all_stops' refits the example neuron without the stop "
+            "restriction and reads the '_allstops' population bundle."
+        ),
+    )
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args()
@@ -512,6 +517,7 @@ def main():
         epoch_name=args.epoch_name,
         neuron_ind=args.neuron_ind,
         data_dir=args.data_dir,
+        stop_cohort=args.stop_cohort,
     )
 
     print(f"Saving to {args.output_dir}...")
