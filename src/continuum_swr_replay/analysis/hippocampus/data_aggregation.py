@@ -222,7 +222,7 @@ def align_results_to_position(
     results: xr.Dataset,
     position_info: pd.DataFrame,
     *,
-    max_dropped_seconds: float = 1.0,
+    max_dropped_seconds: float = 0.1,
     atol: float = 1e-6,
 ) -> tuple[xr.Dataset, pd.DataFrame, dict[str, Any]]:
     """Restrict a decode and a position frame to the timestamps they share.
@@ -251,7 +251,10 @@ def align_results_to_position(
     position_info : pandas.DataFrame
         Time-indexed position frame (seconds).
     max_dropped_seconds : float
-        Largest span either axis may lose to the intersection.
+        Largest span either axis may lose to the intersection. The default
+        (0.1 s, fifty 2 ms bins) is an order of magnitude above the
+        stale-decode tails seen in practice (3-9 bins); a larger mismatch
+        is a different timebase and must be looked at, not trimmed.
     atol : float
         Absolute tolerance (seconds) for calling two timestamps the same.
 

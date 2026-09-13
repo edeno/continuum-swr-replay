@@ -176,7 +176,7 @@ class TestRefusals:
         results = _make_results(time_axis)
         position_info = _make_position(time_axis[: -int(2.0 * SAMPLING_FREQUENCY_HZ)])
 
-        with pytest.raises(ValueError, match="over the 1.0s budget"):
+        with pytest.raises(ValueError, match="over the 0.1s budget"):
             align_results_to_position(results, position_info)
 
         # The same mismatch is accepted once the budget covers it.
