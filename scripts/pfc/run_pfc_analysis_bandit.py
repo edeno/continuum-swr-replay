@@ -38,6 +38,7 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --stop-cohort all_stops
 python run_pfc_analysis_bandit.py --max-sessions 1 --output-dir /tmp/pfc_smoke
 """
 
+import json
 import logging
 import os
 import subprocess
@@ -65,7 +66,10 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     load_session_stop_cohort,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.analysis.replay.fit_provenance import write_fit_provenance
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    fit_provenance_path,
+    write_fit_provenance,
+)
 from continuum_swr_replay.data_loaders import get_epoch_info
 from continuum_swr_replay.decoding_common import setup_logger
 from continuum_swr_replay.parameters import (
@@ -109,13 +113,15 @@ def results_exist(
     pipeline writes a different set of files (modulation .npy arrays
     plus a single .pkl) than the decoder pipeline (results .nc, detector
     .pkl, environment .pkl). The check is per cohort: an at-well bundle
-    never satisfies an ``all_stops`` request.
+    never satisfies an ``all_stops`` request, and a bundle that does not
+    *state* its population in a provenance sidecar is not accepted as one --
+    the canonical name is unsuffixed, so a bundle fit before the cohort
+    existed would otherwise be kept silently by a skip.
     """
     if overwrite:
         return False
-    save_base = modulation_path(save_folder, epoch_identifier, stop_cohort).with_suffix(
-        ""
-    )
+    artifact = modulation_path(save_folder, epoch_identifier, stop_cohort)
+    save_base = artifact.with_suffix("")
     required_files = [
         save_base.with_suffix(".pkl"),
         save_base.with_suffix(".SWR_modulation.npy"),
@@ -123,7 +129,12 @@ def results_exist(
         save_base.with_suffix(".non_local_SWR_modulation.npy"),
         save_base.with_suffix(".non_local_no_SWR_modulation.npy"),
     ]
-    return all(f.exists() for f in required_files)
+    if not all(f.exists() for f in required_files):
+        return False
+    sidecar = fit_provenance_path(artifact)
+    if not sidecar.exists():
+        return False
+    return json.loads(sidecar.read_text()).get("stop_cohort") == stop_cohort
 
 
 def run_analysis(

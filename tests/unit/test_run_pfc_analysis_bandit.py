@@ -59,9 +59,10 @@ def test_only_the_sensitivity_bundle_is_suffixed(tmp_path):
     assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
 
 
-def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
-    epoch_identifier = "wilbur20210329_02_r1_mPFC"
-    base = runner.modulation_path(tmp_path, epoch_identifier, "at_well").with_suffix("")
+def _write_bundle_files(directory, epoch_identifier, stop_cohort, sidecar_cohort):
+    """Touch one bundle's five files, optionally with a provenance sidecar."""
+    artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
+    base = artifact.with_suffix("")
     for suffix in (
         ".pkl",
         ".SWR_modulation.npy",
@@ -70,10 +71,36 @@ def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
         ".non_local_no_SWR_modulation.npy",
     ):
         base.with_suffix(suffix).touch()
+    if sidecar_cohort is not None:
+        artifact.with_suffix(".provenance.json").write_text(
+            json.dumps({"stop_cohort": sidecar_cohort})
+        )
+
+
+def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
 
     assert runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
     assert not runner.results_exist(tmp_path, epoch_identifier, False, "all_stops")
     assert not runner.results_exist(tmp_path, epoch_identifier, True, "at_well")
+
+
+def test_a_bundle_that_does_not_state_its_population_is_refit(tmp_path):
+    # The canonical name is unsuffixed, so a bundle written before the cohort
+    # existed sits under exactly the name a canonical run wants. Skipping on the
+    # name alone would keep an all-bins fit as if it were the at-well one.
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", sidecar_cohort=None)
+
+    assert not runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
+
+
+def test_a_bundle_naming_another_population_is_refit(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", "all_stops")
+
+    assert not runner.results_exist(tmp_path, epoch_identifier, False, "at_well")
 
 
 @pytest.fixture
