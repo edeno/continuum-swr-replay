@@ -32,7 +32,11 @@ a bare call shows none of them:
   ``visit_recency_trials_patch`` has no panel. These require
   ``event_patch_table``.
 * **Stop-grain fitted covariates** (:data:`RATE_COVARIATE_PANELS`) — the
-  Family-A rate design matrix, keyed on stops rather than events.
+  Family-A rate design matrix, keyed on stops rather than events. The
+  per-bin reward-history basis (``reward_history_rcos_*``,
+  ``reward_history_incomplete``) has no panel of its own: it is a fixed
+  transform of the known-outcome lag vector that the reward-lag kernel
+  panel draws.
 
 Note that the task-reward-probability patch aggregate is the experimenter's
 *programmed* reward probability, while the reward-belief-mean patch aggregate

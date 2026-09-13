@@ -1290,6 +1290,7 @@ class TestPanelGroupsAndRegistryIntegrity:
                 or p
                 == "did_last_completed_trip_switch_patch"  # -> is_after_switch_stop
                 or p.startswith("known_reward_outcome_lag_")  # -> reward-lag kernel
+                or p.startswith("reward_history_")  # basis of the drawn lag vector
                 or p.startswith("swr_x_")  # base panel x is_swr row
                 or p.endswith("_z")  # affine rescale of the raw column
                 or p.startswith("replay_fraction")  # choice grain, not a table input
