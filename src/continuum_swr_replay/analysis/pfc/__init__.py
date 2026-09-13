@@ -11,6 +11,11 @@ during sharp-wave ripples (SWR).
 
 Main Functions
 --------------
+build_session_event_sets
+    Build the four event sets (SWR, replay, and the two replay/SWR classes) a
+    session's design matrices are keyed on, restricted to the shared stop cohort.
+build_session_fit_mask
+    The time bins one session's GLMs are fit on: immobility, inside the cohort.
 process_neuron
     Fit GLM to relate single neuron activity to task/behavioral covariates.
     Primary entry point for single-unit analysis.
@@ -57,6 +62,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
     _make_design_matrices as make_design_matrices,
 )
 from continuum_swr_replay.analysis.pfc.glm import (
+    build_session_event_sets,
+    build_session_fit_mask,
     get_spikecount_per_time_bin,
     process_neuron,
     run_session,
@@ -65,6 +72,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
 __all__ = [
     "make_design_matrices",
     "fit_immobility_models",
+    "build_session_event_sets",
+    "build_session_fit_mask",
     "get_spikecount_per_time_bin",
     "process_neuron",
     "run_session",

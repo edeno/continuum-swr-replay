@@ -17,6 +17,11 @@ import statsmodels.api as sm
 from numpy.typing import NDArray
 from patsy import dmatrix
 
+from continuum_swr_replay.analysis.replay.cohort_selection import (
+    events_in_stops,
+    stop_interval_mask,
+)
+
 # ``load_data`` and the hippocampus helpers below open a Spyglass /
 # DataJoint connection at import time. We defer those imports into
 # ``run_session`` (the only function that uses them) so that the pure
@@ -444,16 +449,17 @@ def _make_design_matrices(
 
 
 def _fit_immobility_models(
-    is_immobile: pd.Series,
+    fit_mask: pd.Series,
     design_matrices: dict[str, NDArray],
     neuron_spike_count: NDArray,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Fit Poisson GLMs for each design matrix during immobility.
+    """Fit Poisson GLMs for each design matrix on the fitted time bins.
 
     Parameters
     ----------
-    is_immobile : pd.Series, shape (n_time,)
-        Boolean mask for immobile time bins.
+    fit_mask : pd.Series, shape (n_time,)
+        Boolean mask for the time bins the models are fit on: immobility, and
+        (when a stop cohort is applied) immobility inside a cohort stop.
     design_matrices : dict[str, NDArray]
         Design matrices keyed by model name, each shape (n_time, n_features).
     neuron_spike_count : NDArray, shape (n_time,)
@@ -469,8 +475,8 @@ def _fit_immobility_models(
     """
     glm_models = {
         model_name: sm.GLM(
-            neuron_spike_count[is_immobile],
-            design_matrix[is_immobile],
+            neuron_spike_count[fit_mask],
+            design_matrix[fit_mask],
             family=sm.families.Poisson(),
         )
         for model_name, design_matrix in design_matrices.items()
@@ -544,6 +550,7 @@ def process_neuron(
     spline_basis: NDArray,
     lag_time: NDArray,
     logger_name: str | None = None,
+    fit_mask: pd.Series | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
@@ -620,6 +627,14 @@ def process_neuron(
         Lag times in seconds corresponding to spline_basis rows.
     logger_name : str | None, optional
         Logger name for per-neuron messages. If None, uses module logger.
+    fit_mask : pd.Series | None, shape (n_time,), optional
+        Bins the immobility GLMs are fit on. Defaults to ``is_immobile``, i.e.
+        every immobile bin in the epoch; a stop-cohort run passes
+        ``is_immobile & in_cohort_stop`` so the models describe the same
+        population the hippocampal ladders do. ``is_immobile`` itself still
+        defines the *running* comparison (theta modulation and
+        ``run_avg_firing_rate``): a bin outside the cohort is not running, so it
+        must not be counted as such.
 
     Returns
     -------
@@ -661,6 +676,8 @@ def process_neuron(
 
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
     sampling_frequency = 1 / np.median(np.diff(time))
+    if fit_mask is None:
+        fit_mask = is_immobile
 
     try:
         neuron_stats: dict[str, Any] = {}
@@ -679,13 +696,16 @@ def process_neuron(
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
         )
 
-        # Get immobility SWR/non-local statistics
+        # Get immobility SWR/non-local statistics. This is the mean rate over
+        # the bins the models are actually fit on, so the downstream
+        # minimum-firing-rate inclusion gate screens the sample the estimates
+        # come from rather than a wider one.
         neuron_stats["immobility_avg_firing_rate"] = (
-            neuron_spike_count[is_immobile].mean() * sampling_frequency
+            neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
 
         results, _ = _fit_immobility_models(
-            is_immobile, immobility_design_matrices, neuron_spike_count
+            fit_mask, immobility_design_matrices, neuron_spike_count
         )
 
         # Check for silent non-convergence (NaN parameters from rank-deficient design)
@@ -714,7 +734,7 @@ def process_neuron(
         # tell "absent event class" from "estimated zero effect".
         non_estimable_models = set()
         for name, design in immobility_design_matrices.items():
-            X_im = design[is_immobile]
+            X_im = design[fit_mask]
             if X_im.shape[0] == 0:
                 non_estimable_models.add(name)
                 continue
@@ -910,7 +930,7 @@ def process_neuron(
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
         )
         neuron_stats["immobility_avg_firing_rate"] = (
-            neuron_spike_count[is_immobile].mean() * sampling_frequency
+            neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
         swr_modulation = nan_modulation
@@ -927,63 +947,127 @@ def process_neuron(
     )
 
 
-def run_session(
-    nwb_file_name: str,
-    epoch_name: str,
-    brain_area: str = "mPFC",
-    sampling_frequency: float = 500,
+def build_session_fit_mask(
+    position_info: pd.DataFrame,
+    *,
+    cohort_stops: pd.DataFrame | None = None,
+    stop_cohort: str = "at_well",
     immobility_threshold: float = 4.0,
-    non_local_threshold: float = 0.8,
-    run_parallel: bool = True,
-) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray]:
-    """Run PFC GLM analysis for all neurons in a single session.
+) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
+    """Bins the immobility GLMs are fit on, for one session.
+
+    Two restrictions compose. Immobility is the long-standing one. The stop
+    cohort is the new one: it keeps only the time the animal spends stopped at a
+    well, which is the population the hippocampal rate and content ladders are
+    read on, so a PFC claim and a replay claim describe the same stops.
 
     Parameters
     ----------
-    nwb_file_name : str
-        NWB file name (e.g., "wilbur20210329_.nwb").
-    epoch_name : str
-        Epoch name (e.g., "02_r1").
-    brain_area : str
-        Brain area to analyze ("mPFC" or "OFC").
-    sampling_frequency : float
-        Sampling frequency in Hz.
+    position_info : pandas.DataFrame
+        Time-indexed position table carrying ``head_speed``. The index is
+        absolute seconds, the same clock the stop table's bounds are on.
+    cohort_stops : pandas.DataFrame, optional
+        Stops kept by
+        :func:`~continuum_swr_replay.analysis.pfc.cohort.load_session_stop_cohort`.
+        Required unless ``stop_cohort`` is ``"all_stops"``.
+    stop_cohort : str
+        Cohort name, recorded in the returned counts. ``"all_stops"`` means *no
+        stop restriction at all* -- every immobile bin in the epoch is fit, which
+        is what this pipeline did before the cohort existed.
     immobility_threshold : float
-        Speed threshold for immobility classification (cm/s).
-    non_local_threshold : float
-        Probability threshold for classifying non-local events.
-    run_parallel : bool
-        Whether to use Dask for parallel neuron processing.
+        Speed threshold for immobility (cm/s).
 
     Returns
     -------
-    neuron_stats : pd.DataFrame
-        Per-neuron statistics. Shape (n_neurons, n_stats). Includes GLM
-        comparison results, theta modulation, firing rates, and AIC model
-        selection.
-    swr_modulation : NDArray
-        SWR peri-event modulation from SWR-controlled model.
-        Shape (n_lag_times, n_neurons).
-    no_swr_modulation : NDArray
-        Non-SWR replay modulation from SWR-controlled model, controlling
-        for all whole-event-speed-eligible ripples. Shape (n_lag_times, n_neurons).
-    non_local_swr_modulation : NDArray
-        SWR-coincident replay modulation from replay-split model.
-        Shape (n_lag_times, n_neurons).
-    non_local_no_swr_modulation : NDArray
-        Non-SWR replay modulation from replay-split model, controlling
-        for replay-coincident ripples only.
-        Shape (n_lag_times, n_neurons).
+    is_immobile : pandas.Series of bool, shape (n_time,)
+        Immobility alone; still the definition of the *running* comparison.
+    fit_mask : pandas.Series of bool, shape (n_time,)
+        ``is_immobile & in_cohort_stop``, or ``is_immobile`` for ``all_stops``.
+    counts : dict
+        ``stop_cohort``, ``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``.
 
+    Raises
+    ------
+    ValueError
+        If a stop cohort is requested without ``cohort_stops``.
     """
-    # Deferred imports: these helpers open Spyglass / DataJoint at
-    # import time. Keeping them function-local lets the rest of the
-    # module (pure GLM helpers + design-matrix builders) stay
-    # offline-importable for unit tests.
+    is_immobile = position_info.head_speed < immobility_threshold
+    if stop_cohort == "all_stops":
+        fit_mask = is_immobile
+    else:
+        if cohort_stops is None:
+            raise ValueError(
+                f"stop_cohort={stop_cohort!r} needs cohort_stops; pass the stops "
+                "load_session_stop_cohort returned, or use 'all_stops' for no "
+                "stop restriction"
+            )
+        in_cohort = stop_interval_mask(
+            position_info.index.to_numpy(dtype=float), cohort_stops
+        )
+        fit_mask = is_immobile & pd.Series(in_cohort, index=position_info.index)
+    counts = {
+        "stop_cohort": stop_cohort,
+        "n_bins_total": int(len(is_immobile)),
+        "n_bins_immobile": int(is_immobile.sum()),
+        "n_bins_fit": int(fit_mask.sum()),
+    }
+    return is_immobile, fit_mask, counts
+
+
+def build_session_event_sets(
+    data: dict[str, Any],
+    results: Any,
+    *,
+    cohort_stops: pd.DataFrame | None = None,
+    stop_cohort: str = "at_well",
+    immobility_threshold: float = 4.0,
+    non_local_threshold: float = 0.8,
+) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
+    """Build the four event sets the PFC design matrices are keyed on.
+
+    Non-local events are the confident, whole-event-immobile windows of the HPC
+    decode; ripples are the whole-event-immobile detected SWRs. Both are then
+    restricted to the stop cohort by event onset, BEFORE the SWR overlap split,
+    so ``non_local_SWR`` and ``non_local_no_SWR`` partition exactly the events
+    that are kept -- restricting after the split would let a dropped ripple move
+    a kept replay event from the SWR class into the non-SWR one.
+
+    Parameters
+    ----------
+    data : dict
+        Session data from ``data_loaders.load_data``: ``position_info`` and
+        ``ripple_times``.
+    results : xarray.Dataset
+        HPC decoding results carrying ``acausal_state_probabilities``.
+    cohort_stops : pandas.DataFrame, optional
+        Stops kept for this session; required unless ``stop_cohort`` is
+        ``"all_stops"``.
+    stop_cohort : str
+        Cohort name; ``"all_stops"`` applies no restriction.
+    immobility_threshold : float
+        Speed threshold for whole-event immobility (cm/s).
+    non_local_threshold : float
+        Probability threshold for a confident non-local event.
+
+    Returns
+    -------
+    event_times : dict of str to pandas.DataFrame
+        ``non_local_no_SWR``, ``non_local_SWR``, ``non_local``, ``SWR``.
+    counts : dict
+        ``stop_cohort`` and the event counts before and after the restriction
+        (``n_nonlocal_before``/``n_nonlocal_after``,
+        ``n_ripple_before``/``n_ripple_after``), plus the split
+        (``n_nonlocal_swr``, ``n_nonlocal_no_swr``).
+
+    Raises
+    ------
+    ValueError
+        If a stop cohort is requested without ``cohort_stops``.
+    """
+    # Deferred imports: these helpers open Spyglass / DataJoint at import time.
     from continuum_swr_replay.analysis.hippocampus import (
         get_confident_times,
         get_overlap_times,
-        load_results,
     )
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         validate_results_position_time_alignment,
@@ -991,21 +1075,7 @@ def run_session(
     from continuum_swr_replay.analysis.hippocampus.event_immobility import (
         build_speed_eligible_event_cohort,
     )
-    from continuum_swr_replay.data_loaders import load_data
 
-    logger = logging.getLogger(
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
-    )
-
-    logger.info("Loading HPC decoding results...")
-    results, _, _ = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False,
-    )
-
-    logger.info("Loading session data...")
-    data = load_data(nwb_file_name, epoch_name)
-
-    logger.info("Identifying non-local events...")
     position_time = data["position_info"].index
     speed = data["position_info"].head_speed.to_numpy()
     validate_results_position_time_alignment(
@@ -1039,16 +1109,34 @@ def run_session(
         speed_threshold=immobility_threshold,
     )
 
+    counts: dict[str, Any] = {
+        "stop_cohort": stop_cohort,
+        "n_nonlocal_before": int(len(non_local_times)),
+        "n_ripple_before": int(len(ripple_times)),
+    }
+    if stop_cohort != "all_stops":
+        if cohort_stops is None:
+            raise ValueError(
+                f"stop_cohort={stop_cohort!r} needs cohort_stops; pass the stops "
+                "load_session_stop_cohort returned, or use 'all_stops' for no "
+                "stop restriction"
+            )
+        non_local_times = non_local_times.loc[
+            events_in_stops(
+                non_local_times.start_time.to_numpy(dtype=float), cohort_stops
+            )
+        ]
+        ripple_times = ripple_times.loc[
+            events_in_stops(ripple_times.start_time.to_numpy(dtype=float), cohort_stops)
+        ]
+    counts["n_nonlocal_after"] = int(len(non_local_times))
+    counts["n_ripple_after"] = int(len(ripple_times))
+
     non_local_swr_times, non_local_no_swr_times = get_overlap_times(
         non_local_times, ripple_times
     )
-    logger.info(
-        "Found %d non-local events (%d with SWR, %d without SWR), %d total SWRs",
-        len(non_local_times),
-        len(non_local_swr_times),
-        len(non_local_no_swr_times),
-        len(ripple_times),
-    )
+    counts["n_nonlocal_swr"] = int(len(non_local_swr_times))
+    counts["n_nonlocal_no_swr"] = int(len(non_local_no_swr_times))
 
     # Both populations use the same whole-event immobility definition, so the
     # SWR-controlled decomposition cannot reintroduce a movement-spanning SWR
@@ -1059,12 +1147,128 @@ def run_session(
         "non_local": non_local_times,
         "SWR": ripple_times,
     }
+    return event_times, counts
+
+
+def run_session(
+    nwb_file_name: str,
+    epoch_name: str,
+    brain_area: str = "mPFC",
+    sampling_frequency: float = 500,
+    immobility_threshold: float = 4.0,
+    non_local_threshold: float = 0.8,
+    run_parallel: bool = True,
+    stop_cohort: str = "at_well",
+    cohort_stops: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
+    """Run PFC GLM analysis for all neurons in a single session.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name (e.g., "wilbur20210329_.nwb").
+    epoch_name : str
+        Epoch name (e.g., "02_r1").
+    brain_area : str
+        Brain area to analyze ("mPFC" or "OFC").
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    immobility_threshold : float
+        Speed threshold for immobility classification (cm/s).
+    non_local_threshold : float
+        Probability threshold for classifying non-local events.
+    run_parallel : bool
+        Whether to use Dask for parallel neuron processing.
+    stop_cohort : str
+        Population to fit. ``"at_well"`` (canonical) keeps only immobility bins
+        and events inside the well-anchored stops the hippocampal rate and
+        content ladders are read on; ``"all_stops"`` applies no stop restriction
+        at all, fitting every immobile bin and every speed-eligible event in the
+        epoch, as this pipeline did before the shared cohort existed.
+    cohort_stops : pd.DataFrame, optional
+        The session's kept stops from
+        :func:`~continuum_swr_replay.analysis.pfc.cohort.load_session_stop_cohort`.
+        Required unless ``stop_cohort`` is ``"all_stops"``.
+
+    Returns
+    -------
+    neuron_stats : pd.DataFrame
+        Per-neuron statistics. Shape (n_neurons, n_stats). Includes GLM
+        comparison results, theta modulation, firing rates, and AIC model
+        selection.
+    swr_modulation : NDArray
+        SWR peri-event modulation from SWR-controlled model.
+        Shape (n_lag_times, n_neurons).
+    no_swr_modulation : NDArray
+        Non-SWR replay modulation from SWR-controlled model, controlling
+        for all whole-event-speed-eligible ripples. Shape (n_lag_times, n_neurons).
+    non_local_swr_modulation : NDArray
+        SWR-coincident replay modulation from replay-split model.
+        Shape (n_lag_times, n_neurons).
+    non_local_no_swr_modulation : NDArray
+        Non-SWR replay modulation from replay-split model, controlling
+        for replay-coincident ripples only.
+        Shape (n_lag_times, n_neurons).
+    cohort_info : dict
+        How the population was cut: ``stop_cohort``, the bin counts
+        (``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``) and the event
+        counts before and after the restriction. Written to the run's provenance
+        sidecar so an artifact states the population it was fit on.
+
+    """
+    # Deferred imports: these helpers open Spyglass / DataJoint at
+    # import time. Keeping them function-local lets the rest of the
+    # module (pure GLM helpers + design-matrix builders) stay
+    # offline-importable for unit tests.
+    from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.data_loaders import load_data
+
+    logger = logging.getLogger(
+        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    )
+
+    logger.info("Loading HPC decoding results...")
+    results, _, _ = load_results(
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False,
+    )
+
+    logger.info("Loading session data...")
+    data = load_data(nwb_file_name, epoch_name)
+
+    logger.info("Identifying non-local events (stop cohort: %s)...", stop_cohort)
+    position_time = data["position_info"].index
+    event_times, event_counts = build_session_event_sets(
+        data,
+        results,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=immobility_threshold,
+        non_local_threshold=non_local_threshold,
+    )
+    logger.info(
+        "Events in cohort: %d/%d non-local (%d with SWR, %d without SWR), %d/%d SWRs",
+        event_counts["n_nonlocal_after"],
+        event_counts["n_nonlocal_before"],
+        event_counts["n_nonlocal_swr"],
+        event_counts["n_nonlocal_no_swr"],
+        event_counts["n_ripple_after"],
+        event_counts["n_ripple_before"],
+    )
 
     time = position_time.to_numpy(dtype=float)
-    is_immobile = data["position_info"].head_speed < immobility_threshold
+    is_immobile, fit_mask, bin_counts = build_session_fit_mask(
+        data["position_info"],
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=immobility_threshold,
+    )
+    cohort_info = {**bin_counts, **event_counts}
     logger.info(
-        "Immobility fraction: %.3f (%d/%d time bins)",
-        is_immobile.mean(), is_immobile.sum(), len(is_immobile),
+        "Fit bins: %d immobile, %d in cohort (%.3f of %d time bins)",
+        bin_counts["n_bins_immobile"],
+        bin_counts["n_bins_fit"],
+        bin_counts["n_bins_fit"] / bin_counts["n_bins_total"],
+        bin_counts["n_bins_total"],
     )
 
     # Fit with wider lag window (±250ms) so spline boundary artifacts
@@ -1084,7 +1288,7 @@ def run_session(
     if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
         logger.warning("No %s neurons found for this session", brain_area)
         empty = np.empty((0, 0))
-        return pd.DataFrame(), empty, empty, empty, empty
+        return pd.DataFrame(), empty, empty, empty, empty, cohort_info
 
     n_neurons = len(data["spike_times"][brain_area])
     logger.info(
@@ -1105,6 +1309,7 @@ def run_session(
                 spline_basis,
                 lag_time,
                 logger_name=logger.name,
+                fit_mask=fit_mask,
             )
             for neuron_spike_times in data["spike_times"][brain_area]
         ]
@@ -1124,6 +1329,7 @@ def run_session(
                     spline_basis,
                     lag_time,
                     logger_name=logger.name,
+                    fit_mask=fit_mask,
                 )
             )
 
@@ -1156,6 +1362,7 @@ def run_session(
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
     neuron_stats["brain_area"] = brain_area
+    neuron_stats["stop_cohort"] = stop_cohort
 
     logger.info("Session complete: %d neurons analyzed", len(neuron_stats))
 
@@ -1165,4 +1372,5 @@ def run_session(
         no_swr_modulation,
         non_local_swr_modulation,
         non_local_no_swr_modulation,
+        cohort_info,
     )

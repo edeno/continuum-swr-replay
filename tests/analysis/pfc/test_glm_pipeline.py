@@ -607,3 +607,230 @@ class TestProcessNeuron:
                 "the fix — only the non-nested non_local comparison "
                 "should be removed."
             )
+
+
+# ---------------------------------------------------------------------------
+# Stop-cohort restriction (fit mask and event sets)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def cohort_stops():
+    """Two disjoint stops: one well-anchored (kept), one in transit (dropped).
+
+    Both sit in immobile stretches of the ``position_info`` fixture, so what the
+    cohort drops is the stop rule and not the speed rule.
+    """
+    return pd.DataFrame(
+        {
+            "stop_id": ["s0"],
+            "stop_start": [1.5],
+            "stop_end": [3.0],
+            "occupancy_state": ["at_well"],
+        }
+    )
+
+
+class TestBuildSessionFitMask:
+    def test_fit_mask_is_immobility_inside_the_cohort_stop(
+        self, position_info, is_immobile, cohort_stops
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+
+        returned_immobile, fit_mask, counts = build_session_fit_mask(
+            position_info, cohort_stops=cohort_stops, stop_cohort="at_well"
+        )
+
+        inside = (position_info.index >= 1.5) & (position_info.index <= 3.0)
+        expected = is_immobile & pd.Series(inside, index=position_info.index)
+        pd.testing.assert_series_equal(fit_mask, expected, check_names=False)
+        pd.testing.assert_series_equal(
+            returned_immobile, is_immobile, check_names=False
+        )
+        # The 1.5 s stop at 500 Hz is a small slice of the 10 s epoch: the
+        # restriction must actually bite, not pass everything through.
+        assert counts["n_bins_fit"] == int(expected.sum())
+        assert counts["n_bins_fit"] < counts["n_bins_immobile"]
+        assert counts["n_bins_immobile"] == int(is_immobile.sum())
+        assert counts["n_bins_total"] == len(position_info)
+        assert counts["stop_cohort"] == "at_well"
+
+    def test_all_stops_reproduces_the_immobility_mask_bit_for_bit(
+        self, position_info, is_immobile
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+
+        _, fit_mask, counts = build_session_fit_mask(
+            position_info, stop_cohort="all_stops"
+        )
+
+        pd.testing.assert_series_equal(fit_mask, is_immobile, check_names=False)
+        assert counts["n_bins_fit"] == counts["n_bins_immobile"]
+
+    def test_a_cohort_without_stops_is_refused(self, position_info):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+
+        with pytest.raises(ValueError, match="cohort_stops"):
+            build_session_fit_mask(position_info, stop_cohort="at_well")
+
+
+def _synthetic_session(position_info, event_windows, ripple_windows):
+    """A minimal ``(data, results)`` pair with non-local probability set high
+    inside ``event_windows`` and ripples spanning ``ripple_windows``."""
+    import xarray as xr
+
+    time = position_info.index.to_numpy(dtype=float)
+    prob = np.zeros((len(time), 3))
+    prob[:, 0] = 1.0  # Local
+    for start, end in event_windows:
+        inside = (time >= start) & (time <= end)
+        prob[inside, 0] = 0.0
+        prob[inside, 1] = 1.0  # Non-Local Continuous
+    results = xr.Dataset(
+        {
+            "acausal_state_probabilities": (
+                ("time", "states"),
+                prob,
+            )
+        },
+        coords={
+            "time": time,
+            "states": [
+                "Local",
+                "Non-Local Continuous",
+                "Non-Local Fragmented",
+            ],
+        },
+    )
+    data = {
+        "position_info": position_info,
+        "ripple_times": pd.DataFrame(
+            {
+                "start_time": [start for start, _ in ripple_windows],
+                "end_time": [end for _, end in ripple_windows],
+            }
+        ),
+    }
+    return data, results
+
+
+class TestBuildSessionEventSets:
+    # Two replay events and two ripples, one of each inside the cohort stop
+    # (1.5-3.0 s) and one of each outside it, all in immobile stretches.
+    EVENT_WINDOWS = [(2.0, 2.2), (8.0, 8.2)]
+    RIPPLE_WINDOWS = [(2.0, 2.15), (8.0, 8.15)]
+
+    def test_only_events_starting_inside_a_cohort_stop_survive(
+        self, position_info, cohort_stops
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        event_times, counts = build_session_event_sets(
+            data, results, cohort_stops=cohort_stops, stop_cohort="at_well"
+        )
+
+        assert counts["n_nonlocal_before"] == 2
+        assert counts["n_nonlocal_after"] == 1
+        assert counts["n_ripple_before"] == 2
+        assert counts["n_ripple_after"] == 1
+        np.testing.assert_allclose(
+            event_times["non_local"].start_time.to_numpy(), [2.0], atol=0.01
+        )
+        np.testing.assert_allclose(
+            event_times["SWR"].start_time.to_numpy(), [2.0], atol=0.01
+        )
+        # The kept replay event overlaps the kept ripple, so the SWR split is
+        # taken over the restricted sets, not the full ones.
+        assert len(event_times["non_local_SWR"]) == 1
+        assert len(event_times["non_local_no_SWR"]) == 0
+
+    def test_all_stops_keeps_every_speed_eligible_event(
+        self, position_info, cohort_stops
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        event_times, counts = build_session_event_sets(
+            data, results, stop_cohort="all_stops"
+        )
+
+        assert counts["n_nonlocal_after"] == counts["n_nonlocal_before"] == 2
+        assert counts["n_ripple_after"] == counts["n_ripple_before"] == 2
+        assert len(event_times["non_local_SWR"]) == 2
+
+    def test_a_cohort_without_stops_is_refused(self, position_info):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        with pytest.raises(ValueError, match="cohort_stops"):
+            build_session_event_sets(data, results, stop_cohort="at_well")
+
+
+class TestProcessNeuronFitMask:
+    def test_default_fit_mask_reproduces_the_immobility_fit_bit_for_bit(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, simple_event_times, position_info, sampling_frequency,
+    ):
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+
+        default_stats, *default_mods = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+        )
+        explicit_stats, *explicit_mods = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+            fit_mask=is_immobile,
+        )
+
+        assert default_stats == explicit_stats
+        for default_mod, explicit_mod in zip(
+            default_mods, explicit_mods, strict=True
+        ):
+            np.testing.assert_array_equal(default_mod, explicit_mod)
+
+    def test_a_narrower_fit_mask_changes_the_fitted_sample(
+        self, poisson_spike_times, is_immobile, theta_phase,
+        time_axis, simple_event_times, position_info, sampling_frequency,
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times, position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        # Keep the immobile bins around the two SWR events only.
+        inside = pd.Series(
+            (time_axis >= 0.5) & (time_axis <= 6.0), index=position_info.index
+        )
+        fit_mask = is_immobile & inside
+
+        stats, *_ = process_neuron(
+            poisson_spike_times, is_immobile, theta_phase,
+            time_axis, dm, spline_basis, lag_time,
+            fit_mask=fit_mask,
+        )
+
+        # The reported immobility rate describes the fitted bins, so it equals
+        # the mean over the narrowed mask -- not over every immobile bin.
+        spike_count = get_spikecount_per_time_bin(poisson_spike_times, time_axis)
+        expected = spike_count[fit_mask].mean() * sampling_frequency
+        assert stats["immobility_avg_firing_rate"] == pytest.approx(expected)
+        # Running statistics still use every moving bin, cohort or not.
+        expected_run = spike_count[~is_immobile].mean() * sampling_frequency
+        assert stats["run_avg_firing_rate"] == pytest.approx(expected_run)
