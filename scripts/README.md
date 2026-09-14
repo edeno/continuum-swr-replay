@@ -38,6 +38,9 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 
 ## `figures/` — publication figures
 - `generate_figure01.py … generate_figure04.py`, `generate_all_figures.py` (orchestrator).
+  `generate_figure04.py` takes `--stop-cohort` and describes the bundle of that name:
+  `at_well` (default) is the canonical population, `all_stops` reads the `_allstops`
+  sensitivity bundle and refits the example neuron unrestricted.
 - `generate_uncertainty_content_figure.py` — ground-up uncertainty/content story
   and diagnostic figures from the supported content-analysis artifacts.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
@@ -67,6 +70,10 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   floor is recorded in `docs/design/builder_test_floor.md`.
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into
   one table.
+- `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
+  bins and events on either side of the stop cohort (from the bundles' own provenance
+  sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
+  and the Figure 4 population loaded from both bundle trees.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.

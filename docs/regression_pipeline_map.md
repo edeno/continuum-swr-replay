@@ -32,7 +32,7 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 Aggregation of analysis results over time.
 
-`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
+`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -627,6 +627,12 @@ Report whether every fitted artifact is still current for the tables it read.
 Compare a backed-up rate fit against the current one and write a markdown audit.
 
 `delta_aic`, `n_bins_table`, `reward_quantities`, `arrival_clock_cv_table`, `arrival_clock_shape_table`, `cv_nan_share_table`, `arrival_cohort_table`, `outcome_boundary_shift_cohort`, `reward_boundary_shift_table`, `session_counts_by`, `rung_session_counts`, `cv_validity_table`, `per_stop_validity_table`, `contrast_fit_flag_table`, `term_separation_table`, `audited_row_table`, `audited_term_drop_table`, `drop_mechanism_table`, `build_report`, `ContentFraming`, `content_term_table`, `content_scale_table`, `content_rung_session_counts`, `content_delta_aic_table`, `content_separation_table`, `rung_sort_key`, `contrast_audited_table`, `contrast_design_delta_table`, `contrast_stratum_table`, `build_content_report`, `collect_content_inputs`, `run_content_mode`, `rate_rung_sort_key`, `cohort_size_table`, `reward_kernel_lag1`, `cohort_reward_rr_table`, `cohort_paired_swr_table`, `cohort_delta_aic_table`, `cohort_per_stop_delta_aic_table`, `cohort_arrival_shape_table`, `per_stop_source_note`, `cohort_burst_peak_table`, `cohort_arrival_retention_table`, `cohort_contrast_rung_table`, `cohort_provenance_table`, `cohort_provenance_note`, `in_transit_power_note`, `build_cohort_report`, `collect_cohort_inputs`, `run_cohort_contrast_mode`, `build_parser`, `main`
+
+### `scripts/qa/compare_pfc_cohorts.py`
+
+Write the before/after audit of the mPFC unit-GLM stop cohort.
+
+`read_sidecars`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `gate_counts`, `significance_table`, `population_comparison`, `build_report`, `main`
 
 ### `scripts/qa/compare_to_golden_baseline.py`
 
