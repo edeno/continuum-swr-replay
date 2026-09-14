@@ -65,10 +65,12 @@ def simple_event_times():
             "start_time": [7.0],
             "end_time": [7.1],
         }),
-        "matched_control": pd.DataFrame({
-            "start_time": [2.0, 6.0, 8.0],
-            "end_time": [2.1, 6.1, 8.1],
-        }),
+        "matched_control": pd.DataFrame(
+            {
+                "start_time": [2.0, 6.0, 8.0],
+                "end_time": [2.1, 6.1, 8.1],
+            }
+        ),
     }
 
 
@@ -402,9 +404,7 @@ class TestProcessNeuron:
             lags=np.arange(-50, 51),
         )
 
-        (
-            stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod
-        ) = process_neuron(
+        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
             poisson_spike_times, is_immobile, theta_phase,
             time_axis, dm, spline_basis, lag_time,
         )
@@ -503,17 +503,16 @@ class TestProcessNeuron:
             "non_local_no_SWR": pd.DataFrame(
                 columns=["start_time", "end_time"]
             ),
-            "matched_control": pd.DataFrame({"start_time": [2.0, 6.0],
-                                             "end_time": [2.1, 6.1]}),
+            "matched_control": pd.DataFrame(
+                {"start_time": [2.0, 6.0], "end_time": [2.1, 6.1]}
+            ),
         }
         dm, spline_basis, lag_time = _make_design_matrices(
             event_times, position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
-        (
-            stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod
-        ) = process_neuron(
+        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
             poisson_spike_times, is_immobile, theta_phase,
             time_axis, dm, spline_basis, lag_time,
         )
