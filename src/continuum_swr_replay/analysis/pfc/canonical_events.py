@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
 
 __all__ = [
@@ -75,7 +76,6 @@ _EVENT_COLUMNS = (
     "is_swr",
     "occupancy_state",
 )
-_SESSION_COLUMNS = ("animal", "session_date", "epoch")
 
 
 def load_session_canonical_events(
@@ -125,7 +125,7 @@ def load_session_canonical_events(
     event_table = read_table(path)
     missing = [
         column
-        for column in (*_SESSION_COLUMNS, *_EVENT_COLUMNS)
+        for column in (*SESSION_COLUMNS, *_EVENT_COLUMNS)
         if column not in event_table.columns
     ]
     if missing:

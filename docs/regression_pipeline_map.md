@@ -646,6 +646,12 @@ Compute raw-data QC stats for hippocampal clusterless decoding.
 
 `main`
 
+### `scripts/qa/diagnose_pfc_event_definition.py`
+
+Compare the PFC path's old, run-time event definition against the canonical one.
+
+`build_old_event_sets`, `total_overlap_seconds`, `match_by_overlap`, `build_comparison`, `get_command_line_arguments`, `main`
+
 ### `scripts/qa/diagnose_trial_detection.py`
 
 Diagnostic figures for trial-detection and predictor semantics.
