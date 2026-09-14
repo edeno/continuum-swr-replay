@@ -75,7 +75,7 @@ def _write_bundle_files(
     event_table_sha=EVENT_TABLE_SHA,
     data_over_time_sha=DOT_SHA,
 ):
-    """Touch one bundle's five files, optionally with a provenance sidecar."""
+    """Touch one bundle's six files, optionally with a provenance sidecar."""
     artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
     base = artifact.with_suffix("")
     for suffix in (
@@ -84,6 +84,7 @@ def _write_bundle_files(
         ".no_SWR_modulation.npy",
         ".non_local_SWR_modulation.npy",
         ".non_local_no_SWR_modulation.npy",
+        ".matched_control_modulation.npy",
     ):
         base.with_suffix(suffix).touch()
     if sidecar_cohort is not None:
@@ -190,6 +191,7 @@ def fake_session(monkeypatch):
             modulation,
             modulation,
             modulation,
+            modulation,
             {
                 "stop_cohort": kwargs["stop_cohort"],
                 "n_bins_immobile": 1000,
@@ -203,6 +205,9 @@ def fake_session(monkeypatch):
                 "n_nonlocal_swr": 5,
                 "n_nonlocal_no_swr": 3,
                 "n_events_outside_frame": 0,
+                "matched_control_seed": 12345,
+                "n_matched_control": 7,
+                "n_matched_control_unplaced": 1,
             },
         )
 
@@ -285,7 +290,12 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     assert record["n_events_total"] == 8
     assert record["n_events_swr"] == 5
     assert record["n_events_non_swr"] == 3
-    assert record["n_matched_control"] == 0
+    # The matched non-event control the engagement test is read against: how
+    # it was drawn, how many controls were placed, and how many events could
+    # not be given one.
+    assert record["matched_control_seed"] == 12345
+    assert record["n_matched_control"] == 7
+    assert record["n_matched_control_unplaced"] == 1
 
 
 def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):

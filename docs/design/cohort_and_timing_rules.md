@@ -107,6 +107,22 @@ and 11,997 that are kept. Across the 71 mPFC sessions the bin mask keeps
 keeps **91.9%** of the non-local events (15,143 of 16,477) and 93.6% of the SWRs
 (11,997 of 12,821); the per-session table is in
 [`../audits/2026-09-14-pfc-atwell-cohort.md`](../audits/2026-09-14-pfc-atwell-cohort.md).
+The unit GLM also draws a **matched non-event control** from that same fit
+mask, one window per kept non-local event: the control onset is drawn uniformly
+over the sample times of the *same* contiguous run of fitted bins the event's
+onset falls in, and the draw is rejected unless the window lies wholly inside
+that run, overlaps no real event of any class (`SWR` included) and overlaps no
+control already placed. It preserves its source event's duration, so the
+comparison `matched_control + non_local_no_SWR vs. matched_control` asks whether
+non-SWR replay modulates firing beyond a duration-matched non-event baseline
+sampled from the same bins — the question a replay regressor on its own cannot
+separate from "the animal is in the stretch of immobility replay happens in".
+An event whose bout holds no free window of its duration is dropped rather than
+placed elsewhere, so the control count is `<=` the event count; the draw's seed
+(a hash of the session key) and both counts are written to every provenance
+sidecar (`matched_control_seed`, `n_matched_control`,
+`n_matched_control_unplaced`).
+
 Stage 6
 (`run_stage6_learning.py`) applies `select_stop_cohort` at the stop grain before
 its per-stop summary, and Stage 5B (`run_stage5b_retrospective.py`) takes its

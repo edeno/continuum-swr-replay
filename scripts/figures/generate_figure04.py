@@ -54,6 +54,8 @@ from continuum_swr_replay.analysis.pfc import (
     build_session_fit_mask,
     fit_immobility_models,
     make_design_matrices,
+    make_matched_control_times,
+    matched_control_seed,
 )
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
@@ -406,6 +408,19 @@ def generate_figure(
         f"Events in cohort: {event_counts['n_nonlocal_after']}"
         f"/{event_counts['n_nonlocal_before']} non-local, "
         f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs"
+    )
+
+    # The example neuron is fit on the same ladder the population bundle was,
+    # matched non-event control included, drawn with the same session-keyed
+    # seed -- so the panel's engagement model is the population's.
+    event_times["matched_control"] = make_matched_control_times(
+        event_times,
+        fit_mask,
+        np.random.default_rng(matched_control_seed(nwb_file_name, epoch_name)),
+    )
+    print(
+        f"Matched non-event controls: {len(event_times['matched_control'])}"
+        f"/{len(event_times['non_local'])} placed"
     )
 
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(

@@ -122,7 +122,9 @@ def results_exist(
     Distinct from ``_decoding_common.results_exist`` because the PFC
     pipeline writes a different set of files (modulation .npy arrays
     plus a single .pkl) than the decoder pipeline (results .nc, detector
-    .pkl, environment .pkl). The file names alone never settle it. An at-well
+    .pkl, environment .pkl). The file names alone never settle it. A bundle
+    written before the matched non-event control existed is missing that
+    array, so it is refit rather than kept under a name a current run wants. An at-well
     bundle never satisfies an ``all_stops`` request; a bundle that does not
     *state* its population in a provenance sidecar is not accepted as one (the
     canonical name is unsuffixed, so a bundle fit before the cohort existed
@@ -156,6 +158,7 @@ def results_exist(
         save_base.with_suffix(".no_SWR_modulation.npy"),
         save_base.with_suffix(".non_local_SWR_modulation.npy"),
         save_base.with_suffix(".non_local_no_SWR_modulation.npy"),
+        save_base.with_suffix(".matched_control_modulation.npy"),
     ]
     if not all(f.exists() for f in required_files):
         return False
@@ -279,6 +282,7 @@ def run_analysis(
             no_SWR_modulation,
             non_local_SWR_modulation,
             non_local_no_SWR_modulation,
+            matched_control_modulation,
             cohort_info,
         ) = run_session(
             nwb_file_name,
@@ -312,6 +316,10 @@ def run_analysis(
             save_file.with_suffix(".non_local_no_SWR_modulation.npy"),
             non_local_no_SWR_modulation,
         )
+        np.save(
+            save_file.with_suffix(".matched_control_modulation.npy"),
+            matched_control_modulation,
+        )
 
         # Every artifact states the population it was fit on: which cohort,
         # which stop table, and how many bins and events survived it.
@@ -336,8 +344,14 @@ def run_analysis(
                 "n_events_total": cohort_info.get("n_nonlocal_after"),
                 "n_events_swr": cohort_info.get("n_nonlocal_swr"),
                 "n_events_non_swr": cohort_info.get("n_nonlocal_no_swr"),
-                # No matched-control population is drawn on this path yet.
-                "n_matched_control": 0,
+                # The matched non-event control the engagement test is read
+                # against: how it was drawn, and how many of the session's
+                # events got one.
+                "matched_control_seed": cohort_info.get("matched_control_seed"),
+                "n_matched_control": cohort_info.get("n_matched_control"),
+                "n_matched_control_unplaced": cohort_info.get(
+                    "n_matched_control_unplaced"
+                ),
             },
         )
 

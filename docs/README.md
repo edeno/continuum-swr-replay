@@ -129,7 +129,7 @@ Three tiers:
 
    | artifact | producer | holds |
    |---|---|---|
-   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + four `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-neuron GLM statistics and the four peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`); the Figure 4 population, read by `analysis/pfc/load_population.py` |
+   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-neuron GLM statistics and the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control` — the duration-matched non-event baseline); the Figure 4 population, read by `analysis/pfc/load_population.py` |
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
