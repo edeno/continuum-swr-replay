@@ -1,6 +1,6 @@
 # PFC analyses on the shared well-anchored stop cohort
 
-**Status:** Not started.
+**Status:** COMPLETE — merged to master 2026-09-14. Ledger with every ruling: `ledger.md`. Audits: `docs/audits/2026-09-14-pfc-atwell-cohort.md`, `docs/audits/2026-09-13-stage5b-stage6-atwell.md`. Follow-ups parked: the unit-GLM `_allstops` bundle has not been run (pinned by unit test only); `choice_prediction.build_choice_dataset` still uses strict `at_well` at the stop grain (claim 19d); `align_results_to_position` `dropped_at` unions the two axes' ends; `build_session_event_sets` discards its own alignment counts; the batch summary does not count skipped sessions; `fit_provenance` stamps HEAD at write time (general hazard for long runs); the hippocampal aggregation path still fails closed on the stale-decode drift by design.
 
 The user's instruction (2026-09-13): "we also need the pfc analysis to be only on the at well
 stops." The hippocampal rate and content families fit one shared cohort
