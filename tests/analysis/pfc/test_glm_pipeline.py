@@ -692,6 +692,30 @@ class TestBuildSessionFitMask:
             build_session_fit_mask(position_info, stop_cohort="at_well")
 
 
+def _canonical_events(event_windows, is_swr):
+    """The session rows ``load_session_canonical_events`` would return."""
+    return pd.DataFrame(
+        {
+            "event_id": np.arange(len(event_windows), dtype=np.uint64),
+            "start_time": [start for start, _ in event_windows],
+            "end_time": [end for _, end in event_windows],
+            "is_swr": list(is_swr),
+            "occupancy_state": ["at_well"] * len(event_windows),
+        }
+    )
+
+
+def _swr_intervals(ripple_windows):
+    """The intervals ``load_session_swr_intervals`` would return."""
+    return pd.DataFrame(
+        {
+            "start_time": [start for start, _ in ripple_windows],
+            "end_time": [end for _, end in ripple_windows],
+        },
+        dtype=float,
+    )
+
+
 def _synthetic_session(position_info, event_windows, ripple_windows):
     """A minimal ``(data, results)`` pair with non-local probability set high
     inside ``event_windows`` and ripples spanning ``ripple_windows``."""
@@ -738,6 +762,7 @@ class TestBuildSessionEventSets:
     # in-transit stop (6.0-7.0 s), and one of each outside every stop.
     EVENT_WINDOWS = [(2.0, 2.2), (6.2, 6.4), (8.0, 8.2)]
     RIPPLE_WINDOWS = [(2.0, 2.15), (6.2, 6.35), (8.0, 8.15)]
+    IS_SWR = [True, True, True]
 
     def test_only_events_starting_inside_a_cohort_stop_survive(
         self, position_info, cohort_stops
@@ -749,7 +774,12 @@ class TestBuildSessionEventSets:
         )
 
         event_times, counts = build_session_event_sets(
-            data, results, cohort_stops=cohort_stops, stop_cohort="at_well"
+            data,
+            results,
+            canonical_events=_canonical_events(self.EVENT_WINDOWS, self.IS_SWR),
+            swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+            cohort_stops=cohort_stops,
+            stop_cohort="at_well",
         )
 
         assert counts["n_nonlocal_before"] == 3
@@ -779,7 +809,12 @@ class TestBuildSessionEventSets:
         _, fit_mask, _ = build_session_fit_mask(position_info, stop_cohort="all_stops")
 
         event_times, counts = build_session_event_sets(
-            data, results, stop_cohort="all_stops", fit_mask=fit_mask
+            data,
+            results,
+            canonical_events=_canonical_events(self.EVENT_WINDOWS, self.IS_SWR),
+            swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+            stop_cohort="all_stops",
+            fit_mask=fit_mask,
         )
 
         assert counts["n_nonlocal_after"] == counts["n_nonlocal_before"] == 3
@@ -797,7 +832,101 @@ class TestBuildSessionEventSets:
         )
 
         with pytest.raises(ValueError, match="cohort_stops"):
-            build_session_event_sets(data, results, stop_cohort="at_well")
+            build_session_event_sets(
+                data,
+                results,
+                canonical_events=_canonical_events(self.EVENT_WINDOWS, self.IS_SWR),
+                swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+                stop_cohort="at_well",
+            )
+
+    def test_the_canonical_is_swr_column_decides_the_split(
+        self, position_info, cohort_stops
+    ):
+        # A ripple that begins exactly where the event ends. The retired split
+        # (inclusive interval overlap against ``ripple_times``) called such an
+        # event SWR-coupled; the canonical rule requires positive-duration
+        # overlap and calls it non-SWR. The column, not the intervals, decides.
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        boundary_windows = [(2.0, 2.2), (2.4, 2.6)]
+        boundary_ripples = [(2.2, 2.3), (2.4, 2.5)]
+        data, results = _synthetic_session(
+            position_info, boundary_windows, boundary_ripples
+        )
+
+        event_times, counts = build_session_event_sets(
+            data,
+            results,
+            canonical_events=_canonical_events(boundary_windows, [False, True]),
+            swr_intervals=_swr_intervals(boundary_ripples),
+            cohort_stops=cohort_stops,
+            stop_cohort="at_well",
+        )
+
+        assert counts["n_nonlocal_swr"] == 1
+        assert counts["n_nonlocal_no_swr"] == 1
+        np.testing.assert_allclose(
+            event_times["non_local_no_SWR"].start_time.to_numpy(), [2.0]
+        )
+        np.testing.assert_allclose(
+            event_times["non_local_SWR"].start_time.to_numpy(), [2.4]
+        )
+        # The SWR regressor keeps every interval: only the replay events are
+        # split by the column.
+        assert len(event_times["SWR"]) == 2
+
+    def test_the_event_set_names_are_the_four_the_designs_are_keyed_on(
+        self, position_info, cohort_stops
+    ):
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+
+        event_times, _ = build_session_event_sets(
+            data,
+            results,
+            canonical_events=_canonical_events(self.EVENT_WINDOWS, self.IS_SWR),
+            swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+            cohort_stops=cohort_stops,
+            stop_cohort="at_well",
+        )
+
+        assert set(event_times) == {
+            "non_local_no_SWR",
+            "non_local_SWR",
+            "non_local",
+            "SWR",
+        }
+
+    def test_an_event_outside_the_aligned_frame_is_counted_and_dropped(
+        self, position_info
+    ):
+        # The canonical events were built on the decode's own axis. One past
+        # the end of the aligned position frame has no bins to be modelled on,
+        # so it is dropped -- and counted, because it means the two axes
+        # disagree over more than an empty tail.
+        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+
+        data, results = _synthetic_session(
+            position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
+        )
+        last = float(position_info.index[-1])
+        windows = [*self.EVENT_WINDOWS, (last + 1.0, last + 1.2)]
+
+        _, counts = build_session_event_sets(
+            data,
+            results,
+            canonical_events=_canonical_events(windows, [True, True, True, False]),
+            swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+            stop_cohort="all_stops",
+        )
+
+        assert counts["n_events_outside_frame"] == 1
+        assert counts["n_swr_intervals_outside_frame"] == 0
+        assert counts["n_nonlocal_before"] == 3
 
     def test_a_dropped_event_at_a_stops_leading_edge_is_counted(
         self, position_info, cohort_stops, is_immobile
@@ -810,8 +939,10 @@ class TestBuildSessionEventSets:
             build_session_fit_mask,
         )
 
+        leading_edge_windows = [(1.4, 1.45), (8.0, 8.2)]
+        leading_edge_ripples = [(1.4, 1.45)]
         data, results = _synthetic_session(
-            position_info, [(1.4, 1.45), (8.0, 8.2)], [(1.4, 1.45)]
+            position_info, leading_edge_windows, leading_edge_ripples
         )
         _, fit_mask, _ = build_session_fit_mask(
             position_info, cohort_stops=cohort_stops, stop_cohort="at_well"
@@ -820,6 +951,8 @@ class TestBuildSessionEventSets:
         _, counts = build_session_event_sets(
             data,
             results,
+            canonical_events=_canonical_events(leading_edge_windows, [True, False]),
+            swr_intervals=_swr_intervals(leading_edge_ripples),
             cohort_stops=cohort_stops,
             stop_cohort="at_well",
             fit_mask=fit_mask,
@@ -844,7 +977,12 @@ class TestBuildSessionEventSets:
         )
 
         _, counts = build_session_event_sets(
-            data, results, cohort_stops=cohort_stops, stop_cohort="at_well"
+            data,
+            results,
+            canonical_events=_canonical_events(self.EVENT_WINDOWS, self.IS_SWR),
+            swr_intervals=_swr_intervals(self.RIPPLE_WINDOWS),
+            cohort_stops=cohort_stops,
+            stop_cohort="at_well",
         )
 
         assert counts["n_nonlocal_dropped_overlapping_fit"] is None
@@ -1010,9 +1148,10 @@ class TestAlignmentIsIdentityOnMatchedAxes:
 
     EVENT_WINDOWS = [(2.0, 2.2), (6.2, 6.4), (8.0, 8.2)]
     RIPPLE_WINDOWS = [(2.0, 2.15), (6.2, 6.35), (8.0, 8.15)]
+    IS_SWR = [True, True, True]
 
-    @staticmethod
-    def _fit(data, results, position_info, sampling_frequency, spike_count):
+    @classmethod
+    def _fit(cls, data, results, position_info, sampling_frequency, spike_count):
         from continuum_swr_replay.analysis.pfc.glm import (
             build_session_event_sets,
             build_session_fit_mask,
@@ -1020,7 +1159,12 @@ class TestAlignmentIsIdentityOnMatchedAxes:
 
         _, fit_mask, _ = build_session_fit_mask(position_info, stop_cohort="all_stops")
         event_times, counts = build_session_event_sets(
-            data, results, stop_cohort="all_stops", fit_mask=fit_mask
+            data,
+            results,
+            canonical_events=_canonical_events(cls.EVENT_WINDOWS, cls.IS_SWR),
+            swr_intervals=_swr_intervals(cls.RIPPLE_WINDOWS),
+            stop_cohort="all_stops",
+            fit_mask=fit_mask,
         )
         design_matrices, _, _ = _make_design_matrices(
             event_times,
@@ -1073,3 +1217,35 @@ class TestAlignmentIsIdentityOnMatchedAxes:
         for key in glms_a:
             assert np.array_equal(glms_a[key].params, glms_b[key].params)
             assert glms_a[key].llf == glms_b[key].llf
+
+
+class TestTheRetiredEventConstructionIsGone:
+    """The run-time event construction must not survive anywhere on the PFC
+    path. It reads a separately detected ripple population and re-detects
+    non-local events, which is exactly the drift from the content and rate
+    families that reading the canonical table removes. Its only home is
+    ``scripts/qa/diagnose_pfc_event_definition.py``, which exists to compare
+    the two."""
+
+    RETIRED = ('data["ripple_times"]', "get_overlap_times", "get_confident_times")
+
+    def _sources(self):
+        from pathlib import Path
+
+        import continuum_swr_replay.analysis.pfc as pfc_package
+
+        pfc_dir = Path(pfc_package.__file__).parent
+        repo = Path(pfc_package.__file__).resolve().parents[4]
+        figure = repo / "scripts" / "figures" / "generate_figure04.py"
+        assert figure.exists(), f"expected the Figure 4 script at {figure}"
+        return [*sorted(pfc_dir.glob("*.py")), figure]
+
+    def test_no_pfc_source_rebuilds_its_own_events(self):
+        offenders = [
+            (path, token)
+            for path in self._sources()
+            for token in self.RETIRED
+            if token in path.read_text()
+        ]
+
+        assert offenders == []

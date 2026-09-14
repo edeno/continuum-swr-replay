@@ -55,6 +55,10 @@ from continuum_swr_replay.analysis.pfc import (
     fit_immobility_models,
     make_design_matrices,
 )
+from continuum_swr_replay.analysis.pfc.canonical_events import (
+    load_session_canonical_events,
+    load_session_swr_intervals,
+)
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
@@ -378,13 +382,23 @@ def generate_figure(
         "immobile bins in cohort"
     )
 
+    # The example neuron's events are the canonical ones -- the shipped event
+    # table's rows for this session and its own ``is_swr`` split -- so the panel
+    # and the population bundle describe the same events.
+    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
+    swr_intervals, _ = load_session_swr_intervals(
+        nwb_file_name,
+        epoch_name,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
     event_times, event_counts = build_session_event_sets(
         data,
         results_hpc,
+        canonical_events=canonical_events,
+        swr_intervals=swr_intervals,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(lags).max()) / DEFAULT_SAMPLING_FREQUENCY_HZ,
     )

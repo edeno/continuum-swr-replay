@@ -1130,42 +1130,87 @@ def _basis_coverage_counts(
     }
 
 
+def _restrict_to_frame(
+    events: pd.DataFrame, position_time: pd.Index, *, what: str
+) -> tuple[pd.DataFrame, int]:
+    """Drop events not wholly inside the aligned position frame, and count them.
+
+    The canonical events were built on the decode's own time axis. A session
+    whose decode and position axes were trimmed to their shared run could in
+    principle carry an event in a dropped tail; such an event has no bins to be
+    modelled on, so keeping it would put an onset outside the design matrix.
+    The 27 trimmed sessions were checked and none has one, so a non-zero count
+    here is a data change worth seeing rather than routine attrition.
+    """
+    if events.empty:
+        return events, 0
+    first, last = float(position_time[0]), float(position_time[-1])
+    inside = (events.start_time.to_numpy(dtype=float) >= first) & (
+        events.end_time.to_numpy(dtype=float) <= last
+    )
+    n_outside = int((~inside).sum())
+    if n_outside:
+        logger.warning(
+            "%d of %d %s lie outside the aligned position frame [%f, %f] and "
+            "were dropped; the decode and position axes disagree over more "
+            "than an empty tail",
+            n_outside,
+            len(events),
+            what,
+            first,
+            last,
+        )
+    return events.loc[inside].reset_index(drop=True), n_outside
+
+
 def build_session_event_sets(
     data: Mapping[str, Any],
     results: Any,
     *,
+    canonical_events: pd.DataFrame,
+    swr_intervals: pd.DataFrame,
     cohort_stops: pd.DataFrame | None = None,
     stop_cohort: str = "at_well",
-    immobility_threshold: float = 4.0,
-    non_local_threshold: float = 0.8,
     fit_mask: pd.Series | None = None,
     basis_half_window_s: float = DEFAULT_BASIS_HALF_WINDOW_S,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
     """Build the four event sets the PFC design matrices are keyed on.
 
-    Non-local events are the confident, whole-event-immobile windows of the HPC
-    decode; ripples are the whole-event-immobile detected SWRs. Both are then
-    restricted to the stop cohort by event onset, BEFORE the SWR overlap split,
-    so ``non_local_SWR`` and ``non_local_no_SWR`` partition exactly the events
-    that are kept -- restricting after the split would let a dropped ripple move
-    a kept replay event from the SWR class into the non-SWR one.
+    Both populations are canonical and are read, not re-detected here: the
+    non-local events are rows of the shipped event table and the SWR intervals
+    are its speed-gated ``SWR_event`` labels, both loaded by
+    :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR split is
+    the event table's own ``is_swr`` column -- strict positive-duration overlap
+    with those same labels -- so a Figure 4 event and a content- or rate-family
+    event with the same ``event_id`` are the same event, classified the same
+    way.
+
+    Events are restricted to the stop cohort by onset, BEFORE the split is
+    read, so ``non_local_SWR`` and ``non_local_no_SWR`` partition exactly the
+    events that are kept.
 
     Parameters
     ----------
     data : Mapping
-        Session data from ``data_loaders.load_data``: ``position_info`` and
-        ``ripple_times``.
+        Session data from ``data_loaders.load_data``; only ``position_info`` is
+        read.
     results : xarray.Dataset
-        HPC decoding results carrying ``acausal_state_probabilities``.
+        HPC decoding results, used only to align the position frame.
+    canonical_events : pandas.DataFrame
+        The session's rows of the canonical event table, from
+        :func:`~continuum_swr_replay.analysis.pfc.canonical_events.load_session_canonical_events`:
+        ``event_id``, ``start_time``, ``end_time``, ``is_swr``,
+        ``occupancy_state``. Passed in rather than loaded here so this function
+        stays testable without the shipped tables.
+    swr_intervals : pandas.DataFrame
+        The session's speed-gated SWR intervals, from
+        :func:`~continuum_swr_replay.analysis.pfc.canonical_events.load_session_swr_intervals`:
+        ``start_time``, ``end_time``.
     cohort_stops : pandas.DataFrame, optional
         Stops kept for this session; required unless ``stop_cohort`` is
         ``"all_stops"``.
     stop_cohort : str
         Cohort name; ``"all_stops"`` applies no restriction.
-    immobility_threshold : float
-        Speed threshold for whole-event immobility (cm/s).
-    non_local_threshold : float
-        Probability threshold for a confident non-local event.
     fit_mask : pandas.Series of bool, optional
         The bins the models will be fit on. Used only to measure how many
         dropped events would have had basis coverage over fitted bins; when
@@ -1181,65 +1226,39 @@ def build_session_event_sets(
         ``stop_cohort`` and the event counts before and after the restriction
         (``n_nonlocal_before``/``n_nonlocal_after``,
         ``n_ripple_before``/``n_ripple_after``), the split
-        (``n_nonlocal_swr``, ``n_nonlocal_no_swr``), and the leading-edge
+        (``n_nonlocal_swr``, ``n_nonlocal_no_swr``), the leading-edge
         coverage diagnostic ``n_nonlocal_dropped_overlapping_fit`` /
         ``n_ripple_dropped_overlapping_fit`` with their fractions of the kept
-        counts (``*_frac_of_kept``).
+        counts (``*_frac_of_kept``), and how many canonical events and SWR
+        intervals fell outside the aligned position frame
+        (``n_events_outside_frame``, ``n_swr_intervals_outside_frame``).
 
     Raises
     ------
     ValueError
         If a stop cohort is requested without ``cohort_stops``.
     """
-    # Deferred imports: these helpers open Spyglass / DataJoint at import time.
-    from continuum_swr_replay.analysis.hippocampus import (
-        get_confident_times,
-        get_overlap_times,
-    )
+    # Deferred import: this helper opens Spyglass / DataJoint at import time.
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-        build_speed_eligible_event_cohort,
     )
 
     # Idempotent when the caller already aligned the pair (run_session does):
     # the shared run is then the whole of both axes and this is the identity.
-    results, position_info, _ = align_results_to_position(
-        results, data["position_info"]
-    )
+    _, position_info, _ = align_results_to_position(results, data["position_info"])
     position_time = position_info.index
-    speed = position_info.head_speed.to_numpy()
-    non_local_prob = results.acausal_state_probabilities.sel(
-        states="Non-Local Continuous"
-    ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    non_local_prob = non_local_prob.assign_coords(
-        time=position_time.to_numpy(dtype=float)
-    )
 
-    detected_non_local_times = get_confident_times(
-        non_local_prob,
-        speed,
-        position_time.to_numpy(dtype=float),
-        non_local_threshold,
+    non_local_times, n_events_outside_frame = _restrict_to_frame(
+        canonical_events, position_time, what="canonical events"
     )
-    non_local_times, _ = build_speed_eligible_event_cohort(
-        detected_non_local_times,
-        speed=speed,
-        time=position_time,
-        event_col="non_local_event",
-        speed_threshold=immobility_threshold,
-    )
-    ripple_times, _ = build_speed_eligible_event_cohort(
-        data["ripple_times"],
-        speed=speed,
-        time=position_time,
-        event_col="SWR_event",
-        speed_threshold=immobility_threshold,
+    ripple_times, n_swr_outside_frame = _restrict_to_frame(
+        swr_intervals, position_time, what="SWR intervals"
     )
 
     counts: dict[str, Any] = {
         "stop_cohort": stop_cohort,
+        "n_events_outside_frame": n_events_outside_frame,
+        "n_swr_intervals_outside_frame": n_swr_outside_frame,
         "n_nonlocal_before": int(len(non_local_times)),
         "n_ripple_before": int(len(ripple_times)),
     }
@@ -1280,9 +1299,13 @@ def build_session_event_sets(
         )
     )
 
-    non_local_swr_times, non_local_no_swr_times = get_overlap_times(
-        non_local_times, ripple_times
-    )
+    # The split is read from the canonical table, not recomputed against the
+    # interval list: the column already encodes strict positive-duration
+    # overlap with exactly these speed-gated labels, and recomputing it here
+    # would let the PFC path drift from the content and rate families again.
+    is_swr = non_local_times.is_swr.to_numpy(dtype=bool)
+    non_local_swr_times = non_local_times.loc[is_swr].reset_index(drop=True)
+    non_local_no_swr_times = non_local_times.loc[~is_swr].reset_index(drop=True)
     counts["n_nonlocal_swr"] = int(len(non_local_swr_times))
     counts["n_nonlocal_no_swr"] = int(len(non_local_no_swr_times))
 
@@ -1322,9 +1345,14 @@ def run_session(
     sampling_frequency : float
         Sampling frequency in Hz.
     immobility_threshold : float
-        Speed threshold for immobility classification (cm/s).
+        Speed threshold for immobility classification (cm/s). The rule is
+        strictly ``<``, on the fit mask and on the SWR speed gate alike.
     non_local_threshold : float
-        Probability threshold for classifying non-local events.
+        Probability threshold the events were cut at. It is not applied here:
+        non-local events are read from the canonical event table, which is cut
+        at :data:`~continuum_swr_replay.analysis.constants.DEFAULT_NON_LOCAL_THRESHOLD`,
+        and a different value is refused rather than silently ignored. It does
+        select the cached decode frame the SWR labels are read from.
     run_parallel : bool
         Whether to use Dask for parallel neuron processing.
     stop_cohort : str
@@ -1363,21 +1391,55 @@ def run_session(
         for replay-coincident ripples only.
         Shape (n_lag_times, n_neurons).
     cohort_info : dict
-        How the population was cut: ``stop_cohort``, the bin counts
-        (``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``) and the event
-        counts before and after the restriction. Written to the run's provenance
-        sidecar so an artifact states the population it was fit on.
+        How the population was cut and which event definition it was cut on:
+        ``stop_cohort``, the bin counts (``n_bins_total``, ``n_bins_immobile``,
+        ``n_bins_fit``), the event counts before and after the restriction, and
+        the canonical-event provenance (``is_swr_definition``,
+        ``immobility_inequality``, ``canonical_event_table_path`` /
+        ``_sha256``, ``swr_interval_source``, ``data_over_time_path`` /
+        ``_sha256``). Written to the run's provenance sidecar so an artifact
+        states both the population and the events it was fit on.
 
+    Raises
+    ------
+    ValueError
+        If ``non_local_threshold`` differs from the threshold the canonical
+        event table is cut at; the table cannot be re-cut at run time.
+
+    Notes
+    -----
+    Non-local events and their SWR classification are the canonical ones: the
+    rows of ``Processed-Data/replay_content/event_table.parquet`` for this
+    session, and that table's ``is_swr`` column (strict positive-duration
+    overlap with the speed-gated ``SWR_event`` labels). Figure 4 therefore
+    describes the same ``event_id``s as the content and rate families.
     """
     # Deferred imports: these helpers open Spyglass / DataJoint at
     # import time. Keeping them function-local lets the rest of the
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
+    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
     from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
     )
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        DEFAULT_EVENT_TABLE_PATH,
+        canonical_event_provenance,
+        load_session_canonical_events,
+        load_session_swr_intervals,
+        session_data_over_time_path,
+    )
     from continuum_swr_replay.data_loaders import load_data
+
+    if non_local_threshold != DEFAULT_NON_LOCAL_THRESHOLD:
+        raise ValueError(
+            f"non_local_threshold={non_local_threshold!r} is not the threshold "
+            f"the canonical event table is cut at "
+            f"({DEFAULT_NON_LOCAL_THRESHOLD}). Non-local events are read from "
+            "that table, not re-detected, so a different threshold cannot be "
+            "honoured here."
+        )
 
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
@@ -1433,18 +1495,41 @@ def run_session(
         bin_counts["n_bins_total"],
     )
 
-    logger.info("Identifying non-local events (stop cohort: %s)...", stop_cohort)
+    logger.info("Loading canonical non-local events (stop cohort: %s)...", stop_cohort)
+    canonical_events, event_table_sha256 = load_session_canonical_events(
+        nwb_file_name, epoch_name
+    )
+    swr_intervals, dot_sha256 = load_session_swr_intervals(
+        nwb_file_name,
+        epoch_name,
+        non_local_threshold=non_local_threshold,
+        speed_threshold=immobility_threshold,
+    )
+    event_provenance = canonical_event_provenance(
+        event_table_path=DEFAULT_EVENT_TABLE_PATH,
+        event_table_sha256=event_table_sha256,
+        data_over_time_path=session_data_over_time_path(
+            nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
+        ),
+        data_over_time_sha256=dot_sha256,
+    )
+
     event_times, event_counts = build_session_event_sets(
         data,
         results,
+        canonical_events=canonical_events,
+        swr_intervals=swr_intervals,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        immobility_threshold=immobility_threshold,
-        non_local_threshold=non_local_threshold,
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
-    cohort_info = {**bin_counts, **event_counts, "alignment": alignment_counts}
+    cohort_info = {
+        **bin_counts,
+        **event_counts,
+        **event_provenance,
+        "alignment": alignment_counts,
+    }
     logger.info(
         "Events in cohort: %d/%d non-local (%d with SWR, %d without SWR), %d/%d SWRs",
         event_counts["n_nonlocal_after"],
@@ -1459,6 +1544,11 @@ def run_session(
         "%s non-local, %s SWR",
         event_counts["n_nonlocal_dropped_overlapping_fit"],
         event_counts["n_ripple_dropped_overlapping_fit"],
+    )
+    logger.info(
+        "Canonical events outside the aligned position frame: %d (%d SWR intervals)",
+        event_counts["n_events_outside_frame"],
+        event_counts["n_swr_intervals_outside_frame"],
     )
 
     logger.info("Building design matrices...")
