@@ -251,9 +251,13 @@ def jax_backend() -> str:
     return str(jax.devices()[0].platform)
 
 
-def _chunk_rows(n_units: int, n_features: int) -> int:
-    """Rows per chunk of the time axis, from the widest intermediate."""
-    widest = max(n_units, n_features * n_features, 1)
+def _chunk_rows(n_units: int, rank: int) -> int:
+    """Rows per chunk of the time axis, from the widest intermediate.
+
+    The two are the ``(chunk, n_units)`` working arrays and the
+    ``(chunk, rank**2)`` cross-product block.
+    """
+    widest = max(n_units, rank * rank, 1)
     return int(np.clip(_TARGET_CHUNK_ELEMENTS // widest, 1024, 1 << 17))
 
 
@@ -319,7 +323,7 @@ def _sweep(
         the information matrix's condition number, which is what decides
         whether this fitter can vouch for the unit.
     """
-    n_features = design_chunks.shape[-1]
+    rank = design_chunks.shape[-1]
     n_units = count_chunks.shape[-1]
 
     def body(carry, block):
@@ -345,7 +349,7 @@ def _sweep(
 
         rhs = rhs + design.T @ weighted_response
         cross = (design[:, :, None] * design[:, None, :]).reshape(
-            design.shape[0], n_features * n_features
+            design.shape[0], rank * rank
         )
         information = information + weight.T @ cross
 
@@ -372,8 +376,8 @@ def _sweep(
         ), None
 
     init = (
-        jnp.zeros((n_units, n_features * n_features)),
-        jnp.zeros((n_features, n_units)),
+        jnp.zeros((n_units, rank * rank)),
+        jnp.zeros((rank, n_units)),
         jnp.zeros(n_units),
         jnp.zeros(n_units),
         jnp.full(n_units, jnp.inf),
@@ -383,7 +387,7 @@ def _sweep(
         body, init, (design_chunks, count_chunks, valid_chunks)
     )
     return (
-        information.reshape(n_units, n_features, n_features),
+        information.reshape(n_units, rank, rank),
         rhs,
         deviance,
         llf_kernel,
