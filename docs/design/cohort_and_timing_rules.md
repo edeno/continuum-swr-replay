@@ -88,6 +88,43 @@ deliberately treats a missing value as *unknown*, not *different*, so the
 `n_stops` / `n_bins` row-count guard is the backstop for those until the
 refits land.
 
+**The PFC analyses read the same rule, at three grains.** The mPFC unit GLM
+(`scripts/pfc/run_pfc_analysis_bandit.py`) fits 2 ms bins, so it applies the
+stop-grain cohort **to the bins**: the fit mask is `is_immobile &
+stop_interval_mask(position_time, kept_stops)`, i.e. an immobile sample that
+falls inside a `[stop_start, stop_end]` interval of a kept stop. The events its
+design matrices are keyed on — the confident non-local windows and the detected
+SWRs — are restricted **by onset**: an event enters when its onset lies inside a
+kept stop, applied *before* the SWR-overlap split so `non_local_SWR` and
+`non_local_no_SWR` partition exactly the kept events. The regressor basis still
+spans ±250 ms around each kept event, so an event dropped just outside a stop's
+leading edge could have covered bins that *are* fit; those bins are fit with its
+contribution zero, and the count of such events is written to every provenance
+sidecar (`n_{nonlocal,ripple}_dropped_overlapping_fit`) rather than assumed
+away. Corpus-wide that is **6 non-local events and 4 SWRs** out of the 15,143
+and 11,997 that are kept. Across the 71 mPFC sessions the bin mask keeps
+**92.3%** of the immobile bins (19,732,623 of 21,384,252), and the onset rule
+keeps **91.9%** of the non-local events (15,143 of 16,477) and 93.6% of the SWRs
+(11,997 of 12,821); the per-session table is in
+[`../audits/2026-09-14-pfc-atwell-cohort.md`](../audits/2026-09-14-pfc-atwell-cohort.md).
+Stage 6
+(`run_stage6_learning.py`) applies `select_stop_cohort` at the stop grain before
+its per-stop summary, and Stage 5B (`run_stage5b_retrospective.py`) takes its
+at-well membership from `select_event_cohort` at the event grain (keeping its
+finite-`occupancy_well_arm` conjunct). All three carry `--stop-cohort`; only the
+unit GLM and Stage 6 offer `all_stops`.
+
+**The PFC path aligns the decode to the position frame first.** It is the only
+consumer that reloads `load_data` alongside a saved decode, and decodes written
+before `get_position_info` was trimmed carry more time bins than `load_data` now
+returns for the same epoch. `analysis.hippocampus.data_aggregation.align_results_to_position`
+intersects the two axes on exact timestamps and accepts the result only when the
+mismatch is a head/tail trim within budget (600 s on the results axis, 0.1 s on
+the position axis); interleaved mismatches and drift inside the shared run still
+raise, and the restricted pair goes to the same strict 1-to-1 validator. On
+matched axes it is the identity. What it trimmed is recorded per session under
+`cohort_counts.alignment` in the sidecar.
+
 **Why at-well is the shared cohort.** The rate ladders used to fit every
 immobility stop while the content ladders fit only at-well events, so "non-SWR
 replay is not reward-gated" (a rate claim) and every content claim about
