@@ -269,6 +269,84 @@ class TestSidecarTables:
         assert "0 position rows" in prose
         assert "1 session(s) were fit before the step existed" in prose
 
+    def test_alignment_prose_counts_a_recorded_no_op_as_a_no_op(self, tmp_path):
+        """A recorded ``dropped_at: none`` must not be reported as a trim.
+
+        The step records itself on every session once it exists, so "recorded"
+        and "trimmed" come apart as soon as a session whose axes already agreed
+        is fit by the current code.
+        """
+        tree = tmp_path / "after"
+        _write_bundle(
+            tree,
+            "chimi20200223_02_r1",
+            n_neurons=1,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.5,
+            sidecar=_sidecar(
+                "chimi20200223_02_r1",
+                bins_immobile=1000,
+                bins_fit=900,
+                nonlocal_before=10,
+                nonlocal_after=9,
+                ripple_before=5,
+                ripple_after=5,
+                alignment={
+                    "dropped_at": "none",
+                    "n_results_bins_dropped": 0,
+                    "dropped_seconds_results": 0.0,
+                    "n_position_rows_dropped": 0,
+                    "dropped_seconds_position": 0.0,
+                },
+            ),
+        )
+        _write_bundle(
+            tree,
+            "chimi20200223_04_r2",
+            n_neurons=1,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.5,
+            sidecar=_sidecar(
+                "chimi20200223_04_r2",
+                bins_immobile=1000,
+                bins_fit=900,
+                nonlocal_before=10,
+                nonlocal_after=9,
+                ripple_before=5,
+                ripple_after=5,
+                alignment={
+                    "dropped_at": "tail",
+                    "n_results_bins_dropped": 4,
+                    "dropped_seconds_results": 0.008,
+                    "n_position_rows_dropped": 0,
+                    "dropped_seconds_position": 0.0,
+                },
+            ),
+        )
+        prose = alignment_prose(read_sidecars(tree))
+        assert "2 of 2 sidecars record" in prose
+        assert "1 of those needed a trim" in prose
+        assert "1 record the step as a no-op" in prose
+        assert "every one of those" not in prose
+        assert "`chimi20200223_04_r2`" in prose
+
+    def test_a_bundle_without_a_sidecar_is_refused(self, bundle_trees):
+        """A bundle with no sidecar would be counted by the population only."""
+        _, after = bundle_trees
+        _write_bundle(
+            after,
+            "peanut20201128_06_r3",
+            n_neurons=1,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.5,
+            sidecar=None,
+        )
+        with pytest.raises(ValueError, match="no provenance sidecar"):
+            read_sidecars(after)
+
     def test_animal_is_not_split_on_a_digit(self, bundle_trees):
         """``j16`` sessions must not collapse to ``j1``."""
         _, after = bundle_trees

@@ -136,7 +136,11 @@ Three tiers:
    All three are fit on the **well-anchored stop cohort**, the same population as the
    rate and content ladders, and an unsuffixed PFC artifact is that cohort; `_allstops`
    is the unrestricted sensitivity bundle (unit bundles and Stage 6 only — Stage 5B has
-   one rule at the event grain). Every PFC artifact carries a `*.provenance.json`
+   one rule at the event grain). **Only Stage 6 has shipped an `_allstops` bundle**;
+   the unit-GLM one has never been run — produce it with
+   `run_pfc_analysis_bandit.py --stop-cohort all_stops` (a full 71-session refit), which
+   is the only way to compare the unit fits across populations on artifacts rather than
+   on the unit test that pins the unrestricted path. Every PFC artifact carries a `*.provenance.json`
    sidecar recording `stop_cohort`, the stop-table SHA-256, and the bins and events
    before and after the restriction. See
    [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md),

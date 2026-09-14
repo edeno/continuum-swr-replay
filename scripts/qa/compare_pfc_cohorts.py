@@ -126,6 +126,24 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
     if not rows:
         raise FileNotFoundError(f"No *{stem}.provenance.json sidecars in {data_dir}")
     frame = pd.DataFrame(rows).sort_values("session").reset_index(drop=True)
+    # Every bundle must have a sidecar. A bundle without one is invisible to the
+    # bins/events tables while ``load_population_data`` still counts its
+    # neurons, so the two halves of the report would describe different
+    # session sets without saying so.
+    described = set(frame["session"])
+    present = bundle_sessions(data_dir, artifact_suffix)
+    missing = sorted(present - described)
+    orphaned = sorted(described - present)
+    if missing or orphaned:
+        raise ValueError(
+            f"bundle/sidecar mismatch in {data_dir}: "
+            f"{len(missing)} bundle(s) with no provenance sidecar "
+            f"({', '.join(missing) or 'none'}) and {len(orphaned)} sidecar(s) "
+            f"with no bundle ({', '.join(orphaned) or 'none'}). Refit the "
+            "session(s) so the runner writes a sidecar, or point --after-dir at "
+            "a complete tree; a bundle with no sidecar would be counted in the "
+            "population summary but absent from the per-session tables."
+        )
     # Through the shared parser, so ``j16`` sessions resolve to "j16" and not
     # to "j1" (the leading alphabetic run) or "j" (a split on the first digit).
     frame.insert(
@@ -255,20 +273,33 @@ def alignment_prose(sidecars: pd.DataFrame) -> str:
             "No sidecar in this tree records an alignment block, so nothing "
             "can be said here about the decode/position trim.\n"
         )
+    zeros = pd.Series(0.0, index=sidecars.index)
+    seconds = sidecars.get("align_dropped_seconds_results", zeros).fillna(0)
+    position_rows = sidecars.get("align_n_position_rows_dropped", zeros).fillna(0)
     recorded = bins.notna()
     trimmed = bins.fillna(0) > 0
-    seconds = sidecars["align_dropped_seconds_results"].fillna(0)
-    position_rows = sidecars["align_n_position_rows_dropped"].fillna(0)
-    worst = sidecars.loc[seconds.idxmax()]
+    n_recorded, n_trimmed = int(recorded.sum()), int(trimmed.sum())
+    if n_trimmed == n_recorded:
+        how_many = f"and every one of those {n_trimmed} session(s) needed a trim"
+    else:
+        how_many = (
+            f"and {n_trimmed} of those needed a trim (the other "
+            f"{n_recorded - n_trimmed} record the step as a no-op)"
+        )
+    largest = ""
+    if n_trimmed:
+        worst = sidecars.loc[seconds.idxmax()]
+        largest = (
+            f" The largest single trim is {seconds.max():.1f} s in "
+            f"`{worst['session']}`."
+        )
     return (
-        f"{int(recorded.sum())} of {len(sidecars)} sidecars record the "
-        f"decode/position alignment step, and every one of those "
-        f"{int(trimmed.sum())} session(s) needed a trim: "
+        f"{n_recorded} of {len(sidecars)} sidecars record the "
+        f"decode/position alignment step, {how_many}: "
         f"{int(bins.fillna(0).sum()):,} decode bins "
         f"({seconds.sum():.1f} s) dropped in total, against "
         f"{int(position_rows.sum()):,} position rows -- the decode always "
-        "outlives the position frame, never the reverse. The largest single "
-        f"trim is {seconds.max():.1f} s in `{worst['session']}`. The remaining "
+        f"outlives the position frame, never the reverse.{largest} The remaining "
         f"{int((~recorded).sum())} session(s) were fit before the step existed, "
         "by code whose strict 1-to-1 validator refused any mismatch at all, so "
         "their axes already agreed exactly and the step would be the identity "
@@ -430,7 +461,9 @@ def build_report(
         f"- before: `{before_dir}` -- {before_gate['n_neurons_with_fit']} neurons "
         "with a usable fit, no cohort restriction, no provenance sidecars "
         "(these bundles predate them).\n"
-        f"- after: `{after_dir}` -- {len(sidecars)} bundles, every one "
+        f"- after: `{after_dir}` -- {len(sidecars)} bundles, each with a "
+        "provenance sidecar (a bundle without one is refused, so the tables "
+        "below and the population summary describe one session set), every one "
         f"`stop_cohort` {cohorts}, every one on stop table "
         f"`{hashes[0][:12] if len(hashes) else '?'}`"
         f"{' (SHA-256 agrees across all bundles)' if len(hashes) == 1 else ''}.\n"

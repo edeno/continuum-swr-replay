@@ -15,7 +15,7 @@ Command: `uv run python scripts/qa/compare_pfc_cohorts.py --note '**The "before"
 ## Inputs
 
 - before: `/cumulus/edeno/continuum-swr-replay/Processed-Data/_pre_atwell_pfc_backup_20260913` -- 17147 neurons with a usable fit, no cohort restriction, no provenance sidecars (these bundles predate them).
-- after: `/cumulus/edeno/continuum-swr-replay/Processed-Data` -- 71 bundles, every one `stop_cohort` ['at_well'], every one on stop table `ea62e0b65fbe` (SHA-256 agrees across all bundles).
+- after: `/cumulus/edeno/continuum-swr-replay/Processed-Data` -- 71 bundles, each with a provenance sidecar (a bundle without one is refused, so the tables below and the population summary describe one session set), every one `stop_cohort` ['at_well'], every one on stop table `ea62e0b65fbe` (SHA-256 agrees across all bundles).
 
 The sessions were fit in several passes and each sidecar records the repository HEAD **at the moment it was written**, so a bundle's `git_hash` can be a commit later than the code the worker had already imported:
 
