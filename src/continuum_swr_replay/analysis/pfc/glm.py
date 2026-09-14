@@ -1730,9 +1730,7 @@ def run_session(
     run_parallel: bool = True,
     stop_cohort: str = "at_well",
     cohort_stops: pd.DataFrame | None = None,
-) -> tuple[
-    pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]
-]:
+) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
     """Run PFC GLM analysis for all neurons in a single session.
 
     Parameters
