@@ -6,8 +6,11 @@ For each session, it fits Poisson GLM models with convolutional spline basis fun
 to quantify how each neuron's firing rate changes relative to event onsets.
 
 The analysis pipeline per session:
-1. Load HPC decoding results to identify non-local events
-2. Separate non-local events by SWR overlap
+1. Load the session's non-local events from the canonical event table
+2. Split them on that table's ``is_swr`` column (strict positive-duration
+   overlap with the speed-gated ``SWR_event`` labels), so Figure 4 describes
+   the same events, with the same classification, as the content and rate
+   families
 3. Fit GLMs for each neuron comparing models: constant, SWR, non-local, combined
 4. Compute theta modulation during running
 5. Save per-session neuron statistics and modulation time courses
@@ -61,6 +64,10 @@ import pandas as pd
 from dask.distributed import Client, LocalCluster
 
 from continuum_swr_replay.analysis.pfc import run_session
+from continuum_swr_replay.analysis.pfc.canonical_events import (
+    IS_SWR_DEFINITION,
+    canonical_event_input_hashes,
+)
 from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
@@ -107,19 +114,25 @@ def results_exist(
     overwrite: bool,
     stop_cohort: str = "at_well",
     stop_table_sha256: str | None = None,
+    event_table_sha256: str | None = None,
+    data_over_time_sha256: str | None = None,
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
     Distinct from ``_decoding_common.results_exist`` because the PFC
     pipeline writes a different set of files (modulation .npy arrays
     plus a single .pkl) than the decoder pipeline (results .nc, detector
-    .pkl, environment .pkl). Three things must match, not just the file names:
-    an at-well bundle never satisfies an ``all_stops`` request; a bundle that
-    does not *state* its population in a provenance sidecar is not accepted as
-    one (the canonical name is unsuffixed, so a bundle fit before the cohort
-    existed would otherwise be kept silently by a skip); and the stop table the
-    bundle was cut from must be the one on disk now, because regenerating the
-    stop table changes which bins and events the cohort contains.
+    .pkl, environment .pkl). The file names alone never settle it. An at-well
+    bundle never satisfies an ``all_stops`` request; a bundle that does not
+    *state* its population in a provenance sidecar is not accepted as one (the
+    canonical name is unsuffixed, so a bundle fit before the cohort existed
+    would otherwise be kept silently by a skip); the stop table the bundle was
+    cut from must be the one on disk now, because regenerating the stop table
+    changes which bins and events the cohort contains; and the bundle must
+    state the canonical event definition and have been cut from the event
+    table and cached decode frame now on disk, because a bundle fit on a
+    run-time re-detection of events, or on an earlier generation of those two
+    inputs, describes different events.
 
     Parameters
     ----------
@@ -128,6 +141,10 @@ def results_exist(
         ``load_session_stop_cohort`` reports it. ``None`` for ``all_stops``,
         which reads no stop table -- and which therefore only matches a sidecar
         that also recorded no stop table.
+    event_table_sha256, data_over_time_sha256 : str or None
+        Hashes of the canonical event table and the session's cached decode
+        frame this run would read. ``None`` matches no existing bundle, so a
+        session whose inputs could not be hashed is refit rather than skipped.
     """
     if overwrite:
         return False
@@ -149,6 +166,9 @@ def results_exist(
     return (
         record.get("stop_cohort") == stop_cohort
         and record.get("stop_table_sha256") == stop_table_sha256
+        and record.get("is_swr_definition") == IS_SWR_DEFINITION
+        and record.get("canonical_event_table_sha256") == event_table_sha256
+        and record.get("data_over_time_sha256") == data_over_time_sha256
     )
 
 
@@ -218,12 +238,20 @@ def run_analysis(
             logger.exception(f"No stop cohort for {epoch_identifier}: {e}")
             return
 
+    # The event definition is resolved before the skip check for the same
+    # reason the cohort is: a bundle cut from a previous generation of the
+    # canonical event table or of the cached decode frame describes different
+    # events, so it is not this run's bundle.
+    event_inputs = canonical_event_input_hashes(nwb_file_name, epoch_name)
+
     if results_exist(
         output_dir,
         epoch_identifier,
         overwrite,
         stop_cohort,
         cohort_report.get("stop_table_sha256"),
+        event_inputs["canonical_event_table_sha256"],
+        event_inputs["data_over_time_sha256"],
     ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return
@@ -300,6 +328,16 @@ def run_analysis(
                 "brain_area": brain_area,
                 "nwb_file_name": nwb_file_name,
                 "epoch_name": epoch_name,
+                # Which events the fit describes, from the same block the skip
+                # check above compares against.
+                **event_inputs,
+                # The cohort-restricted event counts, so the sidecar states the
+                # split without a reader recomputing it.
+                "n_events_total": cohort_info.get("n_nonlocal_after"),
+                "n_events_swr": cohort_info.get("n_nonlocal_swr"),
+                "n_events_non_swr": cohort_info.get("n_nonlocal_no_swr"),
+                # No matched-control population is drawn on this path yet.
+                "n_matched_control": 0,
             },
         )
 

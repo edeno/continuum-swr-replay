@@ -59,8 +59,21 @@ def test_only_the_sensitivity_bundle_is_suffixed(tmp_path):
     assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
 
 
+#: Hashes of the two canonical event inputs a test bundle claims to be cut
+#: from. Named so a call site reads as "the current inputs".
+EVENT_TABLE_SHA = "event111"
+DOT_SHA = "dot222"
+
+
 def _write_bundle_files(
-    directory, epoch_identifier, stop_cohort, sidecar_cohort, sidecar_hash="abc123"
+    directory,
+    epoch_identifier,
+    stop_cohort,
+    sidecar_cohort,
+    sidecar_hash="abc123",
+    is_swr_definition=runner.IS_SWR_DEFINITION,
+    event_table_sha=EVENT_TABLE_SHA,
+    data_over_time_sha=DOT_SHA,
 ):
     """Touch one bundle's five files, optionally with a provenance sidecar."""
     artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
@@ -76,7 +89,13 @@ def _write_bundle_files(
     if sidecar_cohort is not None:
         artifact.with_suffix(".provenance.json").write_text(
             json.dumps(
-                {"stop_cohort": sidecar_cohort, "stop_table_sha256": sidecar_hash}
+                {
+                    "stop_cohort": sidecar_cohort,
+                    "stop_table_sha256": sidecar_hash,
+                    "is_swr_definition": is_swr_definition,
+                    "canonical_event_table_sha256": event_table_sha,
+                    "data_over_time_sha256": data_over_time_sha,
+                }
             )
         )
 
@@ -85,12 +104,14 @@ def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
 
-    assert runner.results_exist(tmp_path, epoch_identifier, False, "at_well", "abc123")
-    assert not runner.results_exist(
-        tmp_path, epoch_identifier, False, "all_stops", None
+    assert runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
     assert not runner.results_exist(
-        tmp_path, epoch_identifier, True, "at_well", "abc123"
+        tmp_path, epoch_identifier, False, "all_stops", None, EVENT_TABLE_SHA, DOT_SHA
+    )
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, True, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
 
@@ -104,7 +125,7 @@ def test_a_bundle_cut_from_another_stop_table_is_refit(tmp_path):
     )
 
     assert not runner.results_exist(
-        tmp_path, epoch_identifier, False, "at_well", "abc123"
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
 
@@ -116,7 +137,7 @@ def test_a_bundle_that_does_not_state_its_population_is_refit(tmp_path):
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", sidecar_cohort=None)
 
     assert not runner.results_exist(
-        tmp_path, epoch_identifier, False, "at_well", "abc123"
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
 
@@ -125,7 +146,7 @@ def test_a_bundle_naming_another_population_is_refit(tmp_path):
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "all_stops")
 
     assert not runner.results_exist(
-        tmp_path, epoch_identifier, False, "at_well", "abc123"
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
 
@@ -135,7 +156,9 @@ def test_an_allstops_bundle_matches_when_no_stop_table_was_read(tmp_path):
         tmp_path, epoch_identifier, "all_stops", "all_stops", sidecar_hash=None
     )
 
-    assert runner.results_exist(tmp_path, epoch_identifier, False, "all_stops", None)
+    assert runner.results_exist(
+        tmp_path, epoch_identifier, False, "all_stops", None, EVENT_TABLE_SHA, DOT_SHA
+    )
 
 
 @pytest.fixture
@@ -177,11 +200,27 @@ def fake_session(monkeypatch):
                 "n_ripple_after": 11,
                 "n_nonlocal_dropped_overlapping_fit": 3,
                 "n_ripple_dropped_overlapping_fit": 5,
+                "n_nonlocal_swr": 5,
+                "n_nonlocal_no_swr": 3,
+                "n_events_outside_frame": 0,
             },
         )
 
+    def _fake_event_inputs(nwb_file_name, epoch_name, **kwargs):
+        calls["event_inputs"] = (nwb_file_name, epoch_name)
+        return {
+            "is_swr_definition": runner.IS_SWR_DEFINITION,
+            "immobility_inequality": "<",
+            "canonical_event_table_path": "/canonical/event_table.parquet",
+            "canonical_event_table_sha256": EVENT_TABLE_SHA,
+            "swr_interval_source": "data_over_time.SWR_event",
+            "data_over_time_path": "/canonical/dot.pkl",
+            "data_over_time_sha256": DOT_SHA,
+        }
+
     monkeypatch.setattr(runner, "load_session_stop_cohort", _fake_cohort)
     monkeypatch.setattr(runner, "run_session", _fake_run_session)
+    monkeypatch.setattr(runner, "canonical_event_input_hashes", _fake_event_inputs)
     return calls
 
 
@@ -213,6 +252,72 @@ def test_the_sidecar_states_the_population_the_fit_was_read_on(
     assert record["cohort_counts"]["n_ripple_dropped_overlapping_fit"] == 5
     assert record["stop_cohort_report"]["n_stops_after"] == 1
     assert fake_session["cohort"] == "at_well"
+
+
+def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
+    tmp_path, fake_session, monkeypatch
+):
+    # A bundle that does not name its event definition cannot be told from one
+    # fit on the retired run-time construction, which split events on a
+    # separately detected ripple population.
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["is_swr_definition"] == runner.IS_SWR_DEFINITION
+    assert record["immobility_inequality"] == "<"
+    assert record["canonical_event_table_path"] == "/canonical/event_table.parquet"
+    assert record["canonical_event_table_sha256"] == EVENT_TABLE_SHA
+    assert record["swr_interval_source"] == "data_over_time.SWR_event"
+    assert record["data_over_time_path"] == "/canonical/dot.pkl"
+    assert record["data_over_time_sha256"] == DOT_SHA
+    # The cohort-restricted split, so a reader need not recompute it.
+    assert record["n_events_total"] == 8
+    assert record["n_events_swr"] == 5
+    assert record["n_events_non_swr"] == 3
+    assert record["n_matched_control"] == 0
+
+
+def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path,
+        epoch_identifier,
+        "at_well",
+        "at_well",
+        is_swr_definition="ripple_times_overlap",
+    )
+
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
+
+
+def test_a_bundle_cut_from_another_event_table_or_decode_frame_is_refit(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "at_well", "at_well", event_table_sha="stale111"
+    )
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
+
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "at_well", "at_well", data_over_time_sha="stale222"
+    )
+    assert not runner.results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
 
 
 def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
