@@ -129,7 +129,7 @@ Three tiers:
 
    | artifact | producer | holds |
    |---|---|---|
-   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-neuron GLM statistics and the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control` — the duration-matched non-event baseline); the Figure 4 population, read by `analysis/pfc/load_population.py` |
+   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-neuron GLM statistics and the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control` — the duration-matched non-event baseline); the Figure 4 population, read by `analysis/pfc/load_population.py`, which still loads only the first four curves — the matched-control curve is written per session but not yet read into the population, which waits on the loader update |
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
@@ -142,7 +142,18 @@ Three tiers:
    is the only way to compare the unit fits across populations on artifacts rather than
    on the unit test that pins the unrestricted path. Every PFC artifact carries a `*.provenance.json`
    sidecar recording `stop_cohort`, the stop-table SHA-256, and the bins and events
-   before and after the restriction. See
+   before and after the restriction. The unit bundles' sidecar also states **which
+   events the fit describes**: `is_swr_definition`, the SHA-256 of the canonical event
+   table and of the session's cached decode frame
+   (`canonical_event_table_sha256`, `data_over_time_sha256`), the cohort-restricted
+   `n_events_total` / `n_events_swr` / `n_events_non_swr`, and the matched control's
+   `matched_control_seed` / `n_matched_control` / `n_matched_control_unplaced`;
+   `run_pfc_analysis_bandit.py` refuses to skip a bundle that does not carry the
+   current values. **The 71 shipped at-well unit bundles (fit 2026-09-13/14) predate
+   the event definition and the matched control**, so the next batch refits them —
+   until it does, the Figure 4 population and claim 20 rest on bundles that label the
+   same events the same way but carry neither the canonical `event_id`s nor a
+   control. See
    [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md),
    [audits/2026-09-14-pfc-atwell-cohort.md](audits/2026-09-14-pfc-atwell-cohort.md) and
    [audits/2026-09-13-stage5b-stage6-atwell.md](audits/2026-09-13-stage5b-stage6-atwell.md).

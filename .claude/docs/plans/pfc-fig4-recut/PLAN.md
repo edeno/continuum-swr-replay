@@ -1,6 +1,22 @@
 # PFC Fig 4 Recut Implementation Plan
 
-**Status:** Not started.
+**Status:** Phases 1 and 2 landed on branch `pfc-recut-canonical-events` (2026-09-14),
+executed per the decisions in [phase-1-2-execution.md](phase-1-2-execution.md): the PFC path
+reads the canonical event table and the speed-gated `SWR_event` intervals, the sidecar and the
+skip check state the event definition, the retired construction survives only in
+`scripts/qa/diagnose_pfc_event_definition.py`, and a duration-matched non-event control is drawn
+inside the fit mask and entered as its own event class with the nested engagement test
+(`matched_control + non_local_no_SWR vs. matched_control`) and `matched_control vs. constant`.
+No batch rerun happened, so the 71 shipped at-well unit bundles still predate both.
+
+**Corrected premise (2026-09-14):** Phase 1's motivating discrepancy does not hold. On the
+well-anchored mPFC population the retired ripple-overlap split and the canonical `is_swr` agree
+**exactly in 71 of 71 sessions** (median SWR fraction 0.447 both ways); the earlier 44.7 % vs
+43.0 % comparison set the PFC split against the canonical fraction over *all* events, off-well
+ones included, and was wrong. Phase 1 therefore buys traceability — the canonical `event_id`s
+and input hashes on Figure 4 — not a relabelling; the matched control is the substantive change.
+
+Phases 0, 2b, 3 and 4 are open.
 
 Rebuild the mPFC cross-area analysis (Figure 4 / claim #20) on a correct,
 provenance-tracked footing. It repairs spike-bin and fit-validity mechanics,

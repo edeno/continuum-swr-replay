@@ -93,20 +93,43 @@ refits land.
 stop-grain cohort **to the bins**: the fit mask is `is_immobile &
 stop_interval_mask(position_time, kept_stops)`, i.e. an immobile sample that
 falls inside a `[stop_start, stop_end]` interval of a kept stop. The events its
-design matrices are keyed on — the confident non-local windows and the detected
-SWRs — are restricted **by onset**: an event enters when its onset lies inside a
-kept stop, applied *before* the SWR-overlap split so `non_local_SWR` and
-`non_local_no_SWR` partition exactly the kept events. The regressor basis still
-spans ±250 ms around each kept event, so an event dropped just outside a stop's
-leading edge could have covered bins that *are* fit; those bins are fit with its
-contribution zero, and the count of such events is written to every provenance
-sidecar (`n_{nonlocal,ripple}_dropped_overlapping_fit`) rather than assumed
-away. Corpus-wide that is **6 non-local events and 4 SWRs** out of the 15,143
-and 11,997 that are kept. Across the 71 mPFC sessions the bin mask keeps
+design matrices are keyed on are the **canonical** ones, read rather than
+re-detected (`analysis/pfc/canonical_events.py` is the only place the PFC path
+loads either): the non-local events are the session's rows of the shipped event
+table (`Processed-Data/replay_content/event_table.parquet` — `event_id`,
+`event_start_s`/`event_end_s`, `is_swr`, `occupancy_state`), and the SWR
+intervals are the `SWR_event` labels of the cached
+`{epoch_identifier_HPC}_80_data_over_time.pkl` frame, speed-gated and reduced to
+their sampled bounds by the same two helpers
+(`filter_event_labels_by_speed`, `intervals_from_labels`) the hippocampal event
+table calls. The SWR split is that table's own `is_swr` column — strict
+positive-duration overlap with those same labels — so a Figure 4 event and a
+content- or rate-family event with the same `event_id` are one event, classified
+one way; `data["ripple_times"]` no longer enters any fit path. Events are
+restricted **by onset**: an event enters when its onset lies inside a kept stop,
+applied *before* the split is read so `non_local_SWR` and `non_local_no_SWR`
+partition exactly the kept events. Any canonical event or SWR interval falling
+outside the aligned position frame is counted (`n_events_outside_frame`,
+`n_swr_intervals_outside_frame`) and dropped rather than silently clipped.
+The regressor basis still spans ±250 ms around each kept event, so an
+event dropped just outside a stop's leading edge could have covered bins that
+*are* fit; those bins are fit with its contribution zero, and the count of such
+events is written to every provenance sidecar
+(`n_{nonlocal,ripple}_dropped_overlapping_fit`) rather than assumed away.
+Corpus-wide that is **6 non-local events and 4 SWRs** out of the 15,143 and
+11,997 that are kept. Across the 71 mPFC sessions the bin mask keeps
 **92.3%** of the immobile bins (19,732,623 of 21,384,252), and the onset rule
 keeps **91.9%** of the non-local events (15,143 of 16,477) and 93.6% of the SWRs
 (11,997 of 12,821); the per-session table is in
-[`../audits/2026-09-14-pfc-atwell-cohort.md`](../audits/2026-09-14-pfc-atwell-cohort.md).
+[`../audits/2026-09-14-pfc-atwell-cohort.md`](../audits/2026-09-14-pfc-atwell-cohort.md);
+those counts were measured on bundles cut with the earlier run-time event
+construction, which on this population labels the same events the same way —
+identical event count and identical SWR-coupled count in **71 of 71** sessions,
+median per-session SWR fraction **0.447** either way, and an identical SWR
+population wherever the two constructions were run side by side.
+Reading the canonical table therefore buys traceability, not a different split;
+`scripts/qa/diagnose_pfc_event_definition.py` recomputes the comparison for any
+session.
 The unit GLM also draws a **matched non-event control** from that same fit
 mask, one window per kept non-local event: the control onset is drawn uniformly
 over the sample times of the *same* contiguous run of fitted bins the event's
@@ -122,6 +145,30 @@ placed elsewhere, so the control count is `<=` the event count; the draw's seed
 (a hash of the session key) and both counts are written to every provenance
 sidecar (`matched_control_seed`, `n_matched_control`,
 `n_matched_control_unplaced`).
+
+Three properties of that control decide what the comparison can be read as.
+
+- **It is matched one-per-non-local event, over both classes**, not against the
+  non-SWR class alone, so the control regressor generally carries *more* windows
+  than the class it is compared with (one smoked session: 275 controls against
+  187 non-SWR events, from 277 kept events). The two regressors are therefore
+  not equal-n.
+- **The preserved duration governs only where a control may be placed** — it
+  sets the rejection window that must fit inside the bout and clear every real
+  and already-placed window. The regressor itself is built from onsets alone,
+  for every event class: each class's indicator is a spike-count-per-bin of its
+  `start_time`s convolved with the lagged spline basis, so a window's length
+  never enters the design.
+- **Control onsets are uniform over the fitted bout, while real replay clusters
+  after arrival**, so the control matches bout membership and duration but not
+  time-since-arrival; `matched_control vs. constant` is the diagnostic for that
+  residual — it asks whether the baseline itself modulates firing. And because
+  a draw is rejected where real events already sit, controls are pushed into the
+  event-free stretches of a bout, which in a short event-dense bout is
+  *anti-conservative* for the engagement test. The pair is also not
+  SWR-controlled: the adjudicating rung
+  `SWR + matched_control + non_local_no_SWR vs. SWR + matched_control` is not
+  fit yet.
 
 Stage 6
 (`run_stage6_learning.py`) applies `select_stop_cohort` at the stop grain before

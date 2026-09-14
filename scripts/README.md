@@ -70,6 +70,10 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   floor is recorded in `docs/design/builder_test_floor.md`.
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into
   one table.
+- `write_pipeline_map.py` — regenerates `docs/regression_pipeline_map.md`, the
+  symbol-anchored map of the modules carrying a decoded session to a fitted
+  regression, read out of the source with `ast`; `--check` fails on drift, as
+  `tests/unit/test_pipeline_map_is_current.py` does.
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
