@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
+from continuum_swr_replay.table_io import read_table
 from scripts.pfc import run_stage6_learning as runner
 
 SESSION = {"animal": "a", "session_date": 1, "epoch": "02_r1"}
@@ -238,7 +239,7 @@ class TestProvenance:
         tables it read are the tables on disk.
         """
         _run(monkeypatch)
-        stop_table = pd.read_pickle(stage6 / "stop_table.pkl")
+        stop_table = read_table(stage6 / "stop_table.pkl")
         regenerated = stop_table.copy()
         regenerated.attrs = dict(stop_table.attrs)
         regenerated["immobility_duration_s"] = 6.0
