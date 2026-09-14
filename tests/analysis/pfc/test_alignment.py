@@ -171,19 +171,33 @@ class TestRefusals:
         assert str(len(time_axis) - 1) in message
         assert f"{time_axis[1000]:.6f}" in message
 
-    def test_oversized_trim_raises(self, time_axis):
-        """A trim bigger than the budget is a different timebase, not a trim."""
+    def test_decode_tail_is_dropped_within_its_own_budget(self, time_axis):
+        """A decode running past the trimmed position frame loses its tail."""
         results = _make_results(time_axis)
         position_info = _make_position(time_axis[: -int(2.0 * SAMPLING_FREQUENCY_HZ)])
+
+        _, _, counts = align_results_to_position(results, position_info)
+        assert counts["n_results_bins_dropped"] == int(2.0 * SAMPLING_FREQUENCY_HZ)
+        assert counts["n_position_rows_dropped"] == 0
+
+        with pytest.raises(ValueError, match="over the 1.0s budget"):
+            align_results_to_position(
+                results, position_info, max_dropped_seconds_results=1.0
+            )
+
+    def test_position_rows_without_a_decode_stay_tightly_bounded(self, time_axis):
+        """Position rows the decode never covered would be fit bins with no
+        event evidence, so more than the small budget is a different timebase."""
+        results = _make_results(time_axis[: -int(2.0 * SAMPLING_FREQUENCY_HZ)])
+        position_info = _make_position(time_axis)
 
         with pytest.raises(ValueError, match="over the 0.1s budget"):
             align_results_to_position(results, position_info)
 
-        # The same mismatch is accepted once the budget covers it.
         _, _, counts = align_results_to_position(
-            results, position_info, max_dropped_seconds=3.0
+            results, position_info, max_dropped_seconds_position=3.0
         )
-        assert counts["n_results_bins_dropped"] == int(2.0 * SAMPLING_FREQUENCY_HZ)
+        assert counts["n_position_rows_dropped"] == int(2.0 * SAMPLING_FREQUENCY_HZ)
 
     def test_no_shared_timestamps_raises(self, time_axis):
         results = _make_results(time_axis + 100.0)

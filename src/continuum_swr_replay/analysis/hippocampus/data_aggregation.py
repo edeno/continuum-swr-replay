@@ -222,7 +222,8 @@ def align_results_to_position(
     results: xr.Dataset,
     position_info: pd.DataFrame,
     *,
-    max_dropped_seconds: float = 0.1,
+    max_dropped_seconds_results: float = 600.0,
+    max_dropped_seconds_position: float = 0.1,
     atol: float = 1e-6,
 ) -> tuple[xr.Dataset, pd.DataFrame, dict[str, Any]]:
     """Restrict a decode and a position frame to the timestamps they share.
@@ -250,11 +251,16 @@ def align_results_to_position(
         Decoding results with a sorted ``time`` coordinate (seconds).
     position_info : pandas.DataFrame
         Time-indexed position frame (seconds).
-    max_dropped_seconds : float
-        Largest span either axis may lose to the intersection. The default
-        (0.1 s, fifty 2 ms bins) is an order of magnitude above the
-        stale-decode tails seen in practice (3-9 bins); a larger mismatch
-        is a different timebase and must be looked at, not trimmed.
+    max_dropped_seconds_results : float
+        Largest span the decode may lose. Decodes were run on the untrimmed
+        epoch, so their tail past the trimmed position frame is pre/post
+        trial time (0.01-135 s in practice, no non-local events in it) and
+        is safe to drop; the budget only catches a wrong file.
+    max_dropped_seconds_position : float
+        Largest span the position frame may lose. Position rows without a
+        decode would be fit bins with no event evidence, so this stays
+        tight (0.1 s, fifty 2 ms bins); a larger mismatch is a different
+        timebase and must be looked at, not trimmed.
     atol : float
         Absolute tolerance (seconds) for calling two timestamps the same.
 
@@ -346,9 +352,9 @@ def align_results_to_position(
 
     dropped: dict[str, float] = {}
     dropped_at_ends: set[str] = set()
-    for side, axis, sl in (
-        ("results", results_time, results_slice),
-        ("position", position_time, position_slice),
+    for side, axis, sl, budget in (
+        ("results", results_time, results_slice, max_dropped_seconds_results),
+        ("position", position_time, position_slice, max_dropped_seconds_position),
     ):
         head_seconds = float(axis[sl.start] - axis[0])
         tail_seconds = float(axis[-1] - axis[sl.stop - 1])
@@ -357,11 +363,11 @@ def align_results_to_position(
             dropped_at_ends.add("head")
         if sl.stop < axis.size:
             dropped_at_ends.add("tail")
-        if dropped[side] > max_dropped_seconds:
+        if dropped[side] > budget:
             raise ValueError(
                 f"aligning results.time ({results_time.size}) to position_info "
                 f"({position_time.size}) would drop {dropped[side]:.3f}s from "
-                f"the {side} axis, over the {max_dropped_seconds}s budget; "
+                f"the {side} axis, over the {budget}s budget; "
                 "refusing to trim this much."
             )
 
