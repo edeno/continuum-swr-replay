@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+from continuum_swr_replay.analysis.pfc.glm import FITTERS
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.data_loaders import load_data
@@ -312,6 +313,7 @@ def generate_figure(
     neuron_ind=27,
     data_dir=PROCESSED_DATA_DIR,
     stop_cohort="at_well",
+    fitter="jax",
 ):
     """Generate composite Figure 4.
 
@@ -329,6 +331,11 @@ def generate_figure(
         Population the panels describe. The example neuron is refit here, so it
         must be cut the same way the population bundle in ``data_dir`` was; the
         suffixed ``_allstops`` bundle is read for ``all_stops``.
+    fitter : {"jax", "statsmodels"}
+        How the example neuron's GLMs are fit -- the same choice the population
+        bundle's run made, so the panel and the population it sits beside come
+        off one fitter. The two agree to the tolerances of the fitter
+        equivalence audit.
 
     Returns
     -------
@@ -432,9 +439,9 @@ def generate_figure(
     neuron_spike_times = data["spike_times"]["mPFC"][neuron_ind]
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
 
-    print("Fitting GLM models...")
+    print(f"Fitting GLM models (fitter: {fitter})...")
     glm_results, _ = fit_immobility_models(
-        fit_mask, immobility_design_matrices, neuron_spike_count
+        fit_mask, immobility_design_matrices, neuron_spike_count, fitter=fitter
     )
 
     # --- Load population data ---
@@ -557,6 +564,16 @@ def main():
             "restriction and reads the '_allstops' population bundle."
         ),
     )
+    parser.add_argument(
+        "--fitter",
+        type=str,
+        default="jax",
+        choices=list(FITTERS),
+        help=(
+            "How the example neuron's GLMs are fit (default: jax), matching "
+            "the population bundle's run."
+        ),
+    )
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args()
@@ -568,6 +585,7 @@ def main():
         neuron_ind=args.neuron_ind,
         data_dir=args.data_dir,
         stop_cohort=args.stop_cohort,
+        fitter=args.fitter,
     )
 
     print(f"Saving to {args.output_dir}...")

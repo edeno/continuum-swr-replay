@@ -175,11 +175,197 @@ def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
     )
 
 
+#: The three-column theta design, as a patsy formula.
+THETA_FORMULA = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
+
+
+def build_theta_design(
+    theta_phase: pd.Series,
+    is_immobile: pd.Series,
+    sampling_frequency: float = 500.0,
+) -> tuple[NDArray, NDArray]:
+    """The running-bin mask and theta design the theta test is fit on.
+
+    Split out of :func:`test_theta_modulation` so a session can build the one
+    design every unit shares once, and fit every unit against it in a single
+    batched call.
+
+    Parameters
+    ----------
+    theta_phase : pd.Series, shape (n_lfp_samples,)
+        Theta phase timeseries (radians), on its own clock.
+    is_immobile : pd.Series, shape (n_time,)
+        Boolean series indicating immobility at each time bin.
+    sampling_frequency : float
+        Sampling frequency in Hz, used to set the reindex tolerance.
+
+    Returns
+    -------
+    joint_mask : NDArray of bool, shape (n_time,)
+        Running AND theta phase available.
+    design_matrix : NDArray, shape (n_joint, 3)
+        Intercept, cosine and sine of theta phase on those bins.
+    """
+    reindexed_theta = reindex_by(
+        theta_phase,
+        is_immobile.index,
+        tolerance=1.0 / sampling_frequency,
+    )
+    # Joint mask: running AND theta phase available
+    valid = reindexed_theta.notna().to_numpy().ravel()
+    joint_mask = (~is_immobile).to_numpy() & valid
+
+    design_matrix = dmatrix(
+        THETA_FORMULA,
+        {"theta_phase": reindexed_theta[joint_mask]},
+        return_type="dataframe",
+    )
+    return joint_mask, design_matrix.values
+
+
+#: Fitter backends. ``"statsmodels"`` is the per-unit IRLS the analysis was
+#: built on; ``"jax"`` is the batched IRLS in
+#: :mod:`continuum_swr_replay.analysis.pfc.batched_glm`, which mirrors its
+#: starting values, step and convergence rule.
+FITTERS = ("jax", "statsmodels")
+
+
+def _check_fitter(fitter: str) -> None:
+    if fitter not in FITTERS:
+        raise ValueError(f"fitter must be one of {FITTERS}, got {fitter!r}")
+
+
+def fitter_provenance(fitter: str) -> dict[str, Any]:
+    """How the models were fit, for the artifact's provenance sidecar.
+
+    Both backends stop on the same absolute deviance change, so the tolerance
+    is recorded once for either; the JAX backend additionally records which
+    device it ran on, because a GPU and a CPU run are not bit-identical.
+
+    Parameters
+    ----------
+    fitter : {"jax", "statsmodels"}
+
+    Returns
+    -------
+    dict
+        ``fitter``, ``fitter_tol``, ``jax_backend``, ``jax_version``. The last
+        two are ``None`` for the statsmodels backend.
+    """
+    _check_fitter(fitter)
+    record: dict[str, Any] = {
+        "fitter": fitter,
+        "jax_backend": None,
+        "jax_version": None,
+    }
+    if fitter == "jax":
+        import jax
+
+        from continuum_swr_replay.analysis.pfc.batched_glm import (
+            DEFAULT_TOL,
+            jax_backend,
+        )
+
+        record["fitter_tol"] = DEFAULT_TOL
+        record["jax_backend"] = jax_backend()
+        record["jax_version"] = jax.__version__
+    else:
+        # statsmodels' ``GLM.fit`` default, the tolerance the batched fitter
+        # mirrors.
+        record["fitter_tol"] = 1e-8
+    return record
+
+
+def fit_models_batched(
+    design_matrices: Mapping[str, NDArray],
+    counts: NDArray,
+) -> dict[str, Any]:
+    """Fit every unit against every design in one batched call per design.
+
+    Parameters
+    ----------
+    design_matrices : Mapping[str, NDArray]
+        Design matrices keyed by model name, each already restricted to the
+        bins being fit, shape (n_fit_bins, n_features).
+    counts : NDArray, shape (n_fit_bins, n_units)
+        Spike counts on those bins, one column per unit.
+
+    Returns
+    -------
+    dict[str, BatchedGLMResults]
+        Keyed by model name.
+    """
+    from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+
+    return {
+        model_name: fit_poisson_glms(design, counts)
+        for model_name, design in design_matrices.items()
+    }
+
+
+def _fit_theta_models(
+    design_matrix: NDArray,
+    counts: NDArray,
+    fitter: str = "statsmodels",
+) -> tuple[Any, Any]:
+    """The constant and theta fits the theta LR test compares.
+
+    Parameters
+    ----------
+    design_matrix : NDArray, shape (n_joint, 3)
+    counts : NDArray, shape (n_joint,) or (n_joint, n_units)
+        Spike counts on the running bins. A 2-D array fits every unit at once
+        and returns batched results.
+    fitter : {"statsmodels", "jax"}
+
+    Returns
+    -------
+    constant_result, theta_result
+        Single-unit results for 1-D ``counts``, batched results for 2-D.
+    """
+    _check_fitter(fitter)
+    constant_design = np.ones((design_matrix.shape[0], 1))
+    if fitter == "jax":
+        from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+
+        constant_result = fit_poisson_glms(constant_design, counts)
+        theta_result = fit_poisson_glms(design_matrix, counts)
+        if counts.ndim != 1:
+            return constant_result, theta_result
+        if (
+            constant_result.needs_reference_fit[0]
+            or theta_result.needs_reference_fit[0]
+        ):
+            # Outside the range where the two fitters agree; take statsmodels'
+            # answer rather than a near-miss of it.
+            return _fit_theta_models(design_matrix, counts, fitter="statsmodels")
+        return constant_result.for_unit(0), theta_result.for_unit(0)
+    if counts.ndim != 1:
+        raise ValueError(
+            "the statsmodels theta fitter takes one unit's counts at a time; "
+            "use fitter='jax' to fit a whole session at once"
+        )
+    constant_result = sm.GLM(
+        counts,
+        np.ones_like(counts),
+        family=sm.families.Poisson(),
+    ).fit()
+    theta_result = sm.GLM(
+        counts,
+        design_matrix,
+        family=sm.families.Poisson(),
+    ).fit()
+    return constant_result, theta_result
+
+
 def test_theta_modulation(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
     neuron_spike_count: NDArray,
     sampling_frequency: float = 500.0,
+    *,
+    fitter: str = "statsmodels",
+    prefitted: tuple[Any, Any] | None = None,
 ) -> tuple[float, float, float, float]:
     """Test theta phase modulation of neuron firing during running.
 
@@ -187,6 +373,11 @@ def test_theta_modulation(
     hypothesis testing), then a ridge-regularized fit (alpha=1e-20, L1_wt=0)
     for extracting modulation amplitude and preferred phase to avoid
     overfitting.
+
+    The regularized fit is statsmodels' coordinate-descent elastic net under
+    both fitters: its answer differs from the unregularized MLE by ~1e-4, so
+    ``theta_mod`` and ``theta_preferred_phase`` are that estimator's, not
+    IRLS's, and swapping the IRLS backend must not quietly change them.
 
     Parameters
     ----------
@@ -199,6 +390,13 @@ def test_theta_modulation(
         Binned spike counts aligned to ``is_immobile.index``.
     sampling_frequency : float
         Sampling frequency in Hz, used to set reindex tolerance.
+    fitter : {"statsmodels", "jax"}
+        Backend for the two unregularized fits the LR test is read from.
+        Ignored when ``prefitted`` is given.
+    prefitted : tuple, optional
+        ``(constant_result, theta_result)`` for this unit, already fit on the
+        design :func:`build_theta_design` returns for this session. Passed by
+        :func:`run_session`, which fits every unit at once.
 
     Returns
     -------
@@ -212,36 +410,24 @@ def test_theta_modulation(
         Preferred theta phase in radians (-pi to pi).
 
     """
-    reindexed_theta = reindex_by(
-        theta_phase,
-        is_immobile.index,
-        tolerance=1.0 / sampling_frequency,
-    )
-    # Joint mask: running AND theta phase available
-    valid = reindexed_theta.notna().to_numpy().ravel()
-    joint_mask = (~is_immobile).to_numpy() & valid
-
-    formula = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
-    design_matrix = dmatrix(
-        formula,
-        {"theta_phase": reindexed_theta[joint_mask]},
-        return_type="dataframe",
+    joint_mask, design_matrix = build_theta_design(
+        theta_phase, is_immobile, sampling_frequency=sampling_frequency
     )
 
-    constant_glm_results = sm.GLM(
-        neuron_spike_count[joint_mask],
-        np.ones_like(neuron_spike_count[joint_mask]),
-        family=sm.families.Poisson(),
-    ).fit()
+    if prefitted is not None:
+        constant_glm_results, theta_glm_results = prefitted
+    else:
+        constant_glm_results, theta_glm_results = _fit_theta_models(
+            design_matrix, neuron_spike_count[joint_mask], fitter=fitter
+        )
+
+    likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
 
     theta_glm_model = sm.GLM(
         neuron_spike_count[joint_mask],
-        design_matrix.values,
+        design_matrix,
         family=sm.families.Poisson(),
     )
-    theta_glm_results = theta_glm_model.fit()
-
-    likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
 
     # Fit regularized model to avoid overfitting for modulation and preferred phase
     theta_glm_results = theta_glm_model.fit_regularized(alpha=1e-20, L1_wt=0.0)
@@ -489,6 +675,9 @@ def _fit_immobility_models(
     fit_mask: pd.Series,
     design_matrices: dict[str, NDArray],
     neuron_spike_count: NDArray,
+    *,
+    fitter: str = "statsmodels",
+    prefitted: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Fit Poisson GLMs for each design matrix on the fitted time bins.
 
@@ -501,15 +690,56 @@ def _fit_immobility_models(
         Design matrices keyed by model name, each shape (n_time, n_features).
     neuron_spike_count : NDArray, shape (n_time,)
         Spike counts per time bin.
+    fitter : {"statsmodels", "jax"}
+        Backend. Ignored when ``prefitted`` is given.
+    prefitted : Mapping[str, Any], optional
+        This unit's already-fitted results keyed by model name, as
+        :func:`run_session` produces by fitting the whole session at once.
+        Nothing is fit when they are supplied.
 
     Returns
     -------
-    glm_results : dict[str, statsmodels GLMResults]
-        Fitted model results keyed by model name.
+    glm_results : dict[str, Any]
+        Fitted model results keyed by model name. Whatever the backend, each
+        exposes ``params``, ``deviance``, ``llf``, ``aic`` and ``df_resid``.
     glm_models : dict[str, statsmodels GLM]
-        Unfitted model objects keyed by model name.
+        Unfitted model objects keyed by model name. Empty unless the
+        statsmodels backend did the fitting -- the batched backend has no
+        per-unit model object, and nothing downstream reads one.
 
+    Raises
+    ------
+    ValueError
+        If ``prefitted`` is missing a design's results.
     """
+    if prefitted is not None:
+        missing = sorted(set(design_matrices) - set(prefitted))
+        if missing:
+            raise ValueError(f"prefitted results are missing models: {missing}")
+        return {name: prefitted[name] for name in design_matrices}, {}
+
+    _check_fitter(fitter)
+    if fitter == "jax":
+        batched = fit_models_batched(
+            {
+                model_name: design_matrix[fit_mask]
+                for model_name, design_matrix in design_matrices.items()
+            },
+            np.asarray(neuron_spike_count)[fit_mask][:, None],
+        )
+        if any(result.needs_reference_fit[0] for result in batched.values()):
+            # This neuron left the range where the two fitters agree on at
+            # least one design. The ladder's LR tests compare deviances across
+            # its models, so the whole ladder is refit with statsmodels rather
+            # than mixing the two backends within one neuron.
+            return _fit_immobility_models(
+                fit_mask,
+                design_matrices,
+                neuron_spike_count,
+                fitter="statsmodels",
+            )
+        return {name: result.for_unit(0) for name, result in batched.items()}, {}
+
     glm_models = {
         model_name: sm.GLM(
             neuron_spike_count[fit_mask],
@@ -578,6 +808,43 @@ def get_frac_explained_deviance(
     )
 
 
+def _fit_diagnostics(results: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Per-model fit summary, read the same way off either backend's results.
+
+    The quantities the fitter equivalence audit is run on: the parameters and
+    the three fit criteria, plus the rank and the convergence record that say
+    whether the numbers mean anything.
+
+    Parameters
+    ----------
+    results : Mapping[str, Any]
+        Fitted results keyed by model name (statsmodels ``GLMResults`` or
+        :class:`~continuum_swr_replay.analysis.pfc.batched_glm.UnitGLMResult`).
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+    """
+    diagnostics: dict[str, dict[str, Any]] = {}
+    for name, result in results.items():
+        history = getattr(result, "fit_history", None)
+        diagnostics[name] = {
+            "params": np.asarray(result.params, dtype=float),
+            "deviance": float(result.deviance),
+            "llf": float(result.llf),
+            "aic": float(result.aic),
+            "df_resid": float(result.df_resid),
+            "df_model": float(result.df_model),
+            "converged": bool(getattr(result, "converged", True)),
+            "n_iter": int(
+                getattr(result, "n_iter", None)
+                if getattr(result, "n_iter", None) is not None
+                else (history or {}).get("iteration", -1)
+            ),
+        }
+    return diagnostics
+
+
 def process_neuron(
     neuron_spike_times: NDArray,
     is_immobile: pd.Series,
@@ -588,6 +855,11 @@ def process_neuron(
     lag_time: NDArray,
     logger_name: str | None = None,
     fit_mask: pd.Series | None = None,
+    fitter: str = "statsmodels",
+    prefitted_immobility: Mapping[str, Any] | None = None,
+    prefitted_theta: tuple[Any, Any] | None = None,
+    design_ranks: Mapping[str, int] | None = None,
+    fit_diagnostics_out: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
@@ -690,6 +962,25 @@ def process_neuron(
         defines the *running* comparison (theta modulation and
         ``run_avg_firing_rate``): a bin outside the cohort is not running, so it
         must not be counted as such.
+    fitter : {"statsmodels", "jax"}, optional
+        Backend for the IRLS fits. Ignored for any model whose results are
+        supplied prefitted.
+    prefitted_immobility : Mapping[str, Any] | None, optional
+        This neuron's immobility-model results, keyed by model name, already
+        fit on ``fit_mask``. :func:`run_session` fits every neuron of a session
+        at once and passes each neuron's slice in here.
+    prefitted_theta : tuple | None, optional
+        ``(constant_result, theta_result)`` for the theta LR test, likewise
+        already fit. The regularized fit ``theta_mod`` and
+        ``theta_preferred_phase`` come from is always run here, in statsmodels.
+    design_ranks : Mapping[str, int] | None, optional
+        ``numpy.linalg.matrix_rank`` of each design on ``fit_mask``. The rank
+        is a property of the design, not of the neuron, so a session computes
+        it once; when omitted it is computed here, as it always was.
+    fit_diagnostics_out : dict | None, optional
+        When given, filled with this neuron's per-model fit summary (params,
+        deviance, llf, aic, rank, convergence). For the fitter equivalence
+        audit; never part of the shipped bundle.
 
     Returns
     -------
@@ -764,6 +1055,8 @@ def process_neuron(
         ) = test_theta_modulation(
             theta_phase, is_immobile, neuron_spike_count,
             sampling_frequency=sampling_frequency,
+            fitter=fitter,
+            prefitted=prefitted_theta,
         )
         neuron_stats["run_avg_firing_rate"] = (
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
@@ -784,8 +1077,14 @@ def process_neuron(
         )
 
         results, _ = _fit_immobility_models(
-            fit_mask, immobility_design_matrices, neuron_spike_count
+            fit_mask,
+            immobility_design_matrices,
+            neuron_spike_count,
+            fitter=fitter,
+            prefitted=prefitted_immobility,
         )
+        if fit_diagnostics_out is not None:
+            fit_diagnostics_out.update(_fit_diagnostics(results))
 
         # Check for silent non-convergence (NaN parameters from rank-deficient design)
         nan_models = [
@@ -817,7 +1116,15 @@ def process_neuron(
             if X_im.shape[0] == 0:
                 non_estimable_models.add(name)
                 continue
-            if np.linalg.matrix_rank(X_im) < X_im.shape[1]:
+            # The rank is a property of the design, which every neuron of a
+            # session shares, so a session-level caller supplies it rather than
+            # paying for the same decomposition once per neuron.
+            rank = (
+                np.linalg.matrix_rank(X_im)
+                if design_ranks is None
+                else design_ranks[name]
+            )
+            if rank < X_im.shape[1]:
                 non_estimable_models.add(name)
 
         ## Likelihood ratio tests
@@ -1720,6 +2027,181 @@ def make_matched_control_times(
     )
 
 
+def _prefit_session(
+    spike_times: list[NDArray],
+    time: NDArray,
+    is_immobile: pd.Series,
+    fit_mask: pd.Series,
+    immobility_design_matrices: Mapping[str, NDArray],
+    theta_phase: pd.Series,
+    logger: logging.Logger,
+) -> tuple[
+    list[dict[str, Any] | None],
+    list[tuple[Any, Any] | None],
+    dict[str, int],
+    int,
+]:
+    """Fit every neuron of a session against every design, in batches.
+
+    Parameters
+    ----------
+    spike_times : list of NDArray
+        Spike times per neuron, in seconds.
+    time : NDArray, shape (n_time,)
+        Time bin starts, the axis the designs and masks are on.
+    is_immobile, fit_mask : pd.Series of bool, shape (n_time,)
+        The running comparison's mask and the immobility models' mask.
+    immobility_design_matrices : Mapping[str, NDArray]
+        Full-length designs keyed by model name.
+    theta_phase : pd.Series
+        Theta phase timeseries, on its own clock.
+    logger : logging.Logger
+
+    Returns
+    -------
+    prefitted_immobility : list of (dict or None)
+        Per neuron, the immobility results keyed by model name. ``None`` for a
+        neuron the batched fitter handed back (see Notes) -- that neuron is fit
+        by statsmodels in :func:`process_neuron`, on the original path.
+    prefitted_theta : list of (tuple or None)
+        Per neuron, ``(constant_result, theta_result)`` for the theta LR test,
+        or ``None`` for the same neurons.
+    design_ranks : dict[str, int]
+        Rank of each design on the fit mask.
+    n_reference_fits : int
+        How many neurons were handed back.
+
+    Notes
+    -----
+    The batched fitter and statsmodels agree to ~1e-12 as long as the fitted
+    means stay within a few orders of magnitude of one another, and part
+    company once a fit separates -- a spline column with no spikes in its
+    support drives its coefficient toward infinity, the fitted means spread
+    past what the normal equations can carry, and the two solvers take
+    different steps. The batched fitter names those neurons and they are handed
+    back to statsmodels rather than reported, so their numbers are statsmodels'
+    own rather than an approximation of them. On the mPFC designs that is a
+    real minority of neurons, not a rarity: a session's log states how many.
+    """
+    counts = np.column_stack(
+        [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
+    ).astype(float)
+
+    fit_rows = np.asarray(fit_mask, dtype=bool)
+    logger.info(
+        "Batch-fitting %d neurons x %d models on %d bins...",
+        counts.shape[1],
+        len(immobility_design_matrices),
+        int(fit_rows.sum()),
+    )
+    batched = fit_models_batched(
+        {
+            model_name: design[fit_rows]
+            for model_name, design in immobility_design_matrices.items()
+        },
+        counts[fit_rows],
+    )
+    design_ranks = {name: result.rank for name, result in batched.items()}
+
+    # ``process_neuron`` derives the sampling frequency from the time axis and
+    # passes it to the theta design's reindex tolerance. Derive it the same way
+    # here, so the bins the batch is fit on are exactly the bins each neuron's
+    # own call will read the regularized fit off.
+    sampling_frequency = 1 / np.median(np.diff(time))
+    joint_mask, theta_design = build_theta_design(
+        theta_phase, is_immobile, sampling_frequency=sampling_frequency
+    )
+    logger.info(
+        "Batch-fitting %d neurons x 2 theta models on %d running bins...",
+        counts.shape[1],
+        int(joint_mask.sum()),
+    )
+    theta_constant, theta_full = _fit_theta_models(
+        theta_design, counts[joint_mask], fitter="jax"
+    )
+
+    prefitted_immobility: list[dict[str, Any] | None] = [
+        {name: result.for_unit(i) for name, result in batched.items()}
+        for i in range(counts.shape[1])
+    ]
+    prefitted_theta: list[tuple[Any, Any] | None] = [
+        (theta_constant.for_unit(i), theta_full.for_unit(i))
+        for i in range(counts.shape[1])
+    ]
+
+    hand_back = np.zeros(counts.shape[1], dtype=bool)
+    for result in (*batched.values(), theta_constant, theta_full):
+        hand_back |= result.needs_reference_fit
+    for index in np.flatnonzero(hand_back):
+        prefitted_immobility[index] = None
+        prefitted_theta[index] = None
+    if hand_back.any():
+        logger.info(
+            "%d of %d neurons left the range where the batched fitter and "
+            "statsmodels agree (a fit that did not converge, or fitted means "
+            "spread past what the normal equations carry); they are fit with "
+            "statsmodels instead",
+            int(hand_back.sum()),
+            counts.shape[1],
+        )
+    return (
+        prefitted_immobility,
+        prefitted_theta,
+        design_ranks,
+        int(hand_back.sum()),
+    )
+
+
+def _stack_fit_diagnostics(
+    per_neuron: list[dict[str, Any]],
+    design_matrices: Mapping[str, NDArray],
+) -> dict[str, dict[str, NDArray]]:
+    """Stack per-neuron fit summaries into per-model arrays over neurons.
+
+    A neuron whose fit failed contributes NaN/absent entries rather than
+    shortening the arrays, so every model's arrays are indexed by neuron.
+
+    Parameters
+    ----------
+    per_neuron : list of dict
+        One :func:`_fit_diagnostics` mapping per neuron; ``{}`` where the fit
+        raised.
+    design_matrices : Mapping[str, NDArray]
+        The designs, for the model names and their widths.
+
+    Returns
+    -------
+    dict[str, dict[str, NDArray]]
+    """
+    n_neurons = len(per_neuron)
+    stacked: dict[str, dict[str, NDArray]] = {}
+    for name, design in design_matrices.items():
+        n_features = design.shape[1]
+        params = np.full((n_neurons, n_features), np.nan)
+        scalars = {
+            key: np.full(n_neurons, np.nan)
+            for key in ("deviance", "llf", "aic", "df_resid", "df_model")
+        }
+        converged = np.zeros(n_neurons, dtype=bool)
+        n_iter = np.full(n_neurons, -1, dtype=int)
+        for index, diagnostics in enumerate(per_neuron):
+            record = (diagnostics or {}).get(name)
+            if record is None:
+                continue
+            params[index] = record["params"]
+            for key, values in scalars.items():
+                values[index] = record[key]
+            converged[index] = record["converged"]
+            n_iter[index] = record["n_iter"]
+        stacked[name] = {
+            "params": params,
+            "converged": converged,
+            "n_iter": n_iter,
+            **scalars,
+        }
+    return stacked
+
+
 def run_session(
     nwb_file_name: str,
     epoch_name: str,
@@ -1730,6 +2212,8 @@ def run_session(
     run_parallel: bool = True,
     stop_cohort: str = "at_well",
     cohort_stops: pd.DataFrame | None = None,
+    fitter: str = "jax",
+    fit_diagnostics_out: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
     """Run PFC GLM analysis for all neurons in a single session.
 
@@ -1773,6 +2257,18 @@ def run_session(
         The session's kept stops from
         :func:`~continuum_swr_replay.analysis.pfc.cohort.load_session_stop_cohort`.
         Required unless ``stop_cohort`` is ``"all_stops"``.
+    fitter : {"jax", "statsmodels"}
+        How the GLMs are fit. ``"jax"`` (default) fits every neuron of the
+        session against each design in one batched IRLS -- every neuron shares
+        the design, so the per-neuron loop was refitting the same weighted
+        cross-products once per neuron. ``"statsmodels"`` keeps the original
+        per-neuron path, unchanged, for the equivalence audit. The two
+        converge to the same point by construction (same starting values, same
+        step, same convergence rule); the audit measures how close on real
+        sessions.
+    fit_diagnostics_out : dict, optional
+        When given, filled with ``{model_name: {quantity: array over neurons}}``
+        for the fitter equivalence audit. Never part of the shipped bundle.
 
     Returns
     -------
@@ -1807,7 +2303,9 @@ def run_session(
         (``matched_control_seed``, ``n_matched_control``,
         ``n_matched_control_unplaced``). Written to the run's provenance
         sidecar so an artifact states both the population and the events it
-        was fit on.
+        was fit on. Also records how the models were fit: ``fitter``,
+        ``fitter_tol`` and, for the batched fitter, ``jax_backend`` and
+        ``jax_version``.
 
     Raises
     ------
@@ -1846,6 +2344,7 @@ def run_session(
     )
     from continuum_swr_replay.data_loaders import load_data
 
+    _check_fitter(fitter)
     if immobility_threshold != DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:
         raise ValueError(
             f"immobility_threshold={immobility_threshold!r} is not the "
@@ -1960,6 +2459,10 @@ def run_session(
         **bin_counts,
         **event_counts,
         **event_provenance,
+        **fitter_provenance(fitter),
+        # Filled in after the fits: how many neurons the batched fitter handed
+        # back to statsmodels. ``None`` when no neuron was fit at all.
+        "n_neurons_reference_fit": None,
         "matched_control_seed": control_seed,
         "n_matched_control": n_matched_control,
         "n_matched_control_unplaced": (
@@ -2009,13 +2512,61 @@ def run_session(
 
     n_neurons = len(data["spike_times"][brain_area])
     logger.info(
-        "Fitting GLMs for %d %s neurons (parallel=%s)...",
+        "Fitting GLMs for %d %s neurons (fitter=%s, parallel=%s)...",
         n_neurons,
         brain_area,
+        fitter,
         run_parallel,
     )
 
+    prefitted_immobility: list[dict[str, Any] | None] | None = None
+    prefitted_theta: list[tuple[Any, Any] | None] | None = None
+    design_ranks: dict[str, int] | None = None
+    n_reference_fits = 0
+    if fitter == "jax":
+        # Every neuron shares the design; only the response column differs. Fit
+        # the whole session against each design once, then hand each neuron its
+        # own slice. The rank of each design is a property of the design, so it
+        # is taken from the same batched fit rather than recomputed per neuron.
+        (
+            prefitted_immobility,
+            prefitted_theta,
+            design_ranks,
+            n_reference_fits,
+        ) = _prefit_session(
+            data["spike_times"][brain_area],
+            time,
+            is_immobile,
+            fit_mask,
+            immobility_design_matrices,
+            data["theta_phase"],
+            logger=logger,
+        )
+
+    def _neuron_args(index: int) -> dict[str, Any]:
+        prefit = None if prefitted_immobility is None else prefitted_immobility[index]
+        return {
+            "logger_name": logger.name,
+            "fit_mask": fit_mask,
+            # A neuron the batched fitter handed back has no prefit, and is fit
+            # here on the statsmodels path it would have taken all along.
+            "fitter": fitter if prefit is not None else "statsmodels",
+            "design_ranks": design_ranks,
+            "prefitted_immobility": prefit,
+            "prefitted_theta": (
+                None if prefitted_theta is None else prefitted_theta[index]
+            ),
+            "fit_diagnostics_out": (
+                None if fit_diagnostics_out is None else {}
+            ),
+        }
+
+    neuron_diagnostics: list[dict[str, Any]] = []
     if run_parallel:
+        if fit_diagnostics_out is not None:
+            # Dask returns copies, so an out-parameter cannot be filled through
+            # a delayed call; the diagnostics are a serial-path option.
+            raise ValueError("fit_diagnostics_out requires run_parallel=False")
         tasks = [
             dask.delayed(process_neuron)(
                 neuron_spike_times,
@@ -2025,10 +2576,9 @@ def run_session(
                 immobility_design_matrices,
                 spline_basis,
                 lag_time,
-                logger_name=logger.name,
-                fit_mask=fit_mask,
+                **_neuron_args(i),
             )
-            for neuron_spike_times in data["spike_times"][brain_area]
+            for i, neuron_spike_times in enumerate(data["spike_times"][brain_area])
         ]
 
         result = dask.compute(*tasks)
@@ -2036,6 +2586,8 @@ def run_session(
         result = []
         for i, neuron_spike_times in enumerate(data["spike_times"][brain_area]):
             logger.info("  Neuron %d/%d...", i + 1, n_neurons)
+            kwargs = _neuron_args(i)
+            neuron_diagnostics.append(kwargs["fit_diagnostics_out"])
             result.append(
                 process_neuron(
                     neuron_spike_times,
@@ -2045,10 +2597,14 @@ def run_session(
                     immobility_design_matrices,
                     spline_basis,
                     lag_time,
-                    logger_name=logger.name,
-                    fit_mask=fit_mask,
+                    **kwargs,
                 )
             )
+    if fit_diagnostics_out is not None:
+        fit_diagnostics_out.update(
+            _stack_fit_diagnostics(neuron_diagnostics, immobility_design_matrices)
+        )
+    cohort_info["n_neurons_reference_fit"] = n_reference_fits
 
     (
         neuron_stats_list,

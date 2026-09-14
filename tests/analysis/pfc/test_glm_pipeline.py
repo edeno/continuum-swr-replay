@@ -9,12 +9,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+import statsmodels.api as sm
 
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models,
     _make_design_matrices,
+    build_theta_design,
     create_conv_basis,
     create_lagged_signal,
+    fitter_provenance,
     get_frac_explained_deviance,
     get_frac_null_deviance,
     make_matched_control_times,
@@ -265,25 +268,36 @@ class TestMakeDesignMatrices:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("fitter", ["statsmodels", "jax"])
 class TestFitImmobilityModels:
     def test_returns_results_for_all_models(
-        self, simple_event_times, position_info, is_immobile, spike_count
+        self, simple_event_times, position_info, is_immobile, spike_count, fitter
     ):
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, models = _fit_immobility_models(is_immobile, dm, spike_count)
+        results, models = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter=fitter
+        )
 
         assert set(results.keys()) == set(dm.keys())
-        assert set(models.keys()) == set(dm.keys())
+        # The batched backend has no per-unit statsmodels model object, and
+        # nothing downstream reads one; a neuron it hands back to statsmodels
+        # comes with the full set, as the statsmodels path always does. Either
+        # way the model objects are all-or-nothing.
+        assert set(models.keys()) in (set(), set(dm.keys()))
+        if fitter == "statsmodels":
+            assert set(models.keys()) == set(dm.keys())
 
     def test_results_have_aic(
-        self, simple_event_times, position_info, is_immobile, spike_count
+        self, simple_event_times, position_info, is_immobile, spike_count, fitter
     ):
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count)
+        results, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter=fitter
+        )
 
         for name, result in results.items():
             assert hasattr(result, "aic"), f"{name} result missing AIC"
@@ -291,12 +305,14 @@ class TestFitImmobilityModels:
             assert np.isfinite(result.aic), f"{name} AIC is not finite"
 
     def test_more_complex_model_has_lower_or_equal_deviance(
-        self, simple_event_times, position_info, is_immobile, spike_count
+        self, simple_event_times, position_info, is_immobile, spike_count, fitter
     ):
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count)
+        results, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter=fitter
+        )
 
         # Nested: constant ⊂ SWR ⊂ SWR + non_local_no_SWR
         assert results["SWR"].deviance <= results["constant"].deviance + 1e-6
@@ -658,6 +674,269 @@ def cohort_stops(session_stops):
         "below are not testing the restriction they claim to"
     )
     return selected
+
+
+@pytest.fixture
+def dense_session():
+    """A 120 s epoch with enough events and spikes that no fit separates.
+
+    Every spline column then has hundreds of spikes in its support, which is
+    the regime a real session is in and the regime the batched fitter is for.
+    """
+    sampling_frequency = 500.0
+    time = np.arange(0, 120, 1.0 / sampling_frequency)
+    position_info = pd.DataFrame(
+        {"head_speed": np.full(len(time), 2.0)}, index=time
+    )
+    fit_mask = position_info.head_speed < 4.0
+
+    rng = np.random.default_rng(11)
+    onsets = np.sort(rng.uniform(1.0, 118.0, size=60))
+    event_times = {
+        "non_local": pd.DataFrame(
+            {"start_time": onsets, "end_time": onsets + 0.08}
+        ),
+        "non_local_SWR": pd.DataFrame(
+            {"start_time": onsets[::2], "end_time": onsets[::2] + 0.08}
+        ),
+        "non_local_no_SWR": pd.DataFrame(
+            {"start_time": onsets[1::2], "end_time": onsets[1::2] + 0.08}
+        ),
+        "SWR": pd.DataFrame(
+            {"start_time": onsets[::2] - 0.01, "end_time": onsets[::2] + 0.07}
+        ),
+        "matched_control": pd.DataFrame(
+            {"start_time": onsets + 0.4, "end_time": onsets + 0.48}
+        ),
+    }
+    design_matrices, _, _ = _make_design_matrices(
+        event_times,
+        position_info,
+        sampling_frequency=sampling_frequency,
+        lags=np.arange(-50, 51),
+    )
+    # ~20 Hz, so every basis column's support holds hundreds of spikes.
+    spike_count = rng.poisson(20.0 / sampling_frequency, size=len(time))
+    return design_matrices, spike_count, fit_mask
+
+
+class TestFitterEquivalence:
+    """The batched backend must not move a single shipped number.
+
+    ``process_neuron`` is the unit of comparison because it is what the
+    pipeline calls: everything the bundle carries -- the LR tests, the
+    fractional deviances, the AIC selections and the modulation curves -- is
+    derived from the fits, so comparing its outputs compares the fits through
+    every transformation they are read through.
+    """
+
+    #: Far tighter than the real-data audit's gate; on a synthetic session the
+    #: two backends differ only by the order float64 sums are accumulated in.
+    ATOL = 1e-8
+
+    def test_process_neuron_outputs_are_the_same_under_either_fitter(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+    ):
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        arguments = (
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
+        )
+
+        sm_stats, *sm_mods = process_neuron(*arguments, fitter="statsmodels")
+        jax_stats, *jax_mods = process_neuron(*arguments, fitter="jax")
+
+        assert set(sm_stats) == set(jax_stats)
+        for key, expected in sm_stats.items():
+            actual = jax_stats[key]
+            if isinstance(expected, str) or expected is None:
+                assert actual == expected, key
+            elif np.isnan(expected):
+                assert np.isnan(actual), key
+            else:
+                assert abs(actual - expected) < self.ATOL, key
+
+        for expected, actual in zip(sm_mods, jax_mods, strict=True):
+            np.testing.assert_allclose(actual, expected, atol=self.ATOL, rtol=0)
+
+    def test_the_batched_path_is_taken_and_agrees_on_a_well_posed_session(
+        self, dense_session
+    ):
+        """The comparison above on a session the batched fitter can vouch for.
+
+        The small fixture the other tests share has one to three events of each
+        class, so every spline column has a handful of spikes in its support
+        and the fits separate -- the batched fitter hands them all back and the
+        agreement is trivially exact. This fixture has enough events and enough
+        spikes that nothing is handed back, so it is the batched arithmetic
+        being compared, not statsmodels against itself.
+        """
+        from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+
+        design_matrices, spike_count, fit_mask = dense_session
+        counts = spike_count[np.asarray(fit_mask, dtype=bool)]
+        for name, design in design_matrices.items():
+            batched = fit_poisson_glms(
+                design[np.asarray(fit_mask, dtype=bool)], counts
+            )
+            assert not batched.needs_reference_fit.any(), (
+                f"{name} was handed back; the fixture is not well posed"
+            )
+
+        expected, _ = _fit_immobility_models(
+            fit_mask, design_matrices, spike_count, fitter="statsmodels"
+        )
+        actual, models = _fit_immobility_models(
+            fit_mask, design_matrices, spike_count, fitter="jax"
+        )
+        assert models == {}, "the batched path was not taken"
+
+        for name in design_matrices:
+            np.testing.assert_allclose(
+                actual[name].params,
+                expected[name].params,
+                atol=self.ATOL,
+                rtol=0,
+                err_msg=name,
+            )
+            assert abs(actual[name].deviance - expected[name].deviance) < self.ATOL
+            assert abs(actual[name].llf - expected[name].llf) < self.ATOL
+            assert abs(actual[name].aic - expected[name].aic) < self.ATOL
+
+    def test_the_two_backends_agree_model_by_model(
+        self, simple_event_times, position_info, is_immobile, spike_count
+    ):
+        dm, _, _ = _make_design_matrices(
+            simple_event_times, position_info, lags=np.arange(-50, 51)
+        )
+
+        expected, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter="statsmodels"
+        )
+        actual, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter="jax"
+        )
+
+        for name in dm:
+            np.testing.assert_allclose(
+                actual[name].params,
+                expected[name].params,
+                atol=self.ATOL,
+                rtol=0,
+                err_msg=name,
+            )
+            assert abs(actual[name].deviance - expected[name].deviance) < self.ATOL
+            assert abs(actual[name].aic - expected[name].aic) < self.ATOL
+            assert actual[name].df_resid == expected[name].df_resid
+
+    def test_theta_modulation_is_the_same_under_either_fitter(
+        self, theta_phase, is_immobile, spike_count
+    ):
+        expected = run_theta_modulation_test(
+            theta_phase, is_immobile, spike_count, fitter="statsmodels"
+        )
+        actual = run_theta_modulation_test(
+            theta_phase, is_immobile, spike_count, fitter="jax"
+        )
+
+        for expected_value, actual_value in zip(expected, actual, strict=True):
+            assert abs(actual_value - expected_value) < self.ATOL
+
+    def test_the_regularized_theta_fit_is_statsmodels_under_both(
+        self, theta_phase, is_immobile, spike_count
+    ):
+        """``theta_mod`` comes from the elastic net, whichever IRLS ran.
+
+        statsmodels' ``fit_regularized(alpha=1e-20, L1_wt=0)`` lands ~1e-4 from
+        the unregularized MLE, so substituting one for the other would move a
+        shipped column by more than the audit's tolerance. Both paths must call
+        the same estimator for it.
+        """
+        _, _, modulation, preferred_phase = run_theta_modulation_test(
+            theta_phase, is_immobile, spike_count, fitter="jax"
+        )
+        joint_mask, design = build_theta_design(theta_phase, is_immobile)
+        regularized = sm.GLM(
+            spike_count[joint_mask], design, family=sm.families.Poisson()
+        ).fit_regularized(alpha=1e-20, L1_wt=0.0)
+
+        assert modulation == pytest.approx(
+            np.hypot(regularized.params[1], regularized.params[2])
+        )
+        assert preferred_phase == pytest.approx(
+            np.arctan2(regularized.params[2], regularized.params[1])
+        )
+
+    def test_prefitted_results_are_used_rather_than_refit(
+        self, simple_event_times, position_info, is_immobile, spike_count
+    ):
+        """A session fits every neuron at once and hands each one its slice."""
+        dm, _, _ = _make_design_matrices(
+            simple_event_times, position_info, lags=np.arange(-50, 51)
+        )
+        prefitted, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter="jax"
+        )
+
+        results, models = _fit_immobility_models(
+            is_immobile, dm, spike_count, prefitted=prefitted
+        )
+
+        assert models == {}
+        assert all(results[name] is prefitted[name] for name in dm)
+
+    def test_missing_prefitted_models_are_refused(
+        self, simple_event_times, position_info, is_immobile, spike_count
+    ):
+        dm, _, _ = _make_design_matrices(
+            simple_event_times, position_info, lags=np.arange(-50, 51)
+        )
+        prefitted, _ = _fit_immobility_models(
+            is_immobile, dm, spike_count, fitter="jax"
+        )
+        del prefitted["SWR"]
+
+        with pytest.raises(ValueError, match="missing models"):
+            _fit_immobility_models(is_immobile, dm, spike_count, prefitted=prefitted)
+
+    def test_an_unknown_fitter_is_refused(
+        self, simple_event_times, position_info, is_immobile, spike_count
+    ):
+        dm, _, _ = _make_design_matrices(
+            simple_event_times, position_info, lags=np.arange(-50, 51)
+        )
+        with pytest.raises(ValueError, match="fitter must be one of"):
+            _fit_immobility_models(is_immobile, dm, spike_count, fitter="nemos")
+
+    def test_the_provenance_record_names_the_backend(self):
+        record = fitter_provenance("jax")
+        assert record["fitter"] == "jax"
+        assert record["fitter_tol"] == 1e-8
+        assert record["jax_backend"] in {"cpu", "gpu", "tpu"}
+        assert record["jax_version"]
+
+        record = fitter_provenance("statsmodels")
+        assert record["fitter"] == "statsmodels"
+        assert record["fitter_tol"] == 1e-8
+        assert record["jax_backend"] is None
+        assert record["jax_version"] is None
 
 
 class TestBuildSessionFitMask:
@@ -1055,6 +1334,7 @@ class TestCountEventsCoveringFitBins:
 
 
 class TestProcessNeuronFitMask:
+    @pytest.mark.parametrize("fitter", ["statsmodels", "jax"])
     def test_default_fit_mask_reproduces_the_immobility_fit_bit_for_bit(
         self,
         poisson_spike_times,
@@ -1064,6 +1344,7 @@ class TestProcessNeuronFitMask:
         simple_event_times,
         position_info,
         sampling_frequency,
+        fitter,
     ):
         dm, spline_basis, lag_time = _make_design_matrices(
             simple_event_times,
@@ -1080,6 +1361,7 @@ class TestProcessNeuronFitMask:
             dm,
             spline_basis,
             lag_time,
+            fitter=fitter,
         )
         explicit_stats, *explicit_mods = process_neuron(
             poisson_spike_times,
@@ -1090,6 +1372,7 @@ class TestProcessNeuronFitMask:
             spline_basis,
             lag_time,
             fit_mask=is_immobile,
+            fitter=fitter,
         )
 
         assert default_stats == explicit_stats

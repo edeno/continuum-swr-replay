@@ -39,6 +39,9 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --stop-cohort all_stops
 
 # Smoke one session into a scratch directory
 python run_pfc_analysis_bandit.py --max-sessions 1 --output-dir /tmp/pfc_smoke
+
+# Fit with the original per-neuron statsmodels IRLS (for the fitter audit)
+python run_pfc_analysis_bandit.py --fitter statsmodels --output-dir /tmp/pfc_sm
 """
 
 import json
@@ -72,6 +75,7 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
+from continuum_swr_replay.analysis.pfc.glm import FITTERS
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
@@ -186,6 +190,8 @@ def run_analysis(
     git_hash: str = "",
     stop_cohort: str = "at_well",
     output_dir: Path = PROCESSED_DATA_DIR,
+    fitter: str = "jax",
+    fit_diagnostics: bool = False,
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -212,6 +218,14 @@ def run_analysis(
         read on, or no stop restriction at all.
     output_dir : Path
         Directory the artifacts and their provenance sidecar are written to.
+    fitter : {"jax", "statsmodels"}
+        How the GLMs are fit. ``"jax"`` fits every neuron of the session
+        against each design at once; ``"statsmodels"`` keeps the original
+        per-neuron IRLS. The sidecar records which was used.
+    fit_diagnostics : bool
+        Also write ``<artifact>.fit_diagnostics.npz`` -- per-neuron, per-model
+        parameters and fit criteria, for the fitter equivalence audit. Forces
+        the serial neuron path.
     """
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
@@ -265,6 +279,9 @@ def run_analysis(
     logger.info(f"sampling_frequency: {sampling_frequency}")
     logger.info(f"immobility_threshold: {immobility_threshold}")
     logger.info(f"stop_cohort: {stop_cohort}")
+    logger.info(f"fitter: {fitter}")
+
+    diagnostics: dict | None = {} if fit_diagnostics else None
 
     try:
         logger.info(f"Processing {epoch_identifier}...")
@@ -293,6 +310,8 @@ def run_analysis(
             run_parallel=False,
             stop_cohort=stop_cohort,
             cohort_stops=cohort_stops,
+            fitter=fitter,
+            fit_diagnostics_out=diagnostics,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
@@ -321,6 +340,22 @@ def run_analysis(
             matched_control_modulation,
         )
 
+        if diagnostics:
+            # Per-neuron, per-model parameters and fit criteria. Not part of
+            # the bundle any reader loads; written only when a run asks for it,
+            # so the fitter audit can compare the two backends at the fit level
+            # rather than only through the statistics they feed.
+            diagnostics_file = save_file.with_suffix(".fit_diagnostics.npz")
+            np.savez_compressed(
+                diagnostics_file,
+                **{
+                    f"{model_name}|{quantity}": values
+                    for model_name, record in diagnostics.items()
+                    for quantity, values in record.items()
+                },
+            )
+            logger.info(f"Wrote fit diagnostics to {diagnostics_file}")
+
         # Every artifact states the population it was fit on: which cohort,
         # which stop table, and how many bins and events survived it.
         sidecar = write_fit_provenance(
@@ -336,6 +371,19 @@ def run_analysis(
                 "brain_area": brain_area,
                 "nwb_file_name": nwb_file_name,
                 "epoch_name": epoch_name,
+                # How the models were fit: which backend, the convergence
+                # tolerance both backends stop on, and -- for the batched
+                # fitter -- the device and JAX version, since a GPU and a CPU
+                # run are not bit-identical.
+                "fitter": cohort_info.get("fitter"),
+                "fitter_tol": cohort_info.get("fitter_tol"),
+                "jax_backend": cohort_info.get("jax_backend"),
+                "jax_version": cohort_info.get("jax_version"),
+                # Neurons the batched fitter handed back to statsmodels because
+                # their fits left the range the two agree over.
+                "n_neurons_reference_fit": cohort_info.get(
+                    "n_neurons_reference_fit"
+                ),
                 # Which events the fit describes, from the same block the skip
                 # check above compares against.
                 **event_inputs,
@@ -427,6 +475,28 @@ def get_command_line_arguments() -> Namespace:
         type=int,
         default=None,
         help="Process at most this many sessions (smoke runs)",
+    )
+    parser.add_argument(
+        "--fitter",
+        type=str,
+        default="jax",
+        choices=list(FITTERS),
+        help=(
+            "How the GLMs are fit (default: jax). 'jax' fits every neuron of "
+            "a session against each design in one batched IRLS; 'statsmodels' "
+            "keeps the original per-neuron IRLS, which is the control the "
+            "fitter equivalence audit is read against. Both use the same "
+            "starting values, step and convergence rule."
+        ),
+    )
+    parser.add_argument(
+        "--fit-diagnostics",
+        action="store_true",
+        help=(
+            "Also write <artifact>.fit_diagnostics.npz: per-neuron, per-model "
+            "parameters and fit criteria, for the fitter equivalence audit. "
+            "Forces the serial neuron path."
+        ),
     )
 
     return parser.parse_args()
@@ -537,7 +607,7 @@ def main() -> None:
 
     print(
         f"Processing {len(epoch_info)} sessions for {args.brain_area} "
-        f"(stop cohort: {args.stop_cohort})..."
+        f"(stop cohort: {args.stop_cohort}, fitter: {args.fitter})..."
     )
 
     if args.n_workers <= 1 or len(epoch_info) <= 1:
@@ -553,6 +623,8 @@ def main() -> None:
                 git_hash=git_hash,
                 stop_cohort=args.stop_cohort,
                 output_dir=args.output_dir,
+                fitter=args.fitter,
+                fit_diagnostics=args.fit_diagnostics,
             )
     else:
         cluster = LocalCluster(
@@ -576,6 +648,8 @@ def main() -> None:
                     git_hash=git_hash,
                     stop_cohort=args.stop_cohort,
                     output_dir=args.output_dir,
+                    fitter=args.fitter,
+                    fit_diagnostics=args.fit_diagnostics,
                 )
                 for epoch in epoch_info.itertuples()
             ]
